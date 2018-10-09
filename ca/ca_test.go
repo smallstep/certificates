@@ -268,6 +268,131 @@ ZEp7knvU2psWRw==
 	}
 }
 
+func TestCAProvisioners(t *testing.T) {
+	config, err := authority.LoadConfiguration("testdata/ca.json")
+	assert.FatalError(t, err)
+	ca, err := New(config)
+	assert.FatalError(t, err)
+
+	type ekt struct {
+		ca     *CA
+		status int
+		errMsg string
+	}
+	tests := map[string]func(t *testing.T) *ekt{
+		"ok": func(t *testing.T) *ekt {
+			return &ekt{
+				ca:     ca,
+				status: http.StatusOK,
+			}
+		},
+	}
+
+	for name, genTestCase := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := genTestCase(t)
+
+			rq, err := http.NewRequest("GET", fmt.Sprintf("/provisioners"), strings.NewReader(""))
+			assert.FatalError(t, err)
+			rr := httptest.NewRecorder()
+
+			tc.ca.srv.Handler.ServeHTTP(rr, rq)
+
+			if assert.Equals(t, rr.Code, tc.status) {
+				body := &ClosingBuffer{rr.Body}
+				if rr.Code < http.StatusBadRequest {
+					var (
+						resp   api.ProvisionersResponse
+						psList = config.AuthorityConfig.Provisioners
+					)
+
+					assert.FatalError(t, readJSON(body, &resp))
+					psMap := resp.Provisioners
+
+					maxks, found := psMap["max"]
+					assert.Fatal(t, found)
+					assert.Equals(t, maxks.Keys, []jose.JSONWebKey{*psList[0].Key, *psList[1].Key})
+
+					marianoks, found := psMap["mariano"]
+					assert.Fatal(t, found)
+					assert.Equals(t, marianoks.Keys, []jose.JSONWebKey{*psList[3].Key, *psList[4].Key})
+
+					stepcliks, found := psMap["step-cli"]
+					assert.Fatal(t, found)
+					assert.Equals(t, stepcliks.Keys, []jose.JSONWebKey{*psList[2].Key})
+				} else {
+					err := readError(body)
+					if len(tc.errMsg) == 0 {
+						assert.FatalError(t, errors.New("must validate response error"))
+					}
+					assert.HasPrefix(t, err.Error(), tc.errMsg)
+				}
+			}
+		})
+	}
+}
+
+func TestCAProvisionerEncryptedKey(t *testing.T) {
+	config, err := authority.LoadConfiguration("testdata/ca.json")
+	assert.FatalError(t, err)
+	ca, err := New(config)
+	assert.FatalError(t, err)
+
+	type ekt struct {
+		ca          *CA
+		kid         string
+		expectedKey string
+		status      int
+		errMsg      string
+	}
+	tests := map[string]func(t *testing.T) *ekt{
+		"not-found": func(t *testing.T) *ekt {
+			return &ekt{
+				ca:     ca,
+				kid:    "foo",
+				status: http.StatusNotFound,
+				errMsg: "Not Found",
+			}
+		},
+		"ok": func(t *testing.T) *ekt {
+			p := config.AuthorityConfig.Provisioners[2]
+			return &ekt{
+				ca:          ca,
+				kid:         p.Key.KeyID,
+				expectedKey: p.EncryptedKey,
+				status:      http.StatusOK,
+			}
+		},
+	}
+
+	for name, genTestCase := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := genTestCase(t)
+
+			rq, err := http.NewRequest("GET", fmt.Sprintf("/provisioners/%s/encrypted-key", tc.kid), strings.NewReader(""))
+			assert.FatalError(t, err)
+			rr := httptest.NewRecorder()
+
+			tc.ca.srv.Handler.ServeHTTP(rr, rq)
+
+			if assert.Equals(t, rr.Code, tc.status) {
+				body := &ClosingBuffer{rr.Body}
+				if rr.Code < http.StatusBadRequest {
+					var ek api.ProvisionerKeyResponse
+					assert.FatalError(t, readJSON(body, &ek))
+					assert.Equals(t, ek.Key, tc.expectedKey)
+				} else {
+					err := readError(body)
+					if len(tc.errMsg) == 0 {
+						assert.FatalError(t, errors.New("must validate response error"))
+					}
+					assert.HasPrefix(t, err.Error(), tc.errMsg)
+				}
+			}
+		})
+	}
+}
+
 func TestCARoot(t *testing.T) {
 	config, err := authority.LoadConfiguration("testdata/ca.json")
 	assert.FatalError(t, err)
