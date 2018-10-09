@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
+	"github.com/smallstep/cli/jose"
 )
 
 // Minimum and maximum validity of an end-entity (not root or intermediate) certificate.
@@ -45,6 +46,8 @@ type Authority interface {
 	Root(shasum string) (*x509.Certificate, error)
 	Sign(cr *x509.CertificateRequest, opts SignOptions, claims ...Claim) (*x509.Certificate, *x509.Certificate, error)
 	Renew(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
+	GetProvisioners() (map[string]*jose.JSONWebKeySet, error)
+	GetEncryptedKey(kid string) (string, error)
 }
 
 // Certificate wraps a *x509.Certificate and adds the json.Marshaler interface.
@@ -169,6 +172,18 @@ type SignRequest struct {
 	NotBefore time.Time          `json:"notBefore"`
 }
 
+// ProvisionersResponse is the response object that returns the map of
+// provisioners.
+type ProvisionersResponse struct {
+	Provisioners map[string]*jose.JSONWebKeySet `json:"provisioners"`
+}
+
+// ProvisionerKeyResponse is the response object that returns the encryptoed key
+// of a provisioner.
+type ProvisionerKeyResponse struct {
+	Key string `json:"key"`
+}
+
 // Validate checks the fields of the SignRequest and returns nil if they are ok
 // or an error if something is wrong.
 func (s *SignRequest) Validate() error {
@@ -233,6 +248,8 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/root/{sha}", h.Root)
 	r.MethodFunc("POST", "/sign", h.Sign)
 	r.MethodFunc("POST", "/renew", h.Renew)
+	r.MethodFunc("GET", "/provisioners", h.Provisioners)
+	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
 }
 
 // Health is an HTTP handler that returns the status of the server.
@@ -314,4 +331,25 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 		CaPEM:      Certificate{root},
 		TLSOptions: h.Authority.GetTLSOptions(),
 	})
+}
+
+// Provisioners returns the list of provisioners configured in the authority.
+func (h *caHandler) Provisioners(w http.ResponseWriter, r *http.Request) {
+	p, err := h.Authority.GetProvisioners()
+	if err != nil {
+		WriteError(w, InternalServerError(err))
+		return
+	}
+	JSON(w, &ProvisionersResponse{p})
+}
+
+// ProvisionerKey returns the encrypted key of a provisioner by it's key id.
+func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
+	kid := chi.URLParam(r, "kid")
+	key, err := h.Authority.GetEncryptedKey(kid)
+	if err != nil {
+		WriteError(w, NotFound(err))
+		return
+	}
+	JSON(w, &ProvisionerKeyResponse{key})
 }
