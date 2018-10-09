@@ -66,7 +66,6 @@ func (a *Authority) init() error {
 
 	// Decrypt and load intermediate public / private key pair.
 	if len(a.config.Password) > 0 {
-		//fmt.Printf("Decrypting intermediate... ")
 		a.intermediateIdentity, err = x509util.LoadIdentityFromDisk(
 			a.config.IntermediateCert,
 			a.config.IntermediateKey,
@@ -75,7 +74,6 @@ func (a *Authority) init() error {
 		if err != nil {
 			return err
 		}
-		//fmt.Printf("all done.\n")
 	} else {
 		a.intermediateIdentity, err = x509util.LoadIdentityFromDisk(a.config.IntermediateCert, a.config.IntermediateKey)
 		if err != nil {

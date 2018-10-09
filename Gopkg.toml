@@ -46,7 +46,7 @@ required = [
   name = "github.com/go-chi/chi"
 
 [[constraint]]
-  branch = "ca-commands-wip"
+  branch = "ca-commands"
   name = "github.com/smallstep/cli"
 
 [prune]

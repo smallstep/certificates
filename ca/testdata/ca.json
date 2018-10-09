@@ -1,7 +1,7 @@
 {
-    "root": "testdata/secrets/root_ca.crt",
-    "crt": "testdata/secrets/intermediate_ca.crt",
-    "key": "testdata/secrets/intermediate_ca_key",
+    "root": "../ca/testdata/secrets/root_ca.crt",
+    "crt": "../ca/testdata/secrets/intermediate_ca.crt",
+    "key": "../ca/testdata/secrets/intermediate_ca_key",
     "password": "password",
     "address": "127.0.0.1:0",
     "dnsNames": ["127.0.0.1"],
