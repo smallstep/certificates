@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -30,7 +31,8 @@ func (a *Authority) GetProvisioners() (map[string]*jose.JSONWebKeySet, error) {
 	a.provisionerIDIndex.Range(func(key, val interface{}) bool {
 		p, ok := val.(*Provisioner)
 		if !ok {
-			return false
+			log.Printf("authority.GetProvisioners: expected type *Provisioner, but got %T\n", val)
+			return true
 		}
 		ks, found := pks[p.Issuer]
 		if found {
