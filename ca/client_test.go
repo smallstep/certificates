@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/smallstep/ca-component/api"
+	"github.com/smallstep/cli/jose"
 )
 
 const (
@@ -381,6 +382,125 @@ func TestClient_Renew(t *testing.T) {
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.Renew() = %v, want %v", got, tt.response)
+				}
+			}
+		})
+	}
+}
+
+func TestClient_Provisioners(t *testing.T) {
+	ok := &api.ProvisionersResponse{
+		Provisioners: map[string]*jose.JSONWebKeySet{},
+	}
+	internalServerError := api.InternalServerError(fmt.Errorf("Internal Server Error"))
+
+	tests := []struct {
+		name         string
+		response     interface{}
+		responseCode int
+		wantErr      bool
+	}{
+		{"ok", ok, 200, false},
+		{"fail", internalServerError, 500, true},
+	}
+
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				expected := "/provisioners"
+				if req.RequestURI != expected {
+					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
+				}
+				w.WriteHeader(tt.responseCode)
+				api.JSON(w, tt.response)
+			})
+
+			got, err := c.Provisioners()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Client.Provisioners() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			switch {
+			case err != nil:
+				if got != nil {
+					t.Errorf("Client.Provisioners() = %v, want nil", got)
+				}
+				if !reflect.DeepEqual(err, tt.response) {
+					t.Errorf("Client.Provisioners() error = %v, want %v", err, tt.response)
+				}
+			default:
+				if !reflect.DeepEqual(got, tt.response) {
+					t.Errorf("Client.Provisioners() = %v, want %v", got, tt.response)
+				}
+			}
+		})
+	}
+}
+
+func TestClient_ProvisionerKey(t *testing.T) {
+	ok := &api.ProvisionerKeyResponse{
+		Key: "an encrypted key",
+	}
+	notFound := api.NotFound(fmt.Errorf("Not Found"))
+
+	tests := []struct {
+		name         string
+		kid          string
+		response     interface{}
+		responseCode int
+		wantErr      bool
+	}{
+		{"ok", "kid", ok, 200, false},
+		{"fail", "invalid", notFound, 500, true},
+	}
+
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				expected := "/provisioners/" + tt.kid + "/encrypted-key"
+				if req.RequestURI != expected {
+					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
+				}
+				w.WriteHeader(tt.responseCode)
+				api.JSON(w, tt.response)
+			})
+
+			got, err := c.ProvisionerKey(tt.kid)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Client.ProvisionerKey() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			switch {
+			case err != nil:
+				if got != nil {
+					t.Errorf("Client.ProvisionerKey() = %v, want nil", got)
+				}
+				if !reflect.DeepEqual(err, tt.response) {
+					t.Errorf("Client.ProvisionerKey() error = %v, want %v", err, tt.response)
+				}
+			default:
+				if !reflect.DeepEqual(got, tt.response) {
+					t.Errorf("Client.ProvisionerKey() = %v, want %v", got, tt.response)
 				}
 			}
 		})

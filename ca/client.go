@@ -286,6 +286,43 @@ func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
 	return &sign, nil
 }
 
+// Provisioners performs the provisioners request to the CA and returns the
+// api.ProvisionersResponse struct with a map of provisioners.
+func (c *Client) Provisioners() (*api.ProvisionersResponse, error) {
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/provisioners"})
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var provisioners api.ProvisionersResponse
+	if err := readJSON(resp.Body, &provisioners); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &provisioners, nil
+}
+
+// ProvisionerKey performs the request to the CA to get the encrypted key for
+// the given provisioner kid and returns the api.ProvisionerKeyResponse struct
+// with the encrypted key.
+func (c *Client) ProvisionerKey(kid string) (*api.ProvisionerKeyResponse, error) {
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/provisioners/" + kid + "/encrypted-key"})
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var key api.ProvisionerKeyResponse
+	if err := readJSON(resp.Body, &key); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &key, nil
+}
+
 // CreateSignRequest is a helper function that given an x509 OTT returns a
 // simple but secure sign request as well as the private key used.
 func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) {
