@@ -8,7 +8,54 @@ import (
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	stepJOSE "github.com/smallstep/cli/jose"
+	jose "gopkg.in/square/go-jose.v2"
 )
+
+func TestProvisionerValidate(t *testing.T) {
+	type ProvisionerValidateTest struct {
+		p   *Provisioner
+		err error
+	}
+	tests := map[string]func(*testing.T) ProvisionerValidateTest{
+		"fail-empty-issuer": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p:   &Provisioner{},
+				err: errors.New("provisioner issuer cannot be empty"),
+			}
+		},
+		"fail-empty-type": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p:   &Provisioner{Issuer: "foo"},
+				err: errors.New("provisioner type cannot be empty"),
+			}
+		},
+		"fail-empty-key": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p:   &Provisioner{Issuer: "foo", Type: "bar"},
+				err: errors.New("provisioner key cannot be empty"),
+			}
+		},
+		"ok": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &Provisioner{Issuer: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
+			}
+		},
+	}
+
+	for name, get := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := get(t)
+			err := tc.p.Validate()
+			if err != nil {
+				if assert.NotNil(t, tc.err) {
+					assert.Equals(t, tc.err.Error(), err.Error())
+				}
+			} else {
+				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
 
 func TestConfigValidate(t *testing.T) {
 	maxjwk, err := stepJOSE.ParseKey("testdata/secrets/max_pub.jwk")
@@ -233,19 +280,30 @@ func TestAuthConfigValidate(t *testing.T) {
 		err    error
 	}
 	tests := map[string]func(*testing.T) AuthConfigValidateTest{
-		"nil": func(t *testing.T) AuthConfigValidateTest {
+		"fail-nil-authconfig": func(t *testing.T) AuthConfigValidateTest {
 			return AuthConfigValidateTest{
 				ac:  nil,
 				err: errors.New("authority cannot be undefined"),
 			}
 		},
-		"empty-provisioners": func(t *testing.T) AuthConfigValidateTest {
+		"fail-empty-provisioners": func(t *testing.T) AuthConfigValidateTest {
 			return AuthConfigValidateTest{
 				ac:  &AuthConfig{},
 				err: errors.New("authority.provisioners cannot be empty"),
 			}
 		},
-		"empty-asn1dn-template": func(t *testing.T) AuthConfigValidateTest {
+		"fail-invalid-provisioners": func(t *testing.T) AuthConfigValidateTest {
+			return AuthConfigValidateTest{
+				ac: &AuthConfig{
+					Provisioners: []*Provisioner{
+						&Provisioner{Issuer: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
+						&Provisioner{Issuer: "foo", Key: &jose.JSONWebKey{}},
+					},
+				},
+				err: errors.New("provisioner type cannot be empty"),
+			}
+		},
+		"ok-empty-asn1dn-template": func(t *testing.T) AuthConfigValidateTest {
 			return AuthConfigValidateTest{
 				ac: &AuthConfig{
 					Provisioners: p,
@@ -253,7 +311,7 @@ func TestAuthConfigValidate(t *testing.T) {
 				asn1dn: x509util.ASN1DN{},
 			}
 		},
-		"custom-asn1dn": func(t *testing.T) AuthConfigValidateTest {
+		"ok-custom-asn1dn": func(t *testing.T) AuthConfigValidateTest {
 			return AuthConfigValidateTest{
 				ac: &AuthConfig{
 					Provisioners: p,

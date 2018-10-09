@@ -59,6 +59,22 @@ type Provisioner struct {
 	EncryptedKey string           `json:"encryptedKey,omitempty"`
 }
 
+// Validate validates a provisioner.
+func (p *Provisioner) Validate() error {
+	switch {
+	case p.Issuer == "":
+		return errors.New("provisioner issuer cannot be empty")
+
+	case p.Type == "":
+		return errors.New("provisioner type cannot be empty")
+
+	case p.Key == nil:
+		return errors.New("provisioner key cannot be empty")
+	}
+
+	return nil
+}
+
 // Config represents the CA configuration and it's mapped to a JSON object.
 type Config struct {
 	Root             string              `json:"root"`
@@ -83,17 +99,22 @@ type AuthConfig struct {
 
 // Validate validates the authority configuration.
 func (c *AuthConfig) Validate() error {
-	switch {
-	case c == nil:
+	if c == nil {
 		return errors.New("authority cannot be undefined")
-	case len(c.Provisioners) == 0:
-		return errors.New("authority.provisioners cannot be empty")
-	default:
-		if c.Template == nil {
-			c.Template = &x509util.ASN1DN{}
-		}
-		return nil
 	}
+	if len(c.Provisioners) == 0 {
+		return errors.New("authority.provisioners cannot be empty")
+	}
+	for _, p := range c.Provisioners {
+		err := p.Validate()
+		if err != nil {
+			return err
+		}
+	}
+	if c.Template == nil {
+		c.Template = &x509util.ASN1DN{}
+	}
+	return nil
 }
 
 // LoadConfiguration parses the given filename in JSON format and returns the
