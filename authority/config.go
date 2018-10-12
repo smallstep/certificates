@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/ca-component/provisioner"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
-	jose "gopkg.in/square/go-jose.v2"
 )
 
 // DefaultTLSOptions represents the default TLS version as well as the cipher
@@ -51,30 +51,6 @@ func (d *duration) UnmarshalJSON(data []byte) (err error) {
 	return
 }
 
-// Provisioner - authorized entity that can sign tokens necessary for signature requests.
-type Provisioner struct {
-	Issuer       string           `json:"issuer,omitempty"`
-	Type         string           `json:"type,omitempty"`
-	Key          *jose.JSONWebKey `json:"key,omitempty"`
-	EncryptedKey string           `json:"encryptedKey,omitempty"`
-}
-
-// Validate validates a provisioner.
-func (p *Provisioner) Validate() error {
-	switch {
-	case p.Issuer == "":
-		return errors.New("provisioner issuer cannot be empty")
-
-	case p.Type == "":
-		return errors.New("provisioner type cannot be empty")
-
-	case p.Key == nil:
-		return errors.New("provisioner key cannot be empty")
-	}
-
-	return nil
-}
-
 // Config represents the CA configuration and it's mapped to a JSON object.
 type Config struct {
 	Root             string              `json:"root"`
@@ -91,10 +67,10 @@ type Config struct {
 
 // AuthConfig represents the configuration options for the authority.
 type AuthConfig struct {
-	Provisioners    []*Provisioner   `json:"provisioners,omitempty"`
-	Template        *x509util.ASN1DN `json:"template,omitempty"`
-	MinCertDuration *duration        `json:"minCertDuration,omitempty"`
-	MaxCertDuration *duration        `json:"maxCertDuration,omitempty"`
+	Provisioners    []*provisioner.Provisioner `json:"provisioners,omitempty"`
+	Template        *x509util.ASN1DN           `json:"template,omitempty"`
+	MinCertDuration *duration                  `json:"minCertDuration,omitempty"`
+	MaxCertDuration *duration                  `json:"maxCertDuration,omitempty"`
 }
 
 // Validate validates the authority configuration.

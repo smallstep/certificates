@@ -301,13 +301,62 @@ func TestCAProvisioners(t *testing.T) {
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}
 				if rr.Code < http.StatusBadRequest {
+					var resp api.ProvisionersResponse
+
+					assert.FatalError(t, readJSON(body, &resp))
+					assert.Equals(t, config.AuthorityConfig.Provisioners, resp.Provisioners)
+				} else {
+					err := readError(body)
+					if len(tc.errMsg) == 0 {
+						assert.FatalError(t, errors.New("must validate response error"))
+					}
+					assert.HasPrefix(t, err.Error(), tc.errMsg)
+				}
+			}
+		})
+	}
+}
+
+func TestCAJWKSetByIssuer(t *testing.T) {
+	config, err := authority.LoadConfiguration("testdata/ca.json")
+	assert.FatalError(t, err)
+	ca, err := New(config)
+	assert.FatalError(t, err)
+
+	type ekt struct {
+		ca     *CA
+		status int
+		errMsg string
+	}
+	tests := map[string]func(t *testing.T) *ekt{
+		"ok": func(t *testing.T) *ekt {
+			return &ekt{
+				ca:     ca,
+				status: http.StatusOK,
+			}
+		},
+	}
+
+	for name, genTestCase := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := genTestCase(t)
+
+			rq, err := http.NewRequest("GET", fmt.Sprintf("/provisioners/jwk-set-by-issuer"), strings.NewReader(""))
+			assert.FatalError(t, err)
+			rr := httptest.NewRecorder()
+
+			tc.ca.srv.Handler.ServeHTTP(rr, rq)
+
+			if assert.Equals(t, rr.Code, tc.status) {
+				body := &ClosingBuffer{rr.Body}
+				if rr.Code < http.StatusBadRequest {
 					var (
-						resp   api.ProvisionersResponse
+						resp   api.JWKSetByIssuerResponse
 						psList = config.AuthorityConfig.Provisioners
 					)
 
 					assert.FatalError(t, readJSON(body, &resp))
-					psMap := resp.Provisioners
+					psMap := resp.Map
 
 					maxks, found := psMap["max"]
 					assert.Fatal(t, found)

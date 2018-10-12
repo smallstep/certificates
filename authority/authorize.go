@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/ca-component/api"
+	"github.com/smallstep/ca-component/provisioner"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -63,7 +64,7 @@ func (a *Authority) Authorize(ott string) ([]api.Claim, error) {
 		return nil, &apiError{errors.Errorf("Provisioner with KeyID %s could not be found", kid),
 			http.StatusUnauthorized, errContext}
 	}
-	p, ok := val.(*Provisioner)
+	p, ok := val.(*provisioner.Provisioner)
 	if !ok {
 		return nil, &apiError{errors.Errorf("stored value is not a *Provisioner"),
 			http.StatusInternalServerError, context{}}

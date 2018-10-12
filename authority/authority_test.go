@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/ca-component/provisioner"
 	stepJOSE "github.com/smallstep/cli/jose"
 )
 
@@ -15,7 +16,7 @@ func testAuthority(t *testing.T) *Authority {
 	assert.FatalError(t, err)
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
-	p := []*Provisioner{
+	p := []*provisioner.Provisioner{
 		{
 			Issuer: "Max",
 			Type:   "JWK",

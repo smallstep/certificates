@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+	"github.com/smallstep/ca-component/provisioner"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
@@ -46,7 +47,7 @@ type Authority interface {
 	Root(shasum string) (*x509.Certificate, error)
 	Sign(cr *x509.CertificateRequest, opts SignOptions, claims ...Claim) (*x509.Certificate, *x509.Certificate, error)
 	Renew(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	GetProvisioners() (map[string]*jose.JSONWebKeySet, error)
+	GetProvisioners() ([]*provisioner.Provisioner, error)
 	GetEncryptedKey(kid string) (string, error)
 }
 
@@ -172,10 +173,16 @@ type SignRequest struct {
 	NotBefore time.Time          `json:"notBefore"`
 }
 
-// ProvisionersResponse is the response object that returns the map of
+// ProvisionersResponse is the response object that returns the list of
 // provisioners.
 type ProvisionersResponse struct {
-	Provisioners map[string]*jose.JSONWebKeySet `json:"provisioners"`
+	Provisioners []*provisioner.Provisioner `json:"provisioners"`
+}
+
+// JWKSetByIssuerResponse is the response object that returns the map of
+// provisioners.
+type JWKSetByIssuerResponse struct {
+	Map map[string]*jose.JSONWebKeySet `json:"map"`
 }
 
 // ProvisionerKeyResponse is the response object that returns the encryptoed key
@@ -250,6 +257,7 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("POST", "/renew", h.Renew)
 	r.MethodFunc("GET", "/provisioners", h.Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
+	r.MethodFunc("GET", "/provisioners/jwk-set-by-issuer", h.JWKSetByIssuer)
 }
 
 // Health is an HTTP handler that returns the status of the server.
@@ -352,4 +360,24 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, &ProvisionerKeyResponse{key})
+}
+
+func (h *caHandler) JWKSetByIssuer(w http.ResponseWriter, r *http.Request) {
+	m := map[string]*jose.JSONWebKeySet{}
+	ps, err := h.Authority.GetProvisioners()
+	if err != nil {
+		WriteError(w, InternalServerError(err))
+		return
+	}
+	for _, p := range ps {
+		ks, found := m[p.Issuer]
+		if found {
+			ks.Keys = append(ks.Keys, *p.Key)
+		} else {
+			ks = new(jose.JSONWebKeySet)
+			ks.Keys = []jose.JSONWebKey{*p.Key}
+			m[p.Issuer] = ks
+		}
+	}
+	JSON(w, &JWKSetByIssuerResponse{m})
 }

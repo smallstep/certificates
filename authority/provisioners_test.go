@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/cli/jose"
+	"github.com/smallstep/ca-component/provisioner"
 )
 
 func TestGetEncryptedKey(t *testing.T) {
@@ -73,7 +73,7 @@ func TestGetEncryptedKey(t *testing.T) {
 				if assert.Nil(t, tc.err) {
 					val, ok := tc.a.provisionerIDIndex.Load(tc.kid)
 					assert.Fatal(t, ok)
-					p, ok := val.(*Provisioner)
+					p, ok := val.(*provisioner.Provisioner)
 					assert.Fatal(t, ok)
 					assert.Equals(t, p.EncryptedKey, ek)
 				}
@@ -115,19 +115,7 @@ func TestGetProvisioners(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					var cps = tc.a.config.AuthorityConfig.Provisioners
-
-					maxks, found := ps["max"]
-					assert.Fatal(t, found)
-					assert.Equals(t, maxks.Keys, []jose.JSONWebKey{*cps[0].Key, *cps[1].Key})
-
-					marianoks, found := ps["mariano"]
-					assert.Fatal(t, found)
-					assert.Equals(t, marianoks.Keys, []jose.JSONWebKey{*cps[3].Key, *cps[4].Key})
-
-					stepcliks, found := ps["step-cli"]
-					assert.Fatal(t, found)
-					assert.Equals(t, stepcliks.Keys, []jose.JSONWebKey{*cps[2].Key})
+					assert.Equals(t, ps, tc.a.config.AuthorityConfig.Provisioners)
 				}
 			}
 		})

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/smallstep/ca-component/api"
-	"github.com/smallstep/cli/jose"
+	"github.com/smallstep/ca-component/provisioner"
 )
 
 const (
@@ -390,6 +390,66 @@ func TestClient_Renew(t *testing.T) {
 
 func TestClient_Provisioners(t *testing.T) {
 	ok := &api.ProvisionersResponse{
+		Provisioners: []*provisioner.Provisioner{},
+	}
+	internalServerError := api.InternalServerError(fmt.Errorf("Internal Server Error"))
+
+	tests := []struct {
+		name         string
+		response     interface{}
+		responseCode int
+		wantErr      bool
+	}{
+		{"ok", ok, 200, false},
+		{"fail", internalServerError, 500, true},
+	}
+
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				expected := "/provisioners"
+				if req.RequestURI != expected {
+					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
+				}
+				w.WriteHeader(tt.responseCode)
+				api.JSON(w, tt.response)
+			})
+
+			got, err := c.Provisioners()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Client.Provisioners() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			switch {
+			case err != nil:
+				if got != nil {
+					t.Errorf("Client.Provisioners() = %v, want nil", got)
+				}
+				if !reflect.DeepEqual(err, tt.response) {
+					t.Errorf("Client.Provisioners() error = %v, want %v", err, tt.response)
+				}
+			default:
+				if !reflect.DeepEqual(got, tt.response) {
+					t.Errorf("Client.Provisioners() = %v, want %v", got, tt.response)
+				}
+			}
+		})
+	}
+}
+
+/*
+func TestClient_Provisioners(t *testing.T) {
+	ok := &api.ProvisionersResponse{
 		Provisioners: map[string]*jose.JSONWebKeySet{},
 	}
 	internalServerError := api.InternalServerError(fmt.Errorf("Internal Server Error"))
@@ -446,6 +506,7 @@ func TestClient_Provisioners(t *testing.T) {
 		})
 	}
 }
+*/
 
 func TestClient_ProvisionerKey(t *testing.T) {
 	ok := &api.ProvisionerKeyResponse{

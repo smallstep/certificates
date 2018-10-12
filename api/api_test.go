@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+	"github.com/smallstep/ca-component/provisioner"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/jose"
 )
@@ -397,7 +398,7 @@ type mockAuthority struct {
 	root            func(shasum string) (*x509.Certificate, error)
 	sign            func(cr *x509.CertificateRequest, opts SignOptions, claims ...Claim) (*x509.Certificate, *x509.Certificate, error)
 	renew           func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	getProvisioners func() (map[string]*jose.JSONWebKeySet, error)
+	getProvisioners func() ([]*provisioner.Provisioner, error)
 	getEncryptedKey func(kid string) (string, error)
 }
 
@@ -444,11 +445,11 @@ func (m *mockAuthority) Renew(cert *x509.Certificate) (*x509.Certificate, *x509.
 	return m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) GetProvisioners() (map[string]*jose.JSONWebKeySet, error) {
+func (m *mockAuthority) GetProvisioners() ([]*provisioner.Provisioner, error) {
 	if m.getProvisioners != nil {
 		return m.getProvisioners()
 	}
-	return m.ret1.(map[string]*jose.JSONWebKeySet), m.err
+	return m.ret1.([]*provisioner.Provisioner), m.err
 }
 
 func (m *mockAuthority) GetEncryptedKey(kid string) (string, error) {
@@ -670,6 +671,82 @@ func Test_caHandler_Renew(t *testing.T) {
 	}
 }
 
+func Test_caHandler_JWKSetByIssuer(t *testing.T) {
+	type fields struct {
+		Authority Authority
+	}
+	type args struct {
+		w http.ResponseWriter
+		r *http.Request
+	}
+
+	req, err := http.NewRequest("GET", "http://example.com/provisioners/jwk-set-by-issuer", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var key jose.JSONWebKey
+	if err := json.Unmarshal([]byte(pubKey), &key); err != nil {
+		t.Fatal(err)
+	}
+
+	p := []*provisioner.Provisioner{
+		&provisioner.Provisioner{
+			Issuer: "p1",
+			Key:    &key,
+		},
+		&provisioner.Provisioner{
+			Issuer: "p2",
+			Key:    &key,
+		},
+	}
+
+	tests := []struct {
+		name       string
+		fields     fields
+		args       args
+		statusCode int
+	}{
+		{"ok", fields{&mockAuthority{ret1: p}}, args{httptest.NewRecorder(), req}, 200},
+		{"fail", fields{&mockAuthority{ret1: p, err: fmt.Errorf("the error")}}, args{httptest.NewRecorder(), req}, 500},
+	}
+
+	expectedKey, err := json.Marshal(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := []byte(`{"map":{"p1":{"keys":[` + string(expectedKey) + `]},"p2":{"keys":[` + string(expectedKey) + `]}}}`)
+	expectedError := []byte(`{"status":500,"message":"Internal Server Error"}`)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := &caHandler{
+				Authority: tt.fields.Authority,
+			}
+			h.JWKSetByIssuer(tt.args.w, tt.args.r)
+
+			rec := tt.args.w.(*httptest.ResponseRecorder)
+			res := rec.Result()
+			if res.StatusCode != tt.statusCode {
+				t.Errorf("caHandler.JWKSetByIssuer StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
+			}
+			body, err := ioutil.ReadAll(res.Body)
+			res.Body.Close()
+			if err != nil {
+				t.Errorf("caHandler.JWKSetByIssuer unexpected error = %v", err)
+			}
+			if tt.statusCode < http.StatusBadRequest {
+				if !bytes.Equal(bytes.TrimSpace(body), expected) {
+					t.Errorf("caHandler.JWKSetByIssuer Body = %s, wants %s", body, expected)
+				}
+			} else {
+				if !bytes.Equal(bytes.TrimSpace(body), expectedError) {
+					t.Errorf("caHandler.JWKSetByIssuer Body = %s, wants %s", body, expectedError)
+				}
+			}
+		})
+	}
+}
+
 func Test_caHandler_Provisioners(t *testing.T) {
 	type fields struct {
 		Authority Authority
@@ -689,14 +766,21 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p := map[string]*jose.JSONWebKeySet{
-		"p1": &jose.JSONWebKeySet{
-			Keys: []jose.JSONWebKey{key},
+	p := []*provisioner.Provisioner{
+		&provisioner.Provisioner{
+			Type:         "JWK",
+			Issuer:       "max",
+			EncryptedKey: "abc",
+			Key:          &key,
 		},
-		"p2": &jose.JSONWebKeySet{
-			Keys: []jose.JSONWebKey{key},
+		&provisioner.Provisioner{
+			Type:         "JWK",
+			Issuer:       "mariano",
+			EncryptedKey: "def",
+			Key:          &key,
 		},
 	}
+	pr := ProvisionersResponse{p}
 
 	tests := []struct {
 		name       string
@@ -708,11 +792,11 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		{"fail", fields{&mockAuthority{ret1: p, err: fmt.Errorf("the error")}}, args{httptest.NewRecorder(), req}, 500},
 	}
 
-	expectedKey, err := json.Marshal(key)
+	expected, err := json.Marshal(pr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := []byte(`{"provisioners":{"p1":{"keys":[` + string(expectedKey) + `]},"p2":{"keys":[` + string(expectedKey) + `]}}}`)
+
 	expectedError := []byte(`{"status":500,"message":"Internal Server Error"}`)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

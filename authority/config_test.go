@@ -5,57 +5,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/ca-component/provisioner"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	stepJOSE "github.com/smallstep/cli/jose"
 	jose "gopkg.in/square/go-jose.v2"
 )
-
-func TestProvisionerValidate(t *testing.T) {
-	type ProvisionerValidateTest struct {
-		p   *Provisioner
-		err error
-	}
-	tests := map[string]func(*testing.T) ProvisionerValidateTest{
-		"fail-empty-issuer": func(t *testing.T) ProvisionerValidateTest {
-			return ProvisionerValidateTest{
-				p:   &Provisioner{},
-				err: errors.New("provisioner issuer cannot be empty"),
-			}
-		},
-		"fail-empty-type": func(t *testing.T) ProvisionerValidateTest {
-			return ProvisionerValidateTest{
-				p:   &Provisioner{Issuer: "foo"},
-				err: errors.New("provisioner type cannot be empty"),
-			}
-		},
-		"fail-empty-key": func(t *testing.T) ProvisionerValidateTest {
-			return ProvisionerValidateTest{
-				p:   &Provisioner{Issuer: "foo", Type: "bar"},
-				err: errors.New("provisioner key cannot be empty"),
-			}
-		},
-		"ok": func(t *testing.T) ProvisionerValidateTest {
-			return ProvisionerValidateTest{
-				p: &Provisioner{Issuer: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
-			}
-		},
-	}
-
-	for name, get := range tests {
-		t.Run(name, func(t *testing.T) {
-			tc := get(t)
-			err := tc.p.Validate()
-			if err != nil {
-				if assert.NotNil(t, tc.err) {
-					assert.Equals(t, tc.err.Error(), err.Error())
-				}
-			} else {
-				assert.Nil(t, tc.err)
-			}
-		})
-	}
-}
 
 func TestConfigValidate(t *testing.T) {
 	maxjwk, err := stepJOSE.ParseKey("testdata/secrets/max_pub.jwk")
@@ -63,7 +18,7 @@ func TestConfigValidate(t *testing.T) {
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	ac := &AuthConfig{
-		Provisioners: []*Provisioner{
+		Provisioners: []*provisioner.Provisioner{
 			{
 				Issuer: "Max",
 				Type:   "JWK",
@@ -261,7 +216,7 @@ func TestAuthConfigValidate(t *testing.T) {
 	assert.FatalError(t, err)
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
-	p := []*Provisioner{
+	p := []*provisioner.Provisioner{
 		{
 			Issuer: "Max",
 			Type:   "JWK",
@@ -295,9 +250,9 @@ func TestAuthConfigValidate(t *testing.T) {
 		"fail-invalid-provisioners": func(t *testing.T) AuthConfigValidateTest {
 			return AuthConfigValidateTest{
 				ac: &AuthConfig{
-					Provisioners: []*Provisioner{
-						&Provisioner{Issuer: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
-						&Provisioner{Issuer: "foo", Key: &jose.JSONWebKey{}},
+					Provisioners: []*provisioner.Provisioner{
+						{Issuer: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
+						{Issuer: "foo", Key: &jose.JSONWebKey{}},
 					},
 				},
 				err: errors.New("provisioner type cannot be empty"),
