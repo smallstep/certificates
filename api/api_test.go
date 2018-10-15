@@ -691,11 +691,11 @@ func Test_caHandler_JWKSetByIssuer(t *testing.T) {
 	}
 
 	p := []*provisioner.Provisioner{
-		&provisioner.Provisioner{
+		{
 			Issuer: "p1",
 			Key:    &key,
 		},
-		&provisioner.Provisioner{
+		{
 			Issuer: "p2",
 			Key:    &key,
 		},
@@ -767,13 +767,13 @@ func Test_caHandler_Provisioners(t *testing.T) {
 	}
 
 	p := []*provisioner.Provisioner{
-		&provisioner.Provisioner{
+		{
 			Type:         "JWK",
 			Issuer:       "max",
 			EncryptedKey: "abc",
 			Key:          &key,
 		},
-		&provisioner.Provisioner{
+		{
 			Type:         "JWK",
 			Issuer:       "mariano",
 			EncryptedKey: "def",
