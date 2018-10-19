@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/ca-component/provisioner"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	stepJOSE "github.com/smallstep/cli/jose"
@@ -18,7 +17,7 @@ func TestConfigValidate(t *testing.T) {
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	ac := &AuthConfig{
-		Provisioners: []*provisioner.Provisioner{
+		Provisioners: []*Provisioner{
 			{
 				Issuer: "Max",
 				Type:   "JWK",
@@ -216,7 +215,7 @@ func TestAuthConfigValidate(t *testing.T) {
 	assert.FatalError(t, err)
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
-	p := []*provisioner.Provisioner{
+	p := []*Provisioner{
 		{
 			Issuer: "Max",
 			Type:   "JWK",
@@ -250,7 +249,7 @@ func TestAuthConfigValidate(t *testing.T) {
 		"fail-invalid-provisioners": func(t *testing.T) AuthConfigValidateTest {
 			return AuthConfigValidateTest{
 				ac: &AuthConfig{
-					Provisioners: []*provisioner.Provisioner{
+					Provisioners: []*Provisioner{
 						{Issuer: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
 						{Issuer: "foo", Key: &jose.JSONWebKey{}},
 					},

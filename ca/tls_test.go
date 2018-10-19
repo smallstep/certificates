@@ -45,7 +45,7 @@ func generateOTT(subject string) string {
 		Issuer:    "mariano",
 		NotBefore: jwt.NewNumericDate(now),
 		Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
-		Audience:  []string{"step-certificate-authority"},
+		Audience:  []string{"https://127.0.0.1:0/sign"},
 	}
 	raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
 	if err != nil {

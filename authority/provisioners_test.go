@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/ca-component/provisioner"
 )
 
 func TestGetEncryptedKey(t *testing.T) {
@@ -73,7 +72,7 @@ func TestGetEncryptedKey(t *testing.T) {
 				if assert.Nil(t, tc.err) {
 					val, ok := tc.a.provisionerIDIndex.Load(tc.kid)
 					assert.Fatal(t, ok)
-					p, ok := val.(*provisioner.Provisioner)
+					p, ok := val.(*Provisioner)
 					assert.Fatal(t, ok)
 					assert.Equals(t, p.EncryptedKey, ek)
 				}

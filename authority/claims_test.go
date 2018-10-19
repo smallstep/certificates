@@ -1,35 +1,34 @@
 package authority
 
 import (
-	"crypto/x509"
 	"crypto/x509/pkix"
 	"net"
 	"testing"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/ca-component/api"
+	x509 "github.com/smallstep/cli/pkg/x509"
 )
 
 func TestCommonNameClaim_Valid(t *testing.T) {
 	tests := map[string]struct {
-		cnc api.Claim
-		crt *x509.CertificateRequest
+		cnc certClaim
+		crt *x509.Certificate
 		err error
 	}{
 		"empty-common-name": {
 			cnc: &commonNameClaim{name: "foo"},
-			crt: &x509.CertificateRequest{},
+			crt: &x509.Certificate{},
 			err: errors.New("common name cannot be empty"),
 		},
 		"wrong-common-name": {
 			cnc: &commonNameClaim{name: "foo"},
-			crt: &x509.CertificateRequest{Subject: pkix.Name{CommonName: "bar"}},
+			crt: &x509.Certificate{Subject: pkix.Name{CommonName: "bar"}},
 			err: errors.New("common name claim failed - got bar, want foo"),
 		},
 		"ok": {
 			cnc: &commonNameClaim{name: "foo"},
-			crt: &x509.CertificateRequest{Subject: pkix.Name{CommonName: "foo"}},
+			crt: &x509.Certificate{Subject: pkix.Name{CommonName: "foo"}},
 		},
 	}
 
@@ -49,27 +48,27 @@ func TestCommonNameClaim_Valid(t *testing.T) {
 
 func TestIPAddressesClaim_Valid(t *testing.T) {
 	tests := map[string]struct {
-		iac api.Claim
-		crt *x509.CertificateRequest
+		iac certClaim
+		crt *x509.Certificate
 		err error
 	}{
 		"unexpected-ip": {
 			iac: &ipAddressesClaim{name: "127.0.0.1"},
-			crt: &x509.CertificateRequest{IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("1.1.1.1")}},
+			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("1.1.1.1")}},
 			err: errors.New("IP addresses claim failed - got 1.1.1.1, want 127.0.0.1"),
 		},
 		"invalid-matcher-nonempty-ips": {
 			iac: &ipAddressesClaim{name: "invalid"},
-			crt: &x509.CertificateRequest{IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}},
+			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}},
 			err: errors.New("IP addresses claim failed - got [127.0.0.1], want none"),
 		},
 		"ok": {
 			iac: &ipAddressesClaim{name: "127.0.0.1"},
-			crt: &x509.CertificateRequest{IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}},
+			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}},
 		},
 		"ok-empty-ips": {
 			iac: &ipAddressesClaim{name: "127.0.0.1"},
-			crt: &x509.CertificateRequest{IPAddresses: []net.IP{}},
+			crt: &x509.Certificate{IPAddresses: []net.IP{}},
 		},
 	}
 
@@ -89,26 +88,26 @@ func TestIPAddressesClaim_Valid(t *testing.T) {
 
 func TestDNSNamesClaim_Valid(t *testing.T) {
 	tests := map[string]struct {
-		dnc api.Claim
-		crt *x509.CertificateRequest
+		dnc certClaim
+		crt *x509.Certificate
 		err error
 	}{
 		"wrong-dns-name": {
 			dnc: &dnsNamesClaim{name: "foo"},
-			crt: &x509.CertificateRequest{DNSNames: []string{"foo", "bar"}},
+			crt: &x509.Certificate{DNSNames: []string{"foo", "bar"}},
 			err: errors.New("DNS names claim failed - got bar, want foo"),
 		},
 		"ok": {
 			dnc: &dnsNamesClaim{name: "foo"},
-			crt: &x509.CertificateRequest{DNSNames: []string{"foo"}},
+			crt: &x509.Certificate{DNSNames: []string{"foo"}},
 		},
 		"ok-empty-dnsNames": {
 			dnc: &dnsNamesClaim{"foo"},
-			crt: &x509.CertificateRequest{},
+			crt: &x509.Certificate{},
 		},
 		"ok-multiple-identical-dns-entries": {
 			dnc: &dnsNamesClaim{name: "foo"},
-			crt: &x509.CertificateRequest{DNSNames: []string{"foo", "foo", "foo"}},
+			crt: &x509.Certificate{DNSNames: []string{"foo", "foo", "foo"}},
 		},
 	}
 

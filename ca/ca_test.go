@@ -75,10 +75,10 @@ func TestCASign(t *testing.T) {
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_priv.jwk",
 		stepJOSE.WithPassword([]byte("pass")))
 	assert.FatalError(t, err)
-	fmt.Printf("clijwk.KeyID = %+v\n", clijwk.KeyID)
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: clijwk.Key},
 		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", clijwk.KeyID))
 	assert.FatalError(t, err)
+	validAud := []string{"https://127.0.0.1:0/sign"}
 
 	now := time.Now().UTC()
 	leafExpiry := now.Add(time.Minute * 5)
@@ -90,7 +90,7 @@ func TestCASign(t *testing.T) {
 		errMsg string
 	}
 	tests := map[string]func(t *testing.T) *signTest{
-		"invalid-json-body": func(t *testing.T) *signTest {
+		"fail invalid-json-body": func(t *testing.T) *signTest {
 			return &signTest{
 				ca:     ca,
 				body:   "invalid json",
@@ -98,7 +98,7 @@ func TestCASign(t *testing.T) {
 				errMsg: "Bad Request",
 			}
 		},
-		"invalid-csr-sig": func(t *testing.T) *signTest {
+		"fail invalid-csr-sig": func(t *testing.T) *signTest {
 			der := []byte(`-----BEGIN CERTIFICATE REQUEST-----
 MIIDNjCCAh4CAQAwYzELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMRYwFAYDVQQH
 DA1TYW4gRnJhbmNpc2NvMRIwEAYDVQQKDAlzbWFsbHN0ZXAxGzAZBgNVBAMMEnRl
@@ -136,7 +136,7 @@ ZEp7knvU2psWRw==
 				errMsg: "Bad Request",
 			}
 		},
-		"unauthorized-ott": func(t *testing.T) *signTest {
+		"fail unauthorized-ott": func(t *testing.T) *signTest {
 			csr, err := getCSR(priv)
 			assert.FatalError(t, err)
 			body, err := json.Marshal(&api.SignRequest{
@@ -151,7 +151,7 @@ ZEp7knvU2psWRw==
 				errMsg: "Unauthorized",
 			}
 		},
-		"fail-commonname-claim": func(t *testing.T) *signTest {
+		"fail commonname-claim": func(t *testing.T) *signTest {
 			jti, err := randutil.ASCII(32)
 			assert.FatalError(t, err)
 			cl := jwt.Claims{
@@ -159,7 +159,7 @@ ZEp7knvU2psWRw==
 				Issuer:    "step-cli",
 				NotBefore: jwt.NewNumericDate(now),
 				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
-				Audience:  []string{"step-certificate-authority"},
+				Audience:  validAud,
 				ID:        jti,
 			}
 			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
@@ -178,7 +178,7 @@ ZEp7knvU2psWRw==
 				errMsg: "Unauthorized",
 			}
 		},
-		"success": func(t *testing.T) *signTest {
+		"ok": func(t *testing.T) *signTest {
 			jti, err := randutil.ASCII(32)
 			assert.FatalError(t, err)
 			cl := jwt.Claims{
@@ -186,7 +186,7 @@ ZEp7knvU2psWRw==
 				Issuer:    "step-cli",
 				NotBefore: jwt.NewNumericDate(now),
 				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
-				Audience:  []string{"step-certificate-authority"},
+				Audience:  validAud,
 				ID:        jti,
 			}
 			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
@@ -304,7 +304,11 @@ func TestCAProvisioners(t *testing.T) {
 					var resp api.ProvisionersResponse
 
 					assert.FatalError(t, readJSON(body, &resp))
-					assert.Equals(t, config.AuthorityConfig.Provisioners, resp.Provisioners)
+					a, err := json.Marshal(config.AuthorityConfig.Provisioners)
+					assert.FatalError(t, err)
+					b, err := json.Marshal(resp.Provisioners)
+					assert.FatalError(t, err)
+					assert.Equals(t, a, b)
 				} else {
 					err := readError(body)
 					if len(tc.errMsg) == 0 {
@@ -597,7 +601,7 @@ func TestCARenew(t *testing.T) {
 		"success": func(t *testing.T) *renewTest {
 			profile, err := x509util.NewLeafProfile("test", intermediateIdentity.Crt,
 				intermediateIdentity.Key, x509util.WithPublicKey(pub),
-				x509util.WithNotBeforeAfter(now, leafExpiry), x509util.WithHosts("funk"))
+				x509util.WithNotBeforeAfterDuration(now, leafExpiry, 0), x509util.WithHosts("funk"))
 			assert.FatalError(t, err)
 			crtBytes, err := profile.CreateCertificate()
 			assert.FatalError(t, err)

@@ -3,40 +3,56 @@ package authority
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/api"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	stepx509 "github.com/smallstep/cli/pkg/x509"
 )
 
-// GetMinDuration returns the minimum validity of an end-entity (not root or
-// intermediate) certificate.
-func (a *Authority) GetMinDuration() time.Duration {
-	if a.config.AuthorityConfig.MinCertDuration == nil {
-		return minCertDuration
-	}
-	return a.config.AuthorityConfig.MinCertDuration.Duration
-}
-
-// GetMaxDuration returns the maximum validity of an end-entity (not root or
-// intermediate) certificate.
-func (a *Authority) GetMaxDuration() time.Duration {
-	if a.config.AuthorityConfig.MaxCertDuration == nil {
-		return maxCertDuration
-	}
-	return a.config.AuthorityConfig.MaxCertDuration.Duration
-}
-
 // GetTLSOptions returns the tls options configured.
 func (a *Authority) GetTLSOptions() *tlsutil.TLSOptions {
 	return a.config.TLS
+}
+
+// SignOptions contains the options that can be passed to the Authority.Sign
+// method.
+type SignOptions struct {
+	NotAfter  time.Time `json:"notAfter"`
+	NotBefore time.Time `json:"notBefore"`
+}
+
+func withIssuerAlternativeNameExtension(name string) x509util.WithOption {
+	return func(p x509util.Profile) error {
+		crt := p.Subject()
+
+		iatExt := []asn1.RawValue{
+			asn1.RawValue{
+				Tag:   2,
+				Class: 2,
+				Bytes: []byte(name),
+			},
+		}
+		iatExtBytes, err := asn1.Marshal(iatExt)
+		if err != nil {
+			return &apiError{err, http.StatusInternalServerError, nil}
+		}
+
+		crt.ExtraExtensions = append(crt.ExtraExtensions, pkix.Extension{
+			Id:       []int{2, 5, 9, 18},
+			Critical: false,
+			Value:    iatExtBytes,
+		})
+
+		return nil
+	}
 }
 
 func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
@@ -70,17 +86,40 @@ func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 }
 
 // Sign creates a signed certificate from a certificate signing request.
-func (a *Authority) Sign(csr *x509.CertificateRequest, opts api.SignOptions, claims ...api.Claim) (*x509.Certificate, *x509.Certificate, error) {
-	if err := ValidateClaims(csr, claims); err != nil {
-		return nil, nil, &apiError{err, http.StatusUnauthorized, context{}}
+func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error) {
+	var (
+		errContext = context{"csr": csr, "signOptions": signOpts}
+		claims     = []certClaim{}
+		mods       = []x509util.WithOption{}
+	)
+	for _, op := range extraOpts {
+		switch k := op.(type) {
+		case certClaim:
+			claims = append(claims, k)
+		case x509util.WithOption:
+			mods = append(mods, k)
+		case *Provisioner:
+			m, c, err := k.getTLSApps(signOpts)
+			if err != nil {
+				return nil, nil, &apiError{err, http.StatusInternalServerError, errContext}
+			}
+			mods = append(mods, m...)
+			mods = append(mods, []x509util.WithOption{
+				x509util.WithHosts(csr.Subject.CommonName),
+				withDefaultASN1DN(a.config.AuthorityConfig.Template),
+			}...)
+			claims = append(claims, c...)
+		default:
+			return nil, nil, &apiError{errors.Errorf("sign: invalid extra option type %T", k),
+				http.StatusInternalServerError, errContext}
+		}
 	}
 
 	stepCSR, err := stepx509.ParseCertificateRequest(csr.Raw)
 	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "error converting x509 csr to stepx509 csr"),
-			http.StatusInternalServerError, context{}}
+		return nil, nil, &apiError{errors.Wrap(err, "sign: error converting x509 csr to stepx509 csr"),
+			http.StatusInternalServerError, errContext}
 	}
-
 	// DNSNames and IPAddresses are validated but to avoid duplications we will
 	// clean them as x509util.NewLeafProfileWithCSR will set the right values.
 	stepCSR.DNSNames = nil
@@ -88,27 +127,31 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, opts api.SignOptions, cla
 
 	issIdentity := a.intermediateIdentity
 	leaf, err := x509util.NewLeafProfileWithCSR(stepCSR, issIdentity.Crt,
-		issIdentity.Key, x509util.WithHosts(csr.Subject.CommonName),
-		x509util.WithNotBeforeAfter(opts.NotBefore, opts.NotAfter),
-		withDefaultASN1DN(a.config.AuthorityConfig.Template))
+		issIdentity.Key, mods...)
 	if err != nil {
-		return nil, nil, &apiError{err, http.StatusInternalServerError, context{}}
+		return nil, nil, &apiError{errors.Wrapf(err, "sign"), http.StatusInternalServerError, errContext}
 	}
+
+	if err := validateClaims(leaf.Subject(), claims); err != nil {
+		return nil, nil, &apiError{errors.Wrapf(err, "sign"), http.StatusUnauthorized, errContext}
+	}
+
 	crtBytes, err := leaf.CreateCertificate()
 	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "error creating new leaf certificate from input csr"),
-			http.StatusInternalServerError, context{}}
+		return nil, nil, &apiError{errors.Wrap(err, "sign: error creating new leaf certificate"),
+			http.StatusInternalServerError, errContext}
 	}
 
 	serverCert, err := x509.ParseCertificate(crtBytes)
 	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "error parsing new server certificate"),
-			http.StatusInternalServerError, context{}}
+		return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing new leaf certificate"),
+			http.StatusInternalServerError, errContext}
 	}
+
 	caCert, err := x509.ParseCertificate(issIdentity.Crt.Raw)
 	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "error parsing intermediate certificate"),
-			http.StatusInternalServerError, context{}}
+		return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing intermediate certificate"),
+			http.StatusInternalServerError, errContext}
 	}
 
 	return serverCert, caCert, nil
@@ -143,15 +186,15 @@ func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certi
 		ExtKeyUsage:                 oldCert.ExtKeyUsage,
 		UnknownExtKeyUsage:          oldCert.UnknownExtKeyUsage,
 		BasicConstraintsValid:       oldCert.BasicConstraintsValid,
-		IsCA:                        oldCert.IsCA,
-		MaxPathLen:                  oldCert.MaxPathLen,
-		MaxPathLenZero:              oldCert.MaxPathLenZero,
-		OCSPServer:                  oldCert.OCSPServer,
-		IssuingCertificateURL:       oldCert.IssuingCertificateURL,
-		DNSNames:                    oldCert.DNSNames,
-		EmailAddresses:              oldCert.EmailAddresses,
-		IPAddresses:                 oldCert.IPAddresses,
-		URIs:                        oldCert.URIs,
+		IsCA:                  oldCert.IsCA,
+		MaxPathLen:            oldCert.MaxPathLen,
+		MaxPathLenZero:        oldCert.MaxPathLenZero,
+		OCSPServer:            oldCert.OCSPServer,
+		IssuingCertificateURL: oldCert.IssuingCertificateURL,
+		DNSNames:              oldCert.DNSNames,
+		EmailAddresses:        oldCert.EmailAddresses,
+		IPAddresses:           oldCert.IPAddresses,
+		URIs:                  oldCert.URIs,
 		PermittedDNSDomainsCritical: oldCert.PermittedDNSDomainsCritical,
 		PermittedDNSDomains:         oldCert.PermittedDNSDomains,
 		ExcludedDNSDomains:          oldCert.ExcludedDNSDomains,

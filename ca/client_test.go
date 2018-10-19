@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/smallstep/ca-component/api"
-	"github.com/smallstep/ca-component/provisioner"
+	"github.com/smallstep/ca-component/authority"
 )
 
 const (
@@ -390,7 +390,7 @@ func TestClient_Renew(t *testing.T) {
 
 func TestClient_Provisioners(t *testing.T) {
 	ok := &api.ProvisionersResponse{
-		Provisioners: []*provisioner.Provisioner{},
+		Provisioners: []*authority.Provisioner{},
 	}
 	internalServerError := api.InternalServerError(fmt.Errorf("Internal Server Error"))
 

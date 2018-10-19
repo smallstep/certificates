@@ -1,4 +1,4 @@
-package provisioner
+package authority
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	jose "gopkg.in/square/go-jose.v2"
 )
 
-func TestProvisionerValidate(t *testing.T) {
+func TestProvisionerInit(t *testing.T) {
 	type ProvisionerValidateTest struct {
 		p   *Provisioner
 		err error
@@ -42,7 +42,7 @@ func TestProvisionerValidate(t *testing.T) {
 	for name, get := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := get(t)
-			err := tc.p.Validate()
+			err := tc.p.Init(&globalProvisionerClaims)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.Equals(t, tc.err.Error(), err.Error())

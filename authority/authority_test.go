@@ -7,7 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/ca-component/provisioner"
 	stepJOSE "github.com/smallstep/cli/jose"
 )
 
@@ -16,7 +15,7 @@ func testAuthority(t *testing.T) *Authority {
 	assert.FatalError(t, err)
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
-	p := []*provisioner.Provisioner{
+	p := []*Provisioner{
 		{
 			Issuer: "Max",
 			Type:   "JWK",
@@ -29,11 +28,11 @@ func testAuthority(t *testing.T) *Authority {
 		},
 	}
 	c := &Config{
-		Address:          "127.0.0.1",
+		Address:          "127.0.0.1:443",
 		Root:             "testdata/secrets/root_ca.crt",
 		IntermediateCert: "testdata/secrets/intermediate_ca.crt",
 		IntermediateKey:  "testdata/secrets/intermediate_ca_key",
-		DNSNames:         []string{"test.smallstep.com"},
+		DNSNames:         []string{"test.ca.smallstep.com"},
 		Password:         "pass",
 		AuthorityConfig: &AuthConfig{
 			Provisioners: p,

@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
-	"github.com/smallstep/ca-component/provisioner"
+	"github.com/smallstep/ca-component/authority"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/jose"
 )
@@ -349,7 +349,6 @@ func TestCertificateRequest_UnmarshalJSON_json(t *testing.T) {
 }
 
 func TestSignRequest_Validate(t *testing.T) {
-	now := time.Now()
 	csr := parseCertificateRequest(csrPEM)
 	bad := parseCertificateRequest(csrPEM)
 	bad.Signature[0]++
@@ -364,16 +363,9 @@ func TestSignRequest_Validate(t *testing.T) {
 		fields  fields
 		wantErr bool
 	}{
-		{"ok", fields{CertificateRequest{csr}, "foobarzar", time.Time{}, time.Time{}}, false},
-		{"ok 5m", fields{CertificateRequest{csr}, "foobarzar", now, now.Add(5 * time.Minute)}, false},
-		{"ok 24h", fields{CertificateRequest{csr}, "foobarzar", now, now.Add(24 * time.Hour)}, false},
 		{"missing csr", fields{CertificateRequest{}, "foobarzar", time.Time{}, time.Time{}}, true},
 		{"invalid csr", fields{CertificateRequest{bad}, "foobarzar", time.Time{}, time.Time{}}, true},
 		{"missing ott", fields{CertificateRequest{csr}, "", time.Time{}, time.Time{}}, true},
-		{"notAfter < now", fields{CertificateRequest{csr}, "foobarzar", now, now.Add(-5 * time.Minute)}, true},
-		{"notAfter < notBefore", fields{CertificateRequest{csr}, "foobarzar", now.Add(5 * time.Minute), now.Add(4 * time.Minute)}, true},
-		{"too short", fields{CertificateRequest{csr}, "foobarzar", now, now.Add(4 * time.Minute)}, true},
-		{"too long", fields{CertificateRequest{csr}, "foobarzar", now, now.Add(24 * time.Hour).Add(1 * time.Minute)}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -393,20 +385,20 @@ func TestSignRequest_Validate(t *testing.T) {
 type mockAuthority struct {
 	ret1, ret2      interface{}
 	err             error
-	authorize       func(ott string) ([]Claim, error)
+	authorize       func(ott string) ([]interface{}, error)
 	getTLSOptions   func() *tlsutil.TLSOptions
 	root            func(shasum string) (*x509.Certificate, error)
-	sign            func(cr *x509.CertificateRequest, opts SignOptions, claims ...Claim) (*x509.Certificate, *x509.Certificate, error)
+	sign            func(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error)
 	renew           func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	getProvisioners func() ([]*provisioner.Provisioner, error)
+	getProvisioners func() ([]*authority.Provisioner, error)
 	getEncryptedKey func(kid string) (string, error)
 }
 
-func (m *mockAuthority) Authorize(ott string) ([]Claim, error) {
+func (m *mockAuthority) Authorize(ott string) ([]interface{}, error) {
 	if m.authorize != nil {
 		return m.authorize(ott)
 	}
-	return m.ret1.([]Claim), m.err
+	return m.ret1.([]interface{}), m.err
 }
 
 func (m *mockAuthority) GetTLSOptions() *tlsutil.TLSOptions {
@@ -416,14 +408,6 @@ func (m *mockAuthority) GetTLSOptions() *tlsutil.TLSOptions {
 	return m.ret1.(*tlsutil.TLSOptions)
 }
 
-func (m *mockAuthority) GetMinDuration() time.Duration {
-	return minCertDuration
-}
-
-func (m *mockAuthority) GetMaxDuration() time.Duration {
-	return maxCertDuration
-}
-
 func (m *mockAuthority) Root(shasum string) (*x509.Certificate, error) {
 	if m.root != nil {
 		return m.root(shasum)
@@ -431,9 +415,9 @@ func (m *mockAuthority) Root(shasum string) (*x509.Certificate, error) {
 	return m.ret1.(*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) Sign(cr *x509.CertificateRequest, opts SignOptions, claims ...Claim) (*x509.Certificate, *x509.Certificate, error) {
+func (m *mockAuthority) Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error) {
 	if m.sign != nil {
-		return m.sign(cr, opts, claims...)
+		return m.sign(cr, signOpts, extraOpts...)
 	}
 	return m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate), m.err
 }
@@ -445,11 +429,11 @@ func (m *mockAuthority) Renew(cert *x509.Certificate) (*x509.Certificate, *x509.
 	return m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) GetProvisioners() ([]*provisioner.Provisioner, error) {
+func (m *mockAuthority) GetProvisioners() ([]*authority.Provisioner, error) {
 	if m.getProvisioners != nil {
 		return m.getProvisioners()
 	}
-	return m.ret1.([]*provisioner.Provisioner), m.err
+	return m.ret1.([]*authority.Provisioner), m.err
 }
 
 func (m *mockAuthority) GetEncryptedKey(kid string) (string, error) {
@@ -567,14 +551,14 @@ func Test_caHandler_Sign(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		input      string
-		claims     []Claim
-		autherr    error
-		cert       *x509.Certificate
-		root       *x509.Certificate
-		signErr    error
-		statusCode int
+		name         string
+		input        string
+		certAttrOpts []interface{}
+		autherr      error
+		cert         *x509.Certificate
+		root         *x509.Certificate
+		signErr      error
+		statusCode   int
 	}{
 		{"ok", string(valid), nil, nil, parseCertificate(certPEM), parseCertificate(rootPEM), nil, http.StatusCreated},
 		{"json read error", "{", nil, nil, nil, nil, nil, http.StatusBadRequest},
@@ -589,8 +573,8 @@ func Test_caHandler_Sign(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.signErr,
-				authorize: func(ott string) ([]Claim, error) {
-					return tt.claims, tt.autherr
+				authorize: func(ott string) ([]interface{}, error) {
+					return tt.certAttrOpts, tt.autherr
 				},
 				getTLSOptions: func() *tlsutil.TLSOptions {
 					return nil
@@ -690,7 +674,7 @@ func Test_caHandler_JWKSetByIssuer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p := []*provisioner.Provisioner{
+	p := []*authority.Provisioner{
 		{
 			Issuer: "p1",
 			Key:    &key,
@@ -766,7 +750,7 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p := []*provisioner.Provisioner{
+	p := []*authority.Provisioner{
 		{
 			Type:         "JWK",
 			Issuer:       "max",

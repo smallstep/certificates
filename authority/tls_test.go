@@ -12,7 +12,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/ca-component/api"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
@@ -20,7 +19,7 @@ import (
 
 func getCSR(t *testing.T, priv interface{}) *x509.CertificateRequest {
 	_csr := &x509.CertificateRequest{
-		Subject:  pkix.Name{CommonName: "test"},
+		Subject:  pkix.Name{CommonName: "test.smallstep.com"},
 		DNSNames: []string{"test.smallstep.com"},
 	}
 	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, _csr, priv)
@@ -42,90 +41,121 @@ func TestSign(t *testing.T) {
 		Locality:      "Landscapes",
 		Province:      "Sudden Cliffs",
 		StreetAddress: "TNT",
-		CommonName:    "test",
+		CommonName:    "test.smallstep.com",
 	}
 
-	now := time.Now()
+	nb := time.Now()
+	signOpts := SignOptions{
+		NotBefore: nb,
+		NotAfter:  nb.Add(time.Minute * 5),
+	}
 
 	type signTest struct {
-		auth   *Authority
-		csr    *x509.CertificateRequest
-		opts   api.SignOptions
-		claims []api.Claim
-		err    *apiError
+		auth      *Authority
+		csr       *x509.CertificateRequest
+		signOpts  SignOptions
+		extraOpts []interface{}
+		err       *apiError
 	}
 	tests := map[string]func(*testing.T) *signTest{
-		"fail-validate-claims": func(t *testing.T) *signTest {
-			csr := getCSR(t, priv)
-			return &signTest{
-				auth: a,
-				csr:  csr,
-				opts: api.SignOptions{
-					NotBefore: now,
-					NotAfter:  now.Add(time.Minute * 5),
-				},
-				claims: []api.Claim{&commonNameClaim{"foo"}},
-				err: &apiError{errors.New("common name claim failed - got test, want foo"),
-					http.StatusUnauthorized, context{}},
-			}
-		},
-		"fail-convert-stepCSR": func(t *testing.T) *signTest {
+		"fail invalid extra option": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			csr.Raw = []byte("foo")
 			return &signTest{
 				auth: a,
 				csr:  csr,
-				opts: api.SignOptions{
-					NotBefore: now,
-					NotAfter:  now.Add(time.Minute * 5),
+				extraOpts: []interface{}{
+					withIssuerAlternativeNameExtension("baz"),
+					"42",
 				},
-				claims: []api.Claim{&commonNameClaim{"test"}},
-				err: &apiError{errors.New("error converting x509 csr to stepx509 csr"),
-					http.StatusInternalServerError, context{}},
+				signOpts: signOpts,
+				err: &apiError{errors.New("sign: invalid extra option type string"),
+					http.StatusInternalServerError,
+					context{"csr": csr, "signOptions": signOpts},
+				},
 			}
 		},
-		"fail-merge-default-ASN1DN": func(t *testing.T) *signTest {
+		"fail convert csr to step format": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			csr.Raw = []byte("foo")
+			return &signTest{
+				auth: a,
+				csr:  csr,
+				extraOpts: []interface{}{
+					withIssuerAlternativeNameExtension("baz"),
+				},
+				signOpts: signOpts,
+				err: &apiError{errors.New("sign: error converting x509 csr to stepx509 csr"),
+					http.StatusInternalServerError,
+					context{"csr": csr, "signOptions": signOpts},
+				},
+			}
+		},
+		"fail merge default ASN1DN": func(t *testing.T) *signTest {
 			_a := testAuthority(t)
 			_a.config.AuthorityConfig.Template = nil
 			csr := getCSR(t, priv)
 			return &signTest{
 				auth: _a,
 				csr:  csr,
-				opts: api.SignOptions{
-					NotBefore: now,
-					NotAfter:  now.Add(time.Minute * 5),
+				extraOpts: []interface{}{
+					withIssuerAlternativeNameExtension("baz"),
+					a.config.AuthorityConfig.Provisioners[1],
 				},
-				claims: []api.Claim{&commonNameClaim{"test"}},
-				err: &apiError{errors.New("default ASN1DN template cannot be nil"),
-					http.StatusInternalServerError, context{}},
+				signOpts: signOpts,
+				err: &apiError{errors.New("sign: default ASN1DN template cannot be nil"),
+					http.StatusInternalServerError,
+					context{"csr": csr, "signOptions": signOpts},
+				},
 			}
 		},
-		"fail-create-cert": func(t *testing.T) *signTest {
+		"fail create cert": func(t *testing.T) *signTest {
 			_a := testAuthority(t)
 			_a.intermediateIdentity.Key = nil
 			csr := getCSR(t, priv)
 			return &signTest{
 				auth: _a,
 				csr:  csr,
-				opts: api.SignOptions{
-					NotBefore: now,
-					NotAfter:  now.Add(time.Minute * 5),
+				extraOpts: []interface{}{
+					withIssuerAlternativeNameExtension("baz"),
 				},
-				claims: []api.Claim{&commonNameClaim{"test"}},
-				err: &apiError{errors.New("error creating new leaf certificate from input csr"),
-					http.StatusInternalServerError, context{}},
+				signOpts: signOpts,
+				err: &apiError{errors.New("sign: error creating new leaf certificate"),
+					http.StatusInternalServerError,
+					context{"csr": csr, "signOptions": signOpts},
+				},
 			}
 		},
-		"success": func(t *testing.T) *signTest {
+		"fail provisioner duration claim": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			_signOpts := SignOptions{
+				NotBefore: nb,
+				NotAfter:  nb.Add(time.Hour * 25),
+			}
+			return &signTest{
+				auth: a,
+				csr:  csr,
+				extraOpts: []interface{}{
+					withIssuerAlternativeNameExtension("baz"),
+					a.config.AuthorityConfig.Provisioners[1],
+				},
+				signOpts: _signOpts,
+				err: &apiError{errors.New("sign: requested duration of 25h0m0s is more than the authorized maximum certificate duration of 24h0m0s"),
+					http.StatusUnauthorized,
+					context{"csr": csr, "signOptions": _signOpts},
+				},
+			}
+		},
+		"ok": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			return &signTest{
 				auth: a,
 				csr:  csr,
-				opts: api.SignOptions{
-					NotBefore: now,
-					NotAfter:  now.Add(time.Minute * 5),
+				extraOpts: []interface{}{
+					withIssuerAlternativeNameExtension("baz"),
+					a.config.AuthorityConfig.Provisioners[1],
 				},
-				claims: []api.Claim{&commonNameClaim{"test"}},
+				signOpts: signOpts,
 			}
 		},
 	}
@@ -134,7 +164,7 @@ func TestSign(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			leaf, intermediate, err := tc.auth.Sign(tc.csr, tc.opts, tc.claims...)
+			leaf, intermediate, err := tc.auth.Sign(tc.csr, tc.signOpts, tc.extraOpts...)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					switch v := err.(type) {
@@ -148,8 +178,8 @@ func TestSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, leaf.NotBefore, tc.opts.NotBefore.UTC().Truncate(time.Second))
-					assert.Equals(t, leaf.NotAfter, tc.opts.NotAfter.UTC().Truncate(time.Second))
+					assert.Equals(t, leaf.NotBefore, signOpts.NotBefore.UTC().Truncate(time.Second))
+					assert.Equals(t, leaf.NotAfter, signOpts.NotAfter.UTC().Truncate(time.Second))
 					tmplt := a.config.AuthorityConfig.Template
 					assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
 						fmt.Sprintf("%v", &pkix.Name{
@@ -166,7 +196,7 @@ func TestSign(t *testing.T) {
 					assert.Equals(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
 					assert.Equals(t, leaf.ExtKeyUsage,
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
-					assert.Equals(t, leaf.DNSNames, []string{"test"})
+					assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
 
 					pubBytes, err := x509.MarshalPKIXPublicKey(pub)
 					assert.FatalError(t, err)
@@ -201,14 +231,14 @@ func TestRenew(t *testing.T) {
 	now := time.Now().UTC()
 	nb1 := now.Add(-time.Minute * 7)
 	na1 := now
-	so := &api.SignOptions{
+	so := &SignOptions{
 		NotBefore: nb1,
 		NotAfter:  na1,
 	}
 
 	leaf, err := x509util.NewLeafProfile("renew", a.intermediateIdentity.Crt,
 		a.intermediateIdentity.Key,
-		x509util.WithNotBeforeAfter(so.NotBefore, so.NotAfter),
+		x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, 0),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"))
 	assert.FatalError(t, err)
@@ -310,62 +340,6 @@ func TestRenew(t *testing.T) {
 					assert.Equals(t, intermediate, realIntermediate)
 				}
 			}
-		})
-	}
-}
-
-func TestGetMinDuration(t *testing.T) {
-	type renewTest struct {
-		auth *Authority
-		d    time.Duration
-	}
-	tests := map[string]func() (*renewTest, error){
-		"default": func() (*renewTest, error) {
-			a := testAuthority(t)
-			return &renewTest{auth: a, d: time.Minute * 5}, nil
-		},
-		"non-default": func() (*renewTest, error) {
-			a := testAuthority(t)
-			a.config.AuthorityConfig.MinCertDuration = &duration{time.Minute * 7}
-			return &renewTest{auth: a, d: time.Minute * 7}, nil
-		},
-	}
-
-	for name, genTestCase := range tests {
-		t.Run(name, func(t *testing.T) {
-			tc, err := genTestCase()
-			assert.FatalError(t, err)
-
-			d := tc.auth.GetMinDuration()
-			assert.Equals(t, d, tc.d)
-		})
-	}
-}
-
-func TestGetMaxDuration(t *testing.T) {
-	type renewTest struct {
-		auth *Authority
-		d    time.Duration
-	}
-	tests := map[string]func() (*renewTest, error){
-		"default": func() (*renewTest, error) {
-			a := testAuthority(t)
-			return &renewTest{auth: a, d: time.Hour * 24}, nil
-		},
-		"non-default": func() (*renewTest, error) {
-			a := testAuthority(t)
-			a.config.AuthorityConfig.MaxCertDuration = &duration{time.Minute * 7}
-			return &renewTest{auth: a, d: time.Minute * 7}, nil
-		},
-	}
-
-	for name, genTestCase := range tests {
-		t.Run(name, func(t *testing.T) {
-			tc, err := genTestCase()
-			assert.FatalError(t, err)
-
-			d := tc.auth.GetMaxDuration()
-			assert.Equals(t, d, tc.d)
 		})
 	}
 }

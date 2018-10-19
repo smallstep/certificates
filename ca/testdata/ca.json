@@ -70,6 +70,9 @@
                     "alg": "ES256",
                     "x": "tTKthEHN7RuybhkaC43J2oLfBG995FNSWbtahLAiK7Y",
                     "y": "e3wycXwVB366F0wLE5J9gIpq8EIQ4900nHBNpIGebEA"
+                },
+                "claims": {
+                    "minTLSCertDuration": "30s"
                 }
             }, {
                 "issuer": "mariano",

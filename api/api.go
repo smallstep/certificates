@@ -11,43 +11,19 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/provisioner"
+	"github.com/smallstep/ca-component/authority"
 	"github.com/smallstep/cli/crypto/tlsutil"
-	"github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
 )
 
-// Minimum and maximum validity of an end-entity (not root or intermediate) certificate.
-// They will be overwritten with the values configured in the authority
-var (
-	minCertDuration = 5 * time.Minute
-	maxCertDuration = 24 * time.Hour
-)
-
-// Claim interface is implemented by types used to validate specific claims in a
-// certificate request.
-// TODO(mariano): Rename?
-type Claim interface {
-	Valid(cr *x509.CertificateRequest) error
-}
-
-// SignOptions contains the options that can be passed to the Authority.Sign
-// method.
-type SignOptions struct {
-	NotAfter  time.Time `json:"notAfter"`
-	NotBefore time.Time `json:"notBefore"`
-}
-
 // Authority is the interface implemented by a CA authority.
 type Authority interface {
-	Authorize(ott string) ([]Claim, error)
+	Authorize(ott string) ([]interface{}, error)
 	GetTLSOptions() *tlsutil.TLSOptions
-	GetMinDuration() time.Duration
-	GetMaxDuration() time.Duration
 	Root(shasum string) (*x509.Certificate, error)
-	Sign(cr *x509.CertificateRequest, opts SignOptions, claims ...Claim) (*x509.Certificate, *x509.Certificate, error)
+	Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error)
 	Renew(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	GetProvisioners() ([]*provisioner.Provisioner, error)
+	GetProvisioners() ([]*authority.Provisioner, error)
 	GetEncryptedKey(kid string) (string, error)
 }
 
@@ -176,7 +152,7 @@ type SignRequest struct {
 // ProvisionersResponse is the response object that returns the list of
 // provisioners.
 type ProvisionersResponse struct {
-	Provisioners []*provisioner.Provisioner `json:"provisioners"`
+	Provisioners []*authority.Provisioner `json:"provisioners"`
 }
 
 // JWKSetByIssuerResponse is the response object that returns the map of
@@ -204,27 +180,6 @@ func (s *SignRequest) Validate() error {
 		return BadRequest(errors.New("missing ott"))
 	}
 
-	now := time.Now()
-	if s.NotBefore.IsZero() {
-		s.NotBefore = now
-	}
-	if s.NotAfter.IsZero() {
-		s.NotAfter = now.Add(x509util.DefaultCertValidity)
-	}
-
-	if s.NotAfter.Before(now) {
-		return BadRequest(errors.New("notAfter < now"))
-	}
-	if s.NotAfter.Before(s.NotBefore) {
-		return BadRequest(errors.New("notAfter < notBefore"))
-	}
-	requestedDuration := s.NotAfter.Sub(s.NotBefore)
-	if requestedDuration < minCertDuration {
-		return BadRequest(errors.New("requested certificate validity duration is too short"))
-	}
-	if requestedDuration > maxCertDuration {
-		return BadRequest(errors.New("requested certificate validity duration is too long"))
-	}
 	return nil
 }
 
@@ -243,8 +198,6 @@ type caHandler struct {
 
 // New creates a new RouterHandler with the CA endpoints.
 func New(authority Authority) RouterHandler {
-	minCertDuration = authority.GetMinDuration()
-	maxCertDuration = authority.GetMaxDuration()
 	return &caHandler{
 		Authority: authority,
 	}
@@ -296,18 +249,18 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims, err := h.Authority.Authorize(body.OTT)
+	signOpts := authority.SignOptions{
+		NotBefore: body.NotBefore,
+		NotAfter:  body.NotAfter,
+	}
+
+	extraOpts, err := h.Authority.Authorize(body.OTT)
 	if err != nil {
 		WriteError(w, Unauthorized(err))
 		return
 	}
 
-	opts := SignOptions{
-		NotBefore: body.NotBefore,
-		NotAfter:  body.NotAfter,
-	}
-
-	cert, root, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, opts, claims...)
+	cert, root, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, signOpts, extraOpts...)
 	if err != nil {
 		WriteError(w, Forbidden(err))
 		return

@@ -6,33 +6,41 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/provisioner"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 )
 
-// DefaultTLSOptions represents the default TLS version as well as the cipher
-// suites used in the TLS certificates.
-var DefaultTLSOptions = tlsutil.TLSOptions{
-	CipherSuites: x509util.CipherSuites{
-		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
-		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-		"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
-	},
-	MinVersion:    1.2,
-	MaxVersion:    1.2,
-	Renegotiation: false,
-}
-
-const (
-	// minCertDuration is the minimum validity of an end-entity (not root or intermediate) certificate.
-	minCertDuration = 5 * time.Minute
-	// maxCertDuration is the maximum validity of an end-entity (not root or intermediate) certificate.
-	maxCertDuration = 24 * time.Hour
+var (
+	// DefaultTLSOptions represents the default TLS version as well as the cipher
+	// suites used in the TLS certificates.
+	DefaultTLSOptions = tlsutil.TLSOptions{
+		CipherSuites: x509util.CipherSuites{
+			"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+			"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+			"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+		},
+		MinVersion:    1.2,
+		MaxVersion:    1.2,
+		Renegotiation: false,
+	}
+	globalProvisionerClaims = ProvisionerClaims{
+		MinTLSDur:     &duration{5 * time.Minute},
+		MaxTLSDur:     &duration{24 * time.Hour},
+		DefaultTLSDur: &duration{24 * time.Hour},
+	}
 )
 
 type duration struct {
 	time.Duration
+}
+
+// MarshalJSON parses a duration string and sets it to the duration.
+//
+// A duration string is a possibly signed sequence of decimal numbers, each with
+// optional fraction and a unit suffix, such as "300ms", "-1.5h" or "2h45m".
+// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+func (d *duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
 }
 
 // UnmarshalJSON parses a duration string and sets it to the duration.
@@ -67,24 +75,27 @@ type Config struct {
 
 // AuthConfig represents the configuration options for the authority.
 type AuthConfig struct {
-	Provisioners         []*provisioner.Provisioner `json:"provisioners,omitempty"`
-	Template             *x509util.ASN1DN           `json:"template,omitempty"`
-	MinCertDuration      *duration                  `json:"minCertDuration,omitempty"`
-	MaxCertDuration      *duration                  `json:"maxCertDuration,omitempty"`
-	DisableIssuedAtCheck bool                       `json:"disableIssuedAtCheck,omitempty"`
+	Provisioners []*Provisioner   `json:"provisioners,omitempty"`
+	Template     *x509util.ASN1DN `json:"template,omitempty"`
+	Claims       *ProvisionerClaims
 }
 
 // Validate validates the authority configuration.
 func (c *AuthConfig) Validate() error {
+	var err error
+
 	if c == nil {
 		return errors.New("authority cannot be undefined")
 	}
 	if len(c.Provisioners) == 0 {
 		return errors.New("authority.provisioners cannot be empty")
 	}
+
+	if c.Claims, err = c.Claims.Init(&globalProvisionerClaims); err != nil {
+		return err
+	}
 	for _, p := range c.Provisioners {
-		err := p.Validate()
-		if err != nil {
+		if err := p.Init(c.Claims); err != nil {
 			return err
 		}
 	}

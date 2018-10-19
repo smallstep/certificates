@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/api"
-	"github.com/smallstep/ca-component/provisioner"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -15,17 +13,19 @@ type idUsed struct {
 	Subject string `json:"sub,omitempty"`
 }
 
-func containsAtLeastOneAudience(claim []string, expected []string) bool {
-	if len(expected) == 0 {
+// containsAtLeastOneAudience returns true if 'as' contains at least one element
+// of 'bs', otherwise returns false.
+func containsAtLeastOneAudience(as []string, bs []string) bool {
+	if len(bs) == 0 {
 		return true
 	}
-	if len(claim) == 0 {
+	if len(as) == 0 {
 		return false
 	}
 
-	for _, exp := range expected {
-		for _, cl := range claim {
-			if exp == cl {
+	for _, b := range bs {
+		for _, a := range as {
+			if b == a {
 				return true
 			}
 		}
@@ -35,35 +35,33 @@ func containsAtLeastOneAudience(claim []string, expected []string) bool {
 
 // Authorize authorizes a signature request by validating and authenticating
 // a OTT that must be sent w/ the request.
-func (a *Authority) Authorize(ott string) ([]api.Claim, error) {
+func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 	var (
 		errContext = map[string]interface{}{"ott": ott}
 		claims     = jwt.Claims{}
-		// Claims to check in the Sign method
-		downstreamClaims []api.Claim
 	)
 
 	// Validate payload
 	token, err := jwt.ParseSigned(ott)
 	if err != nil {
-		return nil, &apiError{errors.Wrapf(err, "error parsing OTT to JSONWebToken"),
+		return nil, &apiError{errors.Wrapf(err, "authorize: error parsing token"),
 			http.StatusUnauthorized, errContext}
 	}
 
 	kid := token.Headers[0].KeyID // JWT will only have 1 header.
 	if len(kid) == 0 {
-		return nil, &apiError{errors.New("keyID cannot be empty"),
+		return nil, &apiError{errors.New("authorize: token KeyID cannot be empty"),
 			http.StatusUnauthorized, errContext}
 	}
 	val, ok := a.provisionerIDIndex.Load(kid)
 	if !ok {
-		return nil, &apiError{errors.Errorf("Provisioner with KeyID %s could not be found", kid),
+		return nil, &apiError{errors.Errorf("authorize: provisioner with KeyID %s not found", kid),
 			http.StatusUnauthorized, errContext}
 	}
-	p, ok := val.(*provisioner.Provisioner)
+	p, ok := val.(*Provisioner)
 	if !ok {
-		return nil, &apiError{errors.Errorf("stored value is not a *Provisioner"),
-			http.StatusInternalServerError, context{}}
+		return nil, &apiError{errors.Errorf("authorize: invalid provisioner type"),
+			http.StatusInternalServerError, errContext}
 	}
 
 	if err = token.Claims(p.Key, &claims); err != nil {
@@ -75,7 +73,7 @@ func (a *Authority) Authorize(ott string) ([]api.Claim, error) {
 	if err = claims.ValidateWithLeeway(jwt.Expected{
 		Issuer: p.Issuer,
 	}, time.Minute); err != nil {
-		return nil, &apiError{errors.Wrapf(err, "error validating OTT"),
+		return nil, &apiError{errors.Wrapf(err, "authorize: invalid token"),
 			http.StatusUnauthorized, errContext}
 	}
 
@@ -89,17 +87,22 @@ func (a *Authority) Authorize(ott string) ([]api.Claim, error) {
 	}
 
 	if !containsAtLeastOneAudience(claims.Audience, a.audiences) {
-		return nil, &apiError{errors.New("invalid audience"), http.StatusUnauthorized,
+		return nil, &apiError{errors.New("authorize: token audience invalid"), http.StatusUnauthorized,
 			errContext}
 	}
 
 	if claims.Subject == "" {
-		return nil, &apiError{errors.New("OTT sub cannot be empty"),
+		return nil, &apiError{errors.New("authorize: token subject cannot be empty"),
 			http.StatusUnauthorized, errContext}
 	}
-	downstreamClaims = append(downstreamClaims, &commonNameClaim{claims.Subject})
-	downstreamClaims = append(downstreamClaims, &dnsNamesClaim{claims.Subject})
-	downstreamClaims = append(downstreamClaims, &ipAddressesClaim{claims.Subject})
+
+	signOps := []interface{}{
+		&commonNameClaim{claims.Subject},
+		&dnsNamesClaim{claims.Subject},
+		&ipAddressesClaim{claims.Subject},
+		withIssuerAlternativeNameExtension(p.Issuer + ":" + p.Key.KeyID),
+		p,
+	}
 
 	// Store the token to protect against reuse.
 	if _, ok := a.ottMap.LoadOrStore(claims.ID, &idUsed{
@@ -110,5 +113,5 @@ func (a *Authority) Authorize(ott string) ([]api.Claim, error) {
 			errContext}
 	}
 
-	return downstreamClaims, nil
+	return signOps, nil
 }
