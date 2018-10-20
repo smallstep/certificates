@@ -4,12 +4,17 @@ import (
 	"crypto/sha256"
 	realx509 "crypto/x509"
 	"encoding/hex"
+	"fmt"
+	"net"
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/x509util"
 )
+
+const legacyAuthority = "step-certificate-authority"
 
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
@@ -23,6 +28,7 @@ type Authority struct {
 	provisionerIDIndex     *sync.Map
 	encryptedKeyIndex      *sync.Map
 	provisionerKeySetIndex *sync.Map
+	audiences              []string
 	// Do not re-initialize
 	initOnce bool
 }
@@ -63,6 +69,21 @@ func (a *Authority) init() error {
 	// Add root certificate to the certificate map
 	sum := sha256.Sum256(a.rootX509Crt.Raw)
 	a.certificates.Store(hex.EncodeToString(sum[:]), a.rootX509Crt)
+
+	// Define audiences: legacy + possible urls
+	_, port, err := net.SplitHostPort(a.config.Address)
+	if err != nil {
+		return errors.Wrapf(err, "error parsing %s", a.config.Address)
+	}
+	audiences := []string{legacyAuthority}
+	for _, name := range a.config.DNSNames {
+		if port == "443" {
+			audiences = append(audiences, fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
+		}
+		audiences = append(audiences, fmt.Sprintf("https://%s:%s/sign", name, port), fmt.Sprintf("https://%s:%s/1.0/sign", name, port))
+
+	}
+	a.audiences = audiences
 
 	// Decrypt and load intermediate public / private key pair.
 	if len(a.config.Password) > 0 {

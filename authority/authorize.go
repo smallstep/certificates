@@ -15,10 +15,6 @@ type idUsed struct {
 	Subject string `json:"sub,omitempty"`
 }
 
-var (
-	validTokenAudience = []string{"https://ca/sign", "step-certificate-authority"}
-)
-
 func containsAtLeastOneAudience(claim []string, expected []string) bool {
 	if len(expected) == 0 {
 		return true
@@ -83,7 +79,7 @@ func (a *Authority) Authorize(ott string) ([]api.Claim, error) {
 			http.StatusUnauthorized, errContext}
 	}
 
-	if !containsAtLeastOneAudience(claims.Audience, validTokenAudience) {
+	if !containsAtLeastOneAudience(claims.Audience, a.audiences) {
 		return nil, &apiError{errors.New("invalid audience"), http.StatusUnauthorized,
 			errContext}
 	}
