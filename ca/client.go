@@ -133,10 +133,11 @@ func getTransportFromFile(filename string) (http.RoundTripper, error) {
 }
 
 func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
-	client, err := NewClient(endpoint)
+	u, err := parseEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
+	client := &Client{endpoint: u}
 	root, err := client.Root(sum)
 	if err != nil {
 		return nil, err
@@ -150,6 +151,18 @@ func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
 	})
 }
 
+// parseEndpoint parses and validates the given endpoint
+func parseEndpoint(endpoint string) (*url.URL, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing endpoint '%s'", endpoint)
+	}
+	if u.Scheme == "" || u.Host == "" {
+		return nil, errors.Errorf("error parsing endpoint: url '%s' is not valid", endpoint)
+	}
+	return u, nil
+}
+
 // Client implements an HTTP client for the CA server.
 type Client struct {
 	client   *http.Client
@@ -159,15 +172,10 @@ type Client struct {
 
 // NewClient creates a new Client with the given endpoint and options.
 func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
-	// Validate endpoint
-	u, err := url.Parse(endpoint)
+	u, err := parseEndpoint(endpoint)
 	if err != nil {
-		return nil, errors.Wrap(err, "error parsing endpoint")
+		return nil, err
 	}
-	if u.Scheme == "" || u.Host == "" {
-		return nil, errors.New("error parsing endpoint: url is not valid")
-	}
-
 	// Retrieve transport from options.
 	o := new(clientOptions)
 	if err := o.apply(opts); err != nil {
