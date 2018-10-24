@@ -258,6 +258,8 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/provisioners", h.Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
 	r.MethodFunc("GET", "/provisioners/jwk-set-by-issuer", h.JWKSetByIssuer)
+	// For compatibility with old code:
+	r.MethodFunc("POST", "/re-sign", h.Renew)
 }
 
 // Health is an HTTP handler that returns the status of the server.
