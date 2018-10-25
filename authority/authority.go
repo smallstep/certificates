@@ -28,6 +28,7 @@ type Authority struct {
 	provisionerIDIndex     *sync.Map
 	encryptedKeyIndex      *sync.Map
 	provisionerKeySetIndex *sync.Map
+	sortedProvisioners     provisionerSlice
 	audiences              []string
 	// Do not re-initialize
 	initOnce bool
@@ -35,9 +36,31 @@ type Authority struct {
 
 // New creates and initiates a new Authority type.
 func New(config *Config) (*Authority, error) {
-	if err := config.Validate(); err != nil {
+	err := config.Validate()
+	if err != nil {
 		return nil, err
 	}
+
+	// Get sorted provisioners
+	var sorted provisionerSlice
+	if config.AuthorityConfig != nil {
+		sorted, err = newSortedProvisioners(config.AuthorityConfig.Provisioners)
+	}
+
+	// Define audiences: legacy + possible urls
+	_, port, err := net.SplitHostPort(config.Address)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing %s", config.Address)
+	}
+	audiences := []string{legacyAuthority}
+	for _, name := range config.DNSNames {
+		if port == "443" {
+			audiences = append(audiences, fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
+		}
+		audiences = append(audiences, fmt.Sprintf("https://%s:%s/sign", name, port), fmt.Sprintf("https://%s:%s/1.0/sign", name, port))
+
+	}
+
 	var a = &Authority{
 		config:                 config,
 		certificates:           new(sync.Map),
@@ -45,6 +68,8 @@ func New(config *Config) (*Authority, error) {
 		provisionerIDIndex:     new(sync.Map),
 		encryptedKeyIndex:      new(sync.Map),
 		provisionerKeySetIndex: new(sync.Map),
+		sortedProvisioners:     sorted,
+		audiences:              audiences,
 	}
 	if err := a.init(); err != nil {
 		return nil, err
@@ -69,21 +94,6 @@ func (a *Authority) init() error {
 	// Add root certificate to the certificate map
 	sum := sha256.Sum256(a.rootX509Crt.Raw)
 	a.certificates.Store(hex.EncodeToString(sum[:]), a.rootX509Crt)
-
-	// Define audiences: legacy + possible urls
-	_, port, err := net.SplitHostPort(a.config.Address)
-	if err != nil {
-		return errors.Wrapf(err, "error parsing %s", a.config.Address)
-	}
-	audiences := []string{legacyAuthority}
-	for _, name := range a.config.DNSNames {
-		if port == "443" {
-			audiences = append(audiences, fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
-		}
-		audiences = append(audiences, fmt.Sprintf("https://%s:%s/sign", name, port), fmt.Sprintf("https://%s:%s/1.0/sign", name, port))
-
-	}
-	a.audiences = audiences
 
 	// Decrypt and load intermediate public / private key pair.
 	if len(a.config.Password) > 0 {
