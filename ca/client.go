@@ -15,6 +15,7 @@ import (
 	"encoding/pem"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -353,8 +354,14 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 			CommonName: claims.Subject,
 		},
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
-		DNSNames:           []string{claims.Subject},
 	}
+
+	if ip := net.ParseIP(claims.Subject); ip != nil {
+		template.IPAddresses = append(template.IPAddresses, ip)
+	} else {
+		template.DNSNames = append(template.DNSNames, claims.Subject)
+	}
+
 	csr, err := x509.CreateCertificateRequest(rand.Reader, template, pk)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error creating certificate request")
