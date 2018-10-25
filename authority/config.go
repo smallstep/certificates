@@ -67,10 +67,11 @@ type Config struct {
 
 // AuthConfig represents the configuration options for the authority.
 type AuthConfig struct {
-	Provisioners    []*provisioner.Provisioner `json:"provisioners,omitempty"`
-	Template        *x509util.ASN1DN           `json:"template,omitempty"`
-	MinCertDuration *duration                  `json:"minCertDuration,omitempty"`
-	MaxCertDuration *duration                  `json:"maxCertDuration,omitempty"`
+	Provisioners         []*provisioner.Provisioner `json:"provisioners,omitempty"`
+	Template             *x509util.ASN1DN           `json:"template,omitempty"`
+	MinCertDuration      *duration                  `json:"minCertDuration,omitempty"`
+	MaxCertDuration      *duration                  `json:"maxCertDuration,omitempty"`
+	DisableIssuedAtCheck bool                       `json:"disableIssuedAtCheck,omitempty"`
 }
 
 // Validate validates the authority configuration.
