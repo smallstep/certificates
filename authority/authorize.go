@@ -13,13 +13,9 @@ type idUsed struct {
 	Subject string `json:"sub,omitempty"`
 }
 
-// containsAtLeastOneAudience returns true if 'as' contains at least one element
-// of 'bs', otherwise returns false.
-func containsAtLeastOneAudience(as []string, bs []string) bool {
-	if len(bs) == 0 {
-		return true
-	}
-	if len(as) == 0 {
+// matchesOne returns true if A and B share at least one element.
+func matchesOne(as, bs []string) bool {
+	if len(bs) == 0 || len(as) == 0 {
 		return false
 	}
 
@@ -86,7 +82,7 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 		}
 	}
 
-	if !containsAtLeastOneAudience(claims.Audience, a.audiences) {
+	if !matchesOne(claims.Audience, a.audiences) {
 		return nil, &apiError{errors.New("authorize: token audience invalid"), http.StatusUnauthorized,
 			errContext}
 	}

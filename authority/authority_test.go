@@ -56,7 +56,7 @@ func TestAuthorityNew(t *testing.T) {
 				config: c,
 			}
 		},
-		"fail-bad-root": func(t *testing.T) *newTest {
+		"fail bad root": func(t *testing.T) *newTest {
 			c, err := LoadConfiguration("../ca/testdata/ca.json")
 			assert.FatalError(t, err)
 			c.Root = "foo"
@@ -65,7 +65,16 @@ func TestAuthorityNew(t *testing.T) {
 				err:    errors.New("open foo failed: no such file or directory"),
 			}
 		},
-		"fail-bad-password": func(t *testing.T) *newTest {
+		"fail bad address": func(t *testing.T) *newTest {
+			c, err := LoadConfiguration("../ca/testdata/ca.json")
+			assert.FatalError(t, err)
+			c.Address = "127.0.0.1"
+			return &newTest{
+				config: c,
+				err:    errors.New("error parsing 127.0.0.1: address 127.0.0.1: missing port in address"),
+			}
+		},
+		"fail bad password": func(t *testing.T) *newTest {
 			c, err := LoadConfiguration("../ca/testdata/ca.json")
 			assert.FatalError(t, err)
 			c.Password = "wrong"
@@ -74,7 +83,7 @@ func TestAuthorityNew(t *testing.T) {
 				err:    errors.New("error decrypting ../ca/testdata/secrets/intermediate_ca_key: x509: decryption password incorrect"),
 			}
 		},
-		"fail-loading-ca-cert": func(t *testing.T) *newTest {
+		"fail loading CA cert": func(t *testing.T) *newTest {
 			c, err := LoadConfiguration("../ca/testdata/ca.json")
 			assert.FatalError(t, err)
 			c.IntermediateCert = "wrong"
@@ -116,6 +125,12 @@ func TestAuthorityNew(t *testing.T) {
 					// sanity check
 					_, ok = auth.provisionerIDIndex.Load("fooo")
 					assert.False(t, ok)
+
+					assert.Equals(t, auth.audiences, []string{
+						"step-certificate-authority",
+						"https://127.0.0.1:0/sign",
+						"https://127.0.0.1:0/1.0/sign",
+					})
 				}
 			}
 		})

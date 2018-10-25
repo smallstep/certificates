@@ -13,6 +13,45 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
+func TestMatchesOne(t *testing.T) {
+	type matchesTest struct {
+		a, b []string
+		exp  bool
+	}
+	tests := map[string]matchesTest{
+		"false arg1 empty": matchesTest{
+			a:   []string{},
+			b:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
+			exp: false,
+		},
+		"false arg2 empty": matchesTest{
+			a:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
+			b:   []string{},
+			exp: false,
+		},
+		"false arg1,arg2 empty": matchesTest{
+			a:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
+			b:   []string{"step-gateway", "step-cli"},
+			exp: false,
+		},
+		"false": matchesTest{
+			a:   []string{"step-gateway", "step-cli"},
+			b:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
+			exp: false,
+		},
+		"true": matchesTest{
+			a:   []string{"step-gateway", "https://test.ca.smallstep.com/sign"},
+			b:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
+			exp: true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equals(t, tc.exp, matchesOne(tc.a, tc.b))
+		})
+	}
+}
+
 func TestAuthorize(t *testing.T) {
 	a := testAuthority(t)
 	jwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_priv.jwk",
