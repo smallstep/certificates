@@ -14,7 +14,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/ca-component/authority"
 	"github.com/smallstep/cli/crypto/tlsutil"
-	"github.com/smallstep/cli/jose"
 )
 
 // Authority is the interface implemented by a CA authority.
@@ -157,12 +156,6 @@ type ProvisionersResponse struct {
 	NextCursor   string                   `json:"nextCursor"`
 }
 
-// JWKSetByIssuerResponse is the response object that returns the map of
-// provisioners.
-type JWKSetByIssuerResponse struct {
-	Map map[string]*jose.JSONWebKeySet `json:"map"`
-}
-
 // ProvisionerKeyResponse is the response object that returns the encryptoed key
 // of a provisioner.
 type ProvisionerKeyResponse struct {
@@ -212,7 +205,6 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("POST", "/renew", h.Renew)
 	r.MethodFunc("GET", "/provisioners", h.Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
-	r.MethodFunc("GET", "/provisioners/jwk-set-by-issuer", h.JWKSetByIssuer)
 	// For compatibility with old code:
 	r.MethodFunc("POST", "/re-sign", h.Renew)
 }
@@ -326,26 +318,6 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, &ProvisionerKeyResponse{key})
-}
-
-func (h *caHandler) JWKSetByIssuer(w http.ResponseWriter, r *http.Request) {
-	m := map[string]*jose.JSONWebKeySet{}
-	ps, _, err := h.Authority.GetProvisioners("", 0)
-	if err != nil {
-		WriteError(w, InternalServerError(err))
-		return
-	}
-	for _, p := range ps {
-		ks, found := m[p.Issuer]
-		if found {
-			ks.Keys = append(ks.Keys, *p.Key)
-		} else {
-			ks = new(jose.JSONWebKeySet)
-			ks.Keys = []jose.JSONWebKey{*p.Key}
-			m[p.Issuer] = ks
-		}
-	}
-	JSON(w, &JWKSetByIssuerResponse{m})
 }
 
 func parseCursor(r *http.Request) (cursor string, limit int, err error) {
