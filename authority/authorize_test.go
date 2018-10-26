@@ -19,27 +19,27 @@ func TestMatchesOne(t *testing.T) {
 		exp  bool
 	}
 	tests := map[string]matchesTest{
-		"false arg1 empty": matchesTest{
+		"false arg1 empty": {
 			a:   []string{},
 			b:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
 			exp: false,
 		},
-		"false arg2 empty": matchesTest{
+		"false arg2 empty": {
 			a:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
 			b:   []string{},
 			exp: false,
 		},
-		"false arg1,arg2 empty": matchesTest{
+		"false arg1,arg2 empty": {
 			a:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
 			b:   []string{"step-gateway", "step-cli"},
 			exp: false,
 		},
-		"false": matchesTest{
+		"false": {
 			a:   []string{"step-gateway", "step-cli"},
 			b:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
 			exp: false,
 		},
-		"true": matchesTest{
+		"true": {
 			a:   []string{"step-gateway", "https://test.ca.smallstep.com/sign"},
 			b:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
 			exp: true,
