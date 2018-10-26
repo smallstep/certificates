@@ -9,13 +9,6 @@ import (
 	jose "gopkg.in/square/go-jose.v2"
 )
 
-// baseClaims interface.
-type baseClaims struct {
-	MinTLSDur     *duration `json:"minTLSCertDuration,omitempty"`
-	MaxTLSDur     *duration `json:"maxTLSCertDuration,omitempty"`
-	DefaultTLSDur *duration `json:"defaultTLSCertDuration,omitempty"`
-}
-
 // ProvisionerClaims so that individual provisioners can override global claims.
 type ProvisionerClaims struct {
 	globalClaims  *ProvisionerClaims

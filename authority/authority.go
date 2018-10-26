@@ -45,6 +45,9 @@ func New(config *Config) (*Authority, error) {
 	var sorted provisionerSlice
 	if config.AuthorityConfig != nil {
 		sorted, err = newSortedProvisioners(config.AuthorityConfig.Provisioners)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Define audiences: legacy + possible urls
