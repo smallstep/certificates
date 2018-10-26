@@ -148,9 +148,6 @@ func TestSign(t *testing.T) {
 	}
 
 	for name, genTestCase := range tests {
-		if name != "ok" {
-			continue
-		}
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
@@ -199,22 +196,18 @@ func TestSign(t *testing.T) {
 					found := 0
 					for _, ext := range leaf.Extensions {
 						id := ext.Id.String()
-						if id != stepOIDProvisionerName.String() && id != stepOIDProvisionerKeyID.String() {
+						if id != stepOIDProvisioner.String() {
 							continue
 						}
 						found++
-						rw := asn1.RawValue{}
-						_, err := asn1.Unmarshal(ext.Value, &rw)
+						val := stepProvisionerASN1{}
+						_, err := asn1.Unmarshal(ext.Value, &val)
 						assert.FatalError(t, err)
-						assert.Equals(t, rw.Tag, asn1.TagGeneralString)
-						assert.Equals(t, rw.Class, asn1.ClassPrivate)
-						if id == stepOIDProvisionerName.String() {
-							assert.Equals(t, string(rw.Bytes), p.Issuer)
-						} else {
-							assert.Equals(t, string(rw.Bytes), p.Key.KeyID)
-						}
+						assert.Equals(t, val.Type, provisionerTypeJWK)
+						assert.Equals(t, val.Name, []byte(p.Issuer))
+						assert.Equals(t, val.CredentialID, []byte(p.Key.KeyID))
 					}
-					assert.Equals(t, found, 2)
+					assert.Equals(t, found, 1)
 
 					realIntermediate, err := x509.ParseCertificate(a.intermediateIdentity.Crt.Raw)
 					assert.FatalError(t, err)
