@@ -124,6 +124,7 @@ func (p *Provisioner) getTLSApps(so SignOptions) ([]x509util.WithOption, []certC
 	return []x509util.WithOption{
 			x509util.WithNotBeforeAfterDuration(so.NotBefore,
 				so.NotAfter, c.DefaultTLSCertDuration()),
+			withProvisionerOID(p.Issuer, p.Key.KeyID),
 		}, []certClaim{
 			&certTemporalClaim{
 				min: c.MinTLSCertDuration(),

@@ -96,7 +96,6 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 		&commonNameClaim{claims.Subject},
 		&dnsNamesClaim{claims.Subject},
 		&ipAddressesClaim{claims.Subject},
-		withIssuerAlternativeNameExtension(p.Issuer + ":" + p.Key.KeyID),
 		p,
 	}
 

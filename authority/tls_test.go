@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"fmt"
 	"net/http"
 	"testing"
@@ -50,6 +51,8 @@ func TestSign(t *testing.T) {
 		NotAfter:  nb.Add(time.Minute * 5),
 	}
 
+	p := a.config.AuthorityConfig.Provisioners[1]
+
 	type signTest struct {
 		auth      *Authority
 		csr       *x509.CertificateRequest
@@ -62,13 +65,10 @@ func TestSign(t *testing.T) {
 			csr := getCSR(t, priv)
 			csr.Raw = []byte("foo")
 			return &signTest{
-				auth: a,
-				csr:  csr,
-				extraOpts: []interface{}{
-					withIssuerAlternativeNameExtension("baz"),
-					"42",
-				},
-				signOpts: signOpts,
+				auth:      a,
+				csr:       csr,
+				extraOpts: []interface{}{p, "42"},
+				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: invalid extra option type string"),
 					http.StatusInternalServerError,
 					context{"csr": csr, "signOptions": signOpts},
@@ -79,12 +79,10 @@ func TestSign(t *testing.T) {
 			csr := getCSR(t, priv)
 			csr.Raw = []byte("foo")
 			return &signTest{
-				auth: a,
-				csr:  csr,
-				extraOpts: []interface{}{
-					withIssuerAlternativeNameExtension("baz"),
-				},
-				signOpts: signOpts,
+				auth:      a,
+				csr:       csr,
+				extraOpts: []interface{}{p},
+				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: error converting x509 csr to stepx509 csr"),
 					http.StatusInternalServerError,
 					context{"csr": csr, "signOptions": signOpts},
@@ -96,13 +94,10 @@ func TestSign(t *testing.T) {
 			_a.config.AuthorityConfig.Template = nil
 			csr := getCSR(t, priv)
 			return &signTest{
-				auth: _a,
-				csr:  csr,
-				extraOpts: []interface{}{
-					withIssuerAlternativeNameExtension("baz"),
-					a.config.AuthorityConfig.Provisioners[1],
-				},
-				signOpts: signOpts,
+				auth:      _a,
+				csr:       csr,
+				extraOpts: []interface{}{p},
+				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: default ASN1DN template cannot be nil"),
 					http.StatusInternalServerError,
 					context{"csr": csr, "signOptions": signOpts},
@@ -114,12 +109,10 @@ func TestSign(t *testing.T) {
 			_a.intermediateIdentity.Key = nil
 			csr := getCSR(t, priv)
 			return &signTest{
-				auth: _a,
-				csr:  csr,
-				extraOpts: []interface{}{
-					withIssuerAlternativeNameExtension("baz"),
-				},
-				signOpts: signOpts,
+				auth:      _a,
+				csr:       csr,
+				extraOpts: []interface{}{p},
+				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: error creating new leaf certificate"),
 					http.StatusInternalServerError,
 					context{"csr": csr, "signOptions": signOpts},
@@ -133,13 +126,10 @@ func TestSign(t *testing.T) {
 				NotAfter:  nb.Add(time.Hour * 25),
 			}
 			return &signTest{
-				auth: a,
-				csr:  csr,
-				extraOpts: []interface{}{
-					withIssuerAlternativeNameExtension("baz"),
-					a.config.AuthorityConfig.Provisioners[1],
-				},
-				signOpts: _signOpts,
+				auth:      a,
+				csr:       csr,
+				extraOpts: []interface{}{p},
+				signOpts:  _signOpts,
 				err: &apiError{errors.New("sign: requested duration of 25h0m0s is more than the authorized maximum certificate duration of 24h0m0s"),
 					http.StatusUnauthorized,
 					context{"csr": csr, "signOptions": _signOpts},
@@ -149,18 +139,18 @@ func TestSign(t *testing.T) {
 		"ok": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			return &signTest{
-				auth: a,
-				csr:  csr,
-				extraOpts: []interface{}{
-					withIssuerAlternativeNameExtension("baz"),
-					a.config.AuthorityConfig.Provisioners[1],
-				},
-				signOpts: signOpts,
+				auth:      a,
+				csr:       csr,
+				extraOpts: []interface{}{p},
+				signOpts:  signOpts,
 			}
 		},
 	}
 
 	for name, genTestCase := range tests {
+		if name != "ok" {
+			continue
+		}
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
@@ -204,6 +194,27 @@ func TestSign(t *testing.T) {
 					assert.Equals(t, leaf.SubjectKeyId, hash[:])
 
 					assert.Equals(t, leaf.AuthorityKeyId, a.intermediateIdentity.Crt.SubjectKeyId)
+
+					// Verify Provisioner OID
+					found := 0
+					for _, ext := range leaf.Extensions {
+						id := ext.Id.String()
+						if id != stepOIDProvisionerName.String() && id != stepOIDProvisionerKeyID.String() {
+							continue
+						}
+						found++
+						rw := asn1.RawValue{}
+						_, err := asn1.Unmarshal(ext.Value, &rw)
+						assert.FatalError(t, err)
+						assert.Equals(t, rw.Tag, asn1.TagGeneralString)
+						assert.Equals(t, rw.Class, asn1.ClassPrivate)
+						if id == stepOIDProvisionerName.String() {
+							assert.Equals(t, string(rw.Bytes), p.Issuer)
+						} else {
+							assert.Equals(t, string(rw.Bytes), p.Key.KeyID)
+						}
+					}
+					assert.Equals(t, found, 2)
 
 					realIntermediate, err := x509.ParseCertificate(a.intermediateIdentity.Crt.Raw)
 					assert.FatalError(t, err)

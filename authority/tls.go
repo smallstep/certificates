@@ -29,26 +29,36 @@ type SignOptions struct {
 	NotBefore time.Time `json:"notBefore"`
 }
 
-func withIssuerAlternativeNameExtension(name string) x509util.WithOption {
+var (
+	stepOIDRoot             = asn1.ObjectIdentifier([]int{1, 3, 6, 1, 4, 1, 37476, 9000, 64})
+	stepOIDProvisioner      = asn1.ObjectIdentifier(append([]int(nil), append(stepOIDRoot, 1)...))
+	stepOIDProvisionerName  = asn1.ObjectIdentifier(append([]int(nil), append(stepOIDProvisioner, 1)...))
+	stepOIDProvisionerKeyID = asn1.ObjectIdentifier(append([]int(nil), append(stepOIDProvisioner, 2)...))
+)
+
+func withProvisionerOID(name, kid string) x509util.WithOption {
 	return func(p x509util.Profile) error {
 		crt := p.Subject()
 
-		iatExt := []asn1.RawValue{
-			asn1.RawValue{
-				Tag:   2,
-				Class: 2,
-				Bytes: []byte(name),
-			},
-		}
-		iatExtBytes, err := asn1.Marshal(iatExt)
-		if err != nil {
-			return &apiError{err, http.StatusInternalServerError, nil}
-		}
+		irw := asn1.RawValue{Tag: asn1.TagGeneralString, Class: asn1.ClassPrivate, Bytes: []byte(name)}
+		krw := asn1.RawValue{Tag: asn1.TagGeneralString, Class: asn1.ClassPrivate, Bytes: []byte(kid)}
 
+		irwb, err := asn1.Marshal(irw)
+		if err != nil {
+			return err
+		}
+		krwb, err := asn1.Marshal(krw)
+		if err != nil {
+			return err
+		}
 		crt.ExtraExtensions = append(crt.ExtraExtensions, pkix.Extension{
-			Id:       []int{2, 5, 9, 18},
+			Id:       stepOIDProvisionerName,
 			Critical: false,
-			Value:    iatExtBytes,
+			Value:    irwb,
+		}, pkix.Extension{
+			Id:       stepOIDProvisionerKeyID,
+			Critical: false,
+			Value:    krwb,
 		})
 
 		return nil
