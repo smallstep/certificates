@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -164,6 +165,50 @@ func parseEndpoint(endpoint string) (*url.URL, error) {
 	return u, nil
 }
 
+// ProvisionerOption is the type of options passed to the Provisioner method.
+type ProvisionerOption func(o *provisionerOptions) error
+
+type provisionerOptions struct {
+	cursor string
+	limit  int
+}
+
+func (o *provisionerOptions) apply(opts []ProvisionerOption) (err error) {
+	for _, fn := range opts {
+		if err = fn(o); err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (o *provisionerOptions) rawQuery() string {
+	v := url.Values{}
+	if len(o.cursor) > 0 {
+		v.Set("cursor", o.cursor)
+	}
+	if o.limit > 0 {
+		v.Set("limit", strconv.Itoa(o.limit))
+	}
+	return v.Encode()
+}
+
+// WithProvisionerCursor will request the provisioners starting with the given cursor.
+func WithProvisionerCursor(cursor string) ProvisionerOption {
+	return func(o *provisionerOptions) error {
+		o.cursor = cursor
+		return nil
+	}
+}
+
+// WithProvisionerLimit will request the given number of provisioners.
+func WithProvisionerLimit(limit int) ProvisionerOption {
+	return func(o *provisionerOptions) error {
+		o.limit = limit
+		return nil
+	}
+}
+
 // Client implements an HTTP client for the CA server.
 type Client struct {
 	client   *http.Client
@@ -297,8 +342,18 @@ func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
 
 // Provisioners performs the provisioners request to the CA and returns the
 // api.ProvisionersResponse struct with a map of provisioners.
-func (c *Client) Provisioners() (*api.ProvisionersResponse, error) {
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/provisioners"})
+//
+// ProvisionerOption WithProvisionerCursor and WithProvisionLimit can be used to
+// paginate the provisioners.
+func (c *Client) Provisioners(opts ...ProvisionerOption) (*api.ProvisionersResponse, error) {
+	o := new(provisionerOptions)
+	if err := o.apply(opts); err != nil {
+		return nil, err
+	}
+	u := c.endpoint.ResolveReference(&url.URL{
+		Path:     "/provisioners",
+		RawQuery: o.rawQuery(),
+	})
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)

@@ -396,12 +396,17 @@ func TestClient_Provisioners(t *testing.T) {
 
 	tests := []struct {
 		name         string
+		args         []ProvisionerOption
+		expectedURI  string
 		response     interface{}
 		responseCode int
 		wantErr      bool
 	}{
-		{"ok", ok, 200, false},
-		{"fail", internalServerError, 500, true},
+		{"ok", nil, "/provisioners", ok, 200, false},
+		{"ok with cursor", []ProvisionerOption{WithProvisionerCursor("abc")}, "/provisioners?cursor=abc", ok, 200, false},
+		{"ok with limit", []ProvisionerOption{WithProvisionerLimit(10)}, "/provisioners?limit=10", ok, 200, false},
+		{"ok with cursor+limit", []ProvisionerOption{WithProvisionerCursor("abc"), WithProvisionerLimit(10)}, "/provisioners?cursor=abc&limit=10", ok, 200, false},
+		{"fail", nil, "/provisioners", internalServerError, 500, true},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -416,15 +421,14 @@ func TestClient_Provisioners(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				expected := "/provisioners"
-				if req.RequestURI != expected {
-					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
+				if req.RequestURI != tt.expectedURI {
+					t.Errorf("RequestURI = %s, want %s", req.RequestURI, tt.expectedURI)
 				}
 				w.WriteHeader(tt.responseCode)
 				api.JSON(w, tt.response)
 			})
 
-			got, err := c.Provisioners()
+			got, err := c.Provisioners(tt.args...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Client.Provisioners() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -446,67 +450,6 @@ func TestClient_Provisioners(t *testing.T) {
 		})
 	}
 }
-
-/*
-func TestClient_Provisioners(t *testing.T) {
-	ok := &api.ProvisionersResponse{
-		Provisioners: map[string]*jose.JSONWebKeySet{},
-	}
-	internalServerError := api.InternalServerError(fmt.Errorf("Internal Server Error"))
-
-	tests := []struct {
-		name         string
-		response     interface{}
-		responseCode int
-		wantErr      bool
-	}{
-		{"ok", ok, 200, false},
-		{"fail", internalServerError, 500, true},
-	}
-
-	srv := httptest.NewServer(nil)
-	defer srv.Close()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
-			if err != nil {
-				t.Errorf("NewClient() error = %v", err)
-				return
-			}
-
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				expected := "/provisioners"
-				if req.RequestURI != expected {
-					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
-				}
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
-			})
-
-			got, err := c.Provisioners()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Client.Provisioners() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			switch {
-			case err != nil:
-				if got != nil {
-					t.Errorf("Client.Provisioners() = %v, want nil", got)
-				}
-				if !reflect.DeepEqual(err, tt.response) {
-					t.Errorf("Client.Provisioners() error = %v, want %v", err, tt.response)
-				}
-			default:
-				if !reflect.DeepEqual(got, tt.response) {
-					t.Errorf("Client.Provisioners() = %v, want %v", got, tt.response)
-				}
-			}
-		})
-	}
-}
-*/
 
 func TestClient_ProvisionerKey(t *testing.T) {
 	ok := &api.ProvisionerKeyResponse{
