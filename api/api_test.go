@@ -664,7 +664,12 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		r *http.Request
 	}
 
-	req, err := http.NewRequest("GET", "http://example.com/provisioners", nil)
+	req, err := http.NewRequest("GET", "http://example.com/provisioners?cursor=foo&limit=20", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reqLimitFail, err := http.NewRequest("GET", "http://example.com/provisioners?limit=abc", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -700,6 +705,7 @@ func Test_caHandler_Provisioners(t *testing.T) {
 	}{
 		{"ok", fields{&mockAuthority{ret1: p, ret2: ""}}, args{httptest.NewRecorder(), req}, 200},
 		{"fail", fields{&mockAuthority{ret1: p, ret2: "", err: fmt.Errorf("the error")}}, args{httptest.NewRecorder(), req}, 500},
+		{"limit fail", fields{&mockAuthority{ret1: p, ret2: ""}}, args{httptest.NewRecorder(), reqLimitFail}, 400},
 	}
 
 	expected, err := json.Marshal(pr)
@@ -707,7 +713,8 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedError := []byte(`{"status":500,"message":"Internal Server Error"}`)
+	expectedError400 := []byte(`{"status":400,"message":"Bad Request"}`)
+	expectedError500 := []byte(`{"status":500,"message":"Internal Server Error"}`)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := &caHandler{
@@ -730,9 +737,19 @@ func Test_caHandler_Provisioners(t *testing.T) {
 					t.Errorf("caHandler.Provisioners Body = %s, wants %s", body, expected)
 				}
 			} else {
-				if !bytes.Equal(bytes.TrimSpace(body), expectedError) {
-					t.Errorf("caHandler.Provisioners Body = %s, wants %s", body, expectedError)
+				switch tt.statusCode {
+				case 400:
+					if !bytes.Equal(bytes.TrimSpace(body), expectedError400) {
+						t.Errorf("caHandler.Provisioners Body = %s, wants %s", body, expectedError400)
+					}
+				case 500:
+					if !bytes.Equal(bytes.TrimSpace(body), expectedError500) {
+						t.Errorf("caHandler.Provisioners Body = %s, wants %s", body, expectedError500)
+					}
+				default:
+					t.Errorf("caHandler.Provisioner unexpected status code = %d", tt.statusCode)
 				}
+
 			}
 		})
 	}
