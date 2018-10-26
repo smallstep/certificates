@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,7 +24,7 @@ type Authority interface {
 	Root(shasum string) (*x509.Certificate, error)
 	Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error)
 	Renew(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	GetProvisioners() ([]*authority.Provisioner, error)
+	GetProvisioners(cursor string, limit int) ([]*authority.Provisioner, string, error)
 	GetEncryptedKey(kid string) (string, error)
 }
 
@@ -153,6 +154,7 @@ type SignRequest struct {
 // provisioners.
 type ProvisionersResponse struct {
 	Provisioners []*authority.Provisioner `json:"provisioners"`
+	NextCursor   string                   `json:"nextCursor"`
 }
 
 // JWKSetByIssuerResponse is the response object that returns the map of
@@ -298,12 +300,21 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 
 // Provisioners returns the list of provisioners configured in the authority.
 func (h *caHandler) Provisioners(w http.ResponseWriter, r *http.Request) {
-	p, err := h.Authority.GetProvisioners()
+	cursor, limit, err := parseCursor(r)
+	if err != nil {
+		WriteError(w, BadRequest(err))
+		return
+	}
+
+	p, next, err := h.Authority.GetProvisioners(cursor, limit)
 	if err != nil {
 		WriteError(w, InternalServerError(err))
 		return
 	}
-	JSON(w, &ProvisionersResponse{p})
+	JSON(w, &ProvisionersResponse{
+		Provisioners: p,
+		NextCursor:   next,
+	})
 }
 
 // ProvisionerKey returns the encrypted key of a provisioner by it's key id.
@@ -319,7 +330,7 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 
 func (h *caHandler) JWKSetByIssuer(w http.ResponseWriter, r *http.Request) {
 	m := map[string]*jose.JSONWebKeySet{}
-	ps, err := h.Authority.GetProvisioners()
+	ps, _, err := h.Authority.GetProvisioners("", 0)
 	if err != nil {
 		WriteError(w, InternalServerError(err))
 		return
@@ -335,4 +346,16 @@ func (h *caHandler) JWKSetByIssuer(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	JSON(w, &JWKSetByIssuerResponse{m})
+}
+
+func parseCursor(r *http.Request) (cursor string, limit int, err error) {
+	q := r.URL.Query()
+	cursor = q.Get("cursor")
+	if v := q.Get("limit"); len(v) > 0 {
+		limit, err = strconv.Atoi(v)
+		if err != nil {
+			return "", 0, errors.Wrapf(err, "error converting %s to integer", v)
+		}
+	}
+	return
 }

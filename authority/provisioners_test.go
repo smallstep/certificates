@@ -105,7 +105,7 @@ func TestGetProvisioners(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			ps, err := tc.a.GetProvisioners()
+			ps, next, err := tc.a.GetProvisioners("", 0)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					switch v := err.(type) {
@@ -120,6 +120,7 @@ func TestGetProvisioners(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, ps, tc.a.config.AuthorityConfig.Provisioners)
+					assert.Equals(t, "", next)
 				}
 			}
 		})

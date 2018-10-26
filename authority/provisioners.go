@@ -38,8 +38,9 @@ func (a *Authority) GetEncryptedKey(kid string) (string, error) {
 
 // GetProvisioners returns a map listing each provisioner and the JWK Key Set
 // with their public keys.
-func (a *Authority) GetProvisioners() ([]*Provisioner, error) {
-	return a.config.AuthorityConfig.Provisioners, nil
+func (a *Authority) GetProvisioners(cursor string, limit int) ([]*Provisioner, string, error) {
+	provisioners, nextCursor := a.sortedProvisioners.Find(cursor, limit)
+	return provisioners, nextCursor, nil
 }
 
 type uidProvisioner struct {
