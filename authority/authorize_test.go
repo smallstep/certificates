@@ -243,11 +243,7 @@ func TestAuthorize(t *testing.T) {
 			return &authorizeTest{
 				auth: a,
 				ott:  raw,
-				res: []interface{}{
-					"1", "2", "3",
-					withIssuerAlternativeNameExtension("step-cli:" + jwk.KeyID),
-					"5",
-				},
+				res:  []interface{}{"1", "2", "3", "4"},
 			}
 		},
 	}
