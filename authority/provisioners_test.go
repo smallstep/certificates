@@ -9,7 +9,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/ca-component/provisioner"
 	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/jose"
 )
@@ -127,7 +126,7 @@ func TestGetProvisioners(t *testing.T) {
 	}
 }
 
-func generateProvisioner(t *testing.T) *provisioner.Provisioner {
+func generateProvisioner(t *testing.T) *Provisioner {
 	issuer, err := randutil.Alphanumeric(10)
 	assert.FatalError(t, err)
 	// Create a new JWK
@@ -154,7 +153,7 @@ func generateProvisioner(t *testing.T) *provisioner.Provisioner {
 	public := jwk.Public()
 	encrypted, err := jwe.CompactSerialize()
 	assert.FatalError(t, err)
-	return &provisioner.Provisioner{
+	return &Provisioner{
 		Issuer:       issuer,
 		Type:         "JWT",
 		Key:          &public,
@@ -163,7 +162,7 @@ func generateProvisioner(t *testing.T) *provisioner.Provisioner {
 }
 
 func Test_newSortedProvisioners(t *testing.T) {
-	provisioners := make([]*provisioner.Provisioner, 20)
+	provisioners := make([]*Provisioner, 20)
 	for i := range provisioners {
 		provisioners[i] = generateProvisioner(t)
 	}
@@ -186,7 +185,7 @@ func Test_provisionerSlice_Find(t *testing.T) {
 	trim := func(s string) string {
 		return strings.TrimLeft(s, "0")
 	}
-	provisioners := make([]*provisioner.Provisioner, 20)
+	provisioners := make([]*Provisioner, 20)
 	for i := range provisioners {
 		provisioners[i] = generateProvisioner(t)
 	}
@@ -201,7 +200,7 @@ func Test_provisionerSlice_Find(t *testing.T) {
 		name  string
 		p     provisionerSlice
 		args  args
-		want  []*provisioner.Provisioner
+		want  []*Provisioner
 		want1 string
 	}{
 		{"all", ps, args{"", DefaultProvisionersMax}, provisioners[0:20], ""},

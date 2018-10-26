@@ -43,11 +43,11 @@ func (a *Authority) GetProvisioners() ([]*Provisioner, error) {
 }
 
 type uidProvisioner struct {
-	provisioner *provisioner.Provisioner
+	provisioner *Provisioner
 	uid         string
 }
 
-func newSortedProvisioners(provisioners []*provisioner.Provisioner) (provisionerSlice, error) {
+func newSortedProvisioners(provisioners []*Provisioner) (provisionerSlice, error) {
 	if len(provisioners) > math.MaxUint32 {
 		return nil, errors.New("too many provisioners")
 	}
@@ -80,7 +80,7 @@ func (p provisionerSlice) Len() int           { return len(p) }
 func (p provisionerSlice) Less(i, j int) bool { return p[i].uid < p[j].uid }
 func (p provisionerSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
-func (p provisionerSlice) Find(cursor string, limit int) ([]*provisioner.Provisioner, string) {
+func (p provisionerSlice) Find(cursor string, limit int) ([]*Provisioner, string) {
 	switch {
 	case limit <= 0:
 		limit = DefaultProvisionersLimit
@@ -92,7 +92,7 @@ func (p provisionerSlice) Find(cursor string, limit int) ([]*provisioner.Provisi
 	cursor = fmt.Sprintf("%040s", cursor)
 	i := sort.Search(n, func(i int) bool { return p[i].uid >= cursor })
 
-	var slice []*provisioner.Provisioner
+	var slice []*Provisioner
 	for ; i < n && len(slice) < limit; i++ {
 		slice = append(slice, p[i].provisioner)
 	}
@@ -104,7 +104,7 @@ func (p provisionerSlice) Find(cursor string, limit int) ([]*provisioner.Provisi
 
 // provisionerSum returns the SHA1 of the json representation of the
 // provisioner. From this we will create the unique and sorted id.
-func provisionerSum(p *provisioner.Provisioner) ([]byte, error) {
+func provisionerSum(p *Provisioner) ([]byte, error) {
 	b, err := json.Marshal(p.Key)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshalling provisioner")
