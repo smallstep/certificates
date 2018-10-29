@@ -45,7 +45,7 @@ required = [
   branch = "master"
   name = "github.com/go-chi/chi"
 
-[[constraint]]
+[[override]]
   branch = "ca-commands"
   name = "github.com/smallstep/cli"
 
