@@ -22,19 +22,19 @@ func TestProvisionerInit(t *testing.T) {
 		},
 		"fail-empty-type": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &Provisioner{Issuer: "foo"},
+				p:   &Provisioner{Name: "foo"},
 				err: errors.New("provisioner type cannot be empty"),
 			}
 		},
 		"fail-empty-key": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &Provisioner{Issuer: "foo", Type: "bar"},
+				p:   &Provisioner{Name: "foo", Type: "bar"},
 				err: errors.New("provisioner key cannot be empty"),
 			}
 		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p: &Provisioner{Issuer: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
+				p: &Provisioner{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
 			}
 		},
 	}

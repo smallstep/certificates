@@ -204,7 +204,7 @@ func TestSign(t *testing.T) {
 						_, err := asn1.Unmarshal(ext.Value, &val)
 						assert.FatalError(t, err)
 						assert.Equals(t, val.Type, provisionerTypeJWK)
-						assert.Equals(t, val.Name, []byte(p.Issuer))
+						assert.Equals(t, val.Name, []byte(p.Name))
 						assert.Equals(t, val.CredentialID, []byte(p.Key.KeyID))
 					}
 					assert.Equals(t, found, 1)

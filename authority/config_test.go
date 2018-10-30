@@ -19,14 +19,14 @@ func TestConfigValidate(t *testing.T) {
 	ac := &AuthConfig{
 		Provisioners: []*Provisioner{
 			{
-				Issuer: "Max",
-				Type:   "JWK",
-				Key:    maxjwk,
+				Name: "Max",
+				Type: "JWK",
+				Key:  maxjwk,
 			},
 			{
-				Issuer: "step-cli",
-				Type:   "JWK",
-				Key:    clijwk,
+				Name: "step-cli",
+				Type: "JWK",
+				Key:  clijwk,
 			},
 		},
 	}
@@ -217,14 +217,14 @@ func TestAuthConfigValidate(t *testing.T) {
 	assert.FatalError(t, err)
 	p := []*Provisioner{
 		{
-			Issuer: "Max",
-			Type:   "JWK",
-			Key:    maxjwk,
+			Name: "Max",
+			Type: "JWK",
+			Key:  maxjwk,
 		},
 		{
-			Issuer: "step-cli",
-			Type:   "JWK",
-			Key:    clijwk,
+			Name: "step-cli",
+			Type: "JWK",
+			Key:  clijwk,
 		},
 	}
 
@@ -250,8 +250,8 @@ func TestAuthConfigValidate(t *testing.T) {
 			return AuthConfigValidateTest{
 				ac: &AuthConfig{
 					Provisioners: []*Provisioner{
-						{Issuer: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
-						{Issuer: "foo", Key: &jose.JSONWebKey{}},
+						{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
+						{Name: "foo", Key: &jose.JSONWebKey{}},
 					},
 				},
 				err: errors.New("provisioner type cannot be empty"),

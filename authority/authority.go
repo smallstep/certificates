@@ -115,7 +115,7 @@ func (a *Authority) init() error {
 	}
 
 	for _, p := range a.config.AuthorityConfig.Provisioners {
-		a.provisionerIDIndex.Store(p.Key.KeyID, p)
+		a.provisionerIDIndex.Store(p.ID(), p)
 		if len(p.EncryptedKey) != 0 {
 			a.encryptedKeyIndex.Store(p.Key.KeyID, p.EncryptedKey)
 		}

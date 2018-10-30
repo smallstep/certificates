@@ -682,13 +682,13 @@ func Test_caHandler_Provisioners(t *testing.T) {
 	p := []*authority.Provisioner{
 		{
 			Type:         "JWK",
-			Issuer:       "max",
+			Name:         "max",
 			EncryptedKey: "abc",
 			Key:          &key,
 		},
 		{
 			Type:         "JWK",
-			Issuer:       "mariano",
+			Name:         "mariano",
 			EncryptedKey: "def",
 			Key:          &key,
 		},

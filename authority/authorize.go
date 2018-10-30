@@ -44,14 +44,21 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 			http.StatusUnauthorized, errContext}
 	}
 
+	// Get claims w/out verification. We need to look up the provisioner
+	// key in order to verify the claims and we need the issuer from the claims
+	// before we can look up the provisioner.
+	if err = token.UnsafeClaimsWithoutVerification(&claims); err != nil {
+		return nil, &apiError{err, http.StatusUnauthorized, errContext}
+	}
 	kid := token.Headers[0].KeyID // JWT will only have 1 header.
 	if len(kid) == 0 {
 		return nil, &apiError{errors.New("authorize: token KeyID cannot be empty"),
 			http.StatusUnauthorized, errContext}
 	}
-	val, ok := a.provisionerIDIndex.Load(kid)
+	pid := claims.Issuer + ":" + kid
+	val, ok := a.provisionerIDIndex.Load(pid)
 	if !ok {
-		return nil, &apiError{errors.Errorf("authorize: provisioner with KeyID %s not found", kid),
+		return nil, &apiError{errors.Errorf("authorize: provisioner with id %s not found", pid),
 			http.StatusUnauthorized, errContext}
 	}
 	p, ok := val.(*Provisioner)
@@ -67,7 +74,7 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
 	// more than a few minutes.
 	if err = claims.ValidateWithLeeway(jwt.Expected{
-		Issuer: p.Issuer,
+		Issuer: p.Name,
 	}, time.Minute); err != nil {
 		return nil, &apiError{errors.Wrapf(err, "authorize: invalid token"),
 			http.StatusUnauthorized, errContext}

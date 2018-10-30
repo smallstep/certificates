@@ -121,7 +121,7 @@ func TestAuthorize(t *testing.T) {
 			return &authorizeTest{
 				auth: a,
 				ott:  raw,
-				err: &apiError{errors.New("authorize: provisioner with KeyID foo not found"),
+				err: &apiError{errors.New("authorize: provisioner with id step-cli:foo not found"),
 					http.StatusUnauthorized, context{"ott": raw}},
 			}
 		},
@@ -132,7 +132,7 @@ func TestAuthorize(t *testing.T) {
 				(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", "foo"))
 			assert.FatalError(t, err)
 
-			_a.provisionerIDIndex.Store("foo", "42")
+			_a.provisionerIDIndex.Store(validIssuer+":foo", "42")
 
 			cl := jwt.Claims{
 				Subject:   "test.smallstep.com",
@@ -164,7 +164,7 @@ func TestAuthorize(t *testing.T) {
 			return &authorizeTest{
 				auth: a,
 				ott:  raw,
-				err: &apiError{errors.New("authorize: invalid token"),
+				err: &apiError{errors.New("authorize: provisioner with id invalid-issuer:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc not found"),
 					http.StatusUnauthorized, context{"ott": raw}},
 			}
 		},

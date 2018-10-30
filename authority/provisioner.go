@@ -85,7 +85,7 @@ func (pc *ProvisionerClaims) Validate() error {
 
 // Provisioner - authorized entity that can sign tokens necessary for signature requests.
 type Provisioner struct {
-	Issuer       string             `json:"issuer,omitempty"`
+	Name         string             `json:"name,omitempty"`
 	Type         string             `json:"type,omitempty"`
 	Key          *jose.JSONWebKey   `json:"key,omitempty"`
 	EncryptedKey string             `json:"encryptedKey,omitempty"`
@@ -95,7 +95,7 @@ type Provisioner struct {
 // Init initializes and validates a the fields of Provisioner type.
 func (p *Provisioner) Init(global *ProvisionerClaims) error {
 	switch {
-	case p.Issuer == "":
+	case p.Name == "":
 		return errors.New("provisioner issuer cannot be empty")
 
 	case p.Type == "":
@@ -117,11 +117,17 @@ func (p *Provisioner) getTLSApps(so SignOptions) ([]x509util.WithOption, []certC
 	return []x509util.WithOption{
 			x509util.WithNotBeforeAfterDuration(so.NotBefore,
 				so.NotAfter, c.DefaultTLSCertDuration()),
-			withProvisionerOID(p.Issuer, p.Key.KeyID),
+			withProvisionerOID(p.Name, p.Key.KeyID),
 		}, []certClaim{
 			&certTemporalClaim{
 				min: c.MinTLSCertDuration(),
 				max: c.MaxTLSCertDuration(),
 			},
 		}, nil
+}
+
+// ID returns the provisioner identifier. The name and credential id should
+// uniquely identify any provisioner.
+func (p *Provisioner) ID() string {
+	return p.Name + ":" + p.Key.KeyID
 }

@@ -75,7 +75,7 @@ func TestGetEncryptedKey(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					val, ok := tc.a.provisionerIDIndex.Load(tc.kid)
+					val, ok := tc.a.provisionerIDIndex.Load("max:" + tc.kid)
 					assert.Fatal(t, ok)
 					p, ok := val.(*Provisioner)
 					assert.Fatal(t, ok)
@@ -155,7 +155,7 @@ func generateProvisioner(t *testing.T) *Provisioner {
 	encrypted, err := jwe.CompactSerialize()
 	assert.FatalError(t, err)
 	return &Provisioner{
-		Issuer:       issuer,
+		Name:         issuer,
 		Type:         "JWT",
 		Key:          &public,
 		EncryptedKey: encrypted,

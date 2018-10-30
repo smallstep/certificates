@@ -17,14 +17,14 @@ func testAuthority(t *testing.T) *Authority {
 	assert.FatalError(t, err)
 	p := []*Provisioner{
 		{
-			Issuer: "Max",
-			Type:   "JWK",
-			Key:    maxjwk,
+			Name: "Max",
+			Type: "JWK",
+			Key:  maxjwk,
 		},
 		{
-			Issuer: "step-cli",
-			Type:   "JWK",
-			Key:    clijwk,
+			Name: "step-cli",
+			Type: "JWK",
+			Key:  clijwk,
 		},
 	}
 	c := &Config{
@@ -113,7 +113,7 @@ func TestAuthorityNew(t *testing.T) {
 					assert.True(t, auth.initOnce)
 					assert.NotNil(t, auth.intermediateIdentity)
 					for _, p := range tc.config.AuthorityConfig.Provisioners {
-						_p, ok := auth.provisionerIDIndex.Load(p.Key.KeyID)
+						_p, ok := auth.provisionerIDIndex.Load(p.ID())
 						assert.True(t, ok)
 						assert.Equals(t, p, _p)
 						if len(p.EncryptedKey) > 0 {
