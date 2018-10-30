@@ -14,10 +14,10 @@ func TestProvisionerInit(t *testing.T) {
 		err error
 	}
 	tests := map[string]func(*testing.T) ProvisionerValidateTest{
-		"fail-empty-issuer": func(t *testing.T) ProvisionerValidateTest {
+		"fail-empty-name": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p:   &Provisioner{},
-				err: errors.New("provisioner issuer cannot be empty"),
+				err: errors.New("provisioner name cannot be empty"),
 			}
 		},
 		"fail-empty-type": func(t *testing.T) ProvisionerValidateTest {

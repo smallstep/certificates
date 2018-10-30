@@ -128,7 +128,7 @@ func TestGetProvisioners(t *testing.T) {
 }
 
 func generateProvisioner(t *testing.T) *Provisioner {
-	issuer, err := randutil.Alphanumeric(10)
+	name, err := randutil.Alphanumeric(10)
 	assert.FatalError(t, err)
 	// Create a new JWK
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -155,7 +155,7 @@ func generateProvisioner(t *testing.T) *Provisioner {
 	encrypted, err := jwe.CompactSerialize()
 	assert.FatalError(t, err)
 	return &Provisioner{
-		Name:         issuer,
+		Name:         name,
 		Type:         "JWT",
 		Key:          &public,
 		EncryptedKey: encrypted,

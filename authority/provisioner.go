@@ -96,7 +96,7 @@ type Provisioner struct {
 func (p *Provisioner) Init(global *ProvisionerClaims) error {
 	switch {
 	case p.Name == "":
-		return errors.New("provisioner issuer cannot be empty")
+		return errors.New("provisioner name cannot be empty")
 
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
