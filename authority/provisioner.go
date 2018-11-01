@@ -59,7 +59,7 @@ func (pc *ProvisionerClaims) MaxTLSCertDuration() time.Duration {
 }
 
 // IsDisableRenewal returns if the renewal flow is disabled for the
-// provisioner. If the property is not set withing the provisioner, then the
+// provisioner. If the property is not set within the provisioner, then the
 // global value from the authority configuration will be used.
 func (pc *ProvisionerClaims) IsDisableRenewal() bool {
 	if pc.DisableRenewal == nil {
