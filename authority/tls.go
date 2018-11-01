@@ -169,6 +169,12 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 // Renew creates a new Certificate identical to the old certificate, except
 // with a validity window that begins 'now'.
 func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certificate, error) {
+	// Check step provisioner extensions
+	if err := a.authorizeRenewal(ocx); err != nil {
+		return nil, nil, err
+	}
+
+	// Issuer
 	issIdentity := a.intermediateIdentity
 
 	// Convert a realx509.Certificate to the step x509 Certificate.
