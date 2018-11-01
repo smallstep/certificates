@@ -23,10 +23,12 @@ var (
 		MaxVersion:    1.2,
 		Renegotiation: false,
 	}
+	defaultDisableRenewal   = false
 	globalProvisionerClaims = ProvisionerClaims{
-		MinTLSDur:     &duration{5 * time.Minute},
-		MaxTLSDur:     &duration{24 * time.Hour},
-		DefaultTLSDur: &duration{24 * time.Hour},
+		MinTLSDur:      &duration{5 * time.Minute},
+		MaxTLSDur:      &duration{24 * time.Hour},
+		DefaultTLSDur:  &duration{24 * time.Hour},
+		DisableRenewal: &defaultDisableRenewal,
 	}
 )
 

@@ -11,10 +11,11 @@ import (
 
 // ProvisionerClaims so that individual provisioners can override global claims.
 type ProvisionerClaims struct {
-	globalClaims  *ProvisionerClaims
-	MinTLSDur     *duration `json:"minTLSCertDuration,omitempty"`
-	MaxTLSDur     *duration `json:"maxTLSCertDuration,omitempty"`
-	DefaultTLSDur *duration `json:"defaultTLSCertDuration,omitempty"`
+	globalClaims   *ProvisionerClaims
+	MinTLSDur      *duration `json:"minTLSCertDuration,omitempty"`
+	MaxTLSDur      *duration `json:"maxTLSCertDuration,omitempty"`
+	DefaultTLSDur  *duration `json:"defaultTLSCertDuration,omitempty"`
+	DisableRenewal *bool     `json:"disableRenewal,omitempty"`
 }
 
 // Init initializes and validates the individual provisioner claims.
@@ -55,6 +56,16 @@ func (pc *ProvisionerClaims) MaxTLSCertDuration() time.Duration {
 		return pc.globalClaims.MaxTLSCertDuration()
 	}
 	return pc.MaxTLSDur.Duration
+}
+
+// IsDisableRenewal returns if the renewal flow is disabled for the
+// provisioner. If the property is not set within the provisioner, then the
+// global value from the authority configuration will be used.
+func (pc *ProvisionerClaims) IsDisableRenewal() bool {
+	if pc.DisableRenewal == nil {
+		return pc.globalClaims.IsDisableRenewal()
+	}
+	return *pc.DisableRenewal
 }
 
 // Validate validates and modifies the Claims with default values.

@@ -251,6 +251,19 @@ func TestRenew(t *testing.T) {
 	crt, err := x509.ParseCertificate(crtBytes)
 	assert.FatalError(t, err)
 
+	leafNoRenew, err := x509util.NewLeafProfile("norenew", a.intermediateIdentity.Crt,
+		a.intermediateIdentity.Key,
+		x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, 0),
+		withDefaultASN1DN(a.config.AuthorityConfig.Template),
+		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
+		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].Key.KeyID),
+	)
+	assert.FatalError(t, err)
+	crtBytesNoRenew, err := leafNoRenew.CreateCertificate()
+	assert.FatalError(t, err)
+	crtNoRenew, err := x509.ParseCertificate(crtBytesNoRenew)
+	assert.FatalError(t, err)
+
 	type renewTest struct {
 		auth *Authority
 		crt  *x509.Certificate
@@ -272,6 +285,16 @@ func TestRenew(t *testing.T) {
 				crt:  crt,
 				err: &apiError{errors.New("error renewing certificate from existing server certificate"),
 					http.StatusInternalServerError, context{}},
+			}, nil
+		},
+		"fail-unauthorized": func() (*renewTest, error) {
+			ctx := map[string]interface{}{
+				"serialNumber": crtNoRenew.SerialNumber.String(),
+			}
+			return &renewTest{
+				crt: crtNoRenew,
+				err: &apiError{errors.New("renew disabled"),
+					http.StatusUnauthorized, ctx},
 			}, nil
 		},
 		"success": func() (*renewTest, error) {
