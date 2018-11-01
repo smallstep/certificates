@@ -15,6 +15,7 @@ func testAuthority(t *testing.T) *Authority {
 	assert.FatalError(t, err)
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
+	disableRenewal := true
 	p := []*Provisioner{
 		{
 			Name: "Max",
@@ -25,6 +26,14 @@ func testAuthority(t *testing.T) *Authority {
 			Name: "step-cli",
 			Type: "JWK",
 			Key:  clijwk,
+		},
+		{
+			Name: "dev",
+			Type: "JWK",
+			Key:  maxjwk,
+			Claims: &ProvisionerClaims{
+				DisableRenewal: &disableRenewal,
+			},
 		},
 	}
 	c := &Config{

@@ -1,6 +1,8 @@
 package authority
 
 import (
+	"crypto/x509"
+	"encoding/asn1"
 	"net/http"
 	"time"
 
@@ -116,4 +118,55 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 	}
 
 	return signOps, nil
+}
+
+// authorizeRenewal tries to locate the step provisioner extension, and checks
+// if for the configured provisioner, the renewal is enabled or not. If the
+// extra extension cannot be found, authorize the renewal by default.
+//
+// TODO(mariano): should we authorize by default?
+func (a *Authority) authorizeRenewal(crt *x509.Certificate) error {
+	errContext := map[string]interface{}{"serialNumber": crt.SerialNumber.String()}
+	for _, e := range crt.Extensions {
+		if e.Id.Equal(stepOIDProvisioner) {
+			var provisioner stepProvisionerASN1
+			if _, err := asn1.Unmarshal(e.Value, &provisioner); err != nil {
+				return &apiError{
+					err:     errors.Wrap(err, "error decoding step provisioner extension"),
+					code:    http.StatusInternalServerError,
+					context: errContext,
+				}
+			}
+
+			// Look for the provisioner, if it cannot be found, renewal will not
+			// be authorized.
+			pid := string(provisioner.Name) + ":" + string(provisioner.CredentialID)
+			val, ok := a.provisionerIDIndex.Load(pid)
+			if !ok {
+				return &apiError{
+					err:     errors.Errorf("not found: provisioner %s", pid),
+					code:    http.StatusUnauthorized,
+					context: errContext,
+				}
+			}
+			p, ok := val.(*Provisioner)
+			if !ok {
+				return &apiError{
+					err:     errors.Errorf("invalid type: provisioner %s, type %T", pid, val),
+					code:    http.StatusInternalServerError,
+					context: errContext,
+				}
+			}
+			if p.Claims.IsDisableRenewal() {
+				return &apiError{
+					err:     errors.Errorf("renew disabled: provisioner %s", pid),
+					code:    http.StatusUnauthorized,
+					context: errContext,
+				}
+			}
+			return nil
+		}
+	}
+
+	return nil
 }
