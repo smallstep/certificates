@@ -1,4 +1,4 @@
-PKG?=github.com/smallstep/ca-component/cmd/step-ca
+PKG?=github.com/smallstep/certificates/cmd/step-ca
 BINNAME?=step-ca
 
 # Set V to 1 for verbose output from the Makefile

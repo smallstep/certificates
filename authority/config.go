@@ -173,9 +173,5 @@ func (c *Config) Validate() error {
 		c.TLS.Renegotiation = c.TLS.Renegotiation || DefaultTLSOptions.Renegotiation
 	}
 
-	if err := c.AuthorityConfig.Validate(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.AuthorityConfig.Validate()
 }

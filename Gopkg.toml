@@ -30,7 +30,6 @@ required = [
   "github.com/client9/misspell/cmd/misspell",
   "github.com/gordonklaus/ineffassign",
   "github.com/tsenart/deadcode",
-  "github.com/smallstep/go-makefile"
 ]
 
 [[constraint]]

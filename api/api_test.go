@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
-	"github.com/smallstep/ca-component/authority"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/jose"
 )

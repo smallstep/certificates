@@ -9,7 +9,7 @@ import (
 
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/logging"
+	"github.com/smallstep/certificates/logging"
 )
 
 // Middleware is a function returns another http.Handler that wraps the given

@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smallstep/ca-component/api"
-	"github.com/smallstep/ca-component/authority"
+	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/cli/crypto/randutil"
 	stepJOSE "github.com/smallstep/cli/jose"
 	"gopkg.in/square/go-jose.v2"

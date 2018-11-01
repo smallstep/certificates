@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/api"
+	"github.com/smallstep/certificates/api"
 	"golang.org/x/net/http2"
 )
 

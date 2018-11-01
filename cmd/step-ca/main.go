@@ -11,8 +11,8 @@ import (
 	"unicode"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/authority"
-	"github.com/smallstep/ca-component/ca"
+	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/ca"
 )
 
 func usage() {
