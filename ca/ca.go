@@ -7,11 +7,11 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/api"
-	"github.com/smallstep/ca-component/authority"
-	"github.com/smallstep/ca-component/logging"
-	"github.com/smallstep/ca-component/monitoring"
-	"github.com/smallstep/ca-component/server"
+	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/logging"
+	"github.com/smallstep/certificates/monitoring"
+	"github.com/smallstep/certificates/server"
 )
 
 type options struct {

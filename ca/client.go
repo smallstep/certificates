@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/api"
+	"github.com/smallstep/certificates/api"
 	"golang.org/x/net/http2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )

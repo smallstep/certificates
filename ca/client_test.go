@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smallstep/ca-component/api"
-	"github.com/smallstep/ca-component/authority"
+	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/authority"
 )
 
 const (

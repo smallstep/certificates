@@ -18,8 +18,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/ca-component/api"
-	"github.com/smallstep/ca-component/authority"
+	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/randutil"

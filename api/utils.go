@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/logging"
+	"github.com/smallstep/certificates/logging"
 )
 
 // LogError adds to the response writer the given error if it implements

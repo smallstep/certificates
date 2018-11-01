@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/logging"
+	"github.com/smallstep/certificates/logging"
 )
 
 func TestLogError(t *testing.T) {

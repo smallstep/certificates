@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
-	"github.com/smallstep/ca-component/authority"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/cli/crypto/tlsutil"
 )
 
