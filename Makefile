@@ -156,15 +156,22 @@ uninstall:
 # Debian
 #########################################
 
-debian:
+changelog:
+	$Q echo "step-certificates ($(VERSION)) unstable; urgency=medium" > debian/changelog
+	$Q echo >> debian/changelog
+	$Q echo "  * See https://github.com/smallstep/certificates/releases" >> debian/changelog
+	$Q echo >> debian/changelog
+	$Q echo " -- Smallstep Labs, Inc. <techadmin@smallstep.com>  $(shell date -uR)" >> debian/changelog
+
+debian: changelog
 	$Q mkdir -p $(RELEASE); \
-	OUTPUT=../step-ca_*.deb; \
+	OUTPUT=../step-certificates_*.deb; \
 	rm $$OUTPUT; \
 	dpkg-buildpackage -b -rfakeroot -us -uc && cp $$OUTPUT $(RELEASE)/
 
 distclean: clean
 
-.PHONY: debian distclean
+.PHONY: changelog debian distclean
 
 #################################################
 # Build statically compiled step binary for various operating systems
@@ -172,7 +179,7 @@ distclean: clean
 
 OUTPUT_ROOT=output/
 BINARY_OUTPUT=$(OUTPUT_ROOT)binary/
-BUNDLE_MAKE=v=$v GOOS_OVERRIDE='GOOS=$(1) GOARCH=$(2)' PREFIX=$(3) make $(3)bin/step
+BUNDLE_MAKE=v=$v GOOS_OVERRIDE='GOOS=$(1) GOARCH=$(2)' PREFIX=$(3) make $(3)bin/step-ca
 RELEASE=./.travis-releases
 
 binary-linux:
@@ -183,7 +190,7 @@ binary-darwin:
 
 define BUNDLE
 	$(q)BUNDLE_DIR=$(BINARY_OUTPUT)$(1)/bundle; \
-	stepName=step_$(2); \
+	stepName=step-certificates_$(2); \
  	mkdir -p $$BUNDLE_DIR $(RELEASE); \
 	TMP=$$(mktemp -d $$BUNDLE_DIR/tmp.XXXX); \
 	trap "rm -rf $$TMP" EXIT INT QUIT TERM; \
@@ -191,7 +198,7 @@ define BUNDLE
 	mkdir -p $$newdir/bin; \
 	cp $(BINARY_OUTPUT)$(1)/bin/step $$newdir/bin/; \
 	cp README.md $$newdir/; \
-	NEW_BUNDLE=$(RELEASE)/step_$(2)_$(1)_$(3).tar.gz; \
+	NEW_BUNDLE=$(RELEASE)/step-certificates_$(2)_$(1)_$(3).tar.gz; \
 	rm -f $$NEW_BUNDLE; \
     tar -zcvf $$NEW_BUNDLE -C $$TMP $$stepName;
 endef

@@ -1,0 +1,15 @@
+Source: step-certificates
+Section: utils
+Priority: optional
+Maintainer: Smallstep Labs, Inc. <techadmin@smallstep.com>
+Build-Depends: debhelper (>= 9), git, bash-completion
+Standards-Version: 4.2.0
+Homepage: https://github.com/smallstep/certificates
+Vcs-Browser: https://github.com/smallstep/certificates.git
+Vcs-Git: https://github.com/smallstep/certificates.git
+
+Package: step-certificates
+Architecture: any
+Depends: ${misc:Depends}
+Description: Smallstep Certificate Authority
+   step-certificates is the Smallstep Certificate Authority.
