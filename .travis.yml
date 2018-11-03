@@ -12,9 +12,9 @@ env:
   - V=1
 before_script:
 - make bootstrap
-- make artifacts
 script:
 - make
+- make artifacts
 after_success:
 - bash <(curl -s https://codecov.io/bash) -t "$CODECOV_TOKEN" || echo "Codecov did
   not collect coverage reports"
@@ -25,7 +25,7 @@ deploy:
   provider: releases
   skip_cleanup: true
   api_key:
-    secure: adacQ8yOfKLTxEHY7R56kqGNL25Zw5il1sfxd9NE9Vr0w2ggQN30Jr2OqsTqdNJvDnU5EwqyvZ1ZyRbitKE3byLQY1rpt/JOagxi26xFtwrsc2h9XFNp7mDWGpRAM9QVjYb13x4TnFGHk4SNDOn/3meFV63rls28oQdBKgANozZkVmv4rsQw1lG6oKHA+tFC4x8BCZ7GTbzEleAWXU2XEm+CnovAHl4vNHGheeIjZmhYgia0M/7LLMBa9FIZizlaebZhOqXjZipBafgIVsjYJgI8Kdaxe682HHXe/g1FM3+KBMUr6oWoZ0XYSi7bz1gH9RYYstaGh2zpsxZhmzC60b95wWDPGSIKwv3Z6HOZk5HRqO092mNlplM15QcNmNe/hzKmUlo8hzG+C54mV1crdD799eezjZi9vTr+OZT0+SL1IUQXH7UZHwevp02RF8jNGJzLwi8bJYOZephbNegoQ6hpu9l+jEYdTKOjRJR4Ese1wA54WkemCouk21A6jXqyGfLL+bHApEY0GTDfh+UUfJkyF+x/2TE9Y5/DZ4BVcYXvvIOREDDB5W4JzmPRalem9ampJpTofVEMEAVmL1+XyFE6P9B6mm5sdtlbWOT1UqyFgeAA06UmA72xExwJTSgKr2WemaIAJPPCnRTvyqV8eAgBor5izEZyCxXXtpKI0nM=
+    secure: EVV43Vkqn67hhKGYn4WhQp2YO6KFmUDSkLXjYXYGX07Fm8p5KjRFBPOz9LV83QrvVmLigvg0CtR8Jqqcnq2SUhus3nhZaN2g19NhMypZLioyOVP0kAkas8ocuvxkwz3YxIK/yMrmTKbQ7JGXtbc8IjAox9ovNo1fFIQmVMAzPfu++OWBJ0j+gUqKtpaNA7gzsSv8UOw3/T3hNm6E1IbpWxl9BPSOzUOE9F/QOThANzifGfdxvqNJFkAgqu5DVPz8zQNbMrz4zH+KwASKxd6hjhzSSMzouKzOEHTA/elDCHEjke0Jos29MkGWHcIydLtCD95DGecqM8BFSC9f2acHDjmUO1rdfoLA3Pt+UiZJuTwyQm/jrHHhRnH8oJpK15G5LvxSqzY9YDWpAk38+jMw/udW6wt7BGAU8FEXLbq0bsFL3yfTepeWjmzT5WS0YXdiBz2SEK+Og9R2bSdtl4owghRzKNio5DNPuYAbqbpi+jqzqQVLj27x7LWoQ0MHvZcz9U+oO00r6M1tDCmFVRdtfgb2H+MIDY69qYGo5qoGMfH1btCWR8bA9wSYB/Z7hW/xZT9r7f/d5/P40k8yKINmTZqyUTQeplrE3y4BPVzKksclczBZa67syIUQ49I35QppnH4GFQHUwlra7r3W9zfZRvaLnp5qOIKAQe3MAIZqtLg=
   file_glob: true
   file: .travis-releases/*
   on:
