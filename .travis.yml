@@ -1,9 +1,14 @@
 language: go
 go:
 - 1.11.x
+env:
+  global:
+  - V=1
 before_script:
 - make bootstrap
 script:
 - make
+after_success:
+- bash <(curl -s https://codecov.io/bash) -t "$CODECOV_TOKEN" || echo "Codecov did not collect coverage reports"
 notifications:
   email: false

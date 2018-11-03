@@ -93,12 +93,12 @@ generate:
 # Test
 #########################################
 test:
-	$Q $(GOFLAGS) go test -short -cover ./...
+	$Q $(GOFLAGS) go test -short -coverprofile=coverage.out ./...
 
 vtest:
 	$(Q)for d in $$(go list ./... | grep -v vendor); do \
     echo -e "TESTS FOR: for \033[0;35m$$d\033[0m"; \
-    $(GOFLAGS) go test -v -bench=. -run=. -short -coverprofile=profile.coverage.out -covermode=atomic $$d; \
+    $(GOFLAGS) go test -v -bench=. -run=. -short -coverprofile=coverage.out $$d; \
 	out=$$?; \
 	if [[ $$out -ne 0 ]]; then ret=$$out; fi;\
     rm -f profile.coverage.out; \
