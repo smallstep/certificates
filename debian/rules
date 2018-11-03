@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+
+override_dh_install-arch:
+	dh_install --arch
+
+build:
+	make bootstrap
+	dh build
+
+%:
+	dh $@
