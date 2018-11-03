@@ -1,6 +1,6 @@
 # Example
 
-# Client & Server requests
+# Bootstrap Client & Server
 
 On this example we are going to see the Certificate Authority running, as well
 as a simple Server using TLS and a simple client doing TLS requests to the
@@ -20,7 +20,7 @@ provisioner password:
 ```
 certificates $ export STEPPATH=examples/pki 
 certificates $ export STEP_CA_URL=https://localhost:9000
-certificates $ go run examples/server.go $(step ca new-token localhost))
+certificates $ go run examples/bootstrap-server/server.go $(step ca new-token localhost))
 ✔ Key ID: DmAtZt2EhmZr_iTJJ387fr4Md2NbzMXGdXQNW1UWPXk (mariano@smallstep.com)
 Please enter the password to decrypt the provisioner key:
 Listening on :8443 ...
@@ -58,7 +58,7 @@ But if we the client with the certificate name Mike we'll see:
 ```
 certificates $ export STEPPATH=examples/pki 
 certificates $ export STEP_CA_URL=https://localhost:9000
-certificates $ go run examples/client.go $(step ca new-token Mike)
+certificates $ go run examples/bootstrap-client/client.go $(step ca new-token Mike)
 ✔ Key ID: DmAtZt2EhmZr_iTJJ387fr4Md2NbzMXGdXQNW1UWPXk (mariano@smallstep.com)
 Please enter the password to decrypt the provisioner key:
 Server responded: Hello Mike at 2018-11-03 01:52:52.678215 +0000 UTC!!!
