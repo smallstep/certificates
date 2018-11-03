@@ -179,7 +179,7 @@ distclean: clean
 
 OUTPUT_ROOT=output/
 BINARY_OUTPUT=$(OUTPUT_ROOT)binary/
-BUNDLE_MAKE=v=$v GOOS_OVERRIDE='GOOS=$(1) GOARCH=$(2)' PREFIX=$(3) make $(3)bin/step-ca
+BUNDLE_MAKE=v=$v GOOS_OVERRIDE='GOOS=$(1) GOARCH=$(2)' PREFIX=$(3) make $(3)bin/$(BINNAME)
 RELEASE=./.travis-releases
 
 binary-linux:
@@ -196,7 +196,7 @@ define BUNDLE
 	trap "rm -rf $$TMP" EXIT INT QUIT TERM; \
 	newdir=$$TMP/$$stepName; \
 	mkdir -p $$newdir/bin; \
-	cp $(BINARY_OUTPUT)$(1)/bin/step $$newdir/bin/; \
+	cp $(BINARY_OUTPUT)$(1)/bin/$(BINNAME) $$newdir/bin/; \
 	cp README.md $$newdir/; \
 	NEW_BUNDLE=$(RELEASE)/step-certificates_$(2)_$(1)_$(3).tar.gz; \
 	rm -f $$NEW_BUNDLE; \
