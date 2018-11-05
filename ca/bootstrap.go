@@ -24,7 +24,7 @@ func Bootstrap(token string) (*Client, error) {
 	}
 	var claims tokenClaims
 	if err := tok.UnsafeClaimsWithoutVerification(&claims); err != nil {
-		return nil, errors.Wrap(err, "error parsing ott")
+		return nil, errors.Wrap(err, "error parsing token")
 	}
 
 	// Validate bootstrap token
