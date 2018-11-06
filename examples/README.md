@@ -109,7 +109,7 @@ duration of the certificate has passed, approximately.
 ctx, cancel := context.WithCancel(context.Background())
 defer cancel()
 // Get tls.Config for a server
-tlsConfig, err := client.GetClientTLSConfig(ctx, sign, pk)
+tlsConfig, err := client.GetServerTLSConfig(ctx, sign, pk)
 // Get tls.Config for a client
 tlsConfig, err := client.GetClientTLSConfig(ctx, sign, pk)
 // Get an http.Transport for a client, this can be used as a http.RoundTripper
