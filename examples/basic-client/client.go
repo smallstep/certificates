@@ -105,6 +105,9 @@ func main() {
 	ctxClient, cancelClient := context.WithCancel(context.Background())
 	defer cancelClient()
 	tlsConfig, err = client.GetClientTLSConfig(ctxClient, sign, pk)
+	if err != nil {
+		panic(err)
+	}
 	// An http.Client will need to create a transport first
 	_ = &http.Client{
 		Transport: &http.Transport{
@@ -127,6 +130,9 @@ func main() {
 	ctxTransport, cancelTransport := context.WithCancel(context.Background())
 	defer cancelTransport()
 	tr, err = client.Transport(ctxTransport, sign, pk)
+	if err != nil {
+		panic(err)
+	}
 	// And http.Client will use the transport like
 	_ = &http.Client{
 		Transport: tr,
