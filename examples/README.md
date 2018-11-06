@@ -197,3 +197,31 @@ Server responded: Hello Mike at 2018-11-03 01:52:53.681563 +0000 UTC!!!
 Server responded: Hello Mike at 2018-11-03 01:52:54.682787 +0000 UTC!!!
 ...
 ```
+
+## Certificate rotation
+
+We can use the bootstrap-server to demonstrate the certificate rotation. We've
+added  second provisioner to to the ca with the name of `mike@smallstep.com`,
+this provisioner is configured with a default certificate duration of 2 minutes.
+If we run the server, and inspect the used certificate, we can verify how it
+rotates after approximately two thirds of the duration has passed.
+
+```
+certificates $ export STEPPATH=examples/pki
+certificates $ export STEP_CA_URL=https://localhost:9000
+certificates $ go run examples/bootstrap-server/server.go $(step ca new-token localhost))
+✔ Key ID: YYNxZ0rq0WsT2MlqLCWvgme3jszkmt99KjoGEJJwAKs (mike@smallstep.com)
+Please enter the password to decrypt the provisioner key:
+Listening on :8443 ...
+```
+
+In this specific case, the the rotation will happen after 74-80 seconds have
+passed, the exact formula is 120-120/3-rand(120/20), where rand will return a
+number between 0 and 6.
+
+We can use the following command to check the certificate expiration and to make
+sure the certificate  changes after 74-80 seconds.
+
+```
+certificates $ step certificate inspect --insecure https://localhost:8443
+```
