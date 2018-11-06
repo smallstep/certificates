@@ -128,7 +128,7 @@ And just run the client.go with a new token:
 ```
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
-certificates $ go run examples/basic-client/client.go $(step ca new-token client.smallstep.com))
+certificates $ go run examples/basic-client/client.go $(step ca new-token client.smallstep.com)
 ```
 
 ## Bootstrap Client & Server
@@ -151,7 +151,7 @@ provisioner password:
 ```
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
-certificates $ go run examples/bootstrap-server/server.go $(step ca new-token localhost))
+certificates $ go run examples/bootstrap-server/server.go $(step ca new-token localhost)
 ✔ Key ID: DmAtZt2EhmZr_iTJJ387fr4Md2NbzMXGdXQNW1UWPXk (mariano@smallstep.com)
 Please enter the password to decrypt the provisioner key:
 Listening on :8443 ...
