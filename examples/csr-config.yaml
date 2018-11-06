@@ -1,6 +1,0 @@
-country: USA
-locality: San Francisco
-organization: smallstep
-common_name: internal.smallstep.com
-key_type: rsa
-rsa_bits: 4096

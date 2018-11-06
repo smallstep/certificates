@@ -1,6 +1,0 @@
-{
-    "caPath": "/path/to/intermediate-certificate",
-    "caPrivateKeyPath": "/path/to/intermediate-private-key",
-    "caPasscode": "very-secure-passcode",
-    "listenAddress": "127.0.0.1:9000"
-}
