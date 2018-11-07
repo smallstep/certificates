@@ -38,17 +38,34 @@ func Bootstrap(token string) (*Client, error) {
 	return NewClient(claims.Audience[0], WithRootSHA256(claims.SHA))
 }
 
-// BootstrapServer is a helper function that returns an http.Server configured
-// with the given address and handler, and prepared to use TLS connections. The
-// certificate will automatically rotate if necessary.
+// BootstrapServer is a helper function that using the given token returns the
+// given http.Server configured with a TLS certificate signed by the Certificate
+// Authority. By default the server will kick off a routine that will renew the
+// certificate after 2/3rd of the certificate's lifetime has expired.
 //
 // Usage:
-//   srv, err := ca.BootstrapServer(":443", token, handler)
+//   // Default example with certificate rotation.
+//   srv, err := ca.BootstrapServer(context.Background(), token, &http.Server{
+//       Addr: ":443",
+//       Handler: handler,
+//   })
+//
+//   // Example canceling automatic certificate rotation.
+//   ctx, cancel := context.WithCancel(context.Background())
+//   defer cancel()
+//   srv, err := ca.BootstrapServer(ctx, token, &http.Server{
+//       Addr: ":443",
+//       Handler: handler,
+//   })
 //   if err != nil {
 //       return err
 //   }
 //   srv.ListenAndServeTLS("", "")
-func BootstrapServer(addr, token string, handler http.Handler) (*http.Server, error) {
+func BootstrapServer(ctx context.Context, token string, base *http.Server) (*http.Server, error) {
+	if base.TLSConfig != nil {
+		return nil, errors.New("server TLSConfig is already set")
+	}
+
 	client, err := Bootstrap(token)
 	if err != nil {
 		return nil, err
@@ -64,30 +81,34 @@ func BootstrapServer(addr, token string, handler http.Handler) (*http.Server, er
 		return nil, err
 	}
 
-	tlsConfig, err := client.GetServerTLSConfig(context.Background(), sign, pk)
+	tlsConfig, err := client.GetServerTLSConfig(ctx, sign, pk)
 	if err != nil {
 		return nil, err
 	}
 
-	return &http.Server{
-		Addr:      addr,
-		Handler:   handler,
-		TLSConfig: tlsConfig,
-	}, nil
+	base.TLSConfig = tlsConfig
+	return base, nil
 }
 
 // BootstrapClient is a helper function that using the given bootstrap token
 // return an http.Client configured with a Transport prepared to do TLS
 // connections using the client certificate returned by the certificate
-// authority. The certificate will automatically rotate if necessary.
+// authority. By default the server will kick off a routine that will renew the
+// certificate after 2/3rd of the certificate's lifetime has expired.
 //
 // Usage:
-//   client, err := ca.BootstrapClient(token)
+//   // Default example with certificate rotation.
+//   client, err := ca.BootstrapClient(ctx.Background(), token)
+//
+//   // Example canceling automatic certificate rotation.
+//   ctx, cancel := context.WithCancel(context.Background())
+//   defer cancel()
+//   client, err := ca.BootstrapClient(ctx, token)
 //   if err != nil {
 //     return err
 //   }
 //   resp, err := client.Get("https://internal.smallstep.com")
-func BootstrapClient(token string) (*http.Client, error) {
+func BootstrapClient(ctx context.Context, token string) (*http.Client, error) {
 	client, err := Bootstrap(token)
 	if err != nil {
 		return nil, err
@@ -103,7 +124,7 @@ func BootstrapClient(token string) (*http.Client, error) {
 		return nil, err
 	}
 
-	transport, err := client.Transport(context.Background(), sign, pk)
+	transport, err := client.Transport(ctx, sign, pk)
 	if err != nil {
 		return nil, err
 	}

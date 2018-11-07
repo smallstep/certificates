@@ -1,6 +1,8 @@
 package ca
 
 import (
+	"context"
+	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -128,25 +130,23 @@ func TestBootstrapServer(t *testing.T) {
 	token := func() string {
 		return generateBootstrapToken(srv.URL, "subject", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
 	}
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("ok"))
-	})
 	type args struct {
-		addr    string
-		token   string
-		handler http.Handler
+		ctx   context.Context
+		token string
+		base  *http.Server
 	}
 	tests := []struct {
 		name    string
 		args    args
 		wantErr bool
 	}{
-		{"ok", args{":0", token(), handler}, false},
-		{"fail", args{":0", "bad-token", handler}, true},
+		{"ok", args{context.Background(), token(), &http.Server{}}, false},
+		{"fail", args{context.Background(), "bad-token", &http.Server{}}, true},
+		{"fail with TLSConfig", args{context.Background(), token(), &http.Server{TLSConfig: &tls.Config{}}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := BootstrapServer(tt.args.addr, tt.args.token, tt.args.handler)
+			got, err := BootstrapServer(tt.args.ctx, tt.args.token, tt.args.base)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("BootstrapServer() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -156,8 +156,11 @@ func TestBootstrapServer(t *testing.T) {
 					t.Errorf("BootstrapServer() = %v, want nil", got)
 				}
 			} else {
-				if !reflect.DeepEqual(got.Addr, tt.args.addr) {
-					t.Errorf("BootstrapServer() Addr = %v, want %v", got.Addr, tt.args.addr)
+				expected := &http.Server{
+					TLSConfig: got.TLSConfig,
+				}
+				if !reflect.DeepEqual(got, expected) {
+					t.Errorf("BootstrapServer() = %v, want %v", got, expected)
 				}
 				if got.TLSConfig == nil || got.TLSConfig.ClientCAs == nil || got.TLSConfig.RootCAs == nil || got.TLSConfig.GetCertificate == nil || got.TLSConfig.GetClientCertificate == nil {
 					t.Errorf("BootstrapServer() invalid TLSConfig = %#v", got.TLSConfig)
@@ -174,6 +177,7 @@ func TestBootstrapClient(t *testing.T) {
 		return generateBootstrapToken(srv.URL, "subject", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
 	}
 	type args struct {
+		ctx   context.Context
 		token string
 	}
 	tests := []struct {
@@ -181,12 +185,12 @@ func TestBootstrapClient(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", args{token()}, false},
-		{"fail", args{"bad-token"}, true},
+		{"ok", args{context.Background(), token()}, false},
+		{"fail", args{context.Background(), "bad-token"}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := BootstrapClient(tt.args.token)
+			got, err := BootstrapClient(tt.args.ctx, tt.args.token)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("BootstrapClient() error = %v, wantErr %v", err, tt.wantErr)
 				return

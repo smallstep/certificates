@@ -119,13 +119,13 @@ tr, err := client.Transport(ctx, sign, pk)
 
 To run the example you need to start the certificate authority:
 
-```
+```sh
 certificates $ bin/step-ca examples/pki/config/ca.json
 2018/11/02 18:29:25 Serving HTTPS on :9000 ...
 ```
 
 And just run the client.go with a new token:
-```
+```sh
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
 certificates $ go run examples/basic-client/client.go $(step ca new-token client.smallstep.com)
@@ -140,15 +140,46 @@ server.
 The examples directory already contains a sample pki configuration with the
 password `password` hardcoded, but you can create your own using `step ca init`.
 
-First we will start the certificate authority:
+These examples show the use of other helper methods, they are simple ways to
+create TLS configured http.Server and http.Client objects. The methods are
+`BootstrapServer` and `BootstrapClient` and they are used like:
+
+```go
+// Get a cancelable context to stop the renewal goroutines and timers.
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+// Create an http.Server
+srv, err := ca.BootstrapServer(ctx, token, &http.Server{
+    Addr: ":8443",
+    Handler: handler,
+})
+if err != nil {
+    panic(err)
+}
+srv.ListenAndServeTLS("", "")
 ```
+
+```go
+// Get a cancelable context to stop the renewal goroutines and timers.
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+// Create an http.Client
+client, err := ca.BootstrapClient(ctx, token)
+if err != nil {
+    panic(err)
+}
+resp, err := client.Get("https://localhost:8443")
+```
+
+To run the example first we will start the certificate authority:
+```sh
 certificates $ bin/step-ca examples/pki/config/ca.json
 2018/11/02 18:29:25 Serving HTTPS on :9000 ...
 ```
 
 We will start the server and we will type `password` when step asks for the
 provisioner password:
-```
+```sh
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
 certificates $ go run examples/bootstrap-server/server.go $(step ca new-token localhost)
@@ -177,7 +208,7 @@ HTTPS-proxy has similar options --proxy-cacert and --proxy-insecure.
 ```
 
 But if we use the root certificate it will properly work:
-```
+```sh
 certificates $ curl --cacert examples/pki/secrets/root_ca.crt https://localhost:8443
 Hello nobody at 2018-11-03 01:49:25.66912 +0000 UTC!!!
 ```
@@ -186,7 +217,7 @@ Notice that in the response we see `nobody`, this is because the server didn't
 detected a TLS client configuration.
 
 But if we the client with the certificate name Mike we'll see:
-```
+```sh
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
 certificates $ go run examples/bootstrap-client/client.go $(step ca new-token Mike)
@@ -206,7 +237,7 @@ this provisioner is configured with a default certificate duration of 2 minutes.
 If we run the server, and inspect the used certificate, we can verify how it
 rotates after approximately two thirds of the duration has passed.
 
-```
+```sh
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
 certificates $ go run examples/bootstrap-server/server.go $(step ca new-token localhost))
@@ -222,6 +253,6 @@ number between 0 and 6.
 We can use the following command to check the certificate expiration and to make
 sure the certificate  changes after 74-80 seconds.
 
-```
+```sh
 certificates $ step certificate inspect --insecure https://localhost:8443
 ```
