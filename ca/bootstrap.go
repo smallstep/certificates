@@ -43,12 +43,22 @@ func Bootstrap(token string) (*Client, error) {
 // certificate will automatically rotate if necessary.
 //
 // Usage:
-//   srv, err := ca.BootstrapServer(":443", token, handler)
+//   // make sure to cancel the rotation goroutine
+//   ctx, cancel := context.WithCancel(context.Background())
+//   defer cancel()
+//   srv, err := ca.BootstrapServer(ctx, token, &http.Server{
+//       Addr: ":443",
+//       Handler: handler,
+//   })
 //   if err != nil {
 //       return err
 //   }
 //   srv.ListenAndServeTLS("", "")
-func BootstrapServer(addr, token string, handler http.Handler) (*http.Server, error) {
+func BootstrapServer(ctx context.Context, token string, base *http.Server) (*http.Server, error) {
+	if base.TLSConfig != nil {
+		return nil, errors.New("server TLSConfig is already set")
+	}
+
 	client, err := Bootstrap(token)
 	if err != nil {
 		return nil, err
@@ -64,16 +74,13 @@ func BootstrapServer(addr, token string, handler http.Handler) (*http.Server, er
 		return nil, err
 	}
 
-	tlsConfig, err := client.GetServerTLSConfig(context.Background(), sign, pk)
+	tlsConfig, err := client.GetServerTLSConfig(ctx, sign, pk)
 	if err != nil {
 		return nil, err
 	}
 
-	return &http.Server{
-		Addr:      addr,
-		Handler:   handler,
-		TLSConfig: tlsConfig,
-	}, nil
+	base.TLSConfig = tlsConfig
+	return base, nil
 }
 
 // BootstrapClient is a helper function that using the given bootstrap token
@@ -82,12 +89,15 @@ func BootstrapServer(addr, token string, handler http.Handler) (*http.Server, er
 // authority. The certificate will automatically rotate if necessary.
 //
 // Usage:
-//   client, err := ca.BootstrapClient(token)
+//   // make sure to cancel the rotation goroutine
+//   ctx, cancel := context.WithCancel(context.Background())
+//   defer cancel()
+//   client, err := ca.BootstrapClient(ctx, token)
 //   if err != nil {
 //     return err
 //   }
 //   resp, err := client.Get("https://internal.smallstep.com")
-func BootstrapClient(token string) (*http.Client, error) {
+func BootstrapClient(ctx context.Context, token string) (*http.Client, error) {
 	client, err := Bootstrap(token)
 	if err != nil {
 		return nil, err
@@ -103,7 +113,7 @@ func BootstrapClient(token string) (*http.Client, error) {
 		return nil, err
 	}
 
-	transport, err := client.Transport(context.Background(), sign, pk)
+	transport, err := client.Transport(ctx, sign, pk)
 	if err != nil {
 		return nil, err
 	}

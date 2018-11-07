@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -17,7 +18,11 @@ func main() {
 
 	token := os.Args[1]
 
-	client, err := ca.BootstrapClient(token)
+	// make sure to cancel the renew goroutine
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client, err := ca.BootstrapClient(ctx, token)
 	if err != nil {
 		panic(err)
 	}

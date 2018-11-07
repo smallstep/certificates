@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -17,13 +18,20 @@ func main() {
 
 	token := os.Args[1]
 
-	srv, err := ca.BootstrapServer(":8443", token, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		name := "nobody"
-		if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-			name = r.TLS.PeerCertificates[0].Subject.CommonName
-		}
-		w.Write([]byte(fmt.Sprintf("Hello %s at %s!!!", name, time.Now().UTC())))
-	}))
+	// make sure to cancel the renew goroutine
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	srv, err := ca.BootstrapServer(ctx, token, &http.Server{
+		Addr: ":8443",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			name := "nobody"
+			if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+				name = r.TLS.PeerCertificates[0].Subject.CommonName
+			}
+			w.Write([]byte(fmt.Sprintf("Hello %s at %s!!!", name, time.Now().UTC())))
+		}),
+	})
 	if err != nil {
 		panic(err)
 	}
