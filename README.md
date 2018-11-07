@@ -210,7 +210,7 @@ provides a single command that will prompt you to select and decrypt an
 authorized provisioner and then request a new certificate.
 
 ```
-$ step ca new-certificate "foo.example.com" foo.crt foo.key --ca-url ca.smallstep.com \
+$ step ca certificate "foo.example.com" foo.crt foo.key --ca-url ca.smallstep.com \
     --root /path/to/root_ca.crt
 ```
 
@@ -219,12 +219,12 @@ configuration management solution (no user input) you would split the above flow
 into two commands.
 
 ```
-$ TOKEN=$(step ca new-token foo.example.com \
+$ TOKEN=$(step ca token foo.example.com \
     --kid 4vn46fbZT68Uxfs9LBwHkTvrjEvxQqx-W8nnE-qDjts \
     --ca-url https://ca.example.com \
     --root /path/to/root_ca.crt  --password-file /path/to/provisioner/password)
 
-$ step ca new-certificate "foo.example.com" foo.crt foo.key --token "$TOKEN" \
+$ step ca certificate "foo.example.com" foo.crt foo.key --token "$TOKEN" \
     --ca-url https://ca.example.com --root /path/to/root_ca.crt
 ```
 

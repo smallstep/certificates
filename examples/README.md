@@ -128,7 +128,7 @@ And just run the client.go with a new token:
 ```sh
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
-certificates $ go run examples/basic-client/client.go $(step ca new-token client.smallstep.com)
+certificates $ go run examples/basic-client/client.go $(step ca token client.smallstep.com)
 ```
 
 ## Bootstrap Client & Server
@@ -182,7 +182,7 @@ provisioner password:
 ```sh
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
-certificates $ go run examples/bootstrap-server/server.go $(step ca new-token localhost)
+certificates $ go run examples/bootstrap-server/server.go $(step ca token localhost)
 ✔ Key ID: DmAtZt2EhmZr_iTJJ387fr4Md2NbzMXGdXQNW1UWPXk (mariano@smallstep.com)
 Please enter the password to decrypt the provisioner key:
 Listening on :8443 ...
@@ -220,7 +220,7 @@ But if we the client with the certificate name Mike we'll see:
 ```sh
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
-certificates $ go run examples/bootstrap-client/client.go $(step ca new-token Mike)
+certificates $ go run examples/bootstrap-client/client.go $(step ca token Mike)
 ✔ Key ID: DmAtZt2EhmZr_iTJJ387fr4Md2NbzMXGdXQNW1UWPXk (mariano@smallstep.com)
 Please enter the password to decrypt the provisioner key:
 Server responded: Hello Mike at 2018-11-03 01:52:52.678215 +0000 UTC!!!
@@ -240,7 +240,7 @@ rotates after approximately two thirds of the duration has passed.
 ```sh
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
-certificates $ go run examples/bootstrap-server/server.go $(step ca new-token localhost))
+certificates $ go run examples/bootstrap-server/server.go $(step ca token localhost))
 ✔ Key ID: YYNxZ0rq0WsT2MlqLCWvgme3jszkmt99KjoGEJJwAKs (mike@smallstep.com)
 Please enter the password to decrypt the provisioner key:
 Listening on :8443 ...
