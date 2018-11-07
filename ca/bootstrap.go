@@ -38,9 +38,9 @@ func Bootstrap(token string) (*Client, error) {
 	return NewClient(claims.Audience[0], WithRootSHA256(claims.SHA))
 }
 
-// BootstrapServer is a helper function that returns an http.Server configured
-// with the given address and handler, and prepared to use TLS connections.
-// By default the server will kick off a routine that will renew the
+// BootstrapServer is a helper function that using the given token returns the
+// given http.Server configured with a TLS certificate signed by the Certificate
+// Authority. By default the server will kick off a routine that will renew the
 // certificate after 2/3rd of the certificate's lifetime has expired.
 //
 // Usage:
