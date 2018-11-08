@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime"
+	"time"
 	"unicode"
 
 	"github.com/pkg/errors"
@@ -15,16 +17,43 @@ import (
 	"github.com/smallstep/certificates/ca"
 )
 
+// Version is set by an LDFLAG at build time representing the git tag or commit
+// for the current release
+var Version = "N/A"
+
+// BuildTime is set by an LDFLAG at build time representing the timestamp at
+// the time of build
+var BuildTime = "N/A"
+
 func usage() {
 	fmt.Fprintf(os.Stderr, "Usage: %s [options] <config.json>\n\n", path.Base(os.Args[0]))
 	flag.PrintDefaults()
 }
 
+func printVersion() {
+	version, buildTime := Version, BuildTime
+	if version == "N/A" {
+		version = "0000000-dev"
+	}
+	if buildTime == "N/A" {
+		buildTime = time.Now().UTC().Format("2006-01-02 15:04 MST")
+	}
+	fmt.Printf("Smallstep CA/%s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
+	fmt.Printf("Release Date: %s\n", buildTime)
+}
+
 func main() {
+	var version bool
 	var configFile, passFile string
-	flag.StringVar(&passFile, "password-file", "", "Path to file containing a password")
+	flag.StringVar(&passFile, "password-file", "", "path to file containing a password")
+	flag.BoolVar(&version, "version", false, "print version and exit")
 	flag.Usage = usage
 	flag.Parse()
+
+	if version {
+		printVersion()
+		os.Exit(0)
+	}
 
 	if flag.NArg() != 1 {
 		flag.Usage()
