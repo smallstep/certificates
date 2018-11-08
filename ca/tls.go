@@ -19,7 +19,7 @@ import (
 
 // GetClientTLSConfig returns a tls.Config for client use configured with the
 // sign certificate, and a new certificate pool with the sign root certificate.
-// The certificate will automatically rotate before expiring.
+// The client certificate will automatically rotate before expiring.
 func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey) (*tls.Config, error) {
 	cert, err := TLSCertificate(sign, pk)
 	if err != nil {
@@ -32,15 +32,13 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 	tlsConfig := getDefaultTLSConfig(sign)
 	// Note that with GetClientCertificate tlsConfig.Certificates is not used.
+	// Without tlsConfig.Certificates there's not need to use tlsConfig.BuildNameToCertificate()
 	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
 	tlsConfig.PreferServerCipherSuites = true
 	// Build RootCAs with given root certificate
 	if pool := c.getCertPool(sign); pool != nil {
 		tlsConfig.RootCAs = pool
 	}
-
-	// Parse Certificates and build NameToCertificate
-	tlsConfig.BuildNameToCertificate()
 
 	// Update renew function with transport
 	tr, err := getDefaultTransport(tlsConfig)
@@ -56,7 +54,8 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 // GetServerTLSConfig returns a tls.Config for server use configured with the
 // sign certificate, and a new certificate pool with the sign root certificate.
-// The certificate will automatically rotate before expiring.
+// The returned tls.Config will only verify the client certificate if provided.
+// The server certificate will automatically rotate before expiring.
 func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey) (*tls.Config, error) {
 	cert, err := TLSCertificate(sign, pk)
 	if err != nil {
@@ -70,6 +69,7 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	tlsConfig := getDefaultTLSConfig(sign)
 	// Note that GetCertificate will only be called if the client supplies SNI
 	// information or if tlsConfig.Certificates is empty.
+	// Without tlsConfig.Certificates there's not need to use tlsConfig.BuildNameToCertificate()
 	tlsConfig.GetCertificate = renewer.GetCertificate
 	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
 	tlsConfig.PreferServerCipherSuites = true
@@ -90,6 +90,19 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 	// Start renewer
 	renewer.RunContext(ctx)
+	return tlsConfig, nil
+}
+
+// GetServerMutualTLSConfig returns a tls.Config for server use configured with
+// the sign certificate, and a new certificate pool with the sign root certificate.
+// The returned tls.Config will always require and verify a client certificate.
+// The server certificate will automatically rotate before expiring.
+func (c *Client) GetServerMutualTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey) (*tls.Config, error) {
+	tlsConfig, err := c.GetServerTLSConfig(ctx, sign, pk)
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 	return tlsConfig, nil
 }
 

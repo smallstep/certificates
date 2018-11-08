@@ -142,7 +142,8 @@ password `password` hardcoded, but you can create your own using `step ca init`.
 
 These examples show the use of other helper methods, they are simple ways to
 create TLS configured http.Server and http.Client objects. The methods are
-`BootstrapServer` and `BootstrapClient` and they are used like:
+`BootstrapServer`, `BootstrapServerWithMTLS` and `BootstrapClient` and they are
+used like:
 
 ```go
 // Get a cancelable context to stop the renewal goroutines and timers.
@@ -163,6 +164,21 @@ srv.ListenAndServeTLS("", "")
 // Get a cancelable context to stop the renewal goroutines and timers.
 ctx, cancel := context.WithCancel(context.Background())
 defer cancel()
+// Create an http.Server that requires a client certificate
+srv, err := ca.BootstrapServerWithMTLS(ctx, token, &http.Server{
+    Addr: ":8443",
+    Handler: handler,
+})
+if err != nil {
+    panic(err)
+}
+srv.ListenAndServeTLS("", "")
+```
+
+```go
+// Get a cancelable context to stop the renewal goroutines and timers.
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
 // Create an http.Client
 client, err := ca.BootstrapClient(ctx, token)
 if err != nil {
@@ -170,6 +186,9 @@ if err != nil {
 }
 resp, err := client.Get("https://localhost:8443")
 ```
+
+We will demonstrate the mTLS configuration if a different example, for this one
+we will only verify it if provided.
 
 To run the example first we will start the certificate authority:
 ```sh
@@ -229,6 +248,47 @@ Server responded: Hello Mike at 2018-11-03 01:52:54.682787 +0000 UTC!!!
 ...
 ```
 
+## Bootstrap mTLS Client & Server
+
+This example demonstrates a stricter configuration of the bootstrap server, this
+one always requires a valid client certificate.
+
+As always, to run this example will require the Certificate Authority running:
+```sh
+certificates $ bin/step-ca examples/pki/config/ca.json
+2018/11/02 18:29:25 Serving HTTPS on :9000 ...
+```
+
+We will start the mTLS server and we will type `password` when step asks for the
+provisioner password:
+```sh
+certificates $ export STEPPATH=examples/pki
+certificates $ export STEP_CA_URL=https://localhost:9000
+certificates $ go run examples/bootstrap-mtls-server/server.go $(step ca token localhost)
+✔ Key ID: DmAtZt2EhmZr_iTJJ387fr4Md2NbzMXGdXQNW1UWPXk (mariano@smallstep.com)
+Please enter the password to decrypt the provisioner key:
+Listening on :8443 ...
+```
+
+For mTLS, curl and curl with the root certificate will fail:
+```sh
+certificates $ curl --cacert examples/pki/secrets/root_ca.crt https://localhost:8443
+curl: (35) error:1401E412:SSL routines:CONNECT_CR_FINISHED:sslv3 alert bad certificate
+```
+
+But if we the client with the certificate name Mike we'll see:
+```sh
+certificates $ export STEPPATH=examples/pki
+certificates $ export STEP_CA_URL=https://localhost:9000
+certificates $ go run examples/bootstrap-client/client.go $(step ca token Mike)
+✔ Key ID: DmAtZt2EhmZr_iTJJ387fr4Md2NbzMXGdXQNW1UWPXk (mariano@smallstep.com)
+Please enter the password to decrypt the provisioner key:
+Server responded: Hello Mike at 2018-11-07 21:54:00.140022 +0000 UTC!!!
+Server responded: Hello Mike at 2018-11-07 21:54:01.140827 +0000 UTC!!!
+Server responded: Hello Mike at 2018-11-07 21:54:02.141578 +0000 UTC!!!
+...
+```
+
 ## Certificate rotation
 
 We can use the bootstrap-server to demonstrate the certificate rotation. We've
@@ -240,7 +300,7 @@ rotates after approximately two thirds of the duration has passed.
 ```sh
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
-certificates $ go run examples/bootstrap-server/server.go $(step ca token localhost))
+certificates $ go run examples/bootstrap-server/server.go $(step ca token localhost)
 ✔ Key ID: YYNxZ0rq0WsT2MlqLCWvgme3jszkmt99KjoGEJJwAKs (mike@smallstep.com)
 Please enter the password to decrypt the provisioner key:
 Listening on :8443 ...
