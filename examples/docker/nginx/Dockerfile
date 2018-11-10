@@ -6,6 +6,6 @@ COPY site.conf /etc/nginx/conf.d/
 COPY certwatch.sh /
 COPY entrypoint.sh /
 
-# Cron && Nginx
+# Certificate watcher and nginx
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
