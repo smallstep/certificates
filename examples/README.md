@@ -316,3 +316,108 @@ sure the certificate  changes after 74-80 seconds.
 ```sh
 certificates $ step certificate inspect --insecure https://localhost:8443
 ```
+
+## NGINX with Step CA certificates
+
+The example under the `docker` directory shows how to combine the Smallstep CA
+with NGINX to server pages or proxy services using certificates created by the
+step-ca.
+
+This example creates 3 different docker images:
+
+* nginx-test: docker image with NGINX and a script using inotify-tools to watch
+  for changes in the certificate to reload NGINX.
+* step-ca-test: docker image with the Smallstep CA
+* step-renewer-test: docker images with the step cli tool, it creates the
+  certificate and has a cron that renews the certificate. Right now the cron
+  runs every minute for testing purposes.
+
+To run this test you need to have docker daemon running. With docker running
+swith to the `examples/docker directory` and just run `make`
+
+```sh
+certificates $ cd examples/docker/
+docker $ make
+```
+
+Make will build the binaries for step and step-ca, create the images, and deploy
+them using docker composer.
+
+NGINX will be listening on your local machine on https://localhost:4443, but to
+make sure the cert is right we need to add the following entry to `/etc/hosts`:
+
+```
+127.0.0.1   nginx
+```
+
+Now we can use curl to check:
+
+```sh
+docker $ curl --cacert ca/pki/secrets/root_ca.crt https://nginx:4443/
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+
+Now you can use `make inspect` to inspect the certificate to see how the
+certificate gets updated every minute:
+
+```sh
+docker $ make inspect
+step certificate inspect https://localhost:4443 --insecure
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 220353801925419530569669982276277771655 (0xa5c6993a7e110e6f009c83c79edc1d87)
+    Signature Algorithm: ECDSA-SHA256
+        Issuer: CN=Smallstep Intermediate CA
+        Validity
+            Not Before: Nov 10 02:13:00 2018 UTC
+            Not After : Nov 11 02:13:00 2018 UTC
+mariano@endor docker (docker-nginx)*$ make inspect | head
+step certificate inspect https://localhost:4443 --insecure
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 207756171799719353821615361892302471392 (0x9c4c621c04d3e8be401ff0d14c5440e0)
+    Signature Algorithm: ECDSA-SHA256
+        Issuer: CN=Smallstep Intermediate CA
+        Validity
+            Not Before: Nov 10 02:14:00 2018 UTC
+            Not After : Nov 11 02:14:00 2018 UTC
+```
+
+Finally, to remove the containers and volumes you can use `make clean`:
+
+```sh
+docker $ make clean
+docker service rm steplab_ca steplab_nginx steplab_renewer
+steplab_ca
+steplab_nginx
+steplab_renewer
+sleep 20
+docker volume rm -f steplab_certificates
+steplab_certificates
+```
