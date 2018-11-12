@@ -1,0 +1,2 @@
+# min	hour	day	month	weekday	command
+*	*	*	*	*	rm -f /var/local/step/site-new.crt && step ca renew --out /var/local/step/site-new.crt /var/local/step/site.crt /var/local/step/site.key && mv /var/local/step/site-new.crt /var/local/step/site.crt
