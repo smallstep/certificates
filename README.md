@@ -168,7 +168,7 @@ ciphersuites, min/max TLS version, etc.
         * `maxTLSCertDuration`: do not allow certificates with a duration greater
         than this value.
 
-        * `defaultTLSCertDuration`: if not certificat validity period is specified,
+        * `defaultTLSCertDuration`: if no certificate validity period is specified,
         use this value.
 
         * `disableIssuedAtCheck`: disable a check verifying that provisioning
@@ -214,8 +214,7 @@ $ step ca certificate "foo.example.com" foo.crt foo.key --ca-url ca.smallstep.co
     --root /path/to/root_ca.crt
 ```
 
-If you would like to generate certificates on demand from an automated configuration
-configuration management solution (no user input) you would split the above flow
+If you would like to generate certificates on demand from an automated configuration management solution (no user input) you would split the above flow
 into two commands.
 
 ```
