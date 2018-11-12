@@ -28,10 +28,10 @@ your local machine.
 
 ### Mac OS
 
-Install `step-ca` via [Homebrew](https://brew.sh/):
+Install `step` via [Homebrew](https://brew.sh/):
 
 ```
-brew install smallstep/smallstep/step-ca
+brew install smallstep/smallstep/step
 ```
 
 ### Linux
@@ -231,8 +231,36 @@ $ step ca certificate "foo.example.com" foo.crt foo.key --token "$TOKEN" \
 You can take a closer look at the contents of the certificate using `step certificate inspect`:
 
 ```
-step certificate inspect foo.crt
+$ step certificate inspect foo.crt
 ```
+
+## Reload
+
+It is important that the CA be able to handle configuration changes with no downtime.
+Our CA has a built in `reload` feature allowing it to:
+
+1. Finish processing existing connections while blocking new ones.
+2. Re-read the configuration file and initialize the API.
+3. Begin accepting blocked and new connections.
+
+The `reload` feature is triggered by sending a SIGHUP to the PID of the
+Step CA process. A few important details to note when using `reload`:
+
+* The location of the modified configuration must be in the same location as it
+was in the original invocation of the `step-ca`. So, if the original command was
+
+```
+$ step-ca ./.step/config/ca.json
+```
+
+then, upon reload, the Step CA will read it's new configuration from the same
+configuration file.
+
+* Step CA requires the password to decrypt the intermediate certificate again
+upon `reload`. You can auotmate this in one of two ways:
+
+    * Use the `--password-file` flag in the original invocation.
+    * Use the toplevel `password` attribute in the `ca.json` configuration file.
 
 ## Versioning
 
