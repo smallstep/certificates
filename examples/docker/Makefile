@@ -19,22 +19,5 @@ up:
 down:
 	docker-compose down
 
-deploy:
-	docker stack deploy -c docker-compose.yml steplab
-
-clean:
-	docker service rm steplab_ca steplab_nginx steplab_renewer
-	sleep 20
-	docker volume rm -f steplab_certificates
-
-ls: 
-	docker service ls
-
-ps:
-	docker ps
-
-logs:
-	docker service ls | grep steplab | awk '{print $1}' | xargs -n 1 docker service logs
-
 inspect:
 	step certificate inspect https://localhost:4443 --insecure
