@@ -1,4 +1,4 @@
-all: binaries build deploy
+all: binaries build up
 
 binaries:
 	GOOS=linux go build -o ca/step-ca github.com/smallstep/certificates/cmd/step-ca
@@ -12,6 +12,12 @@ build-ca:
 	docker build -t step-ca-test:latest ca
 build-renewer:
 	docker build -t step-renewer-test:latest renewer
+
+up:
+	docker-compose up
+
+down:
+	docker-compose down
 
 deploy:
 	docker stack deploy -c docker-compose.yml steplab

@@ -335,13 +335,33 @@ This example creates 3 different docker images:
 To run this test you need to have docker daemon running. With docker running
 swith to the `examples/docker directory` and just run `make`
 
-```sh
+```
 certificates $ cd examples/docker/
 docker $ make
+GOOS=linux go build -o ca/step-ca github.com/smallstep/certificates/cmd/step-ca
+GOOS=linux go build -o renewer/step github.com/smallstep/cli/cmd/step
+docker build -t nginx-test:latest nginx
+...
+docker-compose up
+WARNING: The Docker Engine you're using is running in swarm mode.
+
+Compose does not use swarm mode to deploy services to multiple nodes in a swarm. All containers will be scheduled on the current node.
+
+To deploy your application across the swarm, use `docker stack deploy`.
+
+Creating network "docker_default" with the default driver
+Creating docker_ca_1 ... done
+Creating docker_renewer_1 ... done
+Creating docker_nginx_1   ... done
+Attaching to docker_ca_1, docker_renewer_1, docker_nginx_1
+ca_1       | 2018/11/12 19:39:16 Serving HTTPS on :443 ...
+nginx_1    | Setting up watches.
+nginx_1    | Watches established.
+...
 ```
 
-Make will build the binaries for step and step-ca, create the images, and deploy
-them using docker composer.
+Make will build the binaries for step and step-ca, create the images, create the
+containers and start them using docker composer.
 
 NGINX will be listening on your local machine on https://localhost:4443, but to
 make sure the cert is right we need to add the following entry to `/etc/hosts`:
@@ -385,7 +405,7 @@ Now you can use `make inspect` to inspect the certificate to see how the
 certificate gets updated every minute:
 
 ```sh
-docker $ make inspect
+docker $ make inspect | head
 step certificate inspect https://localhost:4443 --insecure
 Certificate:
     Data:
@@ -396,7 +416,7 @@ Certificate:
         Validity
             Not Before: Nov 10 02:13:00 2018 UTC
             Not After : Nov 11 02:13:00 2018 UTC
-mariano@endor docker (docker-nginx)*$ make inspect | head
+docker $ make inspect | head
 step certificate inspect https://localhost:4443 --insecure
 Certificate:
     Data:
@@ -409,15 +429,16 @@ Certificate:
             Not After : Nov 11 02:14:00 2018 UTC
 ```
 
-Finally, to remove the containers and volumes you can use `make clean`:
+Finally, to remove the containers and volumes you can use `make down`:
 
 ```sh
-docker $ make clean
-docker service rm steplab_ca steplab_nginx steplab_renewer
-steplab_ca
-steplab_nginx
-steplab_renewer
-sleep 20
-docker volume rm -f steplab_certificates
-steplab_certificates
+docker $ make down
+docker-compose down
+Stopping docker_nginx_1   ... done
+Stopping docker_renewer_1 ... done
+Stopping docker_ca_1      ... done
+Removing docker_nginx_1   ... done
+Removing docker_renewer_1 ... done
+Removing docker_ca_1      ... done
+Removing network docker_default
 ```
