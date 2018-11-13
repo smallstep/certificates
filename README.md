@@ -9,17 +9,30 @@ For more information and docs see [the Step website](https://smallstep.com/cli/)
 and the [blog post](https://smallstep.com/blog/zero-trust-swiss-army-knife.html)
 announcing Step Certificate Authority.
 
+## Why?
+
+Managing your own *public key infrastructure* (PKI) can be tedious and error
+prone. Good security hygiene is hard. Setting up simple PKI is out of reach for
+many small teams, and following best practices like proper certificate revocation
+and rolling is challenging even for experts.
+
+This project is part of smallstep's broader security architecture, which makes
+it much easier to implement good security practices early, and incrementally
+improve them as your system matures.
+
 ### Table of Contents
 
 - [Installing](#installing)
 - [Documentation](#documentation)
 - [Terminology](#terminology)
 - [Getting Started](#getting-started)
-- [I've Got a Running CA! Now What?](#now-what)
+- [Commonly Asked Questions](docs/common-questions.md)
+- [Recommended Defaults](docs/recommendations.md)
 - [Versioning](#versioning)
-- [How To Create A New Release](./distribution.md)
+- [How To Create A New Release](docs/distribution.md)
 - [LICENSE](./LICENSE)
 - [CHANGELOG](./CHANGELOG.md)
+
 
 ## Installing
 
@@ -62,7 +75,10 @@ Documentation can be found in three places:
 
 ### PKI - Public Key Infrastructure
 
-Blah blah
+A set of roles, policies, and procedures needed to create, manage, distribute,
+use, store, and revoke digital certificates and manage public-key encryption.
+The purpose of a PKI is to facilitate the secure electronic transfer of
+information for a range of network activities.
 
 ### Provisioners
 
@@ -192,13 +208,61 @@ To start the CA run:
 step-ca $STEPPATH/config/ca.step
 ```
 
-## [I've got a running CA! Now What?](#now-what)
+Consider populating a `defaults.json` file with a few variables that will
+make your command line experience much more pleasant.
 
-Now that you have an online CA that authenticates requests before issuing
-certificates you can begin automating the distribution and maintenance of your
-PKI.
+### Set your defaults
 
-### Issuing x.509 certificates for TLS (HTTPS)
+```
+$ cat > $STEPPATH/config/defaults.json
+{
+    "ca-url": "https://<dns-name>:<port>",
+    "ca-config": "/home/user/.step/config/ca.json"
+    "root": "/home/user/.step/secrets/root_ca.crt"
+}
+```
+
+**ca-curl**: Use the DNS name and port that you used when initializing the CA.
+**root**: Path to the root certificate on the file system.
+
+You can always override these values with command-line flags.
+
+### Reload
+
+It is important that the CA be able to handle configuration changes with no downtime.
+Our CA has a built in `reload` function allowing it to:
+
+1. Finish processing existing connections while blocking new ones.
+2. Parse the configuration file and re-initialize the API.
+3. Begin accepting blocked and new connections.
+
+`reload` is triggered by sending a SIGHUP to the PID (see `man kill`
+for your OS) of the Step CA process. A few important details to note when using `reload`:
+
+* The location of the modified configuration must be in the same location as it
+was in the original invocation of `step-ca`. So, if the original command was
+
+```
+$ step-ca ./.step/config/ca.json
+```
+
+then, upon `reload`, the Step CA will read it's new configuration from the same
+configuration file.
+
+* Step CA requires the password to decrypt the intermediate certificate again
+upon `reload`. You can auotmate this in one of two ways:
+
+    * Use the `--password-file` flag in the original invocation.
+    * Use the top level `password` attribute in the `ca.json` configuration file.
+
+## Versioning
+
+We use [SemVer](http://semver.org/) for versioning. For the versions available,
+see the [tags on this repository](https://github.com/smallstep/cli).
+
+
+
+### Let's issue a certificate!
 
 There are two steps to issuing a certificate at the command line:
 
@@ -210,11 +274,10 @@ provides a single command that will prompt you to select and decrypt an
 authorized provisioner and then request a new certificate.
 
 ```
-$ step ca certificate "foo.example.com" foo.crt foo.key --ca-url https://ca.smallstep.com \
-    --root /path/to/root_ca.crt
+$ step ca certificate "foo.example.com" foo.crt foo.key
 ```
 
-If you would like to generate certificates on demand from an automated configuration
+If you would like to generate certificates on demand from an automated
 configuration management solution (no user input) you would split the above flow
 into two commands.
 
@@ -234,39 +297,87 @@ You can take a closer look at the contents of the certificate using `step certif
 $ step certificate inspect foo.crt
 ```
 
-## Hot Reload
+### List|Add|Remove Provisioners
 
-It is important that the CA be able to handle configuration changes with no downtime.
-Our CA has a built in `reload` feature allowing it to:
+The Step CA configuration is initialized with one provisioner; one entity
+that is authorized by the CA to generate provisioning tokens for new certificates.
+We encourage you to have many provisioners - ideally one for each entity in your
+infrastructure.
 
-1. Finish processing existing connections while blocking new ones.
-2. Re-read the configuration file and initialize the API.
-3. Begin accepting blocked and new connections.
+**Why should I be using multiple provisioners?**
 
-The `reload` feature is triggered by sending a SIGHUP to the PID (see `man kill` for your OS) of the
-Step CA process. A few important details to note when using `reload`:
+* Each certificate generated by the Step CA contains the ID of the provisioner
+that issued the *provisioning token* authorizing the creation of the cert. This
+ID is stored in the X.509 ExtraExtensions of the certificate under
+`OID: 1.3.6.1.4.1.37476.9000.64.1` and can be inspected by running `step
+certificate inspect foo.crt`. These IDs can and should be used to debug and
+gather information about the origin of a certificate. If every member of your
+ops team and the configuration management tools all use the same provisioner
+to authorize new certificates you lose valuable visibility into the workings
+of your PKI.
+* Each provisioner should require a **unique** password to decrypt it's private key
+-- we can generate unique passwords for you but we can't force you to use them.
+If you only have one provisioner then every entity in the infrastructure will
+need access to that one password. Jim from your dev ops team should not be using
+the same provisioner/password combo to authorize certificates for debugging as
+Chef is for your CICD - no matter how trustworthy Jim says he is.
 
-* The location of the modified configuration must be in the same location as it
-was in the original invocation of the `step-ca`. So, if the original command was
+Let's begin by listing the existing provisioners:
 
 ```
-$ step-ca ./.step/config/ca.json
+$ bin/step ca provisioner list
 ```
 
-then, upon reload, the Step CA will read it's new configuration from the same
-configuration file.
+Now let's add a provisioner for Jim.
 
-* Step CA requires the password to decrypt the intermediate certificate again
-upon `reload`. You can auotmate this in one of two ways:
+```
+$ bin/step ca provisioner add jim@smallstep.com --create
+```
 
-    * Use the `--password-file` flag in the original invocation.
-    * Use the toplevel `password` attribute in the `ca.json` configuration file.
+**NOTE**: This change will not affect the Step CA until a reload is forced by
+sending a SIGHUP signal to the process.
 
-## Versioning
+List the provisioners again and you will see that nothing has changed.
 
-We use [SemVer](http://semver.org/) for versioning. For the versions available,
-see the [tags on this repository](https://github.com/smallstep/cli).
+```
+$ bin/step ca provisioner list
+```
 
+Now let's reload the CA. You will need to re-enter your intermediate
+password unless it's in your `ca.json` or your are using `--password-file`.
+
+```
+$ ps aux | grep step-ca   # to get the PID
+$ kill -1 <pid>
+```
+
+Once the CA is running again, list the provisioners, again.
+
+```
+$ bin/step ca provisioner list
+```
+
+Boom! Magic.
+Now suppose Jim forgets his password ('come on Jim!'), and he'd like to remove
+his old provisioner. Get the `kid` (Key ID) of Jim's provisioner by listing
+the provisioners and finding the appropriate one. Then run:
+
+```
+$ bin/step ca provisioner remove jim@smallstep.com --kid <kid>
+```
+
+Then reload the CA and verify that Jim's provisioner is no longer returned
+in the provisioner list.
+
+We can also remove all of Jim's provisioners, supposing Jim forgot all the passwords
+('really Jim?'), by running the following:
+
+```
+$ bin/step ca provisioner remove jim@smallstep.com --all
+```
+
+The same entity may have multiple provisioners for authorizing different
+types of certs. Each of these provisioners must have unique keys.
 
 ## License
 
