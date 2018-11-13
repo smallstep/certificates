@@ -210,7 +210,7 @@ provides a single command that will prompt you to select and decrypt an
 authorized provisioner and then request a new certificate.
 
 ```
-$ step ca certificate "foo.example.com" foo.crt foo.key --ca-url ca.smallstep.com \
+$ step ca certificate "foo.example.com" foo.crt foo.key --ca-url https://ca.smallstep.com \
     --root /path/to/root_ca.crt
 ```
 
