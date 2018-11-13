@@ -234,7 +234,7 @@ You can take a closer look at the contents of the certificate using `step certif
 $ step certificate inspect foo.crt
 ```
 
-## Reload
+## Hot Reload
 
 It is important that the CA be able to handle configuration changes with no downtime.
 Our CA has a built in `reload` feature allowing it to:
@@ -243,7 +243,7 @@ Our CA has a built in `reload` feature allowing it to:
 2. Re-read the configuration file and initialize the API.
 3. Begin accepting blocked and new connections.
 
-The `reload` feature is triggered by sending a SIGHUP to the PID of the
+The `reload` feature is triggered by sending a SIGHUP to the PID (see `man kill` for your OS) of the
 Step CA process. A few important details to note when using `reload`:
 
 * The location of the modified configuration must be in the same location as it
