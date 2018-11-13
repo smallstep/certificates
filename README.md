@@ -2,8 +2,6 @@
 
 # Step Certificates
 
-[![CLA assistant](https://cla-assistant.io/readme/badge/smallstep/certificates)](https://cla-assistant.io/smallstep/certificates)
-
 An online certificate authority and related tools for secure automated
 certificate management, so you can use TLS everywhere.
 
@@ -274,3 +272,7 @@ see the [tags on this repository](https://github.com/smallstep/cli).
 
 This project is licensed under the MIT License - see the
 [LICENSE](./LICENSE) file for details
+
+### Individual Contributor License
+
+[![CLA assistant](https://cla-assistant.io/readme/badge/smallstep/certificates)](https://cla-assistant.io/smallstep/certificates)
