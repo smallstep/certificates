@@ -2,6 +2,8 @@
 
 # Step Certificates
 
+[![CLA assistant](https://cla-assistant.io/readme/badge/smallstep/certificates)](https://cla-assistant.io/smallstep/certificates)
+
 An online certificate authority and related tools for secure automated
 certificate management, so you can use TLS everywhere.
 
