@@ -28,8 +28,8 @@ improve them as your system matures.
 - [Getting Started](#getting-started)
 - [Commonly Asked Questions](docs/common-questions.md)
 - [Recommended Defaults](docs/recommendations.md)
-- [Versioning](#versioning)
 - [How To Create A New Release](docs/distribution.md)
+- [Versioning](#versioning)
 - [LICENSE](./LICENSE)
 - [CHANGELOG](./CHANGELOG.md)
 
@@ -208,10 +208,10 @@ To start the CA run:
 step-ca $STEPPATH/config/ca.step
 ```
 
-Consider populating a `defaults.json` file with a few variables that will
-make your command line experience much more pleasant.
-
 ### Set your defaults
+
+This is optional, but we recommend you populate a `defaults.json` file with a
+few variables that will make your command line experience much more pleasant.
 
 ```
 $ cat > $STEPPATH/config/defaults.json
@@ -222,12 +222,13 @@ $ cat > $STEPPATH/config/defaults.json
 }
 ```
 
-**ca-curl**: Use the DNS name and port that you used when initializing the CA.
-**root**: Path to the root certificate on the file system.
+* **ca-curl**: Use the DNS name and port that you used when initializing the CA.
+
+* **root**: Path to the root certificate on the file system.
 
 You can always override these values with command-line flags.
 
-### Reload
+### Hot Reload
 
 It is important that the CA be able to handle configuration changes with no downtime.
 Our CA has a built in `reload` function allowing it to:
@@ -249,18 +250,11 @@ $ step-ca ./.step/config/ca.json
 then, upon `reload`, the Step CA will read it's new configuration from the same
 configuration file.
 
-* Step CA requires the password to decrypt the intermediate certificate again
+* Step CA requires the password to decrypt the intermediate certificate, again,
 upon `reload`. You can auotmate this in one of two ways:
 
     * Use the `--password-file` flag in the original invocation.
     * Use the top level `password` attribute in the `ca.json` configuration file.
-
-## Versioning
-
-We use [SemVer](http://semver.org/) for versioning. For the versions available,
-see the [tags on this repository](https://github.com/smallstep/cli).
-
-
 
 ### Let's issue a certificate!
 
@@ -334,7 +328,7 @@ Now let's add a provisioner for Jim.
 $ bin/step ca provisioner add jim@smallstep.com --create
 ```
 
-**NOTE**: This change will not affect the Step CA until a reload is forced by
+**NOTE**: This change will not affect the Step CA until a `reload` is forced by
 sending a SIGHUP signal to the process.
 
 List the provisioners again and you will see that nothing has changed.
@@ -343,7 +337,7 @@ List the provisioners again and you will see that nothing has changed.
 $ bin/step ca provisioner list
 ```
 
-Now let's reload the CA. You will need to re-enter your intermediate
+Now let's `reload` the CA. You will need to re-enter your intermediate
 password unless it's in your `ca.json` or your are using `--password-file`.
 
 ```
@@ -366,7 +360,7 @@ the provisioners and finding the appropriate one. Then run:
 $ bin/step ca provisioner remove jim@smallstep.com --kid <kid>
 ```
 
-Then reload the CA and verify that Jim's provisioner is no longer returned
+Then `reload` the CA and verify that Jim's provisioner is no longer returned
 in the provisioner list.
 
 We can also remove all of Jim's provisioners, supposing Jim forgot all the passwords
@@ -378,6 +372,11 @@ $ bin/step ca provisioner remove jim@smallstep.com --all
 
 The same entity may have multiple provisioners for authorizing different
 types of certs. Each of these provisioners must have unique keys.
+
+## Versioning
+
+We use [SemVer](http://semver.org/) for versioning. For the versions available,
+see the [tags on this repository](https://github.com/smallstep/cli).
 
 ## License
 
