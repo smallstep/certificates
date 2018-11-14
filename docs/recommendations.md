@@ -14,6 +14,20 @@ best practices in the industry, and to have these practices codified as defaults
 in the `certificates` code base. If you have questions, suggestions, or comments
 about any of these decisions please let us know.
 
+### Tokens
+
+We use JWTs (JSON Web Tokens to prove authenticity and identity within the Step
+ecosystem. JWTs have received negative attention because they are easy to
+misuse, misconfigure.
+We agree! But lots of things are easy to misuse. We also believe
+that when configured well JWTs are a great way to sign and encode data. Our JWT's
+are, by default, short-lived (5 minute lifespan) and can only be used once during
+the lifetime of the Step CA. We use a 1 minute clock drift leeway because that
+was the recommended default in the reputable JWT package that we chose. If using
+Step JWTs or your own JWTs in your code be sure to verify and validate every
+single standard attributed of the JWT. JWTs, like all cryptographic tools,
+are useless without proper attention to configuration and guidelines.
+
 ### Keys
 
   ```
