@@ -1,0 +1,210 @@
+#!/bin/sh
+
+CA_NAME="ca"
+CA_NAMESPACE="step"
+DEMO_NAMESPACE="step-demo"
+DEMO_ENVIRONMENT="staging"
+
+
+# The name of an image pull secret (e.g., for private docker hub images)
+# Set to "none" for no pull secret.
+IMAGE_PULL_SECRET="none"
+
+while getopts "c:d:n:e:h:t:p:i:" opt; do
+    case "$opt" in
+    h)
+        show_help
+        exit 0
+        ;;
+    c)
+        CA_NAMESPACE=$OPTARG
+        ;;
+    n)
+        CA_NAME=$OPTARG
+        ;;
+    e)
+        DEMO_ENVIRONMENT=$OPTARG
+        ;;
+    d)
+        DEMO_NAMESPACE=$OPTARG
+        ;;
+    t)
+        INSTALL_TYPE=$OPTARG
+        ;;
+    p)
+        PROVISIONER_TYPE=$OPTARG
+        ;;
+    i)
+        IMAGE_PULL_SECRET=$OPTARG
+        ;;
+    esac
+done
+
+shift $((OPTIND-1))
+
+
+# Various container images used throughout the script.
+STEP_CA_IMAGE="localhost:5000/smallstep/step-ca:latest"
+
+DIR=`pwd`
+PKI="$(dirname "$DIR")/pki"
+SECRETS="$PKI/secrets"
+
+##
+# Certificate Authority installation (prints yaml to stdout).
+##
+install_ca()
+{
+  read -p "CA Private Key Password: " -s password
+  (>&2 echo "")
+
+  tmp=$(mktemp -d /tmp/step.XXXXXX)
+  (
+    cd "$tmp"
+
+    # Bundle up certificates and private key into ConfigMap
+    mkdir $tmp/certificates
+    cp $SECRETS/root_ca.crt $tmp/certificates
+    cp $SECRETS/intermediate_ca.crt $tmp/certificates/
+    cp $SECRETS/intermediate_ca_key $tmp/certificates/
+
+    # ConfigMap for CA configuration
+    mkdir $tmp/config
+    cp $DIR/ca.json $tmp/config/ca.json
+
+    # Create the namespace
+    echo "---" > $tmp/step-ca.yml
+    echo "apiVersion: v1" >> $tmp/step-ca.yml
+    echo "kind: Namespace" >> $tmp/step-ca.yml
+    echo "metadata:" >> $tmp/step-ca.yml
+    echo "  name: $CA_NAMESPACE" >> $tmp/step-ca.yml
+    echo "---" >> $tmp/step-ca.yml
+
+    # Create certificates configmap
+    echo "apiVersion: v1" >> $tmp/step-ca.yml
+    echo "kind: ConfigMap" >> $tmp/step-ca.yml
+    kubectl create configmap ca-certificates -n $CA_NAMESPACE --from-file `pwd`/certificates --dry-run -o yaml >> $tmp/step-ca.yml
+    echo "" >> $tmp/step-ca.yml
+    echo "---" >> $tmp/step-ca.yml
+
+    # Create a CA configuration configmap
+    echo "" >> $tmp/step-ca.yml
+    echo "apiVersion: v1" >> $tmp/step-ca.yml
+    echo "kind: ConfigMap" >> $tmp/step-ca.yml
+    kubectl create configmap ca-config -n $CA_NAMESPACE --from-file `pwd`/config --dry-run -o yaml >> $tmp/step-ca.yml
+    echo "" >> $tmp/step-ca.yml
+    echo "---" >> $tmp/step-ca.yml
+
+    # Create a secret with the CA password in it
+    echo "" >> $tmp/step-ca.yml
+    echo "apiVersion: v1" >> $tmp/step-ca.yml
+    echo "kind: Secret" >> $tmp/step-ca.yml
+    kubectl create secret generic ca-certificate-password -n $CA_NAMESPACE --from-literal=password="$password" --dry-run -o yaml >> $tmp/step-ca.yml
+)
+
+  echo "" >> $tmp/step-ca.yml
+  echo "---" >> $tmp/step-ca.yml
+  echo "" >> $tmp/step-ca.yml
+
+  cat <<EOF >> $tmp/step-ca.yml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    service: $CA_NAME
+  name: $CA_NAME
+  namespace: $CA_NAMESPACE
+spec:
+  type: ClusterIP
+  ports:
+  - name: headless
+    port: 443
+    targetPort: 9000
+  selector:
+    service: $CA_NAME
+
+---
+
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: $CA_NAME
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      service: $CA_NAME
+
+---
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: $CA_NAME
+  namespace: $CA_NAMESPACE
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        service: $CA_NAME
+    spec:
+      containers:
+        - name: $CA_NAME
+          image: $STEP_CA_IMAGE
+          resources:
+            requests:
+              cpu: 100m
+              memory: 20Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 443
+              scheme: HTTPS
+            initialDelaySeconds: 3
+            periodSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 443
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 3
+          volumeMounts:
+            - name: certificates
+              mountPath: /home/step/.step/secrets
+              readOnly: true
+            - name: config
+              mountPath: /home/step/.step/config
+              readOnly: true
+            - name: secrets
+              mountPath: /home/step/secrets
+              readOnly: true
+          securityContext:
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: certificates
+          configMap:
+            name: ca-certificates
+        - name: config
+          configMap:
+            name: ca-config
+        - name: secrets
+          secret:
+            secretName: ca-certificate-password
+EOF
+
+  cat $tmp/step-ca.yml
+
+  rm -rf "$tmp"
+
+}
+
+install_ca
