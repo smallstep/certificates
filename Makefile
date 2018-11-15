@@ -6,6 +6,7 @@ Q=$(if $V,,@)
 PREFIX?=
 SRC=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
 GOOS_OVERRIDE ?=
+OUTPUT_ROOT=output/
 
 # Set shell to bash for `echo -e`
 SHELL := /bin/bash
@@ -153,6 +154,70 @@ uninstall:
 .PHONY: install uninstall
 
 #########################################
+# Building Docker Image
+#
+# Builds a dockerfile for step by building a linux version of the step-cli and
+# then copying the specific binary when building the container.
+#
+# This ensures the container is as small as possible without having to deal
+# with getting access to private repositories inside the container during build
+# time.
+#########################################
+
+# XXX We put the output for the build in 'output' so we don't mess with how we
+# do rule overriding from the base Makefile (if you name it 'build' it messes up
+# the wildcarding).
+DOCKER_OUTPUT=$(OUTPUT_ROOT)docker/
+
+DOCKER_MAKE=V=$V GOOS_OVERRIDE='GOOS=linux GOARCH=amd64' PREFIX=$(1) make $(1)bin/$(2)
+DOCKER_BUILD=$Q docker build -t smallstep/$(1):latest -f docker/$(2) --build-arg BINPATH=$(DOCKER_OUTPUT)bin/$(1) .
+
+docker: docker-make docker/Dockerfile.step-ca
+	$(call DOCKER_BUILD,step-ca,Dockerfile.step-ca)
+
+docker-make:
+	mkdir -p $(DOCKER_OUTPUT)
+	$(call DOCKER_MAKE,$(DOCKER_OUTPUT),step-ca)
+
+.PHONY: docker docker-make
+
+#################################################
+# Releasing Docker Images
+#
+# Using the docker build infrastructure, this section is responsible for
+# logging into docker hub and pushing the built docker containers up with the
+# appropriate tags.
+#################################################
+
+DOCKER_TAG=docker tag smallstep/$(1):latest smallstep/$(1):$(2)
+DOCKER_PUSH=docker push smallstep/$(1):$(2)
+
+docker-tag:
+	$(call DOCKER_TAG,step-ca,$(VERSION))
+
+docker-push-tag: docker-tag
+	$(call DOCKER_PUSH,step-ca,$(VERSION))
+
+# Rely on DOCKER_USERNAME and DOCKER_PASSWORD being set inside the CI or
+# equivalent environment
+docker-login:
+	$Q docker login -u="$(DOCKER_USERNAME)" -p="$(DOCKER_PASSWORD)"
+
+.PHONY: docker-login docker-tag docker-push-tag
+
+#################################################
+# Targets for pushing the docker images
+#################################################
+
+# For all builds on the master branch, we actually build the container
+docker-master: docker
+
+# For all builds on the master branch with an rc tag
+docker-release: docker-master docker-login docker-push-tag
+
+.PHONY: docker-master docker-release
+
+#########################################
 # Debian
 #########################################
 
@@ -177,7 +242,6 @@ distclean: clean
 # Build statically compiled step binary for various operating systems
 #################################################
 
-OUTPUT_ROOT=output/
 BINARY_OUTPUT=$(OUTPUT_ROOT)binary/
 BUNDLE_MAKE=v=$v GOOS_OVERRIDE='GOOS=$(1) GOARCH=$(2)' PREFIX=$(3) make $(3)bin/$(BINNAME)
 RELEASE=./.travis-releases
@@ -234,7 +298,7 @@ artifacts-master:
 artifacts-release: artifacts-tag
 
 # This command is called by travis directly *after* a successful build
-artifacts: artifacts-$(PUSHTYPE)
+artifacts: artifacts-$(PUSHTYPE) docker-$(PUSHTYPE)
 
 .PHONY: artifacts-master artifacts-release artifacts
 
