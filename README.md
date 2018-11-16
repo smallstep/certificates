@@ -184,7 +184,7 @@ ciphersuites, min/max TLS version, etc.
         * `maxTLSCertDuration`: do not allow certificates with a duration greater
         than this value.
 
-        * `defaultTLSCertDuration`: if not certificat validity period is specified,
+        * `defaultTLSCertDuration`: if no certificate validity period is specified,
         use this value.
 
         * `disableIssuedAtCheck`: disable a check verifying that provisioning
