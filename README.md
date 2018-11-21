@@ -239,30 +239,27 @@ In the examples below we will use `https://ca.smallstep.com:8080`.
 
 1. Get the Fingerprint.
 
-From the **remote server**:
+    From the **remote server**:
 
-```
-$ FP=$(step certificate fingerprint ./path/to/root_ca.crt)
-```
+    ```
+    $ FP=$(step certificate fingerprint ./path/to/root_ca.crt)
+    ```
 
 2. Request the certificate from the running CA.
 
-From the **local server**:
+    From the **local server**:
 
-```
-$ step ca root $STEPPATH/certs/root_ca.crt --fingerprint $FP --ca-url "https:ca.smallstep.com:8080"
-```
+    ```
+    $ step ca root $STEPPATH/secrets/root_ca.crt --fingerprint $FP --ca-url "https:ca.smallstep.com:8080"
+    ```
 
 3. Test.
 
-Now let's test the root certificate by generating a new provisioner token:
+    Now let's test the root certificate by generating a new provisioner token:
 
-```
-* step ca token foo --ca-url "https:ca.smallstep.com:8080" --root $STEPPATH/certs/root_ca.crt
-```
-
-You'll be asked for the password to decrypt the provisioner's private key. By default
-this password is the same as the password you entered when initializing your PKI.
+    ```
+    * step ca health --ca-url "https:ca.smallstep.com:8080" --root $STEPPATH/secrets/root_ca.crt
+    ```
 
 #### Setting up Environment Defaults
 This is optional, but we recommend you populate a `defaults.json` file with a
@@ -290,7 +287,6 @@ Test your `$STEPPATH/config/defaults.json` file:
 
 ```
 $ step ca health
-$ step ca token foo
 ```
 
 ### Hot Reload
@@ -437,6 +433,80 @@ $ bin/step ca provisioner remove jim@smallstep.com --all
 
 The same entity may have multiple provisioners for authorizing different
 types of certs. Each of these provisioners must have unique keys.
+
+## Notes on Securing the Step CA and your PKI.
+
+In this section we recommend a few best practices when it comes to
+running, deploying, and managing your own online CA and PKI. Security is a moving
+target and we expect out recommendations to change and evolve as well.
+
+### Initializing your PKI
+
+When you initialize your PKI two private keys are generated; one intermediate
+private key and one root private key. It is very important that these private keys
+are kept secret. The root private key should be moved around as little as possible,
+preferably not all - meaning it never leaves the server on which it was created.
+
+### Passwords
+
+When you intialize your PKI (`step ca init`) the root and intermediate
+private keys will be encrypted with the same password. We recommend that you
+change the password with which the intermediate was encrypted at your earliest
+convenience.
+
+```
+$ step crypto change-pass $STEPPATH/secrets/intermediate_ca_key
+```
+
+Once you've changed the intermediate private key password you should never have
+to use the root private key password again.
+
+We encourage users to always use a password manager to generate random passwords
+or let Step CLI generate passwords for you.
+
+The next important matter is how your passwords are stored. We recommend using a
+[password manager](https://en.wikipedia.org/wiki/List_of_password_managers).
+There are many to choose from and the choice will depend on the risk & security
+profile of your organization.
+
+In addition to using a password manager to store all passwords (private key,
+provisioner, etc.) we recommend using a threshold cryptography algorithm like
+[Shamir's Secret Sharing](https://en.wikipedia.org/wiki/Shamir's_Secret_Sharing)
+to divide the root private key across a handful of trusted parties.
+
+### Provisioners
+
+When you intialize your PKI (`step ca init`) a default provisioner will be created
+and it's private key will be encrypted using the same password used to encrypt
+the root private key. Before deploying the Step CA you should remove this
+provisioner and add new ones that are encrypted with new, secure, random passwords.
+See the section on [managing provisioners](#listaddremove-provisioners).
+
+### Deploying
+
+* Refrain from entering passwords for private keys or provisioners on the command line.
+Use the `--password-file` flag whenever possible.
+* Run the Step CA as a new user and make sure that the config files, private keys,
+and passwords used by the CA are stored in such a way that only this new user
+has permissions to read and write them.
+* Use short lived certificates. Our default validity period for new certificates
+is 24 hours. You can configure this value in the `ca.json` file. Shorter is
+better - less time to form an attack.
+* Short lived certificates are **not** a replacement for CRL and OCSP. CRL and OCSP
+are features that we plan to implement, but are not yet available. In the mean
+time short lived certificates are a decent alternative.
+* Keep your hosts secure by enforcing AuthN and AuthZ for every connection. SSH
+access is a big one.
+
+## The Future
+
+We plan to build more tools that facilitate the use and management of zero trust
+networks.
+
+* Tell us what you like and don't like about managing your PKI - we're eager to
+help solve problems in this space.
+* Tell us what features you'd like to see - open issues or hit us on
+[Twitter](https://twitter.com/smallsteplabs).
 
 ## Versioning
 
