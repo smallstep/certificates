@@ -22,7 +22,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, err := ca.BootstrapServerWithMTLS(ctx, token, &http.Server{
+	srv, err := ca.BootstrapServer(ctx, token, &http.Server{
 		Addr: ":8443",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			name := "nobody"

@@ -43,6 +43,12 @@ func Bootstrap(token string) (*Client, error) {
 // Authority. By default the server will kick off a routine that will renew the
 // certificate after 2/3rd of the certificate's lifetime has expired.
 //
+// Without any extra option the server will be configured for mTLS, it will
+// require and verify clients certificates, but options can be used to drop this
+// requirement, the most common will be only verify the certs if given with
+// ca.VerifyClientCertIfGiven(), or add extra CAs with
+// ca.AddClientCA(*x509.Certificate).
+//
 // Usage:
 //   // Default example with certificate rotation.
 //   srv, err := ca.BootstrapServer(context.Background(), token, &http.Server{
@@ -61,7 +67,7 @@ func Bootstrap(token string) (*Client, error) {
 //       return err
 //   }
 //   srv.ListenAndServeTLS("", "")
-func BootstrapServer(ctx context.Context, token string, base *http.Server) (*http.Server, error) {
+func BootstrapServer(ctx context.Context, token string, base *http.Server, options ...TLSOption) (*http.Server, error) {
 	if base.TLSConfig != nil {
 		return nil, errors.New("server TLSConfig is already set")
 	}
@@ -81,60 +87,7 @@ func BootstrapServer(ctx context.Context, token string, base *http.Server) (*htt
 		return nil, err
 	}
 
-	tlsConfig, err := client.GetServerTLSConfig(ctx, sign, pk)
-	if err != nil {
-		return nil, err
-	}
-
-	base.TLSConfig = tlsConfig
-	return base, nil
-}
-
-// BootstrapServerWithMTLS is a helper function that using the given token
-// returns the given http.Server configured with a TLS certificate signed by the
-// Certificate Authority, this server will always require and verify a client
-// certificate. By default the server will kick off a routine that will renew
-// the certificate after 2/3rd of the certificate's lifetime has expired.
-//
-// Usage:
-//   // Default example with certificate rotation.
-//   srv, err := ca.BootstrapServerWithMTLS(context.Background(), token, &http.Server{
-//       Addr: ":443",
-//       Handler: handler,
-//   })
-//
-//   // Example canceling automatic certificate rotation.
-//   ctx, cancel := context.WithCancel(context.Background())
-//   defer cancel()
-//   srv, err := ca.BootstrapServerWithMTLS(ctx, token, &http.Server{
-//       Addr: ":443",
-//       Handler: handler,
-//   })
-//   if err != nil {
-//       return err
-//   }
-//   srv.ListenAndServeTLS("", "")
-func BootstrapServerWithMTLS(ctx context.Context, token string, base *http.Server) (*http.Server, error) {
-	if base.TLSConfig != nil {
-		return nil, errors.New("server TLSConfig is already set")
-	}
-
-	client, err := Bootstrap(token)
-	if err != nil {
-		return nil, err
-	}
-
-	req, pk, err := CreateSignRequest(token)
-	if err != nil {
-		return nil, err
-	}
-
-	sign, err := client.Sign(req)
-	if err != nil {
-		return nil, err
-	}
-
-	tlsConfig, err := client.GetServerMutualTLSConfig(ctx, sign, pk)
+	tlsConfig, err := client.GetServerTLSConfig(ctx, sign, pk, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +114,7 @@ func BootstrapServerWithMTLS(ctx context.Context, token string, base *http.Serve
 //     return err
 //   }
 //   resp, err := client.Get("https://internal.smallstep.com")
-func BootstrapClient(ctx context.Context, token string) (*http.Client, error) {
+func BootstrapClient(ctx context.Context, token string, options ...TLSOption) (*http.Client, error) {
 	client, err := Bootstrap(token)
 	if err != nil {
 		return nil, err
@@ -177,7 +130,7 @@ func BootstrapClient(ctx context.Context, token string) (*http.Client, error) {
 		return nil, err
 	}
 
-	transport, err := client.Transport(ctx, sign, pk)
+	transport, err := client.Transport(ctx, sign, pk, options...)
 	if err != nil {
 		return nil, err
 	}

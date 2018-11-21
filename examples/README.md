@@ -139,13 +139,13 @@ password `password` hardcoded, but you can create your own using `step ca init`.
 
 These examples show the use of some other helper methods - simple ways to
 create TLS configured http.Server and http.Client objects. The methods are
-`BootstrapServer`, `BootstrapServerWithMTLS` and `BootstrapClient`.
+`BootstrapServer` and `BootstrapClient`.
 
 ```go
 // Get a cancelable context to stop the renewal goroutines and timers.
 ctx, cancel := context.WithCancel(context.Background())
 defer cancel()
-// Create an http.Server
+// Create an http.Server that requires a client certificate
 srv, err := ca.BootstrapServer(ctx, token, &http.Server{
     Addr: ":8443",
     Handler: handler,
@@ -160,11 +160,11 @@ srv.ListenAndServeTLS("", "")
 // Get a cancelable context to stop the renewal goroutines and timers.
 ctx, cancel := context.WithCancel(context.Background())
 defer cancel()
-// Create an http.Server that requires a client certificate
+// Create an http.Server that does not require a client certificate
 srv, err := ca.BootstrapServerWithMTLS(ctx, token, &http.Server{
     Addr: ":8443",
     Handler: handler,
-})
+}, ca.VerifyClientCertIfGiven())
 if err != nil {
     panic(err)
 }
@@ -194,13 +194,13 @@ certificates $ bin/step-ca examples/pki/config/ca.json
 2018/11/02 18:29:25 Serving HTTPS on :9000 ...
 ```
 
-Next we will start the bootstrap-server and enter `password` prompted for the
+Next we will start the bootstrap-tls-server and enter `password` prompted for the
 provisioner password:
 
 ```sh
 certificates $ export STEPPATH=examples/pki
 certificates $ export STEP_CA_URL=https://localhost:9000
-certificates $ go run examples/bootstrap-server/server.go $(step ca token localhost)
+certificates $ go run examples/bootstrap-tls-server/server.go $(step ca token localhost)
 ✔ Key ID: DmAtZt2EhmZr_iTJJ387fr4Md2NbzMXGdXQNW1UWPXk (mariano@smallstep.com)
 Please enter the password to decrypt the provisioner key:
 Listening on :8443 ...

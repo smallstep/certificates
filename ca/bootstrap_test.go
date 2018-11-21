@@ -124,7 +124,7 @@ func TestBootstrap(t *testing.T) {
 	}
 }
 
-func TestBootstrapServer(t *testing.T) {
+func TestBootstrapServerWithoutMTLS(t *testing.T) {
 	srv := startCABootstrapServer()
 	defer srv.Close()
 	token := func() string {
@@ -146,7 +146,7 @@ func TestBootstrapServer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := BootstrapServer(tt.args.ctx, tt.args.token, tt.args.base)
+			got, err := BootstrapServer(tt.args.ctx, tt.args.token, tt.args.base, VerifyClientCertIfGiven())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("BootstrapServer() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -192,24 +192,24 @@ func TestBootstrapServerWithMTLS(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := BootstrapServerWithMTLS(tt.args.ctx, tt.args.token, tt.args.base)
+			got, err := BootstrapServer(tt.args.ctx, tt.args.token, tt.args.base)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("BootstrapServerWithMTLS() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("BootstrapServer() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if tt.wantErr {
 				if got != nil {
-					t.Errorf("BootstrapServerWithMTLS() = %v, want nil", got)
+					t.Errorf("BootstrapServer() = %v, want nil", got)
 				}
 			} else {
 				expected := &http.Server{
 					TLSConfig: got.TLSConfig,
 				}
 				if !reflect.DeepEqual(got, expected) {
-					t.Errorf("BootstrapServerWithMTLS() = %v, want %v", got, expected)
+					t.Errorf("BootstrapServer() = %v, want %v", got, expected)
 				}
 				if got.TLSConfig == nil || got.TLSConfig.ClientCAs == nil || got.TLSConfig.RootCAs == nil || got.TLSConfig.GetCertificate == nil || got.TLSConfig.GetClientCertificate == nil {
-					t.Errorf("BootstrapServerWithMTLS() invalid TLSConfig = %#v", got.TLSConfig)
+					t.Errorf("BootstrapServer() invalid TLSConfig = %#v", got.TLSConfig)
 				}
 			}
 		})

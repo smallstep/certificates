@@ -31,7 +31,7 @@ func main() {
 			}
 			w.Write([]byte(fmt.Sprintf("Hello %s at %s!!!", name, time.Now().UTC())))
 		}),
-	})
+	}, ca.VerifyClientCertIfGiven())
 	if err != nil {
 		panic(err)
 	}

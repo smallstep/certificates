@@ -20,7 +20,7 @@ import (
 // GetClientTLSConfig returns a tls.Config for client use configured with the
 // sign certificate, and a new certificate pool with the sign root certificate.
 // The client certificate will automatically rotate before expiring.
-func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey) (*tls.Config, error) {
+func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options ...TLSOption) (*tls.Config, error) {
 	cert, err := TLSCertificate(sign, pk)
 	if err != nil {
 		return nil, err
@@ -36,8 +36,13 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
 	tlsConfig.PreferServerCipherSuites = true
 	// Build RootCAs with given root certificate
-	if pool := c.getCertPool(sign); pool != nil {
+	if pool := getCertPool(sign); pool != nil {
 		tlsConfig.RootCAs = pool
+	}
+
+	// Apply options if given
+	if err := setTLSOptions(tlsConfig, options); err != nil {
+		return nil, err
 	}
 
 	// Update renew function with transport
@@ -56,7 +61,7 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 // sign certificate, and a new certificate pool with the sign root certificate.
 // The returned tls.Config will only verify the client certificate if provided.
 // The server certificate will automatically rotate before expiring.
-func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey) (*tls.Config, error) {
+func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options ...TLSOption) (*tls.Config, error) {
 	cert, err := TLSCertificate(sign, pk)
 	if err != nil {
 		return nil, err
@@ -74,11 +79,16 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
 	tlsConfig.PreferServerCipherSuites = true
 	// Build RootCAs with given root certificate
-	if pool := c.getCertPool(sign); pool != nil {
+	if pool := getCertPool(sign); pool != nil {
 		tlsConfig.ClientCAs = pool
-		tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
+		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 		// Add RootCAs for refresh client
 		tlsConfig.RootCAs = pool
+	}
+
+	// Apply options if given
+	if err := setTLSOptions(tlsConfig, options); err != nil {
+		return nil, err
 	}
 
 	// Update renew function with transport
@@ -93,42 +103,13 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	return tlsConfig, nil
 }
 
-// GetServerMutualTLSConfig returns a tls.Config for server use configured with
-// the sign certificate, and a new certificate pool with the sign root certificate.
-// The returned tls.Config will always require and verify a client certificate.
-// The server certificate will automatically rotate before expiring.
-func (c *Client) GetServerMutualTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey) (*tls.Config, error) {
-	tlsConfig, err := c.GetServerTLSConfig(ctx, sign, pk)
-	if err != nil {
-		return nil, err
-	}
-	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-	return tlsConfig, nil
-}
-
 // Transport returns an http.Transport configured to use the client certificate from the sign response.
-func (c *Client) Transport(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey) (*http.Transport, error) {
-	tlsConfig, err := c.GetClientTLSConfig(ctx, sign, pk)
+func (c *Client) Transport(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options ...TLSOption) (*http.Transport, error) {
+	tlsConfig, err := c.GetClientTLSConfig(ctx, sign, pk, options...)
 	if err != nil {
 		return nil, err
 	}
 	return getDefaultTransport(tlsConfig)
-}
-
-// getCertPool returns the transport x509.CertPool or the one from the sign
-// request.
-func (c *Client) getCertPool(sign *api.SignResponse) *x509.CertPool {
-	// Return the transport certPool
-	if c.certPool != nil {
-		return c.certPool
-	}
-	// Return certificate used in sign request.
-	if root, err := RootCertificate(sign); err == nil {
-		pool := x509.NewCertPool()
-		pool.AddCert(root)
-		return pool
-	}
-	return nil
 }
 
 // Certificate returns the server or client certificate from the sign response.
@@ -187,6 +168,17 @@ func TLSCertificate(sign *api.SignResponse, pk crypto.PrivateKey) (*tls.Certific
 	}
 	cert.Leaf = leaf
 	return &cert, nil
+}
+
+// getCertPool returns the transport x509.CertPool or the one from the sign
+// request.
+func getCertPool(sign *api.SignResponse) *x509.CertPool {
+	if root, err := RootCertificate(sign); err == nil {
+		pool := x509.NewCertPool()
+		pool.AddCert(root)
+		return pool
+	}
+	return nil
 }
 
 func getDefaultTLSConfig(sign *api.SignResponse) *tls.Config {
