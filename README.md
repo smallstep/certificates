@@ -208,8 +208,62 @@ To start the CA run:
 step-ca $STEPPATH/config/ca.step
 ```
 
-### Set your defaults
+### Configure Your Environment
 
+Many of the cli utilities under `step ca [sub-command]` interface directly with
+a running instance of the Step CA. The CA exposes an HTTP API and clients are
+required to connect using TLS over HTTP (aka HTTPS). As part of bootstraping the
+Step CA, a certificate was generated using the root of trust that was
+created when you initilialized your PKI. In order to properly validate this
+certificate clients need access to the public root of trust, aka the public
+root certificate. If you are using the Step CLI on the same host where you
+initialized your PKI (the `root_ca.crt` is stored on disk locally), then you
+can continue to setting up a `default.json`, otherwise we will show you
+how to easily download your root certificate in the following step.
+
+#### Download the Root Certificate
+
+The next few steps are a guide for downloading the root certificate of your PKI
+from a running instance of the CA. First we'll define two servers:
+
+* **remote server**: This is the server where the Step CA is running. This may
+also be the server where you initialized your PKI, but for security reasons
+you may have done that offline.
+
+* **local server**: This is the server that wants access to the `step ca [sub-command]`
+
+* **ca-url**: This is the url at which the CA is listening for requests. This
+should be a combination of the DNS name and port entered during PKI initialization.
+In the examples below we will use `https://ca.smallstep.com:8080`.
+
+1. Get the Fingerprint.
+
+From the **remote server**:
+
+```
+$ FP=$(step certificate fingerprint ./path/to/root_ca.crt)
+```
+
+2. Request the certificate from the running CA.
+
+From the **local server**:
+
+```
+$ step ca root $STEPPATH/secrets/root_ca.crt --fingerprint $FP --ca-url "https:ca.smallstep.com:8080"
+```
+
+3. Test.
+
+Now let's test the root certificate by generating a new provisioner token:
+
+```
+* step ca token foo --ca-url "https:ca.smallstep.com:8080" --root $STEPPATH/secrets/root_ca.crt
+```
+
+You'll be asked for the password to decrypt the provisioner's private key. By default
+this password is the same as the password you entered when initializing your PKI.
+
+#### Setting up Environment Defaults
 This is optional, but we recommend you populate a `defaults.json` file with a
 few variables that will make your command line experience much more pleasant.
 
@@ -226,7 +280,17 @@ $ cat > $STEPPATH/config/defaults.json
 
 * **root**: Path to the root certificate on the file system.
 
-You can always override these values with command-line flags.
+* **ca-config**: Path to the CA configuration file. Only used by CLI commands
+that read or modify the CA configuration (e.g. `step ca provisioner [add|delete|list]`.
+
+You can always override these values with command-line flags or environment variables.
+
+Test your `$STEPPATH/config/defaults.json` file:
+
+```
+$ step ca health
+$ step ca token foo
+```
 
 ### Hot Reload
 
