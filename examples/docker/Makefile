@@ -5,7 +5,6 @@ binaries:
 	GOOS=linux go build -o renewer/step github.com/smallstep/cli/cmd/step
 
 build: build-nginx build-ca build-renewer
-
 build-nginx:
 	docker build -t nginx-test:latest nginx
 build-ca:
@@ -21,3 +20,6 @@ down:
 
 inspect:
 	step certificate inspect https://localhost:4443 --insecure
+
+.PHONY: all binaries up down inspect
+.PHONY: build build-nginx build-ca build-renewer
