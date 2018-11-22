@@ -118,14 +118,15 @@ tree .
 You should see:
 
 ```
-...
+.
+├── certs
+│   ├── intermediate_ca.crt
+│   └── root_ca.crt
 ├── config
 │   └── ca.json
 └── secrets
-    ├── intermediate_ca.crt
     ├── intermediate_ca_key
-    ├── root_ca.crt
-    ├── root_ca_key
+    └── root_ca_key
 ```
 
 The files created include:
@@ -249,7 +250,7 @@ $ FP=$(step certificate fingerprint ./path/to/root_ca.crt)
 From the **local server**:
 
 ```
-$ step ca root $STEPPATH/secrets/root_ca.crt --fingerprint $FP --ca-url "https:ca.smallstep.com:8080"
+$ step ca root $STEPPATH/certs/root_ca.crt --fingerprint $FP --ca-url "https:ca.smallstep.com:8080"
 ```
 
 3. Test.
@@ -257,7 +258,7 @@ $ step ca root $STEPPATH/secrets/root_ca.crt --fingerprint $FP --ca-url "https:c
 Now let's test the root certificate by generating a new provisioner token:
 
 ```
-* step ca token foo --ca-url "https:ca.smallstep.com:8080" --root $STEPPATH/secrets/root_ca.crt
+* step ca token foo --ca-url "https:ca.smallstep.com:8080" --root $STEPPATH/certs/root_ca.crt
 ```
 
 You'll be asked for the password to decrypt the provisioner's private key. By default
@@ -272,7 +273,7 @@ $ cat > $STEPPATH/config/defaults.json
 {
     "ca-url": "https://<dns-name>:<port>",
     "ca-config": "/home/user/.step/config/ca.json"
-    "root": "/home/user/.step/secrets/root_ca.crt"
+    "root": "/home/user/.step/certs/root_ca.crt"
 }
 ```
 
