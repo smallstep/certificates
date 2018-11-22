@@ -2,12 +2,13 @@ package main
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
-	"path"
+	"reflect"
+	"regexp"
 	"runtime"
 	"time"
 	"unicode"
@@ -15,73 +16,170 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/ca"
+	"github.com/smallstep/cli/errs"
+	"github.com/smallstep/cli/usage"
+	"github.com/urfave/cli"
 )
 
-// Version is set by an LDFLAG at build time representing the git tag or commit
-// for the current release
-var Version = "N/A"
+// commit and buildTime are filled in during build by the Makefile
+var (
+	BuildTime = "N/A"
+	Version   = "N/A"
+)
 
-// BuildTime is set by an LDFLAG at build time representing the timestamp at
-// the time of build
-var BuildTime = "N/A"
-
-func usage() {
-	fmt.Fprintf(os.Stderr, "Usage: %s [options] <config.json>\n\n", path.Base(os.Args[0]))
-	flag.PrintDefaults()
+// Version returns the current version of the binary.
+func version() string {
+	out := Version
+	if out == "N/A" {
+		out = "0000000-dev"
+	}
+	return fmt.Sprintf("Smallstep CLI/%s (%s/%s)",
+		out, runtime.GOOS, runtime.GOARCH)
 }
 
-func printVersion() {
-	version, buildTime := Version, BuildTime
-	if version == "N/A" {
-		version = "0000000-dev"
+// ReleaseDate returns the time of when the binary was built.
+func releaseDate() string {
+	out := BuildTime
+	if out == "N/A" {
+		out = time.Now().UTC().Format("2006-01-02 15:04 MST")
 	}
-	if buildTime == "N/A" {
-		buildTime = time.Now().UTC().Format("2006-01-02 15:04 MST")
-	}
-	fmt.Printf("Smallstep CA/%s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
-	fmt.Printf("Release Date: %s\n", buildTime)
+
+	return out
+}
+
+// Print version and release date.
+func printFullVersion() {
+	fmt.Printf("%s\n", version())
+	fmt.Printf("Release Date: %s\n", releaseDate())
 }
 
 func main() {
-	var version bool
-	var configFile, passFile string
-	flag.StringVar(&passFile, "password-file", "", "path to file containing a password")
-	flag.BoolVar(&version, "version", false, "print version and exit")
-	flag.Usage = usage
-	flag.Parse()
+	// Override global framework components
+	cli.VersionPrinter = func(c *cli.Context) {
+		printFullVersion()
+	}
+	cli.AppHelpTemplate = usage.AppHelpTemplate
+	cli.SubcommandHelpTemplate = usage.SubcommandHelpTemplate
+	cli.CommandHelpTemplate = usage.CommandHelpTemplate
+	cli.HelpPrinter = usage.HelpPrinter
+	cli.FlagNamePrefixer = usage.FlagNamePrefixer
+	cli.FlagStringer = stringifyFlag
 
-	if version {
-		printVersion()
-		os.Exit(0)
+	// Configure cli app
+	app := cli.NewApp()
+	app.Name = "step-ca"
+	app.HelpName = "step-ca"
+	app.Version = version()
+	app.Usage = "an online certificate authority for secure automated certificate management"
+	app.UsageText = `**step-ca** <config> [**--password-file**=<file>] [**--version**]`
+	app.Description = `**step-ca** runs the Step Online Certificate Authority
+(Step CA) using the given configuration.
+
+See the README.md for more detailed configuration documentation.
+
+## POSITIONAL ARGUMENTS
+
+<config>
+: File that configures the operation of the Step CA; this file is generated
+when you initialize the Step CA using 'step ca init'
+
+## EXIT CODES
+
+This command will run indefinitely on success and return \>0 if any error occurs.
+
+## EXAMPLES
+
+These examples assume that you have already initialized your PKI by running
+'step ca init'. If you have not completed this step please see the 'Getting Started'
+section of the README.
+
+Run the Step CA and prompt for password:
+'''
+$ step-ca $STEPPATH/config/ca.json
+'''
+
+Run the Step CA and read the password from a file - this is useful for
+automating deployment:
+'''
+$ step-ca $STEPPATH/config/ca.json --password-file ./password.txt
+'''`
+	app.Flags = append(app.Flags, []cli.Flag{
+		cli.StringFlag{
+			Name: "password-file",
+			Usage: `path to the <file> containing the password to decrypt the
+intermediate private key.`,
+		},
+	}...)
+	app.Copyright = "(c) 2018 Smallstep Labs, Inc."
+
+	// All non-successful output should be written to stderr
+	app.Writer = os.Stdout
+	app.ErrWriter = os.Stderr
+	app.Commands = []cli.Command{
+		cli.Command{
+			Name:  "version",
+			Usage: "Displays the current version of the cli",
+			// Command prints out the current version of the tool
+			Action: func(c *cli.Context) error {
+				printFullVersion()
+				return nil
+			},
+		},
 	}
 
-	if flag.NArg() != 1 {
-		flag.Usage()
-		os.Exit(1)
+	// Start the golang debug logger if environment variable is set.
+	// See https://golang.org/pkg/net/http/pprof/
+	debugProfAddr := os.Getenv("STEP_PROF_ADDR")
+	if debugProfAddr != "" {
+		go func() {
+			log.Println(http.ListenAndServe(debugProfAddr, nil))
+		}()
 	}
 
-	configFile = flag.Arg(0)
-	config, err := authority.LoadConfiguration(configFile)
-	if err != nil {
-		fatal(err)
-	}
+	app.Action = func(ctx *cli.Context) error {
+		passFile := ctx.String("password-file")
 
-	var password []byte
-	if passFile != "" {
-		if password, err = ioutil.ReadFile(passFile); err != nil {
-			fatal(errors.Wrapf(err, "error reading %s", passFile))
+		// If zero cmd line args show help, if >1 cmd line args show error.
+		if ctx.NArg() == 0 {
+			return cli.ShowAppHelp(ctx)
 		}
-		password = bytes.TrimRightFunc(password, unicode.IsSpace)
+		if err := errs.NumberOfArguments(ctx, 1); err != nil {
+			return err
+		}
+
+		configFile := ctx.Args().Get(0)
+		config, err := authority.LoadConfiguration(configFile)
+		if err != nil {
+			fatal(err)
+		}
+
+		var password []byte
+		if passFile != "" {
+			if password, err = ioutil.ReadFile(passFile); err != nil {
+				fatal(errors.Wrapf(err, "error reading %s", passFile))
+			}
+			password = bytes.TrimRightFunc(password, unicode.IsSpace)
+		}
+
+		srv, err := ca.New(config, ca.WithConfigFile(configFile), ca.WithPassword(password))
+		if err != nil {
+			fatal(err)
+		}
+
+		go ca.StopReloaderHandler(srv)
+		if err = srv.Run(); err != nil && err != http.ErrServerClosed {
+			fatal(err)
+		}
+		return nil
 	}
 
-	srv, err := ca.New(config, ca.WithConfigFile(configFile), ca.WithPassword(password))
-	if err != nil {
-		fatal(err)
-	}
-
-	go ca.StopReloaderHandler(srv)
-	if err = srv.Run(); err != nil && err != http.ErrServerClosed {
-		fatal(err)
+	if err := app.Run(os.Args); err != nil {
+		if os.Getenv("STEPDEBUG") == "1" {
+			fmt.Fprintf(os.Stderr, "%+v\n", err)
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		os.Exit(1)
 	}
 }
 
@@ -95,4 +193,24 @@ func fatal(err error) {
 		fmt.Fprintln(os.Stderr, err)
 	}
 	os.Exit(2)
+}
+
+func flagValue(f cli.Flag) reflect.Value {
+	fv := reflect.ValueOf(f)
+	for fv.Kind() == reflect.Ptr {
+		fv = reflect.Indirect(fv)
+	}
+	return fv
+}
+
+var placeholderString = regexp.MustCompile(`<.*?>`)
+
+func stringifyFlag(f cli.Flag) string {
+	fv := flagValue(f)
+	usage := fv.FieldByName("Usage").String()
+	placeholder := placeholderString.FindString(usage)
+	if placeholder == "" {
+		placeholder = "<value>"
+	}
+	return cli.FlagNamePrefixer(fv.FieldByName("Name").String(), placeholder) + "\t" + usage
 }

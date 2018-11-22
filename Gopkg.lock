@@ -124,6 +124,22 @@
   version = "v1.2.1"
 
 [[projects]]
+  branch = "master"
+  digest = "1:8baa3b16f20963c54e296627ea1dabfd79d1b486f81baf8759e99d73bddf2687"
+  name = "github.com/samfoo/ansi"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "b6bd2ded7189ce35bc02233b554eb56a5146af73"
+
+[[projects]]
+  branch = "master"
+  digest = "1:def689e73e9252f6f7fe66834a76751a41b767e03daab299e607e7226c58a855"
+  name = "github.com/shurcooL/sanitized_anchor_name"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "86672fcb3f950f35f2e675df2240550f2a50762f"
+
+[[projects]]
   digest = "1:3f53e9e4dfbb664cd62940c9c4b65a2171c66acd0b7621a1a6b8e78513525a52"
   name = "github.com/sirupsen/logrus"
   packages = ["."]
@@ -141,7 +157,7 @@
 
 [[projects]]
   branch = "ca-commands"
-  digest = "1:41e2386e08278707d5a20237c10a2c82f4658de64593fe070652c11bb3880812"
+  digest = "1:1731f58ec5ba2770296fb304504798c6f06059bd4645fd85f207de7be0b3add0"
   name = "github.com/smallstep/cli"
   packages = [
     "crypto/keys",
@@ -151,11 +167,13 @@
     "crypto/x509util",
     "errs",
     "jose",
+    "pkg/blackfriday",
     "pkg/x509",
+    "usage",
     "utils",
   ]
   pruneopts = "UT"
-  revision = "e2cf66cdd8f458a28ed9c5a6efc78fcc5500bdd0"
+  revision = "f6b9a18d11bd82c79876b18e57cd475e87be5fcc"
 
 [[projects]]
   branch = "master"
@@ -190,9 +208,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:5afed8b82638da362e14321ec6175b96351226f6662707801a0ec740bfd29840"
+  digest = "1:acfafa29853fd970d5d5ac6ca3b7350b5aef5999196d32bb9b049e21c8caf726"
   name = "golang.org/x/net"
   packages = [
+    "html",
+    "html/atom",
     "http/httpguts",
     "http2",
     "http2/hpack",
@@ -295,9 +315,12 @@
     "github.com/smallstep/cli/crypto/randutil",
     "github.com/smallstep/cli/crypto/tlsutil",
     "github.com/smallstep/cli/crypto/x509util",
+    "github.com/smallstep/cli/errs",
     "github.com/smallstep/cli/jose",
     "github.com/smallstep/cli/pkg/x509",
+    "github.com/smallstep/cli/usage",
     "github.com/tsenart/deadcode",
+    "github.com/urfave/cli",
     "golang.org/x/net/http2",
     "gopkg.in/square/go-jose.v2",
     "gopkg.in/square/go-jose.v2/jwt",
