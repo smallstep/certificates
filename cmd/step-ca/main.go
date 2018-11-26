@@ -116,7 +116,7 @@ intermediate private key.`,
 	app.Writer = os.Stdout
 	app.ErrWriter = os.Stderr
 	app.Commands = []cli.Command{
-		cli.Command{
+		{
 			Name:  "version",
 			Usage: "Displays the current version of the cli",
 			// Command prints out the current version of the tool
