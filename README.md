@@ -93,7 +93,7 @@ and getting certificates using the `step` command line tool and SDK.
 
 ### Prerequisites
 
-1. [Step Cli](https://github.com/smallstep/cli/blob/master/README.md#installing)
+1. [Step CLI](https://github.com/smallstep/cli/blob/master/README.md#installing)
 
 2. [Step CA](#installing)
 
