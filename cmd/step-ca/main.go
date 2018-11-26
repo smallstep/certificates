@@ -64,7 +64,6 @@ func main() {
 	cli.HelpPrinter = usage.HelpPrinter
 	cli.FlagNamePrefixer = usage.FlagNamePrefixer
 	cli.FlagStringer = stringifyFlag
-
 	// Configure cli app
 	app := cli.NewApp()
 	app.Name = "step-ca"
@@ -116,7 +115,7 @@ intermediate private key.`,
 	app.Writer = os.Stdout
 	app.ErrWriter = os.Stderr
 	app.Commands = []cli.Command{
-		{
+		cli.Command{
 			Name:  "version",
 			Usage: "Displays the current version of the cli",
 			// Command prints out the current version of the tool
@@ -124,6 +123,13 @@ intermediate private key.`,
 				printFullVersion()
 				return nil
 			},
+		},
+		cli.Command{
+			Name:      "help",
+			Aliases:   []string{"h"},
+			Usage:     "displays help for the specified command or command group",
+			ArgsUsage: "",
+			Action:    usage.HelpCommandAction,
 		},
 	}
 
