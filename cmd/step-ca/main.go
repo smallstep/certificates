@@ -33,7 +33,7 @@ func version() string {
 	if out == "N/A" {
 		out = "0000000-dev"
 	}
-	return fmt.Sprintf("Smallstep CLI/%s (%s/%s)",
+	return fmt.Sprintf("Smallstep CA/%s (%s/%s)",
 		out, runtime.GOOS, runtime.GOARCH)
 }
 
