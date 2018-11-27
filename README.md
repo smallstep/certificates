@@ -250,7 +250,7 @@ In the examples below we will use `https://ca.smallstep.com:8080`.
     From the **local server**:
 
     ```
-    $ step ca root $STEPPATH/secrets/root_ca.crt --fingerprint $FP --ca-url "https:ca.smallstep.com:8080"
+    $ step ca root $STEPPATH/certs/root_ca.crt --fingerprint $FP --ca-url "https:ca.smallstep.com:8080"
     ```
 
 3. Test.
@@ -258,30 +258,39 @@ In the examples below we will use `https://ca.smallstep.com:8080`.
     Now let's test the root certificate by generating a new provisioner token:
 
     ```
-    * step ca health --ca-url "https:ca.smallstep.com:8080" --root $STEPPATH/secrets/root_ca.crt
+    * step ca health --ca-url "https:ca.smallstep.com:8080" --root $STEPPATH/certs/root_ca.crt
     ```
 
 #### Setting up Environment Defaults
 This is optional, but we recommend you populate a `defaults.json` file with a
 few variables that will make your command line experience much more pleasant.
 
+You can do this manually or with the step command `step ca bootstrap`:
+
 ```
-$ cat > $STEPPATH/config/defaults.json
+$ step ca bootstrap \
+  --ca-url https://ca.smallstep.com:8080 \
+  --fingerprint 0d7d3834cf187726cf331c40a31aa7ef6b29ba4df601416c9788f6ee01058cf3
+$ cat $STEPPATH/config/defaults.json
 {
-    "ca-url": "https://<dns-name>:<port>",
-    "ca-config": "/home/user/.step/config/ca.json"
-    "root": "/home/user/.step/certs/root_ca.crt"
+  "ca-url": "https://ca.smallstep.com",
+  "fingerprint": "0d7d3834cf187726cf331c40a31aa7ef6b29ba4df601416c9788f6ee01058cf3",
+  "root": "/home/user/.step/certs/root_ca.crt"
 }
 ```
 
-* **ca-curl**: Use the DNS name and port that you used when initializing the CA.
+* **ca-curl** is the DNS name and port that you used when initializing the CA.
 
-* **root**: Path to the root certificate on the file system.
+* **root** is the path to the root certificate on the file system.
 
-* **ca-config**: Path to the CA configuration file. Only used by CLI commands
-that read or modify the CA configuration (e.g. `step ca provisioner [add|delete|list]`.
+* **fingerprint** is the root certificate fingerprint (SHA256).
 
-You can always override these values with command-line flags or environment variables.
+To manage the CA provisioners you can also add the property **ca-config** with
+the path to the CA configuration file, with that property you won't need to add
+it in commands like `step ca provisioners [add|remove].
+
+You can always override these values with command-line flags or environment
+variables.
 
 Test your `$STEPPATH/config/defaults.json` file:
 
