@@ -1,5 +1,3 @@
-# SHHHH, THIS PROJECT HASN'T OFFICIALLY LAUNCHED YET AND THIS REPO IS SUPER SECRET!!!
-
 # Step Certificates
 
 An online certificate authority and related tools for secure automated
