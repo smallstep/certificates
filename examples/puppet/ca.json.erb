@@ -1,0 +1,58 @@
+{
+    "root": "/usr/local/lib/step/.step/secrets/root_ca.crt",
+    "crt": "/usr/local/lib/step/.step/secrets/intermediate_ca.crt",
+    "key": "/usr/local/lib/step/.step/secrets/intermediate_ca_key",
+    "password": "password",
+    "address": ":9000",
+    "dnsNames": [
+        "localhost"
+    ],
+    "logger": {
+        "format": "text"
+    },
+    "authority": {
+        "provisioners": [
+            {
+                "name": "mariano@smallstep.com",
+                "type": "jwk",
+                "key": {
+                    "use": "sig",
+                    "kty": "EC",
+                    "kid": "DmAtZt2EhmZr_iTJJ387fr4Md2NbzMXGdXQNW1UWPXk",
+                    "crv": "P-256",
+                    "alg": "ES256",
+                    "x": "jXoO1j4CXxoTC32pNzkVC8l6k2LfP0k5ndhJZmcdVbk",
+                    "y": "c3JDL4GTFxJWHa8EaHdMh4QgwMh64P2_AGWrD0ADXcI"
+                },
+                "encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiOTFVWjdzRGw3RlNXcldfX1I1NUh3USJ9.FcWtrBDNgrkA33G9Ll9sXh1cPF-3jVXeYe1FLmSDc_Q2PmfLOPvJOA.0ZoN32ayaRWnufJb.WrkffMmDLWiq1-2kn-w7-kVBGW12gjNCBHNHB1hyEdED0rWH1YWpKd8FjoOACdJyLhSn4kAS3Lw5AH7fvO27A48zzvoxZU5EgSm5HG9IjkIH-LBJ-v79ShkpmPylchgjkFhxa5epD11OIK4rFmI7s-0BCjmJokLR_DZBhDMw2khGnsr_MEOfAz9UnqXaQ4MIy8eT52xUpx68gpWFlz2YP3EqiYyNEv0PpjMtyP5lO2i8-p8BqvuJdus9H3fO5Dg-1KVto1wuqh4BQ2JKTauv60QAnM_4sdxRHku3F_nV64SCrZfDvnN2ve21raFROtyXaqHZhN6lyoPxDncy8v4.biaOblEe0N-gMpJyFZ-3-A"
+            },
+            {
+                "name": "mike@smallstep.com",
+                "type": "jwk",
+                "key": {
+                    "use": "sig",
+                    "kty": "EC",
+                    "kid": "YYNxZ0rq0WsT2MlqLCWvgme3jszkmt99KjoGEJJwAKs",
+                    "crv": "P-256",
+                    "alg": "ES256",
+                    "x": "LsI8nHBflc-mrCbRqhl8d3hSl5sYuSM1AbXBmRfznyg",
+                    "y": "F99LoOvi7z-ZkumsgoHIhodP8q9brXe4bhF3szK-c_w"
+                },
+                "encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiVERQS2dzcEItTUR4ZDJxTGo0VlpwdyJ9.2_j0cZgTm2eFkZ-hrtr1hBIvLxN0w3TZhbX0Jrrq7vBMaywhgFcGTA.mCasZCbZJ-JT7vjA.bW052WDKSf_ueEXq1dyxLq0n3qXWRO-LXr7OzBLdUKWKSBGQrzqS5KJWqdUCPoMIHTqpwYvm-iD6uFlcxKBYxnsAG_hoq_V3icvvwNQQSd_q7Thxr2_KtPIDJWNuX1t5qXp11hkgb-8d5HO93CmN7xNDG89pzSUepT6RYXOZ483mP5fre9qzkfnrjx3oPROCnf3SnIVUvqk7fwfXuniNsg3NrNqncHYUQNReiq3e9I1R60w0ZQTvIReY7-zfiq7iPgVqmu5I7XGgFK4iBv0L7UOEora65b4hRWeLxg5t7OCfUqrS9yxAk8FdjFb9sEfjopWViPRepB0dYPH8dVI.fb6-7XWqp0j6CR9Li0NI-Q",
+                "claims": {
+                    "minTLSCertDuration": "60s",
+                    "defaultTLSCertDuration": "120s"
+                }
+            }
+        ]
+    },
+    "tls": {
+        "cipherSuites": [
+            "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+            "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+        ],
+        "minVersion": 1.2,
+        "maxVersion": 1.2,
+        "renegotiation": false
+    }
+}

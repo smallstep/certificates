@@ -450,3 +450,32 @@ Removing docker_renewer_1 ... done
 Removing docker_ca_1      ... done
 Removing network docker_default
 ```
+
+## Configuration Management Tools
+
+Configuration management tools such as Puppet, Chef, Ansible, Salt, etc. make
+automation and deployment a whole lot easier and more manageable. Step CLI and
+CA are built with automation in mind and are easy to configure using your
+favorite tools
+
+# Puppet
+
+The following are snippets and files that users can add to their puppet
+manifests to easily instrument services with TLS.
+
+** [step.pp](./puppet/step.pp) ** - Install `step` from source and configure the `step` user, group,
+and home directory for use by the Step CLI and CA.
+** [step_ca.pp](./puppet/step_ca.pp) ** - Install `step-ca` from source. Configure
+certificates and secrets and run the Step CA.
+** [tls_server.pp](./puppet/tls_server.pp) ** - This is your service, instrumented
+with the Step CA SDK to request, receive, and renew TLS certificates. See
+[the bootstrap-tls-server](./bootstrap-tls-server/server.go) for a
+simple integration example.
+
+**Note:** This is a significantly oversimplified example that will not work standalone.
+A complete Puppet configuration should use a service manager (like
+[systemctl](https://www.digitalocean.com/community/tutorials/how-to-use-systemctl-to-manage-systemd-services-and-units))
+and a secret store (like [Hiera](https://puppet.com/docs/puppet/6.0/hiera_intro.html)).
+If you are interested in seeing a more complete example please let us know and we'll
+make one available.
+
