@@ -112,7 +112,7 @@ organization or your project will suffice.
 If you run:
 
 ```
-tree .
+tree $(step path)
 ```
 
 You should see:
