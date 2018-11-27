@@ -351,8 +351,7 @@ $ TOKEN=$(step ca token foo.example.com \
     --ca-url https://ca.example.com \
     --root /path/to/root_ca.crt  --password-file /path/to/provisioner/password)
 
-$ step ca certificate "foo.example.com" foo.crt foo.key --token "$TOKEN" \
-    --ca-url https://ca.example.com --root /path/to/root_ca.crt
+$ step ca certificate "foo.example.com" foo.crt foo.key --token "$TOKEN"
 ```
 
 You can take a closer look at the contents of the certificate using `step certificate inspect`:
