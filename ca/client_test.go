@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"testing"
 	"time"
@@ -506,6 +507,44 @@ func TestClient_ProvisionerKey(t *testing.T) {
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.ProvisionerKey() = %v, want %v", got, tt.response)
 				}
+			}
+		})
+	}
+}
+
+func Test_parseEndpoint(t *testing.T) {
+	expected1 := &url.URL{Scheme: "https", Host: "ca.smallstep.com"}
+	expected2 := &url.URL{Scheme: "https", Host: "ca.smallstep.com", Path: "/1.0/sign"}
+	type args struct {
+		endpoint string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *url.URL
+		wantErr bool
+	}{
+		{"ok", args{"https://ca.smallstep.com"}, expected1, false},
+		{"ok no scheme", args{"//ca.smallstep.com"}, expected1, false},
+		{"ok only host", args{"ca.smallstep.com"}, expected1, false},
+		{"ok no bars", args{"https://ca.smallstep.com"}, expected1, false},
+		{"ok schema, host and path", args{"https://ca.smallstep.com/1.0/sign"}, expected2, false},
+		{"ok no bars with path", args{"https://ca.smallstep.com/1.0/sign"}, expected2, false},
+		{"ok host and path", args{"ca.smallstep.com/1.0/sign"}, expected2, false},
+		{"ok host and port", args{"ca.smallstep.com:443"}, &url.URL{Scheme: "https", Host: "ca.smallstep.com:443"}, false},
+		{"ok host, path and port", args{"ca.smallstep.com:443/1.0/sign"}, &url.URL{Scheme: "https", Host: "ca.smallstep.com:443", Path: "/1.0/sign"}, false},
+		{"fail bad url", args{"://ca.smallstep.com"}, nil, true},
+		{"fail no host", args{"https://"}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseEndpoint(tt.args.endpoint)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseEndpoint() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseEndpoint() = %v, want %v", got, tt.want)
 			}
 		})
 	}

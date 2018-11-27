@@ -153,16 +153,42 @@ func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
 	})
 }
 
-// parseEndpoint parses and validates the given endpoint
+// parseEndpoint parses and validates the given endpoint. It supports general
+// URLs like https://ca.smallstep.com[:port][/path], and incomplete URLs like
+// ca.smallstep.com[:port][/path].
 func parseEndpoint(endpoint string) (*url.URL, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing endpoint '%s'", endpoint)
 	}
-	if u.Scheme == "" || u.Host == "" {
-		return nil, errors.Errorf("error parsing endpoint: url '%s' is not valid", endpoint)
+
+	// URLs are generally parsed as:
+	// [scheme:][//[userinfo@]host][/]path[?query][#fragment]
+	// But URLs that do not start with a slash after the scheme are interpreted as
+	// scheme:opaque[?query][#fragment]
+	if u.Opaque == "" {
+		if u.Scheme == "" {
+			u.Scheme = "https"
+		}
+		if u.Host == "" {
+			// endpoint looks like ca.smallstep.com or ca.smallstep.com/1.0/sign
+			if u.Path != "" {
+				parts := strings.SplitN(u.Path, "/", 2)
+				u.Host = parts[0]
+				if len(parts) == 2 {
+					u.Path = parts[1]
+				} else {
+					u.Path = ""
+				}
+				return parseEndpoint(u.String())
+			}
+			return nil, errors.Errorf("error parsing endpoint: url '%s' is not valid", endpoint)
+		}
+		return u, nil
 	}
-	return u, nil
+	// scheme:opaque[?query][#fragment]
+	// endpoint looks like ca.smallstep.com:443 or ca.smallstep.com:443/1.0/sign
+	return parseEndpoint("https://" + endpoint)
 }
 
 // ProvisionerOption is the type of options passed to the Provisioner method.
