@@ -1,7 +1,7 @@
 # Distribution
 
 This section describes how to build and deploy publicly available releases of
-the Step CLI.
+the Step CA.
 
 ## Creating A New Release
 
@@ -10,13 +10,13 @@ release is as simple as pushing a new github tag.
 
 **Definitions**:
 
-* *Standard Release*: ready for public use. no `-rc*` suffix on the version.
+* **Standard Release**: ready for public use. no `-rc*` suffix on the version.
 e.g. `v1.0.2`
-* *Release Candidate*: not ready for public use, still testing. must have a
+* **Release Candidate**: not ready for public use, still testing. must have a
 `-rc*` suffix. e.g. `v1.0.2-rc` or `v1.0.2-rc.4`
 
 
-1. Figure out the most recent existing tag.
+1. Find the most recent tag.
 
     ```
     git fetch --tags
@@ -44,7 +44,7 @@ e.g. `v1.0.2`
         is a release candidate, say `v1.0.2-rc.3`, then the version of the next
         standard release should be `v1.0.3`.
 
-3. Update the [debian/changelog](./debian/changelog).
+3. Update the [debian changelog](./debian/changelog).
 
     1. Update the version to match the tag selected in the previous step. Leave
     off the `v` prefix.
@@ -103,9 +103,9 @@ e.g. `v1.0.2`
 
     Travis will build and upload the following artifacts:
 
-    * *step-ca_1.0.3_amd64.deb*: debian package for installation on linux.
-    * *step-ca_1.0.3_linux_amd64.tar.gz*: tarball containing a statically compiled linux binary.
-    * *step-ca_1.0.3_darwin_amd64.tar.gz*: tarball containing a statically compiled darwin binary.
+    * **step-ca_1.0.3_amd64.deb**: debian package for installation on linux.
+    * **step-ca_1.0.3_linux_amd64.tar.gz**: tarball containing a statically compiled linux binary.
+    * **step-ca_1.0.3_darwin_amd64.tar.gz**: tarball containing a statically compiled darwin binary.
 
 7. Update the Homebrew formula.
 
