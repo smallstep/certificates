@@ -14,7 +14,7 @@ import (
 // certificate.
 type RenewFunc func() (*tls.Certificate, error)
 
-// TLSRenewer automatically renews a tls certificate using a give RenewFunc.
+// TLSRenewer automatically renews a tls certificate using a RenewFunc.
 type TLSRenewer struct {
 	sync.RWMutex
 	RenewCertificate RenewFunc
