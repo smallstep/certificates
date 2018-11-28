@@ -14,7 +14,7 @@ import (
 // certificate.
 type RenewFunc func() (*tls.Certificate, error)
 
-// TLSRenewer renews automatically a tls certificate with a given function.
+// TLSRenewer automatically renews a tls certificate using a give RenewFunc.
 type TLSRenewer struct {
 	sync.RWMutex
 	RenewCertificate RenewFunc
@@ -44,7 +44,7 @@ func WithRenewJitter(j time.Duration) func(r *TLSRenewer) error {
 }
 
 // NewTLSRenewer creates a TLSRenewer for the given cert. It will use the given
-// function to get a new certificate when required.
+// RenewFunc to get a new certificate when required.
 func NewTLSRenewer(cert *tls.Certificate, fn RenewFunc, opts ...tlsRenewerOptions) (*TLSRenewer, error) {
 	r := &TLSRenewer{
 		RenewCertificate: fn,
@@ -123,8 +123,10 @@ func (r *TLSRenewer) GetClientCertificate(*tls.CertificateRequestInfo) (*tls.Cer
 
 // getCertificate returns the certificate using a read-only lock.
 //
-// Known issue: It will not attempt to renew the certificate if its expired as
-// the renew request with mTLS will fail.
+// Known issue: It cannot renew an expired certificate because the /renew
+// endpoint requires a valid client certificate. The certificate can expire
+// if the timer does not fire e.g. when the CA is run from a laptop that
+// enters sleep mode.
 func (r *TLSRenewer) getCertificate() *tls.Certificate {
 	r.RLock()
 	cert := r.cert
@@ -133,7 +135,7 @@ func (r *TLSRenewer) getCertificate() *tls.Certificate {
 }
 
 // getCertificateForCA returns the certificate using a read-only lock. It will
-// automatically renew the certificate if it's expired.
+// automatically renew the certificate if it has expired.
 func (r *TLSRenewer) getCertificateForCA() *tls.Certificate {
 	r.RLock()
 	// Force certificate renewal if the timer didn't run.
@@ -149,8 +151,8 @@ func (r *TLSRenewer) getCertificateForCA() *tls.Certificate {
 }
 
 // setCertificate updates the certificate using a read-write lock. It also
-// updates certNotAfter with 1m of delta, this will force the renew of the
-// certificate if it's expired or about to expire.
+// updates certNotAfter with 1m of delta; this will force the renewal of the
+// certificate if it is about to expire.
 func (r *TLSRenewer) setCertificate(cert *tls.Certificate) {
 	r.Lock()
 	r.cert = cert
