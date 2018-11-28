@@ -121,6 +121,7 @@ func (ca *CA) Run() error {
 
 // Stop stops the CA calling to the server Shutdown method.
 func (ca *CA) Stop() error {
+	ca.renewer.Stop()
 	return ca.srv.Shutdown()
 }
 
@@ -185,7 +186,7 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	// empty we are implicitly forcing GetCertificate to be the only mechanism
 	// by which the server can find it's own leaf Certificate.
 	tlsConfig.Certificates = []tls.Certificate{}
-	tlsConfig.GetCertificate = ca.renewer.GetCertificate
+	tlsConfig.GetCertificate = ca.renewer.GetCertificateForCA
 
 	// Add support for mutual tls to renew certificates
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven

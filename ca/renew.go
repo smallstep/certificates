@@ -14,7 +14,7 @@ import (
 // certificate.
 type RenewFunc func() (*tls.Certificate, error)
 
-// TLSRenewer renews automatically a tls certificate with a given function.
+// TLSRenewer automatically renews a tls certificate using a RenewFunc.
 type TLSRenewer struct {
 	sync.RWMutex
 	RenewCertificate RenewFunc
@@ -22,6 +22,7 @@ type TLSRenewer struct {
 	timer            *time.Timer
 	renewBefore      time.Duration
 	renewJitter      time.Duration
+	certNotAfter     time.Time
 }
 
 type tlsRenewerOptions func(r *TLSRenewer) error
@@ -43,7 +44,7 @@ func WithRenewJitter(j time.Duration) func(r *TLSRenewer) error {
 }
 
 // NewTLSRenewer creates a TLSRenewer for the given cert. It will use the given
-// function to get a new certificate when required.
+// RenewFunc to get a new certificate when required.
 func NewTLSRenewer(cert *tls.Certificate, fn RenewFunc, opts ...tlsRenewerOptions) (*TLSRenewer, error) {
 	r := &TLSRenewer{
 		RenewCertificate: fn,
@@ -91,7 +92,10 @@ func (r *TLSRenewer) RunContext(ctx context.Context) {
 
 // Stop prevents the renew timer from firing.
 func (r *TLSRenewer) Stop() bool {
-	return r.timer.Stop()
+	if r.timer != nil {
+		return r.timer.Stop()
+	}
+	return true
 }
 
 // GetCertificate returns the current server certificate.
@@ -99,6 +103,15 @@ func (r *TLSRenewer) Stop() bool {
 // This method is set in the tls.Config GetCertificate property.
 func (r *TLSRenewer) GetCertificate(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return r.getCertificate(), nil
+}
+
+// GetCertificateForCA returns the current server certificate. It can only be
+// used if the renew function creates the new certificate and do not uses a TLS
+// request. It's intended to be use by the certificate authority server.
+//
+// This method is set in the tls.Config GetCertificate property.
+func (r *TLSRenewer) GetCertificateForCA(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	return r.getCertificateForCA(), nil
 }
 
 // GetClientCertificate returns the current client certificate.
@@ -109,6 +122,11 @@ func (r *TLSRenewer) GetClientCertificate(*tls.CertificateRequestInfo) (*tls.Cer
 }
 
 // getCertificate returns the certificate using a read-only lock.
+//
+// Known issue: It cannot renew an expired certificate because the /renew
+// endpoint requires a valid client certificate. The certificate can expire
+// if the timer does not fire e.g. when the CA is run from a laptop that
+// enters sleep mode.
 func (r *TLSRenewer) getCertificate() *tls.Certificate {
 	r.RLock()
 	cert := r.cert
@@ -116,10 +134,29 @@ func (r *TLSRenewer) getCertificate() *tls.Certificate {
 	return cert
 }
 
-// setCertificate updates the certificate using a read-write lock.
+// getCertificateForCA returns the certificate using a read-only lock. It will
+// automatically renew the certificate if it has expired.
+func (r *TLSRenewer) getCertificateForCA() *tls.Certificate {
+	r.RLock()
+	// Force certificate renewal if the timer didn't run.
+	// This is an special case that can happen after a computer sleep.
+	if time.Now().After(r.certNotAfter) {
+		r.RUnlock()
+		r.renewCertificate()
+		r.RLock()
+	}
+	cert := r.cert
+	r.RUnlock()
+	return cert
+}
+
+// setCertificate updates the certificate using a read-write lock. It also
+// updates certNotAfter with 1m of delta; this will force the renewal of the
+// certificate if it is about to expire.
 func (r *TLSRenewer) setCertificate(cert *tls.Certificate) {
 	r.Lock()
 	r.cert = cert
+	r.certNotAfter = cert.Leaf.NotAfter.Add(-1 * time.Minute)
 	r.Unlock()
 }
 
@@ -133,7 +170,9 @@ func (r *TLSRenewer) renewCertificate() {
 		r.setCertificate(cert)
 		next = r.nextRenewDuration(cert.Leaf.NotAfter)
 	}
-	r.timer = time.AfterFunc(next, r.renewCertificate)
+	r.Lock()
+	r.timer.Reset(next)
+	r.Unlock()
 }
 
 func (r *TLSRenewer) nextRenewDuration(notAfter time.Time) time.Duration {
