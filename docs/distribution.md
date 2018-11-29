@@ -44,29 +44,6 @@ e.g. `v1.0.2`
         is a release candidate, say `v1.0.2-rc.3`, then the version of the next
         standard release should be `v1.0.3`.
 
-3. Update the [debian changelog](./debian/changelog).
-
-    1. Update the version to match the tag selected in the previous step. Leave
-    off the `v` prefix.
-
-        ```
-        step-cli (1.0.2) UNRELEASED; urgency=medium
-        ...
-        ```
-
-        becomes...
-
-        ```
-        step-cli (1.0.3) UNRELEASED; urgency=medium
-        ...
-        ```
-
-    2. Update the change log.
-
-        *sigh* Honestly, this entire step should be handled programmatically.
-
-    3. Commit the changes.
-
 3. Update the remote origin with your commits.
 
     Make sure that the local checkout is up to date with
