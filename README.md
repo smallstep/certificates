@@ -50,13 +50,13 @@ brew install smallstep/smallstep/step
 Download the latest Debian package from [releases](https://github.com/smallstep/certificates/releases):
 
 ```
-wget https://github.com/smallstep/certificates/releases/download/X.Y.Z/step_X.Y.Z_amd64.deb
+wget https://github.com/smallstep/certificates/releases/download/X.Y.Z/step-certificates_X.Y.Z_amd64.deb
 ```
 
 Install the Debian package:
 
 ```
-sudo dpkg -i step-ca_X.Y.Z_amd64.deb
+sudo dpkg -i step-certificates_X.Y.Z_amd64.deb
 ```
 
 ## Documentation
