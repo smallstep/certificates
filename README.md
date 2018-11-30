@@ -121,7 +121,8 @@ You should see:
 │   ├── intermediate_ca.crt
 │   └── root_ca.crt
 ├── config
-│   └── ca.json
+│   ├── ca.json
+│   └── defaults.json
 └── secrets
     ├── intermediate_ca_key
     └── root_ca_key
@@ -134,9 +135,14 @@ The files created include:
 * `intermediate_ca.crt` and `intermediate_ca_key`: the intermediate certificate
   and private key that will be used to sign leaf certificates
 * `ca.json`: the configuration file necessary for running the Step CA.
+* `defaults.json`: file containing default parameters for the `step` CA cli
+interface. You can override these values with the appropriate flags or
+environment variables.
 
 All of the files endinging in `_key` are password protected using the password
-you chose during PKI initialization.
+you chose during PKI initialization. We advise you to change these passwords
+(using the `step crypto change-pass` utility) if you plan to run your CA in a
+non-development environment.
 
 ### What's Inside `ca.json`?
 
@@ -209,6 +215,9 @@ step-ca $STEPPATH/config/ca.step
 
 ### Configure Your Environment
 
+**Note**: Configuring your environment is only necessary for remote servers
+(not the server on which the `step ca init` command was originally run).
+
 Many of the cli utilities under `step ca [sub-command]` interface directly with
 a running instance of the Step CA. The CA exposes an HTTP API and clients are
 required to connect using TLS over HTTP (aka HTTPS). As part of bootstraping the
@@ -243,20 +252,19 @@ In the examples below we will use `https://ca.smallstep.com:8080`.
     $ FP=$(step certificate fingerprint ./path/to/root_ca.crt)
     ```
 
-2. Request the certificate from the running CA.
+2. Bootstrap your environment.
 
     From the **local server**:
 
     ```
-    $ step ca root $STEPPATH/certs/root_ca.crt --fingerprint $FP --ca-url "https:ca.smallstep.com:8080"
+    $ step ca bootstrap --fingerprint $FP --ca-url "https://ca.smallstep.com:8080"
+    $ cat $STEPPATH/config/defaults.json
     ```
 
 3. Test.
 
-    Now let's test the root certificate by generating a new provisioner token:
-
     ```
-    * step ca health --ca-url "https:ca.smallstep.com:8080" --root $STEPPATH/certs/root_ca.crt
+    * step ca health
     ```
 
 #### Setting up Environment Defaults
@@ -269,12 +277,15 @@ You can do this manually or with the step command `step ca bootstrap`:
 $ step ca bootstrap \
   --ca-url https://ca.smallstep.com:8080 \
   --fingerprint 0d7d3834cf187726cf331c40a31aa7ef6b29ba4df601416c9788f6ee01058cf3
+# Let's see what we got...
 $ cat $STEPPATH/config/defaults.json
 {
-  "ca-url": "https://ca.smallstep.com",
-  "fingerprint": "0d7d3834cf187726cf331c40a31aa7ef6b29ba4df601416c9788f6ee01058cf3",
-  "root": "/home/user/.step/certs/root_ca.crt"
+  "ca-url": "https://ca.smallstep.com:8080",
+  "fingerprint": "628cfc85090ca65bb246d224f1217445be155cfc6167db4ed8f1b0e3de1447c5",
+  "root": "/Users/<you>/src/github.com/smallstep/step/.step/certs/root_ca.crt"
 }
+# Test it out
+$ step ca health
 ```
 
 * **ca-curl** is the DNS name and port that you used when initializing the CA.
@@ -283,18 +294,14 @@ $ cat $STEPPATH/config/defaults.json
 
 * **fingerprint** is the root certificate fingerprint (SHA256).
 
-To manage the CA provisioners you can also add the property **ca-config** with
-the path to the CA configuration file, with that property you won't need to add
-it in commands like `step ca provisioners [add|remove].
-
 You can always override these values with command-line flags or environment
 variables.
 
-Test your `$STEPPATH/config/defaults.json` file:
-
-```
-$ step ca health
-```
+To manage the CA provisioners you can also add the property **ca-config** with
+the path to the CA configuration file, with that property you won't need to add
+it in commands like `step ca provisioners [add|remove]`.
+**Note**: to manage provisioners you must be on the host on which the CA is
+running. You need direct access to the `ca.json` file.
 
 ### Hot Reload
 
