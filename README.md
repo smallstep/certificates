@@ -220,7 +220,7 @@ step-ca $STEPPATH/config/ca.step
 
 Many of the cli utilities under `step ca [sub-command]` interface directly with
 a running instance of the Step CA. The CA exposes an HTTP API and clients are
-required to connect using TLS over HTTP (aka HTTPS). As part of bootstraping the
+required to connect using HTTP over TLS (aka HTTPS). As part of bootstraping the
 Step CA, a certificate was generated using the root of trust that was
 created when you initilialized your PKI. In order to properly validate this
 certificate clients need access to the public root of trust, aka the public
