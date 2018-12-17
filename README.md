@@ -528,7 +528,7 @@ see the [tags on this repository](https://github.com/smallstep/cli).
 
 ## License
 
-This project is licensed under the MIT License - see the
+This project is licensed under the Apache 2.0 License - see the
 [LICENSE](./LICENSE) file for details
 
 ### Individual Contributor License
