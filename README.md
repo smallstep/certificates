@@ -288,7 +288,7 @@ $ cat $STEPPATH/config/defaults.json
 $ step ca health
 ```
 
-* **ca-curl** is the DNS name and port that you used when initializing the CA.
+* **ca-url** is the DNS name and port that you used when initializing the CA.
 
 * **root** is the path to the root certificate on the file system.
 
