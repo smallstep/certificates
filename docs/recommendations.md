@@ -172,7 +172,7 @@ are useless without proper attention to configuration and guidelines.
   //  - ECDHE key exchange algorithm has perfect forward secrecy
   //  - ECDSA has smaller keys and better performance (than RSA)
   //  - CHACHA20 with POLY1305 is the cipher mode used by google.
-  //  - CHACHA20 is more performance than GCM and CBC.
+  //  - CHACHA20's performance is better than GCM and CBC.
   // NOTE: The http2 spec requires the "TLS_ECDHE_(RSA|ECDSA)_WITH_AES_128_GCM_SHA256"
   // ciphersuite be accepted by the server, therefore it makes our list of
   // default ciphersuites until we build the functionality to modify our defaults

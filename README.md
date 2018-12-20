@@ -326,7 +326,7 @@ then, upon `reload`, the Step CA will read it's new configuration from the same
 configuration file.
 
 * Step CA requires the password to decrypt the intermediate certificate, again,
-upon `reload`. You can auotmate this in one of two ways:
+upon `reload`. You can automate this in one of two ways:
 
     * Use the `--password-file` flag in the original invocation.
     * Use the top level `password` attribute in the `ca.json` configuration file.
