@@ -60,7 +60,7 @@ func (srv *Server) ListenAndServe() error {
 	return srv.Serve(ln)
 }
 
-// Serve runs Serve or ServetTLS on the underlaying http.Server and listen to
+// Serve runs Serve or ServetTLS on the underlying http.Server and listen to
 // channels to reload or shutdown the server.
 func (srv *Server) Serve(ln net.Listener) error {
 	var err error

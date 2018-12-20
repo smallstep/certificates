@@ -82,6 +82,7 @@ communication for your own internal infrastructure? There are several reasons:
 * Public CAs can't handle client certificates (mutual TLS)
 * It's much harder (and more expensive) to revoke or roll certificates from public CAs
 * It relies on a third party that can subvert your security
+
 More broadly, the answer is that web PKI was designed for the web. A lot of the
 web PKI design decisions aren't appropriate for internal systems.
 
