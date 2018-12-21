@@ -2,6 +2,7 @@ package authority
 
 import (
 	"encoding/json"
+	"net"
 	"os"
 	"time"
 
@@ -155,6 +156,11 @@ func (c *Config) Validate() error {
 
 	case len(c.DNSNames) == 0:
 		return errors.New("dnsNames cannot be empty")
+	}
+
+	// Validate address (a port is required)
+	if _, _, err := net.SplitHostPort(c.Address); err != nil {
+		return errors.Errorf("invalid address %s", c.Address)
 	}
 
 	if c.TLS == nil {
