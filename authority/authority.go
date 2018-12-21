@@ -57,9 +57,7 @@ func New(config *Config) (*Authority, error) {
 	}
 	audiences := []string{legacyAuthority}
 	for _, name := range config.DNSNames {
-		if port == "443" {
-			audiences = append(audiences, fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
-		}
+		audiences = append(audiences, fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
 		audiences = append(audiences, fmt.Sprintf("https://%s:%s/sign", name, port), fmt.Sprintf("https://%s:%s/1.0/sign", name, port))
 	}
 
