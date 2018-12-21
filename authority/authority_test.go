@@ -74,15 +74,6 @@ func TestAuthorityNew(t *testing.T) {
 				err:    errors.New("open foo failed: no such file or directory"),
 			}
 		},
-		"fail bad address": func(t *testing.T) *newTest {
-			c, err := LoadConfiguration("../ca/testdata/ca.json")
-			assert.FatalError(t, err)
-			c.Address = "127.0.0.1"
-			return &newTest{
-				config: c,
-				err:    errors.New("error parsing 127.0.0.1: address 127.0.0.1: missing port in address"),
-			}
-		},
 		"fail bad password": func(t *testing.T) *newTest {
 			c, err := LoadConfiguration("../ca/testdata/ca.json")
 			assert.FatalError(t, err)
@@ -137,8 +128,8 @@ func TestAuthorityNew(t *testing.T) {
 
 					assert.Equals(t, auth.audiences, []string{
 						"step-certificate-authority",
-						"https://127.0.0.1:0/sign",
-						"https://127.0.0.1:0/1.0/sign",
+						"https://127.0.0.1/sign",
+						"https://127.0.0.1/1.0/sign",
 					})
 				}
 			}

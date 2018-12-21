@@ -5,11 +5,9 @@ import (
 	realx509 "crypto/x509"
 	"encoding/hex"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/x509util"
 )
@@ -50,15 +48,11 @@ func New(config *Config) (*Authority, error) {
 		}
 	}
 
-	// Define audiences: legacy + possible urls
-	_, port, err := net.SplitHostPort(config.Address)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing %s", config.Address)
-	}
+	// Define audiences: legacy + possible urls without the ports.
+	// The CA might have proxies in front so we cannot rely on the port.
 	audiences := []string{legacyAuthority}
 	for _, name := range config.DNSNames {
 		audiences = append(audiences, fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
-		audiences = append(audiences, fmt.Sprintf("https://%s:%s/sign", name, port), fmt.Sprintf("https://%s:%s/1.0/sign", name, port))
 	}
 
 	var a = &Authority{

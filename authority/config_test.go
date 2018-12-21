@@ -50,10 +50,24 @@ func TestConfigValidate(t *testing.T) {
 				err: errors.New("address cannot be empty"),
 			}
 		},
-		"empty-root": func(t *testing.T) ConfigValidateTest {
+		"invalid-address": func(t *testing.T) ConfigValidateTest {
 			return ConfigValidateTest{
 				config: &Config{
 					Address:          "127.0.0.1",
+					Root:             "testdata/secrets/root_ca.crt",
+					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
+					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+					DNSNames:         []string{"test.smallstep.com"},
+					Password:         "pass",
+					AuthorityConfig:  ac,
+				},
+				err: errors.New("invalid address 127.0.0.1"),
+			}
+		},
+		"empty-root": func(t *testing.T) ConfigValidateTest {
+			return ConfigValidateTest{
+				config: &Config{
+					Address:          "127.0.0.1:443",
 					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
 					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
 					DNSNames:         []string{"test.smallstep.com"},
@@ -66,7 +80,7 @@ func TestConfigValidate(t *testing.T) {
 		"empty-intermediate-cert": func(t *testing.T) ConfigValidateTest {
 			return ConfigValidateTest{
 				config: &Config{
-					Address:         "127.0.0.1",
+					Address:         "127.0.0.1:443",
 					Root:            "testdata/secrets/root_ca.crt",
 					IntermediateKey: "testdata/secrets/intermediate_ca_key",
 					DNSNames:        []string{"test.smallstep.com"},
@@ -79,7 +93,7 @@ func TestConfigValidate(t *testing.T) {
 		"empty-intermediate-key": func(t *testing.T) ConfigValidateTest {
 			return ConfigValidateTest{
 				config: &Config{
-					Address:          "127.0.0.1",
+					Address:          "127.0.0.1:443",
 					Root:             "testdata/secrets/root_ca.crt",
 					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
 					DNSNames:         []string{"test.smallstep.com"},
@@ -92,7 +106,7 @@ func TestConfigValidate(t *testing.T) {
 		"empty-dnsNames": func(t *testing.T) ConfigValidateTest {
 			return ConfigValidateTest{
 				config: &Config{
-					Address:          "127.0.0.1",
+					Address:          "127.0.0.1:443",
 					Root:             "testdata/secrets/root_ca.crt",
 					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
 					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
@@ -105,7 +119,7 @@ func TestConfigValidate(t *testing.T) {
 		"empty-TLS": func(t *testing.T) ConfigValidateTest {
 			return ConfigValidateTest{
 				config: &Config{
-					Address:          "127.0.0.1",
+					Address:          "127.0.0.1:443",
 					Root:             "testdata/secrets/root_ca.crt",
 					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
 					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
@@ -119,7 +133,7 @@ func TestConfigValidate(t *testing.T) {
 		"empty-TLS-values": func(t *testing.T) ConfigValidateTest {
 			return ConfigValidateTest{
 				config: &Config{
-					Address:          "127.0.0.1",
+					Address:          "127.0.0.1:443",
 					Root:             "testdata/secrets/root_ca.crt",
 					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
 					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
@@ -134,7 +148,7 @@ func TestConfigValidate(t *testing.T) {
 		"custom-tls-values": func(t *testing.T) ConfigValidateTest {
 			return ConfigValidateTest{
 				config: &Config{
-					Address:          "127.0.0.1",
+					Address:          "127.0.0.1:443",
 					Root:             "testdata/secrets/root_ca.crt",
 					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
 					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
@@ -163,7 +177,7 @@ func TestConfigValidate(t *testing.T) {
 		"tls-min>max": func(t *testing.T) ConfigValidateTest {
 			return ConfigValidateTest{
 				config: &Config{
-					Address:          "127.0.0.1",
+					Address:          "127.0.0.1:443",
 					Root:             "testdata/secrets/root_ca.crt",
 					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
 					IntermediateKey:  "testdata/secrets/intermediate_ca_key",

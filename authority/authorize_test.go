@@ -13,7 +13,7 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-func TestMatchesOne(t *testing.T) {
+func TestMatchesAudience(t *testing.T) {
 	type matchesTest struct {
 		a, b []string
 		exp  bool
@@ -44,10 +44,47 @@ func TestMatchesOne(t *testing.T) {
 			b:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
 			exp: true,
 		},
+		"true,portsA": {
+			a:   []string{"step-gateway", "https://test.ca.smallstep.com:9000/sign"},
+			b:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com/sign"},
+			exp: true,
+		},
+		"true,portsB": {
+			a:   []string{"step-gateway", "https://test.ca.smallstep.com/sign"},
+			b:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com:9000/sign"},
+			exp: true,
+		},
+		"true,portsAB": {
+			a:   []string{"step-gateway", "https://test.ca.smallstep.com:9000/sign"},
+			b:   []string{"https://127.0.0.1:0/sign", "https://test.ca.smallstep.com:8000/sign"},
+			exp: true,
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equals(t, tc.exp, matchesOne(tc.a, tc.b))
+			assert.Equals(t, tc.exp, matchesAudience(tc.a, tc.b))
+		})
+	}
+}
+
+func TestStripPort(t *testing.T) {
+	type args struct {
+		rawurl string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{"with port", args{"https://ca.smallstep.com:9000/sign"}, "https://ca.smallstep.com/sign"},
+		{"with no port", args{"https://ca.smallstep.com/sign/"}, "https://ca.smallstep.com/sign/"},
+		{"bad url", args{"https://a bad url:9000"}, "https://a bad url:9000"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := stripPort(tt.args.rawurl); got != tt.want {
+				t.Errorf("stripPort() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
