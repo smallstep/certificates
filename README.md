@@ -210,7 +210,8 @@ running `step ca provisioner add`.
 To start the CA run:
 
 ```
-step-ca $STEPPATH/config/ca.step
+export STEPPATH=$(step path)
+step-ca $STEPPATH/config/ca.json
 ```
 
 ### Configure Your Environment
