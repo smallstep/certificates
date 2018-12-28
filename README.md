@@ -65,7 +65,7 @@ Documentation can be found in three places:
 
 1. On the command line with `step ca help xxx` where `xxx` is the subcommand you are interested in. Ex: `step help ca provisioners list`
 
-2. On the web at https://smallstep.com/docs/step-ca
+2. On the web at https://smallstep.com/docs/certificates
 
 3. In your browser with `step ca help --http :8080` and visiting http://localhost:8080
 
