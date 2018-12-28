@@ -250,7 +250,7 @@ In the examples below we will use `https://ca.smallstep.com:8080`.
     From the **remote server**:
 
     ```
-    $ FP=$(step certificate fingerprint ./path/to/root_ca.crt)
+    $ FP=$(step certificate fingerprint $(step path)/certs/root_ca.crt)
     ```
 
 2. Bootstrap your environment.
@@ -259,7 +259,7 @@ In the examples below we will use `https://ca.smallstep.com:8080`.
 
     ```
     $ step ca bootstrap --fingerprint $FP --ca-url "https://ca.smallstep.com:8080"
-    $ cat $STEPPATH/config/defaults.json
+    $ cat $(step path)/config/defaults.json
     ```
 
 3. Test.
