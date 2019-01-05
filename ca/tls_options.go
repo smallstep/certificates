@@ -6,13 +6,13 @@ import (
 )
 
 // TLSOption defines the type of a function that modifies a tls.Config.
-type TLSOption func(c *tls.Config) error
+type TLSOption func(c *Client, config *tls.Config) error
 
 // setTLSOptions takes one or more option function and applies them in order to
 // a tls.Config.
-func setTLSOptions(c *tls.Config, options []TLSOption) error {
+func setTLSOptions(c *Client, config *tls.Config, options []TLSOption) error {
 	for _, opt := range options {
-		if err := opt(c); err != nil {
+		if err := opt(c, config); err != nil {
 			return err
 		}
 	}
@@ -22,8 +22,8 @@ func setTLSOptions(c *tls.Config, options []TLSOption) error {
 // RequireAndVerifyClientCert is a tls.Config option used on servers to enforce
 // a valid TLS client certificate. This is the default option for mTLS servers.
 func RequireAndVerifyClientCert() TLSOption {
-	return func(c *tls.Config) error {
-		c.ClientAuth = tls.RequireAndVerifyClientCert
+	return func(_ *Client, config *tls.Config) error {
+		config.ClientAuth = tls.RequireAndVerifyClientCert
 		return nil
 	}
 }
@@ -31,8 +31,8 @@ func RequireAndVerifyClientCert() TLSOption {
 // VerifyClientCertIfGiven is a tls.Config option used on on servers to validate
 // a TLS client certificate if it is provided. It does not requires a certificate.
 func VerifyClientCertIfGiven() TLSOption {
-	return func(c *tls.Config) error {
-		c.ClientAuth = tls.VerifyClientCertIfGiven
+	return func(_ *Client, config *tls.Config) error {
+		config.ClientAuth = tls.VerifyClientCertIfGiven
 		return nil
 	}
 }
@@ -41,11 +41,11 @@ func VerifyClientCertIfGiven() TLSOption {
 // defines the set of root certificate authorities that clients use when
 // verifying server certificates.
 func AddRootCA(cert *x509.Certificate) TLSOption {
-	return func(c *tls.Config) error {
-		if c.RootCAs == nil {
-			c.RootCAs = x509.NewCertPool()
+	return func(_ *Client, config *tls.Config) error {
+		if config.RootCAs == nil {
+			config.RootCAs = x509.NewCertPool()
 		}
-		c.RootCAs.AddCert(cert)
+		config.RootCAs.AddCert(cert)
 		return nil
 	}
 }
@@ -54,11 +54,51 @@ func AddRootCA(cert *x509.Certificate) TLSOption {
 // defines the set of root certificate authorities that servers use if required
 // to verify a client certificate by the policy in ClientAuth.
 func AddClientCA(cert *x509.Certificate) TLSOption {
-	return func(c *tls.Config) error {
-		if c.ClientCAs == nil {
-			c.ClientCAs = x509.NewCertPool()
+	return func(_ *Client, config *tls.Config) error {
+		if config.ClientCAs == nil {
+			config.ClientCAs = x509.NewCertPool()
 		}
-		c.ClientCAs.AddCert(cert)
+		config.ClientCAs.AddCert(cert)
+		return nil
+	}
+}
+
+// AddRootFederation does a federation request and adds to the tls.Config
+// RootCAs all the certificates in the response. RootCAs
+// defines the set of root certificate authorities that clients use when
+// verifying server certificates.
+func AddRootFederation() TLSOption {
+	return func(c *Client, config *tls.Config) error {
+		if config.RootCAs == nil {
+			config.RootCAs = x509.NewCertPool()
+		}
+		certs, err := c.Federation(nil)
+		if err != nil {
+			return err
+		}
+		for _, cert := range certs.Certificates {
+			config.RootCAs.AddCert(cert.Certificate)
+		}
+		return nil
+	}
+}
+
+// AddClientFederation does a federation request and adds to the tls.Config
+// ClientCAs all the certificates in the response. ClientCAs defines the set of
+// root certificate authorities that servers use if required to verify a client
+// certificate by the policy in ClientAuth.
+func AddClientFederation() TLSOption {
+	return func(c *Client, config *tls.Config) error {
+		if config.ClientCAs == nil {
+			config.ClientCAs = x509.NewCertPool()
+		}
+		certs, err := c.Federation(nil)
+		if err != nil {
+			return err
+		}
+		for _, cert := range certs.Certificates {
+			config.ClientCAs.AddCert(cert.Certificate)
+		}
 		return nil
 	}
 }

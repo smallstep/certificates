@@ -17,7 +17,7 @@ func (a *Authority) Root(sum string) (*x509.Certificate, error) {
 
 	crt, ok := val.(*x509.Certificate)
 	if !ok {
-		return nil, &apiError{errors.Errorf("stored value is not a *cryto/x509.Certificate"),
+		return nil, &apiError{errors.Errorf("stored value is not a *x509.Certificate"),
 			http.StatusInternalServerError, context{}}
 	}
 	return crt, nil
@@ -26,4 +26,25 @@ func (a *Authority) Root(sum string) (*x509.Certificate, error) {
 // GetRootCertificate returns the server root certificate.
 func (a *Authority) GetRootCertificate() *x509.Certificate {
 	return a.rootX509Crt
+}
+
+// GetFederation returns all the root certificates in the federation.
+func (a *Authority) GetFederation(peer *x509.Certificate) (federation []*x509.Certificate, err error) {
+	// Check step provisioner extensions
+	if err := a.authorizeRenewal(peer); err != nil {
+		return nil, err
+	}
+
+	a.certificates.Range(func(k, v interface{}) bool {
+		crt, ok := v.(*x509.Certificate)
+		if !ok {
+			federation = nil
+			err = &apiError{errors.Errorf("stored value is not a *x509.Certificate"),
+				http.StatusInternalServerError, context{}}
+			return false
+		}
+		federation = append(federation, crt)
+		return true
+	})
+	return
 }

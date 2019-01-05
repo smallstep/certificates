@@ -413,6 +413,25 @@ func (c *Client) ProvisionerKey(kid string) (*api.ProvisionerKeyResponse, error)
 	return &key, nil
 }
 
+// Federation performs the get federation request to the CA and returns the
+// api.FederationResponse struct.
+func (c *Client) Federation(tr http.RoundTripper) (*api.FederationResponse, error) {
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/federation"})
+	client := &http.Client{Transport: tr}
+	resp, err := client.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var federation api.FederationResponse
+	if err := readJSON(resp.Body, &federation); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &federation, nil
+}
+
 // CreateSignRequest is a helper function that given an x509 OTT returns a
 // simple but secure sign request as well as the private key used.
 func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) {

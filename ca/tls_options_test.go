@@ -10,7 +10,7 @@ import (
 
 func Test_setTLSOptions(t *testing.T) {
 	fail := func() TLSOption {
-		return func(c *tls.Config) error {
+		return func(c *Client, config *tls.Config) error {
 			return fmt.Errorf("an error")
 		}
 	}
@@ -29,7 +29,7 @@ func Test_setTLSOptions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := setTLSOptions(tt.args.c, tt.args.options); (err != nil) != tt.wantErr {
+			if err := setTLSOptions(nil, tt.args.c, tt.args.options); (err != nil) != tt.wantErr {
 				t.Errorf("setTLSOptions() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -46,7 +46,7 @@ func TestRequireAndVerifyClientCert(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := &tls.Config{}
-			if err := RequireAndVerifyClientCert()(got); err != nil {
+			if err := RequireAndVerifyClientCert()(nil, got); err != nil {
 				t.Errorf("RequireAndVerifyClientCert() error = %v", err)
 				return
 			}
@@ -67,7 +67,7 @@ func TestVerifyClientCertIfGiven(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := &tls.Config{}
-			if err := VerifyClientCertIfGiven()(got); err != nil {
+			if err := VerifyClientCertIfGiven()(nil, got); err != nil {
 				t.Errorf("VerifyClientCertIfGiven() error = %v", err)
 				return
 			}
@@ -96,7 +96,7 @@ func TestAddRootCA(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := &tls.Config{}
-			if err := AddRootCA(tt.args.cert)(got); err != nil {
+			if err := AddRootCA(tt.args.cert)(nil, got); err != nil {
 				t.Errorf("AddRootCA() error = %v", err)
 				return
 			}
@@ -125,7 +125,7 @@ func TestAddClientCA(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := &tls.Config{}
-			if err := AddClientCA(tt.args.cert)(got); err != nil {
+			if err := AddClientCA(tt.args.cert)(nil, got); err != nil {
 				t.Errorf("AddClientCA() error = %v", err)
 				return
 			}

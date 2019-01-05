@@ -2,7 +2,7 @@ package authority
 
 import (
 	"crypto/sha256"
-	realx509 "crypto/x509"
+	"crypto/x509"
 	"encoding/hex"
 	"fmt"
 	"sync"
@@ -17,7 +17,7 @@ const legacyAuthority = "step-certificate-authority"
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
 	config                 *Config
-	rootX509Crt            *realx509.Certificate
+	rootX509Crt            *x509.Certificate
 	intermediateIdentity   *x509util.Identity
 	validateOnce           bool
 	certificates           *sync.Map
@@ -88,6 +88,16 @@ func (a *Authority) init() error {
 	// Add root certificate to the certificate map
 	sum := sha256.Sum256(a.rootX509Crt.Raw)
 	a.certificates.Store(hex.EncodeToString(sum[:]), a.rootX509Crt)
+
+	// Add federated roots
+	for _, path := range a.config.FederatedRoots {
+		crt, err := pemutil.ReadCertificate(path)
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(crt.Raw)
+		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
+	}
 
 	// Decrypt and load intermediate public / private key pair.
 	if len(a.config.Password) > 0 {

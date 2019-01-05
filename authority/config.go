@@ -33,38 +33,10 @@ var (
 	}
 )
 
-type duration struct {
-	time.Duration
-}
-
-// MarshalJSON parses a duration string and sets it to the duration.
-//
-// A duration string is a possibly signed sequence of decimal numbers, each with
-// optional fraction and a unit suffix, such as "300ms", "-1.5h" or "2h45m".
-// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-func (d *duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.String())
-}
-
-// UnmarshalJSON parses a duration string and sets it to the duration.
-//
-// A duration string is a possibly signed sequence of decimal numbers, each with
-// optional fraction and a unit suffix, such as "300ms", "-1.5h" or "2h45m".
-// Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-func (d *duration) UnmarshalJSON(data []byte) (err error) {
-	var s string
-	if err = json.Unmarshal(data, &s); err != nil {
-		return errors.Wrapf(err, "error unmarshalling %s", data)
-	}
-	if d.Duration, err = time.ParseDuration(s); err != nil {
-		return errors.Wrapf(err, "error parsing %s as duration", s)
-	}
-	return
-}
-
 // Config represents the CA configuration and it's mapped to a JSON object.
 type Config struct {
 	Root             string              `json:"root"`
+	FederatedRoots   []string            `json:"federatedRoots"`
 	IntermediateCert string              `json:"crt"`
 	IntermediateKey  string              `json:"key"`
 	Address          string              `json:"address"`
