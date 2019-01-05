@@ -25,6 +25,7 @@ type Authority interface {
 	Renew(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
 	GetProvisioners(cursor string, limit int) ([]*authority.Provisioner, string, error)
 	GetEncryptedKey(kid string) (string, error)
+	GetFederation(cert *x509.Certificate) ([]*x509.Certificate, error)
 }
 
 // Certificate wraps a *x509.Certificate and adds the json.Marshaler interface.
@@ -186,6 +187,11 @@ type SignResponse struct {
 	TLS        *tls.ConnectionState `json:"-"`
 }
 
+// FederationResponse is the response object of the federation request.
+type FederationResponse struct {
+	Certificates []Certificate `json:"crts"`
+}
+
 // caHandler is the type used to implement the different CA HTTP endpoints.
 type caHandler struct {
 	Authority Authority
@@ -205,6 +211,7 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("POST", "/renew", h.Renew)
 	r.MethodFunc("GET", "/provisioners", h.Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
+	r.MethodFunc("GET", "/federation", h.Federation)
 	// For compatibility with old code:
 	r.MethodFunc("POST", "/re-sign", h.Renew)
 }
@@ -318,6 +325,30 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, &ProvisionerKeyResponse{key})
+}
+
+// Federation returns all the public certificates in the federation.
+func (h *caHandler) Federation(w http.ResponseWriter, r *http.Request) {
+	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+		WriteError(w, BadRequest(errors.New("missing peer certificate")))
+		return
+	}
+
+	federated, err := h.Authority.GetFederation(r.TLS.PeerCertificates[0])
+	if err != nil {
+		WriteError(w, Forbidden(err))
+		return
+	}
+
+	certs := make([]Certificate, len(federated))
+	for i := range federated {
+		certs[i] = Certificate{federated[i]}
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	JSON(w, &FederationResponse{
+		Certificates: certs,
+	})
 }
 
 func parseCursor(r *http.Request) (cursor string, limit int, err error) {
