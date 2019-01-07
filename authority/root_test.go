@@ -37,7 +37,7 @@ func TestRoot(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, crt, a.rootX509Crt)
+					assert.Equals(t, crt, a.rootX509Certs[0])
 				}
 			}
 		})

@@ -35,7 +35,7 @@ var (
 
 // Config represents the CA configuration and it's mapped to a JSON object.
 type Config struct {
-	Root             string              `json:"root"`
+	Root             multiString         `json:"root"`
 	FederatedRoots   []string            `json:"federatedRoots"`
 	IntermediateCert string              `json:"crt"`
 	IntermediateKey  string              `json:"key"`
@@ -117,7 +117,7 @@ func (c *Config) Validate() error {
 	case c.Address == "":
 		return errors.New("address cannot be empty")
 
-	case c.Root == "":
+	case c.Root.Empties():
 		return errors.New("root cannot be empty")
 
 	case c.IntermediateCert == "":

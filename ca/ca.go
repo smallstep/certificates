@@ -176,7 +176,9 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	}
 
 	certPool := x509.NewCertPool()
-	certPool.AddCert(auth.GetRootCertificate())
+	for _, crt := range auth.GetRootCertificates() {
+		certPool.AddCert(crt)
+	}
 
 	// GetCertificate will only be called if the client supplies SNI
 	// information or if tlsConfig.Certificates is empty.

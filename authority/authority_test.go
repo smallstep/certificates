@@ -38,7 +38,7 @@ func testAuthority(t *testing.T) *Authority {
 	}
 	c := &Config{
 		Address:          "127.0.0.1:443",
-		Root:             "testdata/secrets/root_ca.crt",
+		Root:             []string{"testdata/secrets/root_ca.crt"},
 		IntermediateCert: "testdata/secrets/intermediate_ca.crt",
 		IntermediateKey:  "testdata/secrets/intermediate_ca_key",
 		DNSNames:         []string{"test.ca.smallstep.com"},
@@ -68,7 +68,7 @@ func TestAuthorityNew(t *testing.T) {
 		"fail bad root": func(t *testing.T) *newTest {
 			c, err := LoadConfiguration("../ca/testdata/ca.json")
 			assert.FatalError(t, err)
-			c.Root = "foo"
+			c.Root = []string{"foo"}
 			return &newTest{
 				config: c,
 				err:    errors.New("open foo failed: no such file or directory"),
@@ -105,10 +105,10 @@ func TestAuthorityNew(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					sum := sha256.Sum256(auth.rootX509Crt.Raw)
+					sum := sha256.Sum256(auth.rootX509Certs[0].Raw)
 					root, ok := auth.certificates.Load(hex.EncodeToString(sum[:]))
 					assert.Fatal(t, ok)
-					assert.Equals(t, auth.rootX509Crt, root)
+					assert.Equals(t, auth.rootX509Certs[0], root)
 
 					assert.True(t, auth.initOnce)
 					assert.NotNil(t, auth.intermediateIdentity)

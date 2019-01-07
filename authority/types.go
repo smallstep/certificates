@@ -36,10 +36,9 @@ func (d *duration) UnmarshalJSON(data []byte) (err error) {
 	return
 }
 
+// multiString represents a type that can be encoded/decoded in JSON as a single
+// string or an array of strings.
 type multiString []string
-
-// FIXME: remove me, avoids deadcode warning
-var _ = multiString{}
 
 // First returns the first element of a multiString. It will return an empty
 // string if the multistring is empty.
@@ -69,20 +68,24 @@ func (s multiString) Empties() bool {
 func (s multiString) MarshalJSON() ([]byte, error) {
 	switch len(s) {
 	case 0:
-		return []byte(""), nil
+		return []byte(`""`), nil
 	case 1:
 		return json.Marshal(s[0])
 	default:
-		return json.Marshal(s)
+		return json.Marshal([]string(s))
 	}
 }
 
 // UnmarshalJSON parses a string or a slice and sets it to the multiString.
 func (s *multiString) UnmarshalJSON(data []byte) error {
+	if s == nil {
+		return errors.New("multiString cannot be nil")
+	}
 	if len(data) == 0 {
 		*s = nil
 		return nil
 	}
+	// Parse string
 	if data[0] == '"' {
 		var str string
 		if err := json.Unmarshal(data, &str); err != nil {
@@ -91,8 +94,11 @@ func (s *multiString) UnmarshalJSON(data []byte) error {
 		*s = []string{str}
 		return nil
 	}
-	if err := json.Unmarshal(data, s); err != nil {
+	// Parse array
+	var ss []string
+	if err := json.Unmarshal(data, &ss); err != nil {
 		return errors.Wrapf(err, "error unmarshalling %s", data)
 	}
+	*s = ss
 	return nil
 }

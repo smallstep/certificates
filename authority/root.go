@@ -25,7 +25,12 @@ func (a *Authority) Root(sum string) (*x509.Certificate, error) {
 
 // GetRootCertificate returns the server root certificate.
 func (a *Authority) GetRootCertificate() *x509.Certificate {
-	return a.rootX509Crt
+	return a.rootX509Certs[0]
+}
+
+// GetRootCertificates returns the server root certificates.
+func (a *Authority) GetRootCertificates() []*x509.Certificate {
+	return a.rootX509Certs
 }
 
 // GetFederation returns all the root certificates in the federation.
