@@ -392,6 +392,7 @@ type mockAuthority struct {
 	renew           func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
 	getProvisioners func(nextCursor string, limit int) ([]*authority.Provisioner, string, error)
 	getEncryptedKey func(kid string) (string, error)
+	getRoots        func(cert *x509.Certificate) ([]*x509.Certificate, error)
 	getFederation   func(cert *x509.Certificate) ([]*x509.Certificate, error)
 }
 
@@ -442,6 +443,13 @@ func (m *mockAuthority) GetEncryptedKey(kid string) (string, error) {
 		return m.getEncryptedKey(kid)
 	}
 	return m.ret1.(string), m.err
+}
+
+func (m *mockAuthority) GetRoots(cert *x509.Certificate) ([]*x509.Certificate, error) {
+	if m.getFederation != nil {
+		return m.getRoots(cert)
+	}
+	return m.ret1.([]*x509.Certificate), m.err
 }
 
 func (m *mockAuthority) GetFederation(cert *x509.Certificate) ([]*x509.Certificate, error) {
@@ -821,6 +829,53 @@ func Test_caHandler_ProvisionerKey(t *testing.T) {
 	}
 }
 
+func Test_caHandler_Roots(t *testing.T) {
+	cs := &tls.ConnectionState{
+		PeerCertificates: []*x509.Certificate{parseCertificate(certPEM)},
+	}
+	tests := []struct {
+		name       string
+		tls        *tls.ConnectionState
+		cert       *x509.Certificate
+		root       *x509.Certificate
+		err        error
+		statusCode int
+	}{
+		{"ok", cs, parseCertificate(certPEM), parseCertificate(rootPEM), nil, http.StatusCreated},
+		{"no tls", nil, nil, nil, nil, http.StatusBadRequest},
+		{"no peer certificates", &tls.ConnectionState{}, nil, nil, nil, http.StatusBadRequest},
+		{"renew error", cs, nil, nil, fmt.Errorf("an error"), http.StatusForbidden},
+	}
+
+	expected := []byte(`{"crts":["` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"]}`)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(&mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err}).(*caHandler)
+			req := httptest.NewRequest("GET", "http://example.com/roots", nil)
+			req.TLS = tt.tls
+			w := httptest.NewRecorder()
+			h.Roots(w, req)
+			res := w.Result()
+
+			if res.StatusCode != tt.statusCode {
+				t.Errorf("caHandler.Roots StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
+			}
+
+			body, err := ioutil.ReadAll(res.Body)
+			res.Body.Close()
+			if err != nil {
+				t.Errorf("caHandler.Roots unexpected error = %v", err)
+			}
+			if tt.statusCode < http.StatusBadRequest {
+				if !bytes.Equal(bytes.TrimSpace(body), expected) {
+					t.Errorf("caHandler.Roots Body = %s, wants %s", body, expected)
+				}
+			}
+		})
+	}
+}
+
 func Test_caHandler_Federation(t *testing.T) {
 	cs := &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{parseCertificate(certPEM)},
@@ -851,17 +906,17 @@ func Test_caHandler_Federation(t *testing.T) {
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
-				t.Errorf("caHandler.Root StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
+				t.Errorf("caHandler.Federation StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
 			}
 
 			body, err := ioutil.ReadAll(res.Body)
 			res.Body.Close()
 			if err != nil {
-				t.Errorf("caHandler.Root unexpected error = %v", err)
+				t.Errorf("caHandler.Federation unexpected error = %v", err)
 			}
 			if tt.statusCode < http.StatusBadRequest {
 				if !bytes.Equal(bytes.TrimSpace(body), expected) {
-					t.Errorf("caHandler.Root Body = %s, wants %s", body, expected)
+					t.Errorf("caHandler.Federation Body = %s, wants %s", body, expected)
 				}
 			}
 		})

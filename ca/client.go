@@ -237,9 +237,10 @@ func WithProvisionerLimit(limit int) ProvisionerOption {
 
 // Client implements an HTTP client for the CA server.
 type Client struct {
-	client   *http.Client
-	endpoint *url.URL
-	certPool *x509.CertPool
+	client     *http.Client
+	endpoint   *url.URL
+	certPool   *x509.CertPool
+	cachedSign *api.SignResponse
 }
 
 // NewClient creates a new Client with the given endpoint and options.
@@ -411,6 +412,25 @@ func (c *Client) ProvisionerKey(kid string) (*api.ProvisionerKeyResponse, error)
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
 	return &key, nil
+}
+
+// Roots performs the get roots request to the CA and returns the
+// api.RootsResponse struct.
+func (c *Client) Roots(tr http.RoundTripper) (*api.RootsResponse, error) {
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/roots"})
+	client := &http.Client{Transport: tr}
+	resp, err := client.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var federation api.RootsResponse
+	if err := readJSON(resp.Body, &federation); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &federation, nil
 }
 
 // Federation performs the get federation request to the CA and returns the

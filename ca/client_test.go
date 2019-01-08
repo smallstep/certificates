@@ -512,6 +512,67 @@ func TestClient_ProvisionerKey(t *testing.T) {
 	}
 }
 
+func TestClient_Roots(t *testing.T) {
+	ok := &api.RootsResponse{
+		Certificates: []api.Certificate{
+			{Certificate: parseCertificate(rootPEM)},
+		},
+	}
+	unauthorized := api.Unauthorized(fmt.Errorf("Unauthorized"))
+	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))
+
+	tests := []struct {
+		name         string
+		response     interface{}
+		responseCode int
+		wantErr      bool
+	}{
+		{"ok", ok, 200, false},
+		{"unauthorized", unauthorized, 401, true},
+		{"empty request", badRequest, 403, true},
+		{"nil request", badRequest, 403, true},
+	}
+
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				w.WriteHeader(tt.responseCode)
+				api.JSON(w, tt.response)
+			})
+
+			got, err := c.Roots(nil)
+			if (err != nil) != tt.wantErr {
+				fmt.Printf("%+v", err)
+				t.Errorf("Client.Roots() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			switch {
+			case err != nil:
+				if got != nil {
+					t.Errorf("Client.Roots() = %v, want nil", got)
+				}
+				if !reflect.DeepEqual(err, tt.response) {
+					t.Errorf("Client.Roots() error = %v, want %v", err, tt.response)
+				}
+			default:
+				if !reflect.DeepEqual(got, tt.response) {
+					t.Errorf("Client.Roots() = %v, want %v", got, tt.response)
+				}
+			}
+		})
+	}
+}
+
 func TestClient_Federation(t *testing.T) {
 	ok := &api.FederationResponse{
 		Certificates: []api.Certificate{

@@ -1,5 +1,6 @@
 {
     "root": "../ca/testdata/secrets/root_ca.crt",
+    "federatedRoots": ["../ca/testdata/secrets/federated_ca.crt"],
     "crt": "../ca/testdata/secrets/intermediate_ca.crt",
     "key": "../ca/testdata/secrets/intermediate_ca_key",
     "password": "password",

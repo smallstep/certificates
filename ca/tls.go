@@ -41,7 +41,7 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	}
 
 	// Apply options if given
-	if err := setTLSOptions(c, tlsConfig, options); err != nil {
+	if err := setTLSOptions(c, sign, pk, tlsConfig, options); err != nil {
 		return nil, err
 	}
 
@@ -87,7 +87,7 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	}
 
 	// Apply options if given
-	if err := setTLSOptions(c, tlsConfig, options); err != nil {
+	if err := setTLSOptions(c, sign, pk, tlsConfig, options); err != nil {
 		return nil, err
 	}
 
