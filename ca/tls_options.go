@@ -95,6 +95,8 @@ func AddClientCA(cert *x509.Certificate) TLSOption {
 // AddRootsToRootCAs does a roots request and adds to the tls.Config RootCAs all
 // the certificates in the response. RootCAs defines the set of root certificate
 // authorities that clients use when verifying server certificates.
+//
+// BootstrapServer and BootstrapClient methods include this option by default.
 func AddRootsToRootCAs() TLSOption {
 	return func(c *Client, tr http.RoundTripper, config *tls.Config) error {
 		certs, err := c.Roots(tr)
@@ -115,6 +117,8 @@ func AddRootsToRootCAs() TLSOption {
 // all the certificates in the response. ClientCAs defines the set of root
 // certificate authorities that servers use if required to verify a client
 // certificate by the policy in ClientAuth.
+//
+// BootstrapServer method includes this option by default.
 func AddRootsToClientCAs() TLSOption {
 	return func(c *Client, tr http.RoundTripper, config *tls.Config) error {
 		certs, err := c.Roots(tr)

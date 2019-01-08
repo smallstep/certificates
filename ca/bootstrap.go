@@ -87,6 +87,9 @@ func BootstrapServer(ctx context.Context, token string, base *http.Server, optio
 		return nil, err
 	}
 
+	// Make sure the tlsConfig have all supported roots
+	options = append(options, AddRootsToClientCAs(), AddRootsToRootCAs())
+
 	tlsConfig, err := client.GetServerTLSConfig(ctx, sign, pk, options...)
 	if err != nil {
 		return nil, err
@@ -129,6 +132,9 @@ func BootstrapClient(ctx context.Context, token string, options ...TLSOption) (*
 	if err != nil {
 		return nil, err
 	}
+
+	// Make sure the tlsConfig have all supported roots
+	options = append(options, AddRootsToRootCAs())
 
 	transport, err := client.Transport(ctx, sign, pk, options...)
 	if err != nil {
