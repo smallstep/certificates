@@ -41,7 +41,11 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	}
 
 	// Apply options if given
-	if err := setTLSOptions(c, sign, pk, tlsConfig, options); err != nil {
+	tlsCtx, err := newTLSOptionCtx(c, sign, pk, tlsConfig)
+	if err != nil {
+		return nil, err
+	}
+	if err := tlsCtx.apply(options); err != nil {
 		return nil, err
 	}
 
@@ -50,7 +54,7 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	if err != nil {
 		return nil, err
 	}
-	renewer.RenewCertificate = getRenewFunc(c, tr, pk)
+	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Start renewer
 	renewer.RunContext(ctx)
@@ -87,7 +91,11 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	}
 
 	// Apply options if given
-	if err := setTLSOptions(c, sign, pk, tlsConfig, options); err != nil {
+	tlsCtx, err := newTLSOptionCtx(c, sign, pk, tlsConfig)
+	if err != nil {
+		return nil, err
+	}
+	if err := tlsCtx.apply(options); err != nil {
 		return nil, err
 	}
 
@@ -96,7 +104,7 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	if err != nil {
 		return nil, err
 	}
-	renewer.RenewCertificate = getRenewFunc(c, tr, pk)
+	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Start renewer
 	renewer.RunContext(ctx)
@@ -238,8 +246,13 @@ func getPEM(i interface{}) ([]byte, error) {
 	return pem.EncodeToMemory(block), nil
 }
 
-func getRenewFunc(client *Client, tr *http.Transport, pk crypto.PrivateKey) RenewFunc {
+func getRenewFunc(ctx *TLSOptionCtx, client *Client, tr *http.Transport, pk crypto.PrivateKey) RenewFunc {
 	return func() (*tls.Certificate, error) {
+		// Get updated list of roots
+		if err := ctx.applyRenew(tr); err != nil {
+			return nil, err
+		}
+		// Get new certificate
 		sign, err := client.Renew(tr)
 		if err != nil {
 			return nil, err

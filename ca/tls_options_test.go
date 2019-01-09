@@ -10,33 +10,36 @@ import (
 	"testing"
 )
 
-func Test_setTLSOptions(t *testing.T) {
+func TestTLSOptionCtx_apply(t *testing.T) {
 	fail := func() TLSOption {
-		return func(c *Client, tr http.RoundTripper, config *tls.Config) error {
+		return func(ctx *TLSOptionCtx) error {
 			return fmt.Errorf("an error")
 		}
 	}
+
+	type fields struct {
+		Config *tls.Config
+	}
 	type args struct {
-		c       *tls.Config
 		options []TLSOption
 	}
 	tests := []struct {
 		name    string
+		fields  fields
 		args    args
 		wantErr bool
 	}{
-		{"ok", args{&tls.Config{}, []TLSOption{RequireAndVerifyClientCert()}}, false},
-		{"ok", args{&tls.Config{}, []TLSOption{VerifyClientCertIfGiven()}}, false},
-		{"fail", args{&tls.Config{}, []TLSOption{VerifyClientCertIfGiven(), fail()}}, true},
+		{"ok", fields{&tls.Config{}}, args{[]TLSOption{RequireAndVerifyClientCert()}}, false},
+		{"ok", fields{&tls.Config{}}, args{[]TLSOption{VerifyClientCertIfGiven()}}, false},
+		{"fail", fields{&tls.Config{}}, args{[]TLSOption{VerifyClientCertIfGiven(), fail()}}, true},
 	}
-
-	ca := startCATestServer()
-	defer ca.Close()
-	client, sr, pk := signDuration(ca, "127.0.0.1", 0)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := setTLSOptions(client, sr, pk, tt.args.c, tt.args.options); (err != nil) != tt.wantErr {
-				t.Errorf("setTLSOptions() error = %v, wantErr %v", err, tt.wantErr)
+			ctx := &TLSOptionCtx{
+				Config: tt.fields.Config,
+			}
+			if err := ctx.apply(tt.args.options); (err != nil) != tt.wantErr {
+				t.Errorf("TLSOptionCtx.apply() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -51,13 +54,15 @@ func TestRequireAndVerifyClientCert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := &tls.Config{}
-			if err := RequireAndVerifyClientCert()(nil, nil, got); err != nil {
+			ctx := &TLSOptionCtx{
+				Config: &tls.Config{},
+			}
+			if err := RequireAndVerifyClientCert()(ctx); err != nil {
 				t.Errorf("RequireAndVerifyClientCert() error = %v", err)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("RequireAndVerifyClientCert() = %v, want %v", got, tt.want)
+			if !reflect.DeepEqual(ctx.Config, tt.want) {
+				t.Errorf("RequireAndVerifyClientCert() = %v, want %v", ctx.Config, tt.want)
 			}
 		})
 	}
@@ -72,13 +77,15 @@ func TestVerifyClientCertIfGiven(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := &tls.Config{}
-			if err := VerifyClientCertIfGiven()(nil, nil, got); err != nil {
+			ctx := &TLSOptionCtx{
+				Config: &tls.Config{},
+			}
+			if err := VerifyClientCertIfGiven()(ctx); err != nil {
 				t.Errorf("VerifyClientCertIfGiven() error = %v", err)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("VerifyClientCertIfGiven() = %v, want %v", got, tt.want)
+			if !reflect.DeepEqual(ctx.Config, tt.want) {
+				t.Errorf("VerifyClientCertIfGiven() = %v, want %v", ctx.Config, tt.want)
 			}
 		})
 	}
@@ -101,13 +108,15 @@ func TestAddRootCA(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := &tls.Config{}
-			if err := AddRootCA(tt.args.cert)(nil, nil, got); err != nil {
+			ctx := &TLSOptionCtx{
+				Config: &tls.Config{},
+			}
+			if err := AddRootCA(tt.args.cert)(ctx); err != nil {
 				t.Errorf("AddRootCA() error = %v", err)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("AddRootCA() = %v, want %v", got, tt.want)
+			if !reflect.DeepEqual(ctx.Config, tt.want) {
+				t.Errorf("AddRootCA() = %v, want %v", ctx.Config, tt.want)
 			}
 		})
 	}
@@ -130,13 +139,15 @@ func TestAddClientCA(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := &tls.Config{}
-			if err := AddClientCA(tt.args.cert)(nil, nil, got); err != nil {
+			ctx := &TLSOptionCtx{
+				Config: &tls.Config{},
+			}
+			if err := AddClientCA(tt.args.cert)(ctx); err != nil {
 				t.Errorf("AddClientCA() error = %v", err)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("AddClientCA() = %v, want %v", got, tt.want)
+			if !reflect.DeepEqual(ctx.Config, tt.want) {
+				t.Errorf("AddClientCA() = %v, want %v", ctx.Config, tt.want)
 			}
 		})
 	}
@@ -172,13 +183,17 @@ func TestAddRootsToRootCAs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := &tls.Config{}
-			if err := AddRootsToRootCAs()(client, tt.tr, got); (err != nil) != tt.wantErr {
+			ctx := &TLSOptionCtx{
+				Client:    client,
+				Config:    &tls.Config{},
+				Transport: tt.tr,
+			}
+			if err := AddRootsToRootCAs()(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("AddRootsToRootCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("AddRootsToRootCAs() = %v, want %v", got, tt.want)
+			if !reflect.DeepEqual(ctx.Config, tt.want) {
+				t.Errorf("AddRootsToRootCAs() = %v, want %v", ctx.Config, tt.want)
 			}
 		})
 	}
@@ -214,13 +229,17 @@ func TestAddRootsToClientCAs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := &tls.Config{}
-			if err := AddRootsToClientCAs()(client, tt.tr, got); (err != nil) != tt.wantErr {
+			ctx := &TLSOptionCtx{
+				Client:    client,
+				Config:    &tls.Config{},
+				Transport: tt.tr,
+			}
+			if err := AddRootsToClientCAs()(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("AddRootsToClientCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("AddRootsToClientCAs() = %v, want %v", got, tt.want)
+			if !reflect.DeepEqual(ctx.Config, tt.want) {
+				t.Errorf("AddRootsToClientCAs() = %v, want %v", ctx.Config, tt.want)
 			}
 		})
 	}
@@ -263,13 +282,17 @@ func TestAddFederationToRootCAs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := &tls.Config{}
-			if err := AddFederationToRootCAs()(client, tt.tr, got); (err != nil) != tt.wantErr {
+			ctx := &TLSOptionCtx{
+				Client:    client,
+				Config:    &tls.Config{},
+				Transport: tt.tr,
+			}
+			if err := AddFederationToRootCAs()(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("AddFederationToRootCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("AddFederationToRootCAs() = %v, want %v", got, tt.want)
+			if !reflect.DeepEqual(ctx.Config, tt.want) {
+				t.Errorf("AddFederationToRootCAs() = %v, want %v", ctx.Config, tt.want)
 			}
 		})
 	}
@@ -312,13 +335,116 @@ func TestAddFederationToClientCAs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := &tls.Config{}
-			if err := AddFederationToClientCAs()(client, tt.tr, got); (err != nil) != tt.wantErr {
+			ctx := &TLSOptionCtx{
+				Client:    client,
+				Config:    &tls.Config{},
+				Transport: tt.tr,
+			}
+			if err := AddFederationToClientCAs()(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("AddFederationToClientCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("AddFederationToClientCAs() = %v, want %v", got, tt.want)
+			if !reflect.DeepEqual(ctx.Config, tt.want) {
+				t.Errorf("AddFederationToClientCAs() = %v, want %v", ctx.Config, tt.want)
+			}
+		})
+	}
+}
+
+func TestAddRootsToCAs(t *testing.T) {
+	ca := startCATestServer()
+	defer ca.Close()
+
+	client, sr, pk := signDuration(ca, "127.0.0.1", 0)
+	tr, err := getTLSOptionsTransport(sr, pk)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := ioutil.ReadFile("testdata/secrets/root_ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cert := parseCertificate(string(root))
+	pool := x509.NewCertPool()
+	pool.AddCert(cert)
+
+	tests := []struct {
+		name    string
+		tr      http.RoundTripper
+		want    *tls.Config
+		wantErr bool
+	}{
+		{"ok", tr, &tls.Config{ClientCAs: pool, RootCAs: pool}, false},
+		{"fail", http.DefaultTransport, &tls.Config{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := &TLSOptionCtx{
+				Client:    client,
+				Config:    &tls.Config{},
+				Transport: tt.tr,
+			}
+			if err := AddRootsToCAs()(ctx); (err != nil) != tt.wantErr {
+				t.Errorf("AddRootsToCAs() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(ctx.Config, tt.want) {
+				t.Errorf("AddRootsToCAs() = %v, want %v", ctx.Config, tt.want)
+			}
+		})
+	}
+}
+
+func TestAddFederationToCAs(t *testing.T) {
+	ca := startCATestServer()
+	defer ca.Close()
+
+	client, sr, pk := signDuration(ca, "127.0.0.1", 0)
+	tr, err := getTLSOptionsTransport(sr, pk)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := ioutil.ReadFile("testdata/secrets/root_ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	federated, err := ioutil.ReadFile("testdata/secrets/federated_ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	crt1 := parseCertificate(string(root))
+	crt2 := parseCertificate(string(federated))
+	pool := x509.NewCertPool()
+	pool.AddCert(crt1)
+	pool.AddCert(crt2)
+
+	tests := []struct {
+		name    string
+		tr      http.RoundTripper
+		want    *tls.Config
+		wantErr bool
+	}{
+		{"ok", tr, &tls.Config{ClientCAs: pool, RootCAs: pool}, false},
+		{"fail", http.DefaultTransport, &tls.Config{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := &TLSOptionCtx{
+				Client:    client,
+				Config:    &tls.Config{},
+				Transport: tt.tr,
+			}
+			if err := AddFederationToCAs()(ctx); (err != nil) != tt.wantErr {
+				t.Errorf("AddFederationToCAs() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(ctx.Config, tt.want) {
+				t.Errorf("AddFederationToCAs() = %v, want %v", ctx.Config, tt.want)
 			}
 		})
 	}

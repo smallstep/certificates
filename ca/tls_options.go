@@ -10,18 +10,42 @@ import (
 )
 
 // TLSOption defines the type of a function that modifies a tls.Config.
-type TLSOption func(c *Client, tr http.RoundTripper, config *tls.Config) error
+type TLSOption func(ctx *TLSOptionCtx) error
 
-// setTLSOptions takes one or more option function and applies them in order to
-// a tls.Config.
-func setTLSOptions(c *Client, sign *api.SignResponse, pk crypto.PrivateKey, config *tls.Config, options []TLSOption) error {
+// TLSOptionCtx is the context modified on TLSOption methods.
+type TLSOptionCtx struct {
+	Client      *Client
+	Transport   http.RoundTripper
+	Config      *tls.Config
+	OnRenewFunc []TLSOption
+}
+
+// newTLSOptionCtx creates the TLSOption context.
+func newTLSOptionCtx(c *Client, sign *api.SignResponse, pk crypto.PrivateKey, config *tls.Config) (*TLSOptionCtx, error) {
 	tr, err := getTLSOptionsTransport(sign, pk)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	return &TLSOptionCtx{
+		Client:    c,
+		Transport: tr,
+		Config:    config,
+	}, nil
+}
 
-	for _, opt := range options {
-		if err := opt(c, tr, config); err != nil {
+func (ctx *TLSOptionCtx) apply(options []TLSOption) error {
+	for _, fn := range options {
+		if err := fn(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (ctx *TLSOptionCtx) applyRenew(tr http.RoundTripper) error {
+	ctx.Transport = tr
+	for _, fn := range ctx.OnRenewFunc {
+		if err := fn(ctx); err != nil {
 			return err
 		}
 	}
@@ -51,8 +75,8 @@ func getTLSOptionsTransport(sign *api.SignResponse, pk crypto.PrivateKey) (http.
 // RequireAndVerifyClientCert is a tls.Config option used on servers to enforce
 // a valid TLS client certificate. This is the default option for mTLS servers.
 func RequireAndVerifyClientCert() TLSOption {
-	return func(_ *Client, _ http.RoundTripper, config *tls.Config) error {
-		config.ClientAuth = tls.RequireAndVerifyClientCert
+	return func(ctx *TLSOptionCtx) error {
+		ctx.Config.ClientAuth = tls.RequireAndVerifyClientCert
 		return nil
 	}
 }
@@ -60,8 +84,8 @@ func RequireAndVerifyClientCert() TLSOption {
 // VerifyClientCertIfGiven is a tls.Config option used on on servers to validate
 // a TLS client certificate if it is provided. It does not requires a certificate.
 func VerifyClientCertIfGiven() TLSOption {
-	return func(_ *Client, _ http.RoundTripper, config *tls.Config) error {
-		config.ClientAuth = tls.VerifyClientCertIfGiven
+	return func(ctx *TLSOptionCtx) error {
+		ctx.Config.ClientAuth = tls.VerifyClientCertIfGiven
 		return nil
 	}
 }
@@ -70,11 +94,11 @@ func VerifyClientCertIfGiven() TLSOption {
 // defines the set of root certificate authorities that clients use when
 // verifying server certificates.
 func AddRootCA(cert *x509.Certificate) TLSOption {
-	return func(_ *Client, _ http.RoundTripper, config *tls.Config) error {
-		if config.RootCAs == nil {
-			config.RootCAs = x509.NewCertPool()
+	return func(ctx *TLSOptionCtx) error {
+		if ctx.Config.RootCAs == nil {
+			ctx.Config.RootCAs = x509.NewCertPool()
 		}
-		config.RootCAs.AddCert(cert)
+		ctx.Config.RootCAs.AddCert(cert)
 		return nil
 	}
 }
@@ -83,11 +107,11 @@ func AddRootCA(cert *x509.Certificate) TLSOption {
 // defines the set of root certificate authorities that servers use if required
 // to verify a client certificate by the policy in ClientAuth.
 func AddClientCA(cert *x509.Certificate) TLSOption {
-	return func(_ *Client, _ http.RoundTripper, config *tls.Config) error {
-		if config.ClientCAs == nil {
-			config.ClientCAs = x509.NewCertPool()
+	return func(ctx *TLSOptionCtx) error {
+		if ctx.Config.ClientCAs == nil {
+			ctx.Config.ClientCAs = x509.NewCertPool()
 		}
-		config.ClientCAs.AddCert(cert)
+		ctx.Config.ClientCAs.AddCert(cert)
 		return nil
 	}
 }
@@ -98,18 +122,22 @@ func AddClientCA(cert *x509.Certificate) TLSOption {
 //
 // BootstrapServer and BootstrapClient methods include this option by default.
 func AddRootsToRootCAs() TLSOption {
-	return func(c *Client, tr http.RoundTripper, config *tls.Config) error {
-		certs, err := c.Roots(tr)
+	fn := func(ctx *TLSOptionCtx) error {
+		certs, err := ctx.Client.Roots(ctx.Transport)
 		if err != nil {
 			return err
 		}
-		if config.RootCAs == nil {
-			config.RootCAs = x509.NewCertPool()
+		if ctx.Config.RootCAs == nil {
+			ctx.Config.RootCAs = x509.NewCertPool()
 		}
 		for _, cert := range certs.Certificates {
-			config.RootCAs.AddCert(cert.Certificate)
+			ctx.Config.RootCAs.AddCert(cert.Certificate)
 		}
 		return nil
+	}
+	return func(ctx *TLSOptionCtx) error {
+		ctx.OnRenewFunc = append(ctx.OnRenewFunc, fn)
+		return fn(ctx)
 	}
 }
 
@@ -120,18 +148,22 @@ func AddRootsToRootCAs() TLSOption {
 //
 // BootstrapServer method includes this option by default.
 func AddRootsToClientCAs() TLSOption {
-	return func(c *Client, tr http.RoundTripper, config *tls.Config) error {
-		certs, err := c.Roots(tr)
+	fn := func(ctx *TLSOptionCtx) error {
+		certs, err := ctx.Client.Roots(ctx.Transport)
 		if err != nil {
 			return err
 		}
-		if config.ClientCAs == nil {
-			config.ClientCAs = x509.NewCertPool()
+		if ctx.Config.ClientCAs == nil {
+			ctx.Config.ClientCAs = x509.NewCertPool()
 		}
 		for _, cert := range certs.Certificates {
-			config.ClientCAs.AddCert(cert.Certificate)
+			ctx.Config.ClientCAs.AddCert(cert.Certificate)
 		}
 		return nil
+	}
+	return func(ctx *TLSOptionCtx) error {
+		ctx.OnRenewFunc = append(ctx.OnRenewFunc, fn)
+		return fn(ctx)
 	}
 }
 
@@ -139,18 +171,22 @@ func AddRootsToClientCAs() TLSOption {
 // RootCAs all the certificates in the response. RootCAs defines the set of root
 // certificate authorities that clients use when verifying server certificates.
 func AddFederationToRootCAs() TLSOption {
-	return func(c *Client, tr http.RoundTripper, config *tls.Config) error {
-		certs, err := c.Federation(tr)
+	fn := func(ctx *TLSOptionCtx) error {
+		certs, err := ctx.Client.Federation(ctx.Transport)
 		if err != nil {
 			return err
 		}
-		if config.RootCAs == nil {
-			config.RootCAs = x509.NewCertPool()
+		if ctx.Config.RootCAs == nil {
+			ctx.Config.RootCAs = x509.NewCertPool()
 		}
 		for _, cert := range certs.Certificates {
-			config.RootCAs.AddCert(cert.Certificate)
+			ctx.Config.RootCAs.AddCert(cert.Certificate)
 		}
 		return nil
+	}
+	return func(ctx *TLSOptionCtx) error {
+		ctx.OnRenewFunc = append(ctx.OnRenewFunc, fn)
+		return fn(ctx)
 	}
 }
 
@@ -159,17 +195,75 @@ func AddFederationToRootCAs() TLSOption {
 // root certificate authorities that servers use if required to verify a client
 // certificate by the policy in ClientAuth.
 func AddFederationToClientCAs() TLSOption {
-	return func(c *Client, tr http.RoundTripper, config *tls.Config) error {
-		certs, err := c.Federation(tr)
+	fn := func(ctx *TLSOptionCtx) error {
+		certs, err := ctx.Client.Federation(ctx.Transport)
 		if err != nil {
 			return err
 		}
-		if config.ClientCAs == nil {
-			config.ClientCAs = x509.NewCertPool()
+		if ctx.Config.ClientCAs == nil {
+			ctx.Config.ClientCAs = x509.NewCertPool()
 		}
 		for _, cert := range certs.Certificates {
-			config.ClientCAs.AddCert(cert.Certificate)
+			ctx.Config.ClientCAs.AddCert(cert.Certificate)
 		}
 		return nil
+	}
+	return func(ctx *TLSOptionCtx) error {
+		ctx.OnRenewFunc = append(ctx.OnRenewFunc, fn)
+		return fn(ctx)
+	}
+}
+
+// AddRootsToCAs does a roots request and adds the resulting certs to the
+// tls.Config RootCAs and ClientCAs. Combines the functionality of
+// AddRootsToRootCAs and AddRootsToClientCAs.
+func AddRootsToCAs() TLSOption {
+	fn := func(ctx *TLSOptionCtx) error {
+		certs, err := ctx.Client.Roots(ctx.Transport)
+		if err != nil {
+			return err
+		}
+		if ctx.Config.ClientCAs == nil {
+			ctx.Config.ClientCAs = x509.NewCertPool()
+		}
+		if ctx.Config.RootCAs == nil {
+			ctx.Config.RootCAs = x509.NewCertPool()
+		}
+		for _, cert := range certs.Certificates {
+			ctx.Config.ClientCAs.AddCert(cert.Certificate)
+			ctx.Config.RootCAs.AddCert(cert.Certificate)
+		}
+		return nil
+	}
+	return func(ctx *TLSOptionCtx) error {
+		ctx.OnRenewFunc = append(ctx.OnRenewFunc, fn)
+		return fn(ctx)
+	}
+}
+
+// AddFederationToCAs does a federation request and adds the resulting certs to the
+// tls.Config RootCAs and ClientCAs. Combines the functionality of
+// AddFederationToRootCAs and AddFederationToClientCAs.
+func AddFederationToCAs() TLSOption {
+	fn := func(ctx *TLSOptionCtx) error {
+		certs, err := ctx.Client.Federation(ctx.Transport)
+		if err != nil {
+			return err
+		}
+		if ctx.Config.ClientCAs == nil {
+			ctx.Config.ClientCAs = x509.NewCertPool()
+		}
+		if ctx.Config.RootCAs == nil {
+			ctx.Config.RootCAs = x509.NewCertPool()
+		}
+		for _, cert := range certs.Certificates {
+			ctx.Config.ClientCAs.AddCert(cert.Certificate)
+			ctx.Config.RootCAs.AddCert(cert.Certificate)
+		}
+		return nil
+	}
+	return func(ctx *TLSOptionCtx) error {
+		ctx.OnRenewFunc = append(ctx.OnRenewFunc, fn)
+		return fn(ctx)
 	}
 }
