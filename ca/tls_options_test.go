@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -292,7 +293,10 @@ func TestAddFederationToRootCAs(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(ctx.Config, tt.want) {
-				t.Errorf("AddFederationToRootCAs() = %v, want %v", ctx.Config, tt.want)
+				// Federated roots are randomly sorted
+				if !equalPools(ctx.Config.RootCAs, tt.want.RootCAs) || ctx.Config.ClientCAs != nil {
+					t.Errorf("AddFederationToRootCAs() = %v, want %v", ctx.Config, tt.want)
+				}
 			}
 		})
 	}
@@ -345,7 +349,10 @@ func TestAddFederationToClientCAs(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(ctx.Config, tt.want) {
-				t.Errorf("AddFederationToClientCAs() = %v, want %v", ctx.Config, tt.want)
+				// Federated roots are randomly sorted
+				if !equalPools(ctx.Config.ClientCAs, tt.want.ClientCAs) || ctx.Config.RootCAs != nil {
+					t.Errorf("AddFederationToClientCAs() = %v, want %v", ctx.Config, tt.want)
+				}
 			}
 		})
 	}
@@ -444,8 +451,27 @@ func TestAddFederationToCAs(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(ctx.Config, tt.want) {
-				t.Errorf("AddFederationToCAs() = %v, want %v", ctx.Config, tt.want)
+				// Federated roots are randomly sorted
+				if !equalPools(ctx.Config.ClientCAs, tt.want.ClientCAs) || !equalPools(ctx.Config.RootCAs, tt.want.RootCAs) {
+					t.Errorf("AddFederationToCAs() = %v, want %v", ctx.Config, tt.want)
+				}
 			}
 		})
 	}
+}
+
+func equalPools(a, b *x509.CertPool) bool {
+	subjects := a.Subjects()
+	sA := make([]string, len(subjects))
+	for i := range subjects {
+		sA[i] = string(subjects[i])
+	}
+	subjects = b.Subjects()
+	sB := make([]string, len(subjects))
+	for i := range subjects {
+		sB[i] = string(subjects[i])
+	}
+	sort.Sort(sort.StringSlice(sA))
+	sort.Sort(sort.StringSlice(sB))
+	return reflect.DeepEqual(sA, sB)
 }
