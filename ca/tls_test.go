@@ -20,7 +20,7 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/cli/crypto/randutil"
 	stepJOSE "github.com/smallstep/cli/jose"
-	"gopkg.in/square/go-jose.v2"
+	jose "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -242,16 +242,15 @@ func TestClient_GetServerTLSConfig_http(t *testing.T) {
 }
 
 func TestClient_GetServerTLSConfig_renew(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode.")
-	}
+	reset := setMinCertDuration(1 * time.Second)
+	defer reset()
 
 	// Start CA
 	ca := startCATestServer()
 	defer ca.Close()
 
 	clientDomain := "test.domain"
-	client, sr, pk := signDuration(ca, "127.0.0.1", 1*time.Minute)
+	client, sr, pk := signDuration(ca, "127.0.0.1", 5*time.Second)
 
 	// Start mTLS server
 	ctx, cancel := context.WithCancel(context.Background())
@@ -274,13 +273,13 @@ func TestClient_GetServerTLSConfig_renew(t *testing.T) {
 	defer srvTLS.Close()
 
 	// Transport
-	client, sr, pk = signDuration(ca, clientDomain, 1*time.Minute)
+	client, sr, pk = signDuration(ca, clientDomain, 5*time.Second)
 	tr1, err := client.Transport(context.Background(), sr, pk)
 	if err != nil {
 		t.Fatalf("Client.Transport() error = %v", err)
 	}
 	// Transport with tlsConfig
-	client, sr, pk = signDuration(ca, clientDomain, 1*time.Minute)
+	client, sr, pk = signDuration(ca, clientDomain, 5*time.Second)
 	tlsConfig, err = client.GetClientTLSConfig(context.Background(), sr, pk)
 	if err != nil {
 		t.Fatalf("Client.GetClientTLSConfig() error = %v", err)
@@ -367,9 +366,9 @@ func TestClient_GetServerTLSConfig_renew(t *testing.T) {
 		t.Errorf("number of fingerprints unexpected, got %d, want 2", l)
 	}
 
-	// Wait for renewal 40s == 1m-1m/3
-	log.Printf("Sleeping for %s ...\n", 40*time.Second)
-	time.Sleep(40 * time.Second)
+	// Wait for renewal
+	log.Printf("Sleeping for %s ...\n", 5*time.Second)
+	time.Sleep(5 * time.Second)
 
 	for _, tt := range tests {
 		t.Run("renewed "+tt.name, func(t *testing.T) {
