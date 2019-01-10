@@ -34,7 +34,7 @@ func (a *Authority) GetRootCertificates() []*x509.Certificate {
 }
 
 // GetRoots returns all the root certificates for this CA.
-func (a *Authority) GetRoots(peer *x509.Certificate) (federation []*x509.Certificate, err error) {
+func (a *Authority) GetRoots(peer *x509.Certificate) ([]*x509.Certificate, error) {
 	// Check step provisioner extensions
 	if err := a.authorizeRenewal(peer); err != nil {
 		return nil, err
