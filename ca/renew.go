@@ -14,6 +14,8 @@ import (
 // certificate.
 type RenewFunc func() (*tls.Certificate, error)
 
+var minCertDuration = time.Minute
+
 // TLSRenewer automatically renews a tls certificate using a RenewFunc.
 type TLSRenewer struct {
 	sync.RWMutex
@@ -58,8 +60,8 @@ func NewTLSRenewer(cert *tls.Certificate, fn RenewFunc, opts ...tlsRenewerOption
 	}
 
 	period := cert.Leaf.NotAfter.Sub(cert.Leaf.NotBefore)
-	if period < time.Minute {
-		return nil, errors.Errorf("period must be greater than or equal to 1 Minute, but got %v.", period)
+	if period < minCertDuration {
+		return nil, errors.Errorf("period must be greater than or equal to %s, but got %v.", minCertDuration, period)
 	}
 	// By default we will try to renew the cert before 2/3 of the validity
 	// period have expired.
