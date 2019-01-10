@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -289,25 +290,25 @@ func TestBootstrapClient(t *testing.T) {
 	}
 }
 
-func TestBootstrapClientRotation(t *testing.T) {
+func TestBootstrapClientServerRotation(t *testing.T) {
 	reset := setMinCertDuration(1 * time.Second)
 	defer reset()
 
 	// Configuration with current root
 	config, err := authority.LoadConfiguration("testdata/rotate-ca-0.json")
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	// Get local address
 	listener := newLocalListener()
 	config.Address = listener.Addr().String()
-	srvURL := "https://" + listener.Addr().String()
+	caURL := "https://" + listener.Addr().String()
 
 	// Start CA server
 	ca, err := New(config)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	go func() {
 		ca.srv.Serve(listener)
@@ -315,25 +316,60 @@ func TestBootstrapClientRotation(t *testing.T) {
 	defer ca.Stop()
 	time.Sleep(1 * time.Second)
 
-	// doTest does a request that requires mTLS
-	doTest := func(client *http.Client) error {
-		resp, err := client.Get(srvURL + "/roots")
-		if err != nil {
-			return errors.New("client.Get() failed getting roots")
-		}
-		var roots api.RootsResponse
-		if err := readJSON(resp.Body, &roots); err != nil {
-			return errors.Errorf("client.Get() error reading response: %v", err)
-		}
-		return nil
+	// Create bootstrap server
+	token := generateBootstrapToken(caURL, "127.0.0.1", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
+	server, err := BootstrapServer(context.Background(), token, &http.Server{
+		Addr: ":0",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			w.Write([]byte("ok"))
+		}),
+	}, RequireAndVerifyClientCert())
+	if err != nil {
+		t.Fatal(err)
 	}
+	listener = newLocalListener()
+	srvURL := "https://" + listener.Addr().String()
+	go func() {
+		server.ServeTLS(listener, "", "")
+	}()
+	defer server.Close()
 
 	// Create bootstrap client
-	token := generateBootstrapToken(srvURL, "subject", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
+	token = generateBootstrapToken(caURL, "client", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
 	client, err := BootstrapClient(context.Background(), token)
 	if err != nil {
 		t.Errorf("BootstrapClient() error = %v", err)
 		return
+	}
+
+	// doTest does a request that requires mTLS
+	doTest := func(client *http.Client) error {
+		// test with ca
+		resp, err := client.Get(caURL + "/roots")
+		if err != nil {
+			return errors.Wrapf(err, "client.Get(%s) failed", caURL+"/roots")
+		}
+		var roots api.RootsResponse
+		if err := readJSON(resp.Body, &roots); err != nil {
+			return errors.Wrap(err, "client.Get() error reading response")
+		}
+		if len(roots.Certificates) == 0 {
+			return errors.New("client.Get() error not certificates found")
+		}
+		// test with bootstrap server
+		resp, err = client.Get(srvURL)
+		if err != nil {
+			return errors.Wrapf(err, "client.Get(%s) failed", srvURL)
+		}
+		defer resp.Body.Close()
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return errors.Wrap(err, "client.Get() error reading response")
+		}
+		if string(b) != "ok" {
+			return errors.New("client.Get() unexpected response found")
+		}
+		return nil
 	}
 
 	// Test with default root
