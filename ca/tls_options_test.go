@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -9,7 +10,36 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/smallstep/certificates/api"
 )
+
+func Test_newTLSOptionCtx(t *testing.T) {
+	client, sign, pk := sign("test.smallstep.com")
+	type args struct {
+		c      *Client
+		sign   *api.SignResponse
+		pk     crypto.PrivateKey
+		config *tls.Config
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"ok", args{client, sign, pk, &tls.Config{}}, false},
+		{"fail", args{client, sign, "foo", &tls.Config{}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newTLSOptionCtx(tt.args.c, tt.args.sign, tt.args.pk, tt.args.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("newTLSOptionCtx() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+		})
+	}
+}
 
 func TestTLSOptionCtx_apply(t *testing.T) {
 	fail := func() TLSOption {
