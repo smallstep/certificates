@@ -3,12 +3,15 @@ package ca
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 
@@ -17,6 +20,24 @@ import (
 	jose "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
+
+func newLocalListener() net.Listener {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
+			panic(fmt.Sprintf("failed to listen on a port: %v", err))
+		}
+	}
+	return l
+}
+
+func setMinCertDuration(d time.Duration) func() {
+	tmp := minCertDuration
+	minCertDuration = 1 * time.Second
+	return func() {
+		minCertDuration = tmp
+	}
+}
 
 func startCABootstrapServer() *httptest.Server {
 	config, err := authority.LoadConfiguration("testdata/ca.json")
@@ -266,4 +287,113 @@ func TestBootstrapClient(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBootstrapClientRotation(t *testing.T) {
+	reset := setMinCertDuration(1 * time.Second)
+	defer reset()
+
+	// Configuration with current root
+	config, err := authority.LoadConfiguration("testdata/rotate-ca-0.json")
+	if err != nil {
+		panic(err)
+	}
+
+	// Get local address
+	listener := newLocalListener()
+	config.Address = listener.Addr().String()
+	srvURL := "https://" + listener.Addr().String()
+
+	// Start CA server
+	ca, err := New(config)
+	if err != nil {
+		panic(err)
+	}
+	go func() {
+		ca.srv.Serve(listener)
+	}()
+	defer ca.Stop()
+	time.Sleep(1 * time.Second)
+
+	// doTest does a request that requires mTLS
+	doTest := func(client *http.Client) error {
+		resp, err := client.Get(srvURL + "/roots")
+		if err != nil {
+			return errors.New("client.Get() failed getting roots")
+		}
+		var roots api.RootsResponse
+		if err := readJSON(resp.Body, &roots); err != nil {
+			return errors.Errorf("client.Get() error reading response: %v", err)
+		}
+		return nil
+	}
+
+	// Create bootstrap client
+	token := generateBootstrapToken(srvURL, "subject", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
+	client, err := BootstrapClient(context.Background(), token)
+	if err != nil {
+		t.Errorf("BootstrapClient() error = %v", err)
+		return
+	}
+
+	// Test with default root
+	if err := doTest(client); err != nil {
+		t.Errorf("Test with rotate-ca-0.json failed: %v", err)
+	}
+
+	// wait for renew
+	time.Sleep(5 * time.Second)
+
+	// Reload with configuration with current and future root
+	ca.opts.configFile = "testdata/rotate-ca-1.json"
+	if err := doReload(ca); err != nil {
+		t.Errorf("ca.Reload() error = %v", err)
+		return
+	}
+	if err := doTest(client); err != nil {
+		t.Errorf("Test with rotate-ca-1.json failed: %v", err)
+	}
+
+	// wait for renew
+	time.Sleep(5 * time.Second)
+
+	// Reload with new and old root
+	ca.opts.configFile = "testdata/rotate-ca-2.json"
+	if err := doReload(ca); err != nil {
+		t.Errorf("ca.Reload() error = %v", err)
+		return
+	}
+	if err := doTest(client); err != nil {
+		t.Errorf("Test with rotate-ca-2.json failed: %v", err)
+	}
+
+	// wait for renew
+	time.Sleep(5 * time.Second)
+
+	// Reload with pnly the new root
+	ca.opts.configFile = "testdata/rotate-ca-3.json"
+	if err := doReload(ca); err != nil {
+		t.Errorf("ca.Reload() error = %v", err)
+		return
+	}
+	if err := doTest(client); err != nil {
+		t.Errorf("Test with rotate-ca-3.json failed: %v", err)
+	}
+}
+
+// doReload uses the reload implementation but overwrites the new address with
+// the one being used.
+func doReload(ca *CA) error {
+	config, err := authority.LoadConfiguration(ca.opts.configFile)
+	if err != nil {
+		return errors.Wrap(err, "error reloading ca")
+	}
+
+	newCA, err := New(config, WithPassword(ca.opts.password), WithConfigFile(ca.opts.configFile))
+	if err != nil {
+		return errors.Wrap(err, "error reloading ca")
+	}
+	// Use same address in new server
+	newCA.srv.Addr = ca.srv.Addr
+	return ca.srv.Reload(newCA.srv)
 }
