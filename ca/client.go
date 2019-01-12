@@ -23,7 +23,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
-	"golang.org/x/net/http2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -237,10 +236,8 @@ func WithProvisionerLimit(limit int) ProvisionerOption {
 
 // Client implements an HTTP client for the CA server.
 type Client struct {
-	client     *http.Client
-	endpoint   *url.URL
-	certPool   *x509.CertPool
-	cachedSign *api.SignResponse
+	client   *http.Client
+	endpoint *url.URL
 }
 
 // NewClient creates a new Client with the given endpoint and options.
@@ -259,23 +256,11 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 		return nil, err
 	}
 
-	var cp *x509.CertPool
-	switch tr := tr.(type) {
-	case *http.Transport:
-		if tr.TLSClientConfig != nil && tr.TLSClientConfig.RootCAs != nil {
-			cp = tr.TLSClientConfig.RootCAs
-		}
-	case *http2.Transport:
-		if tr.TLSClientConfig != nil && tr.TLSClientConfig.RootCAs != nil {
-			cp = tr.TLSClientConfig.RootCAs
-		}
-	}
 	return &Client{
 		client: &http.Client{
 			Transport: tr,
 		},
 		endpoint: u,
-		certPool: cp,
 	}, nil
 }
 

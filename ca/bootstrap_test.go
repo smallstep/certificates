@@ -136,8 +136,10 @@ func TestBootstrap(t *testing.T) {
 					if !reflect.DeepEqual(got.endpoint, tt.want.endpoint) {
 						t.Errorf("Bootstrap() endpoint = %v, want %v", got.endpoint, tt.want.endpoint)
 					}
-					if !reflect.DeepEqual(got.certPool, tt.want.certPool) {
-						t.Errorf("Bootstrap() certPool = %v, want %v", got.certPool, tt.want.certPool)
+					gotTR := got.client.Transport.(*http.Transport)
+					wantTR := tt.want.client.Transport.(*http.Transport)
+					if !reflect.DeepEqual(gotTR.TLSClientConfig.RootCAs, wantTR.TLSClientConfig.RootCAs) {
+						t.Errorf("Bootstrap() certPool = %v, want %v", gotTR.TLSClientConfig.RootCAs, wantTR.TLSClientConfig.RootCAs)
 					}
 				}
 			}
