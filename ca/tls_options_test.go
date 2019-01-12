@@ -1,7 +1,6 @@
 package ca
 
 import (
-	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -10,32 +9,29 @@ import (
 	"reflect"
 	"sort"
 	"testing"
-
-	"github.com/smallstep/certificates/api"
 )
 
 func Test_newTLSOptionCtx(t *testing.T) {
-	client, sign, pk := sign("test.smallstep.com")
+	client, err := NewClient("https://ca.smallstep.com", WithTransport(http.DefaultTransport))
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
 	type args struct {
 		c      *Client
-		sign   *api.SignResponse
-		pk     crypto.PrivateKey
 		config *tls.Config
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name string
+		args args
+		want *TLSOptionCtx
 	}{
-		{"ok", args{client, sign, pk, &tls.Config{}}, false},
-		{"fail", args{client, sign, "foo", &tls.Config{}}, true},
+		{"ok", args{client, &tls.Config{}}, &TLSOptionCtx{Client: client, Config: &tls.Config{}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := newTLSOptionCtx(tt.args.c, tt.args.sign, tt.args.pk, tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("newTLSOptionCtx() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if got := newTLSOptionCtx(tt.args.c, tt.args.config); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("newTLSOptionCtx() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -188,8 +184,12 @@ func TestAddRootsToRootCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
 
-	client, sr, pk := signDuration(ca, "127.0.0.1", 0)
-	tr, err := getTLSOptionsTransport(sr, pk)
+	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,21 +203,24 @@ func TestAddRootsToRootCAs(t *testing.T) {
 	pool := x509.NewCertPool()
 	pool.AddCert(cert)
 
+	type args struct {
+		client *Client
+		config *tls.Config
+	}
 	tests := []struct {
 		name    string
-		tr      http.RoundTripper
+		args    args
 		want    *tls.Config
 		wantErr bool
 	}{
-		{"ok", tr, &tls.Config{RootCAs: pool}, false},
-		{"fail", http.DefaultTransport, &tls.Config{}, true},
+		{"ok", args{client, &tls.Config{}}, &tls.Config{RootCAs: pool}, false},
+		{"fail", args{clientFail, &tls.Config{}}, &tls.Config{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client:    client,
-				Config:    &tls.Config{},
-				Transport: tt.tr,
+				Client: tt.args.client,
+				Config: tt.args.config,
 			}
 			if err := AddRootsToRootCAs()(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("AddRootsToRootCAs() error = %v, wantErr %v", err, tt.wantErr)
@@ -234,8 +237,12 @@ func TestAddRootsToClientCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
 
-	client, sr, pk := signDuration(ca, "127.0.0.1", 0)
-	tr, err := getTLSOptionsTransport(sr, pk)
+	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,21 +256,24 @@ func TestAddRootsToClientCAs(t *testing.T) {
 	pool := x509.NewCertPool()
 	pool.AddCert(cert)
 
+	type args struct {
+		client *Client
+		config *tls.Config
+	}
 	tests := []struct {
 		name    string
-		tr      http.RoundTripper
+		args    args
 		want    *tls.Config
 		wantErr bool
 	}{
-		{"ok", tr, &tls.Config{ClientCAs: pool}, false},
-		{"fail", http.DefaultTransport, &tls.Config{}, true},
+		{"ok", args{client, &tls.Config{}}, &tls.Config{ClientCAs: pool}, false},
+		{"fail", args{clientFail, &tls.Config{}}, &tls.Config{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client:    client,
-				Config:    &tls.Config{},
-				Transport: tt.tr,
+				Client: tt.args.client,
+				Config: tt.args.config,
 			}
 			if err := AddRootsToClientCAs()(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("AddRootsToClientCAs() error = %v, wantErr %v", err, tt.wantErr)
@@ -280,8 +290,12 @@ func TestAddFederationToRootCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
 
-	client, sr, pk := signDuration(ca, "127.0.0.1", 0)
-	tr, err := getTLSOptionsTransport(sr, pk)
+	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,21 +316,24 @@ func TestAddFederationToRootCAs(t *testing.T) {
 	pool.AddCert(crt1)
 	pool.AddCert(crt2)
 
+	type args struct {
+		client *Client
+		config *tls.Config
+	}
 	tests := []struct {
 		name    string
-		tr      http.RoundTripper
+		args    args
 		want    *tls.Config
 		wantErr bool
 	}{
-		{"ok", tr, &tls.Config{RootCAs: pool}, false},
-		{"fail", http.DefaultTransport, &tls.Config{}, true},
+		{"ok", args{client, &tls.Config{}}, &tls.Config{RootCAs: pool}, false},
+		{"fail", args{clientFail, &tls.Config{}}, &tls.Config{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client:    client,
-				Config:    &tls.Config{},
-				Transport: tt.tr,
+				Client: tt.args.client,
+				Config: tt.args.config,
 			}
 			if err := AddFederationToRootCAs()(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("AddFederationToRootCAs() error = %v, wantErr %v", err, tt.wantErr)
@@ -336,8 +353,12 @@ func TestAddFederationToClientCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
 
-	client, sr, pk := signDuration(ca, "127.0.0.1", 0)
-	tr, err := getTLSOptionsTransport(sr, pk)
+	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,21 +379,24 @@ func TestAddFederationToClientCAs(t *testing.T) {
 	pool.AddCert(crt1)
 	pool.AddCert(crt2)
 
+	type args struct {
+		client *Client
+		config *tls.Config
+	}
 	tests := []struct {
 		name    string
-		tr      http.RoundTripper
+		args    args
 		want    *tls.Config
 		wantErr bool
 	}{
-		{"ok", tr, &tls.Config{ClientCAs: pool}, false},
-		{"fail", http.DefaultTransport, &tls.Config{}, true},
+		{"ok", args{client, &tls.Config{}}, &tls.Config{ClientCAs: pool}, false},
+		{"fail", args{clientFail, &tls.Config{}}, &tls.Config{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client:    client,
-				Config:    &tls.Config{},
-				Transport: tt.tr,
+				Client: tt.args.client,
+				Config: tt.args.config,
 			}
 			if err := AddFederationToClientCAs()(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("AddFederationToClientCAs() error = %v, wantErr %v", err, tt.wantErr)
@@ -392,8 +416,12 @@ func TestAddRootsToCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
 
-	client, sr, pk := signDuration(ca, "127.0.0.1", 0)
-	tr, err := getTLSOptionsTransport(sr, pk)
+	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,21 +435,24 @@ func TestAddRootsToCAs(t *testing.T) {
 	pool := x509.NewCertPool()
 	pool.AddCert(cert)
 
+	type args struct {
+		client *Client
+		config *tls.Config
+	}
 	tests := []struct {
 		name    string
-		tr      http.RoundTripper
+		args    args
 		want    *tls.Config
 		wantErr bool
 	}{
-		{"ok", tr, &tls.Config{ClientCAs: pool, RootCAs: pool}, false},
-		{"fail", http.DefaultTransport, &tls.Config{}, true},
+		{"ok", args{client, &tls.Config{}}, &tls.Config{ClientCAs: pool, RootCAs: pool}, false},
+		{"fail", args{clientFail, &tls.Config{}}, &tls.Config{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client:    client,
-				Config:    &tls.Config{},
-				Transport: tt.tr,
+				Client: tt.args.client,
+				Config: tt.args.config,
 			}
 			if err := AddRootsToCAs()(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("AddRootsToCAs() error = %v, wantErr %v", err, tt.wantErr)
@@ -438,8 +469,12 @@ func TestAddFederationToCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
 
-	client, sr, pk := signDuration(ca, "127.0.0.1", 0)
-	tr, err := getTLSOptionsTransport(sr, pk)
+	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -460,21 +495,24 @@ func TestAddFederationToCAs(t *testing.T) {
 	pool.AddCert(crt1)
 	pool.AddCert(crt2)
 
+	type args struct {
+		client *Client
+		config *tls.Config
+	}
 	tests := []struct {
 		name    string
-		tr      http.RoundTripper
+		args    args
 		want    *tls.Config
 		wantErr bool
 	}{
-		{"ok", tr, &tls.Config{ClientCAs: pool, RootCAs: pool}, false},
-		{"fail", http.DefaultTransport, &tls.Config{}, true},
+		{"ok", args{client, &tls.Config{}}, &tls.Config{ClientCAs: pool, RootCAs: pool}, false},
+		{"fail", args{clientFail, &tls.Config{}}, &tls.Config{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client:    client,
-				Config:    &tls.Config{},
-				Transport: tt.tr,
+				Client: tt.args.client,
+				Config: tt.args.config,
 			}
 			if err := AddFederationToCAs()(ctx); (err != nil) != tt.wantErr {
 				t.Errorf("AddFederationToCAs() error = %v, wantErr %v", err, tt.wantErr)

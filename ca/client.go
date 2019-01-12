@@ -416,10 +416,9 @@ func (c *Client) ProvisionerKey(kid string) (*api.ProvisionerKeyResponse, error)
 
 // Roots performs the get roots request to the CA and returns the
 // api.RootsResponse struct.
-func (c *Client) Roots(tr http.RoundTripper) (*api.RootsResponse, error) {
+func (c *Client) Roots() (*api.RootsResponse, error) {
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/roots"})
-	client := &http.Client{Transport: tr}
-	resp, err := client.Get(u.String())
+	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
 	}
@@ -435,10 +434,9 @@ func (c *Client) Roots(tr http.RoundTripper) (*api.RootsResponse, error) {
 
 // Federation performs the get federation request to the CA and returns the
 // api.FederationResponse struct.
-func (c *Client) Federation(tr http.RoundTripper) (*api.FederationResponse, error) {
+func (c *Client) Federation() (*api.FederationResponse, error) {
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/federation"})
-	client := &http.Client{Transport: tr}
-	resp, err := client.Get(u.String())
+	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
 	}

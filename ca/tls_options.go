@@ -1,12 +1,8 @@
 package ca
 
 import (
-	"crypto"
 	"crypto/tls"
 	"crypto/x509"
-	"net/http"
-
-	"github.com/smallstep/certificates/api"
 )
 
 // TLSOption defines the type of a function that modifies a tls.Config.
@@ -15,22 +11,16 @@ type TLSOption func(ctx *TLSOptionCtx) error
 // TLSOptionCtx is the context modified on TLSOption methods.
 type TLSOptionCtx struct {
 	Client      *Client
-	Transport   http.RoundTripper
 	Config      *tls.Config
 	OnRenewFunc []TLSOption
 }
 
 // newTLSOptionCtx creates the TLSOption context.
-func newTLSOptionCtx(c *Client, sign *api.SignResponse, pk crypto.PrivateKey, config *tls.Config) (*TLSOptionCtx, error) {
-	tr, err := getTLSOptionsTransport(sign, pk)
-	if err != nil {
-		return nil, err
-	}
+func newTLSOptionCtx(c *Client, config *tls.Config) *TLSOptionCtx {
 	return &TLSOptionCtx{
-		Client:    c,
-		Transport: tr,
-		Config:    config,
-	}, nil
+		Client: c,
+		Config: config,
+	}
 }
 
 func (ctx *TLSOptionCtx) apply(options []TLSOption) error {
@@ -42,34 +32,13 @@ func (ctx *TLSOptionCtx) apply(options []TLSOption) error {
 	return nil
 }
 
-func (ctx *TLSOptionCtx) applyRenew(tr http.RoundTripper) error {
-	ctx.Transport = tr
+func (ctx *TLSOptionCtx) applyRenew() error {
 	for _, fn := range ctx.OnRenewFunc {
 		if err := fn(ctx); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-// getTLSOptionsTransport is the transport used by TLSOptions. It is used to get
-// root certificates using a mTLS connection with the CA.
-func getTLSOptionsTransport(sign *api.SignResponse, pk crypto.PrivateKey) (http.RoundTripper, error) {
-	cert, err := TLSCertificate(sign, pk)
-	if err != nil {
-		return nil, err
-	}
-
-	// Build default transport with fixed certificate
-	tlsConfig := getDefaultTLSConfig(sign)
-	tlsConfig.Certificates = []tls.Certificate{*cert}
-	tlsConfig.PreferServerCipherSuites = true
-	// Build RootCAs with given root certificate
-	if pool := getCertPool(sign); pool != nil {
-		tlsConfig.RootCAs = pool
-	}
-
-	return getDefaultTransport(tlsConfig)
 }
 
 // RequireAndVerifyClientCert is a tls.Config option used on servers to enforce
@@ -123,7 +92,7 @@ func AddClientCA(cert *x509.Certificate) TLSOption {
 // BootstrapServer and BootstrapClient methods include this option by default.
 func AddRootsToRootCAs() TLSOption {
 	fn := func(ctx *TLSOptionCtx) error {
-		certs, err := ctx.Client.Roots(ctx.Transport)
+		certs, err := ctx.Client.Roots()
 		if err != nil {
 			return err
 		}
@@ -149,7 +118,7 @@ func AddRootsToRootCAs() TLSOption {
 // BootstrapServer method includes this option by default.
 func AddRootsToClientCAs() TLSOption {
 	fn := func(ctx *TLSOptionCtx) error {
-		certs, err := ctx.Client.Roots(ctx.Transport)
+		certs, err := ctx.Client.Roots()
 		if err != nil {
 			return err
 		}
@@ -172,7 +141,7 @@ func AddRootsToClientCAs() TLSOption {
 // certificate authorities that clients use when verifying server certificates.
 func AddFederationToRootCAs() TLSOption {
 	fn := func(ctx *TLSOptionCtx) error {
-		certs, err := ctx.Client.Federation(ctx.Transport)
+		certs, err := ctx.Client.Federation()
 		if err != nil {
 			return err
 		}
@@ -196,7 +165,7 @@ func AddFederationToRootCAs() TLSOption {
 // certificate by the policy in ClientAuth.
 func AddFederationToClientCAs() TLSOption {
 	fn := func(ctx *TLSOptionCtx) error {
-		certs, err := ctx.Client.Federation(ctx.Transport)
+		certs, err := ctx.Client.Federation()
 		if err != nil {
 			return err
 		}
@@ -219,7 +188,7 @@ func AddFederationToClientCAs() TLSOption {
 // AddRootsToRootCAs and AddRootsToClientCAs.
 func AddRootsToCAs() TLSOption {
 	fn := func(ctx *TLSOptionCtx) error {
-		certs, err := ctx.Client.Roots(ctx.Transport)
+		certs, err := ctx.Client.Roots()
 		if err != nil {
 			return err
 		}
@@ -246,7 +215,7 @@ func AddRootsToCAs() TLSOption {
 // AddFederationToRootCAs and AddFederationToClientCAs.
 func AddFederationToCAs() TLSOption {
 	fn := func(ctx *TLSOptionCtx) error {
-		certs, err := ctx.Client.Federation(ctx.Transport)
+		certs, err := ctx.Client.Federation()
 		if err != nil {
 			return err
 		}

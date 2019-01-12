@@ -34,21 +34,12 @@ func (a *Authority) GetRootCertificates() []*x509.Certificate {
 }
 
 // GetRoots returns all the root certificates for this CA.
-func (a *Authority) GetRoots(peer *x509.Certificate) ([]*x509.Certificate, error) {
-	// Check step provisioner extensions
-	if err := a.authorizeRenewal(peer); err != nil {
-		return nil, err
-	}
+func (a *Authority) GetRoots() ([]*x509.Certificate, error) {
 	return a.rootX509Certs, nil
 }
 
 // GetFederation returns all the root certificates in the federation.
-func (a *Authority) GetFederation(peer *x509.Certificate) (federation []*x509.Certificate, err error) {
-	// Check step provisioner extensions
-	if err := a.authorizeRenewal(peer); err != nil {
-		return nil, err
-	}
-
+func (a *Authority) GetFederation() (federation []*x509.Certificate, err error) {
 	a.certificates.Range(func(k, v interface{}) bool {
 		crt, ok := v.(*x509.Certificate)
 		if !ok {

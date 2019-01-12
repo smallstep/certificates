@@ -549,7 +549,7 @@ func TestClient_Roots(t *testing.T) {
 				api.JSON(w, tt.response)
 			})
 
-			got, err := c.Roots(nil)
+			got, err := c.Roots()
 			if (err != nil) != tt.wantErr {
 				fmt.Printf("%+v", err)
 				t.Errorf("Client.Roots() error = %v, wantErr %v", err, tt.wantErr)
@@ -610,7 +610,7 @@ func TestClient_Federation(t *testing.T) {
 				api.JSON(w, tt.response)
 			})
 
-			got, err := c.Federation(nil)
+			got, err := c.Federation()
 			if (err != nil) != tt.wantErr {
 				fmt.Printf("%+v", err)
 				t.Errorf("Client.Federation() error = %v, wantErr %v", err, tt.wantErr)

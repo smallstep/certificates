@@ -8,9 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/x509util"
 )
 
 func TestRoot(t *testing.T) {
@@ -99,42 +97,17 @@ func TestAuthority_GetRoots(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a := testAuthority(t)
-	pub, _, err := keys.GenerateDefaultKeyPair()
-	assert.FatalError(t, err)
-	leaf, err := x509util.NewLeafProfile("test", a.intermediateIdentity.Crt, a.intermediateIdentity.Key,
-		withDefaultASN1DN(a.config.AuthorityConfig.Template), x509util.WithPublicKey(pub), x509util.WithHosts("test"))
-	assert.FatalError(t, err)
-	crtBytes, err := leaf.CreateCertificate()
-	assert.FatalError(t, err)
-	crt, err := x509.ParseCertificate(crtBytes)
-	assert.FatalError(t, err)
-
-	leafFail, err := x509util.NewLeafProfile("test", a.intermediateIdentity.Crt, a.intermediateIdentity.Key,
-		withDefaultASN1DN(a.config.AuthorityConfig.Template), x509util.WithPublicKey(pub), x509util.WithHosts("test"),
-		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].Key.KeyID),
-	)
-	assert.FatalError(t, err)
-	crtFailBytes, err := leafFail.CreateCertificate()
-	assert.FatalError(t, err)
-	crtFail, err := x509.ParseCertificate(crtFailBytes)
-	assert.FatalError(t, err)
-
-	type args struct {
-		peer *x509.Certificate
-	}
 	tests := []struct {
 		name    string
-		args    args
 		want    []*x509.Certificate
 		wantErr bool
 	}{
-		{"ok", args{crt}, []*x509.Certificate{cert}, false},
-		{"fail", args{crtFail}, nil, true},
+		{"ok", []*x509.Certificate{cert}, false},
 	}
 	for _, tt := range tests {
+		a := testAuthority(t)
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := a.GetRoots(tt.args.peer)
+			got, err := a.GetRoots()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.GetRoots() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -152,49 +125,24 @@ func TestAuthority_GetFederation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	a := testAuthority(t)
-	pub, _, err := keys.GenerateDefaultKeyPair()
-	assert.FatalError(t, err)
-	leaf, err := x509util.NewLeafProfile("test", a.intermediateIdentity.Crt, a.intermediateIdentity.Key,
-		withDefaultASN1DN(a.config.AuthorityConfig.Template), x509util.WithPublicKey(pub), x509util.WithHosts("test"))
-	assert.FatalError(t, err)
-	crtBytes, err := leaf.CreateCertificate()
-	assert.FatalError(t, err)
-	crt, err := x509.ParseCertificate(crtBytes)
-	assert.FatalError(t, err)
-
-	leafFail, err := x509util.NewLeafProfile("test", a.intermediateIdentity.Crt, a.intermediateIdentity.Key,
-		withDefaultASN1DN(a.config.AuthorityConfig.Template), x509util.WithPublicKey(pub), x509util.WithHosts("test"),
-		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].Key.KeyID),
-	)
-	assert.FatalError(t, err)
-	crtFailBytes, err := leafFail.CreateCertificate()
-	assert.FatalError(t, err)
-	crtFail, err := x509.ParseCertificate(crtFailBytes)
-	assert.FatalError(t, err)
-
-	type args struct {
-		peer *x509.Certificate
-	}
 	tests := []struct {
 		name           string
-		args           args
 		wantFederation []*x509.Certificate
 		wantErr        bool
-		fn             func()
+		fn             func(a *Authority)
 	}{
-		{"ok", args{crt}, []*x509.Certificate{cert}, false, nil},
-		{"fail", args{crtFail}, nil, true, nil},
-		{"fail not a certificate", args{crt}, nil, true, func() {
+		{"ok", []*x509.Certificate{cert}, false, nil},
+		{"fail", nil, true, func(a *Authority) {
 			a.certificates.Store("foo", "bar")
 		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			a := testAuthority(t)
 			if tt.fn != nil {
-				tt.fn()
+				tt.fn(a)
 			}
-			gotFederation, err := a.GetFederation(tt.args.peer)
+			gotFederation, err := a.GetFederation()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.GetFederation() error = %v, wantErr %v", err, tt.wantErr)
 				return

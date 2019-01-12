@@ -25,8 +25,8 @@ type Authority interface {
 	Renew(peer *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
 	GetProvisioners(cursor string, limit int) ([]*authority.Provisioner, string, error)
 	GetEncryptedKey(kid string) (string, error)
-	GetRoots(peer *x509.Certificate) (federation []*x509.Certificate, err error)
-	GetFederation(peer *x509.Certificate) ([]*x509.Certificate, error)
+	GetRoots() (federation []*x509.Certificate, err error)
+	GetFederation() ([]*x509.Certificate, error)
 }
 
 // Certificate wraps a *x509.Certificate and adds the json.Marshaler interface.
@@ -334,15 +334,9 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 	JSON(w, &ProvisionerKeyResponse{key})
 }
 
-// Roots returns all the root certificates for the CA. It requires a valid TLS
-// client.
+// Roots returns all the root certificates for the CA.
 func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
-	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-		WriteError(w, BadRequest(errors.New("missing peer certificate")))
-		return
-	}
-
-	roots, err := h.Authority.GetRoots(r.TLS.PeerCertificates[0])
+	roots, err := h.Authority.GetRoots()
 	if err != nil {
 		WriteError(w, Forbidden(err))
 		return
@@ -359,15 +353,9 @@ func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Federation returns all the public certificates in the federation. It requires
-// a valid TLS client.
+// Federation returns all the public certificates in the federation.
 func (h *caHandler) Federation(w http.ResponseWriter, r *http.Request) {
-	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-		WriteError(w, BadRequest(errors.New("missing peer certificate")))
-		return
-	}
-
-	federated, err := h.Authority.GetFederation(r.TLS.PeerCertificates[0])
+	federated, err := h.Authority.GetFederation()
 	if err != nil {
 		WriteError(w, Forbidden(err))
 		return

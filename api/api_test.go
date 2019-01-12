@@ -392,8 +392,8 @@ type mockAuthority struct {
 	renew           func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
 	getProvisioners func(nextCursor string, limit int) ([]*authority.Provisioner, string, error)
 	getEncryptedKey func(kid string) (string, error)
-	getRoots        func(cert *x509.Certificate) ([]*x509.Certificate, error)
-	getFederation   func(cert *x509.Certificate) ([]*x509.Certificate, error)
+	getRoots        func() ([]*x509.Certificate, error)
+	getFederation   func() ([]*x509.Certificate, error)
 }
 
 func (m *mockAuthority) Authorize(ott string) ([]interface{}, error) {
@@ -445,16 +445,16 @@ func (m *mockAuthority) GetEncryptedKey(kid string) (string, error) {
 	return m.ret1.(string), m.err
 }
 
-func (m *mockAuthority) GetRoots(cert *x509.Certificate) ([]*x509.Certificate, error) {
+func (m *mockAuthority) GetRoots() ([]*x509.Certificate, error) {
 	if m.getFederation != nil {
-		return m.getRoots(cert)
+		return m.getRoots()
 	}
 	return m.ret1.([]*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) GetFederation(cert *x509.Certificate) ([]*x509.Certificate, error) {
+func (m *mockAuthority) GetFederation() ([]*x509.Certificate, error) {
 	if m.getFederation != nil {
-		return m.getFederation(cert)
+		return m.getFederation()
 	}
 	return m.ret1.([]*x509.Certificate), m.err
 }
@@ -842,9 +842,8 @@ func Test_caHandler_Roots(t *testing.T) {
 		statusCode int
 	}{
 		{"ok", cs, parseCertificate(certPEM), parseCertificate(rootPEM), nil, http.StatusCreated},
-		{"no tls", nil, nil, nil, nil, http.StatusBadRequest},
-		{"no peer certificates", &tls.ConnectionState{}, nil, nil, nil, http.StatusBadRequest},
-		{"renew error", cs, nil, nil, fmt.Errorf("an error"), http.StatusForbidden},
+		{"no peer certificates", &tls.ConnectionState{}, parseCertificate(certPEM), parseCertificate(rootPEM), nil, http.StatusCreated},
+		{"fail", cs, nil, nil, fmt.Errorf("an error"), http.StatusForbidden},
 	}
 
 	expected := []byte(`{"crts":["` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"]}`)
@@ -889,9 +888,8 @@ func Test_caHandler_Federation(t *testing.T) {
 		statusCode int
 	}{
 		{"ok", cs, parseCertificate(certPEM), parseCertificate(rootPEM), nil, http.StatusCreated},
-		{"no tls", nil, nil, nil, nil, http.StatusBadRequest},
-		{"no peer certificates", &tls.ConnectionState{}, nil, nil, nil, http.StatusBadRequest},
-		{"renew error", cs, nil, nil, fmt.Errorf("an error"), http.StatusForbidden},
+		{"no peer certificates", &tls.ConnectionState{}, parseCertificate(certPEM), parseCertificate(rootPEM), nil, http.StatusCreated},
+		{"fail", cs, nil, nil, fmt.Errorf("an error"), http.StatusForbidden},
 	}
 
 	expected := []byte(`{"crts":["` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"]}`)

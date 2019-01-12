@@ -3,7 +3,6 @@ package ca
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -26,7 +25,7 @@ func newLocalListener() net.Listener {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
-			panic(fmt.Sprintf("failed to listen on a port: %v", err))
+			panic(errors.Wrap(err, "failed to listen on a port"))
 		}
 	}
 	return l
@@ -345,16 +344,16 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 	// doTest does a request that requires mTLS
 	doTest := func(client *http.Client) error {
 		// test with ca
-		resp, err := client.Get(caURL + "/roots")
+		resp, err := client.Post(caURL+"/renew", "application/json", http.NoBody)
 		if err != nil {
-			return errors.Wrapf(err, "client.Get(%s) failed", caURL+"/roots")
+			return errors.Wrap(err, "client.Post() failed")
 		}
-		var roots api.RootsResponse
-		if err := readJSON(resp.Body, &roots); err != nil {
-			return errors.Wrap(err, "client.Get() error reading response")
+		var renew api.SignResponse
+		if err := readJSON(resp.Body, &renew); err != nil {
+			return errors.Wrap(err, "client.Post() error reading response")
 		}
-		if len(roots.Certificates) == 0 {
-			return errors.New("client.Get() error not certificates found")
+		if renew.ServerPEM.Certificate == nil || renew.CaPEM.Certificate == nil {
+			return errors.New("client.Post() unexpected response found")
 		}
 		// test with bootstrap server
 		resp, err = client.Get(srvURL)
