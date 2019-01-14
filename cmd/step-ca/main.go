@@ -109,7 +109,7 @@ $ step-ca $STEPPATH/config/ca.json --password-file ./password.txt
 intermediate private key.`,
 		},
 	}...)
-	app.Copyright = "(c) 2018 Smallstep Labs, Inc."
+	app.Copyright = "(c) 2019 Smallstep Labs, Inc."
 
 	// All non-successful output should be written to stderr
 	app.Writer = os.Stdout
