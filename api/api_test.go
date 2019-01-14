@@ -446,7 +446,7 @@ func (m *mockAuthority) GetEncryptedKey(kid string) (string, error) {
 }
 
 func (m *mockAuthority) GetRoots() ([]*x509.Certificate, error) {
-	if m.getFederation != nil {
+	if m.getRoots != nil {
 		return m.getRoots()
 	}
 	return m.ret1.([]*x509.Certificate), m.err
