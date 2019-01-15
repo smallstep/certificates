@@ -49,8 +49,8 @@ func (s multiString) First() string {
 	return ""
 }
 
-// Empties returns `true` if any string in the array is empty.
-func (s multiString) Empties() bool {
+// HasEmpties returns `true` if any string in the array is empty.
+func (s multiString) HasEmpties() bool {
 	if len(s) == 0 {
 		return true
 	}

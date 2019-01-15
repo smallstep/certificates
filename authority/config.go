@@ -117,7 +117,7 @@ func (c *Config) Validate() error {
 	case c.Address == "":
 		return errors.New("address cannot be empty")
 
-	case c.Root.Empties():
+	case c.Root.HasEmpties():
 		return errors.New("root cannot be empty")
 
 	case c.IntermediateCert == "":
