@@ -49,7 +49,7 @@ func (s multiString) First() string {
 	return ""
 }
 
-// Empties checks that none of the string is empty.
+// Empties returns `true` if any string in the array is empty.
 func (s multiString) Empties() bool {
 	if len(s) == 0 {
 		return true
