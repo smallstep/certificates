@@ -1,5 +1,6 @@
 {
     "root": "../ca/testdata/secrets/root_ca.crt",
+    "federatedRoots": ["../ca/testdata/secrets/federated_ca.crt"],
     "crt": "../ca/testdata/secrets/intermediate_ca.crt",
     "key": "../ca/testdata/secrets/intermediate_ca_key",
     "password": "password",
@@ -17,7 +18,6 @@
         ]
     },
     "authority": {
-        "minCertDuration": "1m",
         "provisioners": [
             {
                 "name": "max",
@@ -72,7 +72,7 @@
                     "y": "e3wycXwVB366F0wLE5J9gIpq8EIQ4900nHBNpIGebEA"
                 },
                 "claims": {
-                    "minTLSCertDuration": "30s"
+                    "minTLSCertDuration": "1s"
                 }
             }, {
                 "name": "mariano",

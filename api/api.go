@@ -22,9 +22,11 @@ type Authority interface {
 	GetTLSOptions() *tlsutil.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)
 	Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error)
-	Renew(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
+	Renew(peer *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
 	GetProvisioners(cursor string, limit int) ([]*authority.Provisioner, string, error)
 	GetEncryptedKey(kid string) (string, error)
+	GetRoots() (federation []*x509.Certificate, err error)
+	GetFederation() ([]*x509.Certificate, error)
 }
 
 // Certificate wraps a *x509.Certificate and adds the json.Marshaler interface.
@@ -186,6 +188,16 @@ type SignResponse struct {
 	TLS        *tls.ConnectionState `json:"-"`
 }
 
+// RootsResponse is the response object of the roots request.
+type RootsResponse struct {
+	Certificates []Certificate `json:"crts"`
+}
+
+// FederationResponse is the response object of the federation request.
+type FederationResponse struct {
+	Certificates []Certificate `json:"crts"`
+}
+
 // caHandler is the type used to implement the different CA HTTP endpoints.
 type caHandler struct {
 	Authority Authority
@@ -205,6 +217,8 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("POST", "/renew", h.Renew)
 	r.MethodFunc("GET", "/provisioners", h.Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
+	r.MethodFunc("GET", "/roots", h.Roots)
+	r.MethodFunc("GET", "/federation", h.Federation)
 	// For compatibility with old code:
 	r.MethodFunc("POST", "/re-sign", h.Renew)
 }
@@ -318,6 +332,44 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, &ProvisionerKeyResponse{key})
+}
+
+// Roots returns all the root certificates for the CA.
+func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
+	roots, err := h.Authority.GetRoots()
+	if err != nil {
+		WriteError(w, Forbidden(err))
+		return
+	}
+
+	certs := make([]Certificate, len(roots))
+	for i := range roots {
+		certs[i] = Certificate{roots[i]}
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	JSON(w, &RootsResponse{
+		Certificates: certs,
+	})
+}
+
+// Federation returns all the public certificates in the federation.
+func (h *caHandler) Federation(w http.ResponseWriter, r *http.Request) {
+	federated, err := h.Authority.GetFederation()
+	if err != nil {
+		WriteError(w, Forbidden(err))
+		return
+	}
+
+	certs := make([]Certificate, len(federated))
+	for i := range federated {
+		certs[i] = Certificate{federated[i]}
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	JSON(w, &FederationResponse{
+		Certificates: certs,
+	})
 }
 
 func parseCursor(r *http.Request) (cursor string, limit int, err error) {

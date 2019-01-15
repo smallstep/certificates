@@ -23,7 +23,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
-	"golang.org/x/net/http2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -239,7 +238,6 @@ func WithProvisionerLimit(limit int) ProvisionerOption {
 type Client struct {
 	client   *http.Client
 	endpoint *url.URL
-	certPool *x509.CertPool
 }
 
 // NewClient creates a new Client with the given endpoint and options.
@@ -258,23 +256,11 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 		return nil, err
 	}
 
-	var cp *x509.CertPool
-	switch tr := tr.(type) {
-	case *http.Transport:
-		if tr.TLSClientConfig != nil && tr.TLSClientConfig.RootCAs != nil {
-			cp = tr.TLSClientConfig.RootCAs
-		}
-	case *http2.Transport:
-		if tr.TLSClientConfig != nil && tr.TLSClientConfig.RootCAs != nil {
-			cp = tr.TLSClientConfig.RootCAs
-		}
-	}
 	return &Client{
 		client: &http.Client{
 			Transport: tr,
 		},
 		endpoint: u,
-		certPool: cp,
 	}, nil
 }
 
@@ -411,6 +397,42 @@ func (c *Client) ProvisionerKey(kid string) (*api.ProvisionerKeyResponse, error)
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
 	return &key, nil
+}
+
+// Roots performs the get roots request to the CA and returns the
+// api.RootsResponse struct.
+func (c *Client) Roots() (*api.RootsResponse, error) {
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/roots"})
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var roots api.RootsResponse
+	if err := readJSON(resp.Body, &roots); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &roots, nil
+}
+
+// Federation performs the get federation request to the CA and returns the
+// api.FederationResponse struct.
+func (c *Client) Federation() (*api.FederationResponse, error) {
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/federation"})
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var federation api.FederationResponse
+	if err := readJSON(resp.Body, &federation); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &federation, nil
 }
 
 // CreateSignRequest is a helper function that given an x509 OTT returns a
