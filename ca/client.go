@@ -410,11 +410,11 @@ func (c *Client) Roots() (*api.RootsResponse, error) {
 	if resp.StatusCode >= 400 {
 		return nil, readError(resp.Body)
 	}
-	var federation api.RootsResponse
-	if err := readJSON(resp.Body, &federation); err != nil {
+	var roots api.RootsResponse
+	if err := readJSON(resp.Body, &roots); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
-	return &federation, nil
+	return &roots, nil
 }
 
 // Federation performs the get federation request to the CA and returns the
