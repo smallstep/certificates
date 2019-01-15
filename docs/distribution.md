@@ -84,10 +84,4 @@ e.g. `v1.0.2`
     * **step-ca_1.0.3_linux_amd64.tar.gz**: tarball containing a statically compiled linux binary.
     * **step-ca_1.0.3_darwin_amd64.tar.gz**: tarball containing a statically compiled darwin binary.
 
-7. Update the Homebrew formula.
-
-    **NOTE**: this only needs to be done for standard releases.
-
-    Follow the steps [here](https://github.com/smallstep/homebrew-smallstep#how-to-update-the-formula).
-
 *All Done!*
