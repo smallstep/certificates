@@ -1,0 +1,47 @@
+{
+    "root": "testdata/rotated/root_ca.crt",
+    "federatedRoots": ["testdata/secrets/root_ca.crt"],
+    "crt": "testdata/rotated/intermediate_ca.crt",
+    "key": "testdata/rotated/intermediate_ca_key",
+    "password": "asdf",
+    "address": "127.0.0.1:0",
+    "dnsNames": ["127.0.0.1"],
+    "logger": {"format": "text"},
+    "tls": {
+        "minVersion": 1.2,
+        "maxVersion": 1.2,
+        "renegotiation": false,
+        "cipherSuites": [
+            "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+            "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+            "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+        ]
+    },
+    "authority": {
+        "provisioners": [
+            {
+                "name": "mariano",
+                "type": "jwk",
+                "encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlB1UnJVQ1RZZkR1T2F5MEh2cGl6bncifQ.7a-OP5xWGbFra8m2MN9YuLGt6v4y0wmB.u-54daK2y-0UO9na.3GQy6E52-fOSUu5NJ_sEbxj_T3CTyWb7wOPFv2oI2PBWXp5CLpiWJbCFpF4v2oD9fN5XbxMP14ootbrFjATnoMWfWgyLwG-KOj9BqMGNxhG2v37yC7Wrris6s30nrPa3uyNEYZ12AOQW1K04cU2X0u_qJM3vzMCle548ZFTWs6_d6L8lp3o0F9MEbCmJ4p6CLqQxjxYtn1aD79lM91NbIXpRP3iUFQRly-y_iC2mSkXCdd_cQ6-dqLUchXwWRyVO5nBHb4J87aZ91VApw7ldTLtwRZ2ZGJpqGQGgjTwi4sgjEcMuGg0_83XGk2ubdlKDpmGFedOHS5rYCbxotts.vSYfxsi2UU9LQeySDjAnnQ",
+                "key": {
+                    "use": "sig",
+                    "kty": "EC",
+                    "kid": "FLIV7q23CXHrg75J2OSbvzwKJJqoxCYixjmsJirneOg",
+                    "crv": "P-256",
+                    "alg": "ES256",
+                    "x": "tTKthEHN7RuybhkaC43J2oLfBG995FNSWbtahLAiK7Y",
+                    "y": "e3wycXwVB366F0wLE5J9gIpq8EIQ4900nHBNpIGebEA"
+                },
+                "claims": {
+                    "minTLSCertDuration": "1s",
+                    "defaultTLSCertDuration": "5s"
+                }
+            }
+        ],
+        "template": {
+            "country": "US",
+            "locality": "San Francisco",
+            "organization": "Smallstep"
+        }
+    }
+}
