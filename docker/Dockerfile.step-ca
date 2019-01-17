@@ -1,4 +1,4 @@
-FROM smallstep/step-cli:0.0.2-rc.17
+FROM smallstep/step-cli:0.8.3
 
 ARG BINPATH="bin/step-ca"
 
