@@ -58,6 +58,24 @@ func startCABootstrapServer() *httptest.Server {
 	return srv
 }
 
+func startCAServer(configFile string) (*CA, string, error) {
+	config, err := authority.LoadConfiguration(configFile)
+	if err != nil {
+		return nil, "", err
+	}
+	listener := newLocalListener()
+	config.Address = listener.Addr().String()
+	caURL := "https://" + listener.Addr().String()
+	ca, err := New(config)
+	if err != nil {
+		return nil, "", err
+	}
+	go func() {
+		ca.srv.Serve(listener)
+	}()
+	return ca, caURL, nil
+}
+
 func generateBootstrapToken(ca, subject, sha string) string {
 	now := time.Now()
 	jwk, err := stepJOSE.ParseKey("testdata/secrets/ott_mariano_priv.jwk", stepJOSE.WithPassword([]byte("password")))
@@ -415,6 +433,84 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 	}
 	if err := doTest(client); err != nil {
 		t.Errorf("Test with rotate-ca-3.json failed: %v", err)
+	}
+}
+
+func TestBootstrapClientServerFederation(t *testing.T) {
+	reset := setMinCertDuration(1 * time.Second)
+	defer reset()
+
+	ca1, caURL1, err := startCAServer("testdata/ca.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ca1.Stop()
+
+	ca2, caURL2, err := startCAServer("testdata/federated-ca.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ca2.Stop()
+
+	// Create bootstrap server
+	token := generateBootstrapToken(caURL1, "127.0.0.1", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
+	server, err := BootstrapServer(context.Background(), token, &http.Server{
+		Addr: ":0",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			w.Write([]byte("ok"))
+		}),
+	}, RequireAndVerifyClientCert(), AddFederationToClientCAs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener := newLocalListener()
+	srvURL := "https://" + listener.Addr().String()
+	go func() {
+		server.ServeTLS(listener, "", "")
+	}()
+	defer server.Close()
+
+	// Create bootstrap client
+	token = generateBootstrapToken(caURL2, "client", "c86f74bb7eb2eabef45c4f7fc6c146359ed3a5bbad416b31da5dce8093bcbffd")
+	client, err := BootstrapClient(context.Background(), token, AddFederationToRootCAs())
+	if err != nil {
+		t.Errorf("BootstrapClient() error = %v", err)
+		return
+	}
+
+	// doTest does a request that requires mTLS
+	doTest := func(client *http.Client) error {
+		// test with ca
+		resp, err := client.Post(caURL2+"/renew", "application/json", http.NoBody)
+		if err != nil {
+			return errors.Wrap(err, "client.Post() failed")
+		}
+		var renew api.SignResponse
+		if err := readJSON(resp.Body, &renew); err != nil {
+			return errors.Wrap(err, "client.Post() error reading response")
+		}
+		if renew.ServerPEM.Certificate == nil || renew.CaPEM.Certificate == nil {
+			return errors.New("client.Post() unexpected response found")
+		}
+		// test with bootstrap server
+		resp, err = client.Get(srvURL)
+		if err != nil {
+			return errors.Wrapf(err, "client.Get(%s) failed", srvURL)
+		}
+		defer resp.Body.Close()
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return errors.Wrap(err, "client.Get() error reading response")
+		}
+		if string(b) != "ok" {
+			return errors.New("client.Get() unexpected response found")
+		}
+		return nil
+	}
+
+	// Test with default root
+	if err := doTest(client); err != nil {
+		t.Errorf("Test with rotate-ca-0.json failed: %v", err)
 	}
 }
 
