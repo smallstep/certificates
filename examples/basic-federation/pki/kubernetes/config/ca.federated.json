@@ -1,0 +1,40 @@
+{
+   "root": "pki/kubernetes/certs/root_ca.crt",
+   "federatedRoots": ["pki/kubernetes/certs/cloud_root_ca.crt"],
+   "crt": "pki/kubernetes/certs/intermediate_ca.crt",
+   "key": "pki/kubernetes/secrets/intermediate_ca_key",
+   "address": ":2443",
+   "dnsNames": [
+      "localhost"
+   ],
+   "logger": {
+      "format": "text"
+   },
+   "authority": {
+      "provisioners": [
+         {
+            "name": "sebastian@smallstep.com",
+            "type": "jwk",
+            "key": {
+               "use": "sig",
+               "kty": "EC",
+               "kid": "S5gYgpeqcIAgc1Zr4myZXpgJ_Ao4ryS6F6wqg9o8RYo",
+               "crv": "P-256",
+               "alg": "ES256",
+               "x": "uYecJyfa3pKHrO36zVsPKCHAcCUoYKOic2M7_qv9Jes",
+               "y": "WXzgS-36_BcXSi-G86RcLmLaHJEjmcmkhzR9ajrhhGo"
+            },
+            "encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiRlBVMHBJclNYbUU5VzhFSzFaMlQ2USJ9.wTT9VpKIOKzoiaBJ2fIcOYwypkKTwuKauwkf4fcfmJ6_VVQ6TykIrA.y_YTjVhmpztcOqYq.9j_pppHHcJ3_VEbt-WfxSOks05QMXNI862uYWcFGc7EVCoD1qEiKIDKEuoUSTG-_WcgkaXrag9UUQPKfDpuYi6UJcyaLkehO2DBX26DJ1T-qEYlhPxPGpx8r7p84zcg_AftypD6PNheiCLe6HOQWWuPtuPrfyUpvyfMWkJC14NZjR4iJysKP5dndxFbSTI2XCw1X-zBDVD9xMnVPlRtezIIuDi2cLEYnNaIlr5NMNQBOrzQaSo1LQaOOoSa_OrZzTdjg7HaUU5DaAA6YEDQPfFxLIJdKshvj5sxDlH_LLY58mzsGECrUx396zjvN8FD-bFSrdbCNlJJ4xhtt34c.FhRAcFIg-5k2srdtdsq2VQ"
+         }
+      ]
+   },
+   "tls": {
+      "cipherSuites": [
+         "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+         "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+      ],
+      "minVersion": 1.2,
+      "maxVersion": 1.2,
+      "renegotiation": false
+   }
+}
