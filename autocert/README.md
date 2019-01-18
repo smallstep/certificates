@@ -14,7 +14,40 @@ Autocert is a kubernetes add-on that integrates with `step certificates` to auto
  * Ability to run subordinate to an existing public key infrastructure
  * Supports federatation with other roots
 
-## What are these certificates good for?
+## Example
+
+Autocert is incredibly easy to use. To trigger automatic certificate management you simply add an annotation to your pods specifying your service's DNS hostname. Autocert will do the rest: securely issuing a certificate, mounting it in containers, and handling renewals.
+
+```
+$ cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: sleep}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: sleep}}
+  template:
+    metadata:
+      annotations:
+        autocert.step.sm/name: sleep.default.svc.cluster.local
+      labels: {app: sleep}
+    spec:
+      containers:
+      - name: sleep
+        image: alpine
+        command: ["/bin/sleep", "86400"]
+        imagePullPolicy: IfNotPresent
+EOF
+$ kubectl exec -it sleep-f996bd578-nch7c -c sleep -- ls -lias /var/run/autocert.step.sm
+total 20
+1593393      4 drwxrwxrwx    2 root     root          4096 Jan 17 21:27 .
+1339651      4 drwxr-xr-x    1 root     root          4096 Jan 17 21:27 ..
+1593451      4 -rw-------    1 root     root           574 Jan 17 21:27 root.crt
+1593442      4 -rw-r--r--    1 root     root          1352 Jan 17 21:41 site.crt
+1593443      4 -rw-r--r--    1 root     root           227 Jan 17 21:27 site.key
+```
+
+## What are `autocert` certificates good for?
 
 Autocert certificates let you secure your data plane (service-to-service) communication using mutual TLS (mTLS). Services and proxies can limit access to clients that also have a certificate issued by your certificate authority (CA). Servers can identify which client is connecting improving visibility and enabling granular access control.
 
