@@ -153,65 +153,16 @@ spec:
 EOF
 ```
 
-If successful, `kubectl describe pod` will show a new annotation and indicate that a new mount has been created (for certificates). An init container and sidecar are also installed to handle certificate issuance and renewal, respectively.
+The `autocert` admission webhook should intercept this pod creation request and inject an init container and sidecar to manage certificate issuance and renewal, respectively.
 
 ```
-$ kubectl describe pod sleep
-Name:           sleep-f996bd578-nch7c
-Namespace:      default
-
-<... snip ...>
-
-Annotations:    autocert.step.sm/name: sleep.default.svc.cluster.local
-                autocert.step.sm/status: injected
-Status:         Running
-
-<... snip ...>
-
-Init Containers:
-  autocert-bootstrapper:
-    Image:          step-k8s/bootstrapper
-
-<... snip ...>
-
-Containers:
-  sleep:
-    Image:         alpine
-
-<... snip ...>
-
-    Mounts:
-      /var/run/autocert.step.sm from certs (ro)
-      /var/run/secrets/kubernetes.io/serviceaccount from default-token-jn988 (ro)
-  autocert-renewer:
-    Image:          step-k8s/renewer
-
-<... snip ...>
-
-Volumes:
-  certs:
-    Type:        EmptyDir (a temporary directory that shares a pod's lifetime)
-
-<... snip ...>
-
-Events:
-  Type    Reason                 Age    From                         Message
-  ----    ------                 ----   ----                         -------
-  Normal  Scheduled              4m2s   default-scheduler            Successfully assigned sleep-f996bd578-nch7c to docker-for-desktop
-  Normal  SuccessfulMountVolume  4m2s   kubelet, docker-for-desktop  MountVolume.SetUp succeeded for volume "certs"
-  Normal  SuccessfulMountVolume  4m2s   kubelet, docker-for-desktop  MountVolume.SetUp succeeded for volume "default-token-jn988"
-  Normal  Pulled                 4m1s   kubelet, docker-for-desktop  Container image "step-k8s/bootstrapper" already present on machine
-  Normal  Created                4m1s   kubelet, docker-for-desktop  Created container
-  Normal  Started                4m     kubelet, docker-for-desktop  Started container
-  Normal  Pulled                 4m     kubelet, docker-for-desktop  Container image "alpine" already present on machine
-  Normal  Created                4m     kubelet, docker-for-desktop  Created container
-  Normal  Started                3m59s  kubelet, docker-for-desktop  Started container
-  Normal  Pulled                 3m59s  kubelet, docker-for-desktop  Container image "step-k8s/renewer" already present on machine
-  Normal  Created                3m59s  kubelet, docker-for-desktop  Created container
-  Normal  Started                3m59s  kubelet, docker-for-desktop  Started container
+$ kubectl get pods -l app=sleep \
+    -o=custom-columns=NAME:.metadata.name,CONTAINERS:.spec.containers[*].name,INIT_CONTAINERS:.spec.initContainers[*].name
+NAME                    CONTAINERS               INIT_CONTAINERS
+sleep-f996bd578-tzwvm   sleep,autocert-renewer   autocert-bootstrapper
 ```
 
-Certificates are mounted to `/var/run/autocert.step.sm`. We can inspect this directory to make sure everything worked correctly:
+Certificates are mounted in containers at `/var/run/autocert.step.sm`. We can inspect this directory to make sure everything worked correctly:
 
 ```
 $ kubectl exec -it sleep-f996bd578-nch7c -c sleep -- ls -lias /var/run/autocert.step.sm
