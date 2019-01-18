@@ -25,10 +25,13 @@ var (
 		Renegotiation: false,
 	}
 	defaultDisableRenewal   = false
+	minTLSDur               = 5 * time.Minute
+	maxTLSDur               = 24 * time.Hour
+	defaultTLSDur           = 24 * time.Hour
 	globalProvisionerClaims = ProvisionerClaims{
-		MinTLSDur:      &Duration{5 * time.Minute},
-		MaxTLSDur:      &Duration{24 * time.Hour},
-		DefaultTLSDur:  &Duration{24 * time.Hour},
+		MinTLSDur:      (*duration)(&minTLSDur),
+		MaxTLSDur:      (*duration)(&maxTLSDur),
+		DefaultTLSDur:  (*duration)(&defaultTLSDur),
 		DisableRenewal: &defaultDisableRenewal,
 	}
 )
