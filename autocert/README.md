@@ -1,10 +1,20 @@
-AUTOCERT LOGO (see external-dns)
+# Autocert
 
 Autocert issues X.509 certificates from your own internal certificate authority and auto-mounts them in kubernetes containers so services can use TLS.
 
 Autocert is a kubernetes add-on that integrates with `step certificates` to automatically issue X.509 certificates and mount them in your containers. It also automatically renews certificates before they expire.
 
-Diagram / Video
+## Key Features
+
+ * A complete public key infrastructure that you control for your kubernetes clusters
+ * Certificate authority that's easy to initialize and install
+ * Automatic injection of certificates and keys in annotated containers
+ * Enable on a per-namespace basis
+ * Namespaced installation to restrict access to privileged CA and provisioner containers
+ * Ability to run subordinate to an existing public key infrastructure
+ * Supports federatation with other roots
+
+## What are these certificates good for?
 
 Autocert certificates let you secure your data plane (service-to-service) communication using mutual TLS (mTLS). Services and proxies can limit access to clients that also have a certificate issued by your certificate authority (CA). Servers can identify which client is connecting improving visibility and enabling granular access control.
 
