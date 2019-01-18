@@ -12,9 +12,9 @@ import (
 // ProvisionerClaims so that individual provisioners can override global claims.
 type ProvisionerClaims struct {
 	globalClaims   *ProvisionerClaims
-	MinTLSDur      *duration `json:"minTLSCertDuration,omitempty"`
-	MaxTLSDur      *duration `json:"maxTLSCertDuration,omitempty"`
-	DefaultTLSDur  *duration `json:"defaultTLSCertDuration,omitempty"`
+	MinTLSDur      *Duration `json:"minTLSCertDuration,omitempty"`
+	MaxTLSDur      *Duration `json:"maxTLSCertDuration,omitempty"`
+	DefaultTLSDur  *Duration `json:"defaultTLSCertDuration,omitempty"`
 	DisableRenewal *bool     `json:"disableRenewal,omitempty"`
 }
 

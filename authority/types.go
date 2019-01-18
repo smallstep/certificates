@@ -7,25 +7,26 @@ import (
 	"github.com/pkg/errors"
 )
 
-type duration struct {
+// Duration is a wrapper around Time.Duration to aid with marshal/unmarshal.
+type Duration struct {
 	time.Duration
 }
 
-// MarshalJSON parses a duration string and sets it to the duration.
+// MarshalJSON parses a Duration string and sets it to the duration.
 //
 // A duration string is a possibly signed sequence of decimal numbers, each with
 // optional fraction and a unit suffix, such as "300ms", "-1.5h" or "2h45m".
 // Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-func (d *duration) MarshalJSON() ([]byte, error) {
+func (d *Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.String())
 }
 
-// UnmarshalJSON parses a duration string and sets it to the duration.
+// UnmarshalJSON parses a Duration string and sets it to the duration.
 //
-// A duration string is a possibly signed sequence of decimal numbers, each with
+// A Duration string is a possibly signed sequence of decimal numbers, each with
 // optional fraction and a unit suffix, such as "300ms", "-1.5h" or "2h45m".
 // Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
-func (d *duration) UnmarshalJSON(data []byte) (err error) {
+func (d *Duration) UnmarshalJSON(data []byte) (err error) {
 	var s string
 	if err = json.Unmarshal(data, &s); err != nil {
 		return errors.Wrapf(err, "error unmarshalling %s", data)
