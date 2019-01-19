@@ -1,8 +1,12 @@
 # Autocert
 
-Autocert issues X.509 certificates from your own internal certificate authority and auto-mounts them in kubernetes containers so services can use TLS.
+**Autocert** is a kubernetes add-on that automatically injects TLS/HTTPS certificates into your containers.
 
-Autocert is a kubernetes add-on that integrates with `step certificates` to automatically issue X.509 certificates and mount them in your containers. It also automatically renews certificates before they expire.
+![Animated terminal showing autocert in practice](demo.gif)
+
+To request a certificate you simply annotate your pods with a name to include in the injected certificate. Certificates are issued by your own **internal certificate authority** and mounted at `/var/run/autocert.step.sm` along with the corresponding private key and root certificate.
+
+TLS (e.g., HTTPS) is the most widely deployed cryptographic protocol in the world. Mutual TLS (mTLS) provides end-to-end security for service-to-service communication and can **replace complex VPN** technologies to secure communication into, out of, and between kubernetes clusters. But **to use mTLS you need certificates issued by your own certificate authority (CA)**. Building and operating a CA, issuing certificates, and making sure they're renewed before they expire is tricky. Autocert does all of this for you.
 
 ## Key Features
 
@@ -13,39 +17,9 @@ Autocert is a kubernetes add-on that integrates with `step certificates` to auto
  * Namespaced installation to restrict access to privileged CA and provisioner containers
  * Ability to run subordinate to an existing public key infrastructure
  * Supports federatation with other roots
-
-## Example
-
-Autocert is incredibly easy to use. To trigger automatic certificate management you simply add an annotation to your pods specifying your service's DNS hostname. Autocert will do the rest: securely issuing a certificate, mounting it in containers, and handling renewals.
-
-```
-$ cat <<EOF | kubectl apply -f -
-apiVersion: apps/v1
-kind: Deployment
-metadata: {name: sleep}
-spec:
-  replicas: 1
-  selector: {matchLabels: {app: sleep}}
-  template:
-    metadata:
-      annotations:
-        autocert.step.sm/name: sleep.default.svc.cluster.local
-      labels: {app: sleep}
-    spec:
-      containers:
-      - name: sleep
-        image: alpine
-        command: ["/bin/sleep", "86400"]
-        imagePullPolicy: IfNotPresent
-EOF
-$ kubectl exec -it sleep-f996bd578-nch7c -c sleep -- ls -lias /var/run/autocert.step.sm
-total 20
-1593393      4 drwxrwxrwx    2 root     root          4096 Jan 17 21:27 .
-1339651      4 drwxr-xr-x    1 root     root          4096 Jan 17 21:27 ..
-1593451      4 -rw-------    1 root     root           574 Jan 17 21:27 root.crt
-1593442      4 -rw-r--r--    1 root     root          1352 Jan 17 21:41 site.crt
-1593443      4 -rw-r--r--    1 root     root           227 Jan 17 21:27 site.key
-```
+ * Short-lived certificates
+ * Automatic renewal
+ * Uses your own certificate authority -- you control who or what gets a certificate
 
 ## What are `autocert` certificates good for?
 
@@ -63,7 +37,7 @@ These instructions will get `autocert` installed quickly on an existing kubernet
 
 Make sure you've [`installed step`](https://github.com/smallstep/cli#installing) version `0.8.3` or later:
 
-```
+```bash
 $ step version
 Smallstep CLI/0.8.3 (darwin/amd64)
 Release Date: 2019-01-16 01:46 UTC
@@ -71,7 +45,7 @@ Release Date: 2019-01-16 01:46 UTC
 
 You'll also need `kubectl` and a kubernetes cluster running version `1.9` or later:
 
-```
+```bash
 $ kubectl version --short
 Client Version: v1.13.1
 Server Version: v1.10.11
@@ -79,20 +53,20 @@ Server Version: v1.10.11
 
 You'll also need [webhook admission controllers](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) enabled in your cluster:
 
-```
+```bash
 $ kubectl api-versions | grep "admissionregistration.k8s.io/v1beta1"
 admissionregistration.k8s.io/v1beta1
 ```
 
 We'll be creating a new kubernetes namespace and setting up some RBAC rules during installation. You'll need appropriate permissions in your cluster (e.g., you may need to be cluster-admin).
 
-```
+```bash
 TODO: Check whether you have cluster permissions..? GKE instructions here if you don't have them.
 ```
 
 In order to grant these permissions you may need to give yourself cluster-admin rights in your cluster. GKE, in particular, does not give the cluster owner these rights by default. You can give yourself cluster-admin rights by running:
 
-```
+```bash
 kubectl create clusterrolebinding cluster-admin-binding \
     --clusterrole cluster-admin \
     --user $(gcloud config get-value account)
@@ -100,25 +74,25 @@ kubectl create clusterrolebinding cluster-admin-binding \
 
 ### Install
 
-You can install `step certificates` and `autocert` in one step by running:
+To install `step certificates` and `autocert` in one step run:
 
-```
-curl https://github.com/smallstep/... | sh
+```bash
+$ kubectl run autocert-init -it --rm --image smallstep/autocert-init --restart Never --image-pull-policy Never
 ```
 
-If you don't like piping `curl` to `sh` (good for you) you can also [install manually](INSTALL.md) then return here to complete the quick start guide.
+You can also [install manually](INSTALL.md) then return here to complete the quick start guide.
 
 ### Enable autocert
 
 To enable `autocert` for a namespace the `autocert.step.sm=enabled` label (the `autocert` webhook will not affect namespaces for which it is not enabled). To enable `autocert` for the default namespace run:
 
-```
+```bash
 $ kubectl label namespace default autocert.step.sm=enabled
 ```
 
 To check your work you can check which namespaces have `autocert` enabled by running:
 
-```
+```bash
 $ kubectl get namespace -L autocert.step.sm
 NAME          STATUS   AGE   AUTOCERT.STEP.SM
 default       Active   59m   enabled
@@ -131,7 +105,7 @@ In addition to enabling `autocert` for a namespace, pods must be annotated with 
 
 To trigger certificate injection pods must be annotated at creation time. You can do this in your deployment YAMLs:
 
-```
+```bash
 $ cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: Deployment
@@ -155,7 +129,7 @@ EOF
 
 The `autocert` admission webhook should intercept this pod creation request and inject an init container and sidecar to manage certificate issuance and renewal, respectively.
 
-```
+```bash
 $ kubectl get pods -l app=sleep \
     -o=custom-columns=NAME:.metadata.name,CONTAINERS:.spec.containers[*].name,INIT_CONTAINERS:.spec.initContainers[*].name
 NAME                    CONTAINERS               INIT_CONTAINERS
@@ -164,7 +138,7 @@ sleep-f996bd578-tzwvm   sleep,autocert-renewer   autocert-bootstrapper
 
 Certificates are mounted in containers at `/var/run/autocert.step.sm`. We can inspect this directory to make sure everything worked correctly:
 
-```
+```bash
 $ kubectl exec -it sleep-f996bd578-nch7c -c sleep -- ls -lias /var/run/autocert.step.sm
 total 20
 1593393      4 drwxrwxrwx    2 root     root          4096 Jan 17 21:27 .
@@ -176,7 +150,7 @@ total 20
 
 The `autocert-renewer` sidecare installs the `step` CLI tool, which we can use to inspect the issued certificate:
 
-```
+```bash
 $ kubectl exec -it sleep-f996bd578-nch7c -c autocert-renewer -- step certificate inspect /var/run/autocert.step.sm/site.crt
 Certificate:
     Data:
@@ -239,3 +213,15 @@ To test your installation you can install the `hello-mtls` demo app.
 * Remove annotations (show how to find any annotated pods)
 * Remove secrets (show how to find labelled secrets)
 * Delete `step` namespace
+
+### Questions
+
+#### How is this different than [`cert-manager`](https://github.com/jetstack/cert-manager)
+
+#### Doesn't kubernetes already ship with a certificate authority?
+
+Yes, but it's designed for use by the kubernetes control plane rather than by your data plane services. You could use the kubernetes CA to issue certificates for data plane communication, but it's probably not a good idea.
+
+#### Why not use kubernetes CSR resources for this?
+
+It's harder and less secure.

@@ -96,7 +96,7 @@ apiVersion: admissionregistration.k8s.io/v1beta1
 kind: MutatingWebhookConfiguration
 metadata:
   name: autocert-webhook-config
-  labels: {app: controller}
+  labels: {app: autocert}
 webhooks:
   - name: autocert.step.sm
     clientConfig:
