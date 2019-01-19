@@ -2,11 +2,13 @@
 
 **Autocert** is a kubernetes add-on that automatically injects TLS/HTTPS certificates into your containers.
 
-![Animated terminal showing autocert in practice](demo.gif)
+<p align="center"><img src="demo.gif" style="max-width: 600px" alt="Animated terminal showing autocert in practice"></p>
 
-To request a certificate you simply annotate your pods with a name to include in the injected certificate. Certificates are issued by your own **internal certificate authority** and mounted at `/var/run/autocert.step.sm` along with the corresponding private key and root certificate.
+To request a certificate simply annotate your pods with a name. Certificates are issued by a private **internal certificate authority** that runs on your cluster and are mounted at `/var/run/autocert.step.sm` along with a corresponding private key and root certificate.
 
-TLS (e.g., HTTPS) is the most widely deployed cryptographic protocol in the world. Mutual TLS (mTLS) provides end-to-end security for service-to-service communication and can **replace complex VPN** technologies to secure communication into, out of, and between kubernetes clusters. But **to use mTLS you need certificates issued by your own certificate authority (CA)**. Building and operating a CA, issuing certificates, and making sure they're renewed before they expire is tricky. Autocert does all of this for you.
+TLS (e.g., HTTPS) is the most widely deployed cryptographic protocol in the world. Mutual TLS (mTLS) provides end-to-end security for service-to-service communication and can **replace complex VPNs** to secure communication into, out of, and between kubernetes clusters. But **to use mTLS you need certificates issued by your own certificate authority (CA)**.
+
+Building and operating a CA, issuing certificates, and making sure they're renewed before they expire is tricky. Autocert does all of this for you.
 
 ## Key Features
 
@@ -20,14 +22,6 @@ TLS (e.g., HTTPS) is the most widely deployed cryptographic protocol in the worl
  * Short-lived certificates
  * Automatic renewal
  * Uses your own certificate authority -- you control who or what gets a certificate
-
-## What are `autocert` certificates good for?
-
-Autocert certificates let you secure your data plane (service-to-service) communication using mutual TLS (mTLS). Services and proxies can limit access to clients that also have a certificate issued by your certificate authority (CA). Servers can identify which client is connecting improving visibility and enabling granular access control.
-
-Once certificates are issued you can use mTLS to secure communication in to, out of, and between kubernetes clusters. Services can use mTLS to only allow connections from clients that have their own certificate issued from your CA.
-
-It's like your own Let's Encrypt, but you control who gets a certificate.
 
 ## Getting Started
 
@@ -43,17 +37,12 @@ Smallstep CLI/0.8.3 (darwin/amd64)
 Release Date: 2019-01-16 01:46 UTC
 ```
 
-You'll also need `kubectl` and a kubernetes cluster running version `1.9` or later:
+You'll also need `kubectl` and a kubernetes cluster running version `1.9` or later with [webhook admission controllers](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) enabled:
 
 ```bash
 $ kubectl version --short
 Client Version: v1.13.1
 Server Version: v1.10.11
-```
-
-You'll also need [webhook admission controllers](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) enabled in your cluster:
-
-```bash
 $ kubectl api-versions | grep "admissionregistration.k8s.io/v1beta1"
 admissionregistration.k8s.io/v1beta1
 ```
@@ -80,7 +69,19 @@ To install `step certificates` and `autocert` in one step run:
 $ kubectl run autocert-init -it --rm --image smallstep/autocert-init --restart Never
 ```
 
-You can also [install manually](INSTALL.md) then return here to complete the quick start guide.
+You may need to adjust the RBAC policies to run `autocert-init`:
+
+```bash
+$ kubectl create clusterrolebinding autocert-init-binding --clusterrole cluster-admin --user "system:serviceaccount:default:default"
+```
+
+Once `autocert-init` is complete you can delete this binding:
+
+```bash
+$ kubectl delete clusterrolebinding autocert-init-binding
+```
+
+You can also [install manually](INSTALL.md).
 
 ### Enable autocert
 
@@ -90,7 +91,7 @@ To enable `autocert` for a namespace the `autocert.step.sm=enabled` label (the `
 $ kubectl label namespace default autocert.step.sm=enabled
 ```
 
-To check your work you can check which namespaces have `autocert` enabled by running:
+To check which namespaces have `autocert` enabled run:
 
 ```bash
 $ kubectl get namespace -L autocert.step.sm
@@ -127,7 +128,7 @@ spec:
 EOF
 ```
 
-The `autocert` admission webhook should intercept this pod creation request and inject an init container and sidecar to manage certificate issuance and renewal, respectively.
+The `autocert` admission webhook will intercept this pod creation request and inject an init container and sidecar to manage certificate issuance and renewal, respectively.
 
 ```bash
 $ kubectl get pods -l app=sleep \
@@ -148,7 +149,7 @@ total 20
 1593443      4 -rw-r--r--    1 root     root           227 Jan 17 21:27 site.key
 ```
 
-The `autocert-renewer` sidecare installs the `step` CLI tool, which we can use to inspect the issued certificate:
+The `autocert-renewer` sidecar also installs the `step` CLI tool, which we can use to inspect the issued certificate:
 
 ```bash
 $ kubectl exec -it sleep-f996bd578-nch7c -c autocert-renewer -- step certificate inspect /var/run/autocert.step.sm/site.crt
@@ -225,3 +226,11 @@ Yes, but it's designed for use by the kubernetes control plane rather than by yo
 #### Why not use kubernetes CSR resources for this?
 
 It's harder and less secure.
+
+#### What are `autocert` certificates good for?
+
+Autocert certificates let you secure your data plane (service-to-service) communication using mutual TLS (mTLS). Services and proxies can limit access to clients that also have a certificate issued by your certificate authority (CA). Servers can identify which client is connecting improving visibility and enabling granular access control.
+
+Once certificates are issued you can use mTLS to secure communication in to, out of, and between kubernetes clusters. Services can use mTLS to only allow connections from clients that have their own certificate issued from your CA.
+
+It's like your own Let's Encrypt, but you control who gets a certificate.
