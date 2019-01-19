@@ -77,7 +77,7 @@ kubectl create clusterrolebinding cluster-admin-binding \
 To install `step certificates` and `autocert` in one step run:
 
 ```bash
-$ kubectl run autocert-init -it --rm --image smallstep/autocert-init --restart Never --image-pull-policy Never
+$ kubectl run autocert-init -it --rm --image smallstep/autocert-init --restart Never
 ```
 
 You can also [install manually](INSTALL.md) then return here to complete the quick start guide.
