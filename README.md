@@ -4,7 +4,7 @@ An online certificate authority and related tools for secure automated
 certificate management, so you can use TLS everywhere.
 
 For more information and docs see [the Step website](https://smallstep.com/cli/)
-and the [blog post](https://smallstep.com/blog/zero-trust-swiss-army-knife.html)
+and the [blog post](https://smallstep.com/blog/step-certificates.html)
 announcing Step Certificate Authority.
 
 ## Why?
