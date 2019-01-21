@@ -29,9 +29,9 @@ var (
 	maxTLSDur               = 24 * time.Hour
 	defaultTLSDur           = 24 * time.Hour
 	globalProvisionerClaims = ProvisionerClaims{
-		MinTLSDur:      (*duration)(&minTLSDur),
-		MaxTLSDur:      (*duration)(&maxTLSDur),
-		DefaultTLSDur:  (*duration)(&defaultTLSDur),
+		MinTLSDur:      &Duration{5 * time.Minute},
+		MaxTLSDur:      &Duration{24 * time.Hour},
+		DefaultTLSDur:  &Duration{24 * time.Hour},
 		DisableRenewal: &defaultDisableRenewal,
 	}
 )

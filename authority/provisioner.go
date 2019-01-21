@@ -12,9 +12,9 @@ import (
 // ProvisionerClaims so that individual provisioners can override global claims.
 type ProvisionerClaims struct {
 	globalClaims   *ProvisionerClaims
-	MinTLSDur      *duration `json:"minTLSCertDuration,omitempty"`
-	MaxTLSDur      *duration `json:"maxTLSCertDuration,omitempty"`
-	DefaultTLSDur  *duration `json:"defaultTLSCertDuration,omitempty"`
+	MinTLSDur      *Duration `json:"minTLSCertDuration,omitempty"`
+	MaxTLSDur      *Duration `json:"maxTLSCertDuration,omitempty"`
+	DefaultTLSDur  *Duration `json:"defaultTLSCertDuration,omitempty"`
 	DisableRenewal *bool     `json:"disableRenewal,omitempty"`
 }
 
@@ -32,30 +32,30 @@ func (pc *ProvisionerClaims) Init(global *ProvisionerClaims) (*ProvisionerClaims
 // provisioner. If the default is not set within the provisioner, then the global
 // default from the authority configuration will be used.
 func (pc *ProvisionerClaims) DefaultTLSCertDuration() time.Duration {
-	if pc.DefaultTLSDur == nil || *pc.DefaultTLSDur == 0 {
+	if pc.DefaultTLSDur == nil || pc.DefaultTLSDur.Duration == 0 {
 		return pc.globalClaims.DefaultTLSCertDuration()
 	}
-	return time.Duration(*pc.DefaultTLSDur)
+	return pc.DefaultTLSDur.Duration
 }
 
 // MinTLSCertDuration returns the minimum TLS cert duration for the provisioner.
 // If the minimum is not set within the provisioner, then the global
 // minimum from the authority configuration will be used.
 func (pc *ProvisionerClaims) MinTLSCertDuration() time.Duration {
-	if pc.MinTLSDur == nil || *pc.MinTLSDur == 0 {
+	if pc.MinTLSDur == nil || pc.MinTLSDur.Duration == 0 {
 		return pc.globalClaims.MinTLSCertDuration()
 	}
-	return time.Duration(*pc.MinTLSDur)
+	return pc.MinTLSDur.Duration
 }
 
 // MaxTLSCertDuration returns the maximum TLS cert duration for the provisioner.
 // If the maximum is not set within the provisioner, then the global
 // maximum from the authority configuration will be used.
 func (pc *ProvisionerClaims) MaxTLSCertDuration() time.Duration {
-	if pc.MaxTLSDur == nil || *pc.MaxTLSDur == 0 {
+	if pc.MaxTLSDur == nil || pc.MaxTLSDur.Duration == 0 {
 		return pc.globalClaims.MaxTLSCertDuration()
 	}
-	return time.Duration(*pc.MaxTLSDur)
+	return pc.MaxTLSDur.Duration
 }
 
 // IsDisableRenewal returns if the renewal flow is disabled for the
