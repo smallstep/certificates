@@ -43,13 +43,9 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	// Without tlsConfig.Certificates there's not need to use tlsConfig.BuildNameToCertificate()
 	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
 	tlsConfig.PreferServerCipherSuites = true
-	// Build RootCAs with given root certificate
-	if pool := getCertPool(sign); pool != nil {
-		tlsConfig.RootCAs = pool
-	}
 
-	// Apply options if given
-	tlsCtx := newTLSOptionCtx(c, tlsConfig)
+	// Apply options and initialize mutable tls.Config
+	tlsCtx := newTLSOptionCtx(c, tlsConfig, sign)
 	if err := tlsCtx.apply(options); err != nil {
 		return nil, nil, err
 	}
@@ -92,16 +88,10 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	tlsConfig.GetCertificate = renewer.GetCertificate
 	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
 	tlsConfig.PreferServerCipherSuites = true
-	// Build RootCAs with given root certificate
-	if pool := getCertPool(sign); pool != nil {
-		tlsConfig.ClientCAs = pool
-		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		// Add RootCAs for refresh client
-		tlsConfig.RootCAs = pool
-	}
+	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 
-	// Apply options if given
-	tlsCtx := newTLSOptionCtx(c, tlsConfig)
+	// Apply options and initialize mutable tls.Config
+	tlsCtx := newTLSOptionCtx(c, tlsConfig, sign)
 	if err := tlsCtx.apply(options); err != nil {
 		return nil, err
 	}
@@ -179,7 +169,7 @@ func IntermediateCertificate(sign *api.SignResponse) (*x509.Certificate, error) 
 
 // RootCertificate returns the root certificate from the sign response.
 func RootCertificate(sign *api.SignResponse) (*x509.Certificate, error) {
-	if sign.TLS == nil || len(sign.TLS.VerifiedChains) == 0 {
+	if sign == nil || sign.TLS == nil || len(sign.TLS.VerifiedChains) == 0 {
 		return nil, errors.New("ca: certificate does not exists")
 	}
 	lastChain := sign.TLS.VerifiedChains[len(sign.TLS.VerifiedChains)-1]
@@ -216,17 +206,6 @@ func TLSCertificate(sign *api.SignResponse, pk crypto.PrivateKey) (*tls.Certific
 	}
 	cert.Leaf = leaf
 	return &cert, nil
-}
-
-// getCertPool returns the transport x509.CertPool or the one from the sign
-// request.
-func getCertPool(sign *api.SignResponse) *x509.CertPool {
-	if root, err := RootCertificate(sign); err == nil {
-		pool := x509.NewCertPool()
-		pool.AddCert(root)
-		return pool
-	}
-	return nil
 }
 
 func getDefaultTLSConfig(sign *api.SignResponse) *tls.Config {

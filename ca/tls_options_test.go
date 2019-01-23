@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/smallstep/certificates/api"
 )
 
 func Test_newTLSOptionCtx(t *testing.T) {
@@ -20,17 +22,18 @@ func Test_newTLSOptionCtx(t *testing.T) {
 	type args struct {
 		c      *Client
 		config *tls.Config
+		sign   *api.SignResponse
 	}
 	tests := []struct {
 		name string
 		args args
 		want *TLSOptionCtx
 	}{
-		{"ok", args{client, &tls.Config{}}, &TLSOptionCtx{Client: client, Config: &tls.Config{}, mutableConfig: newMutableTLSConfig()}},
+		{"ok", args{client, &tls.Config{}, &api.SignResponse{}}, &TLSOptionCtx{Client: client, Config: &tls.Config{}, Sign: &api.SignResponse{}, mutableConfig: newMutableTLSConfig()}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := newTLSOptionCtx(tt.args.c, tt.args.config); !reflect.DeepEqual(got, tt.want) {
+			if got := newTLSOptionCtx(tt.args.c, tt.args.config, tt.args.sign); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("newTLSOptionCtx() = %v, want %v", got, tt.want)
 			}
 		})
@@ -232,8 +235,7 @@ func TestAddRootsToRootCAs(t *testing.T) {
 				t.Errorf("AddRootsToRootCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-
-			if !reflect.DeepEqual(ctx.Config, tt.want) {
+			if !reflect.DeepEqual(ctx.Config.RootCAs, tt.want.RootCAs) {
 				t.Errorf("AddRootsToRootCAs() = %v, want %v", ctx.Config, tt.want)
 			}
 		})
@@ -287,7 +289,7 @@ func TestAddRootsToClientCAs(t *testing.T) {
 				t.Errorf("AddRootsToClientCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(ctx.Config, tt.want) {
+			if !reflect.DeepEqual(ctx.Config.ClientCAs, tt.want.ClientCAs) {
 				t.Errorf("AddRootsToClientCAs() = %v, want %v", ctx.Config, tt.want)
 			}
 		})
@@ -469,7 +471,7 @@ func TestAddRootsToCAs(t *testing.T) {
 				t.Errorf("AddRootsToCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(ctx.Config, tt.want) {
+			if !reflect.DeepEqual(ctx.Config.RootCAs, tt.want.RootCAs) || !reflect.DeepEqual(ctx.Config.ClientCAs, tt.want.ClientCAs) {
 				t.Errorf("AddRootsToCAs() = %v, want %v", ctx.Config, tt.want)
 			}
 		})
