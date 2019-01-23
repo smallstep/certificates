@@ -26,7 +26,7 @@ func Test_newTLSOptionCtx(t *testing.T) {
 		args args
 		want *TLSOptionCtx
 	}{
-		{"ok", args{client, &tls.Config{}}, &TLSOptionCtx{Client: client, Config: &tls.Config{}}},
+		{"ok", args{client, &tls.Config{}}, &TLSOptionCtx{Client: client, Config: &tls.Config{}, mutableConfig: newMutableTLSConfig()}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -63,7 +63,8 @@ func TestTLSOptionCtx_apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Config: tt.fields.Config,
+				Config:        tt.fields.Config,
+				mutableConfig: newMutableTLSConfig(),
 			}
 			if err := ctx.apply(tt.args.options); (err != nil) != tt.wantErr {
 				t.Errorf("TLSOptionCtx.apply() error = %v, wantErr %v", err, tt.wantErr)
@@ -82,7 +83,8 @@ func TestRequireAndVerifyClientCert(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Config: &tls.Config{},
+				Config:        &tls.Config{},
+				mutableConfig: newMutableTLSConfig(),
 			}
 			if err := RequireAndVerifyClientCert()(ctx); err != nil {
 				t.Errorf("RequireAndVerifyClientCert() error = %v", err)
@@ -105,7 +107,8 @@ func TestVerifyClientCertIfGiven(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Config: &tls.Config{},
+				Config:        &tls.Config{},
+				mutableConfig: newMutableTLSConfig(),
 			}
 			if err := VerifyClientCertIfGiven()(ctx); err != nil {
 				t.Errorf("VerifyClientCertIfGiven() error = %v", err)
@@ -136,7 +139,8 @@ func TestAddRootCA(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Config: &tls.Config{},
+				Config:        &tls.Config{},
+				mutableConfig: newMutableTLSConfig(),
 			}
 			if err := AddRootCA(tt.args.cert)(ctx); err != nil {
 				t.Errorf("AddRootCA() error = %v", err)
@@ -167,7 +171,8 @@ func TestAddClientCA(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Config: &tls.Config{},
+				Config:        &tls.Config{},
+				mutableConfig: newMutableTLSConfig(),
 			}
 			if err := AddClientCA(tt.args.cert)(ctx); err != nil {
 				t.Errorf("AddClientCA() error = %v", err)
@@ -219,13 +224,15 @@ func TestAddRootsToRootCAs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client: tt.args.client,
-				Config: tt.args.config,
+				Client:        tt.args.client,
+				Config:        tt.args.config,
+				mutableConfig: newMutableTLSConfig(),
 			}
-			if err := AddRootsToRootCAs()(ctx); (err != nil) != tt.wantErr {
+			if err := ctx.apply([]TLSOption{AddRootsToRootCAs()}); (err != nil) != tt.wantErr {
 				t.Errorf("AddRootsToRootCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
 			if !reflect.DeepEqual(ctx.Config, tt.want) {
 				t.Errorf("AddRootsToRootCAs() = %v, want %v", ctx.Config, tt.want)
 			}
@@ -272,10 +279,11 @@ func TestAddRootsToClientCAs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client: tt.args.client,
-				Config: tt.args.config,
+				Client:        tt.args.client,
+				Config:        tt.args.config,
+				mutableConfig: newMutableTLSConfig(),
 			}
-			if err := AddRootsToClientCAs()(ctx); (err != nil) != tt.wantErr {
+			if err := ctx.apply([]TLSOption{AddRootsToClientCAs()}); (err != nil) != tt.wantErr {
 				t.Errorf("AddRootsToClientCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -332,10 +340,11 @@ func TestAddFederationToRootCAs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client: tt.args.client,
-				Config: tt.args.config,
+				Client:        tt.args.client,
+				Config:        tt.args.config,
+				mutableConfig: newMutableTLSConfig(),
 			}
-			if err := AddFederationToRootCAs()(ctx); (err != nil) != tt.wantErr {
+			if err := ctx.apply([]TLSOption{AddFederationToRootCAs()}); (err != nil) != tt.wantErr {
 				t.Errorf("AddFederationToRootCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -395,10 +404,11 @@ func TestAddFederationToClientCAs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client: tt.args.client,
-				Config: tt.args.config,
+				Client:        tt.args.client,
+				Config:        tt.args.config,
+				mutableConfig: newMutableTLSConfig(),
 			}
-			if err := AddFederationToClientCAs()(ctx); (err != nil) != tt.wantErr {
+			if err := ctx.apply([]TLSOption{AddFederationToClientCAs()}); (err != nil) != tt.wantErr {
 				t.Errorf("AddFederationToClientCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -451,10 +461,11 @@ func TestAddRootsToCAs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client: tt.args.client,
-				Config: tt.args.config,
+				Client:        tt.args.client,
+				Config:        tt.args.config,
+				mutableConfig: newMutableTLSConfig(),
 			}
-			if err := AddRootsToCAs()(ctx); (err != nil) != tt.wantErr {
+			if err := ctx.apply([]TLSOption{AddRootsToCAs()}); (err != nil) != tt.wantErr {
 				t.Errorf("AddRootsToCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -511,10 +522,11 @@ func TestAddFederationToCAs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := &TLSOptionCtx{
-				Client: tt.args.client,
-				Config: tt.args.config,
+				Client:        tt.args.client,
+				Config:        tt.args.config,
+				mutableConfig: newMutableTLSConfig(),
 			}
-			if err := AddFederationToCAs()(ctx); (err != nil) != tt.wantErr {
+			if err := ctx.apply([]TLSOption{AddFederationToCAs()}); (err != nil) != tt.wantErr {
 				t.Errorf("AddFederationToCAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}

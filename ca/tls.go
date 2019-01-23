@@ -21,13 +21,21 @@ import (
 // sign certificate, and a new certificate pool with the sign root certificate.
 // The client certificate will automatically rotate before expiring.
 func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options ...TLSOption) (*tls.Config, error) {
-	cert, err := TLSCertificate(sign, pk)
+	tlsConfig, _, err := c.getClientTLSConfig(ctx, sign, pk, options)
 	if err != nil {
 		return nil, err
 	}
+	return tlsConfig, nil
+}
+
+func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options []TLSOption) (*tls.Config, *http.Transport, error) {
+	cert, err := TLSCertificate(sign, pk)
+	if err != nil {
+		return nil, nil, err
+	}
 	renewer, err := NewTLSRenewer(cert, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	tlsConfig := getDefaultTLSConfig(sign)
@@ -43,14 +51,16 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	// Apply options if given
 	tlsCtx := newTLSOptionCtx(c, tlsConfig)
 	if err := tlsCtx.apply(options); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Update renew function with transport
 	tr, err := getDefaultTransport(tlsConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	// Use mutable tls.Config on renew
+	tr.DialTLS = c.buildDialTLS(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Update client transport
@@ -58,7 +68,7 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 	// Start renewer
 	renewer.RunContext(ctx)
-	return tlsConfig, nil
+	return tlsConfig, tr, nil
 }
 
 // GetServerTLSConfig returns a tls.Config for server use configured with the
@@ -96,11 +106,18 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 		return nil, err
 	}
 
+	// GetConfigForClient allows seamless root and federated roots rotation.
+	// If the return of the callback is not-nil, it will use the returned
+	// tls.Config instead of the default one.
+	tlsConfig.GetConfigForClient = c.buildGetConfigForClient(tlsCtx)
+
 	// Update renew function with transport
 	tr, err := getDefaultTransport(tlsConfig)
 	if err != nil {
 		return nil, err
 	}
+	// Use mutable tls.Config on renew
+	tr.DialTLS = c.buildDialTLS(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Update client transport
@@ -113,11 +130,34 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 // Transport returns an http.Transport configured to use the client certificate from the sign response.
 func (c *Client) Transport(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options ...TLSOption) (*http.Transport, error) {
-	tlsConfig, err := c.GetClientTLSConfig(ctx, sign, pk, options...)
+	_, tr, err := c.getClientTLSConfig(ctx, sign, pk, options)
 	if err != nil {
 		return nil, err
 	}
-	return getDefaultTransport(tlsConfig)
+	return tr, nil
+}
+
+// buildGetConfigForClient returns an implementation of GetConfigForClient
+// callback in tls.Config.
+//
+// If the implementation returns a nil tls.Config, the original Config will be
+// used, but if it's non-nil, the returned Config will be used to handle this
+// connection.
+func (c *Client) buildGetConfigForClient(ctx *TLSOptionCtx) func(*tls.ClientHelloInfo) (*tls.Config, error) {
+	return func(*tls.ClientHelloInfo) (*tls.Config, error) {
+		return ctx.mutableConfig.TLSConfig(), nil
+	}
+}
+
+// buildDialTLS returns an implementation of DialTLS callback in http.Transport.
+func (c *Client) buildDialTLS(ctx *TLSOptionCtx) func(network, addr string) (net.Conn, error) {
+	return func(network, addr string) (net.Conn, error) {
+		return tls.DialWithDialer(&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}, network, addr, ctx.mutableConfig.TLSConfig())
+	}
 }
 
 // Certificate returns the server or client certificate from the sign response.
