@@ -49,7 +49,7 @@ type uidProvisioner struct {
 }
 
 func newSortedProvisioners(provisioners []*Provisioner) (provisionerSlice, error) {
-	if len(provisioners) > math.MaxUint32 {
+	if len(provisioners) > math.MaxInt32 {
 		return nil, errors.New("too many provisioners")
 	}
 
