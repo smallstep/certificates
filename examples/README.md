@@ -502,7 +502,7 @@ Listening on :8443 ...
 
 # Run Demo Client
 
-Similarly step's [SDK](https://godoc.org/github.com/smallstep/certificates/ca) provides a client option to mutually authenticate connections to servers. Automatically handling cert bootstrapping, renewal, and fetching a bundle of trusted roots. Every 5s the demo client will send HTTP requests to server.
+Similarly step's [SDK](https://godoc.org/github.com/smallstep/certificates/ca) provides a client option to mutually authenticate connections to servers. It automatically handles cert bootstrapping, renewal, and fetches a bundle of trusted roots. The demo client will send HTTP requests to the demo server periodically (every 5s).
 
 ```bash
 $ go run client/main.go $(step ca token sdk_client \
@@ -515,7 +515,7 @@ Server responded: Hello sdk_client (cert issued by 'Smallstep Kubernetes Root CA
 
 # Curl as Client
 
-When using curl as client to request the demo server a cert from `Kubernetes CA` is required:
+While the demo client provides a convenient way to periodically send requests to the demo server curl in combination with a client cert from `Kubernetes CA` can be used to hit the server instead:
 
 ```bash
 $ step ca certificate kube_client kube_client.crt kube_client.key \
