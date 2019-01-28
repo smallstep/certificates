@@ -457,7 +457,7 @@ The [basic-federation example](basic-federation) showcases how to securely facil
 
 This example uses a pre-generated PKI (public/private key material). Do not use pre-generated PKIs for dev, staging, or production purposes outside of this example.
 
-# Launch Online CAs
+### Launch Online CAs
 
 Bring up two online CAs; `Cloud CA` and `Kubernetes CA`.
 
@@ -483,7 +483,7 @@ $ diff pki/cloud/config/ca.json pki/cloud/config/ca.federated.json
 >    "federatedRoots": ["pki/cloud/certs/kubernetes_root_ca.crt"],
 ```
 
-# Bring up Demo Server
+### Bring up Demo Server
 
 This demo server leverages step's [SDK](https://godoc.org/github.com/smallstep/certificates/ca) to obtain certs, automatically renew them, and fetch a bundle of trusted roots. When it starts up it will report what root certificates it will use to authenticate client certs.
 
@@ -500,7 +500,7 @@ Accepting certs anchored in CN=Smallstep Kubernetes Root CA
 Listening on :8443 ...
 ```
 
-# Run Demo Client
+### Run Demo Client
 
 Similarly step's [SDK](https://godoc.org/github.com/smallstep/certificates/ca) provides a client option to mutually authenticate connections to servers. It automatically handles cert bootstrapping, renewal, and fetches a bundle of trusted roots. The demo client will send HTTP requests to the demo server periodically (every 5s).
 
@@ -513,7 +513,7 @@ $ go run client/main.go $(step ca token sdk_client \
 Server responded: Hello sdk_client (cert issued by 'Smallstep Kubernetes Root CA') at 2019-01-23 00:51:38.576648 +0000 UTC
 ```
 
-# Curl as Client
+### Curl as Client
 
 While the demo client provides a convenient way to periodically send requests to the demo server curl in combination with a client cert from `Kubernetes CA` can be used to hit the server instead:
 
