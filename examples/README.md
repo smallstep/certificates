@@ -451,6 +451,110 @@ Removing docker_ca_1      ... done
 Removing network docker_default
 ```
 
+## Basic Federation
+
+The [basic-federation example](basic-federation) showcases how to securely facilitate communication between relying parties of multiple autonomous certificate authorities. Federation is what's required when services are spread between multiple independent Kubernetes clusters, public clouds, and/or serverless cloud functions to enable service communication across boundaries.
+
+This example uses a pre-generated PKI (public/private key material). Do not use pre-generated PKIs for dev, staging, or production purposes outside of this example.
+
+# Launch Online CAs
+
+Bring up two online CAs; `Cloud CA` and `Kubernetes CA`.
+
+```bash
+$ step-ca ./pki/cloud/config/ca.federated.json
+Please enter the password to decrypt intermediate_ca_key: password
+2019/01/22 13:38:52 Serving HTTPS on :1443 ...
+```
+
+```bash
+$ step-ca ./pki/kubernetes/config/ca.federated.json
+Please enter the password to decrypt intermediate_ca_key: password
+2019/01/22 13:39:44 Serving HTTPS on :2443 ...
+```
+
+Notice the difference between the two configuration options below. `Cloud CA` will list `Kubernetes CA` in the `federatedRoots` section and vice versa for the federated options.
+
+```bash
+$ diff pki/cloud/config/ca.json pki/cloud/config/ca.federated.json
+3c3
+<    "federatedRoots": [],
+---
+>    "federatedRoots": ["pki/cloud/certs/kubernetes_root_ca.crt"],
+```
+
+# Bring up Demo Server
+
+This demo server leverages step's [SDK](https://godoc.org/github.com/smallstep/certificates/ca) to obtain certs, automatically renew them, and fetch a bundle of trusted roots. When it starts up it will report what root certificates it will use to authenticate client certs.
+
+```bash
+go run server/main.go $(step ca token \
+  --ca-url https://localhost:1443 \
+  --root ./pki/cloud/certs/root_ca.crt \
+  127.0.0.1)
+✔ Key ID: EE1ZiqkMaxsUdpz8SCSkRBzwK9TWUoidQnMnJ8Eryn8 (sebastian@smallstep.com)
+✔ Please enter the password to decrypt the provisioner key: password
+Server is using federated root certificates
+Accepting certs anchored in CN=Smallstep Public Cloud Root CA
+Accepting certs anchored in CN=Smallstep Kubernetes Root CA
+Listening on :8443 ...
+```
+
+# Run Demo Client
+
+Similarly step's [SDK](https://godoc.org/github.com/smallstep/certificates/ca) provides a client option to mutually authenticate connections to servers. It automatically handles cert bootstrapping, renewal, and fetches a bundle of trusted roots. The demo client will send HTTP requests to the demo server periodically (every 5s).
+
+```bash
+$ go run client/main.go $(step ca token sdk_client \
+  --ca-url https://localhost:2443 \
+  --root ./pki/kubernetes/certs/root_ca.crt)
+✔ Key ID: S5gYgpeqcIAgc1Zr4myZXpgJ_Ao4ryS6F6wqg9o8RYo (sebastian@smallstep.com)
+✔ Please enter the password to decrypt the provisioner key: password
+Server responded: Hello sdk_client (cert issued by 'Smallstep Kubernetes Root CA') at 2019-01-23 00:51:38.576648 +0000 UTC
+```
+
+# Curl as Client
+
+While the demo client provides a convenient way to periodically send requests to the demo server curl in combination with a client cert from `Kubernetes CA` can be used to hit the server instead:
+
+```bash
+$ step ca certificate kube_client kube_client.crt kube_client.key \
+  --ca-url https://localhost:2443 \
+  --root pki/kubernetes/certs/root_ca.crt
+✔ Key ID: S5gYgpeqcIAgc1Zr4myZXpgJ_Ao4ryS6F6wqg9o8RYo (sebastian@smallstep.com)
+✔ Please enter the password to decrypt the provisioner key:
+✔ CA: https://localhost:2443/1.0/sign
+✔ Certificate: kube_client.crt
+✔ Private Key: kube_client.key
+```
+
+Federation relies on a bundle of multiple trusted roots which need to be fetched before passed into curl.
+
+```bash
+$ step ca federation --ca-url https://localhost:1443 \
+  --root pki/cloud/certs/root_ca.crt \
+  federated.pem
+The federation certificate bundle has been saved in federated.pem.
+```
+
+Passing the cert (issued by `Kubernetes CA`) into curl using the appropriate command line flags:
+
+```bash
+$ curl -i --cacert federated.pem \
+  --cert kube_client.crt \
+  --key kube_client.key \
+  https://127.0.0.1:8443
+
+HTTP/2 200
+content-type: text/plain; charset=utf-8
+content-length: 105
+date: Mon, 28 Jan 2019 15:24:54 GMT
+
+Hello kube_client (cert issued by 'Smallstep Kubernetes Root CA') at 2019-01-28 15:24:54.864373 +0000 UTC
+```
+
+Since the demo server is enrolled with the federated `Cloud CA` that trusts certs issued by the `Kubernetes CA` through federation the connection is successfully established.
+
 ## Configuration Management Tools
 
 Configuration management tools such as Puppet, Chef, Ansible, Salt, etc. make
