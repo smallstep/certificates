@@ -1,7 +1,10 @@
 package authority
 
 import (
+	"bytes"
+	"fmt"
 	"net"
+	"sort"
 	"time"
 
 	"github.com/pkg/errors"
@@ -42,43 +45,47 @@ func (c *commonNameClaim) Valid(crt *x509.Certificate) error {
 }
 
 type dnsNamesClaim struct {
-	name string
+	names []string
 }
 
 // Valid checks that certificate request common name matches the one configured.
 func (c *dnsNamesClaim) Valid(crt *x509.Certificate) error {
-	if len(crt.DNSNames) == 0 {
-		return nil
+	sort.Strings(c.names)
+	sort.Strings(crt.DNSNames)
+	if len(c.names) != len(crt.DNSNames) {
+		fmt.Printf("len(c.names) = %+v, len(crt.DNSNames) = %+v\n", len(c.names), len(crt.DNSNames))
+		return errors.Errorf("DNS names claim failed - got %s, want %s", crt.DNSNames, c.names)
 	}
-	for _, name := range crt.DNSNames {
-		if name != c.name {
-			return errors.Errorf("DNS names claim failed - got %s, want %s", name, c.name)
+	for i := range c.names {
+		if c.names[i] != crt.DNSNames[i] {
+			fmt.Printf("c.names[i] = %+v, crt.DNSNames[i] = %+v\n", c.names[i], crt.DNSNames[i])
+			return errors.Errorf("DNS names claim failed - got %s, want %s", crt.DNSNames, c.names)
 		}
 	}
 	return nil
 }
 
 type ipAddressesClaim struct {
-	name string
+	ips []net.IP
 }
 
 // Valid checks that certificate request common name matches the one configured.
 func (c *ipAddressesClaim) Valid(crt *x509.Certificate) error {
-	if len(crt.IPAddresses) == 0 {
-		return nil
+	if len(c.ips) != len(crt.IPAddresses) {
+		return errors.Errorf("IP Addresses claim failed - got %v, want %v", crt.IPAddresses, c.ips)
 	}
-
-	// If it's an IP validate that only that ip is in IP addresses
-	if requestedIP := net.ParseIP(c.name); requestedIP != nil {
-		for _, ip := range crt.IPAddresses {
-			if !ip.Equal(requestedIP) {
-				return errors.Errorf("IP addresses claim failed - got %s, want %s", ip, requestedIP)
-			}
+	sort.Slice(c.ips, func(i, j int) bool {
+		return bytes.Compare(c.ips[i], c.ips[j]) < 0
+	})
+	sort.Slice(crt.IPAddresses, func(i, j int) bool {
+		return bytes.Compare(crt.IPAddresses[i], crt.IPAddresses[j]) < 0
+	})
+	for i := range c.ips {
+		if !c.ips[i].Equal(crt.IPAddresses[i]) {
+			return errors.Errorf("IP Addresses claim failed - got %v, want %v", crt.IPAddresses[i], c.ips[i])
 		}
-		return nil
 	}
-
-	return errors.Errorf("IP addresses claim failed - got %v, want none", crt.IPAddresses)
+	return nil
 }
 
 // certTemporalClaim validates the certificate temporal validity settings.

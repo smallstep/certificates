@@ -129,10 +129,6 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error converting x509 csr to stepx509 csr"),
 			http.StatusInternalServerError, errContext}
 	}
-	// DNSNames and IPAddresses are validated but to avoid duplications we will
-	// clean them as x509util.NewLeafProfileWithCSR will set the right values.
-	stepCSR.DNSNames = nil
-	stepCSR.IPAddresses = nil
 
 	issIdentity := a.intermediateIdentity
 	leaf, err := x509util.NewLeafProfileWithCSR(stepCSR, issIdentity.Crt,
@@ -201,15 +197,15 @@ func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certi
 		ExtKeyUsage:                 oldCert.ExtKeyUsage,
 		UnknownExtKeyUsage:          oldCert.UnknownExtKeyUsage,
 		BasicConstraintsValid:       oldCert.BasicConstraintsValid,
-		IsCA:                        oldCert.IsCA,
-		MaxPathLen:                  oldCert.MaxPathLen,
-		MaxPathLenZero:              oldCert.MaxPathLenZero,
-		OCSPServer:                  oldCert.OCSPServer,
-		IssuingCertificateURL:       oldCert.IssuingCertificateURL,
-		DNSNames:                    oldCert.DNSNames,
-		EmailAddresses:              oldCert.EmailAddresses,
-		IPAddresses:                 oldCert.IPAddresses,
-		URIs:                        oldCert.URIs,
+		IsCA:                  oldCert.IsCA,
+		MaxPathLen:            oldCert.MaxPathLen,
+		MaxPathLenZero:        oldCert.MaxPathLenZero,
+		OCSPServer:            oldCert.OCSPServer,
+		IssuingCertificateURL: oldCert.IssuingCertificateURL,
+		DNSNames:              oldCert.DNSNames,
+		EmailAddresses:        oldCert.EmailAddresses,
+		IPAddresses:           oldCert.IPAddresses,
+		URIs:                  oldCert.URIs,
 		PermittedDNSDomainsCritical: oldCert.PermittedDNSDomainsCritical,
 		PermittedDNSDomains:         oldCert.PermittedDNSDomains,
 		ExcludedDNSDomains:          oldCert.ExcludedDNSDomains,

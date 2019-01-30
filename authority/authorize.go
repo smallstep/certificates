@@ -3,6 +3,7 @@ package authority
 import (
 	"crypto/x509"
 	"encoding/asn1"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -14,6 +15,12 @@ import (
 type idUsed struct {
 	UsedAt  int64  `json:"ua,omitempty"`
 	Subject string `json:"sub,omitempty"`
+}
+
+// Claims extends jwt.Claims with step attributes.
+type Claims struct {
+	jwt.Claims
+	SANS []string `json:"sans,omitempty"`
 }
 
 // matchesAudience returns true if A and B share at least one element.
@@ -48,7 +55,7 @@ func stripPort(rawurl string) string {
 func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 	var (
 		errContext = map[string]interface{}{"ott": ott}
-		claims     = jwt.Claims{}
+		claims     = Claims{}
 	)
 
 	// Validate payload
@@ -113,10 +120,15 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 			http.StatusUnauthorized, errContext}
 	}
 
+	dnsNames, ips := SplitSANS(claims.SANS)
+	if err != nil {
+		return nil, err
+	}
+
 	signOps := []interface{}{
 		&commonNameClaim{claims.Subject},
-		&dnsNamesClaim{claims.Subject},
-		&ipAddressesClaim{claims.Subject},
+		&dnsNamesClaim{dnsNames},
+		&ipAddressesClaim{ips},
 		p,
 	}
 
@@ -130,6 +142,26 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 	}
 
 	return signOps, nil
+}
+
+// SplitSANS splits a slice of Subject Alternative Names into slices of
+// IP Addresses and DNS Names. If an element is not an IP address, then it
+// is bucketed as a DNS Name.
+func SplitSANS(sans []string) (dnsNames []string, ips []net.IP) {
+	dnsNames = []string{}
+	ips = []net.IP{}
+	if sans == nil {
+		return
+	}
+	for _, san := range sans {
+		if ip := net.ParseIP(san); ip != nil {
+			ips = append(ips, ip)
+		} else {
+			// If not IP then assume DNSName.
+			dnsNames = append(dnsNames, san)
+		}
+	}
+	return
 }
 
 // authorizeRenewal tries to locate the step provisioner extension, and checks
