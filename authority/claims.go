@@ -1,10 +1,8 @@
 package authority
 
 import (
-	"bytes"
-	"fmt"
 	"net"
-	"sort"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
@@ -50,17 +48,16 @@ type dnsNamesClaim struct {
 
 // Valid checks that certificate request common name matches the one configured.
 func (c *dnsNamesClaim) Valid(crt *x509.Certificate) error {
-	sort.Strings(c.names)
-	sort.Strings(crt.DNSNames)
-	if len(c.names) != len(crt.DNSNames) {
-		fmt.Printf("len(c.names) = %+v, len(crt.DNSNames) = %+v\n", len(c.names), len(crt.DNSNames))
-		return errors.Errorf("DNS names claim failed - got %s, want %s", crt.DNSNames, c.names)
+	tokMap := make(map[string]int)
+	for _, e := range c.names {
+		tokMap[e] = 1
 	}
-	for i := range c.names {
-		if c.names[i] != crt.DNSNames[i] {
-			fmt.Printf("c.names[i] = %+v, crt.DNSNames[i] = %+v\n", c.names[i], crt.DNSNames[i])
-			return errors.Errorf("DNS names claim failed - got %s, want %s", crt.DNSNames, c.names)
-		}
+	crtMap := make(map[string]int)
+	for _, e := range crt.DNSNames {
+		crtMap[e] = 1
+	}
+	if !reflect.DeepEqual(tokMap, crtMap) {
+		return errors.Errorf("DNS names claim failed - got %s, want %s", crt.DNSNames, c.names)
 	}
 	return nil
 }
@@ -71,19 +68,16 @@ type ipAddressesClaim struct {
 
 // Valid checks that certificate request common name matches the one configured.
 func (c *ipAddressesClaim) Valid(crt *x509.Certificate) error {
-	if len(c.ips) != len(crt.IPAddresses) {
-		return errors.Errorf("IP Addresses claim failed - got %v, want %v", crt.IPAddresses, c.ips)
+	tokMap := make(map[string]int)
+	for _, e := range c.ips {
+		tokMap[e.String()] = 1
 	}
-	sort.Slice(c.ips, func(i, j int) bool {
-		return bytes.Compare(c.ips[i], c.ips[j]) < 0
-	})
-	sort.Slice(crt.IPAddresses, func(i, j int) bool {
-		return bytes.Compare(crt.IPAddresses[i], crt.IPAddresses[j]) < 0
-	})
-	for i := range c.ips {
-		if !c.ips[i].Equal(crt.IPAddresses[i]) {
-			return errors.Errorf("IP Addresses claim failed - got %v, want %v", crt.IPAddresses[i], c.ips[i])
-		}
+	crtMap := make(map[string]int)
+	for _, e := range crt.IPAddresses {
+		crtMap[e.String()] = 1
+	}
+	if !reflect.DeepEqual(tokMap, crtMap) {
+		return errors.Errorf("IP Addresses claim failed - got %v, want %v", crt.IPAddresses, c.ips)
 	}
 	return nil
 }

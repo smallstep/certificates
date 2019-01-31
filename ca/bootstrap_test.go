@@ -94,6 +94,7 @@ func generateBootstrapToken(ca, subject, sha string) string {
 	cl := struct {
 		SHA string `json:"sha"`
 		jwt.Claims
+		SANS []string `json:"sans"`
 	}{
 		SHA: sha,
 		Claims: jwt.Claims{
@@ -104,6 +105,7 @@ func generateBootstrapToken(ca, subject, sha string) string {
 			Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
 			Audience:  []string{ca + "/sign"},
 		},
+		SANS: []string{subject},
 	}
 	raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
 	if err != nil {

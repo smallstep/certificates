@@ -154,13 +154,19 @@ ZEp7knvU2psWRw==
 		"fail commonname-claim": func(t *testing.T) *signTest {
 			jti, err := randutil.ASCII(32)
 			assert.FatalError(t, err)
-			cl := jwt.Claims{
-				Subject:   "invalid",
-				Issuer:    "step-cli",
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
-				Audience:  validAud,
-				ID:        jti,
+			cl := struct {
+				jwt.Claims
+				SANS []string `json:"sans"`
+			}{
+				Claims: jwt.Claims{
+					Subject:   "invalid",
+					Issuer:    "step-cli",
+					NotBefore: jwt.NewNumericDate(now),
+					Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+					Audience:  validAud,
+					ID:        jti,
+				},
+				SANS: []string{"invalid"},
 			}
 			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
@@ -181,13 +187,19 @@ ZEp7knvU2psWRw==
 		"ok": func(t *testing.T) *signTest {
 			jti, err := randutil.ASCII(32)
 			assert.FatalError(t, err)
-			cl := jwt.Claims{
-				Subject:   "test.smallstep.com",
-				Issuer:    "step-cli",
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
-				Audience:  validAud,
-				ID:        jti,
+			cl := struct {
+				jwt.Claims
+				SANS []string `json:"sans"`
+			}{
+				Claims: jwt.Claims{
+					Subject:   "test.smallstep.com",
+					Issuer:    "step-cli",
+					NotBefore: jwt.NewNumericDate(now),
+					Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+					Audience:  validAud,
+					ID:        jti,
+				},
+				SANS: []string{"test.smallstep.com"},
 			}
 			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)

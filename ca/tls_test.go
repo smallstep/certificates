@@ -39,13 +39,19 @@ func generateOTT(subject string) string {
 	if err != nil {
 		panic(err)
 	}
-	cl := jwt.Claims{
-		ID:        id,
-		Subject:   subject,
-		Issuer:    "mariano",
-		NotBefore: jwt.NewNumericDate(now),
-		Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
-		Audience:  []string{"https://127.0.0.1:0/sign"},
+	cl := struct {
+		jwt.Claims
+		SANS []string `json:"sans"`
+	}{
+		Claims: jwt.Claims{
+			ID:        id,
+			Subject:   subject,
+			Issuer:    "mariano",
+			NotBefore: jwt.NewNumericDate(now),
+			Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+			Audience:  []string{"https://127.0.0.1:0/sign"},
+		},
+		SANS: []string{subject},
 	}
 	raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
 	if err != nil {
