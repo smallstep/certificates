@@ -218,6 +218,39 @@ ZEp7knvU2psWRw==
 				status: http.StatusCreated,
 			}
 		},
+		"ok-backwards-compat-missing-subject-SAN": func(t *testing.T) *signTest {
+			jti, err := randutil.ASCII(32)
+			assert.FatalError(t, err)
+			cl := struct {
+				jwt.Claims
+				SANS []string `json:"sans"`
+			}{
+				Claims: jwt.Claims{
+					Subject:   "test.smallstep.com",
+					Issuer:    "step-cli",
+					NotBefore: jwt.NewNumericDate(now),
+					Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+					Audience:  validAud,
+					ID:        jti,
+				},
+			}
+			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+			csr, err := getCSR(priv)
+			assert.FatalError(t, err)
+			body, err := json.Marshal(&api.SignRequest{
+				CsrPEM:    api.CertificateRequest{CertificateRequest: csr},
+				OTT:       raw,
+				NotBefore: now,
+				NotAfter:  leafExpiry,
+			})
+			assert.FatalError(t, err)
+			return &signTest{
+				ca:     ca,
+				body:   string(body),
+				status: http.StatusCreated,
+			}
+		},
 	}
 
 	for name, genTestCase := range tests {
