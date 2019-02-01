@@ -120,6 +120,12 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 			http.StatusUnauthorized, errContext}
 	}
 
+	// `step ca token` should generate tokens where the subject is also in the
+	// sans. It should not be necessary to add to SANS if both certificates and
+	// cli are up to date. However, for backwards compatibility we will add
+	// the subject to the SANS if it is missing.
+	claims.SANS = appendIfMissingString(claims.SANS, claims.Subject)
+
 	dnsNames, ips := SplitSANS(claims.SANS)
 	if err != nil {
 		return nil, err
@@ -162,6 +168,15 @@ func SplitSANS(sans []string) (dnsNames []string, ips []net.IP) {
 		}
 	}
 	return
+}
+
+func appendIfMissingString(slice []string, s string) []string {
+	for _, e := range slice {
+		if e == s {
+			return slice
+		}
+	}
+	return append(slice, s)
 }
 
 // authorizeRenewal tries to locate the step provisioner extension, and checks
