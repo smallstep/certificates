@@ -12,7 +12,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"io"
 	"io/ioutil"
 	"net"
@@ -116,16 +115,10 @@ func getTransportFromFile(filename string) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", filename)
 	}
-	block, _ := pem.Decode(data)
-	if block == nil {
-		return nil, errors.Errorf("error decoding %s", filename)
-	}
-	root, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing %s", filename)
-	}
 	pool := x509.NewCertPool()
-	pool.AddCert(root)
+	if !pool.AppendCertsFromPEM(data) {
+		return nil, errors.Errorf("error parsing %s: no certificates found", filename)
+	}
 	return getDefaultTransport(&tls.Config{
 		MinVersion:               tls.VersionTLS12,
 		PreferServerCipherSuites: true,
