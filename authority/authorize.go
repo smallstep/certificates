@@ -20,7 +20,7 @@ type idUsed struct {
 // Claims extends jwt.Claims with step attributes.
 type Claims struct {
 	jwt.Claims
-	SANS []string `json:"sans,omitempty"`
+	SANs []string `json:"sans,omitempty"`
 }
 
 // matchesAudience returns true if A and B share at least one element.
@@ -123,10 +123,10 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 	// NOTE: This is for backwards compatibility with older versions of cli
 	// and certificates. Older versions added the token subject as the only SAN
 	// in a CSR by default.
-	if len(claims.SANS) == 0 {
-		claims.SANS = []string{claims.Subject}
+	if len(claims.SANs) == 0 {
+		claims.SANs = []string{claims.Subject}
 	}
-	dnsNames, ips := SplitSANS(claims.SANS)
+	dnsNames, ips := SplitSANs(claims.SANs)
 	if err != nil {
 		return nil, err
 	}
@@ -150,10 +150,10 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 	return signOps, nil
 }
 
-// SplitSANS splits a slice of Subject Alternative Names into slices of
+// SplitSANs splits a slice of Subject Alternative Names into slices of
 // IP Addresses and DNS Names. If an element is not an IP address, then it
 // is bucketed as a DNS Name.
-func SplitSANS(sans []string) (dnsNames []string, ips []net.IP) {
+func SplitSANs(sans []string) (dnsNames []string, ips []net.IP) {
 	dnsNames = []string{}
 	ips = []net.IP{}
 	if sans == nil {

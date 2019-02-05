@@ -452,7 +452,7 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 		return nil, nil, errors.Wrap(err, "error generating key")
 	}
 
-	dnsNames, ips := authority.SplitSANS(claims.SANS)
+	dnsNames, ips := authority.SplitSANs(claims.SANs)
 
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
