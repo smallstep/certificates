@@ -3,12 +3,12 @@ package authority
 import (
 	"crypto/x509"
 	"encoding/asn1"
-	"net"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/cli/crypto/x509util"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -126,7 +126,7 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 	if len(claims.SANs) == 0 {
 		claims.SANs = []string{claims.Subject}
 	}
-	dnsNames, ips := SplitSANs(claims.SANs)
+	dnsNames, ips := x509util.SplitSANs(claims.SANs)
 	if err != nil {
 		return nil, err
 	}
@@ -148,26 +148,6 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 	}
 
 	return signOps, nil
-}
-
-// SplitSANs splits a slice of Subject Alternative Names into slices of
-// IP Addresses and DNS Names. If an element is not an IP address, then it
-// is bucketed as a DNS Name.
-func SplitSANs(sans []string) (dnsNames []string, ips []net.IP) {
-	dnsNames = []string{}
-	ips = []net.IP{}
-	if sans == nil {
-		return
-	}
-	for _, san := range sans {
-		if ip := net.ParseIP(san); ip != nil {
-			ips = append(ips, ip)
-		} else {
-			// If not IP then assume DNSName.
-			dnsNames = append(dnsNames, san)
-		}
-	}
-	return
 }
 
 // authorizeRenewal tries to locate the step provisioner extension, and checks
