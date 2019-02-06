@@ -36,8 +36,8 @@ func (c *mutableTLSConfig) Init(base *tls.Config) {
 	c.Unlock()
 }
 
-// TLSConfig returns the updated tls.Config it it has changed. It's is used in
-// the tls.Config GetConfigForClient.
+// TLSConfig returns the updated tls.Config it it has changed. It's used in the
+// tls.Config GetConfigForClient.
 func (c *mutableTLSConfig) TLSConfig() (config *tls.Config) {
 	c.RLock()
 	config = c.config
