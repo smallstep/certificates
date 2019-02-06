@@ -18,8 +18,8 @@ type mutableTLSConfig struct {
 	mutRootCerts   []*x509.Certificate
 }
 
-// newMutableTLSConfig creates a new mutableTLSConfig using the passed one as
-// the base one.
+// newMutableTLSConfig creates a new mutableTLSConfig that will be later
+// initialized with a tls.Config.
 func newMutableTLSConfig() *mutableTLSConfig {
 	return &mutableTLSConfig{
 		clientCerts:    []*x509.Certificate{},
