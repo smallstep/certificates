@@ -76,15 +76,15 @@ func (c *mutableTLSConfig) Reload() {
 	c.Unlock()
 }
 
-// AddFixedClientCACert add an in-mutable cert to ClientCAs.
-func (c *mutableTLSConfig) AddInmutableClientCACert(cert *x509.Certificate) {
+// AddImmutableClientCACert add an in-mutable cert to ClientCAs.
+func (c *mutableTLSConfig) AddImmutableClientCACert(cert *x509.Certificate) {
 	c.Lock()
 	c.clientCerts = append(c.clientCerts, cert)
 	c.Unlock()
 }
 
-// AddInmutableRootCACert add an in-mutable cert to RootCas.
-func (c *mutableTLSConfig) AddInmutableRootCACert(cert *x509.Certificate) {
+// AddImmutableRootCACert add an in-mutable cert to RootCas.
+func (c *mutableTLSConfig) AddImmutableRootCACert(cert *x509.Certificate) {
 	c.Lock()
 	c.rootCerts = append(c.rootCerts, cert)
 	c.Unlock()

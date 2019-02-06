@@ -48,7 +48,7 @@ func (ctx *TLSOptionCtx) apply(options []TLSOption) error {
 				ctx.Config.RootCAs = x509.NewCertPool()
 			}
 			ctx.Config.RootCAs.AddCert(root)
-			ctx.mutableConfig.AddInmutableRootCACert(root)
+			ctx.mutableConfig.AddImmutableRootCACert(root)
 		}
 
 		if !ctx.hasClientCA && ctx.Config.ClientAuth != tls.NoClientCert {
@@ -56,7 +56,7 @@ func (ctx *TLSOptionCtx) apply(options []TLSOption) error {
 				ctx.Config.ClientCAs = x509.NewCertPool()
 			}
 			ctx.Config.ClientCAs.AddCert(root)
-			ctx.mutableConfig.AddInmutableClientCACert(root)
+			ctx.mutableConfig.AddImmutableClientCACert(root)
 		}
 	}
 
@@ -116,7 +116,7 @@ func AddRootCA(cert *x509.Certificate) TLSOption {
 			ctx.Config.RootCAs = x509.NewCertPool()
 		}
 		ctx.Config.RootCAs.AddCert(cert)
-		ctx.mutableConfig.AddInmutableRootCACert(cert)
+		ctx.mutableConfig.AddImmutableRootCACert(cert)
 		return nil
 	}
 }
@@ -130,7 +130,7 @@ func AddClientCA(cert *x509.Certificate) TLSOption {
 			ctx.Config.ClientCAs = x509.NewCertPool()
 		}
 		ctx.Config.ClientCAs.AddCert(cert)
-		ctx.mutableConfig.AddInmutableClientCACert(cert)
+		ctx.mutableConfig.AddImmutableClientCACert(cert)
 		return nil
 	}
 }
