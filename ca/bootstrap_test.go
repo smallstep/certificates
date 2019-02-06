@@ -363,6 +363,7 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 
 	// doTest does a request that requires mTLS
 	doTest := func(client *http.Client) error {
+		time.Sleep(1 * time.Second)
 		// test with ca
 		resp, err := client.Post(caURL+"/renew", "application/json", http.NoBody)
 		if err != nil {
