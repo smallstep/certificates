@@ -60,3 +60,17 @@ languages are appreciated!
   - [X] Restrict to safe ciphersuites and TLS versions
   - [ ] TLS stack configuration loaded from `step-ca`
   - [ ] Root certificate rotation
+
+[node/](node/)
+- [X] Server
+  - [X] mTLS (client authentication using internal root certificate)
+  - [X] Automatic certificate renewal
+  - [X] Restrict to safe ciphersuites and TLS versions
+  - [ ] TLS stack configuration loaded from `step-ca`
+  - [ ] Root certificate rotation
+- [ ] Client using autocert root certificate
+  - [ ] mTLS (send client certificate if server asks for it)
+  - [ ] Automatic certificate rotation
+  - [ ] Restrict to safe ciphersuites and TLS versions
+  - [ ] TLS stack configuration loaded from `step-ca`
+  - [ ] Root certificate rotation
