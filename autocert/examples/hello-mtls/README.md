@@ -53,3 +53,10 @@ languages are appreciated!
   - [ ] TLS stack configuration loaded from `step-ca`
   - [ ] Root certificate rotation
 
+[nginx/](nginx/)
+- [X] Server
+  - [X] mTLS (client authentication using internal root certificate)
+  - [X] Automatic certificate renewal
+  - [X] Restrict to safe ciphersuites and TLS versions
+  - [ ] TLS stack configuration loaded from `step-ca`
+  - [ ] Root certificate rotation
