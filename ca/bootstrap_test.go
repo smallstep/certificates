@@ -579,7 +579,6 @@ func TestBootstrapListener(t *testing.T) {
 				t.Errorf("BootstrapClient() error = %v", err)
 				return
 			}
-			println("https://" + lis.Addr().String())
 			resp, err := client.Get("https://" + lis.Addr().String())
 			if err != nil {
 				t.Errorf("client.Get() error = %v", err)
