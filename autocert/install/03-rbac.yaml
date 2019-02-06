@@ -13,7 +13,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: autocert-secret-management
+  name: autocert-controller
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
@@ -24,11 +24,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: autocert-secret-management
+  name: autocert-controller
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: autocert-secret-management
+  name: autocert-controller
 subjects:
 - kind: ServiceAccount
   name: default
