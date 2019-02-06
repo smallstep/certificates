@@ -1,15 +1,82 @@
 #!/bin/bash
 
 #set -x
-set -e
 
-echo "Welcome to Autocert configuration. Press any key to begin."
+echo "Welcome to Autocert configuration. Press return to begin."
 read ANYKEY
+
 
 STEPPATH=/home/step/.step
 
 CA_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32 ; echo '')
 AUTOCERT_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32 ; echo '')
+
+echo -e "\e[1mChecking cluster permissions...\e[0m"
+
+function permission_error {
+  # TODO: Figure out the actual service account instead of assuming default.
+  echo
+  echo -e "\033[0;31mPERMISSION ERROR\033[0m"
+  echo "Set permissions by running the following command, then try again:"
+  echo -e "\e[1m"
+  echo "    kubectl create clusterrolebinding autocert-init-binding \\"
+  echo "      --clusterrole cluster-admin \\"
+  echo "      --user \"system:serviceaccount:default:default\""
+  echo -e "\e[0m"
+  echo "Once setup is complete you can remove this binding by running:"
+  echo -e "\e[1m"
+  echo "    kubectl delete clusterrolebinding autocert-init-binding"
+  echo -e "\e[0m"
+
+  exit 1
+}
+
+echo -n "Checking for permission to create step namespace: "
+kubectl auth can-i create namespaces
+if [ $? -ne 0 ]; then
+    permission_error "create step namespace"
+fi
+
+echo -n "Checking for permission to create configmaps in step namespace: "
+kubectl auth can-i create configmaps --namespace step
+if [ $? -ne 0 ]; then
+    permission_error "create configmaps"
+fi
+
+echo -n "Checking for permission to create secrets in step namespace: "
+kubectl auth can-i create secrets --namespace step
+if [ $? -ne 0 ]; then
+    permission_error "create secrets"
+fi
+
+echo -n "Checking for permission to create deployments in step namespace: "
+kubectl auth can-i create deployments --namespace step
+if [ $? -ne 0 ]; then
+    permission_error "create deployments"
+fi
+
+echo -n "Checking for permission to create services in step namespace: "
+kubectl auth can-i create services --namespace step
+if [ $? -ne 0 ]; then
+    permission_error "create services"
+fi
+
+echo -n "Checking for permission to create cluster role: "
+kubectl auth can-i create clusterrole
+if [ $? -ne 0 ]; then
+    permission_error "create cluster roles"
+fi
+
+echo -n "Checking for permission to create cluster role binding:"
+kubectl auth can-i create clusterrolebinding
+if [ $? -ne 0 ]; then
+    permission_error "create cluster role bindings"
+    exit 1
+fi
+
+# Setting this here on purpose, after the above section which explicitly checks
+# for and handles exit errors.
+set -e
 
 step ca init \
   --name "$CA_NAME" \
@@ -84,11 +151,14 @@ webhooks:
         autocert.step.sm: enabled
 EOF
 
+FINGERPRINT=$(step certificate fingerprint $(step path)/certs/root_ca.crt)
+
 echo
 echo -e "\e[1mAutocert installed!\e[0m"
 echo
-echo "Store these passwords somewhere safe:"
-echo "  CA & admin provisioner password: $CA_PASSWORD"
-echo "  Autocert password: $AUTOCERT_PASSWORD"
+echo "Store this information somewhere safe:"
+echo "  CA & admin provisioner password: ${CA_PASSWORD}"
+echo "  Autocert password: ${AUTOCERT_PASSWORD}"
+echo "  CA Fingerprint: ${FINGERPRINT}"
 echo
 
