@@ -8,12 +8,19 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/cli/crypto/x509util"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 type idUsed struct {
 	UsedAt  int64  `json:"ua,omitempty"`
 	Subject string `json:"sub,omitempty"`
+}
+
+// Claims extends jwt.Claims with step attributes.
+type Claims struct {
+	jwt.Claims
+	SANs []string `json:"sans,omitempty"`
 }
 
 // matchesAudience returns true if A and B share at least one element.
@@ -48,7 +55,7 @@ func stripPort(rawurl string) string {
 func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 	var (
 		errContext = map[string]interface{}{"ott": ott}
-		claims     = jwt.Claims{}
+		claims     = Claims{}
 	)
 
 	// Validate payload
@@ -113,10 +120,21 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 			http.StatusUnauthorized, errContext}
 	}
 
+	// NOTE: This is for backwards compatibility with older versions of cli
+	// and certificates. Older versions added the token subject as the only SAN
+	// in a CSR by default.
+	if len(claims.SANs) == 0 {
+		claims.SANs = []string{claims.Subject}
+	}
+	dnsNames, ips := x509util.SplitSANs(claims.SANs)
+	if err != nil {
+		return nil, err
+	}
+
 	signOps := []interface{}{
 		&commonNameClaim{claims.Subject},
-		&dnsNamesClaim{claims.Subject},
-		&ipAddressesClaim{claims.Subject},
+		&dnsNamesClaim{dnsNames},
+		&ipAddressesClaim{ips},
 		p,
 	}
 

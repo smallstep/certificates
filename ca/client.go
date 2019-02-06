@@ -15,7 +15,6 @@ import (
 	"encoding/pem"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -23,6 +22,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/cli/crypto/x509util"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -442,7 +443,7 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error parsing ott")
 	}
-	var claims jwt.Claims
+	var claims authority.Claims
 	if err := token.UnsafeClaimsWithoutVerification(&claims); err != nil {
 		return nil, nil, errors.Wrap(err, "error parsing ott")
 	}
@@ -452,17 +453,15 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 		return nil, nil, errors.Wrap(err, "error generating key")
 	}
 
+	dnsNames, ips := x509util.SplitSANs(claims.SANs)
+
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: claims.Subject,
 		},
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
-	}
-
-	if ip := net.ParseIP(claims.Subject); ip != nil {
-		template.IPAddresses = append(template.IPAddresses, ip)
-	} else {
-		template.DNSNames = append(template.DNSNames, claims.Subject)
+		DNSNames:           dnsNames,
+		IPAddresses:        ips,
 	}
 
 	csr, err := x509.CreateCertificateRequest(rand.Reader, template, pk)

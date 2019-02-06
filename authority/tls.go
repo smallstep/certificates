@@ -129,10 +129,6 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error converting x509 csr to stepx509 csr"),
 			http.StatusInternalServerError, errContext}
 	}
-	// DNSNames and IPAddresses are validated but to avoid duplications we will
-	// clean them as x509util.NewLeafProfileWithCSR will set the right values.
-	stepCSR.DNSNames = nil
-	stepCSR.IPAddresses = nil
 
 	issIdentity := a.intermediateIdentity
 	leaf, err := x509util.NewLeafProfileWithCSR(stepCSR, issIdentity.Crt,

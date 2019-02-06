@@ -18,12 +18,9 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:5f3371d6e432e3c4e0ceabb14b5c0679827ce8b96bbd963fa923977782e8e99b"
+  digest = "1:454adc7f974228ff789428b6dc098638c57a64aa0718f0bd61e53d3cd39d7a75"
   name = "github.com/chzyer/readline"
-  packages = [
-    ".",
-    "runes",
-  ]
+  packages = ["."]
   pruneopts = "UT"
   revision = "2972be24d48e78746da79ba8e24e8b488c9880de"
 
@@ -214,8 +211,8 @@
   revision = "de77670473b5492f5d0bce155b5c01534c2d13f7"
 
 [[projects]]
-  branch = "master"
-  digest = "1:9e42b7ce7fce33796a870bbbd4e5fdf7c25f3a243ca355d7d9be52f88e3526d5"
+  branch = "sans"
+  digest = "1:4c9e30abfe7c119eb4d40287f6c23f854f3ad71c69206d8dc6402e1fef14ac88"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
@@ -234,7 +231,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "a633fd7f7eff2e8ba4026189241a60968b3767d6"
+  revision = "1379a62e0cf06b164d35e20a912d017ac8bad071"
 
 [[projects]]
   branch = "master"

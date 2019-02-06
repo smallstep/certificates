@@ -2,6 +2,7 @@ package authority
 
 import (
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
@@ -42,43 +43,43 @@ func (c *commonNameClaim) Valid(crt *x509.Certificate) error {
 }
 
 type dnsNamesClaim struct {
-	name string
+	names []string
 }
 
 // Valid checks that certificate request common name matches the one configured.
 func (c *dnsNamesClaim) Valid(crt *x509.Certificate) error {
-	if len(crt.DNSNames) == 0 {
-		return nil
+	tokMap := make(map[string]int)
+	for _, e := range c.names {
+		tokMap[e] = 1
 	}
-	for _, name := range crt.DNSNames {
-		if name != c.name {
-			return errors.Errorf("DNS names claim failed - got %s, want %s", name, c.name)
-		}
+	crtMap := make(map[string]int)
+	for _, e := range crt.DNSNames {
+		crtMap[e] = 1
+	}
+	if !reflect.DeepEqual(tokMap, crtMap) {
+		return errors.Errorf("DNS names claim failed - got %s, want %s", crt.DNSNames, c.names)
 	}
 	return nil
 }
 
 type ipAddressesClaim struct {
-	name string
+	ips []net.IP
 }
 
 // Valid checks that certificate request common name matches the one configured.
 func (c *ipAddressesClaim) Valid(crt *x509.Certificate) error {
-	if len(crt.IPAddresses) == 0 {
-		return nil
+	tokMap := make(map[string]int)
+	for _, e := range c.ips {
+		tokMap[e.String()] = 1
 	}
-
-	// If it's an IP validate that only that ip is in IP addresses
-	if requestedIP := net.ParseIP(c.name); requestedIP != nil {
-		for _, ip := range crt.IPAddresses {
-			if !ip.Equal(requestedIP) {
-				return errors.Errorf("IP addresses claim failed - got %s, want %s", ip, requestedIP)
-			}
-		}
-		return nil
+	crtMap := make(map[string]int)
+	for _, e := range crt.IPAddresses {
+		crtMap[e.String()] = 1
 	}
-
-	return errors.Errorf("IP addresses claim failed - got %v, want none", crt.IPAddresses)
+	if !reflect.DeepEqual(tokMap, crtMap) {
+		return errors.Errorf("IP Addresses claim failed - got %v, want %v", crt.IPAddresses, c.ips)
+	}
+	return nil
 }
 
 // certTemporalClaim validates the certificate temporal validity settings.

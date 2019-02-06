@@ -52,23 +52,28 @@ func TestIPAddressesClaim_Valid(t *testing.T) {
 		crt *x509.Certificate
 		err error
 	}{
-		"unexpected-ip": {
-			iac: &ipAddressesClaim{name: "127.0.0.1"},
+		"unexpected-ip-in-crt": {
+			iac: &ipAddressesClaim{ips: []net.IP{net.ParseIP("127.0.0.1")}},
 			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("1.1.1.1")}},
-			err: errors.New("IP addresses claim failed - got 1.1.1.1, want 127.0.0.1"),
+			err: errors.New("IP Addresses claim failed - got [127.0.0.1 1.1.1.1], want [127.0.0.1]"),
+		},
+		"missing-ip-in-crt": {
+			iac: &ipAddressesClaim{ips: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("1.1.1.1")}},
+			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}},
+			err: errors.New("IP Addresses claim failed - got [127.0.0.1], want [127.0.0.1 1.1.1.1]"),
 		},
 		"invalid-matcher-nonempty-ips": {
-			iac: &ipAddressesClaim{name: "invalid"},
+			iac: &ipAddressesClaim{ips: []net.IP{}},
 			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}},
-			err: errors.New("IP addresses claim failed - got [127.0.0.1], want none"),
+			err: errors.New("IP Addresses claim failed - got [127.0.0.1], want []"),
 		},
 		"ok": {
-			iac: &ipAddressesClaim{name: "127.0.0.1"},
+			iac: &ipAddressesClaim{ips: []net.IP{net.ParseIP("127.0.0.1")}},
 			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}},
 		},
-		"ok-empty-ips": {
-			iac: &ipAddressesClaim{name: "127.0.0.1"},
-			crt: &x509.Certificate{IPAddresses: []net.IP{}},
+		"ok-multiple-identical-ip-entries": {
+			iac: &ipAddressesClaim{ips: []net.IP{net.ParseIP("127.0.0.1")}},
+			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.1")}},
 		},
 	}
 
@@ -92,21 +97,22 @@ func TestDNSNamesClaim_Valid(t *testing.T) {
 		crt *x509.Certificate
 		err error
 	}{
-		"wrong-dns-name": {
-			dnc: &dnsNamesClaim{name: "foo"},
+		"unexpected-dns-name-in-crt": {
+			dnc: &dnsNamesClaim{names: []string{"foo"}},
 			crt: &x509.Certificate{DNSNames: []string{"foo", "bar"}},
-			err: errors.New("DNS names claim failed - got bar, want foo"),
+			err: errors.New("DNS names claim failed - got [foo bar], want [foo]"),
 		},
 		"ok": {
-			dnc: &dnsNamesClaim{name: "foo"},
-			crt: &x509.Certificate{DNSNames: []string{"foo"}},
+			dnc: &dnsNamesClaim{names: []string{"foo", "bar"}},
+			crt: &x509.Certificate{DNSNames: []string{"bar", "foo"}},
 		},
-		"ok-empty-dnsNames": {
-			dnc: &dnsNamesClaim{"foo"},
-			crt: &x509.Certificate{},
+		"missing-dns-name-in-crt": {
+			dnc: &dnsNamesClaim{names: []string{"foo", "bar"}},
+			crt: &x509.Certificate{DNSNames: []string{"foo"}},
+			err: errors.New("DNS names claim failed - got [foo], want [foo bar]"),
 		},
 		"ok-multiple-identical-dns-entries": {
-			dnc: &dnsNamesClaim{name: "foo"},
+			dnc: &dnsNamesClaim{names: []string{"foo"}},
 			crt: &x509.Certificate{DNSNames: []string{"foo", "foo", "foo"}},
 		},
 	}
