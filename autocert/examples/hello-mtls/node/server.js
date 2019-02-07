@@ -9,7 +9,7 @@ var config = {
     ciphers: 'ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256',
     minVersion: 'TLSv1.2',
     maxVersion: 'TLSv1.2'
-}
+};
 
 function createSecureContext() {
     return tls.createSecureContext({
@@ -24,7 +24,7 @@ var ctx = createSecureContext()
 
 fs.watch(config.cert, (event, filename) => {
     if (event == 'change') {
-        ctx = createSecureContext()
+        ctx = createSecureContext();
     }
 });
 
@@ -38,3 +38,5 @@ https.createServer({
     res.writeHead(200);
     res.end('hello nodejs\n');
 }).listen(443);
+
+console.log("Listening on :443 ...");
