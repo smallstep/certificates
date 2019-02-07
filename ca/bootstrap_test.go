@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
-
 	"github.com/smallstep/cli/crypto/randutil"
 	stepJOSE "github.com/smallstep/cli/jose"
 	jose "gopkg.in/square/go-jose.v2"
@@ -365,6 +365,7 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 
 	// doTest does a request that requires mTLS
 	doTest := func(client *http.Client) error {
+		time.Sleep(1 * time.Second)
 		// test with ca
 		resp, err := client.Post(caURL+"/renew", "application/json", http.NoBody)
 		if err != nil {
@@ -531,4 +532,71 @@ func doReload(ca *CA) error {
 	// Use same address in new server
 	newCA.srv.Addr = ca.srv.Addr
 	return ca.srv.Reload(newCA.srv)
+}
+
+func TestBootstrapListener(t *testing.T) {
+	srv := startCABootstrapServer()
+	defer srv.Close()
+	token := func() string {
+		return generateBootstrapToken(srv.URL, "127.0.0.1", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
+	}
+	type args struct {
+		token string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"ok", args{token()}, false},
+		{"fail", args{"bad-token"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inner := newLocalListener()
+			defer inner.Close()
+			lis, err := BootstrapListener(context.Background(), tt.args.token, inner)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("BootstrapListener() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				if lis != nil {
+					t.Errorf("BootstrapListener() = %v, want nil", lis)
+				}
+				return
+			}
+			wg := new(sync.WaitGroup)
+			go func() {
+				wg.Add(1)
+				http.Serve(lis, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Write([]byte("ok"))
+				}))
+				wg.Done()
+			}()
+			defer wg.Wait()
+			defer lis.Close()
+
+			client, err := BootstrapClient(context.Background(), token())
+			if err != nil {
+				t.Errorf("BootstrapClient() error = %v", err)
+				return
+			}
+			resp, err := client.Get("https://" + lis.Addr().String())
+			if err != nil {
+				t.Errorf("client.Get() error = %v", err)
+				return
+			}
+			defer resp.Body.Close()
+			b, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("ioutil.ReadAll() error = %v", err)
+				return
+			}
+			if string(b) != "ok" {
+				t.Errorf("client.Get() = %s, want ok", string(b))
+				return
+			}
+		})
+	}
 }

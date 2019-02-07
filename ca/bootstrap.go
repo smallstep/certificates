@@ -2,6 +2,8 @@ package ca
 
 import (
 	"context"
+	"crypto/tls"
+	"net"
 	"net/http"
 	"strings"
 
@@ -144,4 +146,55 @@ func BootstrapClient(ctx context.Context, token string, options ...TLSOption) (*
 	return &http.Client{
 		Transport: transport,
 	}, nil
+}
+
+// BootstrapListener is a helper function that using the given token returns a
+// TLS listener which accepts connections from an inner listener and wraps each
+// connection with Server.
+//
+// Without any extra option the server will be configured for mTLS, it will
+// require and verify clients certificates, but options can be used to drop this
+// requirement, the most common will be only verify the certs if given with
+// ca.VerifyClientCertIfGiven(), or add extra CAs with
+// ca.AddClientCA(*x509.Certificate).
+//
+// Usage:
+//   inner, err := net.Listen("tcp", ":443")
+//   if err != nil {
+//     return nil
+//   }
+//   ctx, cancel := context.WithCancel(context.Background())
+//   defer cancel()
+//   lis, err := ca.BootstrapListener(ctx, token, inner)
+//   if err != nil {
+//       return err
+//   }
+//   srv := grpc.NewServer()
+//   ... // register services
+//   srv.Serve(lis)
+func BootstrapListener(ctx context.Context, token string, inner net.Listener, options ...TLSOption) (net.Listener, error) {
+	client, err := Bootstrap(token)
+	if err != nil {
+		return nil, err
+	}
+
+	req, pk, err := CreateSignRequest(token)
+	if err != nil {
+		return nil, err
+	}
+
+	sign, err := client.Sign(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Make sure the tlsConfig have all supported roots on ClientCAs and RootCAs
+	options = append(options, AddRootsToCAs())
+
+	tlsConfig, err := client.GetServerTLSConfig(ctx, sign, pk, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return tls.NewListener(inner, tlsConfig), nil
 }

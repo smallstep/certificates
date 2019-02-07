@@ -3,6 +3,8 @@ package ca
 import (
 	"crypto/tls"
 	"crypto/x509"
+
+	"github.com/smallstep/certificates/api"
 )
 
 // TLSOption defines the type of a function that modifies a tls.Config.
@@ -10,16 +12,22 @@ type TLSOption func(ctx *TLSOptionCtx) error
 
 // TLSOptionCtx is the context modified on TLSOption methods.
 type TLSOptionCtx struct {
-	Client      *Client
-	Config      *tls.Config
-	OnRenewFunc []TLSOption
+	Client        *Client
+	Config        *tls.Config
+	Sign          *api.SignResponse
+	OnRenewFunc   []TLSOption
+	mutableConfig *mutableTLSConfig
+	hasRootCA     bool
+	hasClientCA   bool
 }
 
 // newTLSOptionCtx creates the TLSOption context.
-func newTLSOptionCtx(c *Client, config *tls.Config) *TLSOptionCtx {
+func newTLSOptionCtx(c *Client, config *tls.Config, sign *api.SignResponse) *TLSOptionCtx {
 	return &TLSOptionCtx{
-		Client: c,
-		Config: config,
+		Client:        c,
+		Config:        config,
+		Sign:          sign,
+		mutableConfig: newMutableTLSConfig(),
 	}
 }
 
@@ -29,6 +37,44 @@ func (ctx *TLSOptionCtx) apply(options []TLSOption) error {
 			return err
 		}
 	}
+
+	// Initialize mutable config with the fully configured tls.Config
+	ctx.mutableConfig.Init(ctx.Config)
+
+	// Build RootCAs and ClientCAs with given root certificate if necessary
+	if root, err := RootCertificate(ctx.Sign); err == nil {
+		if !ctx.hasRootCA {
+			if ctx.Config.RootCAs == nil {
+				ctx.Config.RootCAs = x509.NewCertPool()
+			}
+			ctx.Config.RootCAs.AddCert(root)
+			ctx.mutableConfig.AddImmutableRootCACert(root)
+		}
+
+		if !ctx.hasClientCA && ctx.Config.ClientAuth != tls.NoClientCert {
+			if ctx.Config.ClientCAs == nil {
+				ctx.Config.ClientCAs = x509.NewCertPool()
+			}
+			ctx.Config.ClientCAs.AddCert(root)
+			ctx.mutableConfig.AddImmutableClientCACert(root)
+		}
+	}
+
+	// Update tls.Config with mutable data
+	if ctx.Config.RootCAs == nil && len(ctx.mutableConfig.mutRootCerts) > 0 {
+		ctx.Config.RootCAs = x509.NewCertPool()
+	}
+	if ctx.Config.ClientCAs == nil && len(ctx.mutableConfig.mutClientCerts) > 0 {
+		ctx.Config.ClientCAs = x509.NewCertPool()
+	}
+	// Add mutable certificates
+	for _, cert := range ctx.mutableConfig.mutRootCerts {
+		ctx.Config.RootCAs.AddCert(cert)
+	}
+	for _, cert := range ctx.mutableConfig.mutClientCerts {
+		ctx.Config.ClientCAs.AddCert(cert)
+	}
+	ctx.mutableConfig.Reload()
 	return nil
 }
 
@@ -38,6 +84,8 @@ func (ctx *TLSOptionCtx) applyRenew() error {
 			return err
 		}
 	}
+	// Reload mutable config with the changes
+	ctx.mutableConfig.Reload()
 	return nil
 }
 
@@ -68,6 +116,7 @@ func AddRootCA(cert *x509.Certificate) TLSOption {
 			ctx.Config.RootCAs = x509.NewCertPool()
 		}
 		ctx.Config.RootCAs.AddCert(cert)
+		ctx.mutableConfig.AddImmutableRootCACert(cert)
 		return nil
 	}
 }
@@ -81,6 +130,7 @@ func AddClientCA(cert *x509.Certificate) TLSOption {
 			ctx.Config.ClientCAs = x509.NewCertPool()
 		}
 		ctx.Config.ClientCAs.AddCert(cert)
+		ctx.mutableConfig.AddImmutableClientCACert(cert)
 		return nil
 	}
 }
@@ -91,17 +141,14 @@ func AddClientCA(cert *x509.Certificate) TLSOption {
 //
 // BootstrapServer and BootstrapClient methods include this option by default.
 func AddRootsToRootCAs() TLSOption {
+	// var once sync.Once
 	fn := func(ctx *TLSOptionCtx) error {
 		certs, err := ctx.Client.Roots()
 		if err != nil {
 			return err
 		}
-		if ctx.Config.RootCAs == nil {
-			ctx.Config.RootCAs = x509.NewCertPool()
-		}
-		for _, cert := range certs.Certificates {
-			ctx.Config.RootCAs.AddCert(cert.Certificate)
-		}
+		ctx.hasRootCA = true
+		ctx.mutableConfig.AddRootCAs(certs.Certificates)
 		return nil
 	}
 	return func(ctx *TLSOptionCtx) error {
@@ -117,17 +164,14 @@ func AddRootsToRootCAs() TLSOption {
 //
 // BootstrapServer method includes this option by default.
 func AddRootsToClientCAs() TLSOption {
+	// var once sync.Once
 	fn := func(ctx *TLSOptionCtx) error {
 		certs, err := ctx.Client.Roots()
 		if err != nil {
 			return err
 		}
-		if ctx.Config.ClientCAs == nil {
-			ctx.Config.ClientCAs = x509.NewCertPool()
-		}
-		for _, cert := range certs.Certificates {
-			ctx.Config.ClientCAs.AddCert(cert.Certificate)
-		}
+		ctx.hasClientCA = true
+		ctx.mutableConfig.AddClientCAs(certs.Certificates)
 		return nil
 	}
 	return func(ctx *TLSOptionCtx) error {
@@ -145,12 +189,7 @@ func AddFederationToRootCAs() TLSOption {
 		if err != nil {
 			return err
 		}
-		if ctx.Config.RootCAs == nil {
-			ctx.Config.RootCAs = x509.NewCertPool()
-		}
-		for _, cert := range certs.Certificates {
-			ctx.Config.RootCAs.AddCert(cert.Certificate)
-		}
+		ctx.mutableConfig.AddRootCAs(certs.Certificates)
 		return nil
 	}
 	return func(ctx *TLSOptionCtx) error {
@@ -169,12 +208,7 @@ func AddFederationToClientCAs() TLSOption {
 		if err != nil {
 			return err
 		}
-		if ctx.Config.ClientCAs == nil {
-			ctx.Config.ClientCAs = x509.NewCertPool()
-		}
-		for _, cert := range certs.Certificates {
-			ctx.Config.ClientCAs.AddCert(cert.Certificate)
-		}
+		ctx.mutableConfig.AddClientCAs(certs.Certificates)
 		return nil
 	}
 	return func(ctx *TLSOptionCtx) error {
@@ -192,16 +226,10 @@ func AddRootsToCAs() TLSOption {
 		if err != nil {
 			return err
 		}
-		if ctx.Config.ClientCAs == nil {
-			ctx.Config.ClientCAs = x509.NewCertPool()
-		}
-		if ctx.Config.RootCAs == nil {
-			ctx.Config.RootCAs = x509.NewCertPool()
-		}
-		for _, cert := range certs.Certificates {
-			ctx.Config.ClientCAs.AddCert(cert.Certificate)
-			ctx.Config.RootCAs.AddCert(cert.Certificate)
-		}
+		ctx.hasRootCA = true
+		ctx.hasClientCA = true
+		ctx.mutableConfig.AddRootCAs(certs.Certificates)
+		ctx.mutableConfig.AddClientCAs(certs.Certificates)
 		return nil
 	}
 	return func(ctx *TLSOptionCtx) error {
@@ -219,15 +247,20 @@ func AddFederationToCAs() TLSOption {
 		if err != nil {
 			return err
 		}
-		if ctx.Config.ClientCAs == nil {
-			ctx.Config.ClientCAs = x509.NewCertPool()
-		}
-		if ctx.Config.RootCAs == nil {
-			ctx.Config.RootCAs = x509.NewCertPool()
-		}
-		for _, cert := range certs.Certificates {
-			ctx.Config.ClientCAs.AddCert(cert.Certificate)
-			ctx.Config.RootCAs.AddCert(cert.Certificate)
+		if ctx.mutableConfig == nil {
+			if ctx.Config.RootCAs == nil {
+				ctx.Config.RootCAs = x509.NewCertPool()
+			}
+			if ctx.Config.ClientCAs == nil {
+				ctx.Config.ClientCAs = x509.NewCertPool()
+			}
+			for _, cert := range certs.Certificates {
+				ctx.Config.RootCAs.AddCert(cert.Certificate)
+				ctx.Config.ClientCAs.AddCert(cert.Certificate)
+			}
+		} else {
+			ctx.mutableConfig.AddRootCAs(certs.Certificates)
+			ctx.mutableConfig.AddClientCAs(certs.Certificates)
 		}
 		return nil
 	}

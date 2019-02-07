@@ -21,13 +21,21 @@ import (
 // sign certificate, and a new certificate pool with the sign root certificate.
 // The client certificate will automatically rotate before expiring.
 func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options ...TLSOption) (*tls.Config, error) {
-	cert, err := TLSCertificate(sign, pk)
+	tlsConfig, _, err := c.getClientTLSConfig(ctx, sign, pk, options)
 	if err != nil {
 		return nil, err
 	}
+	return tlsConfig, nil
+}
+
+func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options []TLSOption) (*tls.Config, *http.Transport, error) {
+	cert, err := TLSCertificate(sign, pk)
+	if err != nil {
+		return nil, nil, err
+	}
 	renewer, err := NewTLSRenewer(cert, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	tlsConfig := getDefaultTLSConfig(sign)
@@ -35,22 +43,20 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	// Without tlsConfig.Certificates there's not need to use tlsConfig.BuildNameToCertificate()
 	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
 	tlsConfig.PreferServerCipherSuites = true
-	// Build RootCAs with given root certificate
-	if pool := getCertPool(sign); pool != nil {
-		tlsConfig.RootCAs = pool
-	}
 
-	// Apply options if given
-	tlsCtx := newTLSOptionCtx(c, tlsConfig)
+	// Apply options and initialize mutable tls.Config
+	tlsCtx := newTLSOptionCtx(c, tlsConfig, sign)
 	if err := tlsCtx.apply(options); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Update renew function with transport
 	tr, err := getDefaultTransport(tlsConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	// Use mutable tls.Config on renew
+	tr.DialTLS = c.buildDialTLS(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Update client transport
@@ -58,7 +64,7 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 	// Start renewer
 	renewer.RunContext(ctx)
-	return tlsConfig, nil
+	return tlsConfig, tr, nil
 }
 
 // GetServerTLSConfig returns a tls.Config for server use configured with the
@@ -82,25 +88,26 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	tlsConfig.GetCertificate = renewer.GetCertificate
 	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
 	tlsConfig.PreferServerCipherSuites = true
-	// Build RootCAs with given root certificate
-	if pool := getCertPool(sign); pool != nil {
-		tlsConfig.ClientCAs = pool
-		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		// Add RootCAs for refresh client
-		tlsConfig.RootCAs = pool
-	}
+	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 
-	// Apply options if given
-	tlsCtx := newTLSOptionCtx(c, tlsConfig)
+	// Apply options and initialize mutable tls.Config
+	tlsCtx := newTLSOptionCtx(c, tlsConfig, sign)
 	if err := tlsCtx.apply(options); err != nil {
 		return nil, err
 	}
+
+	// GetConfigForClient allows seamless root and federated roots rotation.
+	// If the return of the callback is not-nil, it will use the returned
+	// tls.Config instead of the default one.
+	tlsConfig.GetConfigForClient = c.buildGetConfigForClient(tlsCtx)
 
 	// Update renew function with transport
 	tr, err := getDefaultTransport(tlsConfig)
 	if err != nil {
 		return nil, err
 	}
+	// Use mutable tls.Config on renew
+	tr.DialTLS = c.buildDialTLS(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Update client transport
@@ -113,17 +120,40 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 // Transport returns an http.Transport configured to use the client certificate from the sign response.
 func (c *Client) Transport(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options ...TLSOption) (*http.Transport, error) {
-	tlsConfig, err := c.GetClientTLSConfig(ctx, sign, pk, options...)
+	_, tr, err := c.getClientTLSConfig(ctx, sign, pk, options)
 	if err != nil {
 		return nil, err
 	}
-	return getDefaultTransport(tlsConfig)
+	return tr, nil
+}
+
+// buildGetConfigForClient returns an implementation of GetConfigForClient
+// callback in tls.Config.
+//
+// If the implementation returns a nil tls.Config, the original Config will be
+// used, but if it's non-nil, the returned Config will be used to handle this
+// connection.
+func (c *Client) buildGetConfigForClient(ctx *TLSOptionCtx) func(*tls.ClientHelloInfo) (*tls.Config, error) {
+	return func(*tls.ClientHelloInfo) (*tls.Config, error) {
+		return ctx.mutableConfig.TLSConfig(), nil
+	}
+}
+
+// buildDialTLS returns an implementation of DialTLS callback in http.Transport.
+func (c *Client) buildDialTLS(ctx *TLSOptionCtx) func(network, addr string) (net.Conn, error) {
+	return func(network, addr string) (net.Conn, error) {
+		return tls.DialWithDialer(&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}, network, addr, ctx.mutableConfig.TLSConfig())
+	}
 }
 
 // Certificate returns the server or client certificate from the sign response.
 func Certificate(sign *api.SignResponse) (*x509.Certificate, error) {
 	if sign.ServerPEM.Certificate == nil {
-		return nil, errors.New("ca: certificate does not exists")
+		return nil, errors.New("ca: certificate does not exist")
 	}
 	return sign.ServerPEM.Certificate, nil
 }
@@ -132,19 +162,19 @@ func Certificate(sign *api.SignResponse) (*x509.Certificate, error) {
 // response.
 func IntermediateCertificate(sign *api.SignResponse) (*x509.Certificate, error) {
 	if sign.CaPEM.Certificate == nil {
-		return nil, errors.New("ca: certificate does not exists")
+		return nil, errors.New("ca: certificate does not exist")
 	}
 	return sign.CaPEM.Certificate, nil
 }
 
 // RootCertificate returns the root certificate from the sign response.
 func RootCertificate(sign *api.SignResponse) (*x509.Certificate, error) {
-	if sign.TLS == nil || len(sign.TLS.VerifiedChains) == 0 {
-		return nil, errors.New("ca: certificate does not exists")
+	if sign == nil || sign.TLS == nil || len(sign.TLS.VerifiedChains) == 0 {
+		return nil, errors.New("ca: certificate does not exist")
 	}
 	lastChain := sign.TLS.VerifiedChains[len(sign.TLS.VerifiedChains)-1]
 	if len(lastChain) == 0 {
-		return nil, errors.New("ca: certificate does not exists")
+		return nil, errors.New("ca: certificate does not exist")
 	}
 	return lastChain[len(lastChain)-1], nil
 }
@@ -176,17 +206,6 @@ func TLSCertificate(sign *api.SignResponse, pk crypto.PrivateKey) (*tls.Certific
 	}
 	cert.Leaf = leaf
 	return &cert, nil
-}
-
-// getCertPool returns the transport x509.CertPool or the one from the sign
-// request.
-func getCertPool(sign *api.SignResponse) *x509.CertPool {
-	if root, err := RootCertificate(sign); err == nil {
-		pool := x509.NewCertPool()
-		pool.AddCert(root)
-		return pool
-	}
-	return nil
 }
 
 func getDefaultTLSConfig(sign *api.SignResponse) *tls.Config {
