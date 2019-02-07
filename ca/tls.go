@@ -153,7 +153,7 @@ func (c *Client) buildDialTLS(ctx *TLSOptionCtx) func(network, addr string) (net
 // Certificate returns the server or client certificate from the sign response.
 func Certificate(sign *api.SignResponse) (*x509.Certificate, error) {
 	if sign.ServerPEM.Certificate == nil {
-		return nil, errors.New("ca: certificate does not exists")
+		return nil, errors.New("ca: certificate does not exist")
 	}
 	return sign.ServerPEM.Certificate, nil
 }
@@ -162,7 +162,7 @@ func Certificate(sign *api.SignResponse) (*x509.Certificate, error) {
 // response.
 func IntermediateCertificate(sign *api.SignResponse) (*x509.Certificate, error) {
 	if sign.CaPEM.Certificate == nil {
-		return nil, errors.New("ca: certificate does not exists")
+		return nil, errors.New("ca: certificate does not exist")
 	}
 	return sign.CaPEM.Certificate, nil
 }
@@ -170,11 +170,11 @@ func IntermediateCertificate(sign *api.SignResponse) (*x509.Certificate, error) 
 // RootCertificate returns the root certificate from the sign response.
 func RootCertificate(sign *api.SignResponse) (*x509.Certificate, error) {
 	if sign == nil || sign.TLS == nil || len(sign.TLS.VerifiedChains) == 0 {
-		return nil, errors.New("ca: certificate does not exists")
+		return nil, errors.New("ca: certificate does not exist")
 	}
 	lastChain := sign.TLS.VerifiedChains[len(sign.TLS.VerifiedChains)-1]
 	if len(lastChain) == 0 {
-		return nil, errors.New("ca: certificate does not exists")
+		return nil, errors.New("ca: certificate does not exist")
 	}
 	return lastChain[len(lastChain)-1], nil
 }
