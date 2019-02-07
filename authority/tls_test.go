@@ -7,6 +7,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"fmt"
+	"net"
 	"net/http"
 	"testing"
 	"time"
@@ -18,10 +19,13 @@ import (
 	"github.com/smallstep/cli/crypto/x509util"
 )
 
-func getCSR(t *testing.T, priv interface{}) *x509.CertificateRequest {
+func getCSR(t *testing.T, priv interface{}, opts ...func(*x509.CertificateRequest)) *x509.CertificateRequest {
 	_csr := &x509.CertificateRequest{
-		Subject:  pkix.Name{CommonName: "test.smallstep.com"},
+		Subject:  pkix.Name{CommonName: "smallstep test"},
 		DNSNames: []string{"test.smallstep.com"},
+	}
+	for _, opt := range opts {
+		opt(_csr)
 	}
 	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, _csr, priv)
 	assert.FatalError(t, err)
@@ -52,6 +56,12 @@ func TestSign(t *testing.T) {
 	}
 
 	p := a.config.AuthorityConfig.Provisioners[1]
+	extraOpts := []interface{}{
+		&commonNameClaim{"smallstep test"},
+		&dnsNamesClaim{[]string{"test.smallstep.com"}},
+		&ipAddressesClaim{[]net.IP{}},
+		p,
+	}
 
 	type signTest struct {
 		auth      *Authority
@@ -67,7 +77,7 @@ func TestSign(t *testing.T) {
 			return &signTest{
 				auth:      a,
 				csr:       csr,
-				extraOpts: []interface{}{p, "42"},
+				extraOpts: append(extraOpts, "42"),
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: invalid extra option type string"),
 					http.StatusInternalServerError,
@@ -81,7 +91,7 @@ func TestSign(t *testing.T) {
 			return &signTest{
 				auth:      a,
 				csr:       csr,
-				extraOpts: []interface{}{p},
+				extraOpts: extraOpts,
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: error converting x509 csr to stepx509 csr"),
 					http.StatusInternalServerError,
@@ -96,7 +106,7 @@ func TestSign(t *testing.T) {
 			return &signTest{
 				auth:      _a,
 				csr:       csr,
-				extraOpts: []interface{}{p},
+				extraOpts: extraOpts,
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: default ASN1DN template cannot be nil"),
 					http.StatusInternalServerError,
@@ -128,11 +138,26 @@ func TestSign(t *testing.T) {
 			return &signTest{
 				auth:      a,
 				csr:       csr,
-				extraOpts: []interface{}{p},
+				extraOpts: extraOpts,
 				signOpts:  _signOpts,
 				err: &apiError{errors.New("sign: requested duration of 25h0m0s is more than the authorized maximum certificate duration of 24h0m0s"),
 					http.StatusUnauthorized,
 					context{"csr": csr, "signOptions": _signOpts},
+				},
+			}
+		},
+		"fail validate sans when adding common name not in claims": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv, func(csr *x509.CertificateRequest) {
+				csr.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
+			})
+			return &signTest{
+				auth:      a,
+				csr:       csr,
+				extraOpts: extraOpts,
+				signOpts:  signOpts,
+				err: &apiError{errors.New("sign: DNS names claim failed - got [test.smallstep.com smallstep test], want [test.smallstep.com]"),
+					http.StatusUnauthorized,
+					context{"csr": csr, "signOptions": signOpts},
 				},
 			}
 		},
@@ -141,7 +166,7 @@ func TestSign(t *testing.T) {
 			return &signTest{
 				auth:      a,
 				csr:       csr,
-				extraOpts: []interface{}{p},
+				extraOpts: extraOpts,
 				signOpts:  signOpts,
 			}
 		},
@@ -175,7 +200,7 @@ func TestSign(t *testing.T) {
 							Locality:      []string{tmplt.Locality},
 							StreetAddress: []string{tmplt.StreetAddress},
 							Province:      []string{tmplt.Province},
-							CommonName:    tmplt.CommonName,
+							CommonName:    "smallstep test",
 						}))
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
 

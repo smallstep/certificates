@@ -114,7 +114,6 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 			}
 			mods = append(mods, m...)
 			mods = append(mods, []x509util.WithOption{
-				x509util.WithHosts(csr.Subject.CommonName),
 				withDefaultASN1DN(a.config.AuthorityConfig.Template),
 			}...)
 			claims = append(claims, c...)
