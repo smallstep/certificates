@@ -74,3 +74,11 @@ languages are appreciated!
   - [X] Restrict to safe ciphersuites and TLS versions
   - [ ] TLS stack configuration loaded from `step-ca`
   - [ ] Root certificate rotation
+
+[envoy/](envoy/)
+- [X] Server
+  - [X] mTLS (client authentication using internal root certificate)
+  - [X] Automatic certificate renewal
+  - [X] Restrict to safe ciphersuites and TLS versions
+  - [ ] TLS stack configuration loaded from `step-ca`
+  - [ ] Root certificate rotation
