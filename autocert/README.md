@@ -11,9 +11,9 @@
 [![Autocert Image](https://images.microbadger.com/badges/image/smallstep/autocert-controller.svg)](https://microbadger.com/images/smallstep/autocert-controller)
 [![Renewer Image](https://images.microbadger.com/badges/image/smallstep/autocert-renewer.svg)](https://microbadger.com/images/smallstep/autocert-renewer) -->
 
-**Autocert** is a kubernetes add-on that automatically injects TLS/HTTPS certificates into your containers.
+<!--- TODO: 👋 Welcome. We ❤️ feedback. Submit an issue. Fork and send a PR. Give us a ⭐ if you like what we're doing. --->
 
-<!--- 👋 Welcome. We ❤️ feedback. Submit an issue. Fork and send a PR. Give us a ⭐ if you like what we're doing. --->
+**Autocert** is a kubernetes add-on that automatically injects TLS/HTTPS certificates into your containers.
 
 To get a certificate **simply annotate your pods** with a name. An X.509 (TLS/HTTPS) certificate is automatically created and mounted at `/var/run/autocert.step.sm/` along with a corresponding private key and root certificate (everything you need for [mTLS](#motivation)).
 
@@ -23,51 +23,37 @@ TODO: Twitter, Slack, Issues (tagged with #autocert / special template)...
 
 ![Autocert demo gif](https://raw.githubusercontent.com/smallstep/certificates/autocert/autocert/demo.gif)
 
-## Table of Contents
+## Motivation
 
-* [Features](#features)
-* [Motivation](#motivation)
-* [Getting Started](#getting-started)
-  * [Prerequisites](#prerequisites)
-  * [Installation](#install)
-  * [Enabling autocert](#enable-autocert)
-  * [Annotating pods](#annotate-pods)
-* [Examples](#example)
-  * [Mutual TLS](#mutual-tls)
-  * [Getting a certificate locally](#local-certificate)
-* [How it works](#how-it-works)
-* [Uninstalling](#uninstalling)
-* [Questions](#questions)
+`Autocert` exists to **make it easy to use mTLS** (mutual TLS) to **improve security** within a cluster and to **secure communication into, out of, and between kubernetes clusters**. The goal is to make right and proper public key infrastructure (PKI) more accessible to people running kubernetes.
+
+TLS (and HTTPS, which is HTTP over TLS) provides _authenticated encryption_: an _identity dialtone_ and _end-to-end encryption_ for your workloads. It's like a secure line with caller ID. This has all sorts of benefits: better security, compliance, and easier auditability for starters. It makes workloads identity-aware, improving observability and enabling granular access control. Perhaps most compelling, [mutual TLS](#) (mTLS) lets you securely communicate with workloads running anywhere, not just inside kubernetes.
+
+TODO: Diagram
+
+If you know how to operate and scale DNS and proxy infrastructure then you already know how to scale and operate secure service-to-service communication using mTLS (mutual TLS). There's just one problem: **you need certificates issued by your own certificate authority (CA)**. Building and operating a CA, issuing certificates, and making sure they're renewed before they expire is tricky. `Autocert` does all of this for you.
+
+Because `autocert` is built on [`step certificates`](#) you can easily extend access to developers, endpoints, and workloads running outside your cluster.
 
 ## Features
 
-Autocert uses [`step certificates`](https://github.com/smallstep/certificates) to generate keys and issue certificates from your own **internal certificate authority**. This process is secure and automatic, all you have to do is [install autocert](#install) and [annotate your pods](#annotate-pods). Features include:
+First and foremost, `autocert` is easy. You can **get started in minutes**.
 
- * A complete **public key infrastructure** (PKI) for your kubernetes clusters
-   * A fully featured internal **certificate authority** (CA) that you control so you can **use mTLS to control access to services**
-   * Ability to run subnordinate to or federated with an existing PKI
-   * CA and PKI artifacts are installed in their own namespace (`step`) for easy access control
- * Modern certificate best practices
-   * Automated certificate management (auto enrollment and renewal)
-   * Short-lived certificates
-   * Private keys are never transmitted across the network (and aren't stored in `etcd`)
-   * RFC5280 and CA/Browser Forum compliant certificates that work with browsers and other standard TLS implementations
- * Easily enable/disable per-namespace [using labels](#enable-autocert)
- * Builds on [`step certificates`](https://github.com/smallstep/certificates) so you can also issue certificates to servers, people, and code running in a different cluster and outside of kubernetes
+`Autocert` uses [`step certificates`](https://github.com/smallstep/certificates) to generate keys and issue certificates. This process is secure and automatic, all you have to do is [install autocert](#install) and [annotate your pods](#annotate-pods).
 
-## Motivation
+Features include:
 
-TLS (e.g., HTTPS) is the most widely deployed cryptographic protocol in the world. Mutual TLS (mTLS) provides end-to-end security for service-to-service communication and can **replace complex VPNs** to secure communication into, out of, and between kubernetes clusters. But **to use mTLS to secure internal services you need certificates issued by your own certificate authority (CA)**.
-
-Building and operating a CA, issuing certificates, and making sure they're renewed before they expire is tricky. Autocert does all of this for you.
+ * A fully featured private **certificate authority** (CA) for workloads running on kubernetes and elsewhere
+ * [RFC5280](#) and [CA/Browser Forum](#) compliant certificates that work **for TLS**
+ * Namespaced installation into the `step` namespace so it's **easy to lock down** your CA
+ * Short-lived certificates with **fully automated** enrollment and renewal
+ * Private keys are never transmitted across the network and aren't stored in `etcd`
 
 ## Getting Started
 
-These instructions will get `autocert` installed quickly on an existing kubernetes cluster.
-
 ### Prerequisites
 
-You'll need `kubectl` and a kubernetes cluster running version `1.9` or later with [webhook admission controllers](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) enabled:
+All you need to get started is [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl) and a cluster running kubernetes `1.9` or later with [admission webhooks](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) enabled:
 
 ```bash
 $ kubectl version --short
@@ -77,57 +63,25 @@ $ kubectl api-versions | grep "admissionregistration.k8s.io/v1beta1"
 admissionregistration.k8s.io/v1beta1
 ```
 
-For [manual installation](INSTALL.md) you'll also need to [`install step`](https://github.com/smallstep/cli#installing) version `0.8.3` or later.
-
-```bash
-$ step version
-Smallstep CLI/0.8.3 (darwin/amd64)
-Release Date: 2019-01-16 01:46 UTC
-```
-
 ### Install
 
-To install `step certificates` and `autocert` in one step run:
+To install `autocert` run:
 
 ```bash
-$ kubectl run autocert-init -it --rm --image smallstep/autocert-init --restart Never
+kubectl run autocert-init -it --rm --image smallstep/autocert-init --restart Never
 ```
 
-The init script will end by printing:
+💥 installation complete.
 
- * The admin provisioner password (also used to encrypt the CA's key material)
- * The `autocert` provisioner password (used by the mutating webhook)
- * Your CA's root certificate fingerprint (used to bootstrap secure communication)
+> You might want to [check out what this command does](init/autocert.sh) before running it. You can also [install `autocert` manually](INSTALL.md) if that's your style.
 
-Feel free to store these some place safe. The passwords are also stored as secrets in the `step` namespace.
+## Usage
 
-> 🤔 **Tip:** If you lose your root certificate fingerprint you can calculate it again by running:
-> 
-> ```
-> $ export CA_POD=$(kubectl -n step get pods -l app=ca \
->     -o jsonpath={$.items[0].metadata.name})
-> $ kubectl -n step exec -it $CA_POD -- step certificate fingerprint /home/step/.step/certs/root_ca.crt
-> ```
+### Enable autocert (per namespace)
 
-> 🤯 **Note:** You may need to adjust your RBAC policies to run `autocert-init`:
-> 
-> ```bash
-> $ kubectl create clusterrolebinding autocert-init-binding \
->   --clusterrole cluster-admin \
->   --user "system:serviceaccount:default:default"
-> ```
-> 
-> Once `autocert-init` is complete you can delete this binding:
-> 
-> ```bash
-> $ kubectl delete clusterrolebinding autocert-init-binding
-> ```
+To enable `autocert` for a namespace it must be labelled `autocert.step.sm=enabled`.
 
-Feel free to [check out what the `autocert-init` container does](init/autocert.sh) if you're curious. You can also [install manually](INSTALL.md).
-
-### Enable autocert
-
-To enable `autocert` for a namespace it must be labelled `autocert.step.sm=enabled`. To label the `default` namespace run:
+To label the `default` namespace run:
 
 ```bash
 $ kubectl label namespace default autocert.step.sm=enabled
@@ -142,223 +96,136 @@ default       Active   59m   enabled
 ...
 ```
 
-### Annotate pods
+### Annotate pods to get certificates
 
-For `autocert` to inject a certificate pods must use the `autocert.step.sm/name` annotation to specify their name. The value of this annotation will appear as the name in the issued certificate (the X.509 common name and SAN).
+To tell `autocert` to issue certificates to a pod's containers you need to [specify a name](RUNBOOK.md#naming-considerations) using the `autocert.step.sm/name` annotation. This name will appear in the issued certificate (as the X.509 common name and SAN).
+
+To test your installation apply this annotated deployment, which starts a [simple server](examples/hello-mtls/go/server.go) that uses mTLS:
+
+```yaml
+cat <<EOF | kubectl apply -f - 
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: hello-mtls, labels: {app: hello-mtls}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: hello-mtls}}
+  template:
+    metadata:
+      annotations:
+        # AUTOCERT ANNOTATION HERE -v
+        autocert.step.sm/name: hello-mtls.default.svc.cluster.local
+        # AUTOCERT ANNOTATION HERE -^
+      labels: {app: hello-mtls}
+    spec:
+      containers:
+      - name: hello-mtls
+        image: smallstep/hello-mtls-server-go:latest
+EOF
+```
+
+Our new container should have a certificate, private key, and root certificate mounted at `/var/run/autocert.step.sm`:
+
+```bash
+$ export HELLO_MTLS=$(kubectl get pods -l app=hello-mtls -o jsonpath={$.items[0].metadata.name})
+$ kubectl exec -it $HELLO_MTLS -c hello-mtls -- ls /var/run/autocert.step.sm
+root.crt  site.crt  site.key
+$ kubectl exec -it $HELLO_MTLS -c autocert-renewer -- step certificate inspect /var/run/autocert.step.sm/site.crt | grep "Subject: CN" | awk -F= '{print $2}'
+hello-mts.default.svc.cluster.local
+```
+
+We're done. Our container has a certificate, issued by our CA, and `autocert` will take care of renewal automatically.
+
+✅ Certificates.
+
+## Hello mTLS
+
+It's easy to deploy certificates automatically with `autocert`, but it's up to you to use them correctly. To get you started, [`hello-mtls`](examples/hello-mtls) demonstrates the right way to use mTLS with various tools and languages (contributions welcome :). If you're a bit fuzzy on how mTLS works, [the `hello-mtls` README](examples/hello-mtls) is a great place to start.
+
+To finish out this tutorial let's keep things simple and try `curl`ing the server we just deployed from inside and outside the cluster.
+
+### Connecting from inside the cluster
+
+First, let's expose our workload to the rest of the cluster using a service:
+
+```
+kubectl expose deployment hello-mtls --port 443
+```
+
+Now we can `curl` our server from another container using a certificate issued by `autocert`:
 
 ```yaml
 $ cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: sleep}
+metadata: {name: hello-mtls-client, labels: {app: hello-mtls-client}}
 spec:
   replicas: 1
-  selector: {matchLabels: {app: sleep}}
+  selector: {matchLabels: {app: hello-mtls-client}}
   template:
     metadata:
       annotations:
-        # Autocert annotation
-        autocert.step.sm/name: sleep.default.svc.cluster.local
-      labels: {app: sleep}
+        # AUTOCERT ANNOTATION HERE -v
+        autocert.step.sm/name: hello-mtls-client.default.pod.cluster.local
+        # AUTOCERT ANNOTATION HERE -^
+      labels: {app: hello-mtls-client}
     spec:
       containers:
-      - name: sleep
-        image: alpine
-        command: ["/bin/sleep", "86400"]
+      - name: hello-mtls-client
+        image: smallstep/hello-mtls-client-curl:latest
+        env: [{name: HELLO_MTLS_URL, value: https://hello-mtls.default.svc.cluster.local}]
 EOF
 ```
 
-Once the pod has started we can check that our certificate, private key, and root certificate have been properly mounted in our container at `/var/run/autocert.step.sm`.
-
-```bash
-$ export SLEEP_POD=$(kubectl get pods -l app=sleep \
-    -o jsonpath={$.items[0].metadata.name})
-$ kubectl exec -it $SLEEP_POD -c sleep -- ls /var/run/autocert.step.sm
-root.crt  site.crt  site.key
-```
-
-> 🤔 **Tip:** The `autocert-renewer` sidecar also installs the [`step` CLI tool](https://github.com/smallstep/cli), which we can use to inspect the issued certificate.
-> 
-> ```bash
-> $ kubectl exec -it $SLEEP_POD -c autocert-renewer -- step \
->     certificate inspect /var/run/autocert.step.sm/site.crt
-> Certificate:
->     Data:
->         Version: 3 (0x2)
->         Serial Number: 38872628668914277126045555806003435350 (0x1d3e9890a42ae5861b8a6cb51aa29756)
->     Signature Algorithm: ECDSA-SHA256
->         Issuer: CN=Autocert Intermediate CA
->         Validity
->             Not Before: Jan 19 01:59:06 2019 UTC
->             Not After : Jan 20 01:59:06 2019 UTC
->         Subject: CN=sleep.default.svc.cluster.local
->         Subject Public Key Info:
->             Public Key Algorithm: ECDSA
->                 Public-Key: (256 bit)
->                 X:
->                     e9:f7:f6:04:c5:b5:af:c7:ff:95:19:69:09:74:57:
->                     31:a9:24:a7:31:d8:e4:f1:2a:0e:8c:89:fa:b5:aa:
->                     fa:d9
->                 Y:
->                     26:bc:6c:0f:ad:57:6e:75:ea:8e:d5:ca:bf:b0:c9:
->                     43:61:dc:42:8a:ef:42:79:17:b7:02:8a:07:2e:58:
->                     4c:50
->                 Curve: P-256
->         X509v3 extensions:
->             X509v3 Key Usage: critical
->                 Digital Signature, Key Encipherment
->             X509v3 Extended Key Usage:
->                 TLS Web Server Authentication, TLS Web Client Authentication
->             X509v3 Subject Key Identifier:
->                 BE:3E:92:68:7D:82:61:91:93:C2:E0:DF:77:1F:CD:EF:36:2D:8E:41
->             X509v3 Authority Key Identifier:
->                 keyid:69:BA:E5:9C:6D:66:39:B3:3E:8B:28:85:26:75:34:A6:91:07:F6:4E
->             X509v3 Subject Alternative Name:
->                 DNS:sleep.default.svc.cluster.local
->             X509v3 Step Provisioner:
->                 Type: JWK
->                 Name: autocert
->                 CredentialID: 7OOZUAEgixopdF_Yk7wMtkHv-op6p8FqSfEk3B6nry0
-> 
->     Signature Algorithm: ECDSA-SHA256
->          30:45:02:20:6c:79:31:69:11:65:88:48:fc:a0:a0:f4:8e:bd:
->          81:62:83:6a:d7:66:fa:9c:d0:43:1e:15:69:3a:3c:e0:8e:2b:
->          02:21:00:c2:4a:51:85:25:4f:c1:68:de:07:50:53:8c:36:b3:
->          2c:a3:56:d1:1d:11:3d:aa:77:d1:2e:1e:54:75:1d:f3:0d
-> ```
-
-## Examples
-
-With `autocert` issuing and rotating certificates we can start using mTLS between services. The [`examples/hello-mtls`](examples/hello-mtls) directory demonstrates the right way to do mTLS in several languages (contributions welcome :). Let's deploy one.
-
-### Mutual TLS
-
-Build and deploy the `hello-mtls` server for golang:
-
-```bash
-$ cd examples/hello-mtls/go
-$ docker build -f Dockerfile.server -t hello-mtls-server-go .
-$ kubectl apply -f hello-mtls.server.yaml
-```
-
-Build and deploy the `hello-mtls` client for golang:
-
-```bash
-$ docker build -f Dockerfile.client -t hello-mtls-client-go .
-$ kubectl apply -f hello-mtls.client.yaml
-```
-
-Check that the client is connecting and working as expected:
-
-```bash
-$ export HELLO_MTLS=$(kubectl get pods -l app=hello-mtls-client \
-    -o jsonpath={$.items[0].metadata.name})
-$ kubectl logs $HELLO_MTLS -c hello-mtls-client -f
-2019-01-25T01:36:57Z: Hello, hello-mtls-client.default.pod.cluster.local!
-2019-01-25T01:37:02Z: Hello, hello-mtls-client.default.pod.cluster.local!
-2019-01-25T01:37:07Z: Hello, hello-mtls-client.default.pod.cluster.local!
-...
-```
-
-We can also `exec` into the `sleep` container we deployed earlier
-
-```bash
-$ kubectl exec -it $SLEEP_POD -c sleep -- sh
-```
-
-install `curl`, and hit `hello-mtls` from there:
-
-```bash
-sleep# apk add curl
-sleep# curl --cacert /var/run/autocert.step.sm/root.crt \
-            --cert /var/run/autocert.step.sm/site.crt \
-            --key /var/run/autocert.step.sm/site.key \
-            https://hello-mtls.default.svc.cluster.local
-Hello, sleep.default.svc.cluster.local!
-```
-
-> 🤯 **A few ways things that can go sideways:**
->
-> If we don't provide a client certificate for authentication the request will fail because we haven't authenticated ourselves to the server:
-> 
-> ```
-> sleep# curl --cacert /var/run/autocert.step.sm/root.crt \
->             https://hello-mtls.default.svc.cluster.local
-> curl: (35) error:1401E412:SSL routines:CONNECT_CR_FINISHED:sslv3 alert bad certificate
-> ```
-> 
-> `curl` will also balk if we don't tell it to trust our `root.crt`, this time because it can't validate the server's certificate:
-> 
-> ```
-> sleep# curl https://hello-mtls.default.svc.cluster.local
-> curl: (60) SSL certificate problem: unable to get local issuer certificate
-> More details here: https://curl.haxx.se/docs/sslcerts.html
-> 
-> curl failed to verify the legitimacy of the server and therefore could not
-> establish a secure connection to it. To learn more about this situation and
-> how to fix it, please visit the web page mentioned above.
-> ```
-> 
-> You'll get similar errors from other tools, libraries, and applications if they're not properly configured to use the `autocert` certificates and keys. Minimally, for (non-mutual) TLS:
-> 
->  * Clients must be configured to trust the `autocert` root certificate (`/var/run/autocert.step.sm/root.crt`) to authenticate a server
->  * Servers must be configured to use the key and certificate issued by `autocert` (`/var/run/autocert.step.sm/site.crt` and `/var/run/autocert.step.sm/site.key`) to authenticate *to* a client
->
-> If you're doing mTLS the inverse is also true: the server must trust the root certificate to authenticate client, and the client must be configured to use the `autocert`-issued key and certificate. In other words, for mTLS both the client and server should be configured to use `autocert`'s `root.crt`, `site.crt`, and `site.key`. With `curl` this is done using the `--cacert`, `--cert`, and `--key` flags, respectively.
-
-### Exposing services using mTLS
-
-With properly configured mTLS, services can be safely exposed directly to the public internet: **only clients that have a certificate issued by the internal certificate authority will be allowed to connect**. To demonstrate let's expose our `hello-mtls` service.
-
-If you need a refresher, here's a rough approximation of how an mTLS handshake works:
-
-![mTLS handshake diagram](https://raw.githubusercontent.com/smallstep/certificates/autocert/autocert/mtls-handshake.png)
-
-A few things to note:
-
- * It's the signing of random numbers that proves we're talking to the right remote. It's the digital equivalent of asking someone to send you a photo of them with today's newspaper.
- * The client and server need to have prior knowledge of the root certificate(s) used for signing other certificates.
- * The client and server need to be configured to use the correct certificate and private key (the certificate must have been issued by a CA with a trusted root certificate)
-
-#### Exposing `hello-mtls`
-
-Because `hello-mtls` does proper mTLS itself we can expose it simply using a [service with type LoadBalancer](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer).
+Once deployed the client logs should indicate that it's successfully connecting to our server using mTLS, which is [echoing the client's name](examples/hello-mtls/go/server.go#L71-L72) in response.
 
 ```
-$ kubectl expose deployment hello-mtls --name=hello-mtls-lb --port=443 --target-port=443 --type=LoadBalancer
-service/loadbalancer exposed
-$ kubectl get svc hello-mtls-lb
-NAME            TYPE           CLUSTER-IP    EXTERNAL-IP       PORT(S)   AGE
-hello-mtls-lb   LoadBalancer   10.0.65.118   104.198.149.140   443/TCP    5m
+$ export HELLO_MTLS_CLIENT=$(kubectl get pods -l app=hello-mtls-client -o jsonpath={$.items[0].metadata.name})
+$ kubectl logs $HELLO_MTLS_CLIENT -c hello-mtls-client
+Thu Feb  7 23:35:23 UTC 2019: Hello, hello-mtls-client.default.pod.cluster.local!
+Thu Feb  7 23:35:28 UTC 2019: Hello, hello-mtls-client.default.pod.cluster.local!
 ```
 
-#### Obtaining a certificate locally
-
-To connect to `hello-mtls` from outside kubernetes we need a certificate issued by our internal CA. Since `autocert` is built on `step certificates` we can securely issue certificates to users, devices, and workloads running in other environments.
-
-> 🤯 **Note:** To follow along you'll need `step` [installed locally](https://github.com/smallstep/cli#installing).
-
-First, port-forward from localhost to the `step-ca` pod:
+For kicks, let's `exec` into this pod and try `curl`ing ourselves:
 
 ```
-$ export CA_POD=$(kubectl -n step get pods -l app=ca \
-    -o jsonpath={$.items[0].metadata.name})
+$ kubectl exec $HELLO_MTLS_CLIENT -c hello-mtls-client -- curl -sS \
+       --cacert /var/run/autocert.step.sm/root.crt \
+       --cert /var/run/autocert.step.sm/site.crt \
+       --key /var/run/autocert.step.sm/site.key \
+       https://hello-mtls.default.svc.cluster.local
+Hello, hello-mtls-client.default.pod.cluster.local!
+```
+
+✅ mTLS inside cluster.
+
+### Connecting from outside the cluster
+
+Connecting from outside the cluster is a bit more complicated. We need to handle DNS and obtain a certificate ourselves (tasks which were handled automatically inside the cluster by kubernetes and `autocert`, respectively).
+
+That said, since we're using mTLS our server can be safely exposed directly to the public internet using a [LoadBalancer service type](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer): **only clients that have a certificate issued by our certificate authority will be allowed to connect**.
+
+
+```
+kubectl expose deployment hello-mtls --name=hello-mtls-lb --port=443 --type=LoadBalancer
+```
+
+To connect we need a certificate, which we'll need to obtain from the CA. There are a [couple](RUNBOOK.md#federation) [ways](RUNBOOK.md#exposing-the-ca) to do this, but for simplicity we'll just forward a port.
+
+To follow along you'll need to [`install step`](https://github.com/smallstep/cli#installing).
+
+```
+$ export CA_POD=$(kubectl -n step get pods -l app=ca -o jsonpath={$.items[0].metadata.name})
 $ kubectl -n step port-forward $CA_POD 4443:4443
 ```
 
-Now we can use `step` to securely grab the CA's root certificate and obtain a certificate. You'll be prompted to select a provisioner and enter the correct password to continue:
+In another window we can use `step` to grab the root certificate, generate a key pair, and get a certificate to use with `curl`. You'll need the admin password and CA fingerprint output during installation (see [here](RUNBOOK.md#recovering-fingerprint) and [here](#RUNBOOK.md#recovering-admin-password) if you already lost them :).
 
 ```bash
-# Get root certificate fingerprint
-$ export FINGERPRINT="$(kubectl -n step exec -it $CA_POD -- \
-    step certificate fingerprint /home/step/.step/certs/root_ca.crt | tr -d '[:space:]')"
-
-# Fetch and verify root certificate
+$ export CA_POD=$(kubectl -n step get pods -l app=ca -o jsonpath={$.items[0].metadata.name})
 $ step ca root root.crt \
     --ca-url https://127.0.0.1:4443 \
-    --fingerprint $FINGERPRINT
-
-# Get a certificate locally
+    --fingerprint <fingerprint>
 $ step ca certificate snarf.local.dev snarf.crt snarf.key \
     --ca-url https://127.0.0.1:4443 \
     --root root.crt
@@ -367,51 +234,12 @@ $ step ca certificate snarf.local.dev snarf.crt snarf.key \
 ✔ CA: https://127.0.0.1:4443/1.0/sign
 ✔ Certificate: snarf.crt
 ✔ Private Key: snarf.key
-$ step ca certificate snarf.local.dev snarf.crt snarf.key
 ```
 
-We can inspect our newly minted certificate and verify that it's been issued by `autocert` and includes the right common name:
+Now we can simply `curl` the service:
 
 ```
-$ step certificate inspect --format json snarf.crt | jq '{issuer,subject}'
-{
-  "issuer": {
-    "common_name": [
-      "Autocert Intermediate CA"
-    ]
-  },
-  "subject": {
-    "common_name": [
-      "snarf.local.dev"
-    ]
-  }
-}
-```
-
-> 🤔 **Tip:** If you want someone (or something) to have a certificate with a particular name, but don't want to give them the ability to provision arbitrary certificates, you can generate a bootstrap token for them:
-> 
-> ```bash
-> $ step ca token snarf.local.dev \
->     --ca-url https://127.0.0.1:4443 \
->     --root root.crt
-> eyJhbG...
-> ```
-> 
-> They can use the token to obtain a certificate (once):
-> 
-> ```bash
-> $ step ca certificate snarf.local.dev snarf.crt snarf.key --token "eyJhbG..."
-> ```
->
-> Actually, this is exactly what the `autocert` mutating webhook is doing for your pods! Read [how it works](#how-it-works) for more info.
-
-#### Connecting to `hello-mtls`
-
-We're ready to securely connect to `hello-mtls`.
-
-```
-$ export HELLO_MTLS_IP=$(kubectl get svc hello-mtls-lb -ojsonpath={$.status.loadBalancer.ingress...?})
-$ export HELLO_MTLS_IP="127.0.0.1"
+$ export HELLO_MTLS_IP=$(kubectl get svc hello-mtls-lb -ojsonpath={$.status.loadBalancer.ingress[0].ip})
 $ curl --resolve hello-mtls.default.svc.cluster.local:443:$HELLO_MTLS_IP \
        --cacert root.crt \
        --cert snarf.crt \
@@ -420,99 +248,119 @@ $ curl --resolve hello-mtls.default.svc.cluster.local:443:$HELLO_MTLS_IP \
 Hello, snarf.local.dev!
 ```
 
-🎉
+> If you're using minikube or docker for mac the load balancer's "IP" might be `localhost`, which won't work. In that case, simply `export HELLO_MTLS_IP=127.0.0.1` and try again.
 
-> 🤯 **Note:**  HTTPS clients check that the name in the server's cerificate match the `authority` portion of the URL (e.g., `https://smallstep.com/` must present a certificate with the name `smallstep.com`). (See [RFC2818](https://tools.ietf.org/html/rfc2818#section-3).)
-> 
-> Our `hello-mtls` service's certificate binds the name `hello-mtls.default.svc.cluster.local` so we *must* connect to it using that name. If we use a different authority we'll get an error:
-> 
-> ```
-> $ curl --cacert root.crt \
->        --cert snarf.crt \
->        --key snarf.key \
->        https://127.0.0.1
-> curl: (51) SSL: no alternative certificate subject name matches target host name '127.0.0.1'
-> ```
-> 
-> In a real production environment you'd address this by either:
-> 
->  * using a properly registered domain name and configuring DNS either globally (e.g., using [ExternalDNS](https://github.com/kubernetes-incubator/external-dns/)), or
->  * using internal names and configuring DNS locally in each environment (e.g., using an [ExternalName service](https://kubernetes.io/docs/concepts/services-networking/service/#externalname))
-> 
-> In any case, `hello-mtls.default.svc.cluster.local` must resolve to the right IP.
-> 
-> You could use `/etc/hosts`. Since we're testing with `curl` it's even easier to use the `--resolve` flag to override resolution for a single request.
+> Note that we're using the `--resolve` flag to tell `curl` to resolve the name in our workload's certificate to its public IP address. In a real production infrastructure you could configure DNS manually, or you could propagate DNS to workloads outside kubernetes using something like [ExternalDNS](#).
+
+✅ mTLS outside cluster.
+
+### Cleanup & uninstall
+
+To clean up after running through the tutorial remove the `hello-mtls` and `hello-mtls-client` deployments and services:
+
+```
+kubectl delete deployment hello-mtls
+kubectl delete deployment hello-mtls-client
+kubectl delete service hello-mtls
+kubectl delete service hello-mtls-lb
+```
+
+The runbook contains instructions for [uninstalling `autocert` complete](RUNBOOK.md#uninstalling).
+
+<!--- TODO: CTA or Further Reading... Move "How it works" maybe? Or put this below that? --->
 
 ## How it works
 
 ### Architecture
 
-`Autocert` consists of a [webhook admission controllers](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) that injects one init container and one sidecar container to handle obtaining a certificate for the first time and renewing a certificate, respectively.
-
-The `autocert` admission webhook will intercept this pod creation request and inject an [init container](bootstrapper/) and [sidecar](renewer/) to manage certificate issuance and renewal, respectively.
+`Autocert` is an [admission webhook](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) that intercepts and patches pod creation requests with [some YAML](install/02-autocert.yaml#L26-L44) to inject an [init container](bootstrapper/) and [sidecar](renewer/) that handle obtaining and renewing certificates, respectively.
 
 ![Autocert architecture diagram](https://raw.githubusercontent.com/smallstep/certificates/autocert/autocert/autocert-arch.png)
 
 ### Enrollment & renewal
 
-It integrates with [`step certificates`](https://github.com/smallstep/certificates) and uses the single-use token bootstrap protocol from that project to mutually authenticate a new pod with your certificate authority.
+It integrates with [`step certificates`](https://github.com/smallstep/certificates) and uses the [one-time token bootstrap protocol](https://smallstep.com/blog/...) from that project to mutually authenticate a new pod with your certificate authority, and obtain a certificate.
 
 ![Autocert bootstrap protocol diagram](https://raw.githubusercontent.com/smallstep/certificates/autocert/autocert/autocert-bootstrap.png)
 
-### Further reading
+Tokens are [generated by the admission webhook](controller/provisioner.go#L46-L72) and [transmitted to the injected init container via a kubernetes secret](controller/main.go#L91-L125). The init container [uses the one-time token](bootstrapper/bootstrapper.sh) to obtain a certificate. A sidecar is also installed to [renew certificates](renewer/Dockerfile#L8) before they expire. Renewal simply uses mTLS with the CA.
 
-* Link to ExternalDNS example
-* Link to multiple cluster with Service type ExternalDNS so they can communicate
-
-### Uninstall
-
-* Delete the `sleep` deployment (if you created it)
-* Remove labels (show how to find labelled namespaces)
-* Remove annotations (show how to find any annotated pods)
-* Remove secrets (show how to find labelled secrets)
-* Delete `step` namespace
-
-### Questions
+## Questions
 
 #### How is this different than [`cert-manager`](https://github.com/jetstack/cert-manager)
 
+`Cert-manager` is a great project. However, it's designed primarily for managing certificates issued by [Let's Encrypt's](https://letsencrypt.org/) public certificate authority. These certificates are useful for TLS ingress from web browsers. `Autocert` is different. It's purpose-built to manage certificates issued by your own private CA to support the use of mTLS for internal communication (e.g., service-to-service).
+
 #### Doesn't kubernetes already ship with a certificate authority?
 
-Yes, but it's designed for use by the kubernetes control plane rather than by your data plane services. You could use the kubernetes CA to issue certificates for data plane communication, but it's probably not a good idea.
+Yes, actually it can have [a bunch of them](https://jvns.ca/blog/2017/08/05/how-kubernetes-certificates-work/) for different sorts of control plane communication.
 
-#### Why not use kubernetes CSR resources for this?
+Wait, no, _actually_
+it doesn't _ship_ with _any_ CA. It's complicated. Kubernetes doesn't come with a CA, it has integration points that allow you to use any CA (e.g., [Kubernetes the hard way](https://github.com/kelseyhightower/kubernetes-the-hard-way) [uses CFSSL](https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/2983b28f13b294c6422a5600bb6f14142f5e7a26/docs/02-certificate-authority.md). You could use [`step certificates`](https://github.com/smallstep/certificates), which `autocert` is based on, instead.
 
-It's harder and less secure.
+In any case, none of these CAs are meant for issuing certificates to your workloads for service-to-service communication. Rather, they're meant to secure communication between various control plane components. You could use them for your data plane, but it's probably not a good idea.
+
+#### What permissions does `autocert` require in my cluster and why?
+
+By default we ask for the narrowest permissions we can: the ability to create and delete secrets cluster-wide. You can [check out our RBAC config here](install/03-rbac.yaml).
+
+We need these permissions in order to transmit one-time tokens to workloads using secrets, and to clean up afterwards. We'd love to scope these permissions down further if anyone has any ideas.
+
+#### Why does the mutating webhook have to create secrets?
+
+The `autocert` admission webhook needs to securely transmit one-time bootstrap tokens to containers. This could be accomplished without using secrets by simply patching a token directly into the pod's environment via the admission webhook response. Unfortunately, the kubernetes API server does not authenticate itself to admission webhooks by default, and configuring it to do so [requires passing a custom config file](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#authenticate-apiservers) at apiserver startup. This isn't an option for everyone (e.g., on GKE) so we opted not to rely on it.
+
+Since our webhook can't tell who is calling it, including bootstrap tokens in patch responses would be dangerous. By using secrets an attacker can still trick us into generating superflous bootstrap tokens, but they'd also need read access to cluster secrets to do anything with them.
+
+Hopefully this story will improve with time.
 
 #### Why not use kubernetes service accounts instead of bootstrap tokens?
 
-#### Why does the mutating webhook have to create secrets / need cluster role bindings?
+Great idea! This should be pretty easy to add. However, existing service accounts are [somewhat broken](https://github.com/kubernetes/community/pull/1460) for this use case. The upcoming [TokenRequest API](https://github.com/kubernetes/kubernetes/issues/58790) should fix most of these issues.
+
+TODO: Link to issue for people who want this.
+
+#### Too. many. containers. Why do you need to install an init container and sidecar?
+
+We don't. Your containers can generate key pairs, exchange them for certificates, and manage renewals themselves. This is pretty easy if you [install `step`](https://github.com/smallstep/cli#installing) in your containers, or integrate with our [golang SDK](https://godoc.org/github.com/smallstep/certificates/ca). To support this we'd need to add the option to  inject a bootstrap token without injecting these containers.
+
+TODO: Link to issue for people who want this.
+
+That said, the init container and sidecar are both super lightweight.
+
+#### Why are keys and certificates managed via volume mounts? Why not use a secret or some custom resource?
+
+Because, by default, kubernetes secrets are stored in plaintext in `etcd` and might even be transmitted unencrypted across the network. Even if secrets were properly encrypted, transmitting a private key across the network violates PKI best practices. Key pairs should always be generated where they're used, and private keys should never be shared with anyone but their owners.
+
+That said, there are use cases where a certificate mounted in a secret resource is desirable (e.g., for use with a kubernetes `Ingress`). We may add support for this in the future. However, we think the current method is easier and better.
+
+TODO: Link to issue for people who want this.
+
+#### Why not use kubernetes CSR resources for this?
+
+It's harder and less secure. If any good and simple design exists for securely automating CSR approval using this resource we'd love to see it!
 
 #### Why do I have to tell you the name to put in a certificate? Why can't you automatically bind service names?
 
-#### What are `autocert` certificates good for?
+Mostly because monitoring the API server to figure out which services are associated with which workloads is complicated and somewhat magical. And it might not be what you want.
 
-Autocert certificates let you secure your data plane (service-to-service) communication using mutual TLS (mTLS). Services and proxies can limit access to clients that also have a certificate issued by your certificate authority (CA). Servers can identify which client is connecting improving visibility and enabling granular access control.
+That said, we're not totally opposed to this idea if anyone has strong feels and a good design.
 
-Once certificates are issued you can use mTLS to secure communication in to, out of, and between kubernetes clusters. Services can use mTLS to only allow connections from clients that have their own certificate issued from your CA.
+#### What sorts of keys are issued and how often are certificates rotated?
 
-It's like your own Let's Encrypt, but you control who gets a certificate.
+`Autocert` builds on `step certificates` which issues ECDSA certificates using the P256 curve with ECDSA-SHA256 signatures by default. If this is all Greek to you, rest assured these are safe, sane, and modern defaults that are suitable for the vast majority of environments.
 
-#### How is this different than a service mesh?
+#### What crypto library is under the hood?
 
-Certificate management is a necessary building block for any service mesh that uses mutual TLS for authenticated encryption (e.g., istio, linkerd, consul connect). Typically, service mesh systems will provide their own certificate management solution. However, these systems 
-
-#### What about DaemonSets, ReplicaSets, StatefulSets, and all the other things that might need certificates?
-
-...?
+https://golang.org/pkg/crypto/
 
 ## Building
 
-...
+TODO
 
 ## Contributing
 
-...
+TODO
 
 ## License
 
