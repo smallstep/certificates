@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smallstep/certificates/ct"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/x509util"
 )
@@ -28,6 +29,7 @@ type Authority struct {
 	provisionerKeySetIndex *sync.Map
 	sortedProvisioners     provisionerSlice
 	audiences              []string
+	ctClient               ct.Client
 	// Do not re-initialize
 	initOnce bool
 }
@@ -55,6 +57,14 @@ func New(config *Config) (*Authority, error) {
 		audiences = append(audiences, fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
 	}
 
+	var ctClient ct.Client
+	// only first one is supported at the moment.
+	if len(config.CTs) > 0 {
+		if ctClient, err = ct.New(config.CTs[0]); err != nil {
+			return nil, err
+		}
+	}
+
 	var a = &Authority{
 		config:                 config,
 		certificates:           new(sync.Map),
@@ -64,6 +74,7 @@ func New(config *Config) (*Authority, error) {
 		provisionerKeySetIndex: new(sync.Map),
 		sortedProvisioners:     sorted,
 		audiences:              audiences,
+		ctClient:               ctClient,
 	}
 	if err := a.init(); err != nil {
 		return nil, err

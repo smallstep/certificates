@@ -123,6 +123,11 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 		}
 	}
 
+	// Add CT Poison extension
+	if a.ctClient != nil {
+		mods = append(mods, x509util.WithCTPoison())
+	}
+
 	stepCSR, err := stepx509.ParseCertificateRequest(csr.Raw)
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error converting x509 csr to stepx509 csr"),
@@ -156,6 +161,47 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing intermediate certificate"),
 			http.StatusInternalServerError, errContext}
+	}
+
+	// Certificate transparency
+	if a.ctClient != nil {
+		scts, err := a.ctClient.GetSCTs(serverCert, caCert)
+		if err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "sign: error getting SCTs for certificate"),
+				http.StatusBadGateway, errContext}
+		}
+		crt := leaf.Subject()
+		crt.ExtraExtensions = append(crt.ExtraExtensions, scts.GetExtension())
+		for i, ext := range crt.ExtraExtensions {
+			if ext.Id.Equal(asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 3}) {
+				crt.ExtraExtensions = append(crt.ExtraExtensions[:i], crt.ExtraExtensions[i+1:]...)
+				break
+			}
+		}
+
+		for i, ext := range crt.Extensions {
+			if ext.Id.Equal(asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 3}) {
+				crt.Extensions = append(crt.Extensions[:i], crt.Extensions[i+1:]...)
+				break
+			}
+		}
+
+		crtBytes, err = leaf.CreateCertificate()
+		if err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "sign: error creating new leaf certificate"),
+				http.StatusInternalServerError, errContext}
+		}
+
+		serverCert, err = x509.ParseCertificate(crtBytes)
+		if err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing new leaf certificate"),
+				http.StatusInternalServerError, errContext}
+		}
+
+		if err := a.ctClient.SubmitToLogs(serverCert, caCert); err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "sign: error submitting final certificate to ct logs"),
+				http.StatusBadGateway, errContext}
+		}
 	}
 
 	return serverCert, caCert, nil
