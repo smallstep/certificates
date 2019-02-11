@@ -29,7 +29,7 @@ TODO: Twitter, Slack, Issues (tagged with #autocert / special template)...
 
 TLS (and HTTPS, which is HTTP over TLS) provides _authenticated encryption_: an _identity dialtone_ and _end-to-end encryption_ for your workloads. It's like a secure line with caller ID. This has all sorts of benefits: better security, compliance, and easier auditability for starters. It **makes workloads identity-aware**, improving observability and enabling granular access control. Perhaps most compelling, mTLS lets you securely communicate with workloads running anywhere, not just inside kubernetes.
 
-TODO: Diagram
+![Connect with mTLS diagram](https://raw.githubusercontent.com/smallstep/certificates/autocert/autocert/connect-with-mtls.png)
 
 Unlike VPNs & SDNs, deploying and scaling mTLS is pretty easy. You're (hopefully) already using TLS, and your existing tools and standard libraries will provide most of what you need. If you know how to operate DNS and reverse proxies, you know how to operate mTLS infrastructure.
 
