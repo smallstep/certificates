@@ -7,7 +7,7 @@ For more information and docs see [the Step website](https://smallstep.com/cli/)
 and the [blog post](https://smallstep.com/blog/step-certificates.html)
 announcing Step Certificate Authority.
 
-![Animated terminal showing step certificates in practice](https://smallstep.com/images/blog/2018-12-04-unfurl.gif)
+![Animated terminal showing step certificates in practice](https://github.com/smallstep/certificates/raw/master/step-ca.gif)
 
 ## Why?
 
@@ -90,6 +90,8 @@ can be used to authenticate with the CA and get a certificate.
 
 Demonstrates setting up your own PKI and certificate authority using `step ca`
 and getting certificates using the `step` command line tool and SDK.
+
+![Animated terminal showing step ca init in practice](https://smallstep.com/images/blog/2018-12-04-unfurl.gif)
 
 ### Prerequisites
 
