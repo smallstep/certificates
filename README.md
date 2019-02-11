@@ -7,6 +7,8 @@ For more information and docs see [the Step website](https://smallstep.com/cli/)
 and the [blog post](https://smallstep.com/blog/step-certificates.html)
 announcing Step Certificate Authority.
 
+![Animated terminal showing step certificates in practice](https://smallstep.com/images/blog/2018-12-04-unfurl.gif)
+
 ## Why?
 
 Managing your own *public key infrastructure* (PKI) can be tedious and error
