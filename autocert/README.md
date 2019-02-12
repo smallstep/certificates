@@ -18,7 +18,7 @@ We ❤️ feedback. Please [report bugs](https://github.com/smallstep/certificat
 
 ## Motivation
 
-`Autocert` exists to **make it easy to use mTLS** ([mutual TLS](#)) to **improve security** within a cluster and to **secure communication into, out of, and between kubernetes clusters**.
+`Autocert` exists to **make it easy to use mTLS** ([mutual TLS](examples/hello-mtls/README.md#mutual-tls)) to **improve security** within a cluster and to **secure communication into, out of, and between kubernetes clusters**.
 
 TLS (and HTTPS, which is HTTP over TLS) provides _authenticated encryption_: an _identity dialtone_ and _end-to-end encryption_ for your workloads. It's like a secure line with caller ID. This has all sorts of benefits: better security, compliance, and easier auditability for starters. It **makes workloads identity-aware**, improving observability and enabling granular access control. Perhaps most compelling, mTLS lets you securely communicate with workloads running anywhere, not just inside kubernetes.
 
