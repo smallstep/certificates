@@ -6,7 +6,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -45,8 +44,8 @@ func (c *Config) Validate() error {
 
 // Client is the interfaced used to communicate with the certificate transparency logs.
 type Client interface {
-	GetSCTs(chain ...*x509.Certificate) (*SCT, error)
-	SubmitToLogs(chain ...*x509.Certificate) error
+	GetSCTs(asn1Data ...[]byte) (*SCT, error)
+	SubmitToLogs(asn1Data ...[]byte) error
 }
 
 type logClient interface {
@@ -139,14 +138,15 @@ func New(c Config) (*ClientImpl, error) {
 
 // GetSCTs submit the precertificate to the logs and returns the list of SCTs to
 // embed into the certificate.
-func (c *ClientImpl) GetSCTs(chain ...*x509.Certificate) (*SCT, error) {
-	ctChain := chainFromCerts(chain)
+func (c *ClientImpl) GetSCTs(asn1Data ...[]byte) (*SCT, error) {
+	chain := chainFromDERs(asn1Data)
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
-	sct, err := c.logClient.AddPreChain(ctx, ctChain)
+	sct, err := c.logClient.AddPreChain(ctx, chain)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get SCT from %s", c.config.URI)
 	}
+	logLeafHash(asn1Data, sct, true)
 	return &SCT{
 		LogURL: c.config.URI,
 		SCT:    sct,
@@ -154,32 +154,55 @@ func (c *ClientImpl) GetSCTs(chain ...*x509.Certificate) (*SCT, error) {
 }
 
 // SubmitToLogs submits the certificate to the certificate transparency logs.
-func (c *ClientImpl) SubmitToLogs(chain ...*x509.Certificate) error {
-	ctChain := chainFromCerts(chain)
+func (c *ClientImpl) SubmitToLogs(asn1Data ...[]byte) error {
+	chain := chainFromDERs(asn1Data)
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
-	sct, err := c.logClient.AddChain(ctx, ctChain)
+	sct, err := c.logClient.AddChain(ctx, chain)
 	if err != nil {
 		return errors.Wrapf(err, "failed submit certificate to %s", c.config.URI)
 	}
-
-	// Calculate the leaf hash
-	leafEntry := ct.CreateX509MerkleTreeLeaf(ctChain[0], sct.Timestamp)
-	leafHash, err := ct.LeafHashForLeaf(leafEntry)
-	if err != nil {
-		log.Println(err)
-	}
-	// Display the SCT
-	fmt.Printf("LogID: %x\n", sct.LogID.KeyID[:])
-	fmt.Printf("LeafHash: %x\n", leafHash)
-
+	logLeafHash(asn1Data, sct, false)
 	return nil
 }
 
-func chainFromCerts(certs []*x509.Certificate) []ct.ASN1Cert {
+func chainFromDERs(asn1Data [][]byte) []ct.ASN1Cert {
 	var chain []ct.ASN1Cert
-	for _, cert := range certs {
-		chain = append(chain, ct.ASN1Cert{Data: cert.Raw})
+	for _, der := range asn1Data {
+		chain = append(chain, ct.ASN1Cert{Data: der})
 	}
 	return chain
+}
+
+func logLeafHash(asn1Data [][]byte, sct *ct.SignedCertificateTimestamp, isPrecert bool) {
+	var etype ct.LogEntryType
+	if isPrecert {
+		etype = ct.PrecertLogEntryType
+	} else {
+		etype = ct.X509LogEntryType
+	}
+
+	chain := make([]*ctx509.Certificate, len(asn1Data))
+	for i := range asn1Data {
+		cert, err := ctx509.ParseCertificate(asn1Data[i])
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		chain[i] = cert
+	}
+
+	leafEntry, err := ct.MerkleTreeLeafFromChain(chain, etype, sct.Timestamp)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	leafHash, err := ct.LeafHashForLeaf(leafEntry)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Printf("LogID: %x, LeafHash: %x, Timestamp: %d\n", sct.LogID.KeyID[:], leafHash, sct.Timestamp)
 }

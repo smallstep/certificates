@@ -30,8 +30,12 @@ type SignOptions struct {
 }
 
 var (
+	// Step extensions OIDs
 	stepOIDRoot        = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
 	stepOIDProvisioner = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
+	// Certificate transparency extensions OIDs
+	ctPoisonOID                     = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 3}
+	ctSigendCertificateTimestampOID = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 2}
 )
 
 type stepProvisionerASN1 struct {
@@ -151,6 +155,25 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 			http.StatusInternalServerError, errContext}
 	}
 
+	if a.ctClient != nil {
+		// Submit precertificate chain and get SCTs
+		scts, err := a.ctClient.GetSCTs(crtBytes, issIdentity.Crt.Raw)
+		if err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "sign: error getting SCTs for certificate"),
+				http.StatusBadGateway, errContext}
+		}
+
+		// Remove ct poison extension and add sct extension
+		leaf.RemoveExtension(ctPoisonOID)
+		leaf.AddExtension(scts.GetExtension())
+
+		// Recreate final certificate
+		if crtBytes, err = leaf.CreateCertificate(); err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "sign: error creating final leaf certificate"),
+				http.StatusInternalServerError, errContext}
+		}
+	}
+
 	serverCert, err := x509.ParseCertificate(crtBytes)
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing new leaf certificate"),
@@ -163,42 +186,9 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 			http.StatusInternalServerError, errContext}
 	}
 
-	// Certificate transparency
 	if a.ctClient != nil {
-		scts, err := a.ctClient.GetSCTs(serverCert, caCert)
-		if err != nil {
-			return nil, nil, &apiError{errors.Wrap(err, "sign: error getting SCTs for certificate"),
-				http.StatusBadGateway, errContext}
-		}
-		crt := leaf.Subject()
-		crt.ExtraExtensions = append(crt.ExtraExtensions, scts.GetExtension())
-		for i, ext := range crt.ExtraExtensions {
-			if ext.Id.Equal(asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 3}) {
-				crt.ExtraExtensions = append(crt.ExtraExtensions[:i], crt.ExtraExtensions[i+1:]...)
-				break
-			}
-		}
-
-		for i, ext := range crt.Extensions {
-			if ext.Id.Equal(asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 4, 3}) {
-				crt.Extensions = append(crt.Extensions[:i], crt.Extensions[i+1:]...)
-				break
-			}
-		}
-
-		crtBytes, err = leaf.CreateCertificate()
-		if err != nil {
-			return nil, nil, &apiError{errors.Wrap(err, "sign: error creating new leaf certificate"),
-				http.StatusInternalServerError, errContext}
-		}
-
-		serverCert, err = x509.ParseCertificate(crtBytes)
-		if err != nil {
-			return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing new leaf certificate"),
-				http.StatusInternalServerError, errContext}
-		}
-
-		if err := a.ctClient.SubmitToLogs(serverCert, caCert); err != nil {
+		// Submit final certificate chain
+		if err := a.ctClient.SubmitToLogs(serverCert.Raw, caCert.Raw); err != nil {
 			return nil, nil, &apiError{errors.Wrap(err, "sign: error submitting final certificate to ct logs"),
 				http.StatusBadGateway, errContext}
 		}
@@ -264,15 +254,43 @@ func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certi
 		PolicyIdentifiers:           oldCert.PolicyIdentifiers,
 	}
 
-	leaf, err := x509util.NewLeafProfileWithTemplate(newCert,
-		issIdentity.Crt, issIdentity.Key)
+	opts := []x509util.WithOption{}
+	// Add CT Poison extension
+	if a.ctClient != nil {
+		opts = append(opts, x509util.WithCTPoison())
+	}
+
+	leaf, err := x509util.NewLeafProfileWithTemplate(newCert, issIdentity.Crt, issIdentity.Key, opts...)
 	if err != nil {
 		return nil, nil, &apiError{err, http.StatusInternalServerError, context{}}
 	}
+
+	// Remove previous SCTs if any
+	leaf.RemoveExtension(ctSigendCertificateTimestampOID)
+
 	crtBytes, err := leaf.CreateCertificate()
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "error renewing certificate from existing server certificate"),
 			http.StatusInternalServerError, context{}}
+	}
+
+	if a.ctClient != nil {
+		// Submit precertificate chain and get SCTs
+		scts, err := a.ctClient.GetSCTs(crtBytes, issIdentity.Crt.Raw)
+		if err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "renew: error getting SCTs for certificate"),
+				http.StatusBadGateway, context{}}
+		}
+
+		// Remove ct poison extension and add sct extension
+		leaf.RemoveExtension(ctPoisonOID)
+		leaf.AddExtension(scts.GetExtension())
+
+		// Recreate final certificate
+		if crtBytes, err = leaf.CreateCertificate(); err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "renew: error creating final leaf certificate"),
+				http.StatusInternalServerError, context{}}
+		}
 	}
 
 	serverCert, err := x509.ParseCertificate(crtBytes)
@@ -286,14 +304,30 @@ func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certi
 			http.StatusInternalServerError, context{}}
 	}
 
+	if a.ctClient != nil {
+		// Submit final certificate chain
+		if err := a.ctClient.SubmitToLogs(serverCert.Raw, caCert.Raw); err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "renew: error submitting final certificate to ct logs"),
+				http.StatusBadGateway, context{}}
+		}
+	}
+
 	return serverCert, caCert, nil
 }
 
 // GetTLSCertificate creates a new leaf certificate to be used by the CA HTTPS server.
 func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
+	opts := []x509util.WithOption{
+		x509util.WithHosts(strings.Join(a.config.DNSNames, ",")),
+	}
+
+	// Add CT Poison extension
+	if a.ctClient != nil {
+		opts = append(opts, x509util.WithCTPoison())
+	}
+
 	profile, err := x509util.NewLeafProfile("Step Online CA",
-		a.intermediateIdentity.Crt, a.intermediateIdentity.Key,
-		x509util.WithHosts(strings.Join(a.config.DNSNames, ",")))
+		a.intermediateIdentity.Crt, a.intermediateIdentity.Key, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -301,6 +335,23 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	crtBytes, err := profile.CreateCertificate()
 	if err != nil {
 		return nil, err
+	}
+
+	if a.ctClient != nil {
+		// Submit precertificate chain and get SCTs
+		scts, err := a.ctClient.GetSCTs(crtBytes, a.intermediateIdentity.Crt.Raw)
+		if err != nil {
+			return nil, errors.Wrap(err, "error getting SCTs for certificate")
+		}
+
+		// Remove ct poison extension and add sct extension
+		profile.RemoveExtension(ctPoisonOID)
+		profile.AddExtension(scts.GetExtension())
+
+		// Recreate final certificate
+		if crtBytes, err = profile.CreateCertificate(); err != nil {
+			return nil, errors.Wrap(err, "error creating final leaf certificate")
+		}
 	}
 
 	keyPEM, err := pemutil.Serialize(profile.SubjectPrivateKey())
@@ -319,6 +370,14 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if a.ctClient != nil {
+		// Submit final certificate chain
+		if err := a.ctClient.SubmitToLogs(crtBytes, intermediatePEM.Bytes); err != nil {
+			return nil, errors.Wrap(err, "error submitting final certificate to ct logs")
+		}
+	}
+
 	tlsCrt, err := tls.X509KeyPair(append(crtPEM,
 		pem.EncodeToMemory(intermediatePEM)...),
 		pem.EncodeToMemory(keyPEM))
