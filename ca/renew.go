@@ -72,6 +72,8 @@ func NewTLSRenewer(cert *tls.Certificate, fn RenewFunc, opts ...tlsRenewerOption
 	if r.renewJitter == 0 {
 		r.renewJitter = period / 20
 	}
+	// Initialize certNotAfter
+	r.certNotAfter = cert.Leaf.NotAfter.Add(-1 * time.Minute)
 
 	return r, nil
 }
