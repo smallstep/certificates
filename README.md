@@ -7,7 +7,7 @@ For more information and docs see [the Step website](https://smallstep.com/cli/)
 and the [blog post](https://smallstep.com/blog/step-certificates.html)
 announcing Step Certificate Authority.
 
-![Animated terminal showing step certificates in practice](https://github.com/smallstep/certificates/raw/master/step-ca.gif)
+![Animated terminal showing step certificates in practice](https://github.com/smallstep/certificates/raw/master/docs/step-ca.gif)
 
 ## Why?
 
