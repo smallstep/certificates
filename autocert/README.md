@@ -8,11 +8,6 @@
 [![GitHub stars](https://img.shields.io/github/stars/smallstep/certificates.svg?style=social)](https://github.com/smallstep/certificates/stargazers)
 [![Twitter followers](https://img.shields.io/twitter/follow/smallsteplabs.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=smallsteplabs)
 
-<!--- [![Build Status](https://travis-ci.org/smallstep/certificates.svg?branch=master)](https://travis-ci.org/smallstep/certificates)
-[![Coverage Status](https://coveralls.io/repos/github/smallstep/certificates/badge.svg?branch=master)](https://coveralls.io/github/smallstep/certificates?branch=master)
-[![Autocert Image](https://images.microbadger.com/badges/image/smallstep/autocert-controller.svg)](https://microbadger.com/images/smallstep/autocert-controller)
-[![Renewer Image](https://images.microbadger.com/badges/image/smallstep/autocert-renewer.svg)](https://microbadger.com/images/smallstep/autocert-renewer) -->
-
 **Autocert** is a kubernetes add-on that automatically injects TLS/HTTPS certificates into your containers.
 
 To get a certificate **simply annotate your pods** with a name. An X.509 (TLS/HTTPS) certificate is automatically created and mounted at `/var/run/autocert.step.sm/` along with a corresponding private key and root certificate (everything you need for [mTLS](#motivation)).
@@ -75,7 +70,7 @@ kubectl run autocert-init -it --rm --image smallstep/autocert-init --restart Nev
 
 💥 installation complete.
 
-> You might want to [check out what this command does](init/autocert.sh) before running it. You can also [install `autocert` manually](INSTALL.md) if that's your style.
+> You might want to [check out what this command does](init/autocert.sh) before running it. You can also [install `autocert` manually](INSTALL.md#manual-install) if that's your style.
 
 ## Usage
 
@@ -145,7 +140,7 @@ We're done. Our container has a certificate, issued by our CA, which `autocert` 
 
 ## Hello mTLS
 
-It's easy to deploy certificates using `autocert`, but it's up to you to use them correctly. To get you started, [`hello-mtls`](examples/hello-mtls) demonstrates the right way to use mTLS with various tools and languages (contributions welcome :). If you're a bit fuzzy on how mTLS works, [the `hello-mtls` README](examples/hello-mtls) is a great place to start.
+It's easy to deploy certificates using `autocert`, but it's up to you to use them correctly. To get you started, [`hello-mtls`](examples/hello-mtls) demonstrates the right way to use mTLS with various tools and languages (contributions welcome :). If you're a bit fuzzy on how mTLS works, [the `hello-mtls` README](examples/hello-mtls/README.md) is a great place to start.
 
 To finish out this tutorial let's keep things simple and try `curl`ing the server we just deployed from inside and outside the cluster.
 
@@ -224,7 +219,7 @@ kubectl -n step port-forward $(kubectl -n step get pods -l app=ca -o jsonpath={$
 
 In another window we'll use `step` to grab the root certificate, generate a key pair, and get a certificate.
 
-> To follow along you'll need to [`install step`](https://github.com/smallstep/cli#installing) if you haven't already. You'll also need your admin password and CA fingerprint, which were output during installation (see [here](RUNBOOK.md#recover-admin-and-ca-password) and [here](#RUNBOOK.md#recompute-root-certificate-fingerprint) if you already lost them :).
+> To follow along you'll need to [`install step`](https://github.com/smallstep/cli#installing) if you haven't already. You'll also need your admin password and CA fingerprint, which were output during installation (see [here](RUNBOOK.md#recover-admin-and-ca-password) and [here](RUNBOOK.md#recompute-root-certificate-fingerprint) if you already lost them :).
 
 ```bash
 $ export CA_POD=$(kubectl -n step get pods -l app=ca -o jsonpath={$.items[0].metadata.name})
@@ -405,7 +400,7 @@ If you build your own containers you'll probably need to [install manually](INST
 
 ## Contributing
 
-If you have improvements to `autocert`, send us your pull requests! For those just getting started, Github has a [howto](https://help.github.com/articles/about-pull-requests/). A team member will review your pull requests, provide feedback, and merge your changes. In order to accept contributions we do need you to [sign our contributor license agreement](https://cla-assistant.io/smallstep/certificates).
+If you have improvements to `autocert`, send us your pull requests! For those just getting started, GitHub has a [howto](https://help.github.com/articles/about-pull-requests/). A team member will review your pull requests, provide feedback, and merge your changes. In order to accept contributions we do need you to [sign our contributor license agreement](https://cla-assistant.io/smallstep/certificates).
 
 If you want to contribute but you're not sure where to start, take a look at the [issues with the "good first issue" label](https://github.com/smallstep/certificates/issues?q=is%3Aopen+label%3A%22good+first+issue%22+label%3Aarea%2Fautocert). These are issues that we believe are particularly well suited for outside contributions, often because we probably won't get to them right now. If you decide to start on an issue, leave a comment so that other people know that you're working on it. If you want to help out, but not alone, use the issue comment thread to coordinate.
 

@@ -1,3 +1,39 @@
+# Installing `autocert`
+
+### Prerequisites
+
+To get started you'll need [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl) and a cluster running kubernetes `1.9` or later with [admission webhooks](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#admission-webhooks) enabled:
+
+```bash
+$ kubectl version --short
+Client Version: v1.13.1
+Server Version: v1.10.11
+$ kubectl api-versions | grep "admissionregistration.k8s.io/v1beta1"
+admissionregistration.k8s.io/v1beta1
+```
+
+### Install
+
+The easiest way to install `autocert` is to run:
+
+```bash
+kubectl run autocert-init -it --rm --image smallstep/autocert-init --restart Never
+```
+
+💥 installation complete.
+
+> You might want to [check out what this command does](init/autocert.sh) before running it.
+
+## Manual install
+
+To install manually you'll need to [install step](https://github.com/smallstep/cli#installing) version `0.8.3` or later.
+
+```
+$ step version
+Smallstep CLI/0.8.3 (darwin/amd64)
+Release Date: 2019-01-16 01:46 UTC
+```
+
 ### Create a CA
 
 Set your `STEPPATH` to a working directory where we can stage our CA artifacts before we push them to kubernetes. You can delete this directory once installation is complete.
@@ -40,6 +76,14 @@ $ sed -i "" "s|ca.step.svc.cluster.local:4443|ca.step.svc.cluster.local|" $(step
 ```
 
 ### Install the CA in Kubernetes
+
+We'll be creating a new kubernetes namespace and setting up some RBAC rules during installation. You'll need appropriate permissions in your cluster (e.g., you may need to be cluster-admin). GKE, in particular, does not give the cluster owner these rights by default. You can give yourself cluster-admin rights on GKE by running:
+
+```bash
+kubectl create clusterrolebinding cluster-admin-binding \
+    --clusterrole cluster-admin \
+    --user $(gcloud config get-value account)
+```
 
 We'll install our CA and the `autocert` controller in the `step` namespace.
 
