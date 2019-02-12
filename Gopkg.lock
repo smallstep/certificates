@@ -74,20 +74,6 @@
   revision = "883fe33ffc4344bad1ecd881f61afd5ec5d80e0a"
 
 [[projects]]
-  digest = "1:0f1010da61da43ef23bae5c43a619abda82e04f409ec642e6bdeee0d7736530d"
-  name = "github.com/google/certificate-transparency-go"
-  packages = [
-    ".",
-    "asn1",
-    "tls",
-    "x509",
-    "x509/pkix",
-  ]
-  pruneopts = "UT"
-  revision = "3629d6846518309d22c16fee15d1007262a459d2"
-  version = "v1.0.21"
-
-[[projects]]
   branch = "master"
   digest = "1:3ee90c0d94da31b442dde97c99635aaafec68d0b8a3c12ee2075c6bdabeec6bb"
   name = "github.com/google/gofuzz"
@@ -504,8 +490,6 @@
     "github.com/ghodss/yaml",
     "github.com/go-chi/chi",
     "github.com/golang/lint/golint",
-    "github.com/google/certificate-transparency-go",
-    "github.com/google/certificate-transparency-go/x509",
     "github.com/gordonklaus/ineffassign",
     "github.com/newrelic/go-agent",
     "github.com/pkg/errors",
