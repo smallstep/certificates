@@ -44,7 +44,7 @@ func (r *rotator) loadCertificate(certFile, keyFile string) error {
 	}
 
 	r.certificate = &c
-	
+
 	return nil
 }
 
@@ -87,8 +87,8 @@ func main() {
 		ClientCAs:                roots,
 		MinVersion:               tls.VersionTLS12,
 		CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
-        PreferServerCipherSuites: true,
-        CipherSuites: []uint16{
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
 			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
 			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 		},
@@ -119,7 +119,7 @@ func main() {
 				if err != nil {
 					log.Println("Error loading certificate and key", err)
 				}
-			case <- done:
+			case <-done:
 				return
 			}
 		}
@@ -127,7 +127,7 @@ func main() {
 	defer close(done)
 
 	log.Println("Listening no :443")
-	
+
 	// Start serving HTTPS
 	err = srv.ListenAndServeTLS("", "")
 	if err != nil {

@@ -113,12 +113,3 @@ func NewInClusterK8sClient() (Client, error) {
 		httpClient: httpClient,
 	}, nil
 }
-
-// NewInsecureK8sClient creates an insecure k8s client which is suitable
-// to connect kubernetes api behind proxy
-func NewInsecureK8sClient(apiURL string) Client {
-	return &k8sClient{
-		host:       apiURL,
-		httpClient: http.DefaultClient,
-	}
-}
