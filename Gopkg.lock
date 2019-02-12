@@ -56,6 +56,37 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:239c4c7fd2159585454003d9be7207167970194216193a8a210b8d29576f19c9"
+  name = "github.com/golang/protobuf"
+  packages = [
+    "proto",
+    "ptypes",
+    "ptypes/any",
+    "ptypes/duration",
+    "ptypes/timestamp",
+  ]
+  pruneopts = "UT"
+  revision = "c823c79ea1570fb5ff454033735a8e68575d1d0f"
+
+[[projects]]
+  branch = "master"
+  digest = "1:78ae27573e8adaf14269f9146230153a61c4b29bedc8742e464e053280dfa3d0"
+  name = "github.com/google/certificate-transparency-go"
+  packages = [
+    ".",
+    "asn1",
+    "client",
+    "client/configpb",
+    "jsonclient",
+    "tls",
+    "x509",
+    "x509/pkix",
+  ]
+  pruneopts = "UT"
+  revision = "b5e3a70217c2a317c27b3c852126d0f8f29fef2b"
+
+[[projects]]
+  branch = "master"
   digest = "1:750e747d0aad97b79f4a4e00034bae415c2ea793fd9e61438d966ee9c79579bf"
   name = "github.com/google/shlex"
   packages = ["."]
@@ -211,8 +242,8 @@
   revision = "de77670473b5492f5d0bce155b5c01534c2d13f7"
 
 [[projects]]
-  branch = "master"
-  digest = "1:4c9e30abfe7c119eb4d40287f6c23f854f3ad71c69206d8dc6402e1fef14ac88"
+  branch = "certificate-transparency"
+  digest = "1:69522074a16a54ae22fedb069684d11dd63a138f25e2114869448b0b7f18aba6"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
@@ -231,7 +262,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "c5d02dddb5df825234794da690fe9fe96ead676e"
+  revision = "6b8779be9192115a5bafc768881bb44fc9d07320"
 
 [[projects]]
   branch = "master"
@@ -266,9 +297,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:acfafa29853fd970d5d5ac6ca3b7350b5aef5999196d32bb9b049e21c8caf726"
+  digest = "1:1e410bfb4911c25c42e44b123b1ce705e39644a6b2ef8a3b45f6b60161e9819c"
   name = "golang.org/x/net"
   packages = [
+    "context",
+    "context/ctxhttp",
     "html",
     "html/atom",
     "http/httpguts",
@@ -362,6 +395,11 @@
     "github.com/client9/misspell/cmd/misspell",
     "github.com/go-chi/chi",
     "github.com/golang/lint/golint",
+    "github.com/google/certificate-transparency-go",
+    "github.com/google/certificate-transparency-go/client",
+    "github.com/google/certificate-transparency-go/jsonclient",
+    "github.com/google/certificate-transparency-go/tls",
+    "github.com/google/certificate-transparency-go/x509",
     "github.com/gordonklaus/ineffassign",
     "github.com/newrelic/go-agent",
     "github.com/pkg/errors",

@@ -45,7 +45,7 @@ required = [
   name = "github.com/go-chi/chi"
 
 [[override]]
-  branch = "master"
+  branch = "certificate-transparency"
   name = "github.com/smallstep/cli"
 
 [prune]
@@ -63,3 +63,11 @@ required = [
 [[constraint]]
   name = "gopkg.in/square/go-jose.v2"
   version = "2.1.9"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/google/certificate-transparency-go"
+
+[[override]]
+  branch = "master"
+  name = "github.com/golang/protobuf"
