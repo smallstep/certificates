@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ca
+  name: ca
+  namespace: step
+spec:
+  type: ClusterIP
+  ports:
+  - port: 443
+    targetPort: 4443
+  selector:
+    app: ca
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ca
+  namespace: step
+  labels:
+    app: ca
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ca
+  template:
+    metadata:
+      labels:
+        app: ca
+    spec:
+      containers:
+      - name: ca
+        image: smallstep/step-ca:0.8.3
+        env:
+        - name: PWDPATH
+          value: /home/step/password/password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 20Mi
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 4443
+            scheme: HTTPS
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4443
+            scheme: HTTPS
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        volumeMounts:
+        - name: config
+          mountPath: /home/step/.step/config
+          readOnly: true
+        - name: certs
+          mountPath: /home/step/.step/certs
+          readOnly: true
+        - name: secrets
+          mountPath: /home/step/.step/secrets
+          readOnly: true
+        - name: ca-password
+          mountPath: /home/step/password
+          readOnly: true
+        securityContext:
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+      volumes:
+      - name: certs
+        configMap:
+          name: certs
+      - name: config
+        configMap:
+          name: config
+      - name: secrets
+        configMap:
+          name: secrets
+      - name: ca-password
+        secret:
+          secretName: ca-password
