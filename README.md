@@ -16,9 +16,21 @@ prone. Good security hygiene is hard. Setting up simple PKI is out of reach for
 many small teams, and following best practices like proper certificate revocation
 and rolling is challenging even for experts.
 
+Amongst numerous use cases, proper PKI makes it easy to use mTLS (mutual TLS) to improve security and to make it possible to connect services across the public internet. Unlike VPNs & SDNs, deploying and scaling mTLS is pretty easy. You're (hopefully) already using TLS, and your existing tools and standard libraries will provide most of what you need. If you know how to operate DNS and reverse proxies, you know how to operate mTLS infrastructure.
+
+![Connect it all with mTLS](https://raw.githubusercontent.com/smallstep/certificates/master/autocert/connect-with-mtls.png)
+
+There's just one problem: **you need certificates issued by your own certificate authority (CA)**. Building and operating a CA, issuing certificates, and making sure they're renewed before they expire is tricky. This project provides the infratructure, automations, and workflows you'll need.
+
+
 This project is part of smallstep's broader security architecture, which makes
 it much easier to implement good security practices early, and incrementally
 improve them as your system matures.
+
+> ## 🆕 Autocert
+> <a href="autocert/README.md"><img width="50%" src="https://raw.githubusercontent.com/smallstep/certificates/autocert/autocert/autocert-logo.png"></a>
+> 
+> If you're using Kubernetes, make sure you [check out autocert](autocert/README.md): a kubernetes add-on that builds on `step certificates` to automatically injects TLS/HTTPS certificates into your containers.
 
 ### Table of Contents
 
