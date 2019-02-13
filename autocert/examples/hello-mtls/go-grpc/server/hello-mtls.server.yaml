@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels: {app: hello-mtls}
+  name: hello-mtls
+spec:
+  type: ClusterIP
+  ports:
+  - port: 443
+    targetPort: 443
+  selector: {app: hello-mtls}
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-mtls
+  labels: {app: hello-mtls}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: hello-mtls}}
+  template:
+    metadata:
+      annotations:
+        autocert.step.sm/name: hello-mtls.default.svc.cluster.local
+      labels: {app: hello-mtls}
+    spec:
+      containers:
+      - name: hello-mtls
+        image: hello-mtls-server-go-grpc:latest
+        imagePullPolicy: Never
+        resources: {requests: {cpu: 10m, memory: 20Mi}}

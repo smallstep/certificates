@@ -1,17 +1,21 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
+	"github.com/smallstep/certificates/autocert/examples/hello-mtls/go-grpc/hello"
 )
 
 const (
@@ -21,6 +25,9 @@ const (
 	requestFrequency = 5 * time.Second
 	tickFrequency    = 15 * time.Second
 )
+
+// Uses techniques from https://diogomonica.com/2017/01/11/hitless-tls-certificate-rotation-in-go/
+// to automatically rotate certificates when they're renewed.
 
 type rotator struct {
 	sync.RWMutex
@@ -61,9 +68,31 @@ func loadRootCertPool() (*x509.CertPool, error) {
 	return pool, nil
 }
 
-func main() {
-	url := os.Getenv("HELLO_MTLS_URL")
+func sayHello(c hello.GreeterClient) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
+	r, err := c.SayHello(ctx, &hello.HelloRequest{Name: "world"})
+	if err != nil {
+		return err
+	}
+	log.Printf("Greeting: %s", r.Message)
+	return nil
+}
+
+func sayHelloAgain(c hello.GreeterClient) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	r, err := c.SayHelloAgain(ctx, &hello.HelloRequest{Name: "world"})
+	if err != nil {
+		return err
+	}
+	log.Printf("Greeting: %s", r.Message)
+	return nil
+}
+
+func main() {
 	// Read the root certificate for our CA from disk
 	roots, err := loadRootCertPool()
 	if err != nil {
@@ -75,29 +104,21 @@ func main() {
 	if err := r.loadCertificate(autocertFile, autocertKey); err != nil {
 		log.Fatal("error loading certificate and key", err)
 	}
-
-	// Create an HTTPS client using our cert, key & pool
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs:          roots,
-				MinVersion:       tls.VersionTLS12,
-				CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
-				CipherSuites: []uint16{
-					tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-				},
-				// GetClientCertificate is called when a server requests a
-				// certificate from a client.
-				//
-				// In this example keep alives will cause the certificate to
-				// only be called once, but if we disable them,
-				// GetClientCertificate will be called on every request.
-				GetClientCertificate: r.getClientCertificate,
-			},
-			// Add this line to get the certificate on every request.
-			// DisableKeepAlives: true,
+	tlsConfig := &tls.Config{
+		RootCAs:          roots,
+		MinVersion:       tls.VersionTLS12,
+		CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 		},
+		// GetClientCertificate is called when a server requests a
+		// certificate from a client.
+		//
+		// In this example keep alives will cause the certificate to
+		// only be called once, but if we disable them,
+		// GetClientCertificate will be called on every request.
+		GetClientCertificate: r.getClientCertificate,
 	}
 
 	// Schedule periodic re-load of certificate
@@ -122,21 +143,22 @@ func main() {
 	}()
 	defer close(done)
 
+	// Set up a connection to the server.
+	address := os.Getenv("HELLO_MTLS_URL")
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	client := hello.NewGreeterClient(conn)
+
 	for {
-		// Make request
-		r, err := client.Get(url)
-		if err != nil {
-			log.Fatal(err)
+		if err := sayHello(client); err != nil {
+			log.Fatalf("could not greet: %v", err)
 		}
-
-		defer r.Body.Close()
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			log.Fatal(err)
+		if err := sayHelloAgain(client); err != nil {
+			log.Fatalf("could not greet: %v", err)
 		}
-
-		fmt.Printf("%s: %s\n", time.Now().Format(time.RFC3339), strings.Trim(string(body), "\n"))
-
 		time.Sleep(requestFrequency)
 	}
 }

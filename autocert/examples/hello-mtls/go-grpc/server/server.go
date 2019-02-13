@@ -1,15 +1,22 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
+	"net"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
+
+	"github.com/smallstep/certificates/autocert/examples/hello-mtls/go-grpc/hello"
 )
 
 const (
@@ -61,27 +68,40 @@ func loadRootCertPool() (*x509.CertPool, error) {
 	return pool, nil
 }
 
-func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-			fmt.Fprintf(w, "Unauthenticated")
-		} else {
-			name := r.TLS.PeerCertificates[0].Subject.CommonName
-			fmt.Fprintf(w, "Hello, %s!\n", name)
-		}
-	})
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Ok\n")
-	})
+// Greeter is a service that sends greetings.
+type Greeter struct{}
 
+// SayHello sends a greeting
+func (g *Greeter) SayHello(ctx context.Context, in *hello.HelloRequest) (*hello.HelloReply, error) {
+	return &hello.HelloReply{Message: "Hello " + in.Name + " (" + getServerName(ctx) + ")"}, nil
+}
+
+// SayHelloAgain sends another greeting
+func (g *Greeter) SayHelloAgain(ctx context.Context, in *hello.HelloRequest) (*hello.HelloReply, error) {
+	return &hello.HelloReply{Message: "Hello again " + in.Name + " (" + getServerName(ctx) + ")"}, nil
+}
+
+func getServerName(ctx context.Context) string {
+	if p, ok := peer.FromContext(ctx); ok {
+		if tlsInfo, ok := p.AuthInfo.(credentials.TLSInfo); ok {
+			return tlsInfo.State.ServerName
+		}
+	}
+	return "unknown"
+}
+
+func main() {
 	roots, err := loadRootCertPool()
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// Load certificate
 	r := &rotator{}
-	cfg := &tls.Config{
+	if err := r.loadCertificate(autocertFile, autocertKey); err != nil {
+		log.Fatal("error loading certificate and key", err)
+	}
+	tlsConfig := &tls.Config{
 		ClientAuth:               tls.RequireAndVerifyClientCert,
 		ClientCAs:                roots,
 		MinVersion:               tls.VersionTLS12,
@@ -92,17 +112,6 @@ func main() {
 			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 		},
 		GetCertificate: r.getCertificate,
-	}
-	srv := &http.Server{
-		Addr:      ":443",
-		Handler:   mux,
-		TLSConfig: cfg,
-	}
-
-	// Load certificate
-	err = r.loadCertificate(autocertFile, autocertKey)
-	if err != nil {
-		log.Fatal("Error loading certificate and key", err)
 	}
 
 	// Schedule periodic re-load of certificate
@@ -127,11 +136,16 @@ func main() {
 	}()
 	defer close(done)
 
-	log.Println("Listening no :443")
-
-	// Start serving HTTPS
-	err = srv.ListenAndServeTLS("", "")
+	lis, err := net.Listen("tcp", ":443")
 	if err != nil {
-		log.Fatal("ListenAndServerTLS: ", err)
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	srv := grpc.NewServer(grpc.Creds(credentials.NewTLS(tlsConfig)))
+	hello.RegisterGreeterServer(srv, &Greeter{})
+
+	log.Println("Listening on :443")
+	if err := srv.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
 	}
 }
