@@ -14,6 +14,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
 
 	"github.com/smallstep/certificates/autocert/examples/hello-mtls/go-grpc/hello"
 )
@@ -72,12 +73,21 @@ type Greeter struct{}
 
 // SayHello sends a greeting
 func (g *Greeter) SayHello(ctx context.Context, in *hello.HelloRequest) (*hello.HelloReply, error) {
-	return &hello.HelloReply{Message: "Hello " + in.Name}, nil
+	return &hello.HelloReply{Message: "Hello " + in.Name + " (" + getServerName(ctx) + ")"}, nil
 }
 
 // SayHelloAgain sends another greeting
 func (g *Greeter) SayHelloAgain(ctx context.Context, in *hello.HelloRequest) (*hello.HelloReply, error) {
-	return &hello.HelloReply{Message: "Hello again " + in.Name}, nil
+	return &hello.HelloReply{Message: "Hello again " + in.Name + " (" + getServerName(ctx) + ")"}, nil
+}
+
+func getServerName(ctx context.Context) string {
+	if p, ok := peer.FromContext(ctx); ok {
+		if tlsInfo, ok := p.AuthInfo.(credentials.TLSInfo); ok {
+			return tlsInfo.State.ServerName
+		}
+	}
+	return "unknown"
 }
 
 func main() {
