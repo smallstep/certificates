@@ -26,8 +26,10 @@ var (
 
 // Config represents the configuration for the certificate authority client.
 type Config struct {
-	URI string `json:"uri"`
-	Key string `json:"key"`
+	URI           string    `json:"uri"`
+	Key           string    `json:"key"`
+	NotAfterStart time.Time `json:"notAfterStart,omitempty"`
+	NotAfterLimit time.Time `json:"notAfterLimit,omitempty"`
 }
 
 // Validate validates the ct configuration.
@@ -42,10 +44,10 @@ func (c *Config) Validate() error {
 	}
 }
 
-// Client is the interfaced used to communicate with the certificate transparency logs.
+// Client is the interface used to communicate with the certificate transparency logs.
 type Client interface {
 	GetSCTs(asn1Data ...[]byte) (*SCT, error)
-	SubmitToLogs(asn1Data ...[]byte) error
+	SubmitToLogs(asn1Data ...[]byte) (*SCT, error)
 }
 
 type logClient interface {
@@ -102,19 +104,14 @@ type ClientImpl struct {
 
 // New creates a new Client
 func New(c Config) (*ClientImpl, error) {
-	// Extract DER from key
-	data, err := ioutil.ReadFile(c.Key)
+	der, err := readPublicKey(c.Key)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", c.Key)
-	}
-	block, rest := pem.Decode(data)
-	if block == nil || len(rest) > 0 {
-		return nil, errors.Wrapf(err, "invalid public key %s", c.Key)
+		return nil, err
 	}
 
 	// Initialize ct client
 	logClient, err := client.New(c.URI, &http.Client{}, jsonclient.Options{
-		PublicKeyDER: block.Bytes,
+		PublicKeyDER: der,
 		UserAgent:    "smallstep certificates",
 	})
 	if err != nil {
@@ -146,7 +143,7 @@ func (c *ClientImpl) GetSCTs(asn1Data ...[]byte) (*SCT, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get SCT from %s", c.config.URI)
 	}
-	logLeafHash(asn1Data, sct, true)
+	logLeafHash("AddPreChain", asn1Data, sct, true)
 	return &SCT{
 		LogURL: c.config.URI,
 		SCT:    sct,
@@ -154,16 +151,32 @@ func (c *ClientImpl) GetSCTs(asn1Data ...[]byte) (*SCT, error) {
 }
 
 // SubmitToLogs submits the certificate to the certificate transparency logs.
-func (c *ClientImpl) SubmitToLogs(asn1Data ...[]byte) error {
+func (c *ClientImpl) SubmitToLogs(asn1Data ...[]byte) (*SCT, error) {
 	chain := chainFromDERs(asn1Data)
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 	sct, err := c.logClient.AddChain(ctx, chain)
 	if err != nil {
-		return errors.Wrapf(err, "failed submit certificate to %s", c.config.URI)
+		return nil, errors.Wrapf(err, "failed submit certificate to %s", c.config.URI)
 	}
-	logLeafHash(asn1Data, sct, false)
-	return nil
+	logLeafHash("AddChain", asn1Data, sct, false)
+	return &SCT{
+		LogURL: c.config.URI,
+		SCT:    sct,
+	}, nil
+}
+
+// readPublicKey extracts the DER from the given file.
+func readPublicKey(filename string) ([]byte, error) {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", filename)
+	}
+	block, rest := pem.Decode(data)
+	if block == nil || len(rest) > 0 {
+		return nil, errors.Wrapf(err, "invalid public key %s", filename)
+	}
+	return block.Bytes, nil
 }
 
 func chainFromDERs(asn1Data [][]byte) []ct.ASN1Cert {
@@ -174,7 +187,7 @@ func chainFromDERs(asn1Data [][]byte) []ct.ASN1Cert {
 	return chain
 }
 
-func logLeafHash(asn1Data [][]byte, sct *ct.SignedCertificateTimestamp, isPrecert bool) {
+func logLeafHash(op string, asn1Data [][]byte, sct *ct.SignedCertificateTimestamp, isPrecert bool) {
 	var etype ct.LogEntryType
 	if isPrecert {
 		etype = ct.PrecertLogEntryType
@@ -204,5 +217,5 @@ func logLeafHash(asn1Data [][]byte, sct *ct.SignedCertificateTimestamp, isPrecer
 		return
 	}
 
-	log.Printf("LogID: %x, LeafHash: %x, Timestamp: %d\n", sct.LogID.KeyID[:], leafHash, sct.Timestamp)
+	log.Printf("Op: %s, LogID: %x, LeafHash: %x, Timestamp: %d\n", op, sct.LogID.KeyID[:], leafHash, sct.Timestamp)
 }

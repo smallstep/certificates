@@ -188,7 +188,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 
 	if a.ctClient != nil {
 		// Submit final certificate chain
-		if err := a.ctClient.SubmitToLogs(serverCert.Raw, caCert.Raw); err != nil {
+		if _, err := a.ctClient.SubmitToLogs(serverCert.Raw, caCert.Raw); err != nil {
 			return nil, nil, &apiError{errors.Wrap(err, "sign: error submitting final certificate to ct logs"),
 				http.StatusBadGateway, errContext}
 		}
@@ -306,7 +306,7 @@ func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certi
 
 	if a.ctClient != nil {
 		// Submit final certificate chain
-		if err := a.ctClient.SubmitToLogs(serverCert.Raw, caCert.Raw); err != nil {
+		if _, err := a.ctClient.SubmitToLogs(serverCert.Raw, caCert.Raw); err != nil {
 			return nil, nil, &apiError{errors.Wrap(err, "renew: error submitting final certificate to ct logs"),
 				http.StatusBadGateway, context{}}
 		}
@@ -373,7 +373,7 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 
 	if a.ctClient != nil {
 		// Submit final certificate chain
-		if err := a.ctClient.SubmitToLogs(crtBytes, intermediatePEM.Bytes); err != nil {
+		if _, err := a.ctClient.SubmitToLogs(crtBytes, intermediatePEM.Bytes); err != nil {
 			return nil, errors.Wrap(err, "error submitting final certificate to ct logs")
 		}
 	}
