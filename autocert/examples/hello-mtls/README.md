@@ -64,6 +64,20 @@ languages are appreciated!
   - [ ] TLS stack configuration loaded from `step-ca`
   - [ ] Root certificate rotation
 
+[go-grpc/](go-grpc/)
+- [X] Server using autocert certificate & key
+  - [X] mTLS (client authentication using internal root certificate)
+  - [X] Automatic certificate renewal
+  - [X] Restrict to safe ciphersuites and TLS versions
+  - [ ] TLS stack configuration loaded from `step-ca`
+  - [ ] Root certificate rotation
+- [X] Client using autocert root certificate
+  - [X] mTLS (send client certificate if server asks for it)
+  - [X] Automatic certificate rotation
+  - [X] Restrict to safe ciphersuites and TLS versions
+  - [ ] TLS stack configuration loaded from `step-ca`
+  - [ ] Root certificate rotation
+
 [curl/](curl/)
 - [X] Client
   - [X] mTLS (send client certificate if server asks for it)
