@@ -23,14 +23,13 @@ const (
 // to automatically rotate certificates when they're renewed.
 
 type rotator struct {
-	sync.Mutex
+	sync.RWMutex
 	certificate *tls.Certificate
 }
 
 func (r *rotator) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	r.Lock()
-	defer r.Unlock()
-
+	r.RLock()
+	defer r.RUnlock()
 	return r.certificate, nil
 }
 

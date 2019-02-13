@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -18,7 +19,33 @@ const (
 	autocertKey      = "/var/run/autocert.step.sm/site.key"
 	autocertRoot     = "/var/run/autocert.step.sm/root.crt"
 	requestFrequency = 5 * time.Second
+	tickFrequency    = 15 * time.Second
 )
+
+type rotator struct {
+	sync.RWMutex
+	certificate *tls.Certificate
+}
+
+func (r *rotator) getClientCertificate(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+	r.RLock()
+	defer r.RUnlock()
+	return r.certificate, nil
+}
+
+func (r *rotator) loadCertificate(certFile, keyFile string) error {
+	r.Lock()
+	defer r.Unlock()
+
+	c, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return err
+	}
+
+	r.certificate = &c
+
+	return nil
+}
 
 func loadRootCertPool() (*x509.CertPool, error) {
 	root, err := ioutil.ReadFile(autocertRoot)
@@ -37,16 +64,16 @@ func loadRootCertPool() (*x509.CertPool, error) {
 func main() {
 	url := os.Getenv("HELLO_MTLS_URL")
 
-	// Read our leaf certificate and key from disk
-	cert, err := tls.LoadX509KeyPair(autocertFile, autocertKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// Read the root certificate for our CA from disk
 	roots, err := loadRootCertPool()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// Load certificate
+	r := &rotator{}
+	if err := r.loadCertificate(autocertFile, autocertKey); err != nil {
+		log.Fatal("error loading certificate and key", err)
 	}
 
 	// Create an HTTPS client using our cert, key & pool
@@ -54,16 +81,44 @@ func main() {
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				RootCAs:          roots,
-				Certificates:     []tls.Certificate{cert},
 				MinVersion:       tls.VersionTLS12,
 				CurvePreferences: []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
 				CipherSuites: []uint16{
 					tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
 					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 				},
+				// GetClientCertificate is called when a server requests a
+				// certificate from a client.
+				//
+				// In this example keep alives will cause the certificate to
+				// only be called once, but if we disable them,
+				// GetClientCertificate will be called on every request.
+				GetClientCertificate: r.getClientCertificate,
 			},
+			// Add this line to get the certificate on every request.
+			// DisableKeepAlives: true,
 		},
 	}
+
+	// Schedule periodic re-load of certificate
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(tickFrequency)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				fmt.Println("Checking for new certificate...")
+				err := r.loadCertificate(autocertFile, autocertKey)
+				if err != nil {
+					log.Println("Error loading certificate and key", err)
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+	defer close(done)
 
 	for {
 		// Make request

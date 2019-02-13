@@ -59,7 +59,7 @@ languages are appreciated!
   - [ ] Root certificate rotation
 - [X] Client using autocert root certificate
   - [X] mTLS (send client certificate if server asks for it)
-  - [ ] Automatic certificate rotation
+  - [X] Automatic certificate rotation
   - [X] Restrict to safe ciphersuites and TLS versions
   - [ ] TLS stack configuration loaded from `step-ca`
   - [ ] Root certificate rotation

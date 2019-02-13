@@ -112,6 +112,12 @@ func main() {
 			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
 			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 		},
+		// GetClientCertificate is called when a server requests a
+		// certificate from a client.
+		//
+		// In this example keep alives will cause the certificate to
+		// only be called once, but if we disable them,
+		// GetClientCertificate will be called on every request.
 		GetClientCertificate: r.getClientCertificate,
 	}
 
