@@ -106,6 +106,8 @@ func main() {
 	}
 
 	// Schedule periodic re-load of certificate
+	// A real implementation can use something like
+	// https://github.com/fsnotify/fsnotify
 	done := make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(tickFrequency)
