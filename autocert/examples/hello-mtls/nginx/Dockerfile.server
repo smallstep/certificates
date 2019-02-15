@@ -1,0 +1,11 @@
+FROM nginx:alpine
+
+RUN apk add inotify-tools
+RUN mkdir /src
+ADD site.conf /etc/nginx/conf.d
+ADD certwatch.sh /src
+ADD entrypoint.sh /src
+
+# Certificate watcher and nginx
+ENTRYPOINT ["/src/entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]

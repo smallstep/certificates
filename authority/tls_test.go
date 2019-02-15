@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
+	stepx509 "github.com/smallstep/cli/pkg/x509"
 )
 
 func getCSR(t *testing.T, priv interface{}, opts ...func(*x509.CertificateRequest)) *x509.CertificateRequest {
@@ -269,7 +271,8 @@ func TestRenew(t *testing.T) {
 		a.intermediateIdentity.Key,
 		x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, 0),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
-		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"))
+		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
+		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].Key.KeyID))
 	assert.FatalError(t, err)
 	crtBytes, err := leaf.CreateCertificate()
 	assert.FatalError(t, err)
@@ -324,7 +327,32 @@ func TestRenew(t *testing.T) {
 		},
 		"success": func() (*renewTest, error) {
 			return &renewTest{
-				crt: crt,
+				auth: a,
+				crt:  crt,
+			}, nil
+		},
+		"success-new-intermediate": func() (*renewTest, error) {
+			newRootProfile, err := x509util.NewRootProfile("new-root")
+			assert.FatalError(t, err)
+			newRootBytes, err := newRootProfile.CreateCertificate()
+			assert.FatalError(t, err)
+			newRootCrt, err := stepx509.ParseCertificate(newRootBytes)
+			assert.FatalError(t, err)
+
+			newIntermediateProfile, err := x509util.NewIntermediateProfile("new-intermediate",
+				newRootCrt, newRootProfile.SubjectPrivateKey())
+			assert.FatalError(t, err)
+			newIntermediateBytes, err := newIntermediateProfile.CreateCertificate()
+			assert.FatalError(t, err)
+			newIntermediateCrt, err := stepx509.ParseCertificate(newIntermediateBytes)
+			assert.FatalError(t, err)
+
+			_a := testAuthority(t)
+			_a.intermediateIdentity.Key = newIntermediateProfile.SubjectPrivateKey()
+			_a.intermediateIdentity.Crt = newIntermediateCrt
+			return &renewTest{
+				auth: _a,
+				crt:  crt,
 			}, nil
 		},
 	}
@@ -353,7 +381,7 @@ func TestRenew(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, leaf.NotAfter.Sub(leaf.NotBefore), crt.NotAfter.Sub(crt.NotBefore))
+					assert.Equals(t, leaf.NotAfter.Sub(leaf.NotBefore), tc.crt.NotAfter.Sub(crt.NotBefore))
 
 					assert.True(t, leaf.NotBefore.After(now.Add(-time.Minute)))
 					assert.True(t, leaf.NotBefore.Before(now.Add(time.Minute)))
@@ -385,9 +413,49 @@ func TestRenew(t *testing.T) {
 					hash := sha1.Sum(pubBytes)
 					assert.Equals(t, leaf.SubjectKeyId, hash[:])
 
-					assert.Equals(t, leaf.AuthorityKeyId, a.intermediateIdentity.Crt.SubjectKeyId)
+					// We did not change the intermediate before renewing.
+					if a.intermediateIdentity.Crt.SerialNumber == tc.auth.intermediateIdentity.Crt.SerialNumber {
+						assert.Equals(t, leaf.AuthorityKeyId, a.intermediateIdentity.Crt.SubjectKeyId)
+						// Compare extensions: they can be in a different order
+						for _, ext1 := range tc.crt.Extensions {
+							found := false
+							for _, ext2 := range leaf.Extensions {
+								if reflect.DeepEqual(ext1, ext2) {
+									found = true
+									break
+								}
+							}
+							if !found {
+								t.Errorf("x509 extension %s not found in renewed certificate", ext1.Id.String())
+							}
+						}
+					} else {
+						// We did change the intermediate before renewing.
+						assert.Equals(t, leaf.AuthorityKeyId, tc.auth.intermediateIdentity.Crt.SubjectKeyId)
+						// Compare extensions: they can be in a different order
+						for _, ext1 := range tc.crt.Extensions {
+							// The authority key id extension should be different b/c the intermediates are different.
+							if ext1.Id.Equal(oidAuthorityKeyIdentifier) {
+								for _, ext2 := range leaf.Extensions {
+									assert.False(t, reflect.DeepEqual(ext1, ext2))
+								}
+								continue
+							} else {
+								found := false
+								for _, ext2 := range leaf.Extensions {
+									if reflect.DeepEqual(ext1, ext2) {
+										found = true
+										break
+									}
+								}
+								if !found {
+									t.Errorf("x509 extension %s not found in renewed certificate", ext1.Id.String())
+								}
+							}
+						}
+					}
 
-					realIntermediate, err := x509.ParseCertificate(a.intermediateIdentity.Crt.Raw)
+					realIntermediate, err := x509.ParseCertificate(tc.auth.intermediateIdentity.Crt.Raw)
 					assert.FatalError(t, err)
 					assert.Equals(t, intermediate, realIntermediate)
 				}

@@ -1,0 +1,36 @@
+# Create a ClusterRole for managing autocert secrets, which should
+# only exist in namespaces with autocert enabled and should always
+# be labeled `autocert.step.sm/token: true`.
+#
+# To create this ClusterRole you need cluster-admin privileges. On
+# GKE you can give yourself cluster-admin privileges using the
+# following command:
+#
+# kubectl create clusterrolebinding cluster-admin-binding \
+#  --clusterrole cluster-admin \
+#  --user $(gcloud config get-value account)
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: autocert-controller
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "delete"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: autocert-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: autocert-controller
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: step
+
