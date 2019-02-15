@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -269,7 +270,8 @@ func TestRenew(t *testing.T) {
 		a.intermediateIdentity.Key,
 		x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, 0),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
-		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"))
+		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
+		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].Key.KeyID))
 	assert.FatalError(t, err)
 	crtBytes, err := leaf.CreateCertificate()
 	assert.FatalError(t, err)
@@ -390,6 +392,20 @@ func TestRenew(t *testing.T) {
 					realIntermediate, err := x509.ParseCertificate(a.intermediateIdentity.Crt.Raw)
 					assert.FatalError(t, err)
 					assert.Equals(t, intermediate, realIntermediate)
+
+					// Compare extensions: they can be in a different order
+					for _, ext1 := range crt.Extensions {
+						found := false
+						for _, ext2 := range leaf.Extensions {
+							if reflect.DeepEqual(ext1, ext2) {
+								found = true
+								break
+							}
+						}
+						if !found {
+							t.Errorf("x509 extension %s not found in renewed certificate", ext1.Id.String())
+						}
+					}
 				}
 			}
 		})

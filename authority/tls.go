@@ -30,8 +30,9 @@ type SignOptions struct {
 }
 
 var (
-	stepOIDRoot        = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
-	stepOIDProvisioner = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
+	stepOIDRoot               = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
+	stepOIDProvisioner        = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
+	oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
 )
 
 type stepProvisionerASN1 struct {
@@ -190,8 +191,6 @@ func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certi
 		NotBefore:                   now,
 		NotAfter:                    now.Add(duration),
 		KeyUsage:                    oldCert.KeyUsage,
-		Extensions:                  oldCert.Extensions,
-		ExtraExtensions:             oldCert.ExtraExtensions,
 		UnhandledCriticalExtensions: oldCert.UnhandledCriticalExtensions,
 		ExtKeyUsage:                 oldCert.ExtKeyUsage,
 		UnknownExtKeyUsage:          oldCert.UnknownExtKeyUsage,
@@ -216,6 +215,15 @@ func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certi
 		ExcludedURIDomains:          oldCert.ExcludedURIDomains,
 		CRLDistributionPoints:       oldCert.CRLDistributionPoints,
 		PolicyIdentifiers:           oldCert.PolicyIdentifiers,
+	}
+
+	// Copy all extensions except for Authority Key Identifier. This one might
+	// be different if we rotate the intermediate certificate and it will cause
+	// a TLS bad certificate error.
+	for _, ext := range oldCert.Extensions {
+		if !ext.Id.Equal(oidAuthorityKeyIdentifier) {
+			newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
+		}
 	}
 
 	leaf, err := x509util.NewLeafProfileWithTemplate(newCert,
