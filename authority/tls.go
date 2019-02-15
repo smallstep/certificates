@@ -209,7 +209,7 @@ func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certi
 	// Issuer
 	issIdentity := a.intermediateIdentity
 
-	// Convert a realx509.Certificate to the step x509 Certificate.
+	// Convert a x509.Certificate to the step x509 Certificate.
 	oldCert, err := stepx509.ParseCertificate(ocx.Raw)
 	if err != nil {
 		return nil, nil, &apiError{

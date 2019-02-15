@@ -74,28 +74,6 @@
   revision = "883fe33ffc4344bad1ecd881f61afd5ec5d80e0a"
 
 [[projects]]
-  digest = "1:4c0989ca0bcd10799064318923b9bc2db6b4d6338dd75f3f2d86c3511aaaf5cf"
-  name = "github.com/golang/protobuf"
-  packages = [
-    "proto",
-    "ptypes",
-    "ptypes/any",
-    "ptypes/duration",
-    "ptypes/timestamp",
-  ]
-  pruneopts = "UT"
-  revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
-  version = "v1.2.0"
-
-[[projects]]
-  branch = "master"
-  digest = "1:3ee90c0d94da31b442dde97c99635aaafec68d0b8a3c12ee2075c6bdabeec6bb"
-  name = "github.com/google/gofuzz"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "24818f796faf91cd76ec7bddd72458fbced7a6c1"
-
-[[projects]]
   branch = "master"
   digest = "1:239c4c7fd2159585454003d9be7207167970194216193a8a210b8d29576f19c9"
   name = "github.com/golang/protobuf"
@@ -125,6 +103,14 @@
   ]
   pruneopts = "UT"
   revision = "b5e3a70217c2a317c27b3c852126d0f8f29fef2b"
+
+[[projects]]
+  branch = "master"
+  digest = "1:3ee90c0d94da31b442dde97c99635aaafec68d0b8a3c12ee2075c6bdabeec6bb"
+  name = "github.com/google/gofuzz"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 
 [[projects]]
   branch = "master"
@@ -308,7 +294,7 @@
 
 [[projects]]
   branch = "certificate-transparency"
-  digest = "1:69522074a16a54ae22fedb069684d11dd63a138f25e2114869448b0b7f18aba6"
+  digest = "1:bccb8a0f1fbf8eb120c3624cea03c7285b6706b7c13c3e92c0c13ebdd730f4b7"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
@@ -364,10 +350,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:2f7468b0b3fd7d926072f0dcbb6ec81e337278b4e5de639d017e54f785f0b475"
+  digest = "1:50bed722f4f0bbb3d64b0ca49d41911f57a0ddb63e03666656f6621af3b70f9e"
   name = "golang.org/x/net"
   packages = [
     "context",
+    "context/ctxhttp",
     "html",
     "html/atom",
     "http/httpguts",
@@ -586,6 +573,7 @@
     "github.com/ghodss/yaml",
     "github.com/go-chi/chi",
     "github.com/golang/lint/golint",
+    "github.com/golang/protobuf/proto",
     "github.com/google/certificate-transparency-go",
     "github.com/google/certificate-transparency-go/client",
     "github.com/google/certificate-transparency-go/jsonclient",
