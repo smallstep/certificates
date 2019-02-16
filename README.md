@@ -3,6 +3,9 @@
 An online certificate authority and related tools for secure automated
 certificate management, so you can use TLS everywhere.
 
+[![GitHub stars](https://img.shields.io/github/stars/smallstep/certificates.svg?style=social)](https://github.com/smallstep/certificates/stargazers)
+[![Twitter followers](https://img.shields.io/twitter/follow/smallsteplabs.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=smallsteplabs)
+
 For more information and docs see [the Step website](https://smallstep.com/cli/)
 and the [blog post](https://smallstep.com/blog/step-certificates.html)
 announcing Step Certificate Authority.
