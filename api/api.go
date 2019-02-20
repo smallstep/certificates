@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/tls"
@@ -436,7 +437,9 @@ func fmtPublicKey(cert *x509.Certificate) string {
 	case *ecdsa.PublicKey:
 		params = pk.Curve.Params().Name
 	case *rsa.PublicKey:
-		params = strconv.Itoa(pk.Size())
+		params = strconv.Itoa(pk.Size() * 8)
+	case *dsa.PublicKey:
+		params = strconv.Itoa(pk.Q.BitLen() * 8)
 	default:
 		params = "unknown"
 	}
