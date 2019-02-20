@@ -5,6 +5,12 @@ all: build lint test
 
 .PHONY: all
 
+bootstrap:
+	$Q which dep || go get github.com/golang/dep/cmd/dep
+	$Q dep ensure
+
+.PHONY: bootstrap
+
 # Version flags to embed in the binaries
 VERSION ?= $(shell [ -d .git ] && git describe --tags --always --dirty="-dev")
 # If we are not in an active git dir then try reading the version from .VERSION.
