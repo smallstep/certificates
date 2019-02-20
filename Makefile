@@ -11,7 +11,7 @@ OUTPUT_ROOT=output/
 # Set shell to bash for `echo -e`
 SHELL := /bin/bash
 
-all: build lint test
+all: build test lint
 
 .PHONY: all
 
@@ -49,6 +49,9 @@ $(foreach pkg,$(BOOTSTRAP),$(eval $(call VENDOR_BIN_TMPL,$(pkg))))
 
 # Version flags to embed in the binaries
 VERSION ?= $(shell [ -d .git ] && git describe --tags --always --dirty="-dev")
+# If we are not in an active git dir then try reading the version from .VERSION.
+# .VERSION contains a slug populated by `git archive`.
+VERSION := $(or $(VERSION),$(shell ./.version.sh .VERSION))
 VERSION := $(shell echo $(VERSION) | sed 's/^v//')
 
 # If TRAVIS_TAG is set then we know this ref has been tagged.
@@ -99,7 +102,7 @@ test:
 vtest:
 	$(Q)for d in $$(go list ./... | grep -v vendor); do \
     echo -e "TESTS FOR: for \033[0;35m$$d\033[0m"; \
-    $(GOFLAGS) go test -v -bench=. -run=. -short -coverprofile=coverage.out $$d; \
+    $(GOFLAGS) go test -v -bench=. -run=. -short -coverprofile=vcoverage.out $$d; \
 	out=$$?; \
 	if [[ $$out -ne 0 ]]; then ret=$$out; fi;\
     rm -f profile.coverage.out; \
@@ -152,6 +155,19 @@ uninstall:
 	$Q rm -f $(DESTDIR)$(INSTALL_PREFIX)/bin/$(BINNAME)
 
 .PHONY: install uninstall
+
+#########################################
+# Clean
+#########################################
+
+clean:
+	@echo "You will need to run 'make bootstrap' or 'dep ensure' directly to re-download any dependencies."
+	$Q rm -rf vendor
+ifneq ($(BINNAME),"")
+	$Q rm -f bin/$(BINNAME)
+endif
+
+.PHONY: clean
 
 #########################################
 # Building Docker Image
@@ -301,16 +317,3 @@ artifacts-release: artifacts-tag
 artifacts: artifacts-$(PUSHTYPE) docker-$(PUSHTYPE)
 
 .PHONY: artifacts-master artifacts-release artifacts
-
-#########################################
-# Clean
-#########################################
-
-clean:
-	@echo "You will need to run 'make bootstrap' or 'dep ensure' directly to re-download any dependencies."
-	$Q rm -rf vendor
-ifneq ($(BINNAME),"")
-	$Q rm -f bin/$(BINNAME)
-endif
-
-.PHONY: clean
