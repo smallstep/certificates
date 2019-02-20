@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/jose"
 )
@@ -598,7 +599,7 @@ func Test_caHandler_Sign(t *testing.T) {
 			}).(*caHandler)
 			req := httptest.NewRequest("POST", "http://example.com/sign", strings.NewReader(tt.input))
 			w := httptest.NewRecorder()
-			h.Sign(w, req)
+			h.Sign(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -650,7 +651,7 @@ func Test_caHandler_Renew(t *testing.T) {
 			req := httptest.NewRequest("POST", "http://example.com/renew", nil)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
-			h.Renew(w, req)
+			h.Renew(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
