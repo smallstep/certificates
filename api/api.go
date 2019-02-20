@@ -259,6 +259,8 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, BadRequest(errors.Wrap(err, "error reading request body")))
 		return
 	}
+
+	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
 		WriteError(w, err)
 		return
@@ -282,7 +284,7 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	logCertificate(w, cert, body.OTT)
+	logCertificate(w, cert)
 	JSON(w, &SignResponse{
 		ServerPEM:  Certificate{cert},
 		CaPEM:      Certificate{root},
@@ -305,7 +307,7 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	logCertificate(w, cert, "")
+	logCertificate(w, cert)
 	JSON(w, &SignResponse{
 		ServerPEM:  Certificate{cert},
 		CaPEM:      Certificate{root},
@@ -389,7 +391,15 @@ type stepProvisioner struct {
 	CredentialID []byte
 }
 
-func logCertificate(w http.ResponseWriter, cert *x509.Certificate, token string) {
+func logOtt(w http.ResponseWriter, token string) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		rl.WithFields(map[string]interface{}{
+			"ott": token,
+		})
+	}
+}
+
+func logCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
 		m := map[string]interface{}{
 			"serial":      cert.SerialNumber,
@@ -399,9 +409,6 @@ func logCertificate(w http.ResponseWriter, cert *x509.Certificate, token string)
 			"valid-to":    cert.NotAfter.Format(time.RFC3339),
 			"public-key":  fmtPublicKey(cert),
 			"certificate": base64.StdEncoding.EncodeToString(cert.Raw),
-		}
-		if len(token) > 0 {
-			m["ott"] = token
 		}
 		for _, ext := range cert.Extensions {
 			if ext.Id.Equal(oidStepProvisioner) {
