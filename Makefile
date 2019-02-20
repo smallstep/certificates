@@ -49,6 +49,9 @@ $(foreach pkg,$(BOOTSTRAP),$(eval $(call VENDOR_BIN_TMPL,$(pkg))))
 
 # Version flags to embed in the binaries
 VERSION ?= $(shell [ -d .git ] && git describe --tags --always --dirty="-dev")
+# If we are not in an active git dir then try reading the version from .VERSION.
+# .VERSION contains a slug populated by `git archive`.
+VERSION := $(or $(VERSION),$(shell ./.version.sh .VERSION))
 VERSION := $(shell echo $(VERSION) | sed 's/^v//')
 
 # If TRAVIS_TAG is set then we know this ref has been tagged.
