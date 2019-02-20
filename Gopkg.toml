@@ -45,12 +45,18 @@ required = [
   name = "github.com/go-chi/chi"
 
 [[override]]
-  branch = "master"
+  branch = "max/version"
   name = "github.com/smallstep/cli"
 
 [prune]
   go-tests = true
   unused-packages = true
+  non-go = true
+
+  [[prune.project]]
+    name = "github.com/smallstep/cli"
+    non-go = false
+    unused-packages = false
 
 [[constraint]]
   name = "github.com/newrelic/go-agent"
