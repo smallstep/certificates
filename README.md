@@ -237,7 +237,7 @@ X.509 Certificates and private keys.
     EOF
     ```
 
-<a name="GetStartedCert"></a>3. Get an identity for your server from the Step CA.
+3. Get an identity for your server from the Step CA.<a name="GetStartedCert"></a>
 
     <pre><code>
     <b>$ step ca certificate localhost srv.crt srv.key</b>
