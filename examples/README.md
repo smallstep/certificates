@@ -583,10 +583,12 @@ Please enter the password to decrypt ~/.step/secrets/intermediate_ca_key: passwo
 2019/02/21 12:09:51 Serving HTTPS on :9443 ...
 ```
 
+Please see [`step ca provisioner`](https://smallstep.com/docs/cli/ca/provisioner/) for details on all available claims properties.
+
 Now certs issued by the `dev@smallstep.com` provisioner will be valid for two hours and deny renewals. Command line flags allow validity extension up to 12h, please see [`step ca certificate`](https://smallstep.com/docs/cli/ca/certificate/) for details.
 
 ```bash
-# grab a cert, will alos work with token flow
+# grab a cert, will also work with 'step ca token' flow
 $ step ca certificate localhost site.crt site.key
 Use the arrow keys to navigate: ↓ ↑ → ←
 What provisioner key do you want to use?
