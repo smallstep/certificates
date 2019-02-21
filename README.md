@@ -154,7 +154,6 @@ enabling it to authenticate and encrypt communication. Let's get started!
 
 ### Let's get started!
 
-<a name="GetStartedInit"></a>
 1. Initialize and run the Step CA.
 
     `step ca init` initializes the CA and accomplishes two tasks.
@@ -238,7 +237,6 @@ X.509 Certificates and private keys.
     EOF
     ```
 
-<a name="GetStartedCert"></a>
 3. Get an identity for your server from the Step CA.
 
     <pre><code>
