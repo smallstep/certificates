@@ -16,59 +16,62 @@ e.g. `v1.0.2`
 `-rc*` suffix. e.g. `v1.0.2-rc` or `v1.0.2-rc.4`
 
 
-1. Find the most recent tag.
+1. **Commit all changes.**
 
-    ```
-    git fetch --tags
-    git tag
-    ```
-
-    The new tag needs to be the logical successor of the most recent existing tag.
-    See [versioning](./README.md#versioning) section for more information on version numbers.
-
-2. Select the next tag (but don't actually tag anything yet!!).
-
-    Is the new release a *release candidate* or a *standard release*?
-
-    1. Release Candidate
-
-        If the most recent tag is a standard release, say `v1.0.2`, then the version
-        of the next release candidate should be `v1.0.3-rc.1`. If the most recent tag
-        is a release candidate, say `v1.0.2-rc.3`, then the version of the next
-        release candidate should be `v1.0.2-rc.4`.
-
-    2. Standard Release
-
-        If the most recent tag is a standard release, say `v1.0.2`, then the version
-        of the next standard release should be `v1.0.3`. If the most recent tag
-        is a release candidate, say `v1.0.2-rc.3`, then the version of the next
-        standard release should be `v1.0.3`.
-
-3. Update the remote origin with your commits.
-
-    Make sure that the local checkout is up to date with
-    with the remote origin and that all local changes have been pushed.
+    Make sure that the local checkout is up to date with the remote origin and
+    that all local changes have been pushed.
 
     ```
     git pull --rebase origin master
     git push
     ```
 
-4. Create a local tag.
+2. **Tag it!**
 
-    ```
-    git tag v1.0.3   # standard release
-    ...or
-    git tag v1.0.3-rc.1  # release candidate
-    ```
+    1. **Find the most recent tag.**
 
-5. Push the new tag to the remote origin.
+        ```
+        git fetch --tags
+        git tag
+        ```
 
-    ```
-    git push origin tag v1.0.3   # standard release
-    ...or
-    git push origin tag v1.0.3-rc.1  # release candidate
-    ```
+        The new tag needs to be the logical successor of the most recent existing tag.
+        See [versioning](#versioning) section for more information on version numbers.
+
+    2. **Select the next tag (but don't actually tag anything yet!!).**
+
+        Is the new release a *release candidate* or a *standard release*?
+
+        1. Release Candidate
+
+            If the most recent tag is a standard release, say `v1.0.2`, then the version
+            of the next release candidate should be `v1.0.3-rc.1`. If the most recent tag
+            is a release candidate, say `v1.0.2-rc.3`, then the version of the next
+            release candidate should be `v1.0.2-rc.4`.
+
+        2. Standard Release
+
+            If the most recent tag is a standard release, say `v1.0.2`, then the version
+            of the next standard release should be `v1.0.3`. If the most recent tag
+            is a release candidate, say `v1.0.2-rc.3`, then the version of the next
+            standard release should be `v1.0.3`.
+
+
+    3. **Create a local tag.**
+
+        ```
+        git tag v1.0.3   # standard release
+        ...or
+        git tag v1.0.3-rc.1  # release candidate
+        ```
+
+    4. **Push the new tag to the remote origin.**
+
+        ```
+        git push origin tag v1.0.3   # standard release
+        ...or
+        git push origin tag v1.0.3-rc.1  # release candidate
+        ```
 
 6. Check the build status at
 [Travis-CI](https://travis-ci.com/smallstep/certificates/builds/).
@@ -85,3 +88,8 @@ e.g. `v1.0.2`
     * **step-ca_1.0.3_darwin_amd64.tar.gz**: tarball containing a statically compiled darwin binary.
 
 *All Done!*
+
+## Versioning
+
+We use [SemVer](http://semver.org/) for versioning. For the versions available,
+see the [tags on this repository](https://github.com/smallstep/certificates).
