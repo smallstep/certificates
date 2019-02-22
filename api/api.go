@@ -1,10 +1,16 @@
 package api
 
 import (
+	"crypto/dsa"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/asn1"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +19,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
 )
 
@@ -252,6 +259,8 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, BadRequest(errors.Wrap(err, "error reading request body")))
 		return
 	}
+
+	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
 		WriteError(w, err)
 		return
@@ -275,6 +284,7 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
+	logCertificate(w, cert)
 	JSON(w, &SignResponse{
 		ServerPEM:  Certificate{cert},
 		CaPEM:      Certificate{root},
@@ -297,6 +307,7 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
+	logCertificate(w, cert)
 	JSON(w, &SignResponse{
 		ServerPEM:  Certificate{cert},
 		CaPEM:      Certificate{root},
@@ -372,6 +383,48 @@ func (h *caHandler) Federation(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+var oidStepProvisioner = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1}
+
+type stepProvisioner struct {
+	Type         int
+	Name         []byte
+	CredentialID []byte
+}
+
+func logOtt(w http.ResponseWriter, token string) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		rl.WithFields(map[string]interface{}{
+			"ott": token,
+		})
+	}
+}
+
+func logCertificate(w http.ResponseWriter, cert *x509.Certificate) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		m := map[string]interface{}{
+			"serial":      cert.SerialNumber,
+			"subject":     cert.Subject.CommonName,
+			"issuer":      cert.Issuer.CommonName,
+			"valid-from":  cert.NotBefore.Format(time.RFC3339),
+			"valid-to":    cert.NotAfter.Format(time.RFC3339),
+			"public-key":  fmtPublicKey(cert),
+			"certificate": base64.StdEncoding.EncodeToString(cert.Raw),
+		}
+		for _, ext := range cert.Extensions {
+			if ext.Id.Equal(oidStepProvisioner) {
+				val := &stepProvisioner{}
+				rest, err := asn1.Unmarshal(ext.Value, val)
+				if err != nil || len(rest) > 0 {
+					break
+				}
+				m["provisioner"] = fmt.Sprintf("%s (%s)", val.Name, val.CredentialID)
+				break
+			}
+		}
+		rl.WithFields(m)
+	}
+}
+
 func parseCursor(r *http.Request) (cursor string, limit int, err error) {
 	q := r.URL.Query()
 	cursor = q.Get("cursor")
@@ -382,4 +435,20 @@ func parseCursor(r *http.Request) (cursor string, limit int, err error) {
 		}
 	}
 	return
+}
+
+// TODO: add support for Ed25519 once it's supported
+func fmtPublicKey(cert *x509.Certificate) string {
+	var params string
+	switch pk := cert.PublicKey.(type) {
+	case *ecdsa.PublicKey:
+		params = pk.Curve.Params().Name
+	case *rsa.PublicKey:
+		params = strconv.Itoa(pk.Size() * 8)
+	case *dsa.PublicKey:
+		params = strconv.Itoa(pk.Q.BitLen() * 8)
+	default:
+		params = "unknown"
+	}
+	return fmt.Sprintf("%s %s", cert.PublicKeyAlgorithm, params)
 }

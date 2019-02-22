@@ -3,12 +3,19 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/dsa"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -18,6 +25,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/jose"
 )
@@ -97,6 +105,23 @@ Q7vMNPBWrJWu+A++vHY61WGET+h4lY3GFr2I8OE4IiHPQi1D7Y0+fwOmStwuRPM4
 58jHzJwr1K7cx0lpWfGTtc5bseCGtTKmDBXTziw04yl8eE1+ZFOganixGwCtl4Tt
 DCbKzWTW8lqVdp9Kyf7XEhhc2R8C5w==
 -----END CERTIFICATE REQUEST-----`
+
+	stepCertPEM = `-----BEGIN CERTIFICATE-----
+MIIChTCCAiugAwIBAgIRAJ3O5T28Rdj2lr/UPjf+GAUwCgYIKoZIzj0EAwIwJDEi
+MCAGA1UEAxMZU21hbGxzdGVwIEludGVybWVkaWF0ZSBDQTAeFw0xOTAyMjAyMDE1
+NDNaFw0xOTAyMjEyMDE1NDNaMHExCzAJBgNVBAYTAlVTMQswCQYDVQQIEwJDQTEW
+MBQGA1UEBxMNU2FuIEZyYW5jaXNjbzEcMBoGA1UEChMTU21hbGxzdGVwIExhYnMg
+SW5jLjEfMB0GA1UEAxMWaW50ZXJuYWwuc21hbGxzdGVwLmNvbTBZMBMGByqGSM49
+AgEGCCqGSM49AwEHA0IABC0aKrTNl+gXFuNkXisqX4/foLO3VMt+Kphngziim+fz
+aJhiS9JU+oFYLTNW6HWGUD8CNzfwrmWlVsAmiJwHKlKjgfAwge0wDgYDVR0PAQH/
+BAQDAgWgMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAdBgNVHQ4EFgQU
+JheKvlZqNv1IcgaC8WOS1Zg0i1QwHwYDVR0jBBgwFoAUu97PaFQPfuyKOeew7Hg4
+5WFIAVMwIQYDVR0RBBowGIIWaW50ZXJuYWwuc21hbGxzdGVwLmNvbTBZBgwrBgEE
+AYKkZMYoQAEESTBHAgEBBBVtYXJpYW5vQHNtYWxsc3RlcC5jb20EK2pPMzdkdERi
+a3UtUW5hYnM1VlIwWXc2WUZGdjl3ZUExOGRwM2h0dmRFanMwCgYIKoZIzj0EAwID
+SAAwRQIhAIrn17fP5CBrGtKuhyPiq6eSwryBCf8ki+k17u5a+E/LAiB24Y2E0Put
+nIHOI54lAqDeF7A0y73fPRVCiJEWmuxz0g==
+-----END CERTIFICATE-----`
 
 	pubKey = `{
 	"use": "sig",
@@ -566,6 +591,9 @@ func Test_caHandler_Sign(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	expected1 := []byte(`{"crt":"` + strings.Replace(certPEM, "\n", `\n`, -1) + `\n","ca":"` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"}`)
+	expected2 := []byte(`{"crt":"` + strings.Replace(stepCertPEM, "\n", `\n`, -1) + `\n","ca":"` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"}`)
+
 	tests := []struct {
 		name         string
 		input        string
@@ -575,15 +603,15 @@ func Test_caHandler_Sign(t *testing.T) {
 		root         *x509.Certificate
 		signErr      error
 		statusCode   int
+		expected     []byte
 	}{
-		{"ok", string(valid), nil, nil, parseCertificate(certPEM), parseCertificate(rootPEM), nil, http.StatusCreated},
-		{"json read error", "{", nil, nil, nil, nil, nil, http.StatusBadRequest},
-		{"validate error", string(invalid), nil, nil, nil, nil, nil, http.StatusBadRequest},
-		{"authorize error", string(valid), nil, fmt.Errorf("an error"), nil, nil, nil, http.StatusUnauthorized},
-		{"sign error", string(valid), nil, nil, nil, nil, fmt.Errorf("an error"), http.StatusForbidden},
+		{"ok", string(valid), nil, nil, parseCertificate(certPEM), parseCertificate(rootPEM), nil, http.StatusCreated, expected1},
+		{"ok with Provisioner", string(valid), nil, nil, parseCertificate(stepCertPEM), parseCertificate(rootPEM), nil, http.StatusCreated, expected2},
+		{"json read error", "{", nil, nil, nil, nil, nil, http.StatusBadRequest, nil},
+		{"validate error", string(invalid), nil, nil, nil, nil, nil, http.StatusBadRequest, nil},
+		{"authorize error", string(valid), nil, fmt.Errorf("an error"), nil, nil, nil, http.StatusUnauthorized, nil},
+		{"sign error", string(valid), nil, nil, nil, nil, fmt.Errorf("an error"), http.StatusForbidden, nil},
 	}
-
-	expected := []byte(`{"crt":"` + strings.Replace(certPEM, "\n", `\n`, -1) + `\n","ca":"` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"}`)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -598,7 +626,7 @@ func Test_caHandler_Sign(t *testing.T) {
 			}).(*caHandler)
 			req := httptest.NewRequest("POST", "http://example.com/sign", strings.NewReader(tt.input))
 			w := httptest.NewRecorder()
-			h.Sign(w, req)
+			h.Sign(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -611,8 +639,8 @@ func Test_caHandler_Sign(t *testing.T) {
 				t.Errorf("caHandler.Root unexpected error = %v", err)
 			}
 			if tt.statusCode < http.StatusBadRequest {
-				if !bytes.Equal(bytes.TrimSpace(body), expected) {
-					t.Errorf("caHandler.Root Body = %s, wants %s", body, expected)
+				if !bytes.Equal(bytes.TrimSpace(body), tt.expected) {
+					t.Errorf("caHandler.Root Body = %s, wants %s", body, tt.expected)
 				}
 			}
 		})
@@ -650,7 +678,7 @@ func Test_caHandler_Renew(t *testing.T) {
 			req := httptest.NewRequest("POST", "http://example.com/renew", nil)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
-			h.Renew(w, req)
+			h.Renew(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -919,4 +947,76 @@ func Test_caHandler_Federation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_fmtPublicKey(t *testing.T) {
+	p256, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dsa2048 dsa.PrivateKey
+	if err := dsa.GenerateParameters(&dsa2048.Parameters, rand.Reader, dsa.L2048N256); err != nil {
+		t.Fatal(err)
+	}
+	if err := dsa.GenerateKey(&dsa2048, rand.Reader); err != nil {
+		t.Fatal(err)
+	}
+
+	type args struct {
+		pub, priv interface{}
+		cert      *x509.Certificate
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{"p256", args{p256.Public(), p256, nil}, "ECDSA P-256"},
+		{"rsa1024", args{rsa1024.Public(), rsa1024, nil}, "RSA 1024"},
+		{"dsa2048", args{cert: &x509.Certificate{PublicKeyAlgorithm: x509.DSA, PublicKey: &dsa2048.PublicKey}}, "DSA 2048"},
+		{"unknown", args{cert: &x509.Certificate{PublicKeyAlgorithm: x509.ECDSA, PublicKey: []byte("12345678")}}, "ECDSA unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cert *x509.Certificate
+			if tt.args.cert != nil {
+				cert = tt.args.cert
+			} else {
+				cert = mustCertificate(t, tt.args.pub, tt.args.priv)
+			}
+			if got := fmtPublicKey(cert); got != tt.want {
+				t.Errorf("fmtPublicKey() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func mustCertificate(t *testing.T, pub, priv interface{}) *x509.Certificate {
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization: []string{"Acme Co"},
+		},
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(24 * time.Hour),
+
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	der, err := x509.CreateCertificate(rand.Reader, &template, &template, pub, priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cert
 }
