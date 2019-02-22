@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-mtls-client
+  labels: {app: hello-mtls-client}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: hello-mtls-client}}
+  template:
+    metadata:
+      annotations:
+        autocert.step.sm/name: hello-mtls-client.default.pod.cluster.local
+      labels: {app: hello-mtls-client}
+    spec:
+      containers:
+      - name: hello-mtls-client
+        image: hello-mtls-client-py-gunicorn:latest
+        imagePullPolicy: Never
+        resources: {requests: {cpu: 10m, memory: 20Mi}}
+        env:
+        - name: HELLO_MTLS_URL
+          value: https://hello-mtls.default.svc.cluster.local
