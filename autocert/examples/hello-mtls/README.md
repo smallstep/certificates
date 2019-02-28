@@ -50,6 +50,30 @@ This matrix shows the set of features we'd like to demonstrate in each language
 and where each language is. Bug fixes, improvements, and examples in new
 languages are appreciated!
 
+[curl/](curl/)
+- [X] Client
+  - [X] mTLS (send client certificate if server asks for it)
+  - [X] Automatic certificate rotation
+  - [ ] Restrict to safe ciphersuites and TLS versions
+  - [ ] TLS stack configuration loaded from `step-ca`
+  - [ ] Root certificate rotation
+
+[nginx/](nginx/)
+- [X] Server
+  - [X] mTLS (client authentication using internal root certificate)
+  - [X] Automatic certificate renewal
+  - [X] Restrict to safe ciphersuites and TLS versions
+  - [ ] TLS stack configuration loaded from `step-ca`
+  - [ ] Root certificate rotation
+
+[envoy/](envoy/)
+- [X] Server
+  - [X] mTLS (client authentication using internal root certificate)
+  - [X] Automatic certificate renewal
+  - [X] Restrict to safe ciphersuites and TLS versions
+  - [ ] TLS stack configuration loaded from `step-ca`
+  - [ ] Root certificate rotation
+
 [go/](go/)
 - [X] Server using autocert certificate & key
   - [X] mTLS (client authentication using internal root certificate)
@@ -78,22 +102,6 @@ languages are appreciated!
   - [ ] TLS stack configuration loaded from `step-ca`
   - [ ] Root certificate rotation
 
-[curl/](curl/)
-- [X] Client
-  - [X] mTLS (send client certificate if server asks for it)
-  - [X] Automatic certificate rotation
-  - [ ] Restrict to safe ciphersuites and TLS versions
-  - [ ] TLS stack configuration loaded from `step-ca`
-  - [ ] Root certificate rotation
-
-[nginx/](nginx/)
-- [X] Server
-  - [X] mTLS (client authentication using internal root certificate)
-  - [X] Automatic certificate renewal
-  - [X] Restrict to safe ciphersuites and TLS versions
-  - [ ] TLS stack configuration loaded from `step-ca`
-  - [ ] Root certificate rotation
-
 [node/](node/)
 - [X] Server
   - [X] mTLS (client authentication using internal root certificate)
@@ -108,10 +116,16 @@ languages are appreciated!
   - [ ] TLS stack configuration loaded from `step-ca`
   - [ ] Root certificate rotation
 
-[envoy/](envoy/)
-- [X] Server
+[py-gunicorn/](py-gunicorn/)
+- [X] Server (gunicorn + Flask)
   - [X] mTLS (client authentication using internal root certificate)
   - [X] Automatic certificate renewal
+  - [X] Restrict to safe ciphersuites and TLS versions
+  - [ ] TLS stack configuration loaded from `step-ca`
+  - [ ] Root certificate rotation
+- [X] Client using autocert root certificate (python)
+  - [X] mTLS (send client certificate if server asks for it)
+  - [X] Automatic certificate rotation
   - [X] Restrict to safe ciphersuites and TLS versions
   - [ ] TLS stack configuration loaded from `step-ca`
   - [ ] Root certificate rotation
