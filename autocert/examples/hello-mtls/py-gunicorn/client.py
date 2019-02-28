@@ -20,7 +20,7 @@ key_file = '/var/run/autocert.step.sm/site.key'
 class RenewHandler(FileSystemEventHandler):
     def __init__(self, ctx):
         self.ctx = ctx
-        super()
+        super().__init__()
 
     def on_modified(self, event):
         logging.info("reloading certs ...")
@@ -30,7 +30,7 @@ class RenewHandler(FileSystemEventHandler):
 # RenewHandler when a file is modified.
 class Monitor(threading.Thread):
     def __init__(self, handler, path):
-        threading.Thread.__init__(self)
+        super().__init__()
         self.handler = handler
         self.path = path
 
