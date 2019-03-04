@@ -46,7 +46,8 @@ type dnsNamesClaim struct {
 	names []string
 }
 
-// Valid checks that certificate request common name matches the one configured.
+// Valid checks that certificate request DNS Names match those configured in
+// the bootstrap (token) flow.
 func (c *dnsNamesClaim) Valid(crt *x509.Certificate) error {
 	tokMap := make(map[string]int)
 	for _, e := range c.names {
@@ -66,7 +67,8 @@ type ipAddressesClaim struct {
 	ips []net.IP
 }
 
-// Valid checks that certificate request common name matches the one configured.
+// Valid checks that certificate request IP Addresses match those configured in
+// the bootstrap (token) flow.
 func (c *ipAddressesClaim) Valid(crt *x509.Certificate) error {
 	tokMap := make(map[string]int)
 	for _, e := range c.ips {
