@@ -10,7 +10,7 @@ import (
 // Interface is the interface that all provisioner types must implement.
 type Interface interface {
 	ID() string
-	EncryptedKey() (kid string, key string, ok bool)
+	GetEncryptedKey() (kid string, key string, ok bool)
 	Init(claims *Claims) error
 	Authorize(token string) ([]SignOption, error)
 }
@@ -44,9 +44,9 @@ func (p *Provisioner) ID() string {
 	return p.base.ID()
 }
 
-// EncryptedKey returns the base provisioner encrypted key if it's defined.
-func (p *Provisioner) EncryptedKey() (string, string, bool) {
-	return p.base.EncryptedKey()
+// GetEncryptedKey returns the base provisioner encrypted key if it's defined.
+func (p *Provisioner) GetEncryptedKey() (string, string, bool) {
+	return p.base.GetEncryptedKey()
 }
 
 // Type return the provisioners type.

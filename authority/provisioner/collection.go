@@ -38,7 +38,7 @@ func (c *Collection) Store(p *Provisioner) error {
 		return errors.New("cannot add multiple provisioners with the same id")
 	}
 	// Store EncryptedKey if defined
-	if kid, key, ok := p.EncryptedKey(); ok {
+	if kid, key, ok := p.GetEncryptedKey(); ok {
 		c.byKey.Store(kid, key)
 	}
 	return nil
