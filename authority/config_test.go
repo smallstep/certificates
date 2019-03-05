@@ -277,7 +277,7 @@ func TestAuthConfigValidate(t *testing.T) {
 				ac: &AuthConfig{
 					Provisioners: p,
 					Claims: &provisioner.Claims{
-						MinTLSDur: &provisioner.Duration{-1},
+						MinTLSDur: &provisioner.Duration{Duration: -1},
 					},
 				},
 				err: errors.New("claims: MinTLSCertDuration must be greater than 0"),
@@ -305,7 +305,7 @@ func TestAuthConfigValidate(t *testing.T) {
 	for name, get := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := get(t)
-			err := tc.ac.Validate([]string{})
+			err := tc.ac.Validate(provisioner.Audiences{})
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.Equals(t, tc.err.Error(), err.Error())

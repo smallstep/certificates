@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
@@ -407,23 +408,110 @@ func TestSignRequest_Validate(t *testing.T) {
 	}
 }
 
-type mockAuthority struct {
-	ret1, ret2      interface{}
-	err             error
-	authorize       func(ott string) ([]provisioner.SignOption, error)
-	getTLSOptions   func() *tlsutil.TLSOptions
-	root            func(shasum string) (*x509.Certificate, error)
-	sign            func(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
-	renew           func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	getProvisioners func(nextCursor string, limit int) (provisioner.List, string, error)
-	getEncryptedKey func(kid string) (string, error)
-	getRoots        func() ([]*x509.Certificate, error)
-	getFederation   func() ([]*x509.Certificate, error)
+type mockProvisioner struct {
+	ret1, ret2, ret3 interface{}
+	err              error
+	getID            func() string
+	getTokenID       func(string) (string, error)
+	getName          func() string
+	getType          func() provisioner.Type
+	getEncryptedKey  func() (string, string, bool)
+	init             func(provisioner.Config) error
+	authorizeRevoke  func(ott string) error
+	authorizeSign    func(ott string) ([]provisioner.SignOption, error)
+	authorizeRenewal func(*x509.Certificate) error
 }
 
+func (m *mockProvisioner) GetID() string {
+	if m.getID != nil {
+		return m.getID()
+	}
+	return m.ret1.(string)
+}
+
+func (m *mockProvisioner) GetTokenID(token string) (string, error) {
+	if m.getTokenID != nil {
+		return m.getTokenID(token)
+	}
+	if m.ret1 == nil {
+		return "", m.err
+	}
+	return m.ret1.(string), m.err
+}
+
+func (m *mockProvisioner) GetName() string {
+	if m.getName != nil {
+		return m.getName()
+	}
+	return m.ret1.(string)
+}
+
+func (m *mockProvisioner) GetType() provisioner.Type {
+	if m.getType != nil {
+		return m.getType()
+	}
+	return m.ret1.(provisioner.Type)
+}
+
+func (m *mockProvisioner) GetEncryptedKey() (string, string, bool) {
+	if m.getEncryptedKey != nil {
+		return m.getEncryptedKey()
+	}
+	return m.ret1.(string), m.ret2.(string), m.ret3.(bool)
+}
+
+func (m *mockProvisioner) Init(c provisioner.Config) error {
+	if m.init != nil {
+		return m.init(c)
+	}
+	return m.err
+}
+
+func (m *mockProvisioner) AuthorizeRevoke(ott string) error {
+	if m.authorizeRevoke != nil {
+		return m.authorizeRevoke(ott)
+	}
+	return m.err
+}
+
+func (m *mockProvisioner) AuthorizeSign(ott string) ([]provisioner.SignOption, error) {
+	if m.authorizeSign != nil {
+		return m.authorizeSign(ott)
+	}
+	return m.ret1.([]provisioner.SignOption), m.err
+}
+
+func (m *mockProvisioner) AuthorizeRenewal(c *x509.Certificate) error {
+	if m.authorizeRenewal != nil {
+		return m.authorizeRenewal(c)
+	}
+	return m.err
+}
+
+type mockAuthority struct {
+	ret1, ret2                   interface{}
+	err                          error
+	authorizeSign                func(ott string) ([]provisioner.SignOption, error)
+	getTLSOptions                func() *tlsutil.TLSOptions
+	root                         func(shasum string) (*x509.Certificate, error)
+	sign                         func(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
+	renew                        func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
+	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
+	getProvisioners              func(nextCursor string, limit int) (provisioner.List, string, error)
+	revoke                       func(*authority.RevokeOptions) error
+	getEncryptedKey              func(kid string) (string, error)
+	getRoots                     func() ([]*x509.Certificate, error)
+	getFederation                func() ([]*x509.Certificate, error)
+}
+
+// TODO: remove once Authorize is deprecated.
 func (m *mockAuthority) Authorize(ott string) ([]provisioner.SignOption, error) {
-	if m.authorize != nil {
-		return m.authorize(ott)
+	return m.AuthorizeSign(ott)
+}
+
+func (m *mockAuthority) AuthorizeSign(ott string) ([]provisioner.SignOption, error) {
+	if m.authorizeSign != nil {
+		return m.authorizeSign(ott)
 	}
 	return m.ret1.([]provisioner.SignOption), m.err
 }
@@ -461,6 +549,20 @@ func (m *mockAuthority) GetProvisioners(nextCursor string, limit int) (provision
 		return m.getProvisioners(nextCursor, limit)
 	}
 	return m.ret1.(provisioner.List), m.ret2.(string), m.err
+}
+
+func (m *mockAuthority) LoadProvisionerByCertificate(cert *x509.Certificate) (provisioner.Interface, error) {
+	if m.loadProvisionerByCertificate != nil {
+		return m.loadProvisionerByCertificate(cert)
+	}
+	return m.ret1.(provisioner.Interface), m.err
+}
+
+func (m *mockAuthority) Revoke(opts *authority.RevokeOptions) error {
+	if m.revoke != nil {
+		return m.revoke(opts)
+	}
+	return m.err
 }
 
 func (m *mockAuthority) GetEncryptedKey(kid string) (string, error) {
@@ -617,7 +719,7 @@ func Test_caHandler_Sign(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.signErr,
-				authorize: func(ott string) ([]provisioner.SignOption, error) {
+				authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
 					return tt.certAttrOpts, tt.autherr
 				},
 				getTLSOptions: func() *tlsutil.TLSOptions {

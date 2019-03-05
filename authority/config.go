@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 )
@@ -44,6 +45,7 @@ type Config struct {
 	Address          string              `json:"address"`
 	DNSNames         []string            `json:"dnsNames"`
 	Logger           json.RawMessage     `json:"logger,omitempty"`
+	DB               *db.Config          `json:"db,omitempty"`
 	Monitoring       json.RawMessage     `json:"monitoring,omitempty"`
 	AuthorityConfig  *AuthConfig         `json:"authority,omitempty"`
 	TLS              *tlsutil.TLSOptions `json:"tls,omitempty"`
@@ -59,7 +61,7 @@ type AuthConfig struct {
 }
 
 // Validate validates the authority configuration.
-func (c *AuthConfig) Validate(audiences []string) error {
+func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 	if c == nil {
 		return errors.New("authority cannot be undefined")
 	}
@@ -168,10 +170,18 @@ func (c *Config) Validate() error {
 // getAudiences returns the legacy and possible urls without the ports that will
 // be used as the default provisioner audiences. The CA might have proxies in
 // front so we cannot rely on the port.
-func (c *Config) getAudiences() []string {
-	audiences := []string{legacyAuthority}
-	for _, name := range c.DNSNames {
-		audiences = append(audiences, fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
+func (c *Config) getAudiences() provisioner.Audiences {
+	audiences := provisioner.Audiences{
+		Sign:   []string{legacyAuthority},
+		Revoke: []string{legacyAuthority},
 	}
+
+	for _, name := range c.DNSNames {
+		audiences.Sign = append(audiences.Sign,
+			fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
+		audiences.Revoke = append(audiences.Revoke,
+			fmt.Sprintf("https://%s/revoke", name), fmt.Sprintf("https://%s/1.0/revoke", name))
+	}
+
 	return audiences
 }

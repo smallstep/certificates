@@ -122,6 +122,9 @@ func (ca *CA) Run() error {
 // Stop stops the CA calling to the server Shutdown method.
 func (ca *CA) Stop() error {
 	ca.renewer.Stop()
+	if err := ca.auth.Shutdown(); err != nil {
+		return err
+	}
 	return ca.srv.Shutdown()
 }
 

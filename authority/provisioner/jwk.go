@@ -24,13 +24,32 @@ type JWK struct {
 	EncryptedKey string           `json:"encryptedKey,omitempty"`
 	Claims       *Claims          `json:"claims,omitempty"`
 	claimer      *Claimer
-	audiences    []string
+	audiences    Audiences
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
 // should uniquely identify any JWK provisioner.
 func (p *JWK) GetID() string {
 	return p.Name + ":" + p.Key.KeyID
+}
+
+//
+// GetTokenID returns the identifier of the token.
+func (p *JWK) GetTokenID(ott string) (string, error) {
+	// Validate payload
+	token, err := jose.ParseSigned(ott)
+	if err != nil {
+		return "", errors.Wrap(err, "error parsing token")
+	}
+
+	// Get claims w/out verification. We need to look up the provisioner
+	// key in order to verify the claims and we need the issuer from the claims
+	// before we can look up the provisioner.
+	var claims jose.Claims
+	if err = token.UnsafeClaimsWithoutVerification(&claims); err != nil {
+		return "", errors.Wrap(err, "error verifying claims")
+	}
+	return claims.ID, nil
 }
 
 // GetName returns the name of the provisioner.
@@ -68,8 +87,10 @@ func (p *JWK) Init(config Config) (err error) {
 	return err
 }
 
-// Authorize validates the given token.
-func (p *JWK) Authorize(token string) ([]SignOption, error) {
+// authorizeToken performs common jwt authorization actions and returns the
+// claims for case specific downstream parsing.
+// e.g. a Sign request will auth/validate different fields than a Revoke request.
+func (p *JWK) authorizeToken(token string, audiences []string) (*jwtPayload, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing token")
@@ -90,7 +111,7 @@ func (p *JWK) Authorize(token string) ([]SignOption, error) {
 	}
 
 	// validate audiences with the defaults
-	if !matchesAudience(claims.Audience, p.audiences) {
+	if !matchesAudience(claims.Audience, audiences) {
 		return nil, errors.New("invalid token: invalid audience claim (aud)")
 	}
 
@@ -98,6 +119,22 @@ func (p *JWK) Authorize(token string) ([]SignOption, error) {
 		return nil, errors.New("token subject cannot be empty")
 	}
 
+	return &claims, nil
+}
+
+// AuthorizeRevoke returns an error if the provisioner does not have rights to
+// revoke the certificate with serial number in the `sub` property.
+func (p *JWK) AuthorizeRevoke(token string) error {
+	_, err := p.authorizeToken(token, p.audiences.Revoke)
+	return err
+}
+
+// AuthorizeSign validates the given token.
+func (p *JWK) AuthorizeSign(token string) ([]SignOption, error) {
+	claims, err := p.authorizeToken(token, p.audiences.Sign)
+	if err != nil {
+		return nil, err
+	}
 	// NOTE: This is for backwards compatibility with older versions of cli
 	// and certificates. Older versions added the token subject as the only SAN
 	// in a CSR by default.
@@ -122,10 +159,4 @@ func (p *JWK) AuthorizeRenewal(cert *x509.Certificate) error {
 		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
 	}
 	return nil
-}
-
-// AuthorizeRevoke returns an error if the provisioner does not have rights to
-// revoke the certificate with serial number in the `sub` property.
-func (p *JWK) AuthorizeRevoke(token string) error {
-	return errors.New("not implemented")
 }

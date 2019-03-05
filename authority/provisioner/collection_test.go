@@ -68,14 +68,14 @@ func TestCollection_LoadByToken(t *testing.T) {
 
 	jwk, err := decryptJSONWebKey(p1.EncryptedKey)
 	assert.FatalError(t, err)
-	token, err := generateSimpleToken(p1.Name, testAudiences[0], jwk)
+	token, err := generateSimpleToken(p1.Name, testAudiences.Sign[0], jwk)
 	assert.FatalError(t, err)
 	t1, c1, err := parseToken(token)
 	assert.FatalError(t, err)
 
 	jwk, err = decryptJSONWebKey(p2.EncryptedKey)
 	assert.FatalError(t, err)
-	token, err = generateSimpleToken(p2.Name, testAudiences[1], jwk)
+	token, err = generateSimpleToken(p2.Name, testAudiences.Sign[1], jwk)
 	assert.FatalError(t, err)
 	t2, c2, err := parseToken(token)
 	assert.FatalError(t, err)
@@ -92,7 +92,7 @@ func TestCollection_LoadByToken(t *testing.T) {
 
 	type fields struct {
 		byID      *sync.Map
-		audiences []string
+		audiences Audiences
 	}
 	type args struct {
 		token  *jose.JSONWebToken
@@ -109,7 +109,7 @@ func TestCollection_LoadByToken(t *testing.T) {
 		{"ok2", fields{byID, testAudiences}, args{t2, c2}, p2, true},
 		{"ok3", fields{byID, testAudiences}, args{t3, c3}, p3, true},
 		{"bad", fields{byID, testAudiences}, args{t4, c4}, nil, false},
-		{"fail", fields{byID, []string{"https://foo"}}, args{t1, c1}, nil, false},
+		{"fail", fields{byID, Audiences{Sign: []string{"https://foo"}}}, args{t1, c1}, nil, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -162,7 +162,7 @@ func TestCollection_LoadByCertificate(t *testing.T) {
 
 	type fields struct {
 		byID      *sync.Map
-		audiences []string
+		audiences Audiences
 	}
 	type args struct {
 		cert *x509.Certificate

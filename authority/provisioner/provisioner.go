@@ -11,13 +11,25 @@ import (
 // Interface is the interface that all provisioner types must implement.
 type Interface interface {
 	GetID() string
+	GetTokenID(token string) (string, error)
 	GetName() string
 	GetType() Type
 	GetEncryptedKey() (kid string, key string, ok bool)
 	Init(config Config) error
-	Authorize(token string) ([]SignOption, error)
+	AuthorizeSign(token string) ([]SignOption, error)
 	AuthorizeRenewal(cert *x509.Certificate) error
 	AuthorizeRevoke(token string) error
+}
+
+// Audiences stores all supported audiences by request type.
+type Audiences struct {
+	Sign   []string
+	Revoke []string
+}
+
+// All returns all supported audiences across all request types in one list.
+func (a *Audiences) All() []string {
+	return append(a.Sign, a.Revoke...)
 }
 
 // Type indicates the provisioner Type.
@@ -31,6 +43,11 @@ const (
 
 	// TypeOIDC is used to indicate the OIDC provisioners.
 	TypeOIDC Type = 2
+
+	// RevokeAudienceKey is the key for the 'revoke' audiences in the audiences map.
+	RevokeAudienceKey = "revoke"
+	// SignAudienceKey is the key for the 'sign' audiences in the audiences map.
+	SignAudienceKey = "sign"
 )
 
 // Config defines the default parameters used in the initialization of
@@ -39,7 +56,7 @@ type Config struct {
 	// Claims are the default claims.
 	Claims Claims
 	// Audiences are the audiences used in the default provisioner, (JWK).
-	Audiences []string
+	Audiences Audiences
 }
 
 type provisioner struct {

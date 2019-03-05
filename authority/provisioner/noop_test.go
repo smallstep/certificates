@@ -21,7 +21,7 @@ func Test_noop(t *testing.T) {
 	assert.Equals(t, "", key)
 	assert.Equals(t, false, ok)
 
-	sigOptions, err := p.Authorize("foo")
+	sigOptions, err := p.AuthorizeSign("foo")
 	assert.Equals(t, []SignOption{}, sigOptions)
 	assert.Equals(t, nil, err)
 }

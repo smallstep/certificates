@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -15,10 +16,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/keys"
+	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 var (
@@ -199,8 +203,36 @@ func TestSign(t *testing.T) {
 				},
 			}
 		},
+		"fail store cert in db": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			_a := testAuthority(t)
+			_a.db = &MockAuthDB{
+				storeCertificate: func(crt *x509.Certificate) error {
+					return &apiError{errors.New("force"),
+						http.StatusInternalServerError,
+						context{"csr": csr, "signOptions": signOpts}}
+				},
+			}
+			return &signTest{
+				auth:      _a,
+				csr:       csr,
+				extraOpts: extraOpts,
+				signOpts:  signOpts,
+				err: &apiError{errors.New("sign: error storing certificate in db: force"),
+					http.StatusInternalServerError,
+					context{"csr": csr, "signOptions": signOpts},
+				},
+			}
+		},
 		"ok": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
+			_a := testAuthority(t)
+			_a.db = &MockAuthDB{
+				storeCertificate: func(crt *x509.Certificate) error {
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					return nil
+				},
+			}
 			return &signTest{
 				auth:      a,
 				csr:       csr,
@@ -350,7 +382,7 @@ func TestRenew(t *testing.T) {
 			}
 			return &renewTest{
 				crt: crtNoRenew,
-				err: &apiError{errors.New("renew is disabled for provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
+				err: &apiError{errors.New("renew: renew is disabled for provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
 					http.StatusUnauthorized, ctx},
 			}, nil
 		},
@@ -525,6 +557,233 @@ func TestGetTLSOptions(t *testing.T) {
 
 			opts := tc.auth.GetTLSOptions()
 			assert.Equals(t, opts, tc.opts)
+		})
+	}
+}
+
+func TestRevoke(t *testing.T) {
+	reasonCode := 2
+	reason := "bob was let go"
+	validIssuer := "step-cli"
+	validAudience := []string{"https://test.ca.smallstep.com/revoke"}
+	now := time.Now().UTC()
+	getCtx := func() map[string]interface{} {
+		return context{
+			"serialNumber": "sn",
+			"reasonCode":   reasonCode,
+			"reason":       reason,
+			"mTLS":         false,
+			"passiveOnly":  false,
+		}
+	}
+
+	jwk, err := jose.ParseKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
+	assert.FatalError(t, err)
+
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", jwk.KeyID))
+	assert.FatalError(t, err)
+
+	type test struct {
+		a    *Authority
+		opts *RevokeOptions
+		err  *apiError
+	}
+	tests := map[string]func() test{
+		"error/token/authorizeRevoke error": func() test {
+			a := testAuthority(t)
+			a.db = new(db.NoopDB)
+			ctx := getCtx()
+			ctx["ott"] = "foo"
+			return test{
+				a: a,
+				opts: &RevokeOptions{
+					OTT:        "foo",
+					Serial:     "sn",
+					ReasonCode: reasonCode,
+					Reason:     reason,
+				},
+				err: &apiError{errors.New("revoke: authorizeRevoke: authorizeToken: error parsing token"),
+					http.StatusUnauthorized, ctx},
+			}
+		},
+		"error/nil-db": func() test {
+			a := testAuthority(t)
+			a.db = new(db.NoopDB)
+
+			cl := jwt.Claims{
+				Subject:   "sn",
+				Issuer:    validIssuer,
+				NotBefore: jwt.NewNumericDate(now),
+				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+				ID:        "44",
+			}
+			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+
+			ctx := getCtx()
+			ctx["ott"] = raw
+			ctx["tokenID"] = "44"
+			ctx["provisionerID"] = "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc"
+			return test{
+				a: a,
+				opts: &RevokeOptions{
+					Serial:     "sn",
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					OTT:        raw,
+				},
+				err: &apiError{errors.New("revoke: no persistence layer configured"),
+					http.StatusNotImplemented, ctx},
+			}
+		},
+		"error/db-revoke": func() test {
+			a := testAuthority(t)
+			a.db = &MockAuthDB{err: errors.New("force")}
+
+			cl := jwt.Claims{
+				Subject:   "sn",
+				Issuer:    validIssuer,
+				NotBefore: jwt.NewNumericDate(now),
+				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+				ID:        "44",
+			}
+			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+
+			ctx := getCtx()
+			ctx["ott"] = raw
+			ctx["tokenID"] = "44"
+			ctx["provisionerID"] = "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc"
+			return test{
+				a: a,
+				opts: &RevokeOptions{
+					Serial:     "sn",
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					OTT:        raw,
+				},
+				err: &apiError{errors.New("force"),
+					http.StatusInternalServerError, ctx},
+			}
+		},
+		"error/already-revoked": func() test {
+			a := testAuthority(t)
+			a.db = &MockAuthDB{err: db.ErrAlreadyExists}
+
+			cl := jwt.Claims{
+				Subject:   "sn",
+				Issuer:    validIssuer,
+				NotBefore: jwt.NewNumericDate(now),
+				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+				ID:        "44",
+			}
+			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+
+			ctx := getCtx()
+			ctx["ott"] = raw
+			ctx["tokenID"] = "44"
+			ctx["provisionerID"] = "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc"
+			return test{
+				a: a,
+				opts: &RevokeOptions{
+					Serial:     "sn",
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					OTT:        raw,
+				},
+				err: &apiError{errors.New("revoke: certificate with serial number sn has already been revoked"),
+					http.StatusBadRequest, ctx},
+			}
+		},
+		"ok/token": func() test {
+			a := testAuthority(t)
+			a.db = &MockAuthDB{}
+
+			cl := jwt.Claims{
+				Subject:   "sn",
+				Issuer:    validIssuer,
+				NotBefore: jwt.NewNumericDate(now),
+				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+				ID:        "44",
+			}
+			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+			return test{
+				a: a,
+				opts: &RevokeOptions{
+					Serial:     "sn",
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					OTT:        raw,
+				},
+			}
+		},
+		"error/mTLS/authorizeRevoke": func() test {
+			a := testAuthority(t)
+			a.db = &MockAuthDB{}
+
+			crt, err := pemutil.ReadCertificate("./testdata/certs/foo.crt")
+			assert.FatalError(t, err)
+
+			ctx := getCtx()
+			ctx["certificate"] = base64.StdEncoding.EncodeToString(crt.Raw)
+			ctx["mTLS"] = true
+
+			return test{
+				a: a,
+				opts: &RevokeOptions{
+					Crt:        crt,
+					Serial:     "sn",
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					MTLS:       true,
+				},
+				err: &apiError{errors.New("revoke: authorizeRevoke: serial number in certificate different than body"),
+					http.StatusUnauthorized, ctx},
+			}
+		},
+		"ok/mTLS": func() test {
+			a := testAuthority(t)
+			a.db = &MockAuthDB{}
+
+			crt, err := pemutil.ReadCertificate("./testdata/certs/foo.crt")
+			assert.FatalError(t, err)
+
+			return test{
+				a: a,
+				opts: &RevokeOptions{
+					Crt:        crt,
+					Serial:     "102012593071130646873265215610956555026",
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					MTLS:       true,
+				},
+			}
+		},
+	}
+	for name, f := range tests {
+		tc := f()
+		t.Run(name, func(t *testing.T) {
+			if err := tc.a.Revoke(tc.opts); err != nil {
+				if assert.NotNil(t, tc.err) {
+					switch v := err.(type) {
+					case *apiError:
+						assert.HasPrefix(t, v.err.Error(), tc.err.Error())
+						assert.Equals(t, v.code, tc.err.code)
+						assert.Equals(t, v.context, tc.err.context)
+					default:
+						t.Errorf("unexpected error type: %T", v)
+					}
+				}
+			} else {
+				assert.Nil(t, tc.err)
+			}
 		})
 	}
 }
