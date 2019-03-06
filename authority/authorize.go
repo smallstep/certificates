@@ -2,14 +2,12 @@ package authority
 
 import (
 	"crypto/x509"
-	"encoding/asn1"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/cli/crypto/x509util"
-	"gopkg.in/square/go-jose.v2/jwt"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/cli/jose"
 )
 
 type idUsed struct {
@@ -17,9 +15,9 @@ type idUsed struct {
 	Subject string `json:"sub,omitempty"`
 }
 
-// Claims extends jwt.Claims with step attributes.
+// Claims extends jose.Claims with step attributes.
 type Claims struct {
-	jwt.Claims
+	jose.Claims
 	SANs []string `json:"sans,omitempty"`
 }
 
@@ -52,14 +50,12 @@ func stripPort(rawurl string) string {
 
 // Authorize authorizes a signature request by validating and authenticating
 // a OTT that must be sent w/ the request.
-func (a *Authority) Authorize(ott string) ([]interface{}, error) {
-	var (
-		errContext = map[string]interface{}{"ott": ott}
-		claims     = Claims{}
-	)
+// TODO(mariano): restore protection against reuse
+func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
+	var errContext = map[string]interface{}{"ott": ott}
 
 	// Validate payload
-	token, err := jwt.ParseSigned(ott)
+	token, err := jose.ParseSigned(ott)
 	if err != nil {
 		return nil, &apiError{errors.Wrapf(err, "authorize: error parsing token"),
 			http.StatusUnauthorized, errContext}
@@ -68,37 +64,9 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 	// Get claims w/out verification. We need to look up the provisioner
 	// key in order to verify the claims and we need the issuer from the claims
 	// before we can look up the provisioner.
+	var claims jose.Claims
 	if err = token.UnsafeClaimsWithoutVerification(&claims); err != nil {
 		return nil, &apiError{err, http.StatusUnauthorized, errContext}
-	}
-	kid := token.Headers[0].KeyID // JWT will only have 1 header.
-	if len(kid) == 0 {
-		return nil, &apiError{errors.New("authorize: token KeyID cannot be empty"),
-			http.StatusUnauthorized, errContext}
-	}
-	pid := claims.Issuer + ":" + kid
-	val, ok := a.provisionerIDIndex.Load(pid)
-	if !ok {
-		return nil, &apiError{errors.Errorf("authorize: provisioner with id %s not found", pid),
-			http.StatusUnauthorized, errContext}
-	}
-	p, ok := val.(*Provisioner)
-	if !ok {
-		return nil, &apiError{errors.Errorf("authorize: invalid provisioner type"),
-			http.StatusInternalServerError, errContext}
-	}
-
-	if err = token.Claims(p.Key, &claims); err != nil {
-		return nil, &apiError{err, http.StatusUnauthorized, errContext}
-	}
-
-	// According to "rfc7519 JSON Web Token" acceptable skew should be no
-	// more than a few minutes.
-	if err = claims.ValidateWithLeeway(jwt.Expected{
-		Issuer: p.Name,
-	}, time.Minute); err != nil {
-		return nil, &apiError{errors.Wrapf(err, "authorize: invalid token"),
-			http.StatusUnauthorized, errContext}
 	}
 
 	// Do not accept tokens issued before the start of the ca.
@@ -110,44 +78,22 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 		}
 	}
 
-	if !matchesAudience(claims.Audience, a.audiences) {
-		return nil, &apiError{errors.New("authorize: token audience invalid"), http.StatusUnauthorized,
-			errContext}
-	}
-
-	if claims.Subject == "" {
-		return nil, &apiError{errors.New("authorize: token subject cannot be empty"),
+	p, ok := a.provisioners.LoadByToken(token, &claims)
+	if !ok {
+		return nil, &apiError{errors.Errorf("authorize: provisioner not found"),
 			http.StatusUnauthorized, errContext}
 	}
 
-	// NOTE: This is for backwards compatibility with older versions of cli
-	// and certificates. Older versions added the token subject as the only SAN
-	// in a CSR by default.
-	if len(claims.SANs) == 0 {
-		claims.SANs = []string{claims.Subject}
-	}
-	dnsNames, ips := x509util.SplitSANs(claims.SANs)
-	if err != nil {
-		return nil, err
-	}
-
-	signOps := []interface{}{
-		&commonNameClaim{claims.Subject},
-		&dnsNamesClaim{dnsNames},
-		&ipAddressesClaim{ips},
-		p,
-	}
-
 	// Store the token to protect against reuse.
-	if _, ok := a.ottMap.LoadOrStore(claims.ID, &idUsed{
-		UsedAt:  time.Now().Unix(),
-		Subject: claims.Subject,
-	}); ok {
-		return nil, &apiError{errors.Errorf("token already used"), http.StatusUnauthorized,
-			errContext}
-	}
+	// if _, ok := a.ottMap.LoadOrStore(claims.ID, &idUsed{
+	// 	UsedAt:  time.Now().Unix(),
+	// 	Subject: claims.Subject,
+	// }); ok {
+	// 	return nil, &apiError{errors.Errorf("token already used"), http.StatusUnauthorized,
+	// 		errContext}
+	// }
 
-	return signOps, nil
+	return p.Authorize(ott)
 }
 
 // authorizeRenewal tries to locate the step provisioner extension, and checks
@@ -157,46 +103,20 @@ func (a *Authority) Authorize(ott string) ([]interface{}, error) {
 // TODO(mariano): should we authorize by default?
 func (a *Authority) authorizeRenewal(crt *x509.Certificate) error {
 	errContext := map[string]interface{}{"serialNumber": crt.SerialNumber.String()}
-	for _, e := range crt.Extensions {
-		if e.Id.Equal(stepOIDProvisioner) {
-			var provisioner stepProvisionerASN1
-			if _, err := asn1.Unmarshal(e.Value, &provisioner); err != nil {
-				return &apiError{
-					err:     errors.Wrap(err, "error decoding step provisioner extension"),
-					code:    http.StatusInternalServerError,
-					context: errContext,
-				}
-			}
-
-			// Look for the provisioner, if it cannot be found, renewal will not
-			// be authorized.
-			pid := string(provisioner.Name) + ":" + string(provisioner.CredentialID)
-			val, ok := a.provisionerIDIndex.Load(pid)
-			if !ok {
-				return &apiError{
-					err:     errors.Errorf("not found: provisioner %s", pid),
-					code:    http.StatusUnauthorized,
-					context: errContext,
-				}
-			}
-			p, ok := val.(*Provisioner)
-			if !ok {
-				return &apiError{
-					err:     errors.Errorf("invalid type: provisioner %s, type %T", pid, val),
-					code:    http.StatusInternalServerError,
-					context: errContext,
-				}
-			}
-			if p.Claims.IsDisableRenewal() {
-				return &apiError{
-					err:     errors.Errorf("renew disabled: provisioner %s", pid),
-					code:    http.StatusUnauthorized,
-					context: errContext,
-				}
-			}
-			return nil
+	p, ok := a.provisioners.LoadByCertificate(crt)
+	if !ok {
+		return &apiError{
+			err:     errors.New("provisioner not found"),
+			code:    http.StatusUnauthorized,
+			context: errContext,
 		}
 	}
-
+	if err := p.AuthorizeRenewal(crt); err != nil {
+		return &apiError{
+			err:     err,
+			code:    http.StatusUnauthorized,
+			context: errContext,
+		}
+	}
 	return nil
 }
