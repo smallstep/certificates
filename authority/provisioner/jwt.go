@@ -1,110 +1,53 @@
-package authority
+package provisioner
 
 import (
+	"crypto/x509"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/cli/crypto/x509util"
-
-	jose "gopkg.in/square/go-jose.v2"
+	"github.com/smallstep/cli/jose"
 )
 
-// ProvisionerClaims so that individual provisioners can override global claims.
-type ProvisionerClaims struct {
-	globalClaims   *ProvisionerClaims
-	MinTLSDur      *Duration `json:"minTLSCertDuration,omitempty"`
-	MaxTLSDur      *Duration `json:"maxTLSCertDuration,omitempty"`
-	DefaultTLSDur  *Duration `json:"defaultTLSCertDuration,omitempty"`
-	DisableRenewal *bool     `json:"disableRenewal,omitempty"`
+// jwtPayload extends jwt.Claims with step attributes.
+type jwtPayload struct {
+	jose.Claims
+	SANs []string `json:"sans,omitempty"`
 }
 
-// Init initializes and validates the individual provisioner claims.
-func (pc *ProvisionerClaims) Init(global *ProvisionerClaims) (*ProvisionerClaims, error) {
-	if pc == nil {
-		pc = &ProvisionerClaims{}
-	}
-	pc.globalClaims = global
-	err := pc.Validate()
-	return pc, err
+// JWT is the default provisioner, an entity that can sign tokens necessary for
+// signature requests.
+type JWT struct {
+	Name         string           `json:"name,omitempty"`
+	Type         string           `json:"type,omitempty"`
+	Key          *jose.JSONWebKey `json:"key,omitempty"`
+	EncryptedKey string           `json:"encryptedKey,omitempty"`
+	Claims       *Claims          `json:"claims,omitempty"`
 }
 
-// DefaultTLSCertDuration returns the default TLS cert duration for the
-// provisioner. If the default is not set within the provisioner, then the global
-// default from the authority configuration will be used.
-func (pc *ProvisionerClaims) DefaultTLSCertDuration() time.Duration {
-	if pc.DefaultTLSDur == nil || pc.DefaultTLSDur.Duration == 0 {
-		return pc.globalClaims.DefaultTLSCertDuration()
-	}
-	return pc.DefaultTLSDur.Duration
+// GetID returns the provisioner unique identifier. The name and credential id
+// should uniquely identify any JWT provisioner.
+func (p *JWT) GetID() string {
+	return p.Name + ":" + p.Key.KeyID
 }
 
-// MinTLSCertDuration returns the minimum TLS cert duration for the provisioner.
-// If the minimum is not set within the provisioner, then the global
-// minimum from the authority configuration will be used.
-func (pc *ProvisionerClaims) MinTLSCertDuration() time.Duration {
-	if pc.MinTLSDur == nil || pc.MinTLSDur.Duration == 0 {
-		return pc.globalClaims.MinTLSCertDuration()
-	}
-	return pc.MinTLSDur.Duration
+// GetName returns the name of the provisioner
+func (p *JWT) GetName() string {
+	return p.Name
 }
 
-// MaxTLSCertDuration returns the maximum TLS cert duration for the provisioner.
-// If the maximum is not set within the provisioner, then the global
-// maximum from the authority configuration will be used.
-func (pc *ProvisionerClaims) MaxTLSCertDuration() time.Duration {
-	if pc.MaxTLSDur == nil || pc.MaxTLSDur.Duration == 0 {
-		return pc.globalClaims.MaxTLSCertDuration()
-	}
-	return pc.MaxTLSDur.Duration
+// GetType returns the type of provisioner.
+func (p *JWT) GetType() Type {
+	return TypeJWK
 }
 
-// IsDisableRenewal returns if the renewal flow is disabled for the
-// provisioner. If the property is not set within the provisioner, then the
-// global value from the authority configuration will be used.
-func (pc *ProvisionerClaims) IsDisableRenewal() bool {
-	if pc.DisableRenewal == nil {
-		return pc.globalClaims.IsDisableRenewal()
-	}
-	return *pc.DisableRenewal
-}
-
-// Validate validates and modifies the Claims with default values.
-func (pc *ProvisionerClaims) Validate() error {
-	var (
-		min = pc.MinTLSCertDuration()
-		max = pc.MaxTLSCertDuration()
-		def = pc.DefaultTLSCertDuration()
-	)
-	switch {
-	case min == 0:
-		return errors.Errorf("claims: MinTLSCertDuration cannot be empty")
-	case max == 0:
-		return errors.Errorf("claims: MaxTLSCertDuration cannot be empty")
-	case def == 0:
-		return errors.Errorf("claims: DefaultTLSCertDuration cannot be empty")
-	case max < min:
-		return errors.Errorf("claims: MaxCertDuration cannot be less "+
-			"than MinCertDuration: MaxCertDuration - %v, MinCertDuration - %v", max, min)
-	case def < min:
-		return errors.Errorf("claims: DefaultCertDuration cannot be less than MinCertDuration: DefaultCertDuration - %v, MinCertDuration - %v", def, min)
-	case max < def:
-		return errors.Errorf("claims: MaxCertDuration cannot be less than DefaultCertDuration: MaxCertDuration - %v, DefaultCertDuration - %v", max, def)
-	default:
-		return nil
-	}
-}
-
-// Provisioner - authorized entity that can sign tokens necessary for signature requests.
-type Provisioner struct {
-	Name         string             `json:"name,omitempty"`
-	Type         string             `json:"type,omitempty"`
-	Key          *jose.JSONWebKey   `json:"key,omitempty"`
-	EncryptedKey string             `json:"encryptedKey,omitempty"`
-	Claims       *ProvisionerClaims `json:"claims,omitempty"`
+// GetEncryptedKey returns the base provisioner encrypted key if it's defined.
+func (p *JWT) GetEncryptedKey() (string, string, bool) {
+	return p.Key.KeyID, p.EncryptedKey, len(p.EncryptedKey) > 0
 }
 
 // Init initializes and validates a the fields of Provisioner type.
-func (p *Provisioner) Init(global *ProvisionerClaims) error {
+func (p *JWT) Init(global *Claims) (err error) {
 	switch {
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
@@ -115,30 +58,108 @@ func (p *Provisioner) Init(global *ProvisionerClaims) error {
 	case p.Key == nil:
 		return errors.New("provisioner key cannot be empty")
 	}
-
-	var err error
 	p.Claims, err = p.Claims.Init(global)
 	return err
 }
 
-// getTLSApps returns a list of modifiers and validators that will be applied to
-// the certificate.
-func (p *Provisioner) getTLSApps(so SignOptions) ([]x509util.WithOption, []certClaim, error) {
-	c := p.Claims
-	return []x509util.WithOption{
-			x509util.WithNotBeforeAfterDuration(so.NotBefore,
-				so.NotAfter, c.DefaultTLSCertDuration()),
-			withProvisionerOID(p.Name, p.Key.KeyID),
-		}, []certClaim{
-			&certTemporalClaim{
-				min: c.MinTLSCertDuration(),
-				max: c.MaxTLSCertDuration(),
-			},
-		}, nil
+func (p *JWT) Authorize(token string) ([]SignOption, error) {
+	jwt, err := jose.ParseSigned(token)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing token")
+	}
+
+	var claims jwtPayload
+	if err = jwt.Claims(p.Key, &claims); err != nil {
+		return nil, errors.Wrap(err, "error parsing claims")
+	}
+
+	// According to "rfc7519 JSON Web Token" acceptable skew should be no
+	// more than a few minutes.
+	if err = claims.ValidateWithLeeway(jose.Expected{
+		Issuer: p.Name,
+	}, time.Minute); err != nil {
+		return nil, errors.Wrapf(err, "invalid token")
+	}
+
+	// Do not accept tokens issued before the start of the ca.
+	// This check is meant as a stopgap solution to the current lack of a persistence layer.
+	// if a.config.AuthorityConfig != nil && !a.config.AuthorityConfig.DisableIssuedAtCheck {
+	// 	if claims.IssuedAt > 0 && claims.IssuedAt.Time().Before(a.startTime) {
+	// 		return nil, &apiError{errors.New("token issued before the bootstrap of certificate authority"),
+	// 			http.StatusUnauthorized, errContext}
+	// 	}
+	// }
+
+	// if !matchesAudience(claims.Audience, a.audiences) {
+	// 	return nil, &apiError{errors.New("authorize: token audience invalid"), http.StatusUnauthorized,
+	// 		errContext}
+	// }
+
+	if claims.Subject == "" {
+		return nil, errors.New("token subject cannot be empty")
+	}
+
+	// NOTE: This is for backwards compatibility with older versions of cli
+	// and certificates. Older versions added the token subject as the only SAN
+	// in a CSR by default.
+	if len(claims.SANs) == 0 {
+		claims.SANs = []string{claims.Subject}
+	}
+
+	dnsNames, ips := x509util.SplitSANs(claims.SANs)
+	if err != nil {
+		return nil, err
+	}
+
+	signOps := []SignOption{
+		commonNameValidator(claims.Subject),
+		dnsNamesValidator(dnsNames),
+		ipAddressesValidator(ips),
+		// profileWithOption(x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, p.Claims.DefaultTLSCertDuration())),
+		&validityValidator{
+			min: p.Claims.MinTLSCertDuration(),
+			max: p.Claims.MaxTLSCertDuration(),
+		},
+		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
+	}
+
+	// Store the token to protect against reuse.
+	// if _, ok := a.ottMap.LoadOrStore(claims.ID, &idUsed{
+	// 	UsedAt:  time.Now().Unix(),
+	// 	Subject: claims.Subject,
+	// }); ok {
+	// 	return nil, &apiError{errors.Errorf("token already used"), http.StatusUnauthorized,
+	// 		errContext}
+	// }
+
+	return signOps, nil
 }
 
-// ID returns the provisioner identifier. The name and credential id should
-// uniquely identify any provisioner.
-func (p *Provisioner) ID() string {
-	return p.Name + ":" + p.Key.KeyID
+// AuthorizeRenewal returns an error if the renewal is disabled.
+func (p *JWT) AuthorizeRenewal(cert *x509.Certificate) error {
+	if p.Claims.IsDisableRenewal() {
+		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
+	}
+	return nil
 }
+
+// AuthorizeRevoke returns an error if the provisioner does not have rights to
+// revoke the certificate with serial number in the `sub` property.
+func (p *JWT) AuthorizeRevoke(token string) error {
+	return errors.New("not implemented")
+}
+
+// // getTLSApps returns a list of modifiers and validators that will be applied to
+// // the certificate.
+// func (p *JWT) getTLSApps(so SignOptions) ([]x509util.WithOption, []certClaim, error) {
+// 	c := p.Claims
+// 	return []x509util.WithOption{
+// 			x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, c.DefaultTLSCertDuration()),
+// 			withProvisionerOID(p.Name, p.Key.KeyID),
+// 		}, []certClaim{
+// 			&certTemporalClaim{
+// 				min: c.MinTLSCertDuration(),
+// 				max: c.MaxTLSCertDuration(),
+// 			},
+// 		}, nil
+// }

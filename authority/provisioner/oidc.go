@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -9,6 +10,8 @@ import (
 	"github.com/smallstep/cli/jose"
 )
 
+// openIDConfiguration contains the necessary properties in the
+// `/.well-known/openid-configuration` document.
 type openIDConfiguration struct {
 	Issuer    string `json:"issuer"`
 	JWKSetURI string `json:"jwks_uri"`
@@ -20,7 +23,7 @@ type openIDPayload struct {
 	AtHash          string `json:"at_hash"`
 	AuthorizedParty string `json:"azp"`
 	Email           string `json:"email"`
-	EmailVerified   string `json:"email_verified"`
+	EmailVerified   bool   `json:"email_verified"`
 	Hd              string `json:"hd"`
 	Nonce           string `json:"nonce"`
 }
@@ -32,7 +35,7 @@ type OIDC struct {
 	ClientID              string   `json:"clientID"`
 	ConfigurationEndpoint string   `json:"configurationEndpoint"`
 	Claims                *Claims  `json:"claims,omitempty"`
-	Admins                []string `json:"admins"`
+	Admins                []string `json:"admins,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
 }
@@ -48,8 +51,29 @@ func (o *OIDC) IsAdmin(email string) bool {
 	return false
 }
 
-// Validate validates and initializes the OIDC provider.
-func (o *OIDC) Validate() error {
+// GetID returns the provisioner unique identifier, the OIDC provisioner the
+// uses the clientID for this.
+func (o *OIDC) GetID() string {
+	return o.ClientID
+}
+
+// GetName returns the name of the provisioner.
+func (o *OIDC) GetName() string {
+	return o.Name
+}
+
+// GetType returns the type of provisioner.
+func (o *OIDC) GetType() Type {
+	return TypeOIDC
+}
+
+// GetEncryptedKey is not available in an OIDC provisioner.
+func (o *OIDC) GetEncryptedKey() (kid string, key string, ok bool) {
+	return "", "", false
+}
+
+// Init validates and initializes the OIDC provider.
+func (o *OIDC) Init(global *Claims) (err error) {
 	switch {
 	case o.Name == "":
 		return errors.New("name cannot be empty")
@@ -59,21 +83,22 @@ func (o *OIDC) Validate() error {
 		return errors.New("configurationEndpoint cannot be empty")
 	}
 
-	// Decode openid-configuration endpoint
-	var conf openIDConfiguration
-	if err := getAndDecode(o.ConfigurationEndpoint, &conf); err != nil {
+	// Update claims with global ones
+	if o.Claims, err = o.Claims.Init(global); err != nil {
 		return err
 	}
-	if conf.JWKSetURI == "" {
+	// Decode openid-configuration endpoint
+	if err := getAndDecode(o.ConfigurationEndpoint, &o.configuration); err != nil {
+		return err
+	}
+	if o.configuration.JWKSetURI == "" {
 		return errors.Errorf("error parsing %s: jwks_uri cannot be empty", o.ConfigurationEndpoint)
 	}
 	// Get JWK key set
-	keyStore, err := newKeyStore(conf.JWKSetURI)
+	o.keyStore, err = newKeyStore(o.configuration.JWKSetURI)
 	if err != nil {
 		return err
 	}
-	o.configuration = conf
-	o.keyStore = keyStore
 	return nil
 }
 
@@ -102,8 +127,8 @@ func (o *OIDC) Authorize(token string) ([]SignOption, error) {
 		return nil, errors.Wrapf(err, "error parsing token")
 	}
 
-	var claims openIDPayload
 	// Parse claims to get the kid
+	var claims openIDPayload
 	if err := jwt.UnsafeClaimsWithoutVerification(&claims); err != nil {
 		return nil, errors.Wrap(err, "error parsing claims")
 	}
@@ -131,7 +156,22 @@ func (o *OIDC) Authorize(token string) ([]SignOption, error) {
 
 	return []SignOption{
 		emailOnlyIdentity(claims.Email),
+		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
 	}, nil
+}
+
+// AuthorizeRenewal returns an error if the renewal is disabled.
+func (o *OIDC) AuthorizeRenewal(cert *x509.Certificate) error {
+	if o.Claims.IsDisableRenewal() {
+		return errors.Errorf("renew is disabled for provisioner %s", o.GetID())
+	}
+	return nil
+}
+
+// AuthorizeRevoke returns an error if the provisioner does not have rights to
+// revoke the certificate with serial number in the `sub` property.
+func (o *OIDC) AuthorizeRevoke(token string) error {
+	return errors.New("not implemented")
 }
 
 func getAndDecode(uri string, v interface{}) error {
