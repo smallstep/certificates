@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/x509util"
 )
@@ -16,18 +17,15 @@ const legacyAuthority = "step-certificate-authority"
 
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
-	config                 *Config
-	rootX509Certs          []*x509.Certificate
-	intermediateIdentity   *x509util.Identity
-	validateOnce           bool
-	certificates           *sync.Map
-	ottMap                 *sync.Map
-	startTime              time.Time
-	provisionerIDIndex     *sync.Map
-	encryptedKeyIndex      *sync.Map
-	provisionerKeySetIndex *sync.Map
-	sortedProvisioners     provisionerSlice
-	audiences              []string
+	config               *Config
+	rootX509Certs        []*x509.Certificate
+	intermediateIdentity *x509util.Identity
+	validateOnce         bool
+	certificates         *sync.Map
+	ottMap               *sync.Map
+	startTime            time.Time
+	provisioners         *provisioner.Collection
+	audiences            []string
 	// Do not re-initialize
 	initOnce bool
 }
@@ -39,15 +37,6 @@ func New(config *Config) (*Authority, error) {
 		return nil, err
 	}
 
-	// Get sorted provisioners
-	var sorted provisionerSlice
-	if config.AuthorityConfig != nil {
-		sorted, err = newSortedProvisioners(config.AuthorityConfig.Provisioners)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// Define audiences: legacy + possible urls without the ports.
 	// The CA might have proxies in front so we cannot rely on the port.
 	audiences := []string{legacyAuthority}
@@ -56,14 +45,11 @@ func New(config *Config) (*Authority, error) {
 	}
 
 	var a = &Authority{
-		config:                 config,
-		certificates:           new(sync.Map),
-		ottMap:                 new(sync.Map),
-		provisionerIDIndex:     new(sync.Map),
-		encryptedKeyIndex:      new(sync.Map),
-		provisionerKeySetIndex: new(sync.Map),
-		sortedProvisioners:     sorted,
-		audiences:              audiences,
+		config:       config,
+		certificates: new(sync.Map),
+		ottMap:       new(sync.Map),
+		provisioners: provisioner.NewCollection(audiences),
+		audiences:    audiences,
 	}
 	if err := a.init(); err != nil {
 		return nil, err
@@ -120,10 +106,10 @@ func (a *Authority) init() error {
 		}
 	}
 
+	// Store all the provisioners
 	for _, p := range a.config.AuthorityConfig.Provisioners {
-		a.provisionerIDIndex.Store(p.ID(), p)
-		if len(p.EncryptedKey) != 0 {
-			a.encryptedKeyIndex.Store(p.Key.KeyID, p.EncryptedKey)
+		if err := a.provisioners.Store(p); err != nil {
+			return err
 		}
 	}
 
