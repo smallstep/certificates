@@ -19,18 +19,19 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
 )
 
 // Authority is the interface implemented by a CA authority.
 type Authority interface {
-	Authorize(ott string) ([]interface{}, error)
+	Authorize(ott string) ([]provisioner.SignOption, error)
 	GetTLSOptions() *tlsutil.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)
-	Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error)
+	Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
 	Renew(peer *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	GetProvisioners(cursor string, limit int) ([]*authority.Provisioner, string, error)
+	GetProvisioners(cursor string, limit int) ([]*provisioner.Provisioner, string, error)
 	GetEncryptedKey(kid string) (string, error)
 	GetRoots() (federation []*x509.Certificate, err error)
 	GetFederation() ([]*x509.Certificate, error)
@@ -161,8 +162,8 @@ type SignRequest struct {
 // ProvisionersResponse is the response object that returns the list of
 // provisioners.
 type ProvisionersResponse struct {
-	Provisioners []*authority.Provisioner `json:"provisioners"`
-	NextCursor   string                   `json:"nextCursor"`
+	Provisioners []*provisioner.Provisioner `json:"provisioners"`
+	NextCursor   string                     `json:"nextCursor"`
 }
 
 // ProvisionerKeyResponse is the response object that returns the encryptoed key
