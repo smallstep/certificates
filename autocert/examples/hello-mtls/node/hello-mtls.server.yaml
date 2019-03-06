@@ -28,6 +28,6 @@ spec:
     spec:
       containers:
       - name: hello-mtls
-        image: hello-mtls-server-node:latest
-        imagePullPolicy: Never
+        image: sourishkrout/hello-mtls-server-node:latest
+        imagePullPolicy: IfNotPresent
         resources: {requests: {cpu: 10m, memory: 20Mi}}

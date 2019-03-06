@@ -25,7 +25,7 @@ data:
     certLifetime: 24h
     renewer:
       name: autocert-renewer
-      image: smallstep/autocert-renewer:0.8.3
+      image: sourishkrout/autocert-renewer:dev
       resources: {requests: {cpu: 10m, memory: 20Mi}}
       imagePullPolicy: IfNotPresent
       volumeMounts:
