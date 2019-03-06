@@ -1,4 +1,4 @@
-package authority
+package provisioner
 
 import (
 	"errors"
