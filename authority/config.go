@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 )
@@ -25,10 +26,10 @@ var (
 		Renegotiation: false,
 	}
 	defaultDisableRenewal   = false
-	globalProvisionerClaims = ProvisionerClaims{
-		MinTLSDur:      &Duration{5 * time.Minute},
-		MaxTLSDur:      &Duration{24 * time.Hour},
-		DefaultTLSDur:  &Duration{24 * time.Hour},
+	globalProvisionerClaims = provisioner.Claims{
+		MinTLSDur:      &provisioner.Duration{5 * time.Minute},
+		MaxTLSDur:      &provisioner.Duration{24 * time.Hour},
+		DefaultTLSDur:  &provisioner.Duration{24 * time.Hour},
 		DisableRenewal: &defaultDisableRenewal,
 	}
 )
@@ -50,10 +51,10 @@ type Config struct {
 
 // AuthConfig represents the configuration options for the authority.
 type AuthConfig struct {
-	Provisioners         []*Provisioner     `json:"provisioners,omitempty"`
-	Template             *x509util.ASN1DN   `json:"template,omitempty"`
-	Claims               *ProvisionerClaims `json:"claims,omitempty"`
-	DisableIssuedAtCheck bool               `json:"disableIssuedAtCheck,omitempty"`
+	Provisioners         []*provisioner.Provisioner `json:"provisioners"`
+	Template             *x509util.ASN1DN           `json:"template,omitempty"`
+	Claims               *provisioner.Claims        `json:"claims,omitempty"`
+	DisableIssuedAtCheck bool                       `json:"disableIssuedAtCheck,omitempty"`
 }
 
 // Validate validates the authority configuration.
