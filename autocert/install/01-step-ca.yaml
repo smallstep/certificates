@@ -34,7 +34,7 @@ spec:
     spec:
       containers:
       - name: ca
-        image: smallstep/step-ca:latest
+        image: sourishkrout/step-ca:dev
         env:
         - name: PWDPATH
           value: /home/step/password/password
