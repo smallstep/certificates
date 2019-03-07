@@ -25,6 +25,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/jose"
@@ -410,22 +411,22 @@ func TestSignRequest_Validate(t *testing.T) {
 type mockAuthority struct {
 	ret1, ret2      interface{}
 	err             error
-	authorize       func(ott string) ([]interface{}, error)
+	authorize       func(ott string) ([]provisioner.SignOption, error)
 	getTLSOptions   func() *tlsutil.TLSOptions
 	root            func(shasum string) (*x509.Certificate, error)
-	sign            func(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error)
+	sign            func(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
 	renew           func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	getProvisioners func(nextCursor string, limit int) ([]*authority.Provisioner, string, error)
+	getProvisioners func(nextCursor string, limit int) ([]*provisioner.Provisioner, string, error)
 	getEncryptedKey func(kid string) (string, error)
 	getRoots        func() ([]*x509.Certificate, error)
 	getFederation   func() ([]*x509.Certificate, error)
 }
 
-func (m *mockAuthority) Authorize(ott string) ([]interface{}, error) {
+func (m *mockAuthority) Authorize(ott string) ([]provisioner.SignOption, error) {
 	if m.authorize != nil {
 		return m.authorize(ott)
 	}
-	return m.ret1.([]interface{}), m.err
+	return m.ret1.([]provisioner.SignOption), m.err
 }
 
 func (m *mockAuthority) GetTLSOptions() *tlsutil.TLSOptions {
@@ -442,7 +443,7 @@ func (m *mockAuthority) Root(shasum string) (*x509.Certificate, error) {
 	return m.ret1.(*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error) {
+func (m *mockAuthority) Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
 	if m.sign != nil {
 		return m.sign(cr, signOpts, extraOpts...)
 	}
@@ -456,11 +457,11 @@ func (m *mockAuthority) Renew(cert *x509.Certificate) (*x509.Certificate, *x509.
 	return m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) GetProvisioners(nextCursor string, limit int) ([]*authority.Provisioner, string, error) {
+func (m *mockAuthority) GetProvisioners(nextCursor string, limit int) ([]*provisioner.Provisioner, string, error) {
 	if m.getProvisioners != nil {
 		return m.getProvisioners(nextCursor, limit)
 	}
-	return m.ret1.([]*authority.Provisioner), m.ret2.(string), m.err
+	return m.ret1.([]*provisioner.Provisioner), m.ret2.(string), m.err
 }
 
 func (m *mockAuthority) GetEncryptedKey(kid string) (string, error) {
@@ -597,7 +598,7 @@ func Test_caHandler_Sign(t *testing.T) {
 	tests := []struct {
 		name         string
 		input        string
-		certAttrOpts []interface{}
+		certAttrOpts []provisioner.SignOption
 		autherr      error
 		cert         *x509.Certificate
 		root         *x509.Certificate
@@ -617,7 +618,7 @@ func Test_caHandler_Sign(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.signErr,
-				authorize: func(ott string) ([]interface{}, error) {
+				authorize: func(ott string) ([]provisioner.SignOption, error) {
 					return tt.certAttrOpts, tt.autherr
 				},
 				getTLSOptions: func() *tlsutil.TLSOptions {
@@ -723,19 +724,19 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p := []*authority.Provisioner{
-		{
+	p := []*provisioner.Provisioner{
+		provisioner.New(&provisioner.JWK{
 			Type:         "JWK",
 			Name:         "max",
 			EncryptedKey: "abc",
 			Key:          &key,
-		},
-		{
+		}),
+		provisioner.New(&provisioner.JWK{
 			Type:         "JWK",
 			Name:         "mariano",
 			EncryptedKey: "def",
 			Key:          &key,
-		},
+		}),
 	}
 	pr := ProvisionersResponse{
 		Provisioners: p,
