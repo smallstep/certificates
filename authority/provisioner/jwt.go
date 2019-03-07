@@ -81,15 +81,6 @@ func (p *JWT) Authorize(token string) ([]SignOption, error) {
 		return nil, errors.Wrapf(err, "invalid token")
 	}
 
-	// Do not accept tokens issued before the start of the ca.
-	// This check is meant as a stopgap solution to the current lack of a persistence layer.
-	// if a.config.AuthorityConfig != nil && !a.config.AuthorityConfig.DisableIssuedAtCheck {
-	// 	if claims.IssuedAt > 0 && claims.IssuedAt.Time().Before(a.startTime) {
-	// 		return nil, &apiError{errors.New("token issued before the bootstrap of certificate authority"),
-	// 			http.StatusUnauthorized, errContext}
-	// 	}
-	// }
-
 	// if !matchesAudience(claims.Audience, a.audiences) {
 	// 	return nil, &apiError{errors.New("authorize: token audience invalid"), http.StatusUnauthorized,
 	// 		errContext}
@@ -119,15 +110,6 @@ func (p *JWT) Authorize(token string) ([]SignOption, error) {
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
 		newValidityValidator(p.Claims.MinTLSCertDuration(), p.Claims.MaxTLSCertDuration()),
 	}
-
-	// Store the token to protect against reuse.
-	// if _, ok := a.ottMap.LoadOrStore(claims.ID, &idUsed{
-	// 	UsedAt:  time.Now().Unix(),
-	// 	Subject: claims.Subject,
-	// }); ok {
-	// 	return nil, &apiError{errors.Errorf("token already used"), http.StatusUnauthorized,
-	// 		errContext}
-	// }
 
 	return signOps, nil
 }
