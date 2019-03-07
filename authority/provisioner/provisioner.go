@@ -121,7 +121,7 @@ func (p *Provisioner) UnmarshalJSON(data []byte) error {
 
 	switch strings.ToLower(typ.Type) {
 	case "jwk":
-		p.base = &JWT{}
+		p.base = &JWK{}
 	case "oidc":
 		p.base = &OIDC{}
 	default:

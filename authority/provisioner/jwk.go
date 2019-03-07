@@ -15,9 +15,9 @@ type jwtPayload struct {
 	SANs []string `json:"sans,omitempty"`
 }
 
-// JWT is the default provisioner, an entity that can sign tokens necessary for
+// JWK is the default provisioner, an entity that can sign tokens necessary for
 // signature requests.
-type JWT struct {
+type JWK struct {
 	Name         string           `json:"name,omitempty"`
 	Type         string           `json:"type,omitempty"`
 	Key          *jose.JSONWebKey `json:"key,omitempty"`
@@ -27,28 +27,28 @@ type JWT struct {
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
-// should uniquely identify any JWT provisioner.
-func (p *JWT) GetID() string {
+// should uniquely identify any JWK provisioner.
+func (p *JWK) GetID() string {
 	return p.Name + ":" + p.Key.KeyID
 }
 
 // GetName returns the name of the provisioner
-func (p *JWT) GetName() string {
+func (p *JWK) GetName() string {
 	return p.Name
 }
 
 // GetType returns the type of provisioner.
-func (p *JWT) GetType() Type {
+func (p *JWK) GetType() Type {
 	return TypeJWK
 }
 
 // GetEncryptedKey returns the base provisioner encrypted key if it's defined.
-func (p *JWT) GetEncryptedKey() (string, string, bool) {
+func (p *JWK) GetEncryptedKey() (string, string, bool) {
 	return p.Key.KeyID, p.EncryptedKey, len(p.EncryptedKey) > 0
 }
 
 // Init initializes and validates a the fields of Provisioner type.
-func (p *JWT) Init(config Config) (err error) {
+func (p *JWK) Init(config Config) (err error) {
 	switch {
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
@@ -65,7 +65,7 @@ func (p *JWT) Init(config Config) (err error) {
 }
 
 // Authorize validates the given token.
-func (p *JWT) Authorize(token string) ([]SignOption, error) {
+func (p *JWK) Authorize(token string) ([]SignOption, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing token")
@@ -118,7 +118,7 @@ func (p *JWT) Authorize(token string) ([]SignOption, error) {
 }
 
 // AuthorizeRenewal returns an error if the renewal is disabled.
-func (p *JWT) AuthorizeRenewal(cert *x509.Certificate) error {
+func (p *JWK) AuthorizeRenewal(cert *x509.Certificate) error {
 	if p.Claims.IsDisableRenewal() {
 		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
 	}
@@ -127,7 +127,7 @@ func (p *JWT) AuthorizeRenewal(cert *x509.Certificate) error {
 
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke the certificate with serial number in the `sub` property.
-func (p *JWT) AuthorizeRevoke(token string) error {
+func (p *JWK) AuthorizeRevoke(token string) error {
 	return errors.New("not implemented")
 }
 
