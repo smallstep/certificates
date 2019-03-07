@@ -10,31 +10,31 @@ import (
 
 func TestProvisionerInit(t *testing.T) {
 	type ProvisionerValidateTest struct {
-		p   *Provisioner
+		p   *JWK
 		err error
 	}
 	tests := map[string]func(*testing.T) ProvisionerValidateTest{
 		"fail-empty-name": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &Provisioner{},
+				p:   &JWK{},
 				err: errors.New("provisioner name cannot be empty"),
 			}
 		},
 		"fail-empty-type": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &Provisioner{Name: "foo"},
+				p:   &JWK{Name: "foo"},
 				err: errors.New("provisioner type cannot be empty"),
 			}
 		},
 		"fail-empty-key": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &Provisioner{Name: "foo", Type: "bar"},
+				p:   &JWK{Name: "foo", Type: "bar"},
 				err: errors.New("provisioner key cannot be empty"),
 			}
 		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p: &Provisioner{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
+				p: &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
 			}
 		},
 	}

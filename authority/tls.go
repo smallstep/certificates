@@ -144,6 +144,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 			http.StatusInternalServerError, errContext}
 	}
 
+	// FIXME: This should be before creating the certificate.
 	for _, v := range certValidators {
 		if err := v.Valid(serverCert); err != nil {
 			return nil, nil, err
