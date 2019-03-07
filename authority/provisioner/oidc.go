@@ -73,7 +73,7 @@ func (o *OIDC) GetEncryptedKey() (kid string, key string, ok bool) {
 }
 
 // Init validates and initializes the OIDC provider.
-func (o *OIDC) Init(global *Claims) (err error) {
+func (o *OIDC) Init(config Config) (err error) {
 	switch {
 	case o.Name == "":
 		return errors.New("name cannot be empty")
@@ -84,7 +84,7 @@ func (o *OIDC) Init(global *Claims) (err error) {
 	}
 
 	// Update claims with global ones
-	if o.Claims, err = o.Claims.Init(global); err != nil {
+	if o.Claims, err = o.Claims.Init(&config.Claims); err != nil {
 		return err
 	}
 	// Decode openid-configuration endpoint

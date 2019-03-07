@@ -84,7 +84,7 @@ func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
 	// This method will also validate the audiences for JWK provisioners.
 	p, ok := a.provisioners.LoadByToken(token, &claims.Claims)
 	if !ok {
-		return nil, &apiError{errors.Errorf("authorize: provisioner not found"),
+		return nil, &apiError{errors.New("authorize: provisioner not found or invalid audience"),
 			http.StatusUnauthorized, errContext}
 	}
 

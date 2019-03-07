@@ -14,7 +14,7 @@ type Interface interface {
 	GetName() string
 	GetType() Type
 	GetEncryptedKey() (kid string, key string, ok bool)
-	Init(claims *Claims) error
+	Init(config Config) error
 	Authorize(token string) ([]SignOption, error)
 	AuthorizeRenewal(cert *x509.Certificate) error
 	AuthorizeRevoke(token string) error
@@ -31,11 +31,20 @@ const (
 	TypeOIDC Type = 2
 )
 
+// Config defines the default parameters used in the initialization of
+// provisioners.
+type Config struct {
+	// Claims are the default claims.
+	Claims Claims
+	// Audiences are the audiences used in the default provisioner, (JWK).
+	Audiences []string
+}
+
 type provisioner struct {
 	Type string `json:"type"`
 }
 
-// Provisioner implmements the provisioner.Interface on a base provisioner. It
+// Provisioner implements the provisioner.Interface on a base provisioner. It
 // also implements custom marshalers and unmarshalers so different provisioners
 // can be represented in a configuration type.
 type Provisioner struct {
@@ -76,8 +85,8 @@ func (p *Provisioner) GetType() Type {
 }
 
 // Init initializes the base provisioner with the given claims.
-func (p *Provisioner) Init(claims *Claims) error {
-	return p.base.Init(claims)
+func (p *Provisioner) Init(c Config) error {
+	return p.base.Init(c)
 }
 
 // Authorize validates the given token on the base provisioner returning a list
@@ -107,7 +116,7 @@ func (p *Provisioner) MarshalJSON() ([]byte, error) {
 func (p *Provisioner) UnmarshalJSON(data []byte) error {
 	var typ provisioner
 	if err := json.Unmarshal(data, &typ); err != nil {
-		return errors.Errorf("error unmarshalling provisioner")
+		return errors.Errorf("error unmarshaling provisioner")
 	}
 
 	switch strings.ToLower(typ.Type) {
@@ -119,7 +128,7 @@ func (p *Provisioner) UnmarshalJSON(data []byte) error {
 		return errors.Errorf("provisioner type %s not supported", typ.Type)
 	}
 	if err := json.Unmarshal(data, &p.base); err != nil {
-		return errors.Errorf("error unmarshalling provisioner")
+		return errors.Errorf("error unmarshaling provisioner")
 	}
 	return nil
 }

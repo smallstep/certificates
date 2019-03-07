@@ -2,6 +2,7 @@ package authority
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"time"
@@ -58,9 +59,8 @@ type AuthConfig struct {
 }
 
 // Validate validates the authority configuration.
-func (c *AuthConfig) Validate() error {
+func (c *AuthConfig) Validate(audiences []string) error {
 	var err error
-
 	if c == nil {
 		return errors.New("authority cannot be undefined")
 	}
@@ -71,11 +71,18 @@ func (c *AuthConfig) Validate() error {
 	if c.Claims, err = c.Claims.Init(&globalProvisionerClaims); err != nil {
 		return err
 	}
+
+	// Initialize provisioners
+	config := provisioner.Config{
+		Claims:    *c.Claims,
+		Audiences: audiences,
+	}
 	for _, p := range c.Provisioners {
-		if err := p.Init(c.Claims); err != nil {
+		if err := p.Init(config); err != nil {
 			return err
 		}
 	}
+
 	if c.Template == nil {
 		c.Template = &x509util.ASN1DN{}
 	}
@@ -154,5 +161,16 @@ func (c *Config) Validate() error {
 		c.TLS.Renegotiation = c.TLS.Renegotiation || DefaultTLSOptions.Renegotiation
 	}
 
-	return c.AuthorityConfig.Validate()
+	return c.AuthorityConfig.Validate(c.getAudiences())
+}
+
+// getAudiences returns the legacy and possible urls without the ports that will
+// be used as the default provisioner audiences. The CA might have proxies in
+// front so we cannot rely on the port.
+func (c *Config) getAudiences() []string {
+	audiences := []string{legacyAuthority}
+	for _, name := range c.DNSNames {
+		audiences = append(audiences, fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
+	}
+	return audiences
 }

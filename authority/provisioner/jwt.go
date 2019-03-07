@@ -23,6 +23,7 @@ type JWT struct {
 	Key          *jose.JSONWebKey `json:"key,omitempty"`
 	EncryptedKey string           `json:"encryptedKey,omitempty"`
 	Claims       *Claims          `json:"claims,omitempty"`
+	audiences    []string
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -47,7 +48,7 @@ func (p *JWT) GetEncryptedKey() (string, string, bool) {
 }
 
 // Init initializes and validates a the fields of Provisioner type.
-func (p *JWT) Init(global *Claims) (err error) {
+func (p *JWT) Init(config Config) (err error) {
 	switch {
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
@@ -58,10 +59,12 @@ func (p *JWT) Init(global *Claims) (err error) {
 	case p.Key == nil:
 		return errors.New("provisioner key cannot be empty")
 	}
-	p.Claims, err = p.Claims.Init(global)
+	p.Claims, err = p.Claims.Init(&config.Claims)
+	p.audiences = config.Audiences
 	return err
 }
 
+// Authorize validates the given token.
 func (p *JWT) Authorize(token string) ([]SignOption, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
@@ -81,10 +84,10 @@ func (p *JWT) Authorize(token string) ([]SignOption, error) {
 		return nil, errors.Wrapf(err, "invalid token")
 	}
 
-	// if !matchesAudience(claims.Audience, a.audiences) {
-	// 	return nil, &apiError{errors.New("authorize: token audience invalid"), http.StatusUnauthorized,
-	// 		errContext}
-	// }
+	// validate audiences with the defaults
+	if !matchesAudience(claims.Audience, p.audiences) {
+		return nil, errors.New("invalid token: invalid audience claim (aud)")
+	}
 
 	if claims.Subject == "" {
 		return nil, errors.New("token subject cannot be empty")

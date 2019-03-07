@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
-	"fmt"
 	"sync"
 	"time"
 
@@ -25,7 +24,6 @@ type Authority struct {
 	ottMap               *sync.Map
 	startTime            time.Time
 	provisioners         *provisioner.Collection
-	audiences            []string
 	// Do not re-initialize
 	initOnce bool
 }
@@ -37,19 +35,11 @@ func New(config *Config) (*Authority, error) {
 		return nil, err
 	}
 
-	// Define audiences: legacy + possible urls without the ports.
-	// The CA might have proxies in front so we cannot rely on the port.
-	audiences := []string{legacyAuthority}
-	for _, name := range config.DNSNames {
-		audiences = append(audiences, fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
-	}
-
 	var a = &Authority{
 		config:       config,
 		certificates: new(sync.Map),
 		ottMap:       new(sync.Map),
-		provisioners: provisioner.NewCollection(audiences),
-		audiences:    audiences,
+		provisioners: provisioner.NewCollection(config.getAudiences()),
 	}
 	if err := a.init(); err != nil {
 		return nil, err
