@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
@@ -96,28 +97,22 @@ func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 }
 
 // Sign creates a signed certificate from a certificate signing request.
-func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error) {
+func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
 	var (
-		errContext = context{"csr": csr, "signOptions": signOpts}
-		claims     = []certClaim{}
-		mods       = []x509util.WithOption{}
+		errContext     = context{"csr": csr, "signOptions": signOpts}
+		mods           = []x509util.WithOption{}
+		certValidators = []provisioner.CertificateValidator{}
 	)
 	for _, op := range extraOpts {
 		switch k := op.(type) {
-		case certClaim:
-			claims = append(claims, k)
-		case x509util.WithOption:
-			mods = append(mods, k)
-		case *Provisioner:
-			m, c, err := k.getTLSApps(signOpts)
-			if err != nil {
-				return nil, nil, &apiError{err, http.StatusInternalServerError, errContext}
+		case provisioner.CertificateValidator:
+			certValidators = append(certValidators, k)
+		case provisioner.CertificateRequestValidator:
+			if err := k.Valid(csr); err != nil {
+				return nil, nil, err
 			}
-			mods = append(mods, m...)
-			mods = append(mods, []x509util.WithOption{
-				withDefaultASN1DN(a.config.AuthorityConfig.Template),
-			}...)
-			claims = append(claims, c...)
+		case provisioner.ProfileWithOption:
+			mods = append(mods, k.Option())
 		default:
 			return nil, nil, &apiError{errors.Errorf("sign: invalid extra option type %T", k),
 				http.StatusInternalServerError, errContext}
@@ -137,10 +132,6 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 		return nil, nil, &apiError{errors.Wrapf(err, "sign"), http.StatusInternalServerError, errContext}
 	}
 
-	if err := validateClaims(leaf.Subject(), claims); err != nil {
-		return nil, nil, &apiError{errors.Wrapf(err, "sign"), http.StatusUnauthorized, errContext}
-	}
-
 	crtBytes, err := leaf.CreateCertificate()
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error creating new leaf certificate"),
@@ -151,6 +142,12 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing new leaf certificate"),
 			http.StatusInternalServerError, errContext}
+	}
+
+	for _, v := range certValidators {
+		if err := v.Valid(serverCert); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	caCert, err := x509.ParseCertificate(issIdentity.Crt.Raw)
