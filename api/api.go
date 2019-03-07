@@ -31,7 +31,7 @@ type Authority interface {
 	Root(shasum string) (*x509.Certificate, error)
 	Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
 	Renew(peer *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	GetProvisioners(cursor string, limit int) ([]*provisioner.Provisioner, string, error)
+	GetProvisioners(cursor string, limit int) (provisioner.List, string, error)
 	GetEncryptedKey(kid string) (string, error)
 	GetRoots() (federation []*x509.Certificate, err error)
 	GetFederation() ([]*x509.Certificate, error)
@@ -162,8 +162,8 @@ type SignRequest struct {
 // ProvisionersResponse is the response object that returns the list of
 // provisioners.
 type ProvisionersResponse struct {
-	Provisioners []*provisioner.Provisioner `json:"provisioners"`
-	NextCursor   string                     `json:"nextCursor"`
+	Provisioners provisioner.List `json:"provisioners"`
+	NextCursor   string           `json:"nextCursor"`
 }
 
 // ProvisionerKeyResponse is the response object that returns the encryptoed key

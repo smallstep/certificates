@@ -19,7 +19,7 @@ func (a *Authority) GetEncryptedKey(kid string) (string, error) {
 
 // GetProvisioners returns a map listing each provisioner and the JWK Key Set
 // with their public keys.
-func (a *Authority) GetProvisioners(cursor string, limit int) ([]*provisioner.Provisioner, string, error) {
+func (a *Authority) GetProvisioners(cursor string, limit int) (provisioner.List, string, error) {
 	provisioners, nextCursor := a.provisioners.Find(cursor, limit)
 	return provisioners, nextCursor, nil
 }

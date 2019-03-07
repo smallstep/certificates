@@ -23,7 +23,7 @@ const DefaultProvisionersLimit = 20
 const DefaultProvisionersMax = 100
 
 type uidProvisioner struct {
-	provisioner *Provisioner
+	provisioner Interface
 	uid         string
 }
 
@@ -52,12 +52,12 @@ func NewCollection(audiences []string) *Collection {
 }
 
 // Load a provisioner by the ID.
-func (c *Collection) Load(id string) (*Provisioner, bool) {
+func (c *Collection) Load(id string) (Interface, bool) {
 	return loadProvisioner(c.byID, id)
 }
 
 // LoadByToken parses the token claims and loads the provisioner associated.
-func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) (*Provisioner, bool) {
+func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) (Interface, bool) {
 	// match with server audiences
 	if matchesAudience(claims.Audience, c.audiences) {
 		// If matches with stored audiences it will be a JWT token (default), and
@@ -82,7 +82,7 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 
 // LoadByCertificate lookds for the provisioner extension and extracts the
 // proper id to load the provisioner.
-func (c *Collection) LoadByCertificate(cert *x509.Certificate) (*Provisioner, bool) {
+func (c *Collection) LoadByCertificate(cert *x509.Certificate) (Interface, bool) {
 	for _, e := range cert.Extensions {
 		if e.Id.Equal(stepOIDProvisioner) {
 			var provisioner stepProvisionerASN1
@@ -111,7 +111,7 @@ func (c *Collection) LoadEncryptedKey(keyID string) (string, bool) {
 
 // Store adds a provisioner to the collection, it makes sure two provisioner
 // does not have the same ID.
-func (c *Collection) Store(p *Provisioner) error {
+func (c *Collection) Store(p Interface) error {
 	// Store provisioner always in byID. ID must be unique.
 	if _, loaded := c.byID.LoadOrStore(p.GetID(), p); loaded == true {
 		return errors.New("cannot add multiple provisioners with the same id")
@@ -142,7 +142,7 @@ func (c *Collection) Store(p *Provisioner) error {
 }
 
 // Find implements pagination on a list of sorted provisioners.
-func (c *Collection) Find(cursor string, limit int) ([]*Provisioner, string) {
+func (c *Collection) Find(cursor string, limit int) (List, string) {
 	switch {
 	case limit <= 0:
 		limit = DefaultProvisionersLimit
@@ -154,7 +154,7 @@ func (c *Collection) Find(cursor string, limit int) ([]*Provisioner, string) {
 	cursor = fmt.Sprintf("%040s", cursor)
 	i := sort.Search(n, func(i int) bool { return c.sorted[i].uid >= cursor })
 
-	slice := []*Provisioner{}
+	slice := List{}
 	for ; i < n && len(slice) < limit; i++ {
 		slice = append(slice, c.sorted[i].provisioner)
 	}
@@ -165,12 +165,12 @@ func (c *Collection) Find(cursor string, limit int) ([]*Provisioner, string) {
 	return slice, ""
 }
 
-func loadProvisioner(m *sync.Map, key string) (*Provisioner, bool) {
+func loadProvisioner(m *sync.Map, key string) (Interface, bool) {
 	i, ok := m.Load(key)
 	if !ok {
 		return nil, false
 	}
-	p, ok := i.(*Provisioner)
+	p, ok := i.(Interface)
 	if !ok {
 		return nil, false
 	}
@@ -179,7 +179,7 @@ func loadProvisioner(m *sync.Map, key string) (*Provisioner, bool) {
 
 // provisionerSum returns the SHA1 of the provisioners ID. From this we will
 // create the unique and sorted id.
-func provisionerSum(p *Provisioner) ([]byte, error) {
+func provisionerSum(p Interface) ([]byte, error) {
 	sum := sha1.Sum([]byte(p.GetID()))
 	return sum[:], nil
 }

@@ -44,91 +44,36 @@ type provisioner struct {
 	Type string `json:"type"`
 }
 
-// Provisioner implements the provisioner.Interface on a base provisioner. It
-// also implements custom marshalers and unmarshalers so different provisioners
-// can be represented in a configuration type.
-type Provisioner struct {
-	base Interface
-}
+// List represents a list of provisioners.
+type List []Interface
 
-// New creates a new provisioner from the base provisioner.
-func New(base Interface) *Provisioner {
-	return &Provisioner{
-		base: base,
-	}
-}
-
-// Base returns the base type of the provisioner.
-func (p *Provisioner) Base() Interface {
-	return p.base
-}
-
-// GetID returns the base provisioner unique ID. This identifier is used as the
-// key in a provisioner.Collection.
-func (p *Provisioner) GetID() string {
-	return p.base.GetID()
-}
-
-// GetEncryptedKey returns the base provisioner encrypted key if it's defined.
-func (p *Provisioner) GetEncryptedKey() (string, string, bool) {
-	return p.base.GetEncryptedKey()
-}
-
-// GetName returns the name of the provisioner
-func (p *Provisioner) GetName() string {
-	return p.base.GetName()
-}
-
-// GetType return the provisioners type.
-func (p *Provisioner) GetType() Type {
-	return p.base.GetType()
-}
-
-// Init initializes the base provisioner with the given claims.
-func (p *Provisioner) Init(c Config) error {
-	return p.base.Init(c)
-}
-
-// Authorize validates the given token on the base provisioner returning a list
-// of options to validate the signing request.
-func (p *Provisioner) Authorize(token string) ([]SignOption, error) {
-	return p.base.Authorize(token)
-}
-
-// AuthorizeRenewal checks if the base provisioner authorizes the renewal.
-func (p *Provisioner) AuthorizeRenewal(cert *x509.Certificate) error {
-	return p.base.AuthorizeRenewal(cert)
-}
-
-// AuthorizeRevoke checks on the base provisioner if the given token has revoke
-// access.
-func (p *Provisioner) AuthorizeRevoke(token string) error {
-	return p.base.AuthorizeRevoke(token)
-}
-
-// MarshalJSON implements the json.Marshaler interface on the Provisioner type.
-func (p *Provisioner) MarshalJSON() ([]byte, error) {
-	return json.Marshal(p.base)
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface on the Provisioner
-// type.
-func (p *Provisioner) UnmarshalJSON(data []byte) error {
-	var typ provisioner
-	if err := json.Unmarshal(data, &typ); err != nil {
-		return errors.Errorf("error unmarshaling provisioner")
+// UnmarshalJSON implements json.Unmarshaler and allows to unmarshal a list of a
+// interfaces into the right type.
+func (l *List) UnmarshalJSON(data []byte) error {
+	ps := []json.RawMessage{}
+	if err := json.Unmarshal(data, &ps); err != nil {
+		return errors.Wrap(err, "error unmarshaling provisioner list")
 	}
 
-	switch strings.ToLower(typ.Type) {
-	case "jwk":
-		p.base = &JWK{}
-	case "oidc":
-		p.base = &OIDC{}
-	default:
-		return errors.Errorf("provisioner type %s not supported", typ.Type)
+	for _, data := range ps {
+		var typ provisioner
+		if err := json.Unmarshal(data, &typ); err != nil {
+			return errors.Errorf("error unmarshaling provisioner")
+		}
+		var p Interface
+		switch strings.ToLower(typ.Type) {
+		case "jwk":
+			p = &JWK{}
+		case "oidc":
+			p = &OIDC{}
+		default:
+			return errors.Errorf("provisioner type %s not supported", typ.Type)
+		}
+		if err := json.Unmarshal(data, p); err != nil {
+			return errors.Errorf("error unmarshaling provisioner")
+		}
+		*l = append(*l, p)
 	}
-	if err := json.Unmarshal(data, &p.base); err != nil {
-		return errors.Errorf("error unmarshaling provisioner")
-	}
+
 	return nil
 }
