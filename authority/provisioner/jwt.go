@@ -116,11 +116,8 @@ func (p *JWT) Authorize(token string) ([]SignOption, error) {
 		dnsNamesValidator(dnsNames),
 		ipAddressesValidator(ips),
 		// profileWithOption(x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, p.Claims.DefaultTLSCertDuration())),
-		&validityValidator{
-			min: p.Claims.MinTLSCertDuration(),
-			max: p.Claims.MaxTLSCertDuration(),
-		},
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
+		newValidityValidator(p.Claims.MinTLSCertDuration(), p.Claims.MaxTLSCertDuration()),
 	}
 
 	// Store the token to protect against reuse.

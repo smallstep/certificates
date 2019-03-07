@@ -123,6 +123,11 @@ type validityValidator struct {
 	max time.Duration
 }
 
+// newValidityValidator return a new validity validator.
+func newValidityValidator(min, max time.Duration) *validityValidator {
+	return &validityValidator{min: min, max: max}
+}
+
 // Validate validates the certificate temporal validity settings.
 func (v *validityValidator) Valid(crt *x509.Certificate) error {
 	var (
