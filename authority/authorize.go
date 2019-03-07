@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -18,7 +19,9 @@ type idUsed struct {
 // Claims extends jose.Claims with step attributes.
 type Claims struct {
 	jose.Claims
-	SANs []string `json:"sans,omitempty"`
+	SANs  []string `json:"sans,omitempty"`
+	Email string   `json:"email,omitempty"`
+	Nonce string   `json:"nonce,omitempty"`
 }
 
 // matchesAudience returns true if A and B share at least one element.
@@ -50,7 +53,7 @@ func stripPort(rawurl string) string {
 
 // Authorize authorizes a signature request by validating and authenticating
 // a OTT that must be sent w/ the request.
-// TODO(mariano): restore protection against reuse
+// TODO(mariano): protection against reuse for oidc
 func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
 	var errContext = map[string]interface{}{"ott": ott}
 
@@ -64,7 +67,7 @@ func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
 	// Get claims w/out verification. We need to look up the provisioner
 	// key in order to verify the claims and we need the issuer from the claims
 	// before we can look up the provisioner.
-	var claims jose.Claims
+	var claims Claims
 	if err = token.UnsafeClaimsWithoutVerification(&claims); err != nil {
 		return nil, &apiError{err, http.StatusUnauthorized, errContext}
 	}
@@ -78,20 +81,22 @@ func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
 		}
 	}
 
-	p, ok := a.provisioners.LoadByToken(token, &claims)
+	p, ok := a.provisioners.LoadByToken(token, &claims.Claims)
 	if !ok {
 		return nil, &apiError{errors.Errorf("authorize: provisioner not found"),
 			http.StatusUnauthorized, errContext}
 	}
 
 	// Store the token to protect against reuse.
-	// if _, ok := a.ottMap.LoadOrStore(claims.ID, &idUsed{
-	// 	UsedAt:  time.Now().Unix(),
-	// 	Subject: claims.Subject,
-	// }); ok {
-	// 	return nil, &apiError{errors.Errorf("token already used"), http.StatusUnauthorized,
-	// 		errContext}
-	// }
+	if p.GetType() == provisioner.TypeJWK && claims.ID != "" {
+		if _, ok := a.ottMap.LoadOrStore(claims.ID, &idUsed{
+			UsedAt:  time.Now().Unix(),
+			Subject: claims.Subject,
+		}); ok {
+			return nil, &apiError{errors.Errorf("token already used"), http.StatusUnauthorized,
+				errContext}
+		}
+	}
 
 	return p.Authorize(ott)
 }
