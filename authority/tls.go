@@ -23,13 +23,6 @@ func (a *Authority) GetTLSOptions() *tlsutil.TLSOptions {
 	return a.config.TLS
 }
 
-// SignOptions contains the options that can be passed to the Authority.Sign
-// method.
-type SignOptions struct {
-	NotAfter  time.Time `json:"notAfter"`
-	NotBefore time.Time `json:"notBefore"`
-}
-
 var (
 	stepOIDRoot               = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
 	stepOIDProvisioner        = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
@@ -97,7 +90,7 @@ func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 }
 
 // Sign creates a signed certificate from a certificate signing request.
-func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
+func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
 	var (
 		errContext     = context{"csr": csr, "signOptions": signOpts}
 		mods           = []x509util.WithOption{}
@@ -111,8 +104,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 			if err := k.Valid(csr); err != nil {
 				return nil, nil, err
 			}
-		case provisioner.ProfileWithOption:
-			mods = append(mods, k.Option())
+		case provisioner.ProfileModifier:
+			mods = append(mods, k.Option(signOpts))
 		default:
 			return nil, nil, &apiError{errors.Errorf("sign: invalid extra option type %T", k),
 				http.StatusInternalServerError, errContext}

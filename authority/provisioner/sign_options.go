@@ -12,6 +12,12 @@ import (
 	"github.com/smallstep/cli/crypto/x509util"
 )
 
+// Options contains the options that can be passed to the Sign method.
+type Options struct {
+	NotAfter  time.Time `json:"notAfter"`
+	NotBefore time.Time `json:"notBefore"`
+}
+
 // SignOption is the interface used to collect all extra options used in the
 // Sign method.
 type SignOption interface{}
@@ -29,17 +35,27 @@ type CertificateRequestValidator interface {
 	Valid(req *x509.CertificateRequest) error
 }
 
-// ProfileWithOption is the interface used to add custom options to the profile
+// ProfileModifier is the interface used to add custom options to the profile
 // constructor. The options are used to modify the final certificate.
-type ProfileWithOption interface {
+type ProfileModifier interface {
 	SignOption
-	Option() x509util.WithOption
+	Option(so SignOption) x509util.WithOption
 }
 
+// profileWithOption is a wrapper against x509util.WithOption to conform the
+// interface.
 type profileWithOption x509util.WithOption
 
-func (v profileWithOption) Option() x509util.WithOption {
+func (v profileWithOption) Option(Options) x509util.WithOption {
 	return x509util.WithOption(v)
+}
+
+// profileDefaultDuration is a wrapper against x509util.WithOption to conform the
+// interface.
+type profileDefaultDuration time.Duration
+
+func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
+	return x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, time.Duration(v))
 }
 
 // emailOnlyIdentity is a CertificateRequestValidator that checks that the only

@@ -105,16 +105,14 @@ func (p *JWK) Authorize(token string) ([]SignOption, error) {
 		return nil, err
 	}
 
-	signOps := []SignOption{
+	return []SignOption{
 		commonNameValidator(claims.Subject),
 		dnsNamesValidator(dnsNames),
 		ipAddressesValidator(ips),
-		// profileWithOption(x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, p.Claims.DefaultTLSCertDuration())),
+		profileDefaultDuration(p.Claims.DefaultTLSCertDuration()),
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
 		newValidityValidator(p.Claims.MinTLSCertDuration(), p.Claims.MaxTLSCertDuration()),
-	}
-
-	return signOps, nil
+	}, nil
 }
 
 // AuthorizeRenewal returns an error if the renewal is disabled.
@@ -130,18 +128,3 @@ func (p *JWK) AuthorizeRenewal(cert *x509.Certificate) error {
 func (p *JWK) AuthorizeRevoke(token string) error {
 	return errors.New("not implemented")
 }
-
-// // getTLSApps returns a list of modifiers and validators that will be applied to
-// // the certificate.
-// func (p *JWT) getTLSApps(so SignOptions) ([]x509util.WithOption, []certClaim, error) {
-// 	c := p.Claims
-// 	return []x509util.WithOption{
-// 			x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, c.DefaultTLSCertDuration()),
-// 			withProvisionerOID(p.Name, p.Key.KeyID),
-// 		}, []certClaim{
-// 			&certTemporalClaim{
-// 				min: c.MinTLSCertDuration(),
-// 				max: c.MaxTLSCertDuration(),
-// 			},
-// 		}, nil
-// }

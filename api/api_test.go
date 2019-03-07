@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
-	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
@@ -414,7 +413,7 @@ type mockAuthority struct {
 	authorize       func(ott string) ([]provisioner.SignOption, error)
 	getTLSOptions   func() *tlsutil.TLSOptions
 	root            func(shasum string) (*x509.Certificate, error)
-	sign            func(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
+	sign            func(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
 	renew           func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
 	getProvisioners func(nextCursor string, limit int) (provisioner.List, string, error)
 	getEncryptedKey func(kid string) (string, error)
@@ -443,9 +442,9 @@ func (m *mockAuthority) Root(shasum string) (*x509.Certificate, error) {
 	return m.ret1.(*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
+func (m *mockAuthority) Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
 	if m.sign != nil {
-		return m.sign(cr, signOpts, extraOpts...)
+		return m.sign(cr, opts, signOpts...)
 	}
 	return m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate), m.err
 }

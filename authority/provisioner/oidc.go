@@ -156,6 +156,7 @@ func (o *OIDC) Authorize(token string) ([]SignOption, error) {
 
 	return []SignOption{
 		emailOnlyIdentity(claims.Email),
+		profileDefaultDuration(o.Claims.DefaultTLSCertDuration()),
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
 		newValidityValidator(o.Claims.MinTLSCertDuration(), o.Claims.MaxTLSCertDuration()),
 	}, nil
