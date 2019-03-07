@@ -86,6 +86,8 @@ step ca init \
   --with-ca-url "$CA_URL" \
   --password-file <(echo "$CA_PASSWORD")
 
+# {"cts":[{"uri":"http://trillian.step.toys:8080/smallstep","key":"docker/ct_server/pubkey.pem"}]}
+
 echo
 echo -e "\e[1mCreating autocert provisioner...\e[0m"
 
