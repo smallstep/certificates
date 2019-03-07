@@ -416,7 +416,7 @@ type mockAuthority struct {
 	root            func(shasum string) (*x509.Certificate, error)
 	sign            func(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
 	renew           func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	getProvisioners func(nextCursor string, limit int) ([]*provisioner.Provisioner, string, error)
+	getProvisioners func(nextCursor string, limit int) (provisioner.List, string, error)
 	getEncryptedKey func(kid string) (string, error)
 	getRoots        func() ([]*x509.Certificate, error)
 	getFederation   func() ([]*x509.Certificate, error)
@@ -457,11 +457,11 @@ func (m *mockAuthority) Renew(cert *x509.Certificate) (*x509.Certificate, *x509.
 	return m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) GetProvisioners(nextCursor string, limit int) ([]*provisioner.Provisioner, string, error) {
+func (m *mockAuthority) GetProvisioners(nextCursor string, limit int) (provisioner.List, string, error) {
 	if m.getProvisioners != nil {
 		return m.getProvisioners(nextCursor, limit)
 	}
-	return m.ret1.([]*provisioner.Provisioner), m.ret2.(string), m.err
+	return m.ret1.(provisioner.List), m.ret2.(string), m.err
 }
 
 func (m *mockAuthority) GetEncryptedKey(kid string) (string, error) {
@@ -724,19 +724,19 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p := []*provisioner.Provisioner{
-		provisioner.New(&provisioner.JWK{
+	p := provisioner.List{
+		&provisioner.JWK{
 			Type:         "JWK",
 			Name:         "max",
 			EncryptedKey: "abc",
 			Key:          &key,
-		}),
-		provisioner.New(&provisioner.JWK{
+		},
+		&provisioner.JWK{
 			Type:         "JWK",
 			Name:         "mariano",
 			EncryptedKey: "def",
 			Key:          &key,
-		}),
+		},
 	}
 	pr := ProvisionersResponse{
 		Provisioners: p,
