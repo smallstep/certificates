@@ -80,7 +80,7 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 	return c.Load(payload.Audience[0])
 }
 
-// LoadByCertificate lookds for the provisioner extension and extracts the
+// LoadByCertificate looks for the provisioner extension and extracts the
 // proper id to load the provisioner.
 func (c *Collection) LoadByCertificate(cert *x509.Certificate) (Interface, bool) {
 	for _, e := range cert.Extensions {
@@ -95,7 +95,10 @@ func (c *Collection) LoadByCertificate(cert *x509.Certificate) (Interface, bool)
 			return c.Load(string(provisioner.CredentialID))
 		}
 	}
-	return nil, false
+
+	// Default to noop provisioner if an extension is not found. This allows to
+	// accept a renewal of a cert without the provisioner extension.
+	return &noop{}, true
 }
 
 // LoadEncryptedKey returns a the encrypted key by KeyID. At this moment only
