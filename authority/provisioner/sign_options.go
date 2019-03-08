@@ -39,7 +39,7 @@ type CertificateRequestValidator interface {
 // constructor. The options are used to modify the final certificate.
 type ProfileModifier interface {
 	SignOption
-	Option(so SignOption) x509util.WithOption
+	Option(o Options) x509util.WithOption
 }
 
 // profileWithOption is a wrapper against x509util.WithOption to conform the
@@ -195,7 +195,7 @@ func newProvisionerExtensionOption(typ Type, name, credentialID string) *provisi
 	}
 }
 
-func (o *provisionerExtensionOption) Option() x509util.WithOption {
+func (o *provisionerExtensionOption) Option(Options) x509util.WithOption {
 	return func(p x509util.Profile) error {
 		crt := p.Subject()
 		b, err := asn1.Marshal(stepProvisionerASN1{
