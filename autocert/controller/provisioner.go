@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority"
+	provisioners "github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/crypto/randutil"
@@ -111,10 +111,12 @@ func loadProvisionerJWKByName(name, caURL, caRoot, passFile string) (key *jose.J
 	}
 
 	for _, provisioner := range provisioners {
-		if provisioner.Name == name {
-			key, err = decryptProvisionerJWK(provisioner.EncryptedKey, passFile)
-			if err == nil {
-				return
+		if provisioner.GetName() == name {
+			if _, encryptedKey, ok := provisioner.GetEncryptedKey(); ok {
+				key, err = decryptProvisionerJWK(encryptedKey, passFile)
+				if err == nil {
+					return
+				}
 			}
 		}
 	}
@@ -154,7 +156,7 @@ func getRootCAPath() string {
 }
 
 // getProvisioners returns the map of provisioners on the given CA.
-func getProvisioners(caURL, rootFile string) ([]*authority.Provisioner, error) {
+func getProvisioners(caURL, rootFile string) (provisioners.List, error) {
 	if len(rootFile) == 0 {
 		rootFile = getRootCAPath()
 	}
@@ -163,7 +165,7 @@ func getProvisioners(caURL, rootFile string) ([]*authority.Provisioner, error) {
 		return nil, err
 	}
 	cursor := ""
-	provisioners := []*authority.Provisioner{}
+	var provisioners provisioners.List
 	for {
 		resp, err := client.Provisioners(ca.WithProvisionerCursor(cursor), ca.WithProvisionerLimit(100))
 		if err != nil {
