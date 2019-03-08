@@ -1,4 +1,6 @@
-package authority
+// +build ignore
+
+package provisioner
 
 import (
 	"crypto/x509/pkix"

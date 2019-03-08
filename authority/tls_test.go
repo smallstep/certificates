@@ -7,7 +7,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"fmt"
-	"net"
 	"net/http"
 	"reflect"
 	"testing"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
@@ -52,24 +52,24 @@ func TestSign(t *testing.T) {
 	}
 
 	nb := time.Now()
-	signOpts := SignOptions{
+	signOpts := provisioner.Options{
 		NotBefore: nb,
 		NotAfter:  nb.Add(time.Minute * 5),
 	}
 
-	p := a.config.AuthorityConfig.Provisioners[1]
-	extraOpts := []interface{}{
-		&commonNameClaim{"smallstep test"},
-		&dnsNamesClaim{[]string{"test.smallstep.com"}},
-		&ipAddressesClaim{[]net.IP{}},
-		p,
+	p := a.config.AuthorityConfig.Provisioners[1].(*provisioner.JWK)
+	extraOpts := []provisioner.SignOption{
+		// &commonNameClaim{"smallstep test"},
+		// &dnsNamesClaim{[]string{"test.smallstep.com"}},
+		// &ipAddressesClaim{[]net.IP{}},
+		// p,
 	}
 
 	type signTest struct {
 		auth      *Authority
 		csr       *x509.CertificateRequest
-		signOpts  SignOptions
-		extraOpts []interface{}
+		signOpts  provisioner.Options
+		extraOpts []provisioner.SignOption
 		err       *apiError
 	}
 	tests := map[string]func(*testing.T) *signTest{
@@ -123,7 +123,7 @@ func TestSign(t *testing.T) {
 			return &signTest{
 				auth:      _a,
 				csr:       csr,
-				extraOpts: []interface{}{p},
+				extraOpts: []provisioner.SignOption{p},
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: error creating new leaf certificate"),
 					http.StatusInternalServerError,
@@ -133,7 +133,7 @@ func TestSign(t *testing.T) {
 		},
 		"fail provisioner duration claim": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
-			_signOpts := SignOptions{
+			_signOpts := provisioner.Options{
 				NotBefore: nb,
 				NotAfter:  nb.Add(time.Hour * 25),
 			}
@@ -262,7 +262,7 @@ func TestRenew(t *testing.T) {
 	now := time.Now().UTC()
 	nb1 := now.Add(-time.Minute * 7)
 	na1 := now
-	so := &SignOptions{
+	so := &provisioner.Options{
 		NotBefore: nb1,
 		NotAfter:  na1,
 	}
@@ -272,7 +272,7 @@ func TestRenew(t *testing.T) {
 		x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, 0),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
-		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].Key.KeyID))
+		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID))
 	assert.FatalError(t, err)
 	crtBytes, err := leaf.CreateCertificate()
 	assert.FatalError(t, err)
@@ -284,7 +284,7 @@ func TestRenew(t *testing.T) {
 		x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, 0),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
-		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].Key.KeyID),
+		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].(*provisioner.JWK).Key.KeyID),
 	)
 	assert.FatalError(t, err)
 	crtBytesNoRenew, err := leafNoRenew.CreateCertificate()

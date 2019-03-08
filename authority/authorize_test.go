@@ -169,7 +169,7 @@ func TestAuthorize(t *testing.T) {
 				(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", "foo"))
 			assert.FatalError(t, err)
 
-			_a.provisionerIDIndex.Store(validIssuer+":foo", "42")
+			// _a.provisioners.Store(validIssuer+":foo", "42")
 
 			cl := jwt.Claims{
 				Subject:   "test.smallstep.com",
