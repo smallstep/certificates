@@ -23,7 +23,7 @@ var maxAgeRegex = regexp.MustCompile("max-age=([0-9]*)")
 type keyStore struct {
 	sync.RWMutex
 	uri    string
-	keys   jose.JSONWebKeySet
+	keySet jose.JSONWebKeySet
 	timer  *time.Timer
 	expiry time.Time
 }
@@ -35,7 +35,7 @@ func newKeyStore(uri string) (*keyStore, error) {
 	}
 	ks := &keyStore{
 		uri:    uri,
-		keys:   keys,
+		keySet: keys,
 		expiry: getExpirationTime(age),
 	}
 	ks.timer = time.AfterFunc(age, ks.reload)
@@ -54,7 +54,7 @@ func (ks *keyStore) Get(kid string) (keys []jose.JSONWebKey) {
 		ks.reload()
 		ks.RLock()
 	}
-	keys = ks.keys.Key(kid)
+	keys = ks.keySet.Key(kid)
 	ks.RUnlock()
 	return
 }
@@ -66,7 +66,7 @@ func (ks *keyStore) reload() {
 		next = ks.nextReloadDuration(defaultCacheJitter / 2)
 	} else {
 		ks.Lock()
-		ks.keys = keys
+		ks.keySet = keys
 		ks.expiry = time.Now().Round(time.Second).Add(age - 1*time.Minute).UTC()
 		ks.Unlock()
 		next = ks.nextReloadDuration(age)

@@ -198,19 +198,27 @@ func newProvisionerExtensionOption(typ Type, name, credentialID string) *provisi
 func (o *provisionerExtensionOption) Option(Options) x509util.WithOption {
 	return func(p x509util.Profile) error {
 		crt := p.Subject()
-		b, err := asn1.Marshal(stepProvisionerASN1{
-			Type:         o.Type,
-			Name:         []byte(o.Name),
-			CredentialID: []byte(o.CredentialID),
-		})
+		ext, err := createProvisionerExtension(o.Type, o.Name, o.CredentialID)
 		if err != nil {
-			return errors.Wrapf(err, "error marshaling provisioner extension")
+			return err
 		}
-		crt.ExtraExtensions = append(crt.ExtraExtensions, pkix.Extension{
-			Id:       stepOIDProvisioner,
-			Critical: false,
-			Value:    b,
-		})
+		crt.ExtraExtensions = append(crt.ExtraExtensions, ext)
 		return nil
 	}
+}
+
+func createProvisionerExtension(typ int, name, credentialID string) (pkix.Extension, error) {
+	b, err := asn1.Marshal(stepProvisionerASN1{
+		Type:         typ,
+		Name:         []byte(name),
+		CredentialID: []byte(credentialID),
+	})
+	if err != nil {
+		return pkix.Extension{}, errors.Wrapf(err, "error marshaling provisioner extension")
+	}
+	return pkix.Extension{
+		Id:       stepOIDProvisioner,
+		Critical: false,
+		Value:    b,
+	}, nil
 }

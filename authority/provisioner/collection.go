@@ -129,18 +129,15 @@ func (c *Collection) Store(p Interface) error {
 	// Use the first 4 bytes (32bit) of the sum to insert the order
 	// Using big endian format to get the strings sorted:
 	// 0x00000000, 0x00000001, 0x00000002, ...
-	sum, err := provisionerSum(p)
-	if err != nil {
-		return err
-	}
 	bi := make([]byte, 4)
+	sum := provisionerSum(p)
 	binary.BigEndian.PutUint32(bi, uint32(c.sorted.Len()))
 	sum[0], sum[1], sum[2], sum[3] = bi[0], bi[1], bi[2], bi[3]
-	bi[0], bi[1], bi[2], bi[3] = 0, 0, 0, 0
 	c.sorted = append(c.sorted, uidProvisioner{
 		provisioner: p,
 		uid:         hex.EncodeToString(sum),
 	})
+	sort.Sort(c.sorted)
 	return nil
 }
 
@@ -182,9 +179,9 @@ func loadProvisioner(m *sync.Map, key string) (Interface, bool) {
 
 // provisionerSum returns the SHA1 of the provisioners ID. From this we will
 // create the unique and sorted id.
-func provisionerSum(p Interface) ([]byte, error) {
+func provisionerSum(p Interface) []byte {
 	sum := sha1.Sum([]byte(p.GetID()))
-	return sum[:], nil
+	return sum[:]
 }
 
 // matchesAudience returns true if A and B share at least one element.

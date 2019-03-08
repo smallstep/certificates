@@ -124,7 +124,7 @@ func generateOIDC() (*OIDC, error) {
 			JWKSetURI: "https://example.com/.well-known/jwks",
 		},
 		keyStore: &keyStore{
-			keys:   jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
+			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
 	}, nil
