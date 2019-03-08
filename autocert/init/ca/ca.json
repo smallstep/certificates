@@ -1,0 +1,62 @@
+{
+   "root": "/home/step/.step/certs/root_ca.crt",
+   "crt": "/home/step/.step/certs/intermediate_ca.crt",
+   "key": "/home/step/.step/certs/intermediate_ca_key",
+   "password": "asdf",
+   "address": ":4443",
+   "dnsNames": [
+      "ca.smallstep.com",
+      "ctca.step.toys",
+      "ca.step.svc.cluster.local"
+   ],
+   "logger": {
+      "format": "text",
+      "level": "warn"
+   },
+   "authority": {
+      "claims": {
+         "minTLSCertDuration": "1m"
+      },
+      "template": {
+         "country": "US",
+         "organization": "Smallstep Labs Inc.",
+         "organizationalUnit": "",
+         "locality": "San Francisco",
+         "province": "CA",
+         "streetAddress": "",
+         "commonName": ""
+      },
+      "provisioners": [
+         {
+            "name": "mariano@smallstep.com",
+            "type": "jwk",
+            "key": {
+               "use": "sig",
+               "kty": "EC",
+               "kid": "jO37dtDbku-Qnabs5VR0Yw6YFFv9weA18dp3htvdEjs",
+               "crv": "P-256",
+               "alg": "ES256",
+               "x": "vo6GTwfXryV5WDI-_JL1FeK0k2AvWwUnSbtdSE3IQl0",
+               "y": "Z4j_nNmETqTsKq-6ZCjyCIIMNE_308Mx866z3pD6sJ0"
+            },
+            "encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiUUppQnNnN3VhY2MtQ1BiN3lCM2RhdyJ9.xIundEA1ZT3zk5qP9a9nH1n5pZK2bSTuYIAq6W1vMNJTkKZWIFjtmg.ztnvv4FBPExc2arS.OukgkTrlqpsWRMYM_l4-QHJqBMhfbeW164-qmULuzoNdo1umW8WLIX3Us8newUFh1zrJKDFJfrW_KT2C022_VKXOUO6LGX9WWN7RYiUC_aOY8O73xs1yq65whD7hMxPlq2fMd85AGvv0QQTwlG2lJ_Gw_bdbB3vDIBVJa5lywraG6tyVXT15yykVdoScc6fmxasi5tuoFW4VNjZzcgQ25cdpbwj0fvLACQWQjz49cGAjfpR6I8sys2pA55HobMdbyj7lKnDTD5TUMmoMB8WvGwleKyjLwZBPAhi_Wwrj1UXh3nrEWVFPJY9VLSCIIKdilugE62mW3reTNayqvN0.z-VKtvBPBATKsDtGppbj4w"
+         }
+      ]
+   },
+   "tls": {
+      "cipherSuites": [
+         "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+         "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+         "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+      ],
+      "minVersion": 1.2,
+      "maxVersion": 1.2,
+      "renegotiation": false
+   },
+   "cts": [
+      {
+         "uri": "http://trillian.step.toys:8080/smallstep",
+         "key": "/home/step/.step/certs/pubkey.pem"
+      }
+   ]
+}

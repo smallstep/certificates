@@ -12,7 +12,10 @@ USER root
 RUN curl -L https://storage.googleapis.com/kubernetes-release/release/${KUBE_LATEST_VERSION}/bin/linux/amd64/kubectl -o /usr/local/bin/kubectl \
  && chmod +x /usr/local/bin/kubectl
 RUN apk --update add expect
+RUN apk --update add jq
 
 COPY autocert.sh /home/step/
+COPY ct.json /home/step/
+COPY ca /home/step/ca/
 RUN chmod +x /home/step/autocert.sh
 CMD ["/home/step/autocert.sh"]

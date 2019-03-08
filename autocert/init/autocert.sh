@@ -8,8 +8,8 @@ read ANYKEY
 
 STEPPATH=/home/step/.step
 
-CA_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32 ; echo '')
-AUTOCERT_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32 ; echo '')
+CA_PASSWORD=asdf
+AUTOCERT_PASSWORD=asdf
 
 echo -e "\e[1mChecking cluster permissions...\e[0m"
 
@@ -86,13 +86,18 @@ step ca init \
   --with-ca-url "$CA_URL" \
   --password-file <(echo "$CA_PASSWORD")
 
-# {"cts":[{"uri":"http://trillian.step.toys:8080/smallstep","key":"docker/ct_server/pubkey.pem"}]}
+cp -f ./ca/ca.json $(step path)/config/ca.json
+cp -f ./ca/root_ca.crt $(step path)/certs/root_ca.crt
+cp -f ./ca/pubkey.pem $(step path)/certs/pubkey.pem
+cp -f ./ca/intermediate_ca.crt $(step path)/certs/intermediate_ca.crt
+cp -f ./ca/intermediate_ca_key $(step path)/certs/intermediate_ca_key
+rm -f $(step path)/config/defaults.json
 
 echo
 echo -e "\e[1mCreating autocert provisioner...\e[0m"
 
 expect <<EOD
-spawn step ca provisioner add autocert --create
+spawn step ca provisioner add autocert --create --ca-config $(step path)/config/ca.json
 expect "Please enter a password to encrypt the provisioner private key? \\\\\\[leave empty and we'll generate one\\\\\\]: "
 send "${AUTOCERT_PASSWORD}\n"
 expect eof
@@ -100,6 +105,10 @@ EOD
 
 echo
 echo -e "\e[1mCreating step namespace and preparing environment...\e[0m"
+
+jq -s '.[0] * .[1]' $(step path)/config/ca.json ./ct.json > $(step path)/config/_ca.json
+rm -f $(step path)/config/ca.json
+mv -f $(step path)/config/_ca.json $(step path)/config/ca.json
 
 kubectl create namespace step
 
