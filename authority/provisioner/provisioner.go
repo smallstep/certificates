@@ -24,6 +24,8 @@ type Interface interface {
 type Type int
 
 const (
+	noopType Type = 0
+
 	// TypeJWK is used to indicate the JWK provisioners.
 	TypeJWK Type = 1
 
@@ -55,6 +57,7 @@ func (l *List) UnmarshalJSON(data []byte) error {
 		return errors.Wrap(err, "error unmarshaling provisioner list")
 	}
 
+	*l = List{}
 	for _, data := range ps {
 		var typ provisioner
 		if err := json.Unmarshal(data, &typ); err != nil {
