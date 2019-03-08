@@ -120,7 +120,7 @@ func (d *Duration) UnmarshalJSON(data []byte) (err error) {
 		return errors.New("duration cannot be nil")
 	}
 	if err = json.Unmarshal(data, &s); err != nil {
-		return errors.Wrapf(err, "error unmarshalling %s", data)
+		return errors.Wrapf(err, "error unmarshaling %s", data)
 	}
 	if _d, err = time.ParseDuration(s); err != nil {
 		return errors.Wrapf(err, "error parsing %s as duration", s)

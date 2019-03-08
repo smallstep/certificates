@@ -4,6 +4,9 @@ import (
 	"crypto"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"time"
 
 	"github.com/smallstep/cli/crypto/randutil"
@@ -17,6 +20,15 @@ var testAudiences = []string{
 	"https://ca.smallsteomcom/1.0/sign",
 }
 
+func must(args ...interface{}) []interface{} {
+	if l := len(args); l > 0 && args[l-1] != nil {
+		if err, ok := args[l-1].(error); ok {
+			panic(err)
+		}
+	}
+	return args
+}
+
 func generateJSONWebKey() (*jose.JSONWebKey, error) {
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	if err != nil {
@@ -28,6 +40,18 @@ func generateJSONWebKey() (*jose.JSONWebKey, error) {
 	}
 	jwk.KeyID = string(hex.EncodeToString(fp))
 	return jwk, nil
+}
+
+func generateJSONWebKeySet(n int) (jose.JSONWebKeySet, error) {
+	var keySet jose.JSONWebKeySet
+	for i := 0; i < n; i++ {
+		key, err := generateJSONWebKey()
+		if err != nil {
+			return jose.JSONWebKeySet{}, err
+		}
+		keySet.Keys = append(keySet.Keys, key.Public())
+	}
+	return keySet, nil
 }
 
 func encryptJSONWebKey(jwk *jose.JSONWebKey) (*jose.JSONWebEncryption, error) {
@@ -205,4 +229,39 @@ func parseToken(token string) (*jose.JSONWebToken, *jose.Claims, error) {
 		return nil, nil, err
 	}
 	return tok, claims, nil
+}
+
+func generateJWKServer(n int) *httptest.Server {
+	hits := struct {
+		Hits int `json:"hits"`
+	}{}
+	writeJSON := func(w http.ResponseWriter, v interface{}) {
+		b, err := json.Marshal(v)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(b)
+	}
+	// keySet, err := generateJSONWebKeySet(n)
+	defaultKeySet := must(generateJSONWebKeySet(2))[0].(jose.JSONWebKeySet)
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Hits++
+		switch r.RequestURI {
+		case "/error":
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		case "/hits":
+			writeJSON(w, hits)
+		case "/random":
+			keySet := must(generateJSONWebKeySet(2))[0].(jose.JSONWebKeySet)
+			fmt.Println(keySet)
+			w.Header().Add("Cache-Control", "max-age=5")
+			writeJSON(w, keySet)
+		default:
+			w.Header().Add("Cache-Control", "max-age=5")
+			writeJSON(w, defaultKeySet)
+		}
+	}))
 }

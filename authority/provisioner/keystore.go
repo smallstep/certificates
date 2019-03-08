@@ -26,6 +26,7 @@ type keyStore struct {
 	keySet jose.JSONWebKeySet
 	timer  *time.Timer
 	expiry time.Time
+	jitter time.Duration
 }
 
 func newKeyStore(uri string) (*keyStore, error) {
@@ -37,8 +38,10 @@ func newKeyStore(uri string) (*keyStore, error) {
 		uri:    uri,
 		keySet: keys,
 		expiry: getExpirationTime(age),
+		jitter: getCacheJitter(age),
 	}
-	ks.timer = time.AfterFunc(age, ks.reload)
+	next := ks.nextReloadDuration(age)
+	ks.timer = time.AfterFunc(next, ks.reload)
 	return ks, nil
 }
 
@@ -63,13 +66,14 @@ func (ks *keyStore) reload() {
 	var next time.Duration
 	keys, age, err := getKeysFromJWKsURI(ks.uri)
 	if err != nil {
-		next = ks.nextReloadDuration(defaultCacheJitter / 2)
+		next = ks.nextReloadDuration(ks.jitter / 2)
 	} else {
 		ks.Lock()
 		ks.keySet = keys
-		ks.expiry = time.Now().Round(time.Second).Add(age - 1*time.Minute).UTC()
-		ks.Unlock()
+		ks.expiry = getExpirationTime(age)
+		ks.jitter = getCacheJitter(age)
 		next = ks.nextReloadDuration(age)
+		ks.Unlock()
 	}
 
 	ks.Lock()
@@ -78,7 +82,7 @@ func (ks *keyStore) reload() {
 }
 
 func (ks *keyStore) nextReloadDuration(age time.Duration) time.Duration {
-	n := rand.Int63n(int64(defaultCacheJitter))
+	n := rand.Int63n(int64(ks.jitter))
 	age -= time.Duration(n)
 	if age < 0 {
 		age = 0
@@ -117,6 +121,15 @@ func getCacheAge(cacheControl string) time.Duration {
 	return age
 }
 
+func getCacheJitter(age time.Duration) time.Duration {
+	switch {
+	case age > time.Hour:
+		return defaultCacheJitter
+	default:
+		return age / 3
+	}
+}
+
 func getExpirationTime(age time.Duration) time.Time {
-	return time.Now().Round(time.Second).Add(age - 1*time.Minute).UTC()
+	return time.Now().Round(time.Second).Add(age)
 }
