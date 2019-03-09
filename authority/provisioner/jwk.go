@@ -101,10 +101,6 @@ func (p *JWK) Authorize(token string) ([]SignOption, error) {
 	}
 
 	dnsNames, ips := x509util.SplitSANs(claims.SANs)
-	if err != nil {
-		return nil, err
-	}
-
 	return []SignOption{
 		commonNameValidator(claims.Subject),
 		dnsNamesValidator(dnsNames),

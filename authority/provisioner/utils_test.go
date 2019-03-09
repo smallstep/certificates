@@ -117,6 +117,7 @@ func generateJWK() (*JWK, error) {
 		Type:         "JWK",
 		Key:          &public,
 		EncryptedKey: encrypted,
+		Claims:       &globalProvisionerClaims,
 		audiences:    testAudiences,
 	}, nil
 }
@@ -143,6 +144,7 @@ func generateOIDC() (*OIDC, error) {
 		Type:                  "OIDC",
 		ClientID:              clientID,
 		ConfigurationEndpoint: "https://example.com/.well-known/openid-configuration",
+		Claims:                &globalProvisionerClaims,
 		configuration: openIDConfiguration{
 			Issuer:    issuer,
 			JWKSetURI: "https://example.com/.well-known/jwks",
@@ -174,11 +176,43 @@ func generateCollection(nJWK, nOIDC int) (*Collection, error) {
 }
 
 func generateSimpleToken(iss, aud string, jwk *jose.JSONWebKey) (string, error) {
-	now := time.Now()
-	return generateToken("the-sub", []string{"test.smallstep.com"}, jwk.KeyID, iss, aud, "testdata/root_ca.crt", now, now.Add(5*time.Minute), jwk)
+	return generateToken("subject", iss, aud, []string{"test.smallstep.com"}, jwk)
+	// return generateToken("the-sub", []string{"test.smallstep.com"}, jwk.KeyID, iss, aud, "testdata/root_ca.crt", now, now.Add(5*time.Minute), jwk)
 }
 
-func generateToken(sub string, sans []string, kid, iss, aud, root string, notBefore, notAfter time.Time, jwk *jose.JSONWebKey) (string, error) {
+func generateToken(sub, iss, aud string, sans []string, jwk *jose.JSONWebKey) (string, error) {
+	sig, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
+		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	id, err := randutil.ASCII(64)
+	if err != nil {
+		return "", err
+	}
+
+	now := time.Now()
+	claims := struct {
+		jose.Claims
+		SANS []string `json:"sans"`
+	}{
+		Claims: jose.Claims{
+			ID:        id,
+			Subject:   sub,
+			Issuer:    iss,
+			NotBefore: jose.NewNumericDate(now),
+			Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+			Audience:  []string{aud},
+		},
+		SANS: sans,
+	}
+	return jose.Signed(sig).Claims(claims).CompactSerialize()
+}
+
+func generateToken2(sub string, sans []string, kid, iss, aud, root string, notBefore, notAfter time.Time, jwk *jose.JSONWebKey) (string, error) {
 	// A random jwt id will be used to identify duplicated tokens
 	jwtID, err := randutil.Hex(64) // 256 bits
 	if err != nil {

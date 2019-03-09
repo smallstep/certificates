@@ -22,8 +22,7 @@ func (pc *Claims) Init(global *Claims) (*Claims, error) {
 		pc = &Claims{}
 	}
 	pc.globalClaims = global
-	err := pc.Validate()
-	return pc, err
+	return pc, pc.Validate()
 }
 
 // DefaultTLSCertDuration returns the default TLS cert duration for the
