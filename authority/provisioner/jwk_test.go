@@ -3,7 +3,6 @@ package provisioner
 import (
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -178,15 +177,12 @@ func TestJWK_AuthorizeRenewal(t *testing.T) {
 	p2, err := generateJWK()
 	assert.FatalError(t, err)
 
-	fmt.Printf("%#v\n", *p1.Claims.DisableRenewal)
 	// disable renewal
 	disable := true
 	p2.Claims = &Claims{
 		globalClaims:   &globalProvisionerClaims,
 		DisableRenewal: &disable,
 	}
-
-	fmt.Printf("%#v\n", *p1.Claims.DisableRenewal)
 
 	type args struct {
 		cert *x509.Certificate

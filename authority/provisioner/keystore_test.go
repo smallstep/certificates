@@ -113,7 +113,6 @@ func Test_keyStore_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			println(tt.name)
 			if gotKeys := tt.ks.Get(tt.args.kid); !reflect.DeepEqual(gotKeys, tt.wantKeys) {
 				t.Errorf("keyStore.Get() = %v, want %v", gotKeys, tt.wantKeys)
 			}

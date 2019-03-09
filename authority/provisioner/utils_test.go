@@ -4,7 +4,6 @@ import (
 	"crypto"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -290,7 +289,6 @@ func generateJWKServer(n int) *httptest.Server {
 			writeJSON(w, hits)
 		case "/random":
 			keySet := must(generateJSONWebKeySet(2))[0].(jose.JSONWebKeySet)
-			fmt.Println(keySet)
 			w.Header().Add("Cache-Control", "max-age=5")
 			writeJSON(w, keySet)
 		default:
