@@ -136,7 +136,7 @@ func TestAuthorize(t *testing.T) {
 			return &authorizeTest{
 				auth: a,
 				ott:  raw,
-				err: &apiError{errors.New("authorize: token KeyID cannot be empty"),
+				err: &apiError{errors.New("authorize: provisioner not found or invalid audience"),
 					http.StatusUnauthorized, context{"ott": raw}},
 			}
 		},
@@ -158,7 +158,7 @@ func TestAuthorize(t *testing.T) {
 			return &authorizeTest{
 				auth: a,
 				ott:  raw,
-				err: &apiError{errors.New("authorize: provisioner with id step-cli:foo not found"),
+				err: &apiError{errors.New("authorize: provisioner not found or invalid audience"),
 					http.StatusUnauthorized, context{"ott": raw}},
 			}
 		},
@@ -184,8 +184,8 @@ func TestAuthorize(t *testing.T) {
 			return &authorizeTest{
 				auth: _a,
 				ott:  raw,
-				err: &apiError{errors.New("authorize: invalid provisioner type"),
-					http.StatusInternalServerError, context{"ott": raw}},
+				err: &apiError{errors.New("authorize: provisioner not found or invalid audience"),
+					http.StatusUnauthorized, context{"ott": raw}},
 			}
 		},
 		"fail invalid issuer": func(t *testing.T) *authorizeTest {
@@ -201,7 +201,7 @@ func TestAuthorize(t *testing.T) {
 			return &authorizeTest{
 				auth: a,
 				ott:  raw,
-				err: &apiError{errors.New("authorize: provisioner with id invalid-issuer:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc not found"),
+				err: &apiError{errors.New("authorize: provisioner not found or invalid audience"),
 					http.StatusUnauthorized, context{"ott": raw}},
 			}
 		},
@@ -242,7 +242,7 @@ func TestAuthorize(t *testing.T) {
 			return &authorizeTest{
 				auth: a,
 				ott:  raw,
-				err: &apiError{errors.New("square/go-jose: error in cryptographic primitive"),
+				err: &apiError{errors.New("authorize: error parsing claims: square/go-jose: error in cryptographic primitive"),
 					http.StatusUnauthorized, context{"ott": raw}},
 			}
 		},
@@ -262,7 +262,7 @@ func TestAuthorize(t *testing.T) {
 			return &authorizeTest{
 				auth: a,
 				ott:  raw,
-				err: &apiError{errors.New("token already used"),
+				err: &apiError{errors.New("authorize: token already used"),
 					http.StatusUnauthorized, context{"ott": raw}},
 			}
 		},
@@ -280,7 +280,7 @@ func TestAuthorize(t *testing.T) {
 			return &authorizeTest{
 				auth: a,
 				ott:  raw,
-				res:  []interface{}{"1", "2", "3", "4"},
+				res:  []interface{}{"1", "2", "3", "4", "5", "6"},
 			}
 		},
 	}

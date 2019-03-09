@@ -76,7 +76,7 @@ func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
 	// This check is meant as a stopgap solution to the current lack of a persistence layer.
 	if a.config.AuthorityConfig != nil && !a.config.AuthorityConfig.DisableIssuedAtCheck {
 		if claims.IssuedAt > 0 && claims.IssuedAt.Time().Before(a.startTime) {
-			return nil, &apiError{errors.New("token issued before the bootstrap of certificate authority"),
+			return nil, &apiError{errors.New("authorize: token issued before the bootstrap of certificate authority"),
 				http.StatusUnauthorized, errContext}
 		}
 	}
@@ -94,12 +94,17 @@ func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
 			UsedAt:  time.Now().Unix(),
 			Subject: claims.Subject,
 		}); ok {
-			return nil, &apiError{errors.Errorf("token already used"), http.StatusUnauthorized,
-				errContext}
+			return nil, &apiError{errors.Errorf("authorize: token already used"), http.StatusUnauthorized, errContext}
 		}
 	}
 
-	return p.Authorize(ott)
+	// Call the provisioner Authorize method to get the signing options
+	opts, err := p.Authorize(ott)
+	if err != nil {
+		return nil, &apiError{errors.Wrap(err, "authorize"), http.StatusUnauthorized, errContext}
+	}
+
+	return opts, nil
 }
 
 // authorizeRenewal tries to locate the step provisioner extension, and checks
