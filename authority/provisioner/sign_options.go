@@ -98,7 +98,8 @@ func (v commonNameValidator) Valid(req *x509.CertificateRequest) error {
 // dnsNamesValidator validates the DNS names SAN of a certificate request.
 type dnsNamesValidator []string
 
-// Valid checks that certificate request DNSNames matches the one configured.
+// Valid checks that certificate request DNS Names match those configured in
+// the bootstrap (token) flow.
 func (v dnsNamesValidator) Valid(req *x509.CertificateRequest) error {
 	want := make(map[string]bool)
 	for _, s := range v {
@@ -117,7 +118,8 @@ func (v dnsNamesValidator) Valid(req *x509.CertificateRequest) error {
 // ipAddressesValidator validates the IP addresses SAN of a certificate request.
 type ipAddressesValidator []net.IP
 
-// Valid checks that certificate request IPAddresses matches the one configured.
+// Valid checks that certificate request IP Addresses match those configured in
+// the bootstrap (token) flow.
 func (v ipAddressesValidator) Valid(req *x509.CertificateRequest) error {
 	want := make(map[string]bool)
 	for _, ip := range v {
