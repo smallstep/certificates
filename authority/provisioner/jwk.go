@@ -32,7 +32,7 @@ func (p *JWK) GetID() string {
 	return p.Name + ":" + p.Key.KeyID
 }
 
-// GetName returns the name of the provisioner
+// GetName returns the name of the provisioner.
 func (p *JWK) GetName() string {
 	return p.Name
 }
@@ -80,6 +80,7 @@ func (p *JWK) Authorize(token string) ([]SignOption, error) {
 	// more than a few minutes.
 	if err = claims.ValidateWithLeeway(jose.Expected{
 		Issuer: p.Name,
+		Time:   time.Now().UTC(),
 	}, time.Minute); err != nil {
 		return nil, errors.Wrapf(err, "invalid token")
 	}

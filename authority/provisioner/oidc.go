@@ -111,6 +111,7 @@ func (o *OIDC) ValidatePayload(p openIDPayload) error {
 	if err := p.ValidateWithLeeway(jose.Expected{
 		Issuer:   o.configuration.Issuer,
 		Audience: jose.Audience{o.ClientID},
+		Time:     time.Now().UTC(),
 	}, time.Minute); err != nil {
 		return errors.Wrap(err, "failed to validate payload")
 	}
