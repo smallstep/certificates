@@ -111,11 +111,16 @@ func TestJWK_Authorize(t *testing.T) {
 	assert.FatalError(t, err)
 	t2, err := generateSimpleToken(p2.Name, testAudiences[1], key2)
 	assert.FatalError(t, err)
-	t3, err := generateToken("test.smallstep.com", p1.Name, testAudiences[0], []string{}, key1)
+	t3, err := generateToken("test.smallstep.com", p1.Name, testAudiences[0], []string{}, time.Now(), key1)
 	assert.FatalError(t, err)
 
 	// Invalid tokens
 	parts := strings.Split(t1, ".")
+	key3, err := generateJSONWebKey()
+	assert.FatalError(t, err)
+	// missing key
+	failKey, err := generateSimpleToken(p1.Name, testAudiences[0], key3)
+	assert.FatalError(t, err)
 	// invalid token
 	failTok := "foo." + parts[1] + "." + parts[2]
 	// invalid claims
@@ -129,7 +134,13 @@ func TestJWK_Authorize(t *testing.T) {
 	// invalid signature
 	failSig := t1[0 : len(t1)-2]
 	// no subject
-	failSub, err := generateToken("", p1.Name, testAudiences[0], []string{"test.smallstep.com"}, key1)
+	failSub, err := generateToken("", p1.Name, testAudiences[0], []string{"test.smallstep.com"}, time.Now(), key1)
+	assert.FatalError(t, err)
+	// expired
+	failExp, err := generateToken("subject", p1.Name, testAudiences[0], []string{"test.smallstep.com"}, time.Now().Add(-360*time.Second), key1)
+	assert.FatalError(t, err)
+	// not before
+	failNbf, err := generateToken("subject", p1.Name, testAudiences[0], []string{"test.smallstep.com"}, time.Now().Add(360*time.Second), key1)
 	assert.FatalError(t, err)
 
 	// Remove encrypted key for p2
@@ -147,12 +158,15 @@ func TestJWK_Authorize(t *testing.T) {
 		{"ok", p1, args{t1}, false},
 		{"ok-no-encrypted-key", p2, args{t2}, false},
 		{"ok-no-sans", p1, args{t3}, false},
+		{"fail-key", p1, args{failKey}, true},
 		{"fail-token", p1, args{failTok}, true},
 		{"fail-claims", p1, args{failClaims}, true},
 		{"fail-issuer", p1, args{failIss}, true},
 		{"fail-audience", p1, args{failAud}, true},
 		{"fail-signature", p1, args{failSig}, true},
 		{"fail-subject", p1, args{failSub}, true},
+		{"fail-expired", p1, args{failExp}, true},
+		{"fail-not-before", p1, args{failNbf}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

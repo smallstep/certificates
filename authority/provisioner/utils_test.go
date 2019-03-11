@@ -46,7 +46,7 @@ func generateJSONWebKeySet(n int) (jose.JSONWebKeySet, error) {
 		if err != nil {
 			return jose.JSONWebKeySet{}, err
 		}
-		keySet.Keys = append(keySet.Keys, key.Public())
+		keySet.Keys = append(keySet.Keys, *key)
 	}
 	return keySet, nil
 }
@@ -173,11 +173,10 @@ func generateCollection(nJWK, nOIDC int) (*Collection, error) {
 }
 
 func generateSimpleToken(iss, aud string, jwk *jose.JSONWebKey) (string, error) {
-	return generateToken("subject", iss, aud, []string{"test.smallstep.com"}, jwk)
-	// return generateToken("the-sub", []string{"test.smallstep.com"}, jwk.KeyID, iss, aud, "testdata/root_ca.crt", now, now.Add(5*time.Minute), jwk)
+	return generateToken("subject", iss, aud, []string{"test.smallstep.com"}, time.Now(), jwk)
 }
 
-func generateToken(sub, iss, aud string, sans []string, jwk *jose.JSONWebKey) (string, error) {
+func generateToken(sub, iss, aud string, sans []string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
 	sig, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
 		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID),
@@ -191,20 +190,22 @@ func generateToken(sub, iss, aud string, sans []string, jwk *jose.JSONWebKey) (s
 		return "", err
 	}
 
-	now := time.Now()
 	claims := struct {
 		jose.Claims
-		SANS []string `json:"sans"`
+		Email string   `json:"email"`
+		SANS  []string `json:"sans"`
 	}{
 		Claims: jose.Claims{
 			ID:        id,
 			Subject:   sub,
 			Issuer:    iss,
-			NotBefore: jose.NewNumericDate(now),
-			Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+			IssuedAt:  jose.NewNumericDate(iat),
+			NotBefore: jose.NewNumericDate(iat),
+			Expiry:    jose.NewNumericDate(iat.Add(5 * time.Minute)),
 			Audience:  []string{aud},
 		},
-		SANS: sans,
+		SANS:  sans,
+		Email: "name@smallstep.com",
 	}
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }
@@ -235,22 +236,37 @@ func generateJWKServer(n int) *httptest.Server {
 		w.WriteHeader(http.StatusOK)
 		w.Write(b)
 	}
-	// keySet, err := generateJSONWebKeySet(n)
+	getPublic := func(ks jose.JSONWebKeySet) jose.JSONWebKeySet {
+		var ret jose.JSONWebKeySet
+		for _, k := range ks.Keys {
+			ret.Keys = append(ret.Keys, k.Public())
+		}
+		return ret
+	}
+
 	defaultKeySet := must(generateJSONWebKeySet(2))[0].(jose.JSONWebKeySet)
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewUnstartedServer(nil)
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Hits++
 		switch r.RequestURI {
 		case "/error":
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		case "/hits":
 			writeJSON(w, hits)
+		case "/openid-configuration", "/.well-known/openid-configuration":
+			writeJSON(w, openIDConfiguration{Issuer: "the-issuer", JWKSetURI: srv.URL + "/jwks_uri"})
 		case "/random":
 			keySet := must(generateJSONWebKeySet(2))[0].(jose.JSONWebKeySet)
 			w.Header().Add("Cache-Control", "max-age=5")
-			writeJSON(w, keySet)
+			writeJSON(w, getPublic(keySet))
+		case "/private":
+			writeJSON(w, defaultKeySet)
 		default:
 			w.Header().Add("Cache-Control", "max-age=5")
-			writeJSON(w, defaultKeySet)
+			writeJSON(w, getPublic(defaultKeySet))
 		}
-	}))
+	})
+
+	srv.Start()
+	return srv
 }

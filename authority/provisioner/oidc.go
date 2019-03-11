@@ -17,6 +17,18 @@ type openIDConfiguration struct {
 	JWKSetURI string `json:"jwks_uri"`
 }
 
+// Validate validates the values in a well-known OpenID configuration endpoint.
+func (c openIDConfiguration) Validate() error {
+	switch {
+	case c.Issuer == "":
+		return errors.New("issuer cannot be empty")
+	case c.JWKSetURI == "":
+		return errors.New("jwks_uri cannot be empty")
+	default:
+		return nil
+	}
+}
+
 // openIDPayload represents the fields on the id_token JWT payload.
 type openIDPayload struct {
 	jose.Claims
@@ -87,12 +99,12 @@ func (o *OIDC) Init(config Config) (err error) {
 	if o.Claims, err = o.Claims.Init(&config.Claims); err != nil {
 		return err
 	}
-	// Decode openid-configuration endpoint
+	// Decode and validate openid-configuration endpoint
 	if err := getAndDecode(o.ConfigurationEndpoint, &o.configuration); err != nil {
 		return err
 	}
-	if o.configuration.JWKSetURI == "" {
-		return errors.Errorf("error parsing %s: jwks_uri cannot be empty", o.ConfigurationEndpoint)
+	if err := o.configuration.Validate(); err != nil {
+		return errors.Wrapf(err, "error parsing %s", o.ConfigurationEndpoint)
 	}
 	// Get JWK key set
 	o.keyStore, err = newKeyStore(o.configuration.JWKSetURI)
@@ -103,8 +115,6 @@ func (o *OIDC) Init(config Config) (err error) {
 }
 
 // ValidatePayload validates the given token payload.
-//
-// TODO(mariano): avoid reply attacks validating nonce.
 func (o *OIDC) ValidatePayload(p openIDPayload) error {
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no more
 	// than a few minutes.
@@ -151,8 +161,13 @@ func (o *OIDC) Authorize(token string) ([]SignOption, error) {
 		return nil, err
 	}
 
+	// Admins should be able to authorize any SAN
 	if o.IsAdmin(claims.Email) {
-		return []SignOption{}, nil
+		return []SignOption{
+			profileDefaultDuration(o.Claims.DefaultTLSCertDuration()),
+			newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
+			newValidityValidator(o.Claims.MinTLSCertDuration(), o.Claims.MaxTLSCertDuration()),
+		}, nil
 	}
 
 	return []SignOption{
