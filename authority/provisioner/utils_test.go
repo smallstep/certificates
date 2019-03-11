@@ -4,6 +4,8 @@ import (
 	"crypto"
 	"encoding/hex"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"time"
 
 	"github.com/smallstep/cli/crypto/randutil"
@@ -205,4 +207,50 @@ func generateToken(sub, iss, aud string, sans []string, jwk *jose.JSONWebKey) (s
 		SANS: sans,
 	}
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
+}
+
+func parseToken(token string) (*jose.JSONWebToken, *jose.Claims, error) {
+	tok, err := jose.ParseSigned(token)
+	if err != nil {
+		return nil, nil, err
+	}
+	claims := new(jose.Claims)
+	if err := tok.UnsafeClaimsWithoutVerification(claims); err != nil {
+		return nil, nil, err
+	}
+	return tok, claims, nil
+}
+
+func generateJWKServer(n int) *httptest.Server {
+	hits := struct {
+		Hits int `json:"hits"`
+	}{}
+	writeJSON := func(w http.ResponseWriter, v interface{}) {
+		b, err := json.Marshal(v)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(b)
+	}
+	// keySet, err := generateJSONWebKeySet(n)
+	defaultKeySet := must(generateJSONWebKeySet(2))[0].(jose.JSONWebKeySet)
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Hits++
+		switch r.RequestURI {
+		case "/error":
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		case "/hits":
+			writeJSON(w, hits)
+		case "/random":
+			keySet := must(generateJSONWebKeySet(2))[0].(jose.JSONWebKeySet)
+			w.Header().Add("Cache-Control", "max-age=5")
+			writeJSON(w, keySet)
+		default:
+			w.Header().Add("Cache-Control", "max-age=5")
+			writeJSON(w, defaultKeySet)
+		}
+	}))
 }
