@@ -555,6 +555,66 @@ Hello kube_client (cert issued by 'Smallstep Kubernetes Root CA') at 2019-01-28 
 
 Since the demo server is enrolled with the federated `Cloud CA` that trusts certs issued by the `Kubernetes CA` through federation the connection is successfully established.
 
+## Custom certificate validity periods using Custom Claims
+
+Bring up the certificate authority with the example:
+
+```sh
+certificates $ step-ca examples/pki/config/ca.json
+2019/03/11 13:37:03 Serving HTTPS on :9000 ...
+```
+
+The example comes with multiple provisioner options, two of which have custom claims to expand the validity of certificates:
+
+```sh
+$ step ca provisioner list | jq '.[] | "\(.name): \(.claims.defaultTLSCertDuration)"'
+# null means step default of 24h for cert validity
+"mariano@smallstep.com: null"
+"mike@smallstep.com: 2m0s"
+"decade: 87600h0m0s"
+"90days: 2160h0m0s"
+```
+
+A closer look at a duration-bound provisioner, `90days` for instance, reveals the custom configuration for certificate validity.
+
+```sh
+$ step ca provisioner list | jq '.[3].claims'
+{
+  "maxTLSCertDuration": "2160h0m0s",
+  "defaultTLSCertDuration": "2160h0m0s"
+}
+```
+
+Certificates with different validity periods can be generated using the respective provisioners. Please see [Getting Started](https://github.com/smallstep/certificates/blob/master/docs/GETTING_STARTED.md) in the docs directory to learn what custom claims configuration options are available and how to use them.
+
+```sh
+$ step ca certificate decade decade.crt decade.key
+✔ Key ID: iu7VZxKUcquv1BCWuvEUOyRy4zYyCmgt61OpRW5VbRE (decade)
+✔ Please enter the password to decrypt the provisioner key: password
+✔ CA: https://localhost:9000/1.0/sign
+✔ Certificate: decade.crt
+✔ Private Key: decade.key
+$ step certificate inspect --format json decade.crt | jq .validity
+{
+  "start": "2019-03-11T22:34:30Z",
+  "end": "2029-03-08T22:34:30Z",
+  "length": 315360000
+}
+
+$ step ca certificate 90days 90days.crt 90days.key
+✔ Key ID: 2LgjIvfirblnFMC6FjUr8jYkO8nOqz4rKoarCc8kiGU (90days)
+✔ Please enter the password to decrypt the provisioner key: password
+✔ CA: https://localhost:9000/1.0/sign
+✔ Certificate: 90days.crt
+✔ Private Key: 90days.key
+$ step certificate inspect --format json 90days.crt | jq .validity
+{
+  "start": "2019-03-11T22:35:39Z",
+  "end": "2019-06-09T22:35:39Z",
+  "length": 7776000
+}
+```
+
 ## Configuration Management Tools
 
 Configuration management tools such as Puppet, Chef, Ansible, Salt, etc. make
