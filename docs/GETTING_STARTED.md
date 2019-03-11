@@ -379,6 +379,63 @@ $ bin/step ca provisioner remove jim@smallstep.com --all
 The same entity may have multiple provisioners for authorizing different
 types of certs. Each of these provisioners must have unique keys.
 
+## Use Custom Claims for Provisioners to Control Certificate Validity etc
+
+It's possible to configure provisioners on the CA to issue certs using propoerties specific to their target environments. Most commonly different validity periods and disabling renewals for certs. Here's how:
+
+```bash
+$ step ca init
+# complete the init steps
+$ step ca provisioner add --create dev@smallstep.com
+# lets create a provisioner for dev certs
+Please enter a password to encrypt the provisioner private key? password
+# add claims just above "encryptedKey" per provisioner in ~/.step/config/ca.json
+~/.step/config/ca.json
+--- 40,47 ----
+             },
++            "claims": {
++                    "minTLSCertDuration": "5s",
++                    "maxTLSCertDuration": "12h",
++                    "defaultTLSCertDuration": "2h",
++                    "disableRenewal": true
++            },
+             "encryptedKey": "[...]"
+--------------
+# launch CA...
+$ step-ca $(step path)/config/ca.json
+Please enter the password to decrypt ~/.step/secrets/intermediate_ca_key: password
+2019/02/21 12:09:51 Serving HTTPS on :9443 ...
+```
+
+Please [`step ca provisioner`](https://smallstep.com/docs/cli/ca/provisioner/)'s docs for details on all available claims properties.
+
+Now certs issued by the `dev@smallstep.com` provisioner will be valid for two hours and deny renewals. Command line flags allow validity extension up to 12h, please see [`step ca certificate`](https://smallstep.com/docs/cli/ca/certificate/)'s docs for details.
+
+```bash
+# grab a cert, will also work with 'step ca token' flow
+$ step ca certificate localhost site.crt site.key
+Use the arrow keys to navigate: ↓ ↑ → ←
+What provisioner key do you want to use?
+    IY7gYg_cDKmXtcs1sbhdBDDb9K9YvLO5aHzArjaayso (sebastian@smallstep.com)
+  ▸ uBYWYDCpeJu_IYzMGPZ1LJJTdlaiJQfdpkOVewbjy-8 (dev@smallstep.com)
+
+✔ Please enter the password to decrypt the provisioner key: password
+✔ CA: https://ca.smallstep.com:9443/1.0/sign
+✔ Certificate: site.crt
+✔ Private Key: site.key
+
+$ step certificate inspect site.crt --format json | jq .validity
+{
+  "start": "2019-02-21T20:19:06Z",
+  "end": "2019-02-21T22:19:06Z",
+  "length": 7200
+}
+
+# renewals will be denied for certs issued by this provisioner
+$ step ca renew site.crt site.key
+error renewing certificate: Unauthorized
+```
+
 ## Notes on Securing the Step CA and your PKI.
 
 In this section we recommend a few best practices when it comes to
