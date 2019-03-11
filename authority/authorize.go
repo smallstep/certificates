@@ -3,7 +3,6 @@ package authority
 import (
 	"crypto/x509"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/pkg/errors"
@@ -22,33 +21,6 @@ type Claims struct {
 	SANs  []string `json:"sans,omitempty"`
 	Email string   `json:"email,omitempty"`
 	Nonce string   `json:"nonce,omitempty"`
-}
-
-// matchesAudience returns true if A and B share at least one element.
-func matchesAudience(as, bs []string) bool {
-	if len(bs) == 0 || len(as) == 0 {
-		return false
-	}
-
-	for _, b := range bs {
-		for _, a := range as {
-			if b == a || stripPort(a) == stripPort(b) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// stripPort attempts to strip the port from the given url. If parsing the url
-// produces errors it will just return the passed argument.
-func stripPort(rawurl string) string {
-	u, err := url.Parse(rawurl)
-	if err != nil {
-		return rawurl
-	}
-	u.Host = u.Hostname()
-	return u.String()
 }
 
 // Authorize authorizes a signature request by validating and authenticating
