@@ -1,133 +1,151 @@
-// +build ignore
-
 package provisioner
 
 import (
+	"crypto/x509"
 	"crypto/x509/pkix"
 	"net"
+	"net/url"
 	"testing"
-
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	x509 "github.com/smallstep/cli/pkg/x509"
+	"time"
 )
 
-func TestCommonNameClaim_Valid(t *testing.T) {
-	tests := map[string]struct {
-		cnc certClaim
-		crt *x509.Certificate
-		err error
-	}{
-		"empty-common-name": {
-			cnc: &commonNameClaim{name: "foo"},
-			crt: &x509.Certificate{},
-			err: errors.New("common name cannot be empty"),
-		},
-		"wrong-common-name": {
-			cnc: &commonNameClaim{name: "foo"},
-			crt: &x509.Certificate{Subject: pkix.Name{CommonName: "bar"}},
-			err: errors.New("common name claim failed - got bar, want foo"),
-		},
-		"ok": {
-			cnc: &commonNameClaim{name: "foo"},
-			crt: &x509.Certificate{Subject: pkix.Name{CommonName: "foo"}},
-		},
+func Test_emailOnlyIdentity_Valid(t *testing.T) {
+	uri, err := url.Parse("https://example.com/1.0/getUser")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := tc.cnc.Valid(tc.crt)
-			if err != nil {
-				if assert.NotNil(t, tc.err) {
-					assert.Equals(t, tc.err.Error(), err.Error())
-				}
-			} else {
-				assert.Nil(t, tc.err)
+	type args struct {
+		req *x509.CertificateRequest
+	}
+	tests := []struct {
+		name    string
+		e       emailOnlyIdentity
+		args    args
+		wantErr bool
+	}{
+		{"ok", "name@smallstep.com", args{&x509.CertificateRequest{EmailAddresses: []string{"name@smallstep.com"}}}, false},
+		{"DNSNames", "name@smallstep.com", args{&x509.CertificateRequest{DNSNames: []string{"foo.bar.zar"}}}, true},
+		{"IPAddresses", "name@smallstep.com", args{&x509.CertificateRequest{IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1)}}}, true},
+		{"URIs", "name@smallstep.com", args{&x509.CertificateRequest{URIs: []*url.URL{uri}}}, true},
+		{"no-emails", "name@smallstep.com", args{&x509.CertificateRequest{EmailAddresses: []string{}}}, true},
+		{"empty-email", "", args{&x509.CertificateRequest{EmailAddresses: []string{""}}}, true},
+		{"multiple-emails", "name@smallstep.com", args{&x509.CertificateRequest{EmailAddresses: []string{"name@smallstep.com", "foo@smallstep.com"}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.e.Valid(tt.args.req); (err != nil) != tt.wantErr {
+				t.Errorf("emailOnlyIdentity.Valid() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestIPAddressesClaim_Valid(t *testing.T) {
-	tests := map[string]struct {
-		iac certClaim
-		crt *x509.Certificate
-		err error
-	}{
-		"unexpected-ip-in-crt": {
-			iac: &ipAddressesClaim{ips: []net.IP{net.ParseIP("127.0.0.1")}},
-			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("1.1.1.1")}},
-			err: errors.New("IP Addresses claim failed - got [127.0.0.1 1.1.1.1], want [127.0.0.1]"),
-		},
-		"missing-ip-in-crt": {
-			iac: &ipAddressesClaim{ips: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("1.1.1.1")}},
-			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}},
-			err: errors.New("IP Addresses claim failed - got [127.0.0.1], want [127.0.0.1 1.1.1.1]"),
-		},
-		"invalid-matcher-nonempty-ips": {
-			iac: &ipAddressesClaim{ips: []net.IP{}},
-			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}},
-			err: errors.New("IP Addresses claim failed - got [127.0.0.1], want []"),
-		},
-		"ok": {
-			iac: &ipAddressesClaim{ips: []net.IP{net.ParseIP("127.0.0.1")}},
-			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}},
-		},
-		"ok-multiple-identical-ip-entries": {
-			iac: &ipAddressesClaim{ips: []net.IP{net.ParseIP("127.0.0.1")}},
-			crt: &x509.Certificate{IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.1")}},
-		},
+func Test_commonNameValidator_Valid(t *testing.T) {
+	type args struct {
+		req *x509.CertificateRequest
 	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := tc.iac.Valid(tc.crt)
-			if err != nil {
-				if assert.NotNil(t, tc.err) {
-					assert.Equals(t, tc.err.Error(), err.Error())
-				}
-			} else {
-				assert.Nil(t, tc.err)
+	tests := []struct {
+		name    string
+		v       commonNameValidator
+		args    args
+		wantErr bool
+	}{
+		{"ok", "foo.bar.zar", args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: "foo.bar.zar"}}}, false},
+		{"empty", "", args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: ""}}}, true},
+		{"wrong", "foo.bar.zar", args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: "example.com"}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.v.Valid(tt.args.req); (err != nil) != tt.wantErr {
+				t.Errorf("commonNameValidator.Valid() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func TestDNSNamesClaim_Valid(t *testing.T) {
-	tests := map[string]struct {
-		dnc certClaim
-		crt *x509.Certificate
-		err error
-	}{
-		"unexpected-dns-name-in-crt": {
-			dnc: &dnsNamesClaim{names: []string{"foo"}},
-			crt: &x509.Certificate{DNSNames: []string{"foo", "bar"}},
-			err: errors.New("DNS names claim failed - got [foo bar], want [foo]"),
-		},
-		"ok": {
-			dnc: &dnsNamesClaim{names: []string{"foo", "bar"}},
-			crt: &x509.Certificate{DNSNames: []string{"bar", "foo"}},
-		},
-		"missing-dns-name-in-crt": {
-			dnc: &dnsNamesClaim{names: []string{"foo", "bar"}},
-			crt: &x509.Certificate{DNSNames: []string{"foo"}},
-			err: errors.New("DNS names claim failed - got [foo], want [foo bar]"),
-		},
-		"ok-multiple-identical-dns-entries": {
-			dnc: &dnsNamesClaim{names: []string{"foo"}},
-			crt: &x509.Certificate{DNSNames: []string{"foo", "foo", "foo"}},
-		},
+func Test_dnsNamesValidator_Valid(t *testing.T) {
+	type args struct {
+		req *x509.CertificateRequest
 	}
+	tests := []struct {
+		name    string
+		v       dnsNamesValidator
+		args    args
+		wantErr bool
+	}{
+		{"ok0", []string{}, args{&x509.CertificateRequest{DNSNames: []string{}}}, false},
+		{"ok1", []string{"foo.bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"foo.bar.zar"}}}, false},
+		{"ok2", []string{"foo.bar.zar", "bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"foo.bar.zar", "bar.zar"}}}, false},
+		{"ok3", []string{"foo.bar.zar", "bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"bar.zar", "foo.bar.zar"}}}, false},
+		{"fail1", []string{"foo.bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"bar.zar"}}}, true},
+		{"fail2", []string{"foo.bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"bar.zar", "foo.bar.zar"}}}, true},
+		{"fail3", []string{"foo.bar.zar", "bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"foo.bar.zar", "zar.bar"}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.v.Valid(tt.args.req); (err != nil) != tt.wantErr {
+				t.Errorf("dnsNamesValidator.Valid() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
 
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := tc.dnc.Valid(tc.crt)
-			if err != nil {
-				if assert.NotNil(t, tc.err) {
-					assert.Equals(t, tc.err.Error(), err.Error())
-				}
-			} else {
-				assert.Nil(t, tc.err)
+func Test_ipAddressesValidator_Valid(t *testing.T) {
+	ip1 := net.IPv4(10, 3, 2, 1)
+	ip2 := net.IPv4(10, 3, 2, 2)
+	ip3 := net.IPv4(10, 3, 2, 3)
+
+	type args struct {
+		req *x509.CertificateRequest
+	}
+	tests := []struct {
+		name    string
+		v       ipAddressesValidator
+		args    args
+		wantErr bool
+	}{
+		{"ok0", []net.IP{}, args{&x509.CertificateRequest{IPAddresses: []net.IP{}}}, false},
+		{"ok1", []net.IP{ip1}, args{&x509.CertificateRequest{IPAddresses: []net.IP{ip1}}}, false},
+		{"ok2", []net.IP{ip1, ip2}, args{&x509.CertificateRequest{IPAddresses: []net.IP{ip1, ip2}}}, false},
+		{"ok3", []net.IP{ip1, ip2}, args{&x509.CertificateRequest{IPAddresses: []net.IP{ip2, ip1}}}, false},
+		{"fail1", []net.IP{ip1}, args{&x509.CertificateRequest{IPAddresses: []net.IP{ip2}}}, true},
+		{"fail2", []net.IP{ip1}, args{&x509.CertificateRequest{IPAddresses: []net.IP{ip2, ip1}}}, true},
+		{"fail3", []net.IP{ip1, ip2}, args{&x509.CertificateRequest{IPAddresses: []net.IP{ip1, ip3}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.v.Valid(tt.args.req); (err != nil) != tt.wantErr {
+				t.Errorf("ipAddressesValidator.Valid() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_validityValidator_Valid(t *testing.T) {
+	type fields struct {
+		min time.Duration
+		max time.Duration
+	}
+	type args struct {
+		crt *x509.Certificate
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := &validityValidator{
+				min: tt.fields.min,
+				max: tt.fields.max,
+			}
+			if err := v.Valid(tt.args.crt); (err != nil) != tt.wantErr {
+				t.Errorf("validityValidator.Valid() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

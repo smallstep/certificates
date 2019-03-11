@@ -74,6 +74,8 @@ func (e emailOnlyIdentity) Valid(req *x509.CertificateRequest) error {
 		return errors.New("certificate request does not contain any email address")
 	case len(req.EmailAddresses) > 1:
 		return errors.New("certificate request does not contain too many email addresses")
+	case req.EmailAddresses[0] == "":
+		return errors.New("certificate request cannot contain an empty email address")
 	case req.EmailAddresses[0] != string(e):
 		return errors.Errorf("certificate request does not contain the valid email address, got %s, want %s", req.EmailAddresses[0], e)
 	default:
