@@ -294,7 +294,7 @@
 
 [[projects]]
   branch = "certificate-transparency"
-  digest = "1:bccb8a0f1fbf8eb120c3624cea03c7285b6706b7c13c3e92c0c13ebdd730f4b7"
+  digest = "1:ed4ae9e597c66929a567de027512ee77a632ed8c4471e53c82c82c6658c4eb90"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
@@ -315,7 +315,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "6b8779be9192115a5bafc768881bb44fc9d07320"
+  revision = "6cb4285dba37a5d03e1f4be41fc897b071181a70"
 
 [[projects]]
   branch = "master"
