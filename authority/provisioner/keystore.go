@@ -131,5 +131,5 @@ func getCacheJitter(age time.Duration) time.Duration {
 }
 
 func getExpirationTime(age time.Duration) time.Time {
-	return time.Now().Round(time.Second).Add(age)
+	return time.Now().Truncate(time.Second).Add(age)
 }
