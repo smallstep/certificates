@@ -61,8 +61,15 @@ func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
 	}
 
 	// Store the token to protect against reuse.
-	if p.GetType() == provisioner.TypeJWK && claims.ID != "" {
-		if _, ok := a.ottMap.LoadOrStore(claims.ID, &idUsed{
+	var reuseKey string
+	switch p.GetType() {
+	case provisioner.TypeJWK:
+		reuseKey = claims.ID
+	case provisioner.TypeOIDC:
+		reuseKey = claims.Nonce
+	}
+	if reuseKey != "" {
+		if _, ok := a.ottMap.LoadOrStore(reuseKey, &idUsed{
 			UsedAt:  time.Now().Unix(),
 			Subject: claims.Subject,
 		}); ok {
