@@ -22,6 +22,41 @@ import (
 	stepx509 "github.com/smallstep/cli/pkg/x509"
 )
 
+var (
+	stepOIDRoot        = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
+	stepOIDProvisioner = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
+)
+
+const provisionerTypeJWK = 1
+
+type stepProvisionerASN1 struct {
+	Type         int
+	Name         []byte
+	CredentialID []byte
+}
+
+func withProvisionerOID(name, kid string) x509util.WithOption {
+	return func(p x509util.Profile) error {
+		crt := p.Subject()
+
+		b, err := asn1.Marshal(stepProvisionerASN1{
+			Type:         provisionerTypeJWK,
+			Name:         []byte(name),
+			CredentialID: []byte(kid),
+		})
+		if err != nil {
+			return err
+		}
+		crt.ExtraExtensions = append(crt.ExtraExtensions, pkix.Extension{
+			Id:       stepOIDProvisioner,
+			Critical: false,
+			Value:    b,
+		})
+
+		return nil
+	}
+}
+
 func getCSR(t *testing.T, priv interface{}, opts ...func(*x509.CertificateRequest)) *x509.CertificateRequest {
 	_csr := &x509.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "smallstep test"},

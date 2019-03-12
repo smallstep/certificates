@@ -226,3 +226,8 @@ func createProvisionerExtension(typ int, name, credentialID string) (pkix.Extens
 		Value:    b,
 	}, nil
 }
+
+func init() {
+	// Avoid deadcode warning in profileWithOption
+	_ = profileWithOption(nil)
+}

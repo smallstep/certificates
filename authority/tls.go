@@ -3,7 +3,6 @@ package authority
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
 	"net/http"
@@ -23,41 +22,7 @@ func (a *Authority) GetTLSOptions() *tlsutil.TLSOptions {
 	return a.config.TLS
 }
 
-var (
-	stepOIDRoot               = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
-	stepOIDProvisioner        = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
-	oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
-)
-
-type stepProvisionerASN1 struct {
-	Type         int
-	Name         []byte
-	CredentialID []byte
-}
-
-const provisionerTypeJWK = 1
-
-func withProvisionerOID(name, kid string) x509util.WithOption {
-	return func(p x509util.Profile) error {
-		crt := p.Subject()
-
-		b, err := asn1.Marshal(stepProvisionerASN1{
-			Type:         provisionerTypeJWK,
-			Name:         []byte(name),
-			CredentialID: []byte(kid),
-		})
-		if err != nil {
-			return err
-		}
-		crt.ExtraExtensions = append(crt.ExtraExtensions, pkix.Extension{
-			Id:       stepOIDProvisioner,
-			Critical: false,
-			Value:    b,
-		})
-
-		return nil
-	}
-}
+var oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
 
 func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 	return func(p x509util.Profile) error {

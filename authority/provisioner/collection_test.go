@@ -74,6 +74,7 @@ func TestCollection_LoadByToken(t *testing.T) {
 	assert.FatalError(t, err)
 
 	jwk, err = decryptJSONWebKey(p2.EncryptedKey)
+	assert.FatalError(t, err)
 	token, err = generateSimpleToken(p2.Name, testAudiences[1], jwk)
 	assert.FatalError(t, err)
 	t2, c2, err := parseToken(token)
