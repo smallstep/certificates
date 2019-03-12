@@ -103,7 +103,8 @@ func (a *Authority) init() error {
 		}
 	}
 
-	a.startTime = time.Now()
+	// JWT numeric dates are seconds.
+	a.startTime = time.Now().Truncate(time.Second)
 	// Set flag indicating that initialization has been completed, and should
 	// not be repeated.
 	a.initOnce = true
