@@ -102,7 +102,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 			certValidators = append(certValidators, k)
 		case provisioner.CertificateRequestValidator:
 			if err := k.Valid(csr); err != nil {
-				return nil, nil, &apiError{err, http.StatusUnauthorized, errContext}
+				return nil, nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
 			}
 		case provisioner.ProfileModifier:
 			mods = append(mods, k.Option(signOpts))
@@ -140,7 +140,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 	// FIXME: This should be before creating the certificate.
 	for _, v := range certValidators {
 		if err := v.Valid(serverCert); err != nil {
-			return nil, nil, &apiError{err, http.StatusUnauthorized, errContext}
+			return nil, nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
 		}
 	}
 

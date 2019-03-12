@@ -45,8 +45,6 @@ func generateToken(sub, iss, aud string, sans []string, iat time.Time, jwk *jose
 
 func TestAuthorize(t *testing.T) {
 	a := testAuthority(t)
-	time.Sleep(time.Second)
-	now := time.Now()
 
 	key, err := jose.ParseKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
 	assert.FatalError(t, err)
@@ -54,6 +52,7 @@ func TestAuthorize(t *testing.T) {
 	keyNoKid := &jose.JSONWebKey{Key: key.Key, KeyID: ""}
 	keyBadKid := &jose.JSONWebKey{Key: key.Key, KeyID: "foo"}
 
+	now := time.Now()
 	validIssuer := "step-cli"
 	validAudience := []string{"https://test.ca.smallstep.com/sign"}
 

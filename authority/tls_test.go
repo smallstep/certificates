@@ -18,6 +18,7 @@ import (
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
+	"github.com/smallstep/cli/jose"
 	stepx509 "github.com/smallstep/cli/pkg/x509"
 )
 
@@ -57,13 +58,14 @@ func TestSign(t *testing.T) {
 		NotAfter:  nb.Add(time.Minute * 5),
 	}
 
+	// Create a token to get test extra opts.
 	p := a.config.AuthorityConfig.Provisioners[1].(*provisioner.JWK)
-	extraOpts := []provisioner.SignOption{
-		// &commonNameClaim{"smallstep test"},
-		// &dnsNamesClaim{[]string{"test.smallstep.com"}},
-		// &ipAddressesClaim{[]net.IP{}},
-		// p,
-	}
+	key, err := jose.ParseKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
+	assert.FatalError(t, err)
+	token, err := generateToken("smallstep test", "step-cli", "https://test.ca.smallstep.com/sign", []string{"test.smallstep.com"}, time.Now(), key)
+	assert.FatalError(t, err)
+	extraOpts, err := a.Authorize(token)
+	assert.FatalError(t, err)
 
 	type signTest struct {
 		auth      *Authority
@@ -123,7 +125,7 @@ func TestSign(t *testing.T) {
 			return &signTest{
 				auth:      _a,
 				csr:       csr,
-				extraOpts: []provisioner.SignOption{p},
+				extraOpts: extraOpts,
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: error creating new leaf certificate"),
 					http.StatusInternalServerError,
@@ -157,7 +159,7 @@ func TestSign(t *testing.T) {
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
-				err: &apiError{errors.New("sign: DNS names claim failed - got [test.smallstep.com smallstep test], want [test.smallstep.com]"),
+				err: &apiError{errors.New("sign: certificate request does not contain the valid DNS names - got [test.smallstep.com smallstep test], want [test.smallstep.com]"),
 					http.StatusUnauthorized,
 					context{"csr": csr, "signOptions": signOpts},
 				},
@@ -321,7 +323,7 @@ func TestRenew(t *testing.T) {
 			}
 			return &renewTest{
 				crt: crtNoRenew,
-				err: &apiError{errors.New("renew disabled"),
+				err: &apiError{errors.New("renew is disabled for provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
 					http.StatusUnauthorized, ctx},
 			}, nil
 		},
