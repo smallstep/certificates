@@ -84,6 +84,7 @@ func TestOIDC_Init(t *testing.T) {
 		{"ok", fields{"oidc", "name", "client-id", srv.URL + "/openid-configuration", nil, nil}, args{config}, false},
 		{"ok-admins", fields{"oidc", "name", "client-id", srv.URL + "/openid-configuration", nil, []string{"foo@smallstep.com"}}, args{config}, false},
 		{"no-name", fields{"oidc", "", "client-id", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
+		{"no-type", fields{"", "name", "client-id", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
 		{"no-client-id", fields{"oidc", "name", "", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
 		{"no-configuration", fields{"oidc", "name", "client-id", "", nil, nil}, args{config}, true},
 		{"bad-configuration", fields{"oidc", "name", "client-id", srv.URL, nil, nil}, args{config}, true},

@@ -52,9 +52,17 @@ func TestJWK_Init(t *testing.T) {
 		err error
 	}
 	tests := map[string]func(*testing.T) ProvisionerValidateTest{
-		"fail-empty-name": func(t *testing.T) ProvisionerValidateTest {
+		"fail-empty": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p:   &JWK{},
+				err: errors.New("provisioner type cannot be empty"),
+			}
+		},
+		"fail-empty-name": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &JWK{
+					Type: "JWK",
+				},
 				err: errors.New("provisioner name cannot be empty"),
 			}
 		},
