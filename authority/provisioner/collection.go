@@ -101,8 +101,8 @@ func (c *Collection) LoadByCertificate(cert *x509.Certificate) (Interface, bool)
 	return &noop{}, true
 }
 
-// LoadEncryptedKey returns a the encrypted key by KeyID. At this moment only
-// JWK encrypted keys are indexed by KeyID.
+// LoadEncryptedKey returns an encrypted key by indexed by KeyID. At this moment
+// only JWK encrypted keys are indexed by KeyID.
 func (c *Collection) LoadEncryptedKey(keyID string) (string, bool) {
 	p, ok := loadProvisioner(c.byKey, keyID)
 	if !ok {
@@ -112,15 +112,15 @@ func (c *Collection) LoadEncryptedKey(keyID string) (string, bool) {
 	return key, ok
 }
 
-// Store adds a provisioner to the collection, it makes sure two provisioner
-// does not have the same ID.
+// Store adds a provisioner to the collection and enforces the uniqueness of
+// provisioner IDs.
 func (c *Collection) Store(p Interface) error {
 	// Store provisioner always in byID. ID must be unique.
 	if _, loaded := c.byID.LoadOrStore(p.GetID(), p); loaded == true {
 		return errors.New("cannot add multiple provisioners with the same id")
 	}
 
-	// Store provisioner in byKey in EncryptedKey is defined.
+	// Store provisioner in byKey if EncryptedKey is defined.
 	if kid, _, ok := p.GetEncryptedKey(); ok {
 		c.byKey.Store(kid, p)
 	}

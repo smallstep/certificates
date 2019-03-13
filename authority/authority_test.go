@@ -126,12 +126,6 @@ func TestAuthorityNew(t *testing.T) {
 					// sanity check
 					_, ok = auth.provisioners.Load("fooo")
 					assert.False(t, ok)
-
-					// assert.Equals(t, auth.audiences, []string{
-					// 	"step-certificate-authority",
-					// 	"https://127.0.0.1/sign",
-					// 	"https://127.0.0.1/1.0/sign",
-					// })
 				}
 			}
 		})

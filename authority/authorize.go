@@ -25,7 +25,6 @@ type Claims struct {
 
 // Authorize authorizes a signature request by validating and authenticating
 // a OTT that must be sent w/ the request.
-// TODO(mariano): protection against reuse for oidc
 func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
 	var errContext = map[string]interface{}{"ott": ott}
 

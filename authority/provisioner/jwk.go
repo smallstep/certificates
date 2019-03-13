@@ -47,7 +47,7 @@ func (p *JWK) GetEncryptedKey() (string, string, bool) {
 	return p.Key.KeyID, p.EncryptedKey, len(p.EncryptedKey) > 0
 }
 
-// Init initializes and validates a the fields of Provisioner type.
+// Init initializes and validates the fields of a JWK type.
 func (p *JWK) Init(config Config) (err error) {
 	switch {
 	case p.Name == "":
