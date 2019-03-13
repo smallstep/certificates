@@ -87,6 +87,8 @@ func (o *OIDC) GetEncryptedKey() (kid string, key string, ok bool) {
 // Init validates and initializes the OIDC provider.
 func (o *OIDC) Init(config Config) (err error) {
 	switch {
+	case o.Type == "":
+		return errors.New("type cannot be empty")
 	case o.Name == "":
 		return errors.New("name cannot be empty")
 	case o.ClientID == "":

@@ -18,9 +18,9 @@ type jwtPayload struct {
 // JWK is the default provisioner, an entity that can sign tokens necessary for
 // signature requests.
 type JWK struct {
-	Name         string           `json:"name,omitempty"`
-	Type         string           `json:"type,omitempty"`
-	Key          *jose.JSONWebKey `json:"key,omitempty"`
+	Type         string           `json:"type"`
+	Name         string           `json:"name"`
+	Key          *jose.JSONWebKey `json:"key"`
 	EncryptedKey string           `json:"encryptedKey,omitempty"`
 	Claims       *Claims          `json:"claims,omitempty"`
 	audiences    []string
@@ -50,12 +50,10 @@ func (p *JWK) GetEncryptedKey() (string, string, bool) {
 // Init initializes and validates the fields of a JWK type.
 func (p *JWK) Init(config Config) (err error) {
 	switch {
-	case p.Name == "":
-		return errors.New("provisioner name cannot be empty")
-
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
-
+	case p.Name == "":
+		return errors.New("provisioner name cannot be empty")
 	case p.Key == nil:
 		return errors.New("provisioner key cannot be empty")
 	}
