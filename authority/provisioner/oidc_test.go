@@ -68,6 +68,7 @@ func TestOIDC_Init(t *testing.T) {
 		Type                  string
 		Name                  string
 		ClientID              string
+		ClientSecret          string
 		ConfigurationEndpoint string
 		Claims                *Claims
 		Admins                []string
@@ -81,13 +82,14 @@ func TestOIDC_Init(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{"oidc", "name", "client-id", srv.URL + "/openid-configuration", nil, nil}, args{config}, false},
-		{"ok-admins", fields{"oidc", "name", "client-id", srv.URL + "/openid-configuration", nil, []string{"foo@smallstep.com"}}, args{config}, false},
-		{"no-name", fields{"oidc", "", "client-id", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
-		{"no-type", fields{"", "name", "client-id", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
-		{"no-client-id", fields{"oidc", "name", "", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
-		{"no-configuration", fields{"oidc", "name", "client-id", "", nil, nil}, args{config}, true},
-		{"bad-configuration", fields{"oidc", "name", "client-id", srv.URL, nil, nil}, args{config}, true},
+		{"ok", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil}, args{config}, false},
+		{"ok-admins", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, []string{"foo@smallstep.com"}}, args{config}, false},
+		{"ok-no-secret", fields{"oidc", "name", "client-id", "", srv.URL + "/openid-configuration", nil, nil}, args{config}, false},
+		{"no-name", fields{"oidc", "", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
+		{"no-type", fields{"", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
+		{"no-client-id", fields{"oidc", "name", "", "client-secret", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
+		{"no-configuration", fields{"oidc", "name", "client-id", "client-secret", "", nil, nil}, args{config}, true},
+		{"bad-configuration", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil}, args{config}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

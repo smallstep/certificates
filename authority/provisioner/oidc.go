@@ -42,13 +42,12 @@ type openIDPayload struct {
 
 // OIDC represents an OAuth 2.0 OpenID Connect provider.
 //
-// ClientSecret is optional, and it will be only necessary if an implicit flow
-// is not available, the value will be visible in the provisioners endpoint.
+// ClientSecret is mandatory, but it can be an empty string.
 type OIDC struct {
 	Type                  string   `json:"type"`
 	Name                  string   `json:"name"`
 	ClientID              string   `json:"clientID"`
-	ClientSecret          string   `json:"clientSecret,omitempty"`
+	ClientSecret          string   `json:"clientSecret"`
 	ConfigurationEndpoint string   `json:"configurationEndpoint"`
 	Claims                *Claims  `json:"claims,omitempty"`
 	Admins                []string `json:"admins,omitempty"`
