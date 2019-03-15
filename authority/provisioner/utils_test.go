@@ -173,10 +173,10 @@ func generateCollection(nJWK, nOIDC int) (*Collection, error) {
 }
 
 func generateSimpleToken(iss, aud string, jwk *jose.JSONWebKey) (string, error) {
-	return generateToken("subject", iss, aud, []string{"test.smallstep.com"}, time.Now(), jwk)
+	return generateToken("subject", iss, aud, "name@smallstep.com", []string{"test.smallstep.com"}, time.Now(), jwk)
 }
 
-func generateToken(sub, iss, aud string, sans []string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
+func generateToken(sub, iss, aud string, email string, sans []string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
 	sig, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
 		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID),
@@ -204,8 +204,8 @@ func generateToken(sub, iss, aud string, sans []string, iat time.Time, jwk *jose
 			Expiry:    jose.NewNumericDate(iat.Add(5 * time.Minute)),
 			Audience:  []string{aud},
 		},
+		Email: email,
 		SANS:  sans,
-		Email: "name@smallstep.com",
 	}
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }

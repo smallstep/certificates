@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -49,8 +50,9 @@ type OIDC struct {
 	ClientID              string   `json:"clientID"`
 	ClientSecret          string   `json:"clientSecret"`
 	ConfigurationEndpoint string   `json:"configurationEndpoint"`
+	Admins                []string `json:"admins"`
+	Domains               []string `json:"domains"`
 	Claims                *Claims  `json:"claims,omitempty"`
-	Admins                []string `json:"admins,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
 }
@@ -58,12 +60,20 @@ type OIDC struct {
 // IsAdmin returns true if the given email is in the Admins whitelist, false
 // otherwise.
 func (o *OIDC) IsAdmin(email string) bool {
+	email = sanitizeEmail(email)
 	for _, e := range o.Admins {
-		if e == email {
+		if email == sanitizeEmail(e) {
 			return true
 		}
 	}
 	return false
+}
+
+func sanitizeEmail(email string) string {
+	if i := strings.LastIndex(email, "@"); i >= 0 {
+		email = email[:i] + strings.ToLower(email[i:])
+	}
+	return email
 }
 
 // GetID returns the provisioner unique identifier, the OIDC provisioner the
@@ -130,9 +140,32 @@ func (o *OIDC) ValidatePayload(p openIDPayload) error {
 	}, time.Minute); err != nil {
 		return errors.Wrap(err, "failed to validate payload")
 	}
+
+	// Validate azp if present
 	if p.AuthorizedParty != "" && p.AuthorizedParty != o.ClientID {
 		return errors.New("failed to validate payload: invalid azp")
 	}
+
+	// Enforce an email claim
+	if p.Email == "" {
+		return errors.New("failed to validate payload: email not found")
+	}
+
+	// Validate domains (case-insensitive)
+	if !o.IsAdmin(p.Email) && len(o.Domains) > 0 {
+		email := sanitizeEmail(p.Email)
+		var found bool
+		for _, d := range o.Domains {
+			if strings.HasSuffix(email, "@"+strings.ToLower(d)) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errors.New("failed to validate payload: email is not allowed")
+		}
+	}
+
 	return nil
 }
 

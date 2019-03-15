@@ -119,7 +119,7 @@ func TestJWK_Authorize(t *testing.T) {
 	assert.FatalError(t, err)
 	t2, err := generateSimpleToken(p2.Name, testAudiences[1], key2)
 	assert.FatalError(t, err)
-	t3, err := generateToken("test.smallstep.com", p1.Name, testAudiences[0], []string{}, time.Now(), key1)
+	t3, err := generateToken("test.smallstep.com", p1.Name, testAudiences[0], "", []string{}, time.Now(), key1)
 	assert.FatalError(t, err)
 
 	// Invalid tokens
@@ -142,13 +142,13 @@ func TestJWK_Authorize(t *testing.T) {
 	// invalid signature
 	failSig := t1[0 : len(t1)-2]
 	// no subject
-	failSub, err := generateToken("", p1.Name, testAudiences[0], []string{"test.smallstep.com"}, time.Now(), key1)
+	failSub, err := generateToken("", p1.Name, testAudiences[0], "", []string{"test.smallstep.com"}, time.Now(), key1)
 	assert.FatalError(t, err)
 	// expired
-	failExp, err := generateToken("subject", p1.Name, testAudiences[0], []string{"test.smallstep.com"}, time.Now().Add(-360*time.Second), key1)
+	failExp, err := generateToken("subject", p1.Name, testAudiences[0], "", []string{"test.smallstep.com"}, time.Now().Add(-360*time.Second), key1)
 	assert.FatalError(t, err)
 	// not before
-	failNbf, err := generateToken("subject", p1.Name, testAudiences[0], []string{"test.smallstep.com"}, time.Now().Add(360*time.Second), key1)
+	failNbf, err := generateToken("subject", p1.Name, testAudiences[0], "", []string{"test.smallstep.com"}, time.Now().Add(360*time.Second), key1)
 	assert.FatalError(t, err)
 
 	// Remove encrypted key for p2

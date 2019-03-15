@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"crypto/x509"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -72,6 +73,7 @@ func TestOIDC_Init(t *testing.T) {
 		ConfigurationEndpoint string
 		Claims                *Claims
 		Admins                []string
+		Domains               []string
 	}
 	type args struct {
 		config Config
@@ -82,14 +84,15 @@ func TestOIDC_Init(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil}, args{config}, false},
-		{"ok-admins", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, []string{"foo@smallstep.com"}}, args{config}, false},
-		{"ok-no-secret", fields{"oidc", "name", "client-id", "", srv.URL + "/openid-configuration", nil, nil}, args{config}, false},
-		{"no-name", fields{"oidc", "", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
-		{"no-type", fields{"", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
-		{"no-client-id", fields{"oidc", "name", "", "client-secret", srv.URL + "/openid-configuration", nil, nil}, args{config}, true},
-		{"no-configuration", fields{"oidc", "name", "client-id", "client-secret", "", nil, nil}, args{config}, true},
-		{"bad-configuration", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil}, args{config}, true},
+		{"ok", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil, nil}, args{config}, false},
+		{"ok-admins", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, []string{"foo@smallstep.com"}, nil}, args{config}, false},
+		{"ok-domains", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil, []string{"smallstep.com"}}, args{config}, false},
+		{"ok-no-secret", fields{"oidc", "name", "client-id", "", srv.URL + "/openid-configuration", nil, nil, nil}, args{config}, false},
+		{"no-name", fields{"oidc", "", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil, nil}, args{config}, true},
+		{"no-type", fields{"", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil, nil}, args{config}, true},
+		{"no-client-id", fields{"oidc", "name", "", "client-secret", srv.URL + "/openid-configuration", nil, nil, nil}, args{config}, true},
+		{"no-configuration", fields{"oidc", "name", "client-id", "client-secret", "", nil, nil, nil}, args{config}, true},
+		{"bad-configuration", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, nil}, args{config}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -129,8 +132,9 @@ func TestOIDC_Authorize(t *testing.T) {
 	assert.FatalError(t, err)
 	p3, err := generateOIDC()
 	assert.FatalError(t, err)
-	// Admin
-	p3.Admins = []string{"name@smallstep.com"}
+	// Admin + Domains
+	p3.Admins = []string{"name@smallstep.com", "root@example.com"}
+	p3.Domains = []string{"smallstep.com"}
 
 	// Update configuration endpoints and initialize
 	config := Config{Claims: globalProvisionerClaims}
@@ -146,6 +150,15 @@ func TestOIDC_Authorize(t *testing.T) {
 	t2, err := generateSimpleToken("the-issuer", p2.ClientID, &keys.Keys[1])
 	assert.FatalError(t, err)
 	t3, err := generateSimpleToken("the-issuer", p3.ClientID, &keys.Keys[0])
+	assert.FatalError(t, err)
+
+	// Admin email not in domains
+	okAdmin, err := generateToken("subject", "the-issuer", p3.ClientID, "root@example.com", []string{"test.smallstep.com"}, time.Now(), &keys.Keys[0])
+	assert.FatalError(t, err)
+	// Invalid email
+	failEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
+	assert.FatalError(t, err)
+	failDomain, err := generateToken("subject", "the-issuer", p3.ClientID, "name@example.com", []string{}, time.Now(), &keys.Keys[0])
 	assert.FatalError(t, err)
 
 	// Invalid tokens
@@ -168,10 +181,10 @@ func TestOIDC_Authorize(t *testing.T) {
 	// invalid signature
 	failSig := t1[0 : len(t1)-2]
 	// expired
-	failExp, err := generateToken("subject", "the-issuer", p1.ClientID, []string{}, time.Now().Add(-360*time.Second), &keys.Keys[0])
+	failExp, err := generateToken("subject", "the-issuer", p1.ClientID, "name@smallstep.com", []string{}, time.Now().Add(-360*time.Second), &keys.Keys[0])
 	assert.FatalError(t, err)
 	// not before
-	failNbf, err := generateToken("subject", "the-issuer", p1.ClientID, []string{}, time.Now().Add(360*time.Second), &keys.Keys[0])
+	failNbf, err := generateToken("subject", "the-issuer", p1.ClientID, "name@smallstep.com", []string{}, time.Now().Add(360*time.Second), &keys.Keys[0])
 	assert.FatalError(t, err)
 
 	type args struct {
@@ -186,6 +199,9 @@ func TestOIDC_Authorize(t *testing.T) {
 		{"ok1", p1, args{t1}, false},
 		{"ok2", p2, args{t2}, false},
 		{"admin", p3, args{t3}, false},
+		{"admin", p3, args{okAdmin}, false},
+		{"fail-email", p3, args{failEmail}, true},
+		{"fail-domain", p3, args{failDomain}, true},
 		{"fail-key", p1, args{failKey}, true},
 		{"fail-token", p1, args{failTok}, true},
 		{"fail-claims", p1, args{failClaims}, true},
@@ -199,6 +215,7 @@ func TestOIDC_Authorize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.prov.Authorize(tt.args.token)
 			if (err != nil) != tt.wantErr {
+				fmt.Println(tt)
 				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -284,6 +301,26 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.prov.AuthorizeRevoke(tt.args.token); (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.AuthorizeRevoke() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_sanitizeEmail(t *testing.T) {
+	tests := []struct {
+		name  string
+		email string
+		want  string
+	}{
+		{"equal", "name@smallstep.com", "name@smallstep.com"},
+		{"domain-insensitive", "name@SMALLSTEP.COM", "name@smallstep.com"},
+		{"local-sensitive", "NaMe@smallSTEP.CoM", "NaMe@smallstep.com"},
+		{"multiple-@", "NaMe@NaMe@smallSTEP.CoM", "NaMe@NaMe@smallstep.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sanitizeEmail(tt.email); got != tt.want {
+				t.Errorf("sanitizeEmail() = %v, want %v", got, tt.want)
 			}
 		})
 	}
