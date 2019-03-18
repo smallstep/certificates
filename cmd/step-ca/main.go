@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -143,40 +144,12 @@ intermediate private key.`,
 	}
 
 	app.Action = func(ctx *cli.Context) error {
-		passFile := ctx.String("password-file")
-
-		// If zero cmd line args show help, if >1 cmd line args show error.
-		if ctx.NArg() == 0 {
-			return cli.ShowAppHelp(ctx)
-		}
-		if err := errs.NumberOfArguments(ctx, 1); err != nil {
-			return err
-		}
-
-		configFile := ctx.Args().Get(0)
-		config, err := authority.LoadConfiguration(configFile)
-		if err != nil {
-			fatal(err)
-		}
-
-		var password []byte
-		if passFile != "" {
-			if password, err = ioutil.ReadFile(passFile); err != nil {
-				fatal(errors.Wrapf(err, "error reading %s", passFile))
-			}
-			password = bytes.TrimRightFunc(password, unicode.IsSpace)
-		}
-
-		srv, err := ca.New(config, ca.WithConfigFile(configFile), ca.WithPassword(password))
-		if err != nil {
-			fatal(err)
-		}
-
-		go ca.StopReloaderHandler(srv)
-		if err = srv.Run(); err != nil && err != http.ErrServerClosed {
-			fatal(err)
-		}
-		return nil
+		// Hack to be able to run a the top action as a subcommand
+		cmd := cli.Command{Name: "start", Action: startAction, Flags: app.Flags}
+		set := flag.NewFlagSet(app.Name, flag.ContinueOnError)
+		set.Parse(os.Args)
+		ctx = cli.NewContext(app, set, nil)
+		return cmd.Run(ctx)
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -187,6 +160,43 @@ intermediate private key.`,
 		}
 		os.Exit(1)
 	}
+}
+
+func startAction(ctx *cli.Context) error {
+	passFile := ctx.String("password-file")
+
+	// If zero cmd line args show help, if >1 cmd line args show error.
+	if ctx.NArg() == 0 {
+		return cli.ShowAppHelp(ctx)
+	}
+	if err := errs.NumberOfArguments(ctx, 1); err != nil {
+		return err
+	}
+
+	configFile := ctx.Args().Get(0)
+	config, err := authority.LoadConfiguration(configFile)
+	if err != nil {
+		fatal(err)
+	}
+
+	var password []byte
+	if passFile != "" {
+		if password, err = ioutil.ReadFile(passFile); err != nil {
+			fatal(errors.Wrapf(err, "error reading %s", passFile))
+		}
+		password = bytes.TrimRightFunc(password, unicode.IsSpace)
+	}
+
+	srv, err := ca.New(config, ca.WithConfigFile(configFile), ca.WithPassword(password))
+	if err != nil {
+		fatal(err)
+	}
+
+	go ca.StopReloaderHandler(srv)
+	if err = srv.Run(); err != nil && err != http.ErrServerClosed {
+		fatal(err)
+	}
+	return nil
 }
 
 // fatal writes the passed error on the standard error and exits with the exit
