@@ -50,8 +50,8 @@ type OIDC struct {
 	ClientID              string   `json:"clientID"`
 	ClientSecret          string   `json:"clientSecret"`
 	ConfigurationEndpoint string   `json:"configurationEndpoint"`
-	Admins                []string `json:"admins"`
-	Domains               []string `json:"domains"`
+	Admins                []string `json:"admins,omitempty"`
+	Domains               []string `json:"domains,omitempty"`
 	Claims                *Claims  `json:"claims,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
