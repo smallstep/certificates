@@ -2,11 +2,13 @@ package authority
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 )
@@ -25,10 +27,10 @@ var (
 		Renegotiation: false,
 	}
 	defaultDisableRenewal   = false
-	globalProvisionerClaims = ProvisionerClaims{
-		MinTLSDur:      &Duration{5 * time.Minute},
-		MaxTLSDur:      &Duration{24 * time.Hour},
-		DefaultTLSDur:  &Duration{24 * time.Hour},
+	globalProvisionerClaims = provisioner.Claims{
+		MinTLSDur:      &provisioner.Duration{5 * time.Minute},
+		MaxTLSDur:      &provisioner.Duration{24 * time.Hour},
+		DefaultTLSDur:  &provisioner.Duration{24 * time.Hour},
 		DisableRenewal: &defaultDisableRenewal,
 	}
 )
@@ -50,16 +52,15 @@ type Config struct {
 
 // AuthConfig represents the configuration options for the authority.
 type AuthConfig struct {
-	Provisioners         []*Provisioner     `json:"provisioners,omitempty"`
-	Template             *x509util.ASN1DN   `json:"template,omitempty"`
-	Claims               *ProvisionerClaims `json:"claims,omitempty"`
-	DisableIssuedAtCheck bool               `json:"disableIssuedAtCheck,omitempty"`
+	Provisioners         provisioner.List    `json:"provisioners"`
+	Template             *x509util.ASN1DN    `json:"template,omitempty"`
+	Claims               *provisioner.Claims `json:"claims,omitempty"`
+	DisableIssuedAtCheck bool                `json:"disableIssuedAtCheck,omitempty"`
 }
 
 // Validate validates the authority configuration.
-func (c *AuthConfig) Validate() error {
+func (c *AuthConfig) Validate(audiences []string) error {
 	var err error
-
 	if c == nil {
 		return errors.New("authority cannot be undefined")
 	}
@@ -70,11 +71,18 @@ func (c *AuthConfig) Validate() error {
 	if c.Claims, err = c.Claims.Init(&globalProvisionerClaims); err != nil {
 		return err
 	}
+
+	// Initialize provisioners
+	config := provisioner.Config{
+		Claims:    *c.Claims,
+		Audiences: audiences,
+	}
 	for _, p := range c.Provisioners {
-		if err := p.Init(c.Claims); err != nil {
+		if err := p.Init(config); err != nil {
 			return err
 		}
 	}
+
 	if c.Template == nil {
 		c.Template = &x509util.ASN1DN{}
 	}
@@ -153,5 +161,16 @@ func (c *Config) Validate() error {
 		c.TLS.Renegotiation = c.TLS.Renegotiation || DefaultTLSOptions.Renegotiation
 	}
 
-	return c.AuthorityConfig.Validate()
+	return c.AuthorityConfig.Validate(c.getAudiences())
+}
+
+// getAudiences returns the legacy and possible urls without the ports that will
+// be used as the default provisioner audiences. The CA might have proxies in
+// front so we cannot rely on the port.
+func (c *Config) getAudiences() []string {
+	audiences := []string{legacyAuthority}
+	for _, name := range c.DNSNames {
+		audiences = append(audiences, fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
+	}
+	return audiences
 }

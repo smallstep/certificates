@@ -446,7 +446,11 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 		return nil, nil, errors.Wrap(err, "error generating key")
 	}
 
+	var emails []string
 	dnsNames, ips := x509util.SplitSANs(claims.SANs)
+	if claims.Email != "" {
+		emails = append(emails, claims.Email)
+	}
 
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
@@ -455,6 +459,7 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
 		DNSNames:           dnsNames,
 		IPAddresses:        ips,
+		EmailAddresses:     emails,
 	}
 
 	csr, err := x509.CreateCertificateRequest(rand.Reader, template, pk)

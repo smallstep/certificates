@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/authority/provisioner"
 	stepJOSE "github.com/smallstep/cli/jose"
 )
 
@@ -16,22 +17,22 @@ func testAuthority(t *testing.T) *Authority {
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	disableRenewal := true
-	p := []*Provisioner{
-		{
+	p := provisioner.List{
+		&provisioner.JWK{
 			Name: "Max",
 			Type: "JWK",
 			Key:  maxjwk,
 		},
-		{
+		&provisioner.JWK{
 			Name: "step-cli",
 			Type: "JWK",
 			Key:  clijwk,
 		},
-		{
+		&provisioner.JWK{
 			Name: "dev",
 			Type: "JWK",
 			Key:  maxjwk,
-			Claims: &ProvisionerClaims{
+			Claims: &provisioner.Claims{
 				DisableRenewal: &disableRenewal,
 			},
 		},
@@ -113,24 +114,18 @@ func TestAuthorityNew(t *testing.T) {
 					assert.True(t, auth.initOnce)
 					assert.NotNil(t, auth.intermediateIdentity)
 					for _, p := range tc.config.AuthorityConfig.Provisioners {
-						_p, ok := auth.provisionerIDIndex.Load(p.ID())
+						_p, ok := auth.provisioners.Load(p.GetID())
 						assert.True(t, ok)
 						assert.Equals(t, p, _p)
-						if len(p.EncryptedKey) > 0 {
-							key, ok := auth.encryptedKeyIndex.Load(p.Key.KeyID)
+						if kid, encryptedKey, ok := p.GetEncryptedKey(); ok {
+							key, ok := auth.provisioners.LoadEncryptedKey(kid)
 							assert.True(t, ok)
-							assert.Equals(t, p.EncryptedKey, key)
+							assert.Equals(t, encryptedKey, key)
 						}
 					}
 					// sanity check
-					_, ok = auth.provisionerIDIndex.Load("fooo")
+					_, ok = auth.provisioners.Load("fooo")
 					assert.False(t, ok)
-
-					assert.Equals(t, auth.audiences, []string{
-						"step-certificate-authority",
-						"https://127.0.0.1/sign",
-						"https://127.0.0.1/1.0/sign",
-					})
 				}
 			}
 		})

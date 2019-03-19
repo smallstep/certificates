@@ -3,7 +3,6 @@ package authority
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
@@ -22,48 +22,7 @@ func (a *Authority) GetTLSOptions() *tlsutil.TLSOptions {
 	return a.config.TLS
 }
 
-// SignOptions contains the options that can be passed to the Authority.Sign
-// method.
-type SignOptions struct {
-	NotAfter  time.Time `json:"notAfter"`
-	NotBefore time.Time `json:"notBefore"`
-}
-
-var (
-	stepOIDRoot               = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
-	stepOIDProvisioner        = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
-	oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
-)
-
-type stepProvisionerASN1 struct {
-	Type         int
-	Name         []byte
-	CredentialID []byte
-}
-
-const provisionerTypeJWK = 1
-
-func withProvisionerOID(name, kid string) x509util.WithOption {
-	return func(p x509util.Profile) error {
-		crt := p.Subject()
-
-		b, err := asn1.Marshal(stepProvisionerASN1{
-			Type:         provisionerTypeJWK,
-			Name:         []byte(name),
-			CredentialID: []byte(kid),
-		})
-		if err != nil {
-			return err
-		}
-		crt.ExtraExtensions = append(crt.ExtraExtensions, pkix.Extension{
-			Id:       stepOIDProvisioner,
-			Critical: false,
-			Value:    b,
-		})
-
-		return nil
-	}
-}
+var oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
 
 func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 	return func(p x509util.Profile) error {
@@ -96,28 +55,22 @@ func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 }
 
 // Sign creates a signed certificate from a certificate signing request.
-func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error) {
+func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
 	var (
-		errContext = context{"csr": csr, "signOptions": signOpts}
-		claims     = []certClaim{}
-		mods       = []x509util.WithOption{}
+		errContext     = context{"csr": csr, "signOptions": signOpts}
+		mods           = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
+		certValidators = []provisioner.CertificateValidator{}
 	)
 	for _, op := range extraOpts {
 		switch k := op.(type) {
-		case certClaim:
-			claims = append(claims, k)
-		case x509util.WithOption:
-			mods = append(mods, k)
-		case *Provisioner:
-			m, c, err := k.getTLSApps(signOpts)
-			if err != nil {
-				return nil, nil, &apiError{err, http.StatusInternalServerError, errContext}
+		case provisioner.CertificateValidator:
+			certValidators = append(certValidators, k)
+		case provisioner.CertificateRequestValidator:
+			if err := k.Valid(csr); err != nil {
+				return nil, nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
 			}
-			mods = append(mods, m...)
-			mods = append(mods, []x509util.WithOption{
-				withDefaultASN1DN(a.config.AuthorityConfig.Template),
-			}...)
-			claims = append(claims, c...)
+		case provisioner.ProfileModifier:
+			mods = append(mods, k.Option(signOpts))
 		default:
 			return nil, nil, &apiError{errors.Errorf("sign: invalid extra option type %T", k),
 				http.StatusInternalServerError, errContext}
@@ -137,10 +90,6 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 		return nil, nil, &apiError{errors.Wrapf(err, "sign"), http.StatusInternalServerError, errContext}
 	}
 
-	if err := validateClaims(leaf.Subject(), claims); err != nil {
-		return nil, nil, &apiError{errors.Wrapf(err, "sign"), http.StatusUnauthorized, errContext}
-	}
-
 	crtBytes, err := leaf.CreateCertificate()
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error creating new leaf certificate"),
@@ -151,6 +100,13 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts SignOptions, ext
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing new leaf certificate"),
 			http.StatusInternalServerError, errContext}
+	}
+
+	// FIXME: This should be before creating the certificate.
+	for _, v := range certValidators {
+		if err := v.Valid(serverCert); err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
+		}
 	}
 
 	caCert, err := x509.ParseCertificate(issIdentity.Crt.Raw)

@@ -18,19 +18,19 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
 )
 
 // Authority is the interface implemented by a CA authority.
 type Authority interface {
-	Authorize(ott string) ([]interface{}, error)
+	Authorize(ott string) ([]provisioner.SignOption, error)
 	GetTLSOptions() *tlsutil.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)
-	Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error)
+	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
 	Renew(peer *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	GetProvisioners(cursor string, limit int) ([]*authority.Provisioner, string, error)
+	GetProvisioners(cursor string, limit int) (provisioner.List, string, error)
 	GetEncryptedKey(kid string) (string, error)
 	GetRoots() (federation []*x509.Certificate, err error)
 	GetFederation() ([]*x509.Certificate, error)
@@ -161,11 +161,11 @@ type SignRequest struct {
 // ProvisionersResponse is the response object that returns the list of
 // provisioners.
 type ProvisionersResponse struct {
-	Provisioners []*authority.Provisioner `json:"provisioners"`
-	NextCursor   string                   `json:"nextCursor"`
+	Provisioners provisioner.List `json:"provisioners"`
+	NextCursor   string           `json:"nextCursor"`
 }
 
-// ProvisionerKeyResponse is the response object that returns the encryptoed key
+// ProvisionerKeyResponse is the response object that returns the encrypted key
 // of a provisioner.
 type ProvisionerKeyResponse struct {
 	Key string `json:"key"`
@@ -266,18 +266,18 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	signOpts := authority.SignOptions{
+	opts := provisioner.Options{
 		NotBefore: body.NotBefore,
 		NotAfter:  body.NotAfter,
 	}
 
-	extraOpts, err := h.Authority.Authorize(body.OTT)
+	signOpts, err := h.Authority.Authorize(body.OTT)
 	if err != nil {
 		WriteError(w, Unauthorized(err))
 		return
 	}
 
-	cert, root, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, signOpts, extraOpts...)
+	cert, root, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, opts, signOpts...)
 	if err != nil {
 		WriteError(w, Forbidden(err))
 		return

@@ -7,7 +7,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"fmt"
-	"net"
 	"net/http"
 	"reflect"
 	"testing"
@@ -15,11 +14,48 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
+	"github.com/smallstep/cli/jose"
 	stepx509 "github.com/smallstep/cli/pkg/x509"
 )
+
+var (
+	stepOIDRoot        = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
+	stepOIDProvisioner = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
+)
+
+const provisionerTypeJWK = 1
+
+type stepProvisionerASN1 struct {
+	Type         int
+	Name         []byte
+	CredentialID []byte
+}
+
+func withProvisionerOID(name, kid string) x509util.WithOption {
+	return func(p x509util.Profile) error {
+		crt := p.Subject()
+
+		b, err := asn1.Marshal(stepProvisionerASN1{
+			Type:         provisionerTypeJWK,
+			Name:         []byte(name),
+			CredentialID: []byte(kid),
+		})
+		if err != nil {
+			return err
+		}
+		crt.ExtraExtensions = append(crt.ExtraExtensions, pkix.Extension{
+			Id:       stepOIDProvisioner,
+			Critical: false,
+			Value:    b,
+		})
+
+		return nil
+	}
+}
 
 func getCSR(t *testing.T, priv interface{}, opts ...func(*x509.CertificateRequest)) *x509.CertificateRequest {
 	_csr := &x509.CertificateRequest{
@@ -52,24 +88,25 @@ func TestSign(t *testing.T) {
 	}
 
 	nb := time.Now()
-	signOpts := SignOptions{
+	signOpts := provisioner.Options{
 		NotBefore: nb,
 		NotAfter:  nb.Add(time.Minute * 5),
 	}
 
-	p := a.config.AuthorityConfig.Provisioners[1]
-	extraOpts := []interface{}{
-		&commonNameClaim{"smallstep test"},
-		&dnsNamesClaim{[]string{"test.smallstep.com"}},
-		&ipAddressesClaim{[]net.IP{}},
-		p,
-	}
+	// Create a token to get test extra opts.
+	p := a.config.AuthorityConfig.Provisioners[1].(*provisioner.JWK)
+	key, err := jose.ParseKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
+	assert.FatalError(t, err)
+	token, err := generateToken("smallstep test", "step-cli", "https://test.ca.smallstep.com/sign", []string{"test.smallstep.com"}, time.Now(), key)
+	assert.FatalError(t, err)
+	extraOpts, err := a.Authorize(token)
+	assert.FatalError(t, err)
 
 	type signTest struct {
 		auth      *Authority
 		csr       *x509.CertificateRequest
-		signOpts  SignOptions
-		extraOpts []interface{}
+		signOpts  provisioner.Options
+		extraOpts []provisioner.SignOption
 		err       *apiError
 	}
 	tests := map[string]func(*testing.T) *signTest{
@@ -123,7 +160,7 @@ func TestSign(t *testing.T) {
 			return &signTest{
 				auth:      _a,
 				csr:       csr,
-				extraOpts: []interface{}{p},
+				extraOpts: extraOpts,
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: error creating new leaf certificate"),
 					http.StatusInternalServerError,
@@ -133,7 +170,7 @@ func TestSign(t *testing.T) {
 		},
 		"fail provisioner duration claim": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
-			_signOpts := SignOptions{
+			_signOpts := provisioner.Options{
 				NotBefore: nb,
 				NotAfter:  nb.Add(time.Hour * 25),
 			}
@@ -157,7 +194,7 @@ func TestSign(t *testing.T) {
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
-				err: &apiError{errors.New("sign: DNS names claim failed - got [test.smallstep.com smallstep test], want [test.smallstep.com]"),
+				err: &apiError{errors.New("sign: certificate request does not contain the valid DNS names - got [test.smallstep.com smallstep test], want [test.smallstep.com]"),
 					http.StatusUnauthorized,
 					context{"csr": csr, "signOptions": signOpts},
 				},
@@ -262,7 +299,7 @@ func TestRenew(t *testing.T) {
 	now := time.Now().UTC()
 	nb1 := now.Add(-time.Minute * 7)
 	na1 := now
-	so := &SignOptions{
+	so := &provisioner.Options{
 		NotBefore: nb1,
 		NotAfter:  na1,
 	}
@@ -272,7 +309,7 @@ func TestRenew(t *testing.T) {
 		x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, 0),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
-		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].Key.KeyID))
+		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID))
 	assert.FatalError(t, err)
 	crtBytes, err := leaf.CreateCertificate()
 	assert.FatalError(t, err)
@@ -284,7 +321,7 @@ func TestRenew(t *testing.T) {
 		x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, 0),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
-		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].Key.KeyID),
+		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].(*provisioner.JWK).Key.KeyID),
 	)
 	assert.FatalError(t, err)
 	crtBytesNoRenew, err := leafNoRenew.CreateCertificate()
@@ -321,7 +358,7 @@ func TestRenew(t *testing.T) {
 			}
 			return &renewTest{
 				crt: crtNoRenew,
-				err: &apiError{errors.New("renew disabled"),
+				err: &apiError{errors.New("renew is disabled for provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
 					http.StatusUnauthorized, ctx},
 			}, nil
 		},

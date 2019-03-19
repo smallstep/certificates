@@ -1,17 +1,14 @@
-package authority
+package provisioner
 
 import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/cli/crypto/x509util"
-
-	jose "gopkg.in/square/go-jose.v2"
 )
 
-// ProvisionerClaims so that individual provisioners can override global claims.
-type ProvisionerClaims struct {
-	globalClaims   *ProvisionerClaims
+// Claims so that individual provisioners can override global claims.
+type Claims struct {
+	globalClaims   *Claims
 	MinTLSDur      *Duration `json:"minTLSCertDuration,omitempty"`
 	MaxTLSDur      *Duration `json:"maxTLSCertDuration,omitempty"`
 	DefaultTLSDur  *Duration `json:"defaultTLSCertDuration,omitempty"`
@@ -19,19 +16,18 @@ type ProvisionerClaims struct {
 }
 
 // Init initializes and validates the individual provisioner claims.
-func (pc *ProvisionerClaims) Init(global *ProvisionerClaims) (*ProvisionerClaims, error) {
+func (pc *Claims) Init(global *Claims) (*Claims, error) {
 	if pc == nil {
-		pc = &ProvisionerClaims{}
+		pc = &Claims{}
 	}
 	pc.globalClaims = global
-	err := pc.Validate()
-	return pc, err
+	return pc, pc.Validate()
 }
 
 // DefaultTLSCertDuration returns the default TLS cert duration for the
 // provisioner. If the default is not set within the provisioner, then the global
 // default from the authority configuration will be used.
-func (pc *ProvisionerClaims) DefaultTLSCertDuration() time.Duration {
+func (pc *Claims) DefaultTLSCertDuration() time.Duration {
 	if pc.DefaultTLSDur == nil || pc.DefaultTLSDur.Duration == 0 {
 		return pc.globalClaims.DefaultTLSCertDuration()
 	}
@@ -41,7 +37,7 @@ func (pc *ProvisionerClaims) DefaultTLSCertDuration() time.Duration {
 // MinTLSCertDuration returns the minimum TLS cert duration for the provisioner.
 // If the minimum is not set within the provisioner, then the global
 // minimum from the authority configuration will be used.
-func (pc *ProvisionerClaims) MinTLSCertDuration() time.Duration {
+func (pc *Claims) MinTLSCertDuration() time.Duration {
 	if pc.MinTLSDur == nil || pc.MinTLSDur.Duration == 0 {
 		return pc.globalClaims.MinTLSCertDuration()
 	}
@@ -51,7 +47,7 @@ func (pc *ProvisionerClaims) MinTLSCertDuration() time.Duration {
 // MaxTLSCertDuration returns the maximum TLS cert duration for the provisioner.
 // If the maximum is not set within the provisioner, then the global
 // maximum from the authority configuration will be used.
-func (pc *ProvisionerClaims) MaxTLSCertDuration() time.Duration {
+func (pc *Claims) MaxTLSCertDuration() time.Duration {
 	if pc.MaxTLSDur == nil || pc.MaxTLSDur.Duration == 0 {
 		return pc.globalClaims.MaxTLSCertDuration()
 	}
@@ -61,7 +57,7 @@ func (pc *ProvisionerClaims) MaxTLSCertDuration() time.Duration {
 // IsDisableRenewal returns if the renewal flow is disabled for the
 // provisioner. If the property is not set within the provisioner, then the
 // global value from the authority configuration will be used.
-func (pc *ProvisionerClaims) IsDisableRenewal() bool {
+func (pc *Claims) IsDisableRenewal() bool {
 	if pc.DisableRenewal == nil {
 		return pc.globalClaims.IsDisableRenewal()
 	}
@@ -69,7 +65,7 @@ func (pc *ProvisionerClaims) IsDisableRenewal() bool {
 }
 
 // Validate validates and modifies the Claims with default values.
-func (pc *ProvisionerClaims) Validate() error {
+func (pc *Claims) Validate() error {
 	var (
 		min = pc.MinTLSCertDuration()
 		max = pc.MaxTLSCertDuration()
@@ -92,53 +88,4 @@ func (pc *ProvisionerClaims) Validate() error {
 	default:
 		return nil
 	}
-}
-
-// Provisioner - authorized entity that can sign tokens necessary for signature requests.
-type Provisioner struct {
-	Name         string             `json:"name,omitempty"`
-	Type         string             `json:"type,omitempty"`
-	Key          *jose.JSONWebKey   `json:"key,omitempty"`
-	EncryptedKey string             `json:"encryptedKey,omitempty"`
-	Claims       *ProvisionerClaims `json:"claims,omitempty"`
-}
-
-// Init initializes and validates a the fields of Provisioner type.
-func (p *Provisioner) Init(global *ProvisionerClaims) error {
-	switch {
-	case p.Name == "":
-		return errors.New("provisioner name cannot be empty")
-
-	case p.Type == "":
-		return errors.New("provisioner type cannot be empty")
-
-	case p.Key == nil:
-		return errors.New("provisioner key cannot be empty")
-	}
-
-	var err error
-	p.Claims, err = p.Claims.Init(global)
-	return err
-}
-
-// getTLSApps returns a list of modifiers and validators that will be applied to
-// the certificate.
-func (p *Provisioner) getTLSApps(so SignOptions) ([]x509util.WithOption, []certClaim, error) {
-	c := p.Claims
-	return []x509util.WithOption{
-			x509util.WithNotBeforeAfterDuration(so.NotBefore,
-				so.NotAfter, c.DefaultTLSCertDuration()),
-			withProvisionerOID(p.Name, p.Key.KeyID),
-		}, []certClaim{
-			&certTemporalClaim{
-				min: c.MinTLSCertDuration(),
-				max: c.MaxTLSCertDuration(),
-			},
-		}, nil
-}
-
-// ID returns the provisioner identifier. The name and credential id should
-// uniquely identify any provisioner.
-func (p *Provisioner) ID() string {
-	return p.Name + ":" + p.Key.KeyID
 }
