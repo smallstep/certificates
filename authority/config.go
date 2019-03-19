@@ -60,7 +60,6 @@ type AuthConfig struct {
 
 // Validate validates the authority configuration.
 func (c *AuthConfig) Validate(audiences []string) error {
-	var err error
 	if c == nil {
 		return errors.New("authority cannot be undefined")
 	}
@@ -68,13 +67,15 @@ func (c *AuthConfig) Validate(audiences []string) error {
 		return errors.New("authority.provisioners cannot be empty")
 	}
 
-	if c.Claims, err = c.Claims.Init(&globalProvisionerClaims); err != nil {
+	// Merge global and configuration claims
+	claimer, err := provisioner.NewClaimer(c.Claims, globalProvisionerClaims)
+	if err != nil {
 		return err
 	}
 
 	// Initialize provisioners
 	config := provisioner.Config{
-		Claims:    *c.Claims,
+		Claims:    claimer.Claims(),
 		Audiences: audiences,
 	}
 	for _, p := range c.Provisioners {

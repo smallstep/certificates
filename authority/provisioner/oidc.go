@@ -55,6 +55,7 @@ type OIDC struct {
 	Claims                *Claims  `json:"claims,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
+	claimer               *Claimer
 }
 
 // IsAdmin returns true if the given email is in the Admins whitelist, false
@@ -111,9 +112,10 @@ func (o *OIDC) Init(config Config) (err error) {
 	}
 
 	// Update claims with global ones
-	if o.Claims, err = o.Claims.Init(&config.Claims); err != nil {
+	if o.claimer, err = NewClaimer(o.Claims, config.Claims); err != nil {
 		return err
 	}
+
 	// Decode and validate openid-configuration endpoint
 	if err := getAndDecode(o.ConfigurationEndpoint, &o.configuration); err != nil {
 		return err
@@ -202,23 +204,23 @@ func (o *OIDC) Authorize(token string) ([]SignOption, error) {
 	// Admins should be able to authorize any SAN
 	if o.IsAdmin(claims.Email) {
 		return []SignOption{
-			profileDefaultDuration(o.Claims.DefaultTLSCertDuration()),
+			profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
 			newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
-			newValidityValidator(o.Claims.MinTLSCertDuration(), o.Claims.MaxTLSCertDuration()),
+			newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
 		}, nil
 	}
 
 	return []SignOption{
 		emailOnlyIdentity(claims.Email),
-		profileDefaultDuration(o.Claims.DefaultTLSCertDuration()),
+		profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
-		newValidityValidator(o.Claims.MinTLSCertDuration(), o.Claims.MaxTLSCertDuration()),
+		newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
 	}, nil
 }
 
 // AuthorizeRenewal returns an error if the renewal is disabled.
 func (o *OIDC) AuthorizeRenewal(cert *x509.Certificate) error {
-	if o.Claims.IsDisableRenewal() {
+	if o.claimer.IsDisableRenewal() {
 		return errors.Errorf("renew is disabled for provisioner %s", o.GetID())
 	}
 	return nil

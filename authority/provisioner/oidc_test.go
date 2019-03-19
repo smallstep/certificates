@@ -241,10 +241,9 @@ func TestOIDC_AuthorizeRenewal(t *testing.T) {
 
 	// disable renewal
 	disable := true
-	p2.Claims = &Claims{
-		globalClaims:   &globalProvisionerClaims,
-		DisableRenewal: &disable,
-	}
+	p2.Claims = &Claims{DisableRenewal: &disable}
+	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	assert.FatalError(t, err)
 
 	type args struct {
 		cert *x509.Certificate

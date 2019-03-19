@@ -109,6 +109,10 @@ func generateJWK() (*JWK, error) {
 	if err != nil {
 		return nil, err
 	}
+	claimer, err := NewClaimer(nil, globalProvisionerClaims)
+	if err != nil {
+		return nil, err
+	}
 	return &JWK{
 		Name:         name,
 		Type:         "JWK",
@@ -116,6 +120,7 @@ func generateJWK() (*JWK, error) {
 		EncryptedKey: encrypted,
 		Claims:       &globalProvisionerClaims,
 		audiences:    testAudiences,
+		claimer:      claimer,
 	}, nil
 }
 
@@ -136,6 +141,10 @@ func generateOIDC() (*OIDC, error) {
 	if err != nil {
 		return nil, err
 	}
+	claimer, err := NewClaimer(nil, globalProvisionerClaims)
+	if err != nil {
+		return nil, err
+	}
 	return &OIDC{
 		Name:                  name,
 		Type:                  "OIDC",
@@ -150,6 +159,7 @@ func generateOIDC() (*OIDC, error) {
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
+		claimer: claimer,
 	}, nil
 }
 
