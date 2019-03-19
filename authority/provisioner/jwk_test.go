@@ -78,6 +78,12 @@ func TestJWK_Init(t *testing.T) {
 				err: errors.New("provisioner key cannot be empty"),
 			}
 		},
+		"fail-bad-claims": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p:   &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}, audiences: testAudiences, Claims: &Claims{DefaultTLSDur: &Duration{0}}},
+				err: errors.New("claims: DefaultTLSCertDuration must be greater than 0"),
+			}
+		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p: &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}, audiences: testAudiences},
