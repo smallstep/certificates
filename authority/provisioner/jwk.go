@@ -23,6 +23,7 @@ type JWK struct {
 	Key          *jose.JSONWebKey `json:"key"`
 	EncryptedKey string           `json:"encryptedKey,omitempty"`
 	Claims       *Claims          `json:"claims,omitempty"`
+	claimer      *Claimer
 	audiences    []string
 }
 
@@ -57,7 +58,12 @@ func (p *JWK) Init(config Config) (err error) {
 	case p.Key == nil:
 		return errors.New("provisioner key cannot be empty")
 	}
-	p.Claims, err = p.Claims.Init(&config.Claims)
+
+	// Update claims with global ones
+	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
+		return err
+	}
+
 	p.audiences = config.Audiences
 	return err
 }
@@ -104,15 +110,15 @@ func (p *JWK) Authorize(token string) ([]SignOption, error) {
 		commonNameValidator(claims.Subject),
 		dnsNamesValidator(dnsNames),
 		ipAddressesValidator(ips),
-		profileDefaultDuration(p.Claims.DefaultTLSCertDuration()),
+		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
-		newValidityValidator(p.Claims.MinTLSCertDuration(), p.Claims.MaxTLSCertDuration()),
+		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	}, nil
 }
 
 // AuthorizeRenewal returns an error if the renewal is disabled.
 func (p *JWK) AuthorizeRenewal(cert *x509.Certificate) error {
-	if p.Claims.IsDisableRenewal() {
+	if p.claimer.IsDisableRenewal() {
 		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
 	}
 	return nil

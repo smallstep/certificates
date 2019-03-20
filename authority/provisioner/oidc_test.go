@@ -64,6 +64,9 @@ func TestOIDC_Init(t *testing.T) {
 	config := Config{
 		Claims: globalProvisionerClaims,
 	}
+	badClaims := &Claims{
+		DefaultTLSDur: &Duration{0},
+	}
 
 	type fields struct {
 		Type                  string
@@ -93,6 +96,7 @@ func TestOIDC_Init(t *testing.T) {
 		{"no-client-id", fields{"oidc", "name", "", "client-secret", srv.URL + "/openid-configuration", nil, nil, nil}, args{config}, true},
 		{"no-configuration", fields{"oidc", "name", "client-id", "client-secret", "", nil, nil, nil}, args{config}, true},
 		{"bad-configuration", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, nil}, args{config}, true},
+		{"bad-claims", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", badClaims, nil, nil}, args{config}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -241,10 +245,9 @@ func TestOIDC_AuthorizeRenewal(t *testing.T) {
 
 	// disable renewal
 	disable := true
-	p2.Claims = &Claims{
-		globalClaims:   &globalProvisionerClaims,
-		DisableRenewal: &disable,
-	}
+	p2.Claims = &Claims{DisableRenewal: &disable}
+	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	assert.FatalError(t, err)
 
 	type args struct {
 		cert *x509.Certificate

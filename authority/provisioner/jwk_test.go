@@ -78,6 +78,12 @@ func TestJWK_Init(t *testing.T) {
 				err: errors.New("provisioner key cannot be empty"),
 			}
 		},
+		"fail-bad-claims": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p:   &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}, audiences: testAudiences, Claims: &Claims{DefaultTLSDur: &Duration{0}}},
+				err: errors.New("claims: DefaultTLSCertDuration must be greater than 0"),
+			}
+		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p: &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}, audiences: testAudiences},
@@ -201,10 +207,9 @@ func TestJWK_AuthorizeRenewal(t *testing.T) {
 
 	// disable renewal
 	disable := true
-	p2.Claims = &Claims{
-		globalClaims:   &globalProvisionerClaims,
-		DisableRenewal: &disable,
-	}
+	p2.Claims = &Claims{DisableRenewal: &disable}
+	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	assert.FatalError(t, err)
 
 	type args struct {
 		cert *x509.Certificate

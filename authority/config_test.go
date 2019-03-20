@@ -272,6 +272,17 @@ func TestAuthConfigValidate(t *testing.T) {
 				err: errors.New("provisioner type cannot be empty"),
 			}
 		},
+		"fail-invalid-claims": func(t *testing.T) AuthConfigValidateTest {
+			return AuthConfigValidateTest{
+				ac: &AuthConfig{
+					Provisioners: p,
+					Claims: &provisioner.Claims{
+						MinTLSDur: &provisioner.Duration{-1},
+					},
+				},
+				err: errors.New("claims: MinTLSCertDuration must be greater than 0"),
+			}
+		},
 		"ok-empty-asn1dn-template": func(t *testing.T) AuthConfigValidateTest {
 			return AuthConfigValidateTest{
 				ac: &AuthConfig{
