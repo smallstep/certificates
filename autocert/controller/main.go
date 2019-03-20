@@ -35,12 +35,13 @@ var (
 )
 
 const (
-	admissionWebhookAnnotationKey = "autocert.step.sm/name"
-	admissionWebhookStatusKey     = "autocert.step.sm/status"
-	provisionerPasswordFile       = "/home/step/password/password"
-	volumeMountPath               = "/var/run/autocert.step.sm"
-	tokenSecretKey                = "token"
-	tokenSecretLabel              = "autocert.step.sm/token"
+	admissionWebhookAnnotationKey         = "autocert.step.sm/name"
+	admissionWebhookStatusKey             = "autocert.step.sm/status"
+	provisionerPasswordFile               = "/home/step/password/password"
+	volumeMountPath                       = "/var/run/autocert.step.sm"
+	tokenSecretKey                        = "token"
+	tokenSecretLabel                      = "autocert.step.sm/token"
+	clusterDomain                         = "cluster.local"
 )
 
 // Config options for the autocert admission controller.
@@ -212,10 +213,12 @@ func mkBootstrapper(config *Config, commonName string, namespace string, provisi
 	}
 	log.Infof("Secret name is: %s", secretName)
 
+
 	b.Env = append(b.Env, corev1.EnvVar{
 		Name:  "COMMON_NAME",
 		Value: commonName,
 	})
+
 	b.Env = append(b.Env, corev1.EnvVar{
 		Name: "STEP_TOKEN",
 		ValueFrom: &corev1.EnvVarSource{
@@ -357,7 +360,8 @@ func addAnnotations(existing, new map[string]string) (ops []PatchOperation) {
 func patch(pod *corev1.Pod, namespace string, config *Config, provisioner Provisioner) ([]byte, error) {
 	var ops []PatchOperation
 
-	commonName := pod.ObjectMeta.GetAnnotations()[admissionWebhookAnnotationKey]
+	annotations := pod.ObjectMeta.GetAnnotations()
+	commonName := annotations[admissionWebhookAnnotationKey]
 	renewer := mkRenewer(config)
 	bootstrapper, err := mkBootstrapper(config, commonName, namespace, provisioner)
 	if err != nil {
@@ -376,7 +380,7 @@ func patch(pod *corev1.Pod, namespace string, config *Config, provisioner Provis
 // shouldMutate checks whether a pod is subject to mutation by this admission controller. A pod
 // is subject to mutation if it's annotated with the `admissionWebhookAnnotationKey` and if it
 // has not already been processed (indicated by `admissionWebhookStatusKey` set to `injected`).
-func shouldMutate(metadata *metav1.ObjectMeta) bool {
+func shouldMutate(metadata *metav1.ObjectMeta, namespace string) bool {
 	annotations := metadata.GetAnnotations()
 	if annotations == nil {
 		annotations = map[string]string{}
@@ -385,6 +389,34 @@ func shouldMutate(metadata *metav1.ObjectMeta) bool {
 	// Only mutate if the object is annotated appropriately (annotation key set) and we haven't
 	// mutated already (status key isn't set).
 	if annotations[admissionWebhookAnnotationKey] == "" || annotations[admissionWebhookStatusKey] == "injected" {
+		return false
+	}
+
+	subject := strings.Trim(annotations[admissionWebhookAnnotationKey], ".")
+	subjectParts := strings.Split(subject, ".")
+	clusterDomainParts := strings.Split(fmt.Sprintf("svc.%s", clusterDomain), ".")
+
+	// Mutate if subject is a lonely hostname, e.g., "example", or
+	// if it is two parts. While this could be a hostname + namespace,
+	// it could also be a regular domain (e.g., `example.com`). We don't
+	// want to preclude users from issuing non-cluster hostnames, so we
+	// allow it. Additionally, if it is greater than 5 parts, it is not
+	// a cluster hostname.
+	if len(subjectParts) < 3  || len(subjectParts) > 5 {
+		return true
+	}
+
+	// Check if the parts of the domain match the cluster domain, if they don't
+	// it's not a cluster hostname and we can safely sign it.
+	for index, part := range clusterDomainParts {
+		if len(subjectParts) - 2 > index && subjectParts[index + 2] != part {
+			return true
+		}
+	}
+
+	// If the namespace is not the same as our pod's namespace, do not mutate the pod.
+	if subjectParts[1] != namespace {
+		log.WithField("namespace", namespace).WithField("subject", subject).Infof("Invalid subject for pod in namespace.")
 		return false
 	}
 
@@ -418,7 +450,7 @@ func mutate(review *v1beta1.AdmissionReview, config *Config, provisioner Provisi
 		"user":         request.UserInfo,
 	})
 
-	if !shouldMutate(&pod.ObjectMeta) {
+	if !shouldMutate(&pod.ObjectMeta, request.Namespace) {
 		ctxLog.WithField("annotations", pod.Annotations).Info("Skipping mutation")
 		return &v1beta1.AdmissionResponse{
 			Allowed: true,
