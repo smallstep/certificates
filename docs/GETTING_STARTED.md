@@ -406,22 +406,17 @@ Please enter a password to encrypt the provisioner private key? password
             "x": "So0JVWFFXo-6GmDwq6WWZZk-AFZt5GKTx5PzdLhdsrQ",
             "y": "kVz8pCl2Qx9fZmJZhXGrHpufwNDTp7oHwi8Zaj7rhiQ"
          },
+         "encryptedKey": "...",
 +        "claims": {
 +           "minTLSCertDuration": "5s",
 +           "maxTLSCertDuration": "12h",
 +           "defaultTLSCertDuration": "2h",
 +           "disableRenewal": true
-+        },
-         "encryptedKey": "..."
++        }
       }
    ]
 },
 [...]
-
-A duration string is a possibly signed sequence of
-decimal numbers, each with optional fraction and a unit suffix,
-such as "300ms", "-1.5h" or "2h45m".
-Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 
 # launch CA...
 $ step-ca $(step path)/config/ca.json
@@ -429,7 +424,7 @@ Please enter the password to decrypt ~/.step/secrets/intermediate_ca_key: passwo
 2019/02/21 12:09:51 Serving HTTPS on :9443 ...
 ```
 
-Please [`step ca provisioner`](https://smallstep.com/docs/cli/ca/provisioner/)'s docs for details on all available claims properties. The durations are strings which are a possibly sequence of decimal numbers, each with optional fraction and a unit suffix, such as "300ms" or "2h45m". Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+Please [`step ca provisioner`](https://smallstep.com/docs/cli/ca/provisioner/)'s docs for details on all available claims properties. The durations are strings which are a sequence of decimal numbers, each with optional fraction and a unit suffix, such as "300ms" or "2h45m". Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 
 Now certs issued by the `dev@smallstep.com` provisioner will be valid for two hours and deny renewals. Command line flags allow validity extension up to 12h, please see [`step ca certificate`](https://smallstep.com/docs/cli/ca/certificate/)'s docs for details.
 

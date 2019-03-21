@@ -586,8 +586,7 @@ $ step ca provisioner list | jq '.[3].claims'
 ```
 
 Certificates with different validity periods can be generated using the respective provisioners.
-The durations are strings which are a possibly sequence of decimal numbers, each with optional fraction and a unit suffix,
-such as "300ms" or "2h45m". Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+The durations are strings which are a sequence of decimal numbers, each with optional fraction and a unit suffix, such as "300ms" or "2h45m". Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 
 Please see [Getting Started](https://github.com/smallstep/certificates/blob/master/docs/GETTING_STARTED.md) in the docs directory to learn what custom claims configuration options are available and how to use them.
 

@@ -13,8 +13,8 @@
 	"authority": {
 		"provisioners": [
 			{
-				"name": "mariano@smallstep.com",
 				"type": "jwk",
+				"name": "mariano@smallstep.com",
 				"key": {
 					"use": "sig",
 					"kty": "EC",
@@ -27,8 +27,8 @@
 				"encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiOTFVWjdzRGw3RlNXcldfX1I1NUh3USJ9.FcWtrBDNgrkA33G9Ll9sXh1cPF-3jVXeYe1FLmSDc_Q2PmfLOPvJOA.0ZoN32ayaRWnufJb.WrkffMmDLWiq1-2kn-w7-kVBGW12gjNCBHNHB1hyEdED0rWH1YWpKd8FjoOACdJyLhSn4kAS3Lw5AH7fvO27A48zzvoxZU5EgSm5HG9IjkIH-LBJ-v79ShkpmPylchgjkFhxa5epD11OIK4rFmI7s-0BCjmJokLR_DZBhDMw2khGnsr_MEOfAz9UnqXaQ4MIy8eT52xUpx68gpWFlz2YP3EqiYyNEv0PpjMtyP5lO2i8-p8BqvuJdus9H3fO5Dg-1KVto1wuqh4BQ2JKTauv60QAnM_4sdxRHku3F_nV64SCrZfDvnN2ve21raFROtyXaqHZhN6lyoPxDncy8v4.biaOblEe0N-gMpJyFZ-3-A"
 			},
 			{
-				"name": "mike@smallstep.com",
 				"type": "jwk",
+				"name": "mike@smallstep.com",
 				"key": {
 					"use": "sig",
 					"kty": "EC",
@@ -45,8 +45,8 @@
 				}
 			},
 			{
-				"name": "decade",
 				"type": "jwk",
+				"name": "decade",
 				"key": {
 					"use": "sig",
 					"kty": "EC",
@@ -63,8 +63,8 @@
 				"encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiZS1OVzRaZlBUNjFCUmR1bjJyNk9OZyJ9.zjToJ_Od6RIzVmo0cnmLZ69am410ftfBW594qNt60KmKX6JEWUufhA.kSrC74fKK3CkqiNS.G-oUqQhYMFIKuSj8thg9B5TeiaIMsQ-o_PTxIZE-Qb8TDU15ehPAsuIQmnbM6dSpkSGCmZgHTscp3xgLyv6QEBBjUHBpLwciWyipj1KBZDKSgLKeV6G2NiVBMETOaD1DsX3DxrHM-K3T1chXJFMJfkDSx1OEtaVfzqVYLyvNb5y_26oeRNSNYuTLzOrk6Ebr6KJE6lSWpvu1dtOrDAhTErouC56EQu2fTeDCa9eN50iRs4OjmF6FtBlR63h6FkvbmjJWC3zbIOe2RXRQx0Po6_dnKXSIqs7JMZSBerlgw6jzHme8YvqBqc2Ccy4Y4gJ23nwLkcsOVuFNdk6Nb7s.SB296DDrS-Wi4a9x_TGv4A"
 			},
 			{
-				"name": "90days",
 				"type": "jwk",
+				"name": "90days",
 				"key": {
 					"use": "sig",
 					"kty": "EC",
@@ -85,7 +85,7 @@
 	"tls": {
 		"cipherSuites": [
 			"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
-			"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+			"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
 		],
 		"minVersion": 1.2,
 		"maxVersion": 1.2,
