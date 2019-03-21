@@ -45,7 +45,7 @@ required = [
   name = "github.com/go-chi/chi"
 
 [[override]]
-  branch = "master"
+  branch = "x509util-real-x509"
   name = "github.com/smallstep/cli"
 
 [prune]

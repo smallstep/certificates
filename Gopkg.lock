@@ -276,8 +276,8 @@
   revision = "de77670473b5492f5d0bce155b5c01534c2d13f7"
 
 [[projects]]
-  branch = "master"
-  digest = "1:a11fa27b1cebc2aa3650bd2086aeadf1e2aaf1f4b646895893b80260b17a19d2"
+  branch = "x509util-real-x509"
+  digest = "1:8b36444f30009b5e124a3ac48b353558024a95c3fccdf3e6bb557a091e67342b"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
@@ -298,7 +298,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "68ac9850f47f4cfe0045f1444f3f23404e2237ba"
+  revision = "de740bc707a264406a455c405238788d1f9f0666"
 
 [[projects]]
   branch = "master"
@@ -570,7 +570,6 @@
     "github.com/smallstep/cli/crypto/x509util",
     "github.com/smallstep/cli/errs",
     "github.com/smallstep/cli/jose",
-    "github.com/smallstep/cli/pkg/x509",
     "github.com/smallstep/cli/token",
     "github.com/smallstep/cli/token/provision",
     "github.com/smallstep/cli/usage",
