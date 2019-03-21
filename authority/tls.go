@@ -59,6 +59,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		errContext     = context{"csr": csr, "signOptions": signOpts}
 		mods           = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
 		certValidators = []provisioner.CertificateValidator{}
+		issIdentity    = a.intermediateIdentity
 	)
 	for _, op := range extraOpts {
 		switch k := op.(type) {
@@ -76,16 +77,20 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		}
 	}
 
-	stepCSR, err := x509.ParseCertificateRequest(csr.Raw)
-	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "sign: error converting x509 csr to stepx509 csr"),
-			http.StatusInternalServerError, errContext}
+	if err := csr.CheckSignature(); err != nil {
+		return nil, nil, &apiError{errors.Wrap(err, "sign: invalid certificate request"),
+			http.StatusBadRequest, errContext}
 	}
 
-	issIdentity := a.intermediateIdentity
-	leaf, err := x509util.NewLeafProfileWithCSR(stepCSR, issIdentity.Crt, issIdentity.Key, mods...)
+	leaf, err := x509util.NewLeafProfileWithCSR(csr, issIdentity.Crt, issIdentity.Key, mods...)
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrapf(err, "sign"), http.StatusInternalServerError, errContext}
+	}
+
+	for _, v := range certValidators {
+		if err := v.Valid(leaf.Subject()); err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
+		}
 	}
 
 	crtBytes, err := leaf.CreateCertificate()
@@ -98,13 +103,6 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing new leaf certificate"),
 			http.StatusInternalServerError, errContext}
-	}
-
-	// FIXME: This should be before creating the certificate.
-	for _, v := range certValidators {
-		if err := v.Valid(serverCert); err != nil {
-			return nil, nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
-		}
 	}
 
 	caCert, err := x509.ParseCertificate(issIdentity.Crt.Raw)
