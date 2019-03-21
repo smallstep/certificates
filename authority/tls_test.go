@@ -19,7 +19,6 @@ import (
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
-	stepx509 "github.com/smallstep/cli/pkg/x509"
 )
 
 var (
@@ -119,20 +118,6 @@ func TestSign(t *testing.T) {
 				extraOpts: append(extraOpts, "42"),
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: invalid extra option type string"),
-					http.StatusInternalServerError,
-					context{"csr": csr, "signOptions": signOpts},
-				},
-			}
-		},
-		"fail convert csr to step format": func(t *testing.T) *signTest {
-			csr := getCSR(t, priv)
-			csr.Raw = []byte("foo")
-			return &signTest{
-				auth:      a,
-				csr:       csr,
-				extraOpts: extraOpts,
-				signOpts:  signOpts,
-				err: &apiError{errors.New("sign: error converting x509 csr to stepx509 csr"),
 					http.StatusInternalServerError,
 					context{"csr": csr, "signOptions": signOpts},
 				},
@@ -335,13 +320,6 @@ func TestRenew(t *testing.T) {
 		err  *apiError
 	}
 	tests := map[string]func() (*renewTest, error){
-		"fail-conversion-stepx509": func() (*renewTest, error) {
-			return &renewTest{
-				crt: &x509.Certificate{Raw: []byte("foo")},
-				err: &apiError{errors.New("error converting x509.Certificate to stepx509.Certificate"),
-					http.StatusInternalServerError, context{}},
-			}, nil
-		},
 		"fail-create-cert": func() (*renewTest, error) {
 			_a := testAuthority(t)
 			_a.intermediateIdentity.Key = nil
@@ -373,7 +351,7 @@ func TestRenew(t *testing.T) {
 			assert.FatalError(t, err)
 			newRootBytes, err := newRootProfile.CreateCertificate()
 			assert.FatalError(t, err)
-			newRootCrt, err := stepx509.ParseCertificate(newRootBytes)
+			newRootCrt, err := x509.ParseCertificate(newRootBytes)
 			assert.FatalError(t, err)
 
 			newIntermediateProfile, err := x509util.NewIntermediateProfile("new-intermediate",
@@ -381,7 +359,7 @@ func TestRenew(t *testing.T) {
 			assert.FatalError(t, err)
 			newIntermediateBytes, err := newIntermediateProfile.CreateCertificate()
 			assert.FatalError(t, err)
-			newIntermediateCrt, err := stepx509.ParseCertificate(newIntermediateBytes)
+			newIntermediateCrt, err := x509.ParseCertificate(newIntermediateBytes)
 			assert.FatalError(t, err)
 
 			_a := testAuthority(t)
