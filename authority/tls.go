@@ -14,7 +14,6 @@ import (
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
-	stepx509 "github.com/smallstep/cli/pkg/x509"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -77,15 +76,14 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		}
 	}
 
-	stepCSR, err := stepx509.ParseCertificateRequest(csr.Raw)
+	stepCSR, err := x509.ParseCertificateRequest(csr.Raw)
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error converting x509 csr to stepx509 csr"),
 			http.StatusInternalServerError, errContext}
 	}
 
 	issIdentity := a.intermediateIdentity
-	leaf, err := x509util.NewLeafProfileWithCSR(stepCSR, issIdentity.Crt,
-		issIdentity.Key, mods...)
+	leaf, err := x509util.NewLeafProfileWithCSR(stepCSR, issIdentity.Crt, issIdentity.Key, mods...)
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrapf(err, "sign"), http.StatusInternalServerError, errContext}
 	}
@@ -130,7 +128,7 @@ func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certi
 	issIdentity := a.intermediateIdentity
 
 	// Convert a realx509.Certificate to the step x509 Certificate.
-	oldCert, err := stepx509.ParseCertificate(ocx.Raw)
+	oldCert, err := x509.ParseCertificate(ocx.Raw)
 	if err != nil {
 		return nil, nil, &apiError{
 			errors.Wrap(err, "error converting x509.Certificate to stepx509.Certificate"),
@@ -140,7 +138,7 @@ func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certi
 
 	now := time.Now().UTC()
 	duration := oldCert.NotAfter.Sub(oldCert.NotBefore)
-	newCert := &stepx509.Certificate{
+	newCert := &x509.Certificate{
 		PublicKey:                   oldCert.PublicKey,
 		Issuer:                      issIdentity.Crt.Subject,
 		Subject:                     oldCert.Subject,
