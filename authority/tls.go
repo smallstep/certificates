@@ -116,23 +116,14 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 
 // Renew creates a new Certificate identical to the old certificate, except
 // with a validity window that begins 'now'.
-func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certificate, error) {
+func (a *Authority) Renew(oldCert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error) {
 	// Check step provisioner extensions
-	if err := a.authorizeRenewal(ocx); err != nil {
+	if err := a.authorizeRenewal(oldCert); err != nil {
 		return nil, nil, err
 	}
 
 	// Issuer
 	issIdentity := a.intermediateIdentity
-
-	// Convert a realx509.Certificate to the step x509 Certificate.
-	oldCert, err := x509.ParseCertificate(ocx.Raw)
-	if err != nil {
-		return nil, nil, &apiError{
-			errors.Wrap(err, "error converting x509.Certificate to stepx509.Certificate"),
-			http.StatusInternalServerError, context{},
-		}
-	}
 
 	now := time.Now().UTC()
 	duration := oldCert.NotAfter.Sub(oldCert.NotBefore)

@@ -109,6 +109,20 @@ func TestSign(t *testing.T) {
 		err       *apiError
 	}
 	tests := map[string]func(*testing.T) *signTest{
+		"fail invalid signature": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			csr.Signature = []byte("foo")
+			return &signTest{
+				auth:      a,
+				csr:       csr,
+				extraOpts: extraOpts,
+				signOpts:  signOpts,
+				err: &apiError{errors.New("sign: invalid certificate request"),
+					http.StatusBadRequest,
+					context{"csr": csr, "signOptions": signOpts},
+				},
+			}
+		},
 		"fail invalid extra option": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			csr.Raw = []byte("foo")
