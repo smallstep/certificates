@@ -36,6 +36,15 @@ type Authority interface {
 	GetFederation() ([]*x509.Certificate, error)
 }
 
+// TimeDuration is an alias of provisioner.TimeDuration
+type TimeDuration = provisioner.TimeDuration
+
+// ParseTimeDuration returns a new TimeDuration parsing the RFC 3339 time or
+// time.Duration string.
+func ParseTimeDuration(s string) (TimeDuration, error) {
+	return provisioner.ParseTimeDuration(s)
+}
+
 // Certificate wraps a *x509.Certificate and adds the json.Marshaler interface.
 type Certificate struct {
 	*x509.Certificate
@@ -154,8 +163,8 @@ type RootResponse struct {
 type SignRequest struct {
 	CsrPEM    CertificateRequest `json:"csr"`
 	OTT       string             `json:"ott"`
-	NotAfter  time.Time          `json:"notAfter"`
-	NotBefore time.Time          `json:"notBefore"`
+	NotAfter  TimeDuration       `json:"notAfter"`
+	NotBefore TimeDuration       `json:"notBefore"`
 }
 
 // ProvisionersResponse is the response object that returns the list of
