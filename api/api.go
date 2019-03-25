@@ -39,6 +39,11 @@ type Authority interface {
 // TimeDuration is an alias of provisioner.TimeDuration
 type TimeDuration = provisioner.TimeDuration
 
+// NewTimeDuration returns a TimeDuration with the defined time.
+func NewTimeDuration(t time.Time) TimeDuration {
+	return provisioner.NewTimeDuration(t)
+}
+
 // ParseTimeDuration returns a new TimeDuration parsing the RFC 3339 time or
 // time.Duration string.
 func ParseTimeDuration(s string) (TimeDuration, error) {

@@ -89,8 +89,8 @@ func TestSign(t *testing.T) {
 
 	nb := time.Now()
 	signOpts := provisioner.Options{
-		NotBefore: nb,
-		NotAfter:  nb.Add(time.Minute * 5),
+		NotBefore: provisioner.NewTimeDuration(nb),
+		NotAfter:  provisioner.NewTimeDuration(nb.Add(time.Minute * 5)),
 	}
 
 	// Create a token to get test extra opts.
@@ -171,8 +171,8 @@ func TestSign(t *testing.T) {
 		"fail provisioner duration claim": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			_signOpts := provisioner.Options{
-				NotBefore: nb,
-				NotAfter:  nb.Add(time.Hour * 25),
+				NotBefore: provisioner.NewTimeDuration(nb),
+				NotAfter:  provisioner.NewTimeDuration(nb.Add(time.Hour * 25)),
 			}
 			return &signTest{
 				auth:      a,
@@ -229,8 +229,8 @@ func TestSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, leaf.NotBefore, signOpts.NotBefore.UTC().Truncate(time.Second))
-					assert.Equals(t, leaf.NotAfter, signOpts.NotAfter.UTC().Truncate(time.Second))
+					assert.Equals(t, leaf.NotBefore, signOpts.NotBefore.Time().Truncate(time.Second))
+					assert.Equals(t, leaf.NotAfter, signOpts.NotAfter.Time().Truncate(time.Second))
 					tmplt := a.config.AuthorityConfig.Template
 					assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
 						fmt.Sprintf("%v", &pkix.Name{
@@ -300,13 +300,13 @@ func TestRenew(t *testing.T) {
 	nb1 := now.Add(-time.Minute * 7)
 	na1 := now
 	so := &provisioner.Options{
-		NotBefore: nb1,
-		NotAfter:  na1,
+		NotBefore: provisioner.NewTimeDuration(nb1),
+		NotAfter:  provisioner.NewTimeDuration(na1),
 	}
 
 	leaf, err := x509util.NewLeafProfile("renew", a.intermediateIdentity.Crt,
 		a.intermediateIdentity.Key,
-		x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, 0),
+		x509util.WithNotBeforeAfterDuration(so.NotBefore.Time(), so.NotAfter.Time(), 0),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
 		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID))
@@ -318,7 +318,7 @@ func TestRenew(t *testing.T) {
 
 	leafNoRenew, err := x509util.NewLeafProfile("norenew", a.intermediateIdentity.Crt,
 		a.intermediateIdentity.Key,
-		x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, 0),
+		x509util.WithNotBeforeAfterDuration(so.NotBefore.Time(), so.NotAfter.Time(), 0),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
 		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].(*provisioner.JWK).Key.KeyID),
