@@ -14,7 +14,6 @@ import (
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
-	stepx509 "github.com/smallstep/cli/pkg/x509"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -60,6 +59,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		errContext     = context{"csr": csr, "signOptions": signOpts}
 		mods           = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
 		certValidators = []provisioner.CertificateValidator{}
+		issIdentity    = a.intermediateIdentity
 	)
 	for _, op := range extraOpts {
 		switch k := op.(type) {
@@ -77,17 +77,20 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		}
 	}
 
-	stepCSR, err := stepx509.ParseCertificateRequest(csr.Raw)
-	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "sign: error converting x509 csr to stepx509 csr"),
-			http.StatusInternalServerError, errContext}
+	if err := csr.CheckSignature(); err != nil {
+		return nil, nil, &apiError{errors.Wrap(err, "sign: invalid certificate request"),
+			http.StatusBadRequest, errContext}
 	}
 
-	issIdentity := a.intermediateIdentity
-	leaf, err := x509util.NewLeafProfileWithCSR(stepCSR, issIdentity.Crt,
-		issIdentity.Key, mods...)
+	leaf, err := x509util.NewLeafProfileWithCSR(csr, issIdentity.Crt, issIdentity.Key, mods...)
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrapf(err, "sign"), http.StatusInternalServerError, errContext}
+	}
+
+	for _, v := range certValidators {
+		if err := v.Valid(leaf.Subject()); err != nil {
+			return nil, nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
+		}
 	}
 
 	crtBytes, err := leaf.CreateCertificate()
@@ -102,13 +105,6 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 			http.StatusInternalServerError, errContext}
 	}
 
-	// FIXME: This should be before creating the certificate.
-	for _, v := range certValidators {
-		if err := v.Valid(serverCert); err != nil {
-			return nil, nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
-		}
-	}
-
 	caCert, err := x509.ParseCertificate(issIdentity.Crt.Raw)
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing intermediate certificate"),
@@ -120,27 +116,18 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 
 // Renew creates a new Certificate identical to the old certificate, except
 // with a validity window that begins 'now'.
-func (a *Authority) Renew(ocx *x509.Certificate) (*x509.Certificate, *x509.Certificate, error) {
+func (a *Authority) Renew(oldCert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error) {
 	// Check step provisioner extensions
-	if err := a.authorizeRenewal(ocx); err != nil {
+	if err := a.authorizeRenewal(oldCert); err != nil {
 		return nil, nil, err
 	}
 
 	// Issuer
 	issIdentity := a.intermediateIdentity
 
-	// Convert a realx509.Certificate to the step x509 Certificate.
-	oldCert, err := stepx509.ParseCertificate(ocx.Raw)
-	if err != nil {
-		return nil, nil, &apiError{
-			errors.Wrap(err, "error converting x509.Certificate to stepx509.Certificate"),
-			http.StatusInternalServerError, context{},
-		}
-	}
-
 	now := time.Now().UTC()
 	duration := oldCert.NotAfter.Sub(oldCert.NotBefore)
-	newCert := &stepx509.Certificate{
+	newCert := &x509.Certificate{
 		PublicKey:                   oldCert.PublicKey,
 		Issuer:                      issIdentity.Crt.Subject,
 		Subject:                     oldCert.Subject,
