@@ -209,8 +209,8 @@ ZEp7knvU2psWRw==
 			body, err := json.Marshal(&api.SignRequest{
 				CsrPEM:    api.CertificateRequest{CertificateRequest: csr},
 				OTT:       raw,
-				NotBefore: now,
-				NotAfter:  leafExpiry,
+				NotBefore: api.NewTimeDuration(now),
+				NotAfter:  api.NewTimeDuration(leafExpiry),
 			})
 			assert.FatalError(t, err)
 			return &signTest{
@@ -242,8 +242,8 @@ ZEp7knvU2psWRw==
 			body, err := json.Marshal(&api.SignRequest{
 				CsrPEM:    api.CertificateRequest{CertificateRequest: csr},
 				OTT:       raw,
-				NotBefore: now,
-				NotAfter:  leafExpiry,
+				NotBefore: api.NewTimeDuration(now),
+				NotAfter:  api.NewTimeDuration(leafExpiry),
 			})
 			assert.FatalError(t, err)
 			return &signTest{

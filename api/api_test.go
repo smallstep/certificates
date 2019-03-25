@@ -397,8 +397,8 @@ func TestSignRequest_Validate(t *testing.T) {
 			s := &SignRequest{
 				CsrPEM:    tt.fields.CsrPEM,
 				OTT:       tt.fields.OTT,
-				NotAfter:  tt.fields.NotAfter,
-				NotBefore: tt.fields.NotBefore,
+				NotAfter:  NewTimeDuration(tt.fields.NotAfter),
+				NotBefore: NewTimeDuration(tt.fields.NotBefore),
 			}
 			if err := s.Validate(); (err != nil) != tt.wantErr {
 				t.Errorf("SignRequest.Validate() error = %v, wantErr %v", err, tt.wantErr)

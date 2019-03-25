@@ -14,8 +14,8 @@ import (
 
 // Options contains the options that can be passed to the Sign method.
 type Options struct {
-	NotAfter  time.Time `json:"notAfter"`
-	NotBefore time.Time `json:"notBefore"`
+	NotAfter  TimeDuration `json:"notAfter"`
+	NotBefore TimeDuration `json:"notBefore"`
 }
 
 // SignOption is the interface used to collect all extra options used in the
@@ -55,7 +55,7 @@ func (v profileWithOption) Option(Options) x509util.WithOption {
 type profileDefaultDuration time.Duration
 
 func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
-	return x509util.WithNotBeforeAfterDuration(so.NotBefore, so.NotAfter, time.Duration(v))
+	return x509util.WithNotBeforeAfterDuration(so.NotBefore.Time(), so.NotAfter.Time(), time.Duration(v))
 }
 
 // emailOnlyIdentity is a CertificateRequestValidator that checks that the only
@@ -228,6 +228,6 @@ func createProvisionerExtension(typ int, name, credentialID string) (pkix.Extens
 }
 
 func init() {
-	// Avoid deadcode warning in profileWithOption
+	// Avoid dead-code warning in profileWithOption
 	_ = profileWithOption(nil)
 }

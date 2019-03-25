@@ -257,8 +257,8 @@ func TestClient_Sign(t *testing.T) {
 	request := &api.SignRequest{
 		CsrPEM:    api.CertificateRequest{CertificateRequest: parseCertificateRequest(csrPEM)},
 		OTT:       "the-ott",
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().AddDate(0, 1, 0),
+		NotBefore: api.NewTimeDuration(time.Now()),
+		NotAfter:  api.NewTimeDuration(time.Now().AddDate(0, 1, 0)),
 	}
 	unauthorized := api.Unauthorized(fmt.Errorf("Unauthorized"))
 	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))
