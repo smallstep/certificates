@@ -7,6 +7,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+var now = func() time.Time {
+	return time.Now().UTC()
+}
+
 // TimeDuration is a type that represents a time but the JSON unmarshaling can
 // use a time using the RFC 3339 format or a time.Duration string. If a duration
 // is used, the time will be set on the first call to TimeDuration.Time.
@@ -25,7 +29,7 @@ func ParseTimeDuration(s string) (TimeDuration, error) {
 	// Try to use the unquoted RFC 3339 format
 	var t time.Time
 	if err := t.UnmarshalText([]byte(s)); err == nil {
-		return TimeDuration{t: t}, nil
+		return TimeDuration{t: t.UTC()}, nil
 	}
 
 	// Try to use the time.Duration string format
@@ -101,9 +105,17 @@ func (t *TimeDuration) Time() time.Time {
 	case t == nil:
 		return time.Time{}
 	case t.t.IsZero():
-		t.t = time.Now().UTC().Add(t.d)
+		if t.d == 0 {
+			return time.Time{}
+		}
+		t.t = now().Add(t.d)
 		return t.t
 	default:
 		return t.t
 	}
+}
+
+// String implements the fmt.Stringer interface.
+func (t *TimeDuration) String() string {
+	return t.Time().String()
 }
