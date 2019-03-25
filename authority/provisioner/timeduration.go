@@ -102,7 +102,7 @@ func (t *TimeDuration) UnmarshalJSON(data []byte) error {
 	return errors.Errorf("failed to parse %s", data)
 }
 
-// Time set once the embedded time and returns it.
+// Time calculates the embedded time.Time, sets it if necessary, and returns it.
 func (t *TimeDuration) Time() time.Time {
 	switch {
 	case t == nil:
