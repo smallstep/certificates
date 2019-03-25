@@ -276,7 +276,7 @@
   revision = "de77670473b5492f5d0bce155b5c01534c2d13f7"
 
 [[projects]]
-  branch = "x509util-real-x509"
+  branch = "master"
   digest = "1:8b36444f30009b5e124a3ac48b353558024a95c3fccdf3e6bb557a091e67342b"
   name = "github.com/smallstep/cli"
   packages = [
@@ -298,7 +298,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "de740bc707a264406a455c405238788d1f9f0666"
+  revision = "f1bc6bb3b78d3d508d6cbff1a01402035b76a431"
 
 [[projects]]
   branch = "master"
