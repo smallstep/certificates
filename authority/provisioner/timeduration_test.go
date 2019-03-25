@@ -6,6 +6,28 @@ import (
 	"time"
 )
 
+func TestNewTimeDuration(t *testing.T) {
+	tm := time.Unix(1584198566, 535897000).UTC()
+	type args struct {
+		t time.Time
+	}
+	tests := []struct {
+		name string
+		args args
+		want TimeDuration
+	}{
+		{"ok", args{tm}, TimeDuration{t: tm}},
+		{"zero", args{time.Time{}}, TimeDuration{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NewTimeDuration(tt.args.t); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewTimeDuration() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseTimeDuration(t *testing.T) {
 	type args struct {
 		s string
@@ -111,15 +133,14 @@ func TestTimeDuration_MarshalJSON(t *testing.T) {
 	tm := time.Unix(1584198566, 535897000).UTC()
 	tests := []struct {
 		name         string
-		timeDuration *TimeDuration
+		timeDuration TimeDuration
 		want         []byte
 		wantErr      bool
 	}{
-		{"null", nil, []byte("null"), false},
-		{"null", &TimeDuration{}, []byte("null"), false},
-		{"timestamp", &TimeDuration{t: tm}, []byte(`"2020-03-14T15:09:26.535897Z"`), false},
-		{"duration", &TimeDuration{d: 1 * time.Hour}, []byte(`"1h0m0s"`), false},
-		{"fail", &TimeDuration{t: time.Date(-1, 0, 0, 0, 0, 0, 0, time.UTC)}, nil, true},
+		{"null", TimeDuration{}, []byte("null"), false},
+		{"timestamp", TimeDuration{t: tm}, []byte(`"2020-03-14T15:09:26.535897Z"`), false},
+		{"duration", TimeDuration{d: 1 * time.Hour}, []byte(`"1h0m0s"`), false},
+		{"fail", TimeDuration{t: time.Date(-1, 0, 0, 0, 0, 0, 0, time.UTC)}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -182,6 +203,7 @@ func TestTimeDuration_Time(t *testing.T) {
 		{"zero", nil, time.Time{}},
 		{"zero", &TimeDuration{}, time.Time{}},
 		{"timestamp", &TimeDuration{t: tm}, tm},
+		{"local", &TimeDuration{t: tm.Local()}, tm},
 		{"duration", &TimeDuration{d: 1 * time.Hour}, tm.Add(1 * time.Hour)},
 	}
 	for _, tt := range tests {

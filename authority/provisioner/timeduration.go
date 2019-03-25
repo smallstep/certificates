@@ -19,6 +19,11 @@ type TimeDuration struct {
 	d time.Duration
 }
 
+// NewTimeDuration returns a TimeDuration with the defined time.
+func NewTimeDuration(t time.Time) TimeDuration {
+	return TimeDuration{t: t}
+}
+
 // ParseTimeDuration returns a new TimeDuration parsing the RFC 3339 time or
 // time.Duration string.
 func ParseTimeDuration(s string) (TimeDuration, error) {
@@ -55,10 +60,8 @@ func (t *TimeDuration) SetTime(tt time.Time) {
 // MarshalJSON implements the json.Marshaler interface. If the time is set it
 // will return the time in RFC 3339 format if not it will return the duration
 // string.
-func (t *TimeDuration) MarshalJSON() ([]byte, error) {
+func (t TimeDuration) MarshalJSON() ([]byte, error) {
 	switch {
-	case t == nil:
-		return []byte("null"), nil
 	case t.t.IsZero():
 		if t.d == 0 {
 			return []byte("null"), nil
@@ -111,7 +114,7 @@ func (t *TimeDuration) Time() time.Time {
 		t.t = now().Add(t.d)
 		return t.t
 	default:
-		return t.t
+		return t.t.UTC()
 	}
 }
 
