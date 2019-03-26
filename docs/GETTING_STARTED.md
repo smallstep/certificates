@@ -517,6 +517,8 @@ X.509v3 TLS Certificate (ECDSA P-256) [Serial: 2295...5799]
           to:  2019-03-27T19:02:58Z
 ```
 
+Now it's easy for anybody in the G-Suite organization to self-serve fetching valid certificates.
+
 ## Notes on Securing the Step CA and your PKI.
 
 In this section we recommend a few best practices when it comes to
