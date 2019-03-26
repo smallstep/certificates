@@ -513,13 +513,14 @@ What provisioner key do you want to use?
 ✔ Certificate: personal.crt
 ✔ Private Key: personal.key
 
-$ step certificate inspect --short localhost.crt
-X.509v3 TLS Certificate (ECDSA P-256) [Serial: 2295...5799]
-  Subject:     localhost
+$ step certificate inspect --short personal.crt                                                                 ⏎
+X.509v3 TLS Certificate (ECDSA P-256) [Serial: 6169...4235]
+  Subject:     106202051347258973689
+               sebastian@smallstep.com
   Issuer:      Local CA Intermediate CA
-  Provisioner: admin [ID: fYDo...5iXI]
-  Valid from:  2019-03-26T19:02:58Z
-          to:  2019-03-27T19:02:58Z
+  Provisioner: Google [ID: 9724....com]
+  Valid from:  2019-03-26T20:36:28Z
+          to:  2019-03-27T20:36:28Z
 ```
 
 Now it's easy for anybody in the G-Suite organization to obtain valid personal
