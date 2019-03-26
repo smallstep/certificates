@@ -15,8 +15,13 @@ e.g. `v1.0.2`
 * **Release Candidate**: not ready for public use, still testing. must have a
 `-rc*` suffix. e.g. `v1.0.2-rc` or `v1.0.2-rc.4`
 
+1. **Update the version of step/cli**
 
-1. **Commit all changes.**
+    ```
+    $ dep ensure -update github.com/smallstep/cli
+    ```
+
+2. **Commit all changes.**
 
     Make sure that the local checkout is up to date with the remote origin and
     that all local changes have been pushed.
@@ -26,7 +31,7 @@ e.g. `v1.0.2`
     git push
     ```
 
-2. **Tag it!**
+3. **Tag it!**
 
     1. **Find the most recent tag.**
 
@@ -38,7 +43,7 @@ e.g. `v1.0.2`
         The new tag needs to be the logical successor of the most recent existing tag.
         See [versioning](#versioning) section for more information on version numbers.
 
-    2. **Select the next tag (but don't actually tag anything yet!!).**
+    2. **Select the type and value of the next tag.**
 
         Is the new release a *release candidate* or a *standard release*?
 
@@ -73,7 +78,7 @@ e.g. `v1.0.2`
         git push origin tag v1.0.3-rc.1  # release candidate
         ```
 
-6. Check the build status at
+4. Check the build status at
 [Travis-CI](https://travis-ci.com/smallstep/certificates/builds/).
 
     Travis will begin by verifying that there are no compilation or linting errors
