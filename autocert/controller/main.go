@@ -388,7 +388,10 @@ func patch(pod *corev1.Pod, namespace string, config *Config, provisioner Provis
 // shouldMutate checks whether a pod is subject to mutation by this admission controller. A pod
 // is subject to mutation if it's annotated with the `admissionWebhookAnnotationKey` and if it
 // has not already been processed (indicated by `admissionWebhookStatusKey` set to `injected`).
-func shouldMutate(metadata *metav1.ObjectMeta, namespace string, clusterDomain string, restrictToNamespace bool) bool {
+// If the pod requests a certificate with a subject matching a namespace other than its own
+// and restrictToNamespace is true, then shouldMutate will return a validation error
+// that should be returned to the client.
+func shouldMutate(metadata *metav1.ObjectMeta, namespace string, clusterDomain string, restrictToNamespace bool) (bool, error) {
 	annotations := metadata.GetAnnotations()
 	if annotations == nil {
 		annotations = map[string]string{}
@@ -397,24 +400,26 @@ func shouldMutate(metadata *metav1.ObjectMeta, namespace string, clusterDomain s
 	// Only mutate if the object is annotated appropriately (annotation key set) and we haven't
 	// mutated already (status key isn't set).
 	if annotations[admissionWebhookAnnotationKey] == "" || annotations[admissionWebhookStatusKey] == "injected" {
-		return false
+		return false, nil
 	}
 
 	if !restrictToNamespace {
-		return true
+		return true, nil
 	}
 
 	subject := strings.Trim(annotations[admissionWebhookAnnotationKey], ".")
 
+	err := fmt.Errorf("Subject \"%s\" matches a namespace other than \"%s\" and is not permitted. This check can be disabled by setting restrictCertificatesToNamespace to false in the autocert-config ConfigMap.", subject, namespace)
+
 	if strings.HasSuffix(subject, ".svc") && !strings.HasSuffix(subject, fmt.Sprintf(".%s.svc", namespace)) {
-		return false
+		return false, err
 	}
 
 	if strings.HasSuffix(subject, fmt.Sprintf(".svc.%s", clusterDomain)) && !strings.HasSuffix(subject, fmt.Sprintf(".%s.svc.%s", namespace, clusterDomain)) {
-		return false
+		return false, err
 	}
 
-	return true
+	return true, nil
 }
 
 // mutate takes an `AdmissionReview`, determines whether it is subject to mutation, and returns
@@ -444,7 +449,20 @@ func mutate(review *v1beta1.AdmissionReview, config *Config, provisioner Provisi
 		"user":         request.UserInfo,
 	})
 
-	if !shouldMutate(&pod.ObjectMeta, request.Namespace, config.GetClusterDomain(), config.RestrictCertificatesToNamespace) {
+	mutationAllowed, validationErr := shouldMutate(&pod.ObjectMeta, request.Namespace, config.GetClusterDomain(), config.RestrictCertificatesToNamespace)
+
+	if validationErr != nil {
+		ctxLog.WithField("error", validationErr).Info("Validation error")
+		return &v1beta1.AdmissionResponse{
+			Allowed: false,
+			UID:     request.UID,
+			Result: &metav1.Status{
+				Message: validationErr.Error(),
+			},
+		}
+	}
+
+	if !mutationAllowed {
 		ctxLog.WithField("annotations", pod.Annotations).Info("Skipping mutation")
 		return &v1beta1.AdmissionResponse{
 			Allowed: true,

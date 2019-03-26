@@ -48,23 +48,28 @@ func TestShouldMutate(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			if shouldMutate(&metav1.ObjectMeta{
+			mutationAllowed, validationErr := shouldMutate(&metav1.ObjectMeta{
 				Annotations: map[string]string{
 					admissionWebhookAnnotationKey: testCase.subject,
 				},
-			}, testCase.namespace, "cluster.local", true) != testCase.expected {
+			}, testCase.namespace, "cluster.local", true)
+			if mutationAllowed != testCase.expected {
 				t.Errorf("shouldMutate did not return %t for %s", testCase.expected, testCase.description)
+			}
+			if testCase.subject != "" && mutationAllowed == false && validationErr == nil {
+				t.Errorf("shouldMutate should return validation error for invalid hostname")
 			}
 		})
 	}
 }
 
 func TestShouldMutateNotRestrictToNamespace(t *testing.T) {
-	if shouldMutate(&metav1.ObjectMeta{
+	mutationAllowed, _ := shouldMutate(&metav1.ObjectMeta{
 		Annotations: map[string]string{
 			admissionWebhookAnnotationKey: "test.default.svc.cluster.local",
 		},
-	}, "kube-system", "cluster.local", false) == false {
+	}, "kube-system", "cluster.local", false)
+	if mutationAllowed == false {
 		t.Errorf("shouldMutate should return true even with a wrong namespace if restrictToNamespace is false.")
 	}
 }
