@@ -467,7 +467,7 @@ top navbar's dropdown.
 In the masthead navigation click **Credentials** (key symbol) and then "OAuth consent
 screen" from the subnav. Fill out naming details, all mandatory fields, and decide if
 your app is of type **Public** or **Internal**. Internal will make sure the access scope
-is bound to your G-Suite organization. **Publi** will let anybody with a Google Account
+is bound to your G-Suite organization. **Public** will let anybody with a Google Account
 log in, incl. `gmail.com` accounts.
 
 Move back to **Credentials** on the subnav and choose "OAuth client ID" from the
