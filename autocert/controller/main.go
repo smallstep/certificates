@@ -35,23 +35,32 @@ var (
 )
 
 const (
-	admissionWebhookAnnotationKey         = "autocert.step.sm/name"
-	admissionWebhookStatusKey             = "autocert.step.sm/status"
-	provisionerPasswordFile               = "/home/step/password/password"
-	volumeMountPath                       = "/var/run/autocert.step.sm"
-	tokenSecretKey                        = "token"
-	tokenSecretLabel                      = "autocert.step.sm/token"
-	clusterDomain                         = "cluster.local"
+	admissionWebhookAnnotationKey = "autocert.step.sm/name"
+	admissionWebhookStatusKey     = "autocert.step.sm/status"
+	provisionerPasswordFile       = "/home/step/password/password"
+	volumeMountPath               = "/var/run/autocert.step.sm"
+	tokenSecretKey                = "token"
+	tokenSecretLabel              = "autocert.step.sm/token"
 )
 
 // Config options for the autocert admission controller.
 type Config struct {
-	LogFormat    string           `yaml:"logFormat"`
-	CaURL        string           `yaml:"caUrl"`
-	CertLifetime string           `yaml:"certLifetime"`
-	Bootstrapper corev1.Container `yaml:"bootstrapper"`
-	Renewer      corev1.Container `yaml:"renewer"`
-	CertsVolume  corev1.Volume    `yaml:"certsVolume"`
+	LogFormat                       string           `yaml:"logFormat"`
+	CaURL                           string           `yaml:"caUrl"`
+	CertLifetime                    string           `yaml:"certLifetime"`
+	Bootstrapper                    corev1.Container `yaml:"bootstrapper"`
+	Renewer                         corev1.Container `yaml:"renewer"`
+	CertsVolume                     corev1.Volume    `yaml:"certsVolume"`
+	RestrictCertificatesToNamespace bool             `yaml:"restrictCertificatesToNamespace"`
+	ClusterDomain                   string           `yaml:"clusterDomain"`
+}
+
+func (c Config) GetClusterDomain() string {
+	if c.ClusterDomain != "" {
+		return c.ClusterDomain
+	}
+
+	return "cluster.local"
 }
 
 // PatchOperation represents a RFC6902 JSONPatch Operation
@@ -212,7 +221,6 @@ func mkBootstrapper(config *Config, commonName string, namespace string, provisi
 		return b, errors.Wrap(err, "create token secret")
 	}
 	log.Infof("Secret name is: %s", secretName)
-
 
 	b.Env = append(b.Env, corev1.EnvVar{
 		Name:  "COMMON_NAME",
@@ -380,7 +388,7 @@ func patch(pod *corev1.Pod, namespace string, config *Config, provisioner Provis
 // shouldMutate checks whether a pod is subject to mutation by this admission controller. A pod
 // is subject to mutation if it's annotated with the `admissionWebhookAnnotationKey` and if it
 // has not already been processed (indicated by `admissionWebhookStatusKey` set to `injected`).
-func shouldMutate(metadata *metav1.ObjectMeta, namespace string) bool {
+func shouldMutate(metadata *metav1.ObjectMeta, namespace string, clusterDomain string, restrictToNamespace bool) bool {
 	annotations := metadata.GetAnnotations()
 	if annotations == nil {
 		annotations = map[string]string{}
@@ -392,31 +400,17 @@ func shouldMutate(metadata *metav1.ObjectMeta, namespace string) bool {
 		return false
 	}
 
-	subject := strings.Trim(annotations[admissionWebhookAnnotationKey], ".")
-	subjectParts := strings.Split(subject, ".")
-	clusterDomainParts := strings.Split(fmt.Sprintf("svc.%s", clusterDomain), ".")
-
-	// Mutate if subject is a lonely hostname, e.g., "example", or
-	// if it is two parts. While this could be a hostname + namespace,
-	// it could also be a regular domain (e.g., `example.com`). We don't
-	// want to preclude users from issuing non-cluster hostnames, so we
-	// allow it. Additionally, if it is greater than 5 parts, it is not
-	// a cluster hostname.
-	if len(subjectParts) < 3  || len(subjectParts) > 5 {
+	if !restrictToNamespace {
 		return true
 	}
 
-	// Check if the parts of the domain match the cluster domain, if they don't
-	// it's not a cluster hostname and we can safely sign it.
-	for index, part := range clusterDomainParts {
-		if len(subjectParts) - 2 > index && subjectParts[index + 2] != part {
-			return true
-		}
+	subject := strings.Trim(annotations[admissionWebhookAnnotationKey], ".")
+
+	if strings.HasSuffix(subject, ".svc") && !strings.HasSuffix(subject, fmt.Sprintf(".%s.svc", namespace)) {
+		return false
 	}
 
-	// If the namespace is not the same as our pod's namespace, do not mutate the pod.
-	if subjectParts[1] != namespace {
-		log.WithField("namespace", namespace).WithField("subject", subject).Infof("Invalid subject for pod in namespace.")
+	if strings.HasSuffix(subject, fmt.Sprintf(".svc.%s", clusterDomain)) && !strings.HasSuffix(subject, fmt.Sprintf(".%s.svc.%s", namespace, clusterDomain)) {
 		return false
 	}
 
@@ -450,7 +444,7 @@ func mutate(review *v1beta1.AdmissionReview, config *Config, provisioner Provisi
 		"user":         request.UserInfo,
 	})
 
-	if !shouldMutate(&pod.ObjectMeta, request.Namespace) {
+	if !shouldMutate(&pod.ObjectMeta, request.Namespace, config.GetClusterDomain(), config.RestrictCertificatesToNamespace) {
 		ctxLog.WithField("annotations", pod.Annotations).Info("Skipping mutation")
 		return &v1beta1.AdmissionResponse{
 			Allowed: true,
