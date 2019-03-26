@@ -55,6 +55,8 @@ type Config struct {
 	ClusterDomain                   string           `yaml:"clusterDomain"`
 }
 
+// GetClusterDomain returns the Kubernetes cluster domain, defaults to
+// "cluster.local" if not specified in the configuration.
 func (c Config) GetClusterDomain() string {
 	if c.ClusterDomain != "" {
 		return c.ClusterDomain
@@ -409,7 +411,7 @@ func shouldMutate(metadata *metav1.ObjectMeta, namespace string, clusterDomain s
 
 	subject := strings.Trim(annotations[admissionWebhookAnnotationKey], ".")
 
-	err := fmt.Errorf("Subject \"%s\" matches a namespace other than \"%s\" and is not permitted. This check can be disabled by setting restrictCertificatesToNamespace to false in the autocert-config ConfigMap.", subject, namespace)
+	err := fmt.Errorf("subject \"%s\" matches a namespace other than \"%s\" and is not permitted. This check can be disabled by setting restrictCertificatesToNamespace to false in the autocert-config ConfigMap", subject, namespace)
 
 	if strings.HasSuffix(subject, ".svc") && !strings.HasSuffix(subject, fmt.Sprintf(".%s.svc", namespace)) {
 		return false, err
