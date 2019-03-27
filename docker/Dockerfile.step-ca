@@ -2,13 +2,11 @@ FROM smallstep/step-cli:0.9.0
 
 ARG BINPATH="bin/step-ca"
 
-ENV PORT=9000
 ENV CONFIGPATH="/home/step/config/ca.json"
 ENV PWDPATH="/home/step/secrets/password"
 
 COPY $BINPATH "/usr/local/bin/step-ca"
 
-EXPOSE $PORT
 VOLUME ["/home/step"]
 STOPSIGNAL SIGTERM
 
