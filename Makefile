@@ -233,7 +233,7 @@ docker-login:
 # Targets for pushing the docker images
 #################################################
 
-# For all builds that are not tagged
+# For all builds we build the docker container
 docker-master: docker
 
 # For all builds with a release candidate tag
