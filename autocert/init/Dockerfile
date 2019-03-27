@@ -1,4 +1,4 @@
-FROM smallstep/step-cli:0.8.4-rc.1
+FROM smallstep/step-cli:0.9.0
 
 ENV CA_NAME="Autocert"
 ENV CA_DNS="ca.step.svc.cluster.local,127.0.0.1"
