@@ -53,10 +53,15 @@ VERSION ?= $(shell [ -d .git ] && git describe --tags --always --dirty="-dev")
 # .VERSION contains a slug populated by `git archive`.
 VERSION := $(or $(VERSION),$(shell ./.version.sh .VERSION))
 VERSION := $(shell echo $(VERSION) | sed 's/^v//')
+NOT_RC  := $(shell echo $(VERSION) | grep -v -e -rc)
 
 # If TRAVIS_TAG is set then we know this ref has been tagged.
 ifdef TRAVIS_TAG
-	PUSHTYPE=release
+	ifeq ($(NOT_RC),)
+		PUSHTYPE=release-candidate
+	else
+		PUSHTYPE=release
+	endif
 else
 	PUSHTYPE=master
 endif
@@ -214,24 +219,30 @@ docker-tag:
 docker-push-tag: docker-tag
 	$(call DOCKER_PUSH,step-ca,$(VERSION))
 
+docker-push-tag-latest:
+	$(call DOCKER_PUSH,step-ca,latest)
+
 # Rely on DOCKER_USERNAME and DOCKER_PASSWORD being set inside the CI or
 # equivalent environment
 docker-login:
 	$Q docker login -u="$(DOCKER_USERNAME)" -p="$(DOCKER_PASSWORD)"
 
-.PHONY: docker-login docker-tag docker-push-tag
+.PHONY: docker-login docker-tag docker-push-tag docker-push-tag-latest
 
 #################################################
 # Targets for pushing the docker images
 #################################################
 
-# For all builds on the master branch, we actually build the container
+# For all builds that are not tagged
 docker-master: docker
 
-# For all builds on the master branch with an rc tag
-docker-release: docker-master docker-login docker-push-tag
+# For all builds with a release candidate tag
+docker-release-candidate: docker-master docker-login docker-push-tag
 
-.PHONY: docker-master docker-release
+# For all builds with a release tag
+docker-release: docker-release-candidate docker-push-tag-latest
+
+.PHONY: docker-master docker-release-candidate docker-release
 
 #########################################
 # Debian
@@ -310,10 +321,13 @@ artifacts-tag: artifacts-linux-tag artifacts-darwin-tag
 # For all builds that are not tagged
 artifacts-master:
 
+# For all build with a release candidate tag
+artifacts-release-candidate: artifacts-tag
+
 # For all builds with a release tag
 artifacts-release: artifacts-tag
 
 # This command is called by travis directly *after* a successful build
 artifacts: artifacts-$(PUSHTYPE) docker-$(PUSHTYPE)
 
-.PHONY: artifacts-master artifacts-release artifacts
+.PHONY: artifacts-master artifacts-release-candidate artifacts-release artifacts
