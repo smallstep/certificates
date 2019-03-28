@@ -42,7 +42,7 @@ mTLS](https://raw.githubusercontent.com/smallstep/certificates/master/images/con
 There's just one problem: **you need certificates issued by your own
 certificate authority (CA)**. Building and operating a CA, issuing
 certificates, and making sure they're renewed before they expire is tricky.
-This project provides the infratructure, automations, and workflows you'll
+This project provides the infrastructure, automations, and workflows you'll
 need.
 
 `step certificates` is part of smallstep's broader security architecture, which
