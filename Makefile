@@ -303,7 +303,7 @@ artifacts-archive-tag:
 	$Q mkdir -p $(RELEASE)
 	$Q git archive v$(VERSION) | gzip > $(RELEASE)/step-certificates.tar.gz
 
-artifacts-tag: artifacts-linux-tag artifacts-darwin-tag
+artifacts-tag: artifacts-linux-tag artifacts-darwin-tag artifacts-archive-tag
 
 .PHONY: artifacts-linux-tag artifacts-darwin-tag artifacts-archive-tag artifacts-tag
 
