@@ -127,6 +127,45 @@ func (c *Client) Transport(ctx context.Context, sign *api.SignResponse, pk crypt
 	return tr, nil
 }
 
+// GetCertificateRenewer returns a TLSRenewer for the given certificate.
+func (c *Client) GetCertificateRenewer(sign *api.SignResponse, pk crypto.PrivateKey, options ...TLSOption) (*TLSRenewer, error) {
+	cert, err := TLSCertificate(sign, pk)
+	if err != nil {
+		return nil, err
+	}
+
+	renewer, err := NewTLSRenewer(cert, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsConfig := getDefaultTLSConfig(sign)
+	// Note that with GetClientCertificate tlsConfig.Certificates is not used.
+	// Without tlsConfig.Certificates there's not need to use tlsConfig.BuildNameToCertificate()
+	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
+	tlsConfig.PreferServerCipherSuites = true
+
+	// Apply options and initialize mutable tls.Config
+	tlsCtx := newTLSOptionCtx(c, tlsConfig, sign)
+	if err := tlsCtx.apply(options); err != nil {
+		return nil, err
+	}
+
+	// Update renew function with transport
+	tr, err := getDefaultTransport(tlsConfig)
+	if err != nil {
+		return nil, err
+	}
+	// Use mutable tls.Config on renew
+	tr.DialTLS = c.buildDialTLS(tlsCtx)
+	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
+
+	// Update client transport
+	c.client.Transport = tr
+
+	return renewer, nil
+}
+
 // buildGetConfigForClient returns an implementation of GetConfigForClient
 // callback in tls.Config.
 //
