@@ -258,6 +258,11 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 	}, nil
 }
 
+// SetTransport updates the transport of the internal HTTP client.
+func (c *Client) SetTransport(tr http.RoundTripper) {
+	c.client.Transport = tr
+}
+
 // Health performs the health request to the CA and returns the
 // api.HealthResponse struct.
 func (c *Client) Health() (*api.HealthResponse, error) {
