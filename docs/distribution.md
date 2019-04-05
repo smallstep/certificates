@@ -88,9 +88,10 @@ e.g. `v1.0.2`
 
     Travis will build and upload the following artifacts:
 
-    * **step-ca_1.0.3_amd64.deb**: debian package for installation on linux.
-    * **step-ca_1.0.3_linux_amd64.tar.gz**: tarball containing a statically compiled linux binary.
-    * **step-ca_1.0.3_darwin_amd64.tar.gz**: tarball containing a statically compiled darwin binary.
+    * **step-certificates_1.0.3_amd64.deb**: debian package for installation on linux.
+    * **step-certificates_1.0.3_linux_amd64.tar.gz**: tarball containing a statically compiled linux binary.
+    * **step-certificates_1.0.3_darwin_amd64.tar.gz**: tarball containing a statically compiled darwin binary.
+    * **step-certificates.tar.gz**: tarball containing a git archive of the full repo.
 
 *All Done!*
 
