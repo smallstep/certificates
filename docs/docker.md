@@ -18,7 +18,7 @@ cli](https://github.com/smallstep/cli#installation-guide).
     $ docker pull smallstep/step-ca
     ```
 
-3. Create the required volumens.
+3. Create the required volumes.
 
     We need to create a volume in docker where we will store our PKI as well as
     the step-ca configuration file.
@@ -27,7 +27,7 @@ cli](https://github.com/smallstep/cli#installation-guide).
     $ docker volume create step
     ```
 
-4. Intialize the PKI.
+4. Initialize the PKI.
 
     The simple way to do this is to run an interactive terminal:
 
