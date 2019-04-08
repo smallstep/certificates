@@ -174,3 +174,7 @@ $ kubectl get mutatingwebhookconfiguration
 NAME                      CREATED AT
 autocert-webhook-config   2019-01-17T22:57:57Z
 ```
+
+### Move on to usage instructions
+
+Make sure to follow the autocert usage steps at https://github.com/smallstep/certificates/tree/master/autocert#usage
