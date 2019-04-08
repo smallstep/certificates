@@ -6,82 +6,80 @@ For short, we will use **step-ca** to refer to [step certificates](https://githu
 
 ## Requirements
 
-To be able to follow this guide you need to install [step
-cli](https://github.com/smallstep/cli). Follow the installation instructions to
-install it in your environment.
+1. To follow this guide you will need to [install step
+cli](https://github.com/smallstep/cli#installation-guide).
 
-## Getting the image
+2. Get the docker image.
 
-The first thing that we need to run step-ca is pull the image from docker. Get
-the latest version from the [step-ca docker
-hub](https://hub.docker.com/r/smallstep/step-ca) and run:
+    Get the latest version of **step-ca** from the [step-ca docker
+    hub](https://hub.docker.com/r/smallstep/step-ca):
 
-```sh
-docker pull smallstep/step-ca
-```
+    ```sh
+    $ docker pull smallstep/step-ca
+    ```
 
-## Volumes
+3. Create the required volumens.
 
-To be able to run step-ca we need to create a volume in docker where we will
-store our PKI as well as the step-ca configuration file.
+    We need to create a volume in docker where we will store our PKI as well as
+    the step-ca configuration file.
 
-To create a volume just run:
+    ```sh
+    $ docker volume create step
+    ```
 
-```sh 
-docker volume create step
-```
+4. Intialize the PKI.
 
-## Initializing the PKI
+    The simple way to do this is to run an interactive terminal:
 
-The simpler way to do this is to run an interactive terminal and initialize it:
+    ```sh
+    $ docker run -it -v step:/home/step smallstep/step-ca sh
 
-```
-$ docker run -it -v step:/home/step smallstep/step-ca sh
-~ $ step ca init
-✔ What would you like to name your new PKI? (e.g. Smallstep): Smallstep
-✔ What DNS names or IP addresses would you like to add to your new CA? (e.g. ca.smallstep.com[,1.1.1.1,etc.]): localhost
-✔ What address will your new CA listen at? (e.g. :443): :9000
-✔ What would you like to name the first provisioner for your new CA? (e.g. you@smallstep.com): admin
-✔ What do you want your password to be? [leave empty and we'll generate one]: <your password here>
+    ~ $ step ca init
+    ✔ What would you like to name your new PKI? (e.g. Smallstep): Smallstep
+    ✔ What DNS names or IP addresses would you like to add to your new CA? (e.g. ca.smallstep.com[,1.1.1.1,etc.]): localhost
+    ✔ What address will your new CA listen at? (e.g. :443): :9000
+    ✔ What would you like to name the first provisioner for your new CA? (e.g. you@smallstep.com): admin
+    ✔ What do you want your password to be? [leave empty and we'll generate one]: <your password here>
 
-Generating root certificate...
-all done!
+    Generating root certificate...
+    all done!
 
-Generating intermediate certificate...
-all done!
+    Generating intermediate certificate...
+    all done!
 
-✔ Root certificate: /home/step/certs/root_ca.crt
-✔ Root private key: /home/step/secrets/root_ca_key
-✔ Root fingerprint: f9e45ae9ec5d42d702ce39fd9f3125372ce54d0b29a5ff3016b31d9b887a61a4
-✔ Intermediate certificate: /home/step/certs/intermediate_ca.crt
-✔ Intermediate private key: /home/step/secrets/intermediate_ca_key
-✔ Default configuration: /home/step/config/defaults.json
-✔ Certificate Authority configuration: /home/step/config/ca.json
+    ✔ Root certificate: /home/step/certs/root_ca.crt
+    ✔ Root private key: /home/step/secrets/root_ca_key
+    ✔ Root fingerprint: f9e45ae9ec5d42d702ce39fd9f3125372ce54d0b29a5ff3016b31d9b887a61a4
+    ✔ Intermediate certificate: /home/step/certs/intermediate_ca.crt
+    ✔ Intermediate private key: /home/step/secrets/intermediate_ca_key
+    ✔ Default configuration: /home/step/config/defaults.json
+    ✔ Certificate Authority configuration: /home/step/config/ca.json
 
-Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.
-```
+    Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.
+    ```
 
-Our image is expecting the password to be placed in /home/step/secrets/password
-you can simple go in to the terminal again and write that file:
+5. Place the PKI root password in a known location.
 
-```sh
-$ docker run -it -v step:/home/step smallstep/step-ca sh
-~ $ echo <your password here> > /home/step/secrets/password
-```
+    Our image is expecting the password to be placed in `/home/step/secrets/password`
+    you can simple go in to the terminal again and write that file:
 
-At this time everything is ready to run step-ca.
+    ```sh
+    $ docker run -it -v step:/home/step smallstep/step-ca sh
+    ~ $ echo <your password here> > /home/step/secrets/password
+    ```
+
+At this time everything is ready to run step-ca!
 
 ## Running step certificates
 
-Now that we have the volume and we have initialized the PKI we can run step-ca
-and expose locally the server address with:
+Now that we have configured our environment we are ready to run step-ca.
 
+Expose the server address locally and run the step-ca with:
 ```sh
-docker run -d -p 127.0.0.1:9000:9000 -v step:/home/step smallstep/step-ca
+$ docker run -d -p 127.0.0.1:9000:9000 -v step:/home/step smallstep/step-ca
 ```
 
-You can verify with curl that the service is running:
-
+Let's verify that the service is running with curl:
 ```sh
 $ curl https://localhost:9000/health
 curl: (60) SSL certificate problem: unable to get local issuer certificate
@@ -105,31 +103,11 @@ accepted certificate authority.
 
 ## Dev environment bootstrap
 
-To initialize the development environment we need to go back to [Initializing
-the PKI](#initializing-the-pki) and grab the Root fingerprint. In our case
+To initialize the development environment we need to grab the Root fingerprint
+from the [Initializing the PKI](#initializing-the-pki) step earlier. In the
+case of this example:
 `f9e45ae9ec5d42d702ce39fd9f3125372ce54d0b29a5ff3016b31d9b887a61a4`. With the
 fingerprint we can bootstrap our dev environment.
-
-```sh
-$ step ca bootstrap --ca-url https://localhost:9000 --fingerprint f9e45ae9ec5d42d702ce39fd9f3125372ce54d0b29a5ff3016b31d9b887a61a4
-The root certificate has been saved in ~/.step/certs/root_ca.crt.
-Your configuration has been saved in ~/.step/config/defaults.json.
-```
-
-From this moment forward [step cli](https://github.com/smallstep/cli) is
-configured properly to use step certificates.
-
-But curl and the rest of your environment won't accept the root certificate, we
-can install the root certificate and everything would be ready.
-
-```sh
-$ step certificate install ~/.step/certs/root_ca.crt
-Password: 
-Certificate ~/.step/certs/root_ca.crt has been installed.
-```
-
-We can skip this last step if we go back to the bootstrap and run it with the
-`--install` flag:
 
 ```sh
 $ step ca bootstrap --ca-url https://localhost:9000 --fingerprint f9e45ae9ec5d42d702ce39fd9f3125372ce54d0b29a5ff3016b31d9b887a61a4 --install
@@ -138,25 +116,24 @@ Your configuration has been saved in ~/.step/config/defaults.json.
 Installing the root certificate in the system truststore... done.
 ```
 
-Now curl will not complain:
-
+Now [step cli](https://github.com/smallstep/cli) is configured to use step-ca
+and our new root certificate is trusted by our local environment.
 ```sh
 $ curl https://localhost:9000/health
 {"status":"ok"}
 ```
 
-And you will be able to run web services using TLS (and mTLS):
-
+And we are able to run web services configured with TLS (and mTLS):
 ```sh
-$ $ step ca certificate localhost localhost.crt localhost.key
+~ $ step ca certificate localhost localhost.crt localhost.key
 ✔ Key ID: aTPGWP0qbuQdflR5VxtNouDIOXyNMH1H9KAZKP-UcHo (admin)
 ✔ Please enter the password to decrypt the provisioner key:
 ✔ CA: https://localhost:9000/1.0/sign
 ✔ Certificate: localhost.crt
 ✔ Private Key: localhost.key
-$ step ca root root_ca.crt
+~ $ step ca root root_ca.crt
 The root certificate has been saved in root_ca.crt.
-$ python <<EOF
+~ $ python <<EOF
 import BaseHTTPServer, ssl
 class H(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -168,9 +145,11 @@ httpd.serve_forever()
 EOF
 ```
 
-And in another terminal or in your browser:
+Test from another terminal:
 ```sh
 $ curl https://localhost:8443
 
 👋 Hello! Welcome to TLS 🔒✅
 ```
+
+Or visit `https://localhost:8443` from your browser.
