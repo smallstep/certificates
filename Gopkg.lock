@@ -298,7 +298,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "a2e2d27fd5eff22ba94b1f2bd2fc946f5bb7f041"
+  revision = "3e1e2dcfa54298e0fb86e0be86ab36d79f36473e"
 
 [[projects]]
   branch = "master"

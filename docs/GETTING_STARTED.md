@@ -421,7 +421,7 @@ Please enter a password to encrypt the provisioner private key? password
 },
 [...]
 
-# launch CA...
+## launch CA...
 $ step-ca $(step path)/config/ca.json
 Please enter the password to decrypt ~/.step/secrets/intermediate_ca_key: password
 2019/02/21 12:09:51 Serving HTTPS on :9443 ...
@@ -455,6 +455,79 @@ $ step certificate inspect site.crt --format json | jq .validity
 $ step ca renew site.crt site.key
 error renewing certificate: Unauthorized
 ```
+
+## Use Oauth OIDC to obtain personal certificates
+
+To authenticate users with the CA you can leverage services that expose OAuth
+OpenID Connect identity providers. One of the most common providers, and the
+one we'll use in this example, is G-Suite.
+
+Navigate to the Google APIs developer console and pick a suitable project from the
+top navbar's dropdown.
+
+![Google Dev Console](oidc1.png)
+
+In the masthead navigation click **Credentials** (key symbol) and then "OAuth
+consent screen" from the subnav. Fill out naming details, all mandatory fields,
+and decide if your app is of type **Public** or **Internal**. Internal
+will make sure the access scope is bound to your G-Suite organization.
+**Public** will let anybody with a Google Account log in, incl.
+`gmail.com` accounts.
+
+Move back to **Credentials** on the subnav and choose "OAuth client ID" from the
+**Create credentials** dropdown. Since OIDC will be used from the `step CLI` pick **Other**
+from the available options and pick a name (e.g. **Step CLI**).
+
+![Create credential](oidc2.png)
+
+On successful completion, a confirmation modal with both `clientID` and
+`clientSecret` will be presented. Please note that the `clientSecret` will
+allow applications access to the configured OAuth consent screen. However, it
+will not allow direct authentication of users without their own MfA credentials
+per account.
+
+![OIDC credentials](oidc3.png)
+
+Now using `clientID` and `clientSecret` run the following command to add
+G-Suite as a provisioner to `step certificates`. Please see [`step ca
+provisioner add`](https://smallstep.com/docs/cli/ca/provisioner/add/)'s docs
+for all available configuration options and descriptions.
+
+```bash
+$ step ca provisioner add Google --type oidc --ca-config $(step path)/config/ca.json \
+  --client-id 972437157139-ssiqna0g4ibuhafl3pkrrcb52tbroekt.apps.googleusercontent.com \
+  --client-secret RjEk-GwKBvdsFAICiJhn_RiF \
+  --configuration-endpoint https://accounts.google.com/.well-known/openid-configuration \
+  --domain yourdomain.com --domain gmail.com
+```
+
+Start up the online CA or send a HUP signal if it's already running to reload
+the configuration and pick up the new provisioner. Now users should be able to
+obtain certificates using the familiar `step ca certificate` flow:
+
+```bash
+$ step ca certificate sebastian@smallstep.com personal.crt personal.key
+Use the arrow keys to navigate: ↓ ↑ → ←
+What provisioner key do you want to use?
+    fYDoiQdYueq_LAXx2kqA4N_Yjf_eybe-wari7Js5iXI (admin)
+  ▸ 972437157139-ssiqna0g4ibuhafl3pkrrcb52tbroekt.apps.googleusercontent.com (Google)
+✔ Key ID: 972437157139-ssiqna0g4ibuhafl3pkrrcb52tbroekt.apps.googleusercontent.com (Google)
+✔ CA: https://localhost
+✔ Certificate: personal.crt
+✔ Private Key: personal.key
+
+$ step certificate inspect --short personal.crt                                                                 ⏎
+X.509v3 TLS Certificate (ECDSA P-256) [Serial: 6169...4235]
+  Subject:     106202051347258973689
+               sebastian@smallstep.com
+  Issuer:      Local CA Intermediate CA
+  Provisioner: Google [ID: 9724....com]
+  Valid from:  2019-03-26T20:36:28Z
+          to:  2019-03-27T20:36:28Z
+```
+
+Now it's easy for anybody in the G-Suite organization to obtain valid personal
+certificates!
 
 ## Notes on Securing the Step CA and your PKI.
 

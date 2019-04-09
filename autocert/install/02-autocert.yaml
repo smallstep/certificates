@@ -21,6 +21,8 @@ metadata:
 data:
   config.yaml: |
     logFormat: json # or text
+    restrictCertificatesToNamespace: true
+    clusterDomain: cluster.local
     caUrl: https://ca.step.svc.cluster.local
     certLifetime: 24h
     renewer:
