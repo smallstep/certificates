@@ -29,9 +29,9 @@ var (
 	}
 	defaultDisableRenewal   = false
 	globalProvisionerClaims = provisioner.Claims{
-		MinTLSDur:      &provisioner.Duration{5 * time.Minute},
-		MaxTLSDur:      &provisioner.Duration{24 * time.Hour},
-		DefaultTLSDur:  &provisioner.Duration{24 * time.Hour},
+		MinTLSDur:      &provisioner.Duration{Duration: 5 * time.Minute},
+		MaxTLSDur:      &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:  &provisioner.Duration{Duration: 24 * time.Hour},
 		DisableRenewal: &defaultDisableRenewal,
 	}
 )
