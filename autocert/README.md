@@ -103,7 +103,7 @@ default       Active   59m   enabled
 
 To get a certificate you need to tell `autocert` your workload's name using the `autocert.step.sm/name` annotation (this name will appear as the X.509 common name and SAN).
 
-Let's deploy a [simple mTLS server](examples/hello-mtls/go/server.go) named  `hello-mtls.default.svc.cluster.local`:
+Let's deploy a [simple mTLS server](examples/hello-mtls/go/server/server.go) named `hello-mtls.default.svc.cluster.local`:
 
 ```yaml
 cat <<EOF | kubectl apply -f - 
@@ -180,7 +180,7 @@ EOF
 
 > Note that **the authority portion of the URL** (the `HELLO_MTLS_URL` env var) **matches the name of the server we're connecting to** (both are `hello-mtls.default.svc.cluster.local`). That's required for standard HTTPS and can sometimes require some DNS trickery.
 
-Once deployed we should start seeing the client log responses from the server [saying hello](examples/hello-mtls/go/server.go#L71-L72):
+Once deployed we should start seeing the client log responses from the server [saying hello](examples/hello-mtls/go/server/server.go#L71-L72):
 
 ```
 $ export HELLO_MTLS_CLIENT=$(kubectl get pods -l app=hello-mtls-client -o jsonpath={$.items[0].metadata.name})
