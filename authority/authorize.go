@@ -50,7 +50,7 @@ func (a *Authority) authorizeToken(ott string) (provisioner.Interface, error) {
 	// This check is meant as a stopgap solution to the current lack of a persistence layer.
 	if a.config.AuthorityConfig != nil && !a.config.AuthorityConfig.DisableIssuedAtCheck {
 		if claims.IssuedAt != nil && claims.IssuedAt.Time().Before(a.startTime) {
-			return nil, &apiError{errors.New("authorize: token issued before the bootstrap of certificate authority"),
+			return nil, &apiError{errors.New("authorizeToken: token issued before the bootstrap of certificate authority"),
 				http.StatusUnauthorized, errContext}
 		}
 	}
