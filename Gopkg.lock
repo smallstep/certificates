@@ -276,7 +276,7 @@
   revision = "de77670473b5492f5d0bce155b5c01534c2d13f7"
 
 [[projects]]
-  branch = "update-go-jose"
+  branch = "master"
   digest = "1:253eec7c89c6fe08ae020877b0b44343e86da68dac99207280e7ddcacd441f1f"
   name = "github.com/smallstep/cli"
   packages = [
@@ -298,7 +298,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "b0dd6172f37a12153084edbd170ae95dd35ef9a8"
+  revision = "d419090172442204ea212e156cf6ba2bad4ef9b8"
 
 [[projects]]
   branch = "master"
