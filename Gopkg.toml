@@ -45,7 +45,7 @@ required = [
   name = "github.com/go-chi/chi"
 
 [[override]]
-  branch = "master"
+  branch = "update-go-jose"
   name = "github.com/smallstep/cli"
 
 [prune]
@@ -62,4 +62,7 @@ required = [
 
 [[constraint]]
   name = "gopkg.in/square/go-jose.v2"
-  version = "2.1.9"
+  # version = "2.3.0"
+  # Using special branch with ed25519 fix
+  source = "github.com/maraino/go-jose"
+  branch = "v2"

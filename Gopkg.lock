@@ -276,8 +276,8 @@
   revision = "de77670473b5492f5d0bce155b5c01534c2d13f7"
 
 [[projects]]
-  branch = "master"
-  digest = "1:8b36444f30009b5e124a3ac48b353558024a95c3fccdf3e6bb557a091e67342b"
+  branch = "update-go-jose"
+  digest = "1:253eec7c89c6fe08ae020877b0b44343e86da68dac99207280e7ddcacd441f1f"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
@@ -298,7 +298,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "3e1e2dcfa54298e0fb86e0be86ab36d79f36473e"
+  revision = "b0dd6172f37a12153084edbd170ae95dd35ef9a8"
 
 [[projects]]
   branch = "master"
@@ -460,7 +460,8 @@
   version = "v0.9.1"
 
 [[projects]]
-  digest = "1:7fbe10f3790dc4e6296c7c844c5a9b35513e5521c29c47e10ba99cd2956a2719"
+  branch = "v2"
+  digest = "1:9593bab40e981b1f90b7e07faeab0d09b75fe338880d08880f986a9d3283c53f"
   name = "gopkg.in/square/go-jose.v2"
   packages = [
     ".",
@@ -469,8 +470,8 @@
     "jwt",
   ]
   pruneopts = "UT"
-  revision = "ef984e69dd356202fd4e4910d4d9c24468bdf0b8"
-  version = "v2.1.9"
+  revision = "fd0b35a2f1ec103c6bb76cc6d4b8077fa5844fb2"
+  source = "github.com/maraino/go-jose"
 
 [[projects]]
   digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"
