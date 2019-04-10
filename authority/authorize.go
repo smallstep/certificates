@@ -47,7 +47,7 @@ func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
 	// Do not accept tokens issued before the start of the ca.
 	// This check is meant as a stopgap solution to the current lack of a persistence layer.
 	if a.config.AuthorityConfig != nil && !a.config.AuthorityConfig.DisableIssuedAtCheck {
-		if claims.IssuedAt > 0 && claims.IssuedAt.Time().Before(a.startTime) {
+		if claims.IssuedAt != nil && claims.IssuedAt.Time().Before(a.startTime) {
 			return nil, &apiError{errors.New("authorize: token issued before the bootstrap of certificate authority"),
 				http.StatusUnauthorized, errContext}
 		}

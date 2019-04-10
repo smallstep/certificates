@@ -1,17 +1,13 @@
-FROM smallstep/step-cli:0.8.3
+FROM smallstep/step-cli:0.9.0
 
 ARG BINPATH="bin/step-ca"
 
-ENV PORT=9000
-ENV CONFIGPATH="/home/step/.step/config/ca.json"
+ENV CONFIGPATH="/home/step/config/ca.json"
 ENV PWDPATH="/home/step/secrets/password"
 
 COPY $BINPATH "/usr/local/bin/step-ca"
 
-EXPOSE $PORT
-VOLUME ["/home/step/.step/secrets"]
-VOLUME ["/home/step/.step/config"]
-VOLUME ["/home/step/secrets"]
+VOLUME ["/home/step"]
 STOPSIGNAL SIGTERM
 
 CMD exec /bin/sh -c "/usr/local/bin/step-ca --password-file $PWDPATH $CONFIGPATH"
