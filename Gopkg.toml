@@ -52,10 +52,6 @@ required = [
   branch = "master"
   name = "github.com/smallstep/nosql"
 
-[prune]
-  go-tests = true
-  unused-packages = true
-
 [[constraint]]
   name = "github.com/newrelic/go-agent"
   version = "1.11.0"
@@ -66,7 +62,8 @@ required = [
 
 [[constraint]]
   name = "gopkg.in/square/go-jose.v2"
-  # version = "2.3.0"
-  # Using special branch with ed25519 fix
-  source = "github.com/maraino/go-jose"
-  branch = "v2"
+  version = "2.3.1"
+
+[prune]
+  go-tests = true
+  unused-packages = true
