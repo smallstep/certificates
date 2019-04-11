@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/asn1"
+	"encoding/base64"
 	"encoding/pem"
 	"net/http"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
@@ -111,6 +113,13 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 			http.StatusInternalServerError, errContext}
 	}
 
+	if err = a.db.StoreCertificate(serverCert); err != nil {
+		if err != db.ErrNotImplemented {
+			return nil, nil, &apiError{errors.Wrap(err, "sign: error storing certificate in db"),
+				http.StatusInternalServerError, errContext}
+		}
+	}
+
 	return serverCert, caCert, nil
 }
 
@@ -192,6 +201,80 @@ func (a *Authority) Renew(oldCert *x509.Certificate) (*x509.Certificate, *x509.C
 	}
 
 	return serverCert, caCert, nil
+}
+
+// RevokeOptions are the options for the Revoke API.
+type RevokeOptions struct {
+	Serial      string
+	Reason      string
+	ReasonCode  int
+	PassiveOnly bool
+	MTLS        bool
+	Crt         *x509.Certificate
+	OTT         string
+	errCtxt     map[string]interface{}
+}
+
+// Revoke revokes a certificate.
+//
+// NOTE: Only supports passive revocation - prevent existing certificates from
+// being renewed.
+//
+// TODO: Add OCSP and CRL support.
+func (a *Authority) Revoke(opts *RevokeOptions) error {
+	errContext := context{
+		"serialNumber": opts.Serial,
+		"reasonCode":   opts.ReasonCode,
+		"reason":       opts.Reason,
+		"passiveOnly":  opts.PassiveOnly,
+		"mTLS":         opts.MTLS,
+	}
+	if opts.MTLS {
+		errContext["certificate"] = base64.StdEncoding.EncodeToString(opts.Crt.Raw)
+	} else {
+		errContext["ott"] = opts.OTT
+	}
+
+	rci := &db.RevokedCertificateInfo{
+		Serial:     opts.Serial,
+		ReasonCode: opts.ReasonCode,
+		Reason:     opts.Reason,
+		MTLS:       opts.MTLS,
+		RevokedAt:  time.Now().UTC(),
+	}
+
+	// Authorize mTLS or token request and get back a provisioner interface.
+	p, err := a.authorizeRevoke(opts)
+	if err != nil {
+		return &apiError{errors.Wrap(err, "revoke"),
+			http.StatusUnauthorized, errContext}
+	}
+
+	// If not mTLS then get the TokenID of the token.
+	if !opts.MTLS {
+		rci.TokenID, err = p.GetTokenID(opts.OTT)
+		if err != nil {
+			return &apiError{errors.Wrap(err, "revoke: could not get ID for token"),
+				http.StatusInternalServerError, errContext}
+		}
+		errContext["tokenID"] = rci.TokenID
+	}
+	rci.ProvisionerID = p.GetID()
+	errContext["provisionerID"] = rci.ProvisionerID
+
+	err = a.db.Revoke(rci)
+	switch err {
+	case nil:
+		return nil
+	case db.ErrNotImplemented:
+		return &apiError{errors.New("revoke: no persistence layer configured"),
+			http.StatusNotImplemented, errContext}
+	case db.ErrAlreadyExists:
+		return &apiError{errors.Errorf("revoke: certificate with serial number %s has already been revoked", rci.Serial),
+			http.StatusBadRequest, errContext}
+	default:
+		return &apiError{err, http.StatusInternalServerError, errContext}
+	}
 }
 
 // GetTLSCertificate creates a new leaf certificate to be used by the CA HTTPS server.

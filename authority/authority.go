@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/x509util"
 )
@@ -24,6 +25,7 @@ type Authority struct {
 	ottMap               *sync.Map
 	startTime            time.Time
 	provisioners         *provisioner.Collection
+	db                   db.AuthDB
 	// Do not re-initialize
 	initOnce bool
 }
@@ -55,6 +57,12 @@ func (a *Authority) init() error {
 	}
 
 	var err error
+
+	// Initialize step-ca Database if defined in configuration.
+	// If a.config.DB is nil then a noopDB will be returned.
+	if a.db, err = db.New(a.config.DB); err != nil {
+		return err
+	}
 
 	// Load the root certificates and add them to the certificate store
 	a.rootX509Certs = make([]*x509.Certificate, len(a.config.Root))
@@ -110,4 +118,9 @@ func (a *Authority) init() error {
 	a.initOnce = true
 
 	return nil
+}
+
+// Shutdown safely shuts down any clients, databases, etc. held by the Authority.
+func (a *Authority) Shutdown() error {
+	return a.db.Shutdown()
 }

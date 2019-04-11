@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"crypto/x509"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -22,4 +23,15 @@ func (a *Authority) GetEncryptedKey(kid string) (string, error) {
 func (a *Authority) GetProvisioners(cursor string, limit int) (provisioner.List, string, error) {
 	provisioners, nextCursor := a.provisioners.Find(cursor, limit)
 	return provisioners, nextCursor, nil
+}
+
+// LoadProvisionerByCertificate returns an interface to the provisioner that
+// provisioned the certificate.
+func (a *Authority) LoadProvisionerByCertificate(crt *x509.Certificate) (provisioner.Interface, error) {
+	p, ok := a.provisioners.LoadByCertificate(crt)
+	if !ok {
+		return nil, &apiError{errors.Errorf("provisioner not found"),
+			http.StatusNotFound, context{}}
+	}
+	return p, nil
 }

@@ -228,12 +228,12 @@
   version = "v1.2.0"
 
 [[projects]]
-  digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
+  digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
   name = "github.com/pkg/errors"
   packages = ["."]
   pruneopts = "UT"
-  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
-  version = "v0.8.0"
+  revision = "ba968bfe8b2f7e042a574c888954fccecfa385b4"
+  version = "v0.8.1"
 
 [[projects]]
   digest = "1:2e76a73cb51f42d63a2a1a85b3dc5731fd4faf6821b434bd0ef2c099186031d6"
@@ -277,7 +277,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:253eec7c89c6fe08ae020877b0b44343e86da68dac99207280e7ddcacd441f1f"
+  digest = "1:0f02ebdfb2860d118922fa6abb2fe3b4d9984217b7f12761ac2d787f84fca67a"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
@@ -298,7 +298,15 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "f851b6b63d8d5e78b8a986057034d69fe904c477"
+  revision = "25e732fe7e712d5b3009666fb968f9b9c188666b"
+
+[[projects]]
+  branch = "master"
+  digest = "1:fd8d9eb07509d8ef47fc82c99646f0b2203b2ba3c240ba77d8c457bb6109836d"
+  name = "github.com/smallstep/nosql"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "d8f68d14f9ae04e0991dce06b44768f2d38dccf8"
 
 [[projects]]
   branch = "master"
@@ -317,14 +325,23 @@
   revision = "b67dcf995b6a7b7f14fad5fcb7cc5441b05e814b"
 
 [[projects]]
+  digest = "1:5f7414cf41466d4b4dd7ec52b2cd3e481e08cfd11e7e24fef730c0e483e88bb1"
+  name = "go.etcd.io/bbolt"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "63597a96ec0ad9e6d43c3fc81e809909e0237461"
+  version = "v1.3.2"
+
+[[projects]]
   branch = "master"
-  digest = "1:a068d4e48e0f2e172903d25b6e066815fa8efd4b01102aec4c741f02a9650c03"
+  digest = "1:5dd7da6df07f42194cb25d162b4b89664ed7b08d7d4334f6a288393d54b095ce"
   name = "golang.org/x/crypto"
   packages = [
     "cryptobyte",
     "cryptobyte/asn1",
     "ed25519",
     "ed25519/internal/edwards25519",
+    "ocsp",
     "pbkdf2",
     "ssh/terminal",
   ]
@@ -574,8 +591,10 @@
     "github.com/smallstep/cli/token",
     "github.com/smallstep/cli/token/provision",
     "github.com/smallstep/cli/usage",
+    "github.com/smallstep/nosql",
     "github.com/tsenart/deadcode",
     "github.com/urfave/cli",
+    "golang.org/x/crypto/ocsp",
     "golang.org/x/net/context",
     "golang.org/x/net/http2",
     "google.golang.org/grpc",

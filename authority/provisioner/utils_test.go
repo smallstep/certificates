@@ -12,9 +12,9 @@ import (
 	"github.com/smallstep/cli/jose"
 )
 
-var testAudiences = []string{
-	"https://ca.smallstep.com/sign",
-	"https://ca.smallsteomcom/1.0/sign",
+var testAudiences = Audiences{
+	Sign:   []string{"https://ca.smallstep.com/sign", "https://ca.smallstep.com/1.0/sign"},
+	Revoke: []string{"https://ca.smallstep.com/revoke", "https://ca.smallstep.com/1.0/revoke"},
 }
 
 func must(args ...interface{}) []interface{} {

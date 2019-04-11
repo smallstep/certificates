@@ -38,12 +38,12 @@ type Collection struct {
 	byID      *sync.Map
 	byKey     *sync.Map
 	sorted    provisionerSlice
-	audiences []string
+	audiences Audiences
 }
 
 // NewCollection initializes a collection of provisioners. The given list of
 // audiences are the audiences used by the JWT provisioner.
-func NewCollection(audiences []string) *Collection {
+func NewCollection(audiences Audiences) *Collection {
 	return &Collection{
 		byID:      new(sync.Map),
 		byKey:     new(sync.Map),
@@ -59,7 +59,7 @@ func (c *Collection) Load(id string) (Interface, bool) {
 // LoadByToken parses the token claims and loads the provisioner associated.
 func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) (Interface, bool) {
 	// match with server audiences
-	if matchesAudience(claims.Audience, c.audiences) {
+	if matchesAudience(claims.Audience, c.audiences.All()) {
 		// If matches with stored audiences it will be a JWT token (default), and
 		// the id would be <issuer>:<kid>.
 		return c.Load(claims.Issuer + ":" + token.Headers[0].KeyID)

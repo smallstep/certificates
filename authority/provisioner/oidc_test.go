@@ -122,7 +122,7 @@ func TestOIDC_Init(t *testing.T) {
 	}
 }
 
-func TestOIDC_Authorize(t *testing.T) {
+func TestOIDC_authorizeToken(t *testing.T) {
 	srv := generateJWKServer(2)
 	defer srv.Close()
 
@@ -152,12 +152,6 @@ func TestOIDC_Authorize(t *testing.T) {
 	t1, err := generateSimpleToken("the-issuer", p1.ClientID, &keys.Keys[0])
 	assert.FatalError(t, err)
 	t2, err := generateSimpleToken("the-issuer", p2.ClientID, &keys.Keys[1])
-	assert.FatalError(t, err)
-	t3, err := generateSimpleToken("the-issuer", p3.ClientID, &keys.Keys[0])
-	assert.FatalError(t, err)
-
-	// Admin email not in domains
-	okAdmin, err := generateToken("subject", "the-issuer", p3.ClientID, "root@example.com", []string{"test.smallstep.com"}, time.Now(), &keys.Keys[0])
 	assert.FatalError(t, err)
 	// Invalid email
 	failEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
@@ -202,8 +196,6 @@ func TestOIDC_Authorize(t *testing.T) {
 	}{
 		{"ok1", p1, args{t1}, false},
 		{"ok2", p2, args{t2}, false},
-		{"admin", p3, args{t3}, false},
-		{"admin", p3, args{okAdmin}, false},
 		{"fail-email", p3, args{failEmail}, true},
 		{"fail-domain", p3, args{failDomain}, true},
 		{"fail-key", p1, args{failKey}, true},
@@ -217,7 +209,74 @@ func TestOIDC_Authorize(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.prov.Authorize(tt.args.token)
+			got, err := tt.prov.authorizeToken(tt.args.token)
+			if (err != nil) != tt.wantErr {
+				fmt.Println(tt)
+				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err != nil {
+				assert.Nil(t, got)
+			} else {
+				assert.NotNil(t, got)
+				assert.Equals(t, got.Issuer, "the-issuer")
+			}
+		})
+	}
+}
+
+func TestOIDC_AuthorizeSign(t *testing.T) {
+	srv := generateJWKServer(2)
+	defer srv.Close()
+
+	var keys jose.JSONWebKeySet
+	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
+
+	// Create test provisioners
+	p1, err := generateOIDC()
+	assert.FatalError(t, err)
+	p2, err := generateOIDC()
+	assert.FatalError(t, err)
+	p3, err := generateOIDC()
+	assert.FatalError(t, err)
+	// Admin + Domains
+	p3.Admins = []string{"name@smallstep.com", "root@example.com"}
+	p3.Domains = []string{"smallstep.com"}
+
+	// Update configuration endpoints and initialize
+	config := Config{Claims: globalProvisionerClaims}
+	p1.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	p2.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	p3.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	assert.FatalError(t, p1.Init(config))
+	assert.FatalError(t, p2.Init(config))
+	assert.FatalError(t, p3.Init(config))
+
+	t1, err := generateSimpleToken("the-issuer", p1.ClientID, &keys.Keys[0])
+	assert.FatalError(t, err)
+	// Admin email not in domains
+	okAdmin, err := generateToken("subject", "the-issuer", p3.ClientID, "root@example.com", []string{"test.smallstep.com"}, time.Now(), &keys.Keys[0])
+	assert.FatalError(t, err)
+	// Invalid email
+	failEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
+	assert.FatalError(t, err)
+
+	type args struct {
+		token string
+	}
+	tests := []struct {
+		name    string
+		prov    *OIDC
+		args    args
+		wantErr bool
+	}{
+		{"ok1", p1, args{t1}, false},
+		{"admin", p3, args{okAdmin}, false},
+		{"fail-email", p3, args{failEmail}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.prov.AuthorizeSign(tt.args.token)
 			if (err != nil) != tt.wantErr {
 				fmt.Println(tt)
 				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
@@ -232,6 +291,63 @@ func TestOIDC_Authorize(t *testing.T) {
 				} else {
 					assert.Len(t, 4, got)
 				}
+			}
+		})
+	}
+}
+
+func TestOIDC_AuthorizeRevoke(t *testing.T) {
+	srv := generateJWKServer(2)
+	defer srv.Close()
+
+	var keys jose.JSONWebKeySet
+	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
+
+	// Create test provisioners
+	p1, err := generateOIDC()
+	assert.FatalError(t, err)
+	p3, err := generateOIDC()
+	assert.FatalError(t, err)
+	// Admin + Domains
+	p3.Admins = []string{"name@smallstep.com", "root@example.com"}
+	p3.Domains = []string{"smallstep.com"}
+
+	// Update configuration endpoints and initialize
+	config := Config{Claims: globalProvisionerClaims}
+	p1.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	p3.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	assert.FatalError(t, p1.Init(config))
+	assert.FatalError(t, p3.Init(config))
+
+	t1, err := generateSimpleToken("the-issuer", p1.ClientID, &keys.Keys[0])
+	assert.FatalError(t, err)
+	// Admin email not in domains
+	okAdmin, err := generateToken("subject", "the-issuer", p3.ClientID, "root@example.com", []string{"test.smallstep.com"}, time.Now(), &keys.Keys[0])
+	assert.FatalError(t, err)
+	// Invalid email
+	failEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
+	assert.FatalError(t, err)
+
+	type args struct {
+		token string
+	}
+	tests := []struct {
+		name    string
+		prov    *OIDC
+		args    args
+		wantErr bool
+	}{
+		{"ok1", p1, args{t1}, true},
+		{"admin", p3, args{okAdmin}, false},
+		{"fail-email", p3, args{failEmail}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.prov.AuthorizeRevoke(tt.args.token)
+			if (err != nil) != tt.wantErr {
+				fmt.Println(tt)
+				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 		})
 	}
@@ -270,6 +386,7 @@ func TestOIDC_AuthorizeRenewal(t *testing.T) {
 	}
 }
 
+/*
 func TestOIDC_AuthorizeRevoke(t *testing.T) {
 	srv := generateJWKServer(2)
 	defer srv.Close()
@@ -308,6 +425,7 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 		})
 	}
 }
+*/
 
 func Test_sanitizeEmail(t *testing.T) {
 	tests := []struct {

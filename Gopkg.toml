@@ -48,6 +48,10 @@ required = [
   branch = "master"
   name = "github.com/smallstep/cli"
 
+[[constraint]]
+  branch = "master"
+  name = "github.com/smallstep/nosql"
+
 [prune]
   go-tests = true
   unused-packages = true

@@ -18,6 +18,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
@@ -25,12 +26,17 @@ import (
 
 // Authority is the interface implemented by a CA authority.
 type Authority interface {
+	// NOTE: Authorize will be deprecated in future releases. Please use the
+	// context specific Authoirize[Sign|Revoke|etc.] methods.
 	Authorize(ott string) ([]provisioner.SignOption, error)
+	AuthorizeSign(ott string) ([]provisioner.SignOption, error)
 	GetTLSOptions() *tlsutil.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)
 	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
 	Renew(peer *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
+	LoadProvisionerByCertificate(*x509.Certificate) (provisioner.Interface, error)
 	GetProvisioners(cursor string, limit int) (provisioner.List, string, error)
+	Revoke(*authority.RevokeOptions) error
 	GetEncryptedKey(kid string) (string, error)
 	GetRoots() (federation []*x509.Certificate, err error)
 	GetFederation() ([]*x509.Certificate, error)
@@ -236,6 +242,7 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/root/{sha}", h.Root)
 	r.MethodFunc("POST", "/sign", h.Sign)
 	r.MethodFunc("POST", "/renew", h.Renew)
+	r.MethodFunc("POST", "/revoke", h.Revoke)
 	r.MethodFunc("GET", "/provisioners", h.Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
 	r.MethodFunc("GET", "/roots", h.Roots)
@@ -285,7 +292,7 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		NotAfter:  body.NotAfter,
 	}
 
-	signOpts, err := h.Authority.Authorize(body.OTT)
+	signOpts, err := h.Authority.AuthorizeSign(body.OTT)
 	if err != nil {
 		WriteError(w, Unauthorized(err))
 		return

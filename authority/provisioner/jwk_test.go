@@ -110,7 +110,7 @@ func TestJWK_Init(t *testing.T) {
 	}
 }
 
-func TestJWK_Authorize(t *testing.T) {
+func TestJWK_authorizeToken(t *testing.T) {
 	p1, err := generateJWK()
 	assert.FatalError(t, err)
 	p2, err := generateJWK()
@@ -121,11 +121,11 @@ func TestJWK_Authorize(t *testing.T) {
 	key2, err := decryptJSONWebKey(p2.EncryptedKey)
 	assert.FatalError(t, err)
 
-	t1, err := generateSimpleToken(p1.Name, testAudiences[0], key1)
+	t1, err := generateSimpleToken(p1.Name, testAudiences.Sign[0], key1)
 	assert.FatalError(t, err)
-	t2, err := generateSimpleToken(p2.Name, testAudiences[1], key2)
+	t2, err := generateSimpleToken(p2.Name, testAudiences.Sign[1], key2)
 	assert.FatalError(t, err)
-	t3, err := generateToken("test.smallstep.com", p1.Name, testAudiences[0], "", []string{}, time.Now(), key1)
+	t3, err := generateToken("test.smallstep.com", p1.Name, testAudiences.Sign[0], "", []string{}, time.Now(), key1)
 	assert.FatalError(t, err)
 
 	// Invalid tokens
@@ -133,14 +133,14 @@ func TestJWK_Authorize(t *testing.T) {
 	key3, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 	// missing key
-	failKey, err := generateSimpleToken(p1.Name, testAudiences[0], key3)
+	failKey, err := generateSimpleToken(p1.Name, testAudiences.Sign[0], key3)
 	assert.FatalError(t, err)
 	// invalid token
 	failTok := "foo." + parts[1] + "." + parts[2]
 	// invalid claims
 	failClaims := parts[0] + ".foo." + parts[1]
 	// invalid issuer
-	failIss, err := generateSimpleToken("foobar", testAudiences[0], key1)
+	failIss, err := generateSimpleToken("foobar", testAudiences.Sign[0], key1)
 	assert.FatalError(t, err)
 	// invalid audience
 	failAud, err := generateSimpleToken(p1.Name, "foobar", key1)
@@ -148,13 +148,13 @@ func TestJWK_Authorize(t *testing.T) {
 	// invalid signature
 	failSig := t1[0 : len(t1)-2]
 	// no subject
-	failSub, err := generateToken("", p1.Name, testAudiences[0], "", []string{"test.smallstep.com"}, time.Now(), key1)
+	failSub, err := generateToken("", p1.Name, testAudiences.Sign[0], "", []string{"test.smallstep.com"}, time.Now(), key1)
 	assert.FatalError(t, err)
 	// expired
-	failExp, err := generateToken("subject", p1.Name, testAudiences[0], "", []string{"test.smallstep.com"}, time.Now().Add(-360*time.Second), key1)
+	failExp, err := generateToken("subject", p1.Name, testAudiences.Sign[0], "", []string{"test.smallstep.com"}, time.Now().Add(-360*time.Second), key1)
 	assert.FatalError(t, err)
 	// not before
-	failNbf, err := generateToken("subject", p1.Name, testAudiences[0], "", []string{"test.smallstep.com"}, time.Now().Add(360*time.Second), key1)
+	failNbf, err := generateToken("subject", p1.Name, testAudiences.Sign[0], "", []string{"test.smallstep.com"}, time.Now().Add(360*time.Second), key1)
 	assert.FatalError(t, err)
 
 	// Remove encrypted key for p2
@@ -164,36 +164,123 @@ func TestJWK_Authorize(t *testing.T) {
 		token string
 	}
 	tests := []struct {
-		name    string
-		prov    *JWK
-		args    args
-		wantErr bool
+		name string
+		prov *JWK
+		args args
+		err  error
 	}{
-		{"ok", p1, args{t1}, false},
-		{"ok-no-encrypted-key", p2, args{t2}, false},
-		{"ok-no-sans", p1, args{t3}, false},
-		{"fail-key", p1, args{failKey}, true},
-		{"fail-token", p1, args{failTok}, true},
-		{"fail-claims", p1, args{failClaims}, true},
-		{"fail-issuer", p1, args{failIss}, true},
-		{"fail-audience", p1, args{failAud}, true},
-		{"fail-signature", p1, args{failSig}, true},
-		{"fail-subject", p1, args{failSub}, true},
-		{"fail-expired", p1, args{failExp}, true},
-		{"fail-not-before", p1, args{failNbf}, true},
+		{"fail-token", p1, args{failTok}, errors.New("error parsing token")},
+		{"fail-key", p1, args{failKey}, errors.New("error parsing claims")},
+		{"fail-claims", p1, args{failClaims}, errors.New("error parsing claims")},
+		{"fail-signature", p1, args{failSig}, errors.New("error parsing claims: square/go-jose: error in cryptographic primitive")},
+		{"fail-issuer", p1, args{failIss}, errors.New("invalid token: square/go-jose/jwt: validation failed, invalid issuer claim (iss)")},
+		{"fail-expired", p1, args{failExp}, errors.New("invalid token: square/go-jose/jwt: validation failed, token is expired (exp)")},
+		{"fail-not-before", p1, args{failNbf}, errors.New("invalid token: square/go-jose/jwt: validation failed, token not valid yet (nbf)")},
+		{"fail-audience", p1, args{failAud}, errors.New("invalid token: invalid audience claim (aud)")},
+		{"fail-subject", p1, args{failSub}, errors.New("token subject cannot be empty")},
+		{"ok", p1, args{t1}, nil},
+		{"ok-no-encrypted-key", p2, args{t2}, nil},
+		{"ok-no-sans", p1, args{t3}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.prov.Authorize(tt.args.token)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("JWK.Authorize() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if err != nil {
-				assert.Nil(t, got)
+			if got, err := tt.prov.authorizeToken(tt.args.token, testAudiences.Sign); err != nil {
+				if assert.NotNil(t, tt.err) {
+					assert.HasPrefix(t, err.Error(), tt.err.Error())
+				}
 			} else {
+				assert.Nil(t, tt.err)
 				assert.NotNil(t, got)
-				assert.Len(t, 6, got)
+			}
+		})
+	}
+}
+
+func TestJWK_AuthorizeRevoke(t *testing.T) {
+	p1, err := generateJWK()
+	assert.FatalError(t, err)
+	key1, err := decryptJSONWebKey(p1.EncryptedKey)
+	assert.FatalError(t, err)
+	t1, err := generateSimpleToken(p1.Name, testAudiences.Revoke[0], key1)
+	assert.FatalError(t, err)
+	// invalid signature
+	failSig := t1[0 : len(t1)-2]
+
+	type args struct {
+		token string
+	}
+	tests := []struct {
+		name string
+		prov *JWK
+		args args
+		err  error
+	}{
+		{"fail-signature", p1, args{failSig}, errors.New("error parsing claims: square/go-jose: error in cryptographic primitive")},
+		{"ok", p1, args{t1}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.prov.AuthorizeRevoke(tt.args.token); err != nil {
+				if assert.NotNil(t, tt.err) {
+					assert.HasPrefix(t, err.Error(), tt.err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestJWK_AuthorizeSign(t *testing.T) {
+	p1, err := generateJWK()
+	assert.FatalError(t, err)
+	key1, err := decryptJSONWebKey(p1.EncryptedKey)
+	assert.FatalError(t, err)
+
+	t1, err := generateSimpleToken(p1.Name, testAudiences.Sign[0], key1)
+	assert.FatalError(t, err)
+
+	t2, err := generateToken("subject", p1.Name, testAudiences.Sign[0], "name@smallstep.com", []string{}, time.Now(), key1)
+	assert.FatalError(t, err)
+
+	// invalid signature
+	failSig := t1[0 : len(t1)-2]
+
+	type args struct {
+		token string
+	}
+	tests := []struct {
+		name string
+		prov *JWK
+		args args
+		err  error
+	}{
+		{"fail-signature", p1, args{failSig}, errors.New("error parsing claims: square/go-jose: error in cryptographic primitive")},
+		{"ok-sans", p1, args{t1}, nil},
+		{"ok-no-sans", p1, args{t2}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got, err := tt.prov.AuthorizeSign(tt.args.token); err != nil {
+				if assert.NotNil(t, tt.err) {
+					assert.HasPrefix(t, err.Error(), tt.err.Error())
+				}
+			} else {
+				if assert.NotNil(t, got) {
+					assert.Len(t, 6, got)
+
+					_cnv := got[0]
+					cnv, ok := _cnv.(commonNameValidator)
+					assert.True(t, ok)
+					assert.Equals(t, string(cnv), "subject")
+
+					_dnv := got[1]
+					dnv, ok := _dnv.(dnsNamesValidator)
+					assert.True(t, ok)
+					if tt.name == "ok-sans" {
+						assert.Equals(t, []string(dnv), []string{"test.smallstep.com"})
+					} else {
+						assert.Equals(t, []string(dnv), []string{"subject"})
+					}
+				}
 			}
 		})
 	}
@@ -227,34 +314,6 @@ func TestJWK_AuthorizeRenewal(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.prov.AuthorizeRenewal(tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("JWK.AuthorizeRenewal() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestJWK_AuthorizeRevoke(t *testing.T) {
-	p1, err := generateJWK()
-	assert.FatalError(t, err)
-	key1, err := decryptJSONWebKey(p1.EncryptedKey)
-	assert.FatalError(t, err)
-	t1, err := generateSimpleToken(p1.Name, testAudiences[0], key1)
-	assert.FatalError(t, err)
-
-	type args struct {
-		token string
-	}
-	tests := []struct {
-		name    string
-		prov    *JWK
-		args    args
-		wantErr bool
-	}{
-		{"disabled", p1, args{t1}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRevoke(tt.args.token); (err != nil) != tt.wantErr {
-				t.Errorf("JWK.AuthorizeRevoke() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

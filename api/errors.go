@@ -82,6 +82,11 @@ func InternalServerError(err error) error {
 	return NewError(http.StatusInternalServerError, err)
 }
 
+// NotImplemented returns a 500 error with the given error.
+func NotImplemented(err error) error {
+	return NewError(http.StatusNotImplemented, err)
+}
+
 // BadRequest returns an 400 error with the given error.
 func BadRequest(err error) error {
 	return NewError(http.StatusBadRequest, err)

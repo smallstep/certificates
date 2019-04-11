@@ -48,7 +48,7 @@ func TestRoot(t *testing.T) {
 }
 
 func TestAuthority_GetRootCertificate(t *testing.T) {
-	cert, err := pemutil.ReadCertificate("testdata/secrets/root_ca.crt")
+	cert, err := pemutil.ReadCertificate("testdata/certs/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestAuthority_GetRootCertificate(t *testing.T) {
 }
 
 func TestAuthority_GetRootCertificates(t *testing.T) {
-	cert, err := pemutil.ReadCertificate("testdata/secrets/root_ca.crt")
+	cert, err := pemutil.ReadCertificate("testdata/certs/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestAuthority_GetRootCertificates(t *testing.T) {
 }
 
 func TestAuthority_GetRoots(t *testing.T) {
-	cert, err := pemutil.ReadCertificate("testdata/secrets/root_ca.crt")
+	cert, err := pemutil.ReadCertificate("testdata/certs/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestAuthority_GetRoots(t *testing.T) {
 }
 
 func TestAuthority_GetFederation(t *testing.T) {
-	cert, err := pemutil.ReadCertificate("testdata/secrets/root_ca.crt")
+	cert, err := pemutil.ReadCertificate("testdata/certs/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}

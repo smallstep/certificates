@@ -329,6 +329,81 @@ func TestClient_Sign(t *testing.T) {
 	}
 }
 
+func TestClient_Revoke(t *testing.T) {
+	ok := &api.RevokeResponse{Status: "ok"}
+	request := &api.RevokeRequest{
+		Serial:     "sn",
+		OTT:        "the-ott",
+		ReasonCode: 4,
+	}
+	unauthorized := api.Unauthorized(fmt.Errorf("Unauthorized"))
+	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))
+
+	tests := []struct {
+		name         string
+		request      *api.RevokeRequest
+		response     interface{}
+		responseCode int
+		wantErr      bool
+	}{
+		{"ok", request, ok, 200, false},
+		{"unauthorized", request, unauthorized, 401, true},
+		{"nil request", nil, badRequest, 403, true},
+	}
+
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				body := new(api.RevokeRequest)
+				if err := api.ReadJSON(req.Body, body); err != nil {
+					api.WriteError(w, badRequest)
+					return
+				} else if !equalJSON(t, body, tt.request) {
+					if tt.request == nil {
+						if !reflect.DeepEqual(body, &api.RevokeRequest{}) {
+							t.Errorf("Client.Revoke() request = %v, wants %v", body, tt.request)
+						}
+					} else {
+						t.Errorf("Client.Revoke() request = %v, wants %v", body, tt.request)
+					}
+				}
+				w.WriteHeader(tt.responseCode)
+				api.JSON(w, tt.response)
+			})
+
+			got, err := c.Revoke(tt.request, nil)
+			if (err != nil) != tt.wantErr {
+				fmt.Printf("%+v", err)
+				t.Errorf("Client.Revoke() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			switch {
+			case err != nil:
+				if got != nil {
+					t.Errorf("Client.Revoke() = %v, want nil", got)
+				}
+				if !reflect.DeepEqual(err, tt.response) {
+					t.Errorf("Client.Revoke() error = %v, want %v", err, tt.response)
+				}
+			default:
+				if !reflect.DeepEqual(got, tt.response) {
+					t.Errorf("Client.Revoke() = %v, want %v", got, tt.response)
+				}
+			}
+		})
+	}
+}
+
 func TestClient_Renew(t *testing.T) {
 	ok := &api.SignResponse{
 		ServerPEM: api.Certificate{Certificate: parseCertificate(certPEM)},

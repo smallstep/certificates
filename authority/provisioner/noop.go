@@ -9,6 +9,10 @@ func (p *noop) GetID() string {
 	return "noop"
 }
 
+func (p *noop) GetTokenID(token string) (string, error) {
+	return "", nil
+}
+
 func (p *noop) GetName() string {
 	return "noop"
 }
@@ -24,7 +28,7 @@ func (p *noop) Init(config Config) error {
 	return nil
 }
 
-func (p *noop) Authorize(token string) ([]SignOption, error) {
+func (p *noop) AuthorizeSign(token string) ([]SignOption, error) {
 	return []SignOption{}, nil
 }
 
