@@ -143,15 +143,15 @@ You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
 
 ### Test
 
-    <pre><code>
-    <b>$ step version</b>
-    Smallstep CLI/0.8.5 (darwin/amd64)
-    Release Date: 2019-02-13 22:17 UTC
+<pre><code>
+<b>$ step version</b>
+Smallstep CLI/0.8.5 (darwin/amd64)
+Release Date: 2019-02-13 22:17 UTC
 
-    <b>$ step-ca version</b>
-    Smallstep CA/0.8.4 (darwin/amd64)
-    Release Date: 2019-02-18 18:56 UTC
-    </code></pre>
+<b>$ step-ca version</b>
+Smallstep CA/0.8.4 (darwin/amd64)
+Release Date: 2019-02-18 18:56 UTC
+</code></pre>
 
 ## Quickstart
 
