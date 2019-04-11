@@ -27,8 +27,8 @@ e.g. `v1.0.2`
     that all local changes have been pushed.
 
     ```
-    git pull --rebase origin master
-    git push
+    $ git pull --rebase origin master
+    $ git push
     ```
 
 3. **Tag it!**
@@ -36,8 +36,8 @@ e.g. `v1.0.2`
     1. **Find the most recent tag.**
 
         ```
-        git fetch --tags
-        git tag
+        $ git fetch --tags
+        $ git tag
         ```
 
         The new tag needs to be the logical successor of the most recent existing tag.
@@ -65,17 +65,17 @@ e.g. `v1.0.2`
     3. **Create a local tag.**
 
         ```
-        git tag v1.0.3   # standard release
+        $ git tag v1.0.3   # standard release
         ...or
-        git tag v1.0.3-rc.1  # release candidate
+        $ git tag v1.0.3-rc.1  # release candidate
         ```
 
     4. **Push the new tag to the remote origin.**
 
         ```
-        git push origin tag v1.0.3   # standard release
+        $ git push origin tag v1.0.3   # standard release
         ...or
-        git push origin tag v1.0.3-rc.1  # release candidate
+        $ git push origin tag v1.0.3-rc.1  # release candidate
         ```
 
 4. Check the build status at
@@ -93,9 +93,24 @@ e.g. `v1.0.2`
     * **step-certificates_1.0.3_darwin_amd64.tar.gz**: tarball containing a statically compiled darwin binary.
     * **step-certificates.tar.gz**: tarball containing a git archive of the full repo.
 
+6. **Update the AUR Arch Linux package**
+
+    **NOTE**: if you plan to release `cli` next then you can skip this step.
+
+    ```
+    $ cd archlinux
+
+    # Get up to date...
+    $ git pull origin master
+    $ make
+
+    $ ./update --ca v1.0.3
+    ```
+
 *All Done!*
 
 ## Versioning
 
-We use [SemVer](http://semver.org/) for versioning. For the versions available,
-see the [tags on this repository](https://github.com/smallstep/certificates).
+We use [SemVer](http://semver.org/) for versioning. See the
+[tags on this repository](https://github.com/smallstep/certificates) for all
+available versions.

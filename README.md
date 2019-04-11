@@ -99,6 +99,8 @@ $ brew uninstall step
 
 ### Linux
 
+#### Debian
+
 1. [Optional] Install `step cli`.
 
     Download the latest Debian package from
@@ -129,7 +131,17 @@ $ brew uninstall step
     $ sudo dpkg -i step-certificates_X.Y.Z_amd64.deb
     ```
 
-3. Test.
+#### Arch Linux
+
+We are using the [Arch User Repository](https://aur.archlinux.org) to distribute
+`step` binaries for Arch Linux.
+
+* [Optional] The `step-cli` binary tarball can be found [here](https://aur.archlinux.org/packages/step-cli-bin/).
+* The `step-ca` binary tarball can be found [here](https://aur.archlinux.org/packages/step-ca-bin/).
+
+You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
+
+### Test
 
     <pre><code>
     <b>$ step version</b>
