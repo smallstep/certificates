@@ -60,7 +60,7 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Update client transport
-	c.client.Transport = tr
+	c.SetTransport(tr)
 
 	// Start renewer
 	renewer.RunContext(ctx)
@@ -111,7 +111,7 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Update client transport
-	c.client.Transport = tr
+	c.SetTransport(tr)
 
 	// Start renewer
 	renewer.RunContext(ctx)
@@ -161,7 +161,7 @@ func (c *Client) GetCertificateRenewer(sign *api.SignResponse, pk crypto.Private
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Update client transport
-	c.client.Transport = tr
+	c.SetTransport(tr)
 
 	return renewer, nil
 }
