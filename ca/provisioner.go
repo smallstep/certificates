@@ -33,14 +33,17 @@ type Provisioner struct {
 // NewProvisioner loads and decrypts key material from the CA for the named
 // provisioner. The key identified by `kid` will be used if specified. If `kid`
 // is the empty string we'll use the first key for the named provisioner that
-// decrypts using `passFile`.
+// decrypts using `password`.
 func NewProvisioner(name, kid, caURL, caRoot string, password []byte) (*Provisioner, error) {
 	var jwk *jose.JSONWebKey
 	var err error
-	if kid != "" {
-		jwk, err = loadProvisionerJWKByKid(kid, caURL, caRoot, password)
-	} else {
+	switch {
+	case name == "":
+		return nil, errors.New("provisioner name cannot be empty")
+	case kid == "":
 		jwk, err = loadProvisionerJWKByName(name, caURL, caRoot, password)
+	default:
+		jwk, err = loadProvisionerJWKByKid(kid, caURL, caRoot, password)
 	}
 	if err != nil {
 		return nil, err
@@ -113,7 +116,7 @@ func decryptProvisionerJWK(encryptedKey string, password []byte) (*jose.JSONWebK
 }
 
 // loadProvisionerJWKByKid retrieves a provisioner key from the CA by key ID and
-// decrypts it using the specified password file.
+// decrypts it using the specified password.
 func loadProvisionerJWKByKid(kid, caURL, caRoot string, password []byte) (*jose.JSONWebKey, error) {
 	encrypted, err := getProvisionerKey(caURL, caRoot, kid)
 	if err != nil {
@@ -125,7 +128,7 @@ func loadProvisionerJWKByKid(kid, caURL, caRoot string, password []byte) (*jose.
 
 // loadProvisionerJWKByName retrieves the list of provisioners and encrypted key then
 // returns the key of the first provisioner with a matching name that can be successfully
-// decrypted with the specified password file.
+// decrypted with the specified password.
 func loadProvisionerJWKByName(name, caURL, caRoot string, password []byte) (key *jose.JSONWebKey, err error) {
 	provisioners, err := getProvisioners(caURL, caRoot)
 	if err != nil {
@@ -176,8 +179,7 @@ func getProvisioners(caURL, rootFile string) (provisioner.List, error) {
 	}
 }
 
-// getProvisionerKey returns the encrypted provisioner key with the for the
-// given kid.
+// getProvisionerKey returns the encrypted provisioner key for the given kid.
 func getProvisionerKey(caURL, rootFile, kid string) (string, error) {
 	if len(rootFile) == 0 {
 		rootFile = getRootCAPath()

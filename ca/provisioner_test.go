@@ -1,7 +1,6 @@
 package ca
 
 import (
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -25,16 +24,10 @@ func getTestProvisioner(t *testing.T, url string) *Provisioner {
 }
 
 func TestNewProvisioner(t *testing.T) {
-	value := os.Getenv("STEPPATH")
-	defer os.Setenv("STEPPATH", value)
-	os.Setenv("STEPPATH", "testdata")
-
 	ca := startCATestServer()
 	defer ca.Close()
-
 	want := getTestProvisioner(t, ca.URL)
-	wantByKid := getTestProvisioner(t, ca.URL)
-	wantByKid.name = ""
+
 	type args struct {
 		name     string
 		kid      string
@@ -49,12 +42,12 @@ func TestNewProvisioner(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", args{want.name, want.kid, want.caURL, want.caRoot, []byte("password")}, want, false},
-		{"ok-by-kid", args{"", want.kid, want.caURL, want.caRoot, []byte("password")}, wantByKid, false},
 		{"ok-by-name", args{want.name, "", want.caURL, want.caRoot, []byte("password")}, want, false},
-		{"fail-by-kid", args{want.name, "bad-kid", want.caURL, want.caRoot, []byte("password")}, nil, true},
-		{"fail-by-name", args{"bad-name", "", want.caURL, want.caRoot, []byte("password")}, nil, true},
-		{"fail-by-password", args{"", want.kid, want.caURL, want.caRoot, []byte("bad-password")}, nil, true},
-		{"fail-by-password", args{want.name, "", want.caURL, want.caRoot, []byte("bad-password")}, nil, true},
+		{"fail-bad-kid", args{want.name, "bad-kid", want.caURL, want.caRoot, []byte("password")}, nil, true},
+		{"fail-empty-name", args{"", want.kid, want.caURL, want.caRoot, []byte("password")}, nil, true},
+		{"fail-bad-name", args{"bad-name", "", want.caURL, want.caRoot, []byte("password")}, nil, true},
+		{"fail-by-password", args{want.name, want.kid, want.caURL, want.caRoot, []byte("bad-password")}, nil, true},
+		{"fail-by-password-no-kid", args{want.name, "", want.caURL, want.caRoot, []byte("bad-password")}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
