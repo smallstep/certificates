@@ -16,6 +16,12 @@ import (
 	"github.com/smallstep/cli/jose"
 )
 
+// googleOauth2Certs is the url that servers Google OAuth2 public keys.
+var googleOauth2Certs = "https://www.googleapis.com/oauth2/v3/certs"
+
+// gcpIdentityURL is the base url for the identity document in GCP.
+var gcpIdentityURL = "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity"
+
 // gcpPayload extends jwt.Claims with custom GCP attributes.
 type gcpPayload struct {
 	jose.Claims
@@ -69,8 +75,11 @@ func (p *GCP) GetTokenID(token string) (string, error) {
 	if err = jwt.UnsafeClaimsWithoutVerification(&claims); err != nil {
 		return "", errors.Wrap(err, "error verifying claims")
 	}
-
-	unique := fmt.Sprintf("%s.%d.%d", claims.Google.ComputeEngine.InstanceID, claims.IssuedAt, claims.Expiry)
+	// This string should be mostly unique
+	unique := fmt.Sprintf("%s.%s.%d.%d",
+		p.GetID(), claims.Google.ComputeEngine.InstanceID,
+		*claims.IssuedAt, *claims.Expiry,
+	)
 	sum := sha256.Sum256([]byte(unique))
 	return strings.ToLower(hex.EncodeToString(sum[:])), nil
 }
@@ -90,6 +99,37 @@ func (p *GCP) GetEncryptedKey() (kid string, key string, ok bool) {
 	return "", "", false
 }
 
+// GetIdentityURL returns the url that generates the GCP token.
+func (p *GCP) GetIdentityURL() string {
+	q := url.Values{}
+	q.Add("audience", p.GetID())
+	q.Add("format", "full")
+	q.Add("licenses", "FALSE")
+	return fmt.Sprintf("%s?%s", gcpIdentityURL, q.Encode())
+}
+
+// GetIdentityToken does an HTTP request to the identity url.
+func (p *GCP) GetIdentityToken() (string, error) {
+	req, err := http.NewRequest("GET", p.GetIdentityURL(), http.NoBody)
+	if err != nil {
+		return "", errors.Wrap(err, "error creating identity request")
+	}
+	req.Header.Set("Metadata-Flavor", "Google")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", errors.Wrap(err, "error doing identity request, are you in a GCP VM?")
+	}
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", errors.Wrap(err, "error reading identity request response")
+	}
+	if resp.StatusCode >= 400 {
+		return "", errors.Errorf("error on identity response: status=%d, response=%s", resp.StatusCode, b)
+	}
+	return string(bytes.TrimSpace(b)), nil
+}
+
 // Init validates and initializes the GCP provider.
 func (p *GCP) Init(config Config) error {
 	var err error
@@ -104,7 +144,7 @@ func (p *GCP) Init(config Config) error {
 		return err
 	}
 	// Initialize key store
-	p.keyStore, err = newKeyStore("https://www.googleapis.com/oauth2/v3/certs")
+	p.keyStore, err = newKeyStore(googleOauth2Certs)
 	if err != nil {
 		return err
 	}
@@ -149,31 +189,6 @@ func (p *GCP) AuthorizeRevoke(token string) error {
 	return err
 }
 
-// GetIdentityURL returns the url that generates the GCP token.
-func (p *GCP) GetIdentityURL() string {
-	audience := url.QueryEscape(p.GetID())
-	return fmt.Sprintf("http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience=%s&format=full&licenses=FALSE", audience)
-}
-
-// GetIdentityToken does an HTTP request to the identity url.
-func (p *GCP) GetIdentityToken() (string, error) {
-	req, err := http.NewRequest("GET", p.GetIdentityURL(), http.NoBody)
-	if err != nil {
-		return "", errors.Wrap(err, "error creating identity request")
-	}
-	req.Header.Set("Metadata-Flavor", "Google")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", errors.Wrap(err, "error doing identity request, are you in a GCP VM?")
-	}
-	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", errors.Wrap(err, "error reading identity request response")
-	}
-	return string(bytes.TrimSpace(b)), nil
-}
-
 // authorizeToken performs common jwt authorization actions and returns the
 // claims for case specific downstream parsing.
 // e.g. a Sign request will auth/validate different fields than a Revoke request.
@@ -191,42 +206,44 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 	kid := jwt.Headers[0].KeyID
 	keys := p.keyStore.Get(kid)
 	for _, key := range keys {
-		if err := jwt.Claims(key, &claims); err == nil {
+		if err := jwt.Claims(key.Public(), &claims); err == nil {
 			found = true
 			break
 		}
 	}
 	if !found {
-		return nil, errors.Errorf("failed to validate payload: cannot find certificate for kid %s", kid)
+		return nil, errors.Errorf("failed to validate payload: cannot find key for kid %s", kid)
 	}
 
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
 	// more than a few minutes.
 	if err = claims.ValidateWithLeeway(jose.Expected{
 		Issuer:   "https://accounts.google.com",
-		Time:     time.Now().UTC(),
 		Audience: []string{p.GetID()},
+		Time:     time.Now().UTC(),
 	}, time.Minute); err != nil {
 		return nil, errors.Wrapf(err, "invalid token")
 	}
 
-	// validate authorized party
+	// validate subject (service account)
 	if len(p.ServiceAccounts) > 0 {
 		var found bool
 		for _, sa := range p.ServiceAccounts {
-			if sa == claims.AuthorizedParty {
+			if sa == claims.Subject {
 				found = true
 				break
 			}
 		}
 		if !found {
-			return nil, errors.New("invalid token: invalid authorized party claim (azp)")
+			return nil, errors.New("invalid token: invalid subject claim")
 		}
 	}
 
 	switch {
 	case claims.Google.ComputeEngine.InstanceID == "":
 		return nil, errors.New("token google.compute_engine.instance_id cannot be empty")
+	case claims.Google.ComputeEngine.InstanceName == "":
+		return nil, errors.New("token google.compute_engine.instance_name cannot be empty")
 	case claims.Google.ComputeEngine.ProjectID == "":
 		return nil, errors.New("token google.compute_engine.project_id cannot be empty")
 	case claims.Google.ComputeEngine.Zone == "":

@@ -163,6 +163,36 @@ func generateOIDC() (*OIDC, error) {
 	}, nil
 }
 
+func generateGCP() (*GCP, error) {
+	name, err := randutil.Alphanumeric(10)
+	if err != nil {
+		return nil, err
+	}
+	serviceAccount, err := randutil.Alphanumeric(10)
+	if err != nil {
+		return nil, err
+	}
+	jwk, err := generateJSONWebKey()
+	if err != nil {
+		return nil, err
+	}
+	claimer, err := NewClaimer(nil, globalProvisionerClaims)
+	if err != nil {
+		return nil, err
+	}
+	return &GCP{
+		Type:            "GCP",
+		Name:            name,
+		ServiceAccounts: []string{serviceAccount},
+		Claims:          &globalProvisionerClaims,
+		claimer:         claimer,
+		keyStore: &keyStore{
+			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
+			expiry: time.Now().Add(24 * time.Hour),
+		},
+	}, nil
+}
+
 func generateCollection(nJWK, nOIDC int) (*Collection, error) {
 	col := NewCollection(testAudiences)
 	for i := 0; i < nJWK; i++ {
@@ -216,6 +246,41 @@ func generateToken(sub, iss, aud string, email string, sans []string, iat time.T
 		},
 		Email: email,
 		SANS:  sans,
+	}
+	return jose.Signed(sig).Claims(claims).CompactSerialize()
+}
+
+func generateGCPToken(sub, iss, aud, instanceID, instanceName, projectID, zone string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
+	sig, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
+		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	claims := gcpPayload{
+		Claims: jose.Claims{
+			Subject:   sub,
+			Issuer:    iss,
+			IssuedAt:  jose.NewNumericDate(iat),
+			NotBefore: jose.NewNumericDate(iat),
+			Expiry:    jose.NewNumericDate(iat.Add(5 * time.Minute)),
+			Audience:  []string{aud},
+		},
+		AuthorizedParty: sub,
+		Email:           "foo@developer.gserviceaccount.com",
+		EmailVerified:   true,
+		Google: gcpGooglePayload{
+			ComputeEngine: gcpComputeEnginePayload{
+				InstanceID:                instanceID,
+				InstanceName:              instanceName,
+				InstanceCreationTimestamp: jose.NewNumericDate(iat.Add(-24 * time.Hour)),
+				ProjectID:                 projectID,
+				ProjectNumber:             1234567890,
+				Zone:                      zone,
+			},
+		},
 	}
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }
