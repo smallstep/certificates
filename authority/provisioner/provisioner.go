@@ -37,12 +37,12 @@ type Type int
 
 const (
 	noopType Type = 0
-
 	// TypeJWK is used to indicate the JWK provisioners.
 	TypeJWK Type = 1
-
 	// TypeOIDC is used to indicate the OIDC provisioners.
 	TypeOIDC Type = 2
+	// TypeGCP is used to indicate the GCP provisioners.
+	TypeGCP Type = 3
 
 	// RevokeAudienceKey is the key for the 'revoke' audiences in the audiences map.
 	RevokeAudienceKey = "revoke"
@@ -86,6 +86,8 @@ func (l *List) UnmarshalJSON(data []byte) error {
 			p = &JWK{}
 		case "oidc":
 			p = &OIDC{}
+		case "gcp":
+			p = &GCP{}
 		default:
 			return errors.Errorf("provisioner type %s not supported", typ.Type)
 		}

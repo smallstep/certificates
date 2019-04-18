@@ -70,13 +70,17 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 	if err := token.UnsafeClaimsWithoutVerification(&payload); err != nil {
 		return nil, false
 	}
-	// audience is required
+	// Audience is required
 	if len(payload.Audience) == 0 {
 		return nil, false
 	}
+	// Try with azp (OIDC)
 	if len(payload.AuthorizedParty) > 0 {
-		return c.Load(payload.AuthorizedParty)
+		if p, ok := c.Load(payload.AuthorizedParty); ok {
+			return p, ok
+		}
 	}
+	// Fallback to aud (GCP)
 	return c.Load(payload.Audience[0])
 }
 
