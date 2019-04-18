@@ -47,7 +47,7 @@ type GCP struct {
 	ServiceAccounts []string `json:"serviceAccounts"`
 	Claims          *Claims  `json:"claims,omitempty"`
 	claimer         *Claimer
-	certStore       *keyStore
+	keyStore        *keyStore
 }
 
 // GetID returns the provisioner unique identifier. The name should uniquely
@@ -103,8 +103,8 @@ func (p *GCP) Init(config Config) error {
 	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
 		return err
 	}
-	// Initialize certificate store
-	p.certStore, err = newCertificateStore("https://www.googleapis.com/oauth2/v1/certs")
+	// Initialize key store
+	p.keyStore, err = newKeyStore("https://www.googleapis.com/oauth2/v3/certs")
 	if err != nil {
 		return err
 	}
@@ -185,15 +185,19 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 	if len(jwt.Headers) == 0 {
 		return nil, errors.New("error parsing token: header is missing")
 	}
-	kid := jwt.Headers[0].KeyID
-	cert := p.certStore.GetCertificate(kid)
-	if cert == nil {
-		return nil, errors.Errorf("failed to validate payload: cannot find certificate for kid %s", kid)
-	}
 
+	var found bool
 	var claims gcpPayload
-	if err = jwt.Claims(cert.PublicKey, &claims); err != nil {
-		return nil, errors.Wrap(err, "error parsing claims")
+	kid := jwt.Headers[0].KeyID
+	keys := p.keyStore.Get(kid)
+	for _, key := range keys {
+		if err := jwt.Claims(key, &claims); err == nil {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil, errors.Errorf("failed to validate payload: cannot find certificate for kid %s", kid)
 	}
 
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
