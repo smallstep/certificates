@@ -16,7 +16,7 @@ import (
 )
 
 func resetGoogleVars() {
-	googleOauth2Certs = "https://www.googleapis.com/oauth2/v3/certs"
+	gcpCertsURL = "https://www.googleapis.com/oauth2/v3/certs"
 	gcpIdentityURL = "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity"
 }
 
@@ -100,7 +100,6 @@ func TestGCP_GetIdentityToken(t *testing.T) {
 	assert.FatalError(t, err)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println(r.RequestURI)
 		switch r.URL.Path {
 		case "/bad-request":
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -118,13 +117,15 @@ func TestGCP_GetIdentityToken(t *testing.T) {
 		wantErr     bool
 	}{
 		{"ok", p1, srv.URL, t1, false},
-		{"bad request", p1, srv.URL + "/bad-request", "", true},
-		{"bad url", p1, "badurl", "", true},
+		{"fail request", p1, srv.URL + "/bad-request", "", true},
+		{"fail url", p1, "://ca.smallstep.com", "", true},
+		{"fail connect", p1, "foobarzar", "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gcpIdentityURL = tt.identityURL
 			got, err := tt.gcp.GetIdentityToken()
+			t.Log(err)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GCP.GetIdentityToken() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -169,11 +170,11 @@ func TestGCP_Init(t *testing.T) {
 		{"bad type", fields{"", "name", nil, nil}, args{config, srv.URL}, true},
 		{"bad name", fields{"GCP", "", nil, nil}, args{config, srv.URL}, true},
 		{"bad claims", fields{"GCP", "name", nil, badClaims}, args{config, srv.URL}, true},
-		{"bad certs", fields{"GCP", "name", nil, badClaims}, args{config, srv.URL + "/error"}, true},
+		{"bad certs", fields{"GCP", "name", nil, nil}, args{config, srv.URL + "/error"}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			googleOauth2Certs = tt.args.certsURL
+			gcpCertsURL = tt.args.certsURL
 			p := &GCP{
 				Type:            tt.fields.Type,
 				Name:            tt.fields.Name,

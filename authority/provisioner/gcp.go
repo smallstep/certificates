@@ -16,8 +16,8 @@ import (
 	"github.com/smallstep/cli/jose"
 )
 
-// googleOauth2Certs is the url that servers Google OAuth2 public keys.
-var googleOauth2Certs = "https://www.googleapis.com/oauth2/v3/certs"
+// gcpCertsURL is the url that servers Google OAuth2 public keys.
+var gcpCertsURL = "https://www.googleapis.com/oauth2/v3/certs"
 
 // gcpIdentityURL is the base url for the identity document in GCP.
 var gcpIdentityURL = "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity"
@@ -122,10 +122,10 @@ func (p *GCP) GetIdentityToken() (string, error) {
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", errors.Wrap(err, "error reading identity request response")
+		return "", errors.Wrap(err, "error on identity request")
 	}
 	if resp.StatusCode >= 400 {
-		return "", errors.Errorf("error on identity response: status=%d, response=%s", resp.StatusCode, b)
+		return "", errors.Errorf("error on identity request: status=%d, response=%s", resp.StatusCode, b)
 	}
 	return string(bytes.TrimSpace(b)), nil
 }
@@ -144,7 +144,7 @@ func (p *GCP) Init(config Config) error {
 		return err
 	}
 	// Initialize key store
-	p.keyStore, err = newKeyStore(googleOauth2Certs)
+	p.keyStore, err = newKeyStore(gcpCertsURL)
 	if err != nil {
 		return err
 	}
