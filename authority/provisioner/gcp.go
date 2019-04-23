@@ -63,7 +63,7 @@ func (p *GCP) GetID() string {
 }
 
 // GetTokenID returns the identifier of the token. For GCP this is the sha256 of
-// "instance_id.iat.exp".
+// "provisioner_id.instance_id.iat.exp".
 func (p *GCP) GetTokenID(token string) (string, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
@@ -130,7 +130,7 @@ func (p *GCP) GetIdentityToken() (string, error) {
 	return string(bytes.TrimSpace(b)), nil
 }
 
-// Init validates and initializes the GCP provider.
+// Init validates and initializes the GCP provisioner.
 func (p *GCP) Init(config Config) error {
 	var err error
 	switch {
@@ -169,7 +169,7 @@ func (p *GCP) AuthorizeSign(token string) ([]SignOption, error) {
 		commonNameValidator(ce.InstanceName),
 		dnsNamesValidator(dnsNames),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
-		newProvisionerExtensionOption(TypeGCP, p.Name, claims.AuthorizedParty),
+		newProvisionerExtensionOption(TypeGCP, p.Name, claims.Subject),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	}, nil
 }
@@ -185,8 +185,7 @@ func (p *GCP) AuthorizeRenewal(cert *x509.Certificate) error {
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke a certificate.
 func (p *GCP) AuthorizeRevoke(token string) error {
-	_, err := p.authorizeToken(token)
-	return err
+	return errors.New("revoke is not supported on a GCP provisioner")
 }
 
 // authorizeToken performs common jwt authorization actions and returns the

@@ -340,7 +340,7 @@ func TestGCP_AuthorizeRevoke(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, false},
+		{"ok", p1, args{t1}, true}, // revoke is disabled
 		{"fail", p1, args{"token"}, true},
 	}
 	for _, tt := range tests {
