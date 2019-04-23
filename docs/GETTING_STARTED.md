@@ -384,7 +384,7 @@ types of certs. Each of these provisioners must have unique keys.
 
 ## Use Custom Claims for Provisioners to Control Certificate Validity etc
 
-It's possible to configure provisioners on the CA to issue certs using propoerties specific to their target environments. Most commonly different validity periods and disabling renewals for certs. Here's how:
+It's possible to configure provisioners on the CA to issue certs using properties specific to their target environments. Most commonly different validity periods and disabling renewals for certs. Here's how:
 
 ```bash
 $ step ca init
