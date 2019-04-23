@@ -15,11 +15,6 @@ import (
 	"github.com/smallstep/assert"
 )
 
-func resetGoogleVars() {
-	gcpCertsURL = "https://www.googleapis.com/oauth2/v3/certs"
-	gcpIdentityURL = "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity"
-}
-
 func TestGCP_Getters(t *testing.T) {
 	p, err := generateGCP()
 	assert.FatalError(t, err)
@@ -91,7 +86,6 @@ func TestGCP_GetTokenID(t *testing.T) {
 func TestGCP_GetIdentityToken(t *testing.T) {
 	p1, err := generateGCP()
 	assert.FatalError(t, err)
-	defer resetGoogleVars()
 
 	t1, err := generateGCPToken(p1.ServiceAccounts[0],
 		"https://accounts.google.com", p1.GetID(),
@@ -123,7 +117,7 @@ func TestGCP_GetIdentityToken(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gcpIdentityURL = tt.identityURL
+			tt.gcp.config.IdentityURL = tt.identityURL
 			got, err := tt.gcp.GetIdentityToken()
 			t.Log(err)
 			if (err != nil) != tt.wantErr {
@@ -140,7 +134,6 @@ func TestGCP_GetIdentityToken(t *testing.T) {
 func TestGCP_Init(t *testing.T) {
 	srv := generateJWKServer(2)
 	defer srv.Close()
-	defer resetGoogleVars()
 
 	config := Config{
 		Claims: globalProvisionerClaims,
@@ -174,12 +167,15 @@ func TestGCP_Init(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gcpCertsURL = tt.args.certsURL
 			p := &GCP{
 				Type:            tt.fields.Type,
 				Name:            tt.fields.Name,
 				ServiceAccounts: tt.fields.ServiceAccounts,
 				Claims:          tt.fields.Claims,
+				config: &gcpConfig{
+					CertsURL:    tt.args.certsURL,
+					IdentityURL: gcpIdentityURL,
+				},
 			}
 			if err := p.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("GCP.Init() error = %v, wantErr %v", err, tt.wantErr)

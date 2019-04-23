@@ -17,10 +17,10 @@ import (
 )
 
 // gcpCertsURL is the url that servers Google OAuth2 public keys.
-var gcpCertsURL = "https://www.googleapis.com/oauth2/v3/certs"
+const gcpCertsURL = "https://www.googleapis.com/oauth2/v3/certs"
 
 // gcpIdentityURL is the base url for the identity document in GCP.
-var gcpIdentityURL = "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity"
+const gcpIdentityURL = "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity"
 
 // gcpPayload extends jwt.Claims with custom GCP attributes.
 type gcpPayload struct {
@@ -45,6 +45,18 @@ type gcpComputeEnginePayload struct {
 	LicenseID                 []string          `json:"license_id"`
 }
 
+type gcpConfig struct {
+	CertsURL    string
+	IdentityURL string
+}
+
+func newGCPConfig() *gcpConfig {
+	return &gcpConfig{
+		CertsURL:    gcpCertsURL,
+		IdentityURL: gcpIdentityURL,
+	}
+}
+
 // GCP is the provisioner that supports identity tokens created by the Google
 // Cloud Platform metadata API.
 type GCP struct {
@@ -53,6 +65,7 @@ type GCP struct {
 	ServiceAccounts []string `json:"serviceAccounts"`
 	Claims          *Claims  `json:"claims,omitempty"`
 	claimer         *Claimer
+	config          *gcpConfig
 	keyStore        *keyStore
 }
 
@@ -101,11 +114,14 @@ func (p *GCP) GetEncryptedKey() (kid string, key string, ok bool) {
 
 // GetIdentityURL returns the url that generates the GCP token.
 func (p *GCP) GetIdentityURL() string {
+	// Initialize config if required
+	p.assertConfig()
+
 	q := url.Values{}
 	q.Add("audience", p.GetID())
 	q.Add("format", "full")
 	q.Add("licenses", "FALSE")
-	return fmt.Sprintf("%s?%s", gcpIdentityURL, q.Encode())
+	return fmt.Sprintf("%s?%s", p.config.IdentityURL, q.Encode())
 }
 
 // GetIdentityToken does an HTTP request to the identity url.
@@ -139,12 +155,14 @@ func (p *GCP) Init(config Config) error {
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
 	}
+	// Initialize config
+	p.assertConfig()
 	// Update claims with global ones
 	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
 		return err
 	}
 	// Initialize key store
-	p.keyStore, err = newKeyStore(gcpCertsURL)
+	p.keyStore, err = newKeyStore(p.config.CertsURL)
 	if err != nil {
 		return err
 	}
@@ -186,6 +204,13 @@ func (p *GCP) AuthorizeRenewal(cert *x509.Certificate) error {
 // revoke a certificate.
 func (p *GCP) AuthorizeRevoke(token string) error {
 	return errors.New("revoke is not supported on a GCP provisioner")
+}
+
+// assertConfig initializes the config if it has not been initialized.
+func (p *GCP) assertConfig() {
+	if p.config == nil {
+		p.config = newGCPConfig()
+	}
 }
 
 // authorizeToken performs common jwt authorization actions and returns the
