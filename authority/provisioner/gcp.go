@@ -200,8 +200,8 @@ func (p *GCP) AuthorizeRenewal(cert *x509.Certificate) error {
 	return nil
 }
 
-// AuthorizeRevoke returns an error if the provisioner does not have rights to
-// revoke a certificate.
+// AuthorizeRevoke returns an error because revoke is not supported on GCP
+// provisioners.
 func (p *GCP) AuthorizeRevoke(token string) error {
 	return errors.New("revoke is not supported on a GCP provisioner")
 }
