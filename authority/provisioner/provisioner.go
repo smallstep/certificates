@@ -43,6 +43,8 @@ const (
 	TypeOIDC Type = 2
 	// TypeGCP is used to indicate the GCP provisioners.
 	TypeGCP Type = 3
+	// TypeAWS is used to indicate the AWS provisioners.
+	TypeAWS Type = 4
 
 	// RevokeAudienceKey is the key for the 'revoke' audiences in the audiences map.
 	RevokeAudienceKey = "revoke"
@@ -88,6 +90,8 @@ func (l *List) UnmarshalJSON(data []byte) error {
 			p = &OIDC{}
 		case "gcp":
 			p = &GCP{}
+		case "aws":
+			p = &AWS{}
 		default:
 			return errors.Errorf("provisioner type %s not supported", typ.Type)
 		}
