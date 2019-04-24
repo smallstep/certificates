@@ -59,14 +59,23 @@ func newGCPConfig() *gcpConfig {
 
 // GCP is the provisioner that supports identity tokens created by the Google
 // Cloud Platform metadata API.
+//
+// If DisableCustomSANs is true, only the internal DNS and IP will be added as a
+// SAN. By default it will accept any SAN in the CSR.
+//
+// If DisableTrustOnFirstUse is true, multiple sign request for this provisioner
+// with the same instance will be accepted. By default only the first request
+// will be accepted.
 type GCP struct {
-	Type            string   `json:"type"`
-	Name            string   `json:"name"`
-	ServiceAccounts []string `json:"serviceAccounts"`
-	Claims          *Claims  `json:"claims,omitempty"`
-	claimer         *Claimer
-	config          *gcpConfig
-	keyStore        *keyStore
+	Type                   string   `json:"type"`
+	Name                   string   `json:"name"`
+	ServiceAccounts        []string `json:"serviceAccounts"`
+	DisableCustomSANs      bool     `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
+	Claims                 *Claims  `json:"claims,omitempty"`
+	claimer                *Claimer
+	config                 *gcpConfig
+	keyStore               *keyStore
 }
 
 // GetID returns the provisioner unique identifier. The name should uniquely
@@ -75,12 +84,19 @@ func (p *GCP) GetID() string {
 	return "gcp:" + p.Name
 }
 
-// GetTokenID returns the identifier of the token. For GCP this is the sha256 of
-// "provisioner_id.instance_id.iat.exp".
+// GetTokenID returns the identifier of the token. The default value for GCP the
+// SHA256 of "provisioner_id.instance_id", but if DisableTrustOnFirstUse is set
+// to true, then it will be the SHA256 of the token.
 func (p *GCP) GetTokenID(token string) (string, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
 		return "", errors.Wrap(err, "error parsing token")
+	}
+
+	// If TOFU is disabled create an ID for the token, so it cannot be reused.
+	if p.DisableTrustOnFirstUse {
+		sum := sha256.Sum256([]byte(token))
+		return strings.ToLower(hex.EncodeToString(sum[:])), nil
 	}
 
 	// Get claims w/out verification.
@@ -88,11 +104,11 @@ func (p *GCP) GetTokenID(token string) (string, error) {
 	if err = jwt.UnsafeClaimsWithoutVerification(&claims); err != nil {
 		return "", errors.Wrap(err, "error verifying claims")
 	}
-	// This string should be mostly unique
-	unique := fmt.Sprintf("%s.%s.%d.%d",
-		p.GetID(), claims.Google.ComputeEngine.InstanceID,
-		*claims.IssuedAt, *claims.Expiry,
-	)
+
+	// Create unique ID for Trust On First Use (TOFU). Only the first instance
+	// per provisioner is allowed as we don't have a way to trust the given
+	// sans.
+	unique := fmt.Sprintf("%s.%s", p.GetID(), claims.Google.ComputeEngine.InstanceID)
 	sum := sha256.Sum256([]byte(unique))
 	return strings.ToLower(hex.EncodeToString(sum[:])), nil
 }
@@ -176,20 +192,25 @@ func (p *GCP) AuthorizeSign(token string) ([]SignOption, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	ce := claims.Google.ComputeEngine
-	dnsNames := []string{
-		fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
-		fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
+
+	// Enforce default DNS if configured.
+	// By default we we'll accept the SANs in the CSR.
+	// There's no way to trust them other than TOFU.
+	var so []SignOption
+	if p.DisableCustomSANs {
+		so = append(so, dnsNamesValidator([]string{
+			fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
+			fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
+		}))
 	}
 
-	return []SignOption{
+	return append(so,
 		commonNameValidator(ce.InstanceName),
-		dnsNamesValidator(dnsNames),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		newProvisionerExtensionOption(TypeGCP, p.Name, claims.Subject),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
-	}, nil
+	), nil
 }
 
 // AuthorizeRenewal returns an error if the renewal is disabled.

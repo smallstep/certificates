@@ -118,10 +118,10 @@ type awsInstanceIdentityDocument struct {
 type AWS struct {
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
-	Claims                 *Claims  `json:"claims,omitempty"`
 	Accounts               []string `json:"accounts"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
+	Claims                 *Claims  `json:"claims,omitempty"`
 	claimer                *Claimer
 	config                 *awsConfig
 }
@@ -192,7 +192,7 @@ func (p *AWS) GetIdentityToken() (string, error) {
 	// Create unique ID for Trust On First Use (TOFU). Only the first instance
 	// per provisioner is allowed as we don't have a way to trust the given
 	// sans.
-	unique := fmt.Sprintf("%s:%s", p.GetID(), idoc.InstanceID)
+	unique := fmt.Sprintf("%s.%s", p.GetID(), idoc.InstanceID)
 	sum := sha256.Sum256([]byte(unique))
 
 	// Create a JWT from the identity document
@@ -256,7 +256,7 @@ func (p *AWS) AuthorizeSign(token string) ([]SignOption, error) {
 
 	// Enforce default DNS and IP if configured.
 	// By default we we'll accept the SANs in the CSR.
-	// There's no way to trust them.
+	// There's no way to trust them other than TOFU.
 	var so []SignOption
 	if p.DisableCustomSANs {
 		so = append(so, dnsNamesValidator([]string{

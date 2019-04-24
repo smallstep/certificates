@@ -44,16 +44,26 @@ func TestGCP_GetTokenID(t *testing.T) {
 	assert.FatalError(t, err)
 	p1.Name = "name"
 
+	p2, err := generateGCP()
+	assert.FatalError(t, err)
+	p2.DisableTrustOnFirstUse = true
+
 	now := time.Now()
 	t1, err := generateGCPToken(p1.ServiceAccounts[0],
 		"https://accounts.google.com", "gcp:name",
 		"instance-id", "instance-name", "project-id", "zone",
 		now, &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
+	t2, err := generateGCPToken(p2.ServiceAccounts[0],
+		"https://accounts.google.com", p2.GetID(),
+		"instance-id", "instance-name", "project-id", "zone",
+		now, &p2.keyStore.keySet.Keys[0])
+	assert.FatalError(t, err)
 
-	unique := fmt.Sprintf("gcp:name.instance-id.%d.%d", now.Unix(), now.Add(5*time.Minute).Unix())
-	sum := sha256.Sum256([]byte(unique))
-	want := strings.ToLower(hex.EncodeToString(sum[:]))
+	sum := sha256.Sum256([]byte("gcp:name.instance-id"))
+	want1 := strings.ToLower(hex.EncodeToString(sum[:]))
+	sum = sha256.Sum256([]byte(t2))
+	want2 := strings.ToLower(hex.EncodeToString(sum[:]))
 
 	type args struct {
 		token string
@@ -65,7 +75,8 @@ func TestGCP_GetTokenID(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, want, false},
+		{"ok", p1, args{t1}, want1, false},
+		{"ok", p2, args{t2}, want2, false},
 		{"fail token", p1, args{"token"}, "", true},
 		{"fail claims", p1, args{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ey.fooo"}, "", true},
 	}
@@ -188,6 +199,10 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 	p1, err := generateGCP()
 	assert.FatalError(t, err)
 
+	p2, err := generateGCP()
+	assert.FatalError(t, err)
+	p2.DisableCustomSANs = true
+
 	aKey, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 
@@ -196,6 +211,12 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		"instance-id", "instance-name", "project-id", "zone",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
+	t2, err := generateGCPToken(p2.ServiceAccounts[0],
+		"https://accounts.google.com", p2.GetID(),
+		"instance-id", "instance-name", "project-id", "zone",
+		time.Now(), &p2.keyStore.keySet.Keys[0])
+	assert.FatalError(t, err)
+
 	failKey, err := generateGCPToken(p1.ServiceAccounts[0],
 		"https://accounts.google.com", p1.GetID(),
 		"instance-id", "instance-name", "project-id", "zone",
@@ -253,20 +274,22 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		name    string
 		gcp     *GCP
 		args    args
+		wantLen int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, false},
-		{"fail token", p1, args{"token"}, true},
-		{"fail key", p1, args{failKey}, true},
-		{"fail iss", p1, args{failIss}, true},
-		{"fail aud", p1, args{failAud}, true},
-		{"fail exp", p1, args{failExp}, true},
-		{"fail nbf", p1, args{failNbf}, true},
-		{"fail service account", p1, args{failServiceAccount}, true},
-		{"fail instance id", p1, args{failInstanceID}, true},
-		{"fail instance name", p1, args{failInstanceName}, true},
-		{"fail project id", p1, args{failProjectID}, true},
-		{"fail zone", p1, args{failZone}, true},
+		{"ok", p1, args{t1}, 4, false},
+		{"ok", p2, args{t2}, 5, false},
+		{"fail token", p1, args{"token"}, 0, true},
+		{"fail key", p1, args{failKey}, 0, true},
+		{"fail iss", p1, args{failIss}, 0, true},
+		{"fail aud", p1, args{failAud}, 0, true},
+		{"fail exp", p1, args{failExp}, 0, true},
+		{"fail nbf", p1, args{failNbf}, 0, true},
+		{"fail service account", p1, args{failServiceAccount}, 0, true},
+		{"fail instance id", p1, args{failInstanceID}, 0, true},
+		{"fail instance name", p1, args{failInstanceName}, 0, true},
+		{"fail project id", p1, args{failProjectID}, 0, true},
+		{"fail zone", p1, args{failZone}, 0, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -275,11 +298,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 				t.Errorf("GCP.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if err != nil {
-				assert.Nil(t, got)
-			} else {
-				assert.Len(t, 5, got)
-			}
+			assert.Len(t, tt.wantLen, got)
 		})
 	}
 }
