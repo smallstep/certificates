@@ -186,6 +186,7 @@ func generateGCP() (*GCP, error) {
 		ServiceAccounts: []string{serviceAccount},
 		Claims:          &globalProvisionerClaims,
 		claimer:         claimer,
+		config:          newGCPConfig(),
 		keyStore: &keyStore{
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
