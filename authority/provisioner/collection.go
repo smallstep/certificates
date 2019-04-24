@@ -93,8 +93,13 @@ func (c *Collection) LoadByCertificate(cert *x509.Certificate) (Interface, bool)
 			if _, err := asn1.Unmarshal(e.Value, &provisioner); err != nil {
 				return nil, false
 			}
-			if provisioner.Type == int(TypeJWK) {
+			switch Type(provisioner.Type) {
+			case TypeJWK:
 				return c.Load(string(provisioner.Name) + ":" + string(provisioner.CredentialID))
+			case TypeAWS:
+				return c.Load("aws:" + string(provisioner.Name))
+			case TypeGCP:
+				return c.Load("gcp:" + string(provisioner.Name))
 			}
 			return c.Load(string(provisioner.CredentialID))
 		}
