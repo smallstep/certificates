@@ -226,6 +226,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		"https://foo.bar.zar", p1.GetID(),
 		"instance-id", "instance-name", "project-id", "zone",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
+	assert.FatalError(t, err)
 	failAud, err := generateGCPToken(p1.ServiceAccounts[0],
 		"https://accounts.google.com", "gcp:foo",
 		"instance-id", "instance-name", "project-id", "zone",

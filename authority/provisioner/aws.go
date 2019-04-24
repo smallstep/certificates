@@ -200,6 +200,9 @@ func (p *AWS) GetIdentityToken() (string, error) {
 		jose.SigningKey{Algorithm: jose.HS256, Key: signature},
 		new(jose.SignerOptions).WithType("JWT"),
 	)
+	if err != nil {
+		return "", errors.Wrap(err, "error creating signer")
+	}
 
 	now := time.Now()
 	payload := awsPayload{
