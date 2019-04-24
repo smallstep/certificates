@@ -45,6 +45,8 @@ const (
 	TypeGCP Type = 3
 	// TypeAWS is used to indicate the AWS provisioners.
 	TypeAWS Type = 4
+	// TypeAzure is used to indicate the Azure provisioners.
+	TypeAzure Type = 4
 
 	// RevokeAudienceKey is the key for the 'revoke' audiences in the audiences map.
 	RevokeAudienceKey = "revoke"
