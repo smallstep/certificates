@@ -37,6 +37,7 @@ type AuthDB interface {
 // DB is a wrapper over the nosql.DB interface.
 type DB struct {
 	nosql.DB
+	isUp bool
 }
 
 // New returns a new database client that implements the AuthDB interface.
@@ -59,7 +60,7 @@ func New(c *Config) (AuthDB, error) {
 		}
 	}
 
-	return &DB{db}, nil
+	return &DB{db, true}, nil
 }
 
 // RevokedCertificateInfo contains information regarding the certificate
@@ -127,8 +128,11 @@ func (db *DB) StoreCertificate(crt *x509.Certificate) error {
 
 // Shutdown sends a shutdown message to the database.
 func (db *DB) Shutdown() error {
-	if err := db.Close(); err != nil {
-		return errors.Wrap(err, "database shutdown error")
+	if db.isUp {
+		if err := db.Close(); err != nil {
+			return errors.Wrap(err, "database shutdown error")
+		}
+		db.isUp = false
 	}
 	return nil
 }

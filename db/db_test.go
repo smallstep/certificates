@@ -8,7 +8,7 @@ import (
 	"github.com/smallstep/nosql/database"
 )
 
-type MockdatabaseDB struct {
+type MockNoSQLDB struct {
 	err         error
 	ret1, ret2  interface{}
 	get         func(bucket, key []byte) ([]byte, error)
@@ -22,7 +22,7 @@ type MockdatabaseDB struct {
 	update      func(tx *database.Tx) error
 }
 
-func (m *MockdatabaseDB) Get(bucket, key []byte) ([]byte, error) {
+func (m *MockNoSQLDB) Get(bucket, key []byte) ([]byte, error) {
 	if m.get != nil {
 		return m.get(bucket, key)
 	}
@@ -32,56 +32,56 @@ func (m *MockdatabaseDB) Get(bucket, key []byte) ([]byte, error) {
 	return m.ret1.([]byte), m.err
 }
 
-func (m *MockdatabaseDB) Set(bucket, key, value []byte) error {
+func (m *MockNoSQLDB) Set(bucket, key, value []byte) error {
 	if m.set != nil {
 		return m.set(bucket, key, value)
 	}
 	return m.err
 }
 
-func (m *MockdatabaseDB) Open(dataSourceName string, opt ...database.Option) error {
+func (m *MockNoSQLDB) Open(dataSourceName string, opt ...database.Option) error {
 	if m.open != nil {
 		return m.open(dataSourceName, opt...)
 	}
 	return m.err
 }
 
-func (m *MockdatabaseDB) Close() error {
+func (m *MockNoSQLDB) Close() error {
 	if m.close != nil {
 		return m.close()
 	}
 	return m.err
 }
 
-func (m *MockdatabaseDB) CreateTable(bucket []byte) error {
+func (m *MockNoSQLDB) CreateTable(bucket []byte) error {
 	if m.createTable != nil {
 		return m.createTable(bucket)
 	}
 	return m.err
 }
 
-func (m *MockdatabaseDB) DeleteTable(bucket []byte) error {
+func (m *MockNoSQLDB) DeleteTable(bucket []byte) error {
 	if m.deleteTable != nil {
 		return m.deleteTable(bucket)
 	}
 	return m.err
 }
 
-func (m *MockdatabaseDB) Del(bucket, key []byte) error {
+func (m *MockNoSQLDB) Del(bucket, key []byte) error {
 	if m.del != nil {
 		return m.del(bucket, key)
 	}
 	return m.err
 }
 
-func (m *MockdatabaseDB) List(bucket []byte) ([]*database.Entry, error) {
+func (m *MockNoSQLDB) List(bucket []byte) ([]*database.Entry, error) {
 	if m.list != nil {
 		return m.list(bucket)
 	}
 	return m.ret1.([]*database.Entry), m.err
 }
 
-func (m *MockdatabaseDB) Update(tx *database.Tx) error {
+func (m *MockNoSQLDB) Update(tx *database.Tx) error {
 	if m.update != nil {
 		return m.update(tx)
 	}
@@ -100,16 +100,16 @@ func TestIsRevoked(t *testing.T) {
 		},
 		"false/ErrNotFound": {
 			key: "sn",
-			db:  &DB{&MockdatabaseDB{err: database.ErrNotFound, ret1: nil}},
+			db:  &DB{&MockNoSQLDB{err: database.ErrNotFound, ret1: nil}, true},
 		},
 		"error/checking bucket": {
 			key: "sn",
-			db:  &DB{&MockdatabaseDB{err: errors.New("force"), ret1: nil}},
+			db:  &DB{&MockNoSQLDB{err: errors.New("force"), ret1: nil}, true},
 			err: errors.New("error checking revocation bucket: force"),
 		},
 		"true": {
 			key:       "sn",
-			db:        &DB{&MockdatabaseDB{ret1: []byte("value")}},
+			db:        &DB{&MockNoSQLDB{ret1: []byte("value")}, true},
 			isRevoked: true,
 		},
 	}
@@ -136,44 +136,44 @@ func TestRevoke(t *testing.T) {
 	}{
 		"error/force isRevoked": {
 			rci: &RevokedCertificateInfo{Serial: "sn"},
-			db: &DB{&MockdatabaseDB{
+			db: &DB{&MockNoSQLDB{
 				get: func(bucket []byte, sn []byte) ([]byte, error) {
 					return nil, errors.New("force IsRevoked")
 				},
-			}},
+			}, true},
 			err: errors.New("error checking revocation bucket: force IsRevoked"),
 		},
 		"error/was already revoked": {
 			rci: &RevokedCertificateInfo{Serial: "sn"},
-			db: &DB{&MockdatabaseDB{
+			db: &DB{&MockNoSQLDB{
 				get: func(bucket []byte, sn []byte) ([]byte, error) {
 					return nil, nil
 				},
-			}},
+			}, true},
 			err: ErrAlreadyExists,
 		},
 		"error/database set": {
 			rci: &RevokedCertificateInfo{Serial: "sn"},
-			db: &DB{&MockdatabaseDB{
+			db: &DB{&MockNoSQLDB{
 				get: func(bucket []byte, sn []byte) ([]byte, error) {
 					return nil, database.ErrNotFound
 				},
 				set: func(bucket []byte, key []byte, value []byte) error {
 					return errors.New("force")
 				},
-			}},
+			}, true},
 			err: errors.New("database Set error: force"),
 		},
 		"ok": {
 			rci: &RevokedCertificateInfo{Serial: "sn"},
-			db: &DB{&MockdatabaseDB{
+			db: &DB{&MockNoSQLDB{
 				get: func(bucket []byte, sn []byte) ([]byte, error) {
 					return nil, database.ErrNotFound
 				},
 				set: func(bucket []byte, key []byte, value []byte) error {
 					return nil
 				},
-			}},
+			}, true},
 		},
 	}
 	for name, tc := range tests {

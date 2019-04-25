@@ -671,6 +671,7 @@
     "github.com/smallstep/cli/token/provision",
     "github.com/smallstep/cli/usage",
     "github.com/smallstep/nosql",
+    "github.com/smallstep/nosql/database",
     "github.com/tsenart/deadcode",
     "github.com/urfave/cli",
     "golang.org/x/crypto/ocsp",

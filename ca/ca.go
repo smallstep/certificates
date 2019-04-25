@@ -3,6 +3,7 @@ package ca
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -123,7 +124,7 @@ func (ca *CA) Run() error {
 func (ca *CA) Stop() error {
 	ca.renewer.Stop()
 	if err := ca.auth.Shutdown(); err != nil {
-		return err
+		log.Printf("error stopping ca.Authority: %+v\n", err)
 	}
 	return ca.srv.Shutdown()
 }
@@ -131,8 +132,9 @@ func (ca *CA) Stop() error {
 // Reload reloads the configuration of the CA and calls to the server Reload
 // method.
 func (ca *CA) Reload() error {
-	if err := ca.auth.Shutdown(); err != nil {
-		return err
+	var hasDB bool
+	if ca.config.DB != nil {
+		hasDB = true
 	}
 	if ca.opts.configFile == "" {
 		return errors.New("error reloading ca: configuration file is not set")
@@ -140,15 +142,54 @@ func (ca *CA) Reload() error {
 
 	config, err := authority.LoadConfiguration(ca.opts.configFile)
 	if err != nil {
-		return errors.Wrap(err, "error reloading ca")
+		return errors.Wrap(err, "error reloading ca configuration")
 	}
 
+	logShutDown := func(ss ...string) {
+		for _, s := range ss {
+			log.Println(s)
+		}
+		log.Println("Continuing to serve requests may result in inconsistent state. Shutting Down ...")
+	}
+	logContinue := func(reason string) {
+		log.Println(reason)
+		log.Println("Continuing to run with the original configuration.")
+		log.Println("You can force a restart by sending a SIGTERM signal and then restarting the step-ca.")
+	}
+
+	// Shut down the old authority (shut down the database). If New or Reload
+	// fails then the CA will continue to run but the database will have been
+	// shutdown, which will cause errors.
+	if err := ca.auth.Shutdown(); err != nil {
+		if hasDB {
+			logShutDown("Attempt to shut down the ca.Authority has failed.")
+			return ca.Stop()
+		}
+		logContinue("Reload failed because the ca.Authority could not be shut down.")
+		return err
+	}
 	newCA, err := New(config, WithPassword(ca.opts.password), WithConfigFile(ca.opts.configFile))
 	if err != nil {
+		if hasDB {
+			logShutDown("Attempt to initialize a CA with the new configuration has failed.",
+				"The database has already been shutdown.")
+			return ca.Stop()
+		}
+		logContinue("Reload failed because the CA with new configuration could " +
+			"not be initialized.")
 		return errors.Wrap(err, "error reloading ca")
 	}
 
-	return ca.srv.Reload(newCA.srv)
+	if err = ca.srv.Reload(newCA.srv); err != nil {
+		if hasDB {
+			logShutDown("Attempt to replace the old CA server has failed.",
+				"The database has already been shutdown.")
+			return ca.Stop()
+		}
+		logContinue("Reload failed because server could not be replaced.")
+		return errors.Wrap(err, "error reloading server")
+	}
+	return nil
 }
 
 // getTLSConfig returns a TLSConfig for the CA server with a self-renewing
