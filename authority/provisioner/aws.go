@@ -347,16 +347,6 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 		return nil, errors.Wrap(err, "error verifying claims")
 	}
 
-	// According to "rfc7519 JSON Web Token" acceptable skew should be no
-	// more than a few minutes.
-	if err = payload.ValidateWithLeeway(jose.Expected{
-		Issuer:   awsIssuer,
-		Audience: []string{p.GetID()},
-		Time:     time.Now().UTC(),
-	}, time.Minute); err != nil {
-		return nil, errors.Wrapf(err, "invalid token")
-	}
-
 	// Validate identity document signature
 	if err := p.checkSignature(payload.Amazon.Document, payload.Amazon.Signature); err != nil {
 		return nil, err
@@ -376,6 +366,17 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 		return nil, errors.New("identity document privateIp cannot be empty")
 	case doc.Region == "":
 		return nil, errors.New("identity document region cannot be empty")
+	}
+
+	// According to "rfc7519 JSON Web Token" acceptable skew should be no
+	// more than a few minutes.
+	if err = payload.ValidateWithLeeway(jose.Expected{
+		Issuer:   awsIssuer,
+		Subject:  doc.InstanceID,
+		Audience: []string{p.GetID()},
+		Time:     time.Now().UTC(),
+	}, time.Minute); err != nil {
+		return nil, errors.Wrapf(err, "invalid token")
 	}
 
 	// validate accounts
