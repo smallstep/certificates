@@ -3,7 +3,6 @@ package db
 import (
 	"crypto/x509"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -21,8 +20,10 @@ var ErrAlreadyExists = errors.New("already exists")
 
 // Config represents the JSON attributes used for configuring a step-ca DB.
 type Config struct {
-	Type string `json:"type"`
-	Path string `json:"path"`
+	Type       string `json:"type"`
+	DataSource string `json:"dataSource"`
+	ValueDir   string `json:"valueDir"`
+	Database   string `json:"database"`
 }
 
 // AuthDB is an interface over an Authority DB client that implements a nosql.DB interface.
@@ -44,15 +45,10 @@ func New(c *Config) (AuthDB, error) {
 		return new(NoopDB), nil
 	}
 
-	var db nosql.DB
-	switch strings.ToLower(c.Type) {
-	case "bbolt":
-		db = &nosql.BoltDB{}
-		if err := db.Open(c.Path); err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.Errorf("unsupported db.type '%s'", c.Type)
+	db, err := nosql.New(c.Type, c.DataSource, nosql.WithDatabase(c.Database),
+		nosql.WithValueDir(c.ValueDir))
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error opening database of Type %s with source %s", c.Type, c.DataSource)
 	}
 
 	tables := [][]byte{revokedCertsTable, certsTable}

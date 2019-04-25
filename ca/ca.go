@@ -131,6 +131,9 @@ func (ca *CA) Stop() error {
 // Reload reloads the configuration of the CA and calls to the server Reload
 // method.
 func (ca *CA) Reload() error {
+	if err := ca.auth.Shutdown(); err != nil {
+		return err
+	}
 	if ca.opts.configFile == "" {
 		return errors.New("error reloading ca: configuration file is not set")
 	}
