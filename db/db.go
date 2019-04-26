@@ -22,8 +22,8 @@ var ErrAlreadyExists = errors.New("already exists")
 type Config struct {
 	Type       string `json:"type"`
 	DataSource string `json:"dataSource"`
-	ValueDir   string `json:"valueDir"`
-	Database   string `json:"database"`
+	ValueDir   string `json:"valueDir,omitempty"`
+	Database   string `json:"database,omitempty"`
 }
 
 // AuthDB is an interface over an Authority DB client that implements a nosql.DB interface.
