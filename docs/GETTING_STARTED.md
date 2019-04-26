@@ -102,8 +102,22 @@ and respond to requests.
 
 * `dnsNames`: comma separated list of DNS Name(s) for the CA.
 
-* `logger`: the default logging format for the CA is `text`. The other options
+* `logger`: the default logging format for the CA is `text`. The other option
 is `json`.
+
+* `db`: data persistence layer. See [database documentation](./db.md) for more
+info.
+
+    - type: `badger`, `bbolt`, `mysql`, etc.
+
+    - dataSource: `string` that can be interpreted differently depending on the
+    type of the database. Usually a path to where the data is stored. See
+    the [database configuration docs](./db.md#configuration) for more info.
+
+    - database: name of the database. Used for backends that may have
+    multiple databases. e.g. MySQL
+
+    - valueDir: directory to store the value log in (Badger specific).
 
 * `tls`: settings for negotiating communication with the CA; includes acceptable
 ciphersuites, min/max TLS version, etc.
