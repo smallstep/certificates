@@ -18,6 +18,9 @@ certificate lifetimes.
 `step certificates` currently only supports passive revocation. Active revocation
 is on our roadmap.
 
+Run `step help ca revoke` from the command line for full documentation, list of
+command line flags, and examples.
+
 ## How It Works
 
 Certificates can be created and revoked through the `step cli`. Let's walk
@@ -190,6 +193,9 @@ through an example.
 
    > NOTE: you can only revoke a certificate once. Any repeated attempts to revoke
    > the same serial number will fail.
+
+   Run `step help ca revoke` from the command line for full documentation, list of
+   command line flags, and examples.
 
 ## What's next?
 
