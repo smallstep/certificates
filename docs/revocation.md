@@ -1,15 +1,18 @@
 # Revocation
 
 **Active Revocation**: A certificate is no longer valid from the moment it has
-been actively revoked. Clients are required to check verify certificate validity
-against CRLs (Certificate Revocation Lists) or use OCSP (Online Certificate
-Status Protocol). Active Revocation requires clients to take an active role
-in certificate validation for the benefit of real time revocation.
+been actively revoked. Clients are required to check against centralized
+sources of certificate validity information (e.g. by using CRLs (Certificate
+Revocation Lists) or OCSP (Online Certificate Status Protocol)) to
+verify that certificates have not been revoked. Active Revocation requires
+clients to take an active role in certificate validation for the benefit of
+real time revocation.
 
 **Passive Revocation**: A certificate that has been passively revoked can no
 longer be renewed. It will still be valid for the remainder of it's validity period,
 but cannot be prolonged. The benefit of passive revocation is that clients
-can remain simple and decentralized. Passive revocation works best with short
+can verify certificates in a simple, decentralized manner without relying on
+centralized 3rd parties. Passive revocation works best with short
 certificate lifetimes.
 
 `step certificates` currently only supports passive revocation. Active revocation
@@ -18,55 +21,55 @@ is on our roadmap.
 ## How It Works
 
 Certificates can be created and revoked through the `step cli`. Let's walk
-through some examples.
+through an example.
 
 ### Requirements
 
-* `step` v0.10.0 ([install instructions](../README.md#installation-guide))
+* `step` (>=v0.10.0) ([install instructions](../README.md#installation-guide))
 
-### How It Works
+### Let's Get To It
 
 1. Bootstrap your PKI.
 
-   If you've already done this before and you have a `$STEPPATH` with certs,
-   secrets, and configuration files then you can move on to 1.ii.
+   > If you've already done this before and you have a `$STEPPATH` with certs,
+   > secrets, and configuration files then you can move on to step 2.
 
-   1. Run `step ca init`.
-
-      <pre><code>
-      <b>$ step ca init --name "Local CA" --provisioner admin --dns localhost --address ":443"</b>
-      </code></pre>
-
-      Move on to step 2.
-
-   2. Configure a persistence layer in your `ca.json`.
-
-      > If you did step 1.i with `step` v0.10.0 or greater then your db will
-      > have been configured in the previous step.
-
-      Get your full step path by running `echo $(step path)`. Now edit
-      your `ca.json` by adding the following stanza as a top-level attribute:
-      > Your `ca.json` should be in `$(step path)/config/ca.json`.
-
-      ```
-        ...
-        "db": {
-          "type": "badger",
-          "dataSource": "<full step path>/db"
-        },
-        ...
-      ```
-
-      Check out our [database documentation](./database.md) to see all available
-      database backends and adapters.
-
-2. Run the CA
+   Run `step ca init`.
 
    <pre><code>
-   <b>$ step-ca $(step path)/config/ca.json)</b>
+   <b>$ step ca init --name "Local CA" --provisioner admin --dns localhost --address ":443"</b>
    </code></pre>
 
-3. Create a certificate for localhost
+   Move on to step 3.
+
+2. Configure a persistence layer in your `ca.json`.
+
+   > If you did step 1 with `step` v0.10.0 or greater then your db will
+   > have been configured in the previous step.
+
+   Get your full step path by running `echo $(step path)`. Now edit
+   your `ca.json` by adding the following stanza as a top-level attribute:
+   > Your `ca.json` should be in `$(step path)/config/ca.json`.
+
+   ```
+     ...
+     "db": {
+       "type": "badger",
+       "dataSource": "<full step path>/db"
+     },
+     ...
+   ```
+
+   Check out our [database documentation](./database.md) to see all available
+   database backends and adapters.
+
+3. Run the CA
+
+   <pre><code>
+   <b>$ step-ca $(step path)/config/ca.json</b>
+   </code></pre>
+
+4. Create a certificate for localhost
 
    <pre><code>
    <b>$ step ca certificate localhost localhost.crt localhost.key</b>
@@ -85,7 +88,7 @@ through some examples.
              to:  2019-04-24T22:55:54Z
    </code></pre>
 
-4. Renew the certificate (just to prove we can!)
+5. Renew the certificate (just to prove we can!)
 
    <pre><code>
    <b>$ step ca renew localhost.crt localhost.key</b>
@@ -102,7 +105,7 @@ through some examples.
              to:  2019-04-24T22:57:50Z
    </pre></code>
 
-5. Now let's revoke the certificate
+6. Now let's revoke the certificate
 
    <pre><code>
    <b>$ step certificate inspect --format=json localhost.crt | jq .serial_number</b>
@@ -116,7 +119,7 @@ through some examples.
    Certificate with Serial Number 59636004850364466675608080466579278406 has been revoked.
    </pre></code>
 
-6. Ok cool! But did it work?
+7. Awesome! But did it work?
 
    <pre><code>
    <b>$ step ca renew localhost.crt localhost.key</b>
@@ -133,10 +136,10 @@ through some examples.
    [...]
    </pre></code>
 
-7. Other ways to revoke a Certificate
+8. Other ways to revoke a Certificate
 
-   Use the original certificate and key and authorize the revoke request using
-   mTLS (doesn't require a provisioner).
+   Use the certificate and key. This method does not require a provisioner
+   because it uses the certificate and key to authenticate the request.
 
    <pre><code>
    <b>$ step ca revoke --cert localhost.crt --key localhost.key</b>
@@ -188,12 +191,12 @@ through some examples.
    > NOTE: you can only revoke a certificate once. Any repeated attempts to revoke
    > the same serial number will fail.
 
-## Now What?
+## What's next?
 
 [Use TLS Everywhere](https://smallstep.com/blog/use-tls.html) and let us know
-what you think of our tools. Hit us on [twitter](twitter.com/smallsteplabs) or
-get in touch through our [Gitter](https://gitter.im/smallstep/community)
-to chat with us in real time.
+what you think of our tools. Get in touch over
+[twitter](twitter.com/smallsteplabs) or through our
+[Gitter](https://gitter.im/smallstep/community) to chat with us in real time.
 
 ## Further Reading
 
