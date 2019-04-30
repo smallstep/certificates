@@ -95,7 +95,7 @@ e.g. `v1.0.2`
 
 6. **Update the AUR Arch Linux package**
 
-    **NOTE**: if you plan to release `cli` next then you can skip this step.
+    > **NOTE**: if you plan to release `cli` next then you can skip this step.
 
     ```
     $ cd archlinux
