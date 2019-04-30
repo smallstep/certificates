@@ -3,7 +3,7 @@
 An online certificate authority and related tools for secure automated certificate management, so you can use TLS everywhere.
 
 [Website](https://smallstep.com) |
-[Documentation](https://smallstep.com/docs/certificates) |
+[Documentation](#documentation) |
 [Installation Guide](#installation-guide) |
 [Getting Started](./docs/GETTING_STARTED.md) |
 [Contribution Guide](./docs/CONTRIBUTING.md)
@@ -321,13 +321,17 @@ and best practices on running Step CA in production.
 
 ## Documentation
 
-Documentation can be found in three places:
+Documentation can be found in a handful of different places:
 
-1. On the command line with `step ca help xxx` where `xxx` is the subcommand you are interested in. Ex: `step help ca provisioners list`
+1. The [docs](./docs) sub-repo has an index of documentation and tutorials.
 
-2. On the web at https://smallstep.com/docs/certificates
+2. On the command line with `step ca help xxx` where `xxx` is the subcommand
+you are interested in. Ex: `step help ca provisioners list`.
 
-3. On your browser by running `step ca help --http :8080` and visiting http://localhost:8080
+3. On the web at https://smallstep.com/docs/certificates.
+
+4. On your browser by running `step ca help --http :8080` from the command line
+and visiting http://localhost:8080.
 
 ## The Future
 

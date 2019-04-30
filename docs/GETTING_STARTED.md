@@ -479,7 +479,7 @@ one we'll use in this example, is G-Suite.
 Navigate to the Google APIs developer console and pick a suitable project from the
 top navbar's dropdown.
 
-![Google Dev Console](oidc1.png)
+![Google Dev Console](./images/oidc1.png)
 
 In the masthead navigation click **Credentials** (key symbol) and then "OAuth
 consent screen" from the subnav. Fill out naming details, all mandatory fields,
@@ -492,7 +492,7 @@ Move back to **Credentials** on the subnav and choose "OAuth client ID" from the
 **Create credentials** dropdown. Since OIDC will be used from the `step CLI` pick **Other**
 from the available options and pick a name (e.g. **Step CLI**).
 
-![Create credential](oidc2.png)
+![Create credential](./images/oidc2.png)
 
 On successful completion, a confirmation modal with both `clientID` and
 `clientSecret` will be presented. Please note that the `clientSecret` will
@@ -500,7 +500,7 @@ allow applications access to the configured OAuth consent screen. However, it
 will not allow direct authentication of users without their own MfA credentials
 per account.
 
-![OIDC credentials](oidc3.png)
+![OIDC credentials](./images/oidc3.png)
 
 Now using `clientID` and `clientSecret` run the following command to add
 G-Suite as a provisioner to `step certificates`. Please see [`step ca

@@ -201,7 +201,7 @@ through an example.
 
 [Use TLS Everywhere](https://smallstep.com/blog/use-tls.html) and let us know
 what you think of our tools. Get in touch over
-[twitter](twitter.com/smallsteplabs) or through our
+[Twitter](twitter.com/smallsteplabs) or through our
 [Gitter](https://gitter.im/smallstep/community) to chat with us in real time.
 
 ## Further Reading
