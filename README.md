@@ -323,7 +323,7 @@ and best practices on running Step CA in production.
 
 Documentation can be found in a handful of different places:
 
-1. The [docs](./docs) sub-repo has an index of documentation and tutorials.
+1. The [docs](./docs/README.md) sub-repo has an index of documentation and tutorials.
 
 2. On the command line with `step ca help xxx` where `xxx` is the subcommand
 you are interested in. Ex: `step help ca provisioners list`.
