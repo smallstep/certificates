@@ -13,7 +13,7 @@ Index of Documentation and Tutorials for using and deploying the `step certifica
 [![GitHub stars](https://img.shields.io/github/stars/smallstep/certificates.svg?style=social)](https://github.com/smallstep/certificates/stargazers)
 [![Twitter followers](https://img.shields.io/twitter/follow/smallsteplabs.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=smallsteplabs)
 
-## Index
+## Table of Contents
 
 * **General Info**
     * [Website](https://smallstep.com)
