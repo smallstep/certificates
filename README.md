@@ -19,7 +19,7 @@ An online certificate authority and related tools for secure automated certifica
 [![GitHub stars](https://img.shields.io/github/stars/smallstep/certificates.svg?style=social)](https://github.com/smallstep/certificates/stargazers)
 [![Twitter followers](https://img.shields.io/twitter/follow/smallsteplabs.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=smallsteplabs)
 
-![Animated terminal showing step certificates in practice](https://github.com/smallstep/certificates/raw/master/images/step-ca-2-legged.gif)
+![Animated terminal showing step certificates in practice](https://github.com/smallstep/certificates/raw/master/docs/images/step-ca-2-legged.gif)
 
 ## Motivation
 
@@ -37,7 +37,7 @@ operate DNS and reverse proxies, you know how to operate mTLS
 infrastructure.
 
 ![Connect it all with
-mTLS](https://raw.githubusercontent.com/smallstep/certificates/master/images/connect-with-mtls-2.png)
+mTLS](https://raw.githubusercontent.com/smallstep/certificates/master/docs/images/connect-with-mtls-2.png)
 
 There's just one problem: **you need certificates issued by your own
 certificate authority (CA)**. Building and operating a CA, issuing
