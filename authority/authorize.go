@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/jose"
 )
 
@@ -72,11 +73,23 @@ func (a *Authority) authorizeToken(ott string) (provisioner.Interface, error) {
 		reuseKey = claims.Nonce
 	}
 	if reuseKey != "" {
-		if _, ok := a.ottMap.LoadOrStore(reuseKey, &idUsed{
-			UsedAt:  time.Now().Unix(),
-			Subject: claims.Subject,
-		}); ok {
-			return nil, &apiError{errors.Errorf("authorizeToken: token already used"), http.StatusUnauthorized, errContext}
+		switch a.db.(type) {
+		case *db.NoopDB:
+			if _, ok := a.ottMap.LoadOrStore(reuseKey, &idUsed{
+				UsedAt:  time.Now().Unix(),
+				Subject: claims.Subject,
+			}); ok {
+				return nil, &apiError{errors.Errorf("authorizeToken: token already used"), http.StatusUnauthorized, errContext}
+			}
+		default:
+			ok, err := a.db.UseToken(reuseKey, ott)
+			if err != nil {
+				return nil, &apiError{errors.Wrap(err, "authorizeToken: failed when checking if token already used"),
+					http.StatusInternalServerError, errContext}
+			}
+			if !ok {
+				return nil, &apiError{errors.Errorf("authorizeToken: token already used"), http.StatusUnauthorized, errContext}
+			}
 		}
 	}
 

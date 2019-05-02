@@ -640,7 +640,12 @@ func TestRevoke(t *testing.T) {
 		},
 		"error/db-revoke": func() test {
 			a := testAuthority(t)
-			a.db = &MockAuthDB{err: errors.New("force")}
+			a.db = &MockAuthDB{
+				useToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				err: errors.New("force"),
+			}
 
 			cl := jwt.Claims{
 				Subject:   "sn",
@@ -671,7 +676,12 @@ func TestRevoke(t *testing.T) {
 		},
 		"error/already-revoked": func() test {
 			a := testAuthority(t)
-			a.db = &MockAuthDB{err: db.ErrAlreadyExists}
+			a.db = &MockAuthDB{
+				useToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				err: db.ErrAlreadyExists,
+			}
 
 			cl := jwt.Claims{
 				Subject:   "sn",
@@ -702,7 +712,11 @@ func TestRevoke(t *testing.T) {
 		},
 		"ok/token": func() test {
 			a := testAuthority(t)
-			a.db = &MockAuthDB{}
+			a.db = &MockAuthDB{
+				useToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+			}
 
 			cl := jwt.Claims{
 				Subject:   "sn",

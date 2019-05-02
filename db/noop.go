@@ -32,6 +32,11 @@ func (n *NoopDB) StoreCertificate(crt *x509.Certificate) error {
 	return ErrNotImplemented
 }
 
+// UseToken returns a "NotImplemented" error.
+func (n *NoopDB) UseToken(id, tok string) (bool, error) {
+	return false, ErrNotImplemented
+}
+
 // Shutdown returns nil
 func (n *NoopDB) Shutdown() error {
 	return nil
