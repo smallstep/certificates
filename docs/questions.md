@@ -1,11 +1,16 @@
-# Commonly Asked Questions
+# Frequently Asked Questions
 
 These are some commonly asked questions on the topics of PKI, TLS, X509,
 cryptography, threshold-cryptography, etc.
-We hope to reduce the amount of hand-waving in these responses as we add
+Hopefully we will reduce the amount of hand-waving in these responses as we add
 more features to the Step toolkit over time.
 
-#### What's TLS & PKI?
+> We encourage you to read
+> [our blog post on everything relating to PKI](https://smallstep.com/blog/everything-pki.html)
+> as we believe it to be a solid resource that answers many of of the questions
+> listed below.
+
+## What are TLS & PKI?
 
 TLS stands for *transport layer security*. It used to be called *secure sockets
 layer* (or SSL), but technically SSL refers to an older version of the protocol.
@@ -16,7 +21,9 @@ intended recipient, and cannot be modified in transit.
 
 TLS is a complicated protocol with lots of options, but the most common mode of
 operation establishes a secure channel using *asymmetric cryptography* with
-*digital certificates* (or just certificates for short). First, some quick definitions:
+*digital certificates* (or just certificates for short).
+
+First, some quick definitions:
 * *Asymmetric cryptography* (a.k.a., public key cryptography) is an underappreciated
 gift from mathematics to computer science. It uses a *key pair*: a private key
 known only to the recipient of the message, and a public key that can be broadly
@@ -40,7 +47,7 @@ and procedures for managing digital certificates (i.e., managing the bindings
 between names and public keys). Without proper secure PKI, an attacker can fake
 a binding and undermine security.
 
-#### What's a certificate authority?
+## What's a certificate authority?
 
 A certificate authority (CA) stores, issues, and signs digital certificates. CAs
 have their own key pair, with the private key carefully secured (often offline).
@@ -73,7 +80,7 @@ and verifying the identity of the requesting entities before establishing bindin
 It also acts as a *central directory* and more generally as a *certificate
 management system*, a secure location for storing and distributing key material.
 
-#### Why not just use Verisign, Entrust, Let's Encrypt, etc?
+## Why not just use Verisign, Entrust, Let's Encrypt, etc?
 
 The web's *open public key infrastructure* (web PKI), while far from perfect,
 is an important foundation for securing the web. So why not use it for securing
@@ -86,14 +93,7 @@ communication for your own internal infrastructure? There are several reasons:
 More broadly, the answer is that web PKI was designed for the web. A lot of the
 web PKI design decisions aren't appropriate for internal systems.
 
-#### How does identity proofing work?
-
-Good question. However you want it to. Details here. Give some options: simple
-meat-space token-based method should probably be default. But we should also
-support the use of a CI/CD pipeline or orchestrator as a *registration authority*
-so you can automate certificate provisioning.
-
-Also talk about ACME, if we decide to support it.
+## How does identity proofing work?
 
 In general, trust will always flow back out to you, the operator of your system.
 With that in mind, the simplest form of identity proofing is manual: [describe
@@ -104,6 +104,11 @@ designs, to help with this. If you integrate with our other tools its easy to
 start with a manual identity proofing mechanism and move to a more sophisticated
 automated method as your system grows.
 
-#### I already have PKI in place. Can I use this with my own root certificate?
+## I already have PKI in place. Can I use this with my own root certificate?
 
 Absolutely. [Details here].
+
+## Furher Reading
+
+* [Use TLS Everywhere](https://smallstep.com/blog/use-tls.html)
+* [Everything you should know about certificates and PKI but are too afraid to ask](https://smallstep.com/blog/everything-pki.html)

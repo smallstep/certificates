@@ -3,7 +3,7 @@
 An online certificate authority and related tools for secure automated certificate management, so you can use TLS everywhere.
 
 [Website](https://smallstep.com) |
-[Documentation](https://smallstep.com/docs/certificates) |
+[Documentation](#documentation) |
 [Installation Guide](#installation-guide) |
 [Getting Started](./docs/GETTING_STARTED.md) |
 [Contribution Guide](./docs/CONTRIBUTING.md)
@@ -19,7 +19,7 @@ An online certificate authority and related tools for secure automated certifica
 [![GitHub stars](https://img.shields.io/github/stars/smallstep/certificates.svg?style=social)](https://github.com/smallstep/certificates/stargazers)
 [![Twitter followers](https://img.shields.io/twitter/follow/smallsteplabs.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=smallsteplabs)
 
-![Animated terminal showing step certificates in practice](https://github.com/smallstep/certificates/raw/master/images/step-ca-2-legged.gif)
+![Animated terminal showing step certificates in practice](https://github.com/smallstep/certificates/raw/master/docs/images/step-ca-2-legged.gif)
 
 ## Motivation
 
@@ -37,7 +37,7 @@ operate DNS and reverse proxies, you know how to operate mTLS
 infrastructure.
 
 ![Connect it all with
-mTLS](https://raw.githubusercontent.com/smallstep/certificates/master/images/connect-with-mtls-2.png)
+mTLS](https://raw.githubusercontent.com/smallstep/certificates/master/docs/images/connect-with-mtls-2.png)
 
 There's just one problem: **you need certificates issued by your own
 certificate authority (CA)**. Building and operating a CA, issuing
@@ -321,13 +321,17 @@ and best practices on running Step CA in production.
 
 ## Documentation
 
-Documentation can be found in three places:
+Documentation can be found in a handful of different places:
 
-1. On the command line with `step ca help xxx` where `xxx` is the subcommand you are interested in. Ex: `step help ca provisioners list`
+1. The [docs](./docs/README.md) sub-repo has an index of documentation and tutorials.
 
-2. On the web at https://smallstep.com/docs/certificates
+2. On the command line with `step ca help xxx` where `xxx` is the subcommand
+you are interested in. Ex: `step help ca provisioners list`.
 
-3. On your browser by running `step ca help --http :8080` and visiting http://localhost:8080
+3. On the web at https://smallstep.com/docs/certificates.
+
+4. On your browser by running `step ca help --http :8080` from the command line
+and visiting http://localhost:8080.
 
 ## The Future
 
