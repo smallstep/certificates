@@ -46,7 +46,7 @@ const (
 	// TypeAWS is used to indicate the AWS provisioners.
 	TypeAWS Type = 4
 	// TypeAzure is used to indicate the Azure provisioners.
-	TypeAzure Type = 4
+	TypeAzure Type = 5
 
 	// RevokeAudienceKey is the key for the 'revoke' audiences in the audiences map.
 	RevokeAudienceKey = "revoke"
@@ -94,6 +94,8 @@ func (l *List) UnmarshalJSON(data []byte) error {
 			p = &GCP{}
 		case "aws":
 			p = &AWS{}
+		case "azure":
+			p = &Azure{}
 		default:
 			return errors.Errorf("provisioner type %s not supported", typ.Type)
 		}
