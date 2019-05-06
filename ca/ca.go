@@ -189,6 +189,15 @@ func (ca *CA) Reload() error {
 		logContinue("Reload failed because server could not be replaced.")
 		return errors.Wrap(err, "error reloading server")
 	}
+
+	// 1. Stop previous renewer
+	// 2. Replace ca properties
+	// Do not replace ca.srv
+	ca.renewer.Stop()
+	ca.auth = newCA.auth
+	ca.config = newCA.config
+	ca.opts = newCA.opts
+	ca.renewer = newCA.renewer
 	return nil
 }
 
