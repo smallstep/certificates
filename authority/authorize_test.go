@@ -117,7 +117,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 					http.StatusUnauthorized, context{"ott": raw}},
 			}
 		},
-		"ok/noopdb": func(t *testing.T) *authorizeTest {
+		"ok/simpledb": func(t *testing.T) *authorizeTest {
 			cl := jwt.Claims{
 				Subject:   "test.smallstep.com",
 				Issuer:    validIssuer,
@@ -133,9 +133,8 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				ott:  raw,
 			}
 		},
-		"fail/noopdb/token-already-used": func(t *testing.T) *authorizeTest {
+		"fail/simpledb/token-already-used": func(t *testing.T) *authorizeTest {
 			_a := testAuthority(t)
-
 			cl := jwt.Claims{
 				Subject:   "test.smallstep.com",
 				Issuer:    validIssuer,

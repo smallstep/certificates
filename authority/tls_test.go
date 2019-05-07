@@ -592,7 +592,6 @@ func TestRevoke(t *testing.T) {
 	tests := map[string]func() test{
 		"error/token/authorizeRevoke error": func() test {
 			a := testAuthority(t)
-			a.db = new(db.NoopDB)
 			ctx := getCtx()
 			ctx["ott"] = "foo"
 			return test{
@@ -609,8 +608,6 @@ func TestRevoke(t *testing.T) {
 		},
 		"error/nil-db": func() test {
 			a := testAuthority(t)
-			a.db = new(db.NoopDB)
-
 			cl := jwt.Claims{
 				Subject:   "sn",
 				Issuer:    validIssuer,

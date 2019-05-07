@@ -45,7 +45,7 @@ type DB struct {
 // New returns a new database client that implements the AuthDB interface.
 func New(c *Config) (AuthDB, error) {
 	if c == nil {
-		return new(NoopDB), nil
+		return newSimpleDB(c)
 	}
 
 	db, err := nosql.New(c.Type, c.DataSource, nosql.WithDatabase(c.Database),

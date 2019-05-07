@@ -22,7 +22,6 @@ type Authority struct {
 	intermediateIdentity *x509util.Identity
 	validateOnce         bool
 	certificates         *sync.Map
-	ottMap               *sync.Map
 	startTime            time.Time
 	provisioners         *provisioner.Collection
 	db                   db.AuthDB
@@ -40,7 +39,6 @@ func New(config *Config) (*Authority, error) {
 	var a = &Authority{
 		config:       config,
 		certificates: new(sync.Map),
-		ottMap:       new(sync.Map),
 		provisioners: provisioner.NewCollection(config.getAudiences()),
 	}
 	if err := a.init(); err != nil {
@@ -58,8 +56,8 @@ func (a *Authority) init() error {
 
 	var err error
 
-	// Initialize step-ca Database if defined in configuration.
-	// If a.config.DB is nil then a noopDB will be returned.
+	// Initialize step-ca Database.
+	// If a.config.DB is nil then a simple, barebones in memory DB will be used.
 	if a.db, err = db.New(a.config.DB); err != nil {
 		return err
 	}
