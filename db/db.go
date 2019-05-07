@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	revokedCertsTable = []byte("revoked_x509_certs")
 	certsTable        = []byte("x509_certs")
+	revokedCertsTable = []byte("revoked_x509_certs")
+	usedOTTTable      = []byte("used_ott")
 )
 
 // ErrAlreadyExists can be returned if the DB attempts to set a key that has
@@ -31,6 +32,7 @@ type AuthDB interface {
 	IsRevoked(sn string) (bool, error)
 	Revoke(rci *RevokedCertificateInfo) error
 	StoreCertificate(crt *x509.Certificate) error
+	UseToken(id, tok string) (bool, error)
 	Shutdown() error
 }
 
@@ -43,7 +45,7 @@ type DB struct {
 // New returns a new database client that implements the AuthDB interface.
 func New(c *Config) (AuthDB, error) {
 	if c == nil {
-		return new(NoopDB), nil
+		return newSimpleDB(c)
 	}
 
 	db, err := nosql.New(c.Type, c.DataSource, nosql.WithDatabase(c.Database),
@@ -124,6 +126,23 @@ func (db *DB) StoreCertificate(crt *x509.Certificate) error {
 		return errors.Wrap(err, "database Set error")
 	}
 	return nil
+}
+
+// UseToken returns true if we were able to successfully store the token for
+// for the first time, false otherwise.
+func (db *DB) UseToken(id, tok string) (bool, error) {
+	// If the error is `Not Found` then the certificate has not been revoked.
+	// Any other error should be propagated to the caller.
+	_, found, err := db.LoadOrStore(usedOTTTable, []byte(id), []byte(tok))
+	switch {
+	case err != nil:
+		return false, errors.Wrapf(err, "error LoadOrStore-ing token %s/%s",
+			string(usedOTTTable), id)
+	case found:
+		return false, nil
+	default:
+		return true, nil
+	}
 }
 
 // Shutdown sends a shutdown message to the database.

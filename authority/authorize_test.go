@@ -117,7 +117,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 					http.StatusUnauthorized, context{"ott": raw}},
 			}
 		},
-		"ok": func(t *testing.T) *authorizeTest {
+		"ok/simpledb": func(t *testing.T) *authorizeTest {
 			cl := jwt.Claims{
 				Subject:   "test.smallstep.com",
 				Issuer:    validIssuer,
@@ -133,9 +133,8 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				ott:  raw,
 			}
 		},
-		"fail/token-already-used": func(t *testing.T) *authorizeTest {
+		"fail/simpledb/token-already-used": func(t *testing.T) *authorizeTest {
 			_a := testAuthority(t)
-
 			cl := jwt.Claims{
 				Subject:   "test.smallstep.com",
 				Issuer:    validIssuer,
@@ -147,6 +146,79 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 			_, err = _a.authorizeToken(raw)
+			assert.FatalError(t, err)
+			return &authorizeTest{
+				auth: _a,
+				ott:  raw,
+				err: &apiError{errors.New("authorizeToken: token already used"),
+					http.StatusUnauthorized, context{"ott": raw}},
+			}
+		},
+		"ok/mockNoSQLDB": func(t *testing.T) *authorizeTest {
+			_a := testAuthority(t)
+			_a.db = &MockAuthDB{
+				useToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+			}
+
+			cl := jwt.Claims{
+				Subject:   "test.smallstep.com",
+				Issuer:    validIssuer,
+				NotBefore: jwt.NewNumericDate(now),
+				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+				ID:        "43",
+			}
+			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+			return &authorizeTest{
+				auth: _a,
+				ott:  raw,
+			}
+		},
+		"fail/mockNoSQLDB/error": func(t *testing.T) *authorizeTest {
+			_a := testAuthority(t)
+			_a.db = &MockAuthDB{
+				useToken: func(id, tok string) (bool, error) {
+					return false, errors.New("force")
+				},
+			}
+
+			cl := jwt.Claims{
+				Subject:   "test.smallstep.com",
+				Issuer:    validIssuer,
+				NotBefore: jwt.NewNumericDate(now),
+				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+				ID:        "43",
+			}
+			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+			return &authorizeTest{
+				auth: _a,
+				ott:  raw,
+				err: &apiError{errors.New("authorizeToken: failed when checking if token already used: force"),
+					http.StatusInternalServerError, context{"ott": raw}},
+			}
+		},
+		"fail/mockNoSQLDB/token-already-used": func(t *testing.T) *authorizeTest {
+			_a := testAuthority(t)
+			_a.db = &MockAuthDB{
+				useToken: func(id, tok string) (bool, error) {
+					return false, nil
+				},
+			}
+
+			cl := jwt.Claims{
+				Subject:   "test.smallstep.com",
+				Issuer:    validIssuer,
+				NotBefore: jwt.NewNumericDate(now),
+				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+				ID:        "43",
+			}
+			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth: _a,

@@ -20,6 +20,17 @@ type MockNoSQLDB struct {
 	del         func(bucket, key []byte) error
 	list        func(bucket []byte) ([]*database.Entry, error)
 	update      func(tx *database.Tx) error
+	loadOrStore func(bucket, key, value []byte) ([]byte, bool, error)
+}
+
+func (m *MockNoSQLDB) LoadOrStore(bucket, key, value []byte) ([]byte, bool, error) {
+	if m.get != nil {
+		return m.loadOrStore(bucket, key, value)
+	}
+	if m.ret1 == nil {
+		return nil, false, m.err
+	}
+	return m.ret1.([]byte), m.ret2.(bool), m.err
 }
 
 func (m *MockNoSQLDB) Get(bucket, key []byte) ([]byte, error) {
@@ -184,6 +195,69 @@ func TestRevoke(t *testing.T) {
 				}
 			} else {
 				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
+func TestUseToken(t *testing.T) {
+	type result struct {
+		err error
+		ok  bool
+	}
+	tests := map[string]struct {
+		id, tok string
+		db      *DB
+		want    result
+	}{
+		"fail/force-LoadOrStore-error": {
+			id:  "id",
+			tok: "token",
+			db: &DB{&MockNoSQLDB{
+				loadOrStore: func(bucket, key, value []byte) ([]byte, bool, error) {
+					return nil, false, errors.New("force")
+				},
+			}, true},
+			want: result{
+				ok:  false,
+				err: errors.New("error LoadOrStore-ing token id/token"),
+			},
+		},
+		"fail/LoadOrStore-found": {
+			id:  "id",
+			tok: "token",
+			db: &DB{&MockNoSQLDB{
+				loadOrStore: func(bucket, key, value []byte) ([]byte, bool, error) {
+					return []byte("foo"), true, nil
+				},
+			}, true},
+			want: result{
+				ok: false,
+			},
+		},
+		"ok/LoadOrStore-not-found": {
+			id:  "id",
+			tok: "token",
+			db: &DB{&MockNoSQLDB{
+				loadOrStore: func(bucket, key, value []byte) ([]byte, bool, error) {
+					return nil, false, nil
+				},
+			}, true},
+			want: result{
+				ok: true,
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ok, err := tc.db.UseToken(tc.id, tc.tok)
+			if err != nil {
+				if assert.NotNil(t, tc.want.err) {
+					assert.HasPrefix(t, tc.want.err.Error(), err.Error())
+				}
+				assert.False(t, ok)
+			} else {
+				assert.True(t, ok)
 			}
 		})
 	}

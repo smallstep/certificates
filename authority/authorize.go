@@ -4,17 +4,11 @@ import (
 	"crypto/x509"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/jose"
 )
-
-type idUsed struct {
-	UsedAt  int64  `json:"ua,omitempty"`
-	Subject string `json:"sub,omitempty"`
-}
 
 // Claims extends jose.Claims with step attributes.
 type Claims struct {
@@ -72,10 +66,12 @@ func (a *Authority) authorizeToken(ott string) (provisioner.Interface, error) {
 		reuseKey = claims.Nonce
 	}
 	if reuseKey != "" {
-		if _, ok := a.ottMap.LoadOrStore(reuseKey, &idUsed{
-			UsedAt:  time.Now().Unix(),
-			Subject: claims.Subject,
-		}); ok {
+		ok, err := a.db.UseToken(reuseKey, ott)
+		if err != nil {
+			return nil, &apiError{errors.Wrap(err, "authorizeToken: failed when checking if token already used"),
+				http.StatusInternalServerError, errContext}
+		}
+		if !ok {
 			return nil, &apiError{errors.Errorf("authorizeToken: token already used"), http.StatusUnauthorized, errContext}
 		}
 	}
