@@ -33,6 +33,14 @@ func (p provisionerSlice) Len() int           { return len(p) }
 func (p provisionerSlice) Less(i, j int) bool { return p[i].uid < p[j].uid }
 func (p provisionerSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
+// loadByTokenPayload is a payload used to extract the id used to load the
+// provisioner.
+type loadByTokenPayload struct {
+	jose.Claims
+	AuthorizedParty string `json:"azp"` // OIDC client id
+	TenantID        string `json:"tid"` // Microsoft Azure tenant id
+}
+
 // Collection is a memory map of provisioners.
 type Collection struct {
 	byID      *sync.Map
@@ -65,8 +73,8 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 		return c.Load(claims.Issuer + ":" + token.Headers[0].KeyID)
 	}
 
-	// The ID will be just the clientID stored in azp or aud.
-	var payload openIDPayload
+	// The ID will be just the clientID stored in azp, aud or tid.
+	var payload loadByTokenPayload
 	if err := token.UnsafeClaimsWithoutVerification(&payload); err != nil {
 		return nil, false
 	}
@@ -77,6 +85,12 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 	// Try with azp (OIDC)
 	if len(payload.AuthorizedParty) > 0 {
 		if p, ok := c.Load(payload.AuthorizedParty); ok {
+			return p, ok
+		}
+	}
+	// Try with tid (Azure)
+	if payload.TenantID != "" {
+		if p, ok := c.Load(payload.TenantID); ok {
 			return p, ok
 		}
 	}
