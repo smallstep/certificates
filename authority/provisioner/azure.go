@@ -272,7 +272,7 @@ func (p *Azure) AuthorizeSign(token string) ([]SignOption, error) {
 	return append(so,
 		commonNameValidator(name),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
-		newProvisionerExtensionOption(TypeAzure, p.Name, subscription),
+		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	), nil
 }
