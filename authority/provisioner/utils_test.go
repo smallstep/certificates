@@ -350,6 +350,7 @@ func generateAzure() (*Azure, error) {
 		Type:     "Azure",
 		Name:     name,
 		TenantID: tenantID,
+		Audience: azureDefaultAudience,
 		Claims:   &globalProvisionerClaims,
 		claimer:  claimer,
 		config:   newAzureConfig(tenantID),
@@ -394,6 +395,10 @@ func generateAzureWithServer() (*Azure, *httptest.Server, error) {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		case "/" + az.TenantID + "/.well-known/openid-configuration":
 			writeJSON(w, openIDConfiguration{Issuer: issuer, JWKSetURI: srv.URL + "/jwks_uri"})
+		case "/openid-configuration-no-issuer":
+			writeJSON(w, openIDConfiguration{Issuer: "", JWKSetURI: srv.URL + "/jwks_uri"})
+		case "/openid-configuration-fail-jwk":
+			writeJSON(w, openIDConfiguration{Issuer: issuer, JWKSetURI: srv.URL + "/error"})
 		case "/random":
 			keySet := must(generateJSONWebKeySet(2))[0].(jose.JSONWebKeySet)
 			w.Header().Add("Cache-Control", "max-age=5")
@@ -579,6 +584,7 @@ func generateAzureToken(sub, iss, aud, tenantID, subscriptionID, resourceGroup, 
 			NotBefore: jose.NewNumericDate(iat),
 			Expiry:    jose.NewNumericDate(iat.Add(5 * time.Minute)),
 			Audience:  []string{aud},
+			ID:        "the-jti",
 		},
 		AppID:            "the-appid",
 		AppIDAcr:         "the-appidacr",

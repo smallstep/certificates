@@ -139,9 +139,7 @@ func (p *Azure) GetEncryptedKey() (kid string, key string, ok bool) {
 // generates a token with them.
 func (p *Azure) GetIdentityToken() (string, error) {
 	// Initialize the config if this method is used from the cli.
-	if err := p.assertConfig(); err != nil {
-		return "", err
-	}
+	p.assertConfig()
 
 	req, err := http.NewRequest("GET", p.config.identityTokenURL, http.NoBody)
 	if err != nil {
@@ -183,9 +181,7 @@ func (p *Azure) Init(config Config) (err error) {
 		p.Audience = azureDefaultAudience
 	}
 	// Initialize config
-	if err := p.assertConfig(); err != nil {
-		return err
-	}
+	p.assertConfig()
 
 	// Update claims with global ones
 	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
@@ -296,10 +292,8 @@ func (p *Azure) AuthorizeRevoke(token string) error {
 }
 
 // assertConfig initializes the config if it has not been initialized
-func (p *Azure) assertConfig() error {
-	if p.config != nil {
-		return nil
+func (p *Azure) assertConfig() {
+	if p.config == nil {
+		p.config = newAzureConfig(p.TenantID)
 	}
-	p.config = newAzureConfig(p.TenantID)
-	return nil
 }
