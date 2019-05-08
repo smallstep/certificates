@@ -3,7 +3,6 @@ package provisioner
 import (
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/asn1"
 	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
@@ -41,11 +40,6 @@ func newAzureConfig() *azureConfig {
 	}
 }
 
-type azureAttestedDocument struct {
-	Encoding  string `json:"encoding"`
-	Signature []byte `json:"signature"`
-}
-
 type azureIdentityToken struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -68,13 +62,6 @@ type azurePayload struct {
 	Version          string `json:"ver"`
 	XMSMirID         string `json:"xms_mirid"`
 }
-
-var (
-	oidSHA256                       = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
-	oidSignatureSHA256WithRSA       = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 11}
-	oidSignatureECDSAWithSHA256     = asn1.ObjectIdentifier{1, 2, 840, 10045, 4, 3, 2}
-	oidExtensionAuthorityInfoAccess = []int{1, 3, 6, 1, 5, 5, 7, 1, 1}
-)
 
 // Azure is the provisioner that supports identity tokens created from the
 // Microsoft Azure Instance Metadata service.
