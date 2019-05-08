@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -328,6 +329,99 @@ func generateAWSWithServer() (*AWS, *httptest.Server, error) {
 	return aws, srv, nil
 }
 
+func generateAzure() (*Azure, error) {
+	name, err := randutil.Alphanumeric(10)
+	if err != nil {
+		return nil, err
+	}
+	tenantID, err := randutil.Alphanumeric(10)
+	if err != nil {
+		return nil, err
+	}
+	claimer, err := NewClaimer(nil, globalProvisionerClaims)
+	if err != nil {
+		return nil, err
+	}
+	jwk, err := generateJSONWebKey()
+	if err != nil {
+		return nil, err
+	}
+	return &Azure{
+		Type:     "Azure",
+		Name:     name,
+		TenantID: tenantID,
+		Claims:   &globalProvisionerClaims,
+		claimer:  claimer,
+		config:   newAzureConfig(tenantID),
+		oidcConfig: openIDConfiguration{
+			Issuer:    "https://sts.windows.net/" + tenantID + "/",
+			JWKSetURI: "https://login.microsoftonline.com/common/discovery/keys",
+		},
+		keyStore: &keyStore{
+			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
+			expiry: time.Now().Add(24 * time.Hour),
+		},
+	}, nil
+}
+
+func generateAzureWithServer() (*Azure, *httptest.Server, error) {
+	az, err := generateAzure()
+	if err != nil {
+		return nil, nil, err
+	}
+	writeJSON := func(w http.ResponseWriter, v interface{}) {
+		b, err := json.Marshal(v)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(b)
+	}
+	getPublic := func(ks jose.JSONWebKeySet) jose.JSONWebKeySet {
+		var ret jose.JSONWebKeySet
+		for _, k := range ks.Keys {
+			ret.Keys = append(ret.Keys, k.Public())
+		}
+		return ret
+	}
+	issuer := "https://sts.windows.net/" + az.TenantID + "/"
+	srv := httptest.NewUnstartedServer(nil)
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/error":
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		case "/" + az.TenantID + "/.well-known/openid-configuration":
+			writeJSON(w, openIDConfiguration{Issuer: issuer, JWKSetURI: srv.URL + "/jwks_uri"})
+		case "/random":
+			keySet := must(generateJSONWebKeySet(2))[0].(jose.JSONWebKeySet)
+			w.Header().Add("Cache-Control", "max-age=5")
+			writeJSON(w, getPublic(keySet))
+		case "/private":
+			writeJSON(w, az.keyStore.keySet)
+		case "/jwks_uri":
+			w.Header().Add("Cache-Control", "max-age=5")
+			writeJSON(w, getPublic(az.keyStore.keySet))
+		case "/metadata/identity/oauth2/token":
+			tok, err := generateAzureToken("subject", issuer, "https://management.azure.com/", az.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", time.Now(), &az.keyStore.keySet.Keys[0])
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			} else {
+				writeJSON(w, azureIdentityToken{
+					AccessToken: tok,
+				})
+			}
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	srv.Start()
+	az.config.oidcDiscoveryURL = srv.URL + "/" + az.TenantID + "/.well-known/openid-configuration"
+	az.config.identityTokenURL = srv.URL + "/metadata/identity/oauth2/token"
+	return az, srv, nil
+}
+
 func generateCollection(nJWK, nOIDC int) (*Collection, error) {
 	col := NewCollection(testAudiences)
 	for i := 0; i < nJWK; i++ {
@@ -464,6 +558,35 @@ func generateAWSToken(sub, iss, aud, accountID, instanceID, privateIP, region st
 			Document:  doc,
 			Signature: signature,
 		},
+	}
+	return jose.Signed(sig).Claims(claims).CompactSerialize()
+}
+
+func generateAzureToken(sub, iss, aud, tenantID, subscriptionID, resourceGroup, virtualMachine string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
+	sig, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
+		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	claims := azurePayload{
+		Claims: jose.Claims{
+			Subject:   sub,
+			Issuer:    iss,
+			IssuedAt:  jose.NewNumericDate(iat),
+			NotBefore: jose.NewNumericDate(iat),
+			Expiry:    jose.NewNumericDate(iat.Add(5 * time.Minute)),
+			Audience:  []string{aud},
+		},
+		AppID:            "the-appid",
+		AppIDAcr:         "the-appidacr",
+		IdentityProvider: "the-idp",
+		ObjectID:         "the-oid",
+		TenantID:         tenantID,
+		Version:          "the-version",
+		XMSMirID:         fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s", subscriptionID, resourceGroup, virtualMachine),
 	}
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }

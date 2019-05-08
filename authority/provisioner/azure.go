@@ -15,8 +15,8 @@ import (
 	"github.com/smallstep/cli/jose"
 )
 
-// azureOIDCDiscoveryURL is the default discovery url for Microsoft Azure tokens.
-const azureOIDCDiscoveryURL = "https://login.microsoftonline.com/common/.well-known/openid-configuration"
+// azureOIDCBaseURL is the base discovery url for Microsoft Azure tokens.
+const azureOIDCBaseURL = "https://login.microsoftonline.com"
 
 // azureIdentityTokenURL is the URL to get the identity token for an instance.
 const azureIdentityTokenURL = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F"
@@ -33,9 +33,9 @@ type azureConfig struct {
 	identityTokenURL string
 }
 
-func newAzureConfig() *azureConfig {
+func newAzureConfig(tenantID string) *azureConfig {
 	return &azureConfig{
-		oidcDiscoveryURL: azureOIDCDiscoveryURL,
+		oidcDiscoveryURL: azureOIDCBaseURL + "/" + tenantID + "/.well-known/openid-configuration",
 		identityTokenURL: azureIdentityTokenURL,
 	}
 }
@@ -77,6 +77,7 @@ type azurePayload struct {
 type Azure struct {
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
+	TenantID               string   `json:"tenantId"`
 	Subscriptions          []string `json:"subscriptions"`
 	Audience               string   `json:"audience,omitempty"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
@@ -90,7 +91,7 @@ type Azure struct {
 
 // GetID returns the provisioner unique identifier.
 func (p *Azure) GetID() string {
-	return p.Audience
+	return p.TenantID
 }
 
 // GetTokenID returns the identifier of the token. The default value for Azure
@@ -176,16 +177,20 @@ func (p *Azure) Init(config Config) (err error) {
 		return errors.New("provisioner type cannot be empty")
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
+	case p.TenantID == "":
+		return errors.New("provisioner tenantId cannot be empty")
 	case p.Audience == "": // use default audience
 		p.Audience = azureDefaultAudience
+	}
+	// Initialize config
+	if err := p.assertConfig(); err != nil {
+		return err
 	}
 
 	// Update claims with global ones
 	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
 		return err
 	}
-	// Initialize configuration
-	p.config = newAzureConfig()
 
 	// Decode and validate openid-configuration endpoint
 	if err := getAndDecode(p.config.oidcDiscoveryURL, &p.oidcConfig); err != nil {
@@ -209,12 +214,15 @@ func (p *Azure) AuthorizeSign(token string) ([]SignOption, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing token")
 	}
+	if len(jwt.Headers) == 0 {
+		return nil, errors.New("error parsing token: header is missing")
+	}
 
 	var found bool
 	var claims azurePayload
 	keys := p.keyStore.Get(jwt.Headers[0].KeyID)
 	for _, key := range keys {
-		if err := jwt.Claims(key, &claims); err == nil {
+		if err := jwt.Claims(key.Public(), &claims); err == nil {
 			found = true
 			break
 		}
@@ -225,10 +233,15 @@ func (p *Azure) AuthorizeSign(token string) ([]SignOption, error) {
 
 	if err := claims.ValidateWithLeeway(jose.Expected{
 		Audience: []string{p.Audience},
-		Issuer:   strings.Replace(p.oidcConfig.Issuer, "{tenantid}", claims.TenantID, 1),
+		Issuer:   p.oidcConfig.Issuer,
 		Time:     time.Now(),
 	}, 1*time.Minute); err != nil {
 		return nil, errors.Wrap(err, "failed to validate payload")
+	}
+
+	// Validate TenantID
+	if claims.TenantID != p.TenantID {
+		return nil, errors.New("validation failed: invalid tenant id claim (tid)")
 	}
 
 	re := azureXMSMirIDRegExp.FindStringSubmatch(claims.XMSMirID)
@@ -247,7 +260,7 @@ func (p *Azure) AuthorizeSign(token string) ([]SignOption, error) {
 			}
 		}
 		if !found {
-			return nil, errors.Errorf("subscription %s is not valid", subscription)
+			return nil, errors.New("validation failed: invalid subscription id")
 		}
 	}
 
@@ -287,6 +300,6 @@ func (p *Azure) assertConfig() error {
 	if p.config != nil {
 		return nil
 	}
-	p.config = newAzureConfig()
+	p.config = newAzureConfig(p.TenantID)
 	return nil
 }
