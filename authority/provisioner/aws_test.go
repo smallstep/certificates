@@ -49,7 +49,6 @@ func TestAWS_GetTokenID(t *testing.T) {
 
 	t1, err := p1.GetIdentityToken()
 	assert.FatalError(t, err)
-	t.Error(t1)
 	_, claims, err := parseAWSToken(t1)
 	assert.FatalError(t, err)
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s.%s", p1.GetID(), claims.document.InstanceID)))
