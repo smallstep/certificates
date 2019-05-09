@@ -208,7 +208,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	p2, err := generateAzure()
 	assert.FatalError(t, err)
 	p2.TenantID = p1.TenantID
-	p2.Subscriptions = []string{"subscriptionID"}
+	p2.ResourceGroups = []string{"resourceGroup"}
 	p2.config = p1.config
 	p2.oidcConfig = p1.oidcConfig
 	p2.keyStore = p1.keyStore
@@ -223,7 +223,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	p4, err := generateAzure()
 	assert.FatalError(t, err)
 	p4.TenantID = p1.TenantID
-	p4.Subscriptions = []string{"subscriptionID1"}
+	p4.ResourceGroups = []string{"foobarzar"}
 	p4.config = p1.config
 	p4.oidcConfig = p1.oidcConfig
 	p4.keyStore = p1.keyStore
@@ -280,7 +280,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 		{"ok", p2, args{t2}, 5, false},
 		{"ok", p1, args{t11}, 4, false},
 		{"fail tenant", p3, args{t3}, 0, true},
-		{"fail subscription", p4, args{t4}, 0, true},
+		{"fail resource group", p4, args{t4}, 0, true},
 		{"fail token", p1, args{"token"}, 0, true},
 		{"fail issuer", p1, args{failIssuer}, 0, true},
 		{"fail audience", p1, args{failAudience}, 0, true},

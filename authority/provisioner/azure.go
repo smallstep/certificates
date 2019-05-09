@@ -78,7 +78,7 @@ type Azure struct {
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
 	TenantID               string   `json:"tenantId"`
-	Subscriptions          []string `json:"subscriptions"`
+	ResourceGroups         []string `json:"resourceGroups"`
 	Audience               string   `json:"audience,omitempty"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
@@ -244,19 +244,19 @@ func (p *Azure) AuthorizeSign(token string) ([]SignOption, error) {
 	if len(re) == 0 {
 		return nil, errors.Errorf("error parsing xms_mirid claim: %s", claims.XMSMirID)
 	}
-	subscription, name := re[1], re[3]
+	group, name := re[2], re[3]
 
-	// Filter by subscriptions
-	if len(p.Subscriptions) > 0 {
+	// Filter by resource group
+	if len(p.ResourceGroups) > 0 {
 		var found bool
-		for _, s := range p.Subscriptions {
-			if s == subscription {
+		for _, g := range p.ResourceGroups {
+			if g == group {
 				found = true
 				break
 			}
 		}
 		if !found {
-			return nil, errors.New("validation failed: invalid subscription id")
+			return nil, errors.New("validation failed: invalid resource group")
 		}
 	}
 
