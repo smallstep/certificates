@@ -69,7 +69,7 @@ func (a *Authority) init() error {
 	}
 
 	var err error
-	// Initialize step-ca Database if it's not already initialize with WithDB.
+	// Initialize step-ca Database if it's not already initialized with WithDB.
 	// If a.config.DB is nil then a simple, barebones in memory DB will be used.
 	if a.db == nil {
 		if a.db, err = db.New(a.config.DB); err != nil {
