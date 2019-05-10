@@ -16,7 +16,7 @@ import (
 	"github.com/smallstep/cli/jose"
 )
 
-// gcpCertsURL is the url that servers Google OAuth2 public keys.
+// gcpCertsURL is the url that serves Google OAuth2 public keys.
 const gcpCertsURL = "https://www.googleapis.com/oauth2/v3/certs"
 
 // gcpIdentityURL is the base url for the identity document in GCP.

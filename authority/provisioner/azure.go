@@ -135,8 +135,8 @@ func (p *Azure) GetEncryptedKey() (kid string, key string, ok bool) {
 	return "", "", false
 }
 
-// GetIdentityToken retrieves the identity document and it's signature and
-// generates a token with them.
+// GetIdentityToken retrieves from the metadata service the identity token and
+// returns it.
 func (p *Azure) GetIdentityToken() (string, error) {
 	// Initialize the config if this method is used from the cli.
 	p.assertConfig()
@@ -261,7 +261,7 @@ func (p *Azure) AuthorizeSign(token string) ([]SignOption, error) {
 	}
 
 	// Enforce default DNS if configured.
-	// By default we we'll accept the SANs in the CSR.
+	// By default we'll accept the SANs in the CSR.
 	// There's no way to trust them other than TOFU.
 	var so []SignOption
 	if p.DisableCustomSANs {

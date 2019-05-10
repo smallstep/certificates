@@ -258,7 +258,7 @@ func (p *AWS) AuthorizeSign(token string) ([]SignOption, error) {
 	doc := payload.document
 
 	// Enforce default DNS and IP if configured.
-	// By default we we'll accept the SANs in the CSR.
+	// By default we'll accept the SANs in the CSR.
 	// There's no way to trust them other than TOFU.
 	var so []SignOption
 	if p.DisableCustomSANs {
