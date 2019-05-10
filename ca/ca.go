@@ -159,7 +159,7 @@ func (ca *CA) Reload() error {
 	}
 
 	// Do not allow reload if the database configuration has changed.
-	if ca.config.DB != nil && !reflect.DeepEqual(ca.config.DB, config.DB) {
+	if !reflect.DeepEqual(ca.config.DB, config.DB) {
 		logContinue("Reload failed because the database configuration has changed.")
 		return errors.New("error reloading ca: database configuration cannot change")
 	}
