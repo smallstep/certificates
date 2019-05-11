@@ -29,8 +29,19 @@ type Authority struct {
 	initOnce bool
 }
 
+// Option sets options to the Authority.
+type Option func(*Authority)
+
+// WithDatabase sets an already initialized authority database to a new
+// authority. This option is intended to be use on graceful reloads.
+func WithDatabase(db db.AuthDB) Option {
+	return func(a *Authority) {
+		a.db = db
+	}
+}
+
 // New creates and initiates a new Authority type.
-func New(config *Config) (*Authority, error) {
+func New(config *Config, opts ...Option) (*Authority, error) {
 	err := config.Validate()
 	if err != nil {
 		return nil, err
@@ -40,6 +51,9 @@ func New(config *Config) (*Authority, error) {
 		config:       config,
 		certificates: new(sync.Map),
 		provisioners: provisioner.NewCollection(config.getAudiences()),
+	}
+	for _, opt := range opts {
+		opt(a)
 	}
 	if err := a.init(); err != nil {
 		return nil, err
@@ -55,11 +69,12 @@ func (a *Authority) init() error {
 	}
 
 	var err error
-
-	// Initialize step-ca Database.
+	// Initialize step-ca Database if it's not already initialized with WithDB.
 	// If a.config.DB is nil then a simple, barebones in memory DB will be used.
-	if a.db, err = db.New(a.config.DB); err != nil {
-		return err
+	if a.db == nil {
+		if a.db, err = db.New(a.config.DB); err != nil {
+			return err
+		}
 	}
 
 	// Load the root certificates and add them to the certificate store
@@ -116,6 +131,12 @@ func (a *Authority) init() error {
 	a.initOnce = true
 
 	return nil
+}
+
+// GetDatabase returns the authority database. If the configuration does not
+// define a database, GetDatabase will return a db.SimpleDB instance.
+func (a *Authority) GetDatabase() db.AuthDB {
+	return a.db
 }
 
 // Shutdown safely shuts down any clients, databases, etc. held by the Authority.

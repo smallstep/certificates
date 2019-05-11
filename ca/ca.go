@@ -5,11 +5,13 @@ import (
 	"crypto/x509"
 	"log"
 	"net/http"
+	"reflect"
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/server"
@@ -18,6 +20,7 @@ import (
 type options struct {
 	configFile string
 	password   []byte
+	database   db.AuthDB
 }
 
 func (o *options) apply(opts []Option) {
@@ -42,6 +45,13 @@ func WithConfigFile(name string) Option {
 func WithPassword(password []byte) Option {
 	return func(o *options) {
 		o.password = password
+	}
+}
+
+// WithDatabase sets the given authority database to the CA options.
+func WithDatabase(db db.AuthDB) Option {
+	return func(o *options) {
+		o.database = db
 	}
 }
 
@@ -71,7 +81,12 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		ca.config.Password = string(ca.opts.password)
 	}
 
-	auth, err := authority.New(config)
+	var opts []authority.Option
+	if ca.opts.database != nil {
+		opts = append(opts, authority.WithDatabase(ca.opts.database))
+	}
+
+	auth, err := authority.New(config, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -132,60 +147,34 @@ func (ca *CA) Stop() error {
 // Reload reloads the configuration of the CA and calls to the server Reload
 // method.
 func (ca *CA) Reload() error {
-	var hasDB bool
-	if ca.config.DB != nil {
-		hasDB = true
-	}
-	if ca.opts.configFile == "" {
-		return errors.New("error reloading ca: configuration file is not set")
-	}
-
 	config, err := authority.LoadConfiguration(ca.opts.configFile)
 	if err != nil {
 		return errors.Wrap(err, "error reloading ca configuration")
 	}
 
-	logShutDown := func(ss ...string) {
-		for _, s := range ss {
-			log.Println(s)
-		}
-		log.Println("Continuing to serve requests may result in inconsistent state. Shutting Down ...")
-	}
 	logContinue := func(reason string) {
 		log.Println(reason)
 		log.Println("Continuing to run with the original configuration.")
 		log.Println("You can force a restart by sending a SIGTERM signal and then restarting the step-ca.")
 	}
 
-	// Shut down the old authority (shut down the database). If New or Reload
-	// fails then the CA will continue to run but the database will have been
-	// shutdown, which will cause errors.
-	if err := ca.auth.Shutdown(); err != nil {
-		if hasDB {
-			logShutDown("Attempt to shut down the ca.Authority has failed.")
-			return ca.Stop()
-		}
-		logContinue("Reload failed because the ca.Authority could not be shut down.")
-		return err
+	// Do not allow reload if the database configuration has changed.
+	if !reflect.DeepEqual(ca.config.DB, config.DB) {
+		logContinue("Reload failed because the database configuration has changed.")
+		return errors.New("error reloading ca: database configuration cannot change")
 	}
-	newCA, err := New(config, WithPassword(ca.opts.password), WithConfigFile(ca.opts.configFile))
+
+	newCA, err := New(config,
+		WithPassword(ca.opts.password),
+		WithConfigFile(ca.opts.configFile),
+		WithDatabase(ca.auth.GetDatabase()),
+	)
 	if err != nil {
-		if hasDB {
-			logShutDown("Attempt to initialize a CA with the new configuration has failed.",
-				"The database has already been shutdown.")
-			return ca.Stop()
-		}
-		logContinue("Reload failed because the CA with new configuration could " +
-			"not be initialized.")
+		logContinue("Reload failed because the CA with new configuration could not be initialized.")
 		return errors.Wrap(err, "error reloading ca")
 	}
 
 	if err = ca.srv.Reload(newCA.srv); err != nil {
-		if hasDB {
-			logShutDown("Attempt to replace the old CA server has failed.",
-				"The database has already been shutdown.")
-			return ca.Stop()
-		}
 		logContinue("Reload failed because server could not be replaced.")
 		return errors.Wrap(err, "error reloading server")
 	}

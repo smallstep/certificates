@@ -525,7 +525,10 @@ func doReload(ca *CA) error {
 		return errors.Wrap(err, "error reloading ca")
 	}
 
-	newCA, err := New(config, WithPassword(ca.opts.password), WithConfigFile(ca.opts.configFile))
+	newCA, err := New(config,
+		WithPassword(ca.opts.password),
+		WithConfigFile(ca.opts.configFile),
+		WithDatabase(ca.auth.GetDatabase()))
 	if err != nil {
 		return errors.Wrap(err, "error reloading ca")
 	}
