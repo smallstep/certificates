@@ -32,8 +32,8 @@ type Authority struct {
 // Option sets options to the Authority.
 type Option func(*Authority)
 
-// WithDatabase sets an already initialize authority database to a new
-// authority. This options is intended to be use on graceful reloads.
+// WithDatabase sets an already initialized authority database to a new
+// authority. This option is intended to be use on graceful reloads.
 func WithDatabase(db db.AuthDB) Option {
 	return func(a *Authority) {
 		a.db = db
@@ -133,8 +133,8 @@ func (a *Authority) init() error {
 	return nil
 }
 
-// GetDatabase returns the authority database. It will return null if it's not
-// enabled.
+// GetDatabase returns the authority database. If the configuration does not
+// define a database, GetDatabase will return a db.SimpleDB instance.
 func (a *Authority) GetDatabase() db.AuthDB {
 	return a.db
 }
