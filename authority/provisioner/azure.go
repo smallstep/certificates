@@ -241,7 +241,7 @@ func (p *Azure) AuthorizeSign(token string) ([]SignOption, error) {
 	}
 
 	re := azureXMSMirIDRegExp.FindStringSubmatch(claims.XMSMirID)
-	if len(re) == 0 {
+	if len(re) != 4 {
 		return nil, errors.Errorf("error parsing xms_mirid claim: %s", claims.XMSMirID)
 	}
 	group, name := re[2], re[3]
