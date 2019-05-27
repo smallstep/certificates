@@ -35,3 +35,13 @@ func (a *Authority) LoadProvisionerByCertificate(crt *x509.Certificate) (provisi
 	}
 	return p, nil
 }
+
+// LoadProvisionerByID returns an interface to the provisioner with the given ID.
+func (a *Authority) LoadProvisionerByID(id string) (provisioner.Interface, error) {
+	p, ok := a.provisioners.Load(id)
+	if !ok {
+		return nil, &apiError{errors.Errorf("provisioner not found"),
+			http.StatusNotFound, apiCtx{}}
+	}
+	return p, nil
+}

@@ -506,6 +506,7 @@ type mockAuthority struct {
 	signSSHAddUser               func(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 	renew                        func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
 	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
+	loadProvisionerByID          func(provID string) (provisioner.Interface, error)
 	getProvisioners              func(nextCursor string, limit int) (provisioner.List, string, error)
 	revoke                       func(*authority.RevokeOptions) error
 	getEncryptedKey              func(kid string) (string, error)
@@ -577,6 +578,13 @@ func (m *mockAuthority) GetProvisioners(nextCursor string, limit int) (provision
 func (m *mockAuthority) LoadProvisionerByCertificate(cert *x509.Certificate) (provisioner.Interface, error) {
 	if m.loadProvisionerByCertificate != nil {
 		return m.loadProvisionerByCertificate(cert)
+	}
+	return m.ret1.(provisioner.Interface), m.err
+}
+
+func (m *mockAuthority) LoadProvisionerByID(provID string) (provisioner.Interface, error) {
+	if m.loadProvisionerByID != nil {
+		return m.loadProvisionerByID(provID)
 	}
 	return m.ret1.(provisioner.Interface), m.err
 }

@@ -730,3 +730,15 @@ func generateJWKServer(n int) *httptest.Server {
 	srv.Start()
 	return srv
 }
+
+func generateACME() (*ACME, error) {
+	// Initialize provisioners
+	p := &ACME{
+		Type: "ACME",
+		Name: "test@acme-provisioner.com",
+	}
+	if err := p.Init(Config{Claims: globalProvisionerClaims}); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
