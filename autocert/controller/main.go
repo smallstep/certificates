@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/smallstep/cli/crypto/pki"
+
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -30,21 +32,22 @@ var (
 	deserializer  = codecs.UniversalDeserializer()
 	// GetRootCAPath() is broken; points to secrets not certs. So
 	// we'll hard code instead for now.
-	//rootCAPath  = pki.GetRootCAPath()
-	rootCAPath = "/home/step/.step/certs/root_ca.crt"
+	// rootCAPath  = pki.GetRootCAPath()
+	// rootCAPath = "/home/step/.step/certs/root_ca.crt"
 )
 
 const (
 	admissionWebhookAnnotationKey = "autocert.step.sm/name"
 	admissionWebhookStatusKey     = "autocert.step.sm/status"
-	provisionerPasswordFile       = "/home/step/password/password"
-	volumeMountPath               = "/var/run/autocert.step.sm"
-	tokenSecretKey                = "token"
-	tokenSecretLabel              = "autocert.step.sm/token"
+	// provisionerPasswordFile       = "/home/step/password/password"
+	volumeMountPath  = "/var/run/autocert.step.sm"
+	tokenSecretKey   = "token"
+	tokenSecretLabel = "autocert.step.sm/token"
 )
 
 // Config options for the autocert admission controller.
 type Config struct {
+	Service                         string           `yaml:"service"`
 	LogFormat                       string           `yaml:"logFormat"`
 	CaURL                           string           `yaml:"caUrl"`
 	CertLifetime                    string           `yaml:"certLifetime"`
@@ -53,6 +56,18 @@ type Config struct {
 	CertsVolume                     corev1.Volume    `yaml:"certsVolume"`
 	RestrictCertificatesToNamespace bool             `yaml:"restrictCertificatesToNamespace"`
 	ClusterDomain                   string           `yaml:"clusterDomain"`
+	RootCAPath                      string           `yaml:"rootCAPath"`
+	ProvisionerPasswordPath         string           `yaml:"provisionerPasswordPath"`
+}
+
+// GetServiceName returns the service name set in the configuration, defaults to
+// "autocert" if it's not specified.
+func (c Config) GetServiceName() string {
+	if c.Service != "" {
+		return c.Service
+	}
+
+	return "autocert"
 }
 
 // GetClusterDomain returns the Kubernetes cluster domain, defaults to
@@ -63,6 +78,27 @@ func (c Config) GetClusterDomain() string {
 	}
 
 	return "cluster.local"
+}
+
+// GetRootCAPath returns the root CA path in the configuration, defaults to
+// "STEPPATH/certs/root_ca.crt" if it's not specified.
+func (c Config) GetRootCAPath() string {
+	if c.RootCAPath != "" {
+		return c.RootCAPath
+	}
+
+	return pki.GetRootCAPath()
+}
+
+// GetProvisionerPasswordPath returns the path to the provisioner password,
+// defaults to "/home/step/password/password" if not specified in the
+// configuration.
+func (c Config) GetProvisionerPasswordPath() string {
+	if c.ProvisionerPasswordPath != "" {
+		return c.ProvisionerPasswordPath
+	}
+
+	return "/home/step/password/password"
 }
 
 // PatchOperation represents a RFC6902 JSONPatch Operation
@@ -211,7 +247,7 @@ func mkBootstrapper(config *Config, commonName string, namespace string, provisi
 	}
 
 	// Generate CA fingerprint
-	crt, err := pemutil.ReadCertificate(rootCAPath)
+	crt, err := pemutil.ReadCertificate(config.GetRootCAPath())
 	if err != nil {
 		return b, errors.Wrap(err, "CA fingerprint")
 	}
@@ -526,7 +562,9 @@ func main() {
 		"provisionerKid":  provisionerKid,
 	}).Info("Loaded provisioner configuration")
 
-	provisioner, err := NewProvisioner(provisionerName, provisionerKid, config.CaURL, rootCAPath, provisionerPasswordFile)
+	provisioner, err := NewProvisioner(
+		provisionerName, provisionerKid, config.CaURL,
+		config.GetRootCAPath(), config.GetProvisionerPasswordPath())
 	if err != nil {
 		log.Errorf("Error loading provisioner: %v", err)
 		os.Exit(1)
@@ -542,7 +580,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	name := fmt.Sprintf("autocert.%s.svc", namespace)
+	name := fmt.Sprintf("%s.%s.svc", config.GetServiceName(), namespace)
 	token, err := provisioner.Token(name)
 	if err != nil {
 		log.WithField("error", err).Errorf("Error generating bootstrap token during controller startup")
