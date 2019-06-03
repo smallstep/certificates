@@ -203,6 +203,10 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 	assert.FatalError(t, err)
 	p2.DisableCustomSANs = true
 
+	p3, err := generateGCP()
+	assert.FatalError(t, err)
+	p3.ProjectIDs = []string{"other-project-id"}
+
 	aKey, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 
@@ -215,6 +219,11 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		"https://accounts.google.com", p2.GetID(),
 		"instance-id", "instance-name", "project-id", "zone",
 		time.Now(), &p2.keyStore.keySet.Keys[0])
+	assert.FatalError(t, err)
+	t3, err := generateGCPToken(p3.ServiceAccounts[0],
+		"https://accounts.google.com", p3.GetID(),
+		"instance-id", "instance-name", "other-project-id", "zone",
+		time.Now(), &p3.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 
 	failKey, err := generateGCPToken(p1.ServiceAccounts[0],
@@ -246,6 +255,11 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		"https://accounts.google.com", p1.GetID(),
 		"instance-id", "instance-name", "project-id", "zone",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
+	assert.FatalError(t, err)
+	failInvalidProjectID, err := generateGCPToken(p3.ServiceAccounts[0],
+		"https://accounts.google.com", p3.GetID(),
+		"instance-id", "instance-name", "project-id", "zone",
+		time.Now(), &p3.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 	failInstanceID, err := generateGCPToken(p1.ServiceAccounts[0],
 		"https://accounts.google.com", p1.GetID(),
@@ -280,6 +294,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 	}{
 		{"ok", p1, args{t1}, 4, false},
 		{"ok", p2, args{t2}, 5, false},
+		{"ok", p3, args{t3}, 4, false},
 		{"fail token", p1, args{"token"}, 0, true},
 		{"fail key", p1, args{failKey}, 0, true},
 		{"fail iss", p1, args{failIss}, 0, true},
@@ -287,6 +302,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		{"fail exp", p1, args{failExp}, 0, true},
 		{"fail nbf", p1, args{failNbf}, 0, true},
 		{"fail service account", p1, args{failServiceAccount}, 0, true},
+		{"fail invalid project id", p3, args{failInvalidProjectID}, 0, true},
 		{"fail instance id", p1, args{failInstanceID}, 0, true},
 		{"fail instance name", p1, args{failInstanceName}, 0, true},
 		{"fail project id", p1, args{failProjectID}, 0, true},

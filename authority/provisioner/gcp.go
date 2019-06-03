@@ -70,6 +70,7 @@ type GCP struct {
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
 	ServiceAccounts        []string `json:"serviceAccounts"`
+	ProjectIDs             []string `json:"projectIDs"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
 	Claims                 *Claims  `json:"claims,omitempty"`
@@ -281,6 +282,20 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 		}
 		if !found {
 			return nil, errors.New("invalid token: invalid subject claim")
+		}
+	}
+
+	// validate projects
+	if len(p.ProjectIDs) > 0 {
+		var found bool
+		for _, pi := range p.ProjectIDs {
+			if pi == claims.Google.ComputeEngine.ProjectID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, errors.New("invalid token: invalid project id")
 		}
 	}
 
