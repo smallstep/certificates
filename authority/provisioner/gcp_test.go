@@ -213,6 +213,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 	p3, err := generateGCP()
 	assert.FatalError(t, err)
 	p3.ProjectIDs = []string{"other-project-id"}
+	p3.ServiceAccounts = []string{"foo@developer.gserviceaccount.com"}
 
 	aKey, err := generateJSONWebKey()
 	assert.FatalError(t, err)

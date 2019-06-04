@@ -287,7 +287,7 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 	if len(p.ServiceAccounts) > 0 {
 		var found bool
 		for _, sa := range p.ServiceAccounts {
-			if sa == claims.Subject {
+			if sa == claims.Subject || sa == claims.Email {
 				found = true
 				break
 			}
