@@ -159,11 +159,12 @@ func TestGCP_Init(t *testing.T) {
 	badClaims := &Claims{
 		DefaultTLSDur: &Duration{0},
 	}
-
+	zero := Duration{Duration: 0}
 	type fields struct {
 		Type            string
 		Name            string
 		ServiceAccounts []string
+		InstanceAge     Duration
 		Claims          *Claims
 	}
 	type args struct {
@@ -176,12 +177,14 @@ func TestGCP_Init(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{"GCP", "name", nil, nil}, args{config, srv.URL}, false},
-		{"ok", fields{"GCP", "name", []string{"service-account"}, nil}, args{config, srv.URL}, false},
-		{"bad type", fields{"", "name", nil, nil}, args{config, srv.URL}, true},
-		{"bad name", fields{"GCP", "", nil, nil}, args{config, srv.URL}, true},
-		{"bad claims", fields{"GCP", "name", nil, badClaims}, args{config, srv.URL}, true},
-		{"bad certs", fields{"GCP", "name", nil, nil}, args{config, srv.URL + "/error"}, true},
+		{"ok", fields{"GCP", "name", nil, zero, nil}, args{config, srv.URL}, false},
+		{"ok", fields{"GCP", "name", []string{"service-account"}, zero, nil}, args{config, srv.URL}, false},
+		{"ok", fields{"GCP", "name", []string{"service-account"}, Duration{Duration: 1 * time.Minute}, nil}, args{config, srv.URL}, false},
+		{"bad type", fields{"", "name", nil, zero, nil}, args{config, srv.URL}, true},
+		{"bad name", fields{"GCP", "", nil, zero, nil}, args{config, srv.URL}, true},
+		{"bad duration", fields{"GCP", "name", nil, Duration{Duration: -1 * time.Minute}, nil}, args{config, srv.URL}, true},
+		{"bad claims", fields{"GCP", "name", nil, zero, badClaims}, args{config, srv.URL}, true},
+		{"bad certs", fields{"GCP", "name", nil, zero, nil}, args{config, srv.URL + "/error"}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -189,6 +192,7 @@ func TestGCP_Init(t *testing.T) {
 				Type:            tt.fields.Type,
 				Name:            tt.fields.Name,
 				ServiceAccounts: tt.fields.ServiceAccounts,
+				InstanceAge:     tt.fields.InstanceAge,
 				Claims:          tt.fields.Claims,
 				config: &gcpConfig{
 					CertsURL:    tt.args.certsURL,
@@ -214,6 +218,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 	assert.FatalError(t, err)
 	p3.ProjectIDs = []string{"other-project-id"}
 	p3.ServiceAccounts = []string{"foo@developer.gserviceaccount.com"}
+	p3.InstanceAge = Duration{1 * time.Minute}
 
 	aKey, err := generateJSONWebKey()
 	assert.FatalError(t, err)
@@ -269,6 +274,11 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		"instance-id", "instance-name", "project-id", "zone",
 		time.Now(), &p3.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
+	failInvalidInstanceAge, err := generateGCPToken(p3.ServiceAccounts[0],
+		"https://accounts.google.com", p3.GetID(),
+		"instance-id", "instance-name", "other-project-id", "zone",
+		time.Now().Add(-1*time.Minute), &p3.keyStore.keySet.Keys[0])
+	assert.FatalError(t, err)
 	failInstanceID, err := generateGCPToken(p1.ServiceAccounts[0],
 		"https://accounts.google.com", p1.GetID(),
 		"", "instance-name", "project-id", "zone",
@@ -311,6 +321,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		{"fail nbf", p1, args{failNbf}, 0, true},
 		{"fail service account", p1, args{failServiceAccount}, 0, true},
 		{"fail invalid project id", p3, args{failInvalidProjectID}, 0, true},
+		{"fail invalid instance age", p3, args{failInvalidInstanceAge}, 0, true},
 		{"fail instance id", p1, args{failInstanceID}, 0, true},
 		{"fail instance name", p1, args{failInstanceName}, 0, true},
 		{"fail project id", p1, args{failProjectID}, 0, true},

@@ -513,7 +513,7 @@ func generateGCPToken(sub, iss, aud, instanceID, instanceName, projectID, zone s
 			ComputeEngine: gcpComputeEnginePayload{
 				InstanceID:                instanceID,
 				InstanceName:              instanceName,
-				InstanceCreationTimestamp: jose.NewNumericDate(iat.Add(-24 * time.Hour)),
+				InstanceCreationTimestamp: jose.NewNumericDate(iat),
 				ProjectID:                 projectID,
 				ProjectNumber:             1234567890,
 				Zone:                      zone,

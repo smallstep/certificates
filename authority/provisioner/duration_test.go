@@ -59,3 +59,24 @@ func TestDuration_MarshalJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestDuration_Value(t *testing.T) {
+	var dur *Duration
+	tests := []struct {
+		name     string
+		duration *Duration
+		want     time.Duration
+	}{
+		{"ok", &Duration{Duration: 1 * time.Minute}, 1 * time.Minute},
+		{"ok new", new(Duration), 0},
+		{"ok nil", nil, 0},
+		{"ok nil var", dur, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.duration.Value(); got != tt.want {
+				t.Errorf("Duration.Value() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

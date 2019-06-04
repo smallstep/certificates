@@ -73,6 +73,7 @@ type GCP struct {
 	ProjectIDs             []string `json:"projectIDs"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
+	InstanceAge            Duration `json:"instanceAge,omitempty"`
 	Claims                 *Claims  `json:"claims,omitempty"`
 	claimer                *Claimer
 	config                 *gcpConfig
@@ -177,6 +178,8 @@ func (p *GCP) Init(config Config) error {
 		return errors.New("provisioner type cannot be empty")
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
+	case p.InstanceAge.Value() < 0:
+		return errors.New("provisioner instanceAge cannot be negative")
 	}
 	// Initialize config
 	p.assertConfig()
@@ -271,9 +274,10 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
 	// more than a few minutes.
+	now := time.Now().UTC()
 	if err = claims.ValidateWithLeeway(jose.Expected{
 		Issuer: "https://accounts.google.com",
-		Time:   time.Now().UTC(),
+		Time:   now,
 	}, time.Minute); err != nil {
 		return nil, errors.Wrapf(err, "invalid token")
 	}
@@ -308,6 +312,13 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 		}
 		if !found {
 			return nil, errors.New("invalid token: invalid project id")
+		}
+	}
+
+	// validate instance age
+	if d := p.InstanceAge.Value(); d > 0 {
+		if now.Sub(claims.Google.ComputeEngine.InstanceCreationTimestamp.Time()) > d {
+			return nil, errors.New("token google.compute_engine.instance_creation_timestamp is too old")
 		}
 	}
 
