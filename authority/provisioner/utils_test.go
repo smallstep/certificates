@@ -531,7 +531,7 @@ func generateAWSToken(sub, iss, aud, accountID, instanceID, privateIP, region st
 		ImageID:          "ami-123123",
 		InstanceID:       instanceID,
 		InstanceType:     "t2.micro",
-		PendingTime:      time.Now(),
+		PendingTime:      iat,
 		PrivateIP:        privateIP,
 		Region:           region,
 		Version:          "2017-09-30",

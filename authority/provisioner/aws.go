@@ -121,6 +121,7 @@ type AWS struct {
 	Accounts               []string `json:"accounts"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
+	InstanceAge            Duration `json:"instanceAge,omitempty"`
 	Claims                 *Claims  `json:"claims,omitempty"`
 	claimer                *Claimer
 	config                 *awsConfig
@@ -236,6 +237,8 @@ func (p *AWS) Init(config Config) (err error) {
 		return errors.New("provisioner type cannot be empty")
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
+	case p.InstanceAge.Value() < 0:
+		return errors.New("provisioner instanceAge cannot be negative")
 	}
 	// Update claims with global ones
 	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
@@ -370,11 +373,12 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
 	// more than a few minutes.
+	now := time.Now().UTC()
 	if err = payload.ValidateWithLeeway(jose.Expected{
 		Issuer:   awsIssuer,
 		Subject:  doc.InstanceID,
 		Audience: []string{p.GetID()},
-		Time:     time.Now().UTC(),
+		Time:     now,
 	}, time.Minute); err != nil {
 		return nil, errors.Wrapf(err, "invalid token")
 	}
@@ -392,6 +396,14 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 			return nil, errors.New("invalid identity document: accountId is not valid")
 		}
 	}
+
+	// validate instance age
+	if d := p.InstanceAge.Value(); d > 0 {
+		if now.Sub(doc.PendingTime) > d {
+			return nil, errors.New("identity document pendingTime is too old")
+		}
+	}
+
 	payload.document = doc
 	return &payload, nil
 }

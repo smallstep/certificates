@@ -150,6 +150,7 @@ func TestAWS_Init(t *testing.T) {
 	badClaims := &Claims{
 		DefaultTLSDur: &Duration{0},
 	}
+	zero := Duration{Duration: 0}
 
 	type fields struct {
 		Type                   string
@@ -157,6 +158,7 @@ func TestAWS_Init(t *testing.T) {
 		Accounts               []string
 		DisableCustomSANs      bool
 		DisableTrustOnFirstUse bool
+		InstanceAge            Duration
 		Claims                 *Claims
 	}
 	type args struct {
@@ -168,10 +170,12 @@ func TestAWS_Init(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{"AWS", "name", []string{"account"}, false, false, nil}, args{config}, false},
-		{"fail type ", fields{"", "name", []string{"account"}, false, false, nil}, args{config}, true},
-		{"fail name", fields{"AWS", "", []string{"account"}, false, false, nil}, args{config}, true},
-		{"fail claims", fields{"AWS", "name", []string{"account"}, false, false, badClaims}, args{config}, true},
+		{"ok", fields{"AWS", "name", []string{"account"}, false, false, zero, nil}, args{config}, false},
+		{"ok", fields{"AWS", "name", []string{"account"}, true, true, Duration{Duration: 1 * time.Minute}, nil}, args{config}, false},
+		{"fail type ", fields{"", "name", []string{"account"}, false, false, zero, nil}, args{config}, true},
+		{"fail name", fields{"AWS", "", []string{"account"}, false, false, zero, nil}, args{config}, true},
+		{"bad instance age", fields{"AWS", "name", []string{"account"}, false, false, Duration{Duration: -1 * time.Minute}, nil}, args{config}, true},
+		{"fail claims", fields{"AWS", "name", []string{"account"}, false, false, zero, badClaims}, args{config}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -181,6 +185,7 @@ func TestAWS_Init(t *testing.T) {
 				Accounts:               tt.fields.Accounts,
 				DisableCustomSANs:      tt.fields.DisableCustomSANs,
 				DisableTrustOnFirstUse: tt.fields.DisableTrustOnFirstUse,
+				InstanceAge:            tt.fields.InstanceAge,
 				Claims:                 tt.fields.Claims,
 			}
 			if err := p.Init(tt.args.config); (err != nil) != tt.wantErr {
@@ -200,6 +205,7 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 	p2.Accounts = p1.Accounts
 	p2.config = p1.config
 	p2.DisableCustomSANs = true
+	p2.InstanceAge = Duration{1 * time.Minute}
 
 	p3, err := generateAWS()
 	assert.FatalError(t, err)
@@ -266,6 +272,10 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 		"instance-id", awsIssuer, p1.GetID(), p1.Accounts[0], "instance-id",
 		"127.0.0.1", "us-west-1", time.Now(), badKey)
 	assert.FatalError(t, err)
+	failInstanceAge, err := generateAWSToken(
+		"instance-id", awsIssuer, p2.GetID(), p2.Accounts[0], "instance-id",
+		"127.0.0.1", "us-west-1", time.Now().Add(-1*time.Minute), key)
+	assert.FatalError(t, err)
 
 	type args struct {
 		token string
@@ -292,6 +302,7 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 		{"fail exp", p1, args{failExp}, 0, true},
 		{"fail nbf", p1, args{failNbf}, 0, true},
 		{"fail key", p1, args{failKey}, 0, true},
+		{"fail instance age", p2, args{failInstanceAge}, 0, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
