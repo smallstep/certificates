@@ -3,6 +3,7 @@ package provisioner
 import (
 	"crypto/x509"
 	"encoding/json"
+	"net/url"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -28,8 +29,42 @@ type Audiences struct {
 }
 
 // All returns all supported audiences across all request types in one list.
-func (a *Audiences) All() []string {
+func (a Audiences) All() []string {
 	return append(a.Sign, a.Revoke...)
+}
+
+// WithFragment returns a copy of audiences where the url audiences contains the
+// given fragment.
+func (a Audiences) WithFragment(fragment string) Audiences {
+	ret := Audiences{
+		Sign:   make([]string, len(a.Sign)),
+		Revoke: make([]string, len(a.Revoke)),
+	}
+	for i, s := range a.Sign {
+		if u, err := url.Parse(s); err == nil {
+			ret.Sign[i] = u.ResolveReference(&url.URL{Fragment: fragment}).String()
+		} else {
+			ret.Sign[i] = s
+		}
+	}
+	for i, s := range a.Revoke {
+		if u, err := url.Parse(s); err == nil {
+			ret.Revoke[i] = u.ResolveReference(&url.URL{Fragment: fragment}).String()
+		} else {
+			ret.Revoke[i] = s
+		}
+	}
+	return ret
+}
+
+// generateSignAudience generates a sign audience with the format
+// https://<ca-url>/1.0/sign#provisionerID
+func generateSignAudience(caURL string, provisionerID string) (string, error) {
+	u, err := url.Parse(caURL)
+	if err != nil {
+		return "", errors.Wrapf(err, "error parsing %s", caURL)
+	}
+	return u.ResolveReference(&url.URL{Path: "/1.0/sign", Fragment: provisionerID}).String(), nil
 }
 
 // Type indicates the provisioner Type.

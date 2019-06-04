@@ -66,8 +66,21 @@ func (c *Collection) Load(id string) (Interface, bool) {
 
 // LoadByToken parses the token claims and loads the provisioner associated.
 func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) (Interface, bool) {
+	var audiences []string
+	// Get all audiences with the given fragment
+	fragment := extractFragment(claims.Audience)
+	if fragment == "" {
+		audiences = c.audiences.All()
+	} else {
+		audiences = c.audiences.WithFragment(fragment).All()
+	}
+
 	// match with server audiences
-	if matchesAudience(claims.Audience, c.audiences.All()) {
+	if matchesAudience(claims.Audience, audiences) {
+		// Use fragment to get audiences (GCP)
+		if fragment != "" {
+			return c.Load(fragment)
+		}
 		// If matches with stored audiences it will be a JWT token (default), and
 		// the id would be <issuer>:<kid>.
 		return c.Load(claims.Issuer + ":" + token.Headers[0].KeyID)
@@ -233,4 +246,14 @@ func stripPort(rawurl string) string {
 	}
 	u.Host = u.Hostname()
 	return u.String()
+}
+
+// extractFragment extracts the
+func extractFragment(audience []string) string {
+	for _, s := range audience {
+		if u, err := url.Parse(s); err == nil && u.Fragment != "" {
+			return u.Fragment
+		}
+	}
+	return ""
 }

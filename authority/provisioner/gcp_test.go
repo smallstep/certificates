@@ -18,9 +18,9 @@ import (
 func TestGCP_Getters(t *testing.T) {
 	p, err := generateGCP()
 	assert.FatalError(t, err)
-	aud := "gcp:" + p.Name
-	if got := p.GetID(); got != aud {
-		t.Errorf("GCP.GetID() = %v, want %v", got, aud)
+	id := "gcp/" + p.Name
+	if got := p.GetID(); got != id {
+		t.Errorf("GCP.GetID() = %v, want %v", got, id)
 	}
 	if got := p.GetName(); got != p.Name {
 		t.Errorf("GCP.GetName() = %v, want %v", got, p.Name)
@@ -33,8 +33,10 @@ func TestGCP_Getters(t *testing.T) {
 		t.Errorf("GCP.GetEncryptedKey() = (%v, %v, %v), want (%v, %v, %v)",
 			kid, key, ok, "", "", false)
 	}
-	expected := fmt.Sprintf("http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience=%s&format=full&licenses=FALSE", url.QueryEscape(p.GetID()))
-	if got := p.GetIdentityURL(); got != expected {
+
+	aud := "https://ca.smallstep.com/1.0/sign#" + url.QueryEscape(id)
+	expected := fmt.Sprintf("http://metadata/computeMetadata/v1/instance/service-accounts/default/identity?audience=%s&format=full&licenses=FALSE", url.QueryEscape(aud))
+	if got := p.GetIdentityURL(aud); got != expected {
 		t.Errorf("GCP.GetIdentityURL() = %v, want %v", got, expected)
 	}
 }
@@ -50,7 +52,7 @@ func TestGCP_GetTokenID(t *testing.T) {
 
 	now := time.Now()
 	t1, err := generateGCPToken(p1.ServiceAccounts[0],
-		"https://accounts.google.com", "gcp:name",
+		"https://accounts.google.com", "gcp/name",
 		"instance-id", "instance-name", "project-id", "zone",
 		now, &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
@@ -60,7 +62,7 @@ func TestGCP_GetTokenID(t *testing.T) {
 		now, &p2.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 
-	sum := sha256.Sum256([]byte("gcp:name.instance-id"))
+	sum := sha256.Sum256([]byte("gcp/name.instance-id"))
 	want1 := strings.ToLower(hex.EncodeToString(sum[:]))
 	sum = sha256.Sum256([]byte(t2))
 	want2 := strings.ToLower(hex.EncodeToString(sum[:]))
@@ -114,22 +116,27 @@ func TestGCP_GetIdentityToken(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	type args struct {
+		caURL string
+	}
 	tests := []struct {
 		name        string
 		gcp         *GCP
+		args        args
 		identityURL string
 		want        string
 		wantErr     bool
 	}{
-		{"ok", p1, srv.URL, t1, false},
-		{"fail request", p1, srv.URL + "/bad-request", "", true},
-		{"fail url", p1, "://ca.smallstep.com", "", true},
-		{"fail connect", p1, "foobarzar", "", true},
+		{"ok", p1, args{"https://ca"}, srv.URL, t1, false},
+		{"fail ca url", p1, args{"://ca"}, srv.URL, "", true},
+		{"fail request", p1, args{"https://ca"}, srv.URL + "/bad-request", "", true},
+		{"fail url", p1, args{"https://ca"}, "://ca.smallstep.com", "", true},
+		{"fail connect", p1, args{"https://ca"}, "foobarzar", "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.gcp.config.IdentityURL = tt.identityURL
-			got, err := tt.gcp.GetIdentityToken()
+			got, err := tt.gcp.GetIdentityToken(tt.args.caURL)
 			t.Log(err)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GCP.GetIdentityToken() error = %v, wantErr %v", err, tt.wantErr)

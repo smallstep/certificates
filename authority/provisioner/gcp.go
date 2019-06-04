@@ -77,12 +77,13 @@ type GCP struct {
 	claimer                *Claimer
 	config                 *gcpConfig
 	keyStore               *keyStore
+	audiences              Audiences
 }
 
 // GetID returns the provisioner unique identifier. The name should uniquely
 // identify any GCP provisioner.
 func (p *GCP) GetID() string {
-	return "gcp:" + p.Name
+	return "gcp/" + p.Name
 }
 
 // GetTokenID returns the identifier of the token. The default value for GCP the
@@ -130,20 +131,25 @@ func (p *GCP) GetEncryptedKey() (kid string, key string, ok bool) {
 }
 
 // GetIdentityURL returns the url that generates the GCP token.
-func (p *GCP) GetIdentityURL() string {
+func (p *GCP) GetIdentityURL(audience string) string {
 	// Initialize config if required
 	p.assertConfig()
 
 	q := url.Values{}
-	q.Add("audience", p.GetID())
+	q.Add("audience", audience)
 	q.Add("format", "full")
 	q.Add("licenses", "FALSE")
 	return fmt.Sprintf("%s?%s", p.config.IdentityURL, q.Encode())
 }
 
 // GetIdentityToken does an HTTP request to the identity url.
-func (p *GCP) GetIdentityToken() (string, error) {
-	req, err := http.NewRequest("GET", p.GetIdentityURL(), http.NoBody)
+func (p *GCP) GetIdentityToken(caURL string) (string, error) {
+	audience, err := generateSignAudience(caURL, p.GetID())
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("GET", p.GetIdentityURL(audience), http.NoBody)
 	if err != nil {
 		return "", errors.Wrap(err, "error creating identity request")
 	}
@@ -183,6 +189,8 @@ func (p *GCP) Init(config Config) error {
 	if err != nil {
 		return err
 	}
+
+	p.audiences = config.Audiences.WithFragment(p.GetID())
 	return nil
 }
 
@@ -264,11 +272,15 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
 	// more than a few minutes.
 	if err = claims.ValidateWithLeeway(jose.Expected{
-		Issuer:   "https://accounts.google.com",
-		Audience: []string{p.GetID()},
-		Time:     time.Now().UTC(),
+		Issuer: "https://accounts.google.com",
+		Time:   time.Now().UTC(),
 	}, time.Minute); err != nil {
 		return nil, errors.Wrapf(err, "invalid token")
+	}
+
+	// validate audiences with the defaults
+	if !matchesAudience(claims.Audience, p.audiences.Sign) {
+		return nil, errors.New("invalid token: invalid audience claim (aud)")
 	}
 
 	// validate subject (service account)

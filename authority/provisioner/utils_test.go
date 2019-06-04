@@ -229,6 +229,7 @@ func generateGCP() (*GCP, error) {
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
+		audiences: testAudiences.WithFragment("gcp/" + name),
 	}, nil
 }
 
@@ -492,7 +493,10 @@ func generateGCPToken(sub, iss, aud, instanceID, instanceName, projectID, zone s
 	if err != nil {
 		return "", err
 	}
-
+	aud, err = generateSignAudience("https://ca.smallstep.com", aud)
+	if err != nil {
+		return "", err
+	}
 	claims := gcpPayload{
 		Claims: jose.Claims{
 			Subject:   sub,
