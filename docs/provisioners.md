@@ -177,6 +177,7 @@ In the ca.json, an AWS provisioner looks like:
     "accounts": ["1234567890"],
     "disableCustomSANs": false,
     "disableTrustOnFirstUse": false,
+    "instanceAge": "1h",
     "claims": {
         "maxTLSCertDuration": "2160h",
         "defaultTLSCertDuration": "2160h"
@@ -201,6 +202,9 @@ In the ca.json, an AWS provisioner looks like:
   granted per instance, but if the option is set to true this limit is not set
   and different tokens can be used to get different certificates.
 
+* `instanceAge` (optional): the maximum age of an instance to grant a
+  certificate. The instance age is a string using the duration format.
+
 * `claims` (optional): overwrites the default claims set in the authority, see
   the [JWK](#jwk) section for all the options.
 
@@ -217,8 +221,10 @@ In the ca.json, a GCP provisioner looks like:
     "type": "GCP",
     "name": "Google Cloud",
     "serviceAccounts": ["1234567890"],
+    "projectIDs": ["project-id"],
     "disableCustomSANs": false,
     "disableTrustOnFirstUse": false,
+    "instanceAge": "1h",
     "claims": {
         "maxTLSCertDuration": "2160h",
         "defaultTLSCertDuration": "2160h"
@@ -235,6 +241,9 @@ In the ca.json, a GCP provisioner looks like:
   allowed to use this provisioner. If none is specified, all service accounts
   will be valid.
 
+* `projectIDs` (optional): the list of project identifiers that are allowed to
+  use this provisioner. If non is specified all project will be valid.
+
 * `disableCustomSANs` (optional): by default custom SANs are valid, but if this
   option is set to true only the SANs available in the instance identity
   document will be valid, these are the DNS
@@ -244,6 +253,9 @@ In the ca.json, a GCP provisioner looks like:
 * `disableTrustOnFirstUse` (optional): by default only one certificate will be
   granted per instance, but if the option is set to true this limit is not set
   and different tokens can be used to get different certificates.
+
+* `instanceAge` (optional): the maximum age of an instance to grant a
+  certificate. The instance age is a string using the duration format.
 
 * `claims` (optional): overwrites the default claims set in the authority, see
   the [JWK](#jwk) section for all the options.
