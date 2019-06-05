@@ -74,6 +74,10 @@ type azurePayload struct {
 // If DisableTrustOnFirstUse is true, multiple sign request for this provisioner
 // with the same instance will be accepted. By default only the first request
 // will be accepted.
+//
+// Microsoft Azure identity docs are available at
+// https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/how-to-use-vm-token
+// and https://docs.microsoft.com/en-us/azure/virtual-machines/windows/instance-metadata-service
 type Azure struct {
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`

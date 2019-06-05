@@ -115,6 +115,12 @@ type awsInstanceIdentityDocument struct {
 // If DisableTrustOnFirstUse is true, multiple sign request for this provisioner
 // with the same instance will be accepted. By default only the first request
 // will be accepted.
+//
+// If InstanceAge is set, only the instances with an pendingTime within the
+// given period will be accepted.
+//
+// Amazon Identity docs are available at
+// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-identity-documents.html
 type AWS struct {
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`

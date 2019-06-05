@@ -66,6 +66,12 @@ func newGCPConfig() *gcpConfig {
 // If DisableTrustOnFirstUse is true, multiple sign request for this provisioner
 // with the same instance will be accepted. By default only the first request
 // will be accepted.
+//
+// If InstanceAge is set, only the instances with an instance_creation_timestamp
+// within the given period will be accepted.
+//
+// Google Identity docs are available at
+// https://cloud.google.com/compute/docs/instances/verifying-instance-identity
 type GCP struct {
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
