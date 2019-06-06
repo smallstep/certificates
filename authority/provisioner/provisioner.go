@@ -89,6 +89,24 @@ const (
 	SignAudienceKey = "sign"
 )
 
+// String returns the string representation of the type.
+func (t Type) String() string {
+	switch t {
+	case TypeJWK:
+		return "JWK"
+	case TypeOIDC:
+		return "OIDC"
+	case TypeGCP:
+		return "GCP"
+	case TypeAWS:
+		return "AWS"
+	case TypeAzure:
+		return "Azure"
+	default:
+		return ""
+	}
+}
+
 // Config defines the default parameters used in the initialization of
 // provisioners.
 type Config struct {
