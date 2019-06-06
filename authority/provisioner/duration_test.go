@@ -6,6 +6,35 @@ import (
 	"time"
 )
 
+func TestNewDuration(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *Duration
+		wantErr bool
+	}{
+		{"ok", args{"1h2m3s"}, &Duration{Duration: 3723 * time.Second}, false},
+		{"fail empty", args{""}, nil, true},
+		{"fail number", args{"123"}, nil, true},
+		{"fail string", args{"1hour"}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewDuration(tt.args.s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewDuration() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewDuration() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDuration_UnmarshalJSON(t *testing.T) {
 	type args struct {
 		data []byte
