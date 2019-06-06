@@ -77,7 +77,7 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 
 	// match with server audiences
 	if matchesAudience(claims.Audience, audiences) {
-		// Use fragment to get audiences (GCP)
+		// Use fragment to get audiences (GCP, AWS)
 		if fragment != "" {
 			return c.Load(fragment)
 		}
@@ -107,7 +107,7 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 			return p, ok
 		}
 	}
-	// Fallback to aud (GCP)
+	// Fallback to aud
 	return c.Load(payload.Audience[0])
 }
 
@@ -124,9 +124,9 @@ func (c *Collection) LoadByCertificate(cert *x509.Certificate) (Interface, bool)
 			case TypeJWK:
 				return c.Load(string(provisioner.Name) + ":" + string(provisioner.CredentialID))
 			case TypeAWS:
-				return c.Load("aws:" + string(provisioner.Name))
+				return c.Load("aws/" + string(provisioner.Name))
 			case TypeGCP:
-				return c.Load("gcp:" + string(provisioner.Name))
+				return c.Load("gcp/" + string(provisioner.Name))
 			default:
 				return c.Load(string(provisioner.CredentialID))
 			}
