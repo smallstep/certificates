@@ -397,6 +397,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 
 	// validate audiences with the defaults
 	if !matchesAudience(payload.Audience, p.audiences.Sign) {
+		fmt.Println(payload.Audience, "vs", p.audiences.Sign)
 		return nil, errors.New("invalid token: invalid audience claim (aud)")
 	}
 

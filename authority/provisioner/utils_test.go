@@ -266,6 +266,7 @@ func generateAWS() (*AWS, error) {
 			certificate:        cert,
 			signatureAlgorithm: awsSignatureAlgorithm,
 		},
+		audiences: testAudiences.WithFragment("aws/" + name),
 	}, nil
 }
 
@@ -550,6 +551,11 @@ func generateAWSToken(sub, iss, aud, accountID, instanceID, privateIP, region st
 		jose.SigningKey{Algorithm: jose.HS256, Key: signature},
 		new(jose.SignerOptions).WithType("JWT"),
 	)
+	if err != nil {
+		return "", err
+	}
+
+	aud, err = generateSignAudience("https://ca.smallstep.com", aud)
 	if err != nil {
 		return "", err
 	}
