@@ -27,6 +27,9 @@ Provisioners are people or code that are registered with the CA and authorized
 to issue "provisioning tokens". Provisioning tokens are single use tokens that
 can be used to authenticate with the CA and get a certificate.
 
+See [provisioners.md](provisioners.md) for more information on the supported
+provisioners and its options.
+
 ## Initializing PKI and configuring the Certificate Authority
 
 To initialize a PKI and configure the Step Certificate Authority run:

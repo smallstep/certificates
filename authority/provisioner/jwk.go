@@ -33,7 +33,6 @@ func (p *JWK) GetID() string {
 	return p.Name + ":" + p.Key.KeyID
 }
 
-//
 // GetTokenID returns the identifier of the token.
 func (p *JWK) GetTokenID(ott string) (string, error) {
 	// Validate payload

@@ -12,6 +12,16 @@ type Duration struct {
 	time.Duration
 }
 
+// NewDuration parses a duration string and returns a Duration type or an error
+// if the given string is not a duration.
+func NewDuration(s string) (*Duration, error) {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing %s as duration", s)
+	}
+	return &Duration{Duration: d}, nil
+}
+
 // MarshalJSON parses a duration string and sets it to the duration.
 //
 // A duration string is a possibly signed sequence of decimal numbers, each with
@@ -29,7 +39,7 @@ func (d *Duration) MarshalJSON() ([]byte, error) {
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {
 	var (
 		s  string
-		_d time.Duration
+		dd time.Duration
 	)
 	if d == nil {
 		return errors.New("duration cannot be nil")
@@ -37,9 +47,17 @@ func (d *Duration) UnmarshalJSON(data []byte) (err error) {
 	if err = json.Unmarshal(data, &s); err != nil {
 		return errors.Wrapf(err, "error unmarshaling %s", data)
 	}
-	if _d, err = time.ParseDuration(s); err != nil {
+	if dd, err = time.ParseDuration(s); err != nil {
 		return errors.Wrapf(err, "error parsing %s as duration", s)
 	}
-	d.Duration = _d
+	d.Duration = dd
 	return
+}
+
+// Value returns 0 if the duration is null, the inner duration otherwise.
+func (d *Duration) Value() time.Duration {
+	if d == nil {
+		return 0
+	}
+	return d.Duration
 }

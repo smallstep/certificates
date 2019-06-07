@@ -58,14 +58,7 @@ func (a *Authority) authorizeToken(ott string) (provisioner.Interface, error) {
 	}
 
 	// Store the token to protect against reuse.
-	var reuseKey string
-	switch p.GetType() {
-	case provisioner.TypeJWK:
-		reuseKey = claims.ID
-	case provisioner.TypeOIDC:
-		reuseKey = claims.Nonce
-	}
-	if reuseKey != "" {
+	if reuseKey, err := p.GetTokenID(ott); err == nil {
 		ok, err := a.db.UseToken(reuseKey, ott)
 		if err != nil {
 			return nil, &apiError{errors.Wrap(err, "authorizeToken: failed when checking if token already used"),

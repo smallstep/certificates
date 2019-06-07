@@ -278,7 +278,6 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.prov.AuthorizeSign(tt.args.token)
 			if (err != nil) != tt.wantErr {
-				fmt.Println(tt)
 				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -385,47 +384,6 @@ func TestOIDC_AuthorizeRenewal(t *testing.T) {
 		})
 	}
 }
-
-/*
-func TestOIDC_AuthorizeRevoke(t *testing.T) {
-	srv := generateJWKServer(2)
-	defer srv.Close()
-
-	var keys jose.JSONWebKeySet
-	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
-
-	// Create test provisioners
-	p1, err := generateOIDC()
-	assert.FatalError(t, err)
-
-	// Update configuration endpoints and initialize
-	config := Config{Claims: globalProvisionerClaims}
-	p1.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
-	assert.FatalError(t, p1.Init(config))
-
-	t1, err := generateSimpleToken("the-issuer", p1.ClientID, &keys.Keys[0])
-	assert.FatalError(t, err)
-
-	type args struct {
-		token string
-	}
-	tests := []struct {
-		name    string
-		prov    *OIDC
-		args    args
-		wantErr bool
-	}{
-		{"disabled", p1, args{t1}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRevoke(tt.args.token); (err != nil) != tt.wantErr {
-				t.Errorf("OIDC.AuthorizeRevoke() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-*/
 
 func Test_sanitizeEmail(t *testing.T) {
 	tests := []struct {
