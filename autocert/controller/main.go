@@ -12,13 +12,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/smallstep/cli/crypto/pki"
+	"github.com/smallstep/cli/utils"
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/cli/crypto/pemutil"
+	"github.com/smallstep/cli/crypto/pki"
 	"k8s.io/api/admission/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,23 +31,19 @@ var (
 	runtimeScheme = runtime.NewScheme()
 	codecs        = serializer.NewCodecFactory(runtimeScheme)
 	deserializer  = codecs.UniversalDeserializer()
-	// GetRootCAPath() is broken; points to secrets not certs. So
-	// we'll hard code instead for now.
-	// rootCAPath  = pki.GetRootCAPath()
-	// rootCAPath = "/home/step/.step/certs/root_ca.crt"
 )
 
 const (
 	admissionWebhookAnnotationKey = "autocert.step.sm/name"
 	admissionWebhookStatusKey     = "autocert.step.sm/status"
-	// provisionerPasswordFile       = "/home/step/password/password"
-	volumeMountPath  = "/var/run/autocert.step.sm"
-	tokenSecretKey   = "token"
-	tokenSecretLabel = "autocert.step.sm/token"
+	volumeMountPath               = "/var/run/autocert.step.sm"
+	tokenSecretKey                = "token"
+	tokenSecretLabel              = "autocert.step.sm/token"
 )
 
 // Config options for the autocert admission controller.
 type Config struct {
+	Address                         string           `yaml:"address"`
 	Service                         string           `yaml:"service"`
 	LogFormat                       string           `yaml:"logFormat"`
 	CaURL                           string           `yaml:"caUrl"`
@@ -58,6 +55,16 @@ type Config struct {
 	ClusterDomain                   string           `yaml:"clusterDomain"`
 	RootCAPath                      string           `yaml:"rootCAPath"`
 	ProvisionerPasswordPath         string           `yaml:"provisionerPasswordPath"`
+}
+
+// GetAddress returns the address set in the configuration, defaults to ":4443"
+// if it's not specified.
+func (c Config) GetAddress() string {
+	if c.Address != "" {
+		return c.Address
+	}
+
+	return ":4443"
 }
 
 // GetServiceName returns the service name set in the configuration, defaults to
@@ -132,7 +139,7 @@ func loadConfig(file string) (*Config, error) {
 }
 
 // createTokenSecret generates a kubernetes Secret object containing a bootstrap token
-// in the specified namespce. The secret name is randomly generated with a given prefix.
+// in the specified namespace. The secret name is randomly generated with a given prefix.
 // A goroutine is scheduled to cleanup the secret after the token expires. The secret
 // is also labelled for easy identification and manual cleanup.
 func createTokenSecret(prefix, namespace, token string) (string, error) {
@@ -214,19 +221,19 @@ func createTokenSecret(prefix, namespace, token string) (string, error) {
 			"namespace": namespace,
 		})
 		if err != nil {
-			ctxLog.WithField("error", err).Error("Error deleting expired boostrap token secret")
+			ctxLog.WithField("error", err).Error("Error deleting expired bootstrap token secret")
 			return
 		}
 		resp, err := client.Do(req)
 		if err != nil {
-			ctxLog.WithField("error", err).Error("Error deleting expired boostrap token secret")
+			ctxLog.WithField("error", err).Error("Error deleting expired bootstrap token secret")
 			return
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			ctxLog.WithFields(log.Fields{
 				"status":     resp.Status,
 				"statusCode": resp.StatusCode,
-			}).Error("Error deleting expired boostrap token secret")
+			}).Error("Error deleting expired bootstrap token secret")
 			return
 		}
 		ctxLog.Info("Deleted expired bootstrap token secret")
@@ -236,9 +243,9 @@ func createTokenSecret(prefix, namespace, token string) (string, error) {
 }
 
 // mkBootstrapper generates a bootstrap container based on the template defined in Config. It
-// generates a new bootstrap token and mounts it, along with other required coniguration, as
+// generates a new bootstrap token and mounts it, along with other required configuration, as
 // environment variables in the returned bootstrap container.
-func mkBootstrapper(config *Config, commonName string, namespace string, provisioner Provisioner) (corev1.Container, error) {
+func mkBootstrapper(config *Config, commonName string, namespace string, provisioner *ca.Provisioner) (corev1.Container, error) {
 	b := config.Bootstrapper
 
 	token, err := provisioner.Token(commonName)
@@ -403,7 +410,7 @@ func addAnnotations(existing, new map[string]string) (ops []PatchOperation) {
 //  - Add the `certs` volume definition
 //  - Annotate the pod to indicate that it's been processed by this controller
 // The result is a list of serialized JSONPatch objects (or an error).
-func patch(pod *corev1.Pod, namespace string, config *Config, provisioner Provisioner) ([]byte, error) {
+func patch(pod *corev1.Pod, namespace string, config *Config, provisioner *ca.Provisioner) ([]byte, error) {
 	var ops []PatchOperation
 
 	annotations := pod.ObjectMeta.GetAnnotations()
@@ -462,13 +469,13 @@ func shouldMutate(metadata *metav1.ObjectMeta, namespace string, clusterDomain s
 
 // mutate takes an `AdmissionReview`, determines whether it is subject to mutation, and returns
 // an appropriate `AdmissionResponse` including patches or any errors that occurred.
-func mutate(review *v1beta1.AdmissionReview, config *Config, provisioner Provisioner) *v1beta1.AdmissionResponse {
+func mutate(review *v1beta1.AdmissionReview, config *Config, provisioner *ca.Provisioner) *v1beta1.AdmissionResponse {
 	ctxLog := log.WithField("uid", review.Request.UID)
 
 	request := review.Request
 	var pod corev1.Pod
 	if err := json.Unmarshal(request.Object.Raw, &pod); err != nil {
-		ctxLog.WithField("error", err).Error("Error unmarshalling pod")
+		ctxLog.WithField("error", err).Error("Error unmarshaling pod")
 		return &v1beta1.AdmissionResponse{
 			Allowed: false,
 			UID:     request.UID,
@@ -562,9 +569,14 @@ func main() {
 		"provisionerKid":  provisionerKid,
 	}).Info("Loaded provisioner configuration")
 
-	provisioner, err := NewProvisioner(
+	password, err := utils.ReadPasswordFromFile(config.GetProvisionerPasswordPath())
+	if err != nil {
+		panic(err)
+	}
+
+	provisioner, err := ca.NewProvisioner(
 		provisionerName, provisionerKid, config.CaURL,
-		config.GetRootCAPath(), config.GetProvisionerPasswordPath())
+		config.GetRootCAPath(), password)
 	if err != nil {
 		log.Errorf("Error loading provisioner: %v", err)
 		os.Exit(1)
@@ -593,7 +605,7 @@ func main() {
 	defer cancel()
 
 	srv, err := ca.BootstrapServer(ctx, token, &http.Server{
-		Addr: ":4443",
+		Addr: config.GetAddress(),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/healthz" {
 				log.Info("/healthz")
@@ -601,13 +613,6 @@ func main() {
 				w.WriteHeader(http.StatusOK)
 				return
 			}
-
-			/*
-				var name string
-				if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-					name = r.TLS.PeerCertificates[0].Subject.CommonName
-				}
-			*/
 
 			if r.URL.Path != "/mutate" {
 				log.WithField("path", r.URL.Path).Error("Bad Request: 404 Not Found")
@@ -678,7 +683,7 @@ func main() {
 		panic(err)
 	}
 
-	log.Info("Listening on :4443 ...")
+	log.Info("Listening on", config.GetAddress(), "...")
 	if err := srv.ListenAndServeTLS("", ""); err != nil {
 		panic(err)
 	}
