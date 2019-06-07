@@ -11,8 +11,8 @@ COPY . ./
 RUN go build -o /server .
 
 # final stage
-FROM smallstep/step-cli:0.9.0
-ENV STEPPATH="/home/step/.step"
+FROM smallstep/step-cli:0.10.1
+ENV STEPPATH="/home/step"
 ENV PWDPATH="/home/step/password/password"
 ENV CONFIGPATH="/home/step/autocert/config.yaml"
 COPY --from=build-env /server .

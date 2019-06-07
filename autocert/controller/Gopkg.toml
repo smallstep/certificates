@@ -39,11 +39,15 @@
 
 [[constraint]]
   name = "github.com/smallstep/certificates"
-  version = "0.9.0"
+  branch = "master"
 
 [[constraint]]
   name = "github.com/smallstep/cli"
-  version = "0.9.0"
+  branch = "master"
+
+[[override]]
+  name = "github.com/smallstep/nosql"
+  revision = "b66b34823456721912ba037126e92414690c07d6"
 
 [[constraint]]
   branch = "master"
@@ -55,7 +59,7 @@
 
 [[override]]
   name = "gopkg.in/square/go-jose.v2"
-  version = "=2.1.9"
+  version = "2.3.1"
 
 [prune]
   go-tests = true
