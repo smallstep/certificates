@@ -77,7 +77,7 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 
 	// match with server audiences
 	if matchesAudience(claims.Audience, audiences) {
-		// Use fragment to get audiences (GCP, AWS)
+		// Use fragment to get provisioner name (GCP, AWS)
 		if fragment != "" {
 			return c.Load(fragment)
 		}
@@ -248,7 +248,7 @@ func stripPort(rawurl string) string {
 	return u.String()
 }
 
-// extractFragment extracts the
+// extractFragment extracts the first fragment of an audience url.
 func extractFragment(audience []string) string {
 	for _, s := range audience {
 		if u, err := url.Parse(s); err == nil && u.Fragment != "" {

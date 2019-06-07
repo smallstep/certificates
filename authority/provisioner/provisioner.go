@@ -58,7 +58,7 @@ func (a Audiences) WithFragment(fragment string) Audiences {
 }
 
 // generateSignAudience generates a sign audience with the format
-// https://<ca-url>/1.0/sign#provisionerID
+// https://<host>/1.0/sign#provisionerID
 func generateSignAudience(caURL string, provisionerID string) (string, error) {
 	u, err := url.Parse(caURL)
 	if err != nil {

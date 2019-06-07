@@ -116,8 +116,8 @@ type awsInstanceIdentityDocument struct {
 // with the same instance will be accepted. By default only the first request
 // will be accepted.
 //
-// If InstanceAge is set, only the instances with an pendingTime within the
-// given period will be accepted.
+// If InstanceAge is set, only the instances with a pendingTime within the given
+// period will be accepted.
 //
 // Amazon Identity docs are available at
 // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-identity-documents.html

@@ -12,7 +12,7 @@ type Duration struct {
 	time.Duration
 }
 
-// NewDuration parses a duration string and returns a Duration type or and error
+// NewDuration parses a duration string and returns a Duration type or an error
 // if the given string is not a duration.
 func NewDuration(s string) (*Duration, error) {
 	d, err := time.ParseDuration(s)
