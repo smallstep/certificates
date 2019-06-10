@@ -20,12 +20,12 @@ type MockNoSQLDB struct {
 	del         func(bucket, key []byte) error
 	list        func(bucket []byte) ([]*database.Entry, error)
 	update      func(tx *database.Tx) error
-	loadOrStore func(bucket, key, value []byte) ([]byte, bool, error)
+	cmpAndSwap  func(bucket, key, old, newval []byte) ([]byte, bool, error)
 }
 
-func (m *MockNoSQLDB) LoadOrStore(bucket, key, value []byte) ([]byte, bool, error) {
-	if m.get != nil {
-		return m.loadOrStore(bucket, key, value)
+func (m *MockNoSQLDB) CmpAndSwap(bucket, key, old, newval []byte) ([]byte, bool, error) {
+	if m.cmpAndSwap != nil {
+		return m.cmpAndSwap(bucket, key, old, newval)
 	}
 	if m.ret1 == nil {
 		return nil, false, m.err
@@ -210,37 +210,37 @@ func TestUseToken(t *testing.T) {
 		db      *DB
 		want    result
 	}{
-		"fail/force-LoadOrStore-error": {
+		"fail/force-CmpAndSwap-error": {
 			id:  "id",
 			tok: "token",
 			db: &DB{&MockNoSQLDB{
-				loadOrStore: func(bucket, key, value []byte) ([]byte, bool, error) {
+				cmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return nil, false, errors.New("force")
 				},
 			}, true},
 			want: result{
 				ok:  false,
-				err: errors.New("error LoadOrStore-ing token id/token"),
+				err: errors.New("error storing used token used_ott/id"),
 			},
 		},
-		"fail/LoadOrStore-found": {
+		"fail/CmpAndSwap-already-exists": {
 			id:  "id",
 			tok: "token",
 			db: &DB{&MockNoSQLDB{
-				loadOrStore: func(bucket, key, value []byte) ([]byte, bool, error) {
-					return []byte("foo"), true, nil
+				cmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					return []byte("foo"), false, nil
 				},
 			}, true},
 			want: result{
 				ok: false,
 			},
 		},
-		"ok/LoadOrStore-not-found": {
+		"ok/cmpAndSwap-success": {
 			id:  "id",
 			tok: "token",
 			db: &DB{&MockNoSQLDB{
-				loadOrStore: func(bucket, key, value []byte) ([]byte, bool, error) {
-					return nil, false, nil
+				cmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					return []byte("bar"), true, nil
 				},
 			}, true},
 			want: result{
@@ -253,11 +253,13 @@ func TestUseToken(t *testing.T) {
 			ok, err := tc.db.UseToken(tc.id, tc.tok)
 			if err != nil {
 				if assert.NotNil(t, tc.want.err) {
-					assert.HasPrefix(t, tc.want.err.Error(), err.Error())
+					assert.HasPrefix(t, err.Error(), tc.want.err.Error())
 				}
 				assert.False(t, ok)
+			} else if ok {
+				assert.True(t, tc.want.ok)
 			} else {
-				assert.True(t, ok)
+				assert.False(t, tc.want.ok)
 			}
 		})
 	}

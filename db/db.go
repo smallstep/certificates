@@ -131,14 +131,12 @@ func (db *DB) StoreCertificate(crt *x509.Certificate) error {
 // UseToken returns true if we were able to successfully store the token for
 // for the first time, false otherwise.
 func (db *DB) UseToken(id, tok string) (bool, error) {
-	// If the error is `Not Found` then the certificate has not been revoked.
-	// Any other error should be propagated to the caller.
-	_, found, err := db.LoadOrStore(usedOTTTable, []byte(id), []byte(tok))
+	_, swapped, err := db.CmpAndSwap(usedOTTTable, []byte(id), nil, []byte(tok))
 	switch {
 	case err != nil:
-		return false, errors.Wrapf(err, "error LoadOrStore-ing token %s/%s",
+		return false, errors.Wrapf(err, "error storing used token %s/%s",
 			string(usedOTTTable), id)
-	case found:
+	case !swapped:
 		return false, nil
 	default:
 		return true, nil
