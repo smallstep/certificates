@@ -16,7 +16,7 @@ to manage issues, etc.
 ## Asking Support Questions
 
 Users and developers can ask questions over email (info@smallstep.com) or
-[twitter](https://twitter.com/smallsteplabs).  Please don't use the GitHub
+[twitter](https://twitter.com/smallsteplabs). Please don't use the GitHub
 issue tracker to ask questions.
 
 ## Reporting Issues
@@ -29,7 +29,7 @@ certificates` in use (`step-ca version`) and your operating system.
 
 ## Code Contribution
 
-'step certificates` aims to become a fully featured online Certificate
+`step certificates` aims to become a fully featured online Certificate
 Authority. We encourage all contributions that meet the following criteria:
 
 * fit naturally into a Certificate Authority.

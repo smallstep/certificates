@@ -330,8 +330,9 @@ you are interested in. Ex: `step help ca provisioners list`.
 
 3. On the web at https://smallstep.com/docs/certificates.
 
-4. On your browser by running `step ca help --http :8080` from the command line
+4. On your browser by running `step help --http=:8080 ca` from the command line
 and visiting http://localhost:8080.
+
 
 ## The Future
 
