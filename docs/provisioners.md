@@ -6,7 +6,7 @@ can be used to authenticate with the CA and get a certificate.
 
 ## JWK
 
-JWK is the default provisioner type. It uses public-key cryptography sign and
+JWK is the default provisioner type. It uses public-key cryptography to sign and
 validate a JSON Web Token (JWT).
 
 The [step](https://github.com/smallstep/cli) CLI tool will create a JWK
@@ -55,7 +55,7 @@ In the ca.json configuration file, a complete JWK provisioner example looks like
 
   We can use [step](https://github.com/smallstep/cli) to see the private key
   encrypted with the password `asdf`:
-  
+
   ```sh
   $ echo ey...lw | step crypto jwe decrypt  | jq
   Please enter the password to decrypt the content encryption key:

@@ -108,7 +108,7 @@ automated method as your system grows.
 
 Absolutely. [Details here].
 
-## Furher Reading
+## Further Reading
 
 * [Use TLS Everywhere](https://smallstep.com/blog/use-tls.html)
 * [Everything you should know about certificates and PKI but are too afraid to ask](https://smallstep.com/blog/everything-pki.html)

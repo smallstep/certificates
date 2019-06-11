@@ -61,7 +61,7 @@ cli](https://github.com/smallstep/cli#installation-guide).
 5. Place the PKI root password in a known location.
 
     Our image is expecting the password to be placed in `/home/step/secrets/password`
-    you can simple go in to the terminal again and write that file:
+    you can simply go in to the terminal again and write that file:
 
     ```sh
     $ docker run -it -v step:/home/step smallstep/step-ca sh
