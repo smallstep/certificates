@@ -107,6 +107,40 @@ e.g. `v1.0.2`
     $ ./update --ca v1.0.3
     ```
 
+7. **Update the Helm packages**
+
+    > **NOTE**: This is an optional step, only necessary if we want to release a
+    > new helm package.
+
+    Once we have the docker images, we can release a new version in our Helm
+    [repository](https://smallstep.github.io/helm-charts/) we need to pull the
+    [helm-charts](https://github.com/smallstep/helm-charts) project, and change the
+    following:
+
+    * On step-certificates/Chart.yaml:
+      * Increase the `version` number (Helm Chart version).
+      * Set the `appVersion` to the step-certificates version.
+    * On step-certificates/values.yaml:
+      * Set the docker tag `image.tag` to the appropriate version.
+
+    Then create the step-certificates package running:
+
+    ```sh
+    helm package ./step-certificates
+    ```
+
+    A new file like `step-certificates-<version>.tgz` would be created, then switch
+    to the `gh-pages` branch and add the file to it, and update the index.yaml using
+    the `helm repo index` command:
+
+    ```sh
+    git checkout gh-pages
+    git add "step-certificates-<version>.tgz"
+    helm repo index --merge index.yaml --url https://smallstep.github.io/helm-charts/ .
+    git commit -a -m "Add package for step-certificates <appVersion>"
+    git push origih gh-pages
+    ```
+
 *All Done!*
 
 ## Versioning
