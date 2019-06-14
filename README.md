@@ -54,10 +54,10 @@ website](https://smallstep.com/certificates) and the [blog
 post](https://smallstep.com/blog/step-certificates.html) announcing Step
 Certificate Authority.
 
-> ## 🆕 Autocert <a href="autocert/README.md"><img width="50%" src="https://raw.githubusercontent.com/smallstep/certificates/autocert/autocert/autocert-logo.png"></a>
+> ## 🆕 Autocert <a href="https://github.com/smallstep/autocert"><img width="50%" src="https://raw.githubusercontent.com/smallstep/autocert/master/autocert-logo.png"></a>
 >
 > If you're using Kubernetes, make sure you [check out
-> autocert](autocert/README.md): a kubernetes add-on that builds on `step
+> autocert](https://github.com/smallstep/autocert): a kubernetes add-on that builds on `step
 > certificates` to automatically inject TLS/HTTPS certificates into your containers.
 
 ## Installation Guide
