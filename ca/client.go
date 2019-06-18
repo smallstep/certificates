@@ -17,8 +17,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/user"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -26,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/crypto/x509util"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
@@ -586,7 +585,7 @@ func getInsecureClient() *http.Client {
 // getRootCAPath returns the path where the root CA is stored based on the
 // STEPPATH environment variable.
 func getRootCAPath() string {
-	return filepath.Join(stepPath(), "certs", "root_ca.crt")
+	return filepath.Join(config.StepPath(), "certs", "root_ca.crt")
 }
 
 func readJSON(r io.ReadCloser, v interface{}) error {
@@ -601,22 +600,4 @@ func readError(r io.ReadCloser) error {
 		return err
 	}
 	return apiErr
-}
-
-// stepPath returns the step path. config.StepPath is not used because it will
-// fail if it cannot create the folder.
-func stepPath() string {
-	stepPath := os.Getenv("STEPPATH")
-	if stepPath == "" {
-		usr, err := user.Current()
-		if err == nil && usr.HomeDir != "" {
-			stepPath = path.Join(usr.HomeDir, ".step")
-		} else if home := os.Getenv("HOME"); home != "" {
-			stepPath = path.Join(home, ".step")
-		} else {
-			stepPath = "."
-		}
-	}
-	// cleanup
-	return path.Clean(stepPath)
 }
