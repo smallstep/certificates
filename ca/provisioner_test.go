@@ -22,7 +22,7 @@ func getTestProvisioner(t *testing.T, caURL string) *Provisioner {
 		t.Fatal(err)
 	}
 
-	client, err := NewClient(caURL)
+	client, err := NewClient(caURL, WithRootFile("testdata/secrets/root_ca.crt"))
 	if err != nil {
 		t.Fatal(err)
 	}
