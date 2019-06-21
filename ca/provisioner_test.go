@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"io/ioutil"
 	"net/url"
 	"reflect"
 	"testing"
@@ -43,12 +44,17 @@ func TestNewProvisioner(t *testing.T) {
 	defer ca.Close()
 	want := getTestProvisioner(t, ca.URL)
 
+	caBundle, err := ioutil.ReadFile("testdata/secrets/root_ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type args struct {
-		name     string
-		kid      string
-		caURL    string
-		password []byte
-		caRoot   string
+		name         string
+		kid          string
+		caURL        string
+		password     []byte
+		clientOption ClientOption
 	}
 	tests := []struct {
 		name    string
@@ -56,18 +62,21 @@ func TestNewProvisioner(t *testing.T) {
 		want    *Provisioner
 		wantErr bool
 	}{
-		{"ok", args{want.name, want.kid, ca.URL, []byte("password"), "testdata/secrets/root_ca.crt"}, want, false},
-		{"ok-by-name", args{want.name, "", ca.URL, []byte("password"), "testdata/secrets/root_ca.crt"}, want, false},
-		{"fail-bad-kid", args{want.name, "bad-kid", ca.URL, []byte("password"), "testdata/secrets/root_ca.crt"}, nil, true},
-		{"fail-empty-name", args{"", want.kid, ca.URL, []byte("password"), "testdata/secrets/root_ca.crt"}, nil, true},
-		{"fail-bad-name", args{"bad-name", "", ca.URL, []byte("password"), "testdata/secrets/root_ca.crt"}, nil, true},
-		{"fail-by-password", args{want.name, want.kid, ca.URL, []byte("bad-password"), "testdata/secrets/root_ca.crt"}, nil, true},
-		{"fail-by-password-no-kid", args{want.name, "", ca.URL, []byte("bad-password"), "testdata/secrets/root_ca.crt"}, nil, true},
-		{"fail-bad-certificate", args{want.name, want.kid, ca.URL, []byte("password"), "testdata/secrets/federatec_ca.crt"}, nil, true},
+		{"ok", args{want.name, want.kid, ca.URL, []byte("password"), WithRootFile("testdata/secrets/root_ca.crt")}, want, false},
+		{"ok-by-name", args{want.name, "", ca.URL, []byte("password"), WithRootFile("testdata/secrets/root_ca.crt")}, want, false},
+		{"ok-with-bundle", args{want.name, want.kid, ca.URL, []byte("password"), WithCABundle(caBundle)}, want, false},
+		{"ok-with-fingerprint", args{want.name, want.kid, ca.URL, []byte("password"), WithRootSHA256(want.fingerprint)}, want, false},
+		{"fail-bad-kid", args{want.name, "bad-kid", ca.URL, []byte("password"), WithRootFile("testdata/secrets/root_ca.crt")}, nil, true},
+		{"fail-empty-name", args{"", want.kid, ca.URL, []byte("password"), WithRootFile("testdata/secrets/root_ca.crt")}, nil, true},
+		{"fail-bad-name", args{"bad-name", "", ca.URL, []byte("password"), WithRootFile("testdata/secrets/root_ca.crt")}, nil, true},
+		{"fail-by-password", args{want.name, want.kid, ca.URL, []byte("bad-password"), WithRootFile("testdata/secrets/root_ca.crt")}, nil, true},
+		{"fail-by-password-no-kid", args{want.name, "", ca.URL, []byte("bad-password"), WithRootFile("testdata/secrets/root_ca.crt")}, nil, true},
+		{"fail-bad-certificate", args{want.name, want.kid, ca.URL, []byte("password"), WithRootFile("testdata/secrets/federated_ca.crt")}, nil, true},
+		{"fail-not-found-certificate", args{want.name, want.kid, ca.URL, []byte("password"), WithRootFile("testdata/secrets/missing.crt")}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewProvisioner(tt.args.name, tt.args.kid, tt.args.caURL, tt.args.password, WithRootFile(tt.args.caRoot))
+			got, err := NewProvisioner(tt.args.name, tt.args.kid, tt.args.caURL, tt.args.password, tt.args.clientOption)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewProvisioner() error = %v, wantErr %v", err, tt.wantErr)
 				return
