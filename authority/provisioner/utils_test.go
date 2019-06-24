@@ -658,7 +658,7 @@ func generateJWKServer(n int) *httptest.Server {
 		return ret
 	}
 
-	defaultKeySet := must(generateJSONWebKeySet(2))[0].(jose.JSONWebKeySet)
+	defaultKeySet := must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
 	srv := httptest.NewUnstartedServer(nil)
 	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Hits++
@@ -670,8 +670,12 @@ func generateJWKServer(n int) *httptest.Server {
 		case "/openid-configuration", "/.well-known/openid-configuration":
 			writeJSON(w, openIDConfiguration{Issuer: "the-issuer", JWKSetURI: srv.URL + "/jwks_uri"})
 		case "/random":
-			keySet := must(generateJSONWebKeySet(2))[0].(jose.JSONWebKeySet)
+			keySet := must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
 			w.Header().Add("Cache-Control", "max-age=5")
+			writeJSON(w, getPublic(keySet))
+		case "/no-cache":
+			keySet := must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
+			w.Header().Add("Cache-Control", "no-cache, no-store, max-age=0, must-revalidate")
 			writeJSON(w, getPublic(keySet))
 		case "/private":
 			writeJSON(w, defaultKeySet)
