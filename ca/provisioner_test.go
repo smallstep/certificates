@@ -1,23 +1,39 @@
 package ca
 
 import (
+	"io/ioutil"
+	"net/url"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/smallstep/cli/crypto/pemutil"
+	"github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
 )
 
-func getTestProvisioner(t *testing.T, url string) *Provisioner {
+func getTestProvisioner(t *testing.T, caURL string) *Provisioner {
 	jwk, err := jose.ParseKey("testdata/secrets/ott_mariano_priv.jwk", jose.WithPassword([]byte("password")))
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	cert, err := pemutil.ReadCertificate("testdata/secrets/root_ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := NewClient(caURL, WithRootFile("testdata/secrets/root_ca.crt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	return &Provisioner{
+		Client:        client,
 		name:          "mariano",
 		kid:           "FLIV7q23CXHrg75J2OSbvzwKJJqoxCYixjmsJirneOg",
-		caURL:         url,
-		caRoot:        "testdata/secrets/root_ca.crt",
+		audience:      client.endpoint.ResolveReference(&url.URL{Path: "/1.0/sign"}).String(),
+		fingerprint:   x509util.Fingerprint(cert),
 		jwk:           jwk,
 		tokenLifetime: 5 * time.Minute,
 	}
@@ -28,12 +44,17 @@ func TestNewProvisioner(t *testing.T) {
 	defer ca.Close()
 	want := getTestProvisioner(t, ca.URL)
 
+	caBundle, err := ioutil.ReadFile("testdata/secrets/root_ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type args struct {
-		name     string
-		kid      string
-		caURL    string
-		caRoot   string
-		password []byte
+		name         string
+		kid          string
+		caURL        string
+		password     []byte
+		clientOption ClientOption
 	}
 	tests := []struct {
 		name    string
@@ -41,20 +62,29 @@ func TestNewProvisioner(t *testing.T) {
 		want    *Provisioner
 		wantErr bool
 	}{
-		{"ok", args{want.name, want.kid, want.caURL, want.caRoot, []byte("password")}, want, false},
-		{"ok-by-name", args{want.name, "", want.caURL, want.caRoot, []byte("password")}, want, false},
-		{"fail-bad-kid", args{want.name, "bad-kid", want.caURL, want.caRoot, []byte("password")}, nil, true},
-		{"fail-empty-name", args{"", want.kid, want.caURL, want.caRoot, []byte("password")}, nil, true},
-		{"fail-bad-name", args{"bad-name", "", want.caURL, want.caRoot, []byte("password")}, nil, true},
-		{"fail-by-password", args{want.name, want.kid, want.caURL, want.caRoot, []byte("bad-password")}, nil, true},
-		{"fail-by-password-no-kid", args{want.name, "", want.caURL, want.caRoot, []byte("bad-password")}, nil, true},
+		{"ok", args{want.name, want.kid, ca.URL, []byte("password"), WithRootFile("testdata/secrets/root_ca.crt")}, want, false},
+		{"ok-by-name", args{want.name, "", ca.URL, []byte("password"), WithRootFile("testdata/secrets/root_ca.crt")}, want, false},
+		{"ok-with-bundle", args{want.name, want.kid, ca.URL, []byte("password"), WithCABundle(caBundle)}, want, false},
+		{"ok-with-fingerprint", args{want.name, want.kid, ca.URL, []byte("password"), WithRootSHA256(want.fingerprint)}, want, false},
+		{"fail-bad-kid", args{want.name, "bad-kid", ca.URL, []byte("password"), WithRootFile("testdata/secrets/root_ca.crt")}, nil, true},
+		{"fail-empty-name", args{"", want.kid, ca.URL, []byte("password"), WithRootFile("testdata/secrets/root_ca.crt")}, nil, true},
+		{"fail-bad-name", args{"bad-name", "", ca.URL, []byte("password"), WithRootFile("testdata/secrets/root_ca.crt")}, nil, true},
+		{"fail-by-password", args{want.name, want.kid, ca.URL, []byte("bad-password"), WithRootFile("testdata/secrets/root_ca.crt")}, nil, true},
+		{"fail-by-password-no-kid", args{want.name, "", ca.URL, []byte("bad-password"), WithRootFile("testdata/secrets/root_ca.crt")}, nil, true},
+		{"fail-bad-certificate", args{want.name, want.kid, ca.URL, []byte("password"), WithRootFile("testdata/secrets/federated_ca.crt")}, nil, true},
+		{"fail-not-found-certificate", args{want.name, want.kid, ca.URL, []byte("password"), WithRootFile("testdata/secrets/missing.crt")}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewProvisioner(tt.args.name, tt.args.kid, tt.args.caURL, tt.args.caRoot, tt.args.password)
+			got, err := NewProvisioner(tt.args.name, tt.args.kid, tt.args.caURL, tt.args.password, tt.args.clientOption)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewProvisioner() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			// Client won't match.
+			// Make sure it does.
+			if got != nil {
+				got.Client = want.Client
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewProvisioner() = %v, want %v", got, tt.want)
@@ -80,13 +110,13 @@ func TestProvisioner_Token(t *testing.T) {
 	type fields struct {
 		name          string
 		kid           string
-		caURL         string
-		caRoot        string
+		fingerprint   string
 		jwk           *jose.JSONWebKey
 		tokenLifetime time.Duration
 	}
 	type args struct {
 		subject string
+		sans    []string
 	}
 	tests := []struct {
 		name    string
@@ -94,21 +124,23 @@ func TestProvisioner_Token(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{p.name, p.kid, p.caURL, p.caRoot, p.jwk, p.tokenLifetime}, args{"subject"}, false},
-		{"fail-no-subject", fields{p.name, p.kid, p.caURL, p.caRoot, p.jwk, p.tokenLifetime}, args{""}, true},
-		{"fail-no-key", fields{p.name, p.kid, p.caURL, p.caRoot, &jose.JSONWebKey{}, p.tokenLifetime}, args{"subject"}, true},
+		{"ok", fields{p.name, p.kid, sha, p.jwk, p.tokenLifetime}, args{"subject", nil}, false},
+		{"ok-with-san", fields{p.name, p.kid, sha, p.jwk, p.tokenLifetime}, args{"subject", []string{"foo.smallstep.com"}}, false},
+		{"ok-with-sans", fields{p.name, p.kid, sha, p.jwk, p.tokenLifetime}, args{"subject", []string{"foo.smallstep.com", "127.0.0.1"}}, false},
+		{"fail-no-subject", fields{p.name, p.kid, sha, p.jwk, p.tokenLifetime}, args{"", []string{"foo.smallstep.com"}}, true},
+		{"fail-no-key", fields{p.name, p.kid, sha, &jose.JSONWebKey{}, p.tokenLifetime}, args{"subject", nil}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &Provisioner{
 				name:          tt.fields.name,
 				kid:           tt.fields.kid,
-				caURL:         tt.fields.caURL,
-				caRoot:        tt.fields.caRoot,
+				audience:      "https://127.0.0.1:9000/1.0/sign",
+				fingerprint:   tt.fields.fingerprint,
 				jwk:           tt.fields.jwk,
 				tokenLifetime: tt.fields.tokenLifetime,
 			}
-			got, err := p.Token(tt.args.subject)
+			got, err := p.Token(tt.args.subject, tt.args.sans...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Provisioner.Token() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -126,7 +158,7 @@ func TestProvisioner_Token(t *testing.T) {
 					return
 				}
 				if err := claims.ValidateWithLeeway(jose.Expected{
-					Audience: []string{tt.fields.caURL + "/1.0/sign"},
+					Audience: []string{"https://127.0.0.1:9000/1.0/sign"},
 					Issuer:   tt.fields.name,
 					Subject:  tt.args.subject,
 					Time:     time.Now().UTC(),
@@ -146,8 +178,18 @@ func TestProvisioner_Token(t *testing.T) {
 				if v, ok := allClaims["sha"].(string); !ok || v != sha {
 					t.Errorf("Claim sha = %s, want %s", v, sha)
 				}
-				if v, ok := allClaims["sans"].([]interface{}); !ok || !reflect.DeepEqual(v, []interface{}{tt.args.subject}) {
-					t.Errorf("Claim sans = %s, want %s", v, []interface{}{tt.args.subject})
+				if len(tt.args.sans) == 0 {
+					if v, ok := allClaims["sans"].([]interface{}); !ok || !reflect.DeepEqual(v, []interface{}{tt.args.subject}) {
+						t.Errorf("Claim sans = %s, want %s", v, []interface{}{tt.args.subject})
+					}
+				} else {
+					want := []interface{}{}
+					for _, s := range tt.args.sans {
+						want = append(want, s)
+					}
+					if v, ok := allClaims["sans"].([]interface{}); !ok || !reflect.DeepEqual(v, want) {
+						t.Errorf("Claim sans = %s, want %s", v, want)
+					}
 				}
 				if v, ok := allClaims["jti"].(string); !ok || v == "" {
 					t.Errorf("Claim jti = %s, want not blank", v)

@@ -13,8 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/cli/crypto/x509util"
 )
 
 const (
@@ -745,4 +747,67 @@ func Test_parseEndpoint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClient_RootFingerprint(t *testing.T) {
+	ok := &api.HealthResponse{Status: "ok"}
+	nok := api.InternalServerError(fmt.Errorf("Internal Server Error"))
+
+	httpsServer := httptest.NewTLSServer(nil)
+	defer httpsServer.Close()
+	httpsServerFingerprint := x509util.Fingerprint(httpsServer.Certificate())
+
+	httpServer := httptest.NewServer(nil)
+	defer httpServer.Close()
+
+	tests := []struct {
+		name         string
+		server       *httptest.Server
+		response     interface{}
+		responseCode int
+		want         string
+		wantErr      bool
+	}{
+		{"ok", httpsServer, ok, 200, httpsServerFingerprint, false},
+		{"ok with error", httpsServer, nok, 500, httpsServerFingerprint, false},
+		{"fail", httpServer, ok, 200, "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := tt.server.Client().Transport
+			c, err := NewClient(tt.server.URL, WithTransport(tr))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			tt.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				w.WriteHeader(tt.responseCode)
+				api.JSON(w, tt.response)
+			})
+
+			got, err := c.RootFingerprint()
+			if (err != nil) != tt.wantErr {
+				fmt.Printf("%+v", err)
+				t.Errorf("Client.RootFingerprint() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Client.RootFingerprint() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClient_RootFingerprintWithServer(t *testing.T) {
+	srv := startCABootstrapServer()
+	defer srv.Close()
+
+	client, err := NewClient(srv.URL+"/sign", WithRootFile("testdata/secrets/root_ca.crt"))
+	assert.FatalError(t, err)
+
+	fp, err := client.RootFingerprint()
+	assert.FatalError(t, err)
+	assert.Equals(t, "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7", fp)
 }
