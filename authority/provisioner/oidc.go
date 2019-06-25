@@ -33,12 +33,13 @@ func (c openIDConfiguration) Validate() error {
 // openIDPayload represents the fields on the id_token JWT payload.
 type openIDPayload struct {
 	jose.Claims
-	AtHash          string `json:"at_hash"`
-	AuthorizedParty string `json:"azp"`
-	Email           string `json:"email"`
-	EmailVerified   bool   `json:"email_verified"`
-	Hd              string `json:"hd"`
-	Nonce           string `json:"nonce"`
+	AtHash          string   `json:"at_hash"`
+	AuthorizedParty string   `json:"azp"`
+	Email           string   `json:"email"`
+	EmailVerified   bool     `json:"email_verified"`
+	Hd              string   `json:"hd"`
+	Nonce           string   `json:"nonce"`
+	Groups          []string `json:"groups"`
 }
 
 // OIDC represents an OAuth 2.0 OpenID Connect provider.
@@ -52,6 +53,7 @@ type OIDC struct {
 	ConfigurationEndpoint string   `json:"configurationEndpoint"`
 	Admins                []string `json:"admins,omitempty"`
 	Domains               []string `json:"domains,omitempty"`
+	Groups                []string `json:"groups,omitempty"`
 	Claims                *Claims  `json:"claims,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
@@ -184,6 +186,22 @@ func (o *OIDC) ValidatePayload(p openIDPayload) error {
 		}
 		if !found {
 			return errors.New("failed to validate payload: email is not allowed")
+		}
+	}
+
+	// Filter by oidc group claim
+	if len(o.Groups) > 0 {
+		var found bool
+		for _, group := range o.Groups {
+			for _, g := range p.Groups {
+				if g == group {
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			return errors.New("validation failed: invalid group")
 		}
 	}
 
