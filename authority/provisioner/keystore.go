@@ -138,12 +138,10 @@ func getExpirationTime(age time.Duration) time.Time {
 	return time.Now().Truncate(time.Second).Add(age)
 }
 
-// abs returns the absolute value of n using the two's complement form.
-//
-// It will overflow with math.MinInt64 in the same way a branching version
-// would, this is not a problem because maxAgeRegex will block negative numbers
-// and the logic will never produce that number.
+// abs returns the absolute value of n.
 func abs(n time.Duration) time.Duration {
-	y := n >> 63
-	return (n ^ y) - y
+	if n < 0 {
+		return -n
+	}
+	return n
 }
