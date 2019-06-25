@@ -18,7 +18,7 @@ const (
 	defaultCacheJitter = 1 * time.Hour
 )
 
-var maxAgeRegex = regexp.MustCompile("max-age=([0-9]*)")
+var maxAgeRegex = regexp.MustCompile("max-age=([0-9]+)")
 
 type keyStore struct {
 	sync.RWMutex
@@ -81,13 +81,13 @@ func (ks *keyStore) reload() {
 	ks.Unlock()
 }
 
+// nextReloadDuration would return the duration for the next rotation. If age is
+// 0 it will randomly rotate between 0-12 hours, but every time we call to Get
+// it will automatically rotate.
 func (ks *keyStore) nextReloadDuration(age time.Duration) time.Duration {
 	n := rand.Int63n(int64(ks.jitter))
 	age -= time.Duration(n)
-	if age < 0 {
-		age = 0
-	}
-	return age
+	return abs(age)
 }
 
 func getKeysFromJWKsURI(uri string) (jose.JSONWebKeySet, time.Duration, error) {
@@ -125,6 +125,10 @@ func getCacheJitter(age time.Duration) time.Duration {
 	switch {
 	case age > time.Hour:
 		return defaultCacheJitter
+	case age == 0:
+		// Avoids a 0 jitter. The duration is not important as it will rotate
+		// automatically on each Get request.
+		return defaultCacheJitter
 	default:
 		return age / 3
 	}
@@ -132,4 +136,12 @@ func getCacheJitter(age time.Duration) time.Duration {
 
 func getExpirationTime(age time.Duration) time.Time {
 	return time.Now().Truncate(time.Second).Add(age)
+}
+
+// abs returns the absolute value of n.
+func abs(n time.Duration) time.Duration {
+	if n < 0 {
+		return -n
+	}
+	return n
 }
