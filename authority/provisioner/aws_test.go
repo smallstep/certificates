@@ -255,6 +255,7 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 	t2PrivateIP, err := p2.GetIdentityToken("127.0.0.1", "https://ca.smallstep.com")
 	assert.FatalError(t, err)
 	t2Hostname, err := p2.GetIdentityToken("ip-127-0-0-1.us-west-1.compute.internal", "https://ca.smallstep.com")
+	assert.FatalError(t, err)
 
 	block, _ := pem.Decode([]byte(awsTestKey))
 	if block == nil || block.Type != "RSA PRIVATE KEY" {
