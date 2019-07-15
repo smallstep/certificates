@@ -171,7 +171,7 @@ func (p *AWS) GetEncryptedKey() (kid string, key string, ok bool) {
 
 // GetIdentityToken retrieves the identity document and it's signature and
 // generates a token with them.
-func (p *AWS) GetIdentityToken(caURL string) (string, error) {
+func (p *AWS) GetIdentityToken(subject, caURL string) (string, error) {
 	// Initialize the config if this method is used from the cli.
 	if err := p.assertConfig(); err != nil {
 		return "", err
@@ -221,7 +221,7 @@ func (p *AWS) GetIdentityToken(caURL string) (string, error) {
 	payload := awsPayload{
 		Claims: jose.Claims{
 			Issuer:    awsIssuer,
-			Subject:   idoc.InstanceID,
+			Subject:   subject,
 			Audience:  []string{audience},
 			Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 			NotBefore: jose.NewNumericDate(now),
@@ -273,8 +273,8 @@ func (p *AWS) AuthorizeSign(token string) ([]SignOption, error) {
 	}
 	doc := payload.document
 
-	// Enforce default DNS and IP if configured.
-	// By default we'll accept the SANs in the CSR.
+	// Enforce known CN and default DNS and IP if configured.
+	// By default we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
 	var so []SignOption
 	if p.DisableCustomSANs {
@@ -287,9 +287,9 @@ func (p *AWS) AuthorizeSign(token string) ([]SignOption, error) {
 	}
 
 	return append(so,
-		commonNameValidator(doc.InstanceID),
+		commonNameValidator(payload.Claims.Subject),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
-		newProvisionerExtensionOption(TypeAWS, p.Name, doc.AccountID),
+		newProvisionerExtensionOption(TypeAWS, p.Name, doc.AccountID, "InstanceID", doc.InstanceID),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	), nil
 }
@@ -388,17 +388,24 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 	// more than a few minutes.
 	now := time.Now().UTC()
 	if err = payload.ValidateWithLeeway(jose.Expected{
-		Issuer:  awsIssuer,
-		Subject: doc.InstanceID,
-		Time:    now,
+		Issuer: awsIssuer,
+		Time:   now,
 	}, time.Minute); err != nil {
 		return nil, errors.Wrapf(err, "invalid token")
 	}
 
 	// validate audiences with the defaults
 	if !matchesAudience(payload.Audience, p.audiences.Sign) {
-		fmt.Println(payload.Audience, "vs", p.audiences.Sign)
 		return nil, errors.New("invalid token: invalid audience claim (aud)")
+	}
+
+	// Validate subject, it has to be known if disableCustomSANs is enabled
+	if p.DisableCustomSANs {
+		if payload.Subject != doc.InstanceID &&
+			payload.Subject != doc.PrivateIP &&
+			payload.Subject != fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region) {
+			return nil, errors.New("invalid token: invalid subject claim (sub)")
+		}
 	}
 
 	// validate accounts

@@ -46,9 +46,9 @@ func TestAzure_GetTokenID(t *testing.T) {
 	p2.keyStore = p1.keyStore
 	p2.DisableTrustOnFirstUse = true
 
-	t1, err := p1.GetIdentityToken()
+	t1, err := p1.GetIdentityToken("subject", "caURL")
 	assert.FatalError(t, err)
-	t2, err := p2.GetIdentityToken()
+	t2, err := p2.GetIdentityToken("subject", "caURL")
 	assert.FatalError(t, err)
 
 	sum := sha256.Sum256([]byte("/subscriptions/subscriptionID/resourceGroups/resourceGroup/providers/Microsoft.Compute/virtualMachines/virtualMachine"))
@@ -105,23 +105,28 @@ func TestAzure_GetIdentityToken(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	type args struct {
+		subject string
+		caURL   string
+	}
 	tests := []struct {
 		name             string
 		azure            *Azure
+		args             args
 		identityTokenURL string
 		want             string
 		wantErr          bool
 	}{
-		{"ok", p1, srv.URL, t1, false},
-		{"fail request", p1, srv.URL + "/bad-request", "", true},
-		{"fail unmarshal", p1, srv.URL + "/bad-json", "", true},
-		{"fail url", p1, "://ca.smallstep.com", "", true},
-		{"fail connect", p1, "foobarzar", "", true},
+		{"ok", p1, args{"subject", "caURL"}, srv.URL, t1, false},
+		{"fail request", p1, args{"subject", "caURL"}, srv.URL + "/bad-request", "", true},
+		{"fail unmarshal", p1, args{"subject", "caURL"}, srv.URL + "/bad-json", "", true},
+		{"fail url", p1, args{"subject", "caURL"}, "://ca.smallstep.com", "", true},
+		{"fail connect", p1, args{"subject", "caURL"}, "foobarzar", "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.azure.config.identityTokenURL = tt.identityTokenURL
-			got, err := tt.azure.GetIdentityToken()
+			got, err := tt.azure.GetIdentityToken(tt.args.subject, tt.args.caURL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Azure.GetIdentityToken() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -231,13 +236,13 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	badKey, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 
-	t1, err := p1.GetIdentityToken()
+	t1, err := p1.GetIdentityToken("subject", "caURL")
 	assert.FatalError(t, err)
-	t2, err := p2.GetIdentityToken()
+	t2, err := p2.GetIdentityToken("subject", "caURL")
 	assert.FatalError(t, err)
-	t3, err := p3.GetIdentityToken()
+	t3, err := p3.GetIdentityToken("subject", "caURL")
 	assert.FatalError(t, err)
-	t4, err := p4.GetIdentityToken()
+	t4, err := p4.GetIdentityToken("subject", "caURL")
 	assert.FatalError(t, err)
 
 	t11, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
@@ -276,9 +281,9 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 		wantLen int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 4, false},
+		{"ok", p1, args{t1}, 3, false},
 		{"ok", p2, args{t2}, 5, false},
-		{"ok", p1, args{t11}, 4, false},
+		{"ok", p1, args{t11}, 3, false},
 		{"fail tenant", p3, args{t3}, 0, true},
 		{"fail resource group", p4, args{t4}, 0, true},
 		{"fail token", p1, args{"token"}, 0, true},
@@ -338,7 +343,7 @@ func TestAzure_AuthorizeRevoke(t *testing.T) {
 	assert.FatalError(t, err)
 	defer srv.Close()
 
-	token, err := az.GetIdentityToken()
+	token, err := az.GetIdentityToken("subject", "caURL")
 	assert.FatalError(t, err)
 
 	type args struct {

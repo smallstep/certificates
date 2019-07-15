@@ -104,6 +104,12 @@ func (t *TimeDuration) UnmarshalJSON(data []byte) error {
 
 // Time calculates the embedded time.Time, sets it if necessary, and returns it.
 func (t *TimeDuration) Time() time.Time {
+	return t.RelativeTime(now())
+}
+
+// RelativeTime returns the embedded time.Time or the base time plus the
+// duration if this is not zero.
+func (t *TimeDuration) RelativeTime(base time.Time) time.Time {
 	switch {
 	case t == nil:
 		return time.Time{}
@@ -111,8 +117,8 @@ func (t *TimeDuration) Time() time.Time {
 		if t.d == 0 {
 			return time.Time{}
 		}
-		t.t = now().Add(t.d)
-		return t.t
+		t.t = base.Add(t.d)
+		return t.t.UTC()
 	default:
 		return t.t.UTC()
 	}

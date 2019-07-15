@@ -55,7 +55,12 @@ func (v profileWithOption) Option(Options) x509util.WithOption {
 type profileDefaultDuration time.Duration
 
 func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
-	return x509util.WithNotBeforeAfterDuration(so.NotBefore.Time(), so.NotAfter.Time(), time.Duration(v))
+	notBefore := so.NotBefore.Time()
+	if notBefore.IsZero() {
+		notBefore = time.Now()
+	}
+	notAfter := so.NotAfter.RelativeTime(notBefore)
+	return x509util.WithNotBeforeAfterDuration(notBefore, notAfter, time.Duration(v))
 }
 
 // emailOnlyIdentity is a CertificateRequestValidator that checks that the only
@@ -95,6 +100,21 @@ func (v commonNameValidator) Valid(req *x509.CertificateRequest) error {
 		return errors.Errorf("certificate request does not contain the valid common name, got %s, want %s", req.Subject.CommonName, v)
 	}
 	return nil
+}
+
+// commonNameSliceValidator validates thats the common name of a certificate request is present in the slice.
+type commonNameSliceValidator []string
+
+func (v commonNameSliceValidator) Valid(req *x509.CertificateRequest) error {
+	if req.Subject.CommonName == "" {
+		return errors.New("certificate request cannot contain an empty common name")
+	}
+	for _, cn := range v {
+		if req.Subject.CommonName == cn {
+			return nil
+		}
+	}
+	return errors.Errorf("certificate request does not contain the valid common name, got %s, want %s", req.Subject.CommonName, v)
 }
 
 // dnsNamesValidator validates the DNS names SAN of a certificate request.
@@ -180,29 +200,32 @@ var (
 )
 
 type stepProvisionerASN1 struct {
-	Type         int
-	Name         []byte
-	CredentialID []byte
+	Type          int
+	Name          []byte
+	CredentialID  []byte
+	KeyValuePairs []string `asn1:"optional,omitempty"`
 }
 
 type provisionerExtensionOption struct {
-	Type         int
-	Name         string
-	CredentialID string
+	Type          int
+	Name          string
+	CredentialID  string
+	KeyValuePairs []string
 }
 
-func newProvisionerExtensionOption(typ Type, name, credentialID string) *provisionerExtensionOption {
+func newProvisionerExtensionOption(typ Type, name, credentialID string, keyValuePairs ...string) *provisionerExtensionOption {
 	return &provisionerExtensionOption{
-		Type:         int(typ),
-		Name:         name,
-		CredentialID: credentialID,
+		Type:          int(typ),
+		Name:          name,
+		CredentialID:  credentialID,
+		KeyValuePairs: keyValuePairs,
 	}
 }
 
 func (o *provisionerExtensionOption) Option(Options) x509util.WithOption {
 	return func(p x509util.Profile) error {
 		crt := p.Subject()
-		ext, err := createProvisionerExtension(o.Type, o.Name, o.CredentialID)
+		ext, err := createProvisionerExtension(o.Type, o.Name, o.CredentialID, o.KeyValuePairs...)
 		if err != nil {
 			return err
 		}
@@ -211,11 +234,12 @@ func (o *provisionerExtensionOption) Option(Options) x509util.WithOption {
 	}
 }
 
-func createProvisionerExtension(typ int, name, credentialID string) (pkix.Extension, error) {
+func createProvisionerExtension(typ int, name, credentialID string, keyValuePairs ...string) (pkix.Extension, error) {
 	b, err := asn1.Marshal(stepProvisionerASN1{
-		Type:         typ,
-		Name:         []byte(name),
-		CredentialID: []byte(credentialID),
+		Type:          typ,
+		Name:          []byte(name),
+		CredentialID:  []byte(credentialID),
+		KeyValuePairs: keyValuePairs,
 	})
 	if err != nil {
 		return pkix.Extension{}, errors.Wrapf(err, "error marshaling provisioner extension")

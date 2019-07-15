@@ -141,7 +141,7 @@ func (p *Azure) GetEncryptedKey() (kid string, key string, ok bool) {
 
 // GetIdentityToken retrieves from the metadata service the identity token and
 // returns it.
-func (p *Azure) GetIdentityToken() (string, error) {
+func (p *Azure) GetIdentityToken(subject, caURL string) (string, error) {
 	// Initialize the config if this method is used from the cli.
 	p.assertConfig()
 
@@ -264,17 +264,17 @@ func (p *Azure) AuthorizeSign(token string) ([]SignOption, error) {
 		}
 	}
 
-	// Enforce default DNS if configured.
-	// By default we'll accept the SANs in the CSR.
+	// Enforce known common name and default DNS if configured.
+	// By default we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
 	var so []SignOption
 	if p.DisableCustomSANs {
 		// name will work only inside the virtual network
+		so = append(so, commonNameValidator(name))
 		so = append(so, dnsNamesValidator([]string{name}))
 	}
 
 	return append(so,
-		commonNameValidator(name),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
