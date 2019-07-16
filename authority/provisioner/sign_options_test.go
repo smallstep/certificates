@@ -64,6 +64,30 @@ func Test_commonNameValidator_Valid(t *testing.T) {
 	}
 }
 
+func Test_commonNameSliceValidator_Valid(t *testing.T) {
+	type args struct {
+		req *x509.CertificateRequest
+	}
+	tests := []struct {
+		name    string
+		v       commonNameSliceValidator
+		args    args
+		wantErr bool
+	}{
+		{"ok", []string{"foo.bar.zar"}, args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: "foo.bar.zar"}}}, false},
+		{"ok", []string{"example.com", "foo.bar.zar"}, args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: "foo.bar.zar"}}}, false},
+		{"empty", []string{""}, args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: ""}}}, true},
+		{"wrong", []string{"foo.bar.zar"}, args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: "example.com"}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.v.Valid(tt.args.req); (err != nil) != tt.wantErr {
+				t.Errorf("commonNameSliceValidator.Valid() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func Test_dnsNamesValidator_Valid(t *testing.T) {
 	type args struct {
 		req *x509.CertificateRequest

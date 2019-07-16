@@ -48,14 +48,14 @@ func TestAWS_GetTokenID(t *testing.T) {
 	p2.config = p1.config
 	p2.DisableTrustOnFirstUse = true
 
-	t1, err := p1.GetIdentityToken("https://ca.smallstep.com")
+	t1, err := p1.GetIdentityToken("foo.local", "https://ca.smallstep.com")
 	assert.FatalError(t, err)
 	_, claims, err := parseAWSToken(t1)
 	assert.FatalError(t, err)
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s.%s", p1.GetID(), claims.document.InstanceID)))
 	w1 := strings.ToLower(hex.EncodeToString(sum[:]))
 
-	t2, err := p2.GetIdentityToken("https://ca.smallstep.com")
+	t2, err := p2.GetIdentityToken("foo.local", "https://ca.smallstep.com")
 	assert.FatalError(t, err)
 	sum = sha256.Sum256([]byte(t2))
 	w2 := strings.ToLower(hex.EncodeToString(sum[:]))
@@ -111,12 +111,31 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 	p4.config.signatureURL = srv.URL + "/bad-signature"
 	p4.config.identityURL = p1.config.identityURL
 
+	p5, err := generateAWS()
+	assert.FatalError(t, err)
+	p5.Accounts = p1.Accounts
+	p5.config.identityURL = "https://1234.1234.1234.1234"
+	p5.config.signatureURL = p1.config.signatureURL
+
+	p6, err := generateAWS()
+	assert.FatalError(t, err)
+	p6.Accounts = p1.Accounts
+	p6.config.identityURL = p1.config.identityURL
+	p6.config.signatureURL = "https://1234.1234.1234.1234"
+
+	p7, err := generateAWS()
+	assert.FatalError(t, err)
+	p7.Accounts = p1.Accounts
+	p7.config.identityURL = srv.URL + "/bad-json"
+	p7.config.signatureURL = p1.config.signatureURL
+
 	caURL := "https://ca.smallstep.com"
 	u, err := url.Parse(caURL)
 	assert.FatalError(t, err)
 
 	type args struct {
-		caURL string
+		subject string
+		caURL   string
 	}
 	tests := []struct {
 		name    string
@@ -124,15 +143,18 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", p1, args{caURL}, false},
-		{"fail ca url", p1, args{"://ca.smallstep.com"}, true},
-		{"fail identityURL", p2, args{caURL}, true},
-		{"fail signatureURL", p3, args{caURL}, true},
-		{"fail signature", p4, args{caURL}, true},
+		{"ok", p1, args{"foo.local", caURL}, false},
+		{"fail ca url", p1, args{"foo.local", "://ca.smallstep.com"}, true},
+		{"fail identityURL", p2, args{"foo.local", caURL}, true},
+		{"fail signatureURL", p3, args{"foo.local", caURL}, true},
+		{"fail signature", p4, args{"foo.local", caURL}, true},
+		{"fail read identityURL", p5, args{"foo.local", caURL}, true},
+		{"fail read signatureURL", p6, args{"foo.local", caURL}, true},
+		{"fail unmarshal identityURL", p7, args{"foo.local", caURL}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.aws.GetIdentityToken(tt.args.caURL)
+			got, err := tt.aws.GetIdentityToken(tt.args.subject, tt.args.caURL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AWS.GetIdentityToken() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -141,7 +163,7 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 				_, c, err := parseAWSToken(got)
 				if assert.NoError(t, err) {
 					assert.Equals(t, awsIssuer, c.Issuer)
-					assert.Equals(t, c.document.InstanceID, c.Subject)
+					assert.Equals(t, tt.args.subject, c.Subject)
 					assert.Equals(t, jose.Audience{u.ResolveReference(&url.URL{Path: "/1.0/sign", Fragment: tt.aws.GetID()}).String()}, c.Audience)
 					assert.Equals(t, tt.aws.Accounts[0], c.document.AccountID)
 					err = tt.aws.config.certificate.CheckSignature(
@@ -221,11 +243,18 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 	assert.FatalError(t, err)
 	p3.config = p1.config
 
-	t1, err := p1.GetIdentityToken("https://ca.smallstep.com")
+	t1, err := p1.GetIdentityToken("foo.local", "https://ca.smallstep.com")
 	assert.FatalError(t, err)
-	t2, err := p2.GetIdentityToken("https://ca.smallstep.com")
+	t2, err := p2.GetIdentityToken("instance-id", "https://ca.smallstep.com")
 	assert.FatalError(t, err)
-	t3, err := p3.GetIdentityToken("https://ca.smallstep.com")
+	assert.FatalError(t, err)
+	t3, err := p3.GetIdentityToken("foo.local", "https://ca.smallstep.com")
+	assert.FatalError(t, err)
+
+	// Alternative common names with DisableCustomSANs = true
+	t2PrivateIP, err := p2.GetIdentityToken("127.0.0.1", "https://ca.smallstep.com")
+	assert.FatalError(t, err)
+	t2Hostname, err := p2.GetIdentityToken("ip-127-0-0-1.us-west-1.compute.internal", "https://ca.smallstep.com")
 	assert.FatalError(t, err)
 
 	block, _ := pem.Decode([]byte(awsTestKey))
@@ -243,7 +272,7 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 		"127.0.0.1", "us-west-1", time.Now(), key)
 	assert.FatalError(t, err)
 	failSubject, err := generateAWSToken(
-		"bad-subject", awsIssuer, p1.GetID(), p1.Accounts[0], "instance-id",
+		"bad-subject", awsIssuer, p2.GetID(), p2.Accounts[0], "instance-id",
 		"127.0.0.1", "us-west-1", time.Now(), key)
 	assert.FatalError(t, err)
 	failIssuer, err := generateAWSToken(
@@ -299,6 +328,8 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 	}{
 		{"ok", p1, args{t1}, 4, false},
 		{"ok", p2, args{t2}, 6, false},
+		{"ok", p2, args{t2Hostname}, 6, false},
+		{"ok", p2, args{t2PrivateIP}, 6, false},
 		{"ok", p1, args{t4}, 4, false},
 		{"fail account", p3, args{t3}, 0, true},
 		{"fail token", p1, args{"token"}, 0, true},
@@ -364,7 +395,7 @@ func TestAWS_AuthorizeRevoke(t *testing.T) {
 	assert.FatalError(t, err)
 	defer srv.Close()
 
-	t1, err := p1.GetIdentityToken("https://ca.smallstep.com")
+	t1, err := p1.GetIdentityToken("foo.local", "https://ca.smallstep.com")
 	assert.FatalError(t, err)
 
 	type args struct {

@@ -117,7 +117,8 @@ func TestGCP_GetIdentityToken(t *testing.T) {
 	defer srv.Close()
 
 	type args struct {
-		caURL string
+		subject string
+		caURL   string
 	}
 	tests := []struct {
 		name        string
@@ -127,16 +128,16 @@ func TestGCP_GetIdentityToken(t *testing.T) {
 		want        string
 		wantErr     bool
 	}{
-		{"ok", p1, args{"https://ca"}, srv.URL, t1, false},
-		{"fail ca url", p1, args{"://ca"}, srv.URL, "", true},
-		{"fail request", p1, args{"https://ca"}, srv.URL + "/bad-request", "", true},
-		{"fail url", p1, args{"https://ca"}, "://ca.smallstep.com", "", true},
-		{"fail connect", p1, args{"https://ca"}, "foobarzar", "", true},
+		{"ok", p1, args{"subject", "https://ca"}, srv.URL, t1, false},
+		{"fail ca url", p1, args{"subject", "://ca"}, srv.URL, "", true},
+		{"fail request", p1, args{"subject", "https://ca"}, srv.URL + "/bad-request", "", true},
+		{"fail url", p1, args{"subject", "https://ca"}, "://ca.smallstep.com", "", true},
+		{"fail connect", p1, args{"subject", "https://ca"}, "foobarzar", "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.gcp.config.IdentityURL = tt.identityURL
-			got, err := tt.gcp.GetIdentityToken(tt.args.caURL)
+			got, err := tt.gcp.GetIdentityToken(tt.args.subject, tt.args.caURL)
 			t.Log(err)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GCP.GetIdentityToken() error = %v, wantErr %v", err, tt.wantErr)
@@ -310,9 +311,9 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		wantLen int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 4, false},
+		{"ok", p1, args{t1}, 3, false},
 		{"ok", p2, args{t2}, 5, false},
-		{"ok", p3, args{t3}, 4, false},
+		{"ok", p3, args{t3}, 3, false},
 		{"fail token", p1, args{"token"}, 0, true},
 		{"fail key", p1, args{failKey}, 0, true},
 		{"fail iss", p1, args{failIss}, 0, true},

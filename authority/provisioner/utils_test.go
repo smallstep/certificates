@@ -283,20 +283,12 @@ func generateAWSWithServer() (*AWS, *httptest.Server, error) {
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error parsing AWS private key")
 	}
-	instanceID, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, nil, err
-	}
-	imageID, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, nil, err
-	}
 	doc, err := json.MarshalIndent(awsInstanceIdentityDocument{
 		AccountID:        aws.Accounts[0],
 		Architecture:     "x86_64",
 		AvailabilityZone: "us-west-2b",
-		ImageID:          imageID,
-		InstanceID:       instanceID,
+		ImageID:          "image-id",
+		InstanceID:       "instance-id",
 		InstanceType:     "t2.micro",
 		PendingTime:      time.Now(),
 		PrivateIP:        "127.0.0.1",
@@ -322,6 +314,8 @@ func generateAWSWithServer() (*AWS, *httptest.Server, error) {
 			w.Write([]byte("{}"))
 		case "/bad-signature":
 			w.Write([]byte("YmFkLXNpZ25hdHVyZQo="))
+		case "/bad-json":
+			w.Write([]byte("{"))
 		default:
 			http.NotFound(w, r)
 		}

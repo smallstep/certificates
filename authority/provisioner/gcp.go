@@ -150,7 +150,7 @@ func (p *GCP) GetIdentityURL(audience string) string {
 }
 
 // GetIdentityToken does an HTTP request to the identity url.
-func (p *GCP) GetIdentityToken(caURL string) (string, error) {
+func (p *GCP) GetIdentityToken(subject, caURL string) (string, error) {
 	audience, err := generateSignAudience(caURL, p.GetID())
 	if err != nil {
 		return "", err
@@ -212,21 +212,24 @@ func (p *GCP) AuthorizeSign(token string) ([]SignOption, error) {
 	}
 	ce := claims.Google.ComputeEngine
 
-	// Enforce default DNS if configured.
-	// By default we we'll accept the SANs in the CSR.
+	// Enforce known common name and default DNS if configured.
+	// By default we we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
 	var so []SignOption
 	if p.DisableCustomSANs {
+		dnsName1 := fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID)
+		dnsName2 := fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID)
+		so = append(so, commonNameSliceValidator([]string{
+			ce.InstanceName, ce.InstanceID, dnsName1, dnsName2,
+		}))
 		so = append(so, dnsNamesValidator([]string{
-			fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
-			fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
+			dnsName1, dnsName2,
 		}))
 	}
 
 	return append(so,
-		commonNameValidator(ce.InstanceName),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
-		newProvisionerExtensionOption(TypeGCP, p.Name, claims.Subject),
+		newProvisionerExtensionOption(TypeGCP, p.Name, claims.Subject, "InstanceID", ce.InstanceID, "InstanceName", ce.InstanceName),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	), nil
 }
