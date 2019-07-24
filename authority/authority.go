@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -20,6 +21,8 @@ type Authority struct {
 	config               *Config
 	rootX509Certs        []*x509.Certificate
 	intermediateIdentity *x509util.Identity
+	sshCAUserCertSignKey crypto.Signer
+	sshCAHostCertSignKey crypto.Signer
 	validateOnce         bool
 	certificates         *sync.Map
 	startTime            time.Time
@@ -116,6 +119,9 @@ func (a *Authority) init() error {
 			return err
 		}
 	}
+
+	a.sshCAHostCertSignKey = a.intermediateIdentity.Key.(crypto.Signer)
+	a.sshCAUserCertSignKey = a.intermediateIdentity.Key.(crypto.Signer)
 
 	// Store all the provisioners
 	for _, p := range a.config.AuthorityConfig.Provisioners {

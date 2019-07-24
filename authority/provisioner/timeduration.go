@@ -57,6 +57,17 @@ func (t *TimeDuration) SetTime(tt time.Time) {
 	t.t, t.d = tt, 0
 }
 
+// IsZero returns true the TimeDuration represents the zero value, false
+// otherwise.
+func (t *TimeDuration) IsZero() bool {
+	return t.t.IsZero() && t.d == 0
+}
+
+// Equal returns if t and other are equal.
+func (t *TimeDuration) Equal(other *TimeDuration) bool {
+	return t.t.Equal(other.t) && t.d == other.d
+}
+
 // MarshalJSON implements the json.Marshaler interface. If the time is set it
 // will return the time in RFC 3339 format if not it will return the duration
 // string.

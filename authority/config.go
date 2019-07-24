@@ -29,10 +29,16 @@ var (
 	}
 	defaultDisableRenewal   = false
 	globalProvisionerClaims = provisioner.Claims{
-		MinTLSDur:      &provisioner.Duration{Duration: 5 * time.Minute},
-		MaxTLSDur:      &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultTLSDur:  &provisioner.Duration{Duration: 24 * time.Hour},
-		DisableRenewal: &defaultDisableRenewal,
+		MinTLSDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
+		MaxTLSDur:         &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:     &provisioner.Duration{Duration: 24 * time.Hour},
+		DisableRenewal:    &defaultDisableRenewal,
+		MinUserSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:     &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur: &provisioner.Duration{Duration: 4 * time.Hour},
+		MinHostSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:     &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur: &provisioner.Duration{Duration: 30 * 24 * time.Hour},
 	}
 )
 

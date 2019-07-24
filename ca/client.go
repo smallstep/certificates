@@ -373,6 +373,28 @@ func (c *Client) Sign(req *api.SignRequest) (*api.SignResponse, error) {
 	return &sign, nil
 }
 
+// SignSSH performs the SSH certificate sign request to the CA and returns the
+// api.SignSSHResponse struct.
+func (c *Client) SignSSH(req *api.SignSSHRequest) (*api.SignSSHResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/sign-ssh"})
+	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var sign api.SignSSHResponse
+	if err := readJSON(resp.Body, &sign); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &sign, nil
+}
+
 // Renew performs the renew request to the CA and returns the api.SignResponse
 // struct.
 func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
