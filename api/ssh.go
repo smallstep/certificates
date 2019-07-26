@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -83,24 +82,6 @@ func (s *SignSSHRequest) Validate() error {
 	}
 }
 
-// ParsePublicKey returns the ssh.PublicKey from the request.
-func (s *SignSSHRequest) ParsePublicKey() (ssh.PublicKey, error) {
-	// Validate pub key.
-	data := make([]byte, base64.StdEncoding.DecodedLen(len(s.PublicKey)))
-	if _, err := base64.StdEncoding.Decode(data, s.PublicKey); err != nil {
-		return nil, errors.Wrap(err, "error decoding publicKey")
-	}
-
-	// Trim padding from end of key.
-	data = bytes.TrimRight(data, "\x00")
-	publicKey, err := ssh.ParsePublicKey(data)
-	if err != nil {
-		return nil, errors.Wrap(err, "error parsing publicKey")
-	}
-
-	return publicKey, nil
-}
-
 // SignSSH is an HTTP handler that reads an SignSSHRequest with a one-time-token
 // (ott) from the body and creates a new SSH certificate with the information in
 // the request.
@@ -117,9 +98,9 @@ func (h *caHandler) SignSSH(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	publicKey, err := body.ParsePublicKey()
+	publicKey, err := ssh.ParsePublicKey(body.PublicKey)
 	if err != nil {
-		WriteError(w, BadRequest(err))
+		WriteError(w, BadRequest(errors.Wrap(err, "error parsing publicKey")))
 		return
 	}
 
