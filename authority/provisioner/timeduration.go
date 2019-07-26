@@ -75,7 +75,7 @@ func (t TimeDuration) MarshalJSON() ([]byte, error) {
 	switch {
 	case t.t.IsZero():
 		if t.d == 0 {
-			return []byte("null"), nil
+			return []byte(`""`), nil
 		}
 		return json.Marshal(t.d.String())
 	default:
