@@ -193,7 +193,7 @@ func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
 
 	diff := time.Duration(cert.ValidBefore-cert.ValidAfter) * time.Second
 	switch {
-	case diff < max:
+	case diff < min:
 		return errors.Errorf("ssh certificate duration cannot be lower than %s", min)
 	case diff > max:
 		return errors.Errorf("ssh certificate duration cannot be greater than %s", max)
