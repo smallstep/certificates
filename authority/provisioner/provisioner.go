@@ -11,8 +11,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-var sshUserRegex = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
-
 // Interface is the interface that all provisioner types must implement.
 type Interface interface {
 	GetID() string
@@ -163,4 +161,30 @@ func (l *List) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+var sshUserRegex = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
+
+// SanitizeSSHPrincipal grabs an email or a string with the format local@domain
+// and returns a sanitized version of the local, valid to be used as a user
+// name. If the email starts with a letter between a and z, the resulting string
+// will match the regular expression `^[a-z][-a-z0-9_]*$`.
+func SanitizeSSHPrincipal(email string) string {
+	if i := strings.LastIndex(email, "@"); i >= 0 {
+		email = email[:i]
+	}
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == '-':
+			return '-'
+		case r == '.': // drop dots
+			return -1
+		default:
+			return '_'
+		}
+	}, strings.ToLower(email))
 }

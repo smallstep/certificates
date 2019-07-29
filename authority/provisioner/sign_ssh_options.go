@@ -211,6 +211,9 @@ type sshCertificateOptionsValidator struct {
 // Valid implements SSHCertificateOptionsValidator and returns nil if both
 // SSHOptions match.
 func (v *sshCertificateOptionsValidator) Valid(got SSHOptions) error {
+	if v.Want == nil {
+		return nil
+	}
 	return v.Want.match(got)
 }
 

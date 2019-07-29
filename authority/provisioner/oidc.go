@@ -309,7 +309,7 @@ func (o *OIDC) authorizeSSHSign(claims *openIDPayload) ([]SignOption, error) {
 	if o.IsAdmin(claims.Email) {
 		signOptions = append(signOptions, &sshCertificateOptionsValidator{})
 	} else {
-		name := principalFromEmail(claims.Email)
+		name := SanitizeSSHPrincipal(claims.Email)
 		if !sshUserRegex.MatchString(name) {
 			return nil, errors.Errorf("invalid principal '%s' from email address '%s'", name, claims.Email)
 		}
@@ -337,22 +337,4 @@ func getAndDecode(uri string, v interface{}) error {
 		return errors.Wrapf(err, "error reading %s", uri)
 	}
 	return nil
-}
-
-func principalFromEmail(email string) string {
-	if i := strings.LastIndex(email, "@"); i >= 0 {
-		email = email[:i]
-	}
-	return strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z':
-			return r
-		case r >= '0' && r <= '9':
-			return r
-		case r == '.': // drop dots
-			return -1
-		default:
-			return '_'
-		}
-	}, strings.ToLower(email))
 }
