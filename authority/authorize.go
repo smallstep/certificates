@@ -86,7 +86,7 @@ func (a *Authority) Authorize(ctx context.Context, ott string) ([]provisioner.Si
 
 		// Call the provisioner AuthorizeSign method to apply provisioner specific
 		// auth claims and get the signing options.
-		opts, err := p.AuthorizeSign(context.Background(), ott)
+		opts, err := p.AuthorizeSign(ctx, ott)
 		if err != nil {
 			return nil, &apiError{errors.Wrap(err, "authorizeSign"), http.StatusUnauthorized, errContext}
 		}
