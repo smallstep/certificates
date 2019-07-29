@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/x509"
@@ -102,7 +103,8 @@ func TestSign(t *testing.T) {
 	assert.FatalError(t, err)
 	token, err := generateToken("smallstep test", "step-cli", "https://test.ca.smallstep.com/sign", []string{"test.smallstep.com"}, time.Now(), key)
 	assert.FatalError(t, err)
-	extraOpts, err := a.Authorize(token)
+	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod)
+	extraOpts, err := a.Authorize(ctx, token)
 	assert.FatalError(t, err)
 
 	type signTest struct {
@@ -123,7 +125,7 @@ func TestSign(t *testing.T) {
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: invalid certificate request"),
 					http.StatusBadRequest,
-					context{"csr": csr, "signOptions": signOpts},
+					apiCtx{"csr": csr, "signOptions": signOpts},
 				},
 			}
 		},
@@ -137,7 +139,7 @@ func TestSign(t *testing.T) {
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: invalid extra option type string"),
 					http.StatusInternalServerError,
-					context{"csr": csr, "signOptions": signOpts},
+					apiCtx{"csr": csr, "signOptions": signOpts},
 				},
 			}
 		},
@@ -152,7 +154,7 @@ func TestSign(t *testing.T) {
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: default ASN1DN template cannot be nil"),
 					http.StatusInternalServerError,
-					context{"csr": csr, "signOptions": signOpts},
+					apiCtx{"csr": csr, "signOptions": signOpts},
 				},
 			}
 		},
@@ -167,7 +169,7 @@ func TestSign(t *testing.T) {
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: error creating new leaf certificate"),
 					http.StatusInternalServerError,
-					context{"csr": csr, "signOptions": signOpts},
+					apiCtx{"csr": csr, "signOptions": signOpts},
 				},
 			}
 		},
@@ -184,7 +186,7 @@ func TestSign(t *testing.T) {
 				signOpts:  _signOpts,
 				err: &apiError{errors.New("sign: requested duration of 25h0m0s is more than the authorized maximum certificate duration of 24h0m0s"),
 					http.StatusUnauthorized,
-					context{"csr": csr, "signOptions": _signOpts},
+					apiCtx{"csr": csr, "signOptions": _signOpts},
 				},
 			}
 		},
@@ -199,7 +201,7 @@ func TestSign(t *testing.T) {
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: certificate request does not contain the valid DNS names - got [test.smallstep.com smallstep test], want [test.smallstep.com]"),
 					http.StatusUnauthorized,
-					context{"csr": csr, "signOptions": signOpts},
+					apiCtx{"csr": csr, "signOptions": signOpts},
 				},
 			}
 		},
@@ -210,7 +212,7 @@ func TestSign(t *testing.T) {
 				storeCertificate: func(crt *x509.Certificate) error {
 					return &apiError{errors.New("force"),
 						http.StatusInternalServerError,
-						context{"csr": csr, "signOptions": signOpts}}
+						apiCtx{"csr": csr, "signOptions": signOpts}}
 				},
 			}
 			return &signTest{
@@ -220,7 +222,7 @@ func TestSign(t *testing.T) {
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: error storing certificate in db: force"),
 					http.StatusInternalServerError,
-					context{"csr": csr, "signOptions": signOpts},
+					apiCtx{"csr": csr, "signOptions": signOpts},
 				},
 			}
 		},
@@ -373,7 +375,7 @@ func TestRenew(t *testing.T) {
 				auth: _a,
 				crt:  crt,
 				err: &apiError{errors.New("error renewing certificate from existing server certificate"),
-					http.StatusInternalServerError, context{}},
+					http.StatusInternalServerError, apiCtx{}},
 			}, nil
 		},
 		"fail-unauthorized": func() (*renewTest, error) {
@@ -568,7 +570,7 @@ func TestRevoke(t *testing.T) {
 	validAudience := []string{"https://test.ca.smallstep.com/revoke"}
 	now := time.Now().UTC()
 	getCtx := func() map[string]interface{} {
-		return context{
+		return apiCtx{
 			"serialNumber": "sn",
 			"reasonCode":   reasonCode,
 			"reason":       reason,

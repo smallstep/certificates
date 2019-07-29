@@ -1,10 +1,13 @@
 package authority
 
 import (
+	"context"
 	"crypto/x509"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/smallstep/certificates/authority/provisioner"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
@@ -73,7 +76,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				auth: a,
 				ott:  "foo",
 				err: &apiError{errors.New("authorizeToken: error parsing token"),
-					http.StatusUnauthorized, context{"ott": "foo"}},
+					http.StatusUnauthorized, apiCtx{"ott": "foo"}},
 			}
 		},
 		"fail/prehistoric-token": func(t *testing.T) *authorizeTest {
@@ -92,7 +95,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				auth: a,
 				ott:  raw,
 				err: &apiError{errors.New("authorizeToken: token issued before the bootstrap of certificate authority"),
-					http.StatusUnauthorized, context{"ott": raw}},
+					http.StatusUnauthorized, apiCtx{"ott": raw}},
 			}
 		},
 		"fail/provisioner-not-found": func(t *testing.T) *authorizeTest {
@@ -114,7 +117,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				auth: a,
 				ott:  raw,
 				err: &apiError{errors.New("authorizeToken: provisioner not found or invalid audience (https://test.ca.smallstep.com/revoke)"),
-					http.StatusUnauthorized, context{"ott": raw}},
+					http.StatusUnauthorized, apiCtx{"ott": raw}},
 			}
 		},
 		"ok/simpledb": func(t *testing.T) *authorizeTest {
@@ -151,7 +154,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				auth: _a,
 				ott:  raw,
 				err: &apiError{errors.New("authorizeToken: token already used"),
-					http.StatusUnauthorized, context{"ott": raw}},
+					http.StatusUnauthorized, apiCtx{"ott": raw}},
 			}
 		},
 		"ok/mockNoSQLDB": func(t *testing.T) *authorizeTest {
@@ -199,7 +202,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				auth: _a,
 				ott:  raw,
 				err: &apiError{errors.New("authorizeToken: failed when checking if token already used: force"),
-					http.StatusInternalServerError, context{"ott": raw}},
+					http.StatusInternalServerError, apiCtx{"ott": raw}},
 			}
 		},
 		"fail/mockNoSQLDB/token-already-used": func(t *testing.T) *authorizeTest {
@@ -224,7 +227,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				auth: _a,
 				ott:  raw,
 				err: &apiError{errors.New("authorizeToken: token already used"),
-					http.StatusUnauthorized, context{"ott": raw}},
+					http.StatusUnauthorized, apiCtx{"ott": raw}},
 			}
 		},
 	}
@@ -391,7 +394,7 @@ func TestAuthority_AuthorizeSign(t *testing.T) {
 				auth: a,
 				ott:  "foo",
 				err: &apiError{errors.New("authorizeSign: authorizeToken: error parsing token"),
-					http.StatusUnauthorized, context{"ott": "foo"}},
+					http.StatusUnauthorized, apiCtx{"ott": "foo"}},
 			}
 		},
 		"fail/invalid-subject": func(t *testing.T) *authorizeTest {
@@ -409,7 +412,7 @@ func TestAuthority_AuthorizeSign(t *testing.T) {
 				auth: a,
 				ott:  raw,
 				err: &apiError{errors.New("authorizeSign: token subject cannot be empty"),
-					http.StatusUnauthorized, context{"ott": raw}},
+					http.StatusUnauthorized, apiCtx{"ott": raw}},
 			}
 		},
 		"ok": func(t *testing.T) *authorizeTest {
@@ -484,7 +487,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth: a,
 				ott:  "foo",
 				err: &apiError{errors.New("authorizeSign: authorizeToken: error parsing token"),
-					http.StatusUnauthorized, context{"ott": "foo"}},
+					http.StatusUnauthorized, apiCtx{"ott": "foo"}},
 			}
 		},
 		"fail/invalid-subject": func(t *testing.T) *authorizeTest {
@@ -502,7 +505,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth: a,
 				ott:  raw,
 				err: &apiError{errors.New("authorizeSign: token subject cannot be empty"),
-					http.StatusUnauthorized, context{"ott": raw}},
+					http.StatusUnauthorized, apiCtx{"ott": raw}},
 			}
 		},
 		"ok": func(t *testing.T) *authorizeTest {
@@ -526,8 +529,8 @@ func TestAuthority_Authorize(t *testing.T) {
 	for name, genTestCase := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
-
-			got, err := tc.auth.Authorize(tc.ott)
+			ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod)
+			got, err := tc.auth.Authorize(ctx, tc.ott)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.Nil(t, got)
@@ -577,7 +580,7 @@ func TestAuthority_authorizeRenewal(t *testing.T) {
 				auth: a,
 				crt:  fooCrt,
 				err: &apiError{errors.New("renew: force"),
-					http.StatusInternalServerError, context{"serialNumber": "102012593071130646873265215610956555026"}},
+					http.StatusInternalServerError, apiCtx{"serialNumber": "102012593071130646873265215610956555026"}},
 			}
 		},
 		"fail/revoked": func(t *testing.T) *authorizeTest {
@@ -591,7 +594,7 @@ func TestAuthority_authorizeRenewal(t *testing.T) {
 				auth: a,
 				crt:  fooCrt,
 				err: &apiError{errors.New("renew: certificate has been revoked"),
-					http.StatusUnauthorized, context{"serialNumber": "102012593071130646873265215610956555026"}},
+					http.StatusUnauthorized, apiCtx{"serialNumber": "102012593071130646873265215610956555026"}},
 			}
 		},
 		"fail/load-provisioner": func(t *testing.T) *authorizeTest {
@@ -605,7 +608,7 @@ func TestAuthority_authorizeRenewal(t *testing.T) {
 				auth: a,
 				crt:  otherCrt,
 				err: &apiError{errors.New("renew: provisioner not found"),
-					http.StatusUnauthorized, context{"serialNumber": "41633491264736369593451462439668497527"}},
+					http.StatusUnauthorized, apiCtx{"serialNumber": "41633491264736369593451462439668497527"}},
 			}
 		},
 		"fail/provisioner-authorize-renewal-fail": func(t *testing.T) *authorizeTest {
@@ -620,7 +623,7 @@ func TestAuthority_authorizeRenewal(t *testing.T) {
 				auth: a,
 				crt:  renewDisabledCrt,
 				err: &apiError{errors.New("renew: renew is disabled for provisioner renew_disabled:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
-					http.StatusUnauthorized, context{"serialNumber": "119772236532068856521070735128919532568"}},
+					http.StatusUnauthorized, apiCtx{"serialNumber": "119772236532068856521070735128919532568"}},
 			}
 		},
 		"ok": func(t *testing.T) *authorizeTest {
