@@ -165,11 +165,11 @@ func (l *List) UnmarshalJSON(data []byte) error {
 
 var sshUserRegex = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
 
-// SanitizeSSHPrincipal grabs an email or a string with the format local@domain
-// and returns a sanitized version of the local, valid to be used as a user
-// name. If the email starts with a letter between a and z, the resulting string
-// will match the regular expression `^[a-z][-a-z0-9_]*$`.
-func SanitizeSSHPrincipal(email string) string {
+// SanitizeSSHUserPrincipal grabs an email or a string with the format
+// local@domain and returns a sanitized version of the local, valid to be used
+// as a user name. If the email starts with a letter between a and z, the
+// resulting string will match the regular expression `^[a-z][-a-z0-9_]*$`.
+func SanitizeSSHUserPrincipal(email string) string {
 	if i := strings.LastIndex(email, "@"); i >= 0 {
 		email = email[:i]
 	}

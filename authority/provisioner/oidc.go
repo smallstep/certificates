@@ -307,7 +307,7 @@ func (o *OIDC) authorizeSSHSign(claims *openIDPayload) ([]SignOption, error) {
 	if o.IsAdmin(claims.Email) {
 		signOptions = append(signOptions, &sshCertificateOptionsValidator{})
 	} else {
-		name := SanitizeSSHPrincipal(claims.Email)
+		name := SanitizeSSHUserPrincipal(claims.Email)
 		if !sshUserRegex.MatchString(name) {
 			return nil, errors.Errorf("invalid principal '%s' from email address '%s'", name, claims.Email)
 		}
