@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -111,7 +112,8 @@ func (h *caHandler) SignSSH(w http.ResponseWriter, r *http.Request) {
 		ValidAfter:  body.ValidAfter,
 	}
 
-	signOpts, err := h.Authority.AuthorizeSign(body.OTT)
+	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignSSHMethod)
+	signOpts, err := h.Authority.Authorize(ctx, body.OTT)
 	if err != nil {
 		WriteError(w, Unauthorized(err))
 		return

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/rsa"
@@ -29,7 +30,7 @@ type Authority interface {
 	SSHAuthority
 	// NOTE: Authorize will be deprecated in future releases. Please use the
 	// context specific Authoirize[Sign|Revoke|etc.] methods.
-	Authorize(ott string) ([]provisioner.SignOption, error)
+	Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	AuthorizeSign(ott string) ([]provisioner.SignOption, error)
 	GetTLSOptions() *tlsutil.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)

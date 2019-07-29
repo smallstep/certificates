@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -418,7 +420,7 @@ type mockProvisioner struct {
 	getEncryptedKey  func() (string, string, bool)
 	init             func(provisioner.Config) error
 	authorizeRevoke  func(ott string) error
-	authorizeSign    func(ott string) ([]provisioner.SignOption, error)
+	authorizeSign    func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	authorizeRenewal func(*x509.Certificate) error
 }
 
@@ -474,9 +476,9 @@ func (m *mockProvisioner) AuthorizeRevoke(ott string) error {
 	return m.err
 }
 
-func (m *mockProvisioner) AuthorizeSign(ott string) ([]provisioner.SignOption, error) {
+func (m *mockProvisioner) AuthorizeSign(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 	if m.authorizeSign != nil {
-		return m.authorizeSign(ott)
+		return m.authorizeSign(ctx, ott)
 	}
 	return m.ret1.([]provisioner.SignOption), m.err
 }
@@ -495,6 +497,7 @@ type mockAuthority struct {
 	getTLSOptions                func() *tlsutil.TLSOptions
 	root                         func(shasum string) (*x509.Certificate, error)
 	sign                         func(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
+	singSSH                      func(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	renew                        func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
 	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
 	getProvisioners              func(nextCursor string, limit int) (provisioner.List, string, error)
@@ -505,7 +508,7 @@ type mockAuthority struct {
 }
 
 // TODO: remove once Authorize is deprecated.
-func (m *mockAuthority) Authorize(ott string) ([]provisioner.SignOption, error) {
+func (m *mockAuthority) Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 	return m.AuthorizeSign(ott)
 }
 
@@ -535,6 +538,13 @@ func (m *mockAuthority) Sign(cr *x509.CertificateRequest, opts provisioner.Optio
 		return m.sign(cr, opts, signOpts...)
 	}
 	return m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate), m.err
+}
+
+func (m *mockAuthority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+	if m.singSSH != nil {
+		return m.singSSH(key, opts, signOpts...)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
 }
 
 func (m *mockAuthority) Renew(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error) {
