@@ -82,7 +82,7 @@ func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
 // AuthorizeSign authorizes a signature request by validating and authenticating
 // a OTT that must be sent w/ the request.
 func (a *Authority) AuthorizeSign(ott string) ([]provisioner.SignOption, error) {
-	var errContext = context{"ott": ott}
+	var errContext = apiCtx{"ott": ott}
 
 	p, err := a.authorizeToken(ott)
 	if err != nil {

@@ -13,7 +13,7 @@ func (a *Authority) GetEncryptedKey(kid string) (string, error) {
 	key, ok := a.provisioners.LoadEncryptedKey(kid)
 	if !ok {
 		return "", &apiError{errors.Errorf("encrypted key with kid %s was not found", kid),
-			http.StatusNotFound, context{}}
+			http.StatusNotFound, apiCtx{}}
 	}
 	return key, nil
 }
@@ -31,7 +31,7 @@ func (a *Authority) LoadProvisionerByCertificate(crt *x509.Certificate) (provisi
 	p, ok := a.provisioners.LoadByCertificate(crt)
 	if !ok {
 		return nil, &apiError{errors.Errorf("provisioner not found"),
-			http.StatusNotFound, context{}}
+			http.StatusNotFound, apiCtx{}}
 	}
 	return p, nil
 }

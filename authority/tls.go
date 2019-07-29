@@ -58,7 +58,7 @@ func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 // Sign creates a signed certificate from a certificate signing request.
 func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
 	var (
-		errContext     = context{"csr": csr, "signOptions": signOpts}
+		errContext     = apiCtx{"csr": csr, "signOptions": signOpts}
 		mods           = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
 		certValidators = []provisioner.CertificateValidator{}
 		issIdentity    = a.intermediateIdentity
@@ -181,23 +181,23 @@ func (a *Authority) Renew(oldCert *x509.Certificate) (*x509.Certificate, *x509.C
 	leaf, err := x509util.NewLeafProfileWithTemplate(newCert,
 		issIdentity.Crt, issIdentity.Key)
 	if err != nil {
-		return nil, nil, &apiError{err, http.StatusInternalServerError, context{}}
+		return nil, nil, &apiError{err, http.StatusInternalServerError, apiCtx{}}
 	}
 	crtBytes, err := leaf.CreateCertificate()
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "error renewing certificate from existing server certificate"),
-			http.StatusInternalServerError, context{}}
+			http.StatusInternalServerError, apiCtx{}}
 	}
 
 	serverCert, err := x509.ParseCertificate(crtBytes)
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "error parsing new server certificate"),
-			http.StatusInternalServerError, context{}}
+			http.StatusInternalServerError, apiCtx{}}
 	}
 	caCert, err := x509.ParseCertificate(issIdentity.Crt.Raw)
 	if err != nil {
 		return nil, nil, &apiError{errors.Wrap(err, "error parsing intermediate certificate"),
-			http.StatusInternalServerError, context{}}
+			http.StatusInternalServerError, apiCtx{}}
 	}
 
 	return serverCert, caCert, nil
@@ -222,7 +222,7 @@ type RevokeOptions struct {
 //
 // TODO: Add OCSP and CRL support.
 func (a *Authority) Revoke(opts *RevokeOptions) error {
-	errContext := context{
+	errContext := apiCtx{
 		"serialNumber": opts.Serial,
 		"reasonCode":   opts.ReasonCode,
 		"reason":       opts.Reason,
