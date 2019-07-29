@@ -29,7 +29,7 @@ import (
 type Authority interface {
 	SSHAuthority
 	// NOTE: Authorize will be deprecated in future releases. Please use the
-	// context specific Authoirize[Sign|Revoke|etc.] methods.
+	// context specific Authorize[Sign|Revoke|etc.] methods.
 	Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	AuthorizeSign(ott string) ([]provisioner.SignOption, error)
 	GetTLSOptions() *tlsutil.TLSOptions
