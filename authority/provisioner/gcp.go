@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -205,13 +206,18 @@ func (p *GCP) Init(config Config) error {
 
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
-func (p *GCP) AuthorizeSign(token string) ([]SignOption, error) {
+func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, err
 	}
-	ce := claims.Google.ComputeEngine
 
+	// Check for the sign ssh method, default to sign X.509
+	if m := MethodFromContext(ctx); m == SignSSHMethod {
+		return p.authorizeSSHSign(claims)
+	}
+
+	ce := claims.Google.ComputeEngine
 	// Enforce known common name and default DNS if configured.
 	// By default we we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
@@ -343,4 +349,9 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 	}
 
 	return &claims, nil
+}
+
+// authorizeSSHSign returns the list of SignOption for a SignSSH request.
+func (p *GCP) authorizeSSHSign(claims *gcpPayload) ([]SignOption, error) {
+	return nil, nil
 }

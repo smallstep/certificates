@@ -205,11 +205,13 @@ func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
 // sshCertificateOptionsValidator validates the user SSHOptions with the ones
 // usually present in the token.
 type sshCertificateOptionsValidator struct {
-	*SSHOptions
+	Want *SSHOptions
 }
 
-func (want *sshCertificateOptionsValidator) Valid(got SSHOptions) error {
-	return want.match(got)
+// Valid implements SSHCertificateOptionsValidator and returns nil if both
+// SSHOptions match.
+func (v *sshCertificateOptionsValidator) Valid(got SSHOptions) error {
+	return v.Want.match(got)
 }
 
 // sshCertificateDefaultValidator implements a simple validator for all the

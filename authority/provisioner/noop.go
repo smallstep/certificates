@@ -1,6 +1,9 @@
 package provisioner
 
-import "crypto/x509"
+import (
+	"context"
+	"crypto/x509"
+)
 
 // noop provisioners is a provisioner that accepts anything.
 type noop struct{}
@@ -28,7 +31,7 @@ func (p *noop) Init(config Config) error {
 	return nil
 }
 
-func (p *noop) AuthorizeSign(token string) ([]SignOption, error) {
+func (p *noop) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	return []SignOption{}, nil
 }
 

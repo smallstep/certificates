@@ -1,13 +1,17 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/json"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
 )
+
+var sshUserRegex = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
 
 // Interface is the interface that all provisioner types must implement.
 type Interface interface {
@@ -17,7 +21,7 @@ type Interface interface {
 	GetType() Type
 	GetEncryptedKey() (kid string, key string, ok bool)
 	Init(config Config) error
-	AuthorizeSign(token string) ([]SignOption, error)
+	AuthorizeSign(ctx context.Context, token string) ([]SignOption, error)
 	AuthorizeRenewal(cert *x509.Certificate) error
 	AuthorizeRevoke(token string) error
 }

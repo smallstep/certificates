@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/json"
 	"net/http"
@@ -259,11 +260,17 @@ func (o *OIDC) AuthorizeRevoke(token string) error {
 }
 
 // AuthorizeSign validates the given token.
-func (o *OIDC) AuthorizeSign(token string) ([]SignOption, error) {
+func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := o.authorizeToken(token)
 	if err != nil {
 		return nil, err
 	}
+
+	// Check for the sign ssh method, default to sign X.509
+	if m := MethodFromContext(ctx); m == SignSSHMethod {
+		return o.authorizeSSHSign(claims)
+	}
+
 	// Admins should be able to authorize any SAN
 	if o.IsAdmin(claims.Email) {
 		return []SignOption{
@@ -289,6 +296,37 @@ func (o *OIDC) AuthorizeRenewal(cert *x509.Certificate) error {
 	return nil
 }
 
+// authorizeSSHSign returns the list of SignOption for a SignSSH request.
+func (o *OIDC) authorizeSSHSign(claims *openIDPayload) ([]SignOption, error) {
+	signOptions := []SignOption{
+		// set the default extensions
+		&sshDefaultExtensionModifier{},
+		// set the key id to the token subject
+		sshCertificateKeyIDModifier(claims.Email),
+	}
+
+	// Non-admins are only able to sign user certificates
+	if o.IsAdmin(claims.Email) {
+		signOptions = append(signOptions, &sshCertificateOptionsValidator{})
+	} else {
+		name := principalFromEmail(claims.Email)
+		if !sshUserRegex.MatchString(name) {
+			return nil, errors.Errorf("invalid principal '%s' from email address '%s'", name, claims.Email)
+		}
+		signOptions = append(signOptions, &sshCertificateOptionsValidator{&SSHOptions{
+			CertType:   SSHUserCert,
+			Principals: []string{name},
+		}})
+	}
+
+	return append(signOptions,
+		// checks the validity bounds, and set the validity if has not been set
+		&sshCertificateValidityModifier{o.claimer},
+		// require all the fields in the SSH certificate
+		&sshCertificateDefaultValidator{},
+	), nil
+}
+
 func getAndDecode(uri string, v interface{}) error {
 	resp, err := http.Get(uri)
 	if err != nil {
@@ -299,4 +337,22 @@ func getAndDecode(uri string, v interface{}) error {
 		return errors.Wrapf(err, "error reading %s", uri)
 	}
 	return nil
+}
+
+func principalFromEmail(email string) string {
+	if i := strings.LastIndex(email, "@"); i >= 0 {
+		email = email[:i]
+	}
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == '.': // drop dots
+			return -1
+		default:
+			return '_'
+		}
+	}, strings.ToLower(email))
 }

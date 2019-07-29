@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/x509"
 	"time"
 
@@ -134,7 +135,7 @@ func (p *JWK) AuthorizeRevoke(token string) error {
 }
 
 // AuthorizeSign validates the given token.
-func (p *JWK) AuthorizeSign(token string) ([]SignOption, error) {
+func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.audiences.Sign)
 	if err != nil {
 		return nil, err
@@ -171,6 +172,7 @@ func (p *JWK) AuthorizeRenewal(cert *x509.Certificate) error {
 	return nil
 }
 
+// authorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 	t := now()
 	opts := claims.Step.SSH

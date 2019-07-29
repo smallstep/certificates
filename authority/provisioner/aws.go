@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
@@ -266,13 +267,18 @@ func (p *AWS) Init(config Config) (err error) {
 
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
-func (p *AWS) AuthorizeSign(token string) ([]SignOption, error) {
+func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	payload, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, err
 	}
-	doc := payload.document
 
+	// Check for the sign ssh method, default to sign X.509
+	if m := MethodFromContext(ctx); m == SignSSHMethod {
+		return p.authorizeSSHSign(payload)
+	}
+
+	doc := payload.document
 	// Enforce known CN and default DNS and IP if configured.
 	// By default we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
@@ -431,4 +437,9 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 
 	payload.document = doc
 	return &payload, nil
+}
+
+// authorizeSSHSign returns the list of SignOption for a SignSSH request.
+func (p *AWS) authorizeSSHSign(claims *awsPayload) ([]SignOption, error) {
+	return nil, nil
 }
