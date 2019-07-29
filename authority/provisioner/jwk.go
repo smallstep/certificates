@@ -179,8 +179,6 @@ func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 	signOptions := []SignOption{
 		// validates user's SSHOptions with the ones in the token
 		&sshCertificateOptionsValidator{opts},
-		// set the default extensions
-		&sshDefaultExtensionModifier{},
 		// set the key id to the token subject
 		sshCertificateKeyIDModifier(claims.Subject),
 	}
@@ -200,6 +198,8 @@ func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 	}
 
 	return append(signOptions,
+		// set the default extensions
+		&sshDefaultExtensionModifier{},
 		// checks the validity bounds, and set the validity if has not been set
 		&sshCertificateValidityModifier{p.claimer},
 		// require all the fields in the SSH certificate

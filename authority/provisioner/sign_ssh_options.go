@@ -148,15 +148,23 @@ func (m sshCertificateValidBeforeModifier) Modify(cert *ssh.Certificate) error {
 type sshDefaultExtensionModifier struct{}
 
 func (m *sshDefaultExtensionModifier) Modify(cert *ssh.Certificate) error {
-	if cert.Extensions == nil {
-		cert.Extensions = make(map[string]string)
+	switch cert.CertType {
+	// Default to no extensions to HostCert
+	case ssh.HostCert:
+		return nil
+	case ssh.UserCert:
+		if cert.Extensions == nil {
+			cert.Extensions = make(map[string]string)
+		}
+		cert.Extensions["permit-X11-forwarding"] = ""
+		cert.Extensions["permit-agent-forwarding"] = ""
+		cert.Extensions["permit-port-forwarding"] = ""
+		cert.Extensions["permit-pty"] = ""
+		cert.Extensions["permit-user-rc"] = ""
+		return nil
+	default:
+		return errors.New("ssh certificate type has not been set or is invalid")
 	}
-	cert.Extensions["permit-X11-forwarding"] = ""
-	cert.Extensions["permit-agent-forwarding"] = ""
-	cert.Extensions["permit-port-forwarding"] = ""
-	cert.Extensions["permit-pty"] = ""
-	cert.Extensions["permit-user-rc"] = ""
-	return nil
 }
 
 // sshCertificateValidityModifier is a SSHCertificateModifier checks the
@@ -240,7 +248,7 @@ func (v *sshCertificateDefaultValidator) Valid(crt *ssh.Certificate) error {
 		return errors.New("ssh certificate valid after cannot be 0")
 	case crt.ValidBefore == 0:
 		return errors.New("ssh certificate valid before cannot be 0")
-	case len(crt.Extensions) == 0:
+	case crt.CertType == ssh.UserCert && len(crt.Extensions) == 0:
 		return errors.New("ssh certificate extensions cannot be empty")
 	case crt.SignatureKey == nil:
 		return errors.New("ssh certificate signature key cannot be nil")

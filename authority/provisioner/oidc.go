@@ -299,8 +299,6 @@ func (o *OIDC) AuthorizeRenewal(cert *x509.Certificate) error {
 // authorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (o *OIDC) authorizeSSHSign(claims *openIDPayload) ([]SignOption, error) {
 	signOptions := []SignOption{
-		// set the default extensions
-		&sshDefaultExtensionModifier{},
 		// set the key id to the token subject
 		sshCertificateKeyIDModifier(claims.Email),
 	}
@@ -320,6 +318,8 @@ func (o *OIDC) authorizeSSHSign(claims *openIDPayload) ([]SignOption, error) {
 	}
 
 	return append(signOptions,
+		// set the default extensions
+		&sshDefaultExtensionModifier{},
 		// checks the validity bounds, and set the validity if has not been set
 		&sshCertificateValidityModifier{o.claimer},
 		// require all the fields in the SSH certificate
