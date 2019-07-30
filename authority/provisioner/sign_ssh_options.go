@@ -86,7 +86,7 @@ func (o SSHOptions) match(got SSHOptions) error {
 	if o.CertType != "" && got.CertType != "" && o.CertType != got.CertType {
 		return errors.Errorf("ssh certificate type does not match - got %v, want %v", got.CertType, o.CertType)
 	}
-	if len(o.Principals) > 0 && len(got.Principals) > 0 && !equalStringSlice(o.Principals, got.Principals) {
+	if len(o.Principals) > 0 && len(got.Principals) > 0 && !containsAllMembers(o.Principals, got.Principals) {
 		return errors.Errorf("ssh certificate principals does not match - got %v, want %v", got.Principals, o.Principals)
 	}
 	if !o.ValidAfter.IsZero() && !got.ValidAfter.IsZero() && !o.ValidAfter.Equal(&got.ValidAfter) {
@@ -285,17 +285,18 @@ func sshCertTypeUInt32(ct string) uint32 {
 	}
 }
 
-func equalStringSlice(a, b []string) bool {
-	var l int
-	if l = len(a); l != len(b) {
+// containsAllMembers reports whether all members of subgroup are within group.
+func containsAllMembers(group, subgroup []string) bool {
+	lg, lsg := len(group), len(subgroup)
+	if lsg > lg {
 		return false
 	}
-	visit := make(map[string]struct{}, l)
-	for i := 0; i < l; i++ {
-		visit[a[i]] = struct{}{}
+	visit := make(map[string]struct{}, lg)
+	for i := 0; i < lg; i++ {
+		visit[group[i]] = struct{}{}
 	}
-	for i := 0; i < l; i++ {
-		if _, ok := visit[b[i]]; !ok {
+	for i := 0; i < lsg; i++ {
+		if _, ok := visit[group[i]]; !ok {
 			return false
 		}
 	}
