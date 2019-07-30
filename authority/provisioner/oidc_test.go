@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/x509"
 	"fmt"
 	"strings"
@@ -276,7 +277,8 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.prov.AuthorizeSign(tt.args.token)
+			ctx := NewContextWithMethod(context.Background(), SignMethod)
+			got, err := tt.prov.AuthorizeSign(ctx, tt.args.token)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
 				return

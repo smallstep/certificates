@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/x509"
 	"errors"
 	"strings"
@@ -259,7 +260,8 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got, err := tt.prov.AuthorizeSign(tt.args.token); err != nil {
+			ctx := NewContextWithMethod(context.Background(), SignMethod)
+			if got, err := tt.prov.AuthorizeSign(ctx, tt.args.token); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}

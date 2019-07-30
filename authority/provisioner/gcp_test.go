@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -330,7 +331,8 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.gcp.AuthorizeSign(tt.args.token)
+			ctx := NewContextWithMethod(context.Background(), SignMethod)
+			got, err := tt.gcp.AuthorizeSign(ctx, tt.args.token)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GCP.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return

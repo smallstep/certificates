@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -347,7 +348,8 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.aws.AuthorizeSign(tt.args.token)
+			ctx := NewContextWithMethod(context.Background(), SignMethod)
+			got, err := tt.aws.AuthorizeSign(ctx, tt.args.token)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AWS.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return

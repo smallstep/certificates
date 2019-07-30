@@ -137,7 +137,7 @@ func TestTimeDuration_MarshalJSON(t *testing.T) {
 		want         []byte
 		wantErr      bool
 	}{
-		{"null", TimeDuration{}, []byte("null"), false},
+		{"empty", TimeDuration{}, []byte(`""`), false},
 		{"timestamp", TimeDuration{t: tm}, []byte(`"2020-03-14T15:09:26.535897Z"`), false},
 		{"duration", TimeDuration{d: 1 * time.Hour}, []byte(`"1h0m0s"`), false},
 		{"fail", TimeDuration{t: time.Date(-1, 0, 0, 0, 0, 0, 0, time.UTC)}, nil, true},
@@ -166,7 +166,7 @@ func TestTimeDuration_UnmarshalJSON(t *testing.T) {
 		want    *TimeDuration
 		wantErr bool
 	}{
-		{"null", args{[]byte("null")}, &TimeDuration{}, false},
+		{"empty", args{[]byte(`""`)}, &TimeDuration{}, false},
 		{"timestamp", args{[]byte(`"2020-03-14T15:09:26.535897Z"`)}, &TimeDuration{t: time.Unix(1584198566, 535897000).UTC()}, false},
 		{"duration", args{[]byte(`"1h"`)}, &TimeDuration{d: time.Hour}, false},
 		{"fail", args{[]byte("123")}, &TimeDuration{}, true},
