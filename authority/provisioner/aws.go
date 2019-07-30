@@ -441,5 +441,27 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 
 // authorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *AWS) authorizeSSHSign(claims *awsPayload) ([]SignOption, error) {
-	return nil, nil
+	doc := claims.document
+
+	signOptions := []SignOption{
+		// set the key id to the token subject
+		sshCertificateKeyIDModifier(claims.Subject),
+	}
+
+	signOptions = append(signOptions, &sshCertificateOptionsValidator{&SSHOptions{
+		CertType: SSHHostCert,
+		Principals: []string{
+			doc.PrivateIP,
+			fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region),
+		},
+	}})
+
+	return append(signOptions,
+		// set the default extensions
+		&sshDefaultExtensionModifier{},
+		// checks the validity bounds, and set the validity if has not been set
+		&sshCertificateValidityModifier{p.claimer},
+		// require all the fields in the SSH certificate
+		&sshCertificateDefaultValidator{},
+	), nil
 }
