@@ -267,7 +267,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 
 	// Check for the sign ssh method, default to sign X.509
 	if m := MethodFromContext(ctx); m == SignSSHMethod {
-		return p.authorizeSSHSign(claims)
+		return p.authorizeSSHSign(claims, name)
 	}
 
 	// Enforce known common name and default DNS if configured.
@@ -302,8 +302,25 @@ func (p *Azure) AuthorizeRevoke(token string) error {
 }
 
 // authorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *Azure) authorizeSSHSign(claims azurePayload) ([]SignOption, error) {
-	return nil, nil
+func (p *Azure) authorizeSSHSign(claims azurePayload, name string) ([]SignOption, error) {
+	signOptions := []SignOption{
+		// set the key id to the token subject
+		sshCertificateKeyIDModifier(claims.Subject),
+	}
+
+	signOptions = append(signOptions, &sshCertificateOptionsValidator{&SSHOptions{
+		CertType:   SSHHostCert,
+		Principals: []string{name},
+	}})
+
+	return append(signOptions,
+		// set the default extensions
+		&sshDefaultExtensionModifier{},
+		// checks the validity bounds, and set the validity if has not been set
+		&sshCertificateValidityModifier{p.claimer},
+		// require all the fields in the SSH certificate
+		&sshCertificateDefaultValidator{},
+	), nil
 }
 
 // assertConfig initializes the config if it has not been initialized
