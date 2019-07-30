@@ -305,7 +305,7 @@ func (p *Azure) AuthorizeRevoke(token string) error {
 func (p *Azure) authorizeSSHSign(claims azurePayload, name string) ([]SignOption, error) {
 	signOptions := []SignOption{
 		// set the key id to the token subject
-		sshCertificateKeyIDModifier(claims.Subject),
+		sshCertificateKeyIDModifier(name),
 	}
 
 	signOptions = append(signOptions, &sshCertificateOptionsValidator{&SSHOptions{
