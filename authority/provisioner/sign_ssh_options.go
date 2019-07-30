@@ -95,6 +95,7 @@ func (o SSHOptions) match(got SSHOptions) error {
 	if !o.ValidBefore.IsZero() && !got.ValidBefore.IsZero() && !o.ValidBefore.Equal(&got.ValidBefore) {
 		return errors.Errorf("ssh certificate valid before does not match - got %v, want %v", got.ValidBefore, o.ValidBefore)
 	}
+	fmt.Printf("want %+v\ngot %+v\n", o, got)
 	return nil
 }
 
@@ -288,7 +289,7 @@ func sshCertTypeUInt32(ct string) uint32 {
 // containsAllMembers reports whether all members of subgroup are within group.
 func containsAllMembers(group, subgroup []string) bool {
 	lg, lsg := len(group), len(subgroup)
-	if lsg > lg {
+	if lsg > lg || (lg > 0 && lsg == 0) {
 		return false
 	}
 	visit := make(map[string]struct{}, lg)
@@ -296,7 +297,7 @@ func containsAllMembers(group, subgroup []string) bool {
 		visit[group[i]] = struct{}{}
 	}
 	for i := 0; i < lsg; i++ {
-		if _, ok := visit[group[i]]; !ok {
+		if _, ok := visit[subgroup[i]]; !ok {
 			return false
 		}
 	}
