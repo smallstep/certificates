@@ -95,7 +95,6 @@ func (o SSHOptions) match(got SSHOptions) error {
 	if !o.ValidBefore.IsZero() && !got.ValidBefore.IsZero() && !o.ValidBefore.Equal(&got.ValidBefore) {
 		return errors.Errorf("ssh certificate valid before does not match - got %v, want %v", got.ValidBefore, o.ValidBefore)
 	}
-	fmt.Printf("want %+v\ngot %+v\n", o, got)
 	return nil
 }
 
