@@ -353,5 +353,27 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 
 // authorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *GCP) authorizeSSHSign(claims *gcpPayload) ([]SignOption, error) {
-	return nil, nil
+	ce := claims.Google.ComputeEngine
+
+	signOptions := []SignOption{
+		// set the key id to the token subject
+		sshCertificateKeyIDModifier(ce.InstanceName),
+	}
+
+	signOptions = append(signOptions, &sshCertificateOptionsValidator{&SSHOptions{
+		CertType: SSHHostCert,
+		Principals: []string{
+			fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
+			fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
+		},
+	}})
+
+	return append(signOptions,
+		// set the default extensions
+		&sshDefaultExtensionModifier{},
+		// checks the validity bounds, and set the validity if has not been set
+		&sshCertificateValidityModifier{p.claimer},
+		// require all the fields in the SSH certificate
+		&sshCertificateDefaultValidator{},
+	), nil
 }
