@@ -217,6 +217,38 @@ func TestTimeDuration_Time(t *testing.T) {
 	}
 }
 
+func TestTimeDuration_Unix(t *testing.T) {
+	nowFn := now
+	defer func() {
+		now = nowFn
+		now()
+	}()
+	tm := time.Unix(1584198566, 535897000).UTC()
+	now = func() time.Time {
+		return tm
+	}
+	tests := []struct {
+		name         string
+		timeDuration *TimeDuration
+		want         int64
+	}{
+		{"zero", nil, -62135596800},
+		{"zero", &TimeDuration{}, -62135596800},
+		{"timestamp", &TimeDuration{t: tm}, 1584198566},
+		{"local", &TimeDuration{t: tm.Local()}, 1584198566},
+		{"duration", &TimeDuration{d: 1 * time.Hour}, 1584202166},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.timeDuration.Unix()
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("TimeDuration.Unix() = %v, want %v", got, tt.want)
+
+			}
+		})
+	}
+}
+
 func TestTimeDuration_String(t *testing.T) {
 	nowFn := now
 	defer func() {

@@ -113,9 +113,14 @@ func (t *TimeDuration) UnmarshalJSON(data []byte) error {
 	return errors.Errorf("failed to parse %s", data)
 }
 
-// Time calculates the embedded time.Time, sets it if necessary, and returns it.
+// Time calculates the time if needed and returns it.
 func (t *TimeDuration) Time() time.Time {
 	return t.RelativeTime(now())
+}
+
+// Unix calculates the time if needed it and returns the Unix time in seconds.
+func (t *TimeDuration) Unix() int64 {
+	return t.RelativeTime(now()).Unix()
 }
 
 // RelativeTime returns the embedded time.Time or the base time plus the
