@@ -6,6 +6,17 @@ import (
 	"time"
 )
 
+func mockNow() (time.Time, func()) {
+	tm := time.Unix(1584198566, 535897000).UTC()
+	nowFn := now
+	now = func() time.Time {
+		return tm
+	}
+	return tm, func() {
+		now = nowFn
+	}
+}
+
 func TestNewTimeDuration(t *testing.T) {
 	tm := time.Unix(1584198566, 535897000).UTC()
 	type args struct {
@@ -186,15 +197,8 @@ func TestTimeDuration_UnmarshalJSON(t *testing.T) {
 }
 
 func TestTimeDuration_Time(t *testing.T) {
-	nowFn := now
-	defer func() {
-		now = nowFn
-		now()
-	}()
-	tm := time.Unix(1584198566, 535897000).UTC()
-	now = func() time.Time {
-		return tm
-	}
+	tm, fn := mockNow()
+	defer fn()
 	tests := []struct {
 		name         string
 		timeDuration *TimeDuration
@@ -211,22 +215,14 @@ func TestTimeDuration_Time(t *testing.T) {
 			got := tt.timeDuration.Time()
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("TimeDuration.Time() = %v, want %v", got, tt.want)
-
 			}
 		})
 	}
 }
 
 func TestTimeDuration_Unix(t *testing.T) {
-	nowFn := now
-	defer func() {
-		now = nowFn
-		now()
-	}()
-	tm := time.Unix(1584198566, 535897000).UTC()
-	now = func() time.Time {
-		return tm
-	}
+	tm, fn := mockNow()
+	defer fn()
 	tests := []struct {
 		name         string
 		timeDuration *TimeDuration
@@ -250,15 +246,8 @@ func TestTimeDuration_Unix(t *testing.T) {
 }
 
 func TestTimeDuration_String(t *testing.T) {
-	nowFn := now
-	defer func() {
-		now = nowFn
-		now()
-	}()
-	tm := time.Unix(1584198566, 535897000).UTC()
-	now = func() time.Time {
-		return tm
-	}
+	tm, fn := mockNow()
+	defer fn()
 	type fields struct {
 		t time.Time
 		d time.Duration
