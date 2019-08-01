@@ -360,13 +360,18 @@ func (p *GCP) authorizeSSHSign(claims *gcpPayload) ([]SignOption, error) {
 		sshCertificateKeyIDModifier(ce.InstanceName),
 	}
 
-	signOptions = append(signOptions, &sshCertificateOptionsValidator{&SSHOptions{
+	// Default to host + known hostnames
+	defaults := SSHOptions{
 		CertType: SSHHostCert,
 		Principals: []string{
 			fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
 			fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
 		},
-	}})
+	}
+	// Validate user options
+	signOptions = append(signOptions, sshCertificateOptionsValidator(defaults))
+	// Set defaults if not given as user options
+	signOptions = append(signOptions, sshCertificateDefaultsModifier(defaults))
 
 	return append(signOptions,
 		// set the default extensions

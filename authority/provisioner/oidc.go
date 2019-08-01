@@ -303,19 +303,24 @@ func (o *OIDC) authorizeSSHSign(claims *openIDPayload) ([]SignOption, error) {
 		sshCertificateKeyIDModifier(claims.Email),
 	}
 
-	// Non-admins are only able to sign user certificates
-	if o.IsAdmin(claims.Email) {
-		signOptions = append(signOptions, &sshCertificateOptionsValidator{})
-	} else {
-		name := SanitizeSSHUserPrincipal(claims.Email)
-		if !sshUserRegex.MatchString(name) {
-			return nil, errors.Errorf("invalid principal '%s' from email address '%s'", name, claims.Email)
-		}
-		signOptions = append(signOptions, &sshCertificateOptionsValidator{&SSHOptions{
-			CertType:   SSHUserCert,
-			Principals: []string{name},
-		}})
+	name := SanitizeSSHUserPrincipal(claims.Email)
+	if !sshUserRegex.MatchString(name) {
+		return nil, errors.Errorf("invalid principal '%s' from email address '%s'", name, claims.Email)
 	}
+
+	// Admin users will default to user + name but they can be changed by the
+	// user options. Non-admins are only able to sign user certificates.
+	defaults := SSHOptions{
+		CertType:   SSHUserCert,
+		Principals: []string{name},
+	}
+
+	if !o.IsAdmin(claims.Email) {
+		signOptions = append(signOptions, sshCertificateOptionsValidator(defaults))
+	}
+
+	// Default to a user with name as principal if not set
+	signOptions = append(signOptions, sshCertificateDefaultsModifier(defaults))
 
 	return append(signOptions,
 		// set the default extensions

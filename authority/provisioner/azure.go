@@ -308,10 +308,15 @@ func (p *Azure) authorizeSSHSign(claims azurePayload, name string) ([]SignOption
 		sshCertificateKeyIDModifier(name),
 	}
 
-	signOptions = append(signOptions, &sshCertificateOptionsValidator{&SSHOptions{
+	// Default to host + known hostnames
+	defaults := SSHOptions{
 		CertType:   SSHHostCert,
 		Principals: []string{name},
-	}})
+	}
+	// Validate user options
+	signOptions = append(signOptions, sshCertificateOptionsValidator(defaults))
+	// Set defaults if not given as user options
+	signOptions = append(signOptions, sshCertificateDefaultsModifier(defaults))
 
 	return append(signOptions,
 		// set the default extensions

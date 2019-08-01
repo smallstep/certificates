@@ -448,13 +448,18 @@ func (p *AWS) authorizeSSHSign(claims *awsPayload) ([]SignOption, error) {
 		sshCertificateKeyIDModifier(claims.Subject),
 	}
 
-	signOptions = append(signOptions, &sshCertificateOptionsValidator{&SSHOptions{
+	// Default to host + known IPs/hostnames
+	defaults := SSHOptions{
 		CertType: SSHHostCert,
 		Principals: []string{
 			doc.PrivateIP,
 			fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region),
 		},
-	}})
+	}
+	// Validate user options
+	signOptions = append(signOptions, sshCertificateOptionsValidator(defaults))
+	// Set defaults if not given as user options
+	signOptions = append(signOptions, sshCertificateDefaultsModifier(defaults))
 
 	return append(signOptions,
 		// set the default extensions

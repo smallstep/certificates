@@ -143,6 +143,27 @@ func (m sshCertificateValidBeforeModifier) Modify(cert *ssh.Certificate) error {
 	return nil
 }
 
+// sshCertificateDefaultModifier implements a SSHCertificateModifier that
+// modifies the certificate with the given options if they are not set.
+type sshCertificateDefaultsModifier SSHOptions
+
+// Modify implements the SSHCertificateModifier interface.
+func (m sshCertificateDefaultsModifier) Modify(cert *ssh.Certificate) error {
+	if cert.CertType == 0 {
+		cert.CertType = sshCertTypeUInt32(m.CertType)
+	}
+	if len(cert.ValidPrincipals) == 0 {
+		cert.ValidPrincipals = m.Principals
+	}
+	if cert.ValidAfter == 0 && !m.ValidAfter.IsZero() {
+		cert.ValidAfter = uint64(m.ValidAfter.Unix())
+	}
+	if cert.ValidBefore == 0 && !m.ValidBefore.IsZero() {
+		cert.ValidBefore = uint64(m.ValidBefore.Unix())
+	}
+	return nil
+}
+
 // sshDefaultExtensionModifier implements an SSHCertificateModifier that sets
 // the default extensions in an SSH certificate.
 type sshDefaultExtensionModifier struct{}
@@ -212,17 +233,13 @@ func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
 
 // sshCertificateOptionsValidator validates the user SSHOptions with the ones
 // usually present in the token.
-type sshCertificateOptionsValidator struct {
-	Want *SSHOptions
-}
+type sshCertificateOptionsValidator SSHOptions
 
 // Valid implements SSHCertificateOptionsValidator and returns nil if both
 // SSHOptions match.
-func (v *sshCertificateOptionsValidator) Valid(got SSHOptions) error {
-	if v.Want == nil {
-		return nil
-	}
-	return v.Want.match(got)
+func (v sshCertificateOptionsValidator) Valid(got SSHOptions) error {
+	want := SSHOptions(v)
+	return want.match(got)
 }
 
 // sshCertificateDefaultValidator implements a simple validator for all the

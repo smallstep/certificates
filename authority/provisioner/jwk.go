@@ -178,7 +178,7 @@ func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 	opts := claims.Step.SSH
 	signOptions := []SignOption{
 		// validates user's SSHOptions with the ones in the token
-		&sshCertificateOptionsValidator{opts},
+		sshCertificateOptionsValidator(*opts),
 		// set the key id to the token subject
 		sshCertificateKeyIDModifier(claims.Subject),
 	}
@@ -196,6 +196,9 @@ func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 	if !opts.ValidBefore.IsZero() {
 		signOptions = append(signOptions, sshCertificateValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
 	}
+
+	// Default to a user certificate with no principals if not set
+	signOptions = append(signOptions, sshCertificateDefaultsModifier{CertType: SSHUserCert})
 
 	return append(signOptions,
 		// set the default extensions
