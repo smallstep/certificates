@@ -50,6 +50,7 @@ type Config struct {
 	IntermediateKey  string              `json:"key"`
 	Address          string              `json:"address"`
 	DNSNames         []string            `json:"dnsNames"`
+	SSH              *SSHConfig          `json:"ssh,omitempty"`
 	Logger           json.RawMessage     `json:"logger,omitempty"`
 	DB               *db.Config          `json:"db,omitempty"`
 	Monitoring       json.RawMessage     `json:"monitoring,omitempty"`
@@ -96,6 +97,12 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 		c.Template = &x509util.ASN1DN{}
 	}
 	return nil
+}
+
+// SSHConfig contains the user and host keys.
+type SSHConfig struct {
+	HostKey string `json:"hostKey"`
+	UserKey string `json:"userKey"`
 }
 
 // LoadConfiguration parses the given filename in JSON format and returns the

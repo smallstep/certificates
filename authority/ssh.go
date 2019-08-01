@@ -81,8 +81,20 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 	var signer ssh.Signer
 	switch cert.CertType {
 	case ssh.UserCert:
+		if a.sshCAUserCertSignKey == nil {
+			return nil, &apiError{
+				err:  errors.New("signSSH: user certificate signing is not enabled"),
+				code: http.StatusNotImplemented,
+			}
+		}
 		signer, err = ssh.NewSignerFromSigner(a.sshCAUserCertSignKey)
 	case ssh.HostCert:
+		if a.sshCAHostCertSignKey == nil {
+			return nil, &apiError{
+				err:  errors.New("signSSH: host certificate signing is not enabled"),
+				code: http.StatusNotImplemented,
+			}
+		}
 		signer, err = ssh.NewSignerFromSigner(a.sshCAHostCertSignKey)
 	default:
 		return nil, &apiError{

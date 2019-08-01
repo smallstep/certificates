@@ -78,25 +78,34 @@ func (a *Authority) authorizeToken(ott string) (provisioner.Interface, error) {
 func (a *Authority) Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 	var errContext = apiCtx{"ott": ott}
 	switch m := provisioner.MethodFromContext(ctx); m {
-	case provisioner.SignMethod, provisioner.SignSSHMethod:
-		p, err := a.authorizeToken(ott)
-		if err != nil {
-			return nil, &apiError{errors.Wrap(err, "authorizeSign"), http.StatusUnauthorized, errContext}
+	case provisioner.SignMethod:
+		return a.authorizeSign(ctx, ott)
+	case provisioner.SignSSHMethod:
+		if a.sshCAHostCertSignKey == nil && a.sshCAUserCertSignKey == nil {
+			return nil, &apiError{errors.New("authorize: ssh signing is not enabled"), http.StatusNotImplemented, errContext}
 		}
-
-		// Call the provisioner AuthorizeSign method to apply provisioner specific
-		// auth claims and get the signing options.
-		opts, err := p.AuthorizeSign(ctx, ott)
-		if err != nil {
-			return nil, &apiError{errors.Wrap(err, "authorizeSign"), http.StatusUnauthorized, errContext}
-		}
-
-		return opts, nil
+		return a.authorizeSign(ctx, ott)
 	case provisioner.RevokeMethod:
 		return nil, &apiError{errors.New("authorize: revoke method is not supported"), http.StatusInternalServerError, errContext}
 	default:
 		return nil, &apiError{errors.Errorf("authorize: method %d is not supported", m), http.StatusInternalServerError, errContext}
 	}
+}
+
+// authorizeSign loads the provisioner from the token, checks that it has not
+// been used again and calls the provisioner AuthorizeSign method. returns a
+// list of methods to apply to the signing flow.
+func (a *Authority) authorizeSign(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
+	var errContext = apiCtx{"ott": ott}
+	p, err := a.authorizeToken(ott)
+	if err != nil {
+		return nil, &apiError{errors.Wrap(err, "authorizeSign"), http.StatusUnauthorized, errContext}
+	}
+	opts, err := p.AuthorizeSign(ctx, ott)
+	if err != nil {
+		return nil, &apiError{errors.Wrap(err, "authorizeSign"), http.StatusUnauthorized, errContext}
+	}
+	return opts, nil
 }
 
 // AuthorizeSign authorizes a signature request by validating and authenticating
