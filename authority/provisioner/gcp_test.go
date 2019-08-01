@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"context"
+	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -338,6 +339,87 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 				return
 			}
 			assert.Len(t, tt.wantLen, got)
+		})
+	}
+}
+
+func TestGCP_AuthorizeSign_SSH(t *testing.T) {
+	tm, fn := mockNow()
+	defer fn()
+
+	p1, err := generateGCP()
+	assert.FatalError(t, err)
+
+	t1, err := generateGCPToken(p1.ServiceAccounts[0],
+		"https://accounts.google.com", p1.GetID(),
+		"instance-id", "instance-name", "project-id", "zone",
+		time.Now(), &p1.keyStore.keySet.Keys[0])
+	assert.FatalError(t, err)
+
+	key, err := generateJSONWebKey()
+	assert.FatalError(t, err)
+
+	signer, err := generateJSONWebKey()
+	assert.FatalError(t, err)
+
+	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	expectedHostOptions := &SSHOptions{
+		CertType: "host", Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
+	expectedHostOptionsPrincipal1 := &SSHOptions{
+		CertType: "host", Principals: []string{"instance-name.c.project-id.internal"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
+	expectedHostOptionsPrincipal2 := &SSHOptions{
+		CertType: "host", Principals: []string{"instance-name.zone.c.project-id.internal"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
+
+	type args struct {
+		token   string
+		sshOpts SSHOptions
+	}
+	tests := []struct {
+		name        string
+		gcp         *GCP
+		args        args
+		expected    *SSHOptions
+		wantErr     bool
+		wantSignErr bool
+	}{
+		{"ok", p1, args{t1, SSHOptions{}}, expectedHostOptions, false, false},
+		{"ok-type", p1, args{t1, SSHOptions{CertType: "host"}}, expectedHostOptions, false, false},
+		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"}}}, expectedHostOptions, false, false},
+		{"ok-principal1", p1, args{t1, SSHOptions{Principals: []string{"instance-name.c.project-id.internal"}}}, expectedHostOptionsPrincipal1, false, false},
+		{"ok-principal2", p1, args{t1, SSHOptions{Principals: []string{"instance-name.zone.c.project-id.internal"}}}, expectedHostOptionsPrincipal2, false, false},
+		{"ok-options", p1, args{t1, SSHOptions{CertType: "host", Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"}}}, expectedHostOptions, false, false},
+		{"fail-type", p1, args{t1, SSHOptions{CertType: "user"}}, nil, false, true},
+		{"fail-principal", p1, args{t1, SSHOptions{Principals: []string{"smallstep.com"}}}, nil, false, true},
+		{"fail-extra-principal", p1, args{t1, SSHOptions{Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal", "smallstep.com"}}}, nil, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := NewContextWithMethod(context.Background(), SignSSHMethod)
+			got, err := tt.gcp.AuthorizeSign(ctx, tt.args.token)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GCP.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err != nil {
+				assert.Nil(t, got)
+			} else if assert.NotNil(t, got) {
+				cert, err := signSSHCertificate(key.Public().Key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
+				if (err != nil) != tt.wantSignErr {
+					t.Errorf("SignSSH error = %v, wantSignErr %v", err, tt.wantSignErr)
+				} else {
+					if tt.wantSignErr {
+						assert.Nil(t, cert)
+					} else {
+						assert.NoError(t, validateSSHCertificate(cert, tt.expected))
+					}
+				}
+			}
 		})
 	}
 }
