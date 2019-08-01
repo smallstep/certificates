@@ -14,8 +14,6 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"golang.org/x/crypto/ssh"
-
 	"github.com/pkg/errors"
 	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/jose"
@@ -731,86 +729,4 @@ func generateJWKServer(n int) *httptest.Server {
 
 	srv.Start()
 	return srv
-}
-
-func signSSHCertificate(key crypto.PublicKey, opts SSHOptions, signOpts []SignOption, signKey crypto.Signer) (*ssh.Certificate, error) {
-	pub, err := ssh.NewPublicKey(key)
-	if err != nil {
-		return nil, err
-	}
-
-	var mods []SSHCertificateModifier
-	var validators []SSHCertificateValidator
-
-	for _, op := range signOpts {
-		switch o := op.(type) {
-		// modify the ssh.Certificate
-		case SSHCertificateModifier:
-			mods = append(mods, o)
-		// modify the ssh.Certificate given the SSHOptions
-		case SSHCertificateOptionModifier:
-			mods = append(mods, o.Option(opts))
-		// validate the ssh.Certificate
-		case SSHCertificateValidator:
-			validators = append(validators, o)
-		// validate the given SSHOptions
-		case SSHCertificateOptionsValidator:
-			if err := o.Valid(opts); err != nil {
-				return nil, err
-			}
-		default:
-			return nil, errors.Errorf("signSSH: invalid extra option type %T", o)
-		}
-	}
-
-	// Build base certificate with the key and some random values
-	cert := &ssh.Certificate{
-		Nonce:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
-		Key:    pub,
-		Serial: 1234567890,
-	}
-
-	// Use opts to modify the certificate
-	if err := opts.Modify(cert); err != nil {
-		return nil, err
-	}
-
-	// Use provisioner modifiers
-	for _, m := range mods {
-		if err := m.Modify(cert); err != nil {
-			return nil, err
-		}
-	}
-
-	// Get signer from authority keys
-	var signer ssh.Signer
-	switch cert.CertType {
-	case ssh.UserCert:
-		signer, err = ssh.NewSignerFromSigner(signKey)
-	case ssh.HostCert:
-		signer, err = ssh.NewSignerFromSigner(signKey)
-	default:
-		return nil, errors.Errorf("unexpected ssh certificate type: %d", cert.CertType)
-	}
-	cert.SignatureKey = signer.PublicKey()
-
-	// Get bytes for signing trailing the signature length.
-	data := cert.Marshal()
-	data = data[:len(data)-4]
-
-	// Sign the certificate
-	sig, err := signer.Sign(rand.Reader, data)
-	if err != nil {
-		return nil, err
-	}
-	cert.Signature = sig
-
-	// User provisioners validators
-	for _, v := range validators {
-		if err := v.Valid(cert); err != nil {
-			return nil, err
-		}
-	}
-
-	return cert, nil
 }
