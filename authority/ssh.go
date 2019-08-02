@@ -87,7 +87,12 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 				code: http.StatusNotImplemented,
 			}
 		}
-		signer, err = ssh.NewSignerFromSigner(a.sshCAUserCertSignKey)
+		if signer, err = ssh.NewSignerFromSigner(a.sshCAUserCertSignKey); err != nil {
+			return nil, &apiError{
+				err:  errors.Wrap(err, "signSSH: error creating signer"),
+				code: http.StatusInternalServerError,
+			}
+		}
 	case ssh.HostCert:
 		if a.sshCAHostCertSignKey == nil {
 			return nil, &apiError{
@@ -95,7 +100,12 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 				code: http.StatusNotImplemented,
 			}
 		}
-		signer, err = ssh.NewSignerFromSigner(a.sshCAHostCertSignKey)
+		if signer, err = ssh.NewSignerFromSigner(a.sshCAHostCertSignKey); err != nil {
+			return nil, &apiError{
+				err:  errors.Wrap(err, "signSSH: error creating signer"),
+				code: http.StatusInternalServerError,
+			}
+		}
 	default:
 		return nil, &apiError{
 			err:  errors.Errorf("unexpected ssh certificate type: %d", cert.CertType),
