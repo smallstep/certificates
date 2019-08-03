@@ -101,8 +101,10 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 
 // SSHConfig contains the user and host keys.
 type SSHConfig struct {
-	HostKey string `json:"hostKey"`
-	UserKey string `json:"userKey"`
+	HostKey          string `json:"hostKey"`
+	UserKey          string `json:"userKey"`
+	AddUserPrincipal string `json:"addUserPrincipal"`
+	AddUserCommand   string `json:"addUserCommand"`
 }
 
 // LoadConfiguration parses the given filename in JSON format and returns the

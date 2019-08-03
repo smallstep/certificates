@@ -14,21 +14,24 @@ import (
 // SSHAuthority is the interface implemented by a SSH CA authority.
 type SSHAuthority interface {
 	SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
+	SignSSHAddUser(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 }
 
 // SignSSHRequest is the request body of an SSH certificate request.
 type SignSSHRequest struct {
-	PublicKey   []byte       `json:"publicKey"` //base64 encoded
-	OTT         string       `json:"ott"`
-	CertType    string       `json:"certType"`
-	Principals  []string     `json:"principals"`
-	ValidAfter  TimeDuration `json:"validAfter"`
-	ValidBefore TimeDuration `json:"validBefore"`
+	PublicKey        []byte       `json:"publicKey"` //base64 encoded
+	OTT              string       `json:"ott"`
+	CertType         string       `json:"certType,omitempty"`
+	Principals       []string     `json:"principals,omitempty"`
+	ValidAfter       TimeDuration `json:"validAfter,omitempty"`
+	ValidBefore      TimeDuration `json:"validBefore,omitempty"`
+	AddUserPublicKey []byte       `json:"addUserPublicKey,omitempty"`
 }
 
 // SignSSHResponse is the response object that returns the SSH certificate.
 type SignSSHResponse struct {
-	Certificate SSHCertificate `json:"crt"`
+	Certificate        SSHCertificate `json:"crt"`
+	AddUserCertificate SSHCertificate `json:"addUserCrt"`
 }
 
 // SSHCertificate represents the response SSH certificate.
@@ -52,6 +55,10 @@ func (c *SSHCertificate) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
 		return errors.Wrap(err, "error decoding certificate")
+	}
+	if s == "" {
+		c.Certificate = nil
+		return nil
 	}
 	certData, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
@@ -105,6 +112,15 @@ func (h *caHandler) SignSSH(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var addUserPublicKey ssh.PublicKey
+	if body.AddUserPublicKey != nil {
+		addUserPublicKey, err = ssh.ParsePublicKey(body.AddUserPublicKey)
+		if err != nil {
+			WriteError(w, BadRequest(errors.Wrap(err, "error parsing addUserPublicKey")))
+			return
+		}
+	}
+
 	opts := provisioner.SSHOptions{
 		CertType:    body.CertType,
 		Principals:  body.Principals,
@@ -125,9 +141,19 @@ func (h *caHandler) SignSSH(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var addUserCert *ssh.Certificate
+	if addUserPublicKey != nil && cert.CertType == ssh.UserCert && len(cert.ValidPrincipals) == 1 {
+		addUserCert, err = h.Authority.SignSSHAddUser(addUserPublicKey, cert)
+		if err != nil {
+			WriteError(w, Forbidden(err))
+			return
+		}
+	}
+
 	w.WriteHeader(http.StatusCreated)
 	// logCertificate(w, cert)
 	JSON(w, &SignSSHResponse{
-		Certificate: SSHCertificate{cert},
+		Certificate:        SSHCertificate{cert},
+		AddUserCertificate: SSHCertificate{addUserCert},
 	})
 }

@@ -14,6 +14,9 @@ const (
 
 	// SSHHostCert is the string used to represent ssh.HostCert.
 	SSHHostCert = "host"
+
+	// sshProvisionerCommand is the provisioner command
+	sshProvisionerCommand = "sudo adduser --quiet --disabled-password --gecos '' %s 2>/dev/null ; nc -q0 localhost 22"
 )
 
 // SSHCertificateModifier is the interface used to change properties in an SSH
@@ -186,6 +189,18 @@ func (m *sshDefaultExtensionModifier) Modify(cert *ssh.Certificate) error {
 	default:
 		return errors.New("ssh certificate type has not been set or is invalid")
 	}
+}
+
+type sshProvisionerExtensionModifier string
+
+func (m sshProvisionerExtensionModifier) Modify(cert *ssh.Certificate) error {
+	if cert.CertType == ssh.UserCert {
+		if cert.CriticalOptions == nil {
+			cert.CriticalOptions = make(map[string]string)
+		}
+		cert.CriticalOptions["force-command"] = fmt.Sprintf(sshProvisionerCommand, m)
+	}
+	return nil
 }
 
 // sshCertificateValidityModifier is a SSHCertificateModifier checks the

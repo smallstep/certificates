@@ -2,9 +2,7 @@ package authority
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"net/http"
 	"strings"
 
@@ -14,10 +12,17 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func generateSSHPublicKeyID(key ssh.PublicKey) string {
-	sum := sha256.Sum256(key.Marshal())
-	return strings.ToLower(hex.EncodeToString(sum[:]))
-}
+const (
+	// SSHAddUserPrincipal is the principal that will run the add user command.
+	// Defaults to "provisioner" but it can be changed in the configuration.
+	SSHAddUserPrincipal = "provisioner"
+
+	// SSHAddUserCommand is the default command to run to add a new user.
+	// Defaults to "sudo useradd -m <principal>; nc -q0 localhost 22" but it can be changed in the
+	// configuration. The string "<principal>" will be replace by the new
+	// principal to add.
+	SSHAddUserCommand = "sudo useradd -m <principal>; nc -q0 localhost 22"
+)
 
 // SignSSH creates a signed SSH certificate with the given public key and options.
 func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
@@ -38,7 +43,7 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 		// validate the given SSHOptions
 		case provisioner.SSHCertificateOptionsValidator:
 			if err := o.Valid(opts); err != nil {
-				return nil, &apiError{err: err, code: http.StatusUnauthorized}
+				return nil, &apiError{err: err, code: http.StatusForbidden}
 			}
 		default:
 			return nil, &apiError{
@@ -50,12 +55,15 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 
 	nonce, err := randutil.ASCII(32)
 	if err != nil {
-		return nil, err
+		return nil, &apiError{err: err, code: http.StatusInternalServerError}
 	}
 
 	var serial uint64
 	if err := binary.Read(rand.Reader, binary.BigEndian, &serial); err != nil {
-		return nil, errors.Wrap(err, "error reading random number")
+		return nil, &apiError{
+			err:  errors.Wrap(err, "signSSH: error reading random number"),
+			code: http.StatusInternalServerError,
+		}
 	}
 
 	// Build base certificate with the key and some random values
@@ -67,13 +75,13 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 
 	// Use opts to modify the certificate
 	if err := opts.Modify(cert); err != nil {
-		return nil, err
+		return nil, &apiError{err: err, code: http.StatusForbidden}
 	}
 
 	// Use provisioner modifiers
 	for _, m := range mods {
 		if err := m.Modify(cert); err != nil {
-			return nil, &apiError{err: err, code: http.StatusInternalServerError}
+			return nil, &apiError{err: err, code: http.StatusForbidden}
 		}
 	}
 
@@ -108,7 +116,7 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 		}
 	default:
 		return nil, &apiError{
-			err:  errors.Errorf("unexpected ssh certificate type: %d", cert.CertType),
+			err:  errors.Errorf("signSSH: unexpected ssh certificate type: %d", cert.CertType),
 			code: http.StatusInternalServerError,
 		}
 	}
@@ -121,16 +129,111 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 	// Sign the certificate
 	sig, err := signer.Sign(rand.Reader, data)
 	if err != nil {
-		return nil, err
+		return nil, &apiError{
+			err:  errors.Wrap(err, "signSSH: error signing certificate"),
+			code: http.StatusInternalServerError,
+		}
 	}
 	cert.Signature = sig
 
 	// User provisioners validators
 	for _, v := range validators {
 		if err := v.Valid(cert); err != nil {
-			return nil, &apiError{err: err, code: http.StatusUnauthorized}
+			return nil, &apiError{err: err, code: http.StatusForbidden}
 		}
 	}
 
 	return cert, nil
+}
+
+// SignSSHAddUser signs a certificate that provisions a new user in a server.
+func (a *Authority) SignSSHAddUser(key ssh.PublicKey, subject *ssh.Certificate) (*ssh.Certificate, error) {
+	if a.sshCAUserCertSignKey == nil {
+		return nil, &apiError{
+			err:  errors.New("signSSHProxy: user certificate signing is not enabled"),
+			code: http.StatusNotImplemented,
+		}
+	}
+	if subject.CertType != ssh.UserCert {
+		return nil, &apiError{
+			err:  errors.New("signSSHProxy: certificate is not a user certificate"),
+			code: http.StatusForbidden,
+		}
+	}
+	if len(subject.ValidPrincipals) != 1 {
+		return nil, &apiError{
+			err:  errors.New("signSSHProxy: certificate does not have only one principal"),
+			code: http.StatusForbidden,
+		}
+	}
+
+	nonce, err := randutil.ASCII(32)
+	if err != nil {
+		return nil, &apiError{err: err, code: http.StatusInternalServerError}
+	}
+
+	var serial uint64
+	if err := binary.Read(rand.Reader, binary.BigEndian, &serial); err != nil {
+		return nil, &apiError{
+			err:  errors.Wrap(err, "signSSHProxy: error reading random number"),
+			code: http.StatusInternalServerError,
+		}
+	}
+
+	signer, err := ssh.NewSignerFromSigner(a.sshCAUserCertSignKey)
+	if err != nil {
+		return nil, &apiError{
+			err:  errors.Wrap(err, "signSSHProxy: error creating signer"),
+			code: http.StatusInternalServerError,
+		}
+	}
+
+	principal := subject.ValidPrincipals[0]
+	addUserPrincipal := a.getAddUserPrincipal()
+
+	cert := &ssh.Certificate{
+		Nonce:           []byte(nonce),
+		Key:             key,
+		Serial:          serial,
+		CertType:        ssh.UserCert,
+		KeyId:           principal + "-" + addUserPrincipal,
+		ValidPrincipals: []string{addUserPrincipal},
+		ValidAfter:      subject.ValidAfter,
+		ValidBefore:     subject.ValidBefore,
+		Permissions: ssh.Permissions{
+			CriticalOptions: map[string]string{
+				"force-command": a.getAddUserCommand(principal),
+			},
+		},
+		SignatureKey: signer.PublicKey(),
+	}
+
+	// Get bytes for signing trailing the signature length.
+	data := cert.Marshal()
+	data = data[:len(data)-4]
+
+	// Sign the certificate
+	sig, err := signer.Sign(rand.Reader, data)
+	if err != nil {
+		return nil, err
+	}
+	cert.Signature = sig
+	return cert, nil
+}
+
+func (a *Authority) getAddUserPrincipal() (cmd string) {
+	if a.config.SSH.AddUserPrincipal == "" {
+		return SSHAddUserPrincipal
+	}
+	return a.config.SSH.AddUserPrincipal
+}
+
+func (a *Authority) getAddUserCommand(principal string) string {
+	var cmd string
+	if a.config.SSH.AddUserCommand == "" {
+		cmd = SSHAddUserCommand
+	} else {
+		cmd = a.config.SSH.AddUserCommand
+	}
+	return strings.Replace(cmd, "<principal>", principal, -1)
 }
