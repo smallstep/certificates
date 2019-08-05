@@ -30,13 +30,13 @@ type SignSSHRequest struct {
 
 // SignSSHResponse is the response object that returns the SSH certificate.
 type SignSSHResponse struct {
-	Certificate        SSHCertificate `json:"crt"`
-	AddUserCertificate SSHCertificate `json:"addUserCrt"`
+	Certificate        SSHCertificate  `json:"crt"`
+	AddUserCertificate *SSHCertificate `json:"addUserCrt,omitempty"`
 }
 
 // SSHCertificate represents the response SSH certificate.
 type SSHCertificate struct {
-	*ssh.Certificate
+	*ssh.Certificate `json:"omitempty"`
 }
 
 // MarshalJSON implements the json.Marshaler interface. The certificate is
@@ -102,7 +102,7 @@ func (h *caHandler) SignSSH(w http.ResponseWriter, r *http.Request) {
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		WriteError(w, BadRequest(err))
 		return
 	}
 
@@ -141,19 +141,19 @@ func (h *caHandler) SignSSH(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var addUserCert *ssh.Certificate
+	var addUserCertificate *SSHCertificate
 	if addUserPublicKey != nil && cert.CertType == ssh.UserCert && len(cert.ValidPrincipals) == 1 {
-		addUserCert, err = h.Authority.SignSSHAddUser(addUserPublicKey, cert)
+		addUserCert, err := h.Authority.SignSSHAddUser(addUserPublicKey, cert)
 		if err != nil {
 			WriteError(w, Forbidden(err))
 			return
 		}
+		addUserCertificate = &SSHCertificate{addUserCert}
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	// logCertificate(w, cert)
 	JSON(w, &SignSSHResponse{
 		Certificate:        SSHCertificate{cert},
-		AddUserCertificate: SSHCertificate{addUserCert},
+		AddUserCertificate: addUserCertificate,
 	})
 }
