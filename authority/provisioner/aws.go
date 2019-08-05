@@ -275,6 +275,9 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 
 	// Check for the sign ssh method, default to sign X.509
 	if m := MethodFromContext(ctx); m == SignSSHMethod {
+		if p.claimer.IsSSHCAEnabled() == false {
+			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
+		}
 		return p.authorizeSSHSign(payload)
 	}
 

@@ -20,6 +20,7 @@ type Claims struct {
 	MinHostSSHDur     *Duration `json:"minHostSSHCertDuration,omitempty"`
 	MaxHostSSHDur     *Duration `json:"maxHostSSHCertDuration,omitempty"`
 	DefaultHostSSHDur *Duration `json:"defaultHostSSHCertDuration,omitempty"`
+	EnableSSHCA       *bool     `json:"enableSSHCA,omitempty"`
 }
 
 // Claimer is the type that controls claims. It provides an interface around the
@@ -38,6 +39,7 @@ func NewClaimer(claims *Claims, global Claims) (*Claimer, error) {
 // Claims returns the merge of the inner and global claims.
 func (c *Claimer) Claims() Claims {
 	disableRenewal := c.IsDisableRenewal()
+	enableSSHCA := c.IsSSHCAEnabled()
 	return Claims{
 		MinTLSDur:         &Duration{c.MinTLSCertDuration()},
 		MaxTLSDur:         &Duration{c.MaxTLSCertDuration()},
@@ -49,6 +51,7 @@ func (c *Claimer) Claims() Claims {
 		MinHostSSHDur:     &Duration{c.MinHostSSHCertDuration()},
 		MaxHostSSHDur:     &Duration{c.MaxHostSSHCertDuration()},
 		DefaultHostSSHDur: &Duration{c.DefaultHostSSHCertDuration()},
+		EnableSSHCA:       &enableSSHCA,
 	}
 }
 
@@ -150,6 +153,16 @@ func (c *Claimer) MaxHostSSHCertDuration() time.Duration {
 		return c.global.MaxHostSSHDur.Duration
 	}
 	return c.claims.MaxHostSSHDur.Duration
+}
+
+// IsSSHCAEnabled returns if the SSH CA is enabled for the provisioner. If the
+// property is not set within the provisioner, then the global value from the
+// authority configuration will be used.
+func (c *Claimer) IsSSHCAEnabled() bool {
+	if c.claims == nil || c.claims.EnableSSHCA == nil {
+		return *c.global.EnableSSHCA
+	}
+	return *c.claims.EnableSSHCA
 }
 
 // Validate validates and modifies the Claims with default values.

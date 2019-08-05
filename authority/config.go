@@ -28,6 +28,7 @@ var (
 		Renegotiation: false,
 	}
 	defaultDisableRenewal   = false
+	defaultEnableSSHCA      = false
 	globalProvisionerClaims = provisioner.Claims{
 		MinTLSDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
 		MaxTLSDur:         &provisioner.Duration{Duration: 24 * time.Hour},
@@ -39,6 +40,7 @@ var (
 		MinHostSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
 		MaxHostSSHDur:     &provisioner.Duration{Duration: 30 * 24 * time.Hour},
 		DefaultHostSSHDur: &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:       &defaultEnableSSHCA,
 	}
 )
 

@@ -143,6 +143,9 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 
 	// Check for SSH token
 	if claims.Step != nil && claims.Step.SSH != nil {
+		if p.claimer.IsSSHCAEnabled() == false {
+			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
+		}
 		return p.authorizeSSHSign(claims)
 	}
 

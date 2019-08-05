@@ -268,6 +268,9 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 
 	// Check for the sign ssh method, default to sign X.509
 	if m := MethodFromContext(ctx); m == SignSSHMethod {
+		if o.claimer.IsSSHCAEnabled() == false {
+			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", o.GetID())
+		}
 		return o.authorizeSSHSign(claims)
 	}
 
