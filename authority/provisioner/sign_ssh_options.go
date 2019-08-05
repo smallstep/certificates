@@ -1,7 +1,6 @@
 package provisioner
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -14,9 +13,6 @@ const (
 
 	// SSHHostCert is the string used to represent ssh.HostCert.
 	SSHHostCert = "host"
-
-	// sshProvisionerCommand is the provisioner command
-	sshProvisionerCommand = "sudo adduser --quiet --disabled-password --gecos '' %s 2>/dev/null ; nc -q0 localhost 22"
 )
 
 // SSHCertificateModifier is the interface used to change properties in an SSH
@@ -191,18 +187,6 @@ func (m *sshDefaultExtensionModifier) Modify(cert *ssh.Certificate) error {
 	}
 }
 
-type sshProvisionerExtensionModifier string
-
-func (m sshProvisionerExtensionModifier) Modify(cert *ssh.Certificate) error {
-	if cert.CertType == ssh.UserCert {
-		if cert.CriticalOptions == nil {
-			cert.CriticalOptions = make(map[string]string)
-		}
-		cert.CriticalOptions["force-command"] = fmt.Sprintf(sshProvisionerCommand, m)
-	}
-	return nil
-}
-
 // sshCertificateValidityModifier is a SSHCertificateModifier checks the
 // validity bounds, setting them if they are not provided. It will fail if a
 // CertType has not been set or is not valid.
@@ -288,20 +272,6 @@ func (v *sshCertificateDefaultValidator) Valid(crt *ssh.Certificate) error {
 		return errors.New("ssh certificate signature cannot be nil")
 	default:
 		return nil
-	}
-}
-
-// sshCertTypeName returns the string representation of the given ssh.CertType.
-func sshCertTypeString(ct uint32) string {
-	switch ct {
-	case 0:
-		return ""
-	case ssh.UserCert:
-		return SSHUserCert
-	case ssh.HostCert:
-		return SSHHostCert
-	default:
-		return fmt.Sprintf("unknown (%d)", ct)
 	}
 }
 

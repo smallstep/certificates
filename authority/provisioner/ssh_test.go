@@ -98,6 +98,9 @@ func signSSHCertificate(key crypto.PublicKey, opts SSHOptions, signOpts []SignOp
 	default:
 		return nil, fmt.Errorf("unexpected ssh certificate type: %d", cert.CertType)
 	}
+	if err != nil {
+		return nil, err
+	}
 	cert.SignatureKey = signer.PublicKey()
 
 	// Get bytes for signing trailing the signature length.
