@@ -33,6 +33,10 @@ required = [
 ]
 
 [[constraint]]
+  name = "github.com/golang/lint"
+  revision = "06c8688daad7faa9da5a0c2f163a3d14aac986ca"
+
+[[constraint]]
   name = "github.com/alecthomas/gometalinter"
   revision = "bae2f1293d092fd8167939d5108d1b025eaef9de"
 

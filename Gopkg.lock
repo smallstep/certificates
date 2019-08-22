@@ -83,15 +83,11 @@
   version = "v1.4.1"
 
 [[projects]]
-  branch = "travis-1.9"
-  digest = "1:e8f5d9c09a7209c740e769713376abda388c41b777ba8e9ed52767e21acf379f"
+  digest = "1:4ee452f8994700dcab9e816aef1cb9eb2317218734c6ccf5135746e6c19f3dce"
   name = "github.com/golang/lint"
-  packages = [
-    ".",
-    "golint",
-  ]
+  packages = ["golint"]
   pruneopts = "UT"
-  revision = "883fe33ffc4344bad1ecd881f61afd5ec5d80e0a"
+  revision = "06c8688daad7faa9da5a0c2f163a3d14aac986ca"
 
 [[projects]]
   digest = "1:97df918963298c287643883209a2c3f642e6593379f97ab400c2a2e219ab647d"
@@ -357,6 +353,14 @@
   ]
   pruneopts = "UT"
   revision = "4d3f4d9ffa16a13f451c3b2999e9c49e9750bf06"
+
+[[projects]]
+  branch = "master"
+  digest = "1:0824a2eb250dd552f41daaf471266d085e8e8cabdbff9e4294bc799076e00da7"
+  name = "golang.org/x/lint"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "959b441ac422379a43da2230f62be024250818b0"
 
 [[projects]]
   branch = "master"
