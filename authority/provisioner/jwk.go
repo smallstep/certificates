@@ -141,11 +141,12 @@ func (p *JWK) AuthorizeSign(token string) ([]SignOption, error) {
 		claims.SANs = []string{claims.Subject}
 	}
 
-	dnsNames, ips := x509util.SplitSANs(claims.SANs)
+	dnsNames, ips, emails := x509util.SplitSANs(claims.SANs)
 	return []SignOption{
 		commonNameValidator(claims.Subject),
 		dnsNamesValidator(dnsNames),
 		ipAddressesValidator(ips),
+		emailAddressesValidator(emails),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),

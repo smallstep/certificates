@@ -157,6 +157,26 @@ func (v ipAddressesValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
+// emailAddressesValidator validates the email address SANs of a certificate request.
+type emailAddressesValidator []string
+
+// Valid checks that certificate request IP Addresses match those configured in
+// the bootstrap (token) flow.
+func (v emailAddressesValidator) Valid(req *x509.CertificateRequest) error {
+	want := make(map[string]bool)
+	for _, s := range v {
+		want[s] = true
+	}
+	got := make(map[string]bool)
+	for _, s := range req.EmailAddresses {
+		got[s] = true
+	}
+	if !reflect.DeepEqual(want, got) {
+		return errors.Errorf("certificate request does not contain the valid Email Addresses - got %v, want %v", req.EmailAddresses, v)
+	}
+	return nil
+}
+
 // validityValidator validates the certificate temporal validity settings.
 type validityValidator struct {
 	min time.Duration
