@@ -124,11 +124,14 @@ func TestAuthorityNew(t *testing.T) {
 					assert.True(t, auth.initOnce)
 					assert.NotNil(t, auth.intermediateIdentity)
 					for _, p := range tc.config.AuthorityConfig.Provisioners {
-						_p, ok := auth.provisioners.Load(p.GetID())
+						var _p provisioner.Interface
+						_p, ok = auth.provisioners.Load(p.GetID())
 						assert.True(t, ok)
 						assert.Equals(t, p, _p)
-						if kid, encryptedKey, ok := p.GetEncryptedKey(); ok {
-							key, ok := auth.provisioners.LoadEncryptedKey(kid)
+						var kid, encryptedKey string
+						if kid, encryptedKey, ok = p.GetEncryptedKey(); ok {
+							var key string
+							key, ok = auth.provisioners.LoadEncryptedKey(kid)
 							assert.True(t, ok)
 							assert.Equals(t, encryptedKey, key)
 						}
