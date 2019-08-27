@@ -143,6 +143,7 @@ func (p *JWK) AuthorizeSign(token string) ([]SignOption, error) {
 
 	dnsNames, ips, emails := x509util.SplitSANs(claims.SANs)
 	return []SignOption{
+		defaultPublicKeyValidator{},
 		commonNameValidator(claims.Subject),
 		dnsNamesValidator(dnsNames),
 		ipAddressesValidator(ips),

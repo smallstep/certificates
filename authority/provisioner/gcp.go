@@ -228,6 +228,7 @@ func (p *GCP) AuthorizeSign(token string) ([]SignOption, error) {
 	}
 
 	return append(so,
+		defaultPublicKeyValidator{},
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		newProvisionerExtensionOption(TypeGCP, p.Name, claims.Subject, "InstanceID", ce.InstanceID, "InstanceName", ce.InstanceName),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),

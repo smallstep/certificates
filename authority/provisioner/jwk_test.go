@@ -265,14 +265,14 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.NotNil(t, got) {
-					assert.Len(t, 7, got)
+					assert.Len(t, 8, got)
 
-					_cnv := got[0]
+					_cnv := got[1]
 					cnv, ok := _cnv.(commonNameValidator)
 					assert.True(t, ok)
 					assert.Equals(t, string(cnv), "subject")
 
-					_dnv := got[1]
+					_dnv := got[2]
 					dnv, ok := _dnv.(dnsNamesValidator)
 					assert.True(t, ok)
 					if tt.name == "ok-sans" {

@@ -287,6 +287,7 @@ func (p *AWS) AuthorizeSign(token string) ([]SignOption, error) {
 	}
 
 	return append(so,
+		defaultPublicKeyValidator{},
 		commonNameValidator(payload.Claims.Subject),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		newProvisionerExtensionOption(TypeAWS, p.Name, doc.AccountID, "InstanceID", doc.InstanceID),

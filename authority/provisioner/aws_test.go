@@ -326,11 +326,11 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 		wantLen int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 4, false},
-		{"ok", p2, args{t2}, 6, false},
-		{"ok", p2, args{t2Hostname}, 6, false},
-		{"ok", p2, args{t2PrivateIP}, 6, false},
-		{"ok", p1, args{t4}, 4, false},
+		{"ok", p1, args{t1}, 5, false},
+		{"ok", p2, args{t2}, 7, false},
+		{"ok", p2, args{t2Hostname}, 7, false},
+		{"ok", p2, args{t2PrivateIP}, 7, false},
+		{"ok", p1, args{t4}, 5, false},
 		{"fail account", p3, args{t3}, 0, true},
 		{"fail token", p1, args{"token"}, 0, true},
 		{"fail subject", p1, args{failSubject}, 0, true},

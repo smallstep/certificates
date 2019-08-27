@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+	"github.com/pkg/errors"
+	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
@@ -150,7 +152,7 @@ func parseCertificate(data string) *x509.Certificate {
 }
 
 func parseCertificateRequest(data string) *x509.CertificateRequest {
-	block, _ := pem.Decode([]byte(csrPEM))
+	block, _ := pem.Decode([]byte(data))
 	if block == nil {
 		panic("failed to parse certificate request PEM")
 	}
@@ -385,13 +387,13 @@ func TestSignRequest_Validate(t *testing.T) {
 		NotAfter  time.Time
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
+		name   string
+		fields fields
+		err    error
 	}{
-		{"missing csr", fields{CertificateRequest{}, "foobarzar", time.Time{}, time.Time{}}, true},
-		{"invalid csr", fields{CertificateRequest{bad}, "foobarzar", time.Time{}, time.Time{}}, true},
-		{"missing ott", fields{CertificateRequest{csr}, "", time.Time{}, time.Time{}}, true},
+		{"missing csr", fields{CertificateRequest{}, "foobarzar", time.Time{}, time.Time{}}, errors.New("missing csr")},
+		{"invalid csr", fields{CertificateRequest{bad}, "foobarzar", time.Time{}, time.Time{}}, errors.New("invalid csr")},
+		{"missing ott", fields{CertificateRequest{csr}, "", time.Time{}, time.Time{}}, errors.New("missing ott")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -401,8 +403,12 @@ func TestSignRequest_Validate(t *testing.T) {
 				NotAfter:  NewTimeDuration(tt.fields.NotAfter),
 				NotBefore: NewTimeDuration(tt.fields.NotBefore),
 			}
-			if err := s.Validate(); (err != nil) != tt.wantErr {
-				t.Errorf("SignRequest.Validate() error = %v, wantErr %v", err, tt.wantErr)
+			if err := s.Validate(); err != nil {
+				if assert.NotNil(t, tt.err) {
+					assert.HasPrefix(t, err.Error(), tt.err.Error())
+				}
+			} else {
+				assert.Nil(t, tt.err)
 			}
 		})
 	}

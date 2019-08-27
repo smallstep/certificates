@@ -1,6 +1,8 @@
 package provisioner
 
 import (
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/cli/crypto/x509util"
+	"golang.org/x/crypto/ed25519"
 )
 
 // Options contains the options that can be passed to the Sign method.
@@ -78,7 +81,7 @@ func (e emailOnlyIdentity) Valid(req *x509.CertificateRequest) error {
 	case len(req.EmailAddresses) == 0:
 		return errors.New("certificate request does not contain any email address")
 	case len(req.EmailAddresses) > 1:
-		return errors.New("certificate request does not contain too many email addresses")
+		return errors.New("certificate request contains too many email addresses")
 	case req.EmailAddresses[0] == "":
 		return errors.New("certificate request cannot contain an empty email address")
 	case req.EmailAddresses[0] != string(e):
@@ -86,6 +89,23 @@ func (e emailOnlyIdentity) Valid(req *x509.CertificateRequest) error {
 	default:
 		return nil
 	}
+}
+
+// defaultPublicKeyValidator validates the public key of a certificate request.
+type defaultPublicKeyValidator struct{}
+
+// Valid checks that certificate request common name matches the one configured.
+func (v defaultPublicKeyValidator) Valid(req *x509.CertificateRequest) error {
+	switch k := req.PublicKey.(type) {
+	case *rsa.PublicKey:
+		if k.Size() < 256 {
+			return errors.New("rsa key in CSR must be at least 2048 bits (256 bytes)")
+		}
+	case *ecdsa.PublicKey, ed25519.PublicKey:
+	default:
+		return errors.Errorf("unrecognized public key of type '%T' in CSR", k)
+	}
+	return nil
 }
 
 // commonNameValidator validates the common name of a certificate request.
