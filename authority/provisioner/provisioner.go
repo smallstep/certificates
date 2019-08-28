@@ -150,7 +150,11 @@ func (l *List) UnmarshalJSON(data []byte) error {
 		case "azure":
 			p = &Azure{}
 		default:
-			return errors.Errorf("provisioner type %s not supported", typ.Type)
+			// Skip unsupported files. When this method is specially used on
+			// clients, these might be compiled with a version that does not
+			// support a specific provisioner type, if we don't skip it we will
+			// force to re-compile the client to make it compatible.
+			continue
 		}
 		if err := json.Unmarshal(data, p); err != nil {
 			return errors.Errorf("error unmarshaling provisioner")
