@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"html"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"strconv"
 	"time"
 	"unicode"
 
@@ -54,12 +56,64 @@ func printFullVersion() {
 	fmt.Printf("Release Date: %s\n", releaseDate())
 }
 
+// appHelpTemplate contains the modified template for the main app
+var appHelpTemplate = `## NAME
+**{{.HelpName}}** -- {{.Usage}}
+
+## USAGE
+{{if .UsageText}}{{.UsageText}}{{else}}**{{.HelpName}}**{{if .Commands}} <command>{{end}} {{if .ArgsUsage}}{{.ArgsUsage}}{{else}}_[arguments]_{{end}}{{end}}{{if .Description}}
+
+## DESCRIPTION
+{{.Description}}{{end}}{{if .VisibleCommands}}
+
+## COMMANDS
+
+{{range .VisibleCategories}}{{if .Name}}{{.Name}}:{{end}}
+|||
+|---|---|{{range .VisibleCommands}}
+| **{{join .Names ", "}}** | {{.Usage}} |{{end}}
+{{end}}{{if .VisibleFlags}}{{end}}
+
+## OPTIONS
+
+{{range $index, $option := .VisibleFlags}}{{if $index}}
+{{end}}{{$option}}
+{{end}}{{end}}{{if .Copyright}}{{if len .Authors}}
+
+## AUTHOR{{with $length := len .Authors}}{{if ne 1 $length}}S{{end}}{{end}}:
+
+{{range $index, $author := .Authors}}{{if $index}}
+{{end}}{{$author}}{{end}}{{end}}{{if .Version}}{{if not .HideVersion}}
+
+## ONLINE
+
+This documentation is available online at https://smallstep.com/docs/certificates
+
+## VERSION
+
+{{.Version}}{{end}}{{end}}
+
+## COPYRIGHT
+
+{{.Copyright}}
+
+## FEEDBACK ` +
+	html.UnescapeString("&#"+strconv.Itoa(128525)+";") + " " +
+	html.UnescapeString("&#"+strconv.Itoa(127867)+";") +
+	`
+
+The **step-ca** utility is not instrumented for usage statistics. It does not phone home.
+But your feedback is extremely valuable. Any information you can provide regarding how you’re using **step-ca** helps.
+Please send us a sentence or two, good or bad: **feedback@smallstep.com** or join https://gitter.im/smallstep/community.
+{{end}}
+`
+
 func main() {
 	// Override global framework components
 	cli.VersionPrinter = func(c *cli.Context) {
 		printFullVersion()
 	}
-	cli.AppHelpTemplate = usage.AppHelpTemplate
+	cli.AppHelpTemplate = appHelpTemplate
 	cli.SubcommandHelpTemplate = usage.SubcommandHelpTemplate
 	cli.CommandHelpTemplate = usage.CommandHelpTemplate
 	cli.HelpPrinter = usage.HelpPrinter
@@ -118,7 +172,7 @@ intermediate private key.`,
 	app.Commands = []cli.Command{
 		{
 			Name:  "version",
-			Usage: "Displays the current version of the cli",
+			Usage: "Displays the current version of step-ca",
 			// Command prints out the current version of the tool
 			Action: func(c *cli.Context) error {
 				printFullVersion()
@@ -143,12 +197,12 @@ intermediate private key.`,
 		}()
 	}
 
-	app.Action = func(ctx *cli.Context) error {
+	app.Action = func(_ *cli.Context) error {
 		// Hack to be able to run a the top action as a subcommand
 		cmd := cli.Command{Name: "start", Action: startAction, Flags: app.Flags}
 		set := flag.NewFlagSet(app.Name, flag.ContinueOnError)
 		set.Parse(os.Args)
-		ctx = cli.NewContext(app, set, nil)
+		ctx := cli.NewContext(app, set, nil)
 		return cmd.Run(ctx)
 	}
 
