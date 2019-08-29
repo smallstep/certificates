@@ -11,14 +11,6 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:c198fdc381e898e8fb62b8eb62758195091c313ad18e52a3067366e1dda2fb3c"
-  name = "github.com/alecthomas/units"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a"
-
-[[projects]]
-  branch = "master"
   digest = "1:454adc7f974228ff789428b6dc098638c57a64aa0718f0bd61e53d3cd39d7a75"
   name = "github.com/chzyer/readline"
   packages = ["."]
@@ -74,14 +66,6 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:750e747d0aad97b79f4a4e00034bae415c2ea793fd9e61438d966ee9c79579bf"
-  name = "github.com/google/shlex"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "6f45313302b9c56850fc17f99e40caebce98c716"
-
-[[projects]]
-  branch = "master"
   digest = "1:e51f40f0c19b39c1825eadd07d5c0a98a2ad5942b166d9fc4f54750ce9a04810"
   name = "github.com/juju/ansiterm"
   packages = [
@@ -108,7 +92,7 @@
   revision = "2d01aacdc34a083dca635ba869909f5fc0cd4f41"
 
 [[projects]]
-  digest = "1:2a2a76072bd413b3484a0b5bb2fbb078b0b7dd8950e9276c900e14dce2354679"
+  digest = "1:2d2bc0f23cca6b59cec3fbece9abc102bdb19f548dd58d7667e57699074a2c76"
   name = "github.com/manifoldco/promptui"
   packages = [
     ".",
@@ -116,8 +100,8 @@
     "screenbuf",
   ]
   pruneopts = "UT"
-  revision = "20f2a94120aa14a334121a6de66616a7fa89a5cd"
-  version = "v0.3.2"
+  revision = "157c96fb638a14d268b305cf2012582431fcc410"
+  version = "v0.3.1"
 
 [[projects]]
   digest = "1:c658e84ad3916da105a761660dcaeb01e63416c8ec7bc62256a9b411a05fcd67"
@@ -172,27 +156,6 @@
   pruneopts = "UT"
   revision = "f5bce3387232559bcbe6a5f8227c4bf508dac1ba"
   version = "v1.11.0"
-
-[[projects]]
-  digest = "1:07140002dbf37da92090f731b46fa47be4820b82fe5c14a035203b0e813d0ec2"
-  name = "github.com/nicksnyder/go-i18n"
-  packages = [
-    "i18n",
-    "i18n/bundle",
-    "i18n/language",
-    "i18n/translation",
-  ]
-  pruneopts = "UT"
-  revision = "0dc1626d56435e9d605a29875701721c54bc9bbd"
-  version = "v1.10.0"
-
-[[projects]]
-  digest = "1:95741de3af260a92cc5c7f3f3061e85273f5a81b5db20d4bd68da74bd521675e"
-  name = "github.com/pelletier/go-toml"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "c01d1270ff3e442a8a57cddc1c92dc1138598194"
-  version = "v1.2.0"
 
 [[projects]]
   digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
@@ -315,14 +278,6 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:0824a2eb250dd552f41daaf471266d085e8e8cabdbff9e4294bc799076e00da7"
-  name = "golang.org/x/lint"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "959b441ac422379a43da2230f62be024250818b0"
-
-[[projects]]
-  branch = "master"
   digest = "1:2f7468b0b3fd7d926072f0dcbb6ec81e337278b4e5de639d017e54f785f0b475"
   name = "golang.org/x/net"
   packages = [
@@ -400,13 +355,6 @@
   version = "v1.5.0"
 
 [[projects]]
-  digest = "1:39efb07a0d773dc09785b237ada4e10b5f28646eb6505d97bc18f8d2ff439362"
-  name = "gopkg.in/alecthomas/kingpin.v3-unstable"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "63abe20a23e29e80bbef8089bd3dee3ac25e5306"
-
-[[projects]]
   digest = "1:9593bab40e981b1f90b7e07faeab0d09b75fe338880d08880f986a9d3283c53f"
   name = "gopkg.in/square/go-jose.v2"
   packages = [
@@ -418,14 +366,6 @@
   pruneopts = "UT"
   revision = "730df5f748271903322feb182be83b43ebbbe27d"
   version = "v2.3.1"
-
-[[projects]]
-  digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"
-  name = "gopkg.in/yaml.v2"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
-  version = "v2.2.1"
 
 [solve-meta]
   analyzer-name = "dep"
@@ -445,12 +385,14 @@
     "github.com/smallstep/cli/crypto/x509util",
     "github.com/smallstep/cli/errs",
     "github.com/smallstep/cli/jose",
+    "github.com/smallstep/cli/pkg/x509",
     "github.com/smallstep/cli/token",
     "github.com/smallstep/cli/token/provision",
     "github.com/smallstep/cli/usage",
     "github.com/smallstep/nosql",
     "github.com/smallstep/nosql/database",
     "github.com/urfave/cli",
+    "golang.org/x/crypto/ed25519",
     "golang.org/x/crypto/ocsp",
     "golang.org/x/net/http2",
     "gopkg.in/square/go-jose.v2",

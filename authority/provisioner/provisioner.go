@@ -150,7 +150,16 @@ func (l *List) UnmarshalJSON(data []byte) error {
 		case "azure":
 			p = &Azure{}
 		default:
-			return errors.Errorf("provisioner type %s not supported", typ.Type)
+			// Skip unsupported provisioners. A client using this method may be
+			// compiled with a version of smallstep/certificates that does not
+			// support a specific provisioner type. If we don't skip unknown
+			// provisioners, a client encountering an unknown provisioner will
+			// break. Rather than break the client, we skip the provisioner.
+			// TODO: accept a pluggable logger (depending on client) that can
+			// warn the user that an unknown provisioner was found and suggest
+			// that the user update their client's dependency on
+			// step/certificates and recompile.
+			continue
 		}
 		if err := json.Unmarshal(data, p); err != nil {
 			return errors.Errorf("error unmarshaling provisioner")
