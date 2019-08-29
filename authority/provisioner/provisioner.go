@@ -3,6 +3,7 @@ package provisioner
 import (
 	"crypto/x509"
 	"encoding/json"
+	"log"
 	"net/url"
 	"strings"
 
@@ -150,10 +151,15 @@ func (l *List) UnmarshalJSON(data []byte) error {
 		case "azure":
 			p = &Azure{}
 		default:
-			// Skip unsupported files. When this method is specially used on
-			// clients, these might be compiled with a version that does not
-			// support a specific provisioner type, if we don't skip it we will
-			// force to re-compile the client to make it compatible.
+			// Skip unsupported provisioners. A client using this method may be
+			// compiled with a version of smallstep/certificates that does not
+			// support a specific provisioner type. If we don't skip unknown
+			// provisioners, a client encountering an unknown provisioner will
+			// break. Rather than break the client, we skip the provisioner but
+			// warn the user that an unknown provisioner was found and suggest
+			// that the user update their client's dependency on
+			// step/certificates and recompile.
+			log.Printf("[WARN] Unknown provisioner of type '%s' found. Please update your client.", typ.Type)
 			continue
 		}
 		if err := json.Unmarshal(data, p); err != nil {
