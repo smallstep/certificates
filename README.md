@@ -100,8 +100,7 @@ While `step` is not required to run `step-ca`, it will make your life easier so 
 
 Install `step`  and `step-ca` together via [Homebrew](https://brew.sh/):
 
-<pre><code>
-<b>$ brew install step</b>
+<pre><code><b>$ brew install step</b>
 
 # Test installation ...
 <b>$ step certificate inspect https://smallstep.com</b>
@@ -111,15 +110,15 @@ Certificate:
         Serial Number: 326381749415081530968054238478851085504954 (0x3bf265673332db2d0c70e48a163fb7d11ba)
     Signature Algorithm: SHA256-RSA
         Issuer: C=US,O=Let's Encrypt,CN=Let's Encrypt Authority X3
-...
-</code></pre>
+...</code></pre>
 
 > Note: If you have installed `step` previously through the `smallstep/smallstep`
 > tap you will need to run the following commands before installing:
-```
-$ brew untap smallstep/smallstep
-$ brew uninstall step
-```
+> 
+> ```
+> $ brew untap smallstep/smallstep
+> $ brew uninstall step
+> ```
 
 ### Linux
 
@@ -180,15 +179,13 @@ helm install step-certificates
 
 ### Test
 
-<pre><code>
-<b>$ step version</b>
+<pre><code><b>$ step version</b>
 Smallstep CLI/0.10.0 (darwin/amd64)
 Release Date: 2019-04-30 19:01 UTC
 
 <b>$ step-ca version</b>
 Smallstep CA/0.10.0 (darwin/amd64)
-Release Date: 2019-04-30 19:02 UTC
-</code></pre>
+Release Date: 2019-04-30 19:02 UTC</code></pre>
 
 ## Quickstart
 
@@ -206,8 +203,7 @@ communication. Let's get started!
 
 #### 1. Run `step ca init` to create your CA's keys & certificates and configure `step-ca`:
 
-<pre><code>
-<b>$ step ca init</b>
+<pre><code><b>$ step ca init</b>
 ✔ What would you like to name your new PKI? (e.g. Smallstep): <b>Example Inc.</b>
 ✔ What DNS names or IP addresses would you like to add to your new CA? (e.g. ca.smallstep.com[,1.1.1.1,etc.]): <b>localhost</b>
 ✔ What address will your new CA listen at? (e.g. :443): <b>127.0.0.1:8080</b>
@@ -228,8 +224,7 @@ all done!
 ✔ Default configuration: /Users/bob/src/github.com/smallstep/step/.step/config/defaults.json
 ✔ Certificate Authority configuration: /Users/bob/src/github.com/smallstep/step/.step/config/ca.json
 
-Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.
-</code></pre>
+Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.</code></pre>
 
 This command will:
 
@@ -243,11 +238,9 @@ You can find these artifacts in `$STEPPATH` (or `~/.step` by default).
 
 You'll be prompted for your password from the previous step, to decrypt the CA's private signing key:
 
-<pre><code>
-<b>$ step-ca $(step path)/config/ca.json</b>
+<pre><code><b>$ step-ca $(step path)/config/ca.json</b>
 Please enter the password to decrypt /Users/bob/src/github.com/smallstep/step/.step/secrets/intermediate_ca_key: <b>abc123</b>
-2019/02/18 13:28:58 Serving HTTPS on 127.0.0.1:8080 ...
-</code></pre>
+2019/02/18 13:28:58 Serving HTTPS on 127.0.0.1:8080 ...</code></pre>
 
 #### 3. Copy our `hello world` golang server.
 
@@ -277,8 +270,7 @@ EOF
 
 #### 4. Get an identity for your server from the Step CA.
 
-<pre><code>
-<b>$ step ca certificate localhost srv.crt srv.key</b>
+<pre><code><b>$ step ca certificate localhost srv.crt srv.key</b>
 ✔ Key ID: rQxROEr7Kx9TNjSQBTETtsu3GKmuW9zm02dMXZ8GUEk (bob@example.com)
 ✔ Please enter the password to decrypt the provisioner key: abc123
 ✔ CA: https://localhost:8080/1.0/sign
@@ -307,32 +299,25 @@ Certificate:
             Not Before: Feb 18 21:27:21 2019 UTC
             Not After : Feb 15 21:27:21 2029 UTC
         Subject: CN=Example Inc. Intermediate CA
-...
-</code></pre>
+...</code></pre>
 
 Note that `step` and `step-ca` handle details like [certificate bundling](https://smallstep.com/blog/everything-pki.html#intermediates-chains-and-bundling) for you.
 
 #### 5. Run the simple server.
 
-<pre><code>
-<b>$ go run srv.go &</b>
-</code></pre>
+<pre><code><b>$ go run srv.go &</b></code></pre>
 
 #### 6. Get the root certificate from the Step CA.
 
 In a new Terminal window:
 
-<pre><code>
-<b>$ step ca root root.crt</b>
-The root certificate has been saved in root.crt.
-</code></pre>
+<pre><code><b>$ step ca root root.crt</b>
+The root certificate has been saved in root.crt.</code></pre>
 
 #### 7. Make an authenticated, encrypted curl request to your server using HTTP over TLS.
 
-<pre><code>
-<b>$ curl --cacert root.crt https://localhost:8443/hi</b>
-Hello, world!
-</code></pre>
+<pre><code><b>$ curl --cacert root.crt https://localhost:8443/hi</b>
+Hello, world!</code></pre>
 
 *All Done!*
 
