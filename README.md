@@ -351,5 +351,5 @@ help solve problems in this space.
 
 ## Further Reading
 
-Check out the [Getting Started](./docs/GETTING_STARTED.md) guide for more examples
+Check out the [Getting Started](https://smallstep.com/docs/getting-started/) guide for more examples
 and best practices on running Step CA in production.
