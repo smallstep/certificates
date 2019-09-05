@@ -83,6 +83,7 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 		}
 		// If matches with stored audiences it will be a JWT token (default), and
 		// the id would be <issuer>:<kid>.
+		fmt.Printf("token.Headers[0].ExtraHeaders = %+v\n", token.Headers[0].ExtraHeaders)
 		return c.Load(claims.Issuer + ":" + token.Headers[0].KeyID)
 	}
 
