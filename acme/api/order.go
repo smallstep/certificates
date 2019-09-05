@@ -97,7 +97,6 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, acme.URLSafeProvisionerName(prov), true, o.GetID()))
 	api.JSONStatus(w, o, http.StatusCreated)
-	return
 }
 
 // GetOrder ACME api for retrieving an order.
@@ -121,7 +120,6 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, acme.URLSafeProvisionerName(prov), true, o.GetID()))
 	api.JSON(w, o)
-	return
 }
 
 // FinalizeOrder attemptst to finalize an order and create a certificate.
@@ -160,5 +158,4 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, acme.URLSafeProvisionerName(prov), true, o.ID))
 	api.JSON(w, o)
-	return
 }

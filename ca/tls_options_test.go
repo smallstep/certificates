@@ -553,7 +553,7 @@ func equalPools(a, b *x509.CertPool) bool {
 	for i := range subjects {
 		sB[i] = string(subjects[i])
 	}
-	sort.Sort(sort.StringSlice(sA))
-	sort.Sort(sort.StringSlice(sB))
+	sort.Strings(sA)
+	sort.Strings(sB)
 	return reflect.DeepEqual(sA, sB)
 }

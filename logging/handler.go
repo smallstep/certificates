@@ -32,7 +32,7 @@ func (l *LoggerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	t := time.Now()
 	rw := NewResponseLogger(w)
 	l.next.ServeHTTP(rw, r)
-	d := time.Now().Sub(t)
+	d := time.Since(t)
 	l.writeEntry(rw, r, t, d)
 }
 

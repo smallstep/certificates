@@ -69,10 +69,12 @@ func (p *ACME) AuthorizeSign(ctx context.Context, _ string) ([]SignOption, error
 		return nil, errors.Errorf("unexpected method type %d in context", m)
 	}
 	return []SignOption{
-		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeACME, p.Name, ""),
-		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		// validators
 		defaultPublicKeyValidator{},
+		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	}, nil
 }
 

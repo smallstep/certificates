@@ -53,19 +53,6 @@ func (v profileWithOption) Option(Options) x509util.WithOption {
 	return x509util.WithOption(v)
 }
 
-// profileDefaultDuration is a wrapper against x509util.WithOption to conform the
-// interface.
-type profileDefaultDuration time.Duration
-
-func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
-	notBefore := so.NotBefore.Time()
-	if notBefore.IsZero() {
-		notBefore = time.Now()
-	}
-	notAfter := so.NotAfter.RelativeTime(notBefore)
-	return x509util.WithNotBeforeAfterDuration(notBefore, notAfter, time.Duration(v))
-}
-
 // emailOnlyIdentity is a CertificateRequestValidator that checks that the only
 // SAN provided is the given email address.
 type emailOnlyIdentity string
@@ -197,7 +184,61 @@ func (v emailAddressesValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
-// validityValidator validates the certificate temporal validity settings.
+// profileDefaultDuration is a wrapper against x509util.WithOption to conform
+// the SignOption interface.
+type profileDefaultDuration time.Duration
+
+func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
+	notBefore := so.NotBefore.Time()
+	if notBefore.IsZero() {
+		notBefore = time.Now()
+	}
+	notAfter := so.NotAfter.RelativeTime(notBefore)
+	return x509util.WithNotBeforeAfterDuration(notBefore, notAfter, time.Duration(v))
+}
+
+// profileLimitDuration is an x509 profile option that modifies an x509 validity
+// period according to an imposed expiration time.
+type profileLimitDuration struct {
+	def      time.Duration
+	notAfter time.Time
+}
+
+// Option returns an x509util option that limits the validity period of a
+// certificate to one that is superficially imposed.
+func (v profileLimitDuration) Option(so Options) x509util.WithOption {
+	return func(p x509util.Profile) error {
+		n := now()
+		notBefore := so.NotBefore.Time()
+		if notBefore.IsZero() {
+			notBefore = n
+		}
+		if notBefore.After(v.notAfter) {
+			return errors.Errorf("provisioning credential expiration (%s) is before "+
+				"requested certificate notBefore (%s)", v.notAfter, notBefore)
+		}
+
+		notAfter := so.NotAfter.RelativeTime(notBefore)
+		if notAfter.After(v.notAfter) {
+			return errors.Errorf("provisioning credential expiration (%s) is before "+
+				"requested certificate notAfter (%s)", v.notAfter, notBefore)
+		}
+		if notAfter.IsZero() {
+			t := notBefore.Add(v.def)
+			if t.After(v.notAfter) {
+				notAfter = v.notAfter
+			} else {
+				notAfter = t
+			}
+		}
+		crt := p.Subject()
+		crt.NotBefore = notBefore
+		crt.NotAfter = notAfter
+		return nil
+	}
+}
+
+// validityValidator validates the certificate validity settings.
 type validityValidator struct {
 	min time.Duration
 	max time.Duration
@@ -208,7 +249,8 @@ func newValidityValidator(min, max time.Duration) *validityValidator {
 	return &validityValidator{min: min, max: max}
 }
 
-// Validate validates the certificate temporal validity settings.
+// Valid validates the certificate validity settings (notBefore/notAfter) and
+// and total duration.
 func (v *validityValidator) Valid(crt *x509.Certificate) error {
 	var (
 		na  = crt.NotAfter

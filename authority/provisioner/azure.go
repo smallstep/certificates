@@ -266,8 +266,8 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	}
 
 	// Check for the sign ssh method, default to sign X.509
-	if m := MethodFromContext(ctx); m == SignSSHMethod {
-		if p.claimer.IsSSHCAEnabled() == false {
+	if MethodFromContext(ctx) == SignSSHMethod {
+		if !p.claimer.IsSSHCAEnabled() {
 			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
 		}
 		return p.authorizeSSHSign(claims, name)
@@ -284,9 +284,11 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	}
 
 	return append(so,
-		defaultPublicKeyValidator{},
-		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID),
+		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		// validators
+		defaultPublicKeyValidator{},
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	), nil
 }
@@ -323,13 +325,15 @@ func (p *Azure) authorizeSSHSign(claims azurePayload, name string) ([]SignOption
 	signOptions = append(signOptions, sshCertificateDefaultsModifier(defaults))
 
 	return append(signOptions,
-		// set the default extensions
+		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
-		// checks the validity bounds, and set the validity if has not been set
-		&sshCertificateValidityModifier{p.claimer},
-		// validate public key
+		// Set the validity bounds if not set.
+		sshDefaultValidityModifier(p.claimer),
+		// Validate public key
 		&sshDefaultPublicKeyValidator{},
-		// require all the fields in the SSH certificate
+		// Validate the validity period.
+		&sshCertificateValidityValidator{p.claimer},
+		// Require all the fields in the SSH certificate
 		&sshCertificateDefaultValidator{},
 	), nil
 }

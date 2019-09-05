@@ -23,9 +23,6 @@
 #   non-go = false
 #   go-tests = true
 #   unused-packages = true
-[[override]]
-  name = "gopkg.in/alecthomas/kingpin.v3-unstable"
-  revision = "63abe20a23e29e80bbef8089bd3dee3ac25e5306"
 
 [[constraint]]
   branch = "master"
