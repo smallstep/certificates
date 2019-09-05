@@ -291,7 +291,7 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 				if tt.name == "admin" {
 					assert.Len(t, 3, got)
 				} else {
-					assert.Len(t, 4, got)
+					assert.Len(t, 5, got)
 				}
 			}
 		})

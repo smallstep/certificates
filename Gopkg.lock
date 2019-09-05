@@ -10,38 +10,12 @@
   revision = "e2d15f34fcf99d5dbb871c820ec73f710fca9815"
 
 [[projects]]
-  digest = "1:304cb78c285eaf02ab529ad02a257cad9b4845022915e6c82f87860ac53222d8"
-  name = "github.com/alecthomas/gometalinter"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "bae2f1293d092fd8167939d5108d1b025eaef9de"
-
-[[projects]]
-  branch = "master"
-  digest = "1:c198fdc381e898e8fb62b8eb62758195091c313ad18e52a3067366e1dda2fb3c"
-  name = "github.com/alecthomas/units"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a"
-
-[[projects]]
   branch = "master"
   digest = "1:454adc7f974228ff789428b6dc098638c57a64aa0718f0bd61e53d3cd39d7a75"
   name = "github.com/chzyer/readline"
   packages = ["."]
   pruneopts = "UT"
   revision = "2972be24d48e78746da79ba8e24e8b488c9880de"
-
-[[projects]]
-  digest = "1:848ef40f818e59905140552cc49ff3dc1a15f955e4b56d1c5c2cc4b54dbadf0c"
-  name = "github.com/client9/misspell"
-  packages = [
-    ".",
-    "cmd/misspell",
-  ]
-  pruneopts = "UT"
-  revision = "b90dc15cfd220ecf8bbc9043ecb928cef381f011"
-  version = "v0.3.4"
 
 [[projects]]
   digest = "1:21ac9938fb1098b3a7b0dd909fb30878d33231177fac11a2821114eb9c1088ff"
@@ -83,39 +57,12 @@
   version = "v1.4.1"
 
 [[projects]]
-  branch = "travis-1.9"
-  digest = "1:e8f5d9c09a7209c740e769713376abda388c41b777ba8e9ed52767e21acf379f"
-  name = "github.com/golang/lint"
-  packages = [
-    ".",
-    "golint",
-  ]
-  pruneopts = "UT"
-  revision = "883fe33ffc4344bad1ecd881f61afd5ec5d80e0a"
-
-[[projects]]
   digest = "1:97df918963298c287643883209a2c3f642e6593379f97ab400c2a2e219ab647d"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
   pruneopts = "UT"
   revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
   version = "v1.2.0"
-
-[[projects]]
-  branch = "master"
-  digest = "1:750e747d0aad97b79f4a4e00034bae415c2ea793fd9e61438d966ee9c79579bf"
-  name = "github.com/google/shlex"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "6f45313302b9c56850fc17f99e40caebce98c716"
-
-[[projects]]
-  branch = "master"
-  digest = "1:824d147914b40e56e9e1eebd602bc6bb9761989d52fd8e4a498428467980eb17"
-  name = "github.com/gordonklaus/ineffassign"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "1003c8bd00dc2869cb5ca5282e6ce33834fed514"
 
 [[projects]]
   branch = "master"
@@ -145,7 +92,7 @@
   revision = "2d01aacdc34a083dca635ba869909f5fc0cd4f41"
 
 [[projects]]
-  digest = "1:2a2a76072bd413b3484a0b5bb2fbb078b0b7dd8950e9276c900e14dce2354679"
+  digest = "1:2d2bc0f23cca6b59cec3fbece9abc102bdb19f548dd58d7667e57699074a2c76"
   name = "github.com/manifoldco/promptui"
   packages = [
     ".",
@@ -153,8 +100,8 @@
     "screenbuf",
   ]
   pruneopts = "UT"
-  revision = "20f2a94120aa14a334121a6de66616a7fa89a5cd"
-  version = "v0.3.2"
+  revision = "157c96fb638a14d268b305cf2012582431fcc410"
+  version = "v0.3.1"
 
 [[projects]]
   digest = "1:c658e84ad3916da105a761660dcaeb01e63416c8ec7bc62256a9b411a05fcd67"
@@ -211,27 +158,6 @@
   version = "v1.11.0"
 
 [[projects]]
-  digest = "1:07140002dbf37da92090f731b46fa47be4820b82fe5c14a035203b0e813d0ec2"
-  name = "github.com/nicksnyder/go-i18n"
-  packages = [
-    "i18n",
-    "i18n/bundle",
-    "i18n/language",
-    "i18n/translation",
-  ]
-  pruneopts = "UT"
-  revision = "0dc1626d56435e9d605a29875701721c54bc9bbd"
-  version = "v1.10.0"
-
-[[projects]]
-  digest = "1:95741de3af260a92cc5c7f3f3061e85273f5a81b5db20d4bd68da74bd521675e"
-  name = "github.com/pelletier/go-toml"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "c01d1270ff3e442a8a57cddc1c92dc1138598194"
-  version = "v1.2.0"
-
-[[projects]]
   digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
   name = "github.com/pkg/errors"
   packages = ["."]
@@ -281,7 +207,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:8eb842c27bca9dae16d77baeba7cf612135033da381faf833bb8c11c29a751c7"
+  digest = "1:4998154cc4ffb0ab954b7ecaad6899dcdea8f8ec79c94a071994d1a3b332d493"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
@@ -302,7 +228,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "98635d188cade54451e3997b530716297ce7fc00"
+  revision = "3254c70079f798ee5f269c98fe27abd9a11c4aad"
 
 [[projects]]
   branch = "master"
@@ -317,14 +243,6 @@
   ]
   pruneopts = "UT"
   revision = "a0934e12468769d8cbede3ed316c47a4b88de4ca"
-
-[[projects]]
-  branch = "master"
-  digest = "1:ba52e5a5fb800ce55108b7a5f181bb809aab71c16736051312b0aa969f82ad39"
-  name = "github.com/tsenart/deadcode"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "210d2dc333e90c7e3eedf4f2242507a8e83ed4ab"
 
 [[projects]]
   branch = "master"
@@ -442,13 +360,6 @@
   version = "v1.5.0"
 
 [[projects]]
-  digest = "1:39efb07a0d773dc09785b237ada4e10b5f28646eb6505d97bc18f8d2ff439362"
-  name = "gopkg.in/alecthomas/kingpin.v3-unstable"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "63abe20a23e29e80bbef8089bd3dee3ac25e5306"
-
-[[projects]]
   digest = "1:9593bab40e981b1f90b7e07faeab0d09b75fe338880d08880f986a9d3283c53f"
   name = "gopkg.in/square/go-jose.v2"
   packages = [
@@ -461,23 +372,11 @@
   revision = "730df5f748271903322feb182be83b43ebbbe27d"
   version = "v2.3.1"
 
-[[projects]]
-  digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"
-  name = "gopkg.in/yaml.v2"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
-  version = "v2.2.1"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/alecthomas/gometalinter",
-    "github.com/client9/misspell/cmd/misspell",
     "github.com/go-chi/chi",
-    "github.com/golang/lint/golint",
-    "github.com/gordonklaus/ineffassign",
     "github.com/newrelic/go-agent",
     "github.com/pkg/errors",
     "github.com/rs/xid",
@@ -491,13 +390,14 @@
     "github.com/smallstep/cli/crypto/x509util",
     "github.com/smallstep/cli/errs",
     "github.com/smallstep/cli/jose",
+    "github.com/smallstep/cli/pkg/x509",
     "github.com/smallstep/cli/token",
     "github.com/smallstep/cli/token/provision",
     "github.com/smallstep/cli/usage",
     "github.com/smallstep/nosql",
     "github.com/smallstep/nosql/database",
-    "github.com/tsenart/deadcode",
     "github.com/urfave/cli",
+    "golang.org/x/crypto/ed25519",
     "golang.org/x/crypto/ocsp",
     "golang.org/x/crypto/ssh",
     "golang.org/x/net/http2",

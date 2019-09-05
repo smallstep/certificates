@@ -563,8 +563,7 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 		return nil, nil, errors.Wrap(err, "error generating key")
 	}
 
-	var emails []string
-	dnsNames, ips := x509util.SplitSANs(claims.SANs)
+	dnsNames, ips, emails := x509util.SplitSANs(claims.SANs)
 	if claims.Email != "" {
 		emails = append(emails, claims.Email)
 	}

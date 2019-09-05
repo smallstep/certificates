@@ -283,12 +283,18 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		}, nil
 	}
 
-	return []SignOption{
-		emailOnlyIdentity(claims.Email),
+	so := []SignOption{
+		defaultPublicKeyValidator{},
 		profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
 		newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
-	}, nil
+	}
+	// Admins should be able to authorize any SAN
+	if o.IsAdmin(claims.Email) {
+		return so, nil
+	}
+
+	return append(so, emailOnlyIdentity(claims.Email)), nil
 }
 
 // AuthorizeRenewal returns an error if the renewal is disabled.

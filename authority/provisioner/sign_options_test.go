@@ -7,6 +7,12 @@ import (
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/smallstep/assert"
+	"github.com/smallstep/cli/crypto/pemutil"
+	"github.com/smallstep/cli/crypto/x509util"
+	stepx509 "github.com/smallstep/cli/pkg/x509"
 )
 
 func Test_emailOnlyIdentity_Valid(t *testing.T) {
@@ -36,6 +42,72 @@ func Test_emailOnlyIdentity_Valid(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.e.Valid(tt.args.req); (err != nil) != tt.wantErr {
 				t.Errorf("emailOnlyIdentity.Valid() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_defaultPublicKeyValidator_Valid(t *testing.T) {
+	_shortRSA, err := pemutil.Read("./testdata/short-rsa.csr")
+	assert.FatalError(t, err)
+	shortRSA, ok := _shortRSA.(*x509.CertificateRequest)
+	assert.Fatal(t, ok)
+
+	_rsa, err := pemutil.Read("./testdata/rsa.csr")
+	assert.FatalError(t, err)
+	rsaCSR, ok := _rsa.(*x509.CertificateRequest)
+	assert.Fatal(t, ok)
+
+	_ecdsa, err := pemutil.Read("./testdata/ecdsa.csr")
+	assert.FatalError(t, err)
+	ecdsaCSR, ok := _ecdsa.(*x509.CertificateRequest)
+	assert.Fatal(t, ok)
+
+	_ed25519, err := pemutil.Read("./testdata/ed25519.csr", pemutil.WithStepCrypto())
+	assert.FatalError(t, err)
+	ed25519CSR, ok := _ed25519.(*stepx509.CertificateRequest)
+	assert.Fatal(t, ok)
+
+	v := defaultPublicKeyValidator{}
+	tests := []struct {
+		name string
+		csr  *x509.CertificateRequest
+		err  error
+	}{
+		{
+			"fail/unrecognized-key-type",
+			&x509.CertificateRequest{PublicKey: "foo"},
+			errors.New("unrecognized public key of type 'string' in CSR"),
+		},
+		{
+			"fail/rsa/too-short",
+			shortRSA,
+			errors.New("rsa key in CSR must be at least 2048 bits (256 bytes)"),
+		},
+		{
+			"ok/rsa",
+			rsaCSR,
+			nil,
+		},
+		{
+			"ok/ecdsa",
+			ecdsaCSR,
+			nil,
+		},
+		{
+			"ok/ed25519",
+			x509util.ToX509CertificateRequest(ed25519CSR),
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := v.Valid(tt.csr); err != nil {
+				if assert.NotNil(t, tt.err) {
+					assert.HasPrefix(t, err.Error(), tt.err.Error())
+				}
+			} else {
+				assert.Nil(t, tt.err)
 			}
 		})
 	}
@@ -83,6 +155,33 @@ func Test_commonNameSliceValidator_Valid(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.v.Valid(tt.args.req); (err != nil) != tt.wantErr {
 				t.Errorf("commonNameSliceValidator.Valid() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_emailAddressesValidator_Valid(t *testing.T) {
+	type args struct {
+		req *x509.CertificateRequest
+	}
+	tests := []struct {
+		name    string
+		v       emailAddressesValidator
+		args    args
+		wantErr bool
+	}{
+		{"ok0", []string{}, args{&x509.CertificateRequest{EmailAddresses: []string{}}}, false},
+		{"ok1", []string{"max@smallstep.com"}, args{&x509.CertificateRequest{EmailAddresses: []string{"max@smallstep.com"}}}, false},
+		{"ok2", []string{"max@step.com", "mike@step.com"}, args{&x509.CertificateRequest{EmailAddresses: []string{"max@step.com", "mike@step.com"}}}, false},
+		{"ok3", []string{"max@step.com", "mike@step.com"}, args{&x509.CertificateRequest{EmailAddresses: []string{"mike@step.com", "max@step.com"}}}, false},
+		{"fail1", []string{"max@step.com"}, args{&x509.CertificateRequest{EmailAddresses: []string{"mike@step.com"}}}, true},
+		{"fail2", []string{"mike@step.com"}, args{&x509.CertificateRequest{EmailAddresses: []string{"max@step.com", "mike@step.com"}}}, true},
+		{"fail3", []string{"mike@step.com", "max@step.com"}, args{&x509.CertificateRequest{DNSNames: []string{"mike@step.com", "mex@step.com"}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.v.Valid(tt.args.req); (err != nil) != tt.wantErr {
+				t.Errorf("dnsNamesValidator.Valid() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

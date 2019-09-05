@@ -313,9 +313,9 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		wantLen int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 3, false},
-		{"ok", p2, args{t2}, 5, false},
-		{"ok", p3, args{t3}, 3, false},
+		{"ok", p1, args{t1}, 4, false},
+		{"ok", p2, args{t2}, 6, false},
+		{"ok", p3, args{t3}, 4, false},
 		{"fail token", p1, args{"token"}, 0, true},
 		{"fail key", p1, args{failKey}, 0, true},
 		{"fail iss", p1, args{failIss}, 0, true},

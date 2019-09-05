@@ -2,6 +2,10 @@
 
 An online certificate authority and related tools for secure automated certificate management, so you can use TLS everywhere.
 
+This repository is for `step-ca`, a certificate authority that exposes an API for automated certificate management. It also contains a [golang SDK](https://github.com/smallstep/certificates/tree/master/examples#basic-client-usage) for interacting with `step-ca` programatically. However, you'll probably want to use the [`step` command-line tool](https://github.com/smallstep/cli) to operate `step-ca` and get certificates, instead of using this low-level SDK directly.
+
+**Questions? Find us [on gitter](https://gitter.im/smallstep/community).**
+
 [Website](https://smallstep.com) |
 [Documentation](#documentation) |
 [Installation Guide](#installation-guide) |
@@ -20,6 +24,38 @@ An online certificate authority and related tools for secure automated certifica
 [![Twitter followers](https://img.shields.io/twitter/follow/smallsteplabs.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=smallsteplabs)
 
 ![Animated terminal showing step certificates in practice](https://github.com/smallstep/certificates/raw/master/docs/images/step-ca-2-legged.gif)
+
+## Features
+
+It's super easy to get started and to operate `step-ca` thanks to [streamlined initialization](https://github.com/smallstep/certificates#lets-get-started) and [safe, sane defaults](https://github.com/smallstep/certificates/blob/master/docs/defaults.md). **Get started in 15 minutes.**
+
+### A private certificate authority you run yourself
+
+- Issue client and server certificates to VMs, containers, devices, and people using internal hostnames and emails
+- [RFC5280](https://tools.ietf.org/html/rfc5280) and [CA/Browser Forum](https://cabforum.org/baseline-requirements-documents/) compliant certificates that work **for TLS and HTTPS** (SSH coming soon!)
+- Choose key types (RSA, ECDSA, EdDSA) & lifetimes to suit your needs
+- [Short-lived certificates](https://smallstep.com/blog/passive-revocation.html) with **fully automated** enrollment, renewal, and revocation
+- Fast, stable, and capable of high availability deployment using [root federation](https://smallstep.com/blog/step-v0.8.3-federation-root-rotation.html) and/or multiple intermediaries
+- Operate as an online intermediate for an existing root CA
+- [Pluggable database backends](https://github.com/smallstep/certificates/blob/master/docs/database.md) for persistence
+- [Helm charts](https://hub.helm.sh/charts/smallstep/step-certificates), [autocert](https://github.com/smallstep/autocert), and [cert-manager integration](https://github.com/smallstep/step-issuer) for kubernetes
+
+### Lots of (automatable) ways to get certificates
+
+- [Single sign-on](https://smallstep.com/blog/easily-curl-services-secured-by-https-tls.html) using Okta, GSuite, Active Directory, or any other OAuth OIDC identity provider
+- Instance identity documents for VMs on AWS, GCP, and Azure
+- [Single-use short-lived tokens](https://smallstep.com/docs/design-doc.html#jwk-provisioner) issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
+- Use an existing certificate from another CA (e.g., using a device certificate like [Twilio's Trust OnBoard](https://www.twilio.com/wireless/trust-onboard)) *coming soon*
+- ACMEv2 (RFC8555) support so you can **run your own private ACME server** *[coming soon](https://github.com/smallstep/certificates/tree/acme)*
+
+### Easy certificate management and automation via [`step` CLI](https://github.com/smallstep/cli) [integration](https://smallstep.com/docs/cli/ca/)
+
+- Generate key pairs where they're needed so private keys are never transmitted across the network
+- [Authenticate and obtain a certificate](https://smallstep.com/docs/cli/ca/certificate/) using any enrollment mechanism supported by `step-ca`
+- Securely [distribute root certificates](https://smallstep.com/docs/cli/ca/root/) and [bootstrap](https://smallstep.com/docs/cli/ca/bootstrap/) PKI relying parties
+- [Renew](https://smallstep.com/docs/cli/ca/renew/) and [revoke](https://smallstep.com/docs/cli/ca/revoke/) certificates issued by `step-ca`
+- [Install root certificates](https://smallstep.com/docs/cli/certificate/install/) so your CA is trusted by default (issue development certificates **that [work in browsers](https://smallstep.com/blog/step-v0-8-6-valid-HTTPS-certificates-for-dev-pre-prod.html)**)
+- [Inspect](https://smallstep.com/docs/cli/certificate/inspect/) and [lint](https://smallstep.com/docs/cli/certificate/lint/) certificates
 
 ## Motivation
 
@@ -49,35 +85,22 @@ need.
 makes it much easier to implement good security practices early, and
 incrementally improve them as your system matures.
 
-For more information and docs see [the Step
+For more information and [docs](https://smallstep.com/docs) see [the smallstep
 website](https://smallstep.com/certificates) and the [blog
-post](https://smallstep.com/blog/step-certificates.html) announcing Step
-Certificate Authority.
-
-> ## 🆕 Autocert <a href="https://github.com/smallstep/autocert"><img width="50%" src="https://raw.githubusercontent.com/smallstep/autocert/master/autocert-logo.png"></a>
->
-> If you're using Kubernetes, make sure you [check out
-> autocert](https://github.com/smallstep/autocert): a kubernetes add-on that builds on `step
-> certificates` to automatically inject TLS/HTTPS certificates into your containers.
+post](https://smallstep.com/blog/step-certificates.html) announcing this project.
 
 ## Installation Guide
 
 These instructions will install an OS specific version of the `step-ca` binary on
 your local machine.
 
-> NOTE: While `step` is not required to run the Step Certificate Authority (CA)
-> we strongly recommend installing both `step cli` and `step certificates`
-> because the Step CA is much easier to initialize, manage, and debug using
-> the `step cli` toolkit.
+While `step` is not required to run `step-ca`, it will make your life easier so you'll probably want to [install it](https://github.com/smallstep/cli#installation-guide) too.
 
 ### Mac OS
 
-Install `step` via [Homebrew](https://brew.sh/). The
-[Homebrew Formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/step.rb)
-installs both `step cli` and `step certificates`.
+Install `step`  and `step-ca` together via [Homebrew](https://brew.sh/):
 
-<pre><code>
-<b>$ brew install step</b>
+<pre><code><b>$ brew install step</b>
 
 # Test installation ...
 <b>$ step certificate inspect https://smallstep.com</b>
@@ -87,24 +110,24 @@ Certificate:
         Serial Number: 326381749415081530968054238478851085504954 (0x3bf265673332db2d0c70e48a163fb7d11ba)
     Signature Algorithm: SHA256-RSA
         Issuer: C=US,O=Let's Encrypt,CN=Let's Encrypt Authority X3
-...
-</code></pre>
+...</code></pre>
 
 > Note: If you have installed `step` previously through the `smallstep/smallstep`
 > tap you will need to run the following commands before installing:
-```
-$ brew untap smallstep/smallstep
-$ brew uninstall step
-```
+> 
+> ```
+> $ brew untap smallstep/smallstep
+> $ brew uninstall step
+> ```
 
 ### Linux
 
 #### Debian
 
-1. [Optional] Install `step cli`.
+1. [Optional] Install `step`.
 
     Download the latest Debian package from
-    [`step cli` releases](https://github.com/smallstep/cli/releases):
+    [`step` releases](https://github.com/smallstep/cli/releases):
 
     ```
     $ wget https://github.com/smallstep/cli/releases/download/X.Y.Z/step_X.Y.Z_amd64.deb
@@ -116,10 +139,9 @@ $ brew uninstall step
     $ sudo dpkg -i step_X.Y.Z_amd64.deb
     ```
 
-2. Install `step certificates`.
+2. Install `step-ca`.
 
-    Download the latest Debian package from
-    [`step certificates` releases](https://github.com/smallstep/certificates/releases):
+    Download the latest Debian package from [releases](https://github.com/smallstep/certificates/releases):
 
     ```
     $ wget https://github.com/smallstep/certificates/releases/download/X.Y.Z/step-certificates_X.Y.Z_amd64.deb
@@ -136,29 +158,41 @@ $ brew uninstall step
 We are using the [Arch User Repository](https://aur.archlinux.org) to distribute
 `step` binaries for Arch Linux.
 
-* [Optional] The `step-cli` binary tarball can be found [here](https://aur.archlinux.org/packages/step-cli-bin/).
+* [Optional] The `step` binary tarball can be found [here](https://aur.archlinux.org/packages/step-cli-bin/).
 * The `step-ca` binary tarball can be found [here](https://aur.archlinux.org/packages/step-ca-bin/).
 
 You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
 
+### Kubernetes
+
+We publish [helm charts](https://hub.helm.sh/charts/smallstep/step-certificates) for easy installation on kubernetes:
+
+```
+helm install step-certificates
+```
+
+> <a href="https://github.com/smallstep/autocert"><img width="25%" src="https://raw.githubusercontent.com/smallstep/autocert/master/autocert-logo.png"></a>
+>
+> If you're using Kubernetes, make sure you [check out
+> autocert](https://github.com/smallstep/autocert): a kubernetes add-on that builds on `step
+> certificates` to automatically inject TLS/HTTPS certificates into your containers.
+
 ### Test
 
-<pre><code>
-<b>$ step version</b>
-Smallstep CLI/0.8.5 (darwin/amd64)
-Release Date: 2019-02-13 22:17 UTC
+<pre><code><b>$ step version</b>
+Smallstep CLI/0.10.0 (darwin/amd64)
+Release Date: 2019-04-30 19:01 UTC
 
 <b>$ step-ca version</b>
-Smallstep CA/0.8.4 (darwin/amd64)
-Release Date: 2019-02-18 18:56 UTC
-</code></pre>
+Smallstep CA/0.10.0 (darwin/amd64)
+Release Date: 2019-04-30 19:02 UTC</code></pre>
 
 ## Quickstart
 
 In the following guide we'll run a simple `hello` server that requires clients
-to connect over an authorized and encrypted channel (HTTP over TLS). The Step
-Certificate Authority (CA) will issue an identity dial tone to our server
-enabling it to authenticate and encrypt communication. Let's get started!
+to connect over an authorized and encrypted channel using HTTPS. `step-ca`
+will issue certificates to our server, allowing it to authenticate and encrypt
+communication. Let's get started!
 
 ### Prerequisites
 
@@ -167,152 +201,123 @@ enabling it to authenticate and encrypt communication. Let's get started!
 
 ### Let's get started!
 
-1. Initialize and run the Step CA.
+#### 1. Run `step ca init` to create your CA's keys & certificates and configure `step-ca`:
 
-    `step ca init` initializes the CA and accomplishes two tasks.
+<pre><code><b>$ step ca init</b>
+✔ What would you like to name your new PKI? (e.g. Smallstep): <b>Example Inc.</b>
+✔ What DNS names or IP addresses would you like to add to your new CA? (e.g. ca.smallstep.com[,1.1.1.1,etc.]): <b>localhost</b>
+✔ What address will your new CA listen at? (e.g. :443): <b>127.0.0.1:8080</b>
+✔ What would you like to name the first provisioner for your new CA? (e.g. you@smallstep.com): <b>bob@example.com</b>
+✔ What do you want your password to be? [leave empty and we'll generate one]: <b>abc123</b>
 
-    1. Generate a Public Key Infrastructure (PKI) with Root and Intermediate
-X.509 Certificates and private keys.
+Generating root certificate...
+all done!
 
-       The root X.509 Certificate is a fancy public key that will be
-       distributed to clients enabling them to authenticate all certificates
-       generated by your PKI. The root private key should be kept in a very
-       private place - but as this is just a demo we won't worry about that
-       right now ([more info on storing sensitive
-       data](./docs/GETTING_STARTED.md#passwords)). The intermediate
-       private key will be used to sign new certificates ([Why is it more
-       secure to use intermediate CA
-       certificates?](https://security.stackexchange.com/questions/128779/why-is-it-more-secure-to-use-intermediate-ca-certificates))
-       and the intermediate certificate will be distributed along with newly
-       minted leaf certificates. In our demo, the server will present the
-       intermediate certificate along with it's *server* (leaf) certificate
-       allowing our client to validate the full chain using the root.
+Generating intermediate certificate...
+all done!
 
-    2. Generate the configuration file required by the Step CA.
+✔ Root certificate: /Users/bob/src/github.com/smallstep/step/.step/certs/root_ca.crt
+✔ Root private key: /Users/bob/src/github.com/smallstep/step/.step/secrets/root_ca_key
+✔ Root fingerprint: 702a094e239c9eec6f0dcd0a5f65e595bf7ed6614012825c5fe3d1ae1b2fd6ee
+✔ Intermediate certificate: /Users/bob/src/github.com/smallstep/step/.step/certs/intermediate_ca.crt
+✔ Intermediate private key: /Users/bob/src/github.com/smallstep/step/.step/secrets/intermediate_ca_key
+✔ Default configuration: /Users/bob/src/github.com/smallstep/step/.step/config/defaults.json
+✔ Certificate Authority configuration: /Users/bob/src/github.com/smallstep/step/.step/config/ca.json
 
-       See the [Getting Started](./docs/GETTING_STARTED.md) guide for an in depth
-       explanation of the Step CA configuration file.
+Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.</code></pre>
 
-    <pre><code>
-    <b>$ step ca init</b>
-    ✔ What would you like to name your new PKI? (e.g. Smallstep): <b>Example Inc.</b>
-    ✔ What DNS names or IP addresses would you like to add to your new CA? (e.g. ca.smallstep.com[,1.1.1.1,etc.]): <b>localhost</b>
-    ✔ What address will your new CA listen at? (e.g. :443): <b>127.0.0.1:8080</b>
-    ✔ What would you like to name the first provisioner for your new CA? (e.g. you@smallstep.com): <b>bob@example.com</b>
-    ✔ What do you want your password to be? [leave empty and we'll generate one]: <b>abc123</b>
+This command will:
 
-    Generating root certificate...
-    all done!
+- Generate [password protected](https://github.com/smallstep/certificates/blob/master/docs/GETTING_STARTED.md#passwords)  private keys for your CA to sign certificates
+- Generate a root and [intermediate signing certificate](https://security.stackexchange.com/questions/128779/why-is-it-more-secure-to-use-intermediate-ca-certificates) for your CA
+- Create a JSON configuration file for `step-ca` (see [getting started](./docs/GETTING_STARTED.md) for details)
 
-    Generating intermediate certificate...
-    all done!
+You can find these artifacts in `$STEPPATH` (or `~/.step` by default).
 
-    ✔ Root certificate: /Users/bob/src/github.com/smallstep/step/.step/certs/root_ca.crt
-    ✔ Root private key: /Users/bob/src/github.com/smallstep/step/.step/secrets/root_ca_key
-    ✔ Root fingerprint: 702a094e239c9eec6f0dcd0a5f65e595bf7ed6614012825c5fe3d1ae1b2fd6ee
-    ✔ Intermediate certificate: /Users/bob/src/github.com/smallstep/step/.step/certs/intermediate_ca.crt
-    ✔ Intermediate private key: /Users/bob/src/github.com/smallstep/step/.step/secrets/intermediate_ca_key
-    ✔ Default configuration: /Users/bob/src/github.com/smallstep/step/.step/config/defaults.json
-    ✔ Certificate Authority configuration: /Users/bob/src/github.com/smallstep/step/.step/config/ca.json
+#### 2. Start `step-ca`:
 
-    Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.
+You'll be prompted for your password from the previous step, to decrypt the CA's private signing key:
 
-    <b>$ step-ca $(step path)/config/ca.json</b>
-    Please enter the password to decrypt /Users/bob/src/github.com/smallstep/step/.step/secrets/intermediate_ca_key: <b>abc123</b>
-    2019/02/18 13:28:58 Serving HTTPS on 127.0.0.1:8080 ...
-    </code></pre>
+<pre><code><b>$ step-ca $(step path)/config/ca.json</b>
+Please enter the password to decrypt /Users/bob/src/github.com/smallstep/step/.step/secrets/intermediate_ca_key: <b>abc123</b>
+2019/02/18 13:28:58 Serving HTTPS on 127.0.0.1:8080 ...</code></pre>
 
-    Now we've got an 'up and running' online CA!
+#### 3. Copy our `hello world` golang server.
 
-2. Copy our `hello world` golang server.
+```
+$ cat > srv.go <<EOF
+package main
 
-    ```
-    $ cat > srv.go <<EOF
-    package main
+import (
+    "net/http"
+    "log"
+)
 
-    import (
-        "net/http"
-        "log"
-    )
+func HiHandler(w http.ResponseWriter, req *http.Request) {
+    w.Header().Set("Content-Type", "text/plain")
+    w.Write([]byte("Hello, world!\n"))
+}
 
-    func HiHandler(w http.ResponseWriter, req *http.Request) {
-        w.Header().Set("Content-Type", "text/plain")
-        w.Write([]byte("Hello, world!\n"))
+func main() {
+    http.HandleFunc("/hi", HiHandler)
+    err := http.ListenAndServeTLS(":8443", "srv.crt", "srv.key", nil)
+    if err != nil {
+        log.Fatal(err)
     }
+}
+EOF
+```
 
-    func main() {
-        http.HandleFunc("/hi", HiHandler)
-        err := http.ListenAndServeTLS(":8443", "srv.crt", "srv.key", nil)
-        if err != nil {
-            log.Fatal(err)
-        }
-    }
-    EOF
-    ```
+#### 4. Get an identity for your server from the Step CA.
 
-3. Get an identity for your server from the Step CA.
+<pre><code><b>$ step ca certificate localhost srv.crt srv.key</b>
+✔ Key ID: rQxROEr7Kx9TNjSQBTETtsu3GKmuW9zm02dMXZ8GUEk (bob@example.com)
+✔ Please enter the password to decrypt the provisioner key: abc123
+✔ CA: https://localhost:8080/1.0/sign
+✔ Certificate: srv.crt
+✔ Private Key: srv.key
 
-    <pre><code>
-    <b>$ step ca certificate localhost srv.crt srv.key</b>
-    ✔ Key ID: rQxROEr7Kx9TNjSQBTETtsu3GKmuW9zm02dMXZ8GUEk (bob@example.com)
-    ✔ Please enter the password to decrypt the provisioner key: abc123
-    ✔ CA: https://localhost:8080/1.0/sign
-    ✔ Certificate: srv.crt
-    ✔ Private Key: srv.key
+<b>$ step certificate inspect --bundle srv.crt</b>
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 140439335711218707689123407681832384336 (0x69a7a1d7f6f22f68059d2d9088307750)
+    Signature Algorithm: ECDSA-SHA256
+        Issuer: CN=Example Inc. Intermediate CA
+        Validity
+            Not Before: Feb 18 21:32:35 2019 UTC
+            Not After : Feb 19 21:32:35 2019 UTC
+        Subject: CN=localhost
+...
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 207035091234452090159026162349261226844 (0x9bc18217bd560cf07db23178ed90835c)
+    Signature Algorithm: ECDSA-SHA256
+        Issuer: CN=Example Inc. Root CA
+        Validity
+            Not Before: Feb 18 21:27:21 2019 UTC
+            Not After : Feb 15 21:27:21 2029 UTC
+        Subject: CN=Example Inc. Intermediate CA
+...</code></pre>
 
-    <b>$ step certificate inspect --bundle srv.crt</b>
-    Certificate:
-        Data:
-            Version: 3 (0x2)
-            Serial Number: 140439335711218707689123407681832384336 (0x69a7a1d7f6f22f68059d2d9088307750)
-        Signature Algorithm: ECDSA-SHA256
-            Issuer: CN=Example Inc. Intermediate CA
-            Validity
-                Not Before: Feb 18 21:32:35 2019 UTC
-                Not After : Feb 19 21:32:35 2019 UTC
-            Subject: CN=localhost
-    ...
-    Certificate:
-        Data:
-            Version: 3 (0x2)
-            Serial Number: 207035091234452090159026162349261226844 (0x9bc18217bd560cf07db23178ed90835c)
-        Signature Algorithm: ECDSA-SHA256
-            Issuer: CN=Example Inc. Root CA
-            Validity
-                Not Before: Feb 18 21:27:21 2019 UTC
-                Not After : Feb 15 21:27:21 2029 UTC
-            Subject: CN=Example Inc. Intermediate CA
-    ...
-    </code></pre>
+Note that `step` and `step-ca` handle details like [certificate bundling](https://smallstep.com/blog/everything-pki.html#intermediates-chains-and-bundling) for you.
 
-    Notice that when you inspect `srv.crt` there are actually two certificates
-    present. The first is your **server** (leaf) certificate and the second is
-    the intermediate certificate. When an intermediate CA is used to sign
-    **leaf** certificates it is not enough for the server to only show it's
-    **leaf** certificate because the client (which only has access to the root
-    certificate) will not be able to validate the full chain.
+#### 5. Run the simple server.
 
-4. Run the simple server.
+<pre><code><b>$ go run srv.go &</b></code></pre>
 
-    <pre><code>
-    <b>$ go run srv.go &</b>
-    </code></pre>
+#### 6. Get the root certificate from the Step CA.
 
-5. Get the root certificate from the Step CA.
+In a new Terminal window:
 
-    In a new Terminal window:
+<pre><code><b>$ step ca root root.crt</b>
+The root certificate has been saved in root.crt.</code></pre>
 
-    <pre><code>
-    <b>$ step ca root root.crt</b>
-    The root certificate has been saved in root.crt.
-    </code></pre>
+#### 7. Make an authenticated, encrypted curl request to your server using HTTP over TLS.
 
-6. Make an authenticated, encrypted curl request to your server using HTTP over TLS.
-
-    <pre><code>
-    <b>$ curl --cacert root.crt https://localhost:8443/hi</b>
-    Hello, world!
-    </code></pre>
+<pre><code><b>$ curl --cacert root.crt https://localhost:8443/hi</b>
+Hello, world!</code></pre>
 
 *All Done!*
 
@@ -346,5 +351,5 @@ help solve problems in this space.
 
 ## Further Reading
 
-Check out the [Getting Started](./docs/GETTING_STARTED.md) guide for more examples
+Check out the [Getting Started](https://smallstep.com/docs/getting-started/) guide for more examples
 and best practices on running Step CA in production.

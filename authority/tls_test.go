@@ -8,6 +8,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -200,6 +201,33 @@ func TestSign(t *testing.T) {
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
 				err: &apiError{errors.New("sign: certificate request does not contain the valid DNS names - got [test.smallstep.com smallstep test], want [test.smallstep.com]"),
+					http.StatusUnauthorized,
+					apiCtx{"csr": csr, "signOptions": signOpts},
+				},
+			}
+		},
+		"fail rsa key too short": func(t *testing.T) *signTest {
+			shortRSAKeyPEM := `-----BEGIN CERTIFICATE REQUEST-----
+MIIBdDCB2wIBADAOMQwwCgYDVQQDEwNmb28wgaIwDQYJKoZIhvcNAQEBBQADgZAA
+MIGMAoGEAK8dks7oV6kcIFEaWna7CDGYPAE8IL7rNi+ruQ1dIYz+JtxT7OPjbCn/
+t5iqni96+35iS/8CvMtEuquOMTMSWOWwlurrbTbLqCazuz/g233o8udxSxhny3cY
+wHogp4cXCX6cFll6DeUnoCEuTTSIu8IBHbK48VfNw4V4gGz6cp/H93HrAgMBAAGg
+ITAfBgkqhkiG9w0BCQ4xEjAQMA4GA1UdEQQHMAWCA2ZvbzANBgkqhkiG9w0BAQsF
+AAOBhABCZsYM+Kgje68Z9Fjl2+cBwtQHvZDarh+cz6W1SchinZ1T0aNQvSj/otOe
+ttnEF4Rq8zqzr4fbv+AF451Mx36AkfgZr9XWGzxidrH+fBCNWXWNR+ymhrL6UFTG
+2FbarLt9jN2aJLAYQPwtSeGTAZ74tLOPRPnTP6aMfFNg4XCR0uveHA==
+-----END CERTIFICATE REQUEST-----`
+			block, _ := pem.Decode([]byte(shortRSAKeyPEM))
+			assert.FatalError(t, err)
+			csr, err := x509.ParseCertificateRequest(block.Bytes)
+			assert.FatalError(t, err)
+
+			return &signTest{
+				auth:      a,
+				csr:       csr,
+				extraOpts: extraOpts,
+				signOpts:  signOpts,
+				err: &apiError{errors.New("sign: rsa key in CSR must be at least 2048 bits (256 bytes)"),
 					http.StatusUnauthorized,
 					apiCtx{"csr": csr, "signOptions": signOpts},
 				},

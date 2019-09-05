@@ -68,7 +68,6 @@ func TestAuthority_authorizeToken(t *testing.T) {
 		auth *Authority
 		ott  string
 		err  *apiError
-		res  []interface{}
 	}
 	tests := map[string]func(t *testing.T) *authorizeTest{
 		"fail/invalid-ott": func(t *testing.T) *authorizeTest {
@@ -276,7 +275,6 @@ func TestAuthority_authorizeRevoke(t *testing.T) {
 		auth *Authority
 		opts *RevokeOptions
 		err  error
-		res  []interface{}
 	}
 	tests := map[string]func(t *testing.T) *authorizeTest{
 		"fail/token/invalid-ott": func(t *testing.T) *authorizeTest {
@@ -386,7 +384,6 @@ func TestAuthority_AuthorizeSign(t *testing.T) {
 		auth *Authority
 		ott  string
 		err  *apiError
-		res  []interface{}
 	}
 	tests := map[string]func(t *testing.T) *authorizeTest{
 		"fail/invalid-ott": func(t *testing.T) *authorizeTest {
@@ -452,7 +449,7 @@ func TestAuthority_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Len(t, 6, got)
+					assert.Len(t, 8, got)
 				}
 			}
 		})
@@ -479,7 +476,6 @@ func TestAuthority_Authorize(t *testing.T) {
 		auth *Authority
 		ott  string
 		err  *apiError
-		res  []interface{}
 	}
 	tests := map[string]func(t *testing.T) *authorizeTest{
 		"fail/invalid-ott": func(t *testing.T) *authorizeTest {
@@ -545,7 +541,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Len(t, 6, got)
+					assert.Len(t, 8, got)
 				}
 			}
 		})
