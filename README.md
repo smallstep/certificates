@@ -43,7 +43,7 @@ It's super easy to get started and to operate `step-ca` thanks to [streamlined i
 ### Lots of (automatable) ways to get certificates
 
 - [Single sign-on](https://smallstep.com/blog/easily-curl-services-secured-by-https-tls.html) using Okta, GSuite, Active Directory, or any other OAuth OIDC identity provider
-- Instance identity documents for VMs on AWS, GCP, and Azure
+- [Instance identity documents](https://smallstep.com/blog/embarrassingly-easy-certificates-on-aws-azure-gcp/) for VMs on AWS, GCP, and Azure
 - [Single-use short-lived tokens](https://smallstep.com/docs/design-doc.html#jwk-provisioner) issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
 - Use an existing certificate from another CA (e.g., using a device certificate like [Twilio's Trust OnBoard](https://www.twilio.com/wireless/trust-onboard)) *coming soon*
 - ACMEv2 (RFC8555) support so you can **run your own private ACME server** *[coming soon](https://github.com/smallstep/certificates/tree/acme)*
