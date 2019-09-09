@@ -126,19 +126,22 @@ e.g. `v1.0.2`
     Then create the step-certificates package running:
 
     ```sh
-    helm package ./step-certificates
+    $ helm package ./step-certificates
     ```
 
-    A new file like `step-certificates-<version>.tgz` would be created, then switch
-    to the `gh-pages` branch and add the file to it, and update the index.yaml using
-    the `helm repo index` command:
+    A new file like `step-certificates-<version>.tgz` will be created.
+    Now commit and push your changes (don't commit the tarball) to the master
+    branch of `smallstep/helm-charts`
+
+    Next checkout the `gh-pages` branch. `git add` the new tar-ball and update
+    the index.yaml using the `helm repo index` command:
 
     ```sh
-    git checkout gh-pages
-    git add "step-certificates-<version>.tgz"
-    helm repo index --merge index.yaml --url https://smallstep.github.io/helm-charts/ .
-    git commit -a -m "Add package for step-certificates <appVersion>"
-    git push origih gh-pages
+    $ git checkout gh-pages
+    $ git add "step-certificates-<version>.tgz"
+    $ helm repo index --merge index.yaml --url https://smallstep.github.io/helm-charts/ .
+    $ git commit -a -m "Add package for step-certificates <appVersion>"
+    $ git push origin gh-pages
     ```
 
 *All Done!*
