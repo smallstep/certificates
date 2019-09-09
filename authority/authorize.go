@@ -93,7 +93,7 @@ func (a *Authority) Authorize(ctx context.Context, ott string) ([]provisioner.Si
 }
 
 // authorizeSign loads the provisioner from the token, checks that it has not
-// been used again and calls the provisioner AuthorizeSign method. returns a
+// been used again and calls the provisioner AuthorizeSign method. Returns a
 // list of methods to apply to the signing flow.
 func (a *Authority) authorizeSign(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 	var errContext = apiCtx{"ott": ott}
@@ -110,6 +110,9 @@ func (a *Authority) authorizeSign(ctx context.Context, ott string) ([]provisione
 
 // AuthorizeSign authorizes a signature request by validating and authenticating
 // a OTT that must be sent w/ the request.
+//
+// NOTE: This method is deprecated and should not be used. We make it available
+// in the short term os as not to break existing clients.
 func (a *Authority) AuthorizeSign(ott string) ([]provisioner.SignOption, error) {
 	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod)
 	return a.Authorize(ctx, ott)

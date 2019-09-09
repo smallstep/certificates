@@ -39,8 +39,8 @@ type SSHCertificate struct {
 	*ssh.Certificate `json:"omitempty"`
 }
 
-// MarshalJSON implements the json.Marshaler interface. The certificate is
-// quoted string using the PEM encoding.
+// MarshalJSON implements the json.Marshaler interface. Returns a quoted,
+// base64 encoded, openssh wire format version of the certificate.
 func (c SSHCertificate) MarshalJSON() ([]byte, error) {
 	if c.Certificate == nil {
 		return []byte("null"), nil
@@ -50,7 +50,7 @@ func (c SSHCertificate) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface. The certificate is
-// expected to be a quoted string using the PEM encoding.
+// expected to be a quoted, base64 encoded, openssh wire formatted block of bytes.
 func (c *SSHCertificate) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
@@ -62,15 +62,15 @@ func (c *SSHCertificate) UnmarshalJSON(data []byte) error {
 	}
 	certData, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
-		return errors.Wrap(err, "error decoding certificate")
+		return errors.Wrap(err, "error decoding ssh certificate")
 	}
 	pub, err := ssh.ParsePublicKey(certData)
 	if err != nil {
-		return errors.Wrap(err, "error decoding certificate")
+		return errors.Wrap(err, "error parsing ssh certificate")
 	}
 	cert, ok := pub.(*ssh.Certificate)
 	if !ok {
-		return errors.Errorf("error decoding certificate: %T is not an *ssh.Certificate", pub)
+		return errors.Errorf("error decoding ssh certificate: %T is not an *ssh.Certificate", pub)
 	}
 	c.Certificate = cert
 	return nil

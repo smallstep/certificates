@@ -32,7 +32,7 @@ type SSHCertificateOptionModifier interface {
 // SSHCertificateValidator is the interface used to validate an SSH certificate.
 type SSHCertificateValidator interface {
 	SignOption
-	Valid(crt *ssh.Certificate) error
+	Valid(cert *ssh.Certificate) error
 }
 
 // SSHCertificateOptionsValidator is the interface used to validate the custom
@@ -169,7 +169,7 @@ type sshDefaultExtensionModifier struct{}
 
 func (m *sshDefaultExtensionModifier) Modify(cert *ssh.Certificate) error {
 	switch cert.CertType {
-	// Default to no extensions to HostCert
+	// Default to no extensions for HostCert.
 	case ssh.HostCert:
 		return nil
 	case ssh.UserCert:
@@ -246,29 +246,29 @@ func (v sshCertificateOptionsValidator) Valid(got SSHOptions) error {
 type sshCertificateDefaultValidator struct{}
 
 // Valid returns an error if the given certificate does not contain the necessary fields.
-func (v *sshCertificateDefaultValidator) Valid(crt *ssh.Certificate) error {
+func (v *sshCertificateDefaultValidator) Valid(cert *ssh.Certificate) error {
 	switch {
-	case len(crt.Nonce) == 0:
+	case len(cert.Nonce) == 0:
 		return errors.New("ssh certificate nonce cannot be empty")
-	case crt.Key == nil:
+	case cert.Key == nil:
 		return errors.New("ssh certificate key cannot be nil")
-	case crt.Serial == 0:
+	case cert.Serial == 0:
 		return errors.New("ssh certificate serial cannot be 0")
-	case crt.CertType != ssh.UserCert && crt.CertType != ssh.HostCert:
-		return errors.Errorf("ssh certificate has an unknown type: %d", crt.CertType)
-	case crt.KeyId == "":
+	case cert.CertType != ssh.UserCert && cert.CertType != ssh.HostCert:
+		return errors.Errorf("ssh certificate has an unknown type: %d", cert.CertType)
+	case cert.KeyId == "":
 		return errors.New("ssh certificate key id cannot be empty")
-	case len(crt.ValidPrincipals) == 0:
+	case len(cert.ValidPrincipals) == 0:
 		return errors.New("ssh certificate valid principals cannot be empty")
-	case crt.ValidAfter == 0:
+	case cert.ValidAfter == 0:
 		return errors.New("ssh certificate valid after cannot be 0")
-	case crt.ValidBefore == 0:
+	case cert.ValidBefore == 0:
 		return errors.New("ssh certificate valid before cannot be 0")
-	case crt.CertType == ssh.UserCert && len(crt.Extensions) == 0:
+	case cert.CertType == ssh.UserCert && len(cert.Extensions) == 0:
 		return errors.New("ssh certificate extensions cannot be empty")
-	case crt.SignatureKey == nil:
+	case cert.SignatureKey == nil:
 		return errors.New("ssh certificate signature key cannot be nil")
-	case crt.Signature == nil:
+	case cert.Signature == nil:
 		return errors.New("ssh certificate signature cannot be nil")
 	default:
 		return nil

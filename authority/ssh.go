@@ -150,7 +150,7 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 func (a *Authority) SignSSHAddUser(key ssh.PublicKey, subject *ssh.Certificate) (*ssh.Certificate, error) {
 	if a.sshCAUserCertSignKey == nil {
 		return nil, &apiError{
-			err:  errors.New("signSSHProxy: user certificate signing is not enabled"),
+			err:  errors.New("signSSHAddUser: user certificate signing is not enabled"),
 			code: http.StatusNotImplemented,
 		}
 	}

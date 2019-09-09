@@ -502,8 +502,8 @@ type mockAuthority struct {
 	getTLSOptions                func() *tlsutil.TLSOptions
 	root                         func(shasum string) (*x509.Certificate, error)
 	sign                         func(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
-	singSSH                      func(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
-	singSSHAddUser               func(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
+	signSSH                      func(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
+	signSSHAddUser               func(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 	renew                        func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
 	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
 	getProvisioners              func(nextCursor string, limit int) (provisioner.List, string, error)
@@ -547,15 +547,15 @@ func (m *mockAuthority) Sign(cr *x509.CertificateRequest, opts provisioner.Optio
 }
 
 func (m *mockAuthority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
-	if m.singSSH != nil {
-		return m.singSSH(key, opts, signOpts...)
+	if m.signSSH != nil {
+		return m.signSSH(key, opts, signOpts...)
 	}
 	return m.ret1.(*ssh.Certificate), m.err
 }
 
 func (m *mockAuthority) SignSSHAddUser(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error) {
-	if m.singSSHAddUser != nil {
-		return m.singSSHAddUser(key, cert)
+	if m.signSSHAddUser != nil {
+		return m.signSSHAddUser(key, cert)
 	}
 	return m.ret1.(*ssh.Certificate), m.err
 }
