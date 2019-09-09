@@ -28,11 +28,19 @@ var (
 		Renegotiation: false,
 	}
 	defaultDisableRenewal   = false
+	defaultEnableSSHCA      = false
 	globalProvisionerClaims = provisioner.Claims{
-		MinTLSDur:      &provisioner.Duration{Duration: 5 * time.Minute},
-		MaxTLSDur:      &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultTLSDur:  &provisioner.Duration{Duration: 24 * time.Hour},
-		DisableRenewal: &defaultDisableRenewal,
+		MinTLSDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
+		MaxTLSDur:         &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:     &provisioner.Duration{Duration: 24 * time.Hour},
+		DisableRenewal:    &defaultDisableRenewal,
+		MinUserSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:     &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur: &provisioner.Duration{Duration: 4 * time.Hour},
+		MinHostSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:     &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur: &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:       &defaultEnableSSHCA,
 	}
 )
 
@@ -44,6 +52,7 @@ type Config struct {
 	IntermediateKey  string              `json:"key"`
 	Address          string              `json:"address"`
 	DNSNames         []string            `json:"dnsNames"`
+	SSH              *SSHConfig          `json:"ssh,omitempty"`
 	Logger           json.RawMessage     `json:"logger,omitempty"`
 	DB               *db.Config          `json:"db,omitempty"`
 	Monitoring       json.RawMessage     `json:"monitoring,omitempty"`
@@ -90,6 +99,14 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 		c.Template = &x509util.ASN1DN{}
 	}
 	return nil
+}
+
+// SSHConfig contains the user and host keys.
+type SSHConfig struct {
+	HostKey          string `json:"hostKey"`
+	UserKey          string `json:"userKey"`
+	AddUserPrincipal string `json:"addUserPrincipal"`
+	AddUserCommand   string `json:"addUserCommand"`
 }
 
 // LoadConfiguration parses the given filename in JSON format and returns the

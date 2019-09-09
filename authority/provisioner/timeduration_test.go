@@ -6,6 +6,17 @@ import (
 	"time"
 )
 
+func mockNow() (time.Time, func()) {
+	tm := time.Unix(1584198566, 535897000).UTC()
+	nowFn := now
+	now = func() time.Time {
+		return tm
+	}
+	return tm, func() {
+		now = nowFn
+	}
+}
+
 func TestNewTimeDuration(t *testing.T) {
 	tm := time.Unix(1584198566, 535897000).UTC()
 	type args struct {
@@ -137,7 +148,7 @@ func TestTimeDuration_MarshalJSON(t *testing.T) {
 		want         []byte
 		wantErr      bool
 	}{
-		{"null", TimeDuration{}, []byte("null"), false},
+		{"empty", TimeDuration{}, []byte(`""`), false},
 		{"timestamp", TimeDuration{t: tm}, []byte(`"2020-03-14T15:09:26.535897Z"`), false},
 		{"duration", TimeDuration{d: 1 * time.Hour}, []byte(`"1h0m0s"`), false},
 		{"fail", TimeDuration{t: time.Date(-1, 0, 0, 0, 0, 0, 0, time.UTC)}, nil, true},
@@ -166,7 +177,7 @@ func TestTimeDuration_UnmarshalJSON(t *testing.T) {
 		want    *TimeDuration
 		wantErr bool
 	}{
-		{"null", args{[]byte("null")}, &TimeDuration{}, false},
+		{"empty", args{[]byte(`""`)}, &TimeDuration{}, false},
 		{"timestamp", args{[]byte(`"2020-03-14T15:09:26.535897Z"`)}, &TimeDuration{t: time.Unix(1584198566, 535897000).UTC()}, false},
 		{"duration", args{[]byte(`"1h"`)}, &TimeDuration{d: time.Hour}, false},
 		{"fail", args{[]byte("123")}, &TimeDuration{}, true},
@@ -186,15 +197,8 @@ func TestTimeDuration_UnmarshalJSON(t *testing.T) {
 }
 
 func TestTimeDuration_Time(t *testing.T) {
-	nowFn := now
-	defer func() {
-		now = nowFn
-		now()
-	}()
-	tm := time.Unix(1584198566, 535897000).UTC()
-	now = func() time.Time {
-		return tm
-	}
+	tm, fn := mockNow()
+	defer fn()
 	tests := []struct {
 		name         string
 		timeDuration *TimeDuration
@@ -211,6 +215,30 @@ func TestTimeDuration_Time(t *testing.T) {
 			got := tt.timeDuration.Time()
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("TimeDuration.Time() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTimeDuration_Unix(t *testing.T) {
+	tm, fn := mockNow()
+	defer fn()
+	tests := []struct {
+		name         string
+		timeDuration *TimeDuration
+		want         int64
+	}{
+		{"zero", nil, -62135596800},
+		{"zero", &TimeDuration{}, -62135596800},
+		{"timestamp", &TimeDuration{t: tm}, 1584198566},
+		{"local", &TimeDuration{t: tm.Local()}, 1584198566},
+		{"duration", &TimeDuration{d: 1 * time.Hour}, 1584202166},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.timeDuration.Unix()
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("TimeDuration.Unix() = %v, want %v", got, tt.want)
 
 			}
 		})
@@ -218,15 +246,8 @@ func TestTimeDuration_Time(t *testing.T) {
 }
 
 func TestTimeDuration_String(t *testing.T) {
-	nowFn := now
-	defer func() {
-		now = nowFn
-		now()
-	}()
-	tm := time.Unix(1584198566, 535897000).UTC()
-	now = func() time.Time {
-		return tm
-	}
+	tm, fn := mockNow()
+	defer fn()
 	type fields struct {
 		t time.Time
 		d time.Duration

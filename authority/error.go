@@ -4,13 +4,13 @@ import (
 	"net/http"
 )
 
-type context map[string]interface{}
+type apiCtx map[string]interface{}
 
 // Error implements the api.Error interface and adds context to error messages.
 type apiError struct {
 	err     error
 	code    int
-	context context
+	context apiCtx
 }
 
 // Cause implements the errors.Causer interface and returns the original error.

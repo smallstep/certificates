@@ -1,9 +1,11 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/json"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -17,7 +19,7 @@ type Interface interface {
 	GetType() Type
 	GetEncryptedKey() (kid string, key string, ok bool)
 	Init(config Config) error
-	AuthorizeSign(token string) ([]SignOption, error)
+	AuthorizeSign(ctx context.Context, token string) ([]SignOption, error)
 	AuthorizeRenewal(cert *x509.Certificate) error
 	AuthorizeRevoke(token string) error
 }
@@ -168,4 +170,30 @@ func (l *List) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+var sshUserRegex = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
+
+// SanitizeSSHUserPrincipal grabs an email or a string with the format
+// local@domain and returns a sanitized version of the local, valid to be used
+// as a user name. If the email starts with a letter between a and z, the
+// resulting string will match the regular expression `^[a-z][-a-z0-9_]*$`.
+func SanitizeSSHUserPrincipal(email string) string {
+	if i := strings.LastIndex(email, "@"); i >= 0 {
+		email = email[:i]
+	}
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == '-':
+			return '-'
+		case r == '.': // drop dots
+			return -1
+		default:
+			return '_'
+		}
+	}, strings.ToLower(email))
 }

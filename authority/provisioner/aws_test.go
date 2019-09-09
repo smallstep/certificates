@@ -1,6 +1,8 @@
 package provisioner
 
 import (
+	"context"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -347,7 +349,8 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.aws.AuthorizeSign(tt.args.token)
+			ctx := NewContextWithMethod(context.Background(), SignMethod)
+			got, err := tt.aws.AuthorizeSign(ctx, tt.args.token)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AWS.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -357,6 +360,84 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 	}
 }
 
+func TestAWS_AuthorizeSign_SSH(t *testing.T) {
+	tm, fn := mockNow()
+	defer fn()
+
+	p1, srv, err := generateAWSWithServer()
+	assert.FatalError(t, err)
+	defer srv.Close()
+
+	t1, err := p1.GetIdentityToken("foo.local", "https://ca.smallstep.com")
+	assert.FatalError(t, err)
+
+	key, err := generateJSONWebKey()
+	assert.FatalError(t, err)
+
+	signer, err := generateJSONWebKey()
+	assert.FatalError(t, err)
+
+	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	expectedHostOptions := &SSHOptions{
+		CertType: "host", Principals: []string{"127.0.0.1", "ip-127-0-0-1.us-west-1.compute.internal"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
+	expectedHostOptionsIP := &SSHOptions{
+		CertType: "host", Principals: []string{"127.0.0.1"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
+	expectedHostOptionsHostname := &SSHOptions{
+		CertType: "host", Principals: []string{"ip-127-0-0-1.us-west-1.compute.internal"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
+
+	type args struct {
+		token   string
+		sshOpts SSHOptions
+	}
+	tests := []struct {
+		name        string
+		aws         *AWS
+		args        args
+		expected    *SSHOptions
+		wantErr     bool
+		wantSignErr bool
+	}{
+		{"ok", p1, args{t1, SSHOptions{}}, expectedHostOptions, false, false},
+		{"ok-type", p1, args{t1, SSHOptions{CertType: "host"}}, expectedHostOptions, false, false},
+		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"127.0.0.1", "ip-127-0-0-1.us-west-1.compute.internal"}}}, expectedHostOptions, false, false},
+		{"ok-principal-ip", p1, args{t1, SSHOptions{Principals: []string{"127.0.0.1"}}}, expectedHostOptionsIP, false, false},
+		{"ok-principal-hostname", p1, args{t1, SSHOptions{Principals: []string{"ip-127-0-0-1.us-west-1.compute.internal"}}}, expectedHostOptionsHostname, false, false},
+		{"ok-options", p1, args{t1, SSHOptions{CertType: "host", Principals: []string{"127.0.0.1", "ip-127-0-0-1.us-west-1.compute.internal"}}}, expectedHostOptions, false, false},
+		{"fail-type", p1, args{t1, SSHOptions{CertType: "user"}}, nil, false, true},
+		{"fail-principal", p1, args{t1, SSHOptions{Principals: []string{"smallstep.com"}}}, nil, false, true},
+		{"fail-extra-principal", p1, args{t1, SSHOptions{Principals: []string{"127.0.0.1", "ip-127-0-0-1.us-west-1.compute.internal", "smallstep.com"}}}, nil, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := NewContextWithMethod(context.Background(), SignSSHMethod)
+			got, err := tt.aws.AuthorizeSign(ctx, tt.args.token)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("AWS.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err != nil {
+				assert.Nil(t, got)
+			} else if assert.NotNil(t, got) {
+				cert, err := signSSHCertificate(key.Public().Key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
+				if (err != nil) != tt.wantSignErr {
+					t.Errorf("SignSSH error = %v, wantSignErr %v", err, tt.wantSignErr)
+				} else {
+					if tt.wantSignErr {
+						assert.Nil(t, cert)
+					} else {
+						assert.NoError(t, validateSSHCertificate(cert, tt.expected))
+					}
+				}
+			}
+		})
+	}
+}
 func TestAWS_AuthorizeRenewal(t *testing.T) {
 	p1, err := generateAWS()
 	assert.FatalError(t, err)

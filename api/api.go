@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/rsa"
@@ -26,9 +27,10 @@ import (
 
 // Authority is the interface implemented by a CA authority.
 type Authority interface {
+	SSHAuthority
 	// NOTE: Authorize will be deprecated in future releases. Please use the
-	// context specific Authoirize[Sign|Revoke|etc.] methods.
-	Authorize(ott string) ([]provisioner.SignOption, error)
+	// context specific Authorize[Sign|Revoke|etc.] methods.
+	Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	AuthorizeSign(ott string) ([]provisioner.SignOption, error)
 	GetTLSOptions() *tlsutil.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)
@@ -249,6 +251,8 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/federation", h.Federation)
 	// For compatibility with old code:
 	r.MethodFunc("POST", "/re-sign", h.Renew)
+	// SSH CA
+	r.MethodFunc("POST", "/sign-ssh", h.SignSSH)
 }
 
 // Health is an HTTP handler that returns the status of the server.

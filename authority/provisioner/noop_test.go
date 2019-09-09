@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/x509"
 	"testing"
 
@@ -21,7 +22,8 @@ func Test_noop(t *testing.T) {
 	assert.Equals(t, "", key)
 	assert.Equals(t, false, ok)
 
-	sigOptions, err := p.AuthorizeSign("foo")
+	ctx := NewContextWithMethod(context.Background(), SignMethod)
+	sigOptions, err := p.AuthorizeSign(ctx, "foo")
 	assert.Equals(t, []SignOption{}, sigOptions)
 	assert.Equals(t, nil, err)
 }

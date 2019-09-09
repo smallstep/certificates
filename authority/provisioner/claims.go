@@ -8,10 +8,19 @@ import (
 
 // Claims so that individual provisioners can override global claims.
 type Claims struct {
+	// TLS CA properties
 	MinTLSDur      *Duration `json:"minTLSCertDuration,omitempty"`
 	MaxTLSDur      *Duration `json:"maxTLSCertDuration,omitempty"`
 	DefaultTLSDur  *Duration `json:"defaultTLSCertDuration,omitempty"`
 	DisableRenewal *bool     `json:"disableRenewal,omitempty"`
+	// SSH CA properties
+	MinUserSSHDur     *Duration `json:"minUserSSHCertDuration,omitempty"`
+	MaxUserSSHDur     *Duration `json:"maxUserSSHCertDuration,omitempty"`
+	DefaultUserSSHDur *Duration `json:"defaultUserSSHCertDuration,omitempty"`
+	MinHostSSHDur     *Duration `json:"minHostSSHCertDuration,omitempty"`
+	MaxHostSSHDur     *Duration `json:"maxHostSSHCertDuration,omitempty"`
+	DefaultHostSSHDur *Duration `json:"defaultHostSSHCertDuration,omitempty"`
+	EnableSSHCA       *bool     `json:"enableSSHCA,omitempty"`
 }
 
 // Claimer is the type that controls claims. It provides an interface around the
@@ -30,11 +39,19 @@ func NewClaimer(claims *Claims, global Claims) (*Claimer, error) {
 // Claims returns the merge of the inner and global claims.
 func (c *Claimer) Claims() Claims {
 	disableRenewal := c.IsDisableRenewal()
+	enableSSHCA := c.IsSSHCAEnabled()
 	return Claims{
-		MinTLSDur:      &Duration{c.MinTLSCertDuration()},
-		MaxTLSDur:      &Duration{c.MaxTLSCertDuration()},
-		DefaultTLSDur:  &Duration{c.DefaultTLSCertDuration()},
-		DisableRenewal: &disableRenewal,
+		MinTLSDur:         &Duration{c.MinTLSCertDuration()},
+		MaxTLSDur:         &Duration{c.MaxTLSCertDuration()},
+		DefaultTLSDur:     &Duration{c.DefaultTLSCertDuration()},
+		DisableRenewal:    &disableRenewal,
+		MinUserSSHDur:     &Duration{c.MinUserSSHCertDuration()},
+		MaxUserSSHDur:     &Duration{c.MaxUserSSHCertDuration()},
+		DefaultUserSSHDur: &Duration{c.DefaultUserSSHCertDuration()},
+		MinHostSSHDur:     &Duration{c.MinHostSSHCertDuration()},
+		MaxHostSSHDur:     &Duration{c.MaxHostSSHCertDuration()},
+		DefaultHostSSHDur: &Duration{c.DefaultHostSSHCertDuration()},
+		EnableSSHCA:       &enableSSHCA,
 	}
 }
 
@@ -76,6 +93,76 @@ func (c *Claimer) IsDisableRenewal() bool {
 		return *c.global.DisableRenewal
 	}
 	return *c.claims.DisableRenewal
+}
+
+// DefaultUserSSHCertDuration returns the default SSH user cert duration for the
+// provisioner. If the default is not set within the provisioner, then the
+// global default from the authority configuration will be used.
+func (c *Claimer) DefaultUserSSHCertDuration() time.Duration {
+	if c.claims == nil || c.claims.DefaultUserSSHDur == nil {
+		return c.global.DefaultUserSSHDur.Duration
+	}
+	return c.claims.DefaultUserSSHDur.Duration
+}
+
+// MinUserSSHCertDuration returns the minimum SSH user cert duration for the
+// provisioner. If the minimum is not set within the provisioner, then the
+// global minimum from the authority configuration will be used.
+func (c *Claimer) MinUserSSHCertDuration() time.Duration {
+	if c.claims == nil || c.claims.MinUserSSHDur == nil {
+		return c.global.MinUserSSHDur.Duration
+	}
+	return c.claims.MinUserSSHDur.Duration
+}
+
+// MaxUserSSHCertDuration returns the maximum SSH user cert duration for the
+// provisioner. If the maximum is not set within the provisioner, then the
+// global maximum from the authority configuration will be used.
+func (c *Claimer) MaxUserSSHCertDuration() time.Duration {
+	if c.claims == nil || c.claims.MaxUserSSHDur == nil {
+		return c.global.MaxUserSSHDur.Duration
+	}
+	return c.claims.MaxUserSSHDur.Duration
+}
+
+// DefaultHostSSHCertDuration returns the default SSH host cert duration for the
+// provisioner. If the default is not set within the provisioner, then the
+// global default from the authority configuration will be used.
+func (c *Claimer) DefaultHostSSHCertDuration() time.Duration {
+	if c.claims == nil || c.claims.DefaultHostSSHDur == nil {
+		return c.global.DefaultHostSSHDur.Duration
+	}
+	return c.claims.DefaultHostSSHDur.Duration
+}
+
+// MinHostSSHCertDuration returns the minimum SSH host cert duration for the
+// provisioner. If the minimum is not set within the provisioner, then the
+// global minimum from the authority configuration will be used.
+func (c *Claimer) MinHostSSHCertDuration() time.Duration {
+	if c.claims == nil || c.claims.MinHostSSHDur == nil {
+		return c.global.MinHostSSHDur.Duration
+	}
+	return c.claims.MinHostSSHDur.Duration
+}
+
+// MaxHostSSHCertDuration returns the maximum SSH Host cert duration for the
+// provisioner. If the maximum is not set within the provisioner, then the
+// global maximum from the authority configuration will be used.
+func (c *Claimer) MaxHostSSHCertDuration() time.Duration {
+	if c.claims == nil || c.claims.MaxHostSSHDur == nil {
+		return c.global.MaxHostSSHDur.Duration
+	}
+	return c.claims.MaxHostSSHDur.Duration
+}
+
+// IsSSHCAEnabled returns if the SSH CA is enabled for the provisioner. If the
+// property is not set within the provisioner, then the global value from the
+// authority configuration will be used.
+func (c *Claimer) IsSSHCAEnabled() bool {
+	if c.claims == nil || c.claims.EnableSSHCA == nil {
+		return *c.global.EnableSSHCA
+	}
+	return *c.claims.EnableSSHCA
 }
 
 // Validate validates and modifies the Claims with default values.

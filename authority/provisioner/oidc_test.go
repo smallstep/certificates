@@ -1,6 +1,8 @@
 package provisioner
 
 import (
+	"context"
+	"crypto"
 	"crypto/x509"
 	"fmt"
 	"strings"
@@ -276,7 +278,8 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.prov.AuthorizeSign(tt.args.token)
+			ctx := NewContextWithMethod(context.Background(), SignMethod)
+			got, err := tt.prov.AuthorizeSign(ctx, tt.args.token)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -286,9 +289,120 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 			} else {
 				assert.NotNil(t, got)
 				if tt.name == "admin" {
-					assert.Len(t, 4, got)
+					assert.Len(t, 3, got)
 				} else {
 					assert.Len(t, 5, got)
+				}
+			}
+		})
+	}
+}
+
+func TestOIDC_AuthorizeSign_SSH(t *testing.T) {
+	tm, fn := mockNow()
+	defer fn()
+
+	srv := generateJWKServer(2)
+	defer srv.Close()
+
+	var keys jose.JSONWebKeySet
+	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
+
+	// Create test provisioners
+	p1, err := generateOIDC()
+	assert.FatalError(t, err)
+	p2, err := generateOIDC()
+	assert.FatalError(t, err)
+	p3, err := generateOIDC()
+	assert.FatalError(t, err)
+	// Admin + Domains
+	p3.Admins = []string{"name@smallstep.com", "root@example.com"}
+	p3.Domains = []string{"smallstep.com"}
+
+	// Update configuration endpoints and initialize
+	config := Config{Claims: globalProvisionerClaims}
+	p1.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	p2.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	p3.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	assert.FatalError(t, p1.Init(config))
+	assert.FatalError(t, p2.Init(config))
+	assert.FatalError(t, p3.Init(config))
+
+	t1, err := generateSimpleToken("the-issuer", p1.ClientID, &keys.Keys[0])
+	assert.FatalError(t, err)
+	// Admin email not in domains
+	okAdmin, err := generateToken("subject", "the-issuer", p3.ClientID, "root@example.com", []string{}, time.Now(), &keys.Keys[0])
+	assert.FatalError(t, err)
+	// Invalid email
+	failEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
+	assert.FatalError(t, err)
+
+	key, err := generateJSONWebKey()
+	assert.FatalError(t, err)
+
+	signer, err := generateJSONWebKey()
+	assert.FatalError(t, err)
+
+	userDuration := p1.claimer.DefaultUserSSHCertDuration()
+	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	expectedUserOptions := &SSHOptions{
+		CertType: "user", Principals: []string{"name"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
+	}
+	expectedAdminOptions := &SSHOptions{
+		CertType: "user", Principals: []string{"root"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
+	}
+	expectedHostOptions := &SSHOptions{
+		CertType: "host", Principals: []string{"smallstep.com"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
+
+	type args struct {
+		token   string
+		sshOpts SSHOptions
+	}
+	tests := []struct {
+		name        string
+		prov        *OIDC
+		args        args
+		expected    *SSHOptions
+		wantErr     bool
+		wantSignErr bool
+	}{
+		{"ok", p1, args{t1, SSHOptions{}}, expectedUserOptions, false, false},
+		{"ok-user", p1, args{t1, SSHOptions{CertType: "user"}}, expectedUserOptions, false, false},
+		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}}, expectedUserOptions, false, false},
+		{"ok-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}}, expectedUserOptions, false, false},
+		{"admin", p3, args{okAdmin, SSHOptions{}}, expectedAdminOptions, false, false},
+		{"admin-user", p3, args{okAdmin, SSHOptions{CertType: "user"}}, expectedAdminOptions, false, false},
+		{"admin-principals", p3, args{okAdmin, SSHOptions{Principals: []string{"root"}}}, expectedAdminOptions, false, false},
+		{"admin-options", p3, args{okAdmin, SSHOptions{CertType: "user", Principals: []string{"name"}}}, expectedUserOptions, false, false},
+		{"admin-host", p3, args{okAdmin, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}}, expectedHostOptions, false, false},
+		{"fail-user-host", p1, args{t1, SSHOptions{CertType: "host"}}, nil, false, true},
+		{"fail-user-principals", p1, args{t1, SSHOptions{Principals: []string{"root"}}}, nil, false, true},
+		{"fail-email", p3, args{failEmail, SSHOptions{}}, nil, true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := NewContextWithMethod(context.Background(), SignSSHMethod)
+			got, err := tt.prov.AuthorizeSign(ctx, tt.args.token)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err != nil {
+				assert.Nil(t, got)
+			} else if assert.NotNil(t, got) {
+				cert, err := signSSHCertificate(key.Public().Key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
+				if (err != nil) != tt.wantSignErr {
+					t.Errorf("SignSSH error = %v, wantSignErr %v", err, tt.wantSignErr)
+				} else {
+					if tt.wantSignErr {
+						assert.Nil(t, cert)
+					} else {
+						assert.NoError(t, validateSSHCertificate(cert, tt.expected))
+					}
 				}
 			}
 		})

@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -205,13 +206,21 @@ func (p *GCP) Init(config Config) error {
 
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
-func (p *GCP) AuthorizeSign(token string) ([]SignOption, error) {
+func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, err
 	}
-	ce := claims.Google.ComputeEngine
 
+	// Check for the sign ssh method, default to sign X.509
+	if m := MethodFromContext(ctx); m == SignSSHMethod {
+		if p.claimer.IsSSHCAEnabled() == false {
+			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
+		}
+		return p.authorizeSSHSign(claims)
+	}
+
+	ce := claims.Google.ComputeEngine
 	// Enforce known common name and default DNS if configured.
 	// By default we we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
@@ -344,4 +353,36 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 	}
 
 	return &claims, nil
+}
+
+// authorizeSSHSign returns the list of SignOption for a SignSSH request.
+func (p *GCP) authorizeSSHSign(claims *gcpPayload) ([]SignOption, error) {
+	ce := claims.Google.ComputeEngine
+
+	signOptions := []SignOption{
+		// set the key id to the token subject
+		sshCertificateKeyIDModifier(ce.InstanceName),
+	}
+
+	// Default to host + known hostnames
+	defaults := SSHOptions{
+		CertType: SSHHostCert,
+		Principals: []string{
+			fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
+			fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
+		},
+	}
+	// Validate user options
+	signOptions = append(signOptions, sshCertificateOptionsValidator(defaults))
+	// Set defaults if not given as user options
+	signOptions = append(signOptions, sshCertificateDefaultsModifier(defaults))
+
+	return append(signOptions,
+		// set the default extensions
+		&sshDefaultExtensionModifier{},
+		// checks the validity bounds, and set the validity if has not been set
+		&sshCertificateValidityModifier{p.claimer},
+		// require all the fields in the SSH certificate
+		&sshCertificateDefaultValidator{},
+	), nil
 }

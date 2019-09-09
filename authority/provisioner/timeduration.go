@@ -57,6 +57,17 @@ func (t *TimeDuration) SetTime(tt time.Time) {
 	t.t, t.d = tt, 0
 }
 
+// IsZero returns true the TimeDuration represents the zero value, false
+// otherwise.
+func (t *TimeDuration) IsZero() bool {
+	return t.t.IsZero() && t.d == 0
+}
+
+// Equal returns if t and other are equal.
+func (t *TimeDuration) Equal(other *TimeDuration) bool {
+	return t.t.Equal(other.t) && t.d == other.d
+}
+
 // MarshalJSON implements the json.Marshaler interface. If the time is set it
 // will return the time in RFC 3339 format if not it will return the duration
 // string.
@@ -64,7 +75,7 @@ func (t TimeDuration) MarshalJSON() ([]byte, error) {
 	switch {
 	case t.t.IsZero():
 		if t.d == 0 {
-			return []byte("null"), nil
+			return []byte(`""`), nil
 		}
 		return json.Marshal(t.d.String())
 	default:
@@ -102,9 +113,14 @@ func (t *TimeDuration) UnmarshalJSON(data []byte) error {
 	return errors.Errorf("failed to parse %s", data)
 }
 
-// Time calculates the embedded time.Time, sets it if necessary, and returns it.
+// Time calculates the time if needed and returns it.
 func (t *TimeDuration) Time() time.Time {
 	return t.RelativeTime(now())
+}
+
+// Unix calculates the time if needed it and returns the Unix time in seconds.
+func (t *TimeDuration) Unix() int64 {
+	return t.RelativeTime(now()).Unix()
 }
 
 // RelativeTime returns the embedded time.Time or the base time plus the

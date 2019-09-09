@@ -280,7 +280,11 @@ func stringifyFlag(f cli.Flag) string {
 	usage := fv.FieldByName("Usage").String()
 	placeholder := placeholderString.FindString(usage)
 	if placeholder == "" {
-		placeholder = "<value>"
+		switch f.(type) {
+		case cli.BoolFlag, cli.BoolTFlag:
+		default:
+			placeholder = "<value>"
+		}
 	}
 	return cli.FlagNamePrefixer(fv.FieldByName("Name").String(), placeholder) + "\t" + usage
 }

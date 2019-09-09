@@ -480,6 +480,54 @@ func generateToken(sub, iss, aud string, email string, sans []string, iat time.T
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }
 
+func generateSimpleSSHUserToken(iss, aud string, jwk *jose.JSONWebKey) (string, error) {
+	return generateSSHToken("subject@localhost", iss, aud, time.Now(), &SSHOptions{
+		CertType:   "user",
+		Principals: []string{"name"},
+	}, jwk)
+}
+
+func generateSimpleSSHHostToken(iss, aud string, jwk *jose.JSONWebKey) (string, error) {
+	return generateSSHToken("subject@localhost", iss, aud, time.Now(), &SSHOptions{
+		CertType:   "host",
+		Principals: []string{"smallstep.com"},
+	}, jwk)
+}
+
+func generateSSHToken(sub, iss, aud string, iat time.Time, sshOpts *SSHOptions, jwk *jose.JSONWebKey) (string, error) {
+	sig, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
+		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	id, err := randutil.ASCII(64)
+	if err != nil {
+		return "", err
+	}
+
+	claims := struct {
+		jose.Claims
+		Step *stepPayload `json:"step,omitempty"`
+	}{
+		Claims: jose.Claims{
+			ID:        id,
+			Subject:   sub,
+			Issuer:    iss,
+			IssuedAt:  jose.NewNumericDate(iat),
+			NotBefore: jose.NewNumericDate(iat),
+			Expiry:    jose.NewNumericDate(iat.Add(5 * time.Minute)),
+			Audience:  []string{aud},
+		},
+		Step: &stepPayload{
+			SSH: sshOpts,
+		},
+	}
+	return jose.Signed(sig).Claims(claims).CompactSerialize()
+}
+
 func generateGCPToken(sub, iss, aud, instanceID, instanceName, projectID, zone string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
 	sig, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},

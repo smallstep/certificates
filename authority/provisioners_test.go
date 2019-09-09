@@ -35,7 +35,7 @@ func TestGetEncryptedKey(t *testing.T) {
 				a:   a,
 				kid: "foo",
 				err: &apiError{errors.Errorf("encrypted key with kid foo was not found"),
-					http.StatusNotFound, context{}},
+					http.StatusNotFound, apiCtx{}},
 			}
 		},
 	}

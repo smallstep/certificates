@@ -1,6 +1,8 @@
 package provisioner
 
 import (
+	"context"
+	"crypto"
 	"crypto/x509"
 	"errors"
 	"strings"
@@ -13,11 +15,19 @@ import (
 
 var (
 	defaultDisableRenewal   = false
+	defaultEnableSSHCA      = true
 	globalProvisionerClaims = Claims{
-		MinTLSDur:      &Duration{5 * time.Minute},
-		MaxTLSDur:      &Duration{24 * time.Hour},
-		DefaultTLSDur:  &Duration{24 * time.Hour},
-		DisableRenewal: &defaultDisableRenewal,
+		MinTLSDur:         &Duration{5 * time.Minute},
+		MaxTLSDur:         &Duration{24 * time.Hour},
+		DefaultTLSDur:     &Duration{24 * time.Hour},
+		DisableRenewal:    &defaultDisableRenewal,
+		MinUserSSHDur:     &Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:     &Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur: &Duration{Duration: 4 * time.Hour},
+		MinHostSSHDur:     &Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:     &Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur: &Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:       &defaultEnableSSHCA,
 	}
 )
 
@@ -259,7 +269,8 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got, err := tt.prov.AuthorizeSign(tt.args.token); err != nil {
+			ctx := NewContextWithMethod(context.Background(), SignMethod)
+			if got, err := tt.prov.AuthorizeSign(ctx, tt.args.token); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -314,6 +325,204 @@ func TestJWK_AuthorizeRenewal(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.prov.AuthorizeRenewal(tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("JWK.AuthorizeRenewal() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestJWK_AuthorizeSign_SSH(t *testing.T) {
+	tm, fn := mockNow()
+	defer fn()
+
+	p1, err := generateJWK()
+	assert.FatalError(t, err)
+	jwk, err := decryptJSONWebKey(p1.EncryptedKey)
+	assert.FatalError(t, err)
+
+	iss, aud := p1.Name, testAudiences.Sign[0]
+
+	t1, err := generateSimpleSSHUserToken(iss, aud, jwk)
+	assert.FatalError(t, err)
+
+	t2, err := generateSimpleSSHHostToken(iss, aud, jwk)
+	assert.FatalError(t, err)
+
+	// invalid signature
+	failSig := t1[0 : len(t1)-2]
+
+	key, err := generateJSONWebKey()
+	assert.FatalError(t, err)
+
+	signer, err := generateJSONWebKey()
+	assert.FatalError(t, err)
+
+	userDuration := p1.claimer.DefaultUserSSHCertDuration()
+	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	expectedUserOptions := &SSHOptions{
+		CertType: "user", Principals: []string{"name"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
+	}
+	expectedHostOptions := &SSHOptions{
+		CertType: "host", Principals: []string{"smallstep.com"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
+
+	type args struct {
+		token   string
+		sshOpts SSHOptions
+	}
+	tests := []struct {
+		name        string
+		prov        *JWK
+		args        args
+		expected    *SSHOptions
+		wantErr     bool
+		wantSignErr bool
+	}{
+		{"user", p1, args{t1, SSHOptions{}}, expectedUserOptions, false, false},
+		{"user-type", p1, args{t1, SSHOptions{CertType: "user"}}, expectedUserOptions, false, false},
+		{"user-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}}, expectedUserOptions, false, false},
+		{"user-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}}, expectedUserOptions, false, false},
+		{"host", p1, args{t2, SSHOptions{}}, expectedHostOptions, false, false},
+		{"host-type", p1, args{t2, SSHOptions{CertType: "host"}}, expectedHostOptions, false, false},
+		{"host-principals", p1, args{t2, SSHOptions{Principals: []string{"smallstep.com"}}}, expectedHostOptions, false, false},
+		{"host-options", p1, args{t2, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}}, expectedHostOptions, false, false},
+		{"fail-signature", p1, args{failSig, SSHOptions{}}, nil, true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := NewContextWithMethod(context.Background(), SignSSHMethod)
+			got, err := tt.prov.AuthorizeSign(ctx, tt.args.token)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err != nil {
+				assert.Nil(t, got)
+			} else if assert.NotNil(t, got) {
+				cert, err := signSSHCertificate(key.Public().Key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
+				if (err != nil) != tt.wantSignErr {
+					t.Errorf("SignSSH error = %v, wantSignErr %v", err, tt.wantSignErr)
+				} else {
+					if tt.wantSignErr {
+						assert.Nil(t, cert)
+					} else {
+						assert.NoError(t, validateSSHCertificate(cert, tt.expected))
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestJWK_AuthorizeSign_SSHOptions(t *testing.T) {
+	tm, fn := mockNow()
+	defer fn()
+
+	p1, err := generateJWK()
+	assert.FatalError(t, err)
+	jwk, err := decryptJSONWebKey(p1.EncryptedKey)
+	assert.FatalError(t, err)
+
+	sub, iss, aud, iat := "subject@smallstep.com", p1.Name, testAudiences.Sign[0], time.Now()
+
+	key, err := generateJSONWebKey()
+	assert.FatalError(t, err)
+
+	signer, err := generateJSONWebKey()
+	assert.FatalError(t, err)
+
+	userDuration := p1.claimer.DefaultUserSSHCertDuration()
+	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	expectedUserOptions := &SSHOptions{
+		CertType: "user", Principals: []string{"name"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
+	}
+	expectedHostOptions := &SSHOptions{
+		CertType: "host", Principals: []string{"smallstep.com"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
+	type args struct {
+		sub, iss, aud string
+		iat           time.Time
+		tokSSHOpts    *SSHOptions
+		userSSHOpts   *SSHOptions
+		jwk           *jose.JSONWebKey
+	}
+	tests := []struct {
+		name        string
+		prov        *JWK
+		args        args
+		expected    *SSHOptions
+		wantErr     bool
+		wantSignErr bool
+	}{
+		{"ok-user", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, expectedUserOptions, false, false},
+		{"ok-host", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, &SSHOptions{}, jwk}, expectedHostOptions, false, false},
+		{"ok-user-opts", p1, args{sub, iss, aud, iat, &SSHOptions{}, &SSHOptions{CertType: "user", Principals: []string{"name"}}, jwk}, expectedUserOptions, false, false},
+		{"ok-host-opts", p1, args{sub, iss, aud, iat, &SSHOptions{}, &SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, jwk}, expectedHostOptions, false, false},
+		{"ok-user-mixed", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user"}, &SSHOptions{Principals: []string{"name"}}, jwk}, expectedUserOptions, false, false},
+		{"ok-host-mixed", p1, args{sub, iss, aud, iat, &SSHOptions{Principals: []string{"smallstep.com"}}, &SSHOptions{CertType: "host"}, jwk}, expectedHostOptions, false, false},
+		{"ok-user-validAfter", p1, args{sub, iss, aud, iat, &SSHOptions{
+			CertType: "user", Principals: []string{"name"},
+		}, &SSHOptions{
+			ValidAfter: NewTimeDuration(tm.Add(-time.Hour)),
+		}, jwk}, &SSHOptions{
+			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm.Add(-time.Hour)), ValidBefore: NewTimeDuration(tm.Add(userDuration - time.Hour)),
+		}, false, false},
+		{"ok-user-validBefore", p1, args{sub, iss, aud, iat, &SSHOptions{
+			CertType: "user", Principals: []string{"name"},
+		}, &SSHOptions{
+			ValidBefore: NewTimeDuration(tm.Add(time.Hour)),
+		}, jwk}, &SSHOptions{
+			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(time.Hour)),
+		}, false, false},
+		{"ok-user-validAfter-validBefore", p1, args{sub, iss, aud, iat, &SSHOptions{
+			CertType: "user", Principals: []string{"name"},
+		}, &SSHOptions{
+			ValidAfter: NewTimeDuration(tm.Add(10 * time.Minute)), ValidBefore: NewTimeDuration(tm.Add(time.Hour)),
+		}, jwk}, &SSHOptions{
+			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm.Add(10 * time.Minute)), ValidBefore: NewTimeDuration(tm.Add(time.Hour)),
+		}, false, false},
+		{"ok-user-match", p1, args{sub, iss, aud, iat, &SSHOptions{
+			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(1 * time.Hour)),
+		}, &SSHOptions{
+			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(1 * time.Hour)),
+		}, jwk}, &SSHOptions{
+			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(time.Hour)),
+		}, false, false},
+		{"fail-certType", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{CertType: "host"}, jwk}, nil, false, true},
+		{"fail-principals", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{Principals: []string{"root"}}, jwk}, nil, false, true},
+		{"fail-validAfter", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm)}, &SSHOptions{ValidAfter: NewTimeDuration(tm.Add(time.Hour))}, jwk}, nil, false, true},
+		{"fail-validBefore", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}, ValidBefore: NewTimeDuration(tm.Add(time.Hour))}, &SSHOptions{ValidBefore: NewTimeDuration(tm.Add(10 * time.Hour))}, jwk}, nil, false, true},
+		{"fail-subject", p1, args{"", iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, nil, true, false},
+		{"fail-issuer", p1, args{sub, "invalid", aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, nil, true, false},
+		{"fail-audience", p1, args{sub, iss, "invalid", iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, nil, true, false},
+		{"fail-expired", p1, args{sub, iss, aud, iat.Add(-6 * time.Minute), &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, nil, true, false},
+		{"fail-notBefore", p1, args{sub, iss, aud, iat.Add(5 * time.Minute), &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, nil, true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := NewContextWithMethod(context.Background(), SignSSHMethod)
+			token, err := generateSSHToken(tt.args.sub, tt.args.iss, tt.args.aud, tt.args.iat, tt.args.tokSSHOpts, tt.args.jwk)
+			assert.FatalError(t, err)
+			if got, err := tt.prov.AuthorizeSign(ctx, token); (err != nil) != tt.wantErr {
+				t.Errorf("JWK.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
+			} else if !tt.wantErr && assert.NotNil(t, got) {
+				var opts SSHOptions
+				if tt.args.userSSHOpts != nil {
+					opts = *tt.args.userSSHOpts
+				}
+				cert, err := signSSHCertificate(key.Public().Key, opts, got, signer.Key.(crypto.Signer))
+				if (err != nil) != tt.wantSignErr {
+					t.Errorf("SignSSH error = %v, wantSignErr %v", err, tt.wantSignErr)
+				} else {
+					if tt.wantSignErr {
+						assert.Nil(t, cert)
+					} else {
+						assert.NoError(t, validateSSHCertificate(cert, tt.expected))
+					}
+				}
 			}
 		})
 	}

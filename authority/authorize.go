@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"context"
 	"crypto/x509"
 	"net/http"
 	"strings"
@@ -72,31 +73,49 @@ func (a *Authority) authorizeToken(ott string) (provisioner.Interface, error) {
 	return p, nil
 }
 
-// Authorize is a passthrough to AuthorizeSign.
-// NOTE: Authorize will be deprecated in a future release. Please use the
-// context specific Authorize[Sign|Revoke|etc.] going forwards.
-func (a *Authority) Authorize(ott string) ([]provisioner.SignOption, error) {
-	return a.AuthorizeSign(ott)
+// Authorize grabs the method from the context and authorizes a signature
+// request by validating the one-time-token.
+func (a *Authority) Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
+	var errContext = apiCtx{"ott": ott}
+	switch m := provisioner.MethodFromContext(ctx); m {
+	case provisioner.SignMethod:
+		return a.authorizeSign(ctx, ott)
+	case provisioner.SignSSHMethod:
+		if a.sshCAHostCertSignKey == nil && a.sshCAUserCertSignKey == nil {
+			return nil, &apiError{errors.New("authorize: ssh signing is not enabled"), http.StatusNotImplemented, errContext}
+		}
+		return a.authorizeSign(ctx, ott)
+	case provisioner.RevokeMethod:
+		return nil, &apiError{errors.New("authorize: revoke method is not supported"), http.StatusInternalServerError, errContext}
+	default:
+		return nil, &apiError{errors.Errorf("authorize: method %d is not supported", m), http.StatusInternalServerError, errContext}
+	}
 }
 
-// AuthorizeSign authorizes a signature request by validating and authenticating
-// a OTT that must be sent w/ the request.
-func (a *Authority) AuthorizeSign(ott string) ([]provisioner.SignOption, error) {
-	var errContext = context{"ott": ott}
-
+// authorizeSign loads the provisioner from the token, checks that it has not
+// been used again and calls the provisioner AuthorizeSign method. Returns a
+// list of methods to apply to the signing flow.
+func (a *Authority) authorizeSign(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
+	var errContext = apiCtx{"ott": ott}
 	p, err := a.authorizeToken(ott)
 	if err != nil {
 		return nil, &apiError{errors.Wrap(err, "authorizeSign"), http.StatusUnauthorized, errContext}
 	}
-
-	// Call the provisioner AuthorizeSign method to apply provisioner specific
-	// auth claims and get the signing options.
-	opts, err := p.AuthorizeSign(ott)
+	opts, err := p.AuthorizeSign(ctx, ott)
 	if err != nil {
 		return nil, &apiError{errors.Wrap(err, "authorizeSign"), http.StatusUnauthorized, errContext}
 	}
-
 	return opts, nil
+}
+
+// AuthorizeSign authorizes a signature request by validating and authenticating
+// a OTT that must be sent w/ the request.
+//
+// NOTE: This method is deprecated and should not be used. We make it available
+// in the short term os as not to break existing clients.
+func (a *Authority) AuthorizeSign(ott string) ([]provisioner.SignOption, error) {
+	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod)
+	return a.Authorize(ctx, ott)
 }
 
 // authorizeRevoke authorizes a revocation request by validating and authenticating

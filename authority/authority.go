@@ -1,12 +1,14 @@
 package authority
 
 import (
+	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/pemutil"
@@ -20,6 +22,8 @@ type Authority struct {
 	config               *Config
 	rootX509Certs        []*x509.Certificate
 	intermediateIdentity *x509util.Identity
+	sshCAUserCertSignKey crypto.Signer
+	sshCAHostCertSignKey crypto.Signer
 	validateOnce         bool
 	certificates         *sync.Map
 	startTime            time.Time
@@ -117,6 +121,22 @@ func (a *Authority) init() error {
 		}
 	}
 
+	// Decrypt and load SSH keys
+	if a.config.SSH != nil {
+		if a.config.SSH.HostKey != "" {
+			a.sshCAHostCertSignKey, err = parseCryptoSigner(a.config.SSH.HostKey, a.config.Password)
+			if err != nil {
+				return err
+			}
+		}
+		if a.config.SSH.UserKey != "" {
+			a.sshCAUserCertSignKey, err = parseCryptoSigner(a.config.SSH.UserKey, a.config.Password)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// Store all the provisioners
 	for _, p := range a.config.AuthorityConfig.Provisioners {
 		if err := a.provisioners.Store(p); err != nil {
@@ -142,4 +162,20 @@ func (a *Authority) GetDatabase() db.AuthDB {
 // Shutdown safely shuts down any clients, databases, etc. held by the Authority.
 func (a *Authority) Shutdown() error {
 	return a.db.Shutdown()
+}
+
+func parseCryptoSigner(filename, password string) (crypto.Signer, error) {
+	var opts []pemutil.Options
+	if password != "" {
+		opts = append(opts, pemutil.WithPassword([]byte(password)))
+	}
+	key, err := pemutil.Read(filename, opts...)
+	if err != nil {
+		return nil, err
+	}
+	signer, ok := key.(crypto.Signer)
+	if !ok {
+		return nil, errors.Errorf("key %s of type %T cannot be used for signing operations", filename, key)
+	}
+	return signer, nil
 }

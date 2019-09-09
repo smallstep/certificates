@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/x509"
 	"time"
 
@@ -12,7 +13,12 @@ import (
 // jwtPayload extends jwt.Claims with step attributes.
 type jwtPayload struct {
 	jose.Claims
-	SANs []string `json:"sans,omitempty"`
+	SANs []string     `json:"sans,omitempty"`
+	Step *stepPayload `json:"step,omitempty"`
+}
+
+type stepPayload struct {
+	SSH *SSHOptions `json:"ssh,omitempty"`
 }
 
 // JWK is the default provisioner, an entity that can sign tokens necessary for
@@ -129,11 +135,20 @@ func (p *JWK) AuthorizeRevoke(token string) error {
 }
 
 // AuthorizeSign validates the given token.
-func (p *JWK) AuthorizeSign(token string) ([]SignOption, error) {
+func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.audiences.Sign)
 	if err != nil {
 		return nil, err
 	}
+
+	// Check for SSH token
+	if claims.Step != nil && claims.Step.SSH != nil {
+		if p.claimer.IsSSHCAEnabled() == false {
+			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
+		}
+		return p.authorizeSSHSign(claims)
+	}
+
 	// NOTE: This is for backwards compatibility with older versions of cli
 	// and certificates. Older versions added the token subject as the only SAN
 	// in a CSR by default.
@@ -160,4 +175,42 @@ func (p *JWK) AuthorizeRenewal(cert *x509.Certificate) error {
 		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
 	}
 	return nil
+}
+
+// authorizeSSHSign returns the list of SignOption for a SignSSH request.
+func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
+	t := now()
+	opts := claims.Step.SSH
+	signOptions := []SignOption{
+		// validates user's SSHOptions with the ones in the token
+		sshCertificateOptionsValidator(*opts),
+		// set the key id to the token subject
+		sshCertificateKeyIDModifier(claims.Subject),
+	}
+
+	// Add modifiers from custom claims
+	if opts.CertType != "" {
+		signOptions = append(signOptions, sshCertificateCertTypeModifier(opts.CertType))
+	}
+	if len(opts.Principals) > 0 {
+		signOptions = append(signOptions, sshCertificatePrincipalsModifier(opts.Principals))
+	}
+	if !opts.ValidAfter.IsZero() {
+		signOptions = append(signOptions, sshCertificateValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
+	}
+	if !opts.ValidBefore.IsZero() {
+		signOptions = append(signOptions, sshCertificateValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
+	}
+
+	// Default to a user certificate with no principals if not set
+	signOptions = append(signOptions, sshCertificateDefaultsModifier{CertType: SSHUserCert})
+
+	return append(signOptions,
+		// set the default extensions
+		&sshDefaultExtensionModifier{},
+		// checks the validity bounds, and set the validity if has not been set
+		&sshCertificateValidityModifier{p.claimer},
+		// require all the fields in the SSH certificate
+		&sshCertificateDefaultValidator{},
+	), nil
 }
