@@ -35,49 +35,33 @@ func init() {
 // appHelpTemplate contains the modified template for the main app
 var appHelpTemplate = `## NAME
 **{{.HelpName}}** -- {{.Usage}}
-
 ## USAGE
 {{if .UsageText}}{{.UsageText}}{{else}}**{{.HelpName}}**{{if .Commands}} <command>{{end}} {{if .ArgsUsage}}{{.ArgsUsage}}{{else}}_[arguments]_{{end}}{{end}}{{if .Description}}
-
 ## DESCRIPTION
 {{.Description}}{{end}}{{if .VisibleCommands}}
-
 ## COMMANDS
-
 {{range .VisibleCategories}}{{if .Name}}{{.Name}}:{{end}}
 |||
 |---|---|{{range .VisibleCommands}}
 | **{{join .Names ", "}}** | {{.Usage}} |{{end}}
 {{end}}{{if .VisibleFlags}}{{end}}
-
 ## OPTIONS
-
 {{range $index, $option := .VisibleFlags}}{{if $index}}
 {{end}}{{$option}}
 {{end}}{{end}}{{if .Copyright}}{{if len .Authors}}
-
 ## AUTHOR{{with $length := len .Authors}}{{if ne 1 $length}}S{{end}}{{end}}:
-
 {{range $index, $author := .Authors}}{{if $index}}
 {{end}}{{$author}}{{end}}{{end}}{{if .Version}}{{if not .HideVersion}}
-
 ## ONLINE
-
 This documentation is available online at https://smallstep.com/docs/certificates
-
 ## VERSION
-
 {{.Version}}{{end}}{{end}}
-
 ## COPYRIGHT
-
 {{.Copyright}}
-
 ## FEEDBACK ` +
 	html.UnescapeString("&#"+strconv.Itoa(128525)+";") + " " +
 	html.UnescapeString("&#"+strconv.Itoa(127867)+";") +
 	`
-
 The **step-ca** utility is not instrumented for usage statistics. It does not phone home.
 But your feedback is extremely valuable. Any information you can provide regarding how you’re using **step-ca** helps.
 Please send us a sentence or two, good or bad: **feedback@smallstep.com** or join https://gitter.im/smallstep/community.
@@ -105,30 +89,21 @@ func main() {
 	app.UsageText = `**step-ca** <config> [**--password-file**=<file>] [**--help**] [**--version**]`
 	app.Description = `**step-ca** runs the Step Online Certificate Authority
 (Step CA) using the given configuration.
-
 See the README.md for more detailed configuration documentation.
-
 ## POSITIONAL ARGUMENTS
-
 <config>
 : File that configures the operation of the Step CA; this file is generated
 when you initialize the Step CA using 'step ca init'
-
 ## EXIT CODES
-
 This command will run indefinitely on success and return \>0 if any error occurs.
-
 ## EXAMPLES
-
 These examples assume that you have already initialized your PKI by running
 'step ca init'. If you have not completed this step please see the 'Getting Started'
 section of the README.
-
 Run the Step CA and prompt for password:
 '''
 $ step-ca $STEPPATH/config/ca.json
 '''
-
 Run the Step CA and read the password from a file - this is useful for
 automating deployment:
 '''
