@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"html"
@@ -23,6 +24,15 @@ import (
 	"github.com/smallstep/cli/usage"
 	"github.com/urfave/cli"
 )
+
+type config struct {
+	Name string `json:"name"`
+	DNS string `json:"dns"`
+	Address string `json:"address"`
+}
+type onboardingPayload struct {
+	Fingerprint string `json:"fingerprint"`
+}
 
 // commit and buildTime are filled in during build by the Makefile
 var (
@@ -176,6 +186,67 @@ intermediate private key.`,
 			// Command prints out the current version of the tool
 			Action: func(c *cli.Context) error {
 				printFullVersion()
+				return nil
+			},
+		},
+		{
+			Name:  "start",
+			Usage: "Starts step-ca with the (optional) specified configuration",
+			// TODO this should accept an optional config parameter that defaults to ~/.step/config/ca.json
+			// as well as an optional token parameter for connecting to the onboarding flow
+			Action: func(c *cli.Context) error {
+				fmt.Printf("Connecting to onboarding guide...\n\n")
+
+				token := c.Args().Get(0)
+
+				res, err := http.Get("http://localhost:3002/onboarding/" + token)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				body, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				configuration := config{}
+				err = json.Unmarshal(body, &configuration)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				fmt.Printf("Connected! Initializing step-ca with the following configuration...\n\n")
+				fmt.Printf("Name: %s\n", configuration.Name)
+				fmt.Printf("DNS: %s\n", configuration.DNS)
+				fmt.Printf("Address: %s\n", configuration.Address)
+				// TODO generate this password
+				fmt.Printf("Provisioner Password: abcdef1234567890\n\n")
+
+				// TODO actually initialize the CA config and start listening
+				// TODO get the root cert fingerprint to post back to the onboarding guide
+				payload, err := json.Marshal(onboardingPayload{Fingerprint: "foobarbatbaz"})
+				req, err := http.NewRequest("POST", "http://localhost:3002/onboarding/" + token, bytes.NewBuffer(payload))
+				req.Header.Set("Content-Type", "application/json")
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				client := &http.Client{}
+				resp, err := client.Do(req)
+				if err != nil {
+					log.Fatal(err)
+				}
+				body, err = ioutil.ReadAll(resp.Body)
+				if err != nil {
+					log.Fatal(err)
+				}
+				resp.Body.Close()
+
+				fmt.Printf("Initialized!\n")
+				fmt.Printf("Step CA has been started. Please return to the onboarding guide in your browser to continue.\n")
+				for {
+					time.Sleep(1 * time.Second);
+				}
 				return nil
 			},
 		},
