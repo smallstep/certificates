@@ -3,6 +3,8 @@ package provisioner
 import (
 	"context"
 	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"strings"
@@ -343,6 +345,12 @@ func TestOIDC_AuthorizeSign_SSH(t *testing.T) {
 	signer, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 
+	pub := key.Public().Key
+	rsa2048, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.FatalError(t, err)
+	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
+	assert.FatalError(t, err)
+
 	userDuration := p1.claimer.DefaultUserSSHCertDuration()
 	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
 	expectedUserOptions := &SSHOptions{
@@ -361,6 +369,7 @@ func TestOIDC_AuthorizeSign_SSH(t *testing.T) {
 	type args struct {
 		token   string
 		sshOpts SSHOptions
+		key     interface{}
 	}
 	tests := []struct {
 		name        string
@@ -370,18 +379,20 @@ func TestOIDC_AuthorizeSign_SSH(t *testing.T) {
 		wantErr     bool
 		wantSignErr bool
 	}{
-		{"ok", p1, args{t1, SSHOptions{}}, expectedUserOptions, false, false},
-		{"ok-user", p1, args{t1, SSHOptions{CertType: "user"}}, expectedUserOptions, false, false},
-		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}}, expectedUserOptions, false, false},
-		{"ok-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}}, expectedUserOptions, false, false},
-		{"admin", p3, args{okAdmin, SSHOptions{}}, expectedAdminOptions, false, false},
-		{"admin-user", p3, args{okAdmin, SSHOptions{CertType: "user"}}, expectedAdminOptions, false, false},
-		{"admin-principals", p3, args{okAdmin, SSHOptions{Principals: []string{"root"}}}, expectedAdminOptions, false, false},
-		{"admin-options", p3, args{okAdmin, SSHOptions{CertType: "user", Principals: []string{"name"}}}, expectedUserOptions, false, false},
-		{"admin-host", p3, args{okAdmin, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}}, expectedHostOptions, false, false},
-		{"fail-user-host", p1, args{t1, SSHOptions{CertType: "host"}}, nil, false, true},
-		{"fail-user-principals", p1, args{t1, SSHOptions{Principals: []string{"root"}}}, nil, false, true},
-		{"fail-email", p3, args{failEmail, SSHOptions{}}, nil, true, false},
+		{"ok", p1, args{t1, SSHOptions{}, pub}, expectedUserOptions, false, false},
+		{"ok-rsa2048", p1, args{t1, SSHOptions{}, rsa2048.Public()}, expectedUserOptions, false, false},
+		{"ok-user", p1, args{t1, SSHOptions{CertType: "user"}, pub}, expectedUserOptions, false, false},
+		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}, pub}, expectedUserOptions, false, false},
+		{"ok-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub}, expectedUserOptions, false, false},
+		{"admin", p3, args{okAdmin, SSHOptions{}, pub}, expectedAdminOptions, false, false},
+		{"admin-user", p3, args{okAdmin, SSHOptions{CertType: "user"}, pub}, expectedAdminOptions, false, false},
+		{"admin-principals", p3, args{okAdmin, SSHOptions{Principals: []string{"root"}}, pub}, expectedAdminOptions, false, false},
+		{"admin-options", p3, args{okAdmin, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub}, expectedUserOptions, false, false},
+		{"admin-host", p3, args{okAdmin, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, false, false},
+		{"fail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedUserOptions, false, true},
+		{"fail-user-host", p1, args{t1, SSHOptions{CertType: "host"}, pub}, nil, false, true},
+		{"fail-user-principals", p1, args{t1, SSHOptions{Principals: []string{"root"}}, pub}, nil, false, true},
+		{"fail-email", p3, args{failEmail, SSHOptions{}, pub}, nil, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -394,7 +405,7 @@ func TestOIDC_AuthorizeSign_SSH(t *testing.T) {
 			if err != nil {
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
-				cert, err := signSSHCertificate(key.Public().Key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
+				cert, err := signSSHCertificate(tt.args.key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
 				if (err != nil) != tt.wantSignErr {
 					t.Errorf("SignSSH error = %v, wantSignErr %v", err, tt.wantSignErr)
 				} else {
