@@ -190,8 +190,8 @@ intermediate private key.`,
 			},
 		},
 		{
-			Name:  "start",
-			Usage: "Starts step-ca with the (optional) specified configuration",
+			Name:  "onboard",
+			Usage: "Configure and run step-ca from the onboarding guide",
 			// TODO this should accept an optional config parameter that defaults to ~/.step/config/ca.json
 			// as well as an optional token parameter for connecting to the onboarding flow
 			Action: func(c *cli.Context) error {
