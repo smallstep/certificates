@@ -26,8 +26,8 @@ import (
 )
 
 type config struct {
-	Name string `json:"name"`
-	DNS string `json:"dns"`
+	Name    string `json:"name"`
+	DNS     string `json:"dns"`
 	Address string `json:"address"`
 }
 type onboardingPayload struct {
@@ -225,7 +225,11 @@ intermediate private key.`,
 				// TODO actually initialize the CA config and start listening
 				// TODO get the root cert fingerprint to post back to the onboarding guide
 				payload, err := json.Marshal(onboardingPayload{Fingerprint: "foobarbatbaz"})
-				req, err := http.NewRequest("POST", "http://localhost:3002/onboarding/" + token, bytes.NewBuffer(payload))
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				req, err := http.NewRequest("POST", "http://localhost:3002/onboarding/"+token, bytes.NewBuffer(payload))
 				req.Header.Set("Content-Type", "application/json")
 				if err != nil {
 					log.Fatal(err)
@@ -236,18 +240,13 @@ intermediate private key.`,
 				if err != nil {
 					log.Fatal(err)
 				}
-				body, err = ioutil.ReadAll(resp.Body)
-				if err != nil {
-					log.Fatal(err)
-				}
 				resp.Body.Close()
 
 				fmt.Printf("Initialized!\n")
 				fmt.Printf("Step CA has been started. Please return to the onboarding guide in your browser to continue.\n")
 				for {
-					time.Sleep(1 * time.Second);
+					time.Sleep(1 * time.Second)
 				}
-				return nil
 			},
 		},
 		{
