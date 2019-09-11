@@ -1,6 +1,9 @@
 package provisioner
 
 import (
+	"crypto/rsa"
+	"encoding/binary"
+	"math/big"
 	"time"
 
 	"github.com/pkg/errors"
@@ -275,6 +278,35 @@ func (v *sshCertificateDefaultValidator) Valid(cert *ssh.Certificate) error {
 	}
 }
 
+// sshDefaultPublicKeyValidator implements a validator for the certificate key.
+type sshDefaultPublicKeyValidator struct{}
+
+// Valid checks that certificate request common name matches the one configured.
+func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate) error {
+	if cert.Key == nil {
+		return errors.New("ssh certificate key cannot be nil")
+	}
+	switch cert.Key.Type() {
+	case ssh.KeyAlgoRSA:
+		_, in, ok := sshParseString(cert.Key.Marshal())
+		if !ok {
+			return errors.New("ssh certificate key is invalid")
+		}
+		key, err := sshParseRSAPublicKey(in)
+		if err != nil {
+			return err
+		}
+		if key.Size() < 256 {
+			return errors.New("ssh certificate key must be at least 2048 bits (256 bytes)")
+		}
+		return nil
+	case ssh.KeyAlgoDSA:
+		return errors.New("ssh certificate key algorithm (DSA) is not supported")
+	default:
+		return nil
+	}
+}
+
 // sshCertTypeUInt32
 func sshCertTypeUInt32(ct string) uint32 {
 	switch ct {
@@ -303,4 +335,42 @@ func containsAllMembers(group, subgroup []string) bool {
 		}
 	}
 	return true
+}
+
+func sshParseString(in []byte) (out, rest []byte, ok bool) {
+	if len(in) < 4 {
+		return
+	}
+	length := binary.BigEndian.Uint32(in)
+	in = in[4:]
+	if uint32(len(in)) < length {
+		return
+	}
+	out = in[:length]
+	rest = in[length:]
+	ok = true
+	return
+}
+
+func sshParseRSAPublicKey(in []byte) (*rsa.PublicKey, error) {
+	var w struct {
+		E    *big.Int
+		N    *big.Int
+		Rest []byte `ssh:"rest"`
+	}
+	if err := ssh.Unmarshal(in, &w); err != nil {
+		return nil, errors.Wrap(err, "error unmarshalling public key")
+	}
+	if w.E.BitLen() > 24 {
+		return nil, errors.New("invalid public key: exponent too large")
+	}
+	e := w.E.Int64()
+	if e < 3 || e&1 == 0 {
+		return nil, errors.New("invalid public key: incorrect exponent")
+	}
+
+	var key rsa.PublicKey
+	key.E = int(e)
+	key.N = w.N
+	return &key, nil
 }
