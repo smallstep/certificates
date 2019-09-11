@@ -222,7 +222,8 @@ intermediate private key.`,
 				// TODO generate this password
 				fmt.Printf("Provisioner Password: abcdef1234567890\n\n")
 
-				// TODO actually initialize the CA config and start listening
+				// TODO actually initialize the CA config (automatically add an "admin" JWT provisioner)
+				// and start listening
 				// TODO get the root cert fingerprint to post back to the onboarding guide
 				payload, err := json.Marshal(onboardingPayload{Fingerprint: "foobarbatbaz"})
 				if err != nil {
