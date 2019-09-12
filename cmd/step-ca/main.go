@@ -298,7 +298,7 @@ func onboardAction(ctx *cli.Context) error {
 
 	res, err := http.Get(onboardingURL)
 	if err != nil {
-		return errors.Wrapf(err, "http GET %s failed", onboardingURL)
+		return errors.Wrap(err, "error connecting onboarding guide")
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
@@ -333,7 +333,7 @@ func onboardAction(ctx *cli.Context) error {
 
 	resp, err := http.Post(onboardingURL, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
-		return errors.Wrapf(err, "http POST %s failed", onboardingURL)
+		return errors.Wrap(err, "error connecting onboarding guide")
 	}
 	resp.Body.Close()
 
@@ -342,8 +342,6 @@ func onboardAction(ctx *cli.Context) error {
 	for {
 		time.Sleep(1 * time.Second)
 	}
-
-	return nil
 }
 
 // fatal writes the passed error on the standard error and exits with the exit
