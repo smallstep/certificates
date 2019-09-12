@@ -264,9 +264,11 @@ func (v *sshCertificateDefaultValidator) Valid(cert *ssh.Certificate) error {
 	case len(cert.ValidPrincipals) == 0:
 		return errors.New("ssh certificate valid principals cannot be empty")
 	case cert.ValidAfter == 0:
-		return errors.New("ssh certificate valid after cannot be 0")
-	case cert.ValidBefore == 0:
-		return errors.New("ssh certificate valid before cannot be 0")
+		return errors.New("ssh certificate validAfter cannot be 0")
+	case cert.ValidBefore < uint64(now().Unix()):
+		return errors.New("ssh certificate validBefore cannot be in the past")
+	case cert.ValidBefore < cert.ValidAfter:
+		return errors.New("ssh certificate validBefore cannot be before validAfter")
 	case cert.CertType == ssh.UserCert && len(cert.Extensions) == 0:
 		return errors.New("ssh certificate extensions cannot be empty")
 	case cert.SignatureKey == nil:
