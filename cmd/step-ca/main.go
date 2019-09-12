@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"regexp"
@@ -16,6 +17,8 @@ import (
 	"strconv"
 	"time"
 	"unicode"
+
+	"github.com/smallstep/cli/crypto/randutil"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
@@ -25,7 +28,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-type config struct {
+type onboardingConfiguration struct {
 	Name    string `json:"name"`
 	DNS     string `json:"dns"`
 	Address string `json:"address"`
@@ -190,65 +193,10 @@ intermediate private key.`,
 			},
 		},
 		{
-			Name:  "onboard",
-			Usage: "Configure and run step-ca from the onboarding guide",
-			// TODO this should accept an optional config parameter that defaults to ~/.step/config/ca.json
-			// as well as an optional token parameter for connecting to the onboarding flow
-			Action: func(c *cli.Context) error {
-				fmt.Printf("Connecting to onboarding guide...\n\n")
-
-				token := c.Args().Get(0)
-
-				res, err := http.Get("http://localhost:3002/onboarding/" + token)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				body, err := ioutil.ReadAll(res.Body)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				configuration := config{}
-				err = json.Unmarshal(body, &configuration)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				fmt.Printf("Connected! Initializing step-ca with the following configuration...\n\n")
-				fmt.Printf("Name: %s\n", configuration.Name)
-				fmt.Printf("DNS: %s\n", configuration.DNS)
-				fmt.Printf("Address: %s\n", configuration.Address)
-				// TODO generate this password
-				fmt.Printf("Provisioner Password: abcdef1234567890\n\n")
-
-				// TODO actually initialize the CA config (automatically add an "admin" JWT provisioner)
-				// and start listening
-				// TODO get the root cert fingerprint to post back to the onboarding guide
-				payload, err := json.Marshal(onboardingPayload{Fingerprint: "foobarbatbaz"})
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				req, err := http.NewRequest("POST", "http://localhost:3002/onboarding/"+token, bytes.NewBuffer(payload))
-				req.Header.Set("Content-Type", "application/json")
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				client := &http.Client{}
-				resp, err := client.Do(req)
-				if err != nil {
-					log.Fatal(err)
-				}
-				resp.Body.Close()
-
-				fmt.Printf("Initialized!\n")
-				fmt.Printf("Step CA has been started. Please return to the onboarding guide in your browser to continue.\n")
-				for {
-					time.Sleep(1 * time.Second)
-				}
-			},
+			Name:      "onboard",
+			Usage:     "Configure and run step-ca from the onboarding guide",
+			UsageText: "**step-ca onboard** <token>",
+			Action:    onboardAction,
 		},
 		{
 			Name:      "help",
@@ -321,6 +269,80 @@ func startAction(ctx *cli.Context) error {
 	if err = srv.Run(); err != nil && err != http.ErrServerClosed {
 		fatal(err)
 	}
+	return nil
+}
+
+func onboardAction(ctx *cli.Context) error {
+	if ctx.NArg() == 0 {
+		return cli.ShowAppHelp(ctx)
+	}
+	if err := errs.NumberOfArguments(ctx, 1); err != nil {
+		return err
+	}
+
+	// Get onboarding url
+	onboarding := "http://localhost:3002/onboarding/"
+	if v := os.Getenv("STEP_CA_ONBOARDING_URL"); v != "" {
+		onboarding = v
+	}
+
+	u, err := url.Parse(onboarding)
+	if err != nil {
+		return errors.Wrapf(err, "error parsing %s", onboarding)
+	}
+
+	fmt.Printf("Connecting to onboarding guide...\n\n")
+
+	token := ctx.Args().Get(0)
+	onboardingURL := u.ResolveReference(&url.URL{Path: token}).String()
+
+	res, err := http.Get(onboardingURL)
+	if err != nil {
+		return errors.Wrapf(err, "http GET %s failed", onboardingURL)
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return errors.Wrap(err, "error reading response")
+	}
+
+	var config onboardingConfiguration
+	err = json.Unmarshal(body, &config)
+	if err != nil {
+		return errors.Wrap(err, "error unmarshaling response")
+	}
+
+	password, err := randutil.ASCII(32)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Connected! Initializing step-ca with the following configuration...\n\n")
+	fmt.Printf("Name: %s\n", config.Name)
+	fmt.Printf("DNS: %s\n", config.DNS)
+	fmt.Printf("Address: %s\n", config.Address)
+	fmt.Printf("Provisioner Password: %s\n\n", password)
+
+	// TODO actually initialize the CA config (automatically add an "admin" JWT provisioner)
+	// and start listening
+	// TODO get the root cert fingerprint to post back to the onboarding guide
+	payload, err := json.Marshal(onboardingPayload{Fingerprint: "foobarbatbaz"})
+	if err != nil {
+		return errors.Wrap(err, "error marshalling payload")
+	}
+
+	resp, err := http.Post(onboardingURL, "application/json", bytes.NewBuffer(payload))
+	if err != nil {
+		return errors.Wrapf(err, "http POST %s failed", onboardingURL)
+	}
+	resp.Body.Close()
+
+	fmt.Printf("Initialized!\n")
+	fmt.Printf("Step CA has been started. Please return to the onboarding guide in your browser to continue.\n")
+	for {
+		time.Sleep(1 * time.Second)
+	}
+
 	return nil
 }
 
