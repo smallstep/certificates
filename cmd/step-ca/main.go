@@ -18,20 +18,22 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/smallstep/cli/crypto/randutil"
-
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/ca"
+	"github.com/smallstep/cli/crypto/pki"
+	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/errs"
 	"github.com/smallstep/cli/usage"
+	"github.com/smallstep/cli/utils"
 	"github.com/urfave/cli"
 )
 
 type onboardingConfiguration struct {
-	Name    string `json:"name"`
-	DNS     string `json:"dns"`
-	Address string `json:"address"`
+	Name     string `json:"name"`
+	DNS      string `json:"dns"`
+	Address  string `json:"address"`
+	password []byte
 }
 type onboardingPayload struct {
 	Fingerprint string `json:"fingerprint"`
@@ -307,12 +309,17 @@ func onboardAction(ctx *cli.Context) error {
 	}
 
 	var config onboardingConfiguration
-	err = json.Unmarshal(body, &config)
-	if err != nil {
+	if err = json.Unmarshal(body, &config); err != nil {
 		return errors.Wrap(err, "error unmarshaling response")
 	}
 
 	password, err := randutil.ASCII(32)
+	if err != nil {
+		return err
+	}
+	config.password = []byte(password)
+
+	caConfig, fp, err := onboardPKI(config)
 	if err != nil {
 		return err
 	}
@@ -321,12 +328,9 @@ func onboardAction(ctx *cli.Context) error {
 	fmt.Printf("Name: %s\n", config.Name)
 	fmt.Printf("DNS: %s\n", config.DNS)
 	fmt.Printf("Address: %s\n", config.Address)
-	fmt.Printf("Provisioner Password: %s\n\n", password)
+	fmt.Printf("Password: %s\n\n", password)
 
-	// TODO actually initialize the CA config (automatically add an "admin" JWT provisioner)
-	// and start listening
-	// TODO get the root cert fingerprint to post back to the onboarding guide
-	payload, err := json.Marshal(onboardingPayload{Fingerprint: "foobarbatbaz"})
+	payload, err := json.Marshal(onboardingPayload{Fingerprint: fp})
 	if err != nil {
 		return errors.Wrap(err, "error marshalling payload")
 	}
@@ -338,10 +342,61 @@ func onboardAction(ctx *cli.Context) error {
 	resp.Body.Close()
 
 	fmt.Printf("Initialized!\n")
-	fmt.Printf("Step CA has been started. Please return to the onboarding guide in your browser to continue.\n")
-	for {
-		time.Sleep(1 * time.Second)
+	fmt.Printf("Step CA is starting. Please return to the onboarding guide in your browser to continue.\n")
+
+	srv, err := ca.New(caConfig, ca.WithPassword(config.password))
+	if err != nil {
+		fatal(err)
 	}
+
+	go ca.StopReloaderHandler(srv)
+	if err = srv.Run(); err != nil && err != http.ErrServerClosed {
+		fatal(err)
+	}
+
+	return nil
+}
+
+func onboardPKI(config onboardingConfiguration) (*authority.Config, string, error) {
+	p, err := pki.New(pki.GetPublicPath(), pki.GetSecretsPath(), pki.GetConfigPath())
+	if err != nil {
+		return nil, "", err
+	}
+
+	p.SetAddress(config.Address)
+	p.SetDNSNames([]string{config.DNS})
+
+	rootCrt, rootKey, err := p.GenerateRootCertificate(config.Name+" Root CA", config.password)
+	if err != nil {
+		return nil, "", err
+	}
+
+	err = p.GenerateIntermediateCertificate(config.Name+" Intermediate CA", rootCrt, rootKey, config.password)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Generate provisioner
+	p.SetProvisioner("admin")
+	if err = p.GenerateKeyPairs(config.password); err != nil {
+		return nil, "", err
+	}
+
+	// Generate and write configuration
+	caConfig, err := p.GenerateConfig()
+	if err != nil {
+		return nil, "", err
+	}
+
+	b, err := json.MarshalIndent(caConfig, "", "   ")
+	if err != nil {
+		return nil, "", errors.Wrapf(err, "error marshaling %s", p.GetCAConfigPath())
+	}
+	if err = utils.WriteFile(p.GetCAConfigPath(), b, 0666); err != nil {
+		return nil, "", errs.FileError(err, p.GetCAConfigPath())
+	}
+
+	return caConfig, p.GetRootFingerprint(), nil
 }
 
 // fatal writes the passed error on the standard error and exits with the exit
