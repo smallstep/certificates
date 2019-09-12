@@ -1,43 +1,25 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"html"
-	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
-	"net/url"
 	"os"
 	"reflect"
 	"regexp"
-	"runtime"
 	"strconv"
 	"time"
-	"unicode"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority"
-	"github.com/smallstep/certificates/ca"
-	"github.com/smallstep/cli/crypto/pki"
-	"github.com/smallstep/cli/crypto/randutil"
-	"github.com/smallstep/cli/errs"
+	"github.com/smallstep/certificates/commands"
+	"github.com/smallstep/cli/command"
+	"github.com/smallstep/cli/command/version"
+	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/usage"
-	"github.com/smallstep/cli/utils"
 	"github.com/urfave/cli"
 )
-
-type onboardingConfiguration struct {
-	Name     string `json:"name"`
-	DNS      string `json:"dns"`
-	Address  string `json:"address"`
-	password []byte
-}
-type onboardingPayload struct {
-	Fingerprint string `json:"fingerprint"`
-}
 
 // commit and buildTime are filled in during build by the Makefile
 var (
@@ -45,30 +27,9 @@ var (
 	Version   = "N/A"
 )
 
-// Version returns the current version of the binary.
-func version() string {
-	out := Version
-	if out == "N/A" {
-		out = "0000000-dev"
-	}
-	return fmt.Sprintf("Smallstep CA/%s (%s/%s)",
-		out, runtime.GOOS, runtime.GOARCH)
-}
-
-// ReleaseDate returns the time of when the binary was built.
-func releaseDate() string {
-	out := BuildTime
-	if out == "N/A" {
-		out = time.Now().UTC().Format("2006-01-02 15:04 MST")
-	}
-
-	return out
-}
-
-// Print version and release date.
-func printFullVersion() {
-	fmt.Printf("%s\n", version())
-	fmt.Printf("Release Date: %s\n", releaseDate())
+func init() {
+	config.Set("Smallstep CA", Version, BuildTime)
+	rand.Seed(time.Now().UnixNano())
 }
 
 // appHelpTemplate contains the modified template for the main app
@@ -126,7 +87,7 @@ Please send us a sentence or two, good or bad: **feedback@smallstep.com** or joi
 func main() {
 	// Override global framework components
 	cli.VersionPrinter = func(c *cli.Context) {
-		printFullVersion()
+		version.Command(c)
 	}
 	cli.AppHelpTemplate = appHelpTemplate
 	cli.SubcommandHelpTemplate = usage.SubcommandHelpTemplate
@@ -134,13 +95,14 @@ func main() {
 	cli.HelpPrinter = usage.HelpPrinter
 	cli.FlagNamePrefixer = usage.FlagNamePrefixer
 	cli.FlagStringer = stringifyFlag
+
 	// Configure cli app
 	app := cli.NewApp()
 	app.Name = "step-ca"
 	app.HelpName = "step-ca"
-	app.Version = version()
+	app.Version = config.Version()
 	app.Usage = "an online certificate authority for secure automated certificate management"
-	app.UsageText = `**step-ca** <config> [**--password-file**=<file>] [**--version**]`
+	app.UsageText = `**step-ca** <config> [**--password-file**=<file>] [**--help**] [**--version**]`
 	app.Description = `**step-ca** runs the Step Online Certificate Authority
 (Step CA) using the given configuration.
 
@@ -172,42 +134,14 @@ automating deployment:
 '''
 $ step-ca $STEPPATH/config/ca.json --password-file ./password.txt
 '''`
-	app.Flags = append(app.Flags, []cli.Flag{
-		cli.StringFlag{
-			Name: "password-file",
-			Usage: `path to the <file> containing the password to decrypt the
-intermediate private key.`,
-		},
-	}...)
+	app.Flags = append(app.Flags, commands.AppCommand.Flags...)
+	app.Flags = append(app.Flags, cli.HelpFlag)
 	app.Copyright = "(c) 2019 Smallstep Labs, Inc."
 
 	// All non-successful output should be written to stderr
 	app.Writer = os.Stdout
 	app.ErrWriter = os.Stderr
-	app.Commands = []cli.Command{
-		{
-			Name:  "version",
-			Usage: "Displays the current version of step-ca",
-			// Command prints out the current version of the tool
-			Action: func(c *cli.Context) error {
-				printFullVersion()
-				return nil
-			},
-		},
-		{
-			Name:      "onboard",
-			Usage:     "Configure and run step-ca from the onboarding guide",
-			UsageText: "**step-ca onboard** <token>",
-			Action:    onboardAction,
-		},
-		{
-			Name:      "help",
-			Aliases:   []string{"h"},
-			Usage:     "displays help for the specified command or command group",
-			ArgsUsage: "",
-			Action:    usage.HelpCommandAction,
-		},
-	}
+	app.Commands = command.Retrieve()
 
 	// Start the golang debug logger if environment variable is set.
 	// See https://golang.org/pkg/net/http/pprof/
@@ -220,11 +154,10 @@ intermediate private key.`,
 
 	app.Action = func(_ *cli.Context) error {
 		// Hack to be able to run a the top action as a subcommand
-		cmd := cli.Command{Name: "start", Action: startAction, Flags: app.Flags}
 		set := flag.NewFlagSet(app.Name, flag.ContinueOnError)
 		set.Parse(os.Args)
 		ctx := cli.NewContext(app, set, nil)
-		return cmd.Run(ctx)
+		return commands.AppCommand.Run(ctx)
 	}
 
 	if err := app.Run(os.Args); err != nil {
@@ -235,180 +168,6 @@ intermediate private key.`,
 		}
 		os.Exit(1)
 	}
-}
-
-func startAction(ctx *cli.Context) error {
-	passFile := ctx.String("password-file")
-
-	// If zero cmd line args show help, if >1 cmd line args show error.
-	if ctx.NArg() == 0 {
-		return cli.ShowAppHelp(ctx)
-	}
-	if err := errs.NumberOfArguments(ctx, 1); err != nil {
-		return err
-	}
-
-	configFile := ctx.Args().Get(0)
-	config, err := authority.LoadConfiguration(configFile)
-	if err != nil {
-		fatal(err)
-	}
-
-	var password []byte
-	if passFile != "" {
-		if password, err = ioutil.ReadFile(passFile); err != nil {
-			fatal(errors.Wrapf(err, "error reading %s", passFile))
-		}
-		password = bytes.TrimRightFunc(password, unicode.IsSpace)
-	}
-
-	srv, err := ca.New(config, ca.WithConfigFile(configFile), ca.WithPassword(password))
-	if err != nil {
-		fatal(err)
-	}
-
-	go ca.StopReloaderHandler(srv)
-	if err = srv.Run(); err != nil && err != http.ErrServerClosed {
-		fatal(err)
-	}
-	return nil
-}
-
-func onboardAction(ctx *cli.Context) error {
-	if ctx.NArg() == 0 {
-		return cli.ShowAppHelp(ctx)
-	}
-	if err := errs.NumberOfArguments(ctx, 1); err != nil {
-		return err
-	}
-
-	// Get onboarding url
-	onboarding := "http://localhost:3002/onboarding/"
-	if v := os.Getenv("STEP_CA_ONBOARDING_URL"); v != "" {
-		onboarding = v
-	}
-
-	u, err := url.Parse(onboarding)
-	if err != nil {
-		return errors.Wrapf(err, "error parsing %s", onboarding)
-	}
-
-	fmt.Printf("Connecting to onboarding guide...\n\n")
-
-	token := ctx.Args().Get(0)
-	onboardingURL := u.ResolveReference(&url.URL{Path: token}).String()
-
-	res, err := http.Get(onboardingURL)
-	if err != nil {
-		return errors.Wrap(err, "error connecting onboarding guide")
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return errors.Wrap(err, "error reading response")
-	}
-
-	var config onboardingConfiguration
-	if err = json.Unmarshal(body, &config); err != nil {
-		return errors.Wrap(err, "error unmarshaling response")
-	}
-
-	password, err := randutil.ASCII(32)
-	if err != nil {
-		return err
-	}
-	config.password = []byte(password)
-
-	caConfig, fp, err := onboardPKI(config)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("Connected! Initializing step-ca with the following configuration...\n\n")
-	fmt.Printf("Name: %s\n", config.Name)
-	fmt.Printf("DNS: %s\n", config.DNS)
-	fmt.Printf("Address: %s\n", config.Address)
-	fmt.Printf("Password: %s\n\n", password)
-
-	payload, err := json.Marshal(onboardingPayload{Fingerprint: fp})
-	if err != nil {
-		return errors.Wrap(err, "error marshalling payload")
-	}
-
-	resp, err := http.Post(onboardingURL, "application/json", bytes.NewBuffer(payload))
-	if err != nil {
-		return errors.Wrap(err, "error connecting onboarding guide")
-	}
-	resp.Body.Close()
-
-	fmt.Printf("Initialized!\n")
-	fmt.Printf("Step CA is starting. Please return to the onboarding guide in your browser to continue.\n")
-
-	srv, err := ca.New(caConfig, ca.WithPassword(config.password))
-	if err != nil {
-		fatal(err)
-	}
-
-	go ca.StopReloaderHandler(srv)
-	if err = srv.Run(); err != nil && err != http.ErrServerClosed {
-		fatal(err)
-	}
-
-	return nil
-}
-
-func onboardPKI(config onboardingConfiguration) (*authority.Config, string, error) {
-	p, err := pki.New(pki.GetPublicPath(), pki.GetSecretsPath(), pki.GetConfigPath())
-	if err != nil {
-		return nil, "", err
-	}
-
-	p.SetAddress(config.Address)
-	p.SetDNSNames([]string{config.DNS})
-
-	rootCrt, rootKey, err := p.GenerateRootCertificate(config.Name+" Root CA", config.password)
-	if err != nil {
-		return nil, "", err
-	}
-
-	err = p.GenerateIntermediateCertificate(config.Name+" Intermediate CA", rootCrt, rootKey, config.password)
-	if err != nil {
-		return nil, "", err
-	}
-
-	// Generate provisioner
-	p.SetProvisioner("admin")
-	if err = p.GenerateKeyPairs(config.password); err != nil {
-		return nil, "", err
-	}
-
-	// Generate and write configuration
-	caConfig, err := p.GenerateConfig()
-	if err != nil {
-		return nil, "", err
-	}
-
-	b, err := json.MarshalIndent(caConfig, "", "   ")
-	if err != nil {
-		return nil, "", errors.Wrapf(err, "error marshaling %s", p.GetCAConfigPath())
-	}
-	if err = utils.WriteFile(p.GetCAConfigPath(), b, 0666); err != nil {
-		return nil, "", errs.FileError(err, p.GetCAConfigPath())
-	}
-
-	return caConfig, p.GetRootFingerprint(), nil
-}
-
-// fatal writes the passed error on the standard error and exits with the exit
-// code 1. If the environment variable STEPDEBUG is set to 1 it shows the
-// stack trace of the error.
-func fatal(err error) {
-	if os.Getenv("STEPDEBUG") == "1" {
-		fmt.Fprintf(os.Stderr, "%+v\n", err)
-	} else {
-		fmt.Fprintln(os.Stderr, err)
-	}
-	os.Exit(2)
 }
 
 func flagValue(f cli.Flag) reflect.Value {
