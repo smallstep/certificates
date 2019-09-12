@@ -105,6 +105,9 @@ func onboardAction(ctx *cli.Context) error {
 		return errors.Wrap(err, "error connecting onboarding guide")
 	}
 	resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		fmt.Fprintf(os.Stderr, "error connecting onboarding guide: %s\n", res.Status)
+	}
 
 	fmt.Printf("Initialized!\n")
 	fmt.Printf("Step CA is starting. Please return to the onboarding guide in your browser to continue.\n")
