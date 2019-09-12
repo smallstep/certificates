@@ -3,7 +3,6 @@ package commands
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -16,6 +15,7 @@ import (
 	"github.com/smallstep/cli/crypto/pki"
 	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/errs"
+	"github.com/smallstep/cli/ui"
 	"github.com/smallstep/cli/utils"
 	"github.com/urfave/cli"
 )
@@ -29,6 +29,15 @@ type onboardingConfiguration struct {
 
 type onboardingPayload struct {
 	Fingerprint string `json:"fingerprint"`
+}
+
+type onboardingError struct {
+	StatusCode int    `json:"statusCode"`
+	Message    string `json:"message"`
+}
+
+func (e onboardingError) Error() string {
+	return e.Message
 }
 
 func init() {
@@ -59,7 +68,7 @@ func onboardAction(ctx *cli.Context) error {
 		return errors.Wrapf(err, "error parsing %s", onboarding)
 	}
 
-	fmt.Printf("Connecting to onboarding guide...\n\n")
+	ui.Println("Connecting to onboarding guide...")
 
 	token := ctx.Args().Get(0)
 	onboardingURL := u.ResolveReference(&url.URL{Path: token}).String()
@@ -69,8 +78,11 @@ func onboardAction(ctx *cli.Context) error {
 		return errors.Wrap(err, "error connecting onboarding guide")
 	}
 	if res.StatusCode >= 400 {
-		res.Body.Close()
-		return errors.Errorf("error connecting onboarding guide: %s", res.Status)
+		var msg onboardingError
+		if err := readJSON(res.Body, &msg); err != nil {
+			return errors.Wrap(err, "error unmarshaling response")
+		}
+		return errors.Wrap(msg, "error receiving onboarding guide")
 	}
 
 	var config onboardingConfiguration
@@ -84,11 +96,12 @@ func onboardAction(ctx *cli.Context) error {
 	}
 	config.password = []byte(password)
 
-	fmt.Printf("Connected! Initializing step-ca with the following configuration...\n\n")
-	fmt.Printf("Name: %s\n", config.Name)
-	fmt.Printf("DNS: %s\n", config.DNS)
-	fmt.Printf("Address: %s\n", config.Address)
-	fmt.Printf("Password: %s\n\n", password)
+	ui.Println("Initializing step-ca with the following configuration:")
+	ui.PrintSelected("Name", config.Name)
+	ui.PrintSelected("DNS", config.DNS)
+	ui.PrintSelected("Address", config.Address)
+	ui.PrintSelected("Password", password)
+	ui.Println()
 
 	caConfig, fp, err := onboardPKI(config)
 	if err != nil {
@@ -104,13 +117,19 @@ func onboardAction(ctx *cli.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "error connecting onboarding guide")
 	}
-	resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		fmt.Fprintf(os.Stderr, "error connecting onboarding guide: %s\n", res.Status)
+		var msg onboardingError
+		if err := readJSON(resp.Body, &msg); err != nil {
+			ui.Printf("%s {{ \"error unmarshalling response: %v\" | yellow }}\n", ui.IconWarn, err)
+		} else {
+			ui.Printf("%s {{ \"error posting fingerprint: %s\" | yellow }}\n", ui.IconWarn, msg.Message)
+		}
+	} else {
+		resp.Body.Close()
 	}
 
-	fmt.Printf("Initialized!\n")
-	fmt.Printf("Step CA is starting. Please return to the onboarding guide in your browser to continue.\n")
+	ui.Println("Initialized!")
+	ui.Println("Step CA is starting. Please return to the onboarding guide in your browser to continue.")
 
 	srv, err := ca.New(caConfig, ca.WithPassword(config.password))
 	if err != nil {
@@ -134,11 +153,13 @@ func onboardPKI(config onboardingConfiguration) (*authority.Config, string, erro
 	p.SetAddress(config.Address)
 	p.SetDNSNames([]string{config.DNS})
 
+	ui.Println("Generating root certificate...")
 	rootCrt, rootKey, err := p.GenerateRootCertificate(config.Name+" Root CA", config.password)
 	if err != nil {
 		return nil, "", err
 	}
 
+	ui.Println("Generating intermediate certificate...")
 	err = p.GenerateIntermediateCertificate(config.Name+" Intermediate CA", rootCrt, rootKey, config.password)
 	if err != nil {
 		return nil, "", err
@@ -146,6 +167,7 @@ func onboardPKI(config onboardingConfiguration) (*authority.Config, string, erro
 
 	// Generate provisioner
 	p.SetProvisioner("admin")
+	ui.Println("Generating admin provisioner...")
 	if err = p.GenerateKeyPairs(config.password); err != nil {
 		return nil, "", err
 	}
