@@ -11,8 +11,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/ca"
+	"github.com/smallstep/certificates/pki"
 	"github.com/smallstep/cli/command"
-	"github.com/smallstep/cli/crypto/pki"
 	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/errs"
 	"github.com/smallstep/cli/ui"
@@ -110,7 +110,7 @@ func onboardAction(ctx *cli.Context) error {
 
 	payload, err := json.Marshal(onboardingPayload{Fingerprint: fp})
 	if err != nil {
-		return errors.Wrap(err, "error marshalling payload")
+		return errors.Wrap(err, "error marshaling payload")
 	}
 
 	resp, err := http.Post(onboardingURL, "application/json", bytes.NewBuffer(payload))
