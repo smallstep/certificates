@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/cli/crypto/keys"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -298,8 +299,9 @@ func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate) error {
 		if err != nil {
 			return err
 		}
-		if key.Size() < 256 {
-			return errors.New("ssh certificate key must be at least 2048 bits (256 bytes)")
+		if key.Size() < keys.MinRSAKeyBytes {
+			return errors.Errorf("ssh certificate key must be at least %d bits (%d bytes)",
+				8*keys.MinRSAKeyBytes, keys.MinRSAKeyBytes)
 		}
 		return nil
 	case ssh.KeyAlgoDSA:

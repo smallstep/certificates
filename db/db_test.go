@@ -8,97 +8,6 @@ import (
 	"github.com/smallstep/nosql/database"
 )
 
-type MockNoSQLDB struct {
-	err         error
-	ret1, ret2  interface{}
-	get         func(bucket, key []byte) ([]byte, error)
-	set         func(bucket, key, value []byte) error
-	open        func(dataSourceName string, opt ...database.Option) error
-	close       func() error
-	createTable func(bucket []byte) error
-	deleteTable func(bucket []byte) error
-	del         func(bucket, key []byte) error
-	list        func(bucket []byte) ([]*database.Entry, error)
-	update      func(tx *database.Tx) error
-	cmpAndSwap  func(bucket, key, old, newval []byte) ([]byte, bool, error)
-}
-
-func (m *MockNoSQLDB) CmpAndSwap(bucket, key, old, newval []byte) ([]byte, bool, error) {
-	if m.cmpAndSwap != nil {
-		return m.cmpAndSwap(bucket, key, old, newval)
-	}
-	if m.ret1 == nil {
-		return nil, false, m.err
-	}
-	return m.ret1.([]byte), m.ret2.(bool), m.err
-}
-
-func (m *MockNoSQLDB) Get(bucket, key []byte) ([]byte, error) {
-	if m.get != nil {
-		return m.get(bucket, key)
-	}
-	if m.ret1 == nil {
-		return nil, m.err
-	}
-	return m.ret1.([]byte), m.err
-}
-
-func (m *MockNoSQLDB) Set(bucket, key, value []byte) error {
-	if m.set != nil {
-		return m.set(bucket, key, value)
-	}
-	return m.err
-}
-
-func (m *MockNoSQLDB) Open(dataSourceName string, opt ...database.Option) error {
-	if m.open != nil {
-		return m.open(dataSourceName, opt...)
-	}
-	return m.err
-}
-
-func (m *MockNoSQLDB) Close() error {
-	if m.close != nil {
-		return m.close()
-	}
-	return m.err
-}
-
-func (m *MockNoSQLDB) CreateTable(bucket []byte) error {
-	if m.createTable != nil {
-		return m.createTable(bucket)
-	}
-	return m.err
-}
-
-func (m *MockNoSQLDB) DeleteTable(bucket []byte) error {
-	if m.deleteTable != nil {
-		return m.deleteTable(bucket)
-	}
-	return m.err
-}
-
-func (m *MockNoSQLDB) Del(bucket, key []byte) error {
-	if m.del != nil {
-		return m.del(bucket, key)
-	}
-	return m.err
-}
-
-func (m *MockNoSQLDB) List(bucket []byte) ([]*database.Entry, error) {
-	if m.list != nil {
-		return m.list(bucket)
-	}
-	return m.ret1.([]*database.Entry), m.err
-}
-
-func (m *MockNoSQLDB) Update(tx *database.Tx) error {
-	if m.update != nil {
-		return m.update(tx)
-	}
-	return m.err
-}
-
 func TestIsRevoked(t *testing.T) {
 	tests := map[string]struct {
 		key       string
@@ -111,16 +20,16 @@ func TestIsRevoked(t *testing.T) {
 		},
 		"false/ErrNotFound": {
 			key: "sn",
-			db:  &DB{&MockNoSQLDB{err: database.ErrNotFound, ret1: nil}, true},
+			db:  &DB{&MockNoSQLDB{Err: database.ErrNotFound, Ret1: nil}, true},
 		},
 		"error/checking bucket": {
 			key: "sn",
-			db:  &DB{&MockNoSQLDB{err: errors.New("force"), ret1: nil}, true},
+			db:  &DB{&MockNoSQLDB{Err: errors.New("force"), Ret1: nil}, true},
 			err: errors.New("error checking revocation bucket: force"),
 		},
 		"true": {
 			key:       "sn",
-			db:        &DB{&MockNoSQLDB{ret1: []byte("value")}, true},
+			db:        &DB{&MockNoSQLDB{Ret1: []byte("value")}, true},
 			isRevoked: true,
 		},
 	}
@@ -148,41 +57,26 @@ func TestRevoke(t *testing.T) {
 		"error/force isRevoked": {
 			rci: &RevokedCertificateInfo{Serial: "sn"},
 			db: &DB{&MockNoSQLDB{
-				get: func(bucket []byte, sn []byte) ([]byte, error) {
-					return nil, errors.New("force IsRevoked")
+				MCmpAndSwap: func(bucket, sn, old, newval []byte) ([]byte, bool, error) {
+					return nil, false, errors.New("force")
 				},
 			}, true},
-			err: errors.New("error checking revocation bucket: force IsRevoked"),
+			err: errors.New("error AuthDB CmpAndSwap: force"),
 		},
 		"error/was already revoked": {
 			rci: &RevokedCertificateInfo{Serial: "sn"},
 			db: &DB{&MockNoSQLDB{
-				get: func(bucket []byte, sn []byte) ([]byte, error) {
-					return nil, nil
+				MCmpAndSwap: func(bucket, sn, old, newval []byte) ([]byte, bool, error) {
+					return []byte("foo"), false, nil
 				},
 			}, true},
 			err: ErrAlreadyExists,
 		},
-		"error/database set": {
-			rci: &RevokedCertificateInfo{Serial: "sn"},
-			db: &DB{&MockNoSQLDB{
-				get: func(bucket []byte, sn []byte) ([]byte, error) {
-					return nil, database.ErrNotFound
-				},
-				set: func(bucket []byte, key []byte, value []byte) error {
-					return errors.New("force")
-				},
-			}, true},
-			err: errors.New("database Set error: force"),
-		},
 		"ok": {
 			rci: &RevokedCertificateInfo{Serial: "sn"},
 			db: &DB{&MockNoSQLDB{
-				get: func(bucket []byte, sn []byte) ([]byte, error) {
-					return nil, database.ErrNotFound
-				},
-				set: func(bucket []byte, key []byte, value []byte) error {
-					return nil
+				MCmpAndSwap: func(bucket, sn, old, newval []byte) ([]byte, bool, error) {
+					return []byte("foo"), true, nil
 				},
 			}, true},
 		},
@@ -214,7 +108,7 @@ func TestUseToken(t *testing.T) {
 			id:  "id",
 			tok: "token",
 			db: &DB{&MockNoSQLDB{
-				cmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return nil, false, errors.New("force")
 				},
 			}, true},
@@ -227,7 +121,7 @@ func TestUseToken(t *testing.T) {
 			id:  "id",
 			tok: "token",
 			db: &DB{&MockNoSQLDB{
-				cmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return []byte("foo"), false, nil
 				},
 			}, true},
@@ -239,7 +133,7 @@ func TestUseToken(t *testing.T) {
 			id:  "id",
 			tok: "token",
 			db: &DB{&MockNoSQLDB{
-				cmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return []byte("bar"), true, nil
 				},
 			}, true},

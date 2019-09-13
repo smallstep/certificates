@@ -163,8 +163,7 @@ func TestClient_Health(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Health()
@@ -224,8 +223,7 @@ func TestClient_Root(t *testing.T) {
 				if req.RequestURI != expected {
 					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
 				}
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Root(tt.shasum)
@@ -303,8 +301,7 @@ func TestClient_Sign(t *testing.T) {
 						t.Errorf("Client.Sign() request = %v, wants %v", body, tt.request)
 					}
 				}
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Sign(tt.request)
@@ -378,8 +375,7 @@ func TestClient_Revoke(t *testing.T) {
 						t.Errorf("Client.Revoke() request = %v, wants %v", body, tt.request)
 					}
 				}
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Revoke(tt.request, nil)
@@ -438,8 +434,7 @@ func TestClient_Renew(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Renew(nil)
@@ -502,8 +497,7 @@ func TestClient_Provisioners(t *testing.T) {
 				if req.RequestURI != tt.expectedURI {
 					t.Errorf("RequestURI = %s, want %s", req.RequestURI, tt.expectedURI)
 				}
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Provisioners(tt.args...)
@@ -562,8 +556,7 @@ func TestClient_ProvisionerKey(t *testing.T) {
 				if req.RequestURI != expected {
 					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
 				}
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.ProvisionerKey(tt.kid)
@@ -622,8 +615,7 @@ func TestClient_Roots(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Roots()
@@ -683,8 +675,7 @@ func TestClient_Federation(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Federation()
@@ -783,8 +774,7 @@ func TestClient_RootFingerprint(t *testing.T) {
 			}
 
 			tt.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.RootFingerprint()

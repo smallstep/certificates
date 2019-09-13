@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/logging"
 )
 
@@ -109,7 +110,13 @@ func NotFound(err error) error {
 
 // WriteError writes to w a JSON representation of the given error.
 func WriteError(w http.ResponseWriter, err error) {
-	w.Header().Set("Content-Type", "application/json")
+	switch k := err.(type) {
+	case *acme.Error:
+		w.Header().Set("Content-Type", "application/problem+json")
+		err = k.ToACME()
+	default:
+		w.Header().Set("Content-Type", "application/json")
+	}
 	cause := errors.Cause(err)
 	if sc, ok := err.(StatusCoder); ok {
 		w.WriteHeader(sc.StatusCode())

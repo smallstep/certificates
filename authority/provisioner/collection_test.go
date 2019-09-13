@@ -133,14 +133,19 @@ func TestCollection_LoadByCertificate(t *testing.T) {
 	assert.FatalError(t, err)
 	p2, err := generateOIDC()
 	assert.FatalError(t, err)
+	p3, err := generateACME()
+	assert.FatalError(t, err)
 
 	byID := new(sync.Map)
 	byID.Store(p1.GetID(), p1)
 	byID.Store(p2.GetID(), p2)
+	byID.Store(p3.GetID(), p3)
 
 	ok1Ext, err := createProvisionerExtension(1, p1.Name, p1.Key.KeyID)
 	assert.FatalError(t, err)
 	ok2Ext, err := createProvisionerExtension(2, p2.Name, p2.ClientID)
+	assert.FatalError(t, err)
+	ok3Ext, err := createProvisionerExtension(int(TypeACME), p3.Name, "")
 	assert.FatalError(t, err)
 	notFoundExt, err := createProvisionerExtension(1, "foo", "bar")
 	assert.FatalError(t, err)
@@ -150,6 +155,9 @@ func TestCollection_LoadByCertificate(t *testing.T) {
 	}
 	ok2Cert := &x509.Certificate{
 		Extensions: []pkix.Extension{ok2Ext},
+	}
+	ok3Cert := &x509.Certificate{
+		Extensions: []pkix.Extension{ok3Ext},
 	}
 	notFoundCert := &x509.Certificate{
 		Extensions: []pkix.Extension{notFoundExt},
@@ -176,6 +184,7 @@ func TestCollection_LoadByCertificate(t *testing.T) {
 	}{
 		{"ok1", fields{byID, testAudiences}, args{ok1Cert}, p1, true},
 		{"ok2", fields{byID, testAudiences}, args{ok2Cert}, p2, true},
+		{"ok3", fields{byID, testAudiences}, args{ok3Cert}, p3, true},
 		{"noExtension", fields{byID, testAudiences}, args{&x509.Certificate{}}, &noop{}, true},
 		{"notFound", fields{byID, testAudiences}, args{notFoundCert}, nil, false},
 		{"badCert", fields{byID, testAudiences}, args{badCert}, nil, false},

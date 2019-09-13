@@ -87,8 +87,6 @@ func (h *caHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logRevoke(w, opts)
-
-	w.WriteHeader(http.StatusOK)
 	JSON(w, &RevokeResponse{Status: "ok"})
 }
 

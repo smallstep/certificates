@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/nosql/database"
 )
 
 // ErrNotImplemented is an error returned when an operation is Not Implemented.
@@ -60,4 +61,58 @@ func (s *SimpleDB) UseToken(id, tok string) (bool, error) {
 // Shutdown returns nil
 func (s *SimpleDB) Shutdown() error {
 	return nil
+}
+
+// nosql.DB interface implementation //
+
+// Open opens the database available with the given options.
+func (s *SimpleDB) Open(dataSourceName string, opt ...database.Option) error {
+	return ErrNotImplemented
+}
+
+// Close closes the current database.
+func (s *SimpleDB) Close() error {
+	return ErrNotImplemented
+}
+
+// Get returns the value stored in the given table/bucket and key.
+func (s *SimpleDB) Get(bucket, key []byte) ([]byte, error) {
+	return nil, ErrNotImplemented
+}
+
+// Set sets the given value in the given table/bucket and key.
+func (s *SimpleDB) Set(bucket, key, value []byte) error {
+	return ErrNotImplemented
+}
+
+// CmpAndSwap swaps the value at the given bucket and key if the current
+// value is equivalent to the oldValue input. Returns 'true' if the
+// swap was successful and 'false' otherwise.
+func (s *SimpleDB) CmpAndSwap(bucket, key, oldValue, newValue []byte) ([]byte, bool, error) {
+	return nil, false, ErrNotImplemented
+}
+
+// Del deletes the data in the given table/bucket and key.
+func (s *SimpleDB) Del(bucket, key []byte) error {
+	return ErrNotImplemented
+}
+
+// List returns a list of all the entries in a given table/bucket.
+func (s *SimpleDB) List(bucket []byte) ([]*database.Entry, error) {
+	return nil, ErrNotImplemented
+}
+
+// Update performs a transaction with multiple read-write commands.
+func (s *SimpleDB) Update(tx *database.Tx) error {
+	return ErrNotImplemented
+}
+
+// CreateTable creates a table or a bucket in the database.
+func (s *SimpleDB) CreateTable(bucket []byte) error {
+	return ErrNotImplemented
+}
+
+// DeleteTable deletes a table or a bucket in the database.
+func (s *SimpleDB) DeleteTable(bucket []byte) error {
+	return ErrNotImplemented
 }

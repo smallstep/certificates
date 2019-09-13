@@ -15,7 +15,9 @@ import (
 	"github.com/smallstep/cli/crypto/x509util"
 )
 
-const legacyAuthority = "step-certificate-authority"
+const (
+	legacyAuthority = "step-certificate-authority"
+)
 
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
