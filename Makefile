@@ -22,7 +22,7 @@ all: build test lint
 bootstra%:
 	$Q which dep || go get github.com/golang/dep/cmd/dep
 	$Q dep ensure
-	$Q GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.17.1
+	$Q GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.18.0
 
 
 vendor: Gopkg.lock
