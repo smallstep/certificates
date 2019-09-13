@@ -207,7 +207,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:2c45eb9dbe9857802a514559f5052ba8a104170a04354c036ba4a1a465c946df"
+  digest = "1:d11ada5a805d465ba60830e18af7049e037cf501bd8da55720029aae4355d1fd"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
@@ -228,7 +228,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "ae6e517f70783467afe6199e12fb43309a7e693e"
+  revision = "0a0e9cfe7c290c4d70062ac5cdb4faea7eea9d8f"
 
 [[projects]]
   branch = "master"
