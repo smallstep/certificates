@@ -32,7 +32,7 @@ It's super easy to get started and to operate `step-ca` thanks to [streamlined i
 ### A private certificate authority you run yourself
 
 - Issue client and server certificates to VMs, containers, devices, and people using internal hostnames and emails
-- [RFC5280](https://tools.ietf.org/html/rfc5280) and [CA/Browser Forum](https://cabforum.org/baseline-requirements-documents/) compliant certificates that work **for TLS and HTTPS** (SSH coming soon!)
+- [RFC5280](https://tools.ietf.org/html/rfc5280) and [CA/Browser Forum](https://cabforum.org/baseline-requirements-documents/) compliant certificates that work **for TLS and HTTPS**
 - Choose key types (RSA, ECDSA, EdDSA) & lifetimes to suit your needs
 - [Short-lived certificates](https://smallstep.com/blog/passive-revocation.html) with **fully automated** enrollment, renewal, and revocation
 - Fast, stable, and capable of high availability deployment using [root federation](https://smallstep.com/blog/step-v0.8.3-federation-root-rotation.html) and/or multiple intermediaries
@@ -47,6 +47,12 @@ It's super easy to get started and to operate `step-ca` thanks to [streamlined i
 - [Single-use short-lived tokens](https://smallstep.com/docs/design-doc.html#jwk-provisioner) issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
 - Use an existing certificate from another CA (e.g., using a device certificate like [Twilio's Trust OnBoard](https://www.twilio.com/wireless/trust-onboard)) *coming soon*
 - ACMEv2 (RFC8555) support so you can **run your own private ACME server** *[coming soon](https://github.com/smallstep/certificates/tree/acme)*
+
+### [SSH Certificates](https://smallstep.com/blog/use-ssh-certificates/)
+
+* Use [certificate authentication for SSH](https://smallstep.com/blog/use-ssh-certificates/): connect SSH to SSO, improve security, and eliminate warnings & errors
+* Issue SSH user certificates using OAuth OIDC
+* Issue SSH host certificates to cloud VMs using instance identity documents
 
 ### Easy certificate management and automation via [`step` CLI](https://github.com/smallstep/cli) [integration](https://smallstep.com/docs/cli/ca/)
 
