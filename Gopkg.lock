@@ -211,6 +211,7 @@
   name = "github.com/smallstep/cli"
   packages = [
     "command",
+    "command/version",
     "config",
     "crypto/keys",
     "crypto/pemutil",
@@ -382,6 +383,8 @@
     "github.com/rs/xid",
     "github.com/sirupsen/logrus",
     "github.com/smallstep/assert",
+    "github.com/smallstep/cli/command",
+    "github.com/smallstep/cli/command/version",
     "github.com/smallstep/cli/config",
     "github.com/smallstep/cli/crypto/keys",
     "github.com/smallstep/cli/crypto/pemutil",
@@ -393,7 +396,9 @@
     "github.com/smallstep/cli/pkg/x509",
     "github.com/smallstep/cli/token",
     "github.com/smallstep/cli/token/provision",
+    "github.com/smallstep/cli/ui",
     "github.com/smallstep/cli/usage",
+    "github.com/smallstep/cli/utils",
     "github.com/smallstep/nosql",
     "github.com/smallstep/nosql/database",
     "github.com/urfave/cli",
