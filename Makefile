@@ -8,9 +8,6 @@ SRC=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
 GOOS_OVERRIDE ?=
 OUTPUT_ROOT=output/
 
-# Set shell to bash for `echo -e`
-SHELL := /bin/bash
-
 all: build test lint
 
 .PHONY: all
@@ -97,16 +94,7 @@ generate:
 test:
 	$Q $(GOFLAGS) go test -short -coverprofile=coverage.out ./...
 
-vtest:
-	$(Q)for d in $$(go list ./... | grep -v vendor); do \
-    echo -e "TESTS FOR: for \033[0;35m$$d\033[0m"; \
-    $(GOFLAGS) go test -v -bench=. -run=. -short -coverprofile=vcoverage.out $$d; \
-	out=$$?; \
-	if [[ $$out -ne 0 ]]; then ret=$$out; fi;\
-    rm -f profile.coverage.out; \
-	done; exit $$ret;
-
-.PHONY: test vtest
+.PHONY: test
 
 integrate: integration
 
