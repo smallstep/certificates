@@ -16,14 +16,20 @@ e.g. `v1.0.2`
 `-rc*` suffix. e.g. `v1.0.2-rc` or `v1.0.2-rc.4`
 
 ---
+1. **Release `cli` first**
 
-1. **Update the version of step/cli**
+    If you plan to release [`cli`](https://github.com/smallstep/cli) as part of
+    this release, `cli` must be released first. The `certificates` docker container
+    depends on the `cli` container. Make certain to wait until the `cli` travis
+    build has completed.
 
-   <pre><code>
-   <b>$ dep ensure -update github.com/smallstep/cli</b>
-   </code></pre>
+2. **Update the version of step/cli**
 
-2. **Commit all changes.**
+    <pre><code>
+    <b>$ dep ensure -update github.com/smallstep/cli</b>
+    </code></pre>
+
+3. **Commit all changes.**
 
     Make sure that the local checkout is up to date with the remote origin and
     that all local changes have been pushed.
@@ -33,7 +39,7 @@ e.g. `v1.0.2`
     <b>$ git push</b>
     </code></pre>
 
-3. **Tag it!**
+4. **Tag it!**
 
     1. **Find the most recent tag.**
 
@@ -84,7 +90,7 @@ e.g. `v1.0.2`
         <b>$ git push origin tag v1.0.3-rc.1</b>
         </code></pre>
 
-4. **Check the build status at**
+5. **Check the build status at**
 [Travis-CI](https://travis-ci.com/smallstep/certificates/builds/).
 
     Travis will begin by verifying that there are no compilation or linting errors
@@ -99,7 +105,7 @@ e.g. `v1.0.2`
     * **step-certificates_1.0.3_darwin_amd64.tar.gz**: tarball containing a statically compiled darwin binary.
     * **step-certificates.tar.gz**: tarball containing a git archive of the full repo.
 
-5. **Update the AUR Arch Linux package**
+6. **Update the AUR Arch Linux package**
 
     > **NOTE**: if you plan to release `cli` next then you can skip this step.
 
@@ -113,7 +119,7 @@ e.g. `v1.0.2`
     <b>$ ./update --ca v1.0.3</b>
     </code></pre>
 
-6. **Update the Helm packages**
+7. **Update the Helm packages**
 
     > **NOTE**: This is an optional step, only necessary if we want to release a
     > new helm package.
