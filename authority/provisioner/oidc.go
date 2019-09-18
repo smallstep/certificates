@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -148,7 +150,14 @@ func (o *OIDC) Init(config Config) (err error) {
 	}
 
 	// Decode and validate openid-configuration endpoint
-	if err := getAndDecode(o.ConfigurationEndpoint, &o.configuration); err != nil {
+	u, err := url.Parse(o.ConfigurationEndpoint)
+	if err != nil {
+		return errors.Wrapf(err, "error parsing %s", o.ConfigurationEndpoint)
+	}
+	if !strings.Contains(u.Path, "/.well-known/openid-configuration") {
+		u.Path = path.Join(u.Path, "/.well-known/openid-configuration")
+	}
+	if err := getAndDecode(u.String(), &o.configuration); err != nil {
 		return err
 	}
 	if err := o.configuration.Validate(); err != nil {
