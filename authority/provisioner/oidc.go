@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -55,6 +56,7 @@ type OIDC struct {
 	Admins                []string `json:"admins,omitempty"`
 	Domains               []string `json:"domains,omitempty"`
 	Groups                []string `json:"groups,omitempty"`
+	ListenAddress         string   `json:"listenAddress,omitempty"`
 	Claims                *Claims  `json:"claims,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
@@ -131,6 +133,13 @@ func (o *OIDC) Init(config Config) (err error) {
 		return errors.New("clientID cannot be empty")
 	case o.ConfigurationEndpoint == "":
 		return errors.New("configurationEndpoint cannot be empty")
+	}
+
+	// Validate listenAddress if given
+	if o.ListenAddress != "" {
+		if _, _, err := net.SplitHostPort(o.ListenAddress); err != nil {
+			return errors.Wrap(err, "error parsing listenAddress")
+		}
 	}
 
 	// Update claims with global ones
