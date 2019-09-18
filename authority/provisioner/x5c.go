@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/x509"
 	"time"
 
@@ -102,6 +103,10 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*jwtPayload, err
 	}
 	leaf := verifiedChains[0][0]
 
+	if leaf.KeyUsage&x509.KeyUsageDigitalSignature == 0 {
+		return nil, errors.New("certificate used to sign x5c token cannot be used for digital signature")
+	}
+
 	var claims jwtPayload
 	if err = jwt.Claims(leaf.PublicKey, &claims); err != nil {
 		return nil, errors.Wrap(err, "error parsing claims")
@@ -131,7 +136,7 @@ func (p *X5C) AuthorizeRevoke(token string) error {
 }
 
 // AuthorizeSign validates the given token.
-func (p *X5C) AuthorizeSign(token string) ([]SignOption, error) {
+func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.audiences.Sign)
 	if err != nil {
 		return nil, err
