@@ -2,7 +2,6 @@ package logging
 
 import (
 	"bufio"
-	"context"
 	"net"
 	"net/http"
 )
@@ -31,9 +30,6 @@ func NewResponseLogger(w http.ResponseWriter) ResponseLogger {
 
 func wrapLogger(w http.ResponseWriter) (rw ResponseLogger) {
 	rw = &rwDefault{w, 200, 0, nil}
-	if c, ok := w.(context.Context); ok {
-		rw = &rwCloseNotifier{rw, c}
-	}
 	if f, ok := w.(http.Flusher); ok {
 		rw = &rwFlusher{rw, f}
 	}
@@ -87,15 +83,6 @@ func (r *rwDefault) WithFields(fields map[string]interface{}) {
 	for k, v := range fields {
 		r.fields[k] = v
 	}
-}
-
-type rwCloseNotifier struct {
-	ResponseLogger
-	ctx context.Context
-}
-
-func (r *rwCloseNotifier) Done() <-chan struct{} {
-	return r.Done()
 }
 
 type rwFlusher struct {
