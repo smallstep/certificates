@@ -101,6 +101,8 @@ func TestOIDC_Init(t *testing.T) {
 		{"no-configuration", fields{"oidc", "name", "client-id", "client-secret", "", nil, nil, nil}, args{config}, true},
 		{"bad-configuration", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/random", nil, nil, nil}, args{config}, true},
 		{"bad-claims", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/.well-known/openid-configuration", badClaims, nil, nil}, args{config}, true},
+		{"bad-parse-url", fields{"oidc", "name", "client-id", "client-secret", ":", nil, nil, nil}, args{config}, true},
+		{"bad-get-url", fields{"oidc", "name", "client-id", "client-secret", "https://", nil, nil, nil}, args{config}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -114,6 +116,7 @@ func TestOIDC_Init(t *testing.T) {
 			}
 			if err := p.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.Init() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 			if tt.wantErr == false {
 				assert.Len(t, 2, p.keyStore.keySet.Keys)
