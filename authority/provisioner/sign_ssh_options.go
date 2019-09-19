@@ -216,7 +216,7 @@ func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
 	}
 
 	if cert.ValidAfter == 0 {
-		cert.ValidAfter = uint64(now().Unix())
+		cert.ValidAfter = uint64(now().Truncate(time.Second).Unix())
 	}
 	if cert.ValidBefore == 0 {
 		t := time.Unix(int64(cert.ValidAfter), 0)
