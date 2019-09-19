@@ -16,9 +16,6 @@ func TestDirectoryGetLink(t *testing.T) {
 	prov := newProv()
 	provID := URLSafeProvisionerName(prov)
 
-	type newTest struct {
-		actual, expected string
-	}
 	assert.Equals(t, dir.getLink(NewNonceLink, provID, true), fmt.Sprintf("https://ca.smallstep.com/acme/%s/new-nonce", provID))
 	assert.Equals(t, dir.getLink(NewNonceLink, provID, false), fmt.Sprintf("/%s/new-nonce", provID))
 

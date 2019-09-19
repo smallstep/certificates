@@ -195,13 +195,6 @@ func (ba *baseAuthz) clone() *baseAuthz {
 	return &u
 }
 
-func (ba *baseAuthz) storeAndReturnError(db nosql.DB, err *Error) error {
-	clone := ba.clone()
-	clone.Error = err
-	clone.save(db, ba)
-	return err
-}
-
 func (ba *baseAuthz) parent() authz {
 	return &dnsAuthz{ba}
 }

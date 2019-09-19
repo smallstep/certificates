@@ -22,7 +22,6 @@ import (
 
 func TestNewACMEClient(t *testing.T) {
 	type test struct {
-		endpoint string
 		ops      []ClientOption
 		r1, r2   interface{}
 		rc1, rc2 int
@@ -357,8 +356,6 @@ func TestACMEClient_post(t *testing.T) {
 
 func TestACMEClient_NewOrder(t *testing.T) {
 	type test struct {
-		payload  []byte
-		jwk      *jose.JSONWebKey
 		ops      []withHeaderOption
 		r1, r2   interface{}
 		rc1, rc2 int

@@ -74,7 +74,6 @@ func Test_caHandler_Revoke(t *testing.T) {
 		input      string
 		auth       Authority
 		tls        *tls.ConnectionState
-		err        error
 		statusCode int
 		expected   []byte
 	}
