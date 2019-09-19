@@ -83,7 +83,6 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 		}
 		// If matches with stored audiences it will be a JWT token (default), and
 		// the id would be <issuer>:<kid>.
-		fmt.Printf("token.Headers[0].ExtraHeaders = %+v\n", token.Headers[0].ExtraHeaders)
 		return c.Load(claims.Issuer + ":" + token.Headers[0].KeyID)
 	}
 
@@ -130,6 +129,8 @@ func (c *Collection) LoadByCertificate(cert *x509.Certificate) (Interface, bool)
 				return c.Load("gcp/" + string(provisioner.Name))
 			case TypeACME:
 				return c.Load("acme/" + string(provisioner.Name))
+			case TypeX5C:
+				return c.Load("x5c/" + string(provisioner.Name))
 			default:
 				return c.Load(string(provisioner.CredentialID))
 			}

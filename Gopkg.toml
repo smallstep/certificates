@@ -32,7 +32,7 @@
   name = "github.com/go-chi/chi"
 
 [[override]]
-  branch = "master"
+  branch = "x5c"
   name = "github.com/smallstep/cli"
 
 [[constraint]]

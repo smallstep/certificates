@@ -25,7 +25,7 @@ type X5C struct {
 // GetID returns the provisioner unique identifier. The name and credential id
 // should uniquely identify any X5C provisioner.
 func (p *X5C) GetID() string {
-	return p.Name
+	return "x5c/" + p.Name
 }
 
 // GetTokenID returns the identifier of the token.
@@ -107,6 +107,11 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*jwtPayload, err
 		return nil, errors.New("certificate used to sign x5c token cannot be used for digital signature")
 	}
 
+	// Using the leaf certificates key to validate the claims accomplishes two
+	// things:
+	//   1. Asserts that the private key used to sign the token corresponds
+	//      to the public certificate in the `x5c` header of the token.
+	//   2. Asserts that the claims are valid - have not been tampered with.
 	var claims jwtPayload
 	if err = jwt.Claims(leaf.PublicKey, &claims); err != nil {
 		return nil, errors.Wrap(err, "error parsing claims")
