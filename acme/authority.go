@@ -214,18 +214,18 @@ func (a *Authority) FinalizeOrder(p provisioner.Interface, accID, orderID string
 // GetAuthz retrieves and attempts to update the status on an ACME authz
 // before returning.
 func (a *Authority) GetAuthz(p provisioner.Interface, accID, authzID string) (*Authz, error) {
-	authz, err := getAuthz(a.db, authzID)
+	az, err := getAuthz(a.db, authzID)
 	if err != nil {
 		return nil, err
 	}
-	if accID != authz.getAccountID() {
+	if accID != az.getAccountID() {
 		return nil, UnauthorizedErr(errors.New("account does not own authz"))
 	}
-	authz, err = authz.updateStatus(a.db)
+	az, err = az.updateStatus(a.db)
 	if err != nil {
 		return nil, Wrap(err, "error updating authz status")
 	}
-	return authz.toACME(a.db, a.dir, p)
+	return az.toACME(a.db, a.dir, p)
 }
 
 // ValidateChallenge attempts to validate the challenge.

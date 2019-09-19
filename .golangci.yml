@@ -49,6 +49,8 @@ linters:
     - misspell
     - ineffassign
     - deadcode
+    - staticcheck
+    - unused
 
 run:
   skip-dirs:
@@ -60,10 +62,9 @@ issues:
     - declaration of "err" shadows declaration at line
     - should have a package comment, unless it's in another file for this package
     - error strings should not be capitalized or end with punctuation or a newline
-    - declaration of "authz" shadows declaration at line
 # golangci.com configuration
 # https://github.com/golangci/golangci/wiki/Configuration
 service:
-  golangci-lint-version: 1.17.x # use the fixed version to not introduce new linters unexpectedly
+  golangci-lint-version: 1.18.x # use the fixed version to not introduce new linters unexpectedly
   prepare:
     - echo "here I can run custom commands, but no preparation needed for this repo"

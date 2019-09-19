@@ -248,10 +248,6 @@ func TestTimeDuration_Unix(t *testing.T) {
 func TestTimeDuration_String(t *testing.T) {
 	tm, fn := mockNow()
 	defer fn()
-	type fields struct {
-		t time.Time
-		d time.Duration
-	}
 	tests := []struct {
 		name         string
 		timeDuration *TimeDuration

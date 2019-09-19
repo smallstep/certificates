@@ -63,12 +63,11 @@ func WithDatabase(db db.AuthDB) Option {
 // CA is the type used to build the complete certificate authority. It builds
 // the HTTP server, set ups the middlewares and the HTTP handlers.
 type CA struct {
-	auth     *authority.Authority
-	acmeAuth *acme.Authority
-	config   *authority.Config
-	srv      *server.Server
-	opts     *options
-	renewer  *TLSRenewer
+	auth    *authority.Authority
+	config  *authority.Config
+	srv     *server.Server
+	opts    *options
+	renewer *TLSRenewer
 }
 
 // New creates and initializes the CA with the given configuration and options.

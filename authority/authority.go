@@ -26,7 +26,6 @@ type Authority struct {
 	intermediateIdentity *x509util.Identity
 	sshCAUserCertSignKey crypto.Signer
 	sshCAHostCertSignKey crypto.Signer
-	validateOnce         bool
 	certificates         *sync.Map
 	startTime            time.Time
 	provisioners         *provisioner.Collection
