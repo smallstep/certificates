@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"net"
 	"net/http"
+	"net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -55,6 +58,7 @@ type OIDC struct {
 	Admins                []string `json:"admins,omitempty"`
 	Domains               []string `json:"domains,omitempty"`
 	Groups                []string `json:"groups,omitempty"`
+	ListenAddress         string   `json:"listenAddress,omitempty"`
 	Claims                *Claims  `json:"claims,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
@@ -133,13 +137,27 @@ func (o *OIDC) Init(config Config) (err error) {
 		return errors.New("configurationEndpoint cannot be empty")
 	}
 
+	// Validate listenAddress if given
+	if o.ListenAddress != "" {
+		if _, _, err := net.SplitHostPort(o.ListenAddress); err != nil {
+			return errors.Wrap(err, "error parsing listenAddress")
+		}
+	}
+
 	// Update claims with global ones
 	if o.claimer, err = NewClaimer(o.Claims, config.Claims); err != nil {
 		return err
 	}
 
 	// Decode and validate openid-configuration endpoint
-	if err := getAndDecode(o.ConfigurationEndpoint, &o.configuration); err != nil {
+	u, err := url.Parse(o.ConfigurationEndpoint)
+	if err != nil {
+		return errors.Wrapf(err, "error parsing %s", o.ConfigurationEndpoint)
+	}
+	if !strings.Contains(u.Path, "/.well-known/openid-configuration") {
+		u.Path = path.Join(u.Path, "/.well-known/openid-configuration")
+	}
+	if err := getAndDecode(u.String(), &o.configuration); err != nil {
 		return err
 	}
 	if err := o.configuration.Validate(); err != nil {
