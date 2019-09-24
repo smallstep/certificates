@@ -53,8 +53,12 @@ func (v profileWithOption) Option(Options) x509util.WithOption {
 	return x509util.WithOption(v)
 }
 
-// profileDefaultDuration is a wrapper against x509util.WithOption to conform the
+// profileDefaultDuration sets the NotBefore and NotAfter attributes on an
+// X509 certificate (profile) from values parsed along with the request.
+// This method is a wrapper against x509util.WithOption to conform the
 // interface.
+// NOTE: This method sets values, but does not validate them;
+// validation is done in the ValidityValidator.
 type profileDefaultDuration time.Duration
 
 func (v profileDefaultDuration) Option(so Options) x509util.WithOption {

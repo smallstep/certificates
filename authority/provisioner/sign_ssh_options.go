@@ -196,10 +196,20 @@ func (m *sshDefaultExtensionModifier) Modify(cert *ssh.Certificate) error {
 // CertType has not been set or is not valid.
 type sshCertificateValidityModifier struct {
 	*Claimer
+	// RemainingProvisioningCredentialDuraion is the remaining duration on the
+	// provisioning credential.
+	// E.g. x5c provisioners use a certificate as a provisioning credential.
+	// That certificate should not be able to provision new certificates with
+	// a duration longer than the remaining duration on the provisioning
+	// certificate.
+	RemainingProvisioningCredentialDuraion time.Duration
 }
 
 func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
-	var d, min, max time.Duration
+	var (
+		d, min, max time.Duration
+		rem         = m.RemainingProvisioningCredentialDuraion
+	)
 	switch cert.CertType {
 	case ssh.UserCert:
 		d = m.DefaultUserSSHCertDuration()
@@ -213,6 +223,29 @@ func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
 		return errors.New("ssh certificate type has not been set")
 	default:
 		return errors.Errorf("unknown ssh certificate type %d", cert.CertType)
+	}
+
+	// Use the remaining duration from the provisioning duration to set bounds
+	// and values if it is supplied.
+	if rem > 0 {
+		// If the remaining duration is less than the min duration for the requested
+		// type of SSH certificate then return an error.
+		if rem < min {
+			return errors.New("remaining duration on X5C certificate in the token " +
+				"is less than the minimum SSH duration on the X5C provisioner")
+		}
+		// If the remaining duration from the provisioning credential is less than
+		// the max duration for the requested type of SSH certificate then we
+		// reset our max bound.
+		if rem < max {
+			max = rem
+		}
+		// If the remaining duration from the provisioning credential is less than
+		// the default duration for the requested type of SSH certificate then we
+		// reset our default duration.
+		if rem < d {
+			d = rem
+		}
 	}
 
 	if cert.ValidAfter == 0 {

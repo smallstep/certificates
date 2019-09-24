@@ -469,7 +469,7 @@ func (p *AWS) authorizeSSHSign(claims *awsPayload) ([]SignOption, error) {
 		// set the default extensions
 		&sshDefaultExtensionModifier{},
 		// checks the validity bounds, and set the validity if has not been set
-		&sshCertificateValidityModifier{p.claimer},
+		&sshCertificateValidityModifier{p.claimer, 0},
 		// validate public key
 		&sshDefaultPublicKeyValidator{},
 		// require all the fields in the SSH certificate
