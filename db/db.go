@@ -55,7 +55,7 @@ func New(c *Config) (AuthDB, error) {
 		return nil, errors.Wrapf(err, "Error opening database of Type %s with source %s", c.Type, c.DataSource)
 	}
 
-	tables := [][]byte{revokedCertsTable, certsTable}
+	tables := [][]byte{revokedCertsTable, certsTable, usedOTTTable}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
 			return nil, errors.Wrapf(err, "error creating table %s",

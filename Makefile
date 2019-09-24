@@ -113,7 +113,7 @@ fmt:
 lint:
 	$Q LOG_LEVEL=error golangci-lint run
 
-.PHONY: $(LINTERS) lint fmt
+.PHONY: lint fmt
 
 #########################################
 # Install
