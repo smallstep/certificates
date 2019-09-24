@@ -20,6 +20,11 @@ import (
 	"github.com/urfave/cli"
 )
 
+// defaultOnboardingURL is the production onboarding url, to use a development
+// url use:
+//   export STEP_CA_ONBOARDING_URL=http://localhost:3002/onboarding/
+const defaultOnboardingURL = "https://api.smallstep.com/onboarding/"
+
 type onboardingConfiguration struct {
 	Name     string `json:"name"`
 	DNS      string `json:"dns"`
@@ -43,9 +48,21 @@ func (e onboardingError) Error() string {
 func init() {
 	command.Register(cli.Command{
 		Name:      "onboard",
-		Usage:     "Configure and run step-ca from the onboarding guide",
+		Usage:     "configure and run step-ca from the onboarding guide",
 		UsageText: "**step-ca onboard** <token>",
 		Action:    onboardAction,
+		Description: `**step-ca onboard** configures step certificates using the onboarding guide.
+
+Open https://smallstep.com/onboarding in your browser and start the CA with the
+given token:
+'''
+$ step-ca onboard <token>
+'''
+
+## POSITIONAL ARGUMENTS
+
+<token>
+:  The token string provided by the onboarding guide.`,
 	})
 }
 
@@ -58,7 +75,7 @@ func onboardAction(ctx *cli.Context) error {
 	}
 
 	// Get onboarding url
-	onboarding := "http://localhost:3002/onboarding/"
+	onboarding := defaultOnboardingURL
 	if v := os.Getenv("STEP_CA_ONBOARDING_URL"); v != "" {
 		onboarding = v
 	}
