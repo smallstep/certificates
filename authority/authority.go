@@ -13,6 +13,7 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/x509util"
+	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -24,8 +25,8 @@ type Authority struct {
 	config               *Config
 	rootX509Certs        []*x509.Certificate
 	intermediateIdentity *x509util.Identity
-	sshCAUserCertSignKey crypto.Signer
-	sshCAHostCertSignKey crypto.Signer
+	sshCAUserCertSignKey ssh.Signer
+	sshCAHostCertSignKey ssh.Signer
 	certificates         *sync.Map
 	startTime            time.Time
 	provisioners         *provisioner.Collection
@@ -125,15 +126,23 @@ func (a *Authority) init() error {
 	// Decrypt and load SSH keys
 	if a.config.SSH != nil {
 		if a.config.SSH.HostKey != "" {
-			a.sshCAHostCertSignKey, err = parseCryptoSigner(a.config.SSH.HostKey, a.config.Password)
+			signer, err := parseCryptoSigner(a.config.SSH.HostKey, a.config.Password)
 			if err != nil {
 				return err
 			}
+			a.sshCAHostCertSignKey, err = ssh.NewSignerFromSigner(signer)
+			if err != nil {
+				return errors.Wrap(err, "error creating ssh signer")
+			}
 		}
 		if a.config.SSH.UserKey != "" {
-			a.sshCAUserCertSignKey, err = parseCryptoSigner(a.config.SSH.UserKey, a.config.Password)
+			signer, err := parseCryptoSigner(a.config.SSH.UserKey, a.config.Password)
 			if err != nil {
 				return err
+			}
+			a.sshCAUserCertSignKey, err = ssh.NewSignerFromSigner(signer)
+			if err != nil {
+				return errors.Wrap(err, "error creating ssh signer")
 			}
 		}
 	}

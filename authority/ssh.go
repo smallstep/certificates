@@ -24,6 +24,30 @@ const (
 	SSHAddUserCommand = "sudo useradd -m <principal>; nc -q0 localhost 22"
 )
 
+// SSHConfiguration is the return type for SSHConfig.
+type SSHConfiguration struct {
+	UserKey ssh.PublicKey
+	HostKey ssh.PublicKey
+}
+
+// SSHConfig returns the SSH User and Host public keys.
+func (a *Authority) SSHConfig() (*SSHConfiguration, error) {
+	var config SSHConfiguration
+	if a.sshCAUserCertSignKey != nil {
+		config.UserKey = a.sshCAUserCertSignKey.PublicKey()
+	}
+	if a.sshCAHostCertSignKey != nil {
+		config.HostKey = a.sshCAHostCertSignKey.PublicKey()
+	}
+	if config.UserKey == nil && config.HostKey == nil {
+		return nil, &apiError{
+			err:  errors.New("sshConfig: ssh is not configured"),
+			code: http.StatusNotFound,
+		}
+	}
+	return &config, nil
+}
+
 // SignSSH creates a signed SSH certificate with the given public key and options.
 func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	var mods []provisioner.SSHCertificateModifier
@@ -95,12 +119,7 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 				code: http.StatusNotImplemented,
 			}
 		}
-		if signer, err = ssh.NewSignerFromSigner(a.sshCAUserCertSignKey); err != nil {
-			return nil, &apiError{
-				err:  errors.Wrap(err, "signSSH: error creating signer"),
-				code: http.StatusInternalServerError,
-			}
-		}
+		signer = a.sshCAUserCertSignKey
 	case ssh.HostCert:
 		if a.sshCAHostCertSignKey == nil {
 			return nil, &apiError{
@@ -108,12 +127,7 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 				code: http.StatusNotImplemented,
 			}
 		}
-		if signer, err = ssh.NewSignerFromSigner(a.sshCAHostCertSignKey); err != nil {
-			return nil, &apiError{
-				err:  errors.Wrap(err, "signSSH: error creating signer"),
-				code: http.StatusInternalServerError,
-			}
-		}
+		signer = a.sshCAHostCertSignKey
 	default:
 		return nil, &apiError{
 			err:  errors.Errorf("signSSH: unexpected ssh certificate type: %d", cert.CertType),
@@ -180,14 +194,7 @@ func (a *Authority) SignSSHAddUser(key ssh.PublicKey, subject *ssh.Certificate) 
 		}
 	}
 
-	signer, err := ssh.NewSignerFromSigner(a.sshCAUserCertSignKey)
-	if err != nil {
-		return nil, &apiError{
-			err:  errors.Wrap(err, "signSSHProxy: error creating signer"),
-			code: http.StatusInternalServerError,
-		}
-	}
-
+	signer := a.sshCAUserCertSignKey
 	principal := subject.ValidPrincipals[0]
 	addUserPrincipal := a.getAddUserPrincipal()
 
