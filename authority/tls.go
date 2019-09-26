@@ -212,7 +212,6 @@ type RevokeOptions struct {
 	MTLS        bool
 	Crt         *x509.Certificate
 	OTT         string
-	errCtxt     map[string]interface{}
 }
 
 // Revoke revokes a certificate.

@@ -84,6 +84,8 @@ const (
 	TypeAWS Type = 4
 	// TypeAzure is used to indicate the Azure provisioners.
 	TypeAzure Type = 5
+	// TypeACME is used to indicate the ACME provisioners.
+	TypeACME Type = 6
 
 	// RevokeAudienceKey is the key for the 'revoke' audiences in the audiences map.
 	RevokeAudienceKey = "revoke"
@@ -104,6 +106,8 @@ func (t Type) String() string {
 		return "AWS"
 	case TypeAzure:
 		return "Azure"
+	case TypeACME:
+		return "ACME"
 	default:
 		return ""
 	}
@@ -151,6 +155,8 @@ func (l *List) UnmarshalJSON(data []byte) error {
 			p = &AWS{}
 		case "azure":
 			p = &Azure{}
+		case "acme":
+			p = &ACME{}
 		default:
 			// Skip unsupported provisioners. A client using this method may be
 			// compiled with a version of smallstep/certificates that does not
@@ -196,4 +202,94 @@ func SanitizeSSHUserPrincipal(email string) string {
 			return '_'
 		}
 	}, strings.ToLower(email))
+}
+
+// MockProvisioner for testing
+type MockProvisioner struct {
+	Mret1, Mret2, Mret3 interface{}
+	Merr                error
+	MgetID              func() string
+	MgetTokenID         func(string) (string, error)
+	MgetName            func() string
+	MgetType            func() Type
+	MgetEncryptedKey    func() (string, string, bool)
+	Minit               func(Config) error
+	MauthorizeRevoke    func(ott string) error
+	MauthorizeSign      func(ctx context.Context, ott string) ([]SignOption, error)
+	MauthorizeRenewal   func(*x509.Certificate) error
+}
+
+// GetID mock
+func (m *MockProvisioner) GetID() string {
+	if m.MgetID != nil {
+		return m.MgetID()
+	}
+	return m.Mret1.(string)
+}
+
+// GetTokenID mock
+func (m *MockProvisioner) GetTokenID(token string) (string, error) {
+	if m.MgetTokenID != nil {
+		return m.MgetTokenID(token)
+	}
+	if m.Mret1 == nil {
+		return "", m.Merr
+	}
+	return m.Mret1.(string), m.Merr
+}
+
+// GetName mock
+func (m *MockProvisioner) GetName() string {
+	if m.MgetName != nil {
+		return m.MgetName()
+	}
+	return m.Mret1.(string)
+}
+
+// GetType mock
+func (m *MockProvisioner) GetType() Type {
+	if m.MgetType != nil {
+		return m.MgetType()
+	}
+	return m.Mret1.(Type)
+}
+
+// GetEncryptedKey mock
+func (m *MockProvisioner) GetEncryptedKey() (string, string, bool) {
+	if m.MgetEncryptedKey != nil {
+		return m.MgetEncryptedKey()
+	}
+	return m.Mret1.(string), m.Mret2.(string), m.Mret3.(bool)
+}
+
+// Init mock
+func (m *MockProvisioner) Init(c Config) error {
+	if m.Minit != nil {
+		return m.Minit(c)
+	}
+	return m.Merr
+}
+
+// AuthorizeRevoke mock
+func (m *MockProvisioner) AuthorizeRevoke(ott string) error {
+	if m.MauthorizeRevoke != nil {
+		return m.MauthorizeRevoke(ott)
+	}
+	return m.Merr
+}
+
+// AuthorizeSign mock
+func (m *MockProvisioner) AuthorizeSign(ctx context.Context, ott string) ([]SignOption, error) {
+	if m.MauthorizeSign != nil {
+		return m.MauthorizeSign(ctx, ott)
+	}
+	return m.Mret1.([]SignOption), m.Merr
+}
+
+// AuthorizeRenewal mock
+func (m *MockProvisioner) AuthorizeRenewal(c *x509.Certificate) error {
+	if m.MauthorizeRenewal != nil {
+		return m.MauthorizeRenewal(c)
+	}
+	return m.Merr
 }

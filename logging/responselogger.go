@@ -30,9 +30,6 @@ func NewResponseLogger(w http.ResponseWriter) ResponseLogger {
 
 func wrapLogger(w http.ResponseWriter) (rw ResponseLogger) {
 	rw = &rwDefault{w, 200, 0, nil}
-	if c, ok := w.(http.CloseNotifier); ok {
-		rw = &rwCloseNotifier{rw, c}
-	}
 	if f, ok := w.(http.Flusher); ok {
 		rw = &rwFlusher{rw, f}
 	}
@@ -86,15 +83,6 @@ func (r *rwDefault) WithFields(fields map[string]interface{}) {
 	for k, v := range fields {
 		r.fields[k] = v
 	}
-}
-
-type rwCloseNotifier struct {
-	ResponseLogger
-	c http.CloseNotifier
-}
-
-func (r *rwCloseNotifier) CloseNotify() <-chan bool {
-	return r.CloseNotify()
 }
 
 type rwFlusher struct {

@@ -8,7 +8,7 @@ import (
 
 type MockAuthDB struct {
 	err              error
-	ret1, ret2       interface{}
+	ret1             interface{}
 	init             func(*db.Config) (db.AuthDB, error)
 	isRevoked        func(string) (bool, error)
 	revoke           func(rci *db.RevokedCertificateInfo) error

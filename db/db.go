@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/nosql"
+	"github.com/smallstep/nosql/database"
 )
 
 var (
@@ -54,7 +55,7 @@ func New(c *Config) (AuthDB, error) {
 		return nil, errors.Wrapf(err, "Error opening database of Type %s with source %s", c.Type, c.DataSource)
 	}
 
-	tables := [][]byte{revokedCertsTable, certsTable}
+	tables := [][]byte{revokedCertsTable, certsTable, usedOTTTable}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
 			return nil, errors.Wrapf(err, "error creating table %s",
@@ -102,22 +103,20 @@ func (db *DB) IsRevoked(sn string) (bool, error) {
 
 // Revoke adds a certificate to the revocation table.
 func (db *DB) Revoke(rci *RevokedCertificateInfo) error {
-	isRvkd, err := db.IsRevoked(rci.Serial)
-	if err != nil {
-		return err
-	}
-	if isRvkd {
-		return ErrAlreadyExists
-	}
 	rcib, err := json.Marshal(rci)
 	if err != nil {
 		return errors.Wrap(err, "error marshaling revoked certificate info")
 	}
 
-	if err = db.Set(revokedCertsTable, []byte(rci.Serial), rcib); err != nil {
-		return errors.Wrap(err, "database Set error")
+	_, swapped, err := db.CmpAndSwap(revokedCertsTable, []byte(rci.Serial), nil, rcib)
+	switch {
+	case err != nil:
+		return errors.Wrap(err, "error AuthDB CmpAndSwap")
+	case !swapped:
+		return ErrAlreadyExists
+	default:
+		return nil
 	}
-	return nil
 }
 
 // StoreCertificate stores a certificate PEM.
@@ -132,15 +131,11 @@ func (db *DB) StoreCertificate(crt *x509.Certificate) error {
 // for the first time, false otherwise.
 func (db *DB) UseToken(id, tok string) (bool, error) {
 	_, swapped, err := db.CmpAndSwap(usedOTTTable, []byte(id), nil, []byte(tok))
-	switch {
-	case err != nil:
+	if err != nil {
 		return false, errors.Wrapf(err, "error storing used token %s/%s",
 			string(usedOTTTable), id)
-	case !swapped:
-		return false, nil
-	default:
-		return true, nil
 	}
+	return swapped, nil
 }
 
 // Shutdown sends a shutdown message to the database.
@@ -152,4 +147,106 @@ func (db *DB) Shutdown() error {
 		db.isUp = false
 	}
 	return nil
+}
+
+// MockNoSQLDB //
+type MockNoSQLDB struct {
+	Err          error
+	Ret1, Ret2   interface{}
+	MGet         func(bucket, key []byte) ([]byte, error)
+	MSet         func(bucket, key, value []byte) error
+	MOpen        func(dataSourceName string, opt ...database.Option) error
+	MClose       func() error
+	MCreateTable func(bucket []byte) error
+	MDeleteTable func(bucket []byte) error
+	MDel         func(bucket, key []byte) error
+	MList        func(bucket []byte) ([]*database.Entry, error)
+	MUpdate      func(tx *database.Tx) error
+	MCmpAndSwap  func(bucket, key, old, newval []byte) ([]byte, bool, error)
+}
+
+// CmpAndSwap mock
+func (m *MockNoSQLDB) CmpAndSwap(bucket, key, old, newval []byte) ([]byte, bool, error) {
+	if m.MCmpAndSwap != nil {
+		return m.MCmpAndSwap(bucket, key, old, newval)
+	}
+	if m.Ret1 == nil {
+		return nil, false, m.Err
+	}
+	return m.Ret1.([]byte), m.Ret2.(bool), m.Err
+}
+
+// Get mock
+func (m *MockNoSQLDB) Get(bucket, key []byte) ([]byte, error) {
+	if m.MGet != nil {
+		return m.MGet(bucket, key)
+	}
+	if m.Ret1 == nil {
+		return nil, m.Err
+	}
+	return m.Ret1.([]byte), m.Err
+}
+
+// Set mock
+func (m *MockNoSQLDB) Set(bucket, key, value []byte) error {
+	if m.MSet != nil {
+		return m.MSet(bucket, key, value)
+	}
+	return m.Err
+}
+
+// Open mock
+func (m *MockNoSQLDB) Open(dataSourceName string, opt ...database.Option) error {
+	if m.MOpen != nil {
+		return m.MOpen(dataSourceName, opt...)
+	}
+	return m.Err
+}
+
+// Close mock
+func (m *MockNoSQLDB) Close() error {
+	if m.MClose != nil {
+		return m.MClose()
+	}
+	return m.Err
+}
+
+// CreateTable mock
+func (m *MockNoSQLDB) CreateTable(bucket []byte) error {
+	if m.MCreateTable != nil {
+		return m.MCreateTable(bucket)
+	}
+	return m.Err
+}
+
+// DeleteTable mock
+func (m *MockNoSQLDB) DeleteTable(bucket []byte) error {
+	if m.MDeleteTable != nil {
+		return m.MDeleteTable(bucket)
+	}
+	return m.Err
+}
+
+// Del mock
+func (m *MockNoSQLDB) Del(bucket, key []byte) error {
+	if m.MDel != nil {
+		return m.MDel(bucket, key)
+	}
+	return m.Err
+}
+
+// List mock
+func (m *MockNoSQLDB) List(bucket []byte) ([]*database.Entry, error) {
+	if m.MList != nil {
+		return m.MList(bucket)
+	}
+	return m.Ret1.([]*database.Entry), m.Err
+}
+
+// Update mock
+func (m *MockNoSQLDB) Update(tx *database.Tx) error {
+	if m.MUpdate != nil {
+		return m.MUpdate(tx)
+	}
+	return m.Err
 }

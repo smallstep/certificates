@@ -570,8 +570,8 @@ func TestBootstrapListener(t *testing.T) {
 				return
 			}
 			wg := new(sync.WaitGroup)
+			wg.Add(1)
 			go func() {
-				wg.Add(1)
 				http.Serve(lis, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte("ok"))
 				}))

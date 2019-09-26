@@ -28,8 +28,7 @@ import (
 // Authority is the interface implemented by a CA authority.
 type Authority interface {
 	SSHAuthority
-	// NOTE: Authorize will be deprecated in future releases. Please use the
-	// context specific Authorize[Sign|Revoke|etc.] methods.
+	// context specifies the Authorize[Sign|Revoke|etc.] method.
 	Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	AuthorizeSign(ott string) ([]provisioner.SignOption, error)
 	GetTLSOptions() *tlsutil.TLSOptions
@@ -37,6 +36,7 @@ type Authority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
 	Renew(peer *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
 	LoadProvisionerByCertificate(*x509.Certificate) (provisioner.Interface, error)
+	LoadProvisionerByID(string) (provisioner.Interface, error)
 	GetProvisioners(cursor string, limit int) (provisioner.List, string, error)
 	Revoke(*authority.RevokeOptions) error
 	GetEncryptedKey(kid string) (string, error)
@@ -308,13 +308,12 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
 	logCertificate(w, cert)
-	JSON(w, &SignResponse{
+	JSONStatus(w, &SignResponse{
 		ServerPEM:  Certificate{cert},
 		CaPEM:      Certificate{root},
 		TLSOptions: h.Authority.GetTLSOptions(),
-	})
+	}, http.StatusCreated)
 }
 
 // Renew uses the information of certificate in the TLS connection to create a
@@ -331,13 +330,12 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
 	logCertificate(w, cert)
-	JSON(w, &SignResponse{
+	JSONStatus(w, &SignResponse{
 		ServerPEM:  Certificate{cert},
 		CaPEM:      Certificate{root},
 		TLSOptions: h.Authority.GetTLSOptions(),
-	})
+	}, http.StatusCreated)
 }
 
 // Provisioners returns the list of provisioners configured in the authority.
@@ -383,10 +381,9 @@ func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 		certs[i] = Certificate{roots[i]}
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	JSON(w, &RootsResponse{
+	JSONStatus(w, &RootsResponse{
 		Certificates: certs,
-	})
+	}, http.StatusCreated)
 }
 
 // Federation returns all the public certificates in the federation.
@@ -402,10 +399,9 @@ func (h *caHandler) Federation(w http.ResponseWriter, r *http.Request) {
 		certs[i] = Certificate{federated[i]}
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	JSON(w, &FederationResponse{
+	JSONStatus(w, &FederationResponse{
 		Certificates: certs,
-	})
+	}, http.StatusCreated)
 }
 
 var oidStepProvisioner = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1}

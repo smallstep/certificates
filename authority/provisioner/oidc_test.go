@@ -3,6 +3,8 @@ package provisioner
 import (
 	"context"
 	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"strings"
@@ -79,6 +81,7 @@ func TestOIDC_Init(t *testing.T) {
 		Claims                *Claims
 		Admins                []string
 		Domains               []string
+		ListenAddress         string
 	}
 	type args struct {
 		config Config
@@ -89,16 +92,21 @@ func TestOIDC_Init(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil, nil}, args{config}, false},
-		{"ok-admins", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, []string{"foo@smallstep.com"}, nil}, args{config}, false},
-		{"ok-domains", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil, []string{"smallstep.com"}}, args{config}, false},
-		{"ok-no-secret", fields{"oidc", "name", "client-id", "", srv.URL + "/openid-configuration", nil, nil, nil}, args{config}, false},
-		{"no-name", fields{"oidc", "", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil, nil}, args{config}, true},
-		{"no-type", fields{"", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", nil, nil, nil}, args{config}, true},
-		{"no-client-id", fields{"oidc", "name", "", "client-secret", srv.URL + "/openid-configuration", nil, nil, nil}, args{config}, true},
-		{"no-configuration", fields{"oidc", "name", "client-id", "client-secret", "", nil, nil, nil}, args{config}, true},
-		{"bad-configuration", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, nil}, args{config}, true},
-		{"bad-claims", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/openid-configuration", badClaims, nil, nil}, args{config}, true},
+		{"ok", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, nil, ""}, args{config}, false},
+		{"ok-admins", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/.well-known/openid-configuration", nil, []string{"foo@smallstep.com"}, nil, ""}, args{config}, false},
+		{"ok-domains", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, []string{"smallstep.com"}, ""}, args{config}, false},
+		{"ok-listen-port", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, nil, ":10000"}, args{config}, false},
+		{"ok-listen-host-port", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, nil, "127.0.0.1:10000"}, args{config}, false},
+		{"ok-no-secret", fields{"oidc", "name", "client-id", "", srv.URL, nil, nil, nil, ""}, args{config}, false},
+		{"no-name", fields{"oidc", "", "client-id", "client-secret", srv.URL, nil, nil, nil, ""}, args{config}, true},
+		{"no-type", fields{"", "name", "client-id", "client-secret", srv.URL, nil, nil, nil, ""}, args{config}, true},
+		{"no-client-id", fields{"oidc", "name", "", "client-secret", srv.URL, nil, nil, nil, ""}, args{config}, true},
+		{"no-configuration", fields{"oidc", "name", "client-id", "client-secret", "", nil, nil, nil, ""}, args{config}, true},
+		{"bad-configuration", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/random", nil, nil, nil, ""}, args{config}, true},
+		{"bad-claims", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/.well-known/openid-configuration", badClaims, nil, nil, ""}, args{config}, true},
+		{"bad-parse-url", fields{"oidc", "name", "client-id", "client-secret", ":", nil, nil, nil, ""}, args{config}, true},
+		{"bad-get-url", fields{"oidc", "name", "client-id", "client-secret", "https://", nil, nil, nil, ""}, args{config}, true},
+		{"bad-listen-address", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, nil, "127.0.0.1"}, args{config}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -109,9 +117,12 @@ func TestOIDC_Init(t *testing.T) {
 				ConfigurationEndpoint: tt.fields.ConfigurationEndpoint,
 				Claims:                tt.fields.Claims,
 				Admins:                tt.fields.Admins,
+				Domains:               tt.fields.Domains,
+				ListenAddress:         tt.fields.ListenAddress,
 			}
 			if err := p.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.Init() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 			if tt.wantErr == false {
 				assert.Len(t, 2, p.keyStore.keySet.Keys)
@@ -343,6 +354,12 @@ func TestOIDC_AuthorizeSign_SSH(t *testing.T) {
 	signer, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 
+	pub := key.Public().Key
+	rsa2048, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.FatalError(t, err)
+	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
+	assert.FatalError(t, err)
+
 	userDuration := p1.claimer.DefaultUserSSHCertDuration()
 	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
 	expectedUserOptions := &SSHOptions{
@@ -361,6 +378,7 @@ func TestOIDC_AuthorizeSign_SSH(t *testing.T) {
 	type args struct {
 		token   string
 		sshOpts SSHOptions
+		key     interface{}
 	}
 	tests := []struct {
 		name        string
@@ -370,18 +388,20 @@ func TestOIDC_AuthorizeSign_SSH(t *testing.T) {
 		wantErr     bool
 		wantSignErr bool
 	}{
-		{"ok", p1, args{t1, SSHOptions{}}, expectedUserOptions, false, false},
-		{"ok-user", p1, args{t1, SSHOptions{CertType: "user"}}, expectedUserOptions, false, false},
-		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}}, expectedUserOptions, false, false},
-		{"ok-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}}, expectedUserOptions, false, false},
-		{"admin", p3, args{okAdmin, SSHOptions{}}, expectedAdminOptions, false, false},
-		{"admin-user", p3, args{okAdmin, SSHOptions{CertType: "user"}}, expectedAdminOptions, false, false},
-		{"admin-principals", p3, args{okAdmin, SSHOptions{Principals: []string{"root"}}}, expectedAdminOptions, false, false},
-		{"admin-options", p3, args{okAdmin, SSHOptions{CertType: "user", Principals: []string{"name"}}}, expectedUserOptions, false, false},
-		{"admin-host", p3, args{okAdmin, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}}, expectedHostOptions, false, false},
-		{"fail-user-host", p1, args{t1, SSHOptions{CertType: "host"}}, nil, false, true},
-		{"fail-user-principals", p1, args{t1, SSHOptions{Principals: []string{"root"}}}, nil, false, true},
-		{"fail-email", p3, args{failEmail, SSHOptions{}}, nil, true, false},
+		{"ok", p1, args{t1, SSHOptions{}, pub}, expectedUserOptions, false, false},
+		{"ok-rsa2048", p1, args{t1, SSHOptions{}, rsa2048.Public()}, expectedUserOptions, false, false},
+		{"ok-user", p1, args{t1, SSHOptions{CertType: "user"}, pub}, expectedUserOptions, false, false},
+		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}, pub}, expectedUserOptions, false, false},
+		{"ok-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub}, expectedUserOptions, false, false},
+		{"admin", p3, args{okAdmin, SSHOptions{}, pub}, expectedAdminOptions, false, false},
+		{"admin-user", p3, args{okAdmin, SSHOptions{CertType: "user"}, pub}, expectedAdminOptions, false, false},
+		{"admin-principals", p3, args{okAdmin, SSHOptions{Principals: []string{"root"}}, pub}, expectedAdminOptions, false, false},
+		{"admin-options", p3, args{okAdmin, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub}, expectedUserOptions, false, false},
+		{"admin-host", p3, args{okAdmin, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, false, false},
+		{"fail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedUserOptions, false, true},
+		{"fail-user-host", p1, args{t1, SSHOptions{CertType: "host"}, pub}, nil, false, true},
+		{"fail-user-principals", p1, args{t1, SSHOptions{Principals: []string{"root"}}, pub}, nil, false, true},
+		{"fail-email", p3, args{failEmail, SSHOptions{}, pub}, nil, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -394,7 +414,7 @@ func TestOIDC_AuthorizeSign_SSH(t *testing.T) {
 			if err != nil {
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
-				cert, err := signSSHCertificate(key.Public().Key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
+				cert, err := signSSHCertificate(tt.args.key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
 				if (err != nil) != tt.wantSignErr {
 					t.Errorf("SignSSH error = %v, wantSignErr %v", err, tt.wantSignErr)
 				} else {

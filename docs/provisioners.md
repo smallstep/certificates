@@ -111,6 +111,7 @@ is G-Suite.
     "configurationEndpoint": "https://accounts.google.com/.well-known/openid-configuration",
     "admins": ["you@smallstep.com"],
     "domains": ["smallstep.com"],
+    "listenAddress": ":10000",
     "claims": {
         "maxTLSCertDuration": "8h",
         "defaultTLSCertDuration": "2h",
@@ -140,6 +141,12 @@ is G-Suite.
 
 * `domains` (optional): is the list of domains valid. If provided only the
   emails with the provided domains will be able to authenticate.
+
+* `listenAddress` (optional): is the loopback address (`:port` or `host:port`)
+  where the authorization server will redirect to complete the authorization
+  flow. If it's not defined `step` will use `127.0.0.1` with a random port. This
+  configuration is only required if the authorization server doesn't allow any
+  port to be specified at the time of the request for loopback IP redirect URIs.
 
 * `claims` (optional): overwrites the default claims set in the authority, see
   the [JWK](#jwk) section for all the options.

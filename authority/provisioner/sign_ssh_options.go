@@ -1,9 +1,13 @@
 package provisioner
 
 import (
+	"crypto/rsa"
+	"encoding/binary"
+	"math/big"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/cli/crypto/keys"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -212,7 +216,7 @@ func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
 	}
 
 	if cert.ValidAfter == 0 {
-		cert.ValidAfter = uint64(now().Unix())
+		cert.ValidAfter = uint64(now().Truncate(time.Second).Unix())
 	}
 	if cert.ValidBefore == 0 {
 		t := time.Unix(int64(cert.ValidAfter), 0)
@@ -261,15 +265,47 @@ func (v *sshCertificateDefaultValidator) Valid(cert *ssh.Certificate) error {
 	case len(cert.ValidPrincipals) == 0:
 		return errors.New("ssh certificate valid principals cannot be empty")
 	case cert.ValidAfter == 0:
-		return errors.New("ssh certificate valid after cannot be 0")
-	case cert.ValidBefore == 0:
-		return errors.New("ssh certificate valid before cannot be 0")
+		return errors.New("ssh certificate validAfter cannot be 0")
+	case cert.ValidBefore < uint64(now().Unix()):
+		return errors.New("ssh certificate validBefore cannot be in the past")
+	case cert.ValidBefore < cert.ValidAfter:
+		return errors.New("ssh certificate validBefore cannot be before validAfter")
 	case cert.CertType == ssh.UserCert && len(cert.Extensions) == 0:
 		return errors.New("ssh certificate extensions cannot be empty")
 	case cert.SignatureKey == nil:
 		return errors.New("ssh certificate signature key cannot be nil")
 	case cert.Signature == nil:
 		return errors.New("ssh certificate signature cannot be nil")
+	default:
+		return nil
+	}
+}
+
+// sshDefaultPublicKeyValidator implements a validator for the certificate key.
+type sshDefaultPublicKeyValidator struct{}
+
+// Valid checks that certificate request common name matches the one configured.
+func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate) error {
+	if cert.Key == nil {
+		return errors.New("ssh certificate key cannot be nil")
+	}
+	switch cert.Key.Type() {
+	case ssh.KeyAlgoRSA:
+		_, in, ok := sshParseString(cert.Key.Marshal())
+		if !ok {
+			return errors.New("ssh certificate key is invalid")
+		}
+		key, err := sshParseRSAPublicKey(in)
+		if err != nil {
+			return err
+		}
+		if key.Size() < keys.MinRSAKeyBytes {
+			return errors.Errorf("ssh certificate key must be at least %d bits (%d bytes)",
+				8*keys.MinRSAKeyBytes, keys.MinRSAKeyBytes)
+		}
+		return nil
+	case ssh.KeyAlgoDSA:
+		return errors.New("ssh certificate key algorithm (DSA) is not supported")
 	default:
 		return nil
 	}
@@ -303,4 +339,42 @@ func containsAllMembers(group, subgroup []string) bool {
 		}
 	}
 	return true
+}
+
+func sshParseString(in []byte) (out, rest []byte, ok bool) {
+	if len(in) < 4 {
+		return
+	}
+	length := binary.BigEndian.Uint32(in)
+	in = in[4:]
+	if uint32(len(in)) < length {
+		return
+	}
+	out = in[:length]
+	rest = in[length:]
+	ok = true
+	return
+}
+
+func sshParseRSAPublicKey(in []byte) (*rsa.PublicKey, error) {
+	var w struct {
+		E    *big.Int
+		N    *big.Int
+		Rest []byte `ssh:"rest"`
+	}
+	if err := ssh.Unmarshal(in, &w); err != nil {
+		return nil, errors.Wrap(err, "error unmarshalling public key")
+	}
+	if w.E.BitLen() > 24 {
+		return nil, errors.New("invalid public key: exponent too large")
+	}
+	e := w.E.Int64()
+	if e < 3 || e&1 == 0 {
+		return nil, errors.New("invalid public key: incorrect exponent")
+	}
+
+	var key rsa.PublicKey
+	key.E = int(e)
+	key.N = w.N
+	return &key, nil
 }

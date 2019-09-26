@@ -709,7 +709,7 @@ func generateJWKServer(n int) *httptest.Server {
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		case "/hits":
 			writeJSON(w, hits)
-		case "/openid-configuration", "/.well-known/openid-configuration":
+		case "/.well-known/openid-configuration":
 			writeJSON(w, openIDConfiguration{Issuer: "the-issuer", JWKSetURI: srv.URL + "/jwks_uri"})
 		case "/random":
 			keySet := must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
@@ -729,4 +729,16 @@ func generateJWKServer(n int) *httptest.Server {
 
 	srv.Start()
 	return srv
+}
+
+func generateACME() (*ACME, error) {
+	// Initialize provisioners
+	p := &ACME{
+		Type: "ACME",
+		Name: "test@acme-provisioner.com",
+	}
+	if err := p.Init(Config{Claims: globalProvisionerClaims}); err != nil {
+		return nil, err
+	}
+	return p, nil
 }

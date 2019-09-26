@@ -3,6 +3,8 @@ package provisioner
 import (
 	"context"
 	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"errors"
 	"strings"
@@ -356,6 +358,12 @@ func TestJWK_AuthorizeSign_SSH(t *testing.T) {
 	signer, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 
+	pub := key.Public().Key
+	rsa2048, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.FatalError(t, err)
+	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
+	assert.FatalError(t, err)
+
 	userDuration := p1.claimer.DefaultUserSSHCertDuration()
 	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
 	expectedUserOptions := &SSHOptions{
@@ -370,6 +378,7 @@ func TestJWK_AuthorizeSign_SSH(t *testing.T) {
 	type args struct {
 		token   string
 		sshOpts SSHOptions
+		key     interface{}
 	}
 	tests := []struct {
 		name        string
@@ -379,15 +388,17 @@ func TestJWK_AuthorizeSign_SSH(t *testing.T) {
 		wantErr     bool
 		wantSignErr bool
 	}{
-		{"user", p1, args{t1, SSHOptions{}}, expectedUserOptions, false, false},
-		{"user-type", p1, args{t1, SSHOptions{CertType: "user"}}, expectedUserOptions, false, false},
-		{"user-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}}, expectedUserOptions, false, false},
-		{"user-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}}, expectedUserOptions, false, false},
-		{"host", p1, args{t2, SSHOptions{}}, expectedHostOptions, false, false},
-		{"host-type", p1, args{t2, SSHOptions{CertType: "host"}}, expectedHostOptions, false, false},
-		{"host-principals", p1, args{t2, SSHOptions{Principals: []string{"smallstep.com"}}}, expectedHostOptions, false, false},
-		{"host-options", p1, args{t2, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}}, expectedHostOptions, false, false},
-		{"fail-signature", p1, args{failSig, SSHOptions{}}, nil, true, false},
+		{"user", p1, args{t1, SSHOptions{}, pub}, expectedUserOptions, false, false},
+		{"user-rsa2048", p1, args{t1, SSHOptions{}, rsa2048.Public()}, expectedUserOptions, false, false},
+		{"user-type", p1, args{t1, SSHOptions{CertType: "user"}, pub}, expectedUserOptions, false, false},
+		{"user-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}, pub}, expectedUserOptions, false, false},
+		{"user-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub}, expectedUserOptions, false, false},
+		{"host", p1, args{t2, SSHOptions{}, pub}, expectedHostOptions, false, false},
+		{"host-type", p1, args{t2, SSHOptions{CertType: "host"}, pub}, expectedHostOptions, false, false},
+		{"host-principals", p1, args{t2, SSHOptions{Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, false, false},
+		{"host-options", p1, args{t2, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, false, false},
+		{"fail-signature", p1, args{failSig, SSHOptions{}, pub}, nil, true, false},
+		{"rail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedUserOptions, false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -400,7 +411,7 @@ func TestJWK_AuthorizeSign_SSH(t *testing.T) {
 			if err != nil {
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
-				cert, err := signSSHCertificate(key.Public().Key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
+				cert, err := signSSHCertificate(tt.args.key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
 				if (err != nil) != tt.wantSignErr {
 					t.Errorf("SignSSH error = %v, wantSignErr %v", err, tt.wantSignErr)
 				} else {

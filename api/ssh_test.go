@@ -260,13 +260,6 @@ func Test_caHandler_SignSSH(t *testing.T) {
 	})
 	assert.FatalError(t, err)
 
-	type fields struct {
-		Authority Authority
-	}
-	type args struct {
-		w http.ResponseWriter
-		r *http.Request
-	}
 	tests := []struct {
 		name        string
 		req         []byte
