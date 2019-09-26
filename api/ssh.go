@@ -16,7 +16,7 @@ import (
 type SSHAuthority interface {
 	SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	SignSSHAddUser(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
-	SSHConfig() (*authority.SSHConfiguration, error)
+	GetSSHKeys() (*authority.SSHKeys, error)
 }
 
 // SignSSHRequest is the request body of an SSH certificate request.
@@ -30,15 +30,29 @@ type SignSSHRequest struct {
 	AddUserPublicKey []byte       `json:"addUserPublicKey,omitempty"`
 }
 
+// Validate validates the SignSSHRequest.
+func (s *SignSSHRequest) Validate() error {
+	switch {
+	case s.CertType != "" && s.CertType != provisioner.SSHUserCert && s.CertType != provisioner.SSHHostCert:
+		return errors.Errorf("unknown certType %s", s.CertType)
+	case len(s.PublicKey) == 0:
+		return errors.New("missing or empty publicKey")
+	case len(s.OTT) == 0:
+		return errors.New("missing or empty ott")
+	default:
+		return nil
+	}
+}
+
 // SignSSHResponse is the response object that returns the SSH certificate.
 type SignSSHResponse struct {
 	Certificate        SSHCertificate  `json:"crt"`
 	AddUserCertificate *SSHCertificate `json:"addUserCrt,omitempty"`
 }
 
-// SSHConfigResponse represents the response object that returns the SSH user
-// and host keys.
-type SSHConfigResponse struct {
+// SSHKeysResponse represents the response object that returns the SSH user and
+// host keys.
+type SSHKeysResponse struct {
 	UserKey *SSHPublicKey `json:"userKey,omitempty"`
 	HostKey *SSHPublicKey `json:"hostKey,omitempty"`
 }
@@ -55,21 +69,6 @@ func (c SSHCertificate) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 	s := base64.StdEncoding.EncodeToString(c.Certificate.Marshal())
-	return []byte(`"` + s + `"`), nil
-}
-
-// SSHPublicKey represents a public key in a response object.
-type SSHPublicKey struct {
-	ssh.PublicKey
-}
-
-// MarshalJSON implements the json.Marshaler interface. Returns a quoted,
-// base64 encoded, openssh wire format version of the public key.
-func (p *SSHPublicKey) MarshalJSON() ([]byte, error) {
-	if p == nil || p.PublicKey == nil {
-		return []byte("null"), nil
-	}
-	s := base64.StdEncoding.EncodeToString(p.PublicKey.Marshal())
 	return []byte(`"` + s + `"`), nil
 }
 
@@ -100,18 +99,43 @@ func (c *SSHCertificate) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Validate validates the SignSSHRequest.
-func (s *SignSSHRequest) Validate() error {
-	switch {
-	case s.CertType != "" && s.CertType != provisioner.SSHUserCert && s.CertType != provisioner.SSHHostCert:
-		return errors.Errorf("unknown certType %s", s.CertType)
-	case len(s.PublicKey) == 0:
-		return errors.New("missing or empty publicKey")
-	case len(s.OTT) == 0:
-		return errors.New("missing or empty ott")
-	default:
+// SSHPublicKey represents a public key in a response object.
+type SSHPublicKey struct {
+	ssh.PublicKey
+}
+
+// MarshalJSON implements the json.Marshaler interface. Returns a quoted,
+// base64 encoded, openssh wire format version of the public key.
+func (p *SSHPublicKey) MarshalJSON() ([]byte, error) {
+	if p == nil || p.PublicKey == nil {
+		return []byte("null"), nil
+	}
+	s := base64.StdEncoding.EncodeToString(p.PublicKey.Marshal())
+	return []byte(`"` + s + `"`), nil
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface. The public key is
+// expected to be a quoted, base64 encoded, openssh wire formatted block of
+// bytes.
+func (p *SSHPublicKey) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return errors.Wrap(err, "error decoding ssh public key")
+	}
+	if s == "" {
+		p.PublicKey = nil
 		return nil
 	}
+	data, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return errors.Wrap(err, "error decoding ssh public key")
+	}
+	pub, err := ssh.ParsePublicKey(data)
+	if err != nil {
+		return errors.Wrap(err, "error parsing ssh public key")
+	}
+	p.PublicKey = pub
+	return nil
 }
 
 // SignSSH is an HTTP handler that reads an SignSSHRequest with a one-time-token
@@ -182,24 +206,24 @@ func (h *caHandler) SignSSH(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// SSHConfig is an HTTP handler that returns the SSH public keys for user and
-// host certificates.
-func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
-	config, err := h.Authority.SSHConfig()
+// SSHKeys is an HTTP handler that returns the SSH public keys for user and host
+// certificates.
+func (h *caHandler) SSHKeys(w http.ResponseWriter, r *http.Request) {
+	keys, err := h.Authority.GetSSHKeys()
 	if err != nil {
 		WriteError(w, NotFound(err))
 		return
 	}
 
 	var host, user *SSHPublicKey
-	if config.HostKey != nil {
-		host = &SSHPublicKey{config.HostKey}
+	if keys.HostKey != nil {
+		host = &SSHPublicKey{PublicKey: keys.HostKey}
 	}
-	if config.UserKey != nil {
-		user = &SSHPublicKey{config.UserKey}
+	if keys.UserKey != nil {
+		user = &SSHPublicKey{PublicKey: keys.UserKey}
 	}
 
-	JSON(w, &SSHConfigResponse{
+	JSON(w, &SSHKeysResponse{
 		HostKey: host,
 		UserKey: user,
 	})

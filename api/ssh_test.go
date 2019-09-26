@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
 	"golang.org/x/crypto/ssh"
@@ -296,23 +297,75 @@ func Test_caHandler_SignSSH(t *testing.T) {
 				},
 			}).(*caHandler)
 
-			req := httptest.NewRequest("POST", "http://example.com/sign-ssh", bytes.NewReader(tt.req))
+			req := httptest.NewRequest("POST", "http://example.com/ssh/sign", bytes.NewReader(tt.req))
 			w := httptest.NewRecorder()
 			h.SignSSH(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
-				t.Errorf("caHandler.Root StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
+				t.Errorf("caHandler.SignSSH StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
 			}
 
 			body, err := ioutil.ReadAll(res.Body)
 			res.Body.Close()
 			if err != nil {
-				t.Errorf("caHandler.Root unexpected error = %v", err)
+				t.Errorf("caHandler.SignSSH unexpected error = %v", err)
 			}
 			if tt.statusCode < http.StatusBadRequest {
 				if !bytes.Equal(bytes.TrimSpace(body), tt.body) {
-					t.Errorf("caHandler.Root Body = %s, wants %s", body, tt.body)
+					t.Errorf("caHandler.SignSSH Body = %s, wants %s", body, tt.body)
+				}
+			}
+		})
+	}
+}
+
+func Test_caHandler_SSHKeys(t *testing.T) {
+	user, err := ssh.NewPublicKey(sshUserKey.Public())
+	assert.FatalError(t, err)
+	userB64 := base64.StdEncoding.EncodeToString(user.Marshal())
+
+	host, err := ssh.NewPublicKey(sshHostKey.Public())
+	assert.FatalError(t, err)
+	hostB64 := base64.StdEncoding.EncodeToString(host.Marshal())
+
+	tests := []struct {
+		name       string
+		keys       *authority.SSHKeys
+		keysErr    error
+		body       []byte
+		statusCode int
+	}{
+		{"ok", &authority.SSHKeys{HostKey: host, UserKey: user}, nil, []byte(fmt.Sprintf(`{"userKey":"%s","hostKey":"%s"}`, userB64, hostB64)), http.StatusOK},
+		{"user", &authority.SSHKeys{UserKey: user}, nil, []byte(fmt.Sprintf(`{"userKey":"%s"}`, userB64)), http.StatusOK},
+		{"host", &authority.SSHKeys{HostKey: host}, nil, []byte(fmt.Sprintf(`{"hostKey":"%s"}`, hostB64)), http.StatusOK},
+		{"error", nil, fmt.Errorf("an error"), nil, http.StatusNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(&mockAuthority{
+				getSSHKeys: func() (*authority.SSHKeys, error) {
+					return tt.keys, tt.keysErr
+				},
+			}).(*caHandler)
+
+			req := httptest.NewRequest("GET", "http://example.com/ssh/keys", http.NoBody)
+			w := httptest.NewRecorder()
+			h.SSHKeys(logging.NewResponseLogger(w), req)
+			res := w.Result()
+
+			if res.StatusCode != tt.statusCode {
+				t.Errorf("caHandler.SSHKeys StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
+			}
+
+			body, err := ioutil.ReadAll(res.Body)
+			res.Body.Close()
+			if err != nil {
+				t.Errorf("caHandler.SSHKeys unexpected error = %v", err)
+			}
+			if tt.statusCode < http.StatusBadRequest {
+				if !bytes.Equal(bytes.TrimSpace(body), tt.body) {
+					t.Errorf("caHandler.SSHKeys Body = %s, wants %s", body, tt.body)
 				}
 			}
 		})

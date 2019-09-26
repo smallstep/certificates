@@ -2,6 +2,9 @@ package ca
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -17,6 +20,7 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/x509util"
+	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -95,6 +99,14 @@ Q7vMNPBWrJWu+A++vHY61WGET+h4lY3GFr2I8OE4IiHPQi1D7Y0+fwOmStwuRPM4
 DCbKzWTW8lqVdp9Kyf7XEhhc2R8C5w==
 -----END CERTIFICATE REQUEST-----`
 )
+
+func mustKey() *ecdsa.PrivateKey {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	return priv
+}
 
 func parseCertificate(data string) *x509.Certificate {
 	block, _ := pem.Decode([]byte(data))
@@ -704,6 +716,67 @@ func TestClient_Federation(t *testing.T) {
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.Federation() = %v, want %v", got, tt.response)
+				}
+			}
+		})
+	}
+}
+
+func TestClient_SSHKeys(t *testing.T) {
+	key, err := ssh.NewPublicKey(mustKey().Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok := &api.SSHKeysResponse{
+		HostKey: &api.SSHPublicKey{PublicKey: key},
+		UserKey: &api.SSHPublicKey{PublicKey: key},
+	}
+	notFound := api.NotFound(fmt.Errorf("Not Found"))
+
+	tests := []struct {
+		name         string
+		response     interface{}
+		responseCode int
+		wantErr      bool
+	}{
+		{"ok", ok, 200, false},
+		{"not found", notFound, 404, true},
+	}
+
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				api.JSONStatus(w, tt.response, tt.responseCode)
+			})
+
+			got, err := c.SSHKeys()
+			if (err != nil) != tt.wantErr {
+				fmt.Printf("%+v", err)
+				t.Errorf("Client.SSHKeys() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			switch {
+			case err != nil:
+				if got != nil {
+					t.Errorf("Client.SSHKeys() = %v, want nil", got)
+				}
+				if !reflect.DeepEqual(err, tt.response) {
+					t.Errorf("Client.SSHKeys() error = %v, want %v", err, tt.response)
+				}
+			default:
+				if !reflect.DeepEqual(got, tt.response) {
+					t.Errorf("Client.SSHKeys() = %v, want %v", got, tt.response)
 				}
 			}
 		})

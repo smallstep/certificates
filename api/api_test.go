@@ -512,6 +512,7 @@ type mockAuthority struct {
 	getEncryptedKey              func(kid string) (string, error)
 	getRoots                     func() ([]*x509.Certificate, error)
 	getFederation                func() ([]*x509.Certificate, error)
+	getSSHKeys                   func() (*authority.SSHKeys, error)
 }
 
 // TODO: remove once Authorize is deprecated.
@@ -615,6 +616,13 @@ func (m *mockAuthority) GetFederation() ([]*x509.Certificate, error) {
 		return m.getFederation()
 	}
 	return m.ret1.([]*x509.Certificate), m.err
+}
+
+func (m *mockAuthority) GetSSHKeys() (*authority.SSHKeys, error) {
+	if m.getSSHKeys != nil {
+		return m.getSSHKeys()
+	}
+	return m.ret1.(*authority.SSHKeys), m.err
 }
 
 func Test_caHandler_Route(t *testing.T) {
