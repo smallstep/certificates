@@ -207,39 +207,21 @@ type sshCertificateValidityModifier struct {
 
 func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
 	var (
-		d, min, max time.Duration
-		rem         = m.RemainingProvisioningCredentialDuraion
+		d   time.Duration
+		rem = m.RemainingProvisioningCredentialDuraion
 	)
 	switch cert.CertType {
 	case ssh.UserCert:
 		d = m.DefaultUserSSHCertDuration()
-		min = m.MinUserSSHCertDuration()
-		max = m.MaxUserSSHCertDuration()
 	case ssh.HostCert:
 		d = m.DefaultHostSSHCertDuration()
-		min = m.MinHostSSHCertDuration()
-		max = m.MaxHostSSHCertDuration()
 	case 0:
 		return errors.New("ssh certificate type has not been set")
 	default:
 		return errors.Errorf("unknown ssh certificate type %d", cert.CertType)
 	}
 
-	// Use the remaining duration from the provisioning duration to set bounds
-	// and values if it is supplied.
 	if rem > 0 {
-		// If the remaining duration is less than the min duration for the requested
-		// type of SSH certificate then return an error.
-		if rem < min {
-			return errors.New("remaining duration on X5C certificate in the token " +
-				"is less than the minimum SSH duration on the X5C provisioner")
-		}
-		// If the remaining duration from the provisioning credential is less than
-		// the max duration for the requested type of SSH certificate then we
-		// reset our max bound.
-		if rem < max {
-			max = rem
-		}
 		// If the remaining duration from the provisioning credential is less than
 		// the default duration for the requested type of SSH certificate then we
 		// reset our default duration.
@@ -254,6 +236,57 @@ func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
 	if cert.ValidBefore == 0 {
 		t := time.Unix(int64(cert.ValidAfter), 0)
 		cert.ValidBefore = uint64(t.Add(d).Unix())
+	}
+	return nil
+}
+
+// sshCertificateDurationValidator implements SSHCertificateOptionsValidator
+// and checks the validity bounds. It will fail if a CertType has not been set
+// or is not valid.
+type sshCertificateDurationValidator struct {
+	*Claimer
+	// RemainingProvisioningCredentialDuraion is the remaining duration on the
+	// provisioning credential.
+	// E.g. x5c provisioners use a certificate as a provisioning credential.
+	// That certificate should not be able to provision new certificates with
+	// a duration longer than the remaining duration on the provisioning
+	// certificate.
+	RemainingProvisioningCredentialDuraion time.Duration
+}
+
+func (m *sshCertificateDurationValidator) Valid(cert *ssh.Certificate) error {
+	if cert.ValidAfter == 0 || cert.ValidBefore == 0 {
+		return errors.Errorf("validAfter or validBefore cannot be zero; va = %d, vb = %d",
+			cert.ValidAfter, cert.ValidBefore)
+	}
+	var (
+		min, max time.Duration
+		rem      = m.RemainingProvisioningCredentialDuraion
+	)
+	switch cert.CertType {
+	case ssh.UserCert:
+		min = m.MinUserSSHCertDuration()
+		max = m.MaxUserSSHCertDuration()
+	case ssh.HostCert:
+		min = m.MinHostSSHCertDuration()
+		max = m.MaxHostSSHCertDuration()
+	case 0:
+		return errors.New("ssh certificate type has not been set")
+	default:
+		return errors.Errorf("unknown ssh certificate type %d", cert.CertType)
+	}
+
+	if rem > 0 {
+		if rem < min {
+			return errors.Errorf("remaining duration on provisioning credential is "+
+				"less than provsioners default minimum duration; rem = %d, min = %d", rem, min)
+		}
+		// If the remaining duration from the provisioning credential is less than
+		// the max duration for the requested type of SSH certificate then we
+		// reset our max bound.
+		if rem < max {
+			max = rem
+		}
 	}
 
 	diff := time.Duration(cert.ValidBefore-cert.ValidAfter) * time.Second

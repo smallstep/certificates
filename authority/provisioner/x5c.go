@@ -21,13 +21,13 @@ type x5cPayload struct {
 // X5C is the default provisioner, an entity that can sign tokens necessary for
 // signature requests.
 type X5C struct {
-	Type      string `json:"type"`
-	Name      string `json:"name"`
-	Roots     string `json:"roots"`
-	rootPool  *x509.CertPool
+	Type      string  `json:"type"`
+	Name      string  `json:"name"`
+	Roots     string  `json:"roots"`
 	Claims    *Claims `json:"claims,omitempty"`
 	claimer   *Claimer
 	audiences Audiences
+	rootPool  *x509.CertPool
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -90,7 +90,7 @@ func (p *X5C) Init(config Config) (err error) {
 		return err
 	}
 
-	p.audiences = config.Audiences
+	p.audiences = config.Audiences.WithFragment(p.GetID())
 	return err
 }
 
@@ -134,6 +134,11 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, err
 		return nil, errors.Wrapf(err, "invalid token")
 	}
 
+	// validate audiences with the defaults
+	if !matchesAudience(claims.Audience, audiences) {
+		return nil, errors.New("invalid token: invalid audience claim (aud)")
+	}
+
 	if claims.Subject == "" {
 		return nil, errors.New("token subject cannot be empty")
 	}
@@ -157,9 +162,9 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		return nil, err
 	}
 
-	// Check for SSH token
-	if claims.Step != nil && claims.Step.SSH != nil {
-		if p.claimer.IsSSHCAEnabled() == false {
+	// Check for SSH sign-ing request.
+	if MethodFromContext(ctx) == SignSSHMethod {
+		if !p.claimer.IsSSHCAEnabled() {
 			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
 		}
 		return p.authorizeSSHSign(claims)
@@ -177,39 +182,20 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	// Get the remaining duration from the provisioning cert. The duration
 	// on the new certificate cannot be greater than the remaining duration of
 	// the provisioning certificate.
-	rem := claims.chains[0][0].NotAfter.Sub(time.Now())
-	minD, maxD, defaultD := p.claimer.MinTLSCertDuration(),
-		p.claimer.MaxTLSCertDuration(), p.claimer.DefaultTLSCertDuration()
-	if rem > 0 {
-		// If the remaining duration from the provisioning x5c Certificate is less
-		// than the provisioner's minimum default duration, then return an error.
-		if rem < minD {
-			return nil, errors.New("remaining duration on x5c certificate in the token " +
-				"is less than the minimum duration on the x5c provisioner")
-		}
-		// If the remaining duration from the provisioning credential is less than
-		// the max duration for the requested type of x509 certificate then we
-		// reset our max bound.
-		if rem < maxD {
-			maxD = rem
-		}
-		// If the remaining duration from the provisioning credential is less than
-		// the default duration for the requested type of x509 certificate then we
-		// reset our default duration.
-		if rem < defaultD {
-			defaultD = rem
-		}
-	}
+	rem := claims.chains[0][0].NotAfter.Sub(now())
 
 	return []SignOption{
-		defaultPublicKeyValidator{},
-		commonNameValidator(claims.Subject),
-		dnsNamesValidator(dnsNames),
-		ipAddressesValidator(ips),
-		emailAddressesValidator(emails),
-		profileDefaultDuration(defaultD),
+		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeX5C, p.Name, ""),
-		newValidityValidator(minD, maxD),
+		x509ProfileValidityModifier{p.claimer, rem},
+		// validators
+		commonNameValidator(claims.Subject),
+		defaultPublicKeyValidator{},
+		dnsNamesValidator(dnsNames),
+		emailAddressesValidator(emails),
+		ipAddressesValidator(ips),
+		validityValidator{},
+		x509CertificateDurationValidator{p.claimer, rem},
 	}, nil
 }
 
@@ -224,6 +210,9 @@ func (p *X5C) AuthorizeRenewal(cert *x509.Certificate) error {
 // authorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
 	t := now()
+	if claims.Step == nil || claims.Step.SSH == nil {
+		return nil, errors.New("authorization token must be an SSH provisioning token")
+	}
 	opts := claims.Step.SSH
 	signOptions := []SignOption{
 		// validates user's SSHOptions with the ones in the token
@@ -249,16 +238,19 @@ func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
 	// Default to a user certificate with no principals if not set
 	signOptions = append(signOptions, sshCertificateDefaultsModifier{CertType: SSHUserCert})
 
-	rem := claims.chains[0][0].NotAfter.Sub(time.Now())
+	rem := claims.chains[0][0].NotAfter.Sub(now())
 
 	return append(signOptions,
-		// set the default extensions
+		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
-		// checks the validity bounds, and set the validity if has not been set
+		// Checks the validity bounds, and set the validity if has not been set.
 		&sshCertificateValidityModifier{p.claimer, rem},
-		// validate public key
+		// Check the validity bounds against default provisioner and
+		// provisioning credential bounds.
+		&sshCertificateDurationValidator{p.claimer, rem},
+		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
-		// require all the fields in the SSH certificate
+		// Require all the fields in the SSH certificate
 		&sshCertificateDefaultValidator{},
 	), nil
 }

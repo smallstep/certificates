@@ -296,11 +296,14 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}
 
 	return append(so,
+		// modifiers / withOptions
+		newProvisionerExtensionOption(TypeAWS, p.Name, doc.AccountID, "InstanceID", doc.InstanceID),
+		x509ProfileValidityModifier{p.claimer, 0},
+		// validators
 		defaultPublicKeyValidator{},
 		commonNameValidator(payload.Claims.Subject),
-		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
-		newProvisionerExtensionOption(TypeAWS, p.Name, doc.AccountID, "InstanceID", doc.InstanceID),
-		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		validityValidator{},
+		x509CertificateDurationValidator{p.claimer, 0},
 	), nil
 }
 
@@ -466,13 +469,16 @@ func (p *AWS) authorizeSSHSign(claims *awsPayload) ([]SignOption, error) {
 	signOptions = append(signOptions, sshCertificateDefaultsModifier(defaults))
 
 	return append(signOptions,
-		// set the default extensions
+		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
-		// checks the validity bounds, and set the validity if has not been set
+		// Checks the validity bounds, and set the validity if has not been set.
 		&sshCertificateValidityModifier{p.claimer, 0},
-		// validate public key
+		// Check the validity bounds against default provisioner and
+		// provisioning credential bounds.
+		&sshCertificateDurationValidator{p.claimer, 0},
+		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
-		// require all the fields in the SSH certificate
+		// Require all the fields in the SSH certificate.
 		&sshCertificateDefaultValidator{},
 	), nil
 }

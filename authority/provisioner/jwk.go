@@ -141,8 +141,8 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		return nil, err
 	}
 
-	// Check for SSH token
-	if claims.Step != nil && claims.Step.SSH != nil {
+	// Check for SSH sign-ing request.
+	if MethodFromContext(ctx) == SignSSHMethod {
 		if p.claimer.IsSSHCAEnabled() == false {
 			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
 		}
@@ -158,14 +158,17 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 
 	dnsNames, ips, emails := x509util.SplitSANs(claims.SANs)
 	return []SignOption{
-		defaultPublicKeyValidator{},
-		commonNameValidator(claims.Subject),
-		dnsNamesValidator(dnsNames),
-		ipAddressesValidator(ips),
-		emailAddressesValidator(emails),
-		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
-		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		x509ProfileValidityModifier{p.claimer, 0},
+		// validators
+		commonNameValidator(claims.Subject),
+		defaultPublicKeyValidator{},
+		dnsNamesValidator(dnsNames),
+		emailAddressesValidator(emails),
+		ipAddressesValidator(ips),
+		validityValidator{},
+		x509CertificateDurationValidator{p.claimer, 0},
 	}, nil
 }
 
@@ -180,6 +183,9 @@ func (p *JWK) AuthorizeRenewal(cert *x509.Certificate) error {
 // authorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 	t := now()
+	if claims.Step == nil || claims.Step.SSH == nil {
+		return nil, errors.New("authorization token must be an SSH provisioning token")
+	}
 	opts := claims.Step.SSH
 	signOptions := []SignOption{
 		// validates user's SSHOptions with the ones in the token
@@ -206,13 +212,16 @@ func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 	signOptions = append(signOptions, sshCertificateDefaultsModifier{CertType: SSHUserCert})
 
 	return append(signOptions,
-		// set the default extensions
+		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
-		// checks the validity bounds, and set the validity if has not been set
+		// Set the validity bounds if not set.
 		&sshCertificateValidityModifier{p.claimer, 0},
-		// validate public key
+		// Check the validity bounds against default provisioner and
+		// provisioning credential bounds.
+		&sshCertificateDurationValidator{p.claimer, 0},
+		// Validate public key
 		&sshDefaultPublicKeyValidator{},
-		// require all the fields in the SSH certificate
+		// Require and validate all the default fields in the SSH certificate.
 		&sshCertificateDefaultValidator{},
 	), nil
 }

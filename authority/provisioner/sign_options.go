@@ -59,15 +59,38 @@ func (v profileWithOption) Option(Options) x509util.WithOption {
 // interface.
 // NOTE: This method sets values, but does not validate them;
 // validation is done in the ValidityValidator.
-type profileDefaultDuration time.Duration
+type x509ProfileValidityModifier struct {
+	*Claimer
+	// RemainingProvisioningCredentialDuraion is the remaining duration on the
+	// provisioning credential.
+	// E.g. x5c provisioners use a certificate as a provisioning credential.
+	// That certificate should not be able to provision new certificates with
+	// a duration longer than the remaining duration on the provisioning
+	// certificate.
+	RemainingProvisioningCredentialDuration time.Duration
+}
 
-func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
-	notBefore := so.NotBefore.Time()
-	if notBefore.IsZero() {
-		notBefore = time.Now()
+func (m x509ProfileValidityModifier) Option(so Options) x509util.WithOption {
+	var (
+		d   = m.DefaultTLSCertDuration()
+		rem = m.RemainingProvisioningCredentialDuration
+	)
+
+	if rem > 0 {
+		// If the remaining duration from the provisioning credential is less than
+		// the default duration for the requested type of SSH certificate then we
+		// reset our default duration.
+		if rem < d {
+			d = rem
+		}
 	}
-	notAfter := so.NotAfter.RelativeTime(notBefore)
-	return x509util.WithNotBeforeAfterDuration(notBefore, notAfter, time.Duration(v))
+
+	nbf := so.NotBefore.Time()
+	if nbf.IsZero() {
+		nbf = now()
+	}
+	naf := so.NotAfter.RelativeTime(nbf)
+	return x509util.WithNotBeforeAfterDuration(nbf, naf, d)
 }
 
 // emailOnlyIdentity is a CertificateRequestValidator that checks that the only
@@ -201,39 +224,65 @@ func (v emailAddressesValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
-// validityValidator validates the certificate temporal validity settings.
-type validityValidator struct {
-	min time.Duration
-	max time.Duration
+// x509CertificateDurationValidator implements x509CertificateOptionsValidator
+// and checks the validity bounds. It will fail if a CertType has not been set
+// or is not valid.
+type x509CertificateDurationValidator struct {
+	*Claimer
+	// RemainingProvisioningCredentialDuraion is the remaining duration on the
+	// provisioning credential.
+	// E.g. x5c provisioners use a certificate as a provisioning credential.
+	// That certificate should not be able to provision new certificates with
+	// a duration longer than the remaining duration on the provisioning
+	// certificate.
+	RemainingProvisioningCredentialDuration time.Duration
 }
 
-// newValidityValidator return a new validity validator.
-func newValidityValidator(min, max time.Duration) *validityValidator {
-	return &validityValidator{min: min, max: max}
+func (m *x509CertificateDurationValidator) Valid(cert *x509.Certificate) error {
+	if cert.NotBefore.IsZero() || cert.NotAfter.IsZero() {
+		return errors.Errorf("notBefore or notAfter cannot be zero; nbf = %s, naf = %s",
+			cert.NotBefore, cert.NotAfter)
+	}
+
+	min, max := m.MinTLSCertDuration(), m.MaxTLSCertDuration()
+	rem := m.RemainingProvisioningCredentialDuration
+
+	if rem > 0 {
+		if rem < min {
+			return errors.Errorf("remaining duration on provisioning credential is "+
+				"less than provsioners default minimum duration; rem = %d, min = %d", rem, min)
+		}
+		// If the remaining duration from the provisioning credential is less than
+		// the max duration for the requested type of SSH certificate then we
+		// reset our max bound.
+		if rem < max {
+			max = rem
+		}
+	}
+
+	diff := cert.NotAfter.Sub(cert.NotBefore)
+	switch {
+	case diff < min:
+		return errors.Errorf("x509 certificate duration cannot be lower than %s", min)
+	case diff > max:
+		return errors.Errorf("x509 certificate duration cannot be greater than %s", max)
+	default:
+		return nil
+	}
 }
+
+// validityValidator validates the certificate temporal validity settings.
+type validityValidator struct{}
 
 // Validate validates the certificate temporal validity settings.
-func (v *validityValidator) Valid(crt *x509.Certificate) error {
-	var (
-		na  = crt.NotAfter
-		nb  = crt.NotBefore
-		d   = na.Sub(nb)
-		now = time.Now()
-	)
+func (v validityValidator) Valid(cert *x509.Certificate) error {
+	na, nb := cert.NotAfter, cert.NotBefore
 
-	if na.Before(now) {
+	if na.Before(now()) {
 		return errors.Errorf("NotAfter: %v cannot be in the past", na)
 	}
 	if na.Before(nb) {
 		return errors.Errorf("NotAfter: %v cannot be before NotBefore: %v", na, nb)
-	}
-	if d < v.min {
-		return errors.Errorf("requested duration of %v is less than the authorized minimum certificate duration of %v",
-			d, v.min)
-	}
-	if d > v.max {
-		return errors.Errorf("requested duration of %v is more than the authorized maximum certificate duration of %v",
-			d, v.max)
 	}
 	return nil
 }

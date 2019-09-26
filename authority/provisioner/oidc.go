@@ -285,27 +285,21 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	}
 
 	// Check for the sign ssh method, default to sign X.509
-	if m := MethodFromContext(ctx); m == SignSSHMethod {
-		if o.claimer.IsSSHCAEnabled() == false {
+	if MethodFromContext(ctx) == SignSSHMethod {
+		if !o.claimer.IsSSHCAEnabled() {
 			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", o.GetID())
 		}
 		return o.authorizeSSHSign(claims)
 	}
 
-	// Admins should be able to authorize any SAN
-	if o.IsAdmin(claims.Email) {
-		return []SignOption{
-			profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
-			newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
-			newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
-		}, nil
-	}
-
 	so := []SignOption{
+		// modifiers / withOptions
 		defaultPublicKeyValidator{},
-		profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
+		x509ProfileValidityModifier{o.claimer, 0},
+		// validators
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
-		newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
+		validityValidator{},
+		x509CertificateDurationValidator{o.claimer, 0},
 	}
 	// Admins should be able to authorize any SAN
 	if o.IsAdmin(claims.Email) {
@@ -350,13 +344,16 @@ func (o *OIDC) authorizeSSHSign(claims *openIDPayload) ([]SignOption, error) {
 	signOptions = append(signOptions, sshCertificateDefaultsModifier(defaults))
 
 	return append(signOptions,
-		// set the default extensions
+		// Set the default extensions
 		&sshDefaultExtensionModifier{},
-		// checks the validity bounds, and set the validity if has not been set
+		// Checks the validity bounds, and set the validity if has not been set
 		&sshCertificateValidityModifier{o.claimer, 0},
-		// validate public key
+		// Check the validity bounds against default provisioner and
+		// provisioning credential bounds.
+		&sshCertificateDurationValidator{o.claimer, 0},
+		// Validate public key
 		&sshDefaultPublicKeyValidator{},
-		// require all the fields in the SSH certificate
+		// Require all the fields in the SSH certificate
 		&sshCertificateDefaultValidator{},
 	), nil
 }

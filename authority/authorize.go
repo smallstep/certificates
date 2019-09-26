@@ -103,7 +103,7 @@ func (a *Authority) authorizeSign(ctx context.Context, ott string) ([]provisione
 	}
 	opts, err := p.AuthorizeSign(ctx, ott)
 	if err != nil {
-		return nil, &apiError{errors.Wrap(err, "auth.authorizeSign"), http.StatusUnauthorized, errContext}
+		return nil, &apiError{errors.Wrap(err, "authorizeSign"), http.StatusUnauthorized, errContext}
 	}
 	return opts, nil
 }
