@@ -249,9 +249,12 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
 	r.MethodFunc("GET", "/roots", h.Roots)
 	r.MethodFunc("GET", "/federation", h.Federation)
+	// SSH CA
+	r.MethodFunc("GET", "/ssh/sign", h.SignSSH)
+	r.MethodFunc("GET", "/ssh/keys", h.SSHKeys)
+
 	// For compatibility with old code:
 	r.MethodFunc("POST", "/re-sign", h.Renew)
-	// SSH CA
 	r.MethodFunc("POST", "/sign-ssh", h.SignSSH)
 }
 
