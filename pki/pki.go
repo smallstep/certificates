@@ -403,6 +403,13 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 		return nil, errors.Wrap(err, "error serializing private key")
 	}
 
+	prov := &provisioner.JWK{
+		Name:         p.provisioner,
+		Type:         "JWK",
+		Key:          p.ottPublicKey,
+		EncryptedKey: key,
+	}
+
 	config := &authority.Config{
 		Root:             []string{p.root},
 		FederatedRoots:   []string{},
@@ -417,9 +424,7 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 		},
 		AuthorityConfig: &authority.AuthConfig{
 			DisableIssuedAtCheck: false,
-			Provisioners: provisioner.List{
-				&provisioner.JWK{Name: p.provisioner, Type: "jwk", Key: p.ottPublicKey, EncryptedKey: key},
-			},
+			Provisioners:         provisioner.List{prov},
 		},
 		TLS: &tlsutil.TLSOptions{
 			MinVersion:    x509util.DefaultTLSMinVersion,
@@ -429,9 +434,13 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 		},
 	}
 	if p.enableSSH {
+		enableSSHCA := true
 		config.SSH = &authority.SSHConfig{
 			HostKey: p.sshHostKey,
 			UserKey: p.sshUserKey,
+		}
+		prov.Claims = &provisioner.Claims{
+			EnableSSHCA: &enableSSHCA,
 		}
 	}
 
