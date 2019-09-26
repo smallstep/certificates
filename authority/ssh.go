@@ -24,28 +24,28 @@ const (
 	SSHAddUserCommand = "sudo useradd -m <principal>; nc -q0 localhost 22"
 )
 
-// SSHConfiguration is the return type for SSHConfig.
-type SSHConfiguration struct {
+// SSHKeys represents the SSH User and Host public keys.
+type SSHKeys struct {
 	UserKey ssh.PublicKey
 	HostKey ssh.PublicKey
 }
 
-// SSHConfig returns the SSH User and Host public keys.
-func (a *Authority) SSHConfig() (*SSHConfiguration, error) {
-	var config SSHConfiguration
+// GetSSHKeys returns the SSH User and Host public keys.
+func (a *Authority) GetSSHKeys() (*SSHKeys, error) {
+	var keys SSHKeys
 	if a.sshCAUserCertSignKey != nil {
-		config.UserKey = a.sshCAUserCertSignKey.PublicKey()
+		keys.UserKey = a.sshCAUserCertSignKey.PublicKey()
 	}
 	if a.sshCAHostCertSignKey != nil {
-		config.HostKey = a.sshCAHostCertSignKey.PublicKey()
+		keys.HostKey = a.sshCAHostCertSignKey.PublicKey()
 	}
-	if config.UserKey == nil && config.HostKey == nil {
+	if keys.UserKey == nil && keys.HostKey == nil {
 		return nil, &apiError{
 			err:  errors.New("sshConfig: ssh is not configured"),
 			code: http.StatusNotFound,
 		}
 	}
-	return &config, nil
+	return &keys, nil
 }
 
 // SignSSH creates a signed SSH certificate with the given public key and options.
