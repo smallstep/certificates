@@ -207,10 +207,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:cc890dd647fc3b59a000b66a8473154a4d2823012417007c035b81dbfdfeff20"
+  digest = "1:c26dc5debe7fa23c636a116c336aa033f8d7be0d3464d7b363f4b3355dcccf4f"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
+    "command/version",
     "config",
     "crypto/keys",
     "crypto/pemutil",
@@ -228,7 +229,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "66f7b458dcade67b577ae0ab5b7205b0d6f8a8f7"
+  revision = "eeecaac062cb548ee2ab7c7563bc3c2f2160f019"
 
 [[projects]]
   branch = "master"
@@ -382,6 +383,8 @@
     "github.com/rs/xid",
     "github.com/sirupsen/logrus",
     "github.com/smallstep/assert",
+    "github.com/smallstep/cli/command",
+    "github.com/smallstep/cli/command/version",
     "github.com/smallstep/cli/config",
     "github.com/smallstep/cli/crypto/keys",
     "github.com/smallstep/cli/crypto/pemutil",
@@ -393,7 +396,9 @@
     "github.com/smallstep/cli/pkg/x509",
     "github.com/smallstep/cli/token",
     "github.com/smallstep/cli/token/provision",
+    "github.com/smallstep/cli/ui",
     "github.com/smallstep/cli/usage",
+    "github.com/smallstep/cli/utils",
     "github.com/smallstep/nosql",
     "github.com/smallstep/nosql/database",
     "github.com/urfave/cli",
