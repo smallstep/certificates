@@ -19,6 +19,8 @@ import (
 var AppCommand = cli.Command{
 	Name:   "start",
 	Action: appAction,
+	UsageText: `**step-ca** <config>
+	[**--password-file**=<file>]`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name: "password-file",
