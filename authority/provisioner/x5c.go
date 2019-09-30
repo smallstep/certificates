@@ -187,15 +187,14 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	return []SignOption{
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeX5C, p.Name, ""),
-		x509ProfileValidityModifier{p.claimer, rem},
+		profileProvCredDuration{p.claimer.DefaultTLSCertDuration(), rem},
 		// validators
 		commonNameValidator(claims.Subject),
 		defaultPublicKeyValidator{},
 		dnsNamesValidator(dnsNames),
 		emailAddressesValidator(emails),
 		ipAddressesValidator(ips),
-		validityValidator{},
-		x509CertificateDurationValidator{p.claimer, rem},
+		newTemporalValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	}, nil
 }
 
@@ -244,13 +243,10 @@ func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
 		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
 		// Checks the validity bounds, and set the validity if has not been set.
-		&sshCertificateValidityModifier{p.claimer, rem},
-		// Check the validity bounds against default provisioner and
-		// provisioning credential bounds.
-		&sshCertificateDurationValidator{p.claimer, rem},
+		&sshProvisioningCredTemporalModifier{p.claimer, rem},
 		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
 		// Require all the fields in the SSH certificate
-		&sshCertificateDefaultValidator{},
+		&sshCertificateDefaultValidator{p.claimer},
 	), nil
 }

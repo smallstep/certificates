@@ -71,11 +71,10 @@ func (p *ACME) AuthorizeSign(ctx context.Context, _ string) ([]SignOption, error
 	return []SignOption{
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeACME, p.Name, ""),
-		x509ProfileValidityModifier{p.claimer, 0},
+		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		validityValidator{},
-		x509CertificateDurationValidator{p.claimer, 0},
+		newTemporalValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	}, nil
 }
 

@@ -295,11 +295,10 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	so := []SignOption{
 		// modifiers / withOptions
 		defaultPublicKeyValidator{},
-		x509ProfileValidityModifier{o.claimer, 0},
+		profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
 		// validators
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
-		validityValidator{},
-		x509CertificateDurationValidator{o.claimer, 0},
+		newTemporalValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
 	}
 	// Admins should be able to authorize any SAN
 	if o.IsAdmin(claims.Email) {
@@ -346,15 +345,12 @@ func (o *OIDC) authorizeSSHSign(claims *openIDPayload) ([]SignOption, error) {
 	return append(signOptions,
 		// Set the default extensions
 		&sshDefaultExtensionModifier{},
-		// Checks the validity bounds, and set the validity if has not been set
-		&sshCertificateValidityModifier{o.claimer, 0},
-		// Check the validity bounds against default provisioner and
-		// provisioning credential bounds.
-		&sshCertificateDurationValidator{o.claimer, 0},
+		// Set the validity bounds if not set.
+		&sshDefaultTemporalModifier{o.claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Require all the fields in the SSH certificate
-		&sshCertificateDefaultValidator{},
+		&sshCertificateDefaultValidator{o.claimer},
 	), nil
 }
 

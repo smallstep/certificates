@@ -224,65 +224,67 @@ func (v emailAddressesValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
-// x509CertificateDurationValidator implements x509CertificateOptionsValidator
-// and checks the validity bounds. It will fail if a CertType has not been set
-// or is not valid.
-type x509CertificateDurationValidator struct {
-	*Claimer
-	// RemainingProvisioningCredentialDuraion is the remaining duration on the
-	// provisioning credential.
-	// E.g. x5c provisioners use a certificate as a provisioning credential.
-	// That certificate should not be able to provision new certificates with
-	// a duration longer than the remaining duration on the provisioning
-	// certificate.
-	RemainingProvisioningCredentialDuration time.Duration
+// profileProvCredDuration adjusts the duration to the
+// min(default, remaining provisioning credential duration.
+type profileProvCredDuration struct {
+	def time.Duration
+	rem time.Duration
 }
 
-func (m *x509CertificateDurationValidator) Valid(cert *x509.Certificate) error {
-	if cert.NotBefore.IsZero() || cert.NotAfter.IsZero() {
-		return errors.Errorf("notBefore or notAfter cannot be zero; nbf = %s, naf = %s",
-			cert.NotBefore, cert.NotAfter)
+func (v profileProvCredDuration) Option(so Options) x509util.WithOption {
+	if v.rem < v.def {
+		v.def = v.rem
 	}
-
-	min, max := m.MinTLSCertDuration(), m.MaxTLSCertDuration()
-	rem := m.RemainingProvisioningCredentialDuration
-
-	if rem > 0 {
-		if rem < min {
-			return errors.Errorf("remaining duration on provisioning credential is "+
-				"less than provsioners default minimum duration; rem = %d, min = %d", rem, min)
-		}
-		// If the remaining duration from the provisioning credential is less than
-		// the max duration for the requested type of SSH certificate then we
-		// reset our max bound.
-		if rem < max {
-			max = rem
-		}
-	}
-
-	diff := cert.NotAfter.Sub(cert.NotBefore)
-	switch {
-	case diff < min:
-		return errors.Errorf("x509 certificate duration cannot be lower than %s", min)
-	case diff > max:
-		return errors.Errorf("x509 certificate duration cannot be greater than %s", max)
-	default:
-		return nil
-	}
+	return profileDefaultDuration(v.def).Option(so)
 }
 
-// validityValidator validates the certificate temporal validity settings.
-type validityValidator struct{}
+// profileDefaultDuration is a wrapper against x509util.WithOption to conform
+// the SignOption interface.
+type profileDefaultDuration time.Duration
 
-// Validate validates the certificate temporal validity settings.
-func (v validityValidator) Valid(cert *x509.Certificate) error {
-	na, nb := cert.NotAfter, cert.NotBefore
+func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
+	notBefore := so.NotBefore.Time()
+	if notBefore.IsZero() {
+		notBefore = time.Now()
+	}
+	notAfter := so.NotAfter.RelativeTime(notBefore)
+	return x509util.WithNotBeforeAfterDuration(notBefore, notAfter, time.Duration(v))
+}
 
-	if na.Before(now()) {
+// temporalValidator validates the certificate temporal validity settings.
+type temporalValidator struct {
+	min time.Duration
+	max time.Duration
+}
+
+// newTemporalValidator return a new validity validator.
+func newTemporalValidator(min, max time.Duration) *temporalValidator {
+	return &temporalValidator{min: min, max: max}
+}
+
+// Validate validates the certificate temporal settings (notBefore/notAfter)
+// and total duration.
+func (v *temporalValidator) Valid(crt *x509.Certificate) error {
+	var (
+		na  = crt.NotAfter
+		nb  = crt.NotBefore
+		d   = na.Sub(nb)
+		now = time.Now()
+	)
+
+	if na.Before(now) {
 		return errors.Errorf("NotAfter: %v cannot be in the past", na)
 	}
 	if na.Before(nb) {
 		return errors.Errorf("NotAfter: %v cannot be before NotBefore: %v", na, nb)
+	}
+	if d < v.min {
+		return errors.Errorf("requested duration of %v is less than the authorized minimum certificate duration of %v",
+			d, v.min)
+	}
+	if d > v.max {
+		return errors.Errorf("requested duration of %v is more than the authorized maximum certificate duration of %v",
+			d, v.max)
 	}
 	return nil
 }

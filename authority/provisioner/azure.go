@@ -286,11 +286,10 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	return append(so,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID),
-		x509ProfileValidityModifier{p.claimer, 0},
+		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		validityValidator{},
-		x509CertificateDurationValidator{p.claimer, 0},
+		newTemporalValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	), nil
 }
 
@@ -328,15 +327,12 @@ func (p *Azure) authorizeSSHSign(claims azurePayload, name string) ([]SignOption
 	return append(signOptions,
 		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
-		// Checks the validity bounds, and set the validity if has not been set
-		&sshCertificateValidityModifier{p.claimer, 0},
-		// Check the validity bounds against default provisioner and
-		// provisioning credential bounds.
-		&sshCertificateDurationValidator{p.claimer, 0},
-		// Validate public key.
+		// Set the validity bounds if not set.
+		&sshDefaultTemporalModifier{p.claimer},
+		// Validate public key
 		&sshDefaultPublicKeyValidator{},
-		// Require all the fields in the SSH certificate.
-		&sshCertificateDefaultValidator{},
+		// Require all the fields in the SSH certificate
+		&sshCertificateDefaultValidator{p.claimer},
 	), nil
 }
 

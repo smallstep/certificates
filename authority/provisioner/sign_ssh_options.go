@@ -191,25 +191,16 @@ func (m *sshDefaultExtensionModifier) Modify(cert *ssh.Certificate) error {
 	}
 }
 
-// sshCertificateValidityModifier is a SSHCertificateModifier checks the
+// defaultSSHCertTemporalModifier is an SSHCertificateModifier that checks the
 // validity bounds, setting them if they are not provided. It will fail if a
 // CertType has not been set or is not valid.
-type sshCertificateValidityModifier struct {
+type sshDefaultTemporalModifier struct {
 	*Claimer
-	// RemainingProvisioningCredentialDuraion is the remaining duration on the
-	// provisioning credential.
-	// E.g. x5c provisioners use a certificate as a provisioning credential.
-	// That certificate should not be able to provision new certificates with
-	// a duration longer than the remaining duration on the provisioning
-	// certificate.
-	RemainingProvisioningCredentialDuraion time.Duration
 }
 
-func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
-	var (
-		d   time.Duration
-		rem = m.RemainingProvisioningCredentialDuraion
-	)
+func (m *sshDefaultTemporalModifier) Modify(cert *ssh.Certificate) error {
+	var d time.Duration
+
 	switch cert.CertType {
 	case ssh.UserCert:
 		d = m.DefaultUserSSHCertDuration()
@@ -221,15 +212,6 @@ func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
 		return errors.Errorf("unknown ssh certificate type %d", cert.CertType)
 	}
 
-	if rem > 0 {
-		// If the remaining duration from the provisioning credential is less than
-		// the default duration for the requested type of SSH certificate then we
-		// reset our default duration.
-		if rem < d {
-			d = rem
-		}
-	}
-
 	if cert.ValidAfter == 0 {
 		cert.ValidAfter = uint64(now().Truncate(time.Second).Unix())
 	}
@@ -237,67 +219,43 @@ func (m *sshCertificateValidityModifier) Modify(cert *ssh.Certificate) error {
 		t := time.Unix(int64(cert.ValidAfter), 0)
 		cert.ValidBefore = uint64(t.Add(d).Unix())
 	}
+
 	return nil
 }
 
-// sshCertificateDurationValidator implements SSHCertificateOptionsValidator
-// and checks the validity bounds. It will fail if a CertType has not been set
-// or is not valid.
-type sshCertificateDurationValidator struct {
+type sshProvisioningCredTemporalModifier struct {
 	*Claimer
-	// RemainingProvisioningCredentialDuraion is the remaining duration on the
-	// provisioning credential.
+	// Remaining duration on the provisioning credential.
 	// E.g. x5c provisioners use a certificate as a provisioning credential.
 	// That certificate should not be able to provision new certificates with
 	// a duration longer than the remaining duration on the provisioning
 	// certificate.
-	RemainingProvisioningCredentialDuraion time.Duration
+	rem time.Duration
 }
 
-func (m *sshCertificateDurationValidator) Valid(cert *ssh.Certificate) error {
-	if cert.ValidAfter == 0 || cert.ValidBefore == 0 {
-		return errors.Errorf("validAfter or validBefore cannot be zero; va = %d, vb = %d",
-			cert.ValidAfter, cert.ValidBefore)
+// Modify has the following procedure:
+//  1) Use the existing ValidBefore & ValidAfter values if they are set; else
+//  2.a) Use the default duration to set the validity bounds and
+//  2.b) If 'rem' is non-zero and less than the default duration then
+//       reduce the duration to 'rem'.
+//
+// Step 2) only applies if ValidBefore is not set in the request.
+func (m *sshProvisioningCredTemporalModifier) Modify(cert *ssh.Certificate) error {
+	defMod := &sshDefaultTemporalModifier{m.Claimer}
+	if err := defMod.Modify(cert); err != nil {
+		return err
 	}
-	var (
-		min, max time.Duration
-		rem      = m.RemainingProvisioningCredentialDuraion
-	)
-	switch cert.CertType {
-	case ssh.UserCert:
-		min = m.MinUserSSHCertDuration()
-		max = m.MaxUserSSHCertDuration()
-	case ssh.HostCert:
-		min = m.MinHostSSHCertDuration()
-		max = m.MaxHostSSHCertDuration()
-	case 0:
-		return errors.New("ssh certificate type has not been set")
-	default:
-		return errors.Errorf("unknown ssh certificate type %d", cert.CertType)
-	}
-
-	if rem > 0 {
-		if rem < min {
-			return errors.Errorf("remaining duration on provisioning credential is "+
-				"less than provsioners default minimum duration; rem = %d, min = %d", rem, min)
-		}
-		// If the remaining duration from the provisioning credential is less than
-		// the max duration for the requested type of SSH certificate then we
-		// reset our max bound.
-		if rem < max {
-			max = rem
-		}
-	}
-
-	diff := time.Duration(cert.ValidBefore-cert.ValidAfter) * time.Second
-	switch {
-	case diff < min:
-		return errors.Errorf("ssh certificate duration cannot be lower than %s", min)
-	case diff > max:
-		return errors.Errorf("ssh certificate duration cannot be greater than %s", max)
-	default:
+	if m.rem == 0 {
 		return nil
 	}
+
+	diff := cert.ValidBefore - cert.ValidAfter
+	if uint64(m.rem) < diff {
+		t := time.Unix(int64(cert.ValidAfter), 0)
+		cert.ValidBefore = uint64(t.Add(m.rem).Unix())
+	}
+
+	return nil
 }
 
 // sshCertificateOptionsValidator validates the user SSHOptions with the ones
@@ -313,10 +271,28 @@ func (v sshCertificateOptionsValidator) Valid(got SSHOptions) error {
 
 // sshCertificateDefaultValidator implements a simple validator for all the
 // fields in the SSH certificate.
-type sshCertificateDefaultValidator struct{}
+type sshCertificateDefaultValidator struct {
+	*Claimer
+}
 
 // Valid returns an error if the given certificate does not contain the necessary fields.
 func (v *sshCertificateDefaultValidator) Valid(cert *ssh.Certificate) error {
+	var min, max time.Duration
+	switch cert.CertType {
+	case ssh.UserCert:
+		min = v.MinUserSSHCertDuration()
+		max = v.MaxUserSSHCertDuration()
+	case ssh.HostCert:
+		min = v.MinHostSSHCertDuration()
+		max = v.MaxHostSSHCertDuration()
+	case 0:
+		return errors.New("ssh certificate type has not been set")
+	default:
+		return errors.Errorf("unknown ssh certificate type %d", cert.CertType)
+	}
+
+	duration := time.Duration(cert.ValidBefore - cert.ValidAfter)
+
 	switch {
 	case len(cert.Nonce) == 0:
 		return errors.New("ssh certificate nonce cannot be empty")
@@ -324,8 +300,6 @@ func (v *sshCertificateDefaultValidator) Valid(cert *ssh.Certificate) error {
 		return errors.New("ssh certificate key cannot be nil")
 	case cert.Serial == 0:
 		return errors.New("ssh certificate serial cannot be 0")
-	case cert.CertType != ssh.UserCert && cert.CertType != ssh.HostCert:
-		return errors.Errorf("ssh certificate has an unknown type: %d", cert.CertType)
 	case cert.KeyId == "":
 		return errors.New("ssh certificate key id cannot be empty")
 	case len(cert.ValidPrincipals) == 0:
@@ -336,6 +310,12 @@ func (v *sshCertificateDefaultValidator) Valid(cert *ssh.Certificate) error {
 		return errors.New("ssh certificate validBefore cannot be in the past")
 	case cert.ValidBefore < cert.ValidAfter:
 		return errors.New("ssh certificate validBefore cannot be before validAfter")
+	case duration < min:
+		return errors.Errorf("requested duration of %s is less than minimum "+
+			"accepted duration for selected provisioner of %s", duration, min)
+	case duration > max:
+		return errors.Errorf("requested duration of %s is greater than maximum "+
+			"accepted duration for selected provisioner of %s", duration, max)
 	case cert.CertType == ssh.UserCert && len(cert.Extensions) == 0:
 		return errors.New("ssh certificate extensions cannot be empty")
 	case cert.SignatureKey == nil:

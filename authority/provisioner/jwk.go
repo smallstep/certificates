@@ -160,15 +160,14 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	return []SignOption{
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
-		x509ProfileValidityModifier{p.claimer, 0},
+		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		// validators
 		commonNameValidator(claims.Subject),
 		defaultPublicKeyValidator{},
 		dnsNamesValidator(dnsNames),
 		emailAddressesValidator(emails),
 		ipAddressesValidator(ips),
-		validityValidator{},
-		x509CertificateDurationValidator{p.claimer, 0},
+		newTemporalValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	}, nil
 }
 
@@ -215,13 +214,10 @@ func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
-		&sshCertificateValidityModifier{p.claimer, 0},
-		// Check the validity bounds against default provisioner and
-		// provisioning credential bounds.
-		&sshCertificateDurationValidator{p.claimer, 0},
+		&sshDefaultTemporalModifier{p.claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Require and validate all the default fields in the SSH certificate.
-		&sshCertificateDefaultValidator{},
+		&sshCertificateDefaultValidator{p.claimer},
 	), nil
 }

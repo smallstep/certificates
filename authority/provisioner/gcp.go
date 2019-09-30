@@ -239,11 +239,10 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	return append(so,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeGCP, p.Name, claims.Subject, "InstanceID", ce.InstanceID, "InstanceName", ce.InstanceName),
-		x509ProfileValidityModifier{p.claimer, 0},
+		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		validityValidator{},
-		x509CertificateDurationValidator{p.claimer, 0},
+		newTemporalValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	), nil
 }
 
@@ -383,14 +382,11 @@ func (p *GCP) authorizeSSHSign(claims *gcpPayload) ([]SignOption, error) {
 	return append(signOptions,
 		// Set the default extensions
 		&sshDefaultExtensionModifier{},
-		// Checks the validity bounds, and set the validity if has not been set
-		&sshCertificateValidityModifier{p.claimer, 0},
-		// Check the validity bounds against default provisioner and
-		// provisioning credential bounds.
-		&sshCertificateDurationValidator{p.claimer, 0},
+		// Set the validity bounds if not set.
+		&sshDefaultTemporalModifier{p.claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Require all the fields in the SSH certificate
-		&sshCertificateDefaultValidator{},
+		&sshCertificateDefaultValidator{p.claimer},
 	), nil
 }
