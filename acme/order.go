@@ -73,11 +73,11 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 
 	authzs := make([]string, len(ops.Identifiers))
 	for i, identifier := range ops.Identifiers {
-		authz, err := newAuthz(db, ops.AccountID, identifier)
+		az, err := newAuthz(db, ops.AccountID, identifier)
 		if err != nil {
 			return nil, err
 		}
-		authzs[i] = authz.getID()
+		authzs[i] = az.getID()
 	}
 
 	now := clock.Now()
@@ -203,14 +203,14 @@ func (o *order) updateStatus(db nosql.DB) (*order, error) {
 			StatusPending: 0,
 		}
 		for _, azID := range o.Authorizations {
-			authz, err := getAuthz(db, azID)
+			az, err := getAuthz(db, azID)
 			if err != nil {
 				return nil, err
 			}
-			if authz, err = authz.updateStatus(db); err != nil {
+			if az, err = az.updateStatus(db); err != nil {
 				return nil, err
 			}
-			st := authz.getStatus()
+			st := az.getStatus()
 			count[st]++
 		}
 		switch {
