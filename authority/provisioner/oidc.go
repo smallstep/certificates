@@ -346,11 +346,13 @@ func (o *OIDC) authorizeSSHSign(claims *openIDPayload) ([]SignOption, error) {
 		// Set the default extensions
 		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
-		&sshDefaultTemporalModifier{o.claimer},
+		&sshValidityModifier{o.claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
+		// Validate the validity period.
+		&sshCertificateValidityValidator{o.claimer},
 		// Require all the fields in the SSH certificate
-		&sshCertificateDefaultValidator{o.claimer},
+		&sshCertificateDefaultValidator{},
 	), nil
 }
 

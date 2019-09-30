@@ -214,10 +214,12 @@ func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
-		&sshDefaultTemporalModifier{p.claimer},
+		&sshValidityModifier{p.claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
+		// Validate the validity period.
+		&sshCertificateValidityValidator{p.claimer},
 		// Require and validate all the default fields in the SSH certificate.
-		&sshCertificateDefaultValidator{p.claimer},
+		&sshCertificateDefaultValidator{},
 	), nil
 }

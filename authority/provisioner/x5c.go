@@ -243,10 +243,12 @@ func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
 		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
 		// Checks the validity bounds, and set the validity if has not been set.
-		&sshProvisioningCredTemporalModifier{p.claimer, rem},
+		&sshProvCredValidityModifier{p.claimer, rem},
 		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
+		// Validate the validity period.
+		&sshCertificateValidityValidator{p.claimer},
 		// Require all the fields in the SSH certificate
-		&sshCertificateDefaultValidator{p.claimer},
+		&sshCertificateDefaultValidator{},
 	), nil
 }
