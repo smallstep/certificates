@@ -53,46 +53,6 @@ func (v profileWithOption) Option(Options) x509util.WithOption {
 	return x509util.WithOption(v)
 }
 
-// profileDefaultDuration sets the NotBefore and NotAfter attributes on an
-// X509 certificate (profile) from values parsed along with the request.
-// This method is a wrapper against x509util.WithOption to conform the
-// interface.
-// NOTE: This method sets values, but does not validate them;
-// validation is done in the ValidityValidator.
-type x509ProfileValidityModifier struct {
-	*Claimer
-	// RemainingProvisioningCredentialDuraion is the remaining duration on the
-	// provisioning credential.
-	// E.g. x5c provisioners use a certificate as a provisioning credential.
-	// That certificate should not be able to provision new certificates with
-	// a duration longer than the remaining duration on the provisioning
-	// certificate.
-	RemainingProvisioningCredentialDuration time.Duration
-}
-
-func (m x509ProfileValidityModifier) Option(so Options) x509util.WithOption {
-	var (
-		d   = m.DefaultTLSCertDuration()
-		rem = m.RemainingProvisioningCredentialDuration
-	)
-
-	if rem > 0 {
-		// If the remaining duration from the provisioning credential is less than
-		// the default duration for the requested type of SSH certificate then we
-		// reset our default duration.
-		if rem < d {
-			d = rem
-		}
-	}
-
-	nbf := so.NotBefore.Time()
-	if nbf.IsZero() {
-		nbf = now()
-	}
-	naf := so.NotAfter.RelativeTime(nbf)
-	return x509util.WithNotBeforeAfterDuration(nbf, naf, d)
-}
-
 // emailOnlyIdentity is a CertificateRequestValidator that checks that the only
 // SAN provided is the given email address.
 type emailOnlyIdentity string
