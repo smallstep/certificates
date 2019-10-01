@@ -162,6 +162,39 @@ func generateJWK() (*JWK, error) {
 	}, nil
 }
 
+func generateX5C() (*JWK, error) {
+	name, err := randutil.Alphanumeric(10)
+	if err != nil {
+		return nil, err
+	}
+	jwk, err := generateJSONWebKey()
+	if err != nil {
+		return nil, err
+	}
+	jwe, err := encryptJSONWebKey(jwk)
+	if err != nil {
+		return nil, err
+	}
+	public := jwk.Public()
+	encrypted, err := jwe.CompactSerialize()
+	if err != nil {
+		return nil, err
+	}
+	claimer, err := NewClaimer(nil, globalProvisionerClaims)
+	if err != nil {
+		return nil, err
+	}
+	return &JWK{
+		Name:         name,
+		Type:         "JWK",
+		Key:          &public,
+		EncryptedKey: encrypted,
+		Claims:       &globalProvisionerClaims,
+		audiences:    testAudiences,
+		claimer:      claimer,
+	}, nil
+}
+
 func generateOIDC() (*OIDC, error) {
 	name, err := randutil.Alphanumeric(10)
 	if err != nil {

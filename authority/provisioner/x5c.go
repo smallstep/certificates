@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"encoding/pem"
 	"time"
 
 	"github.com/pkg/errors"
@@ -23,7 +24,7 @@ type x5cPayload struct {
 type X5C struct {
 	Type      string  `json:"type"`
 	Name      string  `json:"name"`
-	Roots     string  `json:"roots"`
+	Roots     []byte  `json:"roots"`
 	Claims    *Claims `json:"claims,omitempty"`
 	claimer   *Claimer
 	audiences Audiences
@@ -70,28 +71,42 @@ func (p *X5C) GetEncryptedKey() (string, string, bool) {
 }
 
 // Init initializes and validates the fields of a X5C type.
-func (p *X5C) Init(config Config) (err error) {
+func (p *X5C) Init(config Config) error {
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
-	case p.Roots == "":
+	case p.Roots == nil || len(p.Roots) == 0:
 		return errors.New("provisioner root(s) cannot be empty")
 	}
 
 	p.rootPool = x509.NewCertPool()
-	if len(p.Roots) > 0 && !p.rootPool.AppendCertsFromPEM([]byte(p.Roots)) {
-		return errors.Errorf("error parsing root certificate(s) for provisioner '%s'", p.Name)
+
+	var (
+		block *pem.Block
+		rest  = p.Roots
+	)
+	for rest != nil {
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			return errors.New("error parsing provisioner x5c roots")
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return errors.Wrap(err, "error parsing x509 certificate from PEM block")
+		}
+		p.rootPool.AddCert(cert)
 	}
 
 	// Update claims with global ones
+	var err error
 	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
 		return err
 	}
 
 	p.audiences = config.Audiences.WithFragment(p.GetID())
-	return err
+	return nil
 }
 
 // authorizeToken performs common jwt authorization actions and returns the
