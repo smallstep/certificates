@@ -132,7 +132,7 @@ is G-Suite.
   provider used to get the id token. Some identity providers might use an empty
   string as a secret.
 
-* `configurationEndpoing` (mandatory): is the HTTP address used by the CA to get
+* `configurationEndpoint` (mandatory): is the HTTP address used by the CA to get
   the OpenID Connect configuration and public keys used to validate the tokens.
 
 * `admins` (optional): is the list of emails that will be able to get
