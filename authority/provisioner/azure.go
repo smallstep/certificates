@@ -289,7 +289,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		newTemporalValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	), nil
 }
 

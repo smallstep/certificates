@@ -74,7 +74,7 @@ func (p *ACME) AuthorizeSign(ctx context.Context, _ string) ([]SignOption, error
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		newTemporalValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	}, nil
 }
 

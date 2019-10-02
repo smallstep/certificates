@@ -298,7 +298,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
 		// validators
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
-		newTemporalValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
+		newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
 	}
 	// Admins should be able to authorize any SAN
 	if o.IsAdmin(claims.Email) {

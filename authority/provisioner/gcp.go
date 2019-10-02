@@ -242,7 +242,7 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		newTemporalValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	), nil
 }
 

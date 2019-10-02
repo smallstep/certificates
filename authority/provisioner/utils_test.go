@@ -162,21 +162,22 @@ func generateJWK() (*JWK, error) {
 	}, nil
 }
 
-func generateX5C() (*JWK, error) {
+func generateX5C(root []byte) (*X5C, error) {
+	if root == nil {
+		root = []byte(`-----BEGIN CERTIFICATE-----
+MIIBhTCCASqgAwIBAgIRAMalM7pKi0GCdKjO6u88OyowCgYIKoZIzj0EAwIwFDES
+MBAGA1UEAxMJcm9vdC10ZXN0MCAXDTE5MTAwMjAyMzk0OFoYDzIxMTkwOTA4MDIz
+OTQ4WjAUMRIwEAYDVQQDEwlyb290LXRlc3QwWTATBgcqhkjOPQIBBggqhkjOPQMB
+BwNCAAS29QTCXUu7cx9sa9wZPpRSFq/zXaw8Ai3EIygayrBsKnX42U2atBUjcBZO
+BWL6A+PpLzU9ja867U5SYNHERS+Oo1swWTAOBgNVHQ8BAf8EBAMCAQYwEgYDVR0T
+AQH/BAgwBgEB/wIBATAdBgNVHQ4EFgQUpHS7FfaQ5bCrTxUeu6R2ZC3VGOowFAYD
+VR0RBA0wC4IJcm9vdC10ZXN0MAoGCCqGSM49BAMCA0kAMEYCIQC2vgqwla0u8LHH
+1MHob14qvS5o76HautbIBW7fcHzz5gIhAIx5A2+wkJYX4026kqaZCk/1sAwTxSGY
+M46l92gdOozT
+-----END CERTIFICATE-----`)
+	}
+
 	name, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
-	jwk, err := generateJSONWebKey()
-	if err != nil {
-		return nil, err
-	}
-	jwe, err := encryptJSONWebKey(jwk)
-	if err != nil {
-		return nil, err
-	}
-	public := jwk.Public()
-	encrypted, err := jwe.CompactSerialize()
 	if err != nil {
 		return nil, err
 	}
@@ -184,14 +185,32 @@ func generateX5C() (*JWK, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &JWK{
-		Name:         name,
-		Type:         "JWK",
-		Key:          &public,
-		EncryptedKey: encrypted,
-		Claims:       &globalProvisionerClaims,
-		audiences:    testAudiences,
-		claimer:      claimer,
+
+	rootPool := x509.NewCertPool()
+
+	var (
+		block *pem.Block
+		rest  = root
+	)
+	for rest != nil {
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, errors.Wrap(err, "error parsing x509 certificate from PEM block")
+		}
+		rootPool.AddCert(cert)
+	}
+	return &X5C{
+		Name:      name,
+		Type:      "X5C",
+		Roots:     root,
+		Claims:    &globalProvisionerClaims,
+		audiences: testAudiences,
+		claimer:   claimer,
+		rootPool:  rootPool,
 	}, nil
 }
 
@@ -479,11 +498,31 @@ func generateSimpleToken(iss, aud string, jwk *jose.JSONWebKey) (string, error) 
 	return generateToken("subject", iss, aud, "name@smallstep.com", []string{"test.smallstep.com"}, time.Now(), jwk)
 }
 
-func generateToken(sub, iss, aud string, email string, sans []string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
-	sig, err := jose.NewSigner(
-		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
-		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID),
-	)
+type tokOption func(*jose.SignerOptions) error
+
+func withX5CHdr(certs []*x509.Certificate) tokOption {
+	return func(so *jose.SignerOptions) error {
+		strs := make([]string, len(certs))
+		for i, cert := range certs {
+			strs[i] = base64.StdEncoding.EncodeToString(cert.Raw)
+		}
+		so.WithHeader("x5c", strs)
+		return nil
+	}
+}
+
+func generateToken(sub, iss, aud string, email string, sans []string, iat time.Time, jwk *jose.JSONWebKey, tokOpts ...tokOption) (string, error) {
+	so := new(jose.SignerOptions)
+	so.WithType("JWT")
+	so.WithHeader("kid", jwk.KeyID)
+
+	for _, o := range tokOpts {
+		if err := o(so); err != nil {
+			return "", err
+		}
+	}
+
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key}, so)
 	if err != nil {
 		return "", err
 	}
@@ -774,4 +813,25 @@ func generateACME() (*ACME, error) {
 		return nil, err
 	}
 	return p, nil
+}
+
+func parseCerts(b []byte) ([]*x509.Certificate, error) {
+	var (
+		block *pem.Block
+		rest  = b
+		certs = []*x509.Certificate{}
+	)
+	for rest != nil {
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, errors.Wrap(err, "error parsing x509 certificate from PEM block")
+		}
+
+		certs = append(certs, cert)
+	}
+	return certs, nil
 }

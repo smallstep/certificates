@@ -90,13 +90,18 @@ func (p *X5C) Init(config Config) error {
 	for rest != nil {
 		block, rest = pem.Decode(rest)
 		if block == nil {
-			return errors.New("error parsing provisioner x5c roots")
+			break
 		}
 		cert, err := x509.ParseCertificate(block.Bytes)
 		if err != nil {
 			return errors.Wrap(err, "error parsing x509 certificate from PEM block")
 		}
 		p.rootPool.AddCert(cert)
+	}
+
+	// Verify that at least one root was found.
+	if len(p.rootPool.Subjects()) == 0 {
+		return errors.Errorf("no x509 certificates found in roots attribute for provisioner %s", p.GetName())
 	}
 
 	// Update claims with global ones
@@ -209,7 +214,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		dnsNamesValidator(dnsNames),
 		emailAddressesValidator(emails),
 		ipAddressesValidator(ips),
-		newTemporalValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	}, nil
 }
 
