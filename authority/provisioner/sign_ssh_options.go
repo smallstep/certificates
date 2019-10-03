@@ -250,8 +250,15 @@ func (m *sshProvCredValidityModifier) Modify(cert *ssh.Certificate) error {
 		return nil
 	}
 
-	diff := cert.ValidBefore - cert.ValidAfter
-	if uint64(m.rem) < diff {
+	if cert.ValidBefore < cert.ValidAfter {
+		return errors.New("ssh certificate validBefore cannot be before validAfter")
+	}
+	dur, err := time.ParseDuration(fmt.Sprintf("%ds", cert.ValidBefore-cert.ValidAfter))
+	if err != nil {
+		return errors.Wrapf(err, "error converting ssh certificate duration; "+
+			"vaf: %d, vbf: %d, d: %d", cert.ValidAfter, cert.ValidBefore, cert.ValidBefore-cert.ValidAfter)
+	}
+	if m.rem < dur {
 		t := time.Unix(int64(cert.ValidAfter), 0)
 		cert.ValidBefore = uint64(t.Add(m.rem).Unix())
 	}
@@ -275,6 +282,15 @@ type sshCertificateValidityValidator struct {
 }
 
 func (v *sshCertificateValidityValidator) Valid(cert *ssh.Certificate) error {
+	switch {
+	case cert.ValidAfter == 0:
+		return errors.New("ssh certificate validAfter cannot be 0")
+	case cert.ValidBefore < uint64(now().Unix()):
+		return errors.New("ssh certificate validBefore cannot be in the past")
+	case cert.ValidBefore < cert.ValidAfter:
+		return errors.New("ssh certificate validBefore cannot be before validAfter")
+	}
+
 	var min, max time.Duration
 	switch cert.CertType {
 	case ssh.UserCert:
@@ -292,16 +308,11 @@ func (v *sshCertificateValidityValidator) Valid(cert *ssh.Certificate) error {
 	// seconds
 	duration, err := time.ParseDuration(fmt.Sprintf("%ds", cert.ValidBefore-cert.ValidAfter))
 	if err != nil {
-		return errors.Wrap(err, "error converting ssh certificate duration")
+		return errors.Wrapf(err, "error converting ssh certificate duration; "+
+			"vaf: %d, vbf: %d, d: %d", cert.ValidAfter, cert.ValidBefore, cert.ValidBefore-cert.ValidAfter)
 	}
 
 	switch {
-	case cert.ValidAfter == 0:
-		return errors.New("ssh certificate validAfter cannot be 0")
-	case cert.ValidBefore < uint64(now().Unix()):
-		return errors.New("ssh certificate validBefore cannot be in the past")
-	case cert.ValidBefore < cert.ValidAfter:
-		return errors.New("ssh certificate validBefore cannot be before validAfter")
 	case duration < min:
 		return errors.Errorf("requested duration of %s is less than minimum "+
 			"accepted duration for selected provisioner of %s", duration, min)
