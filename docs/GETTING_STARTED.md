@@ -176,7 +176,7 @@ created when you initilialized your PKI.  In order to properly validate this
 certificate clients need access to the public root of trust, aka the public root
 certificate.  If you are using the `step cli` on the same host where you
 initialized your PKI (the `root_ca.crt` is stored on disk locally), then you can
-continue to [setting up your environment](setting-up-environment-variables),
+continue to [setting up your environment](#setup-env),
 otherwise we will show you how to easily download your root certificate in the
 following step.
 
@@ -215,9 +215,10 @@ In the examples below we will use `https://ca.smallstep.com:8080`.
 3. Test.
 
     ```
-    * step ca health
+    $ step ca health
     ```
 
+<a name="setup-env"></a>
 #### Setting up Environment Defaults
 
 This is optional, but we recommend you populate a `defaults.json` file with a
