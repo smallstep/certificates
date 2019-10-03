@@ -41,6 +41,24 @@ var (
 	}
 )
 
+func provisionerClaims() *Claims {
+	ddr := false
+	des := true
+	return &Claims{
+		MinTLSDur:         &Duration{5 * time.Minute},
+		MaxTLSDur:         &Duration{24 * time.Hour},
+		DefaultTLSDur:     &Duration{24 * time.Hour},
+		DisableRenewal:    &ddr,
+		MinUserSSHDur:     &Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:     &Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur: &Duration{Duration: 4 * time.Hour},
+		MinHostSSHDur:     &Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:     &Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur: &Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:       &des,
+	}
+}
+
 const awsTestCertificate = `-----BEGIN CERTIFICATE-----
 MIICFTCCAX6gAwIBAgIRAKmbVVYAl/1XEqRfF3eJ97MwDQYJKoZIhvcNAQELBQAw
 GDEWMBQGA1UEAxMNQVdTIFRlc3QgQ2VydDAeFw0xOTA0MjQyMjU3MzlaFw0yOTA0

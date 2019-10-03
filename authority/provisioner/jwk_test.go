@@ -6,11 +6,12 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"errors"
+	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/cli/jose"
 )
@@ -229,7 +230,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 	key1, err := decryptJSONWebKey(p1.EncryptedKey)
 	assert.FatalError(t, err)
 
-	t1, err := generateSimpleToken(p1.Name, testAudiences.Sign[0], key1)
+	t1, err := generateToken("subject", p1.Name, testAudiences.Sign[0], "name@smallstep.com", []string{"127.0.0.1", "max@smallstep.com", "foo"}, time.Now(), key1)
 	assert.FatalError(t, err)
 
 	t2, err := generateToken("subject", p1.Name, testAudiences.Sign[0], "name@smallstep.com", []string{}, time.Now(), key1)
@@ -242,14 +243,17 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 		token string
 	}
 	tests := []struct {
-		name string
-		prov *JWK
-		args args
-		err  error
+		name   string
+		prov   *JWK
+		args   args
+		err    error
+		dns    []string
+		emails []string
+		ips    []net.IP
 	}{
-		{"fail-signature", p1, args{failSig}, errors.New("error parsing claims: square/go-jose: error in cryptographic primitive")},
-		{"ok-sans", p1, args{t1}, nil},
-		{"ok-no-sans", p1, args{t2}, nil},
+		{name: "fail-signature", prov: p1, args: args{failSig}, err: errors.New("error parsing claims: square/go-jose: error in cryptographic primitive")},
+		{"ok-sans", p1, args{t1}, nil, []string{"foo"}, []string{"max@smallstep.com"}, []net.IP{net.ParseIP("127.0.0.1")}},
+		{"ok-no-sans", p1, args{t2}, nil, []string{"subject"}, []string{}, []net.IP{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -261,19 +265,30 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 			} else {
 				if assert.NotNil(t, got) {
 					assert.Len(t, 8, got)
-
-					_cnv := got[1]
-					cnv, ok := _cnv.(commonNameValidator)
-					assert.True(t, ok)
-					assert.Equals(t, string(cnv), "subject")
-
-					_dnv := got[2]
-					dnv, ok := _dnv.(dnsNamesValidator)
-					assert.True(t, ok)
-					if tt.name == "ok-sans" {
-						assert.Equals(t, []string(dnv), []string{"test.smallstep.com"})
-					} else {
-						assert.Equals(t, []string(dnv), []string{"subject"})
+					for _, o := range got {
+						switch v := o.(type) {
+						case *provisionerExtensionOption:
+							assert.Equals(t, v.Type, int(TypeJWK))
+							assert.Equals(t, v.Name, tt.prov.GetName())
+							assert.Equals(t, v.CredentialID, tt.prov.Key.KeyID)
+							assert.Len(t, 0, v.KeyValuePairs)
+						case profileDefaultDuration:
+							assert.Equals(t, time.Duration(v), tt.prov.claimer.DefaultTLSCertDuration())
+						case commonNameValidator:
+							assert.Equals(t, string(v), "subject")
+						case defaultPublicKeyValidator:
+						case dnsNamesValidator:
+							assert.Equals(t, []string(v), tt.dns)
+						case emailAddressesValidator:
+							assert.Equals(t, []string(v), tt.emails)
+						case ipAddressesValidator:
+							assert.Equals(t, []net.IP(v), tt.ips)
+						case *validityValidator:
+							assert.Equals(t, v.min, tt.prov.claimer.MinTLSCertDuration())
+							assert.Equals(t, v.max, tt.prov.claimer.MaxTLSCertDuration())
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+						}
 					}
 				}
 			}

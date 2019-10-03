@@ -410,7 +410,7 @@ func TestAWS_AuthorizeSign_SSH(t *testing.T) {
 		wantErr     bool
 		wantSignErr bool
 	}{
-		{"ok", p1, args{t1, SSHOptions{}, pub}, expectedHostOptions, false, false},
+		{"okey-dokey", p1, args{t1, SSHOptions{}, pub}, expectedHostOptions, false, false},
 		{"ok-rsa2048", p1, args{t1, SSHOptions{}, rsa2048.Public()}, expectedHostOptions, false, false},
 		{"ok-type", p1, args{t1, SSHOptions{CertType: "host"}, pub}, expectedHostOptions, false, false},
 		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"127.0.0.1", "ip-127-0-0-1.us-west-1.compute.internal"}}, pub}, expectedHostOptions, false, false},

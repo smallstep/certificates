@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/cli/jose"
 )
@@ -298,11 +299,31 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 			if err != nil {
 				assert.Nil(t, got)
 			} else {
-				assert.NotNil(t, got)
-				if tt.name == "admin" {
-					assert.Len(t, 3, got)
-				} else {
-					assert.Len(t, 5, got)
+				if assert.NotNil(t, got) {
+					if tt.name == "admin" {
+						assert.Len(t, 4, got)
+					} else {
+						assert.Len(t, 5, got)
+					}
+					for _, o := range got {
+						switch v := o.(type) {
+						case *provisionerExtensionOption:
+							assert.Equals(t, v.Type, int(TypeOIDC))
+							assert.Equals(t, v.Name, tt.prov.GetName())
+							assert.Equals(t, v.CredentialID, tt.prov.ClientID)
+							assert.Len(t, 0, v.KeyValuePairs)
+						case profileDefaultDuration:
+							assert.Equals(t, time.Duration(v), tt.prov.claimer.DefaultTLSCertDuration())
+						case defaultPublicKeyValidator:
+						case *validityValidator:
+							assert.Equals(t, v.min, tt.prov.claimer.MinTLSCertDuration())
+							assert.Equals(t, v.max, tt.prov.claimer.MaxTLSCertDuration())
+						case emailOnlyIdentity:
+							assert.Equals(t, string(v), "name@smallstep.com")
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+						}
+					}
 				}
 			}
 		})

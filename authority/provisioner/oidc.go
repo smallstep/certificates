@@ -294,10 +294,10 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 
 	so := []SignOption{
 		// modifiers / withOptions
-		defaultPublicKeyValidator{},
+		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
 		profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
 		// validators
-		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
+		defaultPublicKeyValidator{},
 		newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
 	}
 	// Admins should be able to authorize any SAN

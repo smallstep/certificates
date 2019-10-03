@@ -430,7 +430,8 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 
 			p, err := generateX5C(nil)
 			assert.FatalError(t, err)
-			*p.Claims.EnableSSHCA = false
+			p.claimer.claims = provisionerClaims()
+			*p.claimer.claims.EnableSSHCA = false
 			tok, err := generateToken("foo", p.GetName(), testAudiences.Sign[0], "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk,
 				withX5CHdr(certs))
@@ -440,6 +441,25 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 				ctx:   NewContextWithMethod(context.Background(), SignSSHMethod),
 				token: tok,
 				err:   errors.Errorf("ssh ca is disabled for provisioner x5c/%s", p.GetName()),
+			}
+		},
+		"fail/ssh/invalid-token": func(t *testing.T) test {
+			certs, err := pemutil.ReadCertificateBundle("./testdata/x5c-leaf.crt")
+			assert.FatalError(t, err)
+			jwk, err := jose.ParseKey("./testdata/x5c-leaf.key")
+			assert.FatalError(t, err)
+
+			p, err := generateX5C(nil)
+			assert.FatalError(t, err)
+			tok, err := generateToken("foo", p.GetName(), testAudiences.Sign[0], "",
+				[]string{"test.smallstep.com"}, time.Now(), jwk,
+				withX5CHdr(certs))
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				ctx:   NewContextWithMethod(context.Background(), SignSSHMethod),
+				token: tok,
+				err:   errors.New("authorization token must be an SSH provisioning token"),
 			}
 		},
 		"ok/empty-sans": func(t *testing.T) test {
@@ -582,6 +602,20 @@ func TestX5C_authorizeSSHSign(t *testing.T) {
 				},
 			}
 		},
+		"ok/without-claims": func(t *testing.T) test {
+			p, err := generateX5C(nil)
+			assert.FatalError(t, err)
+			certs, err := pemutil.ReadCertificateBundle("./testdata/x5c-leaf.crt")
+			assert.FatalError(t, err)
+			return test{
+				p: p,
+				claims: &x5cPayload{
+					Step:   &stepPayload{SSH: &SSHOptions{}},
+					Claims: jose.Claims{Subject: "foo"},
+					chains: [][]*x509.Certificate{certs},
+				},
+			}
+		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -598,6 +632,8 @@ func TestX5C_authorizeSSHSign(t *testing.T) {
 						for _, o := range opts {
 							switch v := o.(type) {
 							case sshCertificateOptionsValidator:
+								tc.claims.Step.SSH.ValidAfter.t = time.Time{}
+								tc.claims.Step.SSH.ValidBefore.t = time.Time{}
 								assert.Equals(t, SSHOptions(v), *tc.claims.Step.SSH)
 							case sshCertificateKeyIDModifier:
 								assert.Equals(t, string(v), "foo")
@@ -614,9 +650,8 @@ func TestX5C_authorizeSSHSign(t *testing.T) {
 							case *sshProvCredValidityModifier:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
 
-								wantRem := time.Until(tc.claims.chains[0][0].NotAfter)
-								assert.True(t, wantRem < v.rem)
-								assert.True(t, wantRem+time.Minute > v.rem)
+								wantRem := tc.claims.chains[0][0].NotAfter.Sub(nw)
+								assert.Equals(t, wantRem, v.rem)
 							case *sshCertificateValidityValidator:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
 							case *sshDefaultExtensionModifier, *sshDefaultPublicKeyValidator,

@@ -3,6 +3,7 @@ package provisioner
 import (
 	"crypto/rsa"
 	"encoding/binary"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -288,7 +289,11 @@ func (v *sshCertificateValidityValidator) Valid(cert *ssh.Certificate) error {
 		return errors.Errorf("unknown ssh certificate type %d", cert.CertType)
 	}
 
-	duration := time.Duration(cert.ValidBefore - cert.ValidAfter)
+	// seconds
+	duration, err := time.ParseDuration(fmt.Sprintf("%ds", cert.ValidBefore-cert.ValidAfter))
+	if err != nil {
+		return errors.Wrap(err, "error converting ssh certificate duration")
+	}
 
 	switch {
 	case cert.ValidAfter == 0:
@@ -321,6 +326,8 @@ func (v *sshCertificateDefaultValidator) Valid(cert *ssh.Certificate) error {
 		return errors.New("ssh certificate key cannot be nil")
 	case cert.Serial == 0:
 		return errors.New("ssh certificate serial cannot be 0")
+	case cert.CertType != ssh.UserCert && cert.CertType != ssh.HostCert:
+		return errors.Errorf("ssh certificate has an unknown type: %d", cert.CertType)
 	case cert.KeyId == "":
 		return errors.New("ssh certificate key id cannot be empty")
 	case len(cert.ValidPrincipals) == 0:
