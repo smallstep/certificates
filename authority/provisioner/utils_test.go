@@ -19,10 +19,27 @@ import (
 	"github.com/smallstep/cli/jose"
 )
 
-var testAudiences = Audiences{
-	Sign:   []string{"https://ca.smallstep.com/sign", "https://ca.smallstep.com/1.0/sign"},
-	Revoke: []string{"https://ca.smallstep.com/revoke", "https://ca.smallstep.com/1.0/revoke"},
-}
+var (
+	defaultDisableRenewal   = false
+	defaultEnableSSHCA      = true
+	globalProvisionerClaims = Claims{
+		MinTLSDur:         &Duration{5 * time.Minute},
+		MaxTLSDur:         &Duration{24 * time.Hour},
+		DefaultTLSDur:     &Duration{24 * time.Hour},
+		DisableRenewal:    &defaultDisableRenewal,
+		MinUserSSHDur:     &Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:     &Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur: &Duration{Duration: 4 * time.Hour},
+		MinHostSSHDur:     &Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:     &Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur: &Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:       &defaultEnableSSHCA,
+	}
+	testAudiences = Audiences{
+		Sign:   []string{"https://ca.smallstep.com/sign", "https://ca.smallstep.com/1.0/sign"},
+		Revoke: []string{"https://ca.smallstep.com/revoke", "https://ca.smallstep.com/1.0/revoke"},
+	}
+)
 
 const awsTestCertificate = `-----BEGIN CERTIFICATE-----
 MIICFTCCAX6gAwIBAgIRAKmbVVYAl/1XEqRfF3eJ97MwDQYJKoZIhvcNAQELBQAw

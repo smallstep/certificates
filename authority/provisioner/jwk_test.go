@@ -15,24 +15,6 @@ import (
 	"github.com/smallstep/cli/jose"
 )
 
-var (
-	defaultDisableRenewal   = false
-	defaultEnableSSHCA      = true
-	globalProvisionerClaims = Claims{
-		MinTLSDur:         &Duration{5 * time.Minute},
-		MaxTLSDur:         &Duration{24 * time.Hour},
-		DefaultTLSDur:     &Duration{24 * time.Hour},
-		DisableRenewal:    &defaultDisableRenewal,
-		MinUserSSHDur:     &Duration{Duration: 5 * time.Minute}, // User SSH certs
-		MaxUserSSHDur:     &Duration{Duration: 24 * time.Hour},
-		DefaultUserSSHDur: &Duration{Duration: 4 * time.Hour},
-		MinHostSSHDur:     &Duration{Duration: 5 * time.Minute}, // Host SSH certs
-		MaxHostSSHDur:     &Duration{Duration: 30 * 24 * time.Hour},
-		DefaultHostSSHDur: &Duration{Duration: 30 * 24 * time.Hour},
-		EnableSSHCA:       &defaultEnableSSHCA,
-	}
-)
-
 func TestJWK_Getters(t *testing.T) {
 	p, err := generateJWK()
 	assert.FatalError(t, err)

@@ -228,7 +228,6 @@ func (p *X5C) AuthorizeRenewal(cert *x509.Certificate) error {
 
 // authorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
-	t := now()
 	if claims.Step == nil || claims.Step.SSH == nil {
 		return nil, errors.New("authorization token must be an SSH provisioning token")
 	}
@@ -247,6 +246,7 @@ func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
 	if len(opts.Principals) > 0 {
 		signOptions = append(signOptions, sshCertificatePrincipalsModifier(opts.Principals))
 	}
+	t := now()
 	if !opts.ValidAfter.IsZero() {
 		signOptions = append(signOptions, sshCertificateValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
 	}

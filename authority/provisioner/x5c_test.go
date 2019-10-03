@@ -1,7 +1,9 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/x509"
+	"net"
 	"testing"
 	"time"
 
@@ -399,7 +401,244 @@ lgsqsR63is+0YQ==
 	}
 }
 
-func TestX5C_AuthorizeReovke(t *testing.T) {
+func TestX5C_AuthorizeSign(t *testing.T) {
+	type test struct {
+		p      *X5C
+		token  string
+		ctx    context.Context
+		err    error
+		dns    []string
+		emails []string
+		ips    []net.IP
+	}
+	tests := map[string]func(*testing.T) test{
+		"fail/invalid-token": func(t *testing.T) test {
+			p, err := generateX5C(nil)
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: "foo",
+				ctx:   NewContextWithMethod(context.Background(), SignMethod),
+				err:   errors.New("error parsing token"),
+			}
+		},
+		"fail/ssh/disabled": func(t *testing.T) test {
+			certs, err := pemutil.ReadCertificateBundle("./testdata/x5c-leaf.crt")
+			assert.FatalError(t, err)
+			jwk, err := jose.ParseKey("./testdata/x5c-leaf.key")
+			assert.FatalError(t, err)
+
+			p, err := generateX5C(nil)
+			assert.FatalError(t, err)
+			*p.Claims.EnableSSHCA = false
+			tok, err := generateToken("foo", p.GetName(), testAudiences.Sign[0], "",
+				[]string{"test.smallstep.com"}, time.Now(), jwk,
+				withX5CHdr(certs))
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				ctx:   NewContextWithMethod(context.Background(), SignSSHMethod),
+				token: tok,
+				err:   errors.Errorf("ssh ca is disabled for provisioner x5c/%s", p.GetName()),
+			}
+		},
+		"ok/empty-sans": func(t *testing.T) test {
+			certs, err := pemutil.ReadCertificateBundle("./testdata/x5c-leaf.crt")
+			assert.FatalError(t, err)
+			jwk, err := jose.ParseKey("./testdata/x5c-leaf.key")
+			assert.FatalError(t, err)
+
+			p, err := generateX5C(nil)
+			assert.FatalError(t, err)
+			tok, err := generateToken("foo", p.GetName(), testAudiences.Sign[0], "",
+				[]string{}, time.Now(), jwk,
+				withX5CHdr(certs))
+			assert.FatalError(t, err)
+			return test{
+				p:      p,
+				ctx:    NewContextWithMethod(context.Background(), SignMethod),
+				token:  tok,
+				dns:    []string{"foo"},
+				emails: []string{},
+				ips:    []net.IP{},
+			}
+		},
+		"ok/multi-sans": func(t *testing.T) test {
+			certs, err := pemutil.ReadCertificateBundle("./testdata/x5c-leaf.crt")
+			assert.FatalError(t, err)
+			jwk, err := jose.ParseKey("./testdata/x5c-leaf.key")
+			assert.FatalError(t, err)
+
+			p, err := generateX5C(nil)
+			assert.FatalError(t, err)
+			tok, err := generateToken("foo", p.GetName(), testAudiences.Sign[0], "",
+				[]string{"127.0.0.1", "foo", "max@smallstep.com"}, time.Now(), jwk,
+				withX5CHdr(certs))
+			assert.FatalError(t, err)
+			return test{
+				p:      p,
+				ctx:    NewContextWithMethod(context.Background(), SignMethod),
+				token:  tok,
+				dns:    []string{"foo"},
+				emails: []string{"max@smallstep.com"},
+				ips:    []net.IP{net.ParseIP("127.0.0.1")},
+			}
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := tt(t)
+			if opts, err := tc.p.AuthorizeSign(tc.ctx, tc.token); err != nil {
+				if assert.NotNil(t, tc.err) {
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					if assert.NotNil(t, opts) {
+						tot := 0
+						for _, o := range opts {
+							switch v := o.(type) {
+							case *provisionerExtensionOption:
+								assert.Equals(t, v.Type, int(TypeX5C))
+								assert.Equals(t, v.Name, tc.p.GetName())
+								assert.Equals(t, v.CredentialID, "")
+								assert.Len(t, 0, v.KeyValuePairs)
+							case profileProvCredDuration:
+								assert.Equals(t, v.def, tc.p.claimer.DefaultTLSCertDuration())
+
+								claims, err := tc.p.authorizeToken(tc.token, tc.p.audiences.Sign)
+								assert.FatalError(t, err)
+								wantRem := time.Until(claims.chains[0][0].NotAfter)
+								assert.True(t, wantRem < v.rem)
+								assert.True(t, wantRem+time.Minute > v.rem)
+							case commonNameValidator:
+								assert.Equals(t, string(v), "foo")
+							case defaultPublicKeyValidator:
+							case dnsNamesValidator:
+								assert.Equals(t, []string(v), tc.dns)
+							case emailAddressesValidator:
+								assert.Equals(t, []string(v), tc.emails)
+							case ipAddressesValidator:
+								assert.Equals(t, []net.IP(v), tc.ips)
+							case *validityValidator:
+								assert.Equals(t, v.min, tc.p.claimer.MinTLSCertDuration())
+								assert.Equals(t, v.max, tc.p.claimer.MaxTLSCertDuration())
+							default:
+								assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+							}
+							tot++
+						}
+						assert.Equals(t, tot, 8)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestX5C_authorizeSSHSign(t *testing.T) {
+	_, fn := mockNow()
+	defer fn()
+	type test struct {
+		p      *X5C
+		claims *x5cPayload
+		err    error
+	}
+	tests := map[string]func(*testing.T) test{
+		"fail/no-Step-claim": func(t *testing.T) test {
+			p, err := generateX5C(nil)
+			assert.FatalError(t, err)
+			return test{
+				p:      p,
+				claims: new(x5cPayload),
+				err:    errors.New("authorization token must be an SSH provisioning token"),
+			}
+		},
+		"fail/no-SSH-subattribute-in-claims": func(t *testing.T) test {
+			p, err := generateX5C(nil)
+			assert.FatalError(t, err)
+			return test{
+				p:      p,
+				claims: &x5cPayload{Step: new(stepPayload)},
+				err:    errors.New("authorization token must be an SSH provisioning token"),
+			}
+		},
+		"ok/with-claims": func(t *testing.T) test {
+			p, err := generateX5C(nil)
+			assert.FatalError(t, err)
+			certs, err := pemutil.ReadCertificateBundle("./testdata/x5c-leaf.crt")
+			assert.FatalError(t, err)
+			return test{
+				p: p,
+				claims: &x5cPayload{
+					Step: &stepPayload{SSH: &SSHOptions{
+						CertType:    SSHHostCert,
+						Principals:  []string{"max", "mariano", "alan"},
+						ValidAfter:  TimeDuration{d: 5 * time.Minute},
+						ValidBefore: TimeDuration{d: 10 * time.Minute},
+					}},
+					Claims: jose.Claims{Subject: "foo"},
+					chains: [][]*x509.Certificate{certs},
+				},
+			}
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := tt(t)
+			if opts, err := tc.p.authorizeSSHSign(tc.claims); err != nil {
+				if assert.NotNil(t, tc.err) {
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					if assert.NotNil(t, opts) {
+						tot := 0
+						nw := now()
+						for _, o := range opts {
+							switch v := o.(type) {
+							case sshCertificateOptionsValidator:
+								assert.Equals(t, SSHOptions(v), *tc.claims.Step.SSH)
+							case sshCertificateKeyIDModifier:
+								assert.Equals(t, string(v), "foo")
+							case sshCertificateCertTypeModifier:
+								assert.Equals(t, string(v), tc.claims.Step.SSH.CertType)
+							case sshCertificatePrincipalsModifier:
+								assert.Equals(t, []string(v), tc.claims.Step.SSH.Principals)
+							case sshCertificateValidAfterModifier:
+								assert.Equals(t, int64(v), tc.claims.Step.SSH.ValidAfter.RelativeTime(nw).Unix())
+							case sshCertificateValidBeforeModifier:
+								assert.Equals(t, int64(v), tc.claims.Step.SSH.ValidBefore.RelativeTime(nw).Unix())
+							case sshCertificateDefaultsModifier:
+								assert.Equals(t, SSHOptions(v), SSHOptions{CertType: SSHUserCert})
+							case *sshProvCredValidityModifier:
+								assert.Equals(t, v.Claimer, tc.p.claimer)
+
+								wantRem := time.Until(tc.claims.chains[0][0].NotAfter)
+								assert.True(t, wantRem < v.rem)
+								assert.True(t, wantRem+time.Minute > v.rem)
+							case *sshCertificateValidityValidator:
+								assert.Equals(t, v.Claimer, tc.p.claimer)
+							case *sshDefaultExtensionModifier, *sshDefaultPublicKeyValidator,
+								*sshCertificateDefaultValidator:
+							default:
+								assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+							}
+							tot++
+						}
+						if len(tc.claims.Step.SSH.CertType) > 0 {
+							assert.Equals(t, tot, 12)
+						} else {
+							assert.Equals(t, tot, 8)
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestX5C_AuthorizeRevoke(t *testing.T) {
 	type test struct {
 		p     *X5C
 		token string
