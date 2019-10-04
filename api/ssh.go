@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/templates"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -17,6 +18,7 @@ type SSHAuthority interface {
 	SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	SignSSHAddUser(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 	GetSSHKeys() (*authority.SSHKeys, error)
+	GetSSHConfig(typ string) ([]templates.Output, error)
 }
 
 // SignSSHRequest is the request body of an SSH certificate request.
@@ -138,6 +140,34 @@ func (p *SSHPublicKey) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Template represents the output of a template.
+type Template = templates.Output
+
+// SSHConfigRequest is the request body used to get the SSH configuration
+// templates.
+type SSHConfigRequest struct {
+	Type string `json:"type"`
+}
+
+// Validate checks the values of the SSHConfigurationRequest.
+func (r *SSHConfigRequest) Validate() error {
+	switch r.Type {
+	case "":
+		r.Type = provisioner.SSHUserCert
+		return nil
+	case provisioner.SSHUserCert, provisioner.SSHHostCert:
+		return nil
+	default:
+		return errors.Errorf("unsupported type %s", r.Type)
+	}
+}
+
+// SSHConfigResponse is the response that returns the rendered templates.
+type SSHConfigResponse struct {
+	UserTemplates []Template `json:"userTemplates,omitempty"`
+	HostTemplates []Template `json:"hostTemplates,omitempty"`
+}
+
 // SignSSH is an HTTP handler that reads an SignSSHRequest with a one-time-token
 // (ott) from the body and creates a new SSH certificate with the information in
 // the request.
@@ -227,4 +257,37 @@ func (h *caHandler) SSHKeys(w http.ResponseWriter, r *http.Request) {
 		HostKey: host,
 		UserKey: user,
 	})
+}
+
+// SSHConfig is an HTTP handler that returns rendered templates for ssh clients
+// and servers.
+func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
+	var body SSHConfigRequest
+	if err := ReadJSON(r.Body, &body); err != nil {
+		WriteError(w, BadRequest(errors.Wrap(err, "error reading request body")))
+		return
+	}
+	if err := body.Validate(); err != nil {
+		WriteError(w, BadRequest(err))
+		return
+	}
+
+	ts, err := h.Authority.GetSSHConfig(body.Type)
+	if err != nil {
+		WriteError(w, InternalServerError(err))
+		return
+	}
+
+	var config SSHConfigResponse
+	switch body.Type {
+	case provisioner.SSHUserCert:
+		config.UserTemplates = ts
+	case provisioner.SSHHostCert:
+		config.UserTemplates = ts
+	default:
+		WriteError(w, InternalServerError(errors.New("it should hot get here")))
+		return
+	}
+
+	JSON(w, config)
 }

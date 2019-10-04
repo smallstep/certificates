@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smallstep/certificates/templates"
+
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
@@ -152,6 +154,23 @@ func (a *Authority) init() error {
 		if err := a.provisioners.Store(p); err != nil {
 			return err
 		}
+	}
+
+	// Configure protected template variables:
+	if t := a.config.Templates; t != nil {
+		if t.Variables == nil {
+			t.Variables = make(map[string]interface{})
+		}
+		var vars templates.Step
+		if a.config.SSH != nil {
+			if a.sshCAHostCertSignKey != nil {
+				vars.SSH.HostKey = a.sshCAHostCertSignKey.PublicKey()
+			}
+			if a.sshCAUserCertSignKey != nil {
+				vars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
+			}
+		}
+		t.Variables["Step"] = vars
 	}
 
 	// JWT numeric dates are seconds.

@@ -23,6 +23,9 @@
 #   non-go = false
 #   go-tests = true
 #   unused-packages = true
+
+ignored = ["github.com/Masterminds/semver/v3"]
+
 [[override]]
   name = "gopkg.in/alecthomas/kingpin.v3-unstable"
   revision = "63abe20a23e29e80bbef8089bd3dee3ac25e5306"
@@ -54,3 +57,7 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+  name = "github.com/Masterminds/sprig"
+  version = "3.0.0"

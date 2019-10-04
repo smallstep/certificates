@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/smallstep/certificates/templates"
+
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/randutil"
@@ -41,11 +43,49 @@ func (a *Authority) GetSSHKeys() (*SSHKeys, error) {
 	}
 	if keys.UserKey == nil && keys.HostKey == nil {
 		return nil, &apiError{
-			err:  errors.New("sshConfig: ssh is not configured"),
+			err:  errors.New("getSSHKeys: ssh is not configured"),
 			code: http.StatusNotFound,
 		}
 	}
 	return &keys, nil
+}
+
+// GetSSHConfig returns rendered templates for clients (user) or servers (host).
+func (a *Authority) GetSSHConfig(typ string) ([]templates.Output, error) {
+	if a.sshCAUserCertSignKey == nil && a.sshCAHostCertSignKey == nil {
+		return nil, &apiError{
+			err:  errors.New("getSSHConfig: ssh is not configured"),
+			code: http.StatusNotFound,
+		}
+	}
+
+	var ts []templates.Template
+	switch typ {
+	case provisioner.SSHUserCert:
+		if a.config.Templates != nil && a.config.Templates.SSH != nil {
+			ts = a.config.Templates.SSH.User
+		}
+	case provisioner.SSHHostCert:
+		if a.config.Templates != nil && a.config.Templates.SSH != nil {
+			ts = a.config.Templates.SSH.Host
+		}
+	default:
+		return nil, &apiError{
+			err:  errors.Errorf("getSSHConfig: type %s is not valid", typ),
+			code: http.StatusBadRequest,
+		}
+	}
+
+	// Render templates.
+	output := []templates.Output{}
+	for _, t := range ts {
+		o, err := t.Output(a.config.Templates.Variables)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, o)
+	}
+	return output, nil
 }
 
 // SignSSH creates a signed SSH certificate with the given public key and options.
