@@ -29,6 +29,7 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
+	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/jose"
 	"golang.org/x/crypto/ssh"
@@ -513,6 +514,7 @@ type mockAuthority struct {
 	getRoots                     func() ([]*x509.Certificate, error)
 	getFederation                func() ([]*x509.Certificate, error)
 	getSSHKeys                   func() (*authority.SSHKeys, error)
+	getSSHConfig                 func(typ string) ([]templates.Output, error)
 }
 
 // TODO: remove once Authorize is deprecated.
@@ -623,6 +625,13 @@ func (m *mockAuthority) GetSSHKeys() (*authority.SSHKeys, error) {
 		return m.getSSHKeys()
 	}
 	return m.ret1.(*authority.SSHKeys), m.err
+}
+
+func (m *mockAuthority) GetSSHConfig(typ string) ([]templates.Output, error) {
+	if m.getSSHConfig != nil {
+		return m.getSSHConfig(typ)
+	}
+	return m.ret1.([]templates.Output), m.err
 }
 
 func Test_caHandler_Route(t *testing.T) {

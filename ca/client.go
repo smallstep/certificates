@@ -545,6 +545,28 @@ func (c *Client) SSHKeys() (*api.SSHKeysResponse, error) {
 	return &keys, nil
 }
 
+// SSHConfig performs the POST request to the CA to get the ssh configuration
+// templates.
+func (c *Client) SSHConfig(req *api.SSHConfigRequest) (*api.SSHConfigResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/config"})
+	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var config api.SSHConfigResponse
+	if err := readJSON(resp.Body, &config); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &config, nil
+}
+
 // RootFingerprint is a helper method that returns the current root fingerprint.
 // It does an health connection and gets the fingerprint from the TLS verified
 // chains.
