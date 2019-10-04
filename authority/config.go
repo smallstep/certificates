@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/smallstep/certificates/templates"
+
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
@@ -46,19 +48,20 @@ var (
 
 // Config represents the CA configuration and it's mapped to a JSON object.
 type Config struct {
-	Root             multiString         `json:"root"`
-	FederatedRoots   []string            `json:"federatedRoots"`
-	IntermediateCert string              `json:"crt"`
-	IntermediateKey  string              `json:"key"`
-	Address          string              `json:"address"`
-	DNSNames         []string            `json:"dnsNames"`
-	SSH              *SSHConfig          `json:"ssh,omitempty"`
-	Logger           json.RawMessage     `json:"logger,omitempty"`
-	DB               *db.Config          `json:"db,omitempty"`
-	Monitoring       json.RawMessage     `json:"monitoring,omitempty"`
-	AuthorityConfig  *AuthConfig         `json:"authority,omitempty"`
-	TLS              *tlsutil.TLSOptions `json:"tls,omitempty"`
-	Password         string              `json:"password,omitempty"`
+	Root             multiString          `json:"root"`
+	FederatedRoots   []string             `json:"federatedRoots"`
+	IntermediateCert string               `json:"crt"`
+	IntermediateKey  string               `json:"key"`
+	Address          string               `json:"address"`
+	DNSNames         []string             `json:"dnsNames"`
+	SSH              *SSHConfig           `json:"ssh,omitempty"`
+	Logger           json.RawMessage      `json:"logger,omitempty"`
+	DB               *db.Config           `json:"db,omitempty"`
+	Monitoring       json.RawMessage      `json:"monitoring,omitempty"`
+	AuthorityConfig  *AuthConfig          `json:"authority,omitempty"`
+	TLS              *tlsutil.TLSOptions  `json:"tls,omitempty"`
+	Password         string               `json:"password,omitempty"`
+	Templates        *templates.Templates `json:"templates,omitempty"`
 }
 
 // AuthConfig represents the configuration options for the authority.
@@ -179,6 +182,11 @@ func (c *Config) Validate() error {
 			return errors.New("tls minVersion cannot exceed tls maxVersion")
 		}
 		c.TLS.Renegotiation = c.TLS.Renegotiation || DefaultTLSOptions.Renegotiation
+	}
+
+	// Validate templates: nil is ok
+	if err := c.Templates.Validate(); err != nil {
+		return err
 	}
 
 	return c.AuthorityConfig.Validate(c.getAudiences())
