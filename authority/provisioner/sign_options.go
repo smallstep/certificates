@@ -211,7 +211,7 @@ func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
 	return x509util.WithNotBeforeAfterDuration(notBefore, notAfter, time.Duration(v))
 }
 
-// validityValidator validates the certificate temporal validity settings.
+// validityValidator validates the certificate validity settings.
 type validityValidator struct {
 	min time.Duration
 	max time.Duration
@@ -222,7 +222,7 @@ func newValidityValidator(min, max time.Duration) *validityValidator {
 	return &validityValidator{min: min, max: max}
 }
 
-// Validate validates the certificate temporal settings (notBefore/notAfter)
+// Valid validates the certificate validity settings (notBefore/notAfter) and
 // and total duration.
 func (v *validityValidator) Valid(crt *x509.Certificate) error {
 	var (
