@@ -18,7 +18,7 @@ type SSHAuthority interface {
 	SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	SignSSHAddUser(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 	GetSSHKeys() (*authority.SSHKeys, error)
-	GetSSHConfig(typ string) ([]templates.Output, error)
+	GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error)
 }
 
 // SignSSHRequest is the request body of an SSH certificate request.
@@ -146,7 +146,8 @@ type Template = templates.Output
 // SSHConfigRequest is the request body used to get the SSH configuration
 // templates.
 type SSHConfigRequest struct {
-	Type string `json:"type"`
+	Type string            `json:"type"`
+	Data map[string]string `json:"data"`
 }
 
 // Validate checks the values of the SSHConfigurationRequest.
@@ -272,7 +273,7 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := h.Authority.GetSSHConfig(body.Type)
+	ts, err := h.Authority.GetSSHConfig(body.Type, body.Data)
 	if err != nil {
 		WriteError(w, InternalServerError(err))
 		return

@@ -6,10 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/smallstep/certificates/templates"
-
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/randutil"
 	"golang.org/x/crypto/ssh"
 )
@@ -51,7 +50,7 @@ func (a *Authority) GetSSHKeys() (*SSHKeys, error) {
 }
 
 // GetSSHConfig returns rendered templates for clients (user) or servers (host).
-func (a *Authority) GetSSHConfig(typ string) ([]templates.Output, error) {
+func (a *Authority) GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error) {
 	if a.sshCAUserCertSignKey == nil && a.sshCAHostCertSignKey == nil {
 		return nil, &apiError{
 			err:  errors.New("getSSHConfig: ssh is not configured"),
@@ -76,10 +75,23 @@ func (a *Authority) GetSSHConfig(typ string) ([]templates.Output, error) {
 		}
 	}
 
-	// Render templates.
+	// Merge user and default data
+	var mergedData map[string]interface{}
+
+	if len(data) == 0 {
+		mergedData = a.config.Templates.Data
+	} else {
+		mergedData = make(map[string]interface{}, len(a.config.Templates.Data)+1)
+		mergedData["User"] = data
+		for k, v := range a.config.Templates.Data {
+			mergedData[k] = v
+		}
+	}
+
+	// Render templates
 	output := []templates.Output{}
 	for _, t := range ts {
-		o, err := t.Output(a.config.Templates.Variables)
+		o, err := t.Output(mergedData)
 		if err != nil {
 			return nil, err
 		}
