@@ -2,7 +2,6 @@ package templates
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"text/template"
 
@@ -31,8 +30,8 @@ type Output struct {
 
 // Templates is a collection of templates and variables.
 type Templates struct {
-	SSH       *SSHTemplates          `json:"ssh,omitempty"`
-	Variables map[string]interface{} `json:"variables,omitempty"`
+	SSH  *SSHTemplates          `json:"ssh,omitempty"`
+	Data map[string]interface{} `json:"data,omitempty"`
 }
 
 // Validate returns an error if a template is not valid.
@@ -46,10 +45,13 @@ func (t *Templates) Validate() (err error) {
 		return
 	}
 
-	// Do not allow "Step"
-	if t.Variables != nil {
-		if _, ok := t.Variables["Step"]; ok {
-			return errors.New("templates variables cannot contain 'step' as a property")
+	// Do not allow "Step" and "User"
+	if t.Data != nil {
+		if _, ok := t.Data["Step"]; ok {
+			return errors.New("templates variables cannot contain 'Step' as a property")
+		}
+		if _, ok := t.Data["User"]; ok {
+			return errors.New("templates variables cannot contain 'User' as a property")
 		}
 	}
 	return nil
@@ -156,7 +158,6 @@ func (t *Template) Render(data interface{}) ([]byte, error) {
 	}
 
 	buf := new(bytes.Buffer)
-	fmt.Println(data)
 	if err := t.Execute(buf, data); err != nil {
 		return nil, errors.Wrapf(err, "error executing %s", t.TemplatePath)
 	}

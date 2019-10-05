@@ -514,7 +514,7 @@ type mockAuthority struct {
 	getRoots                     func() ([]*x509.Certificate, error)
 	getFederation                func() ([]*x509.Certificate, error)
 	getSSHKeys                   func() (*authority.SSHKeys, error)
-	getSSHConfig                 func(typ string) ([]templates.Output, error)
+	getSSHConfig                 func(typ string, data map[string]string) ([]templates.Output, error)
 }
 
 // TODO: remove once Authorize is deprecated.
@@ -627,9 +627,9 @@ func (m *mockAuthority) GetSSHKeys() (*authority.SSHKeys, error) {
 	return m.ret1.(*authority.SSHKeys), m.err
 }
 
-func (m *mockAuthority) GetSSHConfig(typ string) ([]templates.Output, error) {
+func (m *mockAuthority) GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error) {
 	if m.getSSHConfig != nil {
-		return m.getSSHConfig(typ)
+		return m.getSSHConfig(typ, data)
 	}
 	return m.ret1.([]templates.Output), m.err
 }

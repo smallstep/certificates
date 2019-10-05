@@ -158,8 +158,8 @@ func (a *Authority) init() error {
 
 	// Configure protected template variables:
 	if t := a.config.Templates; t != nil {
-		if t.Variables == nil {
-			t.Variables = make(map[string]interface{})
+		if t.Data == nil {
+			t.Data = make(map[string]interface{})
 		}
 		var vars templates.Step
 		if a.config.SSH != nil {
@@ -170,7 +170,7 @@ func (a *Authority) init() error {
 				vars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
 			}
 		}
-		t.Variables["Step"] = vars
+		t.Data["Step"] = vars
 	}
 
 	// JWT numeric dates are seconds.
