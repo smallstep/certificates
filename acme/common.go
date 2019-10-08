@@ -23,17 +23,6 @@ type Identifier struct {
 }
 
 var (
-	accountTable           = []byte("acme-accounts")
-	accountByKeyIDTable    = []byte("acme-keyID-accountID-index")
-	authzTable             = []byte("acme-authzs")
-	challengeTable         = []byte("acme-challenges")
-	nonceTable             = []byte("nonce-table")
-	orderTable             = []byte("acme-orders")
-	ordersByAccountIDTable = []byte("acme-account-orders-index")
-	certTable              = []byte("acme-certs")
-)
-
-var (
 	// StatusValid -- valid
 	StatusValid = "valid"
 	// StatusInvalid -- invalid
