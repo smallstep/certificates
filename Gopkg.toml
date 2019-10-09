@@ -52,8 +52,8 @@
   version = "2.3.1"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/google/certificate-transparency-go"
+  branch = "master"
 
 [prune]
   go-tests = true
