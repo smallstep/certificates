@@ -125,6 +125,7 @@ func New(c Config) (*ClientImpl, error) {
 		return nil, errors.Wrapf(err, "failed to connect to %s", c.URI)
 	}
 	log.Printf("connecting to CT log %s", c.URI)
+	log.Println("CT support is experimental and can change at any time")
 
 	return &ClientImpl{
 		config:    c,
