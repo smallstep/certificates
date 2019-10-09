@@ -274,7 +274,7 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 	}
 
 	// Create and store a new certificate.
-	leaf, inter, err := auth.Sign(csr, provisioner.Options{
+	certChain, err := auth.Sign(csr, provisioner.Options{
 		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
 		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
 	}, signOps...)
@@ -285,8 +285,8 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 	cert, err := newCert(db, CertOptions{
 		AccountID:     o.AccountID,
 		OrderID:       o.ID,
-		Leaf:          leaf,
-		Intermediates: []*x509.Certificate{inter},
+		Leaf:          certChain[0],
+		Intermediates: certChain[1:],
 	})
 	if err != nil {
 		return nil, err
