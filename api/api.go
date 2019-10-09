@@ -253,6 +253,7 @@ func (h *caHandler) Route(r Router) {
 	// SSH CA
 	r.MethodFunc("POST", "/ssh/sign", h.SignSSH)
 	r.MethodFunc("GET", "/ssh/keys", h.SSHKeys)
+	r.MethodFunc("GET", "/ssh/federation", h.SSHFederatedKeys)
 	r.MethodFunc("POST", "/ssh/config", h.SSHConfig)
 	r.MethodFunc("POST", "/ssh/config/{type}", h.SSHConfig)
 
