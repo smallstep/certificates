@@ -104,14 +104,6 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 	return nil
 }
 
-// SSHConfig contains the user and host keys.
-type SSHConfig struct {
-	HostKey          string `json:"hostKey"`
-	UserKey          string `json:"userKey"`
-	AddUserPrincipal string `json:"addUserPrincipal"`
-	AddUserCommand   string `json:"addUserCommand"`
-}
-
 // LoadConfiguration parses the given filename in JSON format and returns the
 // configuration struct.
 func LoadConfiguration(filename string) (*Config, error) {
@@ -182,6 +174,11 @@ func (c *Config) Validate() error {
 			return errors.New("tls minVersion cannot exceed tls maxVersion")
 		}
 		c.TLS.Renegotiation = c.TLS.Renegotiation || DefaultTLSOptions.Renegotiation
+	}
+
+	// Validate ssh: nil is ok
+	if err := c.SSH.Validate(); err != nil {
+		return err
 	}
 
 	// Validate templates: nil is ok
