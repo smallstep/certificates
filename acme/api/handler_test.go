@@ -17,6 +17,7 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/jose"
 )
@@ -230,7 +231,8 @@ func TestHandlerGetNonce(t *testing.T) {
 }
 
 func TestHandlerGetDirectory(t *testing.T) {
-	auth := acme.NewAuthority(nil, "ca.smallstep.com", "acme", nil)
+	auth, err := acme.NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil)
+	assert.FatalError(t, err)
 	prov := newProv()
 	url := fmt.Sprintf("http://ca.smallstep.com/acme/%s/directory", acme.URLSafeProvisionerName(prov))
 

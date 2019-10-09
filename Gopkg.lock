@@ -233,7 +233,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7d03323edb817ca94efaee5489cde6acd06ceeaca9e6eee106d2d6a90deca997"
+  digest = "1:b232e9d74b340b03395b935562aac1ca13ea2704f37372863a210ffd0b89efca"
   name = "github.com/smallstep/nosql"
   packages = [
     ".",
@@ -243,7 +243,7 @@
     "mysql",
   ]
   pruneopts = "UT"
-  revision = "f80b3f432de0662f07ebd58fe52b0a119fe5dcd9"
+  revision = "4b26d8029e613d7ad3e77c9718f9e8e37ab48ddb"
 
 [[projects]]
   branch = "master"

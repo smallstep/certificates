@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	database "github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/jose"
 	"github.com/smallstep/nosql"
 )
@@ -43,11 +44,35 @@ type Authority struct {
 	signAuth SignAuthority
 }
 
+var (
+	accountTable           = []byte("acme_accounts")
+	accountByKeyIDTable    = []byte("acme_keyID_accountID_index")
+	authzTable             = []byte("acme_authzs")
+	challengeTable         = []byte("acme_challenges")
+	nonceTable             = []byte("nonces")
+	orderTable             = []byte("acme_orders")
+	ordersByAccountIDTable = []byte("acme_account-orders-index")
+	certTable              = []byte("acme_certs")
+)
+
 // NewAuthority returns a new Authority that implements the ACME interface.
-func NewAuthority(db nosql.DB, dns, prefix string, signAuth SignAuthority) *Authority {
+func NewAuthority(db nosql.DB, dns, prefix string, signAuth SignAuthority) (*Authority, error) {
+	if _, ok := db.(*database.SimpleDB); !ok {
+		// If it's not a SimpleDB then go ahead and bootstrap the DB with the
+		// necessary ACME tables. SimpleDB should ONLY be used for testing.
+		tables := [][]byte{accountTable, accountByKeyIDTable, authzTable,
+			challengeTable, nonceTable, orderTable, ordersByAccountIDTable,
+			certTable}
+		for _, b := range tables {
+			if err := db.CreateTable(b); err != nil {
+				return nil, errors.Wrapf(err, "error creating table %s",
+					string(b))
+			}
+		}
+	}
 	return &Authority{
 		db: db, dir: newDirectory(dns, prefix), signAuth: signAuth,
-	}
+	}, nil
 }
 
 // GetLink returns the requested link from the directory.
