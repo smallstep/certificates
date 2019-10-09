@@ -87,16 +87,16 @@ type SSHKeys struct {
 	HostKeys []ssh.PublicKey
 }
 
-// GetSSHKeys returns the SSH User and Host public keys.
-func (a *Authority) GetSSHKeys() (*SSHKeys, error) {
+// GetSSHRoots returns the SSH User and Host public keys.
+func (a *Authority) GetSSHRoots() (*SSHKeys, error) {
 	return &SSHKeys{
 		HostKeys: a.sshCAHostCerts,
 		UserKeys: a.sshCAUserCerts,
 	}, nil
 }
 
-// GetSSHFederatedKeys returns the public keys for federated SSH signers.
-func (a *Authority) GetSSHFederatedKeys() (*SSHKeys, error) {
+// GetSSHFederation returns the public keys for federated SSH signers.
+func (a *Authority) GetSSHFederation() (*SSHKeys, error) {
 	return &SSHKeys{
 		HostKeys: a.sshCAHostFederatedCerts,
 		UserKeys: a.sshCAUserFederatedCerts,

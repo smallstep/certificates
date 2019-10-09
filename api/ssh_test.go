@@ -219,7 +219,7 @@ func TestSignSSHRequest_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &SignSSHRequest{
+			s := &SSHSignRequest{
 				PublicKey:        tt.fields.PublicKey,
 				OTT:              tt.fields.OTT,
 				CertType:         tt.fields.CertType,
@@ -235,7 +235,7 @@ func TestSignSSHRequest_Validate(t *testing.T) {
 	}
 }
 
-func Test_caHandler_SignSSH(t *testing.T) {
+func Test_caHandler_SSHSign(t *testing.T) {
 	user, err := getSignedUserCertificate()
 	assert.FatalError(t, err)
 	host, err := getSignedHostCertificate()
@@ -244,17 +244,17 @@ func Test_caHandler_SignSSH(t *testing.T) {
 	userB64 := base64.StdEncoding.EncodeToString(user.Marshal())
 	hostB64 := base64.StdEncoding.EncodeToString(host.Marshal())
 
-	userReq, err := json.Marshal(SignSSHRequest{
+	userReq, err := json.Marshal(SSHSignRequest{
 		PublicKey: user.Key.Marshal(),
 		OTT:       "ott",
 	})
 	assert.FatalError(t, err)
-	hostReq, err := json.Marshal(SignSSHRequest{
+	hostReq, err := json.Marshal(SSHSignRequest{
 		PublicKey: host.Key.Marshal(),
 		OTT:       "ott",
 	})
 	assert.FatalError(t, err)
-	userAddReq, err := json.Marshal(SignSSHRequest{
+	userAddReq, err := json.Marshal(SSHSignRequest{
 		PublicKey:        user.Key.Marshal(),
 		OTT:              "ott",
 		AddUserPublicKey: user.Key.Marshal(),
@@ -299,7 +299,7 @@ func Test_caHandler_SignSSH(t *testing.T) {
 
 			req := httptest.NewRequest("POST", "http://example.com/ssh/sign", bytes.NewReader(tt.req))
 			w := httptest.NewRecorder()
-			h.SignSSH(logging.NewResponseLogger(w), req)
+			h.SSHSign(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -320,7 +320,7 @@ func Test_caHandler_SignSSH(t *testing.T) {
 	}
 }
 
-func Test_caHandler_SSHKeys(t *testing.T) {
+func Test_caHandler_SSHRoots(t *testing.T) {
 	user, err := ssh.NewPublicKey(sshUserKey.Public())
 	assert.FatalError(t, err)
 	userB64 := base64.StdEncoding.EncodeToString(user.Marshal())
@@ -336,22 +336,23 @@ func Test_caHandler_SSHKeys(t *testing.T) {
 		body       []byte
 		statusCode int
 	}{
-		{"ok", &authority.SSHKeys{HostKey: host, UserKey: user}, nil, []byte(fmt.Sprintf(`{"userKey":"%s","hostKey":"%s"}`, userB64, hostB64)), http.StatusOK},
-		{"user", &authority.SSHKeys{UserKey: user}, nil, []byte(fmt.Sprintf(`{"userKey":"%s"}`, userB64)), http.StatusOK},
-		{"host", &authority.SSHKeys{HostKey: host}, nil, []byte(fmt.Sprintf(`{"hostKey":"%s"}`, hostB64)), http.StatusOK},
-		{"error", nil, fmt.Errorf("an error"), nil, http.StatusNotFound},
+		{"ok", &authority.SSHKeys{HostKeys: []ssh.PublicKey{host}, UserKeys: []ssh.PublicKey{user}}, nil, []byte(fmt.Sprintf(`{"userKey":["%s"],"hostKey":["%s"]}`, userB64, hostB64)), http.StatusOK},
+		{"user", &authority.SSHKeys{UserKeys: []ssh.PublicKey{user}}, nil, []byte(fmt.Sprintf(`{"userKey":["%s"]}`, userB64)), http.StatusOK},
+		{"host", &authority.SSHKeys{HostKeys: []ssh.PublicKey{host}}, nil, []byte(fmt.Sprintf(`{"hostKey":["%s"]}`, hostB64)), http.StatusOK},
+		{"empty", &authority.SSHKeys{}, nil, nil, http.StatusNotFound},
+		{"error", nil, fmt.Errorf("an error"), nil, http.StatusInternalServerError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
-				getSSHKeys: func() (*authority.SSHKeys, error) {
+				getSSHRoots: func() (*authority.SSHKeys, error) {
 					return tt.keys, tt.keysErr
 				},
 			}).(*caHandler)
 
 			req := httptest.NewRequest("GET", "http://example.com/ssh/keys", http.NoBody)
 			w := httptest.NewRecorder()
-			h.SSHKeys(logging.NewResponseLogger(w), req)
+			h.SSHRoots(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {

@@ -251,15 +251,15 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/roots", h.Roots)
 	r.MethodFunc("GET", "/federation", h.Federation)
 	// SSH CA
-	r.MethodFunc("POST", "/ssh/sign", h.SignSSH)
-	r.MethodFunc("GET", "/ssh/keys", h.SSHKeys)
-	r.MethodFunc("GET", "/ssh/federation", h.SSHFederatedKeys)
+	r.MethodFunc("POST", "/ssh/sign", h.SSHSign)
+	r.MethodFunc("GET", "/ssh/roots", h.SSHRoots)
+	r.MethodFunc("GET", "/ssh/federation", h.SSHFederation)
 	r.MethodFunc("POST", "/ssh/config", h.SSHConfig)
 	r.MethodFunc("POST", "/ssh/config/{type}", h.SSHConfig)
 
 	// For compatibility with old code:
 	r.MethodFunc("POST", "/re-sign", h.Renew)
-	r.MethodFunc("POST", "/sign-ssh", h.SignSSH)
+	r.MethodFunc("POST", "/sign-ssh", h.SSHSign)
 }
 
 // Health is an HTTP handler that returns the status of the server.

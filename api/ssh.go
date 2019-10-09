@@ -17,13 +17,13 @@ import (
 type SSHAuthority interface {
 	SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	SignSSHAddUser(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
-	GetSSHKeys() (*authority.SSHKeys, error)
-	GetSSHFederatedKeys() (*authority.SSHKeys, error)
+	GetSSHRoots() (*authority.SSHKeys, error)
+	GetSSHFederation() (*authority.SSHKeys, error)
 	GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error)
 }
 
-// SignSSHRequest is the request body of an SSH certificate request.
-type SignSSHRequest struct {
+// SSHSignRequest is the request body of an SSH certificate request.
+type SSHSignRequest struct {
 	PublicKey        []byte       `json:"publicKey"` //base64 encoded
 	OTT              string       `json:"ott"`
 	CertType         string       `json:"certType,omitempty"`
@@ -33,8 +33,8 @@ type SignSSHRequest struct {
 	AddUserPublicKey []byte       `json:"addUserPublicKey,omitempty"`
 }
 
-// Validate validates the SignSSHRequest.
-func (s *SignSSHRequest) Validate() error {
+// Validate validates the SSHSignRequest.
+func (s *SSHSignRequest) Validate() error {
 	switch {
 	case s.CertType != "" && s.CertType != provisioner.SSHUserCert && s.CertType != provisioner.SSHHostCert:
 		return errors.Errorf("unknown certType %s", s.CertType)
@@ -47,15 +47,15 @@ func (s *SignSSHRequest) Validate() error {
 	}
 }
 
-// SignSSHResponse is the response object that returns the SSH certificate.
-type SignSSHResponse struct {
+// SSHSignResponse is the response object that returns the SSH certificate.
+type SSHSignResponse struct {
 	Certificate        SSHCertificate  `json:"crt"`
 	AddUserCertificate *SSHCertificate `json:"addUserCrt,omitempty"`
 }
 
-// SSHKeysResponse represents the response object that returns the SSH user and
+// SSHRootsResponse represents the response object that returns the SSH user and
 // host keys.
-type SSHKeysResponse struct {
+type SSHRootsResponse struct {
 	UserKeys []SSHPublicKey `json:"userKey,omitempty"`
 	HostKeys []SSHPublicKey `json:"hostKey,omitempty"`
 }
@@ -170,11 +170,11 @@ type SSHConfigResponse struct {
 	HostTemplates []Template `json:"hostTemplates,omitempty"`
 }
 
-// SignSSH is an HTTP handler that reads an SignSSHRequest with a one-time-token
+// SSHSign is an HTTP handler that reads an SignSSHRequest with a one-time-token
 // (ott) from the body and creates a new SSH certificate with the information in
 // the request.
-func (h *caHandler) SignSSH(w http.ResponseWriter, r *http.Request) {
-	var body SignSSHRequest
+func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
+	var body SSHSignRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
 		WriteError(w, BadRequest(errors.Wrap(err, "error reading request body")))
 		return
@@ -232,16 +232,16 @@ func (h *caHandler) SignSSH(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	JSON(w, &SignSSHResponse{
+	JSON(w, &SSHSignResponse{
 		Certificate:        SSHCertificate{cert},
 		AddUserCertificate: addUserCertificate,
 	})
 }
 
-// SSHKeys is an HTTP handler that returns the SSH public keys for user and host
+// SSHRoots is an HTTP handler that returns the SSH public keys for user and host
 // certificates.
-func (h *caHandler) SSHKeys(w http.ResponseWriter, r *http.Request) {
-	keys, err := h.Authority.GetSSHKeys()
+func (h *caHandler) SSHRoots(w http.ResponseWriter, r *http.Request) {
+	keys, err := h.Authority.GetSSHRoots()
 	if err != nil {
 		WriteError(w, InternalServerError(err))
 		return
@@ -252,7 +252,7 @@ func (h *caHandler) SSHKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := new(SSHKeysResponse)
+	resp := new(SSHRootsResponse)
 	for _, k := range keys.HostKeys {
 		resp.HostKeys = append(resp.HostKeys, SSHPublicKey{PublicKey: k})
 	}
@@ -263,10 +263,10 @@ func (h *caHandler) SSHKeys(w http.ResponseWriter, r *http.Request) {
 	JSON(w, resp)
 }
 
-// SSHFederatedKeys is an HTTP handler that returns the federated SSH public
-// keys for user and host certificates.
-func (h *caHandler) SSHFederatedKeys(w http.ResponseWriter, r *http.Request) {
-	keys, err := h.Authority.GetSSHFederatedKeys()
+// SSHFederation is an HTTP handler that returns the federated SSH public keys
+// for user and host certificates.
+func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
+	keys, err := h.Authority.GetSSHFederation()
 	if err != nil {
 		WriteError(w, NotFound(err))
 		return
@@ -277,7 +277,7 @@ func (h *caHandler) SSHFederatedKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := new(SSHKeysResponse)
+	resp := new(SSHRootsResponse)
 	for _, k := range keys.HostKeys {
 		resp.HostKeys = append(resp.HostKeys, SSHPublicKey{PublicKey: k})
 	}

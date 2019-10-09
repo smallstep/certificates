@@ -373,28 +373,6 @@ func (c *Client) Sign(req *api.SignRequest) (*api.SignResponse, error) {
 	return &sign, nil
 }
 
-// SignSSH performs the SSH certificate sign request to the CA and returns the
-// api.SignSSHResponse struct.
-func (c *Client) SignSSH(req *api.SignSSHRequest) (*api.SignSSHResponse, error) {
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling request")
-	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/sign"})
-	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
-	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
-	}
-	if resp.StatusCode >= 400 {
-		return nil, readError(resp.Body)
-	}
-	var sign api.SignSSHResponse
-	if err := readJSON(resp.Body, &sign); err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", u)
-	}
-	return &sign, nil
-}
-
 // Renew performs the renew request to the CA and returns the api.SignResponse
 // struct.
 func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
@@ -527,10 +505,32 @@ func (c *Client) Federation() (*api.FederationResponse, error) {
 	return &federation, nil
 }
 
-// SSHKeys performs the get /ssh/keys request to the CA and returns the
-// api.SSHKeysResponse struct.
-func (c *Client) SSHKeys() (*api.SSHKeysResponse, error) {
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/keys"})
+// SSHSign performs the POST /ssh/sign request to the CA and returns the
+// api.SSHSignResponse struct.
+func (c *Client) SSHSign(req *api.SSHSignRequest) (*api.SSHSignResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/sign"})
+	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var sign api.SSHSignResponse
+	if err := readJSON(resp.Body, &sign); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &sign, nil
+}
+
+// SSHRoots performs the GET /ssh/roots request to the CA and returns the
+// api.SSHRootsResponse struct.
+func (c *Client) SSHRoots() (*api.SSHRootsResponse, error) {
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/roots"})
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
@@ -538,7 +538,7 @@ func (c *Client) SSHKeys() (*api.SSHKeysResponse, error) {
 	if resp.StatusCode >= 400 {
 		return nil, readError(resp.Body)
 	}
-	var keys api.SSHKeysResponse
+	var keys api.SSHRootsResponse
 	if err := readJSON(resp.Body, &keys); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
@@ -546,8 +546,8 @@ func (c *Client) SSHKeys() (*api.SSHKeysResponse, error) {
 }
 
 // SSHFederation performs the get /ssh/federation request to the CA and returns
-// the api.SSHKeysResponse struct.
-func (c *Client) SSHFederation() (*api.SSHKeysResponse, error) {
+// the api.SSHRootsResponse struct.
+func (c *Client) SSHFederation() (*api.SSHRootsResponse, error) {
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/federation"})
 	resp, err := c.client.Get(u.String())
 	if err != nil {
@@ -556,15 +556,15 @@ func (c *Client) SSHFederation() (*api.SSHKeysResponse, error) {
 	if resp.StatusCode >= 400 {
 		return nil, readError(resp.Body)
 	}
-	var keys api.SSHKeysResponse
+	var keys api.SSHRootsResponse
 	if err := readJSON(resp.Body, &keys); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
 	return &keys, nil
 }
 
-// SSHConfig performs the POST request to the CA to get the ssh configuration
-// templates.
+// SSHConfig performs the POST /ssh/config request to the CA to get the ssh
+// configuration templates.
 func (c *Client) SSHConfig(req *api.SSHConfigRequest) (*api.SSHConfigResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
