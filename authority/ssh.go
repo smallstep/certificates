@@ -10,6 +10,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/randutil"
+	"github.com/smallstep/cli/jose"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -25,28 +26,81 @@ const (
 	SSHAddUserCommand = "sudo useradd -m <principal>; nc -q0 localhost 22"
 )
 
+// SSHConfig contains the user and host keys.
+type SSHConfig struct {
+	HostKey          string          `json:"hostKey"`
+	UserKey          string          `json:"userKey"`
+	Keys             []*SSHPublicKey `json:"keys,omitempty"`
+	AddUserPrincipal string          `json:"addUserPrincipal"`
+	AddUserCommand   string          `json:"addUserCommand"`
+}
+
+// Validate checks the fields in SSHConfig.
+func (c *SSHConfig) Validate() error {
+	if c == nil {
+		return nil
+	}
+	for _, k := range c.Keys {
+		if err := k.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SSHPublicKey contains a public key used by federated CAs to keep old signing
+// keys for this ca.
+type SSHPublicKey struct {
+	Type      string          `json:"type"`
+	Federated bool            `json:"federated"`
+	Key       jose.JSONWebKey `json:"key"`
+	publicKey ssh.PublicKey
+}
+
+// Validate checks the fields in SSHPublicKey.
+func (k *SSHPublicKey) Validate() error {
+	switch {
+	case k.Type == "":
+		return errors.New("type cannot be empty")
+	case k.Type != provisioner.SSHHostCert && k.Type != provisioner.SSHUserCert:
+		return errors.Errorf("invalid type %s, it must be user or host", k.Type)
+	case !k.Key.IsPublic():
+		return errors.New("invalid key type, it must be a public key")
+	}
+
+	key, err := ssh.NewPublicKey(k.Key.Key)
+	if err != nil {
+		return errors.Wrap(err, "error creating ssh key")
+	}
+	k.publicKey = key
+	return nil
+}
+
+// PublicKey returns the ssh public key.
+func (k *SSHPublicKey) PublicKey() ssh.PublicKey {
+	return k.publicKey
+}
+
 // SSHKeys represents the SSH User and Host public keys.
 type SSHKeys struct {
-	UserKey ssh.PublicKey
-	HostKey ssh.PublicKey
+	UserKeys []ssh.PublicKey
+	HostKeys []ssh.PublicKey
 }
 
 // GetSSHKeys returns the SSH User and Host public keys.
 func (a *Authority) GetSSHKeys() (*SSHKeys, error) {
-	var keys SSHKeys
-	if a.sshCAUserCertSignKey != nil {
-		keys.UserKey = a.sshCAUserCertSignKey.PublicKey()
-	}
-	if a.sshCAHostCertSignKey != nil {
-		keys.HostKey = a.sshCAHostCertSignKey.PublicKey()
-	}
-	if keys.UserKey == nil && keys.HostKey == nil {
-		return nil, &apiError{
-			err:  errors.New("getSSHKeys: ssh is not configured"),
-			code: http.StatusNotFound,
-		}
-	}
-	return &keys, nil
+	return &SSHKeys{
+		HostKeys: a.sshCAHostCerts,
+		UserKeys: a.sshCAUserCerts,
+	}, nil
+}
+
+// GetSSHFederatedKeys returns the public keys for federated SSH signers.
+func (a *Authority) GetSSHFederatedKeys() (*SSHKeys, error) {
+	return &SSHKeys{
+		HostKeys: a.sshCAHostFederatedCerts,
+		UserKeys: a.sshCAUserFederatedCerts,
+	}, nil
 }
 
 // GetSSHConfig returns rendered templates for clients (user) or servers (host).

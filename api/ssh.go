@@ -18,6 +18,7 @@ type SSHAuthority interface {
 	SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	SignSSHAddUser(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 	GetSSHKeys() (*authority.SSHKeys, error)
+	GetSSHFederatedKeys() (*authority.SSHKeys, error)
 	GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error)
 }
 
@@ -55,8 +56,8 @@ type SignSSHResponse struct {
 // SSHKeysResponse represents the response object that returns the SSH user and
 // host keys.
 type SSHKeysResponse struct {
-	UserKey *SSHPublicKey `json:"userKey,omitempty"`
-	HostKey *SSHPublicKey `json:"hostKey,omitempty"`
+	UserKeys []SSHPublicKey `json:"userKey,omitempty"`
+	HostKeys []SSHPublicKey `json:"hostKey,omitempty"`
 }
 
 // SSHCertificate represents the response SSH certificate.
@@ -242,22 +243,49 @@ func (h *caHandler) SignSSH(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.Authority.GetSSHKeys()
 	if err != nil {
+		WriteError(w, InternalServerError(err))
+		return
+	}
+
+	if len(keys.HostKeys) == 0 && len(keys.UserKeys) == 0 {
+		WriteError(w, NotFound(errors.New("no keys found")))
+		return
+	}
+
+	resp := new(SSHKeysResponse)
+	for _, k := range keys.HostKeys {
+		resp.HostKeys = append(resp.HostKeys, SSHPublicKey{PublicKey: k})
+	}
+	for _, k := range keys.UserKeys {
+		resp.UserKeys = append(resp.UserKeys, SSHPublicKey{PublicKey: k})
+	}
+
+	JSON(w, resp)
+}
+
+// SSHFederatedKeys is an HTTP handler that returns the federated SSH public
+// keys for user and host certificates.
+func (h *caHandler) SSHFederatedKeys(w http.ResponseWriter, r *http.Request) {
+	keys, err := h.Authority.GetSSHFederatedKeys()
+	if err != nil {
 		WriteError(w, NotFound(err))
 		return
 	}
 
-	var host, user *SSHPublicKey
-	if keys.HostKey != nil {
-		host = &SSHPublicKey{PublicKey: keys.HostKey}
-	}
-	if keys.UserKey != nil {
-		user = &SSHPublicKey{PublicKey: keys.UserKey}
+	if len(keys.HostKeys) == 0 && len(keys.UserKeys) == 0 {
+		WriteError(w, NotFound(errors.New("no keys found")))
+		return
 	}
 
-	JSON(w, &SSHKeysResponse{
-		HostKey: host,
-		UserKey: user,
-	})
+	resp := new(SSHKeysResponse)
+	for _, k := range keys.HostKeys {
+		resp.HostKeys = append(resp.HostKeys, SSHPublicKey{PublicKey: k})
+	}
+	for _, k := range keys.UserKeys {
+		resp.UserKeys = append(resp.UserKeys, SSHPublicKey{PublicKey: k})
+	}
+
+	JSON(w, resp)
 }
 
 // SSHConfig is an HTTP handler that returns rendered templates for ssh clients

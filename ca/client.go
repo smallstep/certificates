@@ -527,10 +527,28 @@ func (c *Client) Federation() (*api.FederationResponse, error) {
 	return &federation, nil
 }
 
-// SSHKeys performs the get ssh keys request to the CA and returns the
+// SSHKeys performs the get /ssh/keys request to the CA and returns the
 // api.SSHKeysResponse struct.
 func (c *Client) SSHKeys() (*api.SSHKeysResponse, error) {
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/keys"})
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var keys api.SSHKeysResponse
+	if err := readJSON(resp.Body, &keys); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &keys, nil
+}
+
+// SSHFederation performs the get /ssh/federation request to the CA and returns
+// the api.SSHKeysResponse struct.
+func (c *Client) SSHFederation() (*api.SSHKeysResponse, error) {
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/federation"})
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)

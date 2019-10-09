@@ -24,15 +24,19 @@ const (
 
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
-	config               *Config
-	rootX509Certs        []*x509.Certificate
-	intermediateIdentity *x509util.Identity
-	sshCAUserCertSignKey ssh.Signer
-	sshCAHostCertSignKey ssh.Signer
-	certificates         *sync.Map
-	startTime            time.Time
-	provisioners         *provisioner.Collection
-	db                   db.AuthDB
+	config                  *Config
+	rootX509Certs           []*x509.Certificate
+	intermediateIdentity    *x509util.Identity
+	sshCAUserCertSignKey    ssh.Signer
+	sshCAHostCertSignKey    ssh.Signer
+	sshCAUserCerts          []ssh.PublicKey
+	sshCAHostCerts          []ssh.PublicKey
+	sshCAUserFederatedCerts []ssh.PublicKey
+	sshCAHostFederatedCerts []ssh.PublicKey
+	certificates            *sync.Map
+	startTime               time.Time
+	provisioners            *provisioner.Collection
+	db                      db.AuthDB
 	// Do not re-initialize
 	initOnce bool
 }
@@ -136,6 +140,9 @@ func (a *Authority) init() error {
 			if err != nil {
 				return errors.Wrap(err, "error creating ssh signer")
 			}
+			// Append public key to list of host certs
+			a.sshCAHostCerts = append(a.sshCAHostCerts, a.sshCAHostCertSignKey.PublicKey())
+			a.sshCAHostFederatedCerts = append(a.sshCAHostFederatedCerts, a.sshCAHostCertSignKey.PublicKey())
 		}
 		if a.config.SSH.UserKey != "" {
 			signer, err := parseCryptoSigner(a.config.SSH.UserKey, a.config.Password)
@@ -145,6 +152,29 @@ func (a *Authority) init() error {
 			a.sshCAUserCertSignKey, err = ssh.NewSignerFromSigner(signer)
 			if err != nil {
 				return errors.Wrap(err, "error creating ssh signer")
+			}
+			// Append public key to list of user certs
+			a.sshCAUserCerts = append(a.sshCAUserCerts, a.sshCAHostCertSignKey.PublicKey())
+			a.sshCAUserFederatedCerts = append(a.sshCAUserFederatedCerts, a.sshCAUserCertSignKey.PublicKey())
+		}
+
+		// Append other public keys
+		for _, key := range a.config.SSH.Keys {
+			switch key.Type {
+			case provisioner.SSHHostCert:
+				if key.Federated {
+					a.sshCAHostFederatedCerts = append(a.sshCAHostFederatedCerts, key.PublicKey())
+				} else {
+					a.sshCAHostCerts = append(a.sshCAHostCerts, key.PublicKey())
+				}
+			case provisioner.SSHUserCert:
+				if key.Federated {
+					a.sshCAUserFederatedCerts = append(a.sshCAUserFederatedCerts, key.PublicKey())
+				} else {
+					a.sshCAUserCerts = append(a.sshCAUserCerts, key.PublicKey())
+				}
+			default:
+				return errors.Errorf("unsupported type %s", key.Type)
 			}
 		}
 	}
