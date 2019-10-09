@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/ct"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/x509util"
@@ -30,6 +31,7 @@ type Authority struct {
 	startTime            time.Time
 	provisioners         *provisioner.Collection
 	db                   db.AuthDB
+	ctClient             ct.Client
 	// Do not re-initialize
 	initOnce bool
 }
@@ -52,10 +54,19 @@ func New(config *Config, opts ...Option) (*Authority, error) {
 		return nil, err
 	}
 
+	var ctClient ct.Client
+	// only first one is supported at the moment.
+	if len(config.CTs) > 0 {
+		if ctClient, err = ct.New(config.CTs[0]); err != nil {
+			return nil, err
+		}
+	}
+
 	var a = &Authority{
 		config:       config,
 		certificates: new(sync.Map),
 		provisioners: provisioner.NewCollection(config.getAudiences()),
+		ctClient:     ctClient,
 	}
 	for _, opt := range opts {
 		opt(a)

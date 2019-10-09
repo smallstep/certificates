@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/ct"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
@@ -59,6 +60,7 @@ type Config struct {
 	AuthorityConfig  *AuthConfig         `json:"authority,omitempty"`
 	TLS              *tlsutil.TLSOptions `json:"tls,omitempty"`
 	Password         string              `json:"password,omitempty"`
+	CTs              []ct.Config         `json:"cts"`
 }
 
 // AuthConfig represents the configuration options for the authority.
@@ -179,6 +181,14 @@ func (c *Config) Validate() error {
 			return errors.New("tls minVersion cannot exceed tls maxVersion")
 		}
 		c.TLS.Renegotiation = c.TLS.Renegotiation || DefaultTLSOptions.Renegotiation
+	}
+
+	if len(c.CTs) > 0 {
+		for _, ct := range c.CTs {
+			if err := ct.Validate(); err != nil {
+				return err
+			}
+		}
 	}
 
 	return c.AuthorityConfig.Validate(c.getAudiences())

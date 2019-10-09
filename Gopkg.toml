@@ -51,6 +51,10 @@
   name = "gopkg.in/square/go-jose.v2"
   version = "2.3.1"
 
+[[constraint]]
+  branch = "master"
+  name = "github.com/google/certificate-transparency-go"
+
 [prune]
   go-tests = true
   unused-packages = true
