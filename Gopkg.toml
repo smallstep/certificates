@@ -32,7 +32,7 @@
   name = "github.com/go-chi/chi"
 
 [[override]]
-  branch = "certificate-transparency"
+  branch = "master"
   name = "github.com/smallstep/cli"
 
 [[constraint]]
@@ -49,20 +49,12 @@
 
 [[constraint]]
   name = "gopkg.in/square/go-jose.v2"
-<<<<<<< HEAD
-  version = "2.1.9"
+  version = "2.3.1"
 
 [[constraint]]
   branch = "master"
   name = "github.com/google/certificate-transparency-go"
 
-[[override]]
-  branch = "master"
-  name = "github.com/golang/protobuf"
-=======
-  version = "2.3.1"
-
 [prune]
   go-tests = true
   unused-packages = true
->>>>>>> master

@@ -240,7 +240,7 @@ func (a *Authority) Renew(oldCert *x509.Certificate) (*x509.Certificate, *x509.C
 		scts, err := a.ctClient.GetSCTs(crtBytes, issIdentity.Crt.Raw)
 		if err != nil {
 			return nil, nil, &apiError{errors.Wrap(err, "renew: error getting SCTs for certificate"),
-				http.StatusBadGateway, context{}}
+				http.StatusBadGateway, apiCtx{}}
 		}
 
 		// Remove ct poison extension and add sct extension
@@ -250,7 +250,7 @@ func (a *Authority) Renew(oldCert *x509.Certificate) (*x509.Certificate, *x509.C
 		// Recreate final certificate
 		if crtBytes, err = leaf.CreateCertificate(); err != nil {
 			return nil, nil, &apiError{errors.Wrap(err, "renew: error creating final leaf certificate"),
-				http.StatusInternalServerError, context{}}
+				http.StatusInternalServerError, apiCtx{}}
 		}
 	}
 
@@ -269,7 +269,7 @@ func (a *Authority) Renew(oldCert *x509.Certificate) (*x509.Certificate, *x509.C
 		// Submit final certificate chain
 		if _, err := a.ctClient.SubmitToLogs(serverCert.Raw, caCert.Raw); err != nil {
 			return nil, nil, &apiError{errors.Wrap(err, "renew: error submitting final certificate to ct logs"),
-				http.StatusBadGateway, context{}}
+				http.StatusBadGateway, apiCtx{}}
 		}
 	}
 

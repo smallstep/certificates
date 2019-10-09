@@ -57,33 +57,11 @@
   version = "v1.4.1"
 
 [[projects]]
-<<<<<<< HEAD
-  branch = "master"
-  digest = "1:239c4c7fd2159585454003d9be7207167970194216193a8a210b8d29576f19c9"
-=======
-  digest = "1:97df918963298c287643883209a2c3f642e6593379f97ab400c2a2e219ab647d"
->>>>>>> master
+  digest = "1:318f1c959a8a740366fce4b1e1eb2fd914036b4af58fbd0a003349b305f118ad"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
   pruneopts = "UT"
   revision = "c823c79ea1570fb5ff454033735a8e68575d1d0f"
-
-[[projects]]
-  branch = "master"
-  digest = "1:78ae27573e8adaf14269f9146230153a61c4b29bedc8742e464e053280dfa3d0"
-  name = "github.com/google/certificate-transparency-go"
-  packages = [
-    ".",
-    "asn1",
-    "client",
-    "client/configpb",
-    "jsonclient",
-    "tls",
-    "x509",
-    "x509/pkix",
-  ]
-  pruneopts = "UT"
-  revision = "b5e3a70217c2a317c27b3c852126d0f8f29fef2b"
 
 [[projects]]
   branch = "master"
@@ -227,13 +205,8 @@
   revision = "de77670473b5492f5d0bce155b5c01534c2d13f7"
 
 [[projects]]
-<<<<<<< HEAD
-  branch = "certificate-transparency"
-  digest = "1:ed4ae9e597c66929a567de027512ee77a632ed8c4471e53c82c82c6658c4eb90"
-=======
   branch = "master"
-  digest = "1:c26dc5debe7fa23c636a116c336aa033f8d7be0d3464d7b363f4b3355dcccf4f"
->>>>>>> master
+  digest = "1:6f5caf828c58adb4e12f9811b3b9e32ae08a9c340227d385ebd9eab2fd34981b"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
@@ -255,11 +228,7 @@
     "utils",
   ]
   pruneopts = "UT"
-<<<<<<< HEAD
-  revision = "6cb4285dba37a5d03e1f4be41fc897b071181a70"
-=======
-  revision = "eeecaac062cb548ee2ab7c7563bc3c2f2160f019"
->>>>>>> master
+  revision = "32a92ab5aa77d515a087394349f585b2e338c9e5"
 
 [[projects]]
   branch = "master"
@@ -314,11 +283,10 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:50bed722f4f0bbb3d64b0ca49d41911f57a0ddb63e03666656f6621af3b70f9e"
+  digest = "1:2f7468b0b3fd7d926072f0dcbb6ec81e337278b4e5de639d017e54f785f0b475"
   name = "golang.org/x/net"
   packages = [
     "context",
-    "context/ctxhttp",
     "html",
     "html/atom",
     "http/httpguts",
@@ -409,17 +377,6 @@
   analyzer-version = 1
   input-imports = [
     "github.com/go-chi/chi",
-<<<<<<< HEAD
-    "github.com/golang/lint/golint",
-    "github.com/golang/protobuf/proto",
-    "github.com/google/certificate-transparency-go",
-    "github.com/google/certificate-transparency-go/client",
-    "github.com/google/certificate-transparency-go/jsonclient",
-    "github.com/google/certificate-transparency-go/tls",
-    "github.com/google/certificate-transparency-go/x509",
-    "github.com/gordonklaus/ineffassign",
-=======
->>>>>>> master
     "github.com/newrelic/go-agent",
     "github.com/pkg/errors",
     "github.com/rs/xid",
