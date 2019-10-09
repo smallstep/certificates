@@ -513,7 +513,8 @@ type mockAuthority struct {
 	getEncryptedKey              func(kid string) (string, error)
 	getRoots                     func() ([]*x509.Certificate, error)
 	getFederation                func() ([]*x509.Certificate, error)
-	getSSHKeys                   func() (*authority.SSHKeys, error)
+	getSSHRoots                  func() (*authority.SSHKeys, error)
+	getSSHFederation             func() (*authority.SSHKeys, error)
 	getSSHConfig                 func(typ string, data map[string]string) ([]templates.Output, error)
 }
 
@@ -620,9 +621,16 @@ func (m *mockAuthority) GetFederation() ([]*x509.Certificate, error) {
 	return m.ret1.([]*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) GetSSHKeys() (*authority.SSHKeys, error) {
-	if m.getSSHKeys != nil {
-		return m.getSSHKeys()
+func (m *mockAuthority) GetSSHRoots() (*authority.SSHKeys, error) {
+	if m.getSSHRoots != nil {
+		return m.getSSHRoots()
+	}
+	return m.ret1.(*authority.SSHKeys), m.err
+}
+
+func (m *mockAuthority) GetSSHFederation() (*authority.SSHKeys, error) {
+	if m.getSSHFederation != nil {
+		return m.getSSHFederation()
 	}
 	return m.ret1.(*authority.SSHKeys), m.err
 }

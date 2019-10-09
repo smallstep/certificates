@@ -722,15 +722,15 @@ func TestClient_Federation(t *testing.T) {
 	}
 }
 
-func TestClient_SSHKeys(t *testing.T) {
+func TestClient_SSHRoots(t *testing.T) {
 	key, err := ssh.NewPublicKey(mustKey().Public())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ok := &api.SSHKeysResponse{
-		HostKey: &api.SSHPublicKey{PublicKey: key},
-		UserKey: &api.SSHPublicKey{PublicKey: key},
+	ok := &api.SSHRootsResponse{
+		HostKeys: []api.SSHPublicKey{{PublicKey: key}},
+		UserKeys: []api.SSHPublicKey{{PublicKey: key}},
 	}
 	notFound := api.NotFound(fmt.Errorf("Not Found"))
 
@@ -759,7 +759,7 @@ func TestClient_SSHKeys(t *testing.T) {
 				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
-			got, err := c.SSHKeys()
+			got, err := c.SSHRoots()
 			if (err != nil) != tt.wantErr {
 				fmt.Printf("%+v", err)
 				t.Errorf("Client.SSHKeys() error = %v, wantErr %v", err, tt.wantErr)
