@@ -77,7 +77,7 @@ func (p *X5C) Init(config Config) error {
 		return errors.New("provisioner type cannot be empty")
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
-	case p.Roots == nil || len(p.Roots) == 0:
+	case len(p.Roots) == 0:
 		return errors.New("provisioner root(s) cannot be empty")
 	}
 

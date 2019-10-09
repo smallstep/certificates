@@ -3,7 +3,6 @@ package provisioner
 import (
 	"crypto/rsa"
 	"encoding/binary"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -253,11 +252,7 @@ func (m *sshProvCredValidityModifier) Modify(cert *ssh.Certificate) error {
 	if cert.ValidBefore < cert.ValidAfter {
 		return errors.New("ssh certificate validBefore cannot be before validAfter")
 	}
-	dur, err := time.ParseDuration(fmt.Sprintf("%ds", cert.ValidBefore-cert.ValidAfter))
-	if err != nil {
-		return errors.Wrapf(err, "error converting ssh certificate duration; "+
-			"vaf: %d, vbf: %d, d: %d", cert.ValidAfter, cert.ValidBefore, cert.ValidBefore-cert.ValidAfter)
-	}
+	dur := time.Duration(cert.ValidBefore-cert.ValidAfter) * time.Second
 	if m.rem < dur {
 		t := time.Unix(int64(cert.ValidAfter), 0)
 		cert.ValidBefore = uint64(t.Add(m.rem).Unix())
@@ -306,19 +301,14 @@ func (v *sshCertificateValidityValidator) Valid(cert *ssh.Certificate) error {
 	}
 
 	// seconds
-	duration, err := time.ParseDuration(fmt.Sprintf("%ds", cert.ValidBefore-cert.ValidAfter))
-	if err != nil {
-		return errors.Wrapf(err, "error converting ssh certificate duration; "+
-			"vaf: %d, vbf: %d, d: %d", cert.ValidAfter, cert.ValidBefore, cert.ValidBefore-cert.ValidAfter)
-	}
-
+	dur := time.Duration(cert.ValidBefore-cert.ValidAfter) * time.Second
 	switch {
-	case duration < min:
+	case dur < min:
 		return errors.Errorf("requested duration of %s is less than minimum "+
-			"accepted duration for selected provisioner of %s", duration, min)
-	case duration > max:
+			"accepted duration for selected provisioner of %s", dur, min)
+	case dur > max:
 		return errors.Errorf("requested duration of %s is greater than maximum "+
-			"accepted duration for selected provisioner of %s", duration, max)
+			"accepted duration for selected provisioner of %s", dur, max)
 	default:
 		return nil
 	}
