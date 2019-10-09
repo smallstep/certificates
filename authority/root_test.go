@@ -19,8 +19,8 @@ func TestRoot(t *testing.T) {
 		sum string
 		err *apiError
 	}{
-		"not-found":                  {"foo", &apiError{errors.New("certificate with fingerprint foo was not found"), http.StatusNotFound, context{}}},
-		"invalid-stored-certificate": {"invaliddata", &apiError{errors.New("stored value is not a *x509.Certificate"), http.StatusInternalServerError, context{}}},
+		"not-found":                  {"foo", &apiError{errors.New("certificate with fingerprint foo was not found"), http.StatusNotFound, apiCtx{}}},
+		"invalid-stored-certificate": {"invaliddata", &apiError{errors.New("stored value is not a *x509.Certificate"), http.StatusInternalServerError, apiCtx{}}},
 		"success":                    {"189f573cfa159251e445530847ef80b1b62a3a380ee670dcb49e33ed34da0616", nil},
 	}
 
@@ -48,7 +48,7 @@ func TestRoot(t *testing.T) {
 }
 
 func TestAuthority_GetRootCertificate(t *testing.T) {
-	cert, err := pemutil.ReadCertificate("testdata/secrets/root_ca.crt")
+	cert, err := pemutil.ReadCertificate("testdata/certs/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestAuthority_GetRootCertificate(t *testing.T) {
 }
 
 func TestAuthority_GetRootCertificates(t *testing.T) {
-	cert, err := pemutil.ReadCertificate("testdata/secrets/root_ca.crt")
+	cert, err := pemutil.ReadCertificate("testdata/certs/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestAuthority_GetRootCertificates(t *testing.T) {
 }
 
 func TestAuthority_GetRoots(t *testing.T) {
-	cert, err := pemutil.ReadCertificate("testdata/secrets/root_ca.crt")
+	cert, err := pemutil.ReadCertificate("testdata/certs/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestAuthority_GetRoots(t *testing.T) {
 }
 
 func TestAuthority_GetFederation(t *testing.T) {
-	cert, err := pemutil.ReadCertificate("testdata/secrets/root_ca.crt")
+	cert, err := pemutil.ReadCertificate("testdata/certs/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}

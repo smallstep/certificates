@@ -525,7 +525,10 @@ func doReload(ca *CA) error {
 		return errors.Wrap(err, "error reloading ca")
 	}
 
-	newCA, err := New(config, WithPassword(ca.opts.password), WithConfigFile(ca.opts.configFile))
+	newCA, err := New(config,
+		WithPassword(ca.opts.password),
+		WithConfigFile(ca.opts.configFile),
+		WithDatabase(ca.auth.GetDatabase()))
 	if err != nil {
 		return errors.Wrap(err, "error reloading ca")
 	}
@@ -567,8 +570,8 @@ func TestBootstrapListener(t *testing.T) {
 				return
 			}
 			wg := new(sync.WaitGroup)
+			wg.Add(1)
 			go func() {
-				wg.Add(1)
 				http.Serve(lis, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte("ok"))
 				}))

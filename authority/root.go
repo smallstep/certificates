@@ -12,13 +12,13 @@ func (a *Authority) Root(sum string) (*x509.Certificate, error) {
 	val, ok := a.certificates.Load(sum)
 	if !ok {
 		return nil, &apiError{errors.Errorf("certificate with fingerprint %s was not found", sum),
-			http.StatusNotFound, context{}}
+			http.StatusNotFound, apiCtx{}}
 	}
 
 	crt, ok := val.(*x509.Certificate)
 	if !ok {
 		return nil, &apiError{errors.Errorf("stored value is not a *x509.Certificate"),
-			http.StatusInternalServerError, context{}}
+			http.StatusInternalServerError, apiCtx{}}
 	}
 	return crt, nil
 }
@@ -53,7 +53,7 @@ func (a *Authority) GetFederation() (federation []*x509.Certificate, err error) 
 		if !ok {
 			federation = nil
 			err = &apiError{errors.Errorf("stored value is not a *x509.Certificate"),
-				http.StatusInternalServerError, context{}}
+				http.StatusInternalServerError, apiCtx{}}
 			return false
 		}
 		federation = append(federation, crt)

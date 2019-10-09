@@ -1,10 +1,17 @@
 package api
 
 import (
+	"context"
+	"crypto/dsa"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/asn1"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,20 +20,42 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
 )
 
 // Authority is the interface implemented by a CA authority.
 type Authority interface {
-	Authorize(ott string) ([]interface{}, error)
+	SSHAuthority
+	// context specifies the Authorize[Sign|Revoke|etc.] method.
+	Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error)
+	AuthorizeSign(ott string) ([]provisioner.SignOption, error)
 	GetTLSOptions() *tlsutil.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)
-	Sign(cr *x509.CertificateRequest, signOpts authority.SignOptions, extraOpts ...interface{}) (*x509.Certificate, *x509.Certificate, error)
+	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
 	Renew(peer *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
-	GetProvisioners(cursor string, limit int) ([]*authority.Provisioner, string, error)
+	LoadProvisionerByCertificate(*x509.Certificate) (provisioner.Interface, error)
+	LoadProvisionerByID(string) (provisioner.Interface, error)
+	GetProvisioners(cursor string, limit int) (provisioner.List, string, error)
+	Revoke(*authority.RevokeOptions) error
 	GetEncryptedKey(kid string) (string, error)
 	GetRoots() (federation []*x509.Certificate, err error)
 	GetFederation() ([]*x509.Certificate, error)
+}
+
+// TimeDuration is an alias of provisioner.TimeDuration
+type TimeDuration = provisioner.TimeDuration
+
+// NewTimeDuration returns a TimeDuration with the defined time.
+func NewTimeDuration(t time.Time) TimeDuration {
+	return provisioner.NewTimeDuration(t)
+}
+
+// ParseTimeDuration returns a new TimeDuration parsing the RFC 3339 time or
+// time.Duration string.
+func ParseTimeDuration(s string) (TimeDuration, error) {
+	return provisioner.ParseTimeDuration(s)
 }
 
 // Certificate wraps a *x509.Certificate and adds the json.Marshaler interface.
@@ -147,18 +176,18 @@ type RootResponse struct {
 type SignRequest struct {
 	CsrPEM    CertificateRequest `json:"csr"`
 	OTT       string             `json:"ott"`
-	NotAfter  time.Time          `json:"notAfter"`
-	NotBefore time.Time          `json:"notBefore"`
+	NotAfter  TimeDuration       `json:"notAfter"`
+	NotBefore TimeDuration       `json:"notBefore"`
 }
 
 // ProvisionersResponse is the response object that returns the list of
 // provisioners.
 type ProvisionersResponse struct {
-	Provisioners []*authority.Provisioner `json:"provisioners"`
-	NextCursor   string                   `json:"nextCursor"`
+	Provisioners provisioner.List `json:"provisioners"`
+	NextCursor   string           `json:"nextCursor"`
 }
 
-// ProvisionerKeyResponse is the response object that returns the encryptoed key
+// ProvisionerKeyResponse is the response object that returns the encrypted key
 // of a provisioner.
 type ProvisionerKeyResponse struct {
 	Key string `json:"key"`
@@ -215,12 +244,15 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/root/{sha}", h.Root)
 	r.MethodFunc("POST", "/sign", h.Sign)
 	r.MethodFunc("POST", "/renew", h.Renew)
+	r.MethodFunc("POST", "/revoke", h.Revoke)
 	r.MethodFunc("GET", "/provisioners", h.Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
 	r.MethodFunc("GET", "/roots", h.Roots)
 	r.MethodFunc("GET", "/federation", h.Federation)
 	// For compatibility with old code:
 	r.MethodFunc("POST", "/re-sign", h.Renew)
+	// SSH CA
+	r.MethodFunc("POST", "/sign-ssh", h.SignSSH)
 }
 
 // Health is an HTTP handler that returns the status of the server.
@@ -252,34 +284,36 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, BadRequest(errors.Wrap(err, "error reading request body")))
 		return
 	}
+
+	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
 		WriteError(w, err)
 		return
 	}
 
-	signOpts := authority.SignOptions{
+	opts := provisioner.Options{
 		NotBefore: body.NotBefore,
 		NotAfter:  body.NotAfter,
 	}
 
-	extraOpts, err := h.Authority.Authorize(body.OTT)
+	signOpts, err := h.Authority.AuthorizeSign(body.OTT)
 	if err != nil {
 		WriteError(w, Unauthorized(err))
 		return
 	}
 
-	cert, root, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, signOpts, extraOpts...)
+	cert, root, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, opts, signOpts...)
 	if err != nil {
 		WriteError(w, Forbidden(err))
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	JSON(w, &SignResponse{
+	logCertificate(w, cert)
+	JSONStatus(w, &SignResponse{
 		ServerPEM:  Certificate{cert},
 		CaPEM:      Certificate{root},
 		TLSOptions: h.Authority.GetTLSOptions(),
-	})
+	}, http.StatusCreated)
 }
 
 // Renew uses the information of certificate in the TLS connection to create a
@@ -296,12 +330,12 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	JSON(w, &SignResponse{
+	logCertificate(w, cert)
+	JSONStatus(w, &SignResponse{
 		ServerPEM:  Certificate{cert},
 		CaPEM:      Certificate{root},
 		TLSOptions: h.Authority.GetTLSOptions(),
-	})
+	}, http.StatusCreated)
 }
 
 // Provisioners returns the list of provisioners configured in the authority.
@@ -347,10 +381,9 @@ func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 		certs[i] = Certificate{roots[i]}
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	JSON(w, &RootsResponse{
+	JSONStatus(w, &RootsResponse{
 		Certificates: certs,
-	})
+	}, http.StatusCreated)
 }
 
 // Federation returns all the public certificates in the federation.
@@ -366,10 +399,51 @@ func (h *caHandler) Federation(w http.ResponseWriter, r *http.Request) {
 		certs[i] = Certificate{federated[i]}
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	JSON(w, &FederationResponse{
+	JSONStatus(w, &FederationResponse{
 		Certificates: certs,
-	})
+	}, http.StatusCreated)
+}
+
+var oidStepProvisioner = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1}
+
+type stepProvisioner struct {
+	Type         int
+	Name         []byte
+	CredentialID []byte
+}
+
+func logOtt(w http.ResponseWriter, token string) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		rl.WithFields(map[string]interface{}{
+			"ott": token,
+		})
+	}
+}
+
+func logCertificate(w http.ResponseWriter, cert *x509.Certificate) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		m := map[string]interface{}{
+			"serial":      cert.SerialNumber,
+			"subject":     cert.Subject.CommonName,
+			"issuer":      cert.Issuer.CommonName,
+			"valid-from":  cert.NotBefore.Format(time.RFC3339),
+			"valid-to":    cert.NotAfter.Format(time.RFC3339),
+			"public-key":  fmtPublicKey(cert),
+			"certificate": base64.StdEncoding.EncodeToString(cert.Raw),
+		}
+		for _, ext := range cert.Extensions {
+			if ext.Id.Equal(oidStepProvisioner) {
+				val := &stepProvisioner{}
+				rest, err := asn1.Unmarshal(ext.Value, val)
+				if err != nil || len(rest) > 0 {
+					break
+				}
+				m["provisioner"] = fmt.Sprintf("%s (%s)", val.Name, val.CredentialID)
+				break
+			}
+		}
+		rl.WithFields(m)
+	}
 }
 
 func parseCursor(r *http.Request) (cursor string, limit int, err error) {
@@ -382,4 +456,20 @@ func parseCursor(r *http.Request) (cursor string, limit int, err error) {
 		}
 	}
 	return
+}
+
+// TODO: add support for Ed25519 once it's supported
+func fmtPublicKey(cert *x509.Certificate) string {
+	var params string
+	switch pk := cert.PublicKey.(type) {
+	case *ecdsa.PublicKey:
+		params = pk.Curve.Params().Name
+	case *rsa.PublicKey:
+		params = strconv.Itoa(pk.Size() * 8)
+	case *dsa.PublicKey:
+		params = strconv.Itoa(pk.Q.BitLen() * 8)
+	default:
+		params = "unknown"
+	}
+	return fmt.Sprintf("%s %s", cert.PublicKeyAlgorithm, params)
 }

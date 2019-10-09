@@ -20,6 +20,7 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/randutil"
@@ -208,8 +209,8 @@ ZEp7knvU2psWRw==
 			body, err := json.Marshal(&api.SignRequest{
 				CsrPEM:    api.CertificateRequest{CertificateRequest: csr},
 				OTT:       raw,
-				NotBefore: now,
-				NotAfter:  leafExpiry,
+				NotBefore: api.NewTimeDuration(now),
+				NotAfter:  api.NewTimeDuration(leafExpiry),
 			})
 			assert.FatalError(t, err)
 			return &signTest{
@@ -241,8 +242,8 @@ ZEp7knvU2psWRw==
 			body, err := json.Marshal(&api.SignRequest{
 				CsrPEM:    api.CertificateRequest{CertificateRequest: csr},
 				OTT:       raw,
-				NotBefore: now,
-				NotAfter:  leafExpiry,
+				NotBefore: api.NewTimeDuration(now),
+				NotAfter:  api.NewTimeDuration(leafExpiry),
 			})
 			assert.FatalError(t, err)
 			return &signTest{
@@ -389,7 +390,7 @@ func TestCAProvisionerEncryptedKey(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) *ekt {
-			p := config.AuthorityConfig.Provisioners[2]
+			p := config.AuthorityConfig.Provisioners[2].(*provisioner.JWK)
 			return &ekt{
 				ca:          ca,
 				kid:         p.Key.KeyID,

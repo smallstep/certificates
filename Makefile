@@ -8,10 +8,7 @@ SRC=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
 GOOS_OVERRIDE ?=
 OUTPUT_ROOT=output/
 
-# Set shell to bash for `echo -e`
-SHELL := /bin/bash
-
-all: build lint test
+all: build test lint
 
 .PHONY: all
 
@@ -22,24 +19,17 @@ all: build lint test
 bootstra%:
 	$Q which dep || go get github.com/golang/dep/cmd/dep
 	$Q dep ensure
+	$Q GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.18.0
+
 
 vendor: Gopkg.lock
 	$Q dep ensure
-
-BOOTSTRAP=\
-	github.com/golang/lint/golint \
-	github.com/client9/misspell/cmd/misspell \
-	github.com/gordonklaus/ineffassign \
-	github.com/tsenart/deadcode \
-	github.com/alecthomas/gometalinter
 
 define VENDOR_BIN_TMPL
 vendor/bin/$(notdir $(1)): vendor
 	$Q go build -o $$@ ./vendor/$(1)
 VENDOR_BINS += vendor/bin/$(notdir $(1))
 endef
-
-$(foreach pkg,$(BOOTSTRAP),$(eval $(call VENDOR_BIN_TMPL,$(pkg))))
 
 .PHONY: bootstra% vendor
 
@@ -49,11 +39,19 @@ $(foreach pkg,$(BOOTSTRAP),$(eval $(call VENDOR_BIN_TMPL,$(pkg))))
 
 # Version flags to embed in the binaries
 VERSION ?= $(shell [ -d .git ] && git describe --tags --always --dirty="-dev")
+# If we are not in an active git dir then try reading the version from .VERSION.
+# .VERSION contains a slug populated by `git archive`.
+VERSION := $(or $(VERSION),$(shell ./.version.sh .VERSION))
 VERSION := $(shell echo $(VERSION) | sed 's/^v//')
+NOT_RC  := $(shell echo $(VERSION) | grep -v -e -rc)
 
 # If TRAVIS_TAG is set then we know this ref has been tagged.
 ifdef TRAVIS_TAG
-	PUSHTYPE=release
+	ifeq ($(NOT_RC),)
+		PUSHTYPE=release-candidate
+	else
+		PUSHTYPE=release
+	endif
 else
 	PUSHTYPE=master
 endif
@@ -96,16 +94,7 @@ generate:
 test:
 	$Q $(GOFLAGS) go test -short -coverprofile=coverage.out ./...
 
-vtest:
-	$(Q)for d in $$(go list ./... | grep -v vendor); do \
-    echo -e "TESTS FOR: for \033[0;35m$$d\033[0m"; \
-    $(GOFLAGS) go test -v -bench=. -run=. -short -coverprofile=coverage.out $$d; \
-	out=$$?; \
-	if [[ $$out -ne 0 ]]; then ret=$$out; fi;\
-    rm -f profile.coverage.out; \
-	done; exit $$ret;
-
-.PHONY: test vtest
+.PHONY: test
 
 integrate: integration
 
@@ -118,26 +107,13 @@ integration: bin/$(BINNAME)
 # Linting
 #########################################
 
-LINTERS=\
-	gofmt \
-	golint \
-	vet \
-	misspell \
-	ineffassign \
-	deadcode
-
-$(patsubst %,%-bin,$(filter-out gofmt vet,$(LINTERS))): %-bin: vendor/bin/%
-gofmt-bin vet-bin:
-
-$(LINTERS): %: vendor/bin/gometalinter %-bin vendor
-	$Q PATH=`pwd`/vendor/bin:$$PATH gometalinter --tests --disable-all --vendor \
-	     --deadline=5m -s data -s pkg --enable $@ ./...
 fmt:
 	$Q gofmt -l -w $(SRC)
 
-lint: $(LINTERS)
+lint:
+	$Q LOG_LEVEL=error golangci-lint run
 
-.PHONY: $(LINTERS) lint fmt
+.PHONY: lint fmt
 
 #########################################
 # Install
@@ -152,6 +128,19 @@ uninstall:
 	$Q rm -f $(DESTDIR)$(INSTALL_PREFIX)/bin/$(BINNAME)
 
 .PHONY: install uninstall
+
+#########################################
+# Clean
+#########################################
+
+clean:
+	@echo "You will need to run 'make bootstrap' or 'dep ensure' directly to re-download any dependencies."
+	$Q rm -rf vendor
+ifneq ($(BINNAME),"")
+	$Q rm -f bin/$(BINNAME)
+endif
+
+.PHONY: clean
 
 #########################################
 # Building Docker Image
@@ -198,24 +187,30 @@ docker-tag:
 docker-push-tag: docker-tag
 	$(call DOCKER_PUSH,step-ca,$(VERSION))
 
+docker-push-tag-latest:
+	$(call DOCKER_PUSH,step-ca,latest)
+
 # Rely on DOCKER_USERNAME and DOCKER_PASSWORD being set inside the CI or
 # equivalent environment
 docker-login:
 	$Q docker login -u="$(DOCKER_USERNAME)" -p="$(DOCKER_PASSWORD)"
 
-.PHONY: docker-login docker-tag docker-push-tag
+.PHONY: docker-login docker-tag docker-push-tag docker-push-tag-latest
 
 #################################################
 # Targets for pushing the docker images
 #################################################
 
-# For all builds on the master branch, we actually build the container
+# For all builds we build the docker container
 docker-master: docker
 
-# For all builds on the master branch with an rc tag
-docker-release: docker-master docker-login docker-push-tag
+# For all builds with a release candidate tag
+docker-release-candidate: docker-master docker-login docker-push-tag
 
-.PHONY: docker-master docker-release
+# For all builds with a release tag
+docker-release: docker-release-candidate docker-push-tag-latest
+
+.PHONY: docker-master docker-release-candidate docker-release
 
 #########################################
 # Debian
@@ -276,16 +271,20 @@ bundle-darwin: binary-darwin
 .PHONY: binary-linux binary-darwin bundle-linux bundle-darwin
 
 #################################################
-# Targets for creating OS specific artifacts
+# Targets for creating OS specific artifacts and archives
 #################################################
 
 artifacts-linux-tag: bundle-linux debian
 
 artifacts-darwin-tag: bundle-darwin
 
-artifacts-tag: artifacts-linux-tag artifacts-darwin-tag
+artifacts-archive-tag:
+	$Q mkdir -p $(RELEASE)
+	$Q git archive v$(VERSION) | gzip > $(RELEASE)/step-certificates_$(VERSION).tar.gz
 
-.PHONY: artifacts-linux-tag artifacts-darwin-tag artifacts-tag
+artifacts-tag: artifacts-linux-tag artifacts-darwin-tag artifacts-archive-tag
+
+.PHONY: artifacts-linux-tag artifacts-darwin-tag artifacts-archive-tag artifacts-tag
 
 #################################################
 # Targets for creating step artifacts
@@ -294,23 +293,13 @@ artifacts-tag: artifacts-linux-tag artifacts-darwin-tag
 # For all builds that are not tagged
 artifacts-master:
 
+# For all builds with a release-candidate (-rc) tag
+artifacts-release-candidate: artifacts-tag
+
 # For all builds with a release tag
 artifacts-release: artifacts-tag
 
 # This command is called by travis directly *after* a successful build
 artifacts: artifacts-$(PUSHTYPE) docker-$(PUSHTYPE)
 
-.PHONY: artifacts-master artifacts-release artifacts
-
-#########################################
-# Clean
-#########################################
-
-clean:
-	@echo "You will need to run 'make bootstrap' or 'dep ensure' directly to re-download any dependencies."
-	$Q rm -rf vendor
-ifneq ($(BINNAME),"")
-	$Q rm -f bin/$(BINNAME)
-endif
-
-.PHONY: clean
+.PHONY: artifacts-master artifacts-release-candidate artifacts-release artifacts

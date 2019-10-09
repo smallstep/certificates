@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	stepJOSE "github.com/smallstep/cli/jose"
@@ -17,13 +18,13 @@ func TestConfigValidate(t *testing.T) {
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	ac := &AuthConfig{
-		Provisioners: []*Provisioner{
-			{
+		Provisioners: provisioner.List{
+			&provisioner.JWK{
 				Name: "Max",
 				Type: "JWK",
 				Key:  maxjwk,
 			},
-			{
+			&provisioner.JWK{
 				Name: "step-cli",
 				Type: "JWK",
 				Key:  clijwk,
@@ -229,13 +230,13 @@ func TestAuthConfigValidate(t *testing.T) {
 	assert.FatalError(t, err)
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
-	p := []*Provisioner{
-		{
+	p := provisioner.List{
+		&provisioner.JWK{
 			Name: "Max",
 			Type: "JWK",
 			Key:  maxjwk,
 		},
-		{
+		&provisioner.JWK{
 			Name: "step-cli",
 			Type: "JWK",
 			Key:  clijwk,
@@ -263,12 +264,23 @@ func TestAuthConfigValidate(t *testing.T) {
 		"fail-invalid-provisioners": func(t *testing.T) AuthConfigValidateTest {
 			return AuthConfigValidateTest{
 				ac: &AuthConfig{
-					Provisioners: []*Provisioner{
-						{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
-						{Name: "foo", Key: &jose.JSONWebKey{}},
+					Provisioners: provisioner.List{
+						&provisioner.JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
+						&provisioner.JWK{Name: "foo", Key: &jose.JSONWebKey{}},
 					},
 				},
 				err: errors.New("provisioner type cannot be empty"),
+			}
+		},
+		"fail-invalid-claims": func(t *testing.T) AuthConfigValidateTest {
+			return AuthConfigValidateTest{
+				ac: &AuthConfig{
+					Provisioners: p,
+					Claims: &provisioner.Claims{
+						MinTLSDur: &provisioner.Duration{Duration: -1},
+					},
+				},
+				err: errors.New("claims: MinTLSCertDuration must be greater than 0"),
 			}
 		},
 		"ok-empty-asn1dn-template": func(t *testing.T) AuthConfigValidateTest {
@@ -293,7 +305,7 @@ func TestAuthConfigValidate(t *testing.T) {
 	for name, get := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := get(t)
-			err := tc.ac.Validate()
+			err := tc.ac.Validate(provisioner.Audiences{})
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.Equals(t, tc.err.Error(), err.Error())

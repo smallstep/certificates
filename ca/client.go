@@ -16,12 +16,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/crypto/x509util"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
@@ -33,6 +36,7 @@ type clientOptions struct {
 	transport    http.RoundTripper
 	rootSHA256   string
 	rootFilename string
+	rootBundle   []byte
 }
 
 func (o *clientOptions) apply(opts []ClientOption) (err error) {
@@ -47,7 +51,7 @@ func (o *clientOptions) apply(opts []ClientOption) (err error) {
 // checkTransport checks if other ways to set up a transport have been provided.
 // If they have it returns an error.
 func (o *clientOptions) checkTransport() error {
-	if o.transport != nil || o.rootFilename != "" || o.rootSHA256 != "" {
+	if o.transport != nil || o.rootFilename != "" || o.rootSHA256 != "" || o.rootBundle != nil {
 		return errors.New("multiple transport methods have been configured")
 	}
 	return nil
@@ -68,14 +72,27 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 			return nil, err
 		}
 	}
+	if o.rootBundle != nil {
+		if tr, err = getTransportFromCABundle(o.rootBundle); err != nil {
+			return nil, err
+		}
+	}
+	// As the last option attempt to load the default root ca
 	if tr == nil {
+		rootFile := getRootCAPath()
+		if _, err := os.Stat(rootFile); err == nil {
+			if tr, err = getTransportFromFile(rootFile); err != nil {
+				return nil, err
+			}
+			return tr, nil
+		}
 		return nil, errors.New("a transport, a root cert, or a root sha256 must be used")
 	}
 	return tr, nil
 }
 
-// WithTransport adds a custom transport to the Client. If the transport is
-// given is given it will have preference over WithRootFile and WithRootSHA256.
+// WithTransport adds a custom transport to the Client.  It will fail if a
+// previous option to create the transport has been configured.
 func WithTransport(tr http.RoundTripper) ClientOption {
 	return func(o *clientOptions) error {
 		if err := o.checkTransport(); err != nil {
@@ -86,9 +103,8 @@ func WithTransport(tr http.RoundTripper) ClientOption {
 	}
 }
 
-// WithRootFile will create the transport using the given root certificate. If
-// the root file is given it will have preference over WithRootSHA256, but less
-// preference than WithTransport.
+// WithRootFile will create the transport using the given root certificate. It
+// will fail if a previous option to create the transport has been configured.
 func WithRootFile(filename string) ClientOption {
 	return func(o *clientOptions) error {
 		if err := o.checkTransport(); err != nil {
@@ -99,14 +115,27 @@ func WithRootFile(filename string) ClientOption {
 	}
 }
 
-// WithRootSHA256 will create the transport using an insecure client to retrieve the
-// root certificate. It has less preference than WithTransport and WithRootFile.
+// WithRootSHA256 will create the transport using an insecure client to retrieve
+// the root certificate using its fingerprint. It will fail if a previous option
+// to create the transport has been configured.
 func WithRootSHA256(sum string) ClientOption {
 	return func(o *clientOptions) error {
 		if err := o.checkTransport(); err != nil {
 			return err
 		}
 		o.rootSHA256 = sum
+		return nil
+	}
+}
+
+// WithCABundle will create the transport using the given root certificates. It
+// will fail if a previous option to create the transport has been configured.
+func WithCABundle(bundle []byte) ClientOption {
+	return func(o *clientOptions) error {
+		if err := o.checkTransport(); err != nil {
+			return err
+		}
+		o.rootBundle = bundle
 		return nil
 	}
 }
@@ -139,6 +168,18 @@ func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
 	}
 	pool := x509.NewCertPool()
 	pool.AddCert(root.RootPEM.Certificate)
+	return getDefaultTransport(&tls.Config{
+		MinVersion:               tls.VersionTLS12,
+		PreferServerCipherSuites: true,
+		RootCAs:                  pool,
+	})
+}
+
+func getTransportFromCABundle(bundle []byte) (http.RoundTripper, error) {
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(bundle) {
+		return nil, errors.New("error parsing ca bundle: no certificates found")
+	}
 	return getDefaultTransport(&tls.Config{
 		MinVersion:               tls.VersionTLS12,
 		PreferServerCipherSuites: true,
@@ -258,6 +299,11 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 	}, nil
 }
 
+// SetTransport updates the transport of the internal HTTP client.
+func (c *Client) SetTransport(tr http.RoundTripper) {
+	c.client.Transport = tr
+}
+
 // Health performs the health request to the CA and returns the
 // api.HealthResponse struct.
 func (c *Client) Health() (*api.HealthResponse, error) {
@@ -327,6 +373,28 @@ func (c *Client) Sign(req *api.SignRequest) (*api.SignResponse, error) {
 	return &sign, nil
 }
 
+// SignSSH performs the SSH certificate sign request to the CA and returns the
+// api.SignSSHResponse struct.
+func (c *Client) SignSSH(req *api.SignSSHRequest) (*api.SignSSHResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/sign-ssh"})
+	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var sign api.SignSSHResponse
+	if err := readJSON(resp.Body, &sign); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &sign, nil
+}
+
 // Renew performs the renew request to the CA and returns the api.SignResponse
 // struct.
 func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
@@ -344,6 +412,36 @@ func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
 	return &sign, nil
+}
+
+// Revoke performs the revoke request to the CA and returns the api.RevokeResponse
+// struct.
+func (c *Client) Revoke(req *api.RevokeRequest, tr http.RoundTripper) (*api.RevokeResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+
+	var client *http.Client
+	if tr != nil {
+		client = &http.Client{Transport: tr}
+	} else {
+		client = c.client
+	}
+
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/revoke"})
+	resp, err := client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var revoke api.RevokeResponse
+	if err := readJSON(resp.Body, &revoke); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &revoke, nil
 }
 
 // Provisioners performs the provisioners request to the CA and returns the
@@ -429,6 +527,25 @@ func (c *Client) Federation() (*api.FederationResponse, error) {
 	return &federation, nil
 }
 
+// RootFingerprint is a helper method that returns the current root fingerprint.
+// It does an health connection and gets the fingerprint from the TLS verified
+// chains.
+func (c *Client) RootFingerprint() (string, error) {
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/health"})
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return "", errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.TLS == nil || len(resp.TLS.VerifiedChains) == 0 {
+		return "", errors.New("missing verified chains")
+	}
+	lastChain := resp.TLS.VerifiedChains[len(resp.TLS.VerifiedChains)-1]
+	if len(lastChain) == 0 {
+		return "", errors.New("missing verified chains")
+	}
+	return x509util.Fingerprint(lastChain[len(lastChain)-1]), nil
+}
+
 // CreateSignRequest is a helper function that given an x509 OTT returns a
 // simple but secure sign request as well as the private key used.
 func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) {
@@ -446,7 +563,10 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 		return nil, nil, errors.Wrap(err, "error generating key")
 	}
 
-	dnsNames, ips := x509util.SplitSANs(claims.SANs)
+	dnsNames, ips, emails := x509util.SplitSANs(claims.SANs)
+	if claims.Email != "" {
+		emails = append(emails, claims.Email)
+	}
 
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
@@ -455,6 +575,7 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
 		DNSNames:           dnsNames,
 		IPAddresses:        ips,
+		EmailAddresses:     emails,
 	}
 
 	csr, err := x509.CreateCertificateRequest(rand.Reader, template, pk)
@@ -480,6 +601,12 @@ func getInsecureClient() *http.Client {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
+}
+
+// getRootCAPath returns the path where the root CA is stored based on the
+// STEPPATH environment variable.
+func getRootCAPath() string {
+	return filepath.Join(config.StepPath(), "certs", "root_ca.crt")
 }
 
 func readJSON(r io.ReadCloser, v interface{}) error {

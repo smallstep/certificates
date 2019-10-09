@@ -23,19 +23,6 @@
 #   non-go = false
 #   go-tests = true
 #   unused-packages = true
-
-required = [
-  "github.com/alecthomas/gometalinter",
-  "github.com/golang/lint/golint",
-  "github.com/client9/misspell/cmd/misspell",
-  "github.com/gordonklaus/ineffassign",
-  "github.com/tsenart/deadcode",
-]
-
-[[constraint]]
-  name = "github.com/alecthomas/gometalinter"
-  revision = "bae2f1293d092fd8167939d5108d1b025eaef9de"
-
 [[override]]
   name = "gopkg.in/alecthomas/kingpin.v3-unstable"
   revision = "63abe20a23e29e80bbef8089bd3dee3ac25e5306"
@@ -48,9 +35,9 @@ required = [
   branch = "certificate-transparency"
   name = "github.com/smallstep/cli"
 
-[prune]
-  go-tests = true
-  unused-packages = true
+[[constraint]]
+  branch = "master"
+  name = "github.com/smallstep/nosql"
 
 [[constraint]]
   name = "github.com/newrelic/go-agent"
@@ -62,6 +49,7 @@ required = [
 
 [[constraint]]
   name = "gopkg.in/square/go-jose.v2"
+<<<<<<< HEAD
   version = "2.1.9"
 
 [[constraint]]
@@ -71,3 +59,10 @@ required = [
 [[override]]
   branch = "master"
   name = "github.com/golang/protobuf"
+=======
+  version = "2.3.1"
+
+[prune]
+  go-tests = true
+  unused-packages = true
+>>>>>>> master

@@ -1,5 +1,5 @@
-step-certificates (0.0.1-rc.2) unstable; urgency=medium
+step-certificates (0.8.4-14-ge72f087-dev) unstable; urgency=medium
 
   * See https://github.com/smallstep/certificates/releases
 
- -- Smallstep Labs, Inc. <techadmin@smallstep.com>  Thu, 01 Nov 2018 00:00:00 +0000
+ -- Smallstep Labs, Inc. <techadmin@smallstep.com>  Wed, 20 Feb 2019 20:44:25 +0000

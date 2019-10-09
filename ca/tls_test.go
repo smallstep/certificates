@@ -95,8 +95,8 @@ func signDuration(srv *httptest.Server, domain string, duration time.Duration) (
 	}
 
 	if duration > 0 {
-		req.NotBefore = time.Now()
-		req.NotAfter = req.NotBefore.Add(duration)
+		req.NotBefore = api.NewTimeDuration(time.Now())
+		req.NotAfter = api.NewTimeDuration(req.NotBefore.Time().Add(duration))
 	}
 
 	client, err := NewClient(srv.URL, WithRootFile("testdata/secrets/root_ca.crt"))

@@ -2,12 +2,15 @@ package authority
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ct"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 )
@@ -26,11 +29,19 @@ var (
 		Renegotiation: false,
 	}
 	defaultDisableRenewal   = false
-	globalProvisionerClaims = ProvisionerClaims{
-		MinTLSDur:      &Duration{5 * time.Minute},
-		MaxTLSDur:      &Duration{24 * time.Hour},
-		DefaultTLSDur:  &Duration{24 * time.Hour},
-		DisableRenewal: &defaultDisableRenewal,
+	defaultEnableSSHCA      = false
+	globalProvisionerClaims = provisioner.Claims{
+		MinTLSDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
+		MaxTLSDur:         &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:     &provisioner.Duration{Duration: 24 * time.Hour},
+		DisableRenewal:    &defaultDisableRenewal,
+		MinUserSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:     &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur: &provisioner.Duration{Duration: 4 * time.Hour},
+		MinHostSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:     &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur: &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:       &defaultEnableSSHCA,
 	}
 )
 
@@ -42,7 +53,9 @@ type Config struct {
 	IntermediateKey  string              `json:"key"`
 	Address          string              `json:"address"`
 	DNSNames         []string            `json:"dnsNames"`
+	SSH              *SSHConfig          `json:"ssh,omitempty"`
 	Logger           json.RawMessage     `json:"logger,omitempty"`
+	DB               *db.Config          `json:"db,omitempty"`
 	Monitoring       json.RawMessage     `json:"monitoring,omitempty"`
 	AuthorityConfig  *AuthConfig         `json:"authority,omitempty"`
 	TLS              *tlsutil.TLSOptions `json:"tls,omitempty"`
@@ -52,16 +65,14 @@ type Config struct {
 
 // AuthConfig represents the configuration options for the authority.
 type AuthConfig struct {
-	Provisioners         []*Provisioner     `json:"provisioners,omitempty"`
-	Template             *x509util.ASN1DN   `json:"template,omitempty"`
-	Claims               *ProvisionerClaims `json:"claims,omitempty"`
-	DisableIssuedAtCheck bool               `json:"disableIssuedAtCheck,omitempty"`
+	Provisioners         provisioner.List    `json:"provisioners"`
+	Template             *x509util.ASN1DN    `json:"template,omitempty"`
+	Claims               *provisioner.Claims `json:"claims,omitempty"`
+	DisableIssuedAtCheck bool                `json:"disableIssuedAtCheck,omitempty"`
 }
 
 // Validate validates the authority configuration.
-func (c *AuthConfig) Validate() error {
-	var err error
-
+func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 	if c == nil {
 		return errors.New("authority cannot be undefined")
 	}
@@ -69,18 +80,35 @@ func (c *AuthConfig) Validate() error {
 		return errors.New("authority.provisioners cannot be empty")
 	}
 
-	if c.Claims, err = c.Claims.Init(&globalProvisionerClaims); err != nil {
+	// Merge global and configuration claims
+	claimer, err := provisioner.NewClaimer(c.Claims, globalProvisionerClaims)
+	if err != nil {
 		return err
 	}
+
+	// Initialize provisioners
+	config := provisioner.Config{
+		Claims:    claimer.Claims(),
+		Audiences: audiences,
+	}
 	for _, p := range c.Provisioners {
-		if err := p.Init(c.Claims); err != nil {
+		if err := p.Init(config); err != nil {
 			return err
 		}
 	}
+
 	if c.Template == nil {
 		c.Template = &x509util.ASN1DN{}
 	}
 	return nil
+}
+
+// SSHConfig contains the user and host keys.
+type SSHConfig struct {
+	HostKey          string `json:"hostKey"`
+	UserKey          string `json:"userKey"`
+	AddUserPrincipal string `json:"addUserPrincipal"`
+	AddUserCommand   string `json:"addUserCommand"`
 }
 
 // LoadConfiguration parses the given filename in JSON format and returns the
@@ -163,5 +191,24 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	return c.AuthorityConfig.Validate()
+	return c.AuthorityConfig.Validate(c.getAudiences())
+}
+
+// getAudiences returns the legacy and possible urls without the ports that will
+// be used as the default provisioner audiences. The CA might have proxies in
+// front so we cannot rely on the port.
+func (c *Config) getAudiences() provisioner.Audiences {
+	audiences := provisioner.Audiences{
+		Sign:   []string{legacyAuthority},
+		Revoke: []string{legacyAuthority},
+	}
+
+	for _, name := range c.DNSNames {
+		audiences.Sign = append(audiences.Sign,
+			fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
+		audiences.Revoke = append(audiences.Revoke,
+			fmt.Sprintf("https://%s/revoke", name), fmt.Sprintf("https://%s/1.0/revoke", name))
+	}
+
+	return audiences
 }

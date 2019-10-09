@@ -13,8 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/cli/crypto/x509util"
 )
 
 const (
@@ -161,8 +163,7 @@ func TestClient_Health(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Health()
@@ -222,8 +223,7 @@ func TestClient_Root(t *testing.T) {
 				if req.RequestURI != expected {
 					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
 				}
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Root(tt.shasum)
@@ -257,8 +257,8 @@ func TestClient_Sign(t *testing.T) {
 	request := &api.SignRequest{
 		CsrPEM:    api.CertificateRequest{CertificateRequest: parseCertificateRequest(csrPEM)},
 		OTT:       "the-ott",
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().AddDate(0, 1, 0),
+		NotBefore: api.NewTimeDuration(time.Now()),
+		NotAfter:  api.NewTimeDuration(time.Now().AddDate(0, 1, 0)),
 	}
 	unauthorized := api.Unauthorized(fmt.Errorf("Unauthorized"))
 	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))
@@ -301,8 +301,7 @@ func TestClient_Sign(t *testing.T) {
 						t.Errorf("Client.Sign() request = %v, wants %v", body, tt.request)
 					}
 				}
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Sign(tt.request)
@@ -323,6 +322,80 @@ func TestClient_Sign(t *testing.T) {
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.Sign() = %v, want %v", got, tt.response)
+				}
+			}
+		})
+	}
+}
+
+func TestClient_Revoke(t *testing.T) {
+	ok := &api.RevokeResponse{Status: "ok"}
+	request := &api.RevokeRequest{
+		Serial:     "sn",
+		OTT:        "the-ott",
+		ReasonCode: 4,
+	}
+	unauthorized := api.Unauthorized(fmt.Errorf("Unauthorized"))
+	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))
+
+	tests := []struct {
+		name         string
+		request      *api.RevokeRequest
+		response     interface{}
+		responseCode int
+		wantErr      bool
+	}{
+		{"ok", request, ok, 200, false},
+		{"unauthorized", request, unauthorized, 401, true},
+		{"nil request", nil, badRequest, 403, true},
+	}
+
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				body := new(api.RevokeRequest)
+				if err := api.ReadJSON(req.Body, body); err != nil {
+					api.WriteError(w, badRequest)
+					return
+				} else if !equalJSON(t, body, tt.request) {
+					if tt.request == nil {
+						if !reflect.DeepEqual(body, &api.RevokeRequest{}) {
+							t.Errorf("Client.Revoke() request = %v, wants %v", body, tt.request)
+						}
+					} else {
+						t.Errorf("Client.Revoke() request = %v, wants %v", body, tt.request)
+					}
+				}
+				api.JSONStatus(w, tt.response, tt.responseCode)
+			})
+
+			got, err := c.Revoke(tt.request, nil)
+			if (err != nil) != tt.wantErr {
+				fmt.Printf("%+v", err)
+				t.Errorf("Client.Revoke() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			switch {
+			case err != nil:
+				if got != nil {
+					t.Errorf("Client.Revoke() = %v, want nil", got)
+				}
+				if !reflect.DeepEqual(err, tt.response) {
+					t.Errorf("Client.Revoke() error = %v, want %v", err, tt.response)
+				}
+			default:
+				if !reflect.DeepEqual(got, tt.response) {
+					t.Errorf("Client.Revoke() = %v, want %v", got, tt.response)
 				}
 			}
 		})
@@ -361,8 +434,7 @@ func TestClient_Renew(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Renew(nil)
@@ -391,7 +463,7 @@ func TestClient_Renew(t *testing.T) {
 
 func TestClient_Provisioners(t *testing.T) {
 	ok := &api.ProvisionersResponse{
-		Provisioners: []*authority.Provisioner{},
+		Provisioners: provisioner.List{},
 	}
 	internalServerError := api.InternalServerError(fmt.Errorf("Internal Server Error"))
 
@@ -425,8 +497,7 @@ func TestClient_Provisioners(t *testing.T) {
 				if req.RequestURI != tt.expectedURI {
 					t.Errorf("RequestURI = %s, want %s", req.RequestURI, tt.expectedURI)
 				}
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Provisioners(tt.args...)
@@ -485,8 +556,7 @@ func TestClient_ProvisionerKey(t *testing.T) {
 				if req.RequestURI != expected {
 					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
 				}
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.ProvisionerKey(tt.kid)
@@ -545,8 +615,7 @@ func TestClient_Roots(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Roots()
@@ -606,8 +675,7 @@ func TestClient_Federation(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				w.WriteHeader(tt.responseCode)
-				api.JSON(w, tt.response)
+				api.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Federation()
@@ -670,4 +738,66 @@ func Test_parseEndpoint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClient_RootFingerprint(t *testing.T) {
+	ok := &api.HealthResponse{Status: "ok"}
+	nok := api.InternalServerError(fmt.Errorf("Internal Server Error"))
+
+	httpsServer := httptest.NewTLSServer(nil)
+	defer httpsServer.Close()
+	httpsServerFingerprint := x509util.Fingerprint(httpsServer.Certificate())
+
+	httpServer := httptest.NewServer(nil)
+	defer httpServer.Close()
+
+	tests := []struct {
+		name         string
+		server       *httptest.Server
+		response     interface{}
+		responseCode int
+		want         string
+		wantErr      bool
+	}{
+		{"ok", httpsServer, ok, 200, httpsServerFingerprint, false},
+		{"ok with error", httpsServer, nok, 500, httpsServerFingerprint, false},
+		{"fail", httpServer, ok, 200, "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := tt.server.Client().Transport
+			c, err := NewClient(tt.server.URL, WithTransport(tr))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			tt.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				api.JSONStatus(w, tt.response, tt.responseCode)
+			})
+
+			got, err := c.RootFingerprint()
+			if (err != nil) != tt.wantErr {
+				fmt.Printf("%+v", err)
+				t.Errorf("Client.RootFingerprint() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Client.RootFingerprint() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClient_RootFingerprintWithServer(t *testing.T) {
+	srv := startCABootstrapServer()
+	defer srv.Close()
+
+	client, err := NewClient(srv.URL+"/sign", WithRootFile("testdata/secrets/root_ca.crt"))
+	assert.FatalError(t, err)
+
+	fp, err := client.RootFingerprint()
+	assert.FatalError(t, err)
+	assert.Equals(t, "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7", fp)
 }
