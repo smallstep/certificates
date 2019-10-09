@@ -51,8 +51,8 @@ type Client interface {
 }
 
 type logClient interface {
-	AddPreChain(ctx context.Context, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error)
 	AddChain(ctx context.Context, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error)
+	AddPreChain(ctx context.Context, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error)
 }
 
 // SCT represents a Signed Certificate Timestamp.
