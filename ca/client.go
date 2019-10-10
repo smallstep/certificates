@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/smallstep/certificates/authority/provisioner"
+
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
@@ -583,6 +585,31 @@ func (c *Client) SSHConfig(req *api.SSHConfigRequest) (*api.SSHConfigResponse, e
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
 	return &config, nil
+}
+
+// SSHCheckHost performs the POST /ssh/check-host request to the CA with the
+// given principal.
+func (c *Client) SSHCheckHost(principal string) (*api.SSHCheckPrincipalResponse, error) {
+	body, err := json.Marshal(&api.SSHCheckPrincipalRequest{
+		Type:      provisioner.SSHHostCert,
+		Principal: principal,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/check-host"})
+	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var check api.SSHCheckPrincipalResponse
+	if err := readJSON(resp.Body, &check); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &check, nil
 }
 
 // RootFingerprint is a helper method that returns the current root fingerprint.

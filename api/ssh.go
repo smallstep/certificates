@@ -20,6 +20,7 @@ type SSHAuthority interface {
 	GetSSHRoots() (*authority.SSHKeys, error)
 	GetSSHFederation() (*authority.SSHKeys, error)
 	GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error)
+	CheckSSHHost(principal string) (bool, error)
 }
 
 // SSHSignRequest is the request body of an SSH certificate request.
@@ -168,6 +169,32 @@ func (r *SSHConfigRequest) Validate() error {
 type SSHConfigResponse struct {
 	UserTemplates []Template `json:"userTemplates,omitempty"`
 	HostTemplates []Template `json:"hostTemplates,omitempty"`
+}
+
+// SSHCheckPrincipalRequest is the request body used to check if a principal
+// certificate has been created. Right now it only supported for hosts
+// certificates.
+type SSHCheckPrincipalRequest struct {
+	Type      string `json:"type"`
+	Principal string `json:"principal"`
+}
+
+// Validate checks the check principal request.
+func (r *SSHCheckPrincipalRequest) Validate() error {
+	switch {
+	case r.Type != provisioner.SSHHostCert:
+		return errors.Errorf("unsupported type %s", r.Type)
+	case r.Principal == "":
+		return errors.New("missing or empty principal")
+	default:
+		return nil
+	}
+}
+
+// SSHCheckPrincipalResponse is the response body used to check if a principal
+// exists.
+type SSHCheckPrincipalResponse struct {
+	Exists bool `json:"exists"`
 }
 
 // SSHSign is an HTTP handler that reads an SignSSHRequest with a one-time-token
@@ -319,4 +346,26 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	JSON(w, config)
+}
+
+// SSHCheckHost is the HTTP handler that returns if a hosts certificate exists or not.
+func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
+	var body SSHCheckPrincipalRequest
+	if err := ReadJSON(r.Body, &body); err != nil {
+		WriteError(w, BadRequest(errors.Wrap(err, "error reading request body")))
+		return
+	}
+	if err := body.Validate(); err != nil {
+		WriteError(w, BadRequest(err))
+		return
+	}
+
+	exists, err := h.Authority.CheckSSHHost(body.Principal)
+	if err != nil {
+		WriteError(w, InternalServerError(err))
+		return
+	}
+	JSON(w, &SSHCheckPrincipalResponse{
+		Exists: exists,
+	})
 }
