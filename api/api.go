@@ -256,6 +256,7 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/ssh/federation", h.SSHFederation)
 	r.MethodFunc("POST", "/ssh/config", h.SSHConfig)
 	r.MethodFunc("POST", "/ssh/config/{type}", h.SSHConfig)
+	r.MethodFunc("POST", "/ssh/check-host", h.SSHCheckHost)
 
 	// For compatibility with old code:
 	r.MethodFunc("POST", "/re-sign", h.Renew)

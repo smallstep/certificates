@@ -3,17 +3,23 @@ package db
 import (
 	"crypto/x509"
 	"encoding/json"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/nosql"
 	"github.com/smallstep/nosql/database"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
 	certsTable        = []byte("x509_certs")
 	revokedCertsTable = []byte("revoked_x509_certs")
 	usedOTTTable      = []byte("used_ott")
+	sshCertsTable     = []byte("ssh_certs")
+	sshHostsTable     = []byte("ssh_hosts")
+	sshUsersTable     = []byte("ssh_users")
 )
 
 // ErrAlreadyExists can be returned if the DB attempts to set a key that has
@@ -34,6 +40,8 @@ type AuthDB interface {
 	Revoke(rci *RevokedCertificateInfo) error
 	StoreCertificate(crt *x509.Certificate) error
 	UseToken(id, tok string) (bool, error)
+	IsSSHHost(name string) (bool, error)
+	StoreSSHCertificate(crt *ssh.Certificate) error
 	Shutdown() error
 }
 
@@ -55,7 +63,10 @@ func New(c *Config) (AuthDB, error) {
 		return nil, errors.Wrapf(err, "Error opening database of Type %s with source %s", c.Type, c.DataSource)
 	}
 
-	tables := [][]byte{revokedCertsTable, certsTable, usedOTTTable}
+	tables := [][]byte{
+		revokedCertsTable, certsTable, usedOTTTable,
+		sshCertsTable, sshHostsTable, sshUsersTable,
+	}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
 			return nil, errors.Wrapf(err, "error creating table %s",
@@ -136,6 +147,38 @@ func (db *DB) UseToken(id, tok string) (bool, error) {
 			string(usedOTTTable), id)
 	}
 	return swapped, nil
+}
+
+// IsSSHHost returns if a principal is present in the ssh hosts table.
+func (db *DB) IsSSHHost(principal string) (bool, error) {
+	if _, err := db.Get(sshHostsTable, []byte(strings.ToLower(principal))); err != nil {
+		if database.IsErrNotFound(err) {
+			return false, nil
+		}
+		return false, errors.Wrap(err, "database Get error")
+	}
+	return true, nil
+}
+
+// StoreSSHCertificate stores an SSH certificate.
+func (db *DB) StoreSSHCertificate(crt *ssh.Certificate) error {
+	var table []byte
+	serial := strconv.FormatUint(crt.Serial, 10)
+	tx := new(database.Tx)
+	tx.Set(sshCertsTable, []byte(serial), crt.Marshal())
+	if crt.CertType == ssh.HostCert {
+		table = sshHostsTable
+	} else {
+		table = sshUsersTable
+	}
+	for _, p := range crt.ValidPrincipals {
+		tx.Set(table, []byte(strings.ToLower(p)), []byte(serial))
+	}
+	if err := db.Update(tx); err != nil {
+		return errors.Wrap(err, "database Update error")
+	}
+	return nil
+
 }
 
 // Shutdown sends a shutdown message to the database.
