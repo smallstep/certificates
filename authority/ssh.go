@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/jose"
@@ -263,6 +264,13 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 		}
 	}
 
+	if err = a.db.StoreSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+		return nil, &apiError{
+			err:  errors.Wrap(err, "signSSH: error storing certificate in db"),
+			code: http.StatusInternalServerError,
+		}
+	}
+
 	return cert, nil
 }
 
@@ -276,13 +284,13 @@ func (a *Authority) SignSSHAddUser(key ssh.PublicKey, subject *ssh.Certificate) 
 	}
 	if subject.CertType != ssh.UserCert {
 		return nil, &apiError{
-			err:  errors.New("signSSHProxy: certificate is not a user certificate"),
+			err:  errors.New("signSSHAddUser: certificate is not a user certificate"),
 			code: http.StatusForbidden,
 		}
 	}
 	if len(subject.ValidPrincipals) != 1 {
 		return nil, &apiError{
-			err:  errors.New("signSSHProxy: certificate does not have only one principal"),
+			err:  errors.New("signSSHAddUser: certificate does not have only one principal"),
 			code: http.StatusForbidden,
 		}
 	}
@@ -295,7 +303,7 @@ func (a *Authority) SignSSHAddUser(key ssh.PublicKey, subject *ssh.Certificate) 
 	var serial uint64
 	if err := binary.Read(rand.Reader, binary.BigEndian, &serial); err != nil {
 		return nil, &apiError{
-			err:  errors.Wrap(err, "signSSHProxy: error reading random number"),
+			err:  errors.Wrap(err, "signSSHAddUser: error reading random number"),
 			code: http.StatusInternalServerError,
 		}
 	}
@@ -331,7 +339,34 @@ func (a *Authority) SignSSHAddUser(key ssh.PublicKey, subject *ssh.Certificate) 
 		return nil, err
 	}
 	cert.Signature = sig
+
+	if err = a.db.StoreSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+		return nil, &apiError{
+			err:  errors.Wrap(err, "signSSHAddUser: error storing certificate in db"),
+			code: http.StatusInternalServerError,
+		}
+	}
+
 	return cert, nil
+}
+
+// CheckSSHHost checks the given principal has been registered before.
+func (a *Authority) CheckSSHHost(principal string) (bool, error) {
+	exists, err := a.db.IsSSHHost(principal)
+	if err != nil {
+		if err == db.ErrNotImplemented {
+			return false, &apiError{
+				err:  errors.Wrap(err, "checkSSHHost: isSSHHost is not implemented"),
+				code: http.StatusNotImplemented,
+			}
+		}
+		return false, &apiError{
+			err:  errors.Wrap(err, "checkSSHHost: error checking if hosts exists"),
+			code: http.StatusInternalServerError,
+		}
+	}
+
+	return exists, nil
 }
 
 func (a *Authority) getAddUserPrincipal() (cmd string) {
