@@ -162,7 +162,7 @@ func onboardAction(ctx *cli.Context) error {
 }
 
 func onboardPKI(config onboardingConfiguration) (*authority.Config, string, error) {
-	p, err := pki.New(pki.GetPublicPath(), pki.GetSecretsPath(), pki.GetConfigPath())
+	p, err := pki.New()
 	if err != nil {
 		return nil, "", err
 	}
