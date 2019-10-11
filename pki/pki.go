@@ -434,6 +434,7 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 			Renegotiation: x509util.DefaultTLSRenegotiation,
 			CipherSuites:  x509util.DefaultTLSCipherSuites,
 		},
+		Templates: p.getTemplates(),
 	}
 	if p.enableSSH {
 		enableSSHCA := true
@@ -461,6 +462,7 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 func (p *PKI) Save(opt ...Option) error {
 	p.tellPKI()
 
+	// Generate and write ca.json
 	config, err := p.GenerateConfig(opt...)
 	if err != nil {
 		return err
@@ -489,6 +491,7 @@ func (p *PKI) Save(opt ...Option) error {
 		}
 	}
 
+	// Generate and write defaults.json
 	defaults := &caDefaults{
 		Root:        p.root,
 		CAConfig:    p.config,
@@ -503,11 +506,20 @@ func (p *PKI) Save(opt ...Option) error {
 		return errs.FileError(err, p.defaults)
 	}
 
+	// Generate and write templates
+	if err := generateTemplates(config.Templates); err != nil {
+		return err
+	}
+
+	if config.DB != nil {
+		ui.PrintSelected("Database folder", config.DB.DataSource)
+	}
+	if config.Templates != nil {
+		ui.PrintSelected("Templates folder", GetTemplatesPath())
+	}
+
 	ui.PrintSelected("Default configuration", p.defaults)
 	ui.PrintSelected("Certificate Authority configuration", p.config)
-	if config.DB != nil {
-		ui.PrintSelected("Database", config.DB.DataSource)
-	}
 	ui.Println()
 	ui.Println("Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.")
 
