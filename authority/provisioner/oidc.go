@@ -346,7 +346,7 @@ func (o *OIDC) authorizeSSHSign(claims *openIDPayload) ([]SignOption, error) {
 		// Set the default extensions
 		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
-		&sshValidityModifier{o.claimer},
+		sshDefaultValidityModifier(o.claimer),
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.

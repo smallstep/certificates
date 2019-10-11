@@ -184,18 +184,52 @@ func (v emailAddressesValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
-// profileProvCredDuration adjusts the duration to the
-// min(default, remaining provisioning credential duration.
-type profileProvCredDuration struct {
+// remainderDuration adjusts the duration to
+// min(default, remaining provisioning credential duration).
+// E.g. if the default is 12hrs but the remaining validity of the provisioning
+// credential is only 4hrs, this option will set the value to 4hrs (the min of the two values).
+type remainderDuration struct {
 	def time.Duration
 	rem time.Duration
 }
 
-func (v profileProvCredDuration) Option(so Options) x509util.WithOption {
-	if v.rem < v.def {
-		v.def = v.rem
+func (v remainderDuration) Option(so Options) x509util.WithOption {
+	return func(p x509util.Profile) error {
+		n := now()
+		notBefore := so.NotBefore.Time()
+		if notBefore.IsZero() {
+			notBefore = n
+		}
+		notAfter := so.NotAfter.RelativeTime(notBefore)
+
+		if notAfter.IsZero() {
+			// If NotAfter is zero, then we haven't specified a duration in the request.
+			// So we just need to verify that the relative remaining duration is not less than
+			// zero (throw error), and if it is less than the default duration then
+			// modify the default duration.
+			remtd := &TimeDuration{d: v.rem}
+			relativeRemainder := remtd.Time().Sub(notBefore)
+			if relativeRemainder < 0 {
+				return errors.Errorf("remaining provisioning credential duration (%s) expires "+
+					"before requested certificate notBefore (%s)", v.rem, notBefore)
+			} else if relativeRemainder < v.def {
+				v.def = relativeRemainder
+			}
+		} else {
+			// If NotAfter is defined then verify that remaining duration
+			// on the provisioning credential is after NotAfter.
+			if n.Add(v.rem).Before(notAfter) {
+				return errors.Errorf("remaining provisioning credential duration (%s) expires "+
+					"before requested certificate notAfter (%s)", v.rem, notAfter)
+			}
+			// NOTE: re-setting the def below is unecessary (since notAfter is set).
+			// But for posterity ...
+			if v.rem < v.def {
+				v.def = v.rem
+			}
+		}
+		return x509util.WithNotBeforeAfterDuration(notBefore, notAfter, v.def)(p)
 	}
-	return profileDefaultDuration(v.def).Option(so)
 }
 
 // profileDefaultDuration is a wrapper against x509util.WithOption to conform

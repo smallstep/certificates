@@ -383,7 +383,7 @@ func (p *GCP) authorizeSSHSign(claims *gcpPayload) ([]SignOption, error) {
 		// Set the default extensions
 		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
-		&sshValidityModifier{p.claimer},
+		sshDefaultValidityModifier(p.claimer),
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.

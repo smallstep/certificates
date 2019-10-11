@@ -207,7 +207,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	return []SignOption{
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeX5C, p.Name, ""),
-		profileProvCredDuration{p.claimer.DefaultTLSCertDuration(), rem},
+		remainderDuration{p.claimer.DefaultTLSCertDuration(), rem},
 		// validators
 		commonNameValidator(claims.Subject),
 		defaultPublicKeyValidator{},
@@ -263,7 +263,7 @@ func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
 		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
 		// Checks the validity bounds, and set the validity if has not been set.
-		&sshProvCredValidityModifier{p.claimer, rem},
+		sshRemainderValidityModifier(p.claimer, rem),
 		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.

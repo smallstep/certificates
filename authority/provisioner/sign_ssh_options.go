@@ -196,6 +196,7 @@ func (m *sshDefaultExtensionModifier) Modify(cert *ssh.Certificate) error {
 // CertType has not been set or is not valid.
 type sshValidityModifier struct {
 	*Claimer
+	rem time.Duration
 }
 
 func (m *sshValidityModifier) Modify(cert *ssh.Certificate) error {
@@ -212,53 +213,45 @@ func (m *sshValidityModifier) Modify(cert *ssh.Certificate) error {
 		return errors.Errorf("unknown ssh certificate type %d", cert.CertType)
 	}
 
+	n := now()
 	if cert.ValidAfter == 0 {
-		cert.ValidAfter = uint64(now().Truncate(time.Second).Unix())
+		cert.ValidAfter = uint64(n.Truncate(time.Second).Unix())
 	}
+
 	if cert.ValidBefore == 0 {
-		t := time.Unix(int64(cert.ValidAfter), 0)
-		cert.ValidBefore = uint64(t.Add(d).Unix())
+		va := time.Unix(int64(cert.ValidAfter), 0)
+		if m.rem > 0 {
+			remtd := &TimeDuration{d: m.rem}
+			relativeRemainder := remtd.Time().Sub(va)
+			if relativeRemainder < 0 {
+				return errors.Errorf("remaining provisioning credential duration (%s) expires "+
+					"before requested certificate validAfter (%s)", m.rem, va)
+			} else if relativeRemainder < d {
+				d = relativeRemainder
+			}
+		}
+		cert.ValidBefore = uint64(va.Add(d).Unix())
+	} else if m.rem > 0 {
+		vb := time.Unix(int64(cert.ValidBefore), 0)
+		if n.Add(m.rem).Before(vb) {
+			return errors.Errorf("remaining provisioning credential duration (%s) expires "+
+				"before requested certificate validBefore (%s)", m.rem, vb)
+		}
 	}
 
 	return nil
 }
 
-type sshProvCredValidityModifier struct {
-	*Claimer
-	// Remaining duration on the provisioning credential.
-	// E.g. x5c provisioners use a certificate as a provisioning credential.
-	// That certificate should not be able to provision new certificates with
-	// a duration longer than the remaining duration on the provisioning
-	// certificate.
-	rem time.Duration
+func sshDefaultValidityModifier(c *Claimer) SSHCertificateModifier {
+	return &sshValidityModifier{c, 0}
 }
 
-// Modify has the following procedure:
-//  1) Use the existing ValidBefore & ValidAfter values if they are set; else
-//  2.a) Use the default duration to set the validity bounds and
-//  2.b) If 'rem' is non-zero and less than the default duration then
-//       reduce the duration to 'rem'.
-//
-// Step 2) only applies if ValidBefore is not set in the request.
-func (m *sshProvCredValidityModifier) Modify(cert *ssh.Certificate) error {
-	defMod := &sshValidityModifier{m.Claimer}
-	if err := defMod.Modify(cert); err != nil {
-		return err
-	}
-	if m.rem == 0 {
-		return nil
-	}
-
-	if cert.ValidBefore < cert.ValidAfter {
-		return errors.New("ssh certificate validBefore cannot be before validAfter")
-	}
-	dur := time.Duration(cert.ValidBefore-cert.ValidAfter) * time.Second
-	if m.rem < dur {
-		t := time.Unix(int64(cert.ValidAfter), 0)
-		cert.ValidBefore = uint64(t.Add(m.rem).Unix())
-	}
-
-	return nil
+// sshRemainderValidityModifier adjusts the duration to
+// min(default, remaining provisioning credential duration).
+// E.g. if the default is 12hrs but the remaining validity of the provisioning
+// credential is only 4hrs, this option will set the value to 4hrs (the min of the two values).
+func sshRemainderValidityModifier(c *Claimer, rem time.Duration) SSHCertificateModifier {
+	return &sshValidityModifier{c, rem}
 }
 
 // sshCertificateOptionsValidator validates the user SSHOptions with the ones
