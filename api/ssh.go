@@ -339,7 +339,7 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 	case provisioner.SSHUserCert:
 		config.UserTemplates = ts
 	case provisioner.SSHHostCert:
-		config.UserTemplates = ts
+		config.HostTemplates = ts
 	default:
 		WriteError(w, InternalServerError(errors.New("it should hot get here")))
 		return
