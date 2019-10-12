@@ -199,15 +199,10 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 
 	dnsNames, ips, emails := x509util.SplitSANs(claims.SANs)
 
-	// Get the remaining duration from the provisioning cert. The duration
-	// on the new certificate cannot be greater than the remaining duration of
-	// the provisioning certificate.
-	rem := claims.chains[0][0].NotAfter.Sub(now())
-
 	return []SignOption{
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeX5C, p.Name, ""),
-		remainderDuration{p.claimer.DefaultTLSCertDuration(), rem},
+		profileLimitDuration{p.claimer.DefaultTLSCertDuration(), claims.chains[0][0].NotAfter},
 		// validators
 		commonNameValidator(claims.Subject),
 		defaultPublicKeyValidator{},
@@ -257,13 +252,11 @@ func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
 	// Default to a user certificate with no principals if not set
 	signOptions = append(signOptions, sshCertificateDefaultsModifier{CertType: SSHUserCert})
 
-	rem := claims.chains[0][0].NotAfter.Sub(now())
-
 	return append(signOptions,
 		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
 		// Checks the validity bounds, and set the validity if has not been set.
-		sshRemainderValidityModifier(p.claimer, rem),
+		sshLimitValidityModifier(p.claimer, claims.chains[0][0].NotAfter),
 		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.

@@ -184,54 +184,6 @@ func (v emailAddressesValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
-// remainderDuration adjusts the duration to
-// min(default, remaining provisioning credential duration).
-// E.g. if the default is 12hrs but the remaining validity of the provisioning
-// credential is only 4hrs, this option will set the value to 4hrs (the min of the two values).
-type remainderDuration struct {
-	def time.Duration
-	rem time.Duration
-}
-
-func (v remainderDuration) Option(so Options) x509util.WithOption {
-	return func(p x509util.Profile) error {
-		n := now()
-		notBefore := so.NotBefore.Time()
-		if notBefore.IsZero() {
-			notBefore = n
-		}
-		notAfter := so.NotAfter.RelativeTime(notBefore)
-
-		if notAfter.IsZero() {
-			// If NotAfter is zero, then we haven't specified a duration in the request.
-			// So we just need to verify that the relative remaining duration is not less than
-			// zero (throw error), and if it is less than the default duration then
-			// modify the default duration.
-			remtd := &TimeDuration{d: v.rem}
-			relativeRemainder := remtd.Time().Sub(notBefore)
-			if relativeRemainder < 0 {
-				return errors.Errorf("remaining provisioning credential duration (%s) expires "+
-					"before requested certificate notBefore (%s)", v.rem, notBefore)
-			} else if relativeRemainder < v.def {
-				v.def = relativeRemainder
-			}
-		} else {
-			// If NotAfter is defined then verify that remaining duration
-			// on the provisioning credential is after NotAfter.
-			if n.Add(v.rem).Before(notAfter) {
-				return errors.Errorf("remaining provisioning credential duration (%s) expires "+
-					"before requested certificate notAfter (%s)", v.rem, notAfter)
-			}
-			// NOTE: re-setting the def below is unecessary (since notAfter is set).
-			// But for posterity ...
-			if v.rem < v.def {
-				v.def = v.rem
-			}
-		}
-		return x509util.WithNotBeforeAfterDuration(notBefore, notAfter, v.def)(p)
-	}
-}
-
 // profileDefaultDuration is a wrapper against x509util.WithOption to conform
 // the SignOption interface.
 type profileDefaultDuration time.Duration
@@ -243,6 +195,47 @@ func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
 	}
 	notAfter := so.NotAfter.RelativeTime(notBefore)
 	return x509util.WithNotBeforeAfterDuration(notBefore, notAfter, time.Duration(v))
+}
+
+// profileLimitDuration is an x509 profile option that modifies an x509 validity
+// period according to an imposed expiration time.
+type profileLimitDuration struct {
+	def      time.Duration
+	notAfter time.Time
+}
+
+// Option returns an x509util option that limits the validity period of a
+// certificate to one that is superficially imposed.
+func (v profileLimitDuration) Option(so Options) x509util.WithOption {
+	return func(p x509util.Profile) error {
+		n := now()
+		notBefore := so.NotBefore.Time()
+		if notBefore.IsZero() {
+			notBefore = n
+		}
+		if notBefore.After(v.notAfter) {
+			return errors.Errorf("provisioning credential expiration (%s) is before "+
+				"requested certificate notBefore (%s)", v.notAfter, notBefore)
+		}
+
+		notAfter := so.NotAfter.RelativeTime(notBefore)
+		if notAfter.After(v.notAfter) {
+			return errors.Errorf("provisioning credential expiration (%s) is before "+
+				"requested certificate notAfter (%s)", v.notAfter, notBefore)
+		}
+		if notAfter.IsZero() {
+			t := notBefore.Add(v.def)
+			if t.After(v.notAfter) {
+				notAfter = v.notAfter
+			} else {
+				notAfter = t
+			}
+		}
+		crt := p.Subject()
+		crt.NotBefore = notBefore
+		crt.NotAfter = notAfter
+		return nil
+	}
 }
 
 // validityValidator validates the certificate validity settings.

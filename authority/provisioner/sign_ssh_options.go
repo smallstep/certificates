@@ -196,7 +196,7 @@ func (m *sshDefaultExtensionModifier) Modify(cert *ssh.Certificate) error {
 // CertType has not been set or is not valid.
 type sshValidityModifier struct {
 	*Claimer
-	rem time.Duration
+	validBefore time.Time
 }
 
 func (m *sshValidityModifier) Modify(cert *ssh.Certificate) error {
@@ -213,29 +213,29 @@ func (m *sshValidityModifier) Modify(cert *ssh.Certificate) error {
 		return errors.Errorf("unknown ssh certificate type %d", cert.CertType)
 	}
 
+	hasLimit := !m.validBefore.IsZero()
+
 	n := now()
 	if cert.ValidAfter == 0 {
 		cert.ValidAfter = uint64(n.Truncate(time.Second).Unix())
 	}
+	certValidAfter := time.Unix(int64(cert.ValidAfter), 0)
+	if hasLimit && certValidAfter.After(m.validBefore) {
+		return errors.Errorf("provisioning credential expiration (%s) is before "+
+			"requested certificate validAfter (%s)", m.validBefore, certValidAfter)
+	}
 
 	if cert.ValidBefore == 0 {
-		va := time.Unix(int64(cert.ValidAfter), 0)
-		if m.rem > 0 {
-			remtd := &TimeDuration{d: m.rem}
-			relativeRemainder := remtd.Time().Sub(va)
-			if relativeRemainder < 0 {
-				return errors.Errorf("remaining provisioning credential duration (%s) expires "+
-					"before requested certificate validAfter (%s)", m.rem, va)
-			} else if relativeRemainder < d {
-				d = relativeRemainder
-			}
+		certValidBefore := certValidAfter.Add(d)
+		if hasLimit && m.validBefore.Before(certValidBefore) {
+			certValidBefore = m.validBefore
 		}
-		cert.ValidBefore = uint64(va.Add(d).Unix())
-	} else if m.rem > 0 {
-		vb := time.Unix(int64(cert.ValidBefore), 0)
-		if n.Add(m.rem).Before(vb) {
-			return errors.Errorf("remaining provisioning credential duration (%s) expires "+
-				"before requested certificate validBefore (%s)", m.rem, vb)
+		cert.ValidBefore = uint64(certValidBefore.Unix())
+	} else if hasLimit {
+		certValidBefore := time.Unix(int64(cert.ValidBefore), 0)
+		if m.validBefore.Before(certValidBefore) {
+			return errors.Errorf("provisioning credential expiration (%s) is before "+
+				"requested certificate validBefore (%s)", m.validBefore, certValidBefore)
 		}
 	}
 
@@ -243,15 +243,15 @@ func (m *sshValidityModifier) Modify(cert *ssh.Certificate) error {
 }
 
 func sshDefaultValidityModifier(c *Claimer) SSHCertificateModifier {
-	return &sshValidityModifier{c, 0}
+	return &sshValidityModifier{c, time.Time{}}
 }
 
-// sshRemainderValidityModifier adjusts the duration to
+// sshLimitValidityModifier adjusts the duration to
 // min(default, remaining provisioning credential duration).
 // E.g. if the default is 12hrs but the remaining validity of the provisioning
 // credential is only 4hrs, this option will set the value to 4hrs (the min of the two values).
-func sshRemainderValidityModifier(c *Claimer, rem time.Duration) SSHCertificateModifier {
-	return &sshValidityModifier{c, rem}
+func sshLimitValidityModifier(c *Claimer, validBefore time.Time) SSHCertificateModifier {
+	return &sshValidityModifier{c, validBefore}
 }
 
 // sshCertificateOptionsValidator validates the user SSHOptions with the ones

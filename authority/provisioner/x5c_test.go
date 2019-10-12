@@ -523,14 +523,12 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 								assert.Equals(t, v.Name, tc.p.GetName())
 								assert.Equals(t, v.CredentialID, "")
 								assert.Len(t, 0, v.KeyValuePairs)
-							case profileProvCredDuration:
+							case profileLimitDuration:
 								assert.Equals(t, v.def, tc.p.claimer.DefaultTLSCertDuration())
 
 								claims, err := tc.p.authorizeToken(tc.token, tc.p.audiences.Sign)
 								assert.FatalError(t, err)
-								wantRem := time.Until(claims.chains[0][0].NotAfter)
-								assert.True(t, wantRem < v.rem)
-								assert.True(t, wantRem+time.Minute > v.rem)
+								assert.Equals(t, v.notAfter, claims.chains[0][0].NotAfter)
 							case commonNameValidator:
 								assert.Equals(t, string(v), "foo")
 							case defaultPublicKeyValidator:
@@ -647,11 +645,9 @@ func TestX5C_authorizeSSHSign(t *testing.T) {
 								assert.Equals(t, int64(v), tc.claims.Step.SSH.ValidBefore.RelativeTime(nw).Unix())
 							case sshCertificateDefaultsModifier:
 								assert.Equals(t, SSHOptions(v), SSHOptions{CertType: SSHUserCert})
-							case *sshProvCredValidityModifier:
+							case *sshValidityModifier:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
-
-								wantRem := tc.claims.chains[0][0].NotAfter.Sub(nw)
-								assert.Equals(t, wantRem, v.rem)
+								assert.Equals(t, v.validBefore, tc.claims.chains[0][0].NotAfter)
 							case *sshCertificateValidityValidator:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
 							case *sshDefaultExtensionModifier, *sshDefaultPublicKeyValidator,
