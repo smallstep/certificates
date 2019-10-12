@@ -4,23 +4,24 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/smallstep/cli/utils"
-
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/templates"
+	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/errs"
+	"github.com/smallstep/cli/utils"
 )
 
 // sshTemplates contains the configuration of default templates used on ssh.
+// Relative paths are relative to the StepPath.
 var sshTemplates = &templates.SSHTemplates{
 	User: []templates.Template{
-		{Name: "include.tpl", Type: templates.Snippet, TemplatePath: "ssh/include.tpl", Path: "~/.ssh/config", Comment: "#"},
-		{Name: "config.tpl", Type: templates.File, TemplatePath: "ssh/config.tpl", Path: "ssh/config", Comment: "#"},
-		{Name: "known_hosts.tpl", Type: templates.File, TemplatePath: "ssh/known_hosts.tpl", Path: "ssh/known_hosts", Comment: "#"},
+		{Name: "include.tpl", Type: templates.Snippet, TemplatePath: "templates/ssh/include.tpl", Path: "~/.ssh/config", Comment: "#"},
+		{Name: "config.tpl", Type: templates.File, TemplatePath: "templates/ssh/config.tpl", Path: "ssh/config", Comment: "#"},
+		{Name: "known_hosts.tpl", Type: templates.File, TemplatePath: "templates/ssh/known_hosts.tpl", Path: "ssh/known_hosts", Comment: "#"},
 	},
 	Host: []templates.Template{
-		{Name: "sshd_config.tpl", Type: templates.Snippet, TemplatePath: "ssh/sshd_config.tpl", Path: "/etc/ssh/sshd_config", Comment: "#"},
-		{Name: "ca.tpl", Type: templates.Snippet, TemplatePath: "ssh/ca.tpl", Path: "/etc/ssh/ca.pub", Comment: "#"},
+		{Name: "sshd_config.tpl", Type: templates.Snippet, TemplatePath: "templates/ssh/sshd_config.tpl", Path: "/etc/ssh/sshd_config", Comment: "#"},
+		{Name: "ca.tpl", Type: templates.Snippet, TemplatePath: "templates/ssh/ca.tpl", Path: "/etc/ssh/ca.pub", Comment: "#"},
 	},
 }
 
@@ -36,7 +37,7 @@ var sshTemplateData = map[string]string{
 	ForwardAgent yes
 	UserKnownHostsFile {{.User.StepPath}}/config/ssh/known_hosts`,
 
-	// known_hosts.tpl authorizes the ssh hosst key
+	// known_hosts.tpl authorizes the ssh hosts key
 	"known_hosts.tpl": "@cert-authority * {{.Step.SSH.HostKey.Type}} {{.Step.SSH.HostKey.Marshal | toString | b64enc}}",
 
 	// sshd_config.tpl adds the configuration to support certificates
@@ -82,7 +83,7 @@ func generateTemplates(t *templates.Templates) error {
 			if !ok {
 				return errors.Errorf("template %s does not exists", t.Name)
 			}
-			if err := utils.WriteFile(filepath.Join(base, t.TemplatePath), []byte(data), 0644); err != nil {
+			if err := utils.WriteFile(config.StepAbs(t.TemplatePath), []byte(data), 0644); err != nil {
 				return err
 			}
 		}
@@ -91,7 +92,7 @@ func generateTemplates(t *templates.Templates) error {
 			if !ok {
 				return errors.Errorf("template %s does not exists", t.Name)
 			}
-			if err := utils.WriteFile(filepath.Join(base, t.TemplatePath), []byte(data), 0644); err != nil {
+			if err := utils.WriteFile(config.StepAbs(t.TemplatePath), []byte(data), 0644); err != nil {
 				return err
 			}
 		}
