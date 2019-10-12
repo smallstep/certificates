@@ -3,10 +3,14 @@ package templates
 import (
 	"bytes"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"text/template"
 
 	"github.com/Masterminds/sprig"
 	"github.com/pkg/errors"
+	"github.com/smallstep/cli/config"
+	"github.com/smallstep/cli/utils"
 )
 
 // TemplateType defines how a template will be written in disk.
@@ -17,16 +21,9 @@ const (
 	Snippet TemplateType = "snippet"
 	// File will mark a templates as a full file.
 	File TemplateType = "file"
+	// Directory will mark a template as a directory.
+	Directory TemplateType = "directory"
 )
-
-// Output represents the text representation of a rendered template.
-type Output struct {
-	Name    string       `json:"name"`
-	Type    TemplateType `json:"type"`
-	Comment string       `json:"comment"`
-	Path    string       `json:"path"`
-	Content []byte       `json:"content"`
-}
 
 // Templates is a collection of templates and variables.
 type Templates struct {
@@ -137,13 +134,14 @@ func (t *Template) Validate() error {
 // template fails.
 func (t *Template) Load() error {
 	if t.Template == nil {
-		b, err := ioutil.ReadFile(t.TemplatePath)
+		filename := config.StepAbs(t.TemplatePath)
+		b, err := ioutil.ReadFile(filename)
 		if err != nil {
-			return errors.Wrapf(err, "error reading %s", t.TemplatePath)
+			return errors.Wrapf(err, "error reading %s", filename)
 		}
 		tmpl, err := template.New(t.Name).Funcs(sprig.TxtFuncMap()).Parse(string(b))
 		if err != nil {
-			return errors.Wrapf(err, "error parsing %s", t.TemplatePath)
+			return errors.Wrapf(err, "error parsing %s", filename)
 		}
 		t.Template = tmpl
 	}
@@ -178,4 +176,39 @@ func (t *Template) Output(data interface{}) (Output, error) {
 		Path:    t.Path,
 		Content: b,
 	}, nil
+}
+
+// Output represents the text representation of a rendered template.
+type Output struct {
+	Name    string       `json:"name"`
+	Type    TemplateType `json:"type"`
+	Comment string       `json:"comment"`
+	Path    string       `json:"path"`
+	Content []byte       `json:"content"`
+}
+
+// Write writes the Output to the filesystem as a directory, file or snippet.
+func (o *Output) Write() error {
+	path := config.StepAbs(o.Path)
+	if o.Type == Directory {
+		return mkdir(path, 0700)
+	}
+
+	dir := filepath.Dir(path)
+	if err := mkdir(dir, 0700); err != nil {
+		return err
+	}
+
+	if o.Type == File {
+		return utils.WriteFile(path, o.Content, 0600)
+	}
+
+	return utils.WriteSnippet(path, o.Content, 0600)
+}
+
+func mkdir(path string, perm os.FileMode) error {
+	if err := os.MkdirAll(path, perm); err != nil {
+		return errors.Wrapf(err, "error creating %s", path)
+	}
+	return nil
 }
