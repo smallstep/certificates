@@ -10,6 +10,8 @@ type Step struct {
 }
 
 type StepSSH struct {
-	HostKey ssh.PublicKey
-	UserKey ssh.PublicKey
+	HostKey           ssh.PublicKey
+	UserKey           ssh.PublicKey
+	HostFederatedKeys []ssh.PublicKey
+	UserFederatedKeys []ssh.PublicKey
 }
