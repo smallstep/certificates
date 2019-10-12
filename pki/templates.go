@@ -38,7 +38,10 @@ var sshTemplateData = map[string]string{
 	UserKnownHostsFile {{.User.StepPath}}/config/ssh/known_hosts`,
 
 	// known_hosts.tpl authorizes the ssh hosts key
-	"known_hosts.tpl": "@cert-authority * {{.Step.SSH.HostKey.Type}} {{.Step.SSH.HostKey.Marshal | toString | b64enc}}",
+	"known_hosts.tpl": `@cert-authority * {{.Step.SSH.HostKey.Type}} {{.Step.SSH.HostKey.Marshal | toString | b64enc}}
+{{- range .Step.SSH.HostFederatedKeys}}
+@cert-authority * {{.Type}} {{.Marshal | toString | b64enc}}
+{{- end}}`,
 
 	// sshd_config.tpl adds the configuration to support certificates
 	"sshd_config.tpl": `TrustedUserCAKeys /etc/ssh/ca.pub
@@ -46,7 +49,10 @@ HostCertificate /etc/ssh/{{.User.Certificate}}
 HostKey /etc/ssh/{{.User.Key}}`,
 
 	// ca.tpl contains the public key used to authorized clients
-	"ca.tpl": "{{.Step.SSH.UserKey.Type}} {{.Step.SSH.UserKey.Marshal | toString | b64enc}}",
+	"ca.tpl": `{{.Step.SSH.UserKey.Type}} {{.Step.SSH.UserKey.Marshal | toString | b64enc}}
+{{- range .Step.SSH.UserFederatedKeys}}
+{{.Type}} {{.Marshal | toString | b64enc}}
+{{- end}}`,
 }
 
 // getTemplates returns all the templates enabled
