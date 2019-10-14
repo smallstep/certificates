@@ -295,7 +295,7 @@ func (h *caHandler) SSHRoots(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.Authority.GetSSHFederation()
 	if err != nil {
-		WriteError(w, NotFound(err))
+		WriteError(w, InternalServerError(err))
 		return
 	}
 
