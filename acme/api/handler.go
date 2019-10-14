@@ -113,7 +113,6 @@ func (h *Handler) GetNonce(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusNoContent)
 	}
-	return
 }
 
 // GetDirectory is the ACME resource for returning a directory configuration
@@ -126,7 +125,6 @@ func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
 	}
 	dir := h.Auth.GetDirectory(prov)
 	api.JSON(w, dir)
-	return
 }
 
 // GetAuthz ACME api for retrieving an Authz.
@@ -149,7 +147,6 @@ func (h *Handler) GetAuthz(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", h.Auth.GetLink(acme.AuthzLink, acme.URLSafeProvisionerName(prov), true, authz.GetID()))
 	api.JSON(w, authz)
-	return
 }
 
 // GetChallenge ACME api for retrieving a Challenge.
@@ -191,7 +188,6 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Link", link(getLink(acme.AuthzLink, acme.URLSafeProvisionerName(prov), true, ch.GetAuthzID()), "up"))
 	w.Header().Set("Location", getLink(acme.ChallengeLink, acme.URLSafeProvisionerName(prov), true, ch.GetID()))
 	api.JSON(w, ch)
-	return
 }
 
 // GetCertificate ACME api for retrieving a Certificate.
@@ -210,5 +206,4 @@ func (h *Handler) GetCertificate(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/pem-certificate-chain; charset=utf-8")
 	w.Write(certBytes)
-	return
 }

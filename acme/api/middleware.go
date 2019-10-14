@@ -42,7 +42,6 @@ func (h *Handler) addNonce(next nextHTTP) nextHTTP {
 		w.Header().Set("Cache-Control", "no-store")
 		logNonce(w, nonce)
 		next(w, r)
-		return
 	}
 }
 
@@ -57,7 +56,6 @@ func (h *Handler) addDirLink(next nextHTTP) nextHTTP {
 		}
 		w.Header().Add("Link", link(h.Auth.GetLink(acme.DirectoryLink, acme.URLSafeProvisionerName(prov), true), "index"))
 		next(w, r)
-		return
 	}
 }
 
@@ -87,7 +85,6 @@ func (h *Handler) verifyContentType(next nextHTTP) nextHTTP {
 		}
 		api.WriteError(w, acme.MalformedErr(errors.Errorf(
 			"expected content-type to be in %s, but got %s", expected, ct)))
-		return
 	}
 }
 
@@ -106,7 +103,6 @@ func (h *Handler) parseJWS(next nextHTTP) nextHTTP {
 		}
 		ctx := context.WithValue(r.Context(), jwsContextKey, jws)
 		next(w, r.WithContext(ctx))
-		return
 	}
 }
 
@@ -202,7 +198,6 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 			return
 		}
 		next(w, r)
-		return
 	}
 }
 
@@ -248,7 +243,6 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 			ctx = context.WithValue(ctx, accContextKey, acc)
 		}
 		next(w, r.WithContext(ctx))
-		return
 	}
 }
 
@@ -275,7 +269,6 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 		}
 		ctx = context.WithValue(ctx, provisionerContextKey, p)
 		next(w, r.WithContext(ctx))
-		return
 	}
 }
 
@@ -355,7 +348,6 @@ func (h *Handler) verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 			isEmptyJSON: string(payload) == "{}",
 		})
 		next(w, r.WithContext(ctx))
-		return
 	}
 }
 
@@ -372,6 +364,5 @@ func (h *Handler) isPostAsGet(next nextHTTP) nextHTTP {
 			return
 		}
 		next(w, r)
-		return
 	}
 }

@@ -128,7 +128,6 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Location", h.Auth.GetLink(acme.AccountLink,
 		acme.URLSafeProvisionerName(prov), true, acc.GetID()))
 	api.JSONStatus(w, acc, httpStatus)
-	return
 }
 
 // GetUpdateAccount is the api for updating an ACME account.
@@ -172,7 +171,6 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Location", h.Auth.GetLink(acme.AccountLink, acme.URLSafeProvisionerName(prov), true, acc.GetID()))
 	api.JSON(w, acc)
-	return
 }
 
 func logOrdersByAccount(w http.ResponseWriter, oids []string) {
@@ -209,5 +207,4 @@ func (h *Handler) GetOrdersByAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	api.JSON(w, orders)
 	logOrdersByAccount(w, orders)
-	return
 }
