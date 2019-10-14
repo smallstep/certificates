@@ -516,6 +516,7 @@ type mockAuthority struct {
 	getSSHRoots                  func() (*authority.SSHKeys, error)
 	getSSHFederation             func() (*authority.SSHKeys, error)
 	getSSHConfig                 func(typ string, data map[string]string) ([]templates.Output, error)
+	checkSSHHost                 func(principal string) (bool, error)
 }
 
 // TODO: remove once Authorize is deprecated.
@@ -640,6 +641,13 @@ func (m *mockAuthority) GetSSHConfig(typ string, data map[string]string) ([]temp
 		return m.getSSHConfig(typ, data)
 	}
 	return m.ret1.([]templates.Output), m.err
+}
+
+func (m *mockAuthority) CheckSSHHost(principal string) (bool, error) {
+	if m.checkSSHHost != nil {
+		return m.checkSSHHost(principal)
+	}
+	return m.ret1.(bool), m.err
 }
 
 func Test_caHandler_Route(t *testing.T) {
