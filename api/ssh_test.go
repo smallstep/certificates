@@ -432,12 +432,12 @@ func Test_caHandler_SSHFederation(t *testing.T) {
 
 func Test_caHandler_SSHConfig(t *testing.T) {
 	userOutput := []templates.Output{
-		{"config.tpl", templates.File, "#", "ssh/config", []byte("UserKnownHostsFile /home/user/.step/config/ssh/known_hosts")},
-		{"known_host.tpl", templates.File, "#", "ssh/known_host", []byte("@cert-authority * ecdsa-sha2-nistp256 AAAA...=")},
+		{Name: "config.tpl", Type: templates.File, Comment: "#", Path: "ssh/config", Content: []byte("UserKnownHostsFile /home/user/.step/config/ssh/known_hosts")},
+		{Name: "known_host.tpl", Type: templates.File, Comment: "#", Path: "ssh/known_host", Content: []byte("@cert-authority * ecdsa-sha2-nistp256 AAAA...=")},
 	}
 	hostOutput := []templates.Output{
-		{"sshd_config.tpl", templates.Snippet, "#", "/etc/ssh/sshd_config", []byte("TrustedUserCAKeys /etc/ssh/ca.pub")},
-		{"ca.tpl", templates.File, "#", "/etc/ssh/ca.pub", []byte("ecdsa-sha2-nistp256 AAAA...=")},
+		{Name: "sshd_config.tpl", Type: templates.Snippet, Comment: "#", Path: "/etc/ssh/sshd_config", Content: []byte("TrustedUserCAKeys /etc/ssh/ca.pub")},
+		{Name: "ca.tpl", Type: templates.File, Comment: "#", Path: "/etc/ssh/ca.pub", Content: []byte("ecdsa-sha2-nistp256 AAAA...=")},
 	}
 	userJSON, err := json.Marshal(userOutput)
 	assert.FatalError(t, err)
