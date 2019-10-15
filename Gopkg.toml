@@ -35,7 +35,7 @@ ignored = ["github.com/Masterminds/semver/v3"]
   name = "github.com/go-chi/chi"
 
 [[override]]
-  branch = "master"
+  branch = "ssh-login"
   name = "github.com/smallstep/cli"
 
 [[constraint]]
