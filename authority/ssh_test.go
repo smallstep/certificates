@@ -12,7 +12,9 @@ import (
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/templates"
+	"github.com/smallstep/cli/jose"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -383,6 +385,44 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 		{Name: "ca.tpl", Type: templates.File, Comment: "#", Path: "/etc/ssh/ca.pub", Content: []byte(user.Type() + " " + userB64)},
 	}
 
+	tmplConfigWithUserData := &templates.Templates{
+		SSH: &templates.SSHTemplates{
+			User: []templates.Template{
+				{Name: "include.tpl", Type: templates.File, TemplatePath: "./testdata/templates/include.tpl", Path: "ssh/include", Comment: "#"},
+				{Name: "config.tpl", Type: templates.File, TemplatePath: "./testdata/templates/config.tpl", Path: "ssh/config", Comment: "#"},
+			},
+			Host: []templates.Template{
+				{Name: "sshd_config.tpl", Type: templates.File, TemplatePath: "./testdata/templates/sshd_config.tpl", Path: "/etc/ssh/sshd_config", Comment: "#"},
+			},
+		},
+		Data: map[string]interface{}{
+			"Step": &templates.Step{
+				SSH: templates.StepSSH{
+					UserKey: user,
+					HostKey: host,
+				},
+			},
+		},
+	}
+	userOutputWithUserData := []templates.Output{
+		{Name: "include.tpl", Type: templates.File, Comment: "#", Path: "ssh/include", Content: []byte("Host *\n\tInclude /home/user/.step/ssh/config")},
+		{Name: "config.tpl", Type: templates.File, Comment: "#", Path: "ssh/config", Content: []byte("Match exec \"step ssh check-host %h\"\n\tForwardAgent yes\n\tUserKnownHostsFile /home/user/.step/ssh/known_hosts")},
+	}
+	hostOutputWithUserData := []templates.Output{
+		{Name: "sshd_config.tpl", Type: templates.File, Comment: "#", Path: "/etc/ssh/sshd_config", Content: []byte("TrustedUserCAKeys /etc/ssh/ca.pub\nHostCertificate /etc/ssh/ssh_host_ecdsa_key-cert.pub\nHostKey /etc/ssh/ssh_host_ecdsa_key")},
+	}
+
+	tmplConfigErr := &templates.Templates{
+		SSH: &templates.SSHTemplates{
+			User: []templates.Template{
+				{Name: "error.tpl", Type: templates.File, TemplatePath: "./testdata/templates/error.tpl", Path: "ssh/error", Comment: "#"},
+			},
+			Host: []templates.Template{
+				{Name: "error.tpl", Type: templates.File, TemplatePath: "./testdata/templates/error.tpl", Path: "ssh/error", Comment: "#"},
+			},
+		},
+	}
+
 	type fields struct {
 		templates  *templates.Templates
 		userSigner ssh.Signer
@@ -400,7 +440,15 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 		wantErr bool
 	}{
 		{"user", fields{tmplConfig, userSigner, hostSigner}, args{"user", nil}, userOutput, false},
+		{"user", fields{tmplConfig, userSigner, nil}, args{"user", nil}, userOutput, false},
 		{"host", fields{tmplConfig, userSigner, hostSigner}, args{"host", nil}, hostOutput, false},
+		{"host", fields{tmplConfig, nil, hostSigner}, args{"host", nil}, hostOutput, false},
+		{"userWithData", fields{tmplConfigWithUserData, userSigner, hostSigner}, args{"user", map[string]string{"StepPath": "/home/user/.step"}}, userOutputWithUserData, false},
+		{"hostWithData", fields{tmplConfigWithUserData, userSigner, hostSigner}, args{"host", map[string]string{"Certificate": "ssh_host_ecdsa_key-cert.pub", "Key": "ssh_host_ecdsa_key"}}, hostOutputWithUserData, false},
+		{"disabled", fields{tmplConfig, nil, nil}, args{"host", nil}, nil, true},
+		{"badType", fields{tmplConfig, userSigner, hostSigner}, args{"bad", nil}, nil, true},
+		{"userError", fields{tmplConfigErr, userSigner, hostSigner}, args{"user", nil}, nil, true},
+		{"hostError", fields{tmplConfigErr, userSigner, hostSigner}, args{"host", map[string]string{"Function": "foo"}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -416,6 +464,136 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Authority.GetSSHConfig() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAuthority_CheckSSHHost(t *testing.T) {
+	type fields struct {
+		exists bool
+		err    error
+	}
+	type args struct {
+		principal string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{"true", fields{true, nil}, args{"foo.internal.com"}, true, false},
+		{"false", fields{false, nil}, args{"foo.internal.com"}, false, false},
+		{"notImplemented", fields{false, db.ErrNotImplemented}, args{"foo.internal.com"}, false, true},
+		{"notImplemented", fields{true, db.ErrNotImplemented}, args{"foo.internal.com"}, false, true},
+		{"internal", fields{false, fmt.Errorf("an error")}, args{"foo.internal.com"}, false, true},
+		{"internal", fields{true, fmt.Errorf("an error")}, args{"foo.internal.com"}, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := testAuthority(t)
+			a.db = &MockAuthDB{
+				isSSHHost: func(_ string) (bool, error) {
+					return tt.fields.exists, tt.fields.err
+				},
+			}
+			got, err := a.CheckSSHHost(tt.args.principal)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Authority.CheckSSHHost() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Authority.CheckSSHHost() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSSHConfig_Validate(t *testing.T) {
+	key, err := jose.GenerateJWK("EC", "P-256", "", "sig", "", 0)
+	assert.FatalError(t, err)
+
+	tests := []struct {
+		name      string
+		sshConfig *SSHConfig
+		wantErr   bool
+	}{
+		{"nil", nil, false},
+		{"ok", &SSHConfig{Keys: []*SSHPublicKey{{Type: "user", Key: key.Public()}}}, false},
+		{"ok", &SSHConfig{Keys: []*SSHPublicKey{{Type: "host", Key: key.Public()}}}, false},
+		{"badType", &SSHConfig{Keys: []*SSHPublicKey{{Type: "bad", Key: key.Public()}}}, true},
+		{"badKey", &SSHConfig{Keys: []*SSHPublicKey{{Type: "user", Key: *key}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			if err := tt.sshConfig.Validate(); (err != nil) != tt.wantErr {
+				t.Errorf("SSHConfig.Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestSSHPublicKey_Validate(t *testing.T) {
+	key, err := jose.GenerateJWK("EC", "P-256", "", "sig", "", 0)
+	assert.FatalError(t, err)
+
+	type fields struct {
+		Type      string
+		Federated bool
+		Key       jose.JSONWebKey
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantErr bool
+	}{
+		{"user", fields{"user", true, key.Public()}, false},
+		{"host", fields{"host", false, key.Public()}, false},
+		{"empty", fields{"", true, key.Public()}, true},
+		{"badType", fields{"bad", false, key.Public()}, true},
+		{"badKey", fields{"user", false, *key}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			k := &SSHPublicKey{
+				Type:      tt.fields.Type,
+				Federated: tt.fields.Federated,
+				Key:       tt.fields.Key,
+			}
+			if err := k.Validate(); (err != nil) != tt.wantErr {
+				t.Errorf("SSHPublicKey.Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestSSHPublicKey_PublicKey(t *testing.T) {
+	key, err := jose.GenerateJWK("EC", "P-256", "", "sig", "", 0)
+	assert.FatalError(t, err)
+	pub, err := ssh.NewPublicKey(key.Public().Key)
+	assert.FatalError(t, err)
+
+	type fields struct {
+		publicKey ssh.PublicKey
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   ssh.PublicKey
+	}{
+		{"ok", fields{pub}, pub},
+		{"nil", fields{nil}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			k := &SSHPublicKey{
+				publicKey: tt.fields.publicKey,
+			}
+			if got := k.PublicKey(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("SSHPublicKey.PublicKey() = %v, want %v", got, tt.want)
 			}
 		})
 	}
