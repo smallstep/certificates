@@ -4,17 +4,20 @@ import (
 	"crypto/x509"
 
 	"github.com/smallstep/certificates/db"
+	"golang.org/x/crypto/ssh"
 )
 
 type MockAuthDB struct {
-	err              error
-	ret1             interface{}
-	init             func(*db.Config) (db.AuthDB, error)
-	isRevoked        func(string) (bool, error)
-	revoke           func(rci *db.RevokedCertificateInfo) error
-	storeCertificate func(crt *x509.Certificate) error
-	useToken         func(id, tok string) (bool, error)
-	shutdown         func() error
+	err                 error
+	ret1                interface{}
+	init                func(*db.Config) (db.AuthDB, error)
+	isRevoked           func(string) (bool, error)
+	revoke              func(rci *db.RevokedCertificateInfo) error
+	storeCertificate    func(crt *x509.Certificate) error
+	useToken            func(id, tok string) (bool, error)
+	isSSHHost           func(principal string) (bool, error)
+	storeSSHCertificate func(crt *ssh.Certificate) error
+	shutdown            func() error
 }
 
 func (m *MockAuthDB) Init(c *db.Config) (db.AuthDB, error) {
@@ -54,6 +57,20 @@ func (m *MockAuthDB) Revoke(rci *db.RevokedCertificateInfo) error {
 func (m *MockAuthDB) StoreCertificate(crt *x509.Certificate) error {
 	if m.storeCertificate != nil {
 		return m.storeCertificate(crt)
+	}
+	return m.err
+}
+
+func (m *MockAuthDB) IsSSHHost(principal string) (bool, error) {
+	if m.isSSHHost != nil {
+		return m.isSSHHost(principal)
+	}
+	return m.ret1.(bool), m.err
+}
+
+func (m *MockAuthDB) StoreSSHCertificate(crt *ssh.Certificate) error {
+	if m.storeSSHCertificate != nil {
+		return m.storeSSHCertificate(crt)
 	}
 	return m.err
 }

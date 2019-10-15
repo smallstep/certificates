@@ -4,12 +4,15 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/templates"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -249,6 +252,170 @@ func TestAuthority_SignSSHAddUser(t *testing.T) {
 				assert.NotEquals(t, 0, got.Serial)
 				assert.NotNil(t, got.Signature)
 				assert.NotNil(t, got.SignatureKey)
+			}
+		})
+	}
+}
+
+func TestAuthority_GetSSHRoots(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.FatalError(t, err)
+	user, err := ssh.NewPublicKey(key.Public())
+	assert.FatalError(t, err)
+
+	key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.FatalError(t, err)
+	host, err := ssh.NewPublicKey(key.Public())
+	assert.FatalError(t, err)
+
+	type fields struct {
+		sshCAUserCerts []ssh.PublicKey
+		sshCAHostCerts []ssh.PublicKey
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    *SSHKeys
+		wantErr bool
+	}{
+		{"ok", fields{[]ssh.PublicKey{user}, []ssh.PublicKey{host}}, &SSHKeys{UserKeys: []ssh.PublicKey{user}, HostKeys: []ssh.PublicKey{host}}, false},
+		{"nil", fields{}, &SSHKeys{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := testAuthority(t)
+			a.sshCAUserCerts = tt.fields.sshCAUserCerts
+			a.sshCAHostCerts = tt.fields.sshCAHostCerts
+
+			got, err := a.GetSSHRoots()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Authority.GetSSHRoots() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Authority.GetSSHRoots() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAuthority_GetSSHFederation(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.FatalError(t, err)
+	user, err := ssh.NewPublicKey(key.Public())
+	assert.FatalError(t, err)
+
+	key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.FatalError(t, err)
+	host, err := ssh.NewPublicKey(key.Public())
+	assert.FatalError(t, err)
+
+	type fields struct {
+		sshCAUserFederatedCerts []ssh.PublicKey
+		sshCAHostFederatedCerts []ssh.PublicKey
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    *SSHKeys
+		wantErr bool
+	}{
+		{"ok", fields{[]ssh.PublicKey{user}, []ssh.PublicKey{host}}, &SSHKeys{UserKeys: []ssh.PublicKey{user}, HostKeys: []ssh.PublicKey{host}}, false},
+		{"nil", fields{}, &SSHKeys{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := testAuthority(t)
+			a.sshCAUserFederatedCerts = tt.fields.sshCAUserFederatedCerts
+			a.sshCAHostFederatedCerts = tt.fields.sshCAHostFederatedCerts
+
+			got, err := a.GetSSHFederation()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Authority.GetSSHFederation() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Authority.GetSSHFederation() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAuthority_GetSSHConfig(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.FatalError(t, err)
+	user, err := ssh.NewPublicKey(key.Public())
+	assert.FatalError(t, err)
+	userSigner, err := ssh.NewSignerFromSigner(key)
+	assert.FatalError(t, err)
+	userB64 := base64.StdEncoding.EncodeToString(user.Marshal())
+
+	key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.FatalError(t, err)
+	host, err := ssh.NewPublicKey(key.Public())
+	assert.FatalError(t, err)
+	hostSigner, err := ssh.NewSignerFromSigner(key)
+	assert.FatalError(t, err)
+	hostB64 := base64.StdEncoding.EncodeToString(host.Marshal())
+
+	tmplConfig := &templates.Templates{
+		SSH: &templates.SSHTemplates{
+			User: []templates.Template{
+				{Name: "known_host.tpl", Type: templates.File, TemplatePath: "./testdata/templates/known_hosts.tpl", Path: "ssh/known_host", Comment: "#"},
+			},
+			Host: []templates.Template{
+				{Name: "ca.tpl", Type: templates.File, TemplatePath: "./testdata/templates/ca.tpl", Path: "/etc/ssh/ca.pub", Comment: "#"},
+			},
+		},
+		Data: map[string]interface{}{
+			"Step": &templates.Step{
+				SSH: templates.StepSSH{
+					UserKey: user,
+					HostKey: host,
+				},
+			},
+		},
+	}
+	userOutput := []templates.Output{
+		{Name: "known_host.tpl", Type: templates.File, Comment: "#", Path: "ssh/known_host", Content: []byte(fmt.Sprintf("@cert-authority * %s %s", host.Type(), hostB64))},
+	}
+	hostOutput := []templates.Output{
+		{Name: "ca.tpl", Type: templates.File, Comment: "#", Path: "/etc/ssh/ca.pub", Content: []byte(user.Type() + " " + userB64)},
+	}
+
+	type fields struct {
+		templates  *templates.Templates
+		userSigner ssh.Signer
+		hostSigner ssh.Signer
+	}
+	type args struct {
+		typ  string
+		data map[string]string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []templates.Output
+		wantErr bool
+	}{
+		{"user", fields{tmplConfig, userSigner, hostSigner}, args{"user", nil}, userOutput, false},
+		{"host", fields{tmplConfig, userSigner, hostSigner}, args{"host", nil}, hostOutput, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := testAuthority(t)
+			a.config.Templates = tt.fields.templates
+			a.sshCAUserCertSignKey = tt.fields.userSigner
+			a.sshCAHostCertSignKey = tt.fields.hostSigner
+
+			got, err := a.GetSSHConfig(tt.args.typ, tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Authority.GetSSHConfig() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Authority.GetSSHConfig() = %v, want %v", got, tt.want)
 			}
 		})
 	}
