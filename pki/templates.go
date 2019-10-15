@@ -35,7 +35,7 @@ var sshTemplateData = map[string]string{
 	// and references the step known_hosts file
 	"config.tpl": `Match exec "step ssh check-host %h"
 	ForwardAgent yes
-	UserKnownHostsFile {{.User.StepPath}}/config/ssh/known_hosts`,
+	UserKnownHostsFile {{.User.StepPath}}/ssh/known_hosts`,
 
 	// known_hosts.tpl authorizes the ssh hosts key
 	"known_hosts.tpl": `@cert-authority * {{.Step.SSH.HostKey.Type}} {{.Step.SSH.HostKey.Marshal | toString | b64enc}}
