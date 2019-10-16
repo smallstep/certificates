@@ -57,19 +57,21 @@ func (t *Templates) Validate() (err error) {
 // LoadAll preloads all templates in memory. It returns an error if an error is
 // found parsing at least one template.
 func LoadAll(t *Templates) (err error) {
-	if t.SSH != nil {
-		for _, tt := range t.SSH.User {
-			if err = tt.Load(); err != nil {
-				return err
+	if t != nil {
+		if t.SSH != nil {
+			for _, tt := range t.SSH.User {
+				if err = tt.Load(); err != nil {
+					return
+				}
 			}
-		}
-		for _, tt := range t.SSH.Host {
-			if err = tt.Load(); err != nil {
-				return err
+			for _, tt := range t.SSH.Host {
+				if err = tt.Load(); err != nil {
+					return
+				}
 			}
 		}
 	}
-	return nil
+	return
 }
 
 // SSHTemplates contains the templates defining ssh configuration files.
@@ -113,18 +115,30 @@ func (t *Template) Validate() error {
 		return nil
 	case t.Name == "":
 		return errors.New("template name cannot be empty")
-	case t.TemplatePath == "":
+	case t.Type != Snippet && t.Type != File && t.Type != Directory:
+		return errors.Errorf("invalid template type %s, it must be %s, %s, or %s", t.Type, Snippet, File, Directory)
+	case t.TemplatePath == "" && t.Type != Directory:
 		return errors.New("template template cannot be empty")
+	case t.TemplatePath != "" && t.Type == Directory:
+		return errors.New("template template must be empty with directory type")
 	case t.Path == "":
 		return errors.New("template path cannot be empty")
 	}
 
-	// Defaults
-	if t.Type == "" {
-		t.Type = Snippet
-	}
-	if t.Comment == "" {
-		t.Comment = "#"
+	if t.TemplatePath != "" {
+		// Check for file
+		st, err := os.Stat(config.StepAbs(t.TemplatePath))
+		if err != nil {
+			return errors.Wrapf(err, "error reading %s", t.TemplatePath)
+		}
+		if st.IsDir() {
+			return errors.Errorf("error reading %s: is not a file", t.TemplatePath)
+		}
+
+		// Defaults
+		if t.Comment == "" {
+			t.Comment = "#"
+		}
 	}
 
 	return nil
@@ -133,7 +147,7 @@ func (t *Template) Validate() error {
 // Load loads the template in memory, returns an error if the parsing of the
 // template fails.
 func (t *Template) Load() error {
-	if t.Template == nil {
+	if t.Template == nil && t.Type != Directory {
 		filename := config.StepAbs(t.TemplatePath)
 		b, err := ioutil.ReadFile(filename)
 		if err != nil {
@@ -151,6 +165,10 @@ func (t *Template) Load() error {
 // Render executes the template with the given data and returns the rendered
 // version.
 func (t *Template) Render(data interface{}) ([]byte, error) {
+	if t.Type == Directory {
+		return nil, nil
+	}
+
 	if err := t.Load(); err != nil {
 		return nil, err
 	}
@@ -172,8 +190,8 @@ func (t *Template) Output(data interface{}) (Output, error) {
 	return Output{
 		Name:    t.Name,
 		Type:    t.Type,
-		Comment: t.Comment,
 		Path:    t.Path,
+		Comment: t.Comment,
 		Content: b,
 	}, nil
 }
@@ -182,8 +200,8 @@ func (t *Template) Output(data interface{}) (Output, error) {
 type Output struct {
 	Name    string       `json:"name"`
 	Type    TemplateType `json:"type"`
-	Comment string       `json:"comment"`
 	Path    string       `json:"path"`
+	Comment string       `json:"comment"`
 	Content []byte       `json:"content"`
 }
 
