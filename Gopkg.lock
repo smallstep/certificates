@@ -263,7 +263,7 @@
 
 [[projects]]
   branch = "ssh-login"
-  digest = "1:a78bee6074ef87c752657e5641cdcdba87d77544804d6c868689228340de7739"
+  digest = "1:35cb5bef5983a5e43466c00bd6bd7b3b401a94f4abe22873b7b72bad344ee855"
   name = "github.com/smallstep/cli"
   packages = [
     "command",
@@ -285,7 +285,7 @@
     "utils",
   ]
   pruneopts = "UT"
-  revision = "98e63ae8527b8cfbe0090163f6ce55a455698435"
+  revision = "15911d8625df46378c68ecda3b97290e745d7097"
 
 [[projects]]
   branch = "master"
