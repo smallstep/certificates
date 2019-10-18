@@ -417,6 +417,10 @@ func TestCertificate(t *testing.T) {
 	ok := &api.SignResponse{
 		ServerPEM: api.Certificate{Certificate: cert},
 		CaPEM:     api.Certificate{Certificate: parseCertificate(rootPEM)},
+		CertChainPEM: []api.Certificate{
+			{Certificate: cert},
+			{Certificate: parseCertificate(rootPEM)},
+		},
 	}
 	tests := []struct {
 		name    string
@@ -446,6 +450,10 @@ func TestIntermediateCertificate(t *testing.T) {
 	ok := &api.SignResponse{
 		ServerPEM: api.Certificate{Certificate: parseCertificate(certPEM)},
 		CaPEM:     api.Certificate{Certificate: intermediate},
+		CertChainPEM: []api.Certificate{
+			{Certificate: parseCertificate(certPEM)},
+			{Certificate: intermediate},
+		},
 	}
 	tests := []struct {
 		name    string
@@ -475,6 +483,10 @@ func TestRootCertificateCertificate(t *testing.T) {
 	ok := &api.SignResponse{
 		ServerPEM: api.Certificate{Certificate: parseCertificate(certPEM)},
 		CaPEM:     api.Certificate{Certificate: parseCertificate(rootPEM)},
+		CertChainPEM: []api.Certificate{
+			{Certificate: parseCertificate(certPEM)},
+			{Certificate: parseCertificate(rootPEM)},
+		},
 		TLS: &tls.ConnectionState{VerifiedChains: [][]*x509.Certificate{
 			{root, root},
 		}},
@@ -482,6 +494,10 @@ func TestRootCertificateCertificate(t *testing.T) {
 	noTLS := &api.SignResponse{
 		ServerPEM: api.Certificate{Certificate: parseCertificate(certPEM)},
 		CaPEM:     api.Certificate{Certificate: parseCertificate(rootPEM)},
+		CertChainPEM: []api.Certificate{
+			{Certificate: parseCertificate(certPEM)},
+			{Certificate: parseCertificate(rootPEM)},
+		},
 	}
 	tests := []struct {
 		name    string

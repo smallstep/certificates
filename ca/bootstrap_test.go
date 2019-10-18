@@ -303,7 +303,7 @@ func TestBootstrapClient(t *testing.T) {
 					t.Errorf("BootstrapClient() error reading response: %v", err)
 					return
 				}
-				if renewal.CaPEM.Certificate == nil || renewal.ServerPEM.Certificate == nil {
+				if renewal.CaPEM.Certificate == nil || renewal.ServerPEM.Certificate == nil || len(renewal.CertChainPEM) == 0 {
 					t.Errorf("BootstrapClient() invalid renewal response: %v", renewal)
 				}
 			}
@@ -375,7 +375,7 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 		if err := readJSON(resp.Body, &renew); err != nil {
 			return errors.Wrap(err, "client.Post() error reading response")
 		}
-		if renew.ServerPEM.Certificate == nil || renew.CaPEM.Certificate == nil {
+		if renew.ServerPEM.Certificate == nil || renew.CaPEM.Certificate == nil || len(renew.CertChainPEM) == 0 {
 			return errors.New("client.Post() unexpected response found")
 		}
 		// test with bootstrap server
@@ -492,7 +492,7 @@ func TestBootstrapClientServerFederation(t *testing.T) {
 		if err := readJSON(resp.Body, &renew); err != nil {
 			return errors.Wrap(err, "client.Post() error reading response")
 		}
-		if renew.ServerPEM.Certificate == nil || renew.CaPEM.Certificate == nil {
+		if renew.ServerPEM.Certificate == nil || renew.CaPEM.Certificate == nil || len(renew.CertChainPEM) == 0 {
 			return errors.New("client.Post() unexpected response found")
 		}
 		// test with bootstrap server

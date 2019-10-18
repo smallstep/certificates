@@ -56,7 +56,7 @@ func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 }
 
 // Sign creates a signed certificate from a certificate signing request.
-func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
+func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	var (
 		errContext     = apiCtx{"csr": csr, "signOptions": signOpts}
 		mods           = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
@@ -69,66 +69,66 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 			certValidators = append(certValidators, k)
 		case provisioner.CertificateRequestValidator:
 			if err := k.Valid(csr); err != nil {
-				return nil, nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
+				return nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
 			}
 		case provisioner.ProfileModifier:
 			mods = append(mods, k.Option(signOpts))
 		default:
-			return nil, nil, &apiError{errors.Errorf("sign: invalid extra option type %T", k),
+			return nil, &apiError{errors.Errorf("sign: invalid extra option type %T", k),
 				http.StatusInternalServerError, errContext}
 		}
 	}
 
 	if err := csr.CheckSignature(); err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "sign: invalid certificate request"),
+		return nil, &apiError{errors.Wrap(err, "sign: invalid certificate request"),
 			http.StatusBadRequest, errContext}
 	}
 
 	leaf, err := x509util.NewLeafProfileWithCSR(csr, issIdentity.Crt, issIdentity.Key, mods...)
 	if err != nil {
-		return nil, nil, &apiError{errors.Wrapf(err, "sign"), http.StatusInternalServerError, errContext}
+		return nil, &apiError{errors.Wrapf(err, "sign"), http.StatusInternalServerError, errContext}
 	}
 
 	for _, v := range certValidators {
 		if err := v.Valid(leaf.Subject()); err != nil {
-			return nil, nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
+			return nil, &apiError{errors.Wrap(err, "sign"), http.StatusUnauthorized, errContext}
 		}
 	}
 
 	crtBytes, err := leaf.CreateCertificate()
 	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "sign: error creating new leaf certificate"),
+		return nil, &apiError{errors.Wrap(err, "sign: error creating new leaf certificate"),
 			http.StatusInternalServerError, errContext}
 	}
 
 	serverCert, err := x509.ParseCertificate(crtBytes)
 	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing new leaf certificate"),
+		return nil, &apiError{errors.Wrap(err, "sign: error parsing new leaf certificate"),
 			http.StatusInternalServerError, errContext}
 	}
 
 	caCert, err := x509.ParseCertificate(issIdentity.Crt.Raw)
 	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "sign: error parsing intermediate certificate"),
+		return nil, &apiError{errors.Wrap(err, "sign: error parsing intermediate certificate"),
 			http.StatusInternalServerError, errContext}
 	}
 
 	if err = a.db.StoreCertificate(serverCert); err != nil {
 		if err != db.ErrNotImplemented {
-			return nil, nil, &apiError{errors.Wrap(err, "sign: error storing certificate in db"),
+			return nil, &apiError{errors.Wrap(err, "sign: error storing certificate in db"),
 				http.StatusInternalServerError, errContext}
 		}
 	}
 
-	return serverCert, caCert, nil
+	return []*x509.Certificate{serverCert, caCert}, nil
 }
 
 // Renew creates a new Certificate identical to the old certificate, except
 // with a validity window that begins 'now'.
-func (a *Authority) Renew(oldCert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error) {
+func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error) {
 	// Check step provisioner extensions
 	if err := a.authorizeRenewal(oldCert); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Issuer
@@ -181,26 +181,26 @@ func (a *Authority) Renew(oldCert *x509.Certificate) (*x509.Certificate, *x509.C
 	leaf, err := x509util.NewLeafProfileWithTemplate(newCert,
 		issIdentity.Crt, issIdentity.Key)
 	if err != nil {
-		return nil, nil, &apiError{err, http.StatusInternalServerError, apiCtx{}}
+		return nil, &apiError{err, http.StatusInternalServerError, apiCtx{}}
 	}
 	crtBytes, err := leaf.CreateCertificate()
 	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "error renewing certificate from existing server certificate"),
+		return nil, &apiError{errors.Wrap(err, "error renewing certificate from existing server certificate"),
 			http.StatusInternalServerError, apiCtx{}}
 	}
 
 	serverCert, err := x509.ParseCertificate(crtBytes)
 	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "error parsing new server certificate"),
+		return nil, &apiError{errors.Wrap(err, "error parsing new server certificate"),
 			http.StatusInternalServerError, apiCtx{}}
 	}
 	caCert, err := x509.ParseCertificate(issIdentity.Crt.Raw)
 	if err != nil {
-		return nil, nil, &apiError{errors.Wrap(err, "error parsing intermediate certificate"),
+		return nil, &apiError{errors.Wrap(err, "error parsing intermediate certificate"),
 			http.StatusInternalServerError, apiCtx{}}
 	}
 
-	return serverCert, caCert, nil
+	return []*x509.Certificate{serverCert, caCert}, nil
 }
 
 // RevokeOptions are the options for the Revoke API.

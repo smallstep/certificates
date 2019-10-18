@@ -277,7 +277,7 @@ ZYtQ9Ot36qc=
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			leaf, intermediate, err := tc.auth.Sign(tc.csr, tc.signOpts, tc.extraOpts...)
+			certChain, err := tc.auth.Sign(tc.csr, tc.signOpts, tc.extraOpts...)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					switch v := err.(type) {
@@ -290,6 +290,8 @@ ZYtQ9Ot36qc=
 					}
 				}
 			} else {
+				leaf := certChain[0]
+				intermediate := certChain[1]
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, leaf.NotBefore, signOpts.NotBefore.Time().Truncate(time.Second))
 					assert.Equals(t, leaf.NotAfter, signOpts.NotAfter.Time().Truncate(time.Second))
@@ -454,11 +456,11 @@ func TestRenew(t *testing.T) {
 			tc, err := genTestCase()
 			assert.FatalError(t, err)
 
-			var leaf, intermediate *x509.Certificate
+			var certChain []*x509.Certificate
 			if tc.auth != nil {
-				leaf, intermediate, err = tc.auth.Renew(tc.crt)
+				certChain, err = tc.auth.Renew(tc.crt)
 			} else {
-				leaf, intermediate, err = a.Renew(tc.crt)
+				certChain, err = a.Renew(tc.crt)
 			}
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
@@ -472,6 +474,8 @@ func TestRenew(t *testing.T) {
 					}
 				}
 			} else {
+				leaf := certChain[0]
+				intermediate := certChain[1]
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, leaf.NotAfter.Sub(leaf.NotBefore), tc.crt.NotAfter.Sub(crt.NotBefore))
 

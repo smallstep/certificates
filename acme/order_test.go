@@ -789,19 +789,19 @@ func TestOrderUpdateStatus(t *testing.T) {
 }
 
 type mockSignAuth struct {
-	sign                func(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
+	sign                func(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	loadProvisionerByID func(string) (provisioner.Interface, error)
 	ret1, ret2          interface{}
 	err                 error
 }
 
-func (m *mockSignAuth) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
+func (m *mockSignAuth) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	if m.sign != nil {
 		return m.sign(csr, signOpts, extraOpts...)
 	} else if m.err != nil {
-		return nil, nil, m.err
+		return nil, m.err
 	}
-	return m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate), m.err
+	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
 }
 
 func (m *mockSignAuth) LoadProvisionerByID(id string) (provisioner.Interface, error) {
@@ -1082,9 +1082,9 @@ func TestOrderFinalize(t *testing.T) {
 				res: clone,
 				csr: csr,
 				sa: &mockSignAuth{
-					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
+					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, len(signOps), 4)
-						return crt, inter, nil
+						return []*x509.Certificate{crt, inter}, nil
 					},
 				},
 				db: &db.MockNoSQLDB{
