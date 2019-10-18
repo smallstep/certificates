@@ -88,6 +88,8 @@ const (
 	TypeACME Type = 6
 	// TypeX5C is used to indicate the X5C provisioners.
 	TypeX5C Type = 7
+	// TypeK8sSA is used to indicate the X5C provisioners.
+	TypeK8sSA Type = 8
 
 	// RevokeAudienceKey is the key for the 'revoke' audiences in the audiences map.
 	RevokeAudienceKey = "revoke"
@@ -112,6 +114,8 @@ func (t Type) String() string {
 		return "ACME"
 	case TypeX5C:
 		return "X5C"
+	case TypeK8sSA:
+		return "K8sSA"
 	default:
 		return ""
 	}
@@ -163,6 +167,8 @@ func (l *List) UnmarshalJSON(data []byte) error {
 			p = &ACME{}
 		case "x5c":
 			p = &X5C{}
+		case "k8ssa":
+			p = &K8sSA{}
 		default:
 			// Skip unsupported provisioners. A client using this method may be
 			// compiled with a version of smallstep/certificates that does not
