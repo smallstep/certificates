@@ -18,8 +18,3 @@
 coverage.txt
 vendor
 output
-
-# Ignore modules until switch from gopkg
-go.mod
-go.sum
-
