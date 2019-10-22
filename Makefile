@@ -52,10 +52,13 @@ DATE    := $(shell date -u '+%Y-%m-%d %H:%M UTC')
 LDFLAGS := -ldflags='-w -X "main.Version=$(VERSION)" -X "main.BuildTime=$(DATE)"'
 GOFLAGS := CGO_ENABLED=0
 
+download:
+	$Q go mod download
+
 build: $(PREFIX)bin/$(BINNAME)
 	@echo "Build Complete!"
 
-$(PREFIX)bin/$(BINNAME): $(call rwildcard,*.go)
+$(PREFIX)bin/$(BINNAME): download $(call rwildcard,*.go)
 	$Q mkdir -p $(@D)
 	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
 
@@ -65,7 +68,7 @@ simple:
 	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
 	@echo "Build Complete!"
 
-.PHONY: build simple
+.PHONY: download build simple
 
 #########################################
 # Go generate
