@@ -17,21 +17,9 @@ all: build test lint
 #########################################
 
 bootstra%:
-	$Q which dep || go get github.com/golang/dep/cmd/dep
-	$Q dep ensure
 	$Q GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.18.0
 
-
-vendor: Gopkg.lock
-	$Q dep ensure
-
-define VENDOR_BIN_TMPL
-vendor/bin/$(notdir $(1)): vendor
-	$Q go build -o $$@ ./vendor/$(1)
-VENDOR_BINS += vendor/bin/$(notdir $(1))
-endef
-
-.PHONY: bootstra% vendor
+.PHONY: bootstra%
 
 #################################################
 # Determine the type of `push` and `version`
@@ -67,14 +55,14 @@ GOFLAGS := CGO_ENABLED=0
 build: $(PREFIX)bin/$(BINNAME)
 	@echo "Build Complete!"
 
-$(PREFIX)bin/$(BINNAME): vendor $(call rwildcard,*.go)
+$(PREFIX)bin/$(BINNAME): $(call rwildcard,*.go)
 	$Q mkdir -p $(@D)
 	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
 
-# Target for building without calling dep ensure
+# Target to force a build of step-ca without running tests
 simple:
-	$Q mkdir -p bin/
-	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o bin/$(BINNAME) $(LDFLAGS) $(PKG)
+	$Q mkdir -p $(PREFIX)bin
+	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
 	@echo "Build Complete!"
 
 .PHONY: build simple
@@ -134,8 +122,6 @@ uninstall:
 #########################################
 
 clean:
-	@echo "You will need to run 'make bootstrap' or 'dep ensure' directly to re-download any dependencies."
-	$Q rm -rf vendor
 ifneq ($(BINNAME),"")
 	$Q rm -f bin/$(BINNAME)
 endif
