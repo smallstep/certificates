@@ -502,10 +502,10 @@ type mockAuthority struct {
 	authorizeSign                func(ott string) ([]provisioner.SignOption, error)
 	getTLSOptions                func() *tlsutil.TLSOptions
 	root                         func(shasum string) (*x509.Certificate, error)
-	sign                         func(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
+	sign                         func(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	signSSH                      func(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	signSSHAddUser               func(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
-	renew                        func(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
+	renew                        func(cert *x509.Certificate) ([]*x509.Certificate, error)
 	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
 	loadProvisionerByID          func(provID string) (provisioner.Interface, error)
 	getProvisioners              func(nextCursor string, limit int) (provisioner.List, string, error)
@@ -545,11 +545,11 @@ func (m *mockAuthority) Root(shasum string) (*x509.Certificate, error) {
 	return m.ret1.(*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error) {
+func (m *mockAuthority) Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	if m.sign != nil {
 		return m.sign(cr, opts, signOpts...)
 	}
-	return m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate), m.err
+	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
 }
 
 func (m *mockAuthority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
@@ -566,11 +566,11 @@ func (m *mockAuthority) SignSSHAddUser(key ssh.PublicKey, cert *ssh.Certificate)
 	return m.ret1.(*ssh.Certificate), m.err
 }
 
-func (m *mockAuthority) Renew(cert *x509.Certificate) (*x509.Certificate, *x509.Certificate, error) {
+func (m *mockAuthority) Renew(cert *x509.Certificate) ([]*x509.Certificate, error) {
 	if m.renew != nil {
 		return m.renew(cert)
 	}
-	return m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate), m.err
+	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
 }
 
 func (m *mockAuthority) GetProvisioners(nextCursor string, limit int) (provisioner.List, string, error) {
@@ -757,8 +757,8 @@ func Test_caHandler_Sign(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected1 := []byte(`{"crt":"` + strings.Replace(certPEM, "\n", `\n`, -1) + `\n","ca":"` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"}`)
-	expected2 := []byte(`{"crt":"` + strings.Replace(stepCertPEM, "\n", `\n`, -1) + `\n","ca":"` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"}`)
+	expected1 := []byte(`{"crt":"` + strings.Replace(certPEM, "\n", `\n`, -1) + `\n","ca":"` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n","certChain":["` + strings.Replace(certPEM, "\n", `\n`, -1) + `\n","` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"]}`)
+	expected2 := []byte(`{"crt":"` + strings.Replace(stepCertPEM, "\n", `\n`, -1) + `\n","ca":"` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n","certChain":["` + strings.Replace(stepCertPEM, "\n", `\n`, -1) + `\n","` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"]}`)
 
 	tests := []struct {
 		name         string
@@ -831,7 +831,7 @@ func Test_caHandler_Renew(t *testing.T) {
 		{"renew error", cs, nil, nil, fmt.Errorf("an error"), http.StatusForbidden},
 	}
 
-	expected := []byte(`{"crt":"` + strings.Replace(certPEM, "\n", `\n`, -1) + `\n","ca":"` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"}`)
+	expected := []byte(`{"crt":"` + strings.Replace(certPEM, "\n", `\n`, -1) + `\n","ca":"` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n","certChain":["` + strings.Replace(certPEM, "\n", `\n`, -1) + `\n","` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"]}`)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

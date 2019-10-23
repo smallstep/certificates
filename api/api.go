@@ -33,8 +33,8 @@ type Authority interface {
 	AuthorizeSign(ott string) ([]provisioner.SignOption, error)
 	GetTLSOptions() *tlsutil.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)
-	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
-	Renew(peer *x509.Certificate) (*x509.Certificate, *x509.Certificate, error)
+	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	Renew(peer *x509.Certificate) ([]*x509.Certificate, error)
 	LoadProvisionerByCertificate(*x509.Certificate) (provisioner.Interface, error)
 	LoadProvisionerByID(string) (provisioner.Interface, error)
 	GetProvisioners(cursor string, limit int) (provisioner.List, string, error)
@@ -211,10 +211,11 @@ func (s *SignRequest) Validate() error {
 
 // SignResponse is the response object of the certificate signature request.
 type SignResponse struct {
-	ServerPEM  Certificate          `json:"crt"`
-	CaPEM      Certificate          `json:"ca"`
-	TLSOptions *tlsutil.TLSOptions  `json:"tlsOptions,omitempty"`
-	TLS        *tls.ConnectionState `json:"-"`
+	ServerPEM    Certificate          `json:"crt"`
+	CaPEM        Certificate          `json:"ca"`
+	CertChainPEM []Certificate        `json:"certChain"`
+	TLSOptions   *tlsutil.TLSOptions  `json:"tlsOptions,omitempty"`
+	TLS          *tls.ConnectionState `json:"-"`
 }
 
 // RootsResponse is the response object of the roots request.
@@ -282,6 +283,14 @@ func (h *caHandler) Root(w http.ResponseWriter, r *http.Request) {
 	JSON(w, &RootResponse{RootPEM: Certificate{cert}})
 }
 
+func certChainToPEM(certChain []*x509.Certificate) []Certificate {
+	certChainPEM := make([]Certificate, 0, len(certChain))
+	for _, c := range certChain {
+		certChainPEM = append(certChainPEM, Certificate{c})
+	}
+	return certChainPEM
+}
+
 // Sign is an HTTP handler that reads a certificate request and an
 // one-time-token (ott) from the body and creates a new certificate with the
 // information in the certificate request.
@@ -309,17 +318,22 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cert, root, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, opts, signOpts...)
+	certChain, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, opts, signOpts...)
 	if err != nil {
 		WriteError(w, Forbidden(err))
 		return
 	}
-
-	logCertificate(w, cert)
+	certChainPEM := certChainToPEM(certChain)
+	var caPEM Certificate
+	if len(certChainPEM) > 0 {
+		caPEM = certChainPEM[1]
+	}
+	logCertificate(w, certChain[0])
 	JSONStatus(w, &SignResponse{
-		ServerPEM:  Certificate{cert},
-		CaPEM:      Certificate{root},
-		TLSOptions: h.Authority.GetTLSOptions(),
+		ServerPEM:    certChainPEM[0],
+		CaPEM:        caPEM,
+		CertChainPEM: certChainPEM,
+		TLSOptions:   h.Authority.GetTLSOptions(),
 	}, http.StatusCreated)
 }
 
@@ -331,17 +345,23 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cert, root, err := h.Authority.Renew(r.TLS.PeerCertificates[0])
+	certChain, err := h.Authority.Renew(r.TLS.PeerCertificates[0])
 	if err != nil {
 		WriteError(w, Forbidden(err))
 		return
 	}
+	certChainPEM := certChainToPEM(certChain)
+	var caPEM Certificate
+	if len(certChainPEM) > 0 {
+		caPEM = certChainPEM[1]
+	}
 
-	logCertificate(w, cert)
+	logCertificate(w, certChain[0])
 	JSONStatus(w, &SignResponse{
-		ServerPEM:  Certificate{cert},
-		CaPEM:      Certificate{root},
-		TLSOptions: h.Authority.GetTLSOptions(),
+		ServerPEM:    certChainPEM[0],
+		CaPEM:        caPEM,
+		CertChainPEM: certChainPEM,
+		TLSOptions:   h.Authority.GetTLSOptions(),
 	}, http.StatusCreated)
 }
 

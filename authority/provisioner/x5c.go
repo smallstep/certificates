@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"encoding/pem"
 	"time"
 
 	"github.com/pkg/errors"
@@ -10,37 +11,34 @@ import (
 	"github.com/smallstep/cli/jose"
 )
 
-// jwtPayload extends jwt.Claims with step attributes.
-type jwtPayload struct {
+// x5cPayload extends jwt.Claims with step attributes.
+type x5cPayload struct {
 	jose.Claims
-	SANs []string     `json:"sans,omitempty"`
-	Step *stepPayload `json:"step,omitempty"`
+	SANs   []string     `json:"sans,omitempty"`
+	Step   *stepPayload `json:"step,omitempty"`
+	chains [][]*x509.Certificate
 }
 
-type stepPayload struct {
-	SSH *SSHOptions `json:"ssh,omitempty"`
-}
-
-// JWK is the default provisioner, an entity that can sign tokens necessary for
+// X5C is the default provisioner, an entity that can sign tokens necessary for
 // signature requests.
-type JWK struct {
-	Type         string           `json:"type"`
-	Name         string           `json:"name"`
-	Key          *jose.JSONWebKey `json:"key"`
-	EncryptedKey string           `json:"encryptedKey,omitempty"`
-	Claims       *Claims          `json:"claims,omitempty"`
-	claimer      *Claimer
-	audiences    Audiences
+type X5C struct {
+	Type      string  `json:"type"`
+	Name      string  `json:"name"`
+	Roots     []byte  `json:"roots"`
+	Claims    *Claims `json:"claims,omitempty"`
+	claimer   *Claimer
+	audiences Audiences
+	rootPool  *x509.CertPool
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
-// should uniquely identify any JWK provisioner.
-func (p *JWK) GetID() string {
-	return p.Name + ":" + p.Key.KeyID
+// should uniquely identify any X5C provisioner.
+func (p *X5C) GetID() string {
+	return "x5c/" + p.Name
 }
 
 // GetTokenID returns the identifier of the token.
-func (p *JWK) GetTokenID(ott string) (string, error) {
+func (p *X5C) GetTokenID(ott string) (string, error) {
 	// Validate payload
 	token, err := jose.ParseSigned(ott)
 	if err != nil {
@@ -58,51 +56,92 @@ func (p *JWK) GetTokenID(ott string) (string, error) {
 }
 
 // GetName returns the name of the provisioner.
-func (p *JWK) GetName() string {
+func (p *X5C) GetName() string {
 	return p.Name
 }
 
 // GetType returns the type of provisioner.
-func (p *JWK) GetType() Type {
-	return TypeJWK
+func (p *X5C) GetType() Type {
+	return TypeX5C
 }
 
 // GetEncryptedKey returns the base provisioner encrypted key if it's defined.
-func (p *JWK) GetEncryptedKey() (string, string, bool) {
-	return p.Key.KeyID, p.EncryptedKey, len(p.EncryptedKey) > 0
+func (p *X5C) GetEncryptedKey() (string, string, bool) {
+	return "", "", false
 }
 
-// Init initializes and validates the fields of a JWK type.
-func (p *JWK) Init(config Config) (err error) {
+// Init initializes and validates the fields of a X5C type.
+func (p *X5C) Init(config Config) error {
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
-	case p.Key == nil:
-		return errors.New("provisioner key cannot be empty")
+	case len(p.Roots) == 0:
+		return errors.New("provisioner root(s) cannot be empty")
+	}
+
+	p.rootPool = x509.NewCertPool()
+
+	var (
+		block *pem.Block
+		rest  = p.Roots
+	)
+	for rest != nil {
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return errors.Wrap(err, "error parsing x509 certificate from PEM block")
+		}
+		p.rootPool.AddCert(cert)
+	}
+
+	// Verify that at least one root was found.
+	if len(p.rootPool.Subjects()) == 0 {
+		return errors.Errorf("no x509 certificates found in roots attribute for provisioner %s", p.GetName())
 	}
 
 	// Update claims with global ones
+	var err error
 	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
 		return err
 	}
 
-	p.audiences = config.Audiences
-	return err
+	p.audiences = config.Audiences.WithFragment(p.GetID())
+	return nil
 }
 
 // authorizeToken performs common jwt authorization actions and returns the
 // claims for case specific downstream parsing.
 // e.g. a Sign request will auth/validate different fields than a Revoke request.
-func (p *JWK) authorizeToken(token string, audiences []string) (*jwtPayload, error) {
+func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing token")
 	}
 
-	var claims jwtPayload
-	if err = jwt.Claims(p.Key, &claims); err != nil {
+	verifiedChains, err := jwt.Headers[0].Certificates(x509.VerifyOptions{
+		Roots: p.rootPool,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error verifying x5c certificate chain")
+	}
+	leaf := verifiedChains[0][0]
+
+	if leaf.KeyUsage&x509.KeyUsageDigitalSignature == 0 {
+		return nil, errors.New("certificate used to sign x5c token cannot be used for digital signature")
+	}
+
+	// Using the leaf certificates key to validate the claims accomplishes two
+	// things:
+	//   1. Asserts that the private key used to sign the token corresponds
+	//      to the public certificate in the `x5c` header of the token.
+	//   2. Asserts that the claims are valid - have not been tampered with.
+	var claims x5cPayload
+	if err = jwt.Claims(leaf.PublicKey, &claims); err != nil {
 		return nil, errors.Wrap(err, "error parsing claims")
 	}
 
@@ -124,18 +163,20 @@ func (p *JWK) authorizeToken(token string, audiences []string) (*jwtPayload, err
 		return nil, errors.New("token subject cannot be empty")
 	}
 
+	// Save the verified chains on the x5c payload object.
+	claims.chains = verifiedChains
 	return &claims, nil
 }
 
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke the certificate with serial number in the `sub` property.
-func (p *JWK) AuthorizeRevoke(token string) error {
+func (p *X5C) AuthorizeRevoke(token string) error {
 	_, err := p.authorizeToken(token, p.audiences.Revoke)
 	return err
 }
 
 // AuthorizeSign validates the given token.
-func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.audiences.Sign)
 	if err != nil {
 		return nil, err
@@ -157,10 +198,11 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}
 
 	dnsNames, ips, emails := x509util.SplitSANs(claims.SANs)
+
 	return []SignOption{
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
-		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		newProvisionerExtensionOption(TypeX5C, p.Name, ""),
+		profileLimitDuration{p.claimer.DefaultTLSCertDuration(), claims.chains[0][0].NotAfter},
 		// validators
 		commonNameValidator(claims.Subject),
 		defaultPublicKeyValidator{},
@@ -172,7 +214,7 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 }
 
 // AuthorizeRenewal returns an error if the renewal is disabled.
-func (p *JWK) AuthorizeRenewal(cert *x509.Certificate) error {
+func (p *X5C) AuthorizeRenewal(cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
 		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
 	}
@@ -180,8 +222,7 @@ func (p *JWK) AuthorizeRenewal(cert *x509.Certificate) error {
 }
 
 // authorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
-	t := now()
+func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
 	if claims.Step == nil || claims.Step.SSH == nil {
 		return nil, errors.New("authorization token must be an SSH provisioning token")
 	}
@@ -200,6 +241,7 @@ func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 	if len(opts.Principals) > 0 {
 		signOptions = append(signOptions, sshCertificatePrincipalsModifier(opts.Principals))
 	}
+	t := now()
 	if !opts.ValidAfter.IsZero() {
 		signOptions = append(signOptions, sshCertificateValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
 	}
@@ -213,13 +255,13 @@ func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 	return append(signOptions,
 		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
-		// Set the validity bounds if not set.
-		sshDefaultValidityModifier(p.claimer),
-		// Validate public key
+		// Checks the validity bounds, and set the validity if has not been set.
+		sshLimitValidityModifier(p.claimer, claims.chains[0][0].NotAfter),
+		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
 		&sshCertificateValidityValidator{p.claimer},
-		// Require and validate all the default fields in the SSH certificate.
+		// Require all the fields in the SSH certificate
 		&sshCertificateDefaultValidator{},
 	), nil
 }

@@ -71,8 +71,8 @@ There are two ways to address this problem:
 
 1. Explicitly configure your ACME client to trust `step-ca`'s root certificate, or
 2. Add `step-ca`'s root certificate to your system’s default trust store (e.g.,
-   using `[step certificate
-   install](https://smallstep.com/docs/cli/certificate/install/)`)
+   using [`step certificate
+   install`](https://smallstep.com/docs/cli/certificate/install/))
 
 If you’re using your CA for TLS in production, explicitly configuring your ACME
 client to only trust your root certificate is a better option. We’ll

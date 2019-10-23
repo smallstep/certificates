@@ -155,28 +155,23 @@ func TestACME_AuthorizeSign(t *testing.T) {
 				if assert.NotNil(t, got) {
 					assert.Len(t, 4, got)
 
-					_pdd := got[0]
-					pdd, ok := _pdd.(profileDefaultDuration)
-					assert.True(t, ok)
-					assert.Equals(t, pdd, profileDefaultDuration(86400000000000))
-
-					_peo := got[1]
-					peo, ok := _peo.(*provisionerExtensionOption)
-					assert.True(t, ok)
-					assert.Equals(t, peo.Type, 6)
-					assert.Equals(t, peo.Name, "test@acme-provisioner.com")
-					assert.Equals(t, peo.CredentialID, "")
-					assert.Equals(t, peo.KeyValuePairs, nil)
-
-					_vv := got[2]
-					vv, ok := _vv.(*validityValidator)
-					assert.True(t, ok)
-					assert.Equals(t, vv.min, time.Duration(300000000000))
-					assert.Equals(t, vv.max, time.Duration(86400000000000))
-
-					_dpkv := got[3]
-					_, ok = _dpkv.(defaultPublicKeyValidator)
-					assert.True(t, ok)
+					for _, o := range got {
+						switch v := o.(type) {
+						case *provisionerExtensionOption:
+							assert.Equals(t, v.Type, int(TypeACME))
+							assert.Equals(t, v.Name, tt.prov.GetName())
+							assert.Equals(t, v.CredentialID, "")
+							assert.Len(t, 0, v.KeyValuePairs)
+						case profileDefaultDuration:
+							assert.Equals(t, time.Duration(v), tt.prov.claimer.DefaultTLSCertDuration())
+						case defaultPublicKeyValidator:
+						case *validityValidator:
+							assert.Equals(t, v.min, tt.prov.claimer.MinTLSCertDuration())
+							assert.Equals(t, v.max, tt.prov.claimer.MaxTLSCertDuration())
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+						}
+					}
 				}
 			}
 		})

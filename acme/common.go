@@ -12,7 +12,7 @@ import (
 
 // SignAuthority is the interface implemented by a CA authority.
 type SignAuthority interface {
-	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) (*x509.Certificate, *x509.Certificate, error)
+	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	LoadProvisionerByID(string) (provisioner.Interface, error)
 }
 
@@ -21,17 +21,6 @@ type Identifier struct {
 	Type  string `json:"type"`
 	Value string `json:"value"`
 }
-
-var (
-	accountTable           = []byte("acme-accounts")
-	accountByKeyIDTable    = []byte("acme-keyID-accountID-index")
-	authzTable             = []byte("acme-authzs")
-	challengeTable         = []byte("acme-challenges")
-	nonceTable             = []byte("nonce-table")
-	orderTable             = []byte("acme-orders")
-	ordersByAccountIDTable = []byte("acme-account-orders-index")
-	certTable              = []byte("acme-certs")
-)
 
 var (
 	// StatusValid -- valid

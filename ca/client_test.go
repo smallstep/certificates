@@ -265,6 +265,10 @@ func TestClient_Sign(t *testing.T) {
 	ok := &api.SignResponse{
 		ServerPEM: api.Certificate{Certificate: parseCertificate(certPEM)},
 		CaPEM:     api.Certificate{Certificate: parseCertificate(rootPEM)},
+		CertChainPEM: []api.Certificate{
+			{Certificate: parseCertificate(certPEM)},
+			{Certificate: parseCertificate(rootPEM)},
+		},
 	}
 	request := &api.SignRequest{
 		CsrPEM:    api.CertificateRequest{CertificateRequest: parseCertificateRequest(csrPEM)},
@@ -418,6 +422,10 @@ func TestClient_Renew(t *testing.T) {
 	ok := &api.SignResponse{
 		ServerPEM: api.Certificate{Certificate: parseCertificate(certPEM)},
 		CaPEM:     api.Certificate{Certificate: parseCertificate(rootPEM)},
+		CertChainPEM: []api.Certificate{
+			{Certificate: parseCertificate(certPEM)},
+			{Certificate: parseCertificate(rootPEM)},
+		},
 	}
 	unauthorized := api.Unauthorized(fmt.Errorf("Unauthorized"))
 	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))

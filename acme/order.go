@@ -73,11 +73,11 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 
 	authzs := make([]string, len(ops.Identifiers))
 	for i, identifier := range ops.Identifiers {
-		authz, err := newAuthz(db, ops.AccountID, identifier)
+		az, err := newAuthz(db, ops.AccountID, identifier)
 		if err != nil {
 			return nil, err
 		}
-		authzs[i] = authz.getID()
+		authzs[i] = az.getID()
 	}
 
 	now := clock.Now()
@@ -203,14 +203,14 @@ func (o *order) updateStatus(db nosql.DB) (*order, error) {
 			StatusPending: 0,
 		}
 		for _, azID := range o.Authorizations {
-			authz, err := getAuthz(db, azID)
+			az, err := getAuthz(db, azID)
 			if err != nil {
 				return nil, err
 			}
-			if authz, err = authz.updateStatus(db); err != nil {
+			if az, err = az.updateStatus(db); err != nil {
 				return nil, err
 			}
-			st := authz.getStatus()
+			st := az.getStatus()
 			count[st]++
 		}
 		switch {
@@ -274,7 +274,7 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 	}
 
 	// Create and store a new certificate.
-	leaf, inter, err := auth.Sign(csr, provisioner.Options{
+	certChain, err := auth.Sign(csr, provisioner.Options{
 		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
 		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
 	}, signOps...)
@@ -285,8 +285,8 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 	cert, err := newCert(db, CertOptions{
 		AccountID:     o.AccountID,
 		OrderID:       o.ID,
-		Leaf:          leaf,
-		Intermediates: []*x509.Certificate{inter},
+		Leaf:          certChain[0],
+		Intermediates: certChain[1:],
 	})
 	if err != nil {
 		return nil, err

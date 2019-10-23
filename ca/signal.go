@@ -28,20 +28,17 @@ func StopHandler(servers ...Stopper) {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(signals)
 
-	for {
-		select {
-		case sig := <-signals:
-			switch sig {
-			case syscall.SIGINT, syscall.SIGTERM:
-				log.Println("shutting down ...")
-				for _, server := range servers {
-					err := server.Stop()
-					if err != nil {
-						log.Printf("error stopping server: %s", err.Error())
-					}
+	for sig := range signals {
+		switch sig {
+		case syscall.SIGINT, syscall.SIGTERM:
+			log.Println("shutting down ...")
+			for _, server := range servers {
+				err := server.Stop()
+				if err != nil {
+					log.Printf("error stopping server: %s", err.Error())
 				}
-				return
 			}
+			return
 		}
 	}
 }
@@ -54,28 +51,25 @@ func StopReloaderHandler(servers ...StopReloader) {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer signal.Stop(signals)
 
-	for {
-		select {
-		case sig := <-signals:
-			switch sig {
-			case syscall.SIGHUP:
-				log.Println("reloading ...")
-				for _, server := range servers {
-					err := server.Reload()
-					if err != nil {
-						log.Printf("error reloading server: %+v", err)
-					}
+	for sig := range signals {
+		switch sig {
+		case syscall.SIGHUP:
+			log.Println("reloading ...")
+			for _, server := range servers {
+				err := server.Reload()
+				if err != nil {
+					log.Printf("error reloading server: %+v", err)
 				}
-			case syscall.SIGINT, syscall.SIGTERM:
-				log.Println("shutting down ...")
-				for _, server := range servers {
-					err := server.Stop()
-					if err != nil {
-						log.Printf("error stopping server: %s", err.Error())
-					}
-				}
-				return
 			}
+		case syscall.SIGINT, syscall.SIGTERM:
+			log.Println("shutting down ...")
+			for _, server := range servers {
+				err := server.Stop()
+				if err != nil {
+					log.Printf("error stopping server: %s", err.Error())
+				}
+			}
+			return
 		}
 	}
 }

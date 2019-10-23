@@ -273,3 +273,87 @@ func Test_validityValidator_Valid(t *testing.T) {
 		})
 	}
 }
+
+func Test_profileLimitDuration_Option(t *testing.T) {
+	n := now()
+	type test struct {
+		pld   profileLimitDuration
+		so    Options
+		cert  *x509.Certificate
+		valid func(*x509.Certificate)
+		err   error
+	}
+	tests := map[string]func() test{
+		"fail/notBefore-after-limit": func() test {
+			d, err := ParseTimeDuration("8h")
+			assert.FatalError(t, err)
+			return test{
+				pld:  profileLimitDuration{def: 4 * time.Hour, notAfter: n.Add(6 * time.Hour)},
+				so:   Options{NotBefore: d},
+				cert: new(x509.Certificate),
+				err:  errors.New("provisioning credential expiration ("),
+			}
+		},
+		"fail/requested-notAfter-after-limit": func() test {
+			d, err := ParseTimeDuration("4h")
+			assert.FatalError(t, err)
+			return test{
+				pld:  profileLimitDuration{def: 4 * time.Hour, notAfter: n.Add(6 * time.Hour)},
+				so:   Options{NotBefore: NewTimeDuration(n.Add(3 * time.Hour)), NotAfter: d},
+				cert: new(x509.Certificate),
+				err:  errors.New("provisioning credential expiration ("),
+			}
+		},
+		"ok/valid-notAfter-requested": func() test {
+			d, err := ParseTimeDuration("2h")
+			assert.FatalError(t, err)
+			return test{
+				pld:  profileLimitDuration{def: 4 * time.Hour, notAfter: n.Add(6 * time.Hour)},
+				so:   Options{NotBefore: NewTimeDuration(n.Add(3 * time.Hour)), NotAfter: d},
+				cert: new(x509.Certificate),
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, n.Add(3*time.Hour))
+					assert.Equals(t, cert.NotAfter, n.Add(5*time.Hour))
+				},
+			}
+		},
+		"ok/valid-notAfter-nil-limit-over-default": func() test {
+			return test{
+				pld:  profileLimitDuration{def: 1 * time.Hour, notAfter: n.Add(6 * time.Hour)},
+				so:   Options{NotBefore: NewTimeDuration(n.Add(3 * time.Hour))},
+				cert: new(x509.Certificate),
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, n.Add(3*time.Hour))
+					assert.Equals(t, cert.NotAfter, n.Add(4*time.Hour))
+				},
+			}
+		},
+		"ok/valid-notAfter-nil-limit-under-default": func() test {
+			return test{
+				pld:  profileLimitDuration{def: 4 * time.Hour, notAfter: n.Add(6 * time.Hour)},
+				so:   Options{NotBefore: NewTimeDuration(n.Add(3 * time.Hour))},
+				cert: new(x509.Certificate),
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, n.Add(3*time.Hour))
+					assert.Equals(t, cert.NotAfter, n.Add(6*time.Hour))
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tt := run()
+			prof := &x509util.Leaf{}
+			prof.SetSubject(tt.cert)
+			if err := tt.pld.Option(tt.so)(prof); err != nil {
+				if assert.NotNil(t, tt.err) {
+					assert.HasPrefix(t, err.Error(), tt.err.Error())
+				}
+			} else {
+				if assert.Nil(t, tt.err) {
+					tt.valid(prof.Subject())
+				}
+			}
+		})
+	}
+}

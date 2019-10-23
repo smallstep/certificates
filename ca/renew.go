@@ -178,7 +178,7 @@ func (r *TLSRenewer) renewCertificate() {
 }
 
 func (r *TLSRenewer) nextRenewDuration(notAfter time.Time) time.Duration {
-	d := notAfter.Sub(time.Now()) - r.renewBefore
+	d := time.Until(notAfter) - r.renewBefore
 	n := rand.Int63n(int64(r.renewJitter))
 	d -= time.Duration(n)
 	if d < 0 {

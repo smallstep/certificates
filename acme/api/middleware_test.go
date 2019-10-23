@@ -26,7 +26,6 @@ var testBody = []byte("foo")
 
 func testNext(w http.ResponseWriter, r *http.Request) {
 	w.Write(testBody)
-	return
 }
 
 func TestHandlerAddNonce(t *testing.T) {
@@ -471,7 +470,6 @@ func TestHandlerParseJWS(t *testing.T) {
 					assert.FatalError(t, err)
 					assert.Equals(t, gotRaw, expRaw)
 					w.Write(testBody)
-					return
 				},
 				statusCode: 200,
 			}
@@ -923,7 +921,6 @@ func TestHandlerLookupJWK(t *testing.T) {
 					assert.FatalError(t, err)
 					assert.Equals(t, _jwk, jwk)
 					w.Write(testBody)
-					return
 				},
 				statusCode: 200,
 			}
@@ -1114,7 +1111,6 @@ func TestHandlerExtractJWK(t *testing.T) {
 					assert.FatalError(t, err)
 					assert.Equals(t, _jwk.KeyID, pub.KeyID)
 					w.Write(testBody)
-					return
 				},
 				statusCode: 200,
 			}
@@ -1139,7 +1135,6 @@ func TestHandlerExtractJWK(t *testing.T) {
 					assert.FatalError(t, err)
 					assert.Equals(t, _jwk.KeyID, pub.KeyID)
 					w.Write(testBody)
-					return
 				},
 				statusCode: 200,
 			}
@@ -1448,7 +1443,6 @@ func TestHandlerValidateJWS(t *testing.T) {
 				ctx: context.WithValue(context.Background(), jwsContextKey, jws),
 				next: func(w http.ResponseWriter, r *http.Request) {
 					w.Write(testBody)
-					return
 				},
 				statusCode: 200,
 			}
@@ -1479,7 +1473,6 @@ func TestHandlerValidateJWS(t *testing.T) {
 				ctx: context.WithValue(context.Background(), jwsContextKey, jws),
 				next: func(w http.ResponseWriter, r *http.Request) {
 					w.Write(testBody)
-					return
 				},
 				statusCode: 200,
 			}
@@ -1510,7 +1503,6 @@ func TestHandlerValidateJWS(t *testing.T) {
 				ctx: context.WithValue(context.Background(), jwsContextKey, jws),
 				next: func(w http.ResponseWriter, r *http.Request) {
 					w.Write(testBody)
-					return
 				},
 				statusCode: 200,
 			}

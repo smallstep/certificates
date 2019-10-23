@@ -26,7 +26,7 @@ e.g. `v1.0.2`
 2. **Update the version of step/cli**
 
     <pre><code>
-    <b>$ dep ensure -update github.com/smallstep/cli</b>
+    <b>$ go get -u github.com/smallstep/cli</b>
     </code></pre>
 
 3. **Commit all changes.**

@@ -285,26 +285,19 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	}
 
 	// Check for the sign ssh method, default to sign X.509
-	if m := MethodFromContext(ctx); m == SignSSHMethod {
-		if o.claimer.IsSSHCAEnabled() == false {
+	if MethodFromContext(ctx) == SignSSHMethod {
+		if !o.claimer.IsSSHCAEnabled() {
 			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", o.GetID())
 		}
 		return o.authorizeSSHSign(claims)
 	}
 
-	// Admins should be able to authorize any SAN
-	if o.IsAdmin(claims.Email) {
-		return []SignOption{
-			profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
-			newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
-			newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
-		}, nil
-	}
-
 	so := []SignOption{
-		defaultPublicKeyValidator{},
-		profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
+		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
+		profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
+		// validators
+		defaultPublicKeyValidator{},
 		newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
 	}
 	// Admins should be able to authorize any SAN
@@ -350,13 +343,15 @@ func (o *OIDC) authorizeSSHSign(claims *openIDPayload) ([]SignOption, error) {
 	signOptions = append(signOptions, sshCertificateDefaultsModifier(defaults))
 
 	return append(signOptions,
-		// set the default extensions
+		// Set the default extensions
 		&sshDefaultExtensionModifier{},
-		// checks the validity bounds, and set the validity if has not been set
-		&sshCertificateValidityModifier{o.claimer},
-		// validate public key
+		// Set the validity bounds if not set.
+		sshDefaultValidityModifier(o.claimer),
+		// Validate public key
 		&sshDefaultPublicKeyValidator{},
-		// require all the fields in the SSH certificate
+		// Validate the validity period.
+		&sshCertificateValidityValidator{o.claimer},
+		// Require all the fields in the SSH certificate
 		&sshCertificateDefaultValidator{},
 	), nil
 }
