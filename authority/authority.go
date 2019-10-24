@@ -195,15 +195,11 @@ func (a *Authority) init() error {
 		if a.config.SSH != nil {
 			if a.sshCAHostCertSignKey != nil {
 				vars.SSH.HostKey = a.sshCAHostCertSignKey.PublicKey()
-				for _, k := range a.sshCAHostFederatedCerts[1:] {
-					vars.SSH.HostFederatedKeys = append(vars.SSH.HostFederatedKeys, k)
-				}
+				vars.SSH.HostFederatedKeys = append(vars.SSH.HostFederatedKeys, a.sshCAHostFederatedCerts[1:]...)
 			}
 			if a.sshCAUserCertSignKey != nil {
 				vars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
-				for _, k := range a.sshCAUserFederatedCerts[1:] {
-					vars.SSH.UserFederatedKeys = append(vars.SSH.UserFederatedKeys, k)
-				}
+				vars.SSH.UserFederatedKeys = append(vars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts[1:]...)
 			}
 		}
 		t.Data["Step"] = vars
