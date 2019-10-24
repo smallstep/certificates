@@ -142,13 +142,13 @@ Certificate:
     [`step` releases](https://github.com/smallstep/cli/releases):
 
     ```
-    $ wget https://github.com/smallstep/cli/releases/download/X.Y.Z/step_X.Y.Z_amd64.deb
+    $ wget https://github.com/smallstep/cli/releases/download/vX.Y.Z/step-cli_X.Y.Z_amd64.deb
     ```
 
     Install the Debian package:
 
     ```
-    $ sudo dpkg -i step_X.Y.Z_amd64.deb
+    $ sudo dpkg -i step-cli_X.Y.Z_amd64.deb
     ```
 
 2. Install `step-ca`.
@@ -156,7 +156,7 @@ Certificate:
     Download the latest Debian package from [releases](https://github.com/smallstep/certificates/releases):
 
     ```
-    $ wget https://github.com/smallstep/certificates/releases/download/X.Y.Z/step-certificates_X.Y.Z_amd64.deb
+    $ wget https://github.com/smallstep/certificates/releases/download/vX.Y.Z/step-certificates_X.Y.Z_amd64.deb
     ```
 
     Install the Debian package:
