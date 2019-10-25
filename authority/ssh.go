@@ -369,6 +369,16 @@ func (a *Authority) CheckSSHHost(principal string) (bool, error) {
 	return exists, nil
 }
 
+// GetSSHHosts returns a list of valid host principals.
+func (a *Authority) GetSSHHosts() ([]string, error) {
+	ps, err := a.db.GetSSHHostPrincipals()
+	if err != nil {
+		return nil, err
+	}
+
+	return ps, nil
+}
+
 func (a *Authority) getAddUserPrincipal() (cmd string) {
 	if a.config.SSH.AddUserPrincipal == "" {
 		return SSHAddUserPrincipal

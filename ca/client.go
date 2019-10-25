@@ -611,6 +611,24 @@ func (c *Client) SSHCheckHost(principal string) (*api.SSHCheckPrincipalResponse,
 	return &check, nil
 }
 
+// SSHGetHostPrincipals performs the POST /ssh/check-host request to the CA with the
+// given principal.
+func (c *Client) SSHGetHostPrincipals() (*api.SSHGetHostsResponse, error) {
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/get-hosts"})
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var hosts api.SSHGetHostsResponse
+	if err := readJSON(resp.Body, &hosts); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &hosts, nil
+}
+
 // RootFingerprint is a helper method that returns the current root fingerprint.
 // It does an health connection and gets the fingerprint from the TLS verified
 // chains.

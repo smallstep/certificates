@@ -21,6 +21,7 @@ type SSHAuthority interface {
 	GetSSHFederation() (*authority.SSHKeys, error)
 	GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error)
 	CheckSSHHost(principal string) (bool, error)
+	GetSSHHosts() ([]string, error)
 }
 
 // SSHSignRequest is the request body of an SSH certificate request.
@@ -64,6 +65,11 @@ type SSHRootsResponse struct {
 // SSHCertificate represents the response SSH certificate.
 type SSHCertificate struct {
 	*ssh.Certificate `json:"omitempty"`
+}
+
+// SSHGetHostsResponse
+type SSHGetHostsResponse struct {
+	Hosts []string `json:"hosts"`
 }
 
 // MarshalJSON implements the json.Marshaler interface. Returns a quoted,
@@ -367,5 +373,17 @@ func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 	}
 	JSON(w, &SSHCheckPrincipalResponse{
 		Exists: exists,
+	})
+}
+
+// SSHGetHosts is the HTTP handler that returns a list of valid ssh hosts.
+func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
+	hosts, err := h.Authority.GetSSHHosts()
+	if err != nil {
+		WriteError(w, InternalServerError(err))
+		return
+	}
+	JSON(w, &SSHGetHostsResponse{
+		Hosts: hosts,
 	})
 }

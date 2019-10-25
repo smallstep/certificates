@@ -69,6 +69,11 @@ func (s *SimpleDB) StoreSSHCertificate(crt *ssh.Certificate) error {
 	return ErrNotImplemented
 }
 
+// GetSSHHostPrincipals returns a "NotImplemented" error.
+func (s *SimpleDB) GetSSHHostPrincipals() ([]string, error) {
+	return nil, ErrNotImplemented
+}
+
 // Shutdown returns nil
 func (s *SimpleDB) Shutdown() error {
 	return nil
