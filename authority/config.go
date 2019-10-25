@@ -38,7 +38,7 @@ var (
 		DisableRenewal:    &defaultDisableRenewal,
 		MinUserSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
 		MaxUserSSHDur:     &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultUserSSHDur: &provisioner.Duration{Duration: 4 * time.Hour},
+		DefaultUserSSHDur: &provisioner.Duration{Duration: 16 * time.Hour},
 		MinHostSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
 		MaxHostSSHDur:     &provisioner.Duration{Duration: 30 * 24 * time.Hour},
 		DefaultHostSSHDur: &provisioner.Duration{Duration: 30 * 24 * time.Hour},
