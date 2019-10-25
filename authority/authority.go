@@ -154,7 +154,7 @@ func (a *Authority) init() error {
 				return errors.Wrap(err, "error creating ssh signer")
 			}
 			// Append public key to list of user certs
-			a.sshCAUserCerts = append(a.sshCAUserCerts, a.sshCAHostCertSignKey.PublicKey())
+			a.sshCAUserCerts = append(a.sshCAUserCerts, a.sshCAUserCertSignKey.PublicKey())
 			a.sshCAUserFederatedCerts = append(a.sshCAUserFederatedCerts, a.sshCAUserCertSignKey.PublicKey())
 		}
 
