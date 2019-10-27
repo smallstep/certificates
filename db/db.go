@@ -67,7 +67,7 @@ func New(c *Config) (AuthDB, error) {
 
 	tables := [][]byte{
 		revokedCertsTable, certsTable, usedOTTTable,
-		sshCertsTable, sshHostsTable, sshUsersTable,
+		sshCertsTable, sshHostsTable, sshHostPrincipalsTable, sshUsersTable,
 	}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
