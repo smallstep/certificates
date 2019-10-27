@@ -90,6 +90,8 @@ const (
 	TypeX5C Type = 7
 	// TypeK8sSA is used to indicate the X5C provisioners.
 	TypeK8sSA Type = 8
+	// TypeSSHPOP is used to indicate the SSHPOP provisioners.
+	TypeSSHPOP Type = 9
 
 	// RevokeAudienceKey is the key for the 'revoke' audiences in the audiences map.
 	RevokeAudienceKey = "revoke"
@@ -116,6 +118,8 @@ func (t Type) String() string {
 		return "X5C"
 	case TypeK8sSA:
 		return "K8sSA"
+	case TypeSSHPOP:
+		return "SSHPOP"
 	default:
 		return ""
 	}
@@ -169,6 +173,8 @@ func (l *List) UnmarshalJSON(data []byte) error {
 			p = &X5C{}
 		case "k8ssa":
 			p = &K8sSA{}
+		case "sshpop":
+			p = &SSHPOP{}
 		default:
 			// Skip unsupported provisioners. A client using this method may be
 			// compiled with a version of smallstep/certificates that does not
