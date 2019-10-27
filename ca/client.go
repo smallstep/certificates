@@ -611,9 +611,8 @@ func (c *Client) SSHCheckHost(principal string) (*api.SSHCheckPrincipalResponse,
 	return &check, nil
 }
 
-// SSHGetHostPrincipals performs the POST /ssh/check-host request to the CA with the
-// given principal.
-func (c *Client) SSHGetHostPrincipals() (*api.SSHGetHostsResponse, error) {
+// SSHGetHosts performs the GET /ssh/get-hosts request to the CA.
+func (c *Client) SSHGetHosts() (*api.SSHGetHostsResponse, error) {
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/get-hosts"})
 	resp, err := c.client.Get(u.String())
 	if err != nil {
