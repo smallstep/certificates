@@ -81,23 +81,6 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 		return errors.New("authority.provisioners cannot be empty")
 	}
 
-	// Merge global and configuration claims
-	claimer, err := provisioner.NewClaimer(c.Claims, globalProvisionerClaims)
-	if err != nil {
-		return err
-	}
-
-	// Initialize provisioners
-	config := provisioner.Config{
-		Claims:    claimer.Claims(),
-		Audiences: audiences,
-	}
-	for _, p := range c.Provisioners {
-		if err := p.Init(config); err != nil {
-			return err
-		}
-	}
-
 	if c.Template == nil {
 		c.Template = &x509util.ASN1DN{}
 	}
@@ -194,8 +177,11 @@ func (c *Config) Validate() error {
 // front so we cannot rely on the port.
 func (c *Config) getAudiences() provisioner.Audiences {
 	audiences := provisioner.Audiences{
-		Sign:   []string{legacyAuthority},
-		Revoke: []string{legacyAuthority},
+		Sign:      []string{legacyAuthority},
+		Revoke:    []string{legacyAuthority},
+		SSHSign:   []string{},
+		SSHRevoke: []string{},
+		SSHRenew:  []string{},
 	}
 
 	for _, name := range c.DNSNames {
@@ -203,6 +189,14 @@ func (c *Config) getAudiences() provisioner.Audiences {
 			fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
 		audiences.Revoke = append(audiences.Revoke,
 			fmt.Sprintf("https://%s/revoke", name), fmt.Sprintf("https://%s/1.0/revoke", name))
+		audiences.SSHSign = append(audiences.SSHSign,
+			fmt.Sprintf("https://%s/ssh/sign", name), fmt.Sprintf("https://%s/1.0/ssh/sign", name))
+		audiences.SSHRevoke = append(audiences.SSHRevoke,
+			fmt.Sprintf("https://%s/ssh/revoke", name), fmt.Sprintf("https://%s/1.0/ssh/revoke", name))
+		audiences.SSHRenew = append(audiences.SSHRenew,
+			fmt.Sprintf("https://%s/ssh/renew", name), fmt.Sprintf("https://%s/1.0/ssh/renew", name))
+		audiences.SSHRekey = append(audiences.SSHRekey,
+			fmt.Sprintf("https://%s/ssh/rekey", name), fmt.Sprintf("https://%s/1.0/ssh/rekey", name))
 	}
 
 	return audiences

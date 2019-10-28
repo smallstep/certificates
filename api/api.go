@@ -38,7 +38,7 @@ type Authority interface {
 	LoadProvisionerByCertificate(*x509.Certificate) (provisioner.Interface, error)
 	LoadProvisionerByID(string) (provisioner.Interface, error)
 	GetProvisioners(cursor string, limit int) (provisioner.List, string, error)
-	Revoke(*authority.RevokeOptions) error
+	Revoke(context.Context, *authority.RevokeOptions) error
 	GetEncryptedKey(kid string) (string, error)
 	GetRoots() (federation []*x509.Certificate, err error)
 	GetFederation() ([]*x509.Certificate, error)
@@ -252,6 +252,9 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/federation", h.Federation)
 	// SSH CA
 	r.MethodFunc("POST", "/ssh/sign", h.SSHSign)
+	r.MethodFunc("POST", "/ssh/renew", h.SSHRenew)
+	r.MethodFunc("POST", "/ssh/revoke", h.SSHRevoke)
+	r.MethodFunc("POST", "/ssh/rekey", h.SSHRekey)
 	r.MethodFunc("GET", "/ssh/roots", h.SSHRoots)
 	r.MethodFunc("GET", "/ssh/federation", h.SSHFederation)
 	r.MethodFunc("POST", "/ssh/config", h.SSHConfig)

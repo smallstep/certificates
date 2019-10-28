@@ -22,6 +22,7 @@ type x5cPayload struct {
 // X5C is the default provisioner, an entity that can sign tokens necessary for
 // signature requests.
 type X5C struct {
+	*base
 	Type      string  `json:"type"`
 	Name      string  `json:"name"`
 	Roots     []byte  `json:"roots"`
@@ -170,7 +171,7 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, err
 
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke the certificate with serial number in the `sub` property.
-func (p *X5C) AuthorizeRevoke(token string) error {
+func (p *X5C) AuthorizeRevoke(ctx context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.audiences.Revoke)
 	return err
 }
@@ -213,8 +214,8 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}, nil
 }
 
-// AuthorizeRenewal returns an error if the renewal is disabled.
-func (p *X5C) AuthorizeRenewal(cert *x509.Certificate) error {
+// AuthorizeRenew returns an error if the renewal is disabled.
+func (p *X5C) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
 		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
 	}

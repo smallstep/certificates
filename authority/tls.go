@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/asn1"
@@ -16,6 +17,7 @@ import (
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
+	"github.com/smallstep/cli/jose"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -127,7 +129,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 // with a validity window that begins 'now'.
 func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error) {
 	// Check step provisioner extensions
-	if err := a.authorizeRenewal(oldCert); err != nil {
+	if err := a.authorizeRenew(oldCert); err != nil {
 		return nil, err
 	}
 
@@ -147,15 +149,15 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 		ExtKeyUsage:                 oldCert.ExtKeyUsage,
 		UnknownExtKeyUsage:          oldCert.UnknownExtKeyUsage,
 		BasicConstraintsValid:       oldCert.BasicConstraintsValid,
-		IsCA:                        oldCert.IsCA,
-		MaxPathLen:                  oldCert.MaxPathLen,
-		MaxPathLenZero:              oldCert.MaxPathLenZero,
-		OCSPServer:                  oldCert.OCSPServer,
-		IssuingCertificateURL:       oldCert.IssuingCertificateURL,
-		DNSNames:                    oldCert.DNSNames,
-		EmailAddresses:              oldCert.EmailAddresses,
-		IPAddresses:                 oldCert.IPAddresses,
-		URIs:                        oldCert.URIs,
+		IsCA:                  oldCert.IsCA,
+		MaxPathLen:            oldCert.MaxPathLen,
+		MaxPathLenZero:        oldCert.MaxPathLenZero,
+		OCSPServer:            oldCert.OCSPServer,
+		IssuingCertificateURL: oldCert.IssuingCertificateURL,
+		DNSNames:              oldCert.DNSNames,
+		EmailAddresses:        oldCert.EmailAddresses,
+		IPAddresses:           oldCert.IPAddresses,
+		URIs:                  oldCert.URIs,
 		PermittedDNSDomainsCritical: oldCert.PermittedDNSDomainsCritical,
 		PermittedDNSDomains:         oldCert.PermittedDNSDomains,
 		ExcludedDNSDomains:          oldCert.ExcludedDNSDomains,
@@ -220,13 +222,14 @@ type RevokeOptions struct {
 // being renewed.
 //
 // TODO: Add OCSP and CRL support.
-func (a *Authority) Revoke(opts *RevokeOptions) error {
+func (a *Authority) Revoke(ctx context.Context, opts *RevokeOptions) error {
 	errContext := apiCtx{
 		"serialNumber": opts.Serial,
 		"reasonCode":   opts.ReasonCode,
 		"reason":       opts.Reason,
 		"passiveOnly":  opts.PassiveOnly,
 		"mTLS":         opts.MTLS,
+		"context":      string(provisioner.MethodFromContext(ctx)),
 	}
 	if opts.MTLS {
 		errContext["certificate"] = base64.StdEncoding.EncodeToString(opts.Crt.Raw)
@@ -242,26 +245,57 @@ func (a *Authority) Revoke(opts *RevokeOptions) error {
 		RevokedAt:  time.Now().UTC(),
 	}
 
-	// Authorize mTLS or token request and get back a provisioner interface.
-	p, err := a.authorizeRevoke(opts)
-	if err != nil {
-		return &apiError{errors.Wrap(err, "revoke"),
-			http.StatusUnauthorized, errContext}
-	}
-
+	var (
+		p   provisioner.Interface
+		err error
+	)
 	// If not mTLS then get the TokenID of the token.
 	if !opts.MTLS {
+		// Validate payload
+		token, err := jose.ParseSigned(opts.OTT)
+		if err != nil {
+			return &apiError{errors.Wrapf(err, "revoke: error parsing token"),
+				http.StatusUnauthorized, errContext}
+		}
+
+		// Get claims w/out verification. We should have already verified this token
+		// earlier with a call to authorizeSSHRevoke.
+		var claims Claims
+		if err = token.UnsafeClaimsWithoutVerification(&claims); err != nil {
+			return &apiError{errors.Wrap(err, "revoke"), http.StatusUnauthorized, errContext}
+		}
+
+		// This method will also validate the audiences for JWK provisioners.
+		var ok bool
+		p, ok = a.provisioners.LoadByToken(token, &claims.Claims)
+		if !ok {
+			return &apiError{
+				errors.Errorf("revoke: provisioner not found"),
+				http.StatusInternalServerError, errContext}
+		}
 		rci.TokenID, err = p.GetTokenID(opts.OTT)
 		if err != nil {
 			return &apiError{errors.Wrap(err, "revoke: could not get ID for token"),
 				http.StatusInternalServerError, errContext}
 		}
 		errContext["tokenID"] = rci.TokenID
+	} else {
+		// Load the Certificate provisioner if one exists.
+		p, err = a.LoadProvisionerByCertificate(opts.Crt)
+		if err != nil {
+			return &apiError{
+				errors.Wrap(err, "revoke: unable to load certificate provisioner"),
+				http.StatusUnauthorized, errContext}
+		}
 	}
 	rci.ProvisionerID = p.GetID()
 	errContext["provisionerID"] = rci.ProvisionerID
 
-	err = a.db.Revoke(rci)
+	if provisioner.MethodFromContext(ctx) == provisioner.RevokeSSHMethod {
+		err = a.db.RevokeSSH(rci)
+	} else { // default to revoke x509
+		err = a.db.Revoke(rci)
+	}
 	switch err {
 	case nil:
 		return nil

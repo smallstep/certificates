@@ -40,6 +40,7 @@ type k8sSAPayload struct {
 // K8sSA represents a Kubernetes ServiceAccount provisioner; an
 // entity trusted to make signature requests.
 type K8sSA struct {
+	*base
 	Type      string  `json:"type"`
 	Name      string  `json:"name"`
 	Claims    *Claims `json:"claims,omitempty"`
@@ -199,7 +200,7 @@ func (p *K8sSA) authorizeToken(token string, audiences []string) (*k8sSAPayload,
 
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke the certificate with serial number in the `sub` property.
-func (p *K8sSA) AuthorizeRevoke(token string) error {
+func (p *K8sSA) AuthorizeRevoke(ctx context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.audiences.Revoke)
 	return err
 }

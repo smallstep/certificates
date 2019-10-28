@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/db"
+	"golang.org/x/crypto/ssh"
 )
 
 // Interface is the interface that all provisioner types must implement.
@@ -20,27 +22,45 @@ type Interface interface {
 	GetEncryptedKey() (kid string, key string, ok bool)
 	Init(config Config) error
 	AuthorizeSign(ctx context.Context, token string) ([]SignOption, error)
-	AuthorizeRenewal(cert *x509.Certificate) error
-	AuthorizeRevoke(token string) error
+	AuthorizeRevoke(ctx context.Context, token string) error
+	AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error
+	AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error)
+	AuthorizeSSHRevoke(ctx context.Context, token string) error
+	AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error)
+	AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error)
 }
 
 // Audiences stores all supported audiences by request type.
 type Audiences struct {
-	Sign   []string
-	Revoke []string
+	Sign      []string
+	Revoke    []string
+	SSHSign   []string
+	SSHRevoke []string
+	SSHRenew  []string
+	SSHRekey  []string
 }
 
 // All returns all supported audiences across all request types in one list.
-func (a Audiences) All() []string {
-	return append(a.Sign, a.Revoke...)
+func (a Audiences) All() (auds []string) {
+	auds = a.Sign
+	auds = append(auds, a.Revoke...)
+	auds = append(auds, a.SSHSign...)
+	auds = append(auds, a.SSHRevoke...)
+	auds = append(auds, a.SSHRenew...)
+	auds = append(auds, a.SSHRekey...)
+	return
 }
 
 // WithFragment returns a copy of audiences where the url audiences contains the
 // given fragment.
 func (a Audiences) WithFragment(fragment string) Audiences {
 	ret := Audiences{
-		Sign:   make([]string, len(a.Sign)),
-		Revoke: make([]string, len(a.Revoke)),
+		Sign:      make([]string, len(a.Sign)),
+		Revoke:    make([]string, len(a.Revoke)),
+		SSHSign:   make([]string, len(a.SSHSign)),
+		SSHRevoke: make([]string, len(a.SSHRevoke)),
+		SSHRenew:  make([]string, len(a.SSHRenew)),
+		SSHRekey:  make([]string, len(a.SSHRekey)),
 	}
 	for i, s := range a.Sign {
 		if u, err := url.Parse(s); err == nil {
@@ -54,6 +74,34 @@ func (a Audiences) WithFragment(fragment string) Audiences {
 			ret.Revoke[i] = u.ResolveReference(&url.URL{Fragment: fragment}).String()
 		} else {
 			ret.Revoke[i] = s
+		}
+	}
+	for i, s := range a.SSHSign {
+		if u, err := url.Parse(s); err == nil {
+			ret.SSHSign[i] = u.ResolveReference(&url.URL{Fragment: fragment}).String()
+		} else {
+			ret.SSHSign[i] = s
+		}
+	}
+	for i, s := range a.SSHRevoke {
+		if u, err := url.Parse(s); err == nil {
+			ret.SSHRevoke[i] = u.ResolveReference(&url.URL{Fragment: fragment}).String()
+		} else {
+			ret.SSHRevoke[i] = s
+		}
+	}
+	for i, s := range a.SSHRenew {
+		if u, err := url.Parse(s); err == nil {
+			ret.SSHRenew[i] = u.ResolveReference(&url.URL{Fragment: fragment}).String()
+		} else {
+			ret.SSHRenew[i] = s
+		}
+	}
+	for i, s := range a.SSHRekey {
+		if u, err := url.Parse(s); err == nil {
+			ret.SSHRekey[i] = u.ResolveReference(&url.URL{Fragment: fragment}).String()
+		} else {
+			ret.SSHRekey[i] = s
 		}
 	}
 	return ret
@@ -92,11 +140,6 @@ const (
 	TypeK8sSA Type = 8
 	// TypeSSHPOP is used to indicate the SSHPOP provisioners.
 	TypeSSHPOP Type = 9
-
-	// RevokeAudienceKey is the key for the 'revoke' audiences in the audiences map.
-	RevokeAudienceKey = "revoke"
-	// SignAudienceKey is the key for the 'sign' audiences in the audiences map.
-	SignAudienceKey = "sign"
 )
 
 // String returns the string representation of the type.
@@ -125,6 +168,12 @@ func (t Type) String() string {
 	}
 }
 
+// SSHKeys represents the SSH User and Host public keys.
+type SSHKeys struct {
+	UserKeys []ssh.PublicKey
+	HostKeys []ssh.PublicKey
+}
+
 // Config defines the default parameters used in the initialization of
 // provisioners.
 type Config struct {
@@ -132,6 +181,10 @@ type Config struct {
 	Claims Claims
 	// Audiences are the audiences used in the default provisioner, (JWK).
 	Audiences Audiences
+	// DB is the interface to the authority DB client.
+	DB db.AuthDB
+	// SSHKeys are the root SSH public keys
+	SSHKeys *SSHKeys
 }
 
 type provisioner struct {
@@ -220,6 +273,50 @@ func SanitizeSSHUserPrincipal(email string) string {
 			return '_'
 		}
 	}, strings.ToLower(email))
+}
+
+type base struct{}
+
+// AuthorizeSign returns an unimplmented error. Provisioners should overwrite
+// this method if they will support authorizing tokens for signing x509 Certificates.
+func (b *base) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+	return nil, errors.New("not implemented; provisioner does not implement AuthorizeSign")
+}
+
+// AuthorizeRevoke returns an unimplmented error. Provisioners should overwrite
+// this method if they will support authorizing tokens for revoking x509 Certificates.
+func (b *base) AuthorizeRevoke(ctx context.Context, token string) error {
+	return errors.New("not implemented; provisioner does not implement AuthorizeRevoke")
+}
+
+// AuthorizeRenew returns an unimplmented error. Provisioners should overwrite
+// this method if they will support authorizing tokens for renewing x509 Certificates.
+func (b *base) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
+	return errors.New("not implemented; provisioner does not implement AuthorizeRenew")
+}
+
+// AuthorizeSSHSign returns an unimplmented error. Provisioners should overwrite
+// this method if they will support authorizing tokens for signing SSH Certificates.
+func (b *base) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+	return nil, errors.New("not implemented; provisioner does not implement AuthorizeSSHSign")
+}
+
+// AuthorizeRevoke returns an unimplmented error. Provisioners should overwrite
+// this method if they will support authorizing tokens for revoking SSH Certificates.
+func (b *base) AuthorizeSSHRevoke(ctx context.Context, token string) error {
+	return errors.New("not implemented; provisioner does not implement AuthorizeSSHRevoke")
+}
+
+// AuthorizeSSHRenew returns an unimplmented error. Provisioners should overwrite
+// this method if they will support authorizing tokens for renewing SSH Certificates.
+func (b *base) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {
+	return nil, errors.New("not implemented; provisioner does not implement AuthorizeSSHRenew")
+}
+
+// AuthorizeSSHRekey returns an unimplmented error. Provisioners should overwrite
+// this method if they will support authorizing tokens for renewing SSH Certificates.
+func (b *base) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error) {
+	return nil, nil, errors.New("not implemented; provisioner does not implement AuthorizeSSHRekey")
 }
 
 // MockProvisioner for testing
