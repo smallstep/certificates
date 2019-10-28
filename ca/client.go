@@ -528,6 +528,72 @@ func (c *Client) SSHSign(req *api.SSHSignRequest) (*api.SSHSignResponse, error) 
 	return &sign, nil
 }
 
+// SSHRenew performs the POST /ssh/renew request to the CA and returns the
+// api.SSHRenewResponse struct.
+func (c *Client) SSHRenew(req *api.SSHRenewRequest) (*api.SSHRenewResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/renew"})
+	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var renew api.SSHRenewResponse
+	if err := readJSON(resp.Body, &renew); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &renew, nil
+}
+
+// SSHRekey performs the POST /ssh/rekey request to the CA and returns the
+// api.SSHRekeyResponse struct.
+func (c *Client) SSHRekey(req *api.SSHRekeyRequest) (*api.SSHRekeyResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/rekey"})
+	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var rekey api.SSHRekeyResponse
+	if err := readJSON(resp.Body, &rekey); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &rekey, nil
+}
+
+// SSHRevoke performs the POST /ssh/revoke request to the CA and returns the
+// api.SSHRevokeResponse struct.
+func (c *Client) SSHRevoke(req *api.SSHRevokeRequest) (*api.SSHRevokeResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/revoke"})
+	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var revoke api.SSHRevokeResponse
+	if err := readJSON(resp.Body, &revoke); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &revoke, nil
+}
+
 // SSHRoots performs the GET /ssh/roots request to the CA and returns the
 // api.SSHRootsResponse struct.
 func (c *Client) SSHRoots() (*api.SSHRootsResponse, error) {

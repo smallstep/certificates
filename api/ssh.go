@@ -16,6 +16,8 @@ import (
 // SSHAuthority is the interface implemented by a SSH CA authority.
 type SSHAuthority interface {
 	SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
+	RenewSSH(cert *ssh.Certificate) (*ssh.Certificate, error)
+	RekeySSH(cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	SignSSHAddUser(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 	GetSSHRoots() (*authority.SSHKeys, error)
 	GetSSHFederation() (*authority.SSHKeys, error)
@@ -67,7 +69,8 @@ type SSHCertificate struct {
 	*ssh.Certificate `json:"omitempty"`
 }
 
-// SSHGetHostsResponse
+// SSHGetHostsResponse is the response object that returns the list of valid
+// hosts for SSH.
 type SSHGetHostsResponse struct {
 	Hosts []string `json:"hosts"`
 }

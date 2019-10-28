@@ -80,6 +80,7 @@ type azurePayload struct {
 // https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/how-to-use-vm-token
 // and https://docs.microsoft.com/en-us/azure/virtual-machines/windows/instance-metadata-service
 type Azure struct {
+	*base
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
 	TenantID               string   `json:"tenantId"`
@@ -208,15 +209,14 @@ func (p *Azure) Init(config Config) (err error) {
 	return nil
 }
 
-// AuthorizeSign validates the given token and returns the sign options that
-// will be used on certificate creation.
-func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+// parseToken returuns the claims, name, group, error.
+func (p *Azure) parseToken(token string) (*azurePayload, string, string, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing token")
+		return nil, "", "", errors.Wrapf(err, "error parsing token")
 	}
 	if len(jwt.Headers) == 0 {
-		return nil, errors.New("error parsing token: header is missing")
+		return nil, "", "", errors.New("error parsing token: header is missing")
 	}
 
 	var found bool
@@ -229,7 +229,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		}
 	}
 	if !found {
-		return nil, errors.New("cannot validate token")
+		return nil, "", "", errors.New("cannot validate token")
 	}
 
 	if err := claims.ValidateWithLeeway(jose.Expected{
@@ -237,19 +237,29 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		Issuer:   p.oidcConfig.Issuer,
 		Time:     time.Now(),
 	}, 1*time.Minute); err != nil {
-		return nil, errors.Wrap(err, "failed to validate payload")
+		return nil, "", "", errors.Wrap(err, "failed to validate payload")
 	}
 
 	// Validate TenantID
 	if claims.TenantID != p.TenantID {
-		return nil, errors.New("validation failed: invalid tenant id claim (tid)")
+		return nil, "", "", errors.New("validation failed: invalid tenant id claim (tid)")
 	}
 
 	re := azureXMSMirIDRegExp.FindStringSubmatch(claims.XMSMirID)
 	if len(re) != 4 {
-		return nil, errors.Errorf("error parsing xms_mirid claim: %s", claims.XMSMirID)
+		return nil, "", "", errors.Errorf("error parsing xms_mirid claim: %s", claims.XMSMirID)
 	}
 	group, name := re[2], re[3]
+	return &claims, name, group, nil
+}
+
+// AuthorizeSign validates the given token and returns the sign options that
+// will be used on certificate creation.
+func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+	_, name, group, err := p.parseToken(token)
+	if err != nil {
+		return nil, err
+	}
 
 	// Filter by resource group
 	if len(p.ResourceGroups) > 0 {
@@ -263,14 +273,6 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		if !found {
 			return nil, errors.New("validation failed: invalid resource group")
 		}
-	}
-
-	// Check for the sign ssh method, default to sign X.509
-	if MethodFromContext(ctx) == SignSSHMethod {
-		if !p.claimer.IsSSHCAEnabled() {
-			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
-		}
-		return p.authorizeSSHSign(claims, name)
 	}
 
 	// Enforce known common name and default DNS if configured.
@@ -293,22 +295,27 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	), nil
 }
 
-// AuthorizeRenewal returns an error if the renewal is disabled.
-func (p *Azure) AuthorizeRenewal(cert *x509.Certificate) error {
+// AuthorizeRenew returns an error if the renewal is disabled.
+// NOTE: This method does not actually validate the certificate or check it's
+// revocation status. Just confirms that the provisioner that created the
+// certificate was configured to allow renewals.
+func (p *Azure) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
 		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
 	}
 	return nil
 }
 
-// AuthorizeRevoke returns an error because revoke is not supported on Azure
-// provisioners.
-func (p *Azure) AuthorizeRevoke(token string) error {
-	return errors.New("revoke is not supported on a Azure provisioner")
-}
+// AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
+func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+	if !p.claimer.IsSSHCAEnabled() {
+		return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
+	}
 
-// authorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *Azure) authorizeSSHSign(claims azurePayload, name string) ([]SignOption, error) {
+	_, name, _, err := p.parseToken(token)
+	if err != nil {
+		return nil, err
+	}
 	signOptions := []SignOption{
 		// set the key id to the token subject
 		sshCertificateKeyIDModifier(name),

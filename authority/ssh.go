@@ -1,10 +1,12 @@
 package authority
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -155,6 +157,22 @@ func (a *Authority) GetSSHConfig(typ string, data map[string]string) ([]template
 	return output, nil
 }
 
+// authorizeSSHSign loads the provisioner from the token, checks that it has not
+// been used again and calls the provisioner AuthorizeSSHSign method. Returns a
+// list of methods to apply to the signing flow.
+func (a *Authority) authorizeSSHSign(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
+	var errContext = apiCtx{"ott": ott}
+	p, err := a.authorizeToken(ott)
+	if err != nil {
+		return nil, &apiError{errors.Wrap(err, "authorizeSSHSign"), http.StatusUnauthorized, errContext}
+	}
+	opts, err := p.AuthorizeSSHSign(ctx, ott)
+	if err != nil {
+		return nil, &apiError{errors.Wrap(err, "authorizeSSHSign"), http.StatusUnauthorized, errContext}
+	}
+	return opts, nil
+}
+
 // SignSSH creates a signed SSH certificate with the given public key and options.
 func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	var mods []provisioner.SSHCertificateModifier
@@ -272,6 +290,263 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 	}
 
 	return cert, nil
+}
+
+// authorizeSSHRenew authorizes an SSH certificate renewal request, by
+// validating the contents of an SSHPOP token.
+func (a *Authority) authorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {
+	errContext := map[string]interface{}{"ott": token}
+
+	p, err := a.authorizeToken(token)
+	if err != nil {
+		return nil, &apiError{
+			err:     errors.Wrap(err, "authorizeSSHRenew"),
+			code:    http.StatusUnauthorized,
+			context: errContext,
+		}
+	}
+	cert, err := p.AuthorizeSSHRenew(ctx, token)
+	if err != nil {
+		return nil, &apiError{
+			err:     errors.Wrap(err, "authorizeSSHRenew"),
+			code:    http.StatusUnauthorized,
+			context: errContext,
+		}
+	}
+	return cert, nil
+}
+
+// RenewSSH creates a signed SSH certificate using the old SSH certificate as a template.
+func (a *Authority) RenewSSH(oldCert *ssh.Certificate) (*ssh.Certificate, error) {
+	nonce, err := randutil.ASCII(32)
+	if err != nil {
+		return nil, &apiError{err: err, code: http.StatusInternalServerError}
+	}
+
+	var serial uint64
+	if err := binary.Read(rand.Reader, binary.BigEndian, &serial); err != nil {
+		return nil, &apiError{
+			err:  errors.Wrap(err, "renewSSH: error reading random number"),
+			code: http.StatusInternalServerError,
+		}
+	}
+
+	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
+		return nil, errors.New("rewnewSSh: cannot renew certificate without validity period")
+	}
+	dur := time.Duration(oldCert.ValidBefore-oldCert.ValidAfter) * time.Second
+	va := time.Now()
+	vb := va.Add(dur)
+
+	// Build base certificate with the key and some random values
+	cert := &ssh.Certificate{
+		Nonce:           []byte(nonce),
+		Key:             oldCert.Key,
+		Serial:          serial,
+		CertType:        oldCert.CertType,
+		KeyId:           oldCert.KeyId,
+		ValidPrincipals: oldCert.ValidPrincipals,
+		Permissions:     oldCert.Permissions,
+		ValidAfter:      uint64(va.Unix()),
+		ValidBefore:     uint64(vb.Unix()),
+	}
+
+	// Get signer from authority keys
+	var signer ssh.Signer
+	switch cert.CertType {
+	case ssh.UserCert:
+		if a.sshCAUserCertSignKey == nil {
+			return nil, &apiError{
+				err:  errors.New("renewSSH: user certificate signing is not enabled"),
+				code: http.StatusNotImplemented,
+			}
+		}
+		signer = a.sshCAUserCertSignKey
+	case ssh.HostCert:
+		if a.sshCAHostCertSignKey == nil {
+			return nil, &apiError{
+				err:  errors.New("renewSSH: host certificate signing is not enabled"),
+				code: http.StatusNotImplemented,
+			}
+		}
+		signer = a.sshCAHostCertSignKey
+	default:
+		return nil, &apiError{
+			err:  errors.Errorf("renewSSH: unexpected ssh certificate type: %d", cert.CertType),
+			code: http.StatusInternalServerError,
+		}
+	}
+	cert.SignatureKey = signer.PublicKey()
+
+	// Get bytes for signing trailing the signature length.
+	data := cert.Marshal()
+	data = data[:len(data)-4]
+
+	// Sign the certificate
+	sig, err := signer.Sign(rand.Reader, data)
+	if err != nil {
+		return nil, &apiError{
+			err:  errors.Wrap(err, "renewSSH: error signing certificate"),
+			code: http.StatusInternalServerError,
+		}
+	}
+	cert.Signature = sig
+
+	if err = a.db.StoreSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+		return nil, &apiError{
+			err:  errors.Wrap(err, "renewSSH: error storing certificate in db"),
+			code: http.StatusInternalServerError,
+		}
+	}
+
+	return cert, nil
+}
+
+// authorizeSSHRekey authorizes an SSH certificate rekey request, by
+// validating the contents of an SSHPOP token.
+func (a *Authority) authorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []provisioner.SignOption, error) {
+	errContext := map[string]interface{}{"ott": token}
+
+	p, err := a.authorizeToken(token)
+	if err != nil {
+		return nil, nil, &apiError{
+			err:     errors.Wrap(err, "authorizeSSHRenew"),
+			code:    http.StatusUnauthorized,
+			context: errContext,
+		}
+	}
+	cert, opts, err := p.AuthorizeSSHRekey(ctx, token)
+	if err != nil {
+		return nil, nil, &apiError{
+			err:     errors.Wrap(err, "authorizeSSHRekey"),
+			code:    http.StatusUnauthorized,
+			context: errContext,
+		}
+	}
+	return cert, opts, nil
+}
+
+// RekeySSH creates a signed SSH certificate using the old SSH certificate as a template.
+func (a *Authority) RekeySSH(oldCert *ssh.Certificate, pub ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+	var validators []provisioner.SSHCertificateValidator
+
+	for _, op := range signOpts {
+		switch o := op.(type) {
+		// validate the ssh.Certificate
+		case provisioner.SSHCertificateValidator:
+			validators = append(validators, o)
+		default:
+			return nil, &apiError{
+				err:  errors.Errorf("rekeySSH: invalid extra option type %T", o),
+				code: http.StatusInternalServerError,
+			}
+		}
+	}
+
+	nonce, err := randutil.ASCII(32)
+	if err != nil {
+		return nil, &apiError{err: err, code: http.StatusInternalServerError}
+	}
+
+	var serial uint64
+	if err := binary.Read(rand.Reader, binary.BigEndian, &serial); err != nil {
+		return nil, &apiError{
+			err:  errors.Wrap(err, "rekeySSH: error reading random number"),
+			code: http.StatusInternalServerError,
+		}
+	}
+
+	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
+		return nil, errors.New("rekeySSh: cannot rekey certificate without validity period")
+	}
+	dur := time.Duration(oldCert.ValidBefore-oldCert.ValidAfter) * time.Second
+	va := time.Now()
+	vb := va.Add(dur)
+
+	// Build base certificate with the key and some random values
+	cert := &ssh.Certificate{
+		Nonce:           []byte(nonce),
+		Key:             pub,
+		Serial:          serial,
+		CertType:        oldCert.CertType,
+		KeyId:           oldCert.KeyId,
+		ValidPrincipals: oldCert.ValidPrincipals,
+		Permissions:     oldCert.Permissions,
+		ValidAfter:      uint64(va.Unix()),
+		ValidBefore:     uint64(vb.Unix()),
+	}
+
+	// Get signer from authority keys
+	var signer ssh.Signer
+	switch cert.CertType {
+	case ssh.UserCert:
+		if a.sshCAUserCertSignKey == nil {
+			return nil, &apiError{
+				err:  errors.New("rekeySSH: user certificate signing is not enabled"),
+				code: http.StatusNotImplemented,
+			}
+		}
+		signer = a.sshCAUserCertSignKey
+	case ssh.HostCert:
+		if a.sshCAHostCertSignKey == nil {
+			return nil, &apiError{
+				err:  errors.New("rekeySSH: host certificate signing is not enabled"),
+				code: http.StatusNotImplemented,
+			}
+		}
+		signer = a.sshCAHostCertSignKey
+	default:
+		return nil, &apiError{
+			err:  errors.Errorf("rekeySSH: unexpected ssh certificate type: %d", cert.CertType),
+			code: http.StatusInternalServerError,
+		}
+	}
+	cert.SignatureKey = signer.PublicKey()
+
+	// Get bytes for signing trailing the signature length.
+	data := cert.Marshal()
+	data = data[:len(data)-4]
+
+	// Sign the certificate
+	sig, err := signer.Sign(rand.Reader, data)
+	if err != nil {
+		return nil, &apiError{
+			err:  errors.Wrap(err, "rekeySSH: error signing certificate"),
+			code: http.StatusInternalServerError,
+		}
+	}
+	cert.Signature = sig
+
+	// User provisioners validators
+	for _, v := range validators {
+		if err := v.Valid(cert); err != nil {
+			return nil, &apiError{err: err, code: http.StatusForbidden}
+		}
+	}
+
+	if err = a.db.StoreSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+		return nil, &apiError{
+			err:  errors.Wrap(err, "rekeySSH: error storing certificate in db"),
+			code: http.StatusInternalServerError,
+		}
+	}
+
+	return cert, nil
+}
+
+// authorizeSSHRevoke authorizes an SSH certificate revoke request, by
+// validating the contents of an SSHPOP token.
+func (a *Authority) authorizeSSHRevoke(ctx context.Context, token string) error {
+	errContext := map[string]interface{}{"ott": token}
+
+	p, err := a.authorizeToken(token)
+	if err != nil {
+		return &apiError{errors.Wrap(err, "authorizeSSHRevoke"), http.StatusUnauthorized, errContext}
+	}
+	if err = p.AuthorizeSSHRevoke(ctx, token); err != nil {
+		return &apiError{errors.Wrap(err, "authorizeSSHRevoke"), http.StatusUnauthorized, errContext}
+	}
+	return nil
 }
 
 // SignSSHAddUser signs a certificate that provisions a new user in a server.

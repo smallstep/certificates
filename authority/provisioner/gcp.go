@@ -74,6 +74,7 @@ func newGCPConfig() *gcpConfig {
 // Google Identity docs are available at
 // https://cloud.google.com/compute/docs/instances/verifying-instance-identity
 type GCP struct {
+	*base
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
 	ServiceAccounts        []string `json:"serviceAccounts"`
@@ -212,14 +213,6 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		return nil, err
 	}
 
-	// Check for the sign ssh method, default to sign X.509
-	if MethodFromContext(ctx) == SignSSHMethod {
-		if !p.claimer.IsSSHCAEnabled() {
-			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
-		}
-		return p.authorizeSSHSign(claims)
-	}
-
 	ce := claims.Google.ComputeEngine
 	// Enforce known common name and default DNS if configured.
 	// By default we we'll accept the CN and SANs in the CSR.
@@ -247,17 +240,11 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 }
 
 // AuthorizeRenewal returns an error if the renewal is disabled.
-func (p *GCP) AuthorizeRenewal(cert *x509.Certificate) error {
+func (p *GCP) AuthorizeRenewal(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
 		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
 	}
 	return nil
-}
-
-// AuthorizeRevoke returns an error because revoke is not supported on GCP
-// provisioners.
-func (p *GCP) AuthorizeRevoke(token string) error {
-	return errors.New("revoke is not supported on a GCP provisioner")
 }
 
 // assertConfig initializes the config if it has not been initialized.
@@ -357,8 +344,16 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 	return &claims, nil
 }
 
-// authorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *GCP) authorizeSSHSign(claims *gcpPayload) ([]SignOption, error) {
+// AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
+func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+	if !p.claimer.IsSSHCAEnabled() {
+		return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
+	}
+	claims, err := p.authorizeToken(token)
+	if err != nil {
+		return nil, err
+	}
+
 	ce := claims.Google.ComputeEngine
 
 	signOptions := []SignOption{

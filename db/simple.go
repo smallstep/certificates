@@ -31,8 +31,18 @@ func (s *SimpleDB) IsRevoked(sn string) (bool, error) {
 	return false, nil
 }
 
+// IsSSHRevoked noop
+func (s *SimpleDB) IsSSHRevoked(sn string) (bool, error) {
+	return false, nil
+}
+
 // Revoke returns a "NotImplemented" error.
 func (s *SimpleDB) Revoke(rci *RevokedCertificateInfo) error {
+	return ErrNotImplemented
+}
+
+// RevokeSSH returns a "NotImplemented" error.
+func (s *SimpleDB) RevokeSSH(rci *RevokedCertificateInfo) error {
 	return ErrNotImplemented
 }
 

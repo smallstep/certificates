@@ -179,8 +179,33 @@ func (a *Authority) init() error {
 		}
 	}
 
+	// Merge global and configuration claims
+	claimer, err := provisioner.NewClaimer(a.config.AuthorityConfig.Claims, globalProvisionerClaims)
+	if err != nil {
+		return err
+	}
+	// TODO: should we also be combining the ssh federated roots here?
+	// If we rotate ssh roots keys, sshpop provisioner will lose ability to
+	// validate old SSH certificates, unless they are added as federated certs.
+	sshKeys, err := a.GetSSHRoots()
+	if err != nil {
+		return err
+	}
+	// Initialize provisioners
+	config := provisioner.Config{
+		Claims:    claimer.Claims(),
+		Audiences: a.config.getAudiences(),
+		DB:        a.db,
+		SSHKeys: &provisioner.SSHKeys{
+			UserKeys: sshKeys.UserKeys,
+			HostKeys: sshKeys.HostKeys,
+		},
+	}
 	// Store all the provisioners
 	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if err := p.Init(config); err != nil {
+			return err
+		}
 		if err := a.provisioners.Store(p); err != nil {
 			return err
 		}

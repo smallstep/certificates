@@ -80,13 +80,32 @@ func (a *Authority) Authorize(ctx context.Context, ott string) ([]provisioner.Si
 	switch m := provisioner.MethodFromContext(ctx); m {
 	case provisioner.SignMethod:
 		return a.authorizeSign(ctx, ott)
+	case provisioner.RevokeMethod:
+		return nil, a.authorizeRevoke(ctx, ott)
 	case provisioner.SignSSHMethod:
 		if a.sshCAHostCertSignKey == nil && a.sshCAUserCertSignKey == nil {
 			return nil, &apiError{errors.New("authorize: ssh signing is not enabled"), http.StatusNotImplemented, errContext}
 		}
-		return a.authorizeSign(ctx, ott)
-	case provisioner.RevokeMethod:
-		return nil, &apiError{errors.New("authorize: revoke method is not supported"), http.StatusInternalServerError, errContext}
+		return a.authorizeSSHSign(ctx, ott)
+	case provisioner.RenewSSHMethod:
+		if a.sshCAHostCertSignKey == nil && a.sshCAUserCertSignKey == nil {
+			return nil, &apiError{errors.New("authorize: ssh signing is not enabled"), http.StatusNotImplemented, errContext}
+		}
+		if _, err := a.authorizeSSHRenew(ctx, ott); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	case provisioner.RevokeSSHMethod:
+		return nil, a.authorizeSSHRevoke(ctx, ott)
+	case provisioner.RekeySSHMethod:
+		if a.sshCAHostCertSignKey == nil && a.sshCAUserCertSignKey == nil {
+			return nil, &apiError{errors.New("authorize: ssh signing is not enabled"), http.StatusNotImplemented, errContext}
+		}
+		_, opts, err := a.authorizeSSHRekey(ctx, ott)
+		if err != nil {
+			return nil, err
+		}
+		return opts, nil
 	default:
 		return nil, &apiError{errors.Errorf("authorize: method %d is not supported", m), http.StatusInternalServerError, errContext}
 	}
@@ -121,38 +140,25 @@ func (a *Authority) AuthorizeSign(ott string) ([]provisioner.SignOption, error) 
 // authorizeRevoke authorizes a revocation request by validating and authenticating
 // the RevokeOptions POSTed with the request.
 // Returns a tuple of the provisioner ID and error, if one occurred.
-func (a *Authority) authorizeRevoke(opts *RevokeOptions) (p provisioner.Interface, err error) {
-	if opts.MTLS {
-		if opts.Crt.SerialNumber.String() != opts.Serial {
-			return nil, errors.New("authorizeRevoke: serial number in certificate different than body")
-		}
-		// Load the Certificate provisioner if one exists.
-		p, err = a.LoadProvisionerByCertificate(opts.Crt)
-		if err != nil {
-			return nil, errors.Wrap(err, "authorizeRevoke")
-		}
-	} else {
-		// Gets the token provisioner and validates common token fields.
-		p, err = a.authorizeToken(opts.OTT)
-		if err != nil {
-			return nil, errors.Wrap(err, "authorizeRevoke")
-		}
+func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
+	errContext := map[string]interface{}{"ott": token}
 
-		// Call the provisioner AuthorizeRevoke to apply provisioner specific auth claims.
-		err = p.AuthorizeRevoke(opts.OTT)
-		if err != nil {
-			return nil, errors.Wrap(err, "authorizeRevoke")
-		}
+	p, err := a.authorizeToken(token)
+	if err != nil {
+		return &apiError{errors.Wrap(err, "authorizeRevoke"), http.StatusUnauthorized, errContext}
 	}
-	return
+	if err = p.AuthorizeSSHRevoke(ctx, token); err != nil {
+		return &apiError{errors.Wrap(err, "authorizeRevoke"), http.StatusUnauthorized, errContext}
+	}
+	return nil
 }
 
-// authorizeRenewal tries to locate the step provisioner extension, and checks
+// authorizeRenewl tries to locate the step provisioner extension, and checks
 // if for the configured provisioner, the renewal is enabled or not. If the
 // extra extension cannot be found, authorize the renewal by default.
 //
 // TODO(mariano): should we authorize by default?
-func (a *Authority) authorizeRenewal(crt *x509.Certificate) error {
+func (a *Authority) authorizeRenew(crt *x509.Certificate) error {
 	errContext := map[string]interface{}{"serialNumber": crt.SerialNumber.String()}
 
 	// Check the passive revocation table.
@@ -180,7 +186,7 @@ func (a *Authority) authorizeRenewal(crt *x509.Certificate) error {
 			context: errContext,
 		}
 	}
-	if err := p.AuthorizeRenewal(crt); err != nil {
+	if err := p.AuthorizeRenew(context.Background(), crt); err != nil {
 		return &apiError{
 			err:     errors.Wrap(err, "renew"),
 			code:    http.StatusUnauthorized,

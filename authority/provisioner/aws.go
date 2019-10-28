@@ -123,6 +123,7 @@ type awsInstanceIdentityDocument struct {
 // Amazon Identity docs are available at
 // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-identity-documents.html
 type AWS struct {
+	*base
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
 	Accounts               []string `json:"accounts"`
@@ -273,14 +274,6 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		return nil, err
 	}
 
-	// Check for the sign ssh method, default to sign X.509
-	if MethodFromContext(ctx) == SignSSHMethod {
-		if !p.claimer.IsSSHCAEnabled() {
-			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
-		}
-		return p.authorizeSSHSign(payload)
-	}
-
 	doc := payload.document
 	// Enforce known CN and default DNS and IP if configured.
 	// By default we'll accept the CN and SANs in the CSR.
@@ -306,18 +299,15 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	), nil
 }
 
-// AuthorizeRenewal returns an error if the renewal is disabled.
-func (p *AWS) AuthorizeRenewal(cert *x509.Certificate) error {
+// AuthorizeRenew returns an error if the renewal is disabled.
+// NOTE: This method does not actually validate the certificate or check it's
+// revocation status. Just confirms that the provisioner that created the
+// certificate was configured to allow renewals.
+func (p *AWS) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
 		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
 	}
 	return nil
-}
-
-// AuthorizeRevoke returns an error because revoke is not supported on AWS
-// provisioners.
-func (p *AWS) AuthorizeRevoke(token string) error {
-	return errors.New("revoke is not supported on a AWS provisioner")
 }
 
 // assertConfig initializes the config if it has not been initialized
@@ -445,8 +435,16 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 	return &payload, nil
 }
 
-// authorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *AWS) authorizeSSHSign(claims *awsPayload) ([]SignOption, error) {
+// AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
+func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+	if !p.claimer.IsSSHCAEnabled() {
+		return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
+	}
+	claims, err := p.authorizeToken(token)
+	if err != nil {
+		return nil, err
+	}
+
 	doc := claims.document
 
 	signOptions := []SignOption{

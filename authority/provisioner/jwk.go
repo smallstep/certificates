@@ -24,6 +24,7 @@ type stepPayload struct {
 // JWK is the default provisioner, an entity that can sign tokens necessary for
 // signature requests.
 type JWK struct {
+	*base
 	Type         string           `json:"type"`
 	Name         string           `json:"name"`
 	Key          *jose.JSONWebKey `json:"key"`
@@ -129,7 +130,7 @@ func (p *JWK) authorizeToken(token string, audiences []string) (*jwtPayload, err
 
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke the certificate with serial number in the `sub` property.
-func (p *JWK) AuthorizeRevoke(token string) error {
+func (p *JWK) AuthorizeRevoke(ctx context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.audiences.Revoke)
 	return err
 }
@@ -139,14 +140,6 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	claims, err := p.authorizeToken(token, p.audiences.Sign)
 	if err != nil {
 		return nil, err
-	}
-
-	// Check for SSH sign-ing request.
-	if MethodFromContext(ctx) == SignSSHMethod {
-		if !p.claimer.IsSSHCAEnabled() {
-			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
-		}
-		return p.authorizeSSHSign(claims)
 	}
 
 	// NOTE: This is for backwards compatibility with older versions of cli
@@ -171,17 +164,27 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}, nil
 }
 
-// AuthorizeRenewal returns an error if the renewal is disabled.
-func (p *JWK) AuthorizeRenewal(cert *x509.Certificate) error {
+// AuthorizeRenew returns an error if the renewal is disabled.
+// NOTE: This method does not actually validate the certificate or check it's
+// revocation status. Just confirms that the provisioner that created the
+// certificate was configured to allow renewals.
+func (p *JWK) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
 		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
 	}
 	return nil
 }
 
-// authorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
-	t := now()
+// AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
+func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+	if !p.claimer.IsSSHCAEnabled() {
+		return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
+	}
+	// TODO: fix audiences
+	claims, err := p.authorizeToken(token, p.audiences.Sign)
+	if err != nil {
+		return nil, err
+	}
 	if claims.Step == nil || claims.Step.SSH == nil {
 		return nil, errors.New("authorization token must be an SSH provisioning token")
 	}
@@ -193,6 +196,7 @@ func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 		sshCertificateKeyIDModifier(claims.Subject),
 	}
 
+	t := now()
 	// Add modifiers from custom claims
 	if opts.CertType != "" {
 		signOptions = append(signOptions, sshCertificateCertTypeModifier(opts.CertType))
@@ -222,4 +226,11 @@ func (p *JWK) authorizeSSHSign(claims *jwtPayload) ([]SignOption, error) {
 		// Require and validate all the default fields in the SSH certificate.
 		&sshCertificateDefaultValidator{},
 	), nil
+}
+
+// AuthorizeSSHRevoke returns nil if the token is valid, false otherwise.
+func (p *JWK) AuthorizeSSHRevoke(ctx context.Context, token string) error {
+	// TODO fix audience.
+	_, err := p.authorizeToken(token, p.audiences.SSHRevoke)
+	return err
 }

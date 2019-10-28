@@ -16,6 +16,7 @@ import (
 var (
 	certsTable             = []byte("x509_certs")
 	revokedCertsTable      = []byte("revoked_x509_certs")
+	revokedSSHCertsTable   = []byte("revoked_ssh_certs")
 	usedOTTTable           = []byte("used_ott")
 	sshCertsTable          = []byte("ssh_certs")
 	sshHostsTable          = []byte("ssh_hosts")
@@ -38,7 +39,9 @@ type Config struct {
 // AuthDB is an interface over an Authority DB client that implements a nosql.DB interface.
 type AuthDB interface {
 	IsRevoked(sn string) (bool, error)
+	IsSSHRevoked(sn string) (bool, error)
 	Revoke(rci *RevokedCertificateInfo) error
+	RevokeSSH(rci *RevokedCertificateInfo) error
 	StoreCertificate(crt *x509.Certificate) error
 	UseToken(id, tok string) (bool, error)
 	IsSSHHost(name string) (bool, error)
@@ -68,6 +71,7 @@ func New(c *Config) (AuthDB, error) {
 	tables := [][]byte{
 		revokedCertsTable, certsTable, usedOTTTable,
 		sshCertsTable, sshHostsTable, sshHostPrincipalsTable, sshUsersTable,
+		revokedSSHCertsTable,
 	}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
@@ -114,6 +118,29 @@ func (db *DB) IsRevoked(sn string) (bool, error) {
 	return true, nil
 }
 
+// IsSSHRevoked returns whether or not a certificate with the given identifier
+// has been revoked.
+// In the case of an X509 Certificate the `id` should be the Serial Number of
+// the Certificate.
+func (db *DB) IsSSHRevoked(sn string) (bool, error) {
+	// If the DB is nil then act as pass through.
+	if db == nil {
+		return false, nil
+	}
+
+	// If the error is `Not Found` then the certificate has not been revoked.
+	// Any other error should be propagated to the caller.
+	if _, err := db.Get(revokedSSHCertsTable, []byte(sn)); err != nil {
+		if nosql.IsErrNotFound(err) {
+			return false, nil
+		}
+		return false, errors.Wrap(err, "error checking revocation bucket")
+	}
+
+	// This certificate has been revoked.
+	return true, nil
+}
+
 // Revoke adds a certificate to the revocation table.
 func (db *DB) Revoke(rci *RevokedCertificateInfo) error {
 	rcib, err := json.Marshal(rci)
@@ -122,6 +149,24 @@ func (db *DB) Revoke(rci *RevokedCertificateInfo) error {
 	}
 
 	_, swapped, err := db.CmpAndSwap(revokedCertsTable, []byte(rci.Serial), nil, rcib)
+	switch {
+	case err != nil:
+		return errors.Wrap(err, "error AuthDB CmpAndSwap")
+	case !swapped:
+		return ErrAlreadyExists
+	default:
+		return nil
+	}
+}
+
+// RevokeSSH adds a SSH certificate to the revocation table.
+func (db *DB) RevokeSSH(rci *RevokedCertificateInfo) error {
+	rcib, err := json.Marshal(rci)
+	if err != nil {
+		return errors.Wrap(err, "error marshaling revoked certificate info")
+	}
+
+	_, swapped, err := db.CmpAndSwap(revokedSSHCertsTable, []byte(rci.Serial), nil, rcib)
 	switch {
 	case err != nil:
 		return errors.Wrap(err, "error AuthDB CmpAndSwap")

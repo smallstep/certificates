@@ -3,6 +3,8 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+
+	"golang.org/x/crypto/ssh"
 )
 
 // noop provisioners is a provisioner that accepts anything.
@@ -35,10 +37,26 @@ func (p *noop) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	return []SignOption{}, nil
 }
 
-func (p *noop) AuthorizeRenewal(cert *x509.Certificate) error {
+func (p *noop) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	return nil
 }
 
-func (p *noop) AuthorizeRevoke(token string) error {
+func (p *noop) AuthorizeRevoke(ctx context.Context, token string) error {
 	return nil
+}
+
+func (p *noop) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+	return []SignOption{}, nil
+}
+
+func (p *noop) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {
+	return nil, nil
+}
+
+func (p *noop) AuthorizeSSHRevoke(ctx context.Context, token string) error {
+	return nil
+}
+
+func (p *noop) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error) {
+	return nil, []SignOption{}, nil
 }
