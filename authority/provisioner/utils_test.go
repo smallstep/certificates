@@ -10,11 +10,13 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/jose"
 )
@@ -194,6 +196,43 @@ func generateJWK() (*JWK, error) {
 		Claims:       &globalProvisionerClaims,
 		audiences:    testAudiences,
 		claimer:      claimer,
+	}, nil
+}
+
+func generateK8sSA(inputPubKey interface{}) (*K8sSA, error) {
+	fooPubB, err := ioutil.ReadFile("./testdata/foo.pub")
+	if err != nil {
+		return nil, err
+	}
+	fooPub, err := pemutil.ParseKey(fooPubB)
+	if err != nil {
+		return nil, err
+	}
+	barPubB, err := ioutil.ReadFile("./testdata/bar.pub")
+	if err != nil {
+		return nil, err
+	}
+	barPub, err := pemutil.ParseKey(barPubB)
+	if err != nil {
+		return nil, err
+	}
+
+	claimer, err := NewClaimer(nil, globalProvisionerClaims)
+	if err != nil {
+		return nil, err
+	}
+	pubKeys := []interface{}{fooPub, barPub}
+	if inputPubKey != nil {
+		pubKeys = append(pubKeys, inputPubKey)
+	}
+
+	return &K8sSA{
+		Name:      K8sSAName,
+		Type:      "K8sSA",
+		Claims:    &globalProvisionerClaims,
+		audiences: testAudiences,
+		claimer:   claimer,
+		pubKeys:   pubKeys,
 	}, nil
 }
 
@@ -585,6 +624,40 @@ func generateToken(sub, iss, aud string, email string, sans []string, iat time.T
 		SANS:  sans,
 	}
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
+}
+
+func getK8sSAPayload() *k8sSAPayload {
+	return &k8sSAPayload{
+		Claims: jose.Claims{
+			Issuer:  k8sSAIssuer,
+			Subject: "foo",
+		},
+		Namespace:          "ns-foo",
+		SecretName:         "sn-foo",
+		ServiceAccountName: "san-foo",
+		ServiceAccountUID:  "sauid-foo",
+	}
+}
+
+func generateK8sSAToken(jwk *jose.JSONWebKey, claims *k8sSAPayload, tokOpts ...tokOption) (string, error) {
+	so := new(jose.SignerOptions)
+	so.WithHeader("kid", jwk.KeyID)
+
+	for _, o := range tokOpts {
+		if err := o(so); err != nil {
+			return "", err
+		}
+	}
+
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key}, so)
+	if err != nil {
+		return "", err
+	}
+
+	if claims == nil {
+		claims = getK8sSAPayload()
+	}
+	return jose.Signed(sig).Claims(*claims).CompactSerialize()
 }
 
 func generateSimpleSSHUserToken(iss, aud string, jwk *jose.JSONWebKey) (string, error) {

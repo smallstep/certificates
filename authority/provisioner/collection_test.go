@@ -59,12 +59,20 @@ func TestCollection_LoadByToken(t *testing.T) {
 	assert.FatalError(t, err)
 	p3, err := generateOIDC()
 	assert.FatalError(t, err)
+	p4, err := generateK8sSA(nil)
+	assert.FatalError(t, err)
 
 	byID := new(sync.Map)
 	byID.Store(p1.GetID(), p1)
 	byID.Store(p2.GetID(), p2)
 	byID.Store(p3.GetID(), p3)
+	byID.Store(p4.GetID(), p4)
 	byID.Store("string", "a-string")
+
+	byID2 := new(sync.Map)
+	byID2.Store(p1.GetID(), p1)
+	byID2.Store(p2.GetID(), p2)
+	byID2.Store(p3.GetID(), p3)
 
 	jwk, err := decryptJSONWebKey(p1.EncryptedKey)
 	assert.FatalError(t, err)
@@ -90,6 +98,13 @@ func TestCollection_LoadByToken(t *testing.T) {
 	t4, c4, err := parseToken(token)
 	assert.FatalError(t, err)
 
+	jwk, err = jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	assert.FatalError(t, err)
+	token, err = generateK8sSAToken(jwk, nil)
+	assert.FatalError(t, err)
+	t5, c5, err := parseToken(token)
+	assert.FatalError(t, err)
+
 	type fields struct {
 		byID      *sync.Map
 		audiences Audiences
@@ -108,8 +123,10 @@ func TestCollection_LoadByToken(t *testing.T) {
 		{"ok1", fields{byID, testAudiences}, args{t1, c1}, p1, true},
 		{"ok2", fields{byID, testAudiences}, args{t2, c2}, p2, true},
 		{"ok3", fields{byID, testAudiences}, args{t3, c3}, p3, true},
+		{"ok4", fields{byID, testAudiences}, args{t5, c5}, p4, true},
 		{"bad", fields{byID, testAudiences}, args{t4, c4}, nil, false},
 		{"fail", fields{byID, Audiences{Sign: []string{"https://foo"}}}, args{t1, c1}, nil, false},
+		{"fail-no-k8sSa-provisioner", fields{byID2, testAudiences}, args{t5, c5}, nil, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
