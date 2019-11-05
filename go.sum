@@ -86,6 +86,7 @@ github.com/smallstep/certificates v0.14.0-rc.1.0.20191023014154-4669bef8c700/go.
 github.com/smallstep/certinfo v0.0.0-20191008000228-b0e530932339/go.mod h1:n4YHPL9hJIyB+N4F2rPBy3mpPxMxTGJP5Pdsyaoc2Ns=
 github.com/smallstep/cli v0.12.1-0.20191016010425-15911d8625df h1:SSZWKGpaVmKQgTkfaQMnYLS/gYhRVVjvzdE1F9GiffU=
 github.com/smallstep/cli v0.12.1-0.20191016010425-15911d8625df/go.mod h1:zGPm8vWCqzvDqkdC1laFJNdIOjNSB8V4qDp68Ny538o=
+github.com/smallstep/cli v0.13.3 h1:S29UydCtDVy0QQBtGdatq064tnks1/0DYxxnEtNiQpc=
 github.com/smallstep/cli v0.14.0-rc.1.0.20191024214139-914a67ed80c2 h1:Q0B9XBAn3KzjZKH3ojxLQolUnHSXuomfFjm+/KbIdpY=
 github.com/smallstep/cli v0.14.0-rc.1.0.20191024214139-914a67ed80c2/go.mod h1:GoA1cE4YrZRRvVbFlPKJUsMuWHnFBX+R88j1pmpbGgk=
 github.com/smallstep/nosql v0.1.1-0.20191009043502-4b26d8029e61 h1:XM3mkHNBc6bEQhrZNEma+iz63xrmRFfCocmAEObeg/s=
