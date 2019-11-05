@@ -21,11 +21,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/smallstep/certificates/authority/provisioner"
-
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/crypto/x509util"
 	"gopkg.in/square/go-jose.v2/jwt"
