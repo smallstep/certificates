@@ -11,9 +11,9 @@ import (
 	"github.com/smallstep/cli/utils"
 )
 
-// sshTemplates contains the configuration of default templates used on ssh.
+// SSHTemplates contains the configuration of default templates used on ssh.
 // Relative paths are relative to the StepPath.
-var sshTemplates = &templates.SSHTemplates{
+var SSHTemplates = &templates.SSHTemplates{
 	User: []templates.Template{
 		{Name: "include.tpl", Type: templates.Snippet, TemplatePath: "templates/ssh/include.tpl", Path: "~/.ssh/config", Comment: "#"},
 		{Name: "config.tpl", Type: templates.File, TemplatePath: "templates/ssh/config.tpl", Path: "ssh/config", Comment: "#"},
@@ -25,8 +25,8 @@ var sshTemplates = &templates.SSHTemplates{
 	},
 }
 
-// sshTemplateData contains the data of the default templates used on ssh.
-var sshTemplateData = map[string]string{
+// SSHTemplateData contains the data of the default templates used on ssh.
+var SSHTemplateData = map[string]string{
 	// include.tpl adds the step ssh config file
 	"include.tpl": `Host *
 	Include {{.User.StepPath}}/ssh/config`,
@@ -65,7 +65,7 @@ func (p *PKI) getTemplates() *templates.Templates {
 	}
 
 	return &templates.Templates{
-		SSH:  sshTemplates,
+		SSH:  SSHTemplates,
 		Data: map[string]interface{}{},
 	}
 }
@@ -88,7 +88,7 @@ func generateTemplates(t *templates.Templates) error {
 		}
 		// Create all templates
 		for _, t := range t.SSH.User {
-			data, ok := sshTemplateData[t.Name]
+			data, ok := SSHTemplateData[t.Name]
 			if !ok {
 				return errors.Errorf("template %s does not exists", t.Name)
 			}
@@ -97,7 +97,7 @@ func generateTemplates(t *templates.Templates) error {
 			}
 		}
 		for _, t := range t.SSH.Host {
-			data, ok := sshTemplateData[t.Name]
+			data, ok := SSHTemplateData[t.Name]
 			if !ok {
 				return errors.Errorf("template %s does not exists", t.Name)
 			}
