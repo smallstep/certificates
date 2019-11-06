@@ -180,8 +180,7 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	if !p.claimer.IsSSHCAEnabled() {
 		return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
 	}
-	// TODO: fix audiences
-	claims, err := p.authorizeToken(token, p.audiences.Sign)
+	claims, err := p.authorizeToken(token, p.audiences.SSHSign)
 	if err != nil {
 		return nil, err
 	}
@@ -192,8 +191,6 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	signOptions := []SignOption{
 		// validates user's SSHOptions with the ones in the token
 		sshCertificateOptionsValidator(*opts),
-		// set the key id to the token subject
-		sshCertificateKeyIDModifier(claims.Subject),
 	}
 
 	t := now()
@@ -219,6 +216,8 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
 		sshDefaultValidityModifier(p.claimer),
+		// Validate that the keyID is equivalent to the token subject.
+		sshCertKeyIDValidator(claims.Subject),
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
@@ -230,7 +229,6 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 
 // AuthorizeSSHRevoke returns nil if the token is valid, false otherwise.
 func (p *JWK) AuthorizeSSHRevoke(ctx context.Context, token string) error {
-	// TODO fix audience.
 	_, err := p.authorizeToken(token, p.audiences.SSHRevoke)
 	return err
 }

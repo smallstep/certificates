@@ -322,7 +322,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		return nil, err
 	}
 	signOptions := []SignOption{
-		// set the key id to the token subject
+		// set the key id to the token email
 		sshCertificateKeyIDModifier(claims.Email),
 	}
 
