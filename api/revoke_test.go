@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -105,7 +106,10 @@ func Test_caHandler_Revoke(t *testing.T) {
 				input:      string(input),
 				statusCode: http.StatusOK,
 				auth: &mockAuthority{
-					revoke: func(opts *authority.RevokeOptions) error {
+					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+						return nil, nil
+					},
+					revoke: func(ctx context.Context, opts *authority.RevokeOptions) error {
 						assert.True(t, opts.PassiveOnly)
 						assert.False(t, opts.MTLS)
 						assert.Equals(t, opts.Serial, "sn")
@@ -146,7 +150,10 @@ func Test_caHandler_Revoke(t *testing.T) {
 				statusCode: http.StatusOK,
 				tls:        cs,
 				auth: &mockAuthority{
-					revoke: func(ri *authority.RevokeOptions) error {
+					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+						return nil, nil
+					},
+					revoke: func(ctx context.Context, ri *authority.RevokeOptions) error {
 						assert.True(t, ri.PassiveOnly)
 						assert.True(t, ri.MTLS)
 						assert.Equals(t, ri.Serial, "1404354960355712309")
@@ -178,7 +185,10 @@ func Test_caHandler_Revoke(t *testing.T) {
 				input:      string(input),
 				statusCode: http.StatusInternalServerError,
 				auth: &mockAuthority{
-					revoke: func(opts *authority.RevokeOptions) error {
+					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+						return nil, nil
+					},
+					revoke: func(ctx context.Context, opts *authority.RevokeOptions) error {
 						return InternalServerError(errors.New("force"))
 					},
 				},
@@ -197,7 +207,10 @@ func Test_caHandler_Revoke(t *testing.T) {
 				input:      string(input),
 				statusCode: http.StatusForbidden,
 				auth: &mockAuthority{
-					revoke: func(opts *authority.RevokeOptions) error {
+					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+						return nil, nil
+					},
+					revoke: func(ctx context.Context, opts *authority.RevokeOptions) error {
 						return errors.New("force")
 					},
 				},

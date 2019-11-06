@@ -432,7 +432,7 @@ func Test_caHandler_SSHFederation(t *testing.T) {
 
 func Test_caHandler_SSHConfig(t *testing.T) {
 	userOutput := []templates.Output{
-		{Name: "config.tpl", Type: templates.File, Comment: "#", Path: "ssh/config", Content: []byte("UserKnownHostsFile /home/user/.step/config/ssh/known_hosts")},
+		{Name: "config.tpl", Type: templates.File, Comment: "#", Path: "ssh/config", Content: []byte("UserKnownHostsFile /home/user/.step/ssh/known_hosts")},
 		{Name: "known_host.tpl", Type: templates.File, Comment: "#", Path: "ssh/known_host", Content: []byte("@cert-authority * ecdsa-sha2-nistp256 AAAA...=")},
 	}
 	hostOutput := []templates.Output{
