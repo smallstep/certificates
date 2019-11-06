@@ -185,16 +185,16 @@ func New(public, private, config string) (*PKI, error) {
 	if p.intermediateKey, err = getPath(private, "intermediate_ca_key"); err != nil {
 		return nil, err
 	}
-	if p.sshHostPubKey, err = getPath(public, "ssh_host_key.pub"); err != nil {
+	if p.sshHostPubKey, err = getPath(public, "ssh_host_ca_key.pub"); err != nil {
 		return nil, err
 	}
-	if p.sshUserPubKey, err = getPath(public, "ssh_user_key.pub"); err != nil {
+	if p.sshUserPubKey, err = getPath(public, "ssh_user_ca_key.pub"); err != nil {
 		return nil, err
 	}
-	if p.sshHostKey, err = getPath(private, "ssh_host_key"); err != nil {
+	if p.sshHostKey, err = getPath(private, "ssh_host_ca_key"); err != nil {
 		return nil, err
 	}
-	if p.sshUserKey, err = getPath(private, "ssh_user_key"); err != nil {
+	if p.sshUserKey, err = getPath(private, "ssh_user_ca_key"); err != nil {
 		return nil, err
 	}
 	if len(config) > 0 {
