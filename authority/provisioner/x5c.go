@@ -183,14 +183,6 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		return nil, err
 	}
 
-	// Check for SSH sign-ing request.
-	if MethodFromContext(ctx) == SignSSHMethod {
-		if !p.claimer.IsSSHCAEnabled() {
-			return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
-		}
-		return p.authorizeSSHSign(claims)
-	}
-
 	// NOTE: This is for backwards compatibility with older versions of cli
 	// and certificates. Older versions added the token subject as the only SAN
 	// in a CSR by default.
@@ -222,8 +214,17 @@ func (p *X5C) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error 
 	return nil
 }
 
-// authorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
+// AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
+func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+	if !p.claimer.IsSSHCAEnabled() {
+		return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
+	}
+
+	claims, err := p.authorizeToken(token, p.audiences.SSHSign)
+	if err != nil {
+		return nil, err
+	}
+
 	if claims.Step == nil || claims.Step.SSH == nil {
 		return nil, errors.New("authorization token must be an SSH provisioning token")
 	}
@@ -231,8 +232,6 @@ func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
 	signOptions := []SignOption{
 		// validates user's SSHOptions with the ones in the token
 		sshCertificateOptionsValidator(*opts),
-		// set the key id to the token subject
-		sshCertificateKeyIDModifier(claims.Subject),
 	}
 
 	// Add modifiers from custom claims
@@ -258,6 +257,8 @@ func (p *X5C) authorizeSSHSign(claims *x5cPayload) ([]SignOption, error) {
 		&sshDefaultExtensionModifier{},
 		// Checks the validity bounds, and set the validity if has not been set.
 		sshLimitValidityModifier(p.claimer, claims.chains[0][0].NotAfter),
+		// set the key id to the token subject
+		sshCertKeyIDValidator(claims.Subject),
 		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.

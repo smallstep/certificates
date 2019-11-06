@@ -212,11 +212,6 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		return nil, err
 	}
 
-	// Check for SSH sign-ing request.
-	if MethodFromContext(ctx) == SignSSHMethod {
-		return nil, errors.New("ssh certificates not enabled for k8s ServiceAccount provisioners")
-	}
-
 	return []SignOption{
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeK8sSA, p.Name, ""),
@@ -227,12 +222,39 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	}, nil
 }
 
-// AuthorizeRenewal returns an error if the renewal is disabled.
-func (p *K8sSA) AuthorizeRenewal(cert *x509.Certificate) error {
+// AuthorizeRenew returns an error if the renewal is disabled.
+func (p *K8sSA) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
 		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
 	}
 	return nil
+}
+
+// AuthorizeSSHSign validates an request for an SSH certificate.
+func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+	if !p.claimer.IsSSHCAEnabled() {
+		return nil, errors.Errorf("authorizeSSHSign: ssh ca is disabled for provisioner %s", p.GetID())
+	}
+	_, err := p.authorizeToken(token, p.audiences.SSHSign)
+	if err != nil {
+		return nil, errors.Wrap(err, "authorizeSSHSign")
+	}
+
+	// Default to a user certificate with no principals if not set
+	signOptions := []SignOption{sshCertificateDefaultsModifier{CertType: SSHUserCert}}
+
+	return append(signOptions,
+		// Set the default extensions.
+		&sshDefaultExtensionModifier{},
+		// Set the validity bounds if not set.
+		sshDefaultValidityModifier(p.claimer),
+		// Validate public key
+		&sshDefaultPublicKeyValidator{},
+		// Validate the validity period.
+		&sshCertificateValidityValidator{p.claimer},
+		// Require and validate all the default fields in the SSH certificate.
+		&sshCertificateDefaultValidator{},
+	), nil
 }
 
 /*

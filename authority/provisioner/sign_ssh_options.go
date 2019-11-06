@@ -49,6 +49,7 @@ type SSHCertificateOptionsValidator interface {
 // SSHOptions contains the options that can be passed to the SignSSH method.
 type SSHOptions struct {
 	CertType    string       `json:"certType"`
+	KeyID       string       `json:"keyID"`
 	Principals  []string     `json:"principals"`
 	ValidAfter  TimeDuration `json:"validAfter,omitempty"`
 	ValidBefore TimeDuration `json:"validBefore,omitempty"`
@@ -70,6 +71,8 @@ func (o SSHOptions) Modify(cert *ssh.Certificate) error {
 	default:
 		return errors.Errorf("ssh certificate has an unknown type: %s", o.CertType)
 	}
+
+	cert.KeyId = o.KeyID
 	cert.ValidPrincipals = o.Principals
 	if !o.ValidAfter.IsZero() {
 		cert.ValidAfter = uint64(o.ValidAfter.Time().Unix())
@@ -371,6 +374,17 @@ func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate) error {
 	default:
 		return nil
 	}
+}
+
+// sshCertKeyIDValidator implements a validator for the KeyId attribute.
+type sshCertKeyIDValidator string
+
+// Valid returns an error if the given certificate does not contain the necessary fields.
+func (v sshCertKeyIDValidator) Valid(cert *ssh.Certificate) error {
+	if string(v) != cert.KeyId {
+		return errors.Errorf("invalid ssh certificate KeyId; want %s, but got %s", string(v), cert.KeyId)
+	}
+	return nil
 }
 
 // sshCertTypeUInt32

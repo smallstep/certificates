@@ -35,6 +35,7 @@ type SSHSignRequest struct {
 	ValidAfter       TimeDuration `json:"validAfter,omitempty"`
 	ValidBefore      TimeDuration `json:"validBefore,omitempty"`
 	AddUserPublicKey []byte       `json:"addUserPublicKey,omitempty"`
+	KeyID            string       `json:"keyID"`
 }
 
 // Validate validates the SSHSignRequest.
@@ -239,6 +240,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 
 	opts := provisioner.SSHOptions{
 		CertType:    body.CertType,
+		KeyID:       body.KeyID,
 		Principals:  body.Principals,
 		ValidBefore: body.ValidBefore,
 		ValidAfter:  body.ValidAfter,
