@@ -417,17 +417,22 @@ func TestSignRequest_Validate(t *testing.T) {
 }
 
 type mockProvisioner struct {
-	ret1, ret2, ret3 interface{}
-	err              error
-	getID            func() string
-	getTokenID       func(string) (string, error)
-	getName          func() string
-	getType          func() provisioner.Type
-	getEncryptedKey  func() (string, string, bool)
-	init             func(provisioner.Config) error
-	authorizeRevoke  func(ott string) error
-	authorizeSign    func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
-	authorizeRenewal func(*x509.Certificate) error
+	ret1, ret2, ret3   interface{}
+	err                error
+	getID              func() string
+	getTokenID         func(string) (string, error)
+	getName            func() string
+	getType            func() provisioner.Type
+	getEncryptedKey    func() (string, string, bool)
+	init               func(provisioner.Config) error
+	authorizeRenew     func(ctx context.Context, cert *x509.Certificate) error
+	authorizeRevoke    func(ctx context.Context, token string) error
+	authorizeSign      func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
+	authorizeRenewal   func(*x509.Certificate) error
+	authorizeSSHSign   func(ctx context.Context, token string) ([]provisioner.SignOption, error)
+	authorizeSSHRevoke func(ctx context.Context, token string) error
+	authorizeSSHRenew  func(ctx context.Context, token string) (*ssh.Certificate, error)
+	authorizeSSHRekey  func(ctx context.Context, token string) (*ssh.Certificate, []provisioner.SignOption, error)
 }
 
 func (m *mockProvisioner) GetID() string {
@@ -475,9 +480,16 @@ func (m *mockProvisioner) Init(c provisioner.Config) error {
 	return m.err
 }
 
-func (m *mockProvisioner) AuthorizeRevoke(ott string) error {
+func (m *mockProvisioner) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
+	if m.authorizeRenew != nil {
+		return m.authorizeRenew(ctx, cert)
+	}
+	return m.err
+}
+
+func (m *mockProvisioner) AuthorizeRevoke(ctx context.Context, token string) error {
 	if m.authorizeRevoke != nil {
-		return m.authorizeRevoke(ott)
+		return m.authorizeRevoke(ctx, token)
 	}
 	return m.err
 }
@@ -496,6 +508,31 @@ func (m *mockProvisioner) AuthorizeRenewal(c *x509.Certificate) error {
 	return m.err
 }
 
+func (m *mockProvisioner) AuthorizeSSHSign(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+	if m.authorizeSSHSign != nil {
+		return m.authorizeSSHSign(ctx, token)
+	}
+	return m.ret1.([]provisioner.SignOption), m.err
+}
+func (m *mockProvisioner) AuthorizeSSHRevoke(ctx context.Context, token string) error {
+	if m.authorizeSSHRevoke != nil {
+		return m.authorizeSSHRevoke(ctx, token)
+	}
+	return m.err
+}
+func (m *mockProvisioner) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {
+	if m.authorizeSSHRenew != nil {
+		return m.authorizeSSHRenew(ctx, token)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+func (m *mockProvisioner) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []provisioner.SignOption, error) {
+	if m.authorizeSSHRekey != nil {
+		return m.authorizeSSHRekey(ctx, token)
+	}
+	return m.ret1.(*ssh.Certificate), m.ret2.([]provisioner.SignOption), m.err
+}
+
 type mockAuthority struct {
 	ret1, ret2                   interface{}
 	err                          error
@@ -509,10 +546,13 @@ type mockAuthority struct {
 	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
 	loadProvisionerByID          func(provID string) (provisioner.Interface, error)
 	getProvisioners              func(nextCursor string, limit int) (provisioner.List, string, error)
-	revoke                       func(*authority.RevokeOptions) error
+	revoke                       func(context.Context, *authority.RevokeOptions) error
 	getEncryptedKey              func(kid string) (string, error)
 	getRoots                     func() ([]*x509.Certificate, error)
 	getFederation                func() ([]*x509.Certificate, error)
+	renewSSH                     func(cert *ssh.Certificate) (*ssh.Certificate, error)
+	rekeySSH                     func(cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
+	getSSHHosts                  func() ([]string, error)
 	getSSHRoots                  func() (*authority.SSHKeys, error)
 	getSSHFederation             func() (*authority.SSHKeys, error)
 	getSSHConfig                 func(typ string, data map[string]string) ([]templates.Output, error)
@@ -594,9 +634,9 @@ func (m *mockAuthority) LoadProvisionerByID(provID string) (provisioner.Interfac
 	return m.ret1.(provisioner.Interface), m.err
 }
 
-func (m *mockAuthority) Revoke(opts *authority.RevokeOptions) error {
+func (m *mockAuthority) Revoke(ctx context.Context, opts *authority.RevokeOptions) error {
 	if m.revoke != nil {
-		return m.revoke(opts)
+		return m.revoke(ctx, opts)
 	}
 	return m.err
 }
@@ -620,6 +660,27 @@ func (m *mockAuthority) GetFederation() ([]*x509.Certificate, error) {
 		return m.getFederation()
 	}
 	return m.ret1.([]*x509.Certificate), m.err
+}
+
+func (m *mockAuthority) RenewSSH(cert *ssh.Certificate) (*ssh.Certificate, error) {
+	if m.renewSSH != nil {
+		return m.renewSSH(cert)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *mockAuthority) RekeySSH(cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+	if m.rekeySSH != nil {
+		return m.rekeySSH(cert, key, signOpts...)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *mockAuthority) GetSSHHosts() ([]string, error) {
+	if m.getSSHHosts != nil {
+		return m.getSSHHosts()
+	}
+	return m.ret1.([]string), m.err
 }
 
 func (m *mockAuthority) GetSSHRoots() (*authority.SSHKeys, error) {
