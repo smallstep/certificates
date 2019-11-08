@@ -204,6 +204,10 @@ func (p *SSHPOP) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Cert
 	if err != nil {
 		return nil, err
 	}
+	if claims.sshCert.CertType != ssh.HostCert {
+		return nil, errors.New("sshpop AuthorizeSSHRenew: sshpop certificate must be a host ssh certificate")
+	}
+
 	return claims.sshCert, nil
 
 }
@@ -214,6 +218,9 @@ func (p *SSHPOP) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Cert
 	claims, err := p.authorizeToken(token, p.audiences.SSHRekey)
 	if err != nil {
 		return nil, nil, err
+	}
+	if claims.sshCert.CertType != ssh.HostCert {
+		return nil, nil, errors.New("sshpop AuthorizeSSHRekey: sshpop certificate must be a host ssh certificate")
 	}
 	return claims.sshCert, []SignOption{
 		// Validate public key
