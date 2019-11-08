@@ -332,7 +332,7 @@ func (a *Authority) RenewSSH(oldCert *ssh.Certificate) (*ssh.Certificate, error)
 	}
 
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
-		return nil, errors.New("rewnewSSh: cannot renew certificate without validity period")
+		return nil, errors.New("rewnewSSH: cannot renew certificate without validity period")
 	}
 	dur := time.Duration(oldCert.ValidBefore-oldCert.ValidAfter) * time.Second
 	va := time.Now()
@@ -457,7 +457,7 @@ func (a *Authority) RekeySSH(oldCert *ssh.Certificate, pub ssh.PublicKey, signOp
 	}
 
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
-		return nil, errors.New("rekeySSh: cannot rekey certificate without validity period")
+		return nil, errors.New("rekeySSH: cannot rekey certificate without validity period")
 	}
 	dur := time.Duration(oldCert.ValidBefore-oldCert.ValidAfter) * time.Second
 	va := time.Now()
