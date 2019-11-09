@@ -81,6 +81,17 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 		return errors.New("authority.provisioners cannot be empty")
 	}
 
+	// Check that only one K8sSA is enabled
+	var k8sCount int
+	for _, p := range c.Provisioners {
+		if p.GetType() == provisioner.TypeK8sSA {
+			k8sCount++
+		}
+	}
+	if k8sCount > 1 {
+		return errors.New("cannot have more than one kubernetes service account provisioner")
+	}
+
 	if c.Template == nil {
 		c.Template = &x509util.ASN1DN{}
 	}

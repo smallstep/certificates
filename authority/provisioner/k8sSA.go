@@ -25,9 +25,6 @@ const (
 	k8sSAIssuer = "kubernetes/serviceaccount"
 )
 
-// This number must <= 1. We'll verify this in Init() below.
-var numK8sSAProvisioners = 0
-
 // jwtPayload extends jwt.Claims with step attributes.
 type k8sSAPayload struct {
 	jose.Claims
@@ -85,8 +82,6 @@ func (p *K8sSA) Init(config Config) (err error) {
 		return errors.New("provisioner type cannot be empty")
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
-	case numK8sSAProvisioners >= 1:
-		return errors.New("cannot have more than one kubernetes service account provisioner")
 	}
 
 	if p.PubKeys != nil {
@@ -134,7 +129,6 @@ func (p *K8sSA) Init(config Config) (err error) {
 	}
 
 	p.audiences = config.Audiences
-	numK8sSAProvisioners++
 	return err
 }
 
