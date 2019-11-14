@@ -447,7 +447,7 @@ func TestAWS_AuthorizeSign_SSH(t *testing.T) {
 		})
 	}
 }
-func TestAWS_AuthorizeRenewal(t *testing.T) {
+func TestAWS_AuthorizeRenew(t *testing.T) {
 	p1, err := generateAWS()
 	assert.FatalError(t, err)
 	p2, err := generateAWS()
@@ -473,8 +473,8 @@ func TestAWS_AuthorizeRenewal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.aws.AuthorizeRenewal(tt.args.cert); (err != nil) != tt.wantErr {
-				t.Errorf("AWS.AuthorizeRenewal() error = %v, wantErr %v", err, tt.wantErr)
+			if err := tt.aws.AuthorizeRenew(context.TODO(), tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("AWS.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -502,7 +502,7 @@ func TestAWS_AuthorizeRevoke(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.aws.AuthorizeRevoke(tt.args.token); (err != nil) != tt.wantErr {
+			if err := tt.aws.AuthorizeRevoke(context.TODO(), tt.args.token); (err != nil) != tt.wantErr {
 				t.Errorf("AWS.AuthorizeRevoke() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

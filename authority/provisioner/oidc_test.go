@@ -497,7 +497,7 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.prov.AuthorizeRevoke(tt.args.token)
+			err := tt.prov.AuthorizeRevoke(context.TODO(), tt.args.token)
 			if (err != nil) != tt.wantErr {
 				fmt.Println(tt)
 				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
@@ -507,7 +507,7 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 	}
 }
 
-func TestOIDC_AuthorizeRenewal(t *testing.T) {
+func TestOIDC_AuthorizeRenew(t *testing.T) {
 	p1, err := generateOIDC()
 	assert.FatalError(t, err)
 	p2, err := generateOIDC()
@@ -533,8 +533,8 @@ func TestOIDC_AuthorizeRenewal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRenewal(tt.args.cert); (err != nil) != tt.wantErr {
-				t.Errorf("OIDC.AuthorizeRenewal() error = %v, wantErr %v", err, tt.wantErr)
+			if err := tt.prov.AuthorizeRenew(context.TODO(), tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("OIDC.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

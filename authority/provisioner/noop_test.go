@@ -14,8 +14,8 @@ func Test_noop(t *testing.T) {
 	assert.Equals(t, "noop", p.GetName())
 	assert.Equals(t, noopType, p.GetType())
 	assert.Equals(t, nil, p.Init(Config{}))
-	assert.Equals(t, nil, p.AuthorizeRenewal(&x509.Certificate{}))
-	assert.Equals(t, nil, p.AuthorizeRevoke("foo"))
+	assert.Equals(t, nil, p.AuthorizeRenew(context.TODO(), &x509.Certificate{}))
+	assert.Equals(t, nil, p.AuthorizeRevoke(context.TODO(), "foo"))
 
 	kid, key, ok := p.GetEncryptedKey()
 	assert.Equals(t, "", kid)

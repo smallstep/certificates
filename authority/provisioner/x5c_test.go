@@ -554,11 +554,12 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 	}
 }
 
-func TestX5C_authorizeSSHSign(t *testing.T) {
+func TestX5C_AuthorizeSSHSign(t *testing.T) {
 	_, fn := mockNow()
 	defer fn()
 	type test struct {
 		p      *X5C
+		token  string
 		claims *x5cPayload
 		err    error
 	}
@@ -618,7 +619,7 @@ func TestX5C_authorizeSSHSign(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if opts, err := tc.p.authorizeSSHSign(tc.claims); err != nil {
+			if opts, err := tc.p.AuthorizeSSHSign(context.TODO(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -706,7 +707,7 @@ func TestX5C_AuthorizeRevoke(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if err := tc.p.AuthorizeRevoke(tc.token); err != nil {
+			if err := tc.p.AuthorizeRevoke(context.TODO(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -717,7 +718,7 @@ func TestX5C_AuthorizeRevoke(t *testing.T) {
 	}
 }
 
-func TestX5C_AuthorizeRenewal(t *testing.T) {
+func TestX5C_AuthorizeRenew(t *testing.T) {
 	p1, err := generateX5C(nil)
 	assert.FatalError(t, err)
 	p2, err := generateX5C(nil)
@@ -743,8 +744,8 @@ func TestX5C_AuthorizeRenewal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRenewal(tt.args.cert); (err != nil) != tt.wantErr {
-				t.Errorf("X5C.AuthorizeRenewal() error = %v, wantErr %v", err, tt.wantErr)
+			if err := tt.prov.AuthorizeRenew(context.TODO(), tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("X5C.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

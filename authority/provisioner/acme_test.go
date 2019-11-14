@@ -91,10 +91,10 @@ func TestACME_Init(t *testing.T) {
 func TestACME_AuthorizeRevoke(t *testing.T) {
 	p, err := generateACME()
 	assert.FatalError(t, err)
-	assert.Nil(t, p.AuthorizeRevoke(""))
+	assert.Nil(t, p.AuthorizeRevoke(context.TODO(), ""))
 }
 
-func TestACME_AuthorizeRenewal(t *testing.T) {
+func TestACME_AuthorizeRenew(t *testing.T) {
 	p1, err := generateACME()
 	assert.FatalError(t, err)
 	p2, err := generateACME()
@@ -120,7 +120,7 @@ func TestACME_AuthorizeRenewal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRenewal(tt.args.cert); err != nil {
+			if err := tt.prov.AuthorizeRenew(context.TODO(), tt.args.cert); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}

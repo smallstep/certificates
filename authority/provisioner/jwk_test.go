@@ -215,7 +215,7 @@ func TestJWK_AuthorizeRevoke(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRevoke(tt.args.token); err != nil {
+			if err := tt.prov.AuthorizeRevoke(context.TODO(), tt.args.token); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -296,7 +296,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 	}
 }
 
-func TestJWK_AuthorizeRenewal(t *testing.T) {
+func TestJWK_AuthorizeRenew(t *testing.T) {
 	p1, err := generateJWK()
 	assert.FatalError(t, err)
 	p2, err := generateJWK()
@@ -322,8 +322,8 @@ func TestJWK_AuthorizeRenewal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRenewal(tt.args.cert); (err != nil) != tt.wantErr {
-				t.Errorf("JWK.AuthorizeRenewal() error = %v, wantErr %v", err, tt.wantErr)
+			if err := tt.prov.AuthorizeRenew(context.TODO(), tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("JWK.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
