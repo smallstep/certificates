@@ -195,6 +195,7 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 
 	t := now()
 	// Add modifiers from custom claims
+	// FIXME: this is also set in the sign method using SSHOptions.Modify.
 	if opts.CertType != "" {
 		signOptions = append(signOptions, sshCertificateCertTypeModifier(opts.CertType))
 	}
