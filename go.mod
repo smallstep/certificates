@@ -5,7 +5,6 @@ go 1.13
 require (
 	github.com/Masterminds/sprig/v3 v3.0.0
 	github.com/go-chi/chi v3.3.4-0.20181024101233-0ebf7795c516+incompatible
-	github.com/golangci/golangci-lint v1.18.0 // indirect
 	github.com/newrelic/go-agent v1.11.0
 	github.com/pkg/errors v0.8.1
 	github.com/rs/xid v1.2.1
