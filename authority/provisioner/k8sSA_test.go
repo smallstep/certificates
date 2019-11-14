@@ -219,7 +219,7 @@ func TestK8sSA_AuthorizeRevoke(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if err := tc.p.AuthorizeRevoke(tc.token); err != nil {
+			if err := tc.p.AuthorizeRevoke(context.TODO(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -230,7 +230,7 @@ func TestK8sSA_AuthorizeRevoke(t *testing.T) {
 	}
 }
 
-func TestK8sSA_AuthorizeRenewal(t *testing.T) {
+func TestK8sSA_AuthorizeRenew(t *testing.T) {
 	p1, err := generateK8sSA(nil)
 	assert.FatalError(t, err)
 	p2, err := generateK8sSA(nil)
@@ -256,8 +256,8 @@ func TestK8sSA_AuthorizeRenewal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRenewal(tt.args.cert); (err != nil) != tt.wantErr {
-				t.Errorf("X5C.AuthorizeRenewal() error = %v, wantErr %v", err, tt.wantErr)
+			if err := tt.prov.AuthorizeRenew(context.TODO(), tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("X5C.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

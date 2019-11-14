@@ -388,7 +388,7 @@ func TestAzure_AuthorizeSign_SSH(t *testing.T) {
 	}
 }
 
-func TestAzure_AuthorizeRenewal(t *testing.T) {
+func TestAzure_AuthorizeRenew(t *testing.T) {
 	p1, err := generateAzure()
 	assert.FatalError(t, err)
 	p2, err := generateAzure()
@@ -414,8 +414,8 @@ func TestAzure_AuthorizeRenewal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.azure.AuthorizeRenewal(tt.args.cert); (err != nil) != tt.wantErr {
-				t.Errorf("Azure.AuthorizeRenewal() error = %v, wantErr %v", err, tt.wantErr)
+			if err := tt.azure.AuthorizeRenew(context.TODO(), tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("Azure.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -443,7 +443,7 @@ func TestAzure_AuthorizeRevoke(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.azure.AuthorizeRevoke(tt.args.token); (err != nil) != tt.wantErr {
+			if err := tt.azure.AuthorizeRevoke(context.TODO(), tt.args.token); (err != nil) != tt.wantErr {
 				t.Errorf("Azure.AuthorizeRevoke() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
