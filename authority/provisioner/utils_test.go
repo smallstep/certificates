@@ -38,8 +38,12 @@ var (
 		EnableSSHCA:       &defaultEnableSSHCA,
 	}
 	testAudiences = Audiences{
-		Sign:   []string{"https://ca.smallstep.com/sign", "https://ca.smallstep.com/1.0/sign"},
-		Revoke: []string{"https://ca.smallstep.com/revoke", "https://ca.smallstep.com/1.0/revoke"},
+		Sign:      []string{"https://ca.smallstep.com/1.0/sign", "https://ca.smallstep.com/sign"},
+		Revoke:    []string{"https://ca.smallstep.com/1.0/revoke", "https://ca.smallstep.com/revoke"},
+		SSHSign:   []string{"https://ca.smallstep.com/1.0/ssh/sign"},
+		SSHRevoke: []string{"https://ca.smallstep.com/1.0/ssh/revoke"},
+		SSHRenew:  []string{"https://ca.smallstep.com/1.0/ssh/renew"},
+		SSHRekey:  []string{"https://ca.smallstep.com/1.0/ssh/rekey"},
 	}
 )
 
