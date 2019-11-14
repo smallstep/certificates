@@ -74,15 +74,18 @@ func (o SSHOptions) Modify(cert *ssh.Certificate) error {
 
 	cert.KeyId = o.KeyID
 	cert.ValidPrincipals = o.Principals
+
+	t := now()
 	if !o.ValidAfter.IsZero() {
-		cert.ValidAfter = uint64(o.ValidAfter.Time().Unix())
+		cert.ValidAfter = uint64(o.ValidAfter.RelativeTime(t).Unix())
 	}
 	if !o.ValidBefore.IsZero() {
-		cert.ValidBefore = uint64(o.ValidBefore.Time().Unix())
+		cert.ValidBefore = uint64(o.ValidBefore.RelativeTime(t).Unix())
 	}
 	if cert.ValidAfter > 0 && cert.ValidBefore > 0 && cert.ValidAfter > cert.ValidBefore {
 		return errors.New("ssh certificate valid after cannot be greater than valid before")
 	}
+
 	return nil
 }
 

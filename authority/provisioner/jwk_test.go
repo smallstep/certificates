@@ -329,7 +329,7 @@ func TestJWK_AuthorizeRenew(t *testing.T) {
 	}
 }
 
-func TestJWK_AuthorizeSign_SSH(t *testing.T) {
+func TestJWK_AuthorizeSSHSign(t *testing.T) {
 	tm, fn := mockNow()
 	defer fn()
 
@@ -338,7 +338,7 @@ func TestJWK_AuthorizeSign_SSH(t *testing.T) {
 	jwk, err := decryptJSONWebKey(p1.EncryptedKey)
 	assert.FatalError(t, err)
 
-	iss, aud := p1.Name, testAudiences.Sign[0]
+	iss, aud := p1.Name, testAudiences.SSHSign[0]
 
 	t1, err := generateSimpleSSHUserToken(iss, aud, jwk)
 	assert.FatalError(t, err)
@@ -400,9 +400,9 @@ func TestJWK_AuthorizeSign_SSH(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewContextWithMethod(context.Background(), SignSSHMethod)
-			got, err := tt.prov.AuthorizeSign(ctx, tt.args.token)
+			got, err := tt.prov.AuthorizeSSHSign(ctx, tt.args.token)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("JWK.AuthorizeSSHSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if err != nil {
@@ -432,7 +432,7 @@ func TestJWK_AuthorizeSign_SSHOptions(t *testing.T) {
 	jwk, err := decryptJSONWebKey(p1.EncryptedKey)
 	assert.FatalError(t, err)
 
-	sub, iss, aud, iat := "subject@smallstep.com", p1.Name, testAudiences.Sign[0], time.Now()
+	sub, iss, aud, iat := "subject@smallstep.com", p1.Name, testAudiences.SSHSign[0], time.Now()
 
 	key, err := generateJSONWebKey()
 	assert.FatalError(t, err)
@@ -514,8 +514,8 @@ func TestJWK_AuthorizeSign_SSHOptions(t *testing.T) {
 			ctx := NewContextWithMethod(context.Background(), SignSSHMethod)
 			token, err := generateSSHToken(tt.args.sub, tt.args.iss, tt.args.aud, tt.args.iat, tt.args.tokSSHOpts, tt.args.jwk)
 			assert.FatalError(t, err)
-			if got, err := tt.prov.AuthorizeSign(ctx, token); (err != nil) != tt.wantErr {
-				t.Errorf("JWK.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
+			if got, err := tt.prov.AuthorizeSSHSign(ctx, token); (err != nil) != tt.wantErr {
+				t.Errorf("JWK.AuthorizeSSHSign() error = %v, wantErr %v", err, tt.wantErr)
 			} else if !tt.wantErr && assert.NotNil(t, got) {
 				var opts SSHOptions
 				if tt.args.userSSHOpts != nil {

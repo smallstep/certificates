@@ -330,7 +330,7 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 	}
 }
 
-func TestOIDC_AuthorizeSign_SSH(t *testing.T) {
+func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	tm, fn := mockNow()
 	defer fn()
 
@@ -427,9 +427,9 @@ func TestOIDC_AuthorizeSign_SSH(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewContextWithMethod(context.Background(), SignSSHMethod)
-			got, err := tt.prov.AuthorizeSign(ctx, tt.args.token)
+			got, err := tt.prov.AuthorizeSSHSign(ctx, tt.args.token)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("OIDC.AuthorizeSSHSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if err != nil {

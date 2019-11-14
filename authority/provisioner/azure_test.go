@@ -310,7 +310,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	}
 }
 
-func TestAzure_AuthorizeSign_SSH(t *testing.T) {
+func TestAzure_AuthorizeSSHSign(t *testing.T) {
 	tm, fn := mockNow()
 	defer fn()
 
@@ -365,9 +365,9 @@ func TestAzure_AuthorizeSign_SSH(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewContextWithMethod(context.Background(), SignSSHMethod)
-			got, err := tt.azure.AuthorizeSign(ctx, tt.args.token)
+			got, err := tt.azure.AuthorizeSSHSign(ctx, tt.args.token)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Azure.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Azure.AuthorizeSSHSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if err != nil {

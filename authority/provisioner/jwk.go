@@ -207,6 +207,10 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	if !opts.ValidBefore.IsZero() {
 		signOptions = append(signOptions, sshCertificateValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
 	}
+	// Make sure to define the the KeyID
+	if opts.KeyID == "" {
+		signOptions = append(signOptions, sshCertificateKeyIDModifier(claims.Subject))
+	}
 
 	// Default to a user certificate with no principals if not set
 	signOptions = append(signOptions, sshCertificateDefaultsModifier{CertType: SSHUserCert})
