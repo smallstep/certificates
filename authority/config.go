@@ -197,17 +197,25 @@ func (c *Config) getAudiences() provisioner.Audiences {
 
 	for _, name := range c.DNSNames {
 		audiences.Sign = append(audiences.Sign,
-			fmt.Sprintf("https://%s/sign", name), fmt.Sprintf("https://%s/1.0/sign", name))
+			fmt.Sprintf("https://%s/1.0/sign", name),
+			fmt.Sprintf("https://%s/sign", name))
 		audiences.Revoke = append(audiences.Revoke,
-			fmt.Sprintf("https://%s/revoke", name), fmt.Sprintf("https://%s/1.0/revoke", name))
+			fmt.Sprintf("https://%s/1.0/revoke", name),
+			fmt.Sprintf("https://%s/revoke", name))
 		audiences.SSHSign = append(audiences.SSHSign,
-			fmt.Sprintf("https://%s/ssh/sign", name), fmt.Sprintf("https://%s/1.0/ssh/sign", name))
+			fmt.Sprintf("https://%s/1.0/ssh/sign", name),
+			fmt.Sprintf("https://%s/ssh/sign", name),
+			fmt.Sprintf("https://%s/1.0/sign", name),
+			fmt.Sprintf("https://%s/sign", name))
 		audiences.SSHRevoke = append(audiences.SSHRevoke,
-			fmt.Sprintf("https://%s/ssh/revoke", name), fmt.Sprintf("https://%s/1.0/ssh/revoke", name))
+			fmt.Sprintf("https://%s/1.0/ssh/revoke", name),
+			fmt.Sprintf("https://%s/ssh/revoke", name))
 		audiences.SSHRenew = append(audiences.SSHRenew,
-			fmt.Sprintf("https://%s/ssh/renew", name), fmt.Sprintf("https://%s/1.0/ssh/renew", name))
+			fmt.Sprintf("https://%s/1.0/ssh/renew", name),
+			fmt.Sprintf("https://%s/ssh/renew", name))
 		audiences.SSHRekey = append(audiences.SSHRekey,
-			fmt.Sprintf("https://%s/ssh/rekey", name), fmt.Sprintf("https://%s/1.0/ssh/rekey", name))
+			fmt.Sprintf("https://%s/1.0/ssh/rekey", name),
+			fmt.Sprintf("https://%s/ssh/rekey", name))
 	}
 
 	return audiences
