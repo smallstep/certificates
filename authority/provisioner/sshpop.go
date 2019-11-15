@@ -3,7 +3,6 @@ package provisioner
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -171,8 +170,6 @@ func (p *SSHPOP) authorizeToken(token string, audiences []string) (*sshPOPPayloa
 
 	// validate audiences with the defaults
 	if !matchesAudience(claims.Audience, audiences) {
-		fmt.Printf("claims.Audience = %+v\n", claims.Audience)
-		fmt.Printf("audiences = %+v\n", audiences)
 		return nil, errors.New("invalid token: invalid audience claim (aud)")
 	}
 
