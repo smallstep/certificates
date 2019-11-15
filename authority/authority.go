@@ -39,6 +39,8 @@ type Authority struct {
 	db                      db.AuthDB
 	// Do not re-initialize
 	initOnce bool
+	// Custom functions
+	sshBastionFunc func(user, hostname string) (*Bastion, error)
 }
 
 // New creates and initiates a new Authority type.

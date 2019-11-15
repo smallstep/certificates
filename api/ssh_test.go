@@ -537,6 +537,61 @@ func Test_caHandler_SSHCheckHost(t *testing.T) {
 	}
 }
 
+func Test_caHandler_SSHBastion(t *testing.T) {
+	bastion := &authority.Bastion{
+		Hostname: "bastion.local",
+	}
+	bastionPort := &authority.Bastion{
+		Hostname: "bastion.local",
+		Port:     "2222",
+	}
+
+	tests := []struct {
+		name       string
+		bastion    *authority.Bastion
+		bastionErr error
+		req        []byte
+		body       []byte
+		statusCode int
+	}{
+		{"ok", bastion, nil, []byte(`{"hostname":"host.local"}`), []byte(`{"hostname":"host.local","bastion":{"hostname":"bastion.local"}}`), http.StatusOK},
+		{"ok", bastionPort, nil, []byte(`{"hostname":"host.local","user":"user"}`), []byte(`{"hostname":"host.local","bastion":{"hostname":"bastion.local","port":"2222"}}`), http.StatusOK},
+		{"empty", nil, nil, []byte(`{"hostname":"host.local"}`), []byte(`{"hostname":"host.local"}`), http.StatusOK},
+		{"bad json", bastion, nil, []byte(`bad json`), nil, http.StatusBadRequest},
+		{"bad request", bastion, nil, []byte(`{"hostname": ""}`), nil, http.StatusBadRequest},
+		{"error", nil, fmt.Errorf("an error"), []byte(`{"hostname":"host.local"}`), nil, http.StatusInternalServerError},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(&mockAuthority{
+				getSSHBastion: func(user, hostname string) (*authority.Bastion, error) {
+					return tt.bastion, tt.bastionErr
+				},
+			}).(*caHandler)
+
+			req := httptest.NewRequest("POST", "http://example.com/ssh/bastion", bytes.NewReader(tt.req))
+			w := httptest.NewRecorder()
+			h.SSHBastion(logging.NewResponseLogger(w), req)
+			res := w.Result()
+
+			if res.StatusCode != tt.statusCode {
+				t.Errorf("caHandler.SSHBastion StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
+			}
+
+			body, err := ioutil.ReadAll(res.Body)
+			res.Body.Close()
+			if err != nil {
+				t.Errorf("caHandler.SSHBastion unexpected error = %v", err)
+			}
+			if tt.statusCode < http.StatusBadRequest {
+				if !bytes.Equal(bytes.TrimSpace(body), tt.body) {
+					t.Errorf("caHandler.SSHBastion Body = %s, wants %s", body, tt.body)
+				}
+			}
+		})
+	}
+}
+
 func TestSSHPublicKey_MarshalJSON(t *testing.T) {
 	key, err := ssh.NewPublicKey(sshUserKey.Public())
 	assert.FatalError(t, err)

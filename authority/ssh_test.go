@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
@@ -594,6 +595,51 @@ func TestSSHPublicKey_PublicKey(t *testing.T) {
 			}
 			if got := k.PublicKey(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("SSHPublicKey.PublicKey() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAuthority_GetSSHBastion(t *testing.T) {
+	bastion := &Bastion{
+		Hostname: "bastion.local",
+		Port:     "2222",
+	}
+	type fields struct {
+		config         *Config
+		sshBastionFunc func(user, hostname string) (*Bastion, error)
+	}
+	type args struct {
+		user     string
+		hostname string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *Bastion
+		wantErr bool
+	}{
+		{"config", fields{&Config{SSH: &SSHConfig{Bastion: bastion}}, nil}, args{"user", "host.local"}, bastion, false},
+		{"nil", fields{&Config{SSH: &SSHConfig{Bastion: nil}}, nil}, args{"user", "host.local"}, nil, false},
+		{"empty", fields{&Config{SSH: &SSHConfig{Bastion: &Bastion{}}}, nil}, args{"user", "host.local"}, nil, false},
+		{"func", fields{&Config{}, func(_, _ string) (*Bastion, error) { return bastion, nil }}, args{"user", "host.local"}, bastion, false},
+		{"func err", fields{&Config{}, func(_, _ string) (*Bastion, error) { return nil, errors.New("foo") }}, args{"user", "host.local"}, nil, true},
+		{"error", fields{&Config{SSH: nil}, nil}, args{"user", "host.local"}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &Authority{
+				config:         tt.fields.config,
+				sshBastionFunc: tt.fields.sshBastionFunc,
+			}
+			got, err := a.GetSSHBastion(tt.args.user, tt.args.hostname)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Authority.GetSSHBastion() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Authority.GetSSHBastion() = %v, want %v", got, tt.want)
 			}
 		})
 	}
