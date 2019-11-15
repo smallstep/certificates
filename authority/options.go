@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 )
 
@@ -15,10 +16,18 @@ func WithDatabase(db db.AuthDB) Option {
 	}
 }
 
-// WithSSHBastionFunc defines sets a custom function to get the bastion for a
+// WithSSHBastionFunc sets a custom function to get the bastion for a
 // given user-host pair.
 func WithSSHBastionFunc(fn func(user, host string) (*Bastion, error)) Option {
 	return func(a *Authority) {
 		a.sshBastionFunc = fn
+	}
+}
+
+// WithGetIdentityFunc sets a custom function to retrieve the identity from
+// an external resource.
+func WithGetIdentityFunc(fn func(p provisioner.Interface, email string) (*provisioner.Identity, error)) Option {
+	return func(a *Authority) {
+		a.getIdentityFunc = fn
 	}
 }
