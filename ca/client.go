@@ -694,6 +694,27 @@ func (c *Client) SSHGetHosts() (*api.SSHGetHostsResponse, error) {
 	return &hosts, nil
 }
 
+// SSHBastion performs the POST /ssh/bastion request to the CA.
+func (c *Client) SSHBastion(req *api.SSHBastionRequest) (*api.SSHBastionResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/bastion"})
+	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		return nil, readError(resp.Body)
+	}
+	var bastion api.SSHBastionResponse
+	if err := readJSON(resp.Body, &bastion); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &bastion, nil
+}
+
 // RootFingerprint is a helper method that returns the current root fingerprint.
 // It does an health connection and gets the fingerprint from the TLS verified
 // chains.
