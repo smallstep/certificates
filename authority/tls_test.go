@@ -816,7 +816,7 @@ func TestRevoke(t *testing.T) {
 	for name, f := range tests {
 		tc := f()
 		t.Run(name, func(t *testing.T) {
-			if err := tc.a.Revoke(tc.opts); err != nil {
+			if err := tc.a.Revoke(context.TODO(), tc.opts); err != nil {
 				if assert.NotNil(t, tc.err) {
 					switch v := err.(type) {
 					case *apiError:

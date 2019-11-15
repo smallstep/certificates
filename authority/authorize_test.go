@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smallstep/certificates/authority/provisioner"
-
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/jose"
@@ -272,9 +271,10 @@ func TestAuthority_authorizeRevoke(t *testing.T) {
 	validAudience := []string{"https://test.ca.smallstep.com/revoke"}
 
 	type authorizeTest struct {
-		auth *Authority
-		opts *RevokeOptions
-		err  error
+		auth  *Authority
+		token string
+		opts  *RevokeOptions
+		err   error
 	}
 	tests := map[string]func(t *testing.T) *authorizeTest{
 		"fail/token/invalid-ott": func(t *testing.T) *authorizeTest {
@@ -349,17 +349,12 @@ func TestAuthority_authorizeRevoke(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			p, err := tc.auth.authorizeRevoke(tc.opts)
-			if err != nil {
+			if err := tc.auth.authorizeRevoke(context.TODO(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
-				if assert.Nil(t, tc.err) {
-					if assert.NotNil(t, p) {
-						assert.Equals(t, p.GetID(), "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
-					}
-				}
+				assert.Nil(t, tc.err)
 			}
 		})
 	}
@@ -640,7 +635,7 @@ func TestAuthority_authorizeRenewal(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			err := tc.auth.authorizeRenewal(tc.crt)
+			err := tc.auth.authorizeRenew(tc.crt)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					switch v := err.(type) {
