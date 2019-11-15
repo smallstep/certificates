@@ -34,8 +34,18 @@ type SSHConfig struct {
 	HostKey          string          `json:"hostKey"`
 	UserKey          string          `json:"userKey"`
 	Keys             []*SSHPublicKey `json:"keys,omitempty"`
-	AddUserPrincipal string          `json:"addUserPrincipal"`
-	AddUserCommand   string          `json:"addUserCommand"`
+	AddUserPrincipal string          `json:"addUserPrincipal,omitempty"`
+	AddUserCommand   string          `json:"addUserCommand,omitempty"`
+	Bastion          *Bastion        `json:"bastion,omitempty"`
+}
+
+// Bastion contains the custom properties used on bastion.
+type Bastion struct {
+	Hostname string `json:"hostname"`
+	User     string `json:"user,omitempty"`
+	Port     string `json:"port,omitempty"`
+	Command  string `json:"cmd,omitempty"`
+	Flags    string `json:"flags,omitempty"`
 }
 
 // Validate checks the fields in SSHConfig.
@@ -155,6 +165,24 @@ func (a *Authority) GetSSHConfig(typ string, data map[string]string) ([]template
 		output = append(output, o)
 	}
 	return output, nil
+}
+
+// GetSSHBastion returns the bastion configuration, for the given pair user,
+// hostname.
+func (a *Authority) GetSSHBastion(user string, hostname string) (*Bastion, error) {
+	if a.sshBastionFunc != nil {
+		return a.sshBastionFunc(user, hostname)
+	}
+	if a.config.SSH != nil {
+		if a.config.SSH.Bastion != nil && a.config.SSH.Bastion.Hostname != "" {
+			return a.config.SSH.Bastion, nil
+		}
+		return nil, nil
+	}
+	return nil, &apiError{
+		err:  errors.New("getSSHBastion: ssh is not configured"),
+		code: http.StatusNotFound,
+	}
 }
 
 // authorizeSSHSign loads the provisioner from the token, checks that it has not

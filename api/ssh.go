@@ -24,6 +24,7 @@ type SSHAuthority interface {
 	GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error)
 	CheckSSHHost(principal string) (bool, error)
 	GetSSHHosts() ([]string, error)
+	GetSSHBastion(user string, hostname string) (*authority.Bastion, error)
 }
 
 // SSHSignRequest is the request body of an SSH certificate request.
@@ -205,6 +206,28 @@ func (r *SSHCheckPrincipalRequest) Validate() error {
 // exists.
 type SSHCheckPrincipalResponse struct {
 	Exists bool `json:"exists"`
+}
+
+// SSHBastionRequest is the request body used to get the bastion for a given
+// host.
+type SSHBastionRequest struct {
+	User     string `json:"user"`
+	Hostname string `json:"hostname"`
+}
+
+// Validate checks the values of the SSHBastionRequest.
+func (r *SSHBastionRequest) Validate() error {
+	if r.Hostname == "" {
+		return errors.New("missing or empty hostname")
+	}
+	return nil
+}
+
+// SSHBastionResponse is the response body used to return the bastion for a
+// given host.
+type SSHBastionResponse struct {
+	Hostname string             `json:"hostname"`
+	Bastion  *authority.Bastion `json:"bastion,omitempty"`
 }
 
 // SSHSign is an HTTP handler that reads an SignSSHRequest with a one-time-token
@@ -390,5 +413,29 @@ func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 	}
 	JSON(w, &SSHGetHostsResponse{
 		Hosts: hosts,
+	})
+}
+
+// SSHBastion provides returns the bastion configured if any.
+func (h *caHandler) SSHBastion(w http.ResponseWriter, r *http.Request) {
+	var body SSHBastionRequest
+	if err := ReadJSON(r.Body, &body); err != nil {
+		WriteError(w, BadRequest(errors.Wrap(err, "error reading request body")))
+		return
+	}
+	if err := body.Validate(); err != nil {
+		WriteError(w, BadRequest(err))
+		return
+	}
+
+	bastion, err := h.Authority.GetSSHBastion(body.User, body.Hostname)
+	if err != nil {
+		WriteError(w, InternalServerError(err))
+		return
+	}
+
+	JSON(w, &SSHBastionResponse{
+		Hostname: body.Hostname,
+		Bastion:  bastion,
 	})
 }

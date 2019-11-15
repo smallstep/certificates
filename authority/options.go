@@ -14,3 +14,11 @@ func WithDatabase(db db.AuthDB) Option {
 		a.db = db
 	}
 }
+
+// WithSSHBastionFunc defines sets a custom function to get the bastion for a
+// given user-host pair.
+func WithSSHBastionFunc(fn func(user, host string) (*Bastion, error)) Option {
+	return func(a *Authority) {
+		a.sshBastionFunc = fn
+	}
+}
