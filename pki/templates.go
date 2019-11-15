@@ -39,7 +39,7 @@ var SSHTemplateData = map[string]string{
 	User {{.User.User}}
 	{{- end }}
 	UserKnownHostsFile {{.User.StepPath}}/ssh/known_hosts
-	ProxyCommand step ssh proxycommand {{- if .User.RegistryUsername}} --username {{.User.RegistryUsername}}{{end}}{{- if .User.RegistryPassword}} --password {{.User.RegistryPassword}}{{end}} %r %h %p`,
+	ProxyCommand step ssh proxycommand %r %h %p`,
 
 	// known_hosts.tpl authorizes the ssh hosts key
 	"known_hosts.tpl": `@cert-authority * {{.Step.SSH.HostKey.Type}} {{.Step.SSH.HostKey.Marshal | toString | b64enc}}
