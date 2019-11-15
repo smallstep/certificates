@@ -319,6 +319,12 @@ func (b *base) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certif
 	return nil, nil, errors.New("not implemented; provisioner does not implement AuthorizeSSHRekey")
 }
 
+// Identity is the type representing an externally supplied identity that is used
+// by provisioners to populate certificate fields.
+type Identity struct {
+	Usernames []string `json:"usernames"`
+}
+
 // MockProvisioner for testing
 type MockProvisioner struct {
 	Mret1, Mret2, Mret3 interface{}

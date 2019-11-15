@@ -40,7 +40,8 @@ type Authority struct {
 	// Do not re-initialize
 	initOnce bool
 	// Custom functions
-	sshBastionFunc func(user, hostname string) (*Bastion, error)
+	sshBastionFunc  func(user, hostname string) (*Bastion, error)
+	getIdentityFunc func(p provisioner.Interface, email string) (*provisioner.Identity, error)
 }
 
 // New creates and initiates a new Authority type.
