@@ -107,6 +107,16 @@ func (o SSHOptions) match(got SSHOptions) error {
 	return nil
 }
 
+// sshCertPrincipalsModifier is an SSHCertificateModifier that sets the
+// principals to the SSH certificate.
+type sshCertPrincipalsModifier []string
+
+// Modify the ValidPrincipals value of the cert.
+func (o sshCertPrincipalsModifier) Modify(cert *ssh.Certificate) error {
+	cert.ValidPrincipals = []string(o)
+	return nil
+}
+
 // sshCertificateKeyIDModifier is an SSHCertificateModifier that sets the given
 // Key ID in the SSH certificate.
 type sshCertificateKeyIDModifier string
@@ -116,21 +126,13 @@ func (m sshCertificateKeyIDModifier) Modify(cert *ssh.Certificate) error {
 	return nil
 }
 
-// sshCertificateCertTypeModifier is an SSHCertificateModifier that sets the
-// certificate type to the SSH certificate.
-type sshCertificateCertTypeModifier string
+// sshCertTypeModifier is an SSHCertificateModifier that sets the
+// certificate type.
+type sshCertTypeModifier string
 
-func (m sshCertificateCertTypeModifier) Modify(cert *ssh.Certificate) error {
+// Modify sets the CertType for the ssh certificate.
+func (m sshCertTypeModifier) Modify(cert *ssh.Certificate) error {
 	cert.CertType = sshCertTypeUInt32(string(m))
-	return nil
-}
-
-// sshCertificatePrincipalsModifier is an SSHCertificateModifier that sets the
-// principals to the SSH certificate.
-type sshCertificatePrincipalsModifier []string
-
-func (m sshCertificatePrincipalsModifier) Modify(cert *ssh.Certificate) error {
-	cert.ValidPrincipals = []string(m)
 	return nil
 }
 

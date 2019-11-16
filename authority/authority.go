@@ -41,7 +41,7 @@ type Authority struct {
 	initOnce bool
 	// Custom functions
 	sshBastionFunc  func(user, hostname string) (*Bastion, error)
-	getIdentityFunc func(p provisioner.Interface, email string) (*provisioner.Identity, error)
+	getIdentityFunc provisioner.GetIdentityFunc
 }
 
 // New creates and initiates a new Authority type.
@@ -192,6 +192,7 @@ func (a *Authority) init() error {
 			UserKeys: sshKeys.UserKeys,
 			HostKeys: sshKeys.HostKeys,
 		},
+		GetIdentityFunc: a.getIdentityFunc,
 	}
 	// Store all the provisioners
 	for _, p := range a.config.AuthorityConfig.Provisioners {

@@ -64,6 +64,7 @@ type OIDC struct {
 	configuration         openIDConfiguration
 	keyStore              *keyStore
 	claimer               *Claimer
+	getIdentityFunc       GetIdentityFunc
 }
 
 // IsAdmin returns true if the given email is in the Admins whitelist, false
@@ -168,6 +169,13 @@ func (o *OIDC) Init(config Config) (err error) {
 	o.keyStore, err = newKeyStore(o.configuration.JWKSetURI)
 	if err != nil {
 		return err
+	}
+
+	// Set the identity getter if it exists, otherwise use the default.
+	if config.GetIdentityFunc == nil {
+		o.getIdentityFunc = DefaultIdentityFunc
+	} else {
+		o.getIdentityFunc = config.GetIdentityFunc
 	}
 	return nil
 }
@@ -326,23 +334,26 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		sshCertificateKeyIDModifier(claims.Email),
 	}
 
-	name := SanitizeSSHUserPrincipal(claims.Email)
-	if !sshUserRegex.MatchString(name) {
-		return nil, errors.Errorf("invalid principal '%s' from email address '%s'", name, claims.Email)
+	// Get the identity using either the default identityFunc or one injected
+	// externally.
+	iden, err := o.getIdentityFunc(o, claims.Email)
+	if err != nil {
+		return nil, errors.Wrap(err, "authorizeSSHSign")
 	}
-
-	// Admin users will default to user + name but they can be changed by the
-	// user options. Non-admins are only able to sign user certificates.
 	defaults := SSHOptions{
 		CertType:   SSHUserCert,
-		Principals: []string{name},
+		Principals: iden.Usernames,
 	}
 
+	// Admin users can use any principal, and can sign user and host certificates.
+	// Non-admin users can only use principals returned by the identityFunc, and
+	// can only sign user certificates.
 	if !o.IsAdmin(claims.Email) {
 		signOptions = append(signOptions, sshCertificateOptionsValidator(defaults))
 	}
 
-	// Default to a user with name as principal if not set
+	// Default to a user certificate with usernames as principals if those options
+	// are not set.
 	signOptions = append(signOptions, sshCertificateDefaultsModifier(defaults))
 
 	return append(signOptions,

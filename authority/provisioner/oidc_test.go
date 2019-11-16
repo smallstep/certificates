@@ -347,6 +347,10 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	assert.FatalError(t, err)
 	p3, err := generateOIDC()
 	assert.FatalError(t, err)
+	p4, err := generateOIDC()
+	assert.FatalError(t, err)
+	p5, err := generateOIDC()
+	assert.FatalError(t, err)
 	// Admin + Domains
 	p3.Admins = []string{"name@smallstep.com", "root@example.com"}
 	p3.Domains = []string{"smallstep.com"}
@@ -356,11 +360,26 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	p1.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
 	p2.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
 	p3.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	p4.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	p5.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
 	assert.FatalError(t, p1.Init(config))
 	assert.FatalError(t, p2.Init(config))
 	assert.FatalError(t, p3.Init(config))
+	assert.FatalError(t, p4.Init(config))
+	assert.FatalError(t, p5.Init(config))
+
+	p4.getIdentityFunc = func(p Interface, email string) (*Identity, error) {
+		return &Identity{Usernames: []string{"max", "mariano"}}, nil
+	}
+	p5.getIdentityFunc = func(p Interface, email string) (*Identity, error) {
+		return nil, errors.New("force")
+	}
 
 	t1, err := generateSimpleToken("the-issuer", p1.ClientID, &keys.Keys[0])
+	assert.FatalError(t, err)
+	okGetIdentityToken, err := generateSimpleToken("the-issuer", p4.ClientID, &keys.Keys[0])
+	assert.FatalError(t, err)
+	failGetIdentityToken, err := generateSimpleToken("the-issuer", p5.ClientID, &keys.Keys[0])
 	assert.FatalError(t, err)
 	// Admin email not in domains
 	okAdmin, err := generateToken("subject", "the-issuer", p3.ClientID, "root@example.com", []string{}, time.Now(), &keys.Keys[0])
@@ -384,11 +403,11 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	userDuration := p1.claimer.DefaultUserSSHCertDuration()
 	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
 	expectedUserOptions := &SSHOptions{
-		CertType: "user", Principals: []string{"name"},
+		CertType: "user", Principals: []string{"name", "name@smallstep.com"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
 	}
 	expectedAdminOptions := &SSHOptions{
-		CertType: "user", Principals: []string{"root"},
+		CertType: "user", Principals: []string{"root", "root@example.com"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
 	}
 	expectedHostOptions := &SSHOptions{
@@ -412,17 +431,32 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 		{"ok", p1, args{t1, SSHOptions{}, pub}, expectedUserOptions, false, false},
 		{"ok-rsa2048", p1, args{t1, SSHOptions{}, rsa2048.Public()}, expectedUserOptions, false, false},
 		{"ok-user", p1, args{t1, SSHOptions{CertType: "user"}, pub}, expectedUserOptions, false, false},
-		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}, pub}, expectedUserOptions, false, false},
-		{"ok-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub}, expectedUserOptions, false, false},
+		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}, pub},
+			&SSHOptions{CertType: "user", Principals: []string{"name"},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
+		{"ok-principals-getIdentity", p4, args{okGetIdentityToken, SSHOptions{Principals: []string{"mariano"}}, pub},
+			&SSHOptions{CertType: "user", Principals: []string{"mariano"},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
+		{"ok-emptyPrincipals-getIdentity", p4, args{okGetIdentityToken, SSHOptions{}, pub},
+			&SSHOptions{CertType: "user", Principals: []string{"max", "mariano"},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
+		{"ok-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub},
+			&SSHOptions{CertType: "user", Principals: []string{"name"},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
 		{"admin", p3, args{okAdmin, SSHOptions{}, pub}, expectedAdminOptions, false, false},
 		{"admin-user", p3, args{okAdmin, SSHOptions{CertType: "user"}, pub}, expectedAdminOptions, false, false},
-		{"admin-principals", p3, args{okAdmin, SSHOptions{Principals: []string{"root"}}, pub}, expectedAdminOptions, false, false},
-		{"admin-options", p3, args{okAdmin, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub}, expectedUserOptions, false, false},
+		{"admin-principals", p3, args{okAdmin, SSHOptions{Principals: []string{"root"}}, pub},
+			&SSHOptions{CertType: "user", Principals: []string{"root"},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
+		{"admin-options", p3, args{okAdmin, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub},
+			&SSHOptions{CertType: "user", Principals: []string{"name"},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
 		{"admin-host", p3, args{okAdmin, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, false, false},
 		{"fail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedUserOptions, false, true},
 		{"fail-user-host", p1, args{t1, SSHOptions{CertType: "host"}, pub}, nil, false, true},
 		{"fail-user-principals", p1, args{t1, SSHOptions{Principals: []string{"root"}}, pub}, nil, false, true},
 		{"fail-email", p3, args{failEmail, SSHOptions{}, pub}, nil, true, false},
+		{"fail-getIdentity", p5, args{failGetIdentityToken, SSHOptions{}, pub}, nil, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

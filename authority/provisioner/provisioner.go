@@ -185,6 +185,9 @@ type Config struct {
 	DB db.AuthDB
 	// SSHKeys are the root SSH public keys
 	SSHKeys *SSHKeys
+	// GetIdentityFunc is a function that returns an identity that will be
+	// used by the provisioner to populate certificate attributes.
+	GetIdentityFunc GetIdentityFunc
 }
 
 type provisioner struct {
@@ -314,7 +317,7 @@ func (b *base) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certif
 }
 
 // AuthorizeSSHRekey returns an unimplmented error. Provisioners should overwrite
-// this method if they will support authorizing tokens for renewing SSH Certificates.
+// this method if they will support authorizing tokens for rekeying SSH Certificates.
 func (b *base) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error) {
 	return nil, nil, errors.New("not implemented; provisioner does not implement AuthorizeSSHRekey")
 }
@@ -323,6 +326,23 @@ func (b *base) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certif
 // by provisioners to populate certificate fields.
 type Identity struct {
 	Usernames []string `json:"usernames"`
+}
+
+// GetIdentityFunc is a function that returns an identity.
+type GetIdentityFunc func(p Interface, email string) (*Identity, error)
+
+// DefaultIdentityFunc return a default identity depending on the provisioner type.
+func DefaultIdentityFunc(p Interface, email string) (*Identity, error) {
+	switch k := p.(type) {
+	case *OIDC:
+		name := SanitizeSSHUserPrincipal(email)
+		if !sshUserRegex.MatchString(name) {
+			return nil, errors.Errorf("invalid principal '%s' from email '%s'", name, email)
+		}
+		return &Identity{Usernames: []string{name, email}}, nil
+	default:
+		return nil, errors.Errorf("provisioner type '%T' not supported by identity function", k)
+	}
 }
 
 // MockProvisioner for testing
@@ -335,9 +355,13 @@ type MockProvisioner struct {
 	MgetType            func() Type
 	MgetEncryptedKey    func() (string, string, bool)
 	Minit               func(Config) error
-	MauthorizeRevoke    func(ott string) error
 	MauthorizeSign      func(ctx context.Context, ott string) ([]SignOption, error)
-	MauthorizeRenewal   func(*x509.Certificate) error
+	MauthorizeRenew     func(ctx context.Context, cert *x509.Certificate) error
+	MauthorizeRevoke    func(ctx context.Context, ott string) error
+	MauthorizeSSHSign   func(ctx context.Context, ott string) ([]SignOption, error)
+	MauthorizeSSHRenew  func(ctx context.Context, ott string) (*ssh.Certificate, error)
+	MauthorizeSSHRekey  func(ctx context.Context, ott string) (*ssh.Certificate, []SignOption, error)
+	MauthorizeSSHRevoke func(ctx context.Context, ott string) error
 }
 
 // GetID mock
@@ -391,14 +415,6 @@ func (m *MockProvisioner) Init(c Config) error {
 	return m.Merr
 }
 
-// AuthorizeRevoke mock
-func (m *MockProvisioner) AuthorizeRevoke(ott string) error {
-	if m.MauthorizeRevoke != nil {
-		return m.MauthorizeRevoke(ott)
-	}
-	return m.Merr
-}
-
 // AuthorizeSign mock
 func (m *MockProvisioner) AuthorizeSign(ctx context.Context, ott string) ([]SignOption, error) {
 	if m.MauthorizeSign != nil {
@@ -407,10 +423,50 @@ func (m *MockProvisioner) AuthorizeSign(ctx context.Context, ott string) ([]Sign
 	return m.Mret1.([]SignOption), m.Merr
 }
 
-// AuthorizeRenewal mock
-func (m *MockProvisioner) AuthorizeRenewal(c *x509.Certificate) error {
-	if m.MauthorizeRenewal != nil {
-		return m.MauthorizeRenewal(c)
+// AuthorizeRevoke mock
+func (m *MockProvisioner) AuthorizeRevoke(ctx context.Context, ott string) error {
+	if m.MauthorizeRevoke != nil {
+		return m.MauthorizeRevoke(ctx, ott)
+	}
+	return m.Merr
+}
+
+// AuthorizeRenew mock
+func (m *MockProvisioner) AuthorizeRenew(ctx context.Context, c *x509.Certificate) error {
+	if m.MauthorizeRenew != nil {
+		return m.MauthorizeRenew(ctx, c)
+	}
+	return m.Merr
+}
+
+// AuthorizeSSHSign mock
+func (m *MockProvisioner) AuthorizeSSHSign(ctx context.Context, ott string) ([]SignOption, error) {
+	if m.MauthorizeSign != nil {
+		return m.MauthorizeSign(ctx, ott)
+	}
+	return m.Mret1.([]SignOption), m.Merr
+}
+
+// AuthorizeSSHRenew mock
+func (m *MockProvisioner) AuthorizeSSHRenew(ctx context.Context, ott string) (*ssh.Certificate, error) {
+	if m.MauthorizeRenew != nil {
+		return m.MauthorizeSSHRenew(ctx, ott)
+	}
+	return m.Mret1.(*ssh.Certificate), m.Merr
+}
+
+// AuthorizeSSHRekey mock
+func (m *MockProvisioner) AuthorizeSSHRekey(ctx context.Context, ott string) (*ssh.Certificate, []SignOption, error) {
+	if m.MauthorizeSSHRekey != nil {
+		return m.MauthorizeSSHRekey(ctx, ott)
+	}
+	return m.Mret1.(*ssh.Certificate), m.Mret2.([]SignOption), m.Merr
+}
+
+// AuthorizeSSHRevoke mock
+func (m *MockProvisioner) AuthorizeSSHRevoke(ctx context.Context, ott string) error {
+	if m.MauthorizeSSHRevoke != nil {
+		return m.MauthorizeSSHRevoke(ctx, ott)
 	}
 	return m.Merr
 }
