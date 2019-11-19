@@ -27,6 +27,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/crypto/x509util"
+	"golang.org/x/net/http2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -38,15 +39,45 @@ type clientOptions struct {
 	rootSHA256   string
 	rootFilename string
 	rootBundle   []byte
+	certificate  tls.Certificate
 }
 
 func (o *clientOptions) apply(opts []ClientOption) (err error) {
+	if err = o.applyDefaultIdentity(); err != nil {
+		return
+	}
 	for _, fn := range opts {
 		if err = fn(o); err != nil {
 			return
 		}
 	}
 	return
+}
+
+// applyDefaultIdentity sets the options for the default identity if the
+// identity file is present. The identity is enabled by default.
+func (o *clientOptions) applyDefaultIdentity() error {
+	b, err := ioutil.ReadFile(IdentityFile)
+	if err != nil {
+		return nil
+	}
+	var identity Identity
+	if err := json.Unmarshal(b, &identity); err != nil {
+		return errors.Wrapf(err, "error unmarshaling %s", IdentityFile)
+	}
+	if err := identity.Validate(); err != nil {
+		return err
+	}
+	opts, err := identity.Options()
+	if err != nil {
+		return err
+	}
+	for _, fn := range opts {
+		if err := fn(o); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // checkTransport checks if other ways to set up a transport have been provided.
@@ -85,10 +116,28 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 			if tr, err = getTransportFromFile(rootFile); err != nil {
 				return nil, err
 			}
-			return tr, nil
 		}
-		return nil, errors.New("a transport, a root cert, or a root sha256 must be used")
+		if tr == nil {
+			return nil, errors.New("a transport, a root cert, or a root sha256 must be used")
+		}
 	}
+
+	// Add client certificate if available
+	if o.certificate.Certificate != nil {
+		switch tr := tr.(type) {
+		case *http.Transport:
+			if len(tr.TLSClientConfig.Certificates) == 0 && tr.TLSClientConfig.GetClientCertificate == nil {
+				tr.TLSClientConfig.Certificates = []tls.Certificate{o.certificate}
+			}
+		case *http2.Transport:
+			if len(tr.TLSClientConfig.Certificates) == 0 && tr.TLSClientConfig.GetClientCertificate == nil {
+				tr.TLSClientConfig.Certificates = []tls.Certificate{o.certificate}
+			}
+		default:
+			return nil, errors.Errorf("unsupported transport type %T", tr)
+		}
+	}
+
 	return tr, nil
 }
 
@@ -137,6 +186,15 @@ func WithCABundle(bundle []byte) ClientOption {
 			return err
 		}
 		o.rootBundle = bundle
+		return nil
+	}
+}
+
+// WithCertificate will set the given certificate as the TLS client certificate
+// in the client.
+func WithCertificate(crt tls.Certificate) ClientOption {
+	return func(o *clientOptions) error {
+		o.certificate = crt
 		return nil
 	}
 }
