@@ -3,6 +3,7 @@ package authority
 import (
 	"context"
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/binary"
 	"net/http"
 	"strings"
@@ -673,14 +674,18 @@ func (a *Authority) CheckSSHHost(principal string) (bool, error) {
 }
 
 // GetSSHHosts returns a list of valid host principals.
-func (a *Authority) GetSSHHosts(email string) ([]string, error) {
-	if a.sshBastionFunc != nil {
-		return a.sshGetHostsFunc(email)
+func (a *Authority) GetSSHHosts(cert *x509.Certificate) ([]string, error) {
+	if a.sshGetHostsFunc != nil {
+		return a.sshGetHostsFunc(cert)
 	}
-	return nil, &apiError{
-		err:  errors.New("getSSHHosts is not configured"),
-		code: http.StatusNotFound,
+	hosts, err := a.db.GetSSHHostPrincipals()
+	if err != nil {
+		return nil, &apiError{
+			err:  errors.Wrap(err, "getSSHHosts"),
+			code: http.StatusInternalServerError,
+		}
 	}
+	return hosts, nil
 }
 
 func (a *Authority) getAddUserPrincipal() (cmd string) {
