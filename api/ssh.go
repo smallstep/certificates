@@ -23,7 +23,7 @@ type SSHAuthority interface {
 	GetSSHFederation() (*authority.SSHKeys, error)
 	GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error)
 	CheckSSHHost(principal string) (bool, error)
-	GetSSHHosts() ([]string, error)
+	GetSSHHosts(user string) ([]string, error)
 	GetSSHBastion(user string, hostname string) (*authority.Bastion, error)
 }
 
@@ -406,7 +406,18 @@ func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 
 // SSHGetHosts is the HTTP handler that returns a list of valid ssh hosts.
 func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
-	hosts, err := h.Authority.GetSSHHosts()
+	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+		WriteError(w, BadRequest(errors.New("missing peer certificate")))
+		return
+	}
+
+	cert := r.TLS.PeerCertificates[0]
+	email := cert.EmailAddresses[0]
+	if len(email) == 0 {
+		WriteError(w, BadRequest(errors.New("client certificate missing email SAN")))
+		return
+	}
+	hosts, err := h.Authority.GetSSHHosts(email)
 	if err != nil {
 		WriteError(w, InternalServerError(err))
 		return

@@ -673,13 +673,14 @@ func (a *Authority) CheckSSHHost(principal string) (bool, error) {
 }
 
 // GetSSHHosts returns a list of valid host principals.
-func (a *Authority) GetSSHHosts() ([]string, error) {
-	ps, err := a.db.GetSSHHostPrincipals()
-	if err != nil {
-		return nil, err
+func (a *Authority) GetSSHHosts(email string) ([]string, error) {
+	if a.sshBastionFunc != nil {
+		return a.sshGetHostsFunc(email)
 	}
-
-	return ps, nil
+	return nil, &apiError{
+		err:  errors.New("getSSHHosts is not configured"),
+		code: http.StatusNotFound,
+	}
 }
 
 func (a *Authority) getAddUserPrincipal() (cmd string) {
