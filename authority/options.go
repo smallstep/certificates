@@ -1,6 +1,8 @@
 package authority
 
 import (
+	"crypto/x509"
+
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 )
@@ -34,7 +36,7 @@ func WithSSHBastionFunc(fn func(user, host string) (*Bastion, error)) Option {
 
 // WithSSHGetHosts sets a custom function to get the bastion for a
 // given user-host pair.
-func WithSSHGetHosts(fn func(user string) ([]string, error)) Option {
+func WithSSHGetHosts(fn func(cert *x509.Certificate) ([]string, error)) Option {
 	return func(a *Authority) {
 		a.sshGetHostsFunc = fn
 	}
