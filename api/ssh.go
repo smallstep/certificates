@@ -29,14 +29,15 @@ type SSHAuthority interface {
 
 // SSHSignRequest is the request body of an SSH certificate request.
 type SSHSignRequest struct {
-	PublicKey        []byte       `json:"publicKey"` //base64 encoded
-	OTT              string       `json:"ott"`
-	CertType         string       `json:"certType,omitempty"`
-	Principals       []string     `json:"principals,omitempty"`
-	ValidAfter       TimeDuration `json:"validAfter,omitempty"`
-	ValidBefore      TimeDuration `json:"validBefore,omitempty"`
-	AddUserPublicKey []byte       `json:"addUserPublicKey,omitempty"`
-	KeyID            string       `json:"keyID"`
+	PublicKey        []byte             `json:"publicKey"` // base64 encoded
+	OTT              string             `json:"ott"`
+	CertType         string             `json:"certType,omitempty"`
+	Principals       []string           `json:"principals,omitempty"`
+	ValidAfter       TimeDuration       `json:"validAfter,omitempty"`
+	ValidBefore      TimeDuration       `json:"validBefore,omitempty"`
+	AddUserPublicKey []byte             `json:"addUserPublicKey,omitempty"`
+	KeyID            string             `json:"keyID"`
+	IdentityCSR      CertificateRequest `json:"identityCSR,omitempty"`
 }
 
 // Validate validates the SSHSignRequest.
@@ -49,14 +50,21 @@ func (s *SSHSignRequest) Validate() error {
 	case len(s.OTT) == 0:
 		return errors.New("missing or empty ott")
 	default:
+		// Validate identity signature if provided
+		if s.IdentityCSR.CertificateRequest != nil {
+			if err := s.IdentityCSR.CertificateRequest.CheckSignature(); err != nil {
+				return errors.Wrap(err, "invalid csr")
+			}
+		}
 		return nil
 	}
 }
 
 // SSHSignResponse is the response object that returns the SSH certificate.
 type SSHSignResponse struct {
-	Certificate        SSHCertificate  `json:"crt"`
-	AddUserCertificate *SSHCertificate `json:"addUserCrt,omitempty"`
+	Certificate         SSHCertificate  `json:"crt"`
+	AddUserCertificate  *SSHCertificate `json:"addUserCrt,omitempty"`
+	IdentityCertificate []Certificate   `json:"identityCrt,omitempty"`
 }
 
 // SSHRootsResponse represents the response object that returns the SSH user and
@@ -292,11 +300,33 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 		addUserCertificate = &SSHCertificate{addUserCert}
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	JSON(w, &SSHSignResponse{
-		Certificate:        SSHCertificate{cert},
-		AddUserCertificate: addUserCertificate,
-	})
+	// Sign identity certificate if available.
+	var identityCertificate []Certificate
+	if cr := body.IdentityCSR.CertificateRequest; cr != nil {
+		opts := provisioner.Options{
+			NotBefore: body.ValidAfter,
+			NotAfter:  body.ValidBefore,
+		}
+		ctx := authority.NewContextWithSkipTokenReuse(context.Background())
+		ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
+		signOpts, err := h.Authority.Authorize(ctx, body.OTT)
+		if err != nil {
+			WriteError(w, Unauthorized(err))
+			return
+		}
+		certChain, err := h.Authority.Sign(cr, opts, signOpts...)
+		if err != nil {
+			WriteError(w, Forbidden(err))
+			return
+		}
+		identityCertificate = certChainToPEM(certChain)
+	}
+
+	JSONStatus(w, &SSHSignResponse{
+		Certificate:         SSHCertificate{cert},
+		AddUserCertificate:  addUserCertificate,
+		IdentityCertificate: identityCertificate,
+	}, http.StatusCreated)
 }
 
 // SSHRoots is an HTTP handler that returns the SSH public keys for user and host

@@ -19,10 +19,24 @@ type Claims struct {
 	Nonce string   `json:"nonce,omitempty"`
 }
 
+type skipTokenReuseKey struct{}
+
+// NewContextWithSkipTokenReuse creates a new context from ctx and attaches a
+// value to skip the token reuse.
+func NewContextWithSkipTokenReuse(ctx context.Context) context.Context {
+	return context.WithValue(ctx, skipTokenReuseKey{}, true)
+}
+
+// SkipTokenReuseFromContext returns if the token reuse needs to be ignored.
+func SkipTokenReuseFromContext(ctx context.Context) bool {
+	m, _ := ctx.Value(skipTokenReuseKey{}).(bool)
+	return m
+}
+
 // authorizeToken parses the token and returns the provisioner used to generate
 // the token. This method enforces the One-Time use policy (tokens can only be
 // used once).
-func (a *Authority) authorizeToken(ott string) (provisioner.Interface, error) {
+func (a *Authority) authorizeToken(ctx context.Context, ott string) (provisioner.Interface, error) {
 	var errContext = map[string]interface{}{"ott": ott}
 
 	// Validate payload
@@ -58,15 +72,17 @@ func (a *Authority) authorizeToken(ott string) (provisioner.Interface, error) {
 			http.StatusUnauthorized, errContext}
 	}
 
-	// Store the token to protect against reuse.
-	if reuseKey, err := p.GetTokenID(ott); err == nil {
-		ok, err := a.db.UseToken(reuseKey, ott)
-		if err != nil {
-			return nil, &apiError{errors.Wrap(err, "authorizeToken: failed when checking if token already used"),
-				http.StatusInternalServerError, errContext}
-		}
-		if !ok {
-			return nil, &apiError{errors.Errorf("authorizeToken: token already used"), http.StatusUnauthorized, errContext}
+	// Store the token to protect against reuse unless it's skipped.
+	if !SkipTokenReuseFromContext(ctx) {
+		if reuseKey, err := p.GetTokenID(ott); err == nil {
+			ok, err := a.db.UseToken(reuseKey, ott)
+			if err != nil {
+				return nil, &apiError{errors.Wrap(err, "authorizeToken: failed when checking if token already used"),
+					http.StatusInternalServerError, errContext}
+			}
+			if !ok {
+				return nil, &apiError{errors.Errorf("authorizeToken: token already used"), http.StatusUnauthorized, errContext}
+			}
 		}
 	}
 
@@ -116,7 +132,7 @@ func (a *Authority) Authorize(ctx context.Context, ott string) ([]provisioner.Si
 // list of methods to apply to the signing flow.
 func (a *Authority) authorizeSign(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 	var errContext = apiCtx{"ott": ott}
-	p, err := a.authorizeToken(ott)
+	p, err := a.authorizeToken(ctx, ott)
 	if err != nil {
 		return nil, &apiError{errors.Wrap(err, "authorizeSign"), http.StatusUnauthorized, errContext}
 	}
@@ -143,7 +159,7 @@ func (a *Authority) AuthorizeSign(ott string) ([]provisioner.SignOption, error) 
 func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
 	errContext := map[string]interface{}{"ott": token}
 
-	p, err := a.authorizeToken(token)
+	p, err := a.authorizeToken(ctx, token)
 	if err != nil {
 		return &apiError{errors.Wrap(err, "authorizeRevoke"), http.StatusUnauthorized, errContext}
 	}
