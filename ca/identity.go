@@ -1,16 +1,29 @@
 package ca
 
 import (
+	"bytes"
+	"crypto"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/cli/config"
+	"github.com/smallstep/cli/crypto/pemutil"
 )
 
 // IdentityType represents the different types of identity files.
 type IdentityType string
+
+// Disabled represents a disabled identity type
+const Disabled IdentityType = ""
 
 // MutualTLS represents the identity using mTLS
 const MutualTLS IdentityType = "mTLS"
@@ -26,9 +39,73 @@ type Identity struct {
 	Key         string `json:"key"`
 }
 
+// WriteDefaultIdentity writes the given certificates and key and the
+// identity.json pointing to the new files.
+func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) error {
+	base := filepath.Join(config.StepPath(), "config")
+	if err := os.MkdirAll(base, 0600); err != nil {
+		return errors.Wrap(err, "error creating config directory")
+	}
+
+	base = filepath.Join(config.StepPath(), "identity")
+	if err := os.MkdirAll(base, 0600); err != nil {
+		return errors.Wrap(err, "error creating identity directory")
+	}
+
+	certFilename := filepath.Join(base, "identity.crt")
+	keyFilename := filepath.Join(base, "identity_key")
+
+	// Write certificate
+	buf := new(bytes.Buffer)
+	for _, crt := range certChain {
+		block := &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: crt.Raw,
+		}
+		if err := pem.Encode(buf, block); err != nil {
+			return errors.Wrap(err, "error encoding identity certificate")
+		}
+	}
+	if err := ioutil.WriteFile(certFilename, buf.Bytes(), 0600); err != nil {
+		return errors.Wrap(err, "error writing identity certificate")
+	}
+
+	// Write key
+	buf.Reset()
+	block, err := pemutil.Serialize(key)
+	if err != nil {
+		return err
+	}
+	if err := pem.Encode(buf, block); err != nil {
+		return errors.Wrap(err, "error encoding identity key")
+	}
+	if err := ioutil.WriteFile(keyFilename, buf.Bytes(), 0600); err != nil {
+		return errors.Wrap(err, "error writing identity certificate")
+	}
+
+	// Write identity.json
+	buf.Reset()
+	enc := json.NewEncoder(buf)
+	enc.SetIndent("", "   ")
+	if err := enc.Encode(Identity{
+		Type:        string(MutualTLS),
+		Certificate: certFilename,
+		Key:         keyFilename,
+	}); err != nil {
+		return errors.Wrap(err, "error writing identity json")
+	}
+	if err := ioutil.WriteFile(IdentityFile, buf.Bytes(), 0600); err != nil {
+		return errors.Wrap(err, "error writing identity certificate")
+	}
+
+	return nil
+}
+
 // Kind returns the type for the given identity.
 func (i *Identity) Kind() IdentityType {
 	switch strings.ToLower(i.Type) {
+	case "":
+		return Disabled
 	case "mtls":
 		return MutualTLS
 	default:
@@ -39,6 +116,8 @@ func (i *Identity) Kind() IdentityType {
 // Validate validates the identity object.
 func (i *Identity) Validate() error {
 	switch i.Kind() {
+	case Disabled:
+		return nil
 	case MutualTLS:
 		if i.Certificate == "" {
 			return errors.New("identity.crt cannot be empty")
@@ -47,8 +126,6 @@ func (i *Identity) Validate() error {
 			return errors.New("identity.key cannot be empty")
 		}
 		return nil
-	case "":
-		return errors.New("identity.type cannot be empty")
 	default:
 		return errors.Errorf("unsupported identity type %s", i.Type)
 	}
@@ -57,10 +134,22 @@ func (i *Identity) Validate() error {
 // Options returns the ClientOptions used for the given identity.
 func (i *Identity) Options() ([]ClientOption, error) {
 	switch i.Kind() {
+	case Disabled:
+		return nil, nil
 	case MutualTLS:
 		crt, err := tls.LoadX509KeyPair(i.Certificate, i.Key)
 		if err != nil {
 			return nil, errors.Wrap(err, "error creating identity certificate")
+		}
+		// Check if certificate is expired.
+		// Do not return any options if expired.
+		x509Cert, err := x509.ParseCertificate(crt.Certificate[0])
+		if err != nil {
+			return nil, errors.Wrap(err, "error creating identity certificate")
+		}
+		now := time.Now()
+		if now.Before(x509Cert.NotBefore) || now.After(x509Cert.NotAfter) {
+			return nil, nil
 		}
 		return []ClientOption{WithCertificate(crt)}, nil
 	default:
