@@ -31,6 +31,10 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
+// RetryFunc defines the method used to retry a request. If it returns true, the
+// request will be retried once.
+type RetryFunc func(code int) bool
+
 // ClientOption is the type of options passed to the Client constructor.
 type ClientOption func(o *clientOptions) error
 
@@ -40,6 +44,7 @@ type clientOptions struct {
 	rootFilename string
 	rootBundle   []byte
 	certificate  tls.Certificate
+	retryFunc    RetryFunc
 }
 
 func (o *clientOptions) apply(opts []ClientOption) (err error) {
@@ -199,6 +204,14 @@ func WithCertificate(crt tls.Certificate) ClientOption {
 	}
 }
 
+// WithRetryFunc defines a method used to retry a request.
+func WithRetryFunc(fn RetryFunc) ClientOption {
+	return func(o *clientOptions) error {
+		o.retryFunc = fn
+		return nil
+	}
+}
+
 func getTransportFromFile(filename string) (http.RoundTripper, error) {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -330,8 +343,10 @@ func WithProvisionerLimit(limit int) ProvisionerOption {
 
 // Client implements an HTTP client for the CA server.
 type Client struct {
-	client   *http.Client
-	endpoint *url.URL
+	client    *http.Client
+	endpoint  *url.URL
+	retryFunc RetryFunc
+	opts      []ClientOption
 }
 
 // NewClient creates a new Client with the given endpoint and options.
@@ -354,8 +369,29 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 		client: &http.Client{
 			Transport: tr,
 		},
-		endpoint: u,
+		endpoint:  u,
+		retryFunc: o.retryFunc,
+		opts:      opts,
 	}, nil
+}
+
+func (c *Client) retryOnError(r *http.Response) bool {
+	if c.retryFunc != nil {
+		if c.retryFunc(r.StatusCode) {
+			o := new(clientOptions)
+			if err := o.apply(c.opts); err != nil {
+				return false
+			}
+			tr, err := o.getTransport(c.endpoint.String())
+			if err != nil {
+				return false
+			}
+			r.Body.Close()
+			c.client.Transport = tr
+			return true
+		}
+	}
+	return false
 }
 
 // SetTransport updates the transport of the internal HTTP client.
@@ -366,12 +402,18 @@ func (c *Client) SetTransport(tr http.RoundTripper) {
 // Health performs the health request to the CA and returns the
 // api.HealthResponse struct.
 func (c *Client) Health() (*api.HealthResponse, error) {
+	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/health"})
+retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var health api.HealthResponse
@@ -386,13 +428,19 @@ func (c *Client) Health() (*api.HealthResponse, error) {
 // resulting root certificate with the given SHA256, returning an error if they
 // do not match.
 func (c *Client) Root(sha256Sum string) (*api.RootResponse, error) {
+	var retried bool
 	sha256Sum = strings.ToLower(strings.Replace(sha256Sum, "-", "", -1))
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/root/" + sha256Sum})
+retry:
 	resp, err := getInsecureClient().Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var root api.RootResponse
@@ -410,16 +458,22 @@ func (c *Client) Root(sha256Sum string) (*api.RootResponse, error) {
 // Sign performs the sign request to the CA and returns the api.SignResponse
 // struct.
 func (c *Client) Sign(req *api.SignRequest) (*api.SignResponse, error) {
+	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/sign"})
+retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var sign api.SignResponse
@@ -435,13 +489,19 @@ func (c *Client) Sign(req *api.SignRequest) (*api.SignResponse, error) {
 // Renew performs the renew request to the CA and returns the api.SignResponse
 // struct.
 func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
+	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/renew"})
 	client := &http.Client{Transport: tr}
+retry:
 	resp, err := client.Post(u.String(), "application/json", http.NoBody)
 	if err != nil {
 		return nil, errors.Wrapf(err, "client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var sign api.SignResponse
@@ -454,12 +514,13 @@ func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
 // Revoke performs the revoke request to the CA and returns the api.RevokeResponse
 // struct.
 func (c *Client) Revoke(req *api.RevokeRequest, tr http.RoundTripper) (*api.RevokeResponse, error) {
+	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
-
 	var client *http.Client
+retry:
 	if tr != nil {
 		client = &http.Client{Transport: tr}
 	} else {
@@ -472,6 +533,10 @@ func (c *Client) Revoke(req *api.RevokeRequest, tr http.RoundTripper) (*api.Revo
 		return nil, errors.Wrapf(err, "client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var revoke api.RevokeResponse
@@ -487,6 +552,7 @@ func (c *Client) Revoke(req *api.RevokeRequest, tr http.RoundTripper) (*api.Revo
 // ProvisionerOption WithProvisionerCursor and WithProvisionLimit can be used to
 // paginate the provisioners.
 func (c *Client) Provisioners(opts ...ProvisionerOption) (*api.ProvisionersResponse, error) {
+	var retried bool
 	o := new(provisionerOptions)
 	if err := o.apply(opts); err != nil {
 		return nil, err
@@ -495,11 +561,16 @@ func (c *Client) Provisioners(opts ...ProvisionerOption) (*api.ProvisionersRespo
 		Path:     "/provisioners",
 		RawQuery: o.rawQuery(),
 	})
+retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var provisioners api.ProvisionersResponse
@@ -513,12 +584,18 @@ func (c *Client) Provisioners(opts ...ProvisionerOption) (*api.ProvisionersRespo
 // the given provisioner kid and returns the api.ProvisionerKeyResponse struct
 // with the encrypted key.
 func (c *Client) ProvisionerKey(kid string) (*api.ProvisionerKeyResponse, error) {
+	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/provisioners/" + kid + "/encrypted-key"})
+retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var key api.ProvisionerKeyResponse
@@ -531,12 +608,18 @@ func (c *Client) ProvisionerKey(kid string) (*api.ProvisionerKeyResponse, error)
 // Roots performs the get roots request to the CA and returns the
 // api.RootsResponse struct.
 func (c *Client) Roots() (*api.RootsResponse, error) {
+	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/roots"})
+retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var roots api.RootsResponse
@@ -549,12 +632,18 @@ func (c *Client) Roots() (*api.RootsResponse, error) {
 // Federation performs the get federation request to the CA and returns the
 // api.FederationResponse struct.
 func (c *Client) Federation() (*api.FederationResponse, error) {
+	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/federation"})
+retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var federation api.FederationResponse
@@ -567,16 +656,22 @@ func (c *Client) Federation() (*api.FederationResponse, error) {
 // SSHSign performs the POST /ssh/sign request to the CA and returns the
 // api.SSHSignResponse struct.
 func (c *Client) SSHSign(req *api.SSHSignRequest) (*api.SSHSignResponse, error) {
+	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/sign"})
+retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var sign api.SSHSignResponse
@@ -589,16 +684,22 @@ func (c *Client) SSHSign(req *api.SSHSignRequest) (*api.SSHSignResponse, error) 
 // SSHRenew performs the POST /ssh/renew request to the CA and returns the
 // api.SSHRenewResponse struct.
 func (c *Client) SSHRenew(req *api.SSHRenewRequest) (*api.SSHRenewResponse, error) {
+	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/renew"})
+retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var renew api.SSHRenewResponse
@@ -611,16 +712,22 @@ func (c *Client) SSHRenew(req *api.SSHRenewRequest) (*api.SSHRenewResponse, erro
 // SSHRekey performs the POST /ssh/rekey request to the CA and returns the
 // api.SSHRekeyResponse struct.
 func (c *Client) SSHRekey(req *api.SSHRekeyRequest) (*api.SSHRekeyResponse, error) {
+	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/rekey"})
+retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var rekey api.SSHRekeyResponse
@@ -633,16 +740,22 @@ func (c *Client) SSHRekey(req *api.SSHRekeyRequest) (*api.SSHRekeyResponse, erro
 // SSHRevoke performs the POST /ssh/revoke request to the CA and returns the
 // api.SSHRevokeResponse struct.
 func (c *Client) SSHRevoke(req *api.SSHRevokeRequest) (*api.SSHRevokeResponse, error) {
+	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/revoke"})
+retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var revoke api.SSHRevokeResponse
@@ -655,12 +768,18 @@ func (c *Client) SSHRevoke(req *api.SSHRevokeRequest) (*api.SSHRevokeResponse, e
 // SSHRoots performs the GET /ssh/roots request to the CA and returns the
 // api.SSHRootsResponse struct.
 func (c *Client) SSHRoots() (*api.SSHRootsResponse, error) {
+	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/roots"})
+retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var keys api.SSHRootsResponse
@@ -673,12 +792,18 @@ func (c *Client) SSHRoots() (*api.SSHRootsResponse, error) {
 // SSHFederation performs the get /ssh/federation request to the CA and returns
 // the api.SSHRootsResponse struct.
 func (c *Client) SSHFederation() (*api.SSHRootsResponse, error) {
+	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/federation"})
+retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var keys api.SSHRootsResponse
@@ -691,16 +816,22 @@ func (c *Client) SSHFederation() (*api.SSHRootsResponse, error) {
 // SSHConfig performs the POST /ssh/config request to the CA to get the ssh
 // configuration templates.
 func (c *Client) SSHConfig(req *api.SSHConfigRequest) (*api.SSHConfigResponse, error) {
+	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/config"})
+retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var config api.SSHConfigResponse
@@ -713,6 +844,7 @@ func (c *Client) SSHConfig(req *api.SSHConfigRequest) (*api.SSHConfigResponse, e
 // SSHCheckHost performs the POST /ssh/check-host request to the CA with the
 // given principal.
 func (c *Client) SSHCheckHost(principal string) (*api.SSHCheckPrincipalResponse, error) {
+	var retried bool
 	body, err := json.Marshal(&api.SSHCheckPrincipalRequest{
 		Type:      provisioner.SSHHostCert,
 		Principal: principal,
@@ -721,11 +853,16 @@ func (c *Client) SSHCheckHost(principal string) (*api.SSHCheckPrincipalResponse,
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/check-host"})
+retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var check api.SSHCheckPrincipalResponse
@@ -737,12 +874,18 @@ func (c *Client) SSHCheckHost(principal string) (*api.SSHCheckPrincipalResponse,
 
 // SSHGetHosts performs the GET /ssh/get-hosts request to the CA.
 func (c *Client) SSHGetHosts() (*api.SSHGetHostsResponse, error) {
+	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/get-hosts"})
+retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var hosts api.SSHGetHostsResponse
@@ -754,16 +897,22 @@ func (c *Client) SSHGetHosts() (*api.SSHGetHostsResponse, error) {
 
 // SSHBastion performs the POST /ssh/bastion request to the CA.
 func (c *Client) SSHBastion(req *api.SSHBastionRequest) (*api.SSHBastionResponse, error) {
+	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/bastion"})
+retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
 		return nil, readError(resp.Body)
 	}
 	var bastion api.SSHBastionResponse
