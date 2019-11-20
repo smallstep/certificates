@@ -41,6 +41,7 @@ type Authority struct {
 	initOnce bool
 	// Custom functions
 	sshBastionFunc  func(user, hostname string) (*Bastion, error)
+	sshGetHostsFunc func(user string) ([]string, error)
 	getIdentityFunc provisioner.GetIdentityFunc
 }
 

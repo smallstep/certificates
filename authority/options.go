@@ -16,6 +16,14 @@ func WithDatabase(db db.AuthDB) Option {
 	}
 }
 
+// WithGetIdentityFunc sets a custom function to retrieve the identity from
+// an external resource.
+func WithGetIdentityFunc(fn func(p provisioner.Interface, email string) (*provisioner.Identity, error)) Option {
+	return func(a *Authority) {
+		a.getIdentityFunc = fn
+	}
+}
+
 // WithSSHBastionFunc sets a custom function to get the bastion for a
 // given user-host pair.
 func WithSSHBastionFunc(fn func(user, host string) (*Bastion, error)) Option {
@@ -24,10 +32,10 @@ func WithSSHBastionFunc(fn func(user, host string) (*Bastion, error)) Option {
 	}
 }
 
-// WithGetIdentityFunc sets a custom function to retrieve the identity from
-// an external resource.
-func WithGetIdentityFunc(fn func(p provisioner.Interface, email string) (*provisioner.Identity, error)) Option {
+// WithSSHGetHosts sets a custom function to get the bastion for a
+// given user-host pair.
+func WithSSHGetHosts(fn func(user string) ([]string, error)) Option {
 	return func(a *Authority) {
-		a.getIdentityFunc = fn
+		a.sshGetHostsFunc = fn
 	}
 }
