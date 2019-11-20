@@ -190,7 +190,7 @@ func (a *Authority) GetSSHBastion(user string, hostname string) (*Bastion, error
 // list of methods to apply to the signing flow.
 func (a *Authority) authorizeSSHSign(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 	var errContext = apiCtx{"ott": ott}
-	p, err := a.authorizeToken(ott)
+	p, err := a.authorizeToken(ctx, ott)
 	if err != nil {
 		return nil, &apiError{errors.Wrap(err, "authorizeSSHSign"), http.StatusUnauthorized, errContext}
 	}
@@ -325,7 +325,7 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 func (a *Authority) authorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {
 	errContext := map[string]interface{}{"ott": token}
 
-	p, err := a.authorizeToken(token)
+	p, err := a.authorizeToken(ctx, token)
 	if err != nil {
 		return nil, &apiError{
 			err:     errors.Wrap(err, "authorizeSSHRenew"),
@@ -435,7 +435,7 @@ func (a *Authority) RenewSSH(oldCert *ssh.Certificate) (*ssh.Certificate, error)
 func (a *Authority) authorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []provisioner.SignOption, error) {
 	errContext := map[string]interface{}{"ott": token}
 
-	p, err := a.authorizeToken(token)
+	p, err := a.authorizeToken(ctx, token)
 	if err != nil {
 		return nil, nil, &apiError{
 			err:     errors.Wrap(err, "authorizeSSHRenew"),
@@ -567,7 +567,7 @@ func (a *Authority) RekeySSH(oldCert *ssh.Certificate, pub ssh.PublicKey, signOp
 func (a *Authority) authorizeSSHRevoke(ctx context.Context, token string) error {
 	errContext := map[string]interface{}{"ott": token}
 
-	p, err := a.authorizeToken(token)
+	p, err := a.authorizeToken(ctx, token)
 	if err != nil {
 		return &apiError{errors.Wrap(err, "authorizeSSHRevoke"), http.StatusUnauthorized, errContext}
 	}
