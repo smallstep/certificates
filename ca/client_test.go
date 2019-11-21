@@ -150,6 +150,61 @@ func equalJSON(t *testing.T, a interface{}, b interface{}) bool {
 	return bytes.Equal(ab, bb)
 }
 
+func TestClient_Version(t *testing.T) {
+	ok := &api.VersionResponse{Version: "test"}
+	internal := api.InternalServerError(fmt.Errorf("Internal Server Error"))
+	notFound := api.NotFound(fmt.Errorf("Not Found"))
+
+	tests := []struct {
+		name         string
+		response     interface{}
+		responseCode int
+		wantErr      bool
+	}{
+		{"ok", ok, 200, false},
+		{"500", internal, 500, true},
+		{"404", notFound, 404, true},
+	}
+
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				api.JSONStatus(w, tt.response, tt.responseCode)
+			})
+
+			got, err := c.Version()
+			if (err != nil) != tt.wantErr {
+				fmt.Printf("%+v", err)
+				t.Errorf("Client.Version() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			switch {
+			case err != nil:
+				if got != nil {
+					t.Errorf("Client.Version() = %v, want nil", got)
+				}
+				if !reflect.DeepEqual(err, tt.response) {
+					t.Errorf("Client.Version() error = %v, want %v", err, tt.response)
+				}
+			default:
+				if !reflect.DeepEqual(got, tt.response) {
+					t.Errorf("Client.Version() = %v, want %v", got, tt.response)
+				}
+			}
+		})
+	}
+}
+
 func TestClient_Health(t *testing.T) {
 	ok := &api.HealthResponse{Status: "ok"}
 	nok := api.InternalServerError(fmt.Errorf("Internal Server Error"))
