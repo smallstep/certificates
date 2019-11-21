@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
 
 	"github.com/pkg/errors"
@@ -41,7 +42,7 @@ type Authority struct {
 	initOnce bool
 	// Custom functions
 	sshBastionFunc  func(user, hostname string) (*Bastion, error)
-	sshGetHostsFunc func(cert *x509.Certificate) ([]string, error)
+	sshGetHostsFunc func(cert *x509.Certificate) ([]sshutil.Host, error)
 	getIdentityFunc provisioner.GetIdentityFunc
 }
 

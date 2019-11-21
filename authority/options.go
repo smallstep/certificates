@@ -5,6 +5,7 @@ import (
 
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/sshutil"
 )
 
 // Option sets options to the Authority.
@@ -36,7 +37,7 @@ func WithSSHBastionFunc(fn func(user, host string) (*Bastion, error)) Option {
 
 // WithSSHGetHosts sets a custom function to get the bastion for a
 // given user-host pair.
-func WithSSHGetHosts(fn func(cert *x509.Certificate) ([]string, error)) Option {
+func WithSSHGetHosts(fn func(cert *x509.Certificate) ([]sshutil.Host, error)) Option {
 	return func(a *Authority) {
 		a.sshGetHostsFunc = fn
 	}
