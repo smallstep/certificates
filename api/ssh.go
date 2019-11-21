@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
 	"golang.org/x/crypto/ssh"
 )
@@ -24,7 +25,7 @@ type SSHAuthority interface {
 	GetSSHFederation() (*authority.SSHKeys, error)
 	GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error)
 	CheckSSHHost(principal string) (bool, error)
-	GetSSHHosts(cert *x509.Certificate) ([]string, error)
+	GetSSHHosts(cert *x509.Certificate) ([]sshutil.Host, error)
 	GetSSHBastion(user string, hostname string) (*authority.Bastion, error)
 }
 
@@ -83,7 +84,7 @@ type SSHCertificate struct {
 // SSHGetHostsResponse is the response object that returns the list of valid
 // hosts for SSH.
 type SSHGetHostsResponse struct {
-	Hosts []string `json:"hosts"`
+	Hosts []sshutil.Host `json:"hosts"`
 }
 
 // MarshalJSON implements the json.Marshaler interface. Returns a quoted,
