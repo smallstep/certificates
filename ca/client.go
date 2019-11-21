@@ -418,6 +418,30 @@ func (c *Client) SetTransport(tr http.RoundTripper) {
 	c.client.Transport = tr
 }
 
+// Version performs the version request to the CA and returns the
+// api.VersionResponse struct.
+func (c *Client) Version() (*api.VersionResponse, error) {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/version"})
+retry:
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readError(resp.Body)
+	}
+	var version api.VersionResponse
+	if err := readJSON(resp.Body, &version); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return &version, nil
+}
+
 // Health performs the health request to the CA and returns the
 // api.HealthResponse struct.
 func (c *Client) Health() (*api.HealthResponse, error) {
