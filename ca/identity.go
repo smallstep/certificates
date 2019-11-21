@@ -40,6 +40,21 @@ type Identity struct {
 	Key         string `json:"key"`
 }
 
+// NewIdentityRequest returns a new CSR to create the identity. If an identity
+// was already present it reuses the private key.
+func NewIdentityRequest(commonName string, sans ...string) (*api.CertificateRequest, crypto.PrivateKey, error) {
+	var identityKey crypto.PrivateKey
+	if i, err := LoadDefaultIdentity(); err == nil && i.Key != "" {
+		if k, err := pemutil.Read(i.Key); err == nil {
+			identityKey = k
+		}
+	}
+	if identityKey == nil {
+		return CreateCertificateRequest(commonName, sans...)
+	}
+	return createCertificateRequest(commonName, sans, identityKey)
+}
+
 // LoadDefaultIdentity loads the default identity.
 func LoadDefaultIdentity() (*Identity, error) {
 	b, err := ioutil.ReadFile(IdentityFile)
