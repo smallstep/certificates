@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/jose"
@@ -674,16 +675,21 @@ func (a *Authority) CheckSSHHost(principal string) (bool, error) {
 }
 
 // GetSSHHosts returns a list of valid host principals.
-func (a *Authority) GetSSHHosts(cert *x509.Certificate) ([]string, error) {
+func (a *Authority) GetSSHHosts(cert *x509.Certificate) ([]sshutil.Host, error) {
 	if a.sshGetHostsFunc != nil {
 		return a.sshGetHostsFunc(cert)
 	}
-	hosts, err := a.db.GetSSHHostPrincipals()
+	hostnames, err := a.db.GetSSHHostPrincipals()
 	if err != nil {
 		return nil, &apiError{
 			err:  errors.Wrap(err, "getSSHHosts"),
 			code: http.StatusInternalServerError,
 		}
+	}
+
+	hosts := make([]sshutil.Host, len(hostnames))
+	for i, hn := range hostnames {
+		hosts[i] = sshutil.Host{Hostname: hn}
 	}
 	return hosts, nil
 }
