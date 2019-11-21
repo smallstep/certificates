@@ -26,6 +26,7 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/config"
+	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/x509util"
 	"golang.org/x/net/http2"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -1031,6 +1032,44 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 		CsrPEM: api.CertificateRequest{CertificateRequest: cr},
 		OTT:    ott,
 	}, pk, nil
+}
+
+// CreateCertificateRequest creates a new CSR with the given common name and
+// SANs. If no san is provided the commonName will set also a SAN.
+func CreateCertificateRequest(commonName string, sans ...string) (*api.CertificateRequest, crypto.PrivateKey, error) {
+	key, err := keys.GenerateDefaultKey()
+	if err != nil {
+		return nil, nil, err
+	}
+	return createCertificateRequest(commonName, sans, key)
+}
+
+func createCertificateRequest(commonName string, sans []string, key crypto.PrivateKey) (*api.CertificateRequest, crypto.PrivateKey, error) {
+	if len(sans) == 0 {
+		sans = []string{commonName}
+	}
+	dnsNames, ips, emails := x509util.SplitSANs(sans)
+	template := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: commonName,
+		},
+		DNSNames:       dnsNames,
+		IPAddresses:    ips,
+		EmailAddresses: emails,
+	}
+	csr, err := x509.CreateCertificateRequest(rand.Reader, template, key)
+	if err != nil {
+		return nil, nil, err
+	}
+	cr, err := x509.ParseCertificateRequest(csr)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := cr.CheckSignature(); err != nil {
+		return nil, nil, err
+	}
+
+	return &api.CertificateRequest{CertificateRequest: cr}, key, nil
 }
 
 func getInsecureClient() *http.Client {
