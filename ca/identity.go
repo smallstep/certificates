@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,16 +40,29 @@ type Identity struct {
 	Key         string `json:"key"`
 }
 
+// LoadDefaultIdentity loads the default identity.
+func LoadDefaultIdentity() (*Identity, error) {
+	b, err := ioutil.ReadFile(IdentityFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "error reading identity json")
+	}
+	identity := new(Identity)
+	if err := json.Unmarshal(b, &identity); err != nil {
+		return nil, errors.Wrapf(err, "error unmarshaling %s", IdentityFile)
+	}
+	return identity, nil
+}
+
 // WriteDefaultIdentity writes the given certificates and key and the
 // identity.json pointing to the new files.
 func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) error {
 	base := filepath.Join(config.StepPath(), "config")
-	if err := os.MkdirAll(base, 0600); err != nil {
+	if err := os.MkdirAll(base, 0700); err != nil {
 		return errors.Wrap(err, "error creating config directory")
 	}
 
 	base = filepath.Join(config.StepPath(), "identity")
-	if err := os.MkdirAll(base, 0600); err != nil {
+	if err := os.MkdirAll(base, 0700); err != nil {
 		return errors.Wrap(err, "error creating identity directory")
 	}
 
@@ -154,5 +168,45 @@ func (i *Identity) Options() ([]ClientOption, error) {
 		return []ClientOption{WithCertificate(crt)}, nil
 	default:
 		return nil, errors.Errorf("unsupported identity type %s", i.Type)
+	}
+}
+
+// Renew renews the identity certificate using the given client.
+func (i *Identity) Renew(client *Client) error {
+	switch i.Kind() {
+	case Disabled:
+		return nil
+	case MutualTLS:
+		cert, err := tls.LoadX509KeyPair(i.Certificate, i.Key)
+		if err != nil {
+			return errors.Wrap(err, "error creating identity certificate")
+		}
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				Certificates:             []tls.Certificate{cert},
+				RootCAs:                  client.GetRootCAs(),
+				PreferServerCipherSuites: true,
+			},
+		}
+		resp, err := client.Renew(tr)
+		if err != nil {
+			return err
+		}
+		buf := new(bytes.Buffer)
+		for _, crt := range resp.CertChainPEM {
+			block := &pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: crt.Raw,
+			}
+			if err := pem.Encode(buf, block); err != nil {
+				return errors.Wrap(err, "error encoding identity certificate")
+			}
+		}
+		if err := ioutil.WriteFile(i.Certificate, buf.Bytes(), 0600); err != nil {
+			return errors.Wrap(err, "error writing identity certificate")
+		}
+		return nil
+	default:
+		return errors.Errorf("unsupported identity type %s", i.Type)
 	}
 }

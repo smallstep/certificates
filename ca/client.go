@@ -394,6 +394,25 @@ func (c *Client) retryOnError(r *http.Response) bool {
 	return false
 }
 
+// GetRootCAs returns the RootCAs certificate pool from the configured
+// transport.
+func (c *Client) GetRootCAs() *x509.CertPool {
+	switch t := c.client.Transport.(type) {
+	case *http.Transport:
+		if t.TLSClientConfig != nil {
+			return t.TLSClientConfig.RootCAs
+		}
+		return nil
+	case *http2.Transport:
+		if t.TLSClientConfig != nil {
+			return t.TLSClientConfig.RootCAs
+		}
+		return nil
+	default:
+		return nil
+	}
+}
+
 // SetTransport updates the transport of the internal HTTP client.
 func (c *Client) SetTransport(tr http.RoundTripper) {
 	c.client.Transport = tr
