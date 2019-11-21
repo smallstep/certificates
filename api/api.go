@@ -42,6 +42,7 @@ type Authority interface {
 	GetEncryptedKey(kid string) (string, error)
 	GetRoots() (federation []*x509.Certificate, err error)
 	GetFederation() ([]*x509.Certificate, error)
+	Version() authority.Version
 }
 
 // TimeDuration is an alias of provisioner.TimeDuration
@@ -71,6 +72,13 @@ func NewCertificate(cr *x509.Certificate) Certificate {
 	}
 }
 
+// reset sets the inner x509.CertificateRequest to nil
+func (c *Certificate) reset() {
+	if c != nil {
+		c.Certificate = nil
+	}
+}
+
 // MarshalJSON implements the json.Marshaler interface. The certificate is
 // quoted string using the PEM encoding.
 func (c Certificate) MarshalJSON() ([]byte, error) {
@@ -91,6 +99,13 @@ func (c *Certificate) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return errors.Wrap(err, "error decoding certificate")
 	}
+
+	// Make sure the inner x509.Certificate is nil
+	if s == "null" || s == "" {
+		c.reset()
+		return nil
+	}
+
 	block, _ := pem.Decode([]byte(s))
 	if block == nil {
 		return errors.New("error decoding certificate")
@@ -117,6 +132,13 @@ func NewCertificateRequest(cr *x509.CertificateRequest) CertificateRequest {
 	}
 }
 
+// reset sets the inner x509.CertificateRequest to nil
+func (c *CertificateRequest) reset() {
+	if c != nil {
+		c.CertificateRequest = nil
+	}
+}
+
 // MarshalJSON implements the json.Marshaler interface. The certificate request
 // is a quoted string using the PEM encoding.
 func (c CertificateRequest) MarshalJSON() ([]byte, error) {
@@ -137,6 +159,13 @@ func (c *CertificateRequest) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return errors.Wrap(err, "error decoding csr")
 	}
+
+	// Make sure the inner x509.CertificateRequest is nil
+	if s == "null" || s == "" {
+		c.reset()
+		return nil
+	}
+
 	block, _ := pem.Decode([]byte(s))
 	if block == nil {
 		return errors.New("error decoding csr")
@@ -160,6 +189,13 @@ type Router interface {
 // endpoints will implement.
 type RouterHandler interface {
 	Route(r Router)
+}
+
+// VersionResponse is the response object that returns the version of the
+// server.
+type VersionResponse struct {
+	Version                     string `json:"version"`
+	RequireClientAuthentication bool   `json:"requireClientAuthentication,omitempty"`
 }
 
 // HealthResponse is the response object that returns the health of the server.
@@ -241,6 +277,7 @@ func New(authority Authority) RouterHandler {
 }
 
 func (h *caHandler) Route(r Router) {
+	r.MethodFunc("GET", "/version", h.Version)
 	r.MethodFunc("GET", "/health", h.Health)
 	r.MethodFunc("GET", "/root/{sha}", h.Root)
 	r.MethodFunc("POST", "/sign", h.Sign)
@@ -266,6 +303,15 @@ func (h *caHandler) Route(r Router) {
 	// For compatibility with old code:
 	r.MethodFunc("POST", "/re-sign", h.Renew)
 	r.MethodFunc("POST", "/sign-ssh", h.SSHSign)
+}
+
+// Version is an HTTP handler that returns the version of the server.
+func (h *caHandler) Version(w http.ResponseWriter, r *http.Request) {
+	v := h.Authority.Version()
+	JSON(w, VersionResponse{
+		Version:                     v.Version,
+		RequireClientAuthentication: v.RequireClientAuthentication,
+	})
 }
 
 // Health is an HTTP handler that returns the status of the server.
