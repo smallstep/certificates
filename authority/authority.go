@@ -8,11 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smallstep/certificates/templates"
-
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	"golang.org/x/crypto/ssh"

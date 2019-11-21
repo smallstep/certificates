@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/commands"
 	"github.com/smallstep/cli/command"
 	"github.com/smallstep/cli/command/version"
@@ -29,6 +30,7 @@ var (
 
 func init() {
 	config.Set("Smallstep CA", Version, BuildTime)
+	authority.GlobalVersion.Version = Version
 	rand.Seed(time.Now().UnixNano())
 }
 
