@@ -71,8 +71,7 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	JSON(w, &SSHSignResponse{
+	JSONStatus(w, &SSHSignResponse{
 		Certificate: SSHCertificate{newCert},
-	})
+	}, http.StatusCreated)
 }
