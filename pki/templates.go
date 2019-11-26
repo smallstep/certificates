@@ -27,25 +27,39 @@ var SSHTemplates = &templates.SSHTemplates{
 
 // SSHTemplateData contains the data of the default templates used on ssh.
 var SSHTemplateData = map[string]string{
-	// include.tpl adds the step ssh config file
+	// include.tpl adds the step ssh config file.
+	//
+	// Note: on windows `Include C:\...` is treated as a relative path.
 	"include.tpl": `Host *
-	Include {{.User.StepPath}}/ssh/config`,
+{{- if eq .User.GOOS "windows" }}
+	Include {{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config
+{{- else }}
+	Include {{.User.StepPath}}/ssh/config
+{{- end }}`,
 
-	// config.tpl is the step ssh config file, it includes the Match rule
-	// and references the step known_hosts file
+	// config.tpl is the step ssh config file, it includes the Match rule and
+	// references the step known_hosts file.
+	//
+	// Note: on windows ProxyCommand requires the full path
 	"config.tpl": `Match exec "step ssh check-host %h"
 	ForwardAgent yes
-	{{- if .User.User }}
+{{- if .User.User }}
 	User {{.User.User}}
-	{{- end }}
+{{- end }}
+{{- if eq .User.GOOS "windows" }}
+	UserKnownHostsFile {{.User.StepPath}}\ssh\known_hosts
+	ProxyCommand C:\Windows\System32\cmd.exe /c step ssh proxycommand %r %h %p
+{{- else }}
 	UserKnownHostsFile {{.User.StepPath}}/ssh/known_hosts
-	ProxyCommand step ssh proxycommand %r %h %p`,
+	ProxyCommand step ssh proxycommand %r %h %p
+{{- end }}
+`,
 
 	// known_hosts.tpl authorizes the ssh hosts key
 	"known_hosts.tpl": `@cert-authority * {{.Step.SSH.HostKey.Type}} {{.Step.SSH.HostKey.Marshal | toString | b64enc}}
 {{- range .Step.SSH.HostFederatedKeys}}
 @cert-authority * {{.Type}} {{.Marshal | toString | b64enc}}
-{{- end}}
+{{- end }}
 `,
 
 	// sshd_config.tpl adds the configuration to support certificates
@@ -57,7 +71,7 @@ HostKey /etc/ssh/{{.User.Key}}`,
 	"ca.tpl": `{{.Step.SSH.UserKey.Type}} {{.Step.SSH.UserKey.Marshal | toString | b64enc}}
 {{- range .Step.SSH.UserFederatedKeys}}
 {{.Type}} {{.Marshal | toString | b64enc}}
-{{- end}}
+{{- end }}
 `,
 }
 
