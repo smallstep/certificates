@@ -238,7 +238,6 @@ func (db *DB) StoreSSHCertificate(crt *ssh.Certificate) error {
 		return errors.Wrap(err, "database Update error")
 	}
 	return nil
-
 }
 
 // GetSSHHostPrincipals gets a list of all valid host principals.
