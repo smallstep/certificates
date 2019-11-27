@@ -146,7 +146,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			}
 			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
-			_, err = _a.authorizeToken(raw)
+			_, err = _a.authorizeToken(context.TODO(), raw)
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth: _a,
@@ -234,7 +234,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			p, err := tc.auth.authorizeToken(tc.ott)
+			p, err := tc.auth.authorizeToken(context.TODO(), tc.ott)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					switch v := err.(type) {
