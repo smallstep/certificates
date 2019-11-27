@@ -929,7 +929,7 @@ retry:
 // SSHGetHosts performs the GET /ssh/get-hosts request to the CA.
 func (c *Client) SSHGetHosts() (*api.SSHGetHostsResponse, error) {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/get-hosts"})
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/hosts"})
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
