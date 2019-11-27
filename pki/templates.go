@@ -31,7 +31,7 @@ var SSHTemplateData = map[string]string{
 	//
 	// Note: on windows `Include C:\...` is treated as a relative path.
 	"include.tpl": `Host *
-{{- if eq .User.GOOS "windows" }}
+{{- if or .User.GOOS "none" | eq "windows" }}
 	Include {{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config
 {{- else }}
 	Include {{.User.StepPath}}/ssh/config
@@ -46,7 +46,7 @@ var SSHTemplateData = map[string]string{
 {{- if .User.User }}
 	User {{.User.User}}
 {{- end }}
-{{- if eq .User.GOOS "windows" }}
+{{- if or .User.GOOS "none" | eq "windows" }}
 	UserKnownHostsFile {{.User.StepPath}}\ssh\known_hosts
 	ProxyCommand C:\Windows\System32\cmd.exe /c step ssh proxycommand %r %h %p
 {{- else }}
