@@ -230,6 +230,8 @@ func TestTemplate_Render(t *testing.T) {
 		},
 		"User": map[string]string{
 			"StepPath": "/tmp/.step",
+			"User":     "john",
+			"GOOS":     "linux",
 		},
 	}
 
@@ -271,7 +273,7 @@ func TestTemplate_Render(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Template.Render() = %v, want %v", got, tt.want)
+				t.Errorf("Template.Render() = %v, want %v", string(got), string(tt.want))
 			}
 		})
 	}
