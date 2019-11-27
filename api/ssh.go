@@ -56,7 +56,7 @@ func (s *SSHSignRequest) Validate() error {
 		// Validate identity signature if provided
 		if s.IdentityCSR.CertificateRequest != nil {
 			if err := s.IdentityCSR.CertificateRequest.CheckSignature(); err != nil {
-				return errors.Wrap(err, "invalid csr")
+				return errors.Wrap(err, "invalid identityCSR")
 			}
 		}
 		return nil
@@ -308,7 +308,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	if cr := body.IdentityCSR.CertificateRequest; cr != nil {
 		var opts provisioner.Options
 		// Use same duration as ssh certificate for user certificates
-		if body.CertType == provisioner.SSHUserCert {
+		if cert.CertType == ssh.UserCert {
 			opts = provisioner.Options{
 				NotBefore: provisioner.NewTimeDuration(time.Unix(int64(cert.ValidAfter), 0)),
 				NotAfter:  provisioner.NewTimeDuration(time.Unix(int64(cert.ValidBefore), 0)),
