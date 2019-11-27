@@ -23,6 +23,9 @@ import (
 // IdentityType represents the different types of identity files.
 type IdentityType string
 
+// DisableIdentity is a global variable to disable the identity.
+var DisableIdentity bool = false
+
 // Disabled represents a disabled identity type
 const Disabled IdentityType = ""
 
