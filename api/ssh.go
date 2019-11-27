@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
@@ -306,8 +307,8 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	var identityCertificate []Certificate
 	if cr := body.IdentityCSR.CertificateRequest; cr != nil {
 		opts := provisioner.Options{
-			NotBefore: body.ValidAfter,
-			NotAfter:  body.ValidBefore,
+			NotBefore: provisioner.NewTimeDuration(time.Unix(int64(cert.ValidAfter), 0)),
+			NotAfter:  provisioner.NewTimeDuration(time.Unix(int64(cert.ValidBefore), 0)),
 		}
 		ctx := authority.NewContextWithSkipTokenReuse(context.Background())
 		ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
