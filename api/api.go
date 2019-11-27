@@ -297,12 +297,13 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("POST", "/ssh/config", h.SSHConfig)
 	r.MethodFunc("POST", "/ssh/config/{type}", h.SSHConfig)
 	r.MethodFunc("POST", "/ssh/check-host", h.SSHCheckHost)
-	r.MethodFunc("GET", "/ssh/get-hosts", h.SSHGetHosts)
+	r.MethodFunc("GET", "/ssh/hosts", h.SSHGetHosts)
 	r.MethodFunc("POST", "/ssh/bastion", h.SSHBastion)
 
 	// For compatibility with old code:
 	r.MethodFunc("POST", "/re-sign", h.Renew)
 	r.MethodFunc("POST", "/sign-ssh", h.SSHSign)
+	r.MethodFunc("GET", "/ssh/get-hosts", h.SSHGetHosts)
 }
 
 // Version is an HTTP handler that returns the version of the server.
