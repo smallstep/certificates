@@ -306,9 +306,13 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	// Sign identity certificate if available.
 	var identityCertificate []Certificate
 	if cr := body.IdentityCSR.CertificateRequest; cr != nil {
-		opts := provisioner.Options{
-			NotBefore: provisioner.NewTimeDuration(time.Unix(int64(cert.ValidAfter), 0)),
-			NotAfter:  provisioner.NewTimeDuration(time.Unix(int64(cert.ValidBefore), 0)),
+		var opts provisioner.Options
+		// Use same duration as ssh certificate for user certificates
+		if body.CertType == provisioner.SSHUserCert {
+			opts = provisioner.Options{
+				NotBefore: provisioner.NewTimeDuration(time.Unix(int64(cert.ValidAfter), 0)),
+				NotAfter:  provisioner.NewTimeDuration(time.Unix(int64(cert.ValidBefore), 0)),
+			}
 		}
 		ctx := authority.NewContextWithSkipTokenReuse(context.Background())
 		ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
