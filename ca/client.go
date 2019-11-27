@@ -63,6 +63,10 @@ func (o *clientOptions) apply(opts []ClientOption) (err error) {
 // applyDefaultIdentity sets the options for the default identity if the
 // identity file is present. The identity is enabled by default.
 func (o *clientOptions) applyDefaultIdentity() error {
+	if DisableIdentity {
+		return nil
+	}
+
 	b, err := ioutil.ReadFile(IdentityFile)
 	if err != nil {
 		return nil
@@ -132,10 +136,16 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 	if o.certificate.Certificate != nil {
 		switch tr := tr.(type) {
 		case *http.Transport:
+			if tr.TLSClientConfig == nil {
+				tr.TLSClientConfig = &tls.Config{}
+			}
 			if len(tr.TLSClientConfig.Certificates) == 0 && tr.TLSClientConfig.GetClientCertificate == nil {
 				tr.TLSClientConfig.Certificates = []tls.Certificate{o.certificate}
 			}
 		case *http2.Transport:
+			if tr.TLSClientConfig == nil {
+				tr.TLSClientConfig = &tls.Config{}
+			}
 			if len(tr.TLSClientConfig.Certificates) == 0 && tr.TLSClientConfig.GetClientCertificate == nil {
 				tr.TLSClientConfig.Certificates = []tls.Certificate{o.certificate}
 			}

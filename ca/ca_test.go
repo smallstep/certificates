@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -48,6 +49,11 @@ func getCSR(priv interface{}) (*x509.CertificateRequest, error) {
 		return nil, err
 	}
 	return x509.ParseCertificateRequest(csrBytes)
+}
+
+func TestMain(m *testing.M) {
+	DisableIdentity = true
+	os.Exit(m.Run())
 }
 
 func TestCASign(t *testing.T) {
