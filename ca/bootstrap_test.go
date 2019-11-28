@@ -156,8 +156,8 @@ func TestBootstrap(t *testing.T) {
 					if !reflect.DeepEqual(got.endpoint, tt.want.endpoint) {
 						t.Errorf("Bootstrap() endpoint = %v, want %v", got.endpoint, tt.want.endpoint)
 					}
-					gotTR := got.client.Transport.(*http.Transport)
-					wantTR := tt.want.client.Transport.(*http.Transport)
+					gotTR := got.client.GetTransport().(*http.Transport)
+					wantTR := tt.want.client.GetTransport().(*http.Transport)
 					if !reflect.DeepEqual(gotTR.TLSClientConfig.RootCAs, wantTR.TLSClientConfig.RootCAs) {
 						t.Errorf("Bootstrap() certPool = %v, want %v", gotTR.TLSClientConfig.RootCAs, wantTR.TLSClientConfig.RootCAs)
 					}
