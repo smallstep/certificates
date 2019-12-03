@@ -118,7 +118,8 @@ func (p *JWK) authorizeToken(token string, audiences []string) (*jwtPayload, err
 
 	// validate audiences with the defaults
 	if !matchesAudience(claims.Audience, audiences) {
-		return nil, errors.New("invalid token: invalid audience claim (aud)")
+		return nil, errors.Errorf("invalid token: invalid audience claim (aud); want %s, but got %s",
+			audiences, claims.Audience)
 	}
 
 	if claims.Subject == "" {
