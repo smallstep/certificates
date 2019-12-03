@@ -122,7 +122,8 @@ func (p *JWK) authorizeToken(token string, audiences []string) (*jwtPayload, err
 	}
 
 	if claims.Subject == "" {
-		return nil, errors.New("token subject cannot be empty")
+		return nil, errors.Errorf("invalid token: invalid audience claim (aud); want %s, but got %s",
+			audiences, claims.Audience)
 	}
 
 	return &claims, nil
