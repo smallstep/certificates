@@ -77,7 +77,7 @@ func (a *Authority) authorizeToken(ctx context.Context, ott string) (provisioner
 		if reuseKey, err := p.GetTokenID(ott); err == nil {
 			ok, err := a.db.UseToken(reuseKey, ott)
 			if err != nil {
-				return nil, &apiError{errors.Wrap(err, "authorizeToken: failed when checking if token already used"),
+				return nil, &apiError{errors.Wrap(err, "authorizeToken: failed when attempting to store token"),
 					http.StatusInternalServerError, errContext}
 			}
 			if !ok {
@@ -163,7 +163,7 @@ func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
 	if err != nil {
 		return &apiError{errors.Wrap(err, "authorizeRevoke"), http.StatusUnauthorized, errContext}
 	}
-	if err = p.AuthorizeSSHRevoke(ctx, token); err != nil {
+	if err = p.AuthorizeRevoke(ctx, token); err != nil {
 		return &apiError{errors.Wrap(err, "authorizeRevoke"), http.StatusUnauthorized, errContext}
 	}
 	return nil
