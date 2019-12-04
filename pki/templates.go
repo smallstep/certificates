@@ -32,9 +32,9 @@ var SSHTemplateData = map[string]string{
 	// Note: on windows `Include C:\...` is treated as a relative path.
 	"include.tpl": `Host *
 {{- if or .User.GOOS "none" | eq "windows" }}
-	Include {{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config
+	Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config"
 {{- else }}
-	Include {{.User.StepPath}}/ssh/config
+	Include "{{.User.StepPath}}/ssh/config"
 {{- end }}`,
 
 	// config.tpl is the step ssh config file, it includes the Match rule and
@@ -47,10 +47,10 @@ var SSHTemplateData = map[string]string{
 	User {{.User.User}}
 {{- end }}
 {{- if or .User.GOOS "none" | eq "windows" }}
-	UserKnownHostsFile {{.User.StepPath}}\ssh\known_hosts
+	UserKnownHostsFile "{{.User.StepPath}}\ssh\known_hosts"
 	ProxyCommand C:\Windows\System32\cmd.exe /c step ssh proxycommand %r %h %p
 {{- else }}
-	UserKnownHostsFile {{.User.StepPath}}/ssh/known_hosts
+	UserKnownHostsFile "{{.User.StepPath}}/ssh/known_hosts"
 	ProxyCommand step ssh proxycommand %r %h %p
 {{- end }}
 `,
