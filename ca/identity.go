@@ -24,7 +24,7 @@ import (
 type IdentityType string
 
 // DisableIdentity is a global variable to disable the identity.
-var DisableIdentity bool = false
+var DisableIdentity = false
 
 // Disabled represents a disabled identity type
 const Disabled IdentityType = ""
