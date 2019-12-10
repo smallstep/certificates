@@ -114,13 +114,12 @@ github.com/smallstep/certinfo v0.0.0-20191008000228-b0e530932339/go.mod h1:n4YHP
 github.com/smallstep/certinfo v0.0.0-20191029235839-00563809d483/go.mod h1:xmx5n8+7jI0lrjTUwc8WMMqXeOHRyxYUW9U1wrvP3Vo=
 github.com/smallstep/cli v0.12.1-0.20191016010425-15911d8625df h1:SSZWKGpaVmKQgTkfaQMnYLS/gYhRVVjvzdE1F9GiffU=
 github.com/smallstep/cli v0.12.1-0.20191016010425-15911d8625df/go.mod h1:zGPm8vWCqzvDqkdC1laFJNdIOjNSB8V4qDp68Ny538o=
+github.com/smallstep/cli v0.13.3 h1:S29UydCtDVy0QQBtGdatq064tnks1/0DYxxnEtNiQpc=
 github.com/smallstep/cli v0.13.3/go.mod h1:zGPm8vWCqzvDqkdC1laFJNdIOjNSB8V4qDp68Ny538o=
 github.com/smallstep/cli v0.14.0-rc.1.0.20191024214139-914a67ed80c2 h1:Q0B9XBAn3KzjZKH3ojxLQolUnHSXuomfFjm+/KbIdpY=
 github.com/smallstep/cli v0.14.0-rc.1.0.20191024214139-914a67ed80c2/go.mod h1:GoA1cE4YrZRRvVbFlPKJUsMuWHnFBX+R88j1pmpbGgk=
 github.com/smallstep/cli v0.14.0-rc.1.0.20191105013638-8cf838b56d03 h1:kHHsScwMUDlepa7LkxR55r6NT9ra+U9KsP6qJGZb5jM=
 github.com/smallstep/cli v0.14.0-rc.1.0.20191105013638-8cf838b56d03/go.mod h1:dklnISxr+GzUmurBngEF9Jvj0aI9KK5uVgZwOdFniNs=
-github.com/smallstep/cli v0.14.0-rc.1.0.20191127003637-bf0d6274e86f h1:NOch88Di/v87Mlg+l3JUgkfYzOb/aOIpHV5O7B7bZmA=
-github.com/smallstep/cli v0.14.0-rc.1.0.20191127003637-bf0d6274e86f/go.mod h1:F6/cZ7VguiUV4nsoqPdDyZtGOgg3oLHz+LstEQsiSAg=
 github.com/smallstep/cli v0.14.0-rc.1.0.20191127025104-2821b0b811c1 h1:yAB5yZI+iqulxALQoAPv6CNBBYTLeGYcU9ZbwBiD9Es=
 github.com/smallstep/cli v0.14.0-rc.1.0.20191127025104-2821b0b811c1/go.mod h1:F6/cZ7VguiUV4nsoqPdDyZtGOgg3oLHz+LstEQsiSAg=
 github.com/smallstep/nosql v0.1.1-0.20191009043502-4b26d8029e61 h1:XM3mkHNBc6bEQhrZNEma+iz63xrmRFfCocmAEObeg/s=
