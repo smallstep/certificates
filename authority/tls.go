@@ -202,6 +202,13 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 			http.StatusInternalServerError, apiCtx{}}
 	}
 
+	if err = a.db.StoreCertificate(serverCert); err != nil {
+		if err != db.ErrNotImplemented {
+			return nil, &apiError{errors.Wrap(err, "error storing certificate in db"),
+				http.StatusInternalServerError, apiCtx{}}
+		}
+	}
+
 	return []*x509.Certificate{serverCert, caCert}, nil
 }
 
