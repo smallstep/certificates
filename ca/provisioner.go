@@ -22,6 +22,7 @@ type Provisioner struct {
 	name          string
 	kid           string
 	audience      string
+	sshAudience   string
 	fingerprint   string
 	jwk           *jose.JSONWebKey
 	tokenLifetime time.Duration
@@ -60,6 +61,7 @@ func NewProvisioner(name, kid, caURL string, password []byte, opts ...ClientOpti
 		name:          name,
 		kid:           jwk.KeyID,
 		audience:      client.endpoint.ResolveReference(&url.URL{Path: "/1.0/sign"}).String(),
+		sshAudience:   client.endpoint.ResolveReference(&url.URL{Path: "/1.0/ssh/sign"}).String(),
 		fingerprint:   fp,
 		jwk:           jwk,
 		tokenLifetime: tokenLifetime,
@@ -109,6 +111,39 @@ func (p *Provisioner) Token(subject string, sans ...string) (string, error) {
 	}
 
 	tok, err := provision.New(subject, tokOptions...)
+	if err != nil {
+		return "", err
+	}
+
+	return tok.SignedString(p.jwk.Algorithm, p.jwk.Key)
+}
+
+func (p *Provisioner) SSHToken(certType, keyID string, principals []string) (string, error) {
+	jwtID, err := randutil.Hex(64)
+	if err != nil {
+		return "", err
+	}
+
+	notBefore := time.Now()
+	notAfter := notBefore.Add(tokenLifetime)
+	tokOptions := []token.Options{
+		token.WithJWTID(jwtID),
+		token.WithKid(p.kid),
+		token.WithIssuer(p.name),
+		token.WithAudience(p.sshAudience),
+		token.WithValidity(notBefore, notAfter),
+		token.WithSSH(provisioner.SSHOptions{
+			CertType:   certType,
+			Principals: principals,
+			KeyID:      keyID,
+		}),
+	}
+
+	if p.fingerprint != "" {
+		tokOptions = append(tokOptions, token.WithSHA(p.fingerprint))
+	}
+
+	tok, err := provision.New(keyID, tokOptions...)
 	if err != nil {
 		return "", err
 	}
