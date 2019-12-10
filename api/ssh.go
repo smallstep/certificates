@@ -25,7 +25,7 @@ type SSHAuthority interface {
 	GetSSHRoots() (*authority.SSHKeys, error)
 	GetSSHFederation() (*authority.SSHKeys, error)
 	GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error)
-	CheckSSHHost(principal string) (bool, error)
+	CheckSSHHost(ctx context.Context, principal string, token string) (bool, error)
 	GetSSHHosts(cert *x509.Certificate) ([]sshutil.Host, error)
 	GetSSHBastion(user string, hostname string) (*authority.Bastion, error)
 }
@@ -199,6 +199,7 @@ type SSHConfigResponse struct {
 type SSHCheckPrincipalRequest struct {
 	Type      string `json:"type"`
 	Principal string `json:"principal"`
+	Token     string `json:"token,omitempty"`
 }
 
 // Validate checks the check principal request.
@@ -431,7 +432,7 @@ func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exists, err := h.Authority.CheckSSHHost(body.Principal)
+	exists, err := h.Authority.CheckSSHHost(r.Context(), body.Principal, body.Token)
 	if err != nil {
 		WriteError(w, InternalServerError(err))
 		return

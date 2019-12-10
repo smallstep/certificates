@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"context"
 	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
@@ -40,9 +41,10 @@ type Authority struct {
 	// Do not re-initialize
 	initOnce bool
 	// Custom functions
-	sshBastionFunc  func(user, hostname string) (*Bastion, error)
-	sshGetHostsFunc func(cert *x509.Certificate) ([]sshutil.Host, error)
-	getIdentityFunc provisioner.GetIdentityFunc
+	sshBastionFunc   func(user, hostname string) (*Bastion, error)
+	sshCheckHostFunc func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
+	sshGetHostsFunc  func(cert *x509.Certificate) ([]sshutil.Host, error)
+	getIdentityFunc  provisioner.GetIdentityFunc
 }
 
 // New creates and initiates a new Authority type.

@@ -947,11 +947,12 @@ retry:
 
 // SSHCheckHost performs the POST /ssh/check-host request to the CA with the
 // given principal.
-func (c *Client) SSHCheckHost(principal string) (*api.SSHCheckPrincipalResponse, error) {
+func (c *Client) SSHCheckHost(principal string, token string) (*api.SSHCheckPrincipalResponse, error) {
 	var retried bool
 	body, err := json.Marshal(&api.SSHCheckPrincipalRequest{
 		Type:      provisioner.SSHHostCert,
 		Principal: principal,
+		Token:     token,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling request")
