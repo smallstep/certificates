@@ -32,6 +32,9 @@ const Disabled IdentityType = ""
 // MutualTLS represents the identity using mTLS
 const MutualTLS IdentityType = "mTLS"
 
+// DefaultLeeway is the duration for matching not before claims.
+const DefaultLeeway = 1 * time.Minute
+
 // IdentityFile contains the location of the identity file.
 var IdentityFile = filepath.Join(config.StepPath(), "config", "identity.json")
 
@@ -179,8 +182,8 @@ func (i *Identity) Options() ([]ClientOption, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "error creating identity certificate")
 		}
-		now := time.Now()
-		if now.Before(x509Cert.NotBefore) || now.After(x509Cert.NotAfter) {
+		now := time.Now().Truncate(time.Second)
+		if now.Add(DefaultLeeway).Before(x509Cert.NotBefore) || now.After(x509Cert.NotAfter) {
 			return nil, nil
 		}
 		return []ClientOption{WithCertificate(crt)}, nil
