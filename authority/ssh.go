@@ -656,7 +656,17 @@ func (a *Authority) SignSSHAddUser(key ssh.PublicKey, subject *ssh.Certificate) 
 }
 
 // CheckSSHHost checks the given principal has been registered before.
-func (a *Authority) CheckSSHHost(principal string) (bool, error) {
+func (a *Authority) CheckSSHHost(ctx context.Context, principal string, token string) (bool, error) {
+	if a.sshCheckHostFunc != nil {
+		exists, err := a.sshCheckHostFunc(ctx, principal, token, a.GetRootCertificates())
+		if err != nil {
+			return false, &apiError{
+				err:  errors.Wrap(err, "checkSSHHost: error from injected checkSSHHost func"),
+				code: http.StatusInternalServerError,
+			}
+		}
+		return exists, nil
+	}
 	exists, err := a.db.IsSSHHost(principal)
 	if err != nil {
 		if err == db.ErrNotImplemented {

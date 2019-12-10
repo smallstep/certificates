@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"context"
 	"crypto/x509"
 
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -40,5 +41,14 @@ func WithSSHBastionFunc(fn func(user, host string) (*Bastion, error)) Option {
 func WithSSHGetHosts(fn func(cert *x509.Certificate) ([]sshutil.Host, error)) Option {
 	return func(a *Authority) {
 		a.sshGetHostsFunc = fn
+	}
+}
+
+// WithSSHCheckHost sets a custom function to check whether a given host is
+// step ssh enabled. The token is used to validate the request, while the roots
+// are used to validate the token.
+func WithSSHCheckHost(fn func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)) Option {
+	return func(a *Authority) {
+		a.sshCheckHostFunc = fn
 	}
 }
