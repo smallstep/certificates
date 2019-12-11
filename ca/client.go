@@ -474,6 +474,11 @@ func (c *Client) GetRootCAs() *x509.CertPool {
 	}
 }
 
+// GetTransport returns the transport of the internal HTTP client.
+func (c *Client) GetTransport() http.RoundTripper {
+	return c.client.GetTransport()
+}
+
 // SetTransport updates the transport of the internal HTTP client.
 func (c *Client) SetTransport(tr http.RoundTripper) {
 	c.client.SetTransport(tr)
