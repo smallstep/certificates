@@ -209,8 +209,9 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	if !opts.ValidBefore.IsZero() {
 		signOptions = append(signOptions, sshCertificateValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
 	}
-	// Make sure to define the the KeyID
-	if opts.KeyID == "" {
+	if opts.KeyID != "" {
+		signOptions = append(signOptions, sshCertificateKeyIDModifier(opts.KeyID))
+	} else {
 		signOptions = append(signOptions, sshCertificateKeyIDModifier(claims.Subject))
 	}
 
