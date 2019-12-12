@@ -13,6 +13,9 @@ import (
 	"strconv"
 	"time"
 
+	// Server profiler
+	_ "net/http/pprof"
+
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/commands"
 	"github.com/smallstep/cli/command"
