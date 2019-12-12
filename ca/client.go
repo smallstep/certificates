@@ -25,12 +25,17 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/ca/identity"
 	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/crypto/keys"
+	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	"golang.org/x/net/http2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
+
+// DisableIdentity is a global variable to disable the identity.
+var DisableIdentity = false
 
 // UserAgent will set the User-Agent header in the client requests.
 var UserAgent = "step-http-client/1.0"
@@ -120,26 +125,18 @@ func (o *clientOptions) applyDefaultIdentity() error {
 	}
 
 	// Do not load an identity if something fails
-	b, err := ioutil.ReadFile(IdentityFile)
+	i, err := identity.LoadDefaultIdentity()
 	if err != nil {
 		return nil
 	}
-	var identity Identity
-	if err := json.Unmarshal(b, &identity); err != nil {
+	if err := i.Validate(); err != nil {
 		return nil
 	}
-	if err := identity.Validate(); err != nil {
-		return nil
-	}
-	opts, err := identity.Options()
+	crt, err := i.TLSCertificate()
 	if err != nil {
 		return nil
 	}
-	for _, fn := range opts {
-		if err := fn(o); err != nil {
-			return err
-		}
-	}
+	o.certificate = crt
 	return nil
 }
 
@@ -1109,6 +1106,21 @@ func CreateCertificateRequest(commonName string, sans ...string) (*api.Certifica
 		return nil, nil, err
 	}
 	return createCertificateRequest(commonName, sans, key)
+}
+
+// CreateIdentityRequest returns a new CSR to create the identity. If an
+// identity was already present it reuses the private key.
+func CreateIdentityRequest(commonName string, sans ...string) (*api.CertificateRequest, crypto.PrivateKey, error) {
+	var identityKey crypto.PrivateKey
+	if i, err := identity.LoadDefaultIdentity(); err == nil && i.Key != "" {
+		if k, err := pemutil.Read(i.Key); err == nil {
+			identityKey = k
+		}
+	}
+	if identityKey == nil {
+		return CreateCertificateRequest(commonName, sans...)
+	}
+	return createCertificateRequest(commonName, sans, identityKey)
 }
 
 func createCertificateRequest(commonName string, sans []string, key crypto.PrivateKey) (*api.CertificateRequest, crypto.PrivateKey, error) {

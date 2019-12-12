@@ -1,0 +1,6 @@
+{
+   "ca-url": "https://127.0.0.1",
+   "ca-config": "testdata/config/ca.json",
+   "fingerprint": "9dc35eef23a234b2520516a3169090d7ec2fc61323bdd6e4fde08bcfec5d0931",
+   "root": "testdata/certs/root_ca.crt"
+}
