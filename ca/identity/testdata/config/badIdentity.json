@@ -1,0 +1,5 @@
+{
+    "type": "",
+    "crt": "testdata/identity/identity.crt",
+    "key": "testdata/identity/identity_key"
+}
