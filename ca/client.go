@@ -1123,6 +1123,16 @@ func CreateIdentityRequest(commonName string, sans ...string) (*api.CertificateR
 	return createCertificateRequest(commonName, sans, identityKey)
 }
 
+// LoadDefaultIdentity is a wrapper for identity.LoadDefaultIdentity.
+func LoadDefaultIdentity() (*identity.Identity, error) {
+	return identity.LoadDefaultIdentity()
+}
+
+// WriteDefaultIdentity is a wrapper for identity.WriteDefaultIdentity.
+func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) error {
+	return identity.WriteDefaultIdentity(certChain, key)
+}
+
 func createCertificateRequest(commonName string, sans []string, key crypto.PrivateKey) (*api.CertificateRequest, crypto.PrivateKey, error) {
 	if len(sans) == 0 {
 		sans = []string{commonName}
