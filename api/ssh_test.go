@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -539,7 +540,7 @@ func Test_caHandler_SSHCheckHost(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
-				checkSSHHost: func(_ string) (bool, error) {
+				checkSSHHost: func(ctx context.Context, principal, token string) (bool, error) {
 					return tt.exists, tt.err
 				},
 			}).(*caHandler)

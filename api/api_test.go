@@ -565,7 +565,7 @@ type mockAuthority struct {
 	getSSHRoots                  func() (*authority.SSHKeys, error)
 	getSSHFederation             func() (*authority.SSHKeys, error)
 	getSSHConfig                 func(typ string, data map[string]string) ([]templates.Output, error)
-	checkSSHHost                 func(principal string) (bool, error)
+	checkSSHHost                 func(ctx context.Context, principal, token string) (bool, error)
 	getSSHBastion                func(user string, hostname string) (*authority.Bastion, error)
 	version                      func() authority.Version
 }
@@ -715,9 +715,9 @@ func (m *mockAuthority) GetSSHConfig(typ string, data map[string]string) ([]temp
 	return m.ret1.([]templates.Output), m.err
 }
 
-func (m *mockAuthority) CheckSSHHost(principal string) (bool, error) {
+func (m *mockAuthority) CheckSSHHost(ctx context.Context, principal, token string) (bool, error) {
 	if m.checkSSHHost != nil {
-		return m.checkSSHHost(principal)
+		return m.checkSSHHost(ctx, principal, token)
 	}
 	return m.ret1.(bool), m.err
 }
