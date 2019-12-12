@@ -58,21 +58,26 @@ func LoadDefaultIdentity() (*Identity, error) {
 	return identity, nil
 }
 
+// configDir and identityDir are used in WriteDefaultIdentity for testing
+// purposes.
+var (
+	configDir   = filepath.Join(config.StepPath(), "config")
+	identityDir = filepath.Join(config.StepPath(), "identity")
+)
+
 // WriteDefaultIdentity writes the given certificates and key and the
 // identity.json pointing to the new files.
 func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) error {
-	base := filepath.Join(config.StepPath(), "config")
-	if err := os.MkdirAll(base, 0700); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return errors.Wrap(err, "error creating config directory")
 	}
 
-	base = filepath.Join(config.StepPath(), "identity")
-	if err := os.MkdirAll(base, 0700); err != nil {
+	if err := os.MkdirAll(identityDir, 0700); err != nil {
 		return errors.Wrap(err, "error creating identity directory")
 	}
 
-	certFilename := filepath.Join(base, "identity.crt")
-	keyFilename := filepath.Join(base, "identity_key")
+	certFilename := filepath.Join(identityDir, "identity.crt")
+	keyFilename := filepath.Join(identityDir, "identity_key")
 
 	// Write certificate
 	buf := new(bytes.Buffer)

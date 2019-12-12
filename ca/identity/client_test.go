@@ -76,11 +76,38 @@ func TestLoadClient(t *testing.T) {
 		want    *Client
 		wantErr bool
 	}{
-		{"ok", func() { IdentityFile = "testdata/config/identity.json"; DefaultsFile = "testdata/config/defaults.json" }, expected, false},
-		{"fail identity", func() { IdentityFile = "testdata/config/missing.json"; DefaultsFile = "testdata/config/defaults.json" }, nil, true},
-		{"fail identity", func() { IdentityFile = "testdata/config/fail.json"; DefaultsFile = "testdata/config/defaults.json" }, nil, true},
-		{"fail defaults", func() { IdentityFile = "testdata/config/identity.json"; DefaultsFile = "testdata/config/missing.json" }, nil, true},
-		{"fail defaults", func() { IdentityFile = "testdata/config/identity.json"; DefaultsFile = "testdata/config/fail.json" }, nil, true},
+		{"ok", func() {
+			IdentityFile = "testdata/config/identity.json"
+			DefaultsFile = "testdata/config/defaults.json"
+		}, expected, false},
+		{"fail identity", func() {
+			IdentityFile = "testdata/config/missing.json"
+			DefaultsFile = "testdata/config/defaults.json"
+		}, nil, true},
+		{"fail identity", func() {
+			IdentityFile = "testdata/config/fail.json"
+			DefaultsFile = "testdata/config/defaults.json"
+		}, nil, true},
+		{"fail defaults", func() {
+			IdentityFile = "testdata/config/identity.json"
+			DefaultsFile = "testdata/config/missing.json"
+		}, nil, true},
+		{"fail defaults", func() {
+			IdentityFile = "testdata/config/identity.json"
+			DefaultsFile = "testdata/config/fail.json"
+		}, nil, true},
+		{"fail ca", func() {
+			IdentityFile = "testdata/config/identity.json"
+			DefaultsFile = "testdata/config/badca.json"
+		}, nil, true},
+		{"fail root", func() {
+			IdentityFile = "testdata/config/identity.json"
+			DefaultsFile = "testdata/config/badroot.json"
+		}, nil, true},
+		{"fail type", func() {
+			IdentityFile = "testdata/config/badIdentity.json"
+			DefaultsFile = "testdata/config/defaults.json"
+		}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
