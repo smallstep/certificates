@@ -119,20 +119,21 @@ func (o *clientOptions) applyDefaultIdentity() error {
 		return nil
 	}
 
+	// Do not load an identity if something fails
 	b, err := ioutil.ReadFile(IdentityFile)
 	if err != nil {
 		return nil
 	}
 	var identity Identity
 	if err := json.Unmarshal(b, &identity); err != nil {
-		return errors.Wrapf(err, "error unmarshaling %s", IdentityFile)
+		return nil
 	}
 	if err := identity.Validate(); err != nil {
-		return err
+		return nil
 	}
 	opts, err := identity.Options()
 	if err != nil {
-		return err
+		return nil
 	}
 	for _, fn := range opts {
 		if err := fn(o); err != nil {
