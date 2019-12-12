@@ -33,6 +33,7 @@ func getTestProvisioner(t *testing.T, caURL string) *Provisioner {
 		name:          "mariano",
 		kid:           "FLIV7q23CXHrg75J2OSbvzwKJJqoxCYixjmsJirneOg",
 		audience:      client.endpoint.ResolveReference(&url.URL{Path: "/1.0/sign"}).String(),
+		sshAudience:   client.endpoint.ResolveReference(&url.URL{Path: "/1.0/ssh/sign"}).String(),
 		fingerprint:   x509util.Fingerprint(cert),
 		jwk:           jwk,
 		tokenLifetime: 5 * time.Minute,
