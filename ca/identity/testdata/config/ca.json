@@ -1,0 +1,41 @@
+{
+   "root": "testdata/certs/root_ca.crt",
+   "federatedRoots": [],
+   "crt": "testdata/certs/intermediate_ca.crt",
+   "key": "testdata/secrets/intermediate_ca_key",
+   "address": ":443",
+   "dnsNames": [
+      "127.0.0.1",
+      "localhost"
+   ],
+   "logger": {
+      "format": "text"
+   },
+   "authority": {
+      "provisioners": [
+         {
+            "type": "jwk",
+            "name": "joe@example.com",
+            "key": {
+               "use": "sig",
+               "kty": "EC",
+               "kid": "2wSN_CmexXWig_DnpVZsYFdMH1Stc86BIBzN0rt5ipE",
+               "crv": "P-256",
+               "alg": "ES256",
+               "x": "QqYaIULUQqP0EOmogorCcQIxEtI7-zCRcUVFxyNwq4Q",
+               "y": "YeIMipM7uMHjlxpFIUbfCBC1xEXczXNYRzJCMyrGcH0"
+            },
+            "encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiSVQ3MVNUMTNNMTd1S3Y4VHRDczYyUSJ9.TXShNLPcITS0bFvQeMjjCDhQLICQs1ShECkgUkUsAm9ZWpSq6Yu03w.SWxtxscivS3L5Yo5.O-XY9YKK8wEJgVs7X1-FxiM_6w4s7iJQNXRD2JrZRsXtDqUz7diPfXuBOFPUFsNzykvob1qCsU4B23Ek2nbaS2HqPrIOGbOvOsR8Pt6kNoraH1QDp3Hyzkv0S-VGM0MCGYDDmmH33PZmsdS36Aw8v9xBnDHlwlMg4NjTskxpqggfQl01433B0lCJqJdrmeBeGL1ZCKixvc-wAQxU8GH5iiD925ViLY7RlVo-tmIBXpxRgheLgKiuMxmgPvf15qCdgU5TRqeuJbYJLzvPpoai0W4WHjpM1zLjjmp5OYRFW4m4ZRZf5g1Cm4lstFPUlTn85fkMZFdBh4_bFbjAv7k.epXp8DZKHj_dxP9EohwDIg"
+         }
+      ]
+   },
+   "tls": {
+      "cipherSuites": [
+         "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+         "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+      ],
+      "minVersion": 1.2,
+      "maxVersion": 1.2,
+      "renegotiation": false
+   }
+}

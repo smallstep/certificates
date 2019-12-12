@@ -1,4 +1,4 @@
-package ca
+package identity
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,23 +19,23 @@ import (
 	"github.com/smallstep/cli/crypto/pemutil"
 )
 
-// IdentityType represents the different types of identity files.
-type IdentityType string
-
-// DisableIdentity is a global variable to disable the identity.
-var DisableIdentity = false
+// Type represents the different types of identity files.
+type Type string
 
 // Disabled represents a disabled identity type
-const Disabled IdentityType = ""
+const Disabled Type = ""
 
 // MutualTLS represents the identity using mTLS
-const MutualTLS IdentityType = "mTLS"
+const MutualTLS Type = "mTLS"
 
 // DefaultLeeway is the duration for matching not before claims.
 const DefaultLeeway = 1 * time.Minute
 
 // IdentityFile contains the location of the identity file.
 var IdentityFile = filepath.Join(config.StepPath(), "config", "identity.json")
+
+// DefaultsFile contains the location of the defaults file.
+var DefaultsFile = filepath.Join(config.StepPath(), "config", "defaults.json")
 
 // Identity represents the identity file that can be used to authenticate with
 // the CA.
@@ -46,26 +45,11 @@ type Identity struct {
 	Key         string `json:"key"`
 }
 
-// NewIdentityRequest returns a new CSR to create the identity. If an identity
-// was already present it reuses the private key.
-func NewIdentityRequest(commonName string, sans ...string) (*api.CertificateRequest, crypto.PrivateKey, error) {
-	var identityKey crypto.PrivateKey
-	if i, err := LoadDefaultIdentity(); err == nil && i.Key != "" {
-		if k, err := pemutil.Read(i.Key); err == nil {
-			identityKey = k
-		}
-	}
-	if identityKey == nil {
-		return CreateCertificateRequest(commonName, sans...)
-	}
-	return createCertificateRequest(commonName, sans, identityKey)
-}
-
 // LoadDefaultIdentity loads the default identity.
 func LoadDefaultIdentity() (*Identity, error) {
 	b, err := ioutil.ReadFile(IdentityFile)
 	if err != nil {
-		return nil, errors.Wrap(err, "error reading identity json")
+		return nil, errors.Wrapf(err, "error reading %s", IdentityFile)
 	}
 	identity := new(Identity)
 	if err := json.Unmarshal(b, &identity); err != nil {
@@ -137,14 +121,14 @@ func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) er
 }
 
 // Kind returns the type for the given identity.
-func (i *Identity) Kind() IdentityType {
+func (i *Identity) Kind() Type {
 	switch strings.ToLower(i.Type) {
 	case "":
 		return Disabled
 	case "mtls":
 		return MutualTLS
 	default:
-		return IdentityType(i.Type)
+		return Type(i.Type)
 	}
 }
 
@@ -160,74 +144,55 @@ func (i *Identity) Validate() error {
 		if i.Key == "" {
 			return errors.New("identity.key cannot be empty")
 		}
+		if err := fileExists(i.Certificate); err != nil {
+			return err
+		}
+		if err := fileExists(i.Key); err != nil {
+			return err
+		}
 		return nil
 	default:
 		return errors.Errorf("unsupported identity type %s", i.Type)
 	}
 }
 
-// Options returns the ClientOptions used for the given identity.
-func (i *Identity) Options() ([]ClientOption, error) {
+// TLSCertificate returns a tls.Certificate for the identity.
+func (i *Identity) TLSCertificate() (tls.Certificate, error) {
+	fail := func(err error) (tls.Certificate, error) { return tls.Certificate{}, err }
 	switch i.Kind() {
 	case Disabled:
-		return nil, nil
+		return tls.Certificate{}, nil
 	case MutualTLS:
 		crt, err := tls.LoadX509KeyPair(i.Certificate, i.Key)
 		if err != nil {
-			return nil, errors.Wrap(err, "error creating identity certificate")
+			return fail(errors.Wrap(err, "error creating identity certificate"))
 		}
+
 		// Check if certificate is expired.
-		// Do not return any options if expired.
 		x509Cert, err := x509.ParseCertificate(crt.Certificate[0])
 		if err != nil {
-			return nil, errors.Wrap(err, "error creating identity certificate")
+			return fail(errors.Wrap(err, "error creating identity certificate"))
 		}
 		now := time.Now().Truncate(time.Second)
-		if now.Add(DefaultLeeway).Before(x509Cert.NotBefore) || now.After(x509Cert.NotAfter) {
-			return nil, nil
+		if now.Add(DefaultLeeway).Before(x509Cert.NotBefore) {
+			return fail(errors.New("certificate is not yet valid"))
 		}
-		return []ClientOption{WithCertificate(crt)}, nil
+		if now.After(x509Cert.NotAfter) {
+			return fail(errors.New("certificate is already expired"))
+		}
+		return crt, nil
 	default:
-		return nil, errors.Errorf("unsupported identity type %s", i.Type)
+		return fail(errors.Errorf("unsupported identity type %s", i.Type))
 	}
 }
 
-// Renew renews the identity certificate using the given client.
-func (i *Identity) Renew(client *Client) error {
-	switch i.Kind() {
-	case Disabled:
-		return nil
-	case MutualTLS:
-		cert, err := tls.LoadX509KeyPair(i.Certificate, i.Key)
-		if err != nil {
-			return errors.Wrap(err, "error creating identity certificate")
-		}
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{
-				Certificates:             []tls.Certificate{cert},
-				RootCAs:                  client.GetRootCAs(),
-				PreferServerCipherSuites: true,
-			},
-		}
-		resp, err := client.Renew(tr)
-		if err != nil {
-			return err
-		}
-		buf := new(bytes.Buffer)
-		for _, crt := range resp.CertChainPEM {
-			block := &pem.Block{
-				Type:  "CERTIFICATE",
-				Bytes: crt.Raw,
-			}
-			if err := pem.Encode(buf, block); err != nil {
-				return errors.Wrap(err, "error encoding identity certificate")
-			}
-		}
-		if err := ioutil.WriteFile(i.Certificate, buf.Bytes(), 0600); err != nil {
-			return errors.Wrap(err, "error writing identity certificate")
-		}
-		return nil
-	default:
-		return errors.Errorf("unsupported identity type %s", i.Type)
+func fileExists(filename string) error {
+	info, err := os.Stat(filename)
+	if err != nil {
+		return errors.Wrapf(err, "error reading %s", filename)
 	}
+	if info.IsDir() {
+		return errors.Errorf("error reading %s: file is a directory", filename)
+	}
+	return nil
 }
