@@ -26,6 +26,7 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca/identity"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/pemutil"
@@ -134,7 +135,7 @@ func (o *clientOptions) applyDefaultIdentity() error {
 	}
 	crt, err := i.TLSCertificate()
 	if err != nil {
-		return nil
+		return err
 	}
 	o.certificate = crt
 	return nil
@@ -470,11 +471,6 @@ func (c *Client) GetRootCAs() *x509.CertPool {
 	default:
 		return nil
 	}
-}
-
-// GetTransport returns the transport of the internal HTTP client.
-func (c *Client) GetTransport() http.RoundTripper {
-	return c.client.GetTransport()
 }
 
 // SetTransport updates the transport of the internal HTTP client.
@@ -958,24 +954,27 @@ func (c *Client) SSHCheckHost(principal string, token string) (*api.SSHCheckPrin
 		Token:     token,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling request")
+		return nil, errs.Wrap(http.StatusInternalServerError, err,
+			"error marshaling check-host request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/check-host"})
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client POST %s failed", u,
+			errs.WithMessage("Failed to perform POST request to %s", u))
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+
+		return nil, errs.StatusCodeError(resp.StatusCode, readError(resp.Body))
 	}
 	var check api.SSHCheckPrincipalResponse
 	if err := readJSON(resp.Body, &check); err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "error reading %s response", u)
 	}
 	return &check, nil
 }
@@ -1174,7 +1173,7 @@ func readJSON(r io.ReadCloser, v interface{}) error {
 
 func readError(r io.ReadCloser) error {
 	defer r.Close()
-	apiErr := new(api.Error)
+	apiErr := new(errs.Error)
 	if err := json.NewDecoder(r).Decode(apiErr); err != nil {
 		return err
 	}

@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/cli/crypto/tlsutil"
 )
@@ -233,13 +234,13 @@ type ProvisionerKeyResponse struct {
 // or an error if something is wrong.
 func (s *SignRequest) Validate() error {
 	if s.CsrPEM.CertificateRequest == nil {
-		return BadRequest(errors.New("missing csr"))
+		return errs.BadRequest(errors.New("missing csr"))
 	}
 	if err := s.CsrPEM.CertificateRequest.CheckSignature(); err != nil {
-		return BadRequest(errors.Wrap(err, "invalid csr"))
+		return errs.BadRequest(errors.Wrap(err, "invalid csr"))
 	}
 	if s.OTT == "" {
-		return BadRequest(errors.New("missing ott"))
+		return errs.BadRequest(errors.New("missing ott"))
 	}
 
 	return nil
@@ -328,7 +329,7 @@ func (h *caHandler) Root(w http.ResponseWriter, r *http.Request) {
 	// Load root certificate with the
 	cert, err := h.Authority.Root(sum)
 	if err != nil {
-		WriteError(w, NotFound(errors.Wrapf(err, "%s was not found", r.RequestURI)))
+		WriteError(w, errs.NotFound(errors.Wrapf(err, "%s was not found", r.RequestURI)))
 		return
 	}
 
@@ -349,7 +350,7 @@ func certChainToPEM(certChain []*x509.Certificate) []Certificate {
 func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 	var body SignRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, BadRequest(errors.Wrap(err, "error reading request body")))
+		WriteError(w, errs.BadRequest(errors.Wrap(err, "error reading request body")))
 		return
 	}
 
@@ -366,13 +367,13 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 
 	signOpts, err := h.Authority.AuthorizeSign(body.OTT)
 	if err != nil {
-		WriteError(w, Unauthorized(err))
+		WriteError(w, errs.Unauthorized(err))
 		return
 	}
 
 	certChain, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, opts, signOpts...)
 	if err != nil {
-		WriteError(w, Forbidden(err))
+		WriteError(w, errs.Forbidden(err))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)
@@ -393,13 +394,13 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 // new one.
 func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-		WriteError(w, BadRequest(errors.New("missing peer certificate")))
+		WriteError(w, errs.BadRequest(errors.New("missing peer certificate")))
 		return
 	}
 
 	certChain, err := h.Authority.Renew(r.TLS.PeerCertificates[0])
 	if err != nil {
-		WriteError(w, Forbidden(err))
+		WriteError(w, errs.Forbidden(err))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)
@@ -421,13 +422,13 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) Provisioners(w http.ResponseWriter, r *http.Request) {
 	cursor, limit, err := parseCursor(r)
 	if err != nil {
-		WriteError(w, BadRequest(err))
+		WriteError(w, errs.BadRequest(err))
 		return
 	}
 
 	p, next, err := h.Authority.GetProvisioners(cursor, limit)
 	if err != nil {
-		WriteError(w, InternalServerError(err))
+		WriteError(w, errs.InternalServerError(err))
 		return
 	}
 	JSON(w, &ProvisionersResponse{
@@ -441,7 +442,7 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 	kid := chi.URLParam(r, "kid")
 	key, err := h.Authority.GetEncryptedKey(kid)
 	if err != nil {
-		WriteError(w, NotFound(err))
+		WriteError(w, errs.NotFound(err))
 		return
 	}
 	JSON(w, &ProvisionerKeyResponse{key})
@@ -451,7 +452,7 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 	roots, err := h.Authority.GetRoots()
 	if err != nil {
-		WriteError(w, Forbidden(err))
+		WriteError(w, errs.Forbidden(err))
 		return
 	}
 
@@ -469,7 +470,7 @@ func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) Federation(w http.ResponseWriter, r *http.Request) {
 	federated, err := h.Authority.GetFederation()
 	if err != nil {
-		WriteError(w, Forbidden(err))
+		WriteError(w, errs.Forbidden(err))
 		return
 	}
 

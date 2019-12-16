@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
 	"golang.org/x/crypto/ocsp"
 )
@@ -29,16 +30,16 @@ type SSHRevokeRequest struct {
 // or an error if something is wrong.
 func (r *SSHRevokeRequest) Validate() (err error) {
 	if r.Serial == "" {
-		return BadRequest(errors.New("missing serial"))
+		return errs.BadRequest(errors.New("missing serial"))
 	}
 	if r.ReasonCode < ocsp.Unspecified || r.ReasonCode > ocsp.AACompromise {
-		return BadRequest(errors.New("reasonCode out of bounds"))
+		return errs.BadRequest(errors.New("reasonCode out of bounds"))
 	}
 	if !r.Passive {
-		return NotImplemented(errors.New("non-passive revocation not implemented"))
+		return errs.NotImplemented(errors.New("non-passive revocation not implemented"))
 	}
 	if len(r.OTT) == 0 {
-		return BadRequest(errors.New("missing ott"))
+		return errs.BadRequest(errors.New("missing ott"))
 	}
 	return
 }
@@ -49,7 +50,7 @@ func (r *SSHRevokeRequest) Validate() (err error) {
 func (h *caHandler) SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	var body SSHRevokeRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, BadRequest(errors.Wrap(err, "error reading request body")))
+		WriteError(w, errs.BadRequest(errors.Wrap(err, "error reading request body")))
 		return
 	}
 
@@ -70,13 +71,13 @@ func (h *caHandler) SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	// otherwise it is assumed that the certificate is revoking itself over mTLS.
 	logOtt(w, body.OTT)
 	if _, err := h.Authority.Authorize(ctx, body.OTT); err != nil {
-		WriteError(w, Unauthorized(err))
+		WriteError(w, errs.Unauthorized(err))
 		return
 	}
 	opts.OTT = body.OTT
 
 	if err := h.Authority.Revoke(ctx, opts); err != nil {
-		WriteError(w, Forbidden(err))
+		WriteError(w, errs.Forbidden(err))
 		return
 	}
 
