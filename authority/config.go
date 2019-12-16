@@ -76,9 +76,6 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 	if c == nil {
 		return errors.New("authority cannot be undefined")
 	}
-	if len(c.Provisioners) == 0 {
-		return errors.New("authority.provisioners cannot be empty")
-	}
 
 	// Check that only one K8sSA is enabled
 	var k8sCount int

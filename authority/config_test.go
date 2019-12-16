@@ -255,12 +255,6 @@ func TestAuthConfigValidate(t *testing.T) {
 				err: errors.New("authority cannot be undefined"),
 			}
 		},
-		"fail-empty-provisioners": func(t *testing.T) AuthConfigValidateTest {
-			return AuthConfigValidateTest{
-				ac:  &AuthConfig{},
-				err: errors.New("authority.provisioners cannot be empty"),
-			}
-		},
 		"fail-invalid-provisioners": func(t *testing.T) AuthConfigValidateTest {
 			return AuthConfigValidateTest{
 				ac: &AuthConfig{
@@ -281,6 +275,12 @@ func TestAuthConfigValidate(t *testing.T) {
 					},
 				},
 				err: errors.New("claims: MinTLSCertDuration must be greater than 0"),
+			}
+		},
+		"ok-empty-provisioners": func(t *testing.T) AuthConfigValidateTest {
+			return AuthConfigValidateTest{
+				ac:     &AuthConfig{},
+				asn1dn: x509util.ASN1DN{},
 			}
 		},
 		"ok-empty-asn1dn-template": func(t *testing.T) AuthConfigValidateTest {
