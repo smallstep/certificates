@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
 )
 
@@ -68,7 +69,7 @@ func JSONStatus(w http.ResponseWriter, v interface{}, status int) {
 // pointed by v.
 func ReadJSON(r io.Reader, v interface{}) error {
 	if err := json.NewDecoder(r).Decode(v); err != nil {
-		return BadRequest(errors.Wrap(err, "error decoding json"))
+		return errs.BadRequest(errors.Wrap(err, "error decoding json"))
 	}
 	return nil
 }

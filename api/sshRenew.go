@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/errs"
 )
 
 // SSHRenewRequest is the request body of an SSH certificate request.
@@ -34,30 +35,30 @@ type SSHRenewResponse struct {
 func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 	var body SSHRenewRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, BadRequest(errors.Wrap(err, "error reading request body")))
+		WriteError(w, errs.BadRequest(errors.Wrap(err, "error reading request body")))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, BadRequest(err))
+		WriteError(w, errs.BadRequest(err))
 		return
 	}
 
 	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.RenewSSHMethod)
 	_, err := h.Authority.Authorize(ctx, body.OTT)
 	if err != nil {
-		WriteError(w, Unauthorized(err))
+		WriteError(w, errs.Unauthorized(err))
 		return
 	}
 	oldCert, err := provisioner.ExtractSSHPOPCert(body.OTT)
 	if err != nil {
-		WriteError(w, InternalServerError(err))
+		WriteError(w, errs.InternalServerError(err))
 	}
 
 	newCert, err := h.Authority.RenewSSH(oldCert)
 	if err != nil {
-		WriteError(w, Forbidden(err))
+		WriteError(w, errs.Forbidden(err))
 		return
 	}
 
