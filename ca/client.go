@@ -135,7 +135,7 @@ func (o *clientOptions) applyDefaultIdentity() error {
 	}
 	crt, err := i.TLSCertificate()
 	if err != nil {
-		return err
+		return nil
 	}
 	o.certificate = crt
 	return nil
@@ -954,8 +954,8 @@ func (c *Client) SSHCheckHost(principal string, token string) (*api.SSHCheckPrin
 		Token:     token,
 	})
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"error marshaling check-host request")
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request",
+			errs.WithMessage("Failed to marshal the check-host request"))
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/check-host"})
 retry:
@@ -974,7 +974,8 @@ retry:
 	}
 	var check api.SSHCheckPrincipalResponse
 	if err := readJSON(resp.Body, &check); err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "error reading %s response", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "error reading %s response", u,
+			errs.WithMessage("Failed to parse response from /ssh/check-host endpoint"))
 	}
 	return &check, nil
 }
