@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/errs"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -38,36 +39,36 @@ type SSHRekeyResponse struct {
 func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 	var body SSHRekeyRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, BadRequest(errors.Wrap(err, "error reading request body")))
+		WriteError(w, errs.BadRequest(errors.Wrap(err, "error reading request body")))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, BadRequest(err))
+		WriteError(w, errs.BadRequest(err))
 		return
 	}
 
 	publicKey, err := ssh.ParsePublicKey(body.PublicKey)
 	if err != nil {
-		WriteError(w, BadRequest(errors.Wrap(err, "error parsing publicKey")))
+		WriteError(w, errs.BadRequest(errors.Wrap(err, "error parsing publicKey")))
 		return
 	}
 
 	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.RekeySSHMethod)
 	signOpts, err := h.Authority.Authorize(ctx, body.OTT)
 	if err != nil {
-		WriteError(w, Unauthorized(err))
+		WriteError(w, errs.Unauthorized(err))
 		return
 	}
 	oldCert, err := provisioner.ExtractSSHPOPCert(body.OTT)
 	if err != nil {
-		WriteError(w, InternalServerError(err))
+		WriteError(w, errs.InternalServerError(err))
 	}
 
 	newCert, err := h.Authority.RekeySSH(oldCert, publicKey, signOpts...)
 	if err != nil {
-		WriteError(w, Forbidden(err))
+		WriteError(w, errs.Forbidden(err))
 		return
 	}
 

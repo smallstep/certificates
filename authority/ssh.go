@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/randutil"
@@ -660,25 +661,19 @@ func (a *Authority) CheckSSHHost(ctx context.Context, principal string, token st
 	if a.sshCheckHostFunc != nil {
 		exists, err := a.sshCheckHostFunc(ctx, principal, token, a.GetRootCertificates())
 		if err != nil {
-			return false, &apiError{
-				err:  errors.Wrap(err, "checkSSHHost: error from injected checkSSHHost func"),
-				code: http.StatusInternalServerError,
-			}
+			return false, errs.Wrap(http.StatusInternalServerError, err,
+				"checkSSHHost: error from injected checkSSHHost func")
 		}
 		return exists, nil
 	}
 	exists, err := a.db.IsSSHHost(principal)
 	if err != nil {
 		if err == db.ErrNotImplemented {
-			return false, &apiError{
-				err:  errors.Wrap(err, "checkSSHHost: isSSHHost is not implemented"),
-				code: http.StatusNotImplemented,
-			}
+			return false, errs.Wrap(http.StatusNotImplemented, err,
+				"checkSSHHost: isSSHHost is not implemented")
 		}
-		return false, &apiError{
-			err:  errors.Wrap(err, "checkSSHHost: error checking if hosts exists"),
-			code: http.StatusInternalServerError,
-		}
+		return false, errs.Wrap(http.StatusInternalServerError, err,
+			"checkSSHHost: error checking if hosts exists")
 	}
 
 	return exists, nil
