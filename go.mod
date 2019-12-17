@@ -5,7 +5,6 @@ go 1.13
 require (
 	github.com/Masterminds/sprig/v3 v3.0.0
 	github.com/go-chi/chi v4.0.2+incompatible
-	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.8.1
 	github.com/rs/xid v1.2.1
