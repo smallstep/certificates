@@ -130,6 +130,8 @@ github.com/smallstep/cli v0.14.0-rc.1.0.20191211225301-a5e848783407 h1:zU1JWNx/H
 github.com/smallstep/cli v0.14.0-rc.1.0.20191211225301-a5e848783407/go.mod h1:1DDxP5W6pSuPL7DudNMbr/qVVjToo8qz3tlRt8ka8TA=
 github.com/smallstep/cli v0.14.0-rc.1.0.20191213215810-4a01db0b2385 h1:5e1azRUUFvWaE0hCbbXxTKpzPmjjcQ4A/TotE6etaa4=
 github.com/smallstep/cli v0.14.0-rc.1.0.20191213215810-4a01db0b2385/go.mod h1:DC6mnMaYNejkAstQrMxkobEgB1QET7zwibISGoMSQis=
+github.com/smallstep/cli v0.14.0-rc.1.0.20191217223638-5ee30a55af45 h1:ff5cEYAUCVGxQXaKezPQhqOKORFRIpZMmXQV6u+CwL0=
+github.com/smallstep/cli v0.14.0-rc.1.0.20191217223638-5ee30a55af45/go.mod h1:6pTiWJKfIQcUYtK7lVnI0pOXRiYAWuy0qrlFVnn9q8M=
 github.com/smallstep/nosql v0.1.1-0.20191009043502-4b26d8029e61 h1:XM3mkHNBc6bEQhrZNEma+iz63xrmRFfCocmAEObeg/s=
 github.com/smallstep/nosql v0.1.1-0.20191009043502-4b26d8029e61/go.mod h1:MFhYHIE/0V7OOHjYzjnWHqySJ40PVbwhjy24UBkJI2g=
 github.com/smallstep/nosql v0.1.1 h1:ijeE3CM00SddioodNl/LWRQINNNCK1dLUsjZDwpUbNg=
