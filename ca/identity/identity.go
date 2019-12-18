@@ -81,22 +81,12 @@ func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) er
 	keyFilename := filepath.Join(identityDir, "identity_key")
 
 	// Write certificate
-	buf := new(bytes.Buffer)
-	for _, crt := range certChain {
-		block := &pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: crt.Raw,
-		}
-		if err := pem.Encode(buf, block); err != nil {
-			return errors.Wrap(err, "error encoding identity certificate")
-		}
-	}
-	if err := ioutil.WriteFile(certFilename, buf.Bytes(), 0600); err != nil {
-		return errors.Wrap(err, "error writing identity certificate")
+	if err := WriteIdentityCertificate(certChain); err != nil {
+		return err
 	}
 
 	// Write key
-	buf.Reset()
+	buf := new(bytes.Buffer)
 	block, err := pemutil.Serialize(key)
 	if err != nil {
 		return err
@@ -120,6 +110,27 @@ func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) er
 		return errors.Wrap(err, "error writing identity json")
 	}
 	if err := ioutil.WriteFile(IdentityFile, buf.Bytes(), 0600); err != nil {
+		return errors.Wrap(err, "error writing identity certificate")
+	}
+
+	return nil
+}
+
+// WriteIdentityCertificate writes the identity certificate in disk.
+func WriteIdentityCertificate(certChain []api.Certificate) error {
+	buf := new(bytes.Buffer)
+	certFilename := filepath.Join(identityDir, "identity.crt")
+	for _, crt := range certChain {
+		block := &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: crt.Raw,
+		}
+		if err := pem.Encode(buf, block); err != nil {
+			return errors.Wrap(err, "error encoding identity certificate")
+		}
+	}
+
+	if err := ioutil.WriteFile(certFilename, buf.Bytes(), 0600); err != nil {
 		return errors.Wrap(err, "error writing identity certificate")
 	}
 
