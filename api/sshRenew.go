@@ -26,7 +26,8 @@ func (s *SSHRenewRequest) Validate() error {
 
 // SSHRenewResponse is the response object that returns the SSH certificate.
 type SSHRenewResponse struct {
-	Certificate SSHCertificate `json:"crt"`
+	Certificate         SSHCertificate `json:"crt"`
+	IdentityCertificate []Certificate  `json:"identityCrt,omitempty"`
 }
 
 // SSHRenew is an HTTP handler that reads an RenewSSHRequest with a one-time-token
@@ -62,7 +63,28 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	identity, err := h.renewIdentityCertificate(r)
+	if err != nil {
+		WriteError(w, errs.Forbidden(err))
+		return
+	}
+
 	JSONStatus(w, &SSHSignResponse{
-		Certificate: SSHCertificate{newCert},
+		Certificate:         SSHCertificate{newCert},
+		IdentityCertificate: identity,
 	}, http.StatusCreated)
+}
+
+// renewIdentityCertificate request the client TLS certificate if present.
+func (h *caHandler) renewIdentityCertificate(r *http.Request) ([]Certificate, error) {
+	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+		return nil, nil
+	}
+
+	certChain, err := h.Authority.Renew(r.TLS.PeerCertificates[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return certChainToPEM(certChain), nil
 }
