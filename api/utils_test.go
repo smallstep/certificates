@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
 )
 
@@ -108,7 +109,7 @@ func TestReadJSON(t *testing.T) {
 				t.Errorf("ReadJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.wantErr {
-				e, ok := err.(*Error)
+				e, ok := err.(*errs.Error)
 				if ok {
 					if code := e.StatusCode(); code != 400 {
 						t.Errorf("error.StatusCode() = %v, wants 400", code)

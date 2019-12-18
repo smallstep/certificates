@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 func TestError_MarshalJSON(t *testing.T) {
@@ -22,7 +24,7 @@ func TestError_MarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := &Error{
+			e := &errs.Error{
 				Status: tt.fields.Status,
 				Err:    tt.fields.Err,
 			}
@@ -45,15 +47,15 @@ func TestError_UnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     args
-		expected *Error
+		expected *errs.Error
 		wantErr  bool
 	}{
-		{"ok", args{[]byte(`{"status":400,"message":"bad request"}`)}, &Error{Status: 400, Err: fmt.Errorf("bad request")}, false},
-		{"fail", args{[]byte(`{"status":"400","message":"bad request"}`)}, &Error{}, true},
+		{"ok", args{[]byte(`{"status":400,"message":"bad request"}`)}, &errs.Error{Status: 400, Err: fmt.Errorf("bad request")}, false},
+		{"fail", args{[]byte(`{"status":"400","message":"bad request"}`)}, &errs.Error{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := new(Error)
+			e := new(errs.Error)
 			if err := e.UnmarshalJSON(tt.args.data); (err != nil) != tt.wantErr {
 				t.Errorf("Error.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
