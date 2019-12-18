@@ -10,7 +10,7 @@ require (
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smallstep/assert v0.0.0-20180720014142-de77670473b5
-	github.com/smallstep/cli v0.14.0-rc.1.0.20191217223638-5ee30a55af45
+	github.com/smallstep/cli v0.14.0-rc.1.0.20191218000521-3e7348324838
 	github.com/smallstep/nosql v0.2.0
 	github.com/urfave/cli v1.20.1-0.20181029213200-b67dcf995b6a
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
