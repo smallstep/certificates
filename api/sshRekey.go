@@ -30,7 +30,8 @@ func (s *SSHRekeyRequest) Validate() error {
 
 // SSHRekeyResponse is the response object that returns the SSH certificate.
 type SSHRekeyResponse struct {
-	Certificate SSHCertificate `json:"crt"`
+	Certificate         SSHCertificate `json:"crt"`
+	IdentityCertificate []Certificate  `json:"identityCrt,omitempty"`
 }
 
 // SSHRekey is an HTTP handler that reads an RekeySSHRequest with a one-time-token
@@ -72,7 +73,14 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	JSONStatus(w, &SSHSignResponse{
-		Certificate: SSHCertificate{newCert},
+	identity, err := h.renewIdentityCertificate(r)
+	if err != nil {
+		WriteError(w, errs.Forbidden(err))
+		return
+	}
+
+	JSONStatus(w, &SSHRekeyResponse{
+		Certificate:         SSHCertificate{newCert},
+		IdentityCertificate: identity,
 	}, http.StatusCreated)
 }
