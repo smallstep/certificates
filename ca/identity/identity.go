@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -188,6 +189,62 @@ func (i *Identity) TLSCertificate() (tls.Certificate, error) {
 		return crt, nil
 	default:
 		return fail(errors.Errorf("unsupported identity type %s", i.Type))
+	}
+}
+
+// Renewer is that interface that a renew client must implement.
+type Renewer interface {
+	GetRootCAs() *x509.CertPool
+	Renew(tr http.RoundTripper) (*api.SignResponse, error)
+}
+
+// Renew renews the current identity certificate using a client with a renew
+// method.
+func (i *Identity) Renew(client Renewer) error {
+	switch i.Kind() {
+	case Disabled:
+		return nil
+	case MutualTLS:
+		cert, err := i.TLSCertificate()
+		if err != nil {
+			return err
+		}
+
+		tr := http.DefaultTransport.(*http.Transport).Clone()
+		tr.TLSClientConfig = &tls.Config{
+			Certificates:             []tls.Certificate{cert},
+			RootCAs:                  client.GetRootCAs(),
+			PreferServerCipherSuites: true,
+		}
+
+		sign, err := client.Renew(tr)
+		if err != nil {
+			return err
+		}
+
+		if sign.CertChainPEM == nil || len(sign.CertChainPEM) == 0 {
+			sign.CertChainPEM = []api.Certificate{sign.ServerPEM, sign.CaPEM}
+		}
+
+		// Write certificate
+		buf := new(bytes.Buffer)
+		for _, crt := range sign.CertChainPEM {
+			block := &pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: crt.Raw,
+			}
+			if err := pem.Encode(buf, block); err != nil {
+				return errors.Wrap(err, "error encoding identity certificate")
+			}
+		}
+		certFilename := filepath.Join(identityDir, "identity.crt")
+		if err := ioutil.WriteFile(certFilename, buf.Bytes(), 0600); err != nil {
+			return errors.Wrap(err, "error writing identity certificate")
+		}
+
+		return nil
+	default:
+		return errors.Errorf("unsupported identity type %s", i.Type)
 	}
 }
 
