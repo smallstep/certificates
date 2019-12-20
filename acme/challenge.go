@@ -389,10 +389,7 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 	// This is done to avoid making TXT lookups for domains like
 	// _acme-challenge.*.example.com
 	// Instead perform txt lookup for _acme-challenge.example.com
-	domain := dc.Value
-	if strings.HasPrefix(domain, "*") {
-		domain = strings.TrimPrefix(domain, "*.")
-	}
+	domain := strings.TrimPrefix(dc.Value, "*.")
 
 	txtRecords, err := vo.lookupTxt("_acme-challenge." + domain)
 	if err != nil {
