@@ -395,7 +395,6 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 	}
 
 	txtRecords, err := vo.lookupTxt("_acme-challenge." + domain)
-	fmt.Printf("Lookup TXT for _acme-challenge." + domain)
 	if err != nil {
 		if err = dc.storeError(db,
 			DNSErr(errors.Wrapf(err, "error looking up TXT "+
