@@ -16,14 +16,16 @@ const (
 	SignMethod Method = iota
 	// RevokeMethod is the method used to revoke X.509 certificates.
 	RevokeMethod
-	// SignSSHMethod is the method used to sign SSH certificates.
-	SignSSHMethod
-	// RenewSSHMethod is the method used to renew SSH certificates.
-	RenewSSHMethod
-	// RevokeSSHMethod is the method used to revoke SSH certificates.
-	RevokeSSHMethod
-	// RekeySSHMethod is the method used to rekey SSH certificates.
-	RekeySSHMethod
+	// RenewMethod is the method used to renew X.509 certificates.
+	RenewMethod
+	// SSHSignMethod is the method used to sign SSH certificates.
+	SSHSignMethod
+	// SSHRenewMethod is the method used to renew SSH certificates.
+	SSHRenewMethod
+	// SSHRevokeMethod is the method used to revoke SSH certificates.
+	SSHRevokeMethod
+	// SSHRekeyMethod is the method used to rekey SSH certificates.
+	SSHRekeyMethod
 )
 
 // String returns a string representation of the context method.
@@ -33,14 +35,16 @@ func (m Method) String() string {
 		return "sign-method"
 	case RevokeMethod:
 		return "revoke-method"
-	case SignSSHMethod:
-		return "sign-ssh-method"
-	case RenewSSHMethod:
-		return "renew-ssh-method"
-	case RevokeSSHMethod:
-		return "revoke-ssh-method"
-	case RekeySSHMethod:
-		return "rekey-ssh-method"
+	case RenewMethod:
+		return "renew-method"
+	case SSHSignMethod:
+		return "ssh-sign-method"
+	case SSHRenewMethod:
+		return "ssh-renew-method"
+	case SSHRevokeMethod:
+		return "ssh-revoke-method"
+	case SSHRekeyMethod:
+		return "ssh-rekey-method"
 	default:
 		return "unknown"
 	}

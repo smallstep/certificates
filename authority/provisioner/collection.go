@@ -78,7 +78,7 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 
 	// match with server audiences
 	if matchesAudience(claims.Audience, audiences) {
-		// Use fragment to get provisioner name (GCP, AWS)
+		// Use fragment to get provisioner name (GCP, AWS, SSHPOP)
 		if fragment != "" {
 			return c.Load(fragment)
 		}

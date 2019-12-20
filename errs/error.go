@@ -21,9 +21,9 @@ type StackTracer interface {
 // Option modifies the Error type.
 type Option func(e *Error) error
 
-// WithMessage returns an Option that modifies the error by overwriting the
+// withDefaultMessage returns an Option that modifies the error by overwriting the
 // message only if it is empty.
-func WithMessage(format string, args ...interface{}) Option {
+func withDefaultMessage(format string, args ...interface{}) Option {
 	return func(e *Error) error {
 		if len(e.Msg) > 0 {
 			return e
@@ -33,25 +33,52 @@ func WithMessage(format string, args ...interface{}) Option {
 	}
 }
 
+// WithMessage returns an Option that modifies the error by overwriting the
+// message only if it is empty.
+func WithMessage(format string, args ...interface{}) Option {
+	return func(e *Error) error {
+		e.Msg = fmt.Sprintf(format, args...)
+		return e
+	}
+}
+
+// WithKeyVal returns an Option that adds the given key-value pair to the
+// Error details. This is helpful for debugging errors.
+func WithKeyVal(key string, val interface{}) Option {
+	return func(e *Error) error {
+		if e.Details == nil {
+			e.Details = make(map[string]interface{})
+		}
+		e.Details[key] = val
+		return e
+	}
+}
+
 // Error represents the CA API errors.
 type Error struct {
-	Status int
-	Err    error
-	Msg    string
+	Status  int
+	Err     error
+	Msg     string
+	Details map[string]interface{}
 }
 
 // New returns a new Error. If the given error implements the StatusCoder
 // interface we will ignore the given status.
 func New(status int, err error, opts ...Option) error {
-	var e *Error
-	if sc, ok := err.(StatusCoder); ok {
-		e = &Error{Status: sc.StatusCode(), Err: err}
-	} else {
-		cause := errors.Cause(err)
-		if sc, ok := cause.(StatusCoder); ok {
+	var (
+		e  *Error
+		ok bool
+	)
+	if e, ok = err.(*Error); !ok {
+		if sc, ok := err.(StatusCoder); ok {
 			e = &Error{Status: sc.StatusCode(), Err: err}
 		} else {
-			e = &Error{Status: status, Err: err}
+			cause := errors.Cause(err)
+			if sc, ok := cause.(StatusCoder); ok {
+				e = &Error{Status: sc.StatusCode(), Err: err}
+			} else {
+				e = &Error{Status: status, Err: err}
+			}
 		}
 	}
 	for _, o := range opts {
@@ -188,63 +215,62 @@ func StatusCodeError(code int, e error, opts ...Option) error {
 	}
 }
 
-var seeLogs = "Please see the certificate authority logs for more info."
+var (
+	seeLogs = "Please see the certificate authority logs for more info."
+	// BadRequestDefaultMsg 400 default msg
+	BadRequestDefaultMsg = "The request could not be completed due to being poorly formatted or missing critical data. " + seeLogs
+	// UnauthorizedDefaultMsg 401 default msg
+	UnauthorizedDefaultMsg = "The request lacked necessary authorization to be completed. " + seeLogs
+	// ForbiddenDefaultMsg 403 default msg
+	ForbiddenDefaultMsg = "The request was forbidden by the certificate authority. " + seeLogs
+	// NotFoundDefaultMsg 404 default msg
+	NotFoundDefaultMsg = "The requested resource could not be found. " + seeLogs
+	// InternalServerErrorDefaultMsg 500 default msg
+	InternalServerErrorDefaultMsg = "The certificate authority encountered an Internal Server Error. " + seeLogs
+	// NotImplementedDefaultMsg 501 default msg
+	NotImplementedDefaultMsg = "The requested method is not implemented by the certificate authority. " + seeLogs
+)
 
 // InternalServerError returns a 500 error with the given error.
 func InternalServerError(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The certificate authority encountered an Internal Server Error. "+seeLogs))
-	}
+	opts = append(opts, withDefaultMessage(InternalServerErrorDefaultMsg))
 	return New(http.StatusInternalServerError, err, opts...)
 }
 
 // NotImplemented returns a 501 error with the given error.
 func NotImplemented(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The requested method is not implemented by the certificate authority. "+seeLogs))
-	}
+	opts = append(opts, withDefaultMessage(NotImplementedDefaultMsg))
 	return New(http.StatusNotImplemented, err, opts...)
 }
 
 // BadRequest returns an 400 error with the given error.
 func BadRequest(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The request could not be completed due to being poorly formatted or "+
-			"missing critical data. "+seeLogs))
-	}
+	opts = append(opts, withDefaultMessage(BadRequestDefaultMsg))
 	return New(http.StatusBadRequest, err, opts...)
 }
 
 // Unauthorized returns an 401 error with the given error.
 func Unauthorized(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The request lacked necessary authorization to be completed. "+seeLogs))
-	}
+	opts = append(opts, withDefaultMessage(UnauthorizedDefaultMsg))
 	return New(http.StatusUnauthorized, err, opts...)
 }
 
 // Forbidden returns an 403 error with the given error.
 func Forbidden(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The request was Forbidden by the certificate authority. "+seeLogs))
-	}
+	opts = append(opts, withDefaultMessage(ForbiddenDefaultMsg))
 	return New(http.StatusForbidden, err, opts...)
 }
 
 // NotFound returns an 404 error with the given error.
 func NotFound(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The requested resource could not be found. "+seeLogs))
-	}
+	opts = append(opts, withDefaultMessage(NotFoundDefaultMsg))
 	return New(http.StatusNotFound, err, opts...)
 }
 
 // UnexpectedError will be used when the certificate authority makes an outgoing
 // request and receives an unhandled status code.
 func UnexpectedError(code int, err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The certificate authority received an "+
-			"unexpected HTTP status code - '%d'. "+seeLogs, code))
-	}
+	opts = append(opts, withDefaultMessage("The certificate authority received an "+
+		"unexpected HTTP status code - '%d'. "+seeLogs, code))
 	return New(code, err, opts...)
 }
