@@ -282,7 +282,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 		ValidAfter:  body.ValidAfter,
 	}
 
-	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignSSHMethod)
+	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SSHSignMethod)
 	signOpts, err := h.Authority.Authorize(ctx, body.OTT)
 	if err != nil {
 		WriteError(w, errs.Unauthorized(err))

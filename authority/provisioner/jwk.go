@@ -3,9 +3,11 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
 )
@@ -99,12 +101,12 @@ func (p *JWK) Init(config Config) (err error) {
 func (p *JWK) authorizeToken(token string, audiences []string) (*jwtPayload, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing token")
+		return nil, errs.Wrap(http.StatusUnauthorized, err, "jwk.authorizeToken; error parsing jwk token")
 	}
 
 	var claims jwtPayload
 	if err = jwt.Claims(p.Key, &claims); err != nil {
-		return nil, errors.Wrap(err, "error parsing claims")
+		return nil, errs.Wrap(http.StatusUnauthorized, err, "jwk.authorizeToken; error parsing jwk claims")
 	}
 
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
@@ -113,17 +115,17 @@ func (p *JWK) authorizeToken(token string, audiences []string) (*jwtPayload, err
 		Issuer: p.Name,
 		Time:   time.Now().UTC(),
 	}, time.Minute); err != nil {
-		return nil, errors.Wrapf(err, "invalid token")
+		return nil, errs.Wrapf(http.StatusUnauthorized, err, "jwk.authorizeToken; invalid jwk claims")
 	}
 
 	// validate audiences with the defaults
 	if !matchesAudience(claims.Audience, audiences) {
-		return nil, errors.Errorf("invalid token: invalid audience claim (aud); want %s, but got %s",
-			audiences, claims.Audience)
+		return nil, errs.Unauthorized(errors.Errorf("jwk.authorizeToken; invalid jwk token audience claim (aud); want %s, but got %s",
+			audiences, claims.Audience))
 	}
 
 	if claims.Subject == "" {
-		return nil, errors.New("token subject cannot be empty")
+		return nil, errs.Unauthorized(errors.New("jwk.authorizeToken; jwk token subject cannot be empty"))
 	}
 
 	return &claims, nil
@@ -133,14 +135,14 @@ func (p *JWK) authorizeToken(token string, audiences []string) (*jwtPayload, err
 // revoke the certificate with serial number in the `sub` property.
 func (p *JWK) AuthorizeRevoke(ctx context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.audiences.Revoke)
-	return err
+	return errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeRevoke")
 }
 
 // AuthorizeSign validates the given token.
 func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.audiences.Sign)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
 	}
 
 	// NOTE: This is for backwards compatibility with older versions of cli
@@ -171,7 +173,7 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // certificate was configured to allow renewals.
 func (p *JWK) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
+		return errs.Unauthorized(errors.Errorf("jwk.AuthorizeRenew; renew is disabled for jwk provisioner %s", p.GetID()))
 	}
 	return nil
 }
@@ -179,14 +181,14 @@ func (p *JWK) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
+		return nil, errs.Unauthorized(errors.Errorf("jwk.AuthorizeSSHSign; sshCA is disabled for jwk provisioner %s", p.GetID()))
 	}
 	claims, err := p.authorizeToken(token, p.audiences.SSHSign)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSSHSign")
 	}
 	if claims.Step == nil || claims.Step.SSH == nil {
-		return nil, errors.New("authorization token must be an SSH provisioning token")
+		return nil, errs.Unauthorized(errors.New("jwk.AuthorizeSSHSign; jwk token must be an SSH provisioning token"))
 	}
 
 	opts := claims.Step.SSH
@@ -205,19 +207,19 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		signOptions = append(signOptions, sshCertPrincipalsModifier(opts.Principals))
 	}
 	if !opts.ValidAfter.IsZero() {
-		signOptions = append(signOptions, sshCertificateValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
+		signOptions = append(signOptions, sshCertValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
 	}
 	if !opts.ValidBefore.IsZero() {
-		signOptions = append(signOptions, sshCertificateValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
+		signOptions = append(signOptions, sshCertValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
 	}
 	if opts.KeyID != "" {
-		signOptions = append(signOptions, sshCertificateKeyIDModifier(opts.KeyID))
+		signOptions = append(signOptions, sshCertKeyIDModifier(opts.KeyID))
 	} else {
-		signOptions = append(signOptions, sshCertificateKeyIDModifier(claims.Subject))
+		signOptions = append(signOptions, sshCertKeyIDModifier(claims.Subject))
 	}
 
 	// Default to a user certificate with no principals if not set
-	signOptions = append(signOptions, sshCertificateDefaultsModifier{CertType: SSHUserCert})
+	signOptions = append(signOptions, sshCertDefaultsModifier{CertType: SSHUserCert})
 
 	return append(signOptions,
 		// Set the default extensions.
@@ -238,5 +240,5 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 // AuthorizeSSHRevoke returns nil if the token is valid, false otherwise.
 func (p *JWK) AuthorizeSSHRevoke(ctx context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.audiences.SSHRevoke)
-	return err
+	return errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSSHRevoke")
 }

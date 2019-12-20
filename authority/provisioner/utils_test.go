@@ -19,6 +19,7 @@ import (
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/jose"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
@@ -46,24 +47,6 @@ var (
 		SSHRekey:  []string{"https://ca.smallstep.com/1.0/ssh/rekey"},
 	}
 )
-
-func provisionerClaims() *Claims {
-	ddr := false
-	des := true
-	return &Claims{
-		MinTLSDur:         &Duration{5 * time.Minute},
-		MaxTLSDur:         &Duration{24 * time.Hour},
-		DefaultTLSDur:     &Duration{24 * time.Hour},
-		DisableRenewal:    &ddr,
-		MinUserSSHDur:     &Duration{Duration: 5 * time.Minute}, // User SSH certs
-		MaxUserSSHDur:     &Duration{Duration: 24 * time.Hour},
-		DefaultUserSSHDur: &Duration{Duration: 4 * time.Hour},
-		MinHostSSHDur:     &Duration{Duration: 5 * time.Minute}, // Host SSH certs
-		MaxHostSSHDur:     &Duration{Duration: 30 * 24 * time.Hour},
-		DefaultHostSSHDur: &Duration{Duration: 30 * 24 * time.Hour},
-		EnableSSHCA:       &des,
-	}
-}
 
 const awsTestCertificate = `-----BEGIN CERTIFICATE-----
 MIICFTCCAX6gAwIBAgIRAKmbVVYAl/1XEqRfF3eJ97MwDQYJKoZIhvcNAQELBQAw
@@ -204,7 +187,7 @@ func generateJWK() (*JWK, error) {
 }
 
 func generateK8sSA(inputPubKey interface{}) (*K8sSA, error) {
-	fooPubB, err := ioutil.ReadFile("./testdata/foo.pub")
+	fooPubB, err := ioutil.ReadFile("./testdata/certs/foo.pub")
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +195,7 @@ func generateK8sSA(inputPubKey interface{}) (*K8sSA, error) {
 	if err != nil {
 		return nil, err
 	}
-	barPubB, err := ioutil.ReadFile("./testdata/bar.pub")
+	barPubB, err := ioutil.ReadFile("./testdata/certs/bar.pub")
 	if err != nil {
 		return nil, err
 	}
@@ -237,6 +220,46 @@ func generateK8sSA(inputPubKey interface{}) (*K8sSA, error) {
 		audiences: testAudiences,
 		claimer:   claimer,
 		pubKeys:   pubKeys,
+	}, nil
+}
+
+func generateSSHPOP() (*SSHPOP, error) {
+	name, err := randutil.Alphanumeric(10)
+	if err != nil {
+		return nil, err
+	}
+	claimer, err := NewClaimer(nil, globalProvisionerClaims)
+	if err != nil {
+		return nil, err
+	}
+
+	userB, err := ioutil.ReadFile("./testdata/certs/ssh_user_ca_key.pub")
+	if err != nil {
+		return nil, err
+	}
+	userKey, _, _, _, err := ssh.ParseAuthorizedKey(userB)
+	if err != nil {
+		return nil, err
+	}
+	hostB, err := ioutil.ReadFile("./testdata/certs/ssh_host_ca_key.pub")
+	if err != nil {
+		return nil, err
+	}
+	hostKey, _, _, _, err := ssh.ParseAuthorizedKey(hostB)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SSHPOP{
+		Name:      name,
+		Type:      "SSHPOP",
+		Claims:    &globalProvisionerClaims,
+		audiences: testAudiences,
+		claimer:   claimer,
+		sshPubKeys: &SSHKeys{
+			UserKeys: []ssh.PublicKey{userKey},
+			HostKeys: []ssh.PublicKey{hostKey},
+		},
 	}, nil
 }
 
@@ -589,6 +612,13 @@ func withX5CHdr(certs []*x509.Certificate) tokOption {
 	}
 }
 
+func withSSHPOPFile(cert *ssh.Certificate) tokOption {
+	return func(so *jose.SignerOptions) error {
+		so.WithHeader("sshpop", base64.StdEncoding.EncodeToString(cert.Marshal()))
+		return nil
+	}
+}
+
 func generateToken(sub, iss, aud string, email string, sans []string, iat time.Time, jwk *jose.JSONWebKey, tokOpts ...tokOption) (string, error) {
 	so := new(jose.SignerOptions)
 	so.WithType("JWT")
@@ -626,6 +656,24 @@ func generateToken(sub, iss, aud string, email string, sans []string, iat time.T
 		},
 		Email: email,
 		SANS:  sans,
+	}
+	return jose.Signed(sig).Claims(claims).CompactSerialize()
+}
+
+func generateX5CSSHToken(jwk *jose.JSONWebKey, claims *x5cPayload, tokOpts ...tokOption) (string, error) {
+	so := new(jose.SignerOptions)
+	so.WithType("JWT")
+	so.WithHeader("kid", jwk.KeyID)
+
+	for _, o := range tokOpts {
+		if err := o(so); err != nil {
+			return "", err
+		}
+	}
+
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key}, so)
+	if err != nil {
+		return "", err
 	}
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }

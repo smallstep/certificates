@@ -13,12 +13,13 @@ import (
 	stepJOSE "github.com/smallstep/cli/jose"
 )
 
-func testAuthority(t *testing.T) *Authority {
+func testAuthority(t *testing.T, opts ...Option) *Authority {
 	maxjwk, err := stepJOSE.ParseKey("testdata/secrets/max_pub.jwk")
 	assert.FatalError(t, err)
 	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	disableRenewal := true
+	enableSSHCA := true
 	p := provisioner.List{
 		&provisioner.JWK{
 			Name: "Max",
@@ -29,6 +30,9 @@ func testAuthority(t *testing.T) *Authority {
 			Name: "step-cli",
 			Type: "JWK",
 			Key:  clijwk,
+			Claims: &provisioner.Claims{
+				EnableSSHCA: &enableSSHCA,
+			},
 		},
 		&provisioner.JWK{
 			Name: "dev",
@@ -46,19 +50,30 @@ func testAuthority(t *testing.T) *Authority {
 				DisableRenewal: &disableRenewal,
 			},
 		},
+		&provisioner.SSHPOP{
+			Name: "sshpop",
+			Type: "SSHPOP",
+			Claims: &provisioner.Claims{
+				EnableSSHCA: &enableSSHCA,
+			},
+		},
 	}
 	c := &Config{
 		Address:          "127.0.0.1:443",
 		Root:             []string{"testdata/certs/root_ca.crt"},
 		IntermediateCert: "testdata/certs/intermediate_ca.crt",
 		IntermediateKey:  "testdata/secrets/intermediate_ca_key",
-		DNSNames:         []string{"test.ca.smallstep.com"},
-		Password:         "pass",
+		SSH: &SSHConfig{
+			HostKey: "testdata/secrets/ssh_host_ca_key",
+			UserKey: "testdata/secrets/ssh_user_ca_key",
+		},
+		DNSNames: []string{"example.com"},
+		Password: "pass",
 		AuthorityConfig: &AuthConfig{
 			Provisioners: p,
 		},
 	}
-	a, err := New(c)
+	a, err := New(c, opts...)
 	assert.FatalError(t, err)
 	return a
 }

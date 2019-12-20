@@ -78,7 +78,7 @@ func (o SSHOptions) Modify(cert *ssh.Certificate) error {
 	case SSHHostCert:
 		cert.CertType = ssh.HostCert
 	default:
-		return errors.Errorf("ssh certificate has an unknown type: %s", o.CertType)
+		return errors.Errorf("ssh certificate has an unknown type - %s", o.CertType)
 	}
 
 	cert.KeyId = o.KeyID
@@ -126,11 +126,11 @@ func (o sshCertPrincipalsModifier) Modify(cert *ssh.Certificate) error {
 	return nil
 }
 
-// sshCertificateKeyIDModifier is an SSHCertificateModifier that sets the given
+// sshCertKeyIDModifier is an SSHCertificateModifier that sets the given
 // Key ID in the SSH certificate.
-type sshCertificateKeyIDModifier string
+type sshCertKeyIDModifier string
 
-func (m sshCertificateKeyIDModifier) Modify(cert *ssh.Certificate) error {
+func (m sshCertKeyIDModifier) Modify(cert *ssh.Certificate) error {
 	cert.KeyId = string(m)
 	return nil
 }
@@ -145,30 +145,30 @@ func (m sshCertTypeModifier) Modify(cert *ssh.Certificate) error {
 	return nil
 }
 
-// sshCertificateValidAfterModifier is an SSHCertificateModifier that sets the
+// sshCertValidAfterModifier is an SSHCertificateModifier that sets the
 // ValidAfter in the SSH certificate.
-type sshCertificateValidAfterModifier uint64
+type sshCertValidAfterModifier uint64
 
-func (m sshCertificateValidAfterModifier) Modify(cert *ssh.Certificate) error {
+func (m sshCertValidAfterModifier) Modify(cert *ssh.Certificate) error {
 	cert.ValidAfter = uint64(m)
 	return nil
 }
 
-// sshCertificateValidBeforeModifier is an SSHCertificateModifier that sets the
+// sshCertValidBeforeModifier is an SSHCertificateModifier that sets the
 // ValidBefore in the SSH certificate.
-type sshCertificateValidBeforeModifier uint64
+type sshCertValidBeforeModifier uint64
 
-func (m sshCertificateValidBeforeModifier) Modify(cert *ssh.Certificate) error {
+func (m sshCertValidBeforeModifier) Modify(cert *ssh.Certificate) error {
 	cert.ValidBefore = uint64(m)
 	return nil
 }
 
-// sshCertificateDefaultModifier implements a SSHCertificateModifier that
+// sshCertDefaultsModifier implements a SSHCertificateModifier that
 // modifies the certificate with the given options if they are not set.
-type sshCertificateDefaultsModifier SSHOptions
+type sshCertDefaultsModifier SSHOptions
 
 // Modify implements the SSHCertificateModifier interface.
-func (m sshCertificateDefaultsModifier) Modify(cert *ssh.Certificate) error {
+func (m sshCertDefaultsModifier) Modify(cert *ssh.Certificate) error {
 	if cert.CertType == 0 {
 		cert.CertType = sshCertTypeUInt32(m.CertType)
 	}
