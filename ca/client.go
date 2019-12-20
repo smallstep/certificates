@@ -486,7 +486,7 @@ func (c *Client) Version() (*api.VersionResponse, error) {
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Version; client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -497,7 +497,7 @@ retry:
 	}
 	var version api.VersionResponse
 	if err := readJSON(resp.Body, &version); err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Version; error reading %s", u)
 	}
 	return &version, nil
 }
@@ -510,7 +510,7 @@ func (c *Client) Health() (*api.HealthResponse, error) {
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Health; client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -521,7 +521,7 @@ retry:
 	}
 	var health api.HealthResponse
 	if err := readJSON(resp.Body, &health); err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Health; error reading %s", u)
 	}
 	return &health, nil
 }
@@ -537,7 +537,7 @@ func (c *Client) Root(sha256Sum string) (*api.RootResponse, error) {
 retry:
 	resp, err := newInsecureClient().Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Root; client GET %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -548,12 +548,12 @@ retry:
 	}
 	var root api.RootResponse
 	if err := readJSON(resp.Body, &root); err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Root; error reading %s", u)
 	}
 	// verify the sha256
 	sum := sha256.Sum256(root.RootPEM.Raw)
 	if sha256Sum != strings.ToLower(hex.EncodeToString(sum[:])) {
-		return nil, errors.New("root certificate SHA256 fingerprint do not match")
+		return nil, errs.BadRequest(errors.New("client.Root; root certificate SHA256 fingerprint do not match"))
 	}
 	return &root, nil
 }
@@ -564,13 +564,13 @@ func (c *Client) Sign(req *api.SignRequest) (*api.SignResponse, error) {
 	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling request")
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "client.Sign; error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/sign"})
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Sign; client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -581,7 +581,7 @@ retry:
 	}
 	var sign api.SignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Sign; error reading %s", u)
 	}
 	// Add tls.ConnectionState:
 	// We'll extract the root certificate from the verified chains
@@ -598,7 +598,7 @@ func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
 retry:
 	resp, err := client.Post(u.String(), "application/json", http.NoBody)
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Renew; client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -609,7 +609,7 @@ retry:
 	}
 	var sign api.SignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Renew; error reading %s", u)
 	}
 	return &sign, nil
 }
@@ -1008,13 +1008,13 @@ func (c *Client) SSHBastion(req *api.SSHBastionRequest) (*api.SSHBastionResponse
 	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling request")
+		return nil, errors.Wrap(err, "client.SSHBastion; error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/ssh/bastion"})
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, errors.Wrapf(err, "client.SSHBastion; client POST %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1025,7 +1025,7 @@ retry:
 	}
 	var bastion api.SSHBastionResponse
 	if err := readJSON(resp.Body, &bastion); err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", u)
+		return nil, errors.Wrapf(err, "client.SSHBastion; error reading %s", u)
 	}
 	return &bastion, nil
 }

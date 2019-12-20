@@ -7,12 +7,14 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/jose"
 )
 
@@ -206,20 +208,21 @@ func TestOIDC_authorizeToken(t *testing.T) {
 		name    string
 		prov    *OIDC
 		args    args
+		code    int
 		wantErr bool
 	}{
-		{"ok1", p1, args{t1}, false},
-		{"ok2", p2, args{t2}, false},
-		{"fail-email", p3, args{failEmail}, true},
-		{"fail-domain", p3, args{failDomain}, true},
-		{"fail-key", p1, args{failKey}, true},
-		{"fail-token", p1, args{failTok}, true},
-		{"fail-claims", p1, args{failClaims}, true},
-		{"fail-issuer", p1, args{failIss}, true},
-		{"fail-audience", p1, args{failAud}, true},
-		{"fail-signature", p1, args{failSig}, true},
-		{"fail-expired", p1, args{failExp}, true},
-		{"fail-not-before", p1, args{failNbf}, true},
+		{"ok1", p1, args{t1}, http.StatusOK, false},
+		{"ok2", p2, args{t2}, http.StatusOK, false},
+		{"fail-email", p3, args{failEmail}, http.StatusUnauthorized, true},
+		{"fail-domain", p3, args{failDomain}, http.StatusUnauthorized, true},
+		{"fail-key", p1, args{failKey}, http.StatusUnauthorized, true},
+		{"fail-token", p1, args{failTok}, http.StatusUnauthorized, true},
+		{"fail-claims", p1, args{failClaims}, http.StatusUnauthorized, true},
+		{"fail-issuer", p1, args{failIss}, http.StatusUnauthorized, true},
+		{"fail-audience", p1, args{failAud}, http.StatusUnauthorized, true},
+		{"fail-signature", p1, args{failSig}, http.StatusUnauthorized, true},
+		{"fail-expired", p1, args{failExp}, http.StatusUnauthorized, true},
+		{"fail-not-before", p1, args{failNbf}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -230,6 +233,9 @@ func TestOIDC_authorizeToken(t *testing.T) {
 				return
 			}
 			if err != nil {
+				sc, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else {
 				assert.NotNil(t, got)
@@ -282,21 +288,24 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 		name    string
 		prov    *OIDC
 		args    args
+		code    int
 		wantErr bool
 	}{
-		{"ok1", p1, args{t1}, false},
-		{"admin", p3, args{okAdmin}, false},
-		{"fail-email", p3, args{failEmail}, true},
+		{"ok1", p1, args{t1}, http.StatusOK, false},
+		{"admin", p3, args{okAdmin}, http.StatusOK, false},
+		{"fail-email", p3, args{failEmail}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := NewContextWithMethod(context.Background(), SignMethod)
-			got, err := tt.prov.AuthorizeSign(ctx, tt.args.token)
+			got, err := tt.prov.AuthorizeSign(context.Background(), tt.args.token)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if err != nil {
+				sc, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else {
 				if assert.NotNil(t, got) {
@@ -330,6 +339,107 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 	}
 }
 
+func TestOIDC_AuthorizeRevoke(t *testing.T) {
+	srv := generateJWKServer(2)
+	defer srv.Close()
+
+	var keys jose.JSONWebKeySet
+	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
+
+	// Create test provisioners
+	p1, err := generateOIDC()
+	assert.FatalError(t, err)
+	p3, err := generateOIDC()
+	assert.FatalError(t, err)
+	// Admin + Domains
+	p3.Admins = []string{"name@smallstep.com", "root@example.com"}
+	p3.Domains = []string{"smallstep.com"}
+
+	// Update configuration endpoints and initialize
+	config := Config{Claims: globalProvisionerClaims}
+	p1.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	p3.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	assert.FatalError(t, p1.Init(config))
+	assert.FatalError(t, p3.Init(config))
+
+	t1, err := generateSimpleToken("the-issuer", p1.ClientID, &keys.Keys[0])
+	assert.FatalError(t, err)
+	// Admin email not in domains
+	okAdmin, err := generateToken("subject", "the-issuer", p3.ClientID, "root@example.com", []string{"test.smallstep.com"}, time.Now(), &keys.Keys[0])
+	assert.FatalError(t, err)
+	// Invalid email
+	failEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
+	assert.FatalError(t, err)
+
+	type args struct {
+		token string
+	}
+	tests := []struct {
+		name    string
+		prov    *OIDC
+		args    args
+		code    int
+		wantErr bool
+	}{
+		{"ok1", p1, args{t1}, http.StatusUnauthorized, true},
+		{"admin", p3, args{okAdmin}, http.StatusOK, false},
+		{"fail-email", p3, args{failEmail}, http.StatusUnauthorized, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.prov.AuthorizeRevoke(context.Background(), tt.args.token)
+			if (err != nil) != tt.wantErr {
+				fmt.Println(tt)
+				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			} else if err != nil {
+				sc, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				assert.Equals(t, sc.StatusCode(), tt.code)
+			}
+		})
+	}
+}
+
+func TestOIDC_AuthorizeRenew(t *testing.T) {
+	p1, err := generateOIDC()
+	assert.FatalError(t, err)
+	p2, err := generateOIDC()
+	assert.FatalError(t, err)
+
+	// disable renewal
+	disable := true
+	p2.Claims = &Claims{DisableRenewal: &disable}
+	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	assert.FatalError(t, err)
+
+	type args struct {
+		cert *x509.Certificate
+	}
+	tests := []struct {
+		name    string
+		prov    *OIDC
+		args    args
+		code    int
+		wantErr bool
+	}{
+		{"ok", p1, args{nil}, http.StatusOK, false},
+		{"fail/renew-disabled", p2, args{nil}, http.StatusUnauthorized, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.prov.AuthorizeRenew(context.Background(), tt.args.cert)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("OIDC.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
+			} else if err != nil {
+				sc, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				assert.Equals(t, sc.StatusCode(), tt.code)
+			}
+		})
+	}
+}
+
 func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	tm, fn := mockNow()
 	defer fn()
@@ -351,9 +461,16 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	assert.FatalError(t, err)
 	p5, err := generateOIDC()
 	assert.FatalError(t, err)
+	p6, err := generateOIDC()
+	assert.FatalError(t, err)
 	// Admin + Domains
 	p3.Admins = []string{"name@smallstep.com", "root@example.com"}
 	p3.Domains = []string{"smallstep.com"}
+	// disable sshCA
+	disable := false
+	p6.Claims = &Claims{EnableSSHCA: &disable}
+	p6.claimer, err = NewClaimer(p6.Claims, globalProvisionerClaims)
+	assert.FatalError(t, err)
 
 	// Update configuration endpoints and initialize
 	config := Config{Claims: globalProvisionerClaims}
@@ -425,48 +542,53 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 		prov        *OIDC
 		args        args
 		expected    *SSHOptions
+		code        int
 		wantErr     bool
 		wantSignErr bool
 	}{
-		{"ok", p1, args{t1, SSHOptions{}, pub}, expectedUserOptions, false, false},
-		{"ok-rsa2048", p1, args{t1, SSHOptions{}, rsa2048.Public()}, expectedUserOptions, false, false},
-		{"ok-user", p1, args{t1, SSHOptions{CertType: "user"}, pub}, expectedUserOptions, false, false},
+		{"ok", p1, args{t1, SSHOptions{}, pub}, expectedUserOptions, http.StatusOK, false, false},
+		{"ok-rsa2048", p1, args{t1, SSHOptions{}, rsa2048.Public()}, expectedUserOptions, http.StatusOK, false, false},
+		{"ok-user", p1, args{t1, SSHOptions{CertType: "user"}, pub}, expectedUserOptions, http.StatusOK, false, false},
 		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}, pub},
 			&SSHOptions{CertType: "user", Principals: []string{"name"},
-				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
 		{"ok-principals-getIdentity", p4, args{okGetIdentityToken, SSHOptions{Principals: []string{"mariano"}}, pub},
 			&SSHOptions{CertType: "user", Principals: []string{"mariano"},
-				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
 		{"ok-emptyPrincipals-getIdentity", p4, args{okGetIdentityToken, SSHOptions{}, pub},
 			&SSHOptions{CertType: "user", Principals: []string{"max", "mariano"},
-				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
 		{"ok-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub},
 			&SSHOptions{CertType: "user", Principals: []string{"name"},
-				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
-		{"admin", p3, args{okAdmin, SSHOptions{}, pub}, expectedAdminOptions, false, false},
-		{"admin-user", p3, args{okAdmin, SSHOptions{CertType: "user"}, pub}, expectedAdminOptions, false, false},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
+		{"admin", p3, args{okAdmin, SSHOptions{}, pub}, expectedAdminOptions, http.StatusOK, false, false},
+		{"admin-user", p3, args{okAdmin, SSHOptions{CertType: "user"}, pub}, expectedAdminOptions, http.StatusOK, false, false},
 		{"admin-principals", p3, args{okAdmin, SSHOptions{Principals: []string{"root"}}, pub},
 			&SSHOptions{CertType: "user", Principals: []string{"root"},
-				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
 		{"admin-options", p3, args{okAdmin, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub},
 			&SSHOptions{CertType: "user", Principals: []string{"name"},
-				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, false, false},
-		{"admin-host", p3, args{okAdmin, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, false, false},
-		{"fail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedUserOptions, false, true},
-		{"fail-user-host", p1, args{t1, SSHOptions{CertType: "host"}, pub}, nil, false, true},
-		{"fail-user-principals", p1, args{t1, SSHOptions{Principals: []string{"root"}}, pub}, nil, false, true},
-		{"fail-email", p3, args{failEmail, SSHOptions{}, pub}, nil, true, false},
-		{"fail-getIdentity", p5, args{failGetIdentityToken, SSHOptions{}, pub}, nil, true, false},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
+		{"admin-host", p3, args{okAdmin, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub},
+			expectedHostOptions, http.StatusOK, false, false},
+		{"fail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedUserOptions, http.StatusOK, false, true},
+		{"fail-user-host", p1, args{t1, SSHOptions{CertType: "host"}, pub}, nil, http.StatusOK, false, true},
+		{"fail-user-principals", p1, args{t1, SSHOptions{Principals: []string{"root"}}, pub}, nil, http.StatusOK, false, true},
+		{"fail-email", p3, args{failEmail, SSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
+		{"fail-getIdentity", p5, args{failGetIdentityToken, SSHOptions{}, pub}, nil, http.StatusInternalServerError, true, false},
+		{"fail-sshCA-disabled", p6, args{"foo", SSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := NewContextWithMethod(context.Background(), SignSSHMethod)
-			got, err := tt.prov.AuthorizeSSHSign(ctx, tt.args.token)
+			got, err := tt.prov.AuthorizeSSHSign(context.Background(), tt.args.token)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.AuthorizeSSHSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if err != nil {
+				sc, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
 				cert, err := signSSHCertificate(tt.args.key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
@@ -484,36 +606,32 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	}
 }
 
-func TestOIDC_AuthorizeRevoke(t *testing.T) {
+func TestOIDC_AuthorizeSSHRevoke(t *testing.T) {
+	p1, err := generateOIDC()
+	assert.FatalError(t, err)
+	p2, err := generateOIDC()
+	assert.FatalError(t, err)
+	p2.Admins = []string{"root@example.com"}
+
 	srv := generateJWKServer(2)
 	defer srv.Close()
-
 	var keys jose.JSONWebKeySet
 	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
 
-	// Create test provisioners
-	p1, err := generateOIDC()
-	assert.FatalError(t, err)
-	p3, err := generateOIDC()
-	assert.FatalError(t, err)
-	// Admin + Domains
-	p3.Admins = []string{"name@smallstep.com", "root@example.com"}
-	p3.Domains = []string{"smallstep.com"}
-
-	// Update configuration endpoints and initialize
 	config := Config{Claims: globalProvisionerClaims}
 	p1.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
-	p3.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	p2.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
 	assert.FatalError(t, p1.Init(config))
-	assert.FatalError(t, p3.Init(config))
+	assert.FatalError(t, p2.Init(config))
 
-	t1, err := generateSimpleToken("the-issuer", p1.ClientID, &keys.Keys[0])
+	// Invalid email
+	failEmail, err := generateToken("subject", "the-issuer", p1.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
 	assert.FatalError(t, err)
 	// Admin email not in domains
-	okAdmin, err := generateToken("subject", "the-issuer", p3.ClientID, "root@example.com", []string{"test.smallstep.com"}, time.Now(), &keys.Keys[0])
+	noAdmin, err := generateToken("subject", "the-issuer", p1.ClientID, "root@example.com", []string{"test.smallstep.com"}, time.Now(), &keys.Keys[0])
 	assert.FatalError(t, err)
-	// Invalid email
-	failEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
+	// Admin email in domains
+	okAdmin, err := generateToken("subject", "the-issuer", p2.ClientID, "root@example.com", []string{"test.smallstep.com"}, time.Now(), &keys.Keys[0])
 	assert.FatalError(t, err)
 
 	type args struct {
@@ -523,52 +641,22 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 		name    string
 		prov    *OIDC
 		args    args
+		code    int
 		wantErr bool
 	}{
-		{"ok1", p1, args{t1}, true},
-		{"admin", p3, args{okAdmin}, false},
-		{"fail-email", p3, args{failEmail}, true},
+		{"ok", p2, args{okAdmin}, http.StatusOK, false},
+		{"fail/invalid-token", p1, args{failEmail}, http.StatusUnauthorized, true},
+		{"fail/not-admin", p1, args{noAdmin}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.prov.AuthorizeRevoke(context.TODO(), tt.args.token)
+			err := tt.prov.AuthorizeSSHRevoke(context.Background(), tt.args.token)
 			if (err != nil) != tt.wantErr {
-				fmt.Println(tt)
-				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-		})
-	}
-}
-
-func TestOIDC_AuthorizeRenew(t *testing.T) {
-	p1, err := generateOIDC()
-	assert.FatalError(t, err)
-	p2, err := generateOIDC()
-	assert.FatalError(t, err)
-
-	// disable renewal
-	disable := true
-	p2.Claims = &Claims{DisableRenewal: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
-	assert.FatalError(t, err)
-
-	type args struct {
-		cert *x509.Certificate
-	}
-	tests := []struct {
-		name    string
-		prov    *OIDC
-		args    args
-		wantErr bool
-	}{
-		{"ok", p1, args{nil}, false},
-		{"fail", p2, args{nil}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRenew(context.TODO(), tt.args.cert); (err != nil) != tt.wantErr {
-				t.Errorf("OIDC.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("OIDC.AuthorizeSSHRevoke() error = %v, wantErr %v", err, tt.wantErr)
+			} else if err != nil {
+				sc, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})
 	}
