@@ -65,6 +65,10 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		certValidators = []provisioner.CertificateValidator{}
 		issIdentity    = a.intermediateIdentity
 	)
+
+	// Set backdate with the configured value
+	signOpts.Backdate = a.config.AuthorityConfig.Backdate.Duration
+
 	for _, op := range extraOpts {
 		switch k := op.(type) {
 		case provisioner.CertificateValidator:
@@ -136,14 +140,17 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 	// Issuer
 	issIdentity := a.intermediateIdentity
 
-	now := time.Now().UTC()
+	// Durations
+	backdate := a.config.AuthorityConfig.Backdate.Duration
 	duration := oldCert.NotAfter.Sub(oldCert.NotBefore)
+	now := time.Now().UTC()
+
 	newCert := &x509.Certificate{
 		PublicKey:                   oldCert.PublicKey,
 		Issuer:                      issIdentity.Crt.Subject,
 		Subject:                     oldCert.Subject,
-		NotBefore:                   now,
-		NotAfter:                    now.Add(duration),
+		NotBefore:                   now.Add(-1 * backdate),
+		NotAfter:                    now.Add(duration - backdate),
 		KeyUsage:                    oldCert.KeyUsage,
 		UnhandledCriticalExtensions: oldCert.UnhandledCriticalExtensions,
 		ExtKeyUsage:                 oldCert.ExtKeyUsage,
