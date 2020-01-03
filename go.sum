@@ -109,6 +109,8 @@ github.com/sirupsen/logrus v1.4.2 h1:SPIRibHv4MatM3XXNO2BJeFLZwZ2LvZgfQ5+UNI2im4
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
 github.com/smallstep/assert v0.0.0-20180720014142-de77670473b5 h1:lX6ybsQW9Agn3qK/W1Z39Z4a6RyEMGem/gXUYW0axYk=
 github.com/smallstep/assert v0.0.0-20180720014142-de77670473b5/go.mod h1:TC9A4+RjIOS+HyTH7wG17/gSqVv95uDw2J64dQZx7RE=
+github.com/smallstep/assert v0.0.0-20200103212524-b99dc1097b15 h1:kSImCuenAkXtCaBeQ1UhmzzJGRhSm8sVH7I3sHE2Qdg=
+github.com/smallstep/assert v0.0.0-20200103212524-b99dc1097b15/go.mod h1:MyOHs9Po2fbM1LHej6sBUT8ozbxmMOFG+E+rx/GSGuc=
 github.com/smallstep/certificates v0.14.0-rc.1.0.20191023014154-4669bef8c700/go.mod h1:/WOAB2LkcjkEbKG5rDol+A22Lp3UsttkLPLkY7tVtuk=
 github.com/smallstep/certificates v0.14.0-rc.1.0.20191025192352-8ef9b020ed24/go.mod h1:043iBnsMvNhQ+QFwSh0N6JR3H2yamHPPAc78vCf+8Tc=
 github.com/smallstep/certificates v0.14.0-rc.1.0.20191126035953-e88034bea402/go.mod h1:r2UTcAZNriKlwvNNXymNAcF3iKL6mTYOYrOCtBYYGJU=
