@@ -28,6 +28,7 @@ var (
 		MaxVersion:    1.2,
 		Renegotiation: false,
 	}
+	defaultBackdate         = time.Minute
 	defaultDisableRenewal   = false
 	defaultEnableSSHCA      = false
 	globalProvisionerClaims = provisioner.Claims{
@@ -65,10 +66,11 @@ type Config struct {
 
 // AuthConfig represents the configuration options for the authority.
 type AuthConfig struct {
-	Provisioners         provisioner.List    `json:"provisioners"`
-	Template             *x509util.ASN1DN    `json:"template,omitempty"`
-	Claims               *provisioner.Claims `json:"claims,omitempty"`
-	DisableIssuedAtCheck bool                `json:"disableIssuedAtCheck,omitempty"`
+	Provisioners         provisioner.List      `json:"provisioners"`
+	Template             *x509util.ASN1DN      `json:"template,omitempty"`
+	Claims               *provisioner.Claims   `json:"claims,omitempty"`
+	DisableIssuedAtCheck bool                  `json:"disableIssuedAtCheck,omitempty"`
+	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
 }
 
 // Validate validates the authority configuration.
@@ -91,6 +93,17 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 	if c.Template == nil {
 		c.Template = &x509util.ASN1DN{}
 	}
+
+	if c.Backdate != nil {
+		if c.Backdate.Duration < 0 {
+			return errors.New("authority.backdate cannot be less than 0")
+		}
+	} else {
+		c.Backdate = &provisioner.Duration{
+			Duration: defaultBackdate,
+		}
+	}
+
 	return nil
 }
 
