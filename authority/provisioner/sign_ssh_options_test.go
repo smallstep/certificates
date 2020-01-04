@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,6 +10,32 @@ import (
 	"github.com/smallstep/cli/crypto/keys"
 	"golang.org/x/crypto/ssh"
 )
+
+func TestSSHOptions_Type(t *testing.T) {
+	type fields struct {
+		CertType string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   uint32
+	}{
+		{"user", fields{"user"}, 1},
+		{"host", fields{"host"}, 2},
+		{"empty", fields{""}, 0},
+		{"invalid", fields{"invalid"}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := SSHOptions{
+				CertType: tt.fields.CertType,
+			}
+			if got := o.Type(); got != tt.want {
+				t.Errorf("SSHOptions.Type() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func Test_sshCertificateDefaultValidator_Valid(t *testing.T) {
 	pub, _, err := keys.GenerateDefaultKeyPair()
@@ -276,7 +303,7 @@ func Test_sshValidityModifier(t *testing.T) {
 	p, err := generateX5C(nil)
 	assert.FatalError(t, err)
 	type test struct {
-		svm   *sshValidityModifier
+		svm   *sshLimitDuration
 		cert  *ssh.Certificate
 		valid func(*ssh.Certificate)
 		err   error
@@ -284,7 +311,7 @@ func Test_sshValidityModifier(t *testing.T) {
 	tests := map[string]func() test{
 		"fail/type-not-set": func() test {
 			return test{
-				svm: &sshValidityModifier{Claimer: p.claimer, validBefore: n.Add(6 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(6 * time.Hour)},
 				cert: &ssh.Certificate{
 					ValidAfter:  uint64(n.Unix()),
 					ValidBefore: uint64(n.Add(8 * time.Hour).Unix()),
@@ -294,18 +321,18 @@ func Test_sshValidityModifier(t *testing.T) {
 		},
 		"fail/type-not-recognized": func() test {
 			return test{
-				svm: &sshValidityModifier{Claimer: p.claimer, validBefore: n.Add(6 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(6 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:    4,
 					ValidAfter:  uint64(n.Unix()),
 					ValidBefore: uint64(n.Add(8 * time.Hour).Unix()),
 				},
-				err: errors.New("unknown ssh certificate type 4"),
+				err: errors.New("ssh certificate has an unknown type: 4"),
 			}
 		},
 		"fail/requested-validAfter-after-limit": func() test {
 			return test{
-				svm: &sshValidityModifier{Claimer: p.claimer, validBefore: n.Add(1 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(1 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:    1,
 					ValidAfter:  uint64(n.Add(2 * time.Hour).Unix()),
@@ -316,7 +343,7 @@ func Test_sshValidityModifier(t *testing.T) {
 		},
 		"fail/requested-validBefore-after-limit": func() test {
 			return test{
-				svm: &sshValidityModifier{Claimer: p.claimer, validBefore: n.Add(1 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(1 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:    1,
 					ValidAfter:  uint64(n.Unix()),
@@ -328,7 +355,7 @@ func Test_sshValidityModifier(t *testing.T) {
 		"ok/valid-requested-validBefore": func() test {
 			va, vb := uint64(n.Unix()), uint64(n.Add(2*time.Hour).Unix())
 			return test{
-				svm: &sshValidityModifier{Claimer: p.claimer, validBefore: n.Add(3 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(3 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:    1,
 					ValidAfter:  va,
@@ -343,21 +370,21 @@ func Test_sshValidityModifier(t *testing.T) {
 		"ok/empty-requested-validBefore-limit-after-default": func() test {
 			va := uint64(n.Unix())
 			return test{
-				svm: &sshValidityModifier{Claimer: p.claimer, validBefore: n.Add(5 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(24 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:   1,
 					ValidAfter: va,
 				},
 				valid: func(cert *ssh.Certificate) {
 					assert.Equals(t, cert.ValidAfter, va)
-					assert.Equals(t, cert.ValidBefore, uint64(n.Add(4*time.Hour).Unix()))
+					assert.Equals(t, cert.ValidBefore, uint64(n.Add(16*time.Hour).Unix()))
 				},
 			}
 		},
 		"ok/empty-requested-validBefore-limit-before-default": func() test {
 			va := uint64(n.Unix())
 			return test{
-				svm: &sshValidityModifier{Claimer: p.claimer, validBefore: n.Add(3 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(3 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:   1,
 					ValidAfter: va,
@@ -372,7 +399,7 @@ func Test_sshValidityModifier(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tt := run()
-			if err := tt.svm.Modify(tt.cert); err != nil {
+			if err := tt.svm.Option(SSHOptions{}).Modify(tt.cert); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -380,6 +407,28 @@ func Test_sshValidityModifier(t *testing.T) {
 				if assert.Nil(t, tt.err) {
 					tt.valid(tt.cert)
 				}
+			}
+		})
+	}
+}
+
+func Test_sshModifierFunc_Modify(t *testing.T) {
+	type args struct {
+		cert *ssh.Certificate
+	}
+	tests := []struct {
+		name    string
+		f       sshModifierFunc
+		args    args
+		wantErr bool
+	}{
+		{"ok", func(cert *ssh.Certificate) error { return nil }, args{&ssh.Certificate{}}, false},
+		{"fail", func(cert *ssh.Certificate) error { return fmt.Errorf("an error") }, args{&ssh.Certificate{}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.f.Modify(tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("sshModifierFunc.Modify() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

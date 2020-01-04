@@ -378,7 +378,7 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Set the default extensions
 		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
-		sshDefaultValidityModifier(p.claimer),
+		&sshDefaultDuration{p.claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
