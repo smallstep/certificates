@@ -209,7 +209,7 @@ func (p *Azure) Init(config Config) (err error) {
 	return nil
 }
 
-// parseToken returuns the claims, name, group, error.
+// parseToken returns the claims, name, group, error.
 func (p *Azure) parseToken(token string) (*azurePayload, string, string, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
@@ -335,7 +335,7 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
-		sshDefaultValidityModifier(p.claimer),
+		&sshDefaultDuration{p.claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.

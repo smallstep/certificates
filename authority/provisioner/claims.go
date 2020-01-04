@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
 )
 
 // Claims so that individual provisioners can override global claims.
@@ -93,6 +94,21 @@ func (c *Claimer) IsDisableRenewal() bool {
 		return *c.global.DisableRenewal
 	}
 	return *c.claims.DisableRenewal
+}
+
+// DefaultSSHCertDuration returns the default SSH certificate duration for the
+// given certificate type.
+func (c *Claimer) DefaultSSHCertDuration(certType uint32) (time.Duration, error) {
+	switch certType {
+	case ssh.UserCert:
+		return c.DefaultUserSSHCertDuration(), nil
+	case ssh.HostCert:
+		return c.DefaultHostSSHCertDuration(), nil
+	case 0:
+		return 0, errors.New("ssh certificate type has not been set")
+	default:
+		return 0, errors.Errorf("ssh certificate has an unknown type: %d", certType)
+	}
 }
 
 // DefaultUserSSHCertDuration returns the default SSH user cert duration for the

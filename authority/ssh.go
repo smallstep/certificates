@@ -209,6 +209,9 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 	var mods []provisioner.SSHCertificateModifier
 	var validators []provisioner.SSHCertificateValidator
 
+	// Set backdate with the configured value
+	opts.Backdate = a.config.AuthorityConfig.Backdate.Duration
+
 	for _, op := range signOpts {
 		switch o := op.(type) {
 		// modify the ssh.Certificate
@@ -365,9 +368,12 @@ func (a *Authority) RenewSSH(oldCert *ssh.Certificate) (*ssh.Certificate, error)
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
 		return nil, errors.New("rewnewSSH: cannot renew certificate without validity period")
 	}
-	dur := time.Duration(oldCert.ValidBefore-oldCert.ValidAfter) * time.Second
-	va := time.Now()
-	vb := va.Add(dur)
+
+	backdate := a.config.AuthorityConfig.Backdate.Duration
+	duration := time.Duration(oldCert.ValidBefore-oldCert.ValidAfter) * time.Second
+	now := time.Now()
+	va := now.Add(-1 * backdate)
+	vb := now.Add(duration - backdate)
 
 	// Build base certificate with the key and some random values
 	cert := &ssh.Certificate{
