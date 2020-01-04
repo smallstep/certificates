@@ -188,6 +188,7 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	if claims.Step == nil || claims.Step.SSH == nil {
 		return nil, errors.New("authorization token must be an SSH provisioning token")
 	}
+
 	opts := claims.Step.SSH
 	signOptions := []SignOption{
 		// validates user's SSHOptions with the ones in the token
@@ -222,7 +223,7 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
-		sshDefaultValidityModifier(p.claimer),
+		&sshDefaultDuration{p.claimer},
 		// Validate that the keyID is equivalent to the token subject.
 		sshCertKeyIDValidator(claims.Subject),
 		// Validate public key

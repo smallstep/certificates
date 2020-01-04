@@ -267,12 +267,19 @@ func newValidityValidator(min, max time.Duration) *validityValidator {
 // and total duration.
 func (v *validityValidator) Valid(crt *x509.Certificate) error {
 	var (
-		na  = crt.NotAfter
-		nb  = crt.NotBefore
-		now = time.Now()
+		na  = crt.NotAfter.Truncate(time.Second)
+		nb  = crt.NotBefore.Truncate(time.Second)
+		now = time.Now().Truncate(time.Second)
 	)
-	// Get duration from to not take into account the backdate.
-	var d = na.Sub(now)
+
+	// To not take into account the backdate, time.Now() will be used to
+	// calculate the duration if NotBefore is in the past.
+	var d time.Duration
+	if now.After(nb) {
+		d = na.Sub(now)
+	} else {
+		d = na.Sub(nb)
+	}
 
 	if na.Before(now) {
 		return errors.Errorf("NotAfter: %v cannot be in the past", na)

@@ -235,13 +235,15 @@ func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 	}
 
 	// Default to a user certificate with no principals if not set
-	signOptions := []SignOption{sshCertificateDefaultsModifier{CertType: SSHUserCert}}
+	signOptions := []SignOption{
+		sshCertificateDefaultsModifier{CertType: SSHUserCert},
+	}
 
 	return append(signOptions,
 		// Set the default extensions.
 		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
-		sshDefaultValidityModifier(p.claimer),
+		&sshDefaultDuration{p.claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
