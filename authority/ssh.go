@@ -496,9 +496,12 @@ func (a *Authority) RekeySSH(oldCert *ssh.Certificate, pub ssh.PublicKey, signOp
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
 		return nil, errors.New("rekeySSH: cannot rekey certificate without validity period")
 	}
-	dur := time.Duration(oldCert.ValidBefore-oldCert.ValidAfter) * time.Second
-	va := time.Now()
-	vb := va.Add(dur)
+
+	backdate := a.config.AuthorityConfig.Backdate.Duration
+	duration := time.Duration(oldCert.ValidBefore-oldCert.ValidAfter) * time.Second
+	now := time.Now()
+	va := now.Add(-1 * backdate)
+	vb := now.Add(duration - backdate)
 
 	// Build base certificate with the key and some random values
 	cert := &ssh.Certificate{
