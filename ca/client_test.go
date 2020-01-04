@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smallstep/certificates/errs"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
@@ -152,8 +154,8 @@ func equalJSON(t *testing.T, a interface{}, b interface{}) bool {
 
 func TestClient_Version(t *testing.T) {
 	ok := &api.VersionResponse{Version: "test"}
-	internal := api.InternalServerError(fmt.Errorf("Internal Server Error"))
-	notFound := api.NotFound(fmt.Errorf("Not Found"))
+	internal := errs.InternalServerError(fmt.Errorf("Internal Server Error"))
+	notFound := errs.NotFound(fmt.Errorf("Not Found"))
 
 	tests := []struct {
 		name         string
@@ -207,7 +209,7 @@ func TestClient_Version(t *testing.T) {
 
 func TestClient_Health(t *testing.T) {
 	ok := &api.HealthResponse{Status: "ok"}
-	nok := api.InternalServerError(fmt.Errorf("Internal Server Error"))
+	nok := errs.InternalServerError(fmt.Errorf("Internal Server Error"))
 
 	tests := []struct {
 		name         string
@@ -262,7 +264,7 @@ func TestClient_Root(t *testing.T) {
 	ok := &api.RootResponse{
 		RootPEM: api.Certificate{Certificate: parseCertificate(rootPEM)},
 	}
-	notFound := api.NotFound(fmt.Errorf("Not Found"))
+	notFound := errs.NotFound(fmt.Errorf("Not Found"))
 
 	tests := []struct {
 		name         string
@@ -332,8 +334,8 @@ func TestClient_Sign(t *testing.T) {
 		NotBefore: api.NewTimeDuration(time.Now()),
 		NotAfter:  api.NewTimeDuration(time.Now().AddDate(0, 1, 0)),
 	}
-	unauthorized := api.Unauthorized(fmt.Errorf("Unauthorized"))
-	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))
+	unauthorized := errs.Unauthorized(fmt.Errorf("Unauthorized"))
+	badRequest := errs.BadRequest(fmt.Errorf("Bad Request"))
 
 	tests := []struct {
 		name         string
@@ -407,8 +409,8 @@ func TestClient_Revoke(t *testing.T) {
 		OTT:        "the-ott",
 		ReasonCode: 4,
 	}
-	unauthorized := api.Unauthorized(fmt.Errorf("Unauthorized"))
-	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))
+	unauthorized := errs.Unauthorized(fmt.Errorf("Unauthorized"))
+	badRequest := errs.BadRequest(fmt.Errorf("Bad Request"))
 
 	tests := []struct {
 		name         string
@@ -483,8 +485,8 @@ func TestClient_Renew(t *testing.T) {
 			{Certificate: parseCertificate(rootPEM)},
 		},
 	}
-	unauthorized := api.Unauthorized(fmt.Errorf("Unauthorized"))
-	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))
+	unauthorized := errs.Unauthorized(fmt.Errorf("Unauthorized"))
+	badRequest := errs.BadRequest(fmt.Errorf("Bad Request"))
 
 	tests := []struct {
 		name         string
@@ -541,7 +543,7 @@ func TestClient_Provisioners(t *testing.T) {
 	ok := &api.ProvisionersResponse{
 		Provisioners: provisioner.List{},
 	}
-	internalServerError := api.InternalServerError(fmt.Errorf("Internal Server Error"))
+	internalServerError := errs.InternalServerError(fmt.Errorf("Internal Server Error"))
 
 	tests := []struct {
 		name         string
@@ -603,7 +605,7 @@ func TestClient_ProvisionerKey(t *testing.T) {
 	ok := &api.ProvisionerKeyResponse{
 		Key: "an encrypted key",
 	}
-	notFound := api.NotFound(fmt.Errorf("Not Found"))
+	notFound := errs.NotFound(fmt.Errorf("Not Found"))
 
 	tests := []struct {
 		name         string
@@ -664,8 +666,8 @@ func TestClient_Roots(t *testing.T) {
 			{Certificate: parseCertificate(rootPEM)},
 		},
 	}
-	unauthorized := api.Unauthorized(fmt.Errorf("Unauthorized"))
-	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))
+	unauthorized := errs.Unauthorized(fmt.Errorf("Unauthorized"))
+	badRequest := errs.BadRequest(fmt.Errorf("Bad Request"))
 
 	tests := []struct {
 		name         string
@@ -724,8 +726,8 @@ func TestClient_Federation(t *testing.T) {
 			{Certificate: parseCertificate(rootPEM)},
 		},
 	}
-	unauthorized := api.Unauthorized(fmt.Errorf("Unauthorized"))
-	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))
+	unauthorized := errs.Unauthorized(fmt.Errorf("Unauthorized"))
+	badRequest := errs.BadRequest(fmt.Errorf("Bad Request"))
 
 	tests := []struct {
 		name         string
@@ -788,7 +790,7 @@ func TestClient_SSHRoots(t *testing.T) {
 		HostKeys: []api.SSHPublicKey{{PublicKey: key}},
 		UserKeys: []api.SSHPublicKey{{PublicKey: key}},
 	}
-	notFound := api.NotFound(fmt.Errorf("Not Found"))
+	notFound := errs.NotFound(fmt.Errorf("Not Found"))
 
 	tests := []struct {
 		name         string
@@ -879,7 +881,7 @@ func Test_parseEndpoint(t *testing.T) {
 
 func TestClient_RootFingerprint(t *testing.T) {
 	ok := &api.HealthResponse{Status: "ok"}
-	nok := api.InternalServerError(fmt.Errorf("Internal Server Error"))
+	nok := errs.InternalServerError(fmt.Errorf("Internal Server Error"))
 
 	httpsServer := httptest.NewTLSServer(nil)
 	defer httpsServer.Close()
@@ -946,7 +948,7 @@ func TestClient_SSHBastion(t *testing.T) {
 			Hostname: "bastion.local",
 		},
 	}
-	badRequest := api.BadRequest(fmt.Errorf("Bad Request"))
+	badRequest := errs.BadRequest(fmt.Errorf("Bad Request"))
 
 	tests := []struct {
 		name         string
