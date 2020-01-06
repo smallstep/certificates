@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -299,7 +300,9 @@ func Test_sshCertificateValidityValidator(t *testing.T) {
 }
 
 func Test_sshValidityModifier(t *testing.T) {
-	n := now()
+	n, fn := mockNow()
+	defer fn()
+
 	p, err := generateX5C(nil)
 	assert.FatalError(t, err)
 	type test struct {
@@ -350,6 +353,32 @@ func Test_sshValidityModifier(t *testing.T) {
 					ValidBefore: uint64(n.Add(2 * time.Hour).Unix()),
 				},
 				err: errors.New("provisioning credential expiration ("),
+			}
+		},
+		"ok/no-limit": func() test {
+			va, vb := uint64(n.Unix()), uint64(n.Add(16*time.Hour).Unix())
+			return test{
+				svm: &sshLimitDuration{Claimer: p.claimer},
+				cert: &ssh.Certificate{
+					CertType: 1,
+				},
+				valid: func(cert *ssh.Certificate) {
+					assert.Equals(t, cert.ValidAfter, va)
+					assert.Equals(t, cert.ValidBefore, vb)
+				},
+			}
+		},
+		"ok/defaults": func() test {
+			va, vb := uint64(n.Unix()), uint64(n.Add(16*time.Hour).Unix())
+			return test{
+				svm: &sshLimitDuration{Claimer: p.claimer},
+				cert: &ssh.Certificate{
+					CertType: 1,
+				},
+				valid: func(cert *ssh.Certificate) {
+					assert.Equals(t, cert.ValidAfter, va)
+					assert.Equals(t, cert.ValidBefore, vb)
+				},
 			}
 		},
 		"ok/valid-requested-validBefore": func() test {
@@ -429,6 +458,101 @@ func Test_sshModifierFunc_Modify(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.f.Modify(tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("sshModifierFunc.Modify() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_sshDefaultDuration_Option(t *testing.T) {
+	tm, fn := mockNow()
+	defer fn()
+
+	newClaimer := func(claims *Claims) *Claimer {
+		c, err := NewClaimer(claims, globalProvisionerClaims)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	unix := func(d time.Duration) uint64 {
+		return uint64(tm.Add(d).Unix())
+	}
+
+	type fields struct {
+		Claimer *Claimer
+	}
+	type args struct {
+		o    SSHOptions
+		cert *ssh.Certificate
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *ssh.Certificate
+		wantErr bool
+	}{
+		{"user", fields{newClaimer(nil)}, args{SSHOptions{}, &ssh.Certificate{CertType: ssh.UserCert}},
+			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(0), ValidBefore: unix(16 * time.Hour)}, false},
+		{"host", fields{newClaimer(nil)}, args{SSHOptions{}, &ssh.Certificate{CertType: ssh.HostCert}},
+			&ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(0), ValidBefore: unix(30 * 24 * time.Hour)}, false},
+		{"user claim", fields{newClaimer(&Claims{DefaultUserSSHDur: &Duration{1 * time.Hour}})}, args{SSHOptions{}, &ssh.Certificate{CertType: ssh.UserCert}},
+			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(0), ValidBefore: unix(1 * time.Hour)}, false},
+		{"host claim", fields{newClaimer(&Claims{DefaultHostSSHDur: &Duration{1 * time.Hour}})}, args{SSHOptions{}, &ssh.Certificate{CertType: ssh.HostCert}},
+			&ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(0), ValidBefore: unix(1 * time.Hour)}, false},
+		{"user backdate", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.UserCert}},
+			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(-1 * time.Minute), ValidBefore: unix(16 * time.Hour)}, false},
+		{"host backdate", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.HostCert}},
+			&ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(-1 * time.Minute), ValidBefore: unix(30 * 24 * time.Hour)}, false},
+		{"user validAfter", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(1 * time.Hour)}},
+			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(time.Minute), ValidBefore: unix(17 * time.Hour)}, false},
+		{"user validBefore", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.UserCert, ValidBefore: unix(1 * time.Hour)}},
+			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(-1 * time.Minute), ValidBefore: unix(time.Hour)}, false},
+		{"host validAfter validBefore", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(1 * time.Minute), ValidBefore: unix(2 * time.Minute)}},
+			&ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(1 * time.Minute), ValidBefore: unix(2 * time.Minute)}, false},
+		{"fail zero", fields{newClaimer(nil)}, args{SSHOptions{}, &ssh.Certificate{}}, &ssh.Certificate{}, true},
+		{"fail type", fields{newClaimer(nil)}, args{SSHOptions{}, &ssh.Certificate{CertType: 3}}, &ssh.Certificate{CertType: 3}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &sshDefaultDuration{
+				Claimer: tt.fields.Claimer,
+			}
+			v := m.Option(tt.args.o)
+			if err := v.Modify(tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("sshDefaultDuration.Option() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(tt.args.cert, tt.want) {
+				t.Errorf("sshDefaultDuration.Option() = %v, want %v", tt.args.cert, tt.want)
+			}
+		})
+	}
+}
+
+func Test_sshLimitDuration_Option(t *testing.T) {
+	type fields struct {
+		Claimer  *Claimer
+		NotAfter time.Time
+	}
+	type args struct {
+		o SSHOptions
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   SSHCertificateModifier
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &sshLimitDuration{
+				Claimer:  tt.fields.Claimer,
+				NotAfter: tt.fields.NotAfter,
+			}
+			if got := m.Option(tt.args.o); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("sshLimitDuration.Option() = %v, want %v", got, tt.want)
 			}
 		})
 	}
