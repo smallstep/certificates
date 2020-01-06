@@ -5,6 +5,7 @@ import (
 	"crypto/x509/pkix"
 	"net"
 	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
@@ -353,6 +354,46 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 				if assert.Nil(t, tt.err) {
 					tt.valid(prof.Subject())
 				}
+			}
+		})
+	}
+}
+
+func Test_profileDefaultDuration_Option(t *testing.T) {
+	tm, fn := mockNow()
+	defer fn()
+
+	v := profileDefaultDuration(24 * time.Hour)
+	type args struct {
+		so Options
+	}
+	tests := []struct {
+		name string
+		v    profileDefaultDuration
+		args args
+		want *x509.Certificate
+	}{
+		{"default", v, args{Options{}}, &x509.Certificate{NotBefore: tm, NotAfter: tm.Add(24 * time.Hour)}},
+		{"backdate", v, args{Options{Backdate: 1 * time.Minute}}, &x509.Certificate{NotBefore: tm.Add(-1 * time.Minute), NotAfter: tm.Add(24 * time.Hour)}},
+		{"notBefore", v, args{Options{NotBefore: NewTimeDuration(tm.Add(10 * time.Second))}}, &x509.Certificate{NotBefore: tm.Add(10 * time.Second), NotAfter: tm.Add(24*time.Hour + 10*time.Second)}},
+		{"notAfter", v, args{Options{NotAfter: NewTimeDuration(tm.Add(1 * time.Hour))}}, &x509.Certificate{NotBefore: tm, NotAfter: tm.Add(1 * time.Hour)}},
+		{"notBefore and notAfter", v, args{Options{NotBefore: NewTimeDuration(tm.Add(10 * time.Second)), NotAfter: NewTimeDuration(tm.Add(1 * time.Hour))}},
+			&x509.Certificate{NotBefore: tm.Add(10 * time.Second), NotAfter: tm.Add(1 * time.Hour)}},
+		{"notBefore and backdate", v, args{Options{Backdate: 1 * time.Minute, NotBefore: NewTimeDuration(tm.Add(10 * time.Second))}},
+			&x509.Certificate{NotBefore: tm.Add(10 * time.Second), NotAfter: tm.Add(24*time.Hour + 10*time.Second)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cert := &x509.Certificate{}
+			profile := &x509util.Leaf{}
+			profile.SetSubject(cert)
+
+			fn := tt.v.Option(tt.args.so)
+			if err := fn(profile); err != nil {
+				t.Errorf("profileDefaultDuration.Option() error %v", err)
+			}
+			if !reflect.DeepEqual(cert, tt.want) {
+				t.Errorf("profileDefaultDuration.Option() = %v, \nwant %v", cert, tt.want)
 			}
 		})
 	}
