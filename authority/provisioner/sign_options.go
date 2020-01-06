@@ -194,7 +194,7 @@ func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
 	var backdate time.Duration
 	notBefore := so.NotBefore.Time()
 	if notBefore.IsZero() {
-		notBefore = time.Now()
+		notBefore = now()
 		backdate = -1 * so.Backdate
 	}
 	notAfter := so.NotAfter.RelativeTime(notBefore)
