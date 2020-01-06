@@ -390,7 +390,7 @@ func Test_profileDefaultDuration_Option(t *testing.T) {
 
 			fn := tt.v.Option(tt.args.so)
 			if err := fn(profile); err != nil {
-				t.Errorf("profileDefaultDuration.Option() error %v", err)
+				t.Errorf("profileDefaultDuration.Option() error = %v", err)
 			}
 			if !reflect.DeepEqual(cert, tt.want) {
 				t.Errorf("profileDefaultDuration.Option() = %v, \nwant %v", cert, tt.want)
