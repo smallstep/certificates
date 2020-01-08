@@ -18,6 +18,7 @@
         ]
     },
     "authority": {
+        "backdate": "0s",
         "provisioners": [
             {
                 "name": "max",

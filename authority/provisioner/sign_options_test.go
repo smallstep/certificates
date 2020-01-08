@@ -5,6 +5,7 @@ import (
 	"crypto/x509/pkix"
 	"net"
 	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
@@ -275,7 +276,9 @@ func Test_validityValidator_Valid(t *testing.T) {
 }
 
 func Test_profileLimitDuration_Option(t *testing.T) {
-	n := now()
+	n, fn := mockNow()
+	defer fn()
+
 	type test struct {
 		pld   profileLimitDuration
 		so    Options
@@ -309,7 +312,7 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 			assert.FatalError(t, err)
 			return test{
 				pld:  profileLimitDuration{def: 4 * time.Hour, notAfter: n.Add(6 * time.Hour)},
-				so:   Options{NotBefore: NewTimeDuration(n.Add(3 * time.Hour)), NotAfter: d},
+				so:   Options{NotBefore: NewTimeDuration(n.Add(3 * time.Hour)), NotAfter: d, Backdate: 1 * time.Minute},
 				cert: new(x509.Certificate),
 				valid: func(cert *x509.Certificate) {
 					assert.Equals(t, cert.NotBefore, n.Add(3*time.Hour))
@@ -320,7 +323,7 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 		"ok/valid-notAfter-nil-limit-over-default": func() test {
 			return test{
 				pld:  profileLimitDuration{def: 1 * time.Hour, notAfter: n.Add(6 * time.Hour)},
-				so:   Options{NotBefore: NewTimeDuration(n.Add(3 * time.Hour))},
+				so:   Options{NotBefore: NewTimeDuration(n.Add(3 * time.Hour)), Backdate: 1 * time.Minute},
 				cert: new(x509.Certificate),
 				valid: func(cert *x509.Certificate) {
 					assert.Equals(t, cert.NotBefore, n.Add(3*time.Hour))
@@ -331,11 +334,33 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 		"ok/valid-notAfter-nil-limit-under-default": func() test {
 			return test{
 				pld:  profileLimitDuration{def: 4 * time.Hour, notAfter: n.Add(6 * time.Hour)},
-				so:   Options{NotBefore: NewTimeDuration(n.Add(3 * time.Hour))},
+				so:   Options{NotBefore: NewTimeDuration(n.Add(3 * time.Hour)), Backdate: 1 * time.Minute},
 				cert: new(x509.Certificate),
 				valid: func(cert *x509.Certificate) {
 					assert.Equals(t, cert.NotBefore, n.Add(3*time.Hour))
 					assert.Equals(t, cert.NotAfter, n.Add(6*time.Hour))
+				},
+			}
+		},
+		"ok/over-limit-with-backdate": func() test {
+			return test{
+				pld:  profileLimitDuration{def: 24 * time.Hour, notAfter: n.Add(6 * time.Hour)},
+				so:   Options{Backdate: 1 * time.Minute},
+				cert: new(x509.Certificate),
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, n.Add(-time.Minute))
+					assert.Equals(t, cert.NotAfter, n.Add(6*time.Hour))
+				},
+			}
+		},
+		"ok/under-limit-with-backdate": func() test {
+			return test{
+				pld:  profileLimitDuration{def: 24 * time.Hour, notAfter: n.Add(30 * time.Hour)},
+				so:   Options{Backdate: 1 * time.Minute},
+				cert: new(x509.Certificate),
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, n.Add(-time.Minute))
+					assert.Equals(t, cert.NotAfter, n.Add(24*time.Hour))
 				},
 			}
 		},
@@ -353,6 +378,46 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 				if assert.Nil(t, tt.err) {
 					tt.valid(prof.Subject())
 				}
+			}
+		})
+	}
+}
+
+func Test_profileDefaultDuration_Option(t *testing.T) {
+	tm, fn := mockNow()
+	defer fn()
+
+	v := profileDefaultDuration(24 * time.Hour)
+	type args struct {
+		so Options
+	}
+	tests := []struct {
+		name string
+		v    profileDefaultDuration
+		args args
+		want *x509.Certificate
+	}{
+		{"default", v, args{Options{}}, &x509.Certificate{NotBefore: tm, NotAfter: tm.Add(24 * time.Hour)}},
+		{"backdate", v, args{Options{Backdate: 1 * time.Minute}}, &x509.Certificate{NotBefore: tm.Add(-1 * time.Minute), NotAfter: tm.Add(24 * time.Hour)}},
+		{"notBefore", v, args{Options{NotBefore: NewTimeDuration(tm.Add(10 * time.Second))}}, &x509.Certificate{NotBefore: tm.Add(10 * time.Second), NotAfter: tm.Add(24*time.Hour + 10*time.Second)}},
+		{"notAfter", v, args{Options{NotAfter: NewTimeDuration(tm.Add(1 * time.Hour))}}, &x509.Certificate{NotBefore: tm, NotAfter: tm.Add(1 * time.Hour)}},
+		{"notBefore and notAfter", v, args{Options{NotBefore: NewTimeDuration(tm.Add(10 * time.Second)), NotAfter: NewTimeDuration(tm.Add(1 * time.Hour))}},
+			&x509.Certificate{NotBefore: tm.Add(10 * time.Second), NotAfter: tm.Add(1 * time.Hour)}},
+		{"notBefore and backdate", v, args{Options{Backdate: 1 * time.Minute, NotBefore: NewTimeDuration(tm.Add(10 * time.Second))}},
+			&x509.Certificate{NotBefore: tm.Add(10 * time.Second), NotAfter: tm.Add(24*time.Hour + 10*time.Second)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cert := &x509.Certificate{}
+			profile := &x509util.Leaf{}
+			profile.SetSubject(cert)
+
+			fn := tt.v.Option(tt.args.so)
+			if err := fn(profile); err != nil {
+				t.Errorf("profileDefaultDuration.Option() error = %v", err)
+			}
+			if !reflect.DeepEqual(cert, tt.want) {
+				t.Errorf("profileDefaultDuration.Option() = %v, \nwant %v", cert, tt.want)
 			}
 		})
 	}

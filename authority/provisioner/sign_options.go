@@ -15,10 +15,12 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
-// Options contains the options that can be passed to the Sign method.
+// Options contains the options that can be passed to the Sign method. Backdate
+// is automatically filled and can only be configured in the CA.
 type Options struct {
-	NotAfter  TimeDuration `json:"notAfter"`
-	NotBefore TimeDuration `json:"notBefore"`
+	NotAfter  TimeDuration  `json:"notAfter"`
+	NotBefore TimeDuration  `json:"notBefore"`
+	Backdate  time.Duration `json:"-"`
 }
 
 // SignOption is the interface used to collect all extra options used in the
@@ -189,12 +191,22 @@ func (v emailAddressesValidator) Valid(req *x509.CertificateRequest) error {
 type profileDefaultDuration time.Duration
 
 func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
+	var backdate time.Duration
 	notBefore := so.NotBefore.Time()
 	if notBefore.IsZero() {
-		notBefore = time.Now()
+		notBefore = now()
+		backdate = -1 * so.Backdate
 	}
 	notAfter := so.NotAfter.RelativeTime(notBefore)
-	return x509util.WithNotBeforeAfterDuration(notBefore, notAfter, time.Duration(v))
+	return func(p x509util.Profile) error {
+		fn := x509util.WithNotBeforeAfterDuration(notBefore, notAfter, time.Duration(v))
+		if err := fn(p); err != nil {
+			return err
+		}
+		crt := p.Subject()
+		crt.NotBefore = crt.NotBefore.Add(backdate)
+		return nil
+	}
 }
 
 // profileLimitDuration is an x509 profile option that modifies an x509 validity
@@ -208,10 +220,12 @@ type profileLimitDuration struct {
 // certificate to one that is superficially imposed.
 func (v profileLimitDuration) Option(so Options) x509util.WithOption {
 	return func(p x509util.Profile) error {
+		var backdate time.Duration
 		n := now()
 		notBefore := so.NotBefore.Time()
 		if notBefore.IsZero() {
 			notBefore = n
+			backdate = -1 * so.Backdate
 		}
 		if notBefore.After(v.notAfter) {
 			return errors.Errorf("provisioning credential expiration (%s) is before "+
@@ -232,7 +246,7 @@ func (v profileLimitDuration) Option(so Options) x509util.WithOption {
 			}
 		}
 		crt := p.Subject()
-		crt.NotBefore = notBefore
+		crt.NotBefore = notBefore.Add(backdate)
 		crt.NotAfter = notAfter
 		return nil
 	}
@@ -253,11 +267,19 @@ func newValidityValidator(min, max time.Duration) *validityValidator {
 // and total duration.
 func (v *validityValidator) Valid(crt *x509.Certificate) error {
 	var (
-		na  = crt.NotAfter
-		nb  = crt.NotBefore
-		d   = na.Sub(nb)
-		now = time.Now()
+		na  = crt.NotAfter.Truncate(time.Second)
+		nb  = crt.NotBefore.Truncate(time.Second)
+		now = time.Now().Truncate(time.Second)
 	)
+
+	// To not take into account the backdate, time.Now() will be used to
+	// calculate the duration if NotBefore is in the past.
+	var d time.Duration
+	if now.After(nb) {
+		d = na.Sub(now)
+	} else {
+		d = na.Sub(nb)
+	}
 
 	if na.Before(now) {
 		return errors.Errorf("NotAfter: %v cannot be in the past", na)

@@ -360,7 +360,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		// Set the default extensions
 		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
-		sshDefaultValidityModifier(o.claimer),
+		&sshDefaultDuration{o.claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
