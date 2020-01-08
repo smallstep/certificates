@@ -276,7 +276,6 @@ func (m *sshLimitDuration) Option(o SSHOptions) SSHCertificateModifier {
 			certValidBefore := certValidAfter.Add(d)
 			if m.NotAfter.Before(certValidBefore) {
 				certValidBefore = m.NotAfter
-				println(2, certValidBefore.String())
 			}
 			cert.ValidBefore = uint64(certValidBefore.Unix())
 		} else {
