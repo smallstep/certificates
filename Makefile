@@ -17,7 +17,7 @@ all: build test lint
 #########################################
 
 bootstra%:
-	$Q GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.18.0
+	$Q GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.22.2
 
 .PHONY: bootstra%
 
