@@ -12,6 +12,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/kms"
+	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/pemutil"
@@ -28,6 +30,9 @@ type Authority struct {
 	config                  *Config
 	rootX509Certs           []*x509.Certificate
 	intermediateIdentity    *x509util.Identity
+	keyManager              kms.KeyManager
+	x509Signer              crypto.Signer
+	x509Issuer              *x509.Certificate
 	sshCAUserCertSignKey    ssh.Signer
 	sshCAHostCertSignKey    ssh.Signer
 	sshCAUserCerts          []ssh.PublicKey
@@ -76,6 +81,14 @@ func (a *Authority) init() error {
 	}
 
 	var err error
+
+	if a.keyManager == nil {
+		a.keyManager, err = kms.New(context.Background(), *a.config.KMS)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Initialize step-ca Database if it's not already initialized with WithDB.
 	// If a.config.DB is nil then a simple, barebones in memory DB will be used.
 	if a.db == nil {
@@ -107,27 +120,47 @@ func (a *Authority) init() error {
 		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
 	}
 
-	// Decrypt and load intermediate public / private key pair.
-	if len(a.config.Password) > 0 {
-		a.intermediateIdentity, err = x509util.LoadIdentityFromDisk(
-			a.config.IntermediateCert,
-			a.config.IntermediateKey,
-			pemutil.WithPassword([]byte(a.config.Password)),
-		)
+	if a.x509Signer == nil {
+		crt, err := pemutil.ReadCertificate(a.config.IntermediateCert)
 		if err != nil {
 			return err
 		}
-	} else {
-		a.intermediateIdentity, err = x509util.LoadIdentityFromDisk(a.config.IntermediateCert, a.config.IntermediateKey)
+		signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+			SigningKey: a.config.IntermediateKey,
+			Password:   a.config.Password,
+		})
 		if err != nil {
 			return err
 		}
+		a.x509Signer = signer
+		a.x509Issuer = crt
+
+		// Decrypt and load intermediate public / private key pair.
+		// if len(a.config.Password) > 0 {
+		// 	a.intermediateIdentity, err = x509util.LoadIdentityFromDisk(
+		// 		a.config.IntermediateCert,
+		// 		a.config.IntermediateKey,
+		// 		pemutil.WithPassword([]byte(a.config.Password)),
+		// 	)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// } else {
+		// 	a.intermediateIdentity, err = x509util.LoadIdentityFromDisk(a.config.IntermediateCert, a.config.IntermediateKey)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// }
 	}
 
 	// Decrypt and load SSH keys
 	if a.config.SSH != nil {
 		if a.config.SSH.HostKey != "" {
-			signer, err := parseCryptoSigner(a.config.SSH.HostKey, a.config.Password)
+			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.SSH.HostKey,
+				Password:   a.config.Password,
+			})
+			// signer, err := parseCryptoSigner(a.config.SSH.HostKey, a.config.Password)
 			if err != nil {
 				return err
 			}
@@ -140,7 +173,11 @@ func (a *Authority) init() error {
 			a.sshCAHostFederatedCerts = append(a.sshCAHostFederatedCerts, a.sshCAHostCertSignKey.PublicKey())
 		}
 		if a.config.SSH.UserKey != "" {
-			signer, err := parseCryptoSigner(a.config.SSH.UserKey, a.config.Password)
+			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.SSH.UserKey,
+				Password:   a.config.Password,
+			})
+			// signer, err := parseCryptoSigner(a.config.SSH.UserKey, a.config.Password)
 			if err != nil {
 				return err
 			}

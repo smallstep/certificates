@@ -63,7 +63,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		errContext     = apiCtx{"csr": csr, "signOptions": signOpts}
 		mods           = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
 		certValidators = []provisioner.CertificateValidator{}
-		issIdentity    = a.intermediateIdentity
+		// issIdentity    = a.intermediateIdentity
 	)
 
 	// Set backdate with the configured value
@@ -90,7 +90,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 			http.StatusBadRequest, errContext}
 	}
 
-	leaf, err := x509util.NewLeafProfileWithCSR(csr, issIdentity.Crt, issIdentity.Key, mods...)
+	leaf, err := x509util.NewLeafProfileWithCSR(csr, a.x509Issuer, a.x509Signer, mods...)
 	if err != nil {
 		return nil, &apiError{errors.Wrapf(err, "sign"), http.StatusInternalServerError, errContext}
 	}
@@ -113,11 +113,11 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 			http.StatusInternalServerError, errContext}
 	}
 
-	caCert, err := x509.ParseCertificate(issIdentity.Crt.Raw)
-	if err != nil {
-		return nil, &apiError{errors.Wrap(err, "sign: error parsing intermediate certificate"),
-			http.StatusInternalServerError, errContext}
-	}
+	// caCert, err := x509.ParseCertificate(a.x509SignerCert.Raw)
+	// if err != nil {
+	// 	return nil, &apiError{errors.Wrap(err, "sign: error parsing intermediate certificate"),
+	// 		http.StatusInternalServerError, errContext}
+	// }
 
 	if err = a.db.StoreCertificate(serverCert); err != nil {
 		if err != db.ErrNotImplemented {
@@ -126,7 +126,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		}
 	}
 
-	return []*x509.Certificate{serverCert, caCert}, nil
+	return []*x509.Certificate{serverCert, a.x509Issuer}, nil
 }
 
 // Renew creates a new Certificate identical to the old certificate, except
@@ -138,7 +138,7 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 	}
 
 	// Issuer
-	issIdentity := a.intermediateIdentity
+	// issIdentity := a.intermediateIdentity
 
 	// Durations
 	backdate := a.config.AuthorityConfig.Backdate.Duration
@@ -147,7 +147,7 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 
 	newCert := &x509.Certificate{
 		PublicKey:                   oldCert.PublicKey,
-		Issuer:                      issIdentity.Crt.Subject,
+		Issuer:                      a.x509Issuer.Subject,
 		Subject:                     oldCert.Subject,
 		NotBefore:                   now.Add(-1 * backdate),
 		NotAfter:                    now.Add(duration - backdate),
@@ -187,8 +187,7 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 		}
 	}
 
-	leaf, err := x509util.NewLeafProfileWithTemplate(newCert,
-		issIdentity.Crt, issIdentity.Key)
+	leaf, err := x509util.NewLeafProfileWithTemplate(newCert, a.x509Issuer, a.x509Signer)
 	if err != nil {
 		return nil, &apiError{err, http.StatusInternalServerError, apiCtx{}}
 	}
@@ -203,7 +202,7 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 		return nil, &apiError{errors.Wrap(err, "error parsing new server certificate"),
 			http.StatusInternalServerError, apiCtx{}}
 	}
-	caCert, err := x509.ParseCertificate(issIdentity.Crt.Raw)
+	caCert, err := x509.ParseCertificate(a.x509Issuer.Raw)
 	if err != nil {
 		return nil, &apiError{errors.Wrap(err, "error parsing intermediate certificate"),
 			http.StatusInternalServerError, apiCtx{}}
@@ -327,7 +326,7 @@ func (a *Authority) Revoke(ctx context.Context, opts *RevokeOptions) error {
 // GetTLSCertificate creates a new leaf certificate to be used by the CA HTTPS server.
 func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	profile, err := x509util.NewLeafProfile("Step Online CA",
-		a.intermediateIdentity.Crt, a.intermediateIdentity.Key,
+		a.x509Issuer, a.x509Signer,
 		x509util.WithHosts(strings.Join(a.config.DNSNames, ",")))
 	if err != nil {
 		return nil, err
@@ -350,7 +349,7 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 
 	// Load the x509 key pair (combining server and intermediate blocks)
 	// to a tls.Certificate.
-	intermediatePEM, err := pemutil.Serialize(a.intermediateIdentity.Crt)
+	intermediatePEM, err := pemutil.Serialize(a.x509Issuer)
 	if err != nil {
 		return nil, err
 	}

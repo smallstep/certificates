@@ -2,11 +2,14 @@ package authority
 
 import (
 	"context"
+	"crypto"
 	"crypto/x509"
 
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/kms"
 	"github.com/smallstep/certificates/sshutil"
+	"golang.org/x/crypto/ssh"
 )
 
 // Option sets options to the Authority.
@@ -50,5 +53,35 @@ func WithSSHGetHosts(fn func(cert *x509.Certificate) ([]sshutil.Host, error)) Op
 func WithSSHCheckHost(fn func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)) Option {
 	return func(a *Authority) {
 		a.sshCheckHostFunc = fn
+	}
+}
+
+// WithKeyManager defines the key manager used to get and create keys, and sign
+// certificates.
+func WithKeyManager(k kms.KeyManager) Option {
+	return func(a *Authority) {
+		a.keyManager = k
+	}
+}
+
+// WithX509Signer defines the signer used to sign X509 certificates.
+func WithX509Signer(crt *x509.Certificate, s crypto.Signer) Option {
+	return func(a *Authority) {
+		a.x509Issuer = crt
+		a.x509Signer = s
+	}
+}
+
+// WithSSHUserSigner defines the signer used to sign SSH user certificates.
+func WithSSHUserSigner(s ssh.Signer) Option {
+	return func(a *Authority) {
+		a.sshCAUserCertSignKey = s
+	}
+}
+
+// WithSSHHostSigner defines the signer used to sign SSH host certificates.
+func WithSSHHostSigner(s ssh.Signer) Option {
+	return func(a *Authority) {
+		a.sshCAHostCertSignKey = s
 	}
 }
