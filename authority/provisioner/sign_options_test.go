@@ -13,7 +13,6 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/x509util"
-	stepx509 "github.com/smallstep/cli/pkg/x509"
 )
 
 func Test_emailOnlyIdentity_Valid(t *testing.T) {
@@ -64,9 +63,9 @@ func Test_defaultPublicKeyValidator_Valid(t *testing.T) {
 	ecdsaCSR, ok := _ecdsa.(*x509.CertificateRequest)
 	assert.Fatal(t, ok)
 
-	_ed25519, err := pemutil.Read("./testdata/ed25519.csr", pemutil.WithStepCrypto())
+	_ed25519, err := pemutil.Read("./testdata/ed25519.csr")
 	assert.FatalError(t, err)
-	ed25519CSR, ok := _ed25519.(*stepx509.CertificateRequest)
+	ed25519CSR, ok := _ed25519.(*x509.CertificateRequest)
 	assert.Fatal(t, ok)
 
 	v := defaultPublicKeyValidator{}
@@ -97,7 +96,7 @@ func Test_defaultPublicKeyValidator_Valid(t *testing.T) {
 		},
 		{
 			"ok/ed25519",
-			x509util.ToX509CertificateRequest(ed25519CSR),
+			ed25519CSR,
 			nil,
 		},
 	}

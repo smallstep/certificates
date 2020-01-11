@@ -13,13 +13,11 @@ require (
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smallstep/assert v0.0.0-20200103212524-b99dc1097b15
-	github.com/smallstep/cli v0.14.0-rc.1.0.20191218000521-3e7348324838
+	github.com/smallstep/cli v0.14.0-rc.1.0.20200111011727-83a91ec8e405
 	github.com/smallstep/nosql v0.2.0
-	github.com/urfave/cli v1.20.1-0.20181029213200-b67dcf995b6a
-	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
+	github.com/urfave/cli v1.22.2
+	golang.org/x/crypto v0.0.0-20191227163750-53104e6ec876
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
-	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
-	golang.org/x/sys v0.0.0-20200107162124-548cf772de50 // indirect
 	google.golang.org/api v0.15.0
 	google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
 	gopkg.in/square/go-jose.v2 v2.4.0
