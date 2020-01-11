@@ -1,13 +1,13 @@
 linters-settings:
   govet:
     check-shadowing: true
-    # settings:
-    #   printf:
-    #     funcs:
-    #       - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
-    #       - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
-    #       - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
-    #       - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+    settings:
+      printf:
+        funcs:
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
   golint:
     min-confidence: 0
   gocyclo:
@@ -66,6 +66,6 @@ issues:
 # golangci.com configuration
 # https://github.com/golangci/golangci/wiki/Configuration
 service:
-  golangci-lint-version: 1.22.x # use the fixed version to not introduce new linters unexpectedly
+  golangci-lint-version: 1.19.x # use the fixed version to not introduce new linters unexpectedly
   prepare:
     - echo "here I can run custom commands, but no preparation needed for this repo"
