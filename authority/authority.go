@@ -17,7 +17,6 @@ import (
 	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -27,24 +26,30 @@ const (
 
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
-	config                  *Config
-	rootX509Certs           []*x509.Certificate
-	intermediateIdentity    *x509util.Identity
-	keyManager              kms.KeyManager
-	x509Signer              crypto.Signer
-	x509Issuer              *x509.Certificate
+	config       *Config
+	keyManager   kms.KeyManager
+	provisioners *provisioner.Collection
+	db           db.AuthDB
+
+	// X509 CA
+	rootX509Certs      []*x509.Certificate
+	federatedX509Certs []*x509.Certificate
+	x509Signer         crypto.Signer
+	x509Issuer         *x509.Certificate
+	certificates       *sync.Map
+
+	// SSH CA
 	sshCAUserCertSignKey    ssh.Signer
 	sshCAHostCertSignKey    ssh.Signer
 	sshCAUserCerts          []ssh.PublicKey
 	sshCAHostCerts          []ssh.PublicKey
 	sshCAUserFederatedCerts []ssh.PublicKey
 	sshCAHostFederatedCerts []ssh.PublicKey
-	certificates            *sync.Map
-	startTime               time.Time
-	provisioners            *provisioner.Collection
-	db                      db.AuthDB
+
 	// Do not re-initialize
-	initOnce bool
+	initOnce  bool
+	startTime time.Time
+
 	// Custom functions
 	sshBastionFunc   func(user, hostname string) (*Bastion, error)
 	sshCheckHostFunc func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
@@ -64,12 +69,19 @@ func New(config *Config, opts ...Option) (*Authority, error) {
 		certificates: new(sync.Map),
 		provisioners: provisioner.NewCollection(config.getAudiences()),
 	}
-	for _, opt := range opts {
-		opt(a)
+
+	// Apply options.
+	for _, fn := range opts {
+		if err := fn(a); err != nil {
+			return nil, err
+		}
 	}
+
+	// Initialize authority from options or configuration.
 	if err := a.init(); err != nil {
 		return nil, err
 	}
+
 	return a, nil
 }
 
@@ -82,6 +94,7 @@ func (a *Authority) init() error {
 
 	var err error
 
+	// Initialize key manager if it has not been set in the options.
 	if a.keyManager == nil {
 		a.keyManager, err = kms.New(context.Background(), *a.config.KMS)
 		if err != nil {
@@ -97,29 +110,39 @@ func (a *Authority) init() error {
 		}
 	}
 
-	// Load the root certificates and add them to the certificate store
-	a.rootX509Certs = make([]*x509.Certificate, len(a.config.Root))
-	for i, path := range a.config.Root {
-		crt, err := pemutil.ReadCertificate(path)
-		if err != nil {
-			return err
+	// Read root certificates and store them in the certificates map.
+	if len(a.rootX509Certs) == 0 {
+		a.rootX509Certs = make([]*x509.Certificate, len(a.config.Root))
+		for i, path := range a.config.Root {
+			crt, err := pemutil.ReadCertificate(path)
+			if err != nil {
+				return err
+			}
+			a.rootX509Certs[i] = crt
 		}
-		// Add root certificate to the certificate map
-		sum := sha256.Sum256(crt.Raw)
-		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
-		a.rootX509Certs[i] = crt
 	}
-
-	// Add federated roots
-	for _, path := range a.config.FederatedRoots {
-		crt, err := pemutil.ReadCertificate(path)
-		if err != nil {
-			return err
-		}
+	for _, crt := range a.rootX509Certs {
 		sum := sha256.Sum256(crt.Raw)
 		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
 	}
 
+	// Read federated certificates and store them in the certificates map.
+	if len(a.federatedX509Certs) == 0 {
+		a.federatedX509Certs = make([]*x509.Certificate, len(a.config.FederatedRoots))
+		for i, path := range a.config.FederatedRoots {
+			crt, err := pemutil.ReadCertificate(path)
+			if err != nil {
+				return err
+			}
+			a.federatedX509Certs[i] = crt
+		}
+	}
+	for _, crt := range a.federatedX509Certs {
+		sum := sha256.Sum256(crt.Raw)
+		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
+	}
+
+	// Read intermediate and create X509 signer.
 	if a.x509Signer == nil {
 		crt, err := pemutil.ReadCertificate(a.config.IntermediateCert)
 		if err != nil {
@@ -134,23 +157,6 @@ func (a *Authority) init() error {
 		}
 		a.x509Signer = signer
 		a.x509Issuer = crt
-
-		// Decrypt and load intermediate public / private key pair.
-		// if len(a.config.Password) > 0 {
-		// 	a.intermediateIdentity, err = x509util.LoadIdentityFromDisk(
-		// 		a.config.IntermediateCert,
-		// 		a.config.IntermediateKey,
-		// 		pemutil.WithPassword([]byte(a.config.Password)),
-		// 	)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// } else {
-		// 	a.intermediateIdentity, err = x509util.LoadIdentityFromDisk(a.config.IntermediateCert, a.config.IntermediateKey)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// }
 	}
 
 	// Decrypt and load SSH keys
@@ -160,7 +166,6 @@ func (a *Authority) init() error {
 				SigningKey: a.config.SSH.HostKey,
 				Password:   a.config.Password,
 			})
-			// signer, err := parseCryptoSigner(a.config.SSH.HostKey, a.config.Password)
 			if err != nil {
 				return err
 			}
@@ -177,7 +182,6 @@ func (a *Authority) init() error {
 				SigningKey: a.config.SSH.UserKey,
 				Password:   a.config.Password,
 			})
-			// signer, err := parseCryptoSigner(a.config.SSH.UserKey, a.config.Password)
 			if err != nil {
 				return err
 			}
