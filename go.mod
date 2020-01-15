@@ -20,6 +20,7 @@ require (
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	google.golang.org/api v0.15.0
 	google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
+	google.golang.org/grpc v1.26.0
 	gopkg.in/square/go-jose.v2 v2.4.0
 )
 
