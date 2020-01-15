@@ -96,7 +96,11 @@ func (a *Authority) init() error {
 
 	// Initialize key manager if it has not been set in the options.
 	if a.keyManager == nil {
-		a.keyManager, err = kms.New(context.Background(), *a.config.KMS)
+		var options kmsapi.Options
+		if a.config.KMS != nil {
+			options = *a.config.KMS
+		}
+		a.keyManager, err = kms.New(context.Background(), options)
 		if err != nil {
 			return err
 		}
@@ -150,7 +154,7 @@ func (a *Authority) init() error {
 		}
 		signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 			SigningKey: a.config.IntermediateKey,
-			Password:   a.config.Password,
+			Password:   []byte(a.config.Password),
 		})
 		if err != nil {
 			return err
@@ -164,7 +168,7 @@ func (a *Authority) init() error {
 		if a.config.SSH.HostKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.SSH.HostKey,
-				Password:   a.config.Password,
+				Password:   []byte(a.config.Password),
 			})
 			if err != nil {
 				return err
@@ -180,7 +184,7 @@ func (a *Authority) init() error {
 		if a.config.SSH.UserKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.SSH.UserKey,
-				Password:   a.config.Password,
+				Password:   []byte(a.config.Password),
 			})
 			if err != nil {
 				return err
