@@ -16,6 +16,7 @@ type KeyManager interface {
 	GetPublicKey(req *apiv1.GetPublicKeyRequest) (*apiv1.GetPublicKeyResponse, error)
 	CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyResponse, error)
 	CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, error)
+	Close() error
 }
 
 // New initializes a new KMS from the given type.
