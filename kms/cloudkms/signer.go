@@ -31,7 +31,6 @@ func (s *signer) Public() crypto.PublicKey {
 		Name: s.signingKey,
 	})
 	if err != nil {
-		println(1, err.Error())
 		return errors.Wrap(err, "cloudKMS GetPublicKey failed")
 	}
 

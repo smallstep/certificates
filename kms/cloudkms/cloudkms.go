@@ -3,7 +3,11 @@ package cloudkms
 import (
 	"context"
 	"crypto"
+	"strings"
 	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	cloudkms "cloud.google.com/go/kms/apiv1"
 	gax "github.com/googleapis/gax-go/v2"
@@ -53,9 +57,13 @@ var signatureAlgorithmMapping = map[apiv1.SignatureAlgorithm]interface{}{
 }
 
 type keyManagementClient interface {
+	Close() error
 	GetPublicKey(context.Context, *kmspb.GetPublicKeyRequest, ...gax.CallOption) (*kmspb.PublicKey, error)
 	AsymmetricSign(context.Context, *kmspb.AsymmetricSignRequest, ...gax.CallOption) (*kmspb.AsymmetricSignResponse, error)
 	CreateCryptoKey(context.Context, *kmspb.CreateCryptoKeyRequest, ...gax.CallOption) (*kmspb.CryptoKey, error)
+	GetKeyRing(context.Context, *kmspb.GetKeyRingRequest, ...gax.CallOption) (*kmspb.KeyRing, error)
+	CreateKeyRing(context.Context, *kmspb.CreateKeyRingRequest, ...gax.CallOption) (*kmspb.KeyRing, error)
+	CreateCryptoKeyVersion(ctx context.Context, req *kmspb.CreateCryptoKeyVersionRequest, opts ...gax.CallOption) (*kmspb.CryptoKeyVersion, error)
 }
 
 // CloudKMS implements a KMS using Google's Cloud apiv1.
@@ -79,6 +87,14 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudKMS, error) {
 	}, nil
 }
 
+// Close closes the connection of the Cloud KMS client.
+func (k *CloudKMS) Close() error {
+	if err := k.client.Close(); err != nil {
+		return errors.Wrap(err, "cloudKMS Close failed")
+	}
+	return nil
+}
+
 // CreateSigner returns a new cloudkms signer configured with the given signing
 // key name.
 func (k *CloudKMS) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, error) {
@@ -94,8 +110,6 @@ func (k *CloudKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 	switch {
 	case req.Name == "":
 		return nil, errors.New("createKeyRequest 'name' cannot be empty")
-	case req.Parent == "":
-		return nil, errors.New("createKeyRequest 'parent' cannot be empty")
 	}
 
 	protectionLevel, ok := protectionLevelMapping[req.ProtectionLevel]
@@ -119,12 +133,22 @@ func (k *CloudKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 		return nil, errors.Errorf("unexpected error: this should not happen")
 	}
 
+	var crytoKeyName string
+
+	// Split `projects/PROJECT_ID/locations/global/keyRings/RING_ID/cryptoKeys/KEY_ID`
+	// to `projects/PROJECT_ID/locations/global/keyRings/RING_ID` and `KEY_ID`.
+	keyRing, keyId := Parent(req.Name)
+	if err := k.createKeyRingIfNeeded(keyRing); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := defaultContext()
 	defer cancel()
 
+	// Create private key in CloudKMS.
 	response, err := k.client.CreateCryptoKey(ctx, &kmspb.CreateCryptoKeyRequest{
-		Parent:      req.Parent,
-		CryptoKeyId: req.Name,
+		Parent:      keyRing,
+		CryptoKeyId: keyId,
 		CryptoKey: &kmspb.CryptoKey{
 			Purpose: kmspb.CryptoKey_ASYMMETRIC_SIGN,
 			VersionTemplate: &kmspb.CryptoKeyVersionTemplate{
@@ -134,12 +158,66 @@ func (k *CloudKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 		},
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "cloudKMS CreateCryptoKey failed")
+		if status.Code(err) != codes.AlreadyExists {
+			return nil, errors.Wrap(err, "cloudKMS CreateCryptoKey failed")
+		}
+		// Create a new version if the key already exists.
+		//
+		// Note that it will have the same purpose, protection level and
+		// algorithm than the previous one.
+		req := &kmspb.CreateCryptoKeyVersionRequest{
+			Parent: req.Name,
+			CryptoKeyVersion: &kmspb.CryptoKeyVersion{
+				State: kmspb.CryptoKeyVersion_ENABLED,
+			},
+		}
+		response, err := k.client.CreateCryptoKeyVersion(ctx, req)
+		if err != nil {
+			return nil, errors.Wrap(err, "cloudKMS CreateCryptoKeyVersion failed")
+		}
+		crytoKeyName = response.Name
+	} else {
+		crytoKeyName = response.Name + "/cryptoKeyVersions/1"
+	}
+
+	// Retrieve public key to add it to the response.
+	pk, err := k.GetPublicKey(&apiv1.GetPublicKeyRequest{
+		Name: crytoKeyName,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "cloudKMS GetPublicKey failed")
 	}
 
 	return &apiv1.CreateKeyResponse{
-		Name: response.Name,
+		Name:      crytoKeyName,
+		PublicKey: pk.PublicKey,
+		CreateSignerRequest: apiv1.CreateSignerRequest{
+			SigningKey: crytoKeyName,
+		},
 	}, nil
+}
+
+func (k *CloudKMS) createKeyRingIfNeeded(name string) error {
+	ctx, cancel := defaultContext()
+	defer cancel()
+
+	_, err := k.client.GetKeyRing(ctx, &kmspb.GetKeyRingRequest{
+		Name: name,
+	})
+	if err == nil {
+		return nil
+	}
+
+	parent, child := Parent(name)
+	_, err = k.client.CreateKeyRing(ctx, &kmspb.CreateKeyRingRequest{
+		Parent:    parent,
+		KeyRingId: child,
+	})
+	if err != nil && status.Code(err) != codes.AlreadyExists {
+		return errors.Wrap(err, "cloudKMS CreateKeyRing failed")
+	}
+
+	return nil
 }
 
 // GetPublicKey gets from Google's Cloud KMS a public key by name. Key names
@@ -169,4 +247,24 @@ func (k *CloudKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (*apiv1.GetPubli
 
 func defaultContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 15*time.Second)
+}
+
+// Parent splits a string in the format `key/value/key2/value2` in a parent and
+// child, for the previous string it will return `key/value` and `value2`.
+func Parent(name string) (string, string) {
+	a, b := parent(name)
+	a, _ = parent(a)
+	return a, b
+}
+
+func parent(name string) (string, string) {
+	i := strings.LastIndex(name, "/")
+	switch i {
+	case -1:
+		return "", name
+	case 0:
+		return "", name[i+1:]
+	default:
+		return name[:i], name[i+1:]
+	}
 }
