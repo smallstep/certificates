@@ -25,18 +25,27 @@ const (
 	// DefaultKMS is a KMS implementation using software.
 	DefaultKMS Type = ""
 	// SoftKMS is a KMS implementation using software.
-	SoftKMS = "softkms"
+	SoftKMS Type = "softkms"
 	// CloudKMS is a KMS implementation using Google's Cloud KMS.
-	CloudKMS = "cloudkms"
+	CloudKMS Type = "cloudkms"
 	// AmazonKMS is a KMS implementation using Amazon AWS KMS.
-	AmazonKMS = "awskms"
+	AmazonKMS Type = "awskms"
 	// PKCS11 is a KMS implementation using the PKCS11 standard.
-	PKCS11 = "pkcs11"
+	PKCS11 Type = "pkcs11"
 )
 
 type Options struct {
-	Type            string `json:"type"`
+	// The type of the KMS to use.
+	Type string `json:"type"`
+
+	// Path to the credentials file used in CloudKMS.
 	CredentialsFile string `json:"credentialsFile"`
+
+	// Path to the module used with PKCS11 KMS.
+	Module string `json:"module"`
+
+	// Pin used to access the PKCS11 module.
+	Pin string `json:"pin"`
 }
 
 // Validate checks the fields in Options.

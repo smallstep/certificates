@@ -5,18 +5,6 @@ import (
 	"fmt"
 )
 
-type KeyType int
-
-const (
-	// nolint:camelcase
-	RSA_2048 KeyType = iota
-	RSA_3072
-	RSA_4096
-	EC_P256
-	EC_P384
-	EC_P512
-)
-
 // ProtectionLevel specifies on some KMS how cryptographic operations are
 // performed.
 type ProtectionLevel int
@@ -112,11 +100,9 @@ type GetPublicKeyResponse struct {
 }
 
 type CreateKeyRequest struct {
-	Parent             string
 	Name               string
-	Type               KeyType
-	Bits               int
 	SignatureAlgorithm SignatureAlgorithm
+	Bits               int
 
 	// ProtectionLevel specifies how cryptographic operations are performed.
 	// Used by: cloudkms
@@ -124,13 +110,18 @@ type CreateKeyRequest struct {
 }
 
 type CreateKeyResponse struct {
-	Name       string
-	PublicKey  crypto.PublicKey
-	PrivateKey crypto.PrivateKey
+	Name                string
+	PublicKey           crypto.PublicKey
+	PrivateKey          crypto.PrivateKey
+	CreateSignerRequest CreateSignerRequest
 }
 
 type CreateSignerRequest struct {
+	Signer        crypto.Signer
 	SigningKey    string
 	SigningKeyPEM []byte
-	Password      string
+	TokenLabel    string
+	PublicKey     string
+	PublicKeyPEM  []byte
+	Password      []byte
 }
