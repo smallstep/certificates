@@ -41,14 +41,21 @@ func New(ctx context.Context, opts apiv1.Options) (*SoftKMS, error) {
 	return &SoftKMS{}, nil
 }
 
+// Closes is a noop that just returns nil.
+func (k *SoftKMS) Close() error {
+	return nil
+}
+
 // CreateSigner returns a new signer configured with the given signing key.
 func (k *SoftKMS) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, error) {
 	var opts []pemutil.Options
-	if req.Password != "" {
-		opts = append(opts, pemutil.WithPassword([]byte(req.Password)))
+	if req.Password != nil {
+		opts = append(opts, pemutil.WithPassword(req.Password))
 	}
 
 	switch {
+	case req.Signer != nil:
+		return req.Signer, nil
 	case len(req.SigningKeyPEM) != 0:
 		v, err := pemutil.ParseKey(req.SigningKeyPEM, opts...)
 		if err != nil {
@@ -84,11 +91,18 @@ func (k *SoftKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespon
 	if err != nil {
 		return nil, err
 	}
+	signer, ok := priv.(crypto.Signer)
+	if !ok {
+		return nil, errors.Errorf("softKMS createKey result is not a crypto.Signer: type %T", priv)
+	}
 
 	return &apiv1.CreateKeyResponse{
 		Name:       req.Name,
 		PublicKey:  pub,
 		PrivateKey: priv,
+		CreateSignerRequest: apiv1.CreateSignerRequest{
+			Signer: signer,
+		},
 	}, nil
 }
 
