@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/kms"
@@ -81,17 +82,33 @@ func WithX509Signer(crt *x509.Certificate, s crypto.Signer) Option {
 }
 
 // WithSSHUserSigner defines the signer used to sign SSH user certificates.
-func WithSSHUserSigner(s ssh.Signer) Option {
+func WithSSHUserSigner(s crypto.Signer) Option {
 	return func(a *Authority) error {
-		a.sshCAUserCertSignKey = s
+		signer, err := ssh.NewSignerFromSigner(s)
+		if err != nil {
+			return errors.Wrap(err, "error creating ssh user signer")
+		}
+		a.sshCAUserCertSignKey = signer
+		// Append public key to list of user certs
+		pub := signer.PublicKey()
+		a.sshCAUserCerts = append(a.sshCAUserCerts, pub)
+		a.sshCAUserFederatedCerts = append(a.sshCAUserFederatedCerts, pub)
 		return nil
 	}
 }
 
 // WithSSHHostSigner defines the signer used to sign SSH host certificates.
-func WithSSHHostSigner(s ssh.Signer) Option {
+func WithSSHHostSigner(s crypto.Signer) Option {
 	return func(a *Authority) error {
-		a.sshCAHostCertSignKey = s
+		signer, err := ssh.NewSignerFromSigner(s)
+		if err != nil {
+			return errors.Wrap(err, "error creating ssh host signer")
+		}
+		a.sshCAHostCertSignKey = signer
+		// Append public key to list of host certs
+		pub := signer.PublicKey()
+		a.sshCAHostCerts = append(a.sshCAHostCerts, pub)
+		a.sshCAHostFederatedCerts = append(a.sshCAHostFederatedCerts, pub)
 		return nil
 	}
 }
