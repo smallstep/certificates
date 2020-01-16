@@ -223,7 +223,7 @@ func (k *CloudKMS) createKeyRingIfNeeded(name string) error {
 // GetPublicKey gets from Google's Cloud KMS a public key by name. Key names
 // follow the pattern:
 //   projects/([^/]+)/locations/([a-zA-Z0-9_-]{1,63})/keyRings/([a-zA-Z0-9_-]{1,63})/cryptoKeys/([a-zA-Z0-9_-]{1,63})/cryptoKeyVersions/([a-zA-Z0-9_-]{1,63})
-func (k *CloudKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (*apiv1.GetPublicKeyResponse, error) {
+func (k *CloudKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey, error) {
 	ctx, cancel := defaultContext()
 	defer cancel()
 
@@ -239,10 +239,7 @@ func (k *CloudKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (*apiv1.GetPubli
 		return nil, err
 	}
 
-	return &apiv1.GetPublicKeyResponse{
-		Name:      req.Name,
-		PublicKey: pk,
-	}, nil
+	return pk, nil
 }
 
 func defaultContext() (context.Context, context.CancelFunc) {

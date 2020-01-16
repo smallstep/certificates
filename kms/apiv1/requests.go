@@ -94,11 +94,6 @@ type GetPublicKeyRequest struct {
 	Name string
 }
 
-type GetPublicKeyResponse struct {
-	Name      string
-	PublicKey crypto.PublicKey
-}
-
 type CreateKeyRequest struct {
 	Name               string
 	SignatureAlgorithm SignatureAlgorithm

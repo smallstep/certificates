@@ -19,6 +19,9 @@ type algorithmAttributes struct {
 	Curve string
 }
 
+// DefaultRSAKeySize is the default size for RSA keys.
+const DefaultRSAKeySize = 3072
+
 var signatureAlgorithmMapping = map[apiv1.SignatureAlgorithm]algorithmAttributes{
 	apiv1.UnspecifiedSignAlgorithm: algorithmAttributes{"EC", "P-256"},
 	apiv1.SHA256WithRSA:            algorithmAttributes{"RSA", ""},
@@ -31,6 +34,14 @@ var signatureAlgorithmMapping = map[apiv1.SignatureAlgorithm]algorithmAttributes
 	apiv1.ECDSAWithSHA384:          algorithmAttributes{"EC", "P-384"},
 	apiv1.ECDSAWithSHA512:          algorithmAttributes{"EC", "P-521"},
 	apiv1.PureEd25519:              algorithmAttributes{"OKP", "Ed25519"},
+}
+
+// generateKey is used for testing purposes.
+var generateKey = func(kty, crv string, size int) (interface{}, interface{}, error) {
+	if kty == "RSA" && size == 0 {
+		size = DefaultRSAKeySize
+	}
+	return keys.GenerateKeyPair(kty, crv, size)
 }
 
 // SoftKSM is a key manager that uses keys stored in disk.
@@ -87,7 +98,7 @@ func (k *SoftKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespon
 		return nil, errors.Errorf("softKMS does not support signature algorithm '%s'", req.SignatureAlgorithm)
 	}
 
-	pub, priv, err := keys.GenerateKeyPair(v.Type, v.Curve, req.Bits)
+	pub, priv, err := generateKey(v.Type, v.Curve, req.Bits)
 	if err != nil {
 		return nil, err
 	}
@@ -106,21 +117,18 @@ func (k *SoftKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespon
 	}, nil
 }
 
-func (k *SoftKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (*apiv1.GetPublicKeyResponse, error) {
+func (k *SoftKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey, error) {
 	v, err := pemutil.Read(req.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	switch v.(type) {
+	switch vv := v.(type) {
 	case *x509.Certificate:
+		return vv.PublicKey, nil
 	case *rsa.PublicKey, *ecdsa.PublicKey, ed25519.PublicKey:
+		return vv, nil
 	default:
 		return nil, errors.Errorf("unsupported public key type %T", v)
 	}
-
-	return &apiv1.GetPublicKeyResponse{
-		Name:      req.Name,
-		PublicKey: v,
-	}, nil
 }

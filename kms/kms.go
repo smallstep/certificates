@@ -13,7 +13,7 @@ import (
 
 // KeyManager is the interface implemented by all the KMS.
 type KeyManager interface {
-	GetPublicKey(req *apiv1.GetPublicKeyRequest) (*apiv1.GetPublicKeyResponse, error)
+	GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey, error)
 	CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyResponse, error)
 	CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, error)
 	Close() error
