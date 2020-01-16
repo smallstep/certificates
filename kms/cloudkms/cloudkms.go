@@ -107,8 +107,7 @@ func (k *CloudKMS) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, 
 
 // CreateKey creates in Google's Cloud KMS a new asymmetric key for signing.
 func (k *CloudKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyResponse, error) {
-	switch {
-	case req.Name == "":
+	if req.Name == "" {
 		return nil, errors.New("createKeyRequest 'name' cannot be empty")
 	}
 
@@ -137,7 +136,7 @@ func (k *CloudKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 
 	// Split `projects/PROJECT_ID/locations/global/keyRings/RING_ID/cryptoKeys/KEY_ID`
 	// to `projects/PROJECT_ID/locations/global/keyRings/RING_ID` and `KEY_ID`.
-	keyRing, keyId := Parent(req.Name)
+	keyRing, keyID := Parent(req.Name)
 	if err := k.createKeyRingIfNeeded(keyRing); err != nil {
 		return nil, err
 	}
@@ -148,7 +147,7 @@ func (k *CloudKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 	// Create private key in CloudKMS.
 	response, err := k.client.CreateCryptoKey(ctx, &kmspb.CreateCryptoKeyRequest{
 		Parent:      keyRing,
-		CryptoKeyId: keyId,
+		CryptoKeyId: keyID,
 		CryptoKey: &kmspb.CryptoKey{
 			Purpose: kmspb.CryptoKey_ASYMMETRIC_SIGN,
 			VersionTemplate: &kmspb.CryptoKeyVersionTemplate{
@@ -224,6 +223,10 @@ func (k *CloudKMS) createKeyRingIfNeeded(name string) error {
 // follow the pattern:
 //   projects/([^/]+)/locations/([a-zA-Z0-9_-]{1,63})/keyRings/([a-zA-Z0-9_-]{1,63})/cryptoKeys/([a-zA-Z0-9_-]{1,63})/cryptoKeyVersions/([a-zA-Z0-9_-]{1,63})
 func (k *CloudKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey, error) {
+	if req.Name == "" {
+		return nil, errors.New("createKeyRequest 'name' cannot be empty")
+	}
+
 	ctx, cancel := defaultContext()
 	defer cancel()
 

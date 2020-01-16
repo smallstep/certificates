@@ -36,7 +36,6 @@ func (s *signer) Public() crypto.PublicKey {
 
 	pk, err := pemutil.ParseKey([]byte(response.Pem))
 	if err != nil {
-		println(2, err.Error())
 		return err
 	}
 
