@@ -90,10 +90,12 @@ func (s SignatureAlgorithm) String() string {
 	}
 }
 
+// GetPublicKeyRequest is the parameter used in the kms.GetPublicKey method.
 type GetPublicKeyRequest struct {
 	Name string
 }
 
+// CreateKeyRequest is the parameter used in the kms.CreateKey method.
 type CreateKeyRequest struct {
 	Name               string
 	SignatureAlgorithm SignatureAlgorithm
@@ -104,6 +106,7 @@ type CreateKeyRequest struct {
 	ProtectionLevel ProtectionLevel
 }
 
+// CreateKeyResponse is the response value of the kms.CreateKey method.
 type CreateKeyResponse struct {
 	Name                string
 	PublicKey           crypto.PublicKey
@@ -111,6 +114,7 @@ type CreateKeyResponse struct {
 	CreateSignerRequest CreateSignerRequest
 }
 
+// CreateSignerRequest is the parameter used in the kms.CreateSigner method.
 type CreateSignerRequest struct {
 	Signer        crypto.Signer
 	SigningKey    string
