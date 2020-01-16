@@ -190,7 +190,7 @@ func (k *CloudKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 
 	return &apiv1.CreateKeyResponse{
 		Name:      crytoKeyName,
-		PublicKey: pk.PublicKey,
+		PublicKey: pk,
 		CreateSignerRequest: apiv1.CreateSignerRequest{
 			SigningKey: crytoKeyName,
 		},
