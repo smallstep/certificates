@@ -91,7 +91,7 @@ func TestCloudKMS_Close(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			k := &CloudKMS{
-				client: tt.fields.client,
+				Client: tt.fields.client,
 			}
 			if err := k.Close(); (err != nil) != tt.wantErr {
 				t.Errorf("CloudKMS.Close() error = %v, wantErr %v", err, tt.wantErr)
@@ -121,7 +121,7 @@ func TestCloudKMS_CreateSigner(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			k := &CloudKMS{
-				client: tt.fields.client,
+				Client: tt.fields.client,
 			}
 			got, err := k.CreateSigner(tt.args.req)
 			if (err != nil) != tt.wantErr {
@@ -269,7 +269,7 @@ func TestCloudKMS_CreateKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			k := &CloudKMS{
-				client: tt.fields.client,
+				Client: tt.fields.client,
 			}
 			got, err := k.CreateKey(tt.args.req)
 			if (err != nil) != tt.wantErr {
@@ -335,7 +335,7 @@ func TestCloudKMS_GetPublicKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			k := &CloudKMS{
-				client: tt.fields.client,
+				Client: tt.fields.client,
 			}
 			got, err := k.GetPublicKey(tt.args.req)
 			if (err != nil) != tt.wantErr {

@@ -68,7 +68,7 @@ type keyManagementClient interface {
 
 // CloudKMS implements a KMS using Google's Cloud apiv1.
 type CloudKMS struct {
-	client keyManagementClient
+	Client keyManagementClient
 }
 
 func New(ctx context.Context, opts apiv1.Options) (*CloudKMS, error) {
@@ -83,13 +83,13 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudKMS, error) {
 	}
 
 	return &CloudKMS{
-		client: client,
+		Client: client,
 	}, nil
 }
 
 // Close closes the connection of the Cloud KMS client.
 func (k *CloudKMS) Close() error {
-	if err := k.client.Close(); err != nil {
+	if err := k.Client.Close(); err != nil {
 		return errors.Wrap(err, "cloudKMS Close failed")
 	}
 	return nil
@@ -102,7 +102,7 @@ func (k *CloudKMS) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, 
 		return nil, errors.New("signing key cannot be empty")
 	}
 
-	return newSigner(k.client, req.SigningKey), nil
+	return newSigner(k.Client, req.SigningKey), nil
 }
 
 // CreateKey creates in Google's Cloud KMS a new asymmetric key for signing.
@@ -145,7 +145,7 @@ func (k *CloudKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 	defer cancel()
 
 	// Create private key in CloudKMS.
-	response, err := k.client.CreateCryptoKey(ctx, &kmspb.CreateCryptoKeyRequest{
+	response, err := k.Client.CreateCryptoKey(ctx, &kmspb.CreateCryptoKeyRequest{
 		Parent:      keyRing,
 		CryptoKeyId: keyID,
 		CryptoKey: &kmspb.CryptoKey{
@@ -170,7 +170,7 @@ func (k *CloudKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 				State: kmspb.CryptoKeyVersion_ENABLED,
 			},
 		}
-		response, err := k.client.CreateCryptoKeyVersion(ctx, req)
+		response, err := k.Client.CreateCryptoKeyVersion(ctx, req)
 		if err != nil {
 			return nil, errors.Wrap(err, "cloudKMS CreateCryptoKeyVersion failed")
 		}
@@ -200,7 +200,7 @@ func (k *CloudKMS) createKeyRingIfNeeded(name string) error {
 	ctx, cancel := defaultContext()
 	defer cancel()
 
-	_, err := k.client.GetKeyRing(ctx, &kmspb.GetKeyRingRequest{
+	_, err := k.Client.GetKeyRing(ctx, &kmspb.GetKeyRingRequest{
 		Name: name,
 	})
 	if err == nil {
@@ -208,7 +208,7 @@ func (k *CloudKMS) createKeyRingIfNeeded(name string) error {
 	}
 
 	parent, child := Parent(name)
-	_, err = k.client.CreateKeyRing(ctx, &kmspb.CreateKeyRingRequest{
+	_, err = k.Client.CreateKeyRing(ctx, &kmspb.CreateKeyRingRequest{
 		Parent:    parent,
 		KeyRingId: child,
 	})
@@ -230,7 +230,7 @@ func (k *CloudKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKe
 	ctx, cancel := defaultContext()
 	defer cancel()
 
-	response, err := k.client.GetPublicKey(ctx, &kmspb.GetPublicKeyRequest{
+	response, err := k.Client.GetPublicKey(ctx, &kmspb.GetPublicKeyRequest{
 		Name: req.Name,
 	})
 	if err != nil {
