@@ -9,21 +9,21 @@ import (
 	kmspb "google.golang.org/genproto/googleapis/cloud/kms/v1"
 )
 
-// signer implements a crypto.Signer using Google's Cloud KMS.
-type signer struct {
-	client     keyManagementClient
+// Signer implements a crypto.Signer using Google's Cloud KMS.
+type Signer struct {
+	client     KeyManagementClient
 	signingKey string
 }
 
-func newSigner(c keyManagementClient, signingKey string) *signer {
-	return &signer{
+func NewSigner(c KeyManagementClient, signingKey string) *Signer {
+	return &Signer{
 		client:     c,
 		signingKey: signingKey,
 	}
 }
 
 // Public returns the public key of this signer or an error.
-func (s *signer) Public() crypto.PublicKey {
+func (s *Signer) Public() crypto.PublicKey {
 	ctx, cancel := defaultContext()
 	defer cancel()
 
@@ -43,7 +43,7 @@ func (s *signer) Public() crypto.PublicKey {
 }
 
 // Sign signs digest with the private key stored in Google's Cloud KMS.
-func (s *signer) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+func (s *Signer) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	req := &kmspb.AsymmetricSignRequest{
 		Name:   s.signingKey,
 		Digest: &kmspb.Digest{},

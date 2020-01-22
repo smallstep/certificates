@@ -17,19 +17,19 @@ import (
 
 func Test_newSigner(t *testing.T) {
 	type args struct {
-		c          keyManagementClient
+		c          KeyManagementClient
 		signingKey string
 	}
 	tests := []struct {
 		name string
 		args args
-		want *signer
+		want *Signer
 	}{
-		{"ok", args{&MockClient{}, "signingKey"}, &signer{client: &MockClient{}, signingKey: "signingKey"}},
+		{"ok", args{&MockClient{}, "signingKey"}, &Signer{client: &MockClient{}, signingKey: "signingKey"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := newSigner(tt.args.c, tt.args.signingKey); !reflect.DeepEqual(got, tt.want) {
+			if got := NewSigner(tt.args.c, tt.args.signingKey); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("newSigner() = %v, want %v", got, tt.want)
 			}
 		})
@@ -50,7 +50,7 @@ func Test_signer_Public(t *testing.T) {
 	}
 
 	type fields struct {
-		client     keyManagementClient
+		client     KeyManagementClient
 		signingKey string
 	}
 	tests := []struct {
@@ -78,7 +78,7 @@ func Test_signer_Public(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &signer{
+			s := &Signer{
 				client:     tt.fields.client,
 				signingKey: tt.fields.signingKey,
 			}
@@ -108,7 +108,7 @@ func Test_signer_Sign(t *testing.T) {
 	}
 
 	type fields struct {
-		client     keyManagementClient
+		client     KeyManagementClient
 		signingKey string
 	}
 	type args struct {
@@ -131,7 +131,7 @@ func Test_signer_Sign(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &signer{
+			s := &Signer{
 				client:     tt.fields.client,
 				signingKey: tt.fields.signingKey,
 			}

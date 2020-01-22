@@ -76,9 +76,29 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestNewCloudKMS(t *testing.T) {
+	type args struct {
+		client KeyManagementClient
+	}
+	tests := []struct {
+		name string
+		args args
+		want *CloudKMS
+	}{
+		{"ok", args{&MockClient{}}, &CloudKMS{&MockClient{}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NewCloudKMS(tt.args.client); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewCloudKMS() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCloudKMS_Close(t *testing.T) {
 	type fields struct {
-		client keyManagementClient
+		client KeyManagementClient
 	}
 	tests := []struct {
 		name    string
@@ -91,7 +111,7 @@ func TestCloudKMS_Close(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			k := &CloudKMS{
-				Client: tt.fields.client,
+				client: tt.fields.client,
 			}
 			if err := k.Close(); (err != nil) != tt.wantErr {
 				t.Errorf("CloudKMS.Close() error = %v, wantErr %v", err, tt.wantErr)
@@ -103,7 +123,7 @@ func TestCloudKMS_Close(t *testing.T) {
 func TestCloudKMS_CreateSigner(t *testing.T) {
 	keyName := "projects/p/locations/l/keyRings/k/cryptoKeys/c/cryptoKeyVersions/1"
 	type fields struct {
-		client keyManagementClient
+		client KeyManagementClient
 	}
 	type args struct {
 		req *apiv1.CreateSignerRequest
@@ -115,13 +135,13 @@ func TestCloudKMS_CreateSigner(t *testing.T) {
 		want    crypto.Signer
 		wantErr bool
 	}{
-		{"ok", fields{&MockClient{}}, args{&apiv1.CreateSignerRequest{SigningKey: keyName}}, &signer{client: &MockClient{}, signingKey: keyName}, false},
+		{"ok", fields{&MockClient{}}, args{&apiv1.CreateSignerRequest{SigningKey: keyName}}, &Signer{client: &MockClient{}, signingKey: keyName}, false},
 		{"fail", fields{&MockClient{}}, args{&apiv1.CreateSignerRequest{SigningKey: ""}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			k := &CloudKMS{
-				Client: tt.fields.client,
+				client: tt.fields.client,
 			}
 			got, err := k.CreateSigner(tt.args.req)
 			if (err != nil) != tt.wantErr {
@@ -150,7 +170,7 @@ func TestCloudKMS_CreateKey(t *testing.T) {
 	}
 
 	type fields struct {
-		client keyManagementClient
+		client KeyManagementClient
 	}
 	type args struct {
 		req *apiv1.CreateKeyRequest
@@ -269,7 +289,7 @@ func TestCloudKMS_CreateKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			k := &CloudKMS{
-				Client: tt.fields.client,
+				client: tt.fields.client,
 			}
 			got, err := k.CreateKey(tt.args.req)
 			if (err != nil) != tt.wantErr {
@@ -297,7 +317,7 @@ func TestCloudKMS_GetPublicKey(t *testing.T) {
 	}
 
 	type fields struct {
-		client keyManagementClient
+		client KeyManagementClient
 	}
 	type args struct {
 		req *apiv1.GetPublicKeyRequest
@@ -335,7 +355,7 @@ func TestCloudKMS_GetPublicKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			k := &CloudKMS{
-				Client: tt.fields.client,
+				client: tt.fields.client,
 			}
 			got, err := k.GetPublicKey(tt.args.req)
 			if (err != nil) != tt.wantErr {
