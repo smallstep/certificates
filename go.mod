@@ -12,6 +12,7 @@ require (
 	github.com/go-chi/chi v3.3.4-0.20181024101233-0ebf7795c516+incompatible
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/golangci/golangci-lint v1.18.0 // indirect
+	github.com/hashicorp/go-retryablehttp v0.6.4
 	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.1 // indirect
 	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect

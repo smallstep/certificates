@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"time"
 
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	database "github.com/smallstep/certificates/db"
@@ -262,9 +263,14 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 	if accID != ch.getAccountID() {
 		return nil, UnauthorizedErr(errors.New("account does not own challenge"))
 	}
-	client := http.Client{
-		Timeout: time.Duration(30 * time.Second),
+	client := retryablehttp.NewClient()
+	client.HTTPClient = &http.Client{
+		Timeout: 20 * time.Second,
 	}
+	client.RetryWaitMin = 100 * time.Millisecond
+	client.RetryWaitMax = 1 * time.Second
+	client.RetryMax = 10
+
 	ch, err = ch.validate(a.db, jwk, validateOptions{
 		httpGet:   client.Get,
 		lookupTxt: net.LookupTXT,
