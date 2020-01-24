@@ -178,7 +178,7 @@ func TestAuthority_Sign(t *testing.T) {
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  _signOpts,
-				err:       errors.New("authority.Sign: requested duration of 25h0m0s is more than the authorized maximum certificate duration of 24h0m0s"),
+				err:       errors.New("authority.Sign: requested duration of 25h0m0s is more than the authorized maximum certificate duration of 24h1m0s"),
 				code:      http.StatusUnauthorized,
 			}
 		},

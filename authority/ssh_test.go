@@ -62,7 +62,7 @@ func (m sshTestCertModifier) Modify(cert *ssh.Certificate) error {
 
 type sshTestCertValidator string
 
-func (v sshTestCertValidator) Valid(crt *ssh.Certificate) error {
+func (v sshTestCertValidator) Valid(crt *ssh.Certificate, opts provisioner.SSHOptions) error {
 	if v == "" {
 		return nil
 	}

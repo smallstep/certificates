@@ -36,7 +36,7 @@ type SSHCertOptionModifier interface {
 // SSHCertValidator is the interface used to validate an SSH certificate.
 type SSHCertValidator interface {
 	SignOption
-	Valid(cert *ssh.Certificate) error
+	Valid(cert *ssh.Certificate, opts SSHOptions) error
 }
 
 // SSHCertOptionsValidator is the interface used to validate the custom
@@ -310,7 +310,7 @@ type sshCertValidityValidator struct {
 	*Claimer
 }
 
-func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate) error {
+func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SSHOptions) error {
 	switch {
 	case cert.ValidAfter == 0:
 		return errors.New("ssh certificate validAfter cannot be 0")
@@ -336,20 +336,15 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate) error {
 
 	// To not take into account the backdate, time.Now() will be used to
 	// calculate the duration if ValidAfter is in the past.
-	var dur time.Duration
-	if t := now().Unix(); t > int64(cert.ValidAfter) {
-		dur = time.Duration(int64(cert.ValidBefore)-t) * time.Second
-	} else {
-		dur = time.Duration(cert.ValidBefore-cert.ValidAfter) * time.Second
-	}
+	dur := time.Duration(cert.ValidBefore-cert.ValidAfter) * time.Second
 
 	switch {
 	case dur < min:
 		return errors.Errorf("requested duration of %s is less than minimum "+
 			"accepted duration for selected provisioner of %s", dur, min)
-	case dur > max:
+	case dur > max+opts.Backdate:
 		return errors.Errorf("requested duration of %s is greater than maximum "+
-			"accepted duration for selected provisioner of %s", dur, max)
+			"accepted duration for selected provisioner of %s", dur, max+opts.Backdate)
 	default:
 		return nil
 	}
@@ -360,7 +355,7 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate) error {
 type sshCertDefaultValidator struct{}
 
 // Valid returns an error if the given certificate does not contain the necessary fields.
-func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate) error {
+func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate, o SSHOptions) error {
 	switch {
 	case len(cert.Nonce) == 0:
 		return errors.New("ssh certificate nonce cannot be empty")
@@ -395,7 +390,7 @@ func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate) error {
 type sshDefaultPublicKeyValidator struct{}
 
 // Valid checks that certificate request common name matches the one configured.
-func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate) error {
+func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, o SSHOptions) error {
 	if cert.Key == nil {
 		return errors.New("ssh certificate key cannot be nil")
 	}
@@ -425,7 +420,7 @@ func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate) error {
 type sshCertKeyIDValidator string
 
 // Valid returns an error if the given certificate does not contain the necessary fields.
-func (v sshCertKeyIDValidator) Valid(cert *ssh.Certificate) error {
+func (v sshCertKeyIDValidator) Valid(cert *ssh.Certificate, o SSHOptions) error {
 	if string(v) != cert.KeyId {
 		return errors.Errorf("invalid ssh certificate KeyId; want %s, but got %s", string(v), cert.KeyId)
 	}
