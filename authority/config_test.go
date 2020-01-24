@@ -255,19 +255,6 @@ func TestAuthConfigValidate(t *testing.T) {
 				err: errors.New("authority cannot be undefined"),
 			}
 		},
-		/*
-			"fail-invalid-claims": func(t *testing.T) AuthConfigValidateTest {
-				return AuthConfigValidateTest{
-					ac: &AuthConfig{
-						Provisioners: p,
-						Claims: &provisioner.Claims{
-							MinTLSDur: &provisioner.Duration{Duration: -1},
-						},
-					},
-					err: errors.New("claims: MinTLSCertDuration must be greater than 0"),
-				}
-			},
-		*/
 		"ok-empty-provisioners": func(t *testing.T) AuthConfigValidateTest {
 			return AuthConfigValidateTest{
 				ac:     &AuthConfig{},
