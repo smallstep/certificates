@@ -40,7 +40,7 @@ func (c *mutableTLSConfig) Init(base *tls.Config) {
 // tls.Config GetConfigForClient.
 func (c *mutableTLSConfig) TLSConfig() (config *tls.Config) {
 	c.RLock()
-	config = c.config
+	config = c.config.Clone()
 	c.RUnlock()
 	return
 }
