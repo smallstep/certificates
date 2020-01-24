@@ -61,7 +61,7 @@ func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 // Sign creates a signed certificate from a certificate signing request.
 func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	var (
-		opts           = []errs.Option{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
+		opts           = []interface{}{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
 		mods           = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
 		certValidators = []provisioner.CertificateValidator{}
 		issIdentity    = a.intermediateIdentity
@@ -81,7 +81,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		case provisioner.ProfileModifier:
 			mods = append(mods, k.Option(signOpts))
 		default:
-			return nil, errs.InternalServerError(errors.Errorf("authority.Sign; invalid extra option type %T", k), opts...)
+			return nil, errs.InternalServer("authority.Sign; invalid extra option type %T", append([]interface{}{k}, opts...)...)
 		}
 	}
 
@@ -131,7 +131,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 // Renew creates a new Certificate identical to the old certificate, except
 // with a validity window that begins 'now'.
 func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error) {
-	opts := []errs.Option{errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String())}
+	opts := []interface{}{errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String())}
 
 	// Check step provisioner extensions
 	if err := a.authorizeRenew(oldCert); err != nil {
@@ -237,7 +237,7 @@ type RevokeOptions struct {
 //
 // TODO: Add OCSP and CRL support.
 func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error {
-	opts := []errs.Option{
+	opts := []interface{}{
 		errs.WithKeyVal("serialNumber", revokeOpts.Serial),
 		errs.WithKeyVal("reasonCode", revokeOpts.ReasonCode),
 		errs.WithKeyVal("reason", revokeOpts.Reason),
@@ -281,7 +281,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		var ok bool
 		p, ok = a.provisioners.LoadByToken(token, &claims.Claims)
 		if !ok {
-			return errs.InternalServerError(errors.Errorf("authority.Revoke; provisioner not found"), opts...)
+			return errs.InternalServer("authority.Revoke; provisioner not found", opts...)
 		}
 		rci.TokenID, err = p.GetTokenID(revokeOpts.OTT)
 		if err != nil {
@@ -309,10 +309,10 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 	case nil:
 		return nil
 	case db.ErrNotImplemented:
-		return errs.NotImplemented(errors.New("authority.Revoke; no persistence layer configured"), opts...)
+		return errs.NotImplemented("authority.Revoke; no persistence layer configured", opts...)
 	case db.ErrAlreadyExists:
-		return errs.BadRequest(errors.Errorf("authority.Revoke; certificate with serial "+
-			"number %s has already been revoked", rci.Serial), opts...)
+		return errs.BadRequest("authority.Revoke; certificate with serial "+
+			"number %s has already been revoked", append([]interface{}{rci.Serial}, opts...)...)
 	default:
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
 	}

@@ -190,7 +190,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 						return nil, nil
 					},
 					revoke: func(ctx context.Context, opts *authority.RevokeOptions) error {
-						return errs.InternalServerError(errors.New("force"))
+						return errs.InternalServer("force")
 					},
 				},
 			}

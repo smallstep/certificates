@@ -548,7 +548,7 @@ func TestX5C_AuthorizeRevoke(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if err := tc.p.AuthorizeRevoke(context.TODO(), tc.token); err != nil {
+			if err := tc.p.AuthorizeRevoke(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
 					sc, ok := err.(errs.StatusCoder)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
@@ -594,7 +594,7 @@ func TestX5C_AuthorizeRenew(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if err := tc.p.AuthorizeRenew(context.TODO(), nil); err != nil {
+			if err := tc.p.AuthorizeRenew(context.Background(), nil); err != nil {
 				if assert.NotNil(t, tc.err) {
 					sc, ok := err.(errs.StatusCoder)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
@@ -754,7 +754,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if opts, err := tc.p.AuthorizeSSHSign(context.TODO(), tc.token); err != nil {
+			if opts, err := tc.p.AuthorizeSSHSign(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
 					sc, ok := err.(errs.StatusCoder)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
@@ -768,7 +768,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 						nw := now()
 						for _, o := range opts {
 							switch v := o.(type) {
-							case sshCertificateOptionsValidator:
+							case sshCertOptionsValidator:
 								tc.claims.Step.SSH.ValidAfter.t = time.Time{}
 								tc.claims.Step.SSH.ValidBefore.t = time.Time{}
 								assert.Equals(t, SSHOptions(v), *tc.claims.Step.SSH)
@@ -787,10 +787,10 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 							case *sshLimitDuration:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
 								assert.Equals(t, v.NotAfter, x5cCerts[0].NotAfter)
-							case *sshCertificateValidityValidator:
+							case *sshCertValidityValidator:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
 							case *sshDefaultExtensionModifier, *sshDefaultPublicKeyValidator,
-								*sshCertificateDefaultValidator:
+								*sshCertDefaultValidator:
 							case sshCertKeyIDValidator:
 								assert.Equals(t, string(v), "foo")
 							default:

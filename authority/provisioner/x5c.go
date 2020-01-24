@@ -136,7 +136,7 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, err
 	leaf := verifiedChains[0][0]
 
 	if leaf.KeyUsage&x509.KeyUsageDigitalSignature == 0 {
-		return nil, errs.Unauthorized(errors.New("x5c.authorizeToken; certificate used to sign x5c token cannot be used for digital signature"))
+		return nil, errs.Unauthorized("x5c.authorizeToken; certificate used to sign x5c token cannot be used for digital signature")
 	}
 
 	// Using the leaf certificates key to validate the claims accomplishes two
@@ -160,12 +160,12 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, err
 
 	// validate audiences with the defaults
 	if !matchesAudience(claims.Audience, audiences) {
-		return nil, errs.Unauthorized(errors.Errorf("x5c.authorizeToken; x5c token has invalid audience "+
-			"claim (aud); expected %s, but got %s", audiences, claims.Audience))
+		return nil, errs.Unauthorized("x5c.authorizeToken; x5c token has invalid audience "+
+			"claim (aud); expected %s, but got %s", audiences, claims.Audience)
 	}
 
 	if claims.Subject == "" {
-		return nil, errs.Unauthorized(errors.New("x5c.authorizeToken; x5c token subject cannot be empty"))
+		return nil, errs.Unauthorized("x5c.authorizeToken; x5c token subject cannot be empty")
 	}
 
 	// Save the verified chains on the x5c payload object.
@@ -213,7 +213,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // AuthorizeRenew returns an error if the renewal is disabled.
 func (p *X5C) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized(errors.Errorf("x5c.AuthorizeRenew; renew is disabled for x5c provisioner %s", p.GetID()))
+		return errs.Unauthorized("x5c.AuthorizeRenew; renew is disabled for x5c provisioner %s", p.GetID())
 	}
 	return nil
 }
@@ -221,7 +221,7 @@ func (p *X5C) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized(errors.Errorf("x5c.AuthorizeSSHSign; sshCA is disabled for x5c provisioner %s", p.GetID()))
+		return nil, errs.Unauthorized("x5c.AuthorizeSSHSign; sshCA is disabled for x5c provisioner %s", p.GetID())
 	}
 
 	claims, err := p.authorizeToken(token, p.audiences.SSHSign)
@@ -230,13 +230,13 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	}
 
 	if claims.Step == nil || claims.Step.SSH == nil {
-		return nil, errs.Unauthorized(errors.New("x5c.AuthorizeSSHSign; x5c token must be an SSH provisioning token"))
+		return nil, errs.Unauthorized("x5c.AuthorizeSSHSign; x5c token must be an SSH provisioning token")
 	}
 
 	opts := claims.Step.SSH
 	signOptions := []SignOption{
 		// validates user's SSHOptions with the ones in the token
-		sshCertificateOptionsValidator(*opts),
+		sshCertOptionsValidator(*opts),
 	}
 
 	// Add modifiers from custom claims
@@ -272,8 +272,8 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertificateValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.claimer},
 		// Require all the fields in the SSH certificate
-		&sshCertificateDefaultValidator{},
+		&sshCertDefaultValidator{},
 	), nil
 }

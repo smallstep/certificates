@@ -180,7 +180,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			}
 			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
-			_, err = _a.authorizeToken(context.TODO(), raw)
+			_, err = _a.authorizeToken(context.Background(), raw)
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  _a,
@@ -268,7 +268,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			p, err := tc.auth.authorizeToken(context.TODO(), tc.token)
+			p, err := tc.auth.authorizeToken(context.Background(), tc.token)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					sc, ok := err.(errs.StatusCoder)
@@ -355,7 +355,7 @@ func TestAuthority_authorizeRevoke(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			if err := tc.auth.authorizeRevoke(context.TODO(), tc.token); err != nil {
+			if err := tc.auth.authorizeRevoke(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
 					sc, ok := err.(errs.StatusCoder)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")

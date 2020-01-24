@@ -363,10 +363,10 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 							case sshCertDefaultsModifier:
 								assert.Equals(t, v.CertType, SSHUserCert)
 							case *sshDefaultExtensionModifier:
-							case *sshCertificateValidityValidator:
+							case *sshCertValidityValidator:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
 							case *sshDefaultPublicKeyValidator:
-							case *sshCertificateDefaultValidator:
+							case *sshCertDefaultValidator:
 							case *sshDefaultDuration:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
 							default:

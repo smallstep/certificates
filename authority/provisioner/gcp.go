@@ -243,7 +243,7 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // AuthorizeRenew returns an error if the renewal is disabled.
 func (p *GCP) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized(errors.Errorf("gcp.AuthorizeRenew; renew is disabled for gcp provisioner %s", p.GetID()))
+		return errs.Unauthorized("gcp.AuthorizeRenew; renew is disabled for gcp provisioner %s", p.GetID())
 	}
 	return nil
 }
@@ -264,7 +264,7 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 		return nil, errs.Wrap(http.StatusUnauthorized, err, "gcp.authorizeToken; error parsing gcp token")
 	}
 	if len(jwt.Headers) == 0 {
-		return nil, errs.Unauthorized(errors.New("gcp.authorizeToken; error parsing gcp token - header is missing"))
+		return nil, errs.Unauthorized("gcp.authorizeToken; error parsing gcp token - header is missing")
 	}
 
 	var found bool
@@ -278,7 +278,7 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 		}
 	}
 	if !found {
-		return nil, errs.Unauthorized(errors.Errorf("gcp.authorizeToken; failed to validate gcp token payload - cannot find key for kid %s", kid))
+		return nil, errs.Unauthorized("gcp.authorizeToken; failed to validate gcp token payload - cannot find key for kid %s", kid)
 	}
 
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
@@ -293,7 +293,7 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 
 	// validate audiences with the defaults
 	if !matchesAudience(claims.Audience, p.audiences.Sign) {
-		return nil, errs.Unauthorized(errors.New("gcp.authorizeToken; invalid gcp token - invalid audience claim (aud)"))
+		return nil, errs.Unauthorized("gcp.authorizeToken; invalid gcp token - invalid audience claim (aud)")
 	}
 
 	// validate subject (service account)
@@ -306,7 +306,7 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 			}
 		}
 		if !found {
-			return nil, errs.Unauthorized(errors.New("gcp.authorizeToken; invalid gcp token - invalid subject claim"))
+			return nil, errs.Unauthorized("gcp.authorizeToken; invalid gcp token - invalid subject claim")
 		}
 	}
 
@@ -320,26 +320,26 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 			}
 		}
 		if !found {
-			return nil, errs.Unauthorized(errors.New("gcp.authorizeToken; invalid gcp token - invalid project id"))
+			return nil, errs.Unauthorized("gcp.authorizeToken; invalid gcp token - invalid project id")
 		}
 	}
 
 	// validate instance age
 	if d := p.InstanceAge.Value(); d > 0 {
 		if now.Sub(claims.Google.ComputeEngine.InstanceCreationTimestamp.Time()) > d {
-			return nil, errs.Unauthorized(errors.New("gcp.authorizeToken; token google.compute_engine.instance_creation_timestamp is too old"))
+			return nil, errs.Unauthorized("gcp.authorizeToken; token google.compute_engine.instance_creation_timestamp is too old")
 		}
 	}
 
 	switch {
 	case claims.Google.ComputeEngine.InstanceID == "":
-		return nil, errs.Unauthorized(errors.New("gcp.authorizeToken; gcp token google.compute_engine.instance_id cannot be empty"))
+		return nil, errs.Unauthorized("gcp.authorizeToken; gcp token google.compute_engine.instance_id cannot be empty")
 	case claims.Google.ComputeEngine.InstanceName == "":
-		return nil, errs.Unauthorized(errors.New("gcp.authorizeToken; gcp token google.compute_engine.instance_name cannot be empty"))
+		return nil, errs.Unauthorized("gcp.authorizeToken; gcp token google.compute_engine.instance_name cannot be empty")
 	case claims.Google.ComputeEngine.ProjectID == "":
-		return nil, errs.Unauthorized(errors.New("gcp.authorizeToken; gcp token google.compute_engine.project_id cannot be empty"))
+		return nil, errs.Unauthorized("gcp.authorizeToken; gcp token google.compute_engine.project_id cannot be empty")
 	case claims.Google.ComputeEngine.Zone == "":
-		return nil, errs.Unauthorized(errors.New("gcp.authorizeToken; gcp token google.compute_engine.zone cannot be empty"))
+		return nil, errs.Unauthorized("gcp.authorizeToken; gcp token google.compute_engine.zone cannot be empty")
 	}
 
 	return &claims, nil
@@ -348,7 +348,7 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized(errors.Errorf("gcp.AuthorizeSSHSign; sshCA is disabled for gcp provisioner %s", p.GetID()))
+		return nil, errs.Unauthorized("gcp.AuthorizeSSHSign; sshCA is disabled for gcp provisioner %s", p.GetID())
 	}
 	claims, err := p.authorizeToken(token)
 	if err != nil {
@@ -371,7 +371,7 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		},
 	}
 	// Validate user options
-	signOptions = append(signOptions, sshCertificateOptionsValidator(defaults))
+	signOptions = append(signOptions, sshCertOptionsValidator(defaults))
 	// Set defaults if not given as user options
 	signOptions = append(signOptions, sshCertDefaultsModifier(defaults))
 
@@ -383,8 +383,8 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertificateValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.claimer},
 		// Require all the fields in the SSH certificate
-		&sshCertificateDefaultValidator{},
+		&sshCertDefaultValidator{},
 	), nil
 }

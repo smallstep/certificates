@@ -915,7 +915,7 @@ func Test_caHandler_Renew(t *testing.T) {
 		{"ok", cs, parseCertificate(certPEM), parseCertificate(rootPEM), nil, http.StatusCreated},
 		{"no tls", nil, nil, nil, nil, http.StatusBadRequest},
 		{"no peer certificates", &tls.ConnectionState{}, nil, nil, nil, http.StatusBadRequest},
-		{"renew error", cs, nil, nil, errs.Forbidden(fmt.Errorf("an error")), http.StatusForbidden},
+		{"renew error", cs, nil, nil, errs.Forbidden("an error"), http.StatusForbidden},
 	}
 
 	expected := []byte(`{"crt":"` + strings.Replace(certPEM, "\n", `\n`, -1) + `\n","ca":"` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n","certChain":["` + strings.Replace(certPEM, "\n", `\n`, -1) + `\n","` + strings.Replace(rootPEM, "\n", `\n`, -1) + `\n"]}`)
@@ -1010,10 +1010,10 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedError400 := errs.BadRequest(errors.New("force"))
+	expectedError400 := errs.BadRequest("force")
 	expectedError400Bytes, err := json.Marshal(expectedError400)
 	assert.FatalError(t, err)
-	expectedError500 := errs.InternalServerError(errors.New("force"))
+	expectedError500 := errs.InternalServer("force")
 	expectedError500Bytes, err := json.Marshal(expectedError500)
 	assert.FatalError(t, err)
 	for _, tt := range tests {
@@ -1082,7 +1082,7 @@ func Test_caHandler_ProvisionerKey(t *testing.T) {
 	}
 
 	expected := []byte(`{"key":"` + privKey + `"}`)
-	expectedError404 := errs.NotFound(errors.New("force"))
+	expectedError404 := errs.NotFound("force")
 	expectedError404Bytes, err := json.Marshal(expectedError404)
 	assert.FatalError(t, err)
 

@@ -3,7 +3,6 @@ package api
 import (
 	"net/http"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -11,7 +10,7 @@ import (
 // new one.
 func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-		WriteError(w, errs.BadRequest(errors.New("missing peer certificate")))
+		WriteError(w, errs.BadRequest("missing peer certificate"))
 		return
 	}
 
@@ -22,7 +21,7 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	}
 	certChainPEM := certChainToPEM(certChain)
 	var caPEM Certificate
-	if len(certChainPEM) > 0 {
+	if len(certChainPEM) > 1 {
 		caPEM = certChainPEM[1]
 	}
 

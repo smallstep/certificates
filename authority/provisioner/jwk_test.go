@@ -222,7 +222,7 @@ func TestJWK_AuthorizeRevoke(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRevoke(context.TODO(), tt.args.token); err != nil {
+			if err := tt.prov.AuthorizeRevoke(context.Background(), tt.args.token); err != nil {
 				if assert.NotNil(t, tt.err) {
 					sc, ok := err.(errs.StatusCoder)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
@@ -337,7 +337,7 @@ func TestJWK_AuthorizeRenew(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRenew(context.TODO(), tt.args.cert); (err != nil) != tt.wantErr {
+			if err := tt.prov.AuthorizeRenew(context.Background(), tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("JWK.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
 				sc, ok := err.(errs.StatusCoder)

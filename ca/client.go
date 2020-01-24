@@ -553,7 +553,7 @@ retry:
 	// verify the sha256
 	sum := sha256.Sum256(root.RootPEM.Raw)
 	if sha256Sum != strings.ToLower(hex.EncodeToString(sum[:])) {
-		return nil, errs.BadRequest(errors.New("client.Root; root certificate SHA256 fingerprint do not match"))
+		return nil, errs.BadRequest("client.Root; root certificate SHA256 fingerprint do not match")
 	}
 	return &root, nil
 }
@@ -961,8 +961,8 @@ func (c *Client) SSHCheckHost(principal string, token string) (*api.SSHCheckPrin
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client POST %s failed", u,
-			errs.WithMessage("Failed to perform POST request to %s", u))
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client POST %s failed",
+			[]interface{}{u, errs.WithMessage("Failed to perform POST request to %s", u)}...)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -974,8 +974,8 @@ retry:
 	}
 	var check api.SSHCheckPrincipalResponse
 	if err := readJSON(resp.Body, &check); err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "error reading %s response", u,
-			errs.WithMessage("Failed to parse response from /ssh/check-host endpoint"))
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "error reading %s response",
+			[]interface{}{u, errs.WithMessage("Failed to parse response from /ssh/check-host endpoint")})
 	}
 	return &check, nil
 }

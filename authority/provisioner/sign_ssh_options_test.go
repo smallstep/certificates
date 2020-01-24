@@ -489,12 +489,12 @@ func Test_sshDefaultExtensionModifier_Modify(t *testing.T) {
 	}
 }
 
-func Test_sshCertificateDefaultValidator_Valid(t *testing.T) {
+func Test_sshCertDefaultValidator_Valid(t *testing.T) {
 	pub, _, err := keys.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 	sshPub, err := ssh.NewPublicKey(pub)
 	assert.FatalError(t, err)
-	v := sshCertificateDefaultValidator{}
+	v := sshCertDefaultValidator{}
 	tests := []struct {
 		name string
 		cert *ssh.Certificate
@@ -670,10 +670,10 @@ func Test_sshCertificateDefaultValidator_Valid(t *testing.T) {
 	}
 }
 
-func Test_sshCertificateValidityValidator(t *testing.T) {
+func Test_sshCertValidityValidator(t *testing.T) {
 	p, err := generateX5C(nil)
 	assert.FatalError(t, err)
-	v := sshCertificateValidityValidator{p.claimer}
+	v := sshCertValidityValidator{p.claimer}
 	n := now()
 	tests := []struct {
 		name string
@@ -992,7 +992,7 @@ func Test_sshLimitDuration_Option(t *testing.T) {
 		name   string
 		fields fields
 		args   args
-		want   SSHCertificateModifier
+		want   SSHCertModifier
 	}{
 		// TODO: Add test cases.
 	}
