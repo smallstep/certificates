@@ -80,7 +80,7 @@ func (v sshTestOptionsValidator) Valid(opts provisioner.SSHOptions) error {
 
 type sshTestOptionsModifier string
 
-func (m sshTestOptionsModifier) Option(opts provisioner.SSHOptions) provisioner.SSHCertificateModifier {
+func (m sshTestOptionsModifier) Option(opts provisioner.SSHOptions) provisioner.SSHCertModifier {
 	return sshTestCertModifier(string(m))
 }
 
@@ -492,12 +492,12 @@ func TestAuthority_CheckSSHHost(t *testing.T) {
 		want    bool
 		wantErr bool
 	}{
-		{"true", fields{true, nil}, args{context.TODO(), "foo.internal.com", ""}, true, false},
-		{"false", fields{false, nil}, args{context.TODO(), "foo.internal.com", ""}, false, false},
-		{"notImplemented", fields{false, db.ErrNotImplemented}, args{context.TODO(), "foo.internal.com", ""}, false, true},
-		{"notImplemented", fields{true, db.ErrNotImplemented}, args{context.TODO(), "foo.internal.com", ""}, false, true},
-		{"internal", fields{false, fmt.Errorf("an error")}, args{context.TODO(), "foo.internal.com", ""}, false, true},
-		{"internal", fields{true, fmt.Errorf("an error")}, args{context.TODO(), "foo.internal.com", ""}, false, true},
+		{"true", fields{true, nil}, args{context.Background(), "foo.internal.com", ""}, true, false},
+		{"false", fields{false, nil}, args{context.Background(), "foo.internal.com", ""}, false, false},
+		{"notImplemented", fields{false, db.ErrNotImplemented}, args{context.Background(), "foo.internal.com", ""}, false, true},
+		{"notImplemented", fields{true, db.ErrNotImplemented}, args{context.Background(), "foo.internal.com", ""}, false, true},
+		{"internal", fields{false, fmt.Errorf("an error")}, args{context.Background(), "foo.internal.com", ""}, false, true},
+		{"internal", fields{true, fmt.Errorf("an error")}, args{context.Background(), "foo.internal.com", ""}, false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

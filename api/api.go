@@ -295,7 +295,7 @@ func (h *caHandler) Root(w http.ResponseWriter, r *http.Request) {
 	// Load root certificate with the
 	cert, err := h.Authority.Root(sum)
 	if err != nil {
-		WriteError(w, errs.NotFound(errors.Wrapf(err, "%s was not found", r.RequestURI)))
+		WriteError(w, errs.Wrapf(http.StatusNotFound, err, "%s was not found", r.RequestURI))
 		return
 	}
 
@@ -314,13 +314,13 @@ func certChainToPEM(certChain []*x509.Certificate) []Certificate {
 func (h *caHandler) Provisioners(w http.ResponseWriter, r *http.Request) {
 	cursor, limit, err := parseCursor(r)
 	if err != nil {
-		WriteError(w, errs.BadRequest(err))
+		WriteError(w, errs.BadRequestErr(err))
 		return
 	}
 
 	p, next, err := h.Authority.GetProvisioners(cursor, limit)
 	if err != nil {
-		WriteError(w, errs.InternalServerError(err))
+		WriteError(w, errs.InternalServerErr(err))
 		return
 	}
 	JSON(w, &ProvisionersResponse{
@@ -334,7 +334,7 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 	kid := chi.URLParam(r, "kid")
 	key, err := h.Authority.GetEncryptedKey(kid)
 	if err != nil {
-		WriteError(w, errs.NotFound(err))
+		WriteError(w, errs.NotFoundErr(err))
 		return
 	}
 	JSON(w, &ProvisionerKeyResponse{key})
@@ -344,7 +344,7 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 	roots, err := h.Authority.GetRoots()
 	if err != nil {
-		WriteError(w, errs.Forbidden(err))
+		WriteError(w, errs.ForbiddenErr(err))
 		return
 	}
 
@@ -362,7 +362,7 @@ func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) Federation(w http.ResponseWriter, r *http.Request) {
 	federated, err := h.Authority.GetFederation()
 	if err != nil {
-		WriteError(w, errs.Forbidden(err))
+		WriteError(w, errs.ForbiddenErr(err))
 		return
 	}
 

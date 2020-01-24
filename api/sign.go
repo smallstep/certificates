@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"net/http"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/tlsutil"
@@ -22,13 +21,13 @@ type SignRequest struct {
 // or an error if something is wrong.
 func (s *SignRequest) Validate() error {
 	if s.CsrPEM.CertificateRequest == nil {
-		return errs.BadRequest(errors.New("missing csr"))
+		return errs.BadRequest("missing csr")
 	}
 	if err := s.CsrPEM.CertificateRequest.CheckSignature(); err != nil {
-		return errs.BadRequest(errors.Wrap(err, "invalid csr"))
+		return errs.Wrap(http.StatusBadRequest, err, "invalid csr")
 	}
 	if s.OTT == "" {
-		return errs.BadRequest(errors.New("missing ott"))
+		return errs.BadRequest("missing ott")
 	}
 
 	return nil
@@ -49,7 +48,7 @@ type SignResponse struct {
 func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 	var body SignRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequest(errors.Wrap(err, "error reading request body")))
+		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
 		return
 	}
 
@@ -66,18 +65,18 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 
 	signOpts, err := h.Authority.AuthorizeSign(body.OTT)
 	if err != nil {
-		WriteError(w, errs.Unauthorized(err))
+		WriteError(w, errs.UnauthorizedErr(err))
 		return
 	}
 
 	certChain, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, opts, signOpts...)
 	if err != nil {
-		WriteError(w, errs.Forbidden(err))
+		WriteError(w, errs.ForbiddenErr(err))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)
 	var caPEM Certificate
-	if len(certChainPEM) > 0 {
+	if len(certChainPEM) > 1 {
 		caPEM = certChainPEM[1]
 	}
 	logCertificate(w, certChain[0])

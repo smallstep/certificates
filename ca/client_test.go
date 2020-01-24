@@ -163,8 +163,8 @@ func TestClient_Version(t *testing.T) {
 		expectedErr  error
 	}{
 		{"ok", ok, 200, false, nil},
-		{"500", errs.InternalServerError(errors.New("force")), 500, true, errors.New(errs.InternalServerErrorDefaultMsg)},
-		{"404", errs.NotFound(errors.New("force")), 404, true, errors.New(errs.NotFoundDefaultMsg)},
+		{"500", errs.InternalServer("force"), 500, true, errors.New(errs.InternalServerErrorDefaultMsg)},
+		{"404", errs.NotFound("force"), 404, true, errors.New(errs.NotFoundDefaultMsg)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -214,7 +214,7 @@ func TestClient_Health(t *testing.T) {
 		expectedErr  error
 	}{
 		{"ok", ok, 200, false, nil},
-		{"not ok", errs.InternalServerError(errors.New("force")), 500, true, errors.New(errs.InternalServerErrorDefaultMsg)},
+		{"not ok", errs.InternalServer("force"), 500, true, errors.New(errs.InternalServerErrorDefaultMsg)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -268,7 +268,7 @@ func TestClient_Root(t *testing.T) {
 		expectedErr  error
 	}{
 		{"ok", "a047a37fa2d2e118a4f5095fe074d6cfe0e352425a7632bf8659c03919a6c81d", ok, 200, false, nil},
-		{"not found", "invalid", errs.NotFound(errors.New("force")), 404, true, errors.New(errs.NotFoundDefaultMsg)},
+		{"not found", "invalid", errs.NotFound("force"), 404, true, errors.New(errs.NotFoundDefaultMsg)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -336,9 +336,9 @@ func TestClient_Sign(t *testing.T) {
 		expectedErr  error
 	}{
 		{"ok", request, ok, 200, false, nil},
-		{"unauthorized", request, errs.Unauthorized(errors.New("force")), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
-		{"empty request", &api.SignRequest{}, errs.BadRequest(errors.New("force")), 400, true, errors.New(errs.BadRequestDefaultMsg)},
-		{"nil request", nil, errs.BadRequest(errors.New("force")), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"unauthorized", request, errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
+		{"empty request", &api.SignRequest{}, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"nil request", nil, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -409,8 +409,8 @@ func TestClient_Revoke(t *testing.T) {
 		expectedErr  error
 	}{
 		{"ok", request, ok, 200, false, nil},
-		{"unauthorized", request, errs.Unauthorized(errors.New("force")), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
-		{"nil request", nil, errs.BadRequest(errors.New("force")), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"unauthorized", request, errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
+		{"nil request", nil, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -483,9 +483,9 @@ func TestClient_Renew(t *testing.T) {
 		err          error
 	}{
 		{"ok", ok, 200, false, nil},
-		{"unauthorized", errs.Unauthorized(errors.New("force")), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
-		{"empty request", errs.BadRequest(errors.New("force")), 400, true, errors.New(errs.BadRequestDefaultMsg)},
-		{"nil request", errs.BadRequest(errors.New("force")), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"unauthorized", errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
+		{"empty request", errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"nil request", errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -533,7 +533,7 @@ func TestClient_Provisioners(t *testing.T) {
 	ok := &api.ProvisionersResponse{
 		Provisioners: provisioner.List{},
 	}
-	internalServerError := errs.InternalServerError(fmt.Errorf("Internal Server Error"))
+	internalServerError := errs.InternalServer("Internal Server Error")
 
 	tests := []struct {
 		name         string
@@ -603,7 +603,7 @@ func TestClient_ProvisionerKey(t *testing.T) {
 		err          error
 	}{
 		{"ok", "kid", ok, 200, false, nil},
-		{"fail", "invalid", errs.NotFound(errors.New("force")), 404, true, errors.New(errs.NotFoundDefaultMsg)},
+		{"fail", "invalid", errs.NotFound("force"), 404, true, errors.New(errs.NotFoundDefaultMsg)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -665,8 +665,8 @@ func TestClient_Roots(t *testing.T) {
 		err          error
 	}{
 		{"ok", ok, 200, false, nil},
-		{"unauthorized", errs.Unauthorized(errors.New("force")), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
-		{"bad-request", errs.BadRequest(errors.New("force")), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"unauthorized", errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
+		{"bad-request", errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -724,7 +724,7 @@ func TestClient_Federation(t *testing.T) {
 		err          error
 	}{
 		{"ok", ok, 200, false, nil},
-		{"unauthorized", errs.Unauthorized(errors.New("force")), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
+		{"unauthorized", errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -786,7 +786,7 @@ func TestClient_SSHRoots(t *testing.T) {
 		err          error
 	}{
 		{"ok", ok, 200, false, nil},
-		{"not found", errs.NotFound(errors.New("force")), 404, true, errors.New(errs.NotFoundDefaultMsg)},
+		{"not found", errs.NotFound("force"), 404, true, errors.New(errs.NotFoundDefaultMsg)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -869,7 +869,7 @@ func Test_parseEndpoint(t *testing.T) {
 
 func TestClient_RootFingerprint(t *testing.T) {
 	ok := &api.HealthResponse{Status: "ok"}
-	nok := errs.InternalServerError(fmt.Errorf("Internal Server Error"))
+	nok := errs.InternalServer("Internal Server Error")
 
 	httpsServer := httptest.NewTLSServer(nil)
 	defer httpsServer.Close()
@@ -947,7 +947,7 @@ func TestClient_SSHBastion(t *testing.T) {
 	}{
 		{"ok", &api.SSHBastionRequest{Hostname: "host.local"}, ok, 200, false, nil},
 		{"bad-response", &api.SSHBastionRequest{Hostname: "host.local"}, "bad json", 200, true, nil},
-		{"bad-request", &api.SSHBastionRequest{}, errs.BadRequest(errors.New("force")), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"bad-request", &api.SSHBastionRequest{}, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
 	}
 
 	srv := httptest.NewServer(nil)

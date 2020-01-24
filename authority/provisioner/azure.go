@@ -210,14 +210,14 @@ func (p *Azure) Init(config Config) (err error) {
 	return nil
 }
 
-// authorizeToken returs the claims, name, group, error.
+// authorizeToken returns the claims, name, group, error.
 func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
 		return nil, "", "", errs.Wrap(http.StatusUnauthorized, err, "azure.authorizeToken; error parsing azure token")
 	}
 	if len(jwt.Headers) == 0 {
-		return nil, "", "", errs.Unauthorized(errors.New("azure.authorizeToken; azure token missing header"))
+		return nil, "", "", errs.Unauthorized("azure.authorizeToken; azure token missing header")
 	}
 
 	var found bool
@@ -230,7 +230,7 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, err
 		}
 	}
 	if !found {
-		return nil, "", "", errs.Unauthorized(errors.New("azure.authorizeToken; cannot validate azure token"))
+		return nil, "", "", errs.Unauthorized("azure.authorizeToken; cannot validate azure token")
 	}
 
 	if err := claims.ValidateWithLeeway(jose.Expected{
@@ -243,12 +243,12 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, err
 
 	// Validate TenantID
 	if claims.TenantID != p.TenantID {
-		return nil, "", "", errs.Unauthorized(errors.New("azure.authorizeToken; azure token validation failed - invalid tenant id claim (tid)"))
+		return nil, "", "", errs.Unauthorized("azure.authorizeToken; azure token validation failed - invalid tenant id claim (tid)")
 	}
 
 	re := azureXMSMirIDRegExp.FindStringSubmatch(claims.XMSMirID)
 	if len(re) != 4 {
-		return nil, "", "", errs.Unauthorized(errors.Errorf("azure.authorizeToken; error parsing xms_mirid claim - %s", claims.XMSMirID))
+		return nil, "", "", errs.Unauthorized("azure.authorizeToken; error parsing xms_mirid claim - %s", claims.XMSMirID)
 	}
 	group, name := re[2], re[3]
 	return &claims, name, group, nil
@@ -272,7 +272,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 			}
 		}
 		if !found {
-			return nil, errs.Unauthorized(errors.New("azure.AuthorizeSign; azure token validation failed - invalid resource group"))
+			return nil, errs.Unauthorized("azure.AuthorizeSign; azure token validation failed - invalid resource group")
 		}
 	}
 
@@ -302,7 +302,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 // certificate was configured to allow renewals.
 func (p *Azure) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized(errors.Errorf("azure.AuthorizeRenew; renew is disabled for azure provisioner %s", p.GetID()))
+		return errs.Unauthorized("azure.AuthorizeRenew; renew is disabled for azure provisioner %s", p.GetID())
 	}
 	return nil
 }
@@ -310,7 +310,7 @@ func (p *Azure) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) erro
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized(errors.Errorf("azure.AuthorizeSSHSign; sshCA is disabled for provisioner %s", p.GetID()))
+		return nil, errs.Unauthorized("azure.AuthorizeSSHSign; sshCA is disabled for provisioner %s", p.GetID())
 	}
 
 	_, name, _, err := p.authorizeToken(token)
@@ -328,7 +328,7 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		Principals: []string{name},
 	}
 	// Validate user options
-	signOptions = append(signOptions, sshCertificateOptionsValidator(defaults))
+	signOptions = append(signOptions, sshCertOptionsValidator(defaults))
 	// Set defaults if not given as user options
 	signOptions = append(signOptions, sshCertDefaultsModifier(defaults))
 
@@ -340,9 +340,9 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertificateValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.claimer},
 		// Require all the fields in the SSH certificate
-		&sshCertificateDefaultValidator{},
+		&sshCertDefaultValidator{},
 	), nil
 }
 

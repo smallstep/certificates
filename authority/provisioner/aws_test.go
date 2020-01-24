@@ -704,7 +704,7 @@ func TestAWS_AuthorizeRenew(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.aws.AuthorizeRenew(context.TODO(), tt.args.cert); (err != nil) != tt.wantErr {
+			if err := tt.aws.AuthorizeRenew(context.Background(), tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("AWS.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
 				sc, ok := err.(errs.StatusCoder)

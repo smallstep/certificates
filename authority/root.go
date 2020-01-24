@@ -2,23 +2,20 @@ package authority
 
 import (
 	"crypto/x509"
-	"net/http"
 
-	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/errs"
 )
 
 // Root returns the certificate corresponding to the given SHA sum argument.
 func (a *Authority) Root(sum string) (*x509.Certificate, error) {
 	val, ok := a.certificates.Load(sum)
 	if !ok {
-		return nil, &apiError{errors.Errorf("certificate with fingerprint %s was not found", sum),
-			http.StatusNotFound, apiCtx{}}
+		return nil, errs.NotFound("certificate with fingerprint %s was not found", sum)
 	}
 
 	crt, ok := val.(*x509.Certificate)
 	if !ok {
-		return nil, &apiError{errors.Errorf("stored value is not a *x509.Certificate"),
-			http.StatusInternalServerError, apiCtx{}}
+		return nil, errs.InternalServer("stored value is not a *x509.Certificate")
 	}
 	return crt, nil
 }
@@ -52,8 +49,7 @@ func (a *Authority) GetFederation() (federation []*x509.Certificate, err error) 
 		crt, ok := v.(*x509.Certificate)
 		if !ok {
 			federation = nil
-			err = &apiError{errors.Errorf("stored value is not a *x509.Certificate"),
-				http.StatusInternalServerError, apiCtx{}}
+			err = errs.InternalServer("stored value is not a *x509.Certificate")
 			return false
 		}
 		federation = append(federation, crt)

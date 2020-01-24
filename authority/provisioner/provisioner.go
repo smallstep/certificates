@@ -284,43 +284,43 @@ type base struct{}
 // AuthorizeSign returns an unimplmented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for signing x509 Certificates.
 func (b *base) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	return nil, errs.Unauthorized(errors.New("provisioner.AuthorizeSign not implemented"))
+	return nil, errs.Unauthorized("provisioner.AuthorizeSign not implemented")
 }
 
 // AuthorizeRevoke returns an unimplmented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for revoking x509 Certificates.
 func (b *base) AuthorizeRevoke(ctx context.Context, token string) error {
-	return errs.Unauthorized(errors.New("provisioner.AuthorizeRevoke not implemented"))
+	return errs.Unauthorized("provisioner.AuthorizeRevoke not implemented")
 }
 
 // AuthorizeRenew returns an unimplmented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for renewing x509 Certificates.
 func (b *base) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
-	return errs.Unauthorized(errors.New("provisioner.AuthorizeRenew not implemented"))
+	return errs.Unauthorized("provisioner.AuthorizeRenew not implemented")
 }
 
 // AuthorizeSSHSign returns an unimplmented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for signing SSH Certificates.
 func (b *base) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
-	return nil, errs.Unauthorized(errors.New("provisioner.AuthorizeSSHSign not implemented"))
+	return nil, errs.Unauthorized("provisioner.AuthorizeSSHSign not implemented")
 }
 
 // AuthorizeRevoke returns an unimplmented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for revoking SSH Certificates.
 func (b *base) AuthorizeSSHRevoke(ctx context.Context, token string) error {
-	return errs.Unauthorized(errors.New("provisioner.AuthorizeSSHRevoke not implemented"))
+	return errs.Unauthorized("provisioner.AuthorizeSSHRevoke not implemented")
 }
 
 // AuthorizeSSHRenew returns an unimplmented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for renewing SSH Certificates.
 func (b *base) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {
-	return nil, errs.Unauthorized(errors.New("provisioner.AuthorizeSSHRenew not implemented"))
+	return nil, errs.Unauthorized("provisioner.AuthorizeSSHRenew not implemented")
 }
 
 // AuthorizeSSHRekey returns an unimplmented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for rekeying SSH Certificates.
 func (b *base) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error) {
-	return nil, nil, errs.Unauthorized(errors.New("provisioner.AuthorizeSSHRekey not implemented"))
+	return nil, nil, errs.Unauthorized("provisioner.AuthorizeSSHRekey not implemented")
 }
 
 // Identity is the type representing an externally supplied identity that is used

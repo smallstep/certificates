@@ -564,8 +564,8 @@ func TestSSHPOP_AuthorizeSSHRekey(t *testing.T) {
 					for _, o := range opts {
 						switch v := o.(type) {
 						case *sshDefaultPublicKeyValidator:
-						case *sshCertificateDefaultValidator:
-						case *sshCertificateValidityValidator:
+						case *sshCertDefaultValidator:
+						case *sshCertValidityValidator:
 							assert.Equals(t, v.Claimer, tc.p.claimer)
 						default:
 							assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))

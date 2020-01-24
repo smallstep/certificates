@@ -306,7 +306,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // certificate was configured to allow renewals.
 func (p *AWS) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized(errors.Errorf("aws.AuthorizeRenew; renew is disabled for aws provisioner %s", p.GetID()))
+		return errs.Unauthorized("aws.AuthorizeRenew; renew is disabled for aws provisioner %s", p.GetID())
 	}
 	return nil
 }
@@ -353,7 +353,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 		return nil, errs.Wrapf(http.StatusUnauthorized, err, "aws.authorizeToken; error parsing aws token")
 	}
 	if len(jwt.Headers) == 0 {
-		return nil, errs.InternalServerError(errors.New("aws.authorizeToken; error parsing token, header is missing"))
+		return nil, errs.InternalServer("aws.authorizeToken; error parsing token, header is missing")
 	}
 
 	var unsafeClaims awsPayload
@@ -378,13 +378,13 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 
 	switch {
 	case doc.AccountID == "":
-		return nil, errs.Unauthorized(errors.New("aws.authorizeToken; aws identity document accountId cannot be empty"))
+		return nil, errs.Unauthorized("aws.authorizeToken; aws identity document accountId cannot be empty")
 	case doc.InstanceID == "":
-		return nil, errs.Unauthorized(errors.New("aws.authorizeToken; aws identity document instanceId cannot be empty"))
+		return nil, errs.Unauthorized("aws.authorizeToken; aws identity document instanceId cannot be empty")
 	case doc.PrivateIP == "":
-		return nil, errs.Unauthorized(errors.New("aws.authorizeToken; aws identity document privateIp cannot be empty"))
+		return nil, errs.Unauthorized("aws.authorizeToken; aws identity document privateIp cannot be empty")
 	case doc.Region == "":
-		return nil, errs.Unauthorized(errors.New("aws.authorizeToken; aws identity document region cannot be empty"))
+		return nil, errs.Unauthorized("aws.authorizeToken; aws identity document region cannot be empty")
 	}
 
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
@@ -399,7 +399,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 
 	// validate audiences with the defaults
 	if !matchesAudience(payload.Audience, p.audiences.Sign) {
-		return nil, errs.Unauthorized(errors.New("aws.authorizeToken; invalid token - invalid audience claim (aud)"))
+		return nil, errs.Unauthorized("aws.authorizeToken; invalid token - invalid audience claim (aud)")
 	}
 
 	// Validate subject, it has to be known if disableCustomSANs is enabled
@@ -407,7 +407,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 		if payload.Subject != doc.InstanceID &&
 			payload.Subject != doc.PrivateIP &&
 			payload.Subject != fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region) {
-			return nil, errs.Unauthorized(errors.New("aws.authorizeToken; invalid token - invalid subject claim (sub)"))
+			return nil, errs.Unauthorized("aws.authorizeToken; invalid token - invalid subject claim (sub)")
 		}
 	}
 
@@ -421,14 +421,14 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 			}
 		}
 		if !found {
-			return nil, errs.Unauthorized(errors.New("aws.authorizeToken; invalid aws identity document - accountId is not valid"))
+			return nil, errs.Unauthorized("aws.authorizeToken; invalid aws identity document - accountId is not valid")
 		}
 	}
 
 	// validate instance age
 	if d := p.InstanceAge.Value(); d > 0 {
 		if now.Sub(doc.PendingTime) > d {
-			return nil, errs.Unauthorized(errors.New("aws.authorizeToken; aws identity document pendingTime is too old"))
+			return nil, errs.Unauthorized("aws.authorizeToken; aws identity document pendingTime is too old")
 		}
 	}
 
@@ -439,7 +439,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized(errors.Errorf("aws.AuthorizeSSHSign; ssh ca is disabled for aws provisioner %s", p.GetID()))
+		return nil, errs.Unauthorized("aws.AuthorizeSSHSign; ssh ca is disabled for aws provisioner %s", p.GetID())
 	}
 	claims, err := p.authorizeToken(token)
 	if err != nil {
@@ -462,7 +462,7 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		},
 	}
 	// Validate user options
-	signOptions = append(signOptions, sshCertificateOptionsValidator(defaults))
+	signOptions = append(signOptions, sshCertOptionsValidator(defaults))
 	// Set defaults if not given as user options
 	signOptions = append(signOptions, sshCertDefaultsModifier(defaults))
 
@@ -474,8 +474,8 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertificateValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.claimer},
 		// Require all the fields in the SSH certificate
-		&sshCertificateDefaultValidator{},
+		&sshCertDefaultValidator{},
 	), nil
 }
