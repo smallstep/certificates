@@ -269,7 +269,7 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 
 	// User provisioners validators
 	for _, v := range validators {
-		if err := v.Valid(cert); err != nil {
+		if err := v.Valid(cert, opts); err != nil {
 			return nil, errs.Wrap(http.StatusForbidden, err, "signSSH")
 		}
 	}
@@ -428,9 +428,9 @@ func (a *Authority) RekeySSH(oldCert *ssh.Certificate, pub ssh.PublicKey, signOp
 	}
 	cert.Signature = sig
 
-	// Apply validators from provisioner..
+	// Apply validators from provisioner.
 	for _, v := range validators {
-		if err := v.Valid(cert); err != nil {
+		if err := v.Valid(cert, provisioner.SSHOptions{Backdate: backdate}); err != nil {
 			return nil, errs.Wrap(http.StatusForbidden, err, "rekeySSH")
 		}
 	}

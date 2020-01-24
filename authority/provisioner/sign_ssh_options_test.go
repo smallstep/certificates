@@ -659,7 +659,7 @@ func Test_sshCertDefaultValidator_Valid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := v.Valid(tt.cert); err != nil {
+			if err := v.Valid(tt.cert, SSHOptions{}); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -678,26 +678,31 @@ func Test_sshCertValidityValidator(t *testing.T) {
 	tests := []struct {
 		name string
 		cert *ssh.Certificate
+		opts SSHOptions
 		err  error
 	}{
 		{
 			"fail/validAfter-0",
 			&ssh.Certificate{CertType: ssh.UserCert},
+			SSHOptions{},
 			errors.New("ssh certificate validAfter cannot be 0"),
 		},
 		{
 			"fail/validBefore-in-past",
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: uint64(now().Unix()), ValidBefore: uint64(now().Add(-time.Minute).Unix())},
+			SSHOptions{},
 			errors.New("ssh certificate validBefore cannot be in the past"),
 		},
 		{
 			"fail/validBefore-before-validAfter",
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: uint64(now().Add(5 * time.Minute).Unix()), ValidBefore: uint64(now().Add(3 * time.Minute).Unix())},
+			SSHOptions{},
 			errors.New("ssh certificate validBefore cannot be before validAfter"),
 		},
 		{
 			"fail/cert-type-not-set",
 			&ssh.Certificate{ValidAfter: uint64(now().Unix()), ValidBefore: uint64(now().Add(10 * time.Minute).Unix())},
+			SSHOptions{},
 			errors.New("ssh certificate type has not been set"),
 		},
 		{
@@ -707,6 +712,7 @@ func Test_sshCertValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(now().Unix()),
 				ValidBefore: uint64(now().Add(10 * time.Minute).Unix()),
 			},
+			SSHOptions{},
 			errors.New("unknown ssh certificate type 3"),
 		},
 		{
@@ -716,7 +722,18 @@ func Test_sshCertValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(n.Unix()),
 				ValidBefore: uint64(n.Add(4 * time.Minute).Unix()),
 			},
+			SSHOptions{Backdate: time.Second},
 			errors.New("requested duration of 4m0s is less than minimum accepted duration for selected provisioner of 5m0s"),
+		},
+		{
+			"ok/duration-exactly-min",
+			&ssh.Certificate{
+				CertType:    1,
+				ValidAfter:  uint64(n.Unix()),
+				ValidBefore: uint64(n.Add(5 * time.Minute).Unix()),
+			},
+			SSHOptions{Backdate: time.Second},
+			nil,
 		},
 		{
 			"fail/duration>max",
@@ -725,7 +742,18 @@ func Test_sshCertValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(n.Unix()),
 				ValidBefore: uint64(n.Add(48 * time.Hour).Unix()),
 			},
-			errors.New("requested duration of 48h0m0s is greater than maximum accepted duration for selected provisioner of 24h0m0s"),
+			SSHOptions{Backdate: time.Second},
+			errors.New("requested duration of 48h0m0s is greater than maximum accepted duration for selected provisioner of 24h0m1s"),
+		},
+		{
+			"ok/duration-exactly-max",
+			&ssh.Certificate{
+				CertType:    1,
+				ValidAfter:  uint64(n.Unix()),
+				ValidBefore: uint64(n.Add(24*time.Hour + time.Second).Unix()),
+			},
+			SSHOptions{Backdate: time.Second},
+			nil,
 		},
 		{
 			"ok",
@@ -734,12 +762,13 @@ func Test_sshCertValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(now().Unix()),
 				ValidBefore: uint64(now().Add(8 * time.Hour).Unix()),
 			},
+			SSHOptions{Backdate: time.Second},
 			nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := v.Valid(tt.cert); err != nil {
+			if err := v.Valid(tt.cert, tt.opts); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}

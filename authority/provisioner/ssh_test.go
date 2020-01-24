@@ -116,7 +116,7 @@ func signSSHCertificate(key crypto.PublicKey, opts SSHOptions, signOpts []SignOp
 
 	// User provisioners validators
 	for _, v := range validators {
-		if err := v.Valid(cert); err != nil {
+		if err := v.Valid(cert, opts); err != nil {
 			return nil, err
 		}
 	}
