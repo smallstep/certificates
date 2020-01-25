@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/errs"
 )
 
 // ACME is the acme provisioner type, an entity that can authorize the ACME
@@ -79,7 +80,7 @@ func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 // certificate was configured to allow renewals.
 func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
+		return errs.Unauthorized("acme.AuthorizeRenew; renew is disabled for acme provisioner %s", p.GetID())
 	}
 	return nil
 }

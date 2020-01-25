@@ -21,9 +21,9 @@ type StackTracer interface {
 // Option modifies the Error type.
 type Option func(e *Error) error
 
-// WithMessage returns an Option that modifies the error by overwriting the
+// withDefaultMessage returns an Option that modifies the error by overwriting the
 // message only if it is empty.
-func WithMessage(format string, args ...interface{}) Option {
+func withDefaultMessage(format string, args ...interface{}) Option {
 	return func(e *Error) error {
 		if len(e.Msg) > 0 {
 			return e
@@ -33,31 +33,33 @@ func WithMessage(format string, args ...interface{}) Option {
 	}
 }
 
-// Error represents the CA API errors.
-type Error struct {
-	Status int
-	Err    error
-	Msg    string
+// WithMessage returns an Option that modifies the error by overwriting the
+// message only if it is empty.
+func WithMessage(format string, args ...interface{}) Option {
+	return func(e *Error) error {
+		e.Msg = fmt.Sprintf(format, args...)
+		return e
+	}
 }
 
-// New returns a new Error. If the given error implements the StatusCoder
-// interface we will ignore the given status.
-func New(status int, err error, opts ...Option) error {
-	var e *Error
-	if sc, ok := err.(StatusCoder); ok {
-		e = &Error{Status: sc.StatusCode(), Err: err}
-	} else {
-		cause := errors.Cause(err)
-		if sc, ok := cause.(StatusCoder); ok {
-			e = &Error{Status: sc.StatusCode(), Err: err}
-		} else {
-			e = &Error{Status: status, Err: err}
+// WithKeyVal returns an Option that adds the given key-value pair to the
+// Error details. This is helpful for debugging errors.
+func WithKeyVal(key string, val interface{}) Option {
+	return func(e *Error) error {
+		if e.Details == nil {
+			e.Details = make(map[string]interface{})
 		}
+		e.Details[key] = val
+		return e
 	}
-	for _, o := range opts {
-		o(e)
-	}
-	return e
+}
+
+// Error represents the CA API errors.
+type Error struct {
+	Status  int
+	Err     error
+	Msg     string
+	Details map[string]interface{}
 }
 
 // ErrorResponse represents an error in JSON format.
@@ -92,10 +94,11 @@ func (e *Error) Message() string {
 
 // Wrap returns an error annotating err with a stack trace at the point Wrap is
 // called, and the supplied message. If err is nil, Wrap returns nil.
-func Wrap(status int, e error, m string, opts ...Option) error {
+func Wrap(status int, e error, m string, args ...interface{}) error {
 	if e == nil {
 		return nil
 	}
+	_, opts := splitOptionArgs(args)
 	if err, ok := e.(*Error); ok {
 		err.Err = errors.Wrap(err.Err, m)
 		e = err
@@ -111,25 +114,12 @@ func Wrapf(status int, e error, format string, args ...interface{}) error {
 	if e == nil {
 		return nil
 	}
-	var opts []Option
-	for i, arg := range args {
-		// Once we find the first Option, assume that all further arguments are Options.
-		if _, ok := arg.(Option); ok {
-			for _, a := range args[i:] {
-				// Ignore any arguments after the first Option that are not Options.
-				if opt, ok := a.(Option); ok {
-					opts = append(opts, opt)
-				}
-			}
-			args = args[:i]
-			break
-		}
-	}
+	as, opts := splitOptionArgs(args)
 	if err, ok := e.(*Error); ok {
 		err.Err = errors.Wrapf(err.Err, format, args...)
 		e = err
 	} else {
-		e = errors.Wrapf(e, format, args...)
+		e = errors.Wrapf(e, format, as...)
 	}
 	return StatusCodeError(status, e, opts...)
 }
@@ -174,77 +164,172 @@ type Messenger interface {
 func StatusCodeError(code int, e error, opts ...Option) error {
 	switch code {
 	case http.StatusBadRequest:
-		return BadRequest(e, opts...)
+		return BadRequestErr(e, opts...)
 	case http.StatusUnauthorized:
-		return Unauthorized(e, opts...)
+		return UnauthorizedErr(e, opts...)
 	case http.StatusForbidden:
-		return Forbidden(e, opts...)
+		return ForbiddenErr(e, opts...)
 	case http.StatusInternalServerError:
-		return InternalServerError(e, opts...)
+		return InternalServerErr(e, opts...)
 	case http.StatusNotImplemented:
-		return NotImplemented(e, opts...)
+		return NotImplementedErr(e, opts...)
 	default:
-		return UnexpectedError(code, e, opts...)
+		return UnexpectedErr(code, e, opts...)
 	}
 }
 
-var seeLogs = "Please see the certificate authority logs for more info."
+var (
+	seeLogs = "Please see the certificate authority logs for more info."
+	// BadRequestDefaultMsg 400 default msg
+	BadRequestDefaultMsg = "The request could not be completed; malformed or missing data" + seeLogs
+	// UnauthorizedDefaultMsg 401 default msg
+	UnauthorizedDefaultMsg = "The request lacked necessary authorization to be completed. " + seeLogs
+	// ForbiddenDefaultMsg 403 default msg
+	ForbiddenDefaultMsg = "The request was forbidden by the certificate authority. " + seeLogs
+	// NotFoundDefaultMsg 404 default msg
+	NotFoundDefaultMsg = "The requested resource could not be found. " + seeLogs
+	// InternalServerErrorDefaultMsg 500 default msg
+	InternalServerErrorDefaultMsg = "The certificate authority encountered an Internal Server Error. " + seeLogs
+	// NotImplementedDefaultMsg 501 default msg
+	NotImplementedDefaultMsg = "The requested method is not implemented by the certificate authority. " + seeLogs
+)
 
-// InternalServerError returns a 500 error with the given error.
-func InternalServerError(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The certificate authority encountered an Internal Server Error. "+seeLogs))
+// splitOptionArgs splits the variadic length args into string formatting args
+// and Option(s) to apply to an Error.
+func splitOptionArgs(args []interface{}) ([]interface{}, []Option) {
+	indexOptionStart := -1
+	for i, a := range args {
+		if _, ok := a.(Option); ok {
+			indexOptionStart = i
+			break
+		}
 	}
-	return New(http.StatusInternalServerError, err, opts...)
+
+	if indexOptionStart < 0 {
+		return args, []Option{}
+	}
+	opts := []Option{}
+	// Ignore any non-Option args that come after the first Option.
+	for _, o := range args[indexOptionStart:] {
+		if opt, ok := o.(Option); ok {
+			opts = append(opts, opt)
+		}
+	}
+	return args[:indexOptionStart], opts
 }
 
-// NotImplemented returns a 501 error with the given error.
-func NotImplemented(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The requested method is not implemented by the certificate authority. "+seeLogs))
+// NewErr returns a new Error. If the given error implements the StatusCoder
+// interface we will ignore the given status.
+func NewErr(status int, err error, opts ...Option) error {
+	var (
+		e  *Error
+		ok bool
+	)
+	if e, ok = err.(*Error); !ok {
+		if sc, ok := err.(StatusCoder); ok {
+			e = &Error{Status: sc.StatusCode(), Err: err}
+		} else {
+			cause := errors.Cause(err)
+			if sc, ok := cause.(StatusCoder); ok {
+				e = &Error{Status: sc.StatusCode(), Err: err}
+			} else {
+				e = &Error{Status: status, Err: err}
+			}
+		}
 	}
-	return New(http.StatusNotImplemented, err, opts...)
+	for _, o := range opts {
+		o(e)
+	}
+	return e
 }
 
-// BadRequest returns an 400 error with the given error.
-func BadRequest(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The request could not be completed due to being poorly formatted or "+
-			"missing critical data. "+seeLogs))
+// Errorf creates a new error using the given format and status code.
+func Errorf(code int, format string, args ...interface{}) error {
+	as, opts := splitOptionArgs(args)
+	opts = append(opts, withDefaultMessage(NotImplementedDefaultMsg))
+	e := &Error{Status: code, Err: fmt.Errorf(format, as...)}
+	for _, o := range opts {
+		o(e)
 	}
-	return New(http.StatusBadRequest, err, opts...)
+	return e
 }
 
-// Unauthorized returns an 401 error with the given error.
-func Unauthorized(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The request lacked necessary authorization to be completed. "+seeLogs))
-	}
-	return New(http.StatusUnauthorized, err, opts...)
+// InternalServer creates a 500 error with the given format and arguments.
+func InternalServer(format string, args ...interface{}) error {
+	args = append(args, withDefaultMessage(InternalServerErrorDefaultMsg))
+	return Errorf(http.StatusInternalServerError, format, args...)
 }
 
-// Forbidden returns an 403 error with the given error.
-func Forbidden(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The request was Forbidden by the certificate authority. "+seeLogs))
-	}
-	return New(http.StatusForbidden, err, opts...)
+// InternalServerErr returns a 500 error with the given error.
+func InternalServerErr(err error, opts ...Option) error {
+	opts = append(opts, withDefaultMessage(InternalServerErrorDefaultMsg))
+	return NewErr(http.StatusInternalServerError, err, opts...)
 }
 
-// NotFound returns an 404 error with the given error.
-func NotFound(err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The requested resource could not be found. "+seeLogs))
-	}
-	return New(http.StatusNotFound, err, opts...)
+// NotImplemented creates a 501 error with the given format and arguments.
+func NotImplemented(format string, args ...interface{}) error {
+	args = append(args, withDefaultMessage(NotImplementedDefaultMsg))
+	return Errorf(http.StatusNotImplemented, format, args...)
 }
 
-// UnexpectedError will be used when the certificate authority makes an outgoing
+// NotImplementedErr returns a 501 error with the given error.
+func NotImplementedErr(err error, opts ...Option) error {
+	opts = append(opts, withDefaultMessage(NotImplementedDefaultMsg))
+	return NewErr(http.StatusNotImplemented, err, opts...)
+}
+
+// BadRequest creates a 400 error with the given format and arguments.
+func BadRequest(format string, args ...interface{}) error {
+	args = append(args, withDefaultMessage(BadRequestDefaultMsg))
+	return Errorf(http.StatusBadRequest, format, args...)
+}
+
+// BadRequestErr returns an 400 error with the given error.
+func BadRequestErr(err error, opts ...Option) error {
+	opts = append(opts, withDefaultMessage(BadRequestDefaultMsg))
+	return NewErr(http.StatusBadRequest, err, opts...)
+}
+
+// Unauthorized creates a 401 error with the given format and arguments.
+func Unauthorized(format string, args ...interface{}) error {
+	args = append(args, withDefaultMessage(UnauthorizedDefaultMsg))
+	return Errorf(http.StatusUnauthorized, format, args...)
+}
+
+// UnauthorizedErr returns an 401 error with the given error.
+func UnauthorizedErr(err error, opts ...Option) error {
+	opts = append(opts, withDefaultMessage(UnauthorizedDefaultMsg))
+	return NewErr(http.StatusUnauthorized, err, opts...)
+}
+
+// Forbidden creates a 403 error with the given format and arguments.
+func Forbidden(format string, args ...interface{}) error {
+	args = append(args, withDefaultMessage(ForbiddenDefaultMsg))
+	return Errorf(http.StatusForbidden, format, args...)
+}
+
+// ForbiddenErr returns an 403 error with the given error.
+func ForbiddenErr(err error, opts ...Option) error {
+	opts = append(opts, withDefaultMessage(ForbiddenDefaultMsg))
+	return NewErr(http.StatusForbidden, err, opts...)
+}
+
+// NotFound creates a 404 error with the given format and arguments.
+func NotFound(format string, args ...interface{}) error {
+	args = append(args, withDefaultMessage(NotFoundDefaultMsg))
+	return Errorf(http.StatusNotFound, format, args...)
+}
+
+// NotFoundErr returns an 404 error with the given error.
+func NotFoundErr(err error, opts ...Option) error {
+	opts = append(opts, withDefaultMessage(NotFoundDefaultMsg))
+	return NewErr(http.StatusNotFound, err, opts...)
+}
+
+// UnexpectedErr will be used when the certificate authority makes an outgoing
 // request and receives an unhandled status code.
-func UnexpectedError(code int, err error, opts ...Option) error {
-	if len(opts) == 0 {
-		opts = append(opts, WithMessage("The certificate authority received an "+
-			"unexpected HTTP status code - '%d'. "+seeLogs, code))
-	}
-	return New(code, err, opts...)
+func UnexpectedErr(code int, err error, opts ...Option) error {
+	opts = append(opts, withDefaultMessage("The certificate authority received an "+
+		"unexpected HTTP status code - '%d'. "+seeLogs, code))
+	return NewErr(code, err, opts...)
 }

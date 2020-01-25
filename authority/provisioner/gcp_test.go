@@ -16,7 +16,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/cli/jose"
 )
 
 func TestGCP_Getters(t *testing.T) {
@@ -211,6 +214,202 @@ func TestGCP_Init(t *testing.T) {
 	}
 }
 
+func TestGCP_authorizeToken(t *testing.T) {
+	type test struct {
+		p     *GCP
+		token string
+		err   error
+		code  int
+	}
+	tests := map[string]func(*testing.T) test{
+		"fail/bad-token": func(t *testing.T) test {
+			p, err := generateGCP()
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: "foo",
+				code:  http.StatusUnauthorized,
+				err:   errors.New("gcp.authorizeToken; error parsing gcp token"),
+			}
+		},
+		"fail/cannot-validate-sig": func(t *testing.T) test {
+			p, err := generateGCP()
+			assert.FatalError(t, err)
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			tok, err := generateGCPToken(p.ServiceAccounts[0],
+				"https://accounts.google.com", p.GetID(),
+				"instance-id", "instance-name", "project-id", "zone",
+				time.Now(), jwk)
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+				code:  http.StatusUnauthorized,
+				err:   errors.New("gcp.authorizeToken; failed to validate gcp token payload - cannot find key for kid "),
+			}
+		},
+		"fail/invalid-issuer": func(t *testing.T) test {
+			p, err := generateGCP()
+			assert.FatalError(t, err)
+			tok, err := generateGCPToken(p.ServiceAccounts[0],
+				"https://foo.bar.zap", p.GetID(),
+				"instance-id", "instance-name", "project-id", "zone",
+				time.Now(), &p.keyStore.keySet.Keys[0])
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+				code:  http.StatusUnauthorized,
+				err:   errors.New("gcp.authorizeToken; invalid gcp token payload"),
+			}
+		},
+		"fail/invalid-serviceAccount": func(t *testing.T) test {
+			p, err := generateGCP()
+			assert.FatalError(t, err)
+			tok, err := generateGCPToken("foo",
+				"https://accounts.google.com", p.GetID(),
+				"instance-id", "instance-name", "project-id", "zone",
+				time.Now(), &p.keyStore.keySet.Keys[0])
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+				code:  http.StatusUnauthorized,
+				err:   errors.New("gcp.authorizeToken; invalid gcp token - invalid subject claim"),
+			}
+		},
+		"fail/invalid-projectID": func(t *testing.T) test {
+			p, err := generateGCP()
+			assert.FatalError(t, err)
+			p.ProjectIDs = []string{"foo", "bar"}
+			tok, err := generateGCPToken(p.ServiceAccounts[0],
+				"https://accounts.google.com", p.GetID(),
+				"instance-id", "instance-name", "project-id", "zone",
+				time.Now(), &p.keyStore.keySet.Keys[0])
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+				code:  http.StatusUnauthorized,
+				err:   errors.New("gcp.authorizeToken; invalid gcp token - invalid project id"),
+			}
+		},
+		"fail/instance-age": func(t *testing.T) test {
+			p, err := generateGCP()
+			assert.FatalError(t, err)
+			p.InstanceAge = Duration{1 * time.Minute}
+			tok, err := generateGCPToken(p.ServiceAccounts[0],
+				"https://accounts.google.com", p.GetID(),
+				"instance-id", "instance-name", "project-id", "zone",
+				time.Now().Add(-1*time.Minute), &p.keyStore.keySet.Keys[0])
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+				code:  http.StatusUnauthorized,
+				err:   errors.New("gcp.authorizeToken; token google.compute_engine.instance_creation_timestamp is too old"),
+			}
+		},
+		"fail/empty-instance-id": func(t *testing.T) test {
+			p, err := generateGCP()
+			assert.FatalError(t, err)
+			tok, err := generateGCPToken(p.ServiceAccounts[0],
+				"https://accounts.google.com", p.GetID(),
+				"", "instance-name", "project-id", "zone",
+				time.Now(), &p.keyStore.keySet.Keys[0])
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+				code:  http.StatusUnauthorized,
+				err:   errors.New("gcp.authorizeToken; gcp token google.compute_engine.instance_id cannot be empty"),
+			}
+		},
+		"fail/empty-instance-name": func(t *testing.T) test {
+			p, err := generateGCP()
+			assert.FatalError(t, err)
+			tok, err := generateGCPToken(p.ServiceAccounts[0],
+				"https://accounts.google.com", p.GetID(),
+				"instance-id", "", "project-id", "zone",
+				time.Now(), &p.keyStore.keySet.Keys[0])
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+				code:  http.StatusUnauthorized,
+				err:   errors.New("gcp.authorizeToken; gcp token google.compute_engine.instance_name cannot be empty"),
+			}
+		},
+		"fail/empty-project-id": func(t *testing.T) test {
+			p, err := generateGCP()
+			assert.FatalError(t, err)
+			tok, err := generateGCPToken(p.ServiceAccounts[0],
+				"https://accounts.google.com", p.GetID(),
+				"instance-id", "instance-name", "", "zone",
+				time.Now(), &p.keyStore.keySet.Keys[0])
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+				code:  http.StatusUnauthorized,
+				err:   errors.New("gcp.authorizeToken; gcp token google.compute_engine.project_id cannot be empty"),
+			}
+		},
+		"fail/empty-zone": func(t *testing.T) test {
+			p, err := generateGCP()
+			assert.FatalError(t, err)
+			tok, err := generateGCPToken(p.ServiceAccounts[0],
+				"https://accounts.google.com", p.GetID(),
+				"instance-id", "instance-name", "project-id", "",
+				time.Now(), &p.keyStore.keySet.Keys[0])
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+				code:  http.StatusUnauthorized,
+				err:   errors.New("gcp.authorizeToken; gcp token google.compute_engine.zone cannot be empty"),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			p, err := generateGCP()
+			assert.FatalError(t, err)
+			tok, err := generateGCPToken(p.ServiceAccounts[0],
+				"https://accounts.google.com", p.GetID(),
+				"instance-id", "instance-name", "project-id", "zone",
+				time.Now(), &p.keyStore.keySet.Keys[0])
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+			}
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := tt(t)
+			if claims, err := tc.p.authorizeToken(tc.token); err != nil {
+				if assert.NotNil(t, tc.err) {
+					sc, ok := err.(errs.StatusCoder)
+					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					assert.Equals(t, sc.StatusCode(), tc.code)
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
+				}
+			} else {
+				if assert.Nil(t, tc.err) && assert.NotNil(t, claims) {
+					assert.Equals(t, claims.Subject, tc.p.ServiceAccounts[0])
+					assert.Equals(t, claims.Issuer, "https://accounts.google.com")
+					assert.NotNil(t, claims.Google)
+
+					aud, err := generateSignAudience("https://ca.smallstep.com", tc.p.GetID())
+					assert.FatalError(t, err)
+					assert.Equals(t, claims.Audience[0], aud)
+				}
+			}
+		})
+	}
+}
+
 func TestGCP_AuthorizeSign(t *testing.T) {
 	p1, err := generateGCP()
 	assert.FatalError(t, err)
@@ -313,24 +512,25 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		gcp     *GCP
 		args    args
 		wantLen int
+		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 4, false},
-		{"ok", p2, args{t2}, 6, false},
-		{"ok", p3, args{t3}, 4, false},
-		{"fail token", p1, args{"token"}, 0, true},
-		{"fail key", p1, args{failKey}, 0, true},
-		{"fail iss", p1, args{failIss}, 0, true},
-		{"fail aud", p1, args{failAud}, 0, true},
-		{"fail exp", p1, args{failExp}, 0, true},
-		{"fail nbf", p1, args{failNbf}, 0, true},
-		{"fail service account", p1, args{failServiceAccount}, 0, true},
-		{"fail invalid project id", p3, args{failInvalidProjectID}, 0, true},
-		{"fail invalid instance age", p3, args{failInvalidInstanceAge}, 0, true},
-		{"fail instance id", p1, args{failInstanceID}, 0, true},
-		{"fail instance name", p1, args{failInstanceName}, 0, true},
-		{"fail project id", p1, args{failProjectID}, 0, true},
-		{"fail zone", p1, args{failZone}, 0, true},
+		{"ok", p1, args{t1}, 4, http.StatusOK, false},
+		{"ok", p2, args{t2}, 6, http.StatusOK, false},
+		{"ok", p3, args{t3}, 4, http.StatusOK, false},
+		{"fail token", p1, args{"token"}, 0, http.StatusUnauthorized, true},
+		{"fail key", p1, args{failKey}, 0, http.StatusUnauthorized, true},
+		{"fail iss", p1, args{failIss}, 0, http.StatusUnauthorized, true},
+		{"fail aud", p1, args{failAud}, 0, http.StatusUnauthorized, true},
+		{"fail exp", p1, args{failExp}, 0, http.StatusUnauthorized, true},
+		{"fail nbf", p1, args{failNbf}, 0, http.StatusUnauthorized, true},
+		{"fail service account", p1, args{failServiceAccount}, 0, http.StatusUnauthorized, true},
+		{"fail invalid project id", p3, args{failInvalidProjectID}, 0, http.StatusUnauthorized, true},
+		{"fail invalid instance age", p3, args{failInvalidInstanceAge}, 0, http.StatusUnauthorized, true},
+		{"fail instance id", p1, args{failInstanceID}, 0, http.StatusUnauthorized, true},
+		{"fail instance name", p1, args{failInstanceName}, 0, http.StatusUnauthorized, true},
+		{"fail project id", p1, args{failProjectID}, 0, http.StatusUnauthorized, true},
+		{"fail zone", p1, args{failZone}, 0, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -339,8 +539,13 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GCP.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			} else if err != nil {
+				sc, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				assert.Equals(t, sc.StatusCode(), tt.code)
+			} else {
+				assert.Len(t, tt.wantLen, got)
 			}
-			assert.Len(t, tt.wantLen, got)
 		})
 	}
 }
@@ -350,6 +555,14 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 	defer fn()
 
 	p1, err := generateGCP()
+	assert.FatalError(t, err)
+
+	p2, err := generateGCP()
+	assert.FatalError(t, err)
+	// disable sshCA
+	disable := false
+	p2.Claims = &Claims{EnableSSHCA: &disable}
+	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	t1, err := generateGCPToken(p1.ServiceAccounts[0],
@@ -394,30 +607,35 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 		gcp         *GCP
 		args        args
 		expected    *SSHOptions
+		code        int
 		wantErr     bool
 		wantSignErr bool
 	}{
-		{"ok", p1, args{t1, SSHOptions{}, pub}, expectedHostOptions, false, false},
-		{"ok-rsa2048", p1, args{t1, SSHOptions{}, rsa2048.Public()}, expectedHostOptions, false, false},
-		{"ok-type", p1, args{t1, SSHOptions{CertType: "host"}, pub}, expectedHostOptions, false, false},
-		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"}}, pub}, expectedHostOptions, false, false},
-		{"ok-principal1", p1, args{t1, SSHOptions{Principals: []string{"instance-name.c.project-id.internal"}}, pub}, expectedHostOptionsPrincipal1, false, false},
-		{"ok-principal2", p1, args{t1, SSHOptions{Principals: []string{"instance-name.zone.c.project-id.internal"}}, pub}, expectedHostOptionsPrincipal2, false, false},
-		{"ok-options", p1, args{t1, SSHOptions{CertType: "host", Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"}}, pub}, expectedHostOptions, false, false},
-		{"fail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedHostOptions, false, true},
-		{"fail-type", p1, args{t1, SSHOptions{CertType: "user"}, pub}, nil, false, true},
-		{"fail-principal", p1, args{t1, SSHOptions{Principals: []string{"smallstep.com"}}, pub}, nil, false, true},
-		{"fail-extra-principal", p1, args{t1, SSHOptions{Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal", "smallstep.com"}}, pub}, nil, false, true},
+		{"ok", p1, args{t1, SSHOptions{}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"ok-rsa2048", p1, args{t1, SSHOptions{}, rsa2048.Public()}, expectedHostOptions, http.StatusOK, false, false},
+		{"ok-type", p1, args{t1, SSHOptions{CertType: "host"}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"ok-principal1", p1, args{t1, SSHOptions{Principals: []string{"instance-name.c.project-id.internal"}}, pub}, expectedHostOptionsPrincipal1, http.StatusOK, false, false},
+		{"ok-principal2", p1, args{t1, SSHOptions{Principals: []string{"instance-name.zone.c.project-id.internal"}}, pub}, expectedHostOptionsPrincipal2, http.StatusOK, false, false},
+		{"ok-options", p1, args{t1, SSHOptions{CertType: "host", Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"fail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedHostOptions, http.StatusOK, false, true},
+		{"fail-type", p1, args{t1, SSHOptions{CertType: "user"}, pub}, nil, http.StatusOK, false, true},
+		{"fail-principal", p1, args{t1, SSHOptions{Principals: []string{"smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
+		{"fail-extra-principal", p1, args{t1, SSHOptions{Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal", "smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
+		{"fail-sshCA-disabled", p2, args{"foo", SSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
+		{"fail-invalid-token", p1, args{"foo", SSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := NewContextWithMethod(context.Background(), SignSSHMethod)
-			got, err := tt.gcp.AuthorizeSSHSign(ctx, tt.args.token)
+			got, err := tt.gcp.AuthorizeSSHSign(context.Background(), tt.args.token)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GCP.AuthorizeSSHSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if err != nil {
+				sc, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
 				cert, err := signSSHCertificate(tt.args.key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
@@ -435,7 +653,7 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 	}
 }
 
-func TestGCP_AuthorizeRenewal(t *testing.T) {
+func TestGCP_AuthorizeRenew(t *testing.T) {
 	p1, err := generateGCP()
 	assert.FatalError(t, err)
 	p2, err := generateGCP()
@@ -454,46 +672,20 @@ func TestGCP_AuthorizeRenewal(t *testing.T) {
 		name    string
 		prov    *GCP
 		args    args
+		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{nil}, false},
-		{"fail", p2, args{nil}, true},
+		{"ok", p1, args{nil}, http.StatusOK, false},
+		{"fail/renewal-disabled", p2, args{nil}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.prov.AuthorizeRenewal(context.TODO(), tt.args.cert); (err != nil) != tt.wantErr {
-				t.Errorf("GCP.AuthorizeRenewal() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestGCP_AuthorizeRevoke(t *testing.T) {
-	p1, err := generateGCP()
-	assert.FatalError(t, err)
-
-	t1, err := generateGCPToken(p1.ServiceAccounts[0],
-		"https://accounts.google.com", p1.GetID(),
-		"instance-id", "instance-name", "project-id", "zone",
-		time.Now(), &p1.keyStore.keySet.Keys[0])
-	assert.FatalError(t, err)
-
-	type args struct {
-		token string
-	}
-	tests := []struct {
-		name    string
-		gcp     *GCP
-		args    args
-		wantErr bool
-	}{
-		{"ok", p1, args{t1}, true}, // revoke is disabled
-		{"fail", p1, args{"token"}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.gcp.AuthorizeRevoke(context.TODO(), tt.args.token); (err != nil) != tt.wantErr {
-				t.Errorf("GCP.AuthorizeRevoke() error = %v, wantErr %v", err, tt.wantErr)
+			if err := tt.prov.AuthorizeRenew(context.Background(), tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("GCP.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
+			} else if err != nil {
+				sc, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})
 	}

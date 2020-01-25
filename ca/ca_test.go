@@ -22,6 +22,7 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/randutil"
@@ -102,7 +103,7 @@ func TestCASign(t *testing.T) {
 				ca:     ca,
 				body:   "invalid json",
 				status: http.StatusBadRequest,
-				errMsg: "Bad Request",
+				errMsg: errs.BadRequestDefaultMsg,
 			}
 		},
 		"fail invalid-csr-sig": func(t *testing.T) *signTest {
@@ -140,7 +141,7 @@ ZEp7knvU2psWRw==
 				ca:     ca,
 				body:   string(body),
 				status: http.StatusBadRequest,
-				errMsg: "Bad Request",
+				errMsg: errs.BadRequestDefaultMsg,
 			}
 		},
 		"fail unauthorized-ott": func(t *testing.T) *signTest {
@@ -155,7 +156,7 @@ ZEp7knvU2psWRw==
 				ca:     ca,
 				body:   string(body),
 				status: http.StatusUnauthorized,
-				errMsg: "Unauthorized",
+				errMsg: errs.UnauthorizedDefaultMsg,
 			}
 		},
 		"fail commonname-claim": func(t *testing.T) *signTest {
@@ -188,7 +189,7 @@ ZEp7knvU2psWRw==
 				ca:     ca,
 				body:   string(body),
 				status: http.StatusUnauthorized,
-				errMsg: "Unauthorized",
+				errMsg: errs.UnauthorizedDefaultMsg,
 			}
 		},
 		"ok": func(t *testing.T) *signTest {
@@ -392,7 +393,7 @@ func TestCAProvisionerEncryptedKey(t *testing.T) {
 				ca:     ca,
 				kid:    "foo",
 				status: http.StatusNotFound,
-				errMsg: "Not Found",
+				errMsg: errs.NotFoundDefaultMsg,
 			}
 		},
 		"ok": func(t *testing.T) *ekt {
@@ -455,7 +456,7 @@ func TestCARoot(t *testing.T) {
 				ca:     ca,
 				sha:    "foo",
 				status: http.StatusNotFound,
-				errMsg: "Not Found",
+				errMsg: errs.NotFoundDefaultMsg,
 			}
 		},
 		"success": func(t *testing.T) *rootTest {
@@ -575,7 +576,7 @@ func TestCARenew(t *testing.T) {
 				ca:           ca,
 				tlsConnState: nil,
 				status:       http.StatusBadRequest,
-				errMsg:       "Bad Request",
+				errMsg:       errs.BadRequestDefaultMsg,
 			}
 		},
 		"request-missing-peer-certificate": func(t *testing.T) *renewTest {
@@ -583,7 +584,7 @@ func TestCARenew(t *testing.T) {
 				ca:           ca,
 				tlsConnState: &tls.ConnectionState{PeerCertificates: []*x509.Certificate{}},
 				status:       http.StatusBadRequest,
-				errMsg:       "Bad Request",
+				errMsg:       errs.BadRequestDefaultMsg,
 			}
 		},
 		"success": func(t *testing.T) *renewTest {

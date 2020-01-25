@@ -276,6 +276,7 @@ func TestIdentity_Renew(t *testing.T) {
 	}
 
 	oldIdentityDir := identityDir
+	identityDir = "testdata/identity"
 	defer func() {
 		identityDir = oldIdentityDir
 		os.RemoveAll(tmpDir)

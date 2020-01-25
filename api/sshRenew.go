@@ -36,36 +36,36 @@ type SSHRenewResponse struct {
 func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 	var body SSHRenewRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequest(errors.Wrap(err, "error reading request body")))
+		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, errs.BadRequest(err))
+		WriteError(w, errs.BadRequestErr(err))
 		return
 	}
 
-	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.RenewSSHMethod)
+	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SSHRenewMethod)
 	_, err := h.Authority.Authorize(ctx, body.OTT)
 	if err != nil {
-		WriteError(w, errs.Unauthorized(err))
+		WriteError(w, errs.UnauthorizedErr(err))
 		return
 	}
-	oldCert, err := provisioner.ExtractSSHPOPCert(body.OTT)
+	oldCert, _, err := provisioner.ExtractSSHPOPCert(body.OTT)
 	if err != nil {
-		WriteError(w, errs.InternalServerError(err))
+		WriteError(w, errs.InternalServerErr(err))
 	}
 
 	newCert, err := h.Authority.RenewSSH(oldCert)
 	if err != nil {
-		WriteError(w, errs.Forbidden(err))
+		WriteError(w, errs.ForbiddenErr(err))
 		return
 	}
 
 	identity, err := h.renewIdentityCertificate(r)
 	if err != nil {
-		WriteError(w, errs.Forbidden(err))
+		WriteError(w, errs.ForbiddenErr(err))
 		return
 	}
 

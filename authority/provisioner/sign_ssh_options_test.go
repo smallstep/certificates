@@ -38,12 +38,463 @@ func TestSSHOptions_Type(t *testing.T) {
 	}
 }
 
-func Test_sshCertificateDefaultValidator_Valid(t *testing.T) {
+func TestSSHOptions_Modify(t *testing.T) {
+	type test struct {
+		so    *SSHOptions
+		cert  *ssh.Certificate
+		valid func(*ssh.Certificate)
+		err   error
+	}
+	tests := map[string](func() test){
+		"fail/unexpected-cert-type": func() test {
+			return test{
+				so:   &SSHOptions{CertType: "foo"},
+				cert: new(ssh.Certificate),
+				err:  errors.Errorf("ssh certificate has an unknown type - foo"),
+			}
+		},
+		"fail/validAfter-greater-validBefore": func() test {
+			return test{
+				so:   &SSHOptions{CertType: "user"},
+				cert: &ssh.Certificate{ValidAfter: uint64(15), ValidBefore: uint64(10)},
+				err:  errors.Errorf("ssh certificate valid after cannot be greater than valid before"),
+			}
+		},
+		"ok/user-cert": func() test {
+			return test{
+				so:   &SSHOptions{CertType: "user"},
+				cert: new(ssh.Certificate),
+				valid: func(cert *ssh.Certificate) {
+					assert.Equals(t, cert.CertType, uint32(ssh.UserCert))
+				},
+			}
+		},
+		"ok/host-cert": func() test {
+			return test{
+				so:   &SSHOptions{CertType: "host"},
+				cert: new(ssh.Certificate),
+				valid: func(cert *ssh.Certificate) {
+					assert.Equals(t, cert.CertType, uint32(ssh.HostCert))
+				},
+			}
+		},
+		"ok": func() test {
+			va := time.Now().Add(5 * time.Minute)
+			vb := time.Now().Add(1 * time.Hour)
+			so := &SSHOptions{CertType: "host", KeyID: "foo", Principals: []string{"foo", "bar"},
+				ValidAfter: NewTimeDuration(va), ValidBefore: NewTimeDuration(vb)}
+			return test{
+				so:   so,
+				cert: new(ssh.Certificate),
+				valid: func(cert *ssh.Certificate) {
+					assert.Equals(t, cert.CertType, uint32(ssh.HostCert))
+					assert.Equals(t, cert.KeyId, so.KeyID)
+					assert.Equals(t, cert.ValidPrincipals, so.Principals)
+					assert.Equals(t, cert.ValidAfter, uint64(so.ValidAfter.RelativeTime(time.Now()).Unix()))
+					assert.Equals(t, cert.ValidBefore, uint64(so.ValidBefore.RelativeTime(time.Now()).Unix()))
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run()
+			if err := tc.so.Modify(tc.cert); err != nil {
+				if assert.NotNil(t, tc.err) {
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					tc.valid(tc.cert)
+				}
+			}
+		})
+	}
+}
+
+func TestSSHOptions_Match(t *testing.T) {
+	type test struct {
+		so  SSHOptions
+		cmp SSHOptions
+		err error
+	}
+	tests := map[string](func() test){
+		"fail/cert-type": func() test {
+			return test{
+				so:  SSHOptions{CertType: "foo"},
+				cmp: SSHOptions{CertType: "bar"},
+				err: errors.Errorf("ssh certificate type does not match - got bar, want foo"),
+			}
+		},
+		"fail/pricipals": func() test {
+			return test{
+				so:  SSHOptions{Principals: []string{"foo"}},
+				cmp: SSHOptions{Principals: []string{"bar"}},
+				err: errors.Errorf("ssh certificate principals does not match - got [bar], want [foo]"),
+			}
+		},
+		"fail/validAfter": func() test {
+			return test{
+				so:  SSHOptions{ValidAfter: NewTimeDuration(time.Now().Add(1 * time.Minute))},
+				cmp: SSHOptions{ValidAfter: NewTimeDuration(time.Now().Add(5 * time.Minute))},
+				err: errors.Errorf("ssh certificate valid after does not match"),
+			}
+		},
+		"fail/validBefore": func() test {
+			return test{
+				so:  SSHOptions{ValidBefore: NewTimeDuration(time.Now().Add(1 * time.Minute))},
+				cmp: SSHOptions{ValidBefore: NewTimeDuration(time.Now().Add(5 * time.Minute))},
+				err: errors.Errorf("ssh certificate valid before does not match"),
+			}
+		},
+		"ok/original-empty": func() test {
+			return test{
+				so: SSHOptions{},
+				cmp: SSHOptions{
+					CertType:    "foo",
+					Principals:  []string{"foo"},
+					ValidAfter:  NewTimeDuration(time.Now().Add(1 * time.Minute)),
+					ValidBefore: NewTimeDuration(time.Now().Add(5 * time.Minute)),
+				},
+			}
+		},
+		"ok/cmp-empty": func() test {
+			return test{
+				cmp: SSHOptions{},
+				so: SSHOptions{
+					CertType:    "foo",
+					Principals:  []string{"foo"},
+					ValidAfter:  NewTimeDuration(time.Now().Add(1 * time.Minute)),
+					ValidBefore: NewTimeDuration(time.Now().Add(5 * time.Minute)),
+				},
+			}
+		},
+		"ok/equal": func() test {
+			n := time.Now()
+			va := NewTimeDuration(n.Add(1 * time.Minute))
+			vb := NewTimeDuration(n.Add(5 * time.Minute))
+			return test{
+				cmp: SSHOptions{
+					CertType:    "foo",
+					Principals:  []string{"foo"},
+					ValidAfter:  va,
+					ValidBefore: vb,
+				},
+				so: SSHOptions{
+					CertType:    "foo",
+					Principals:  []string{"foo"},
+					ValidAfter:  va,
+					ValidBefore: vb,
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run()
+			if err := tc.so.match(tc.cmp); err != nil {
+				if assert.NotNil(t, tc.err) {
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
+				}
+			} else {
+				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
+func Test_sshCertPrincipalsModifier_Modify(t *testing.T) {
+	type test struct {
+		modifier sshCertPrincipalsModifier
+		cert     *ssh.Certificate
+		expected []string
+	}
+	tests := map[string](func() test){
+		"ok": func() test {
+			a := []string{"foo", "bar"}
+			return test{
+				modifier: sshCertPrincipalsModifier(a),
+				cert:     new(ssh.Certificate),
+				expected: a,
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run()
+			if assert.Nil(t, tc.modifier.Modify(tc.cert)) {
+				assert.Equals(t, tc.cert.ValidPrincipals, tc.expected)
+			}
+		})
+	}
+}
+
+func Test_sshCertKeyIDModifier_Modify(t *testing.T) {
+	type test struct {
+		modifier sshCertKeyIDModifier
+		cert     *ssh.Certificate
+		expected string
+	}
+	tests := map[string](func() test){
+		"ok": func() test {
+			a := "foo"
+			return test{
+				modifier: sshCertKeyIDModifier(a),
+				cert:     new(ssh.Certificate),
+				expected: a,
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run()
+			if assert.Nil(t, tc.modifier.Modify(tc.cert)) {
+				assert.Equals(t, tc.cert.KeyId, tc.expected)
+			}
+		})
+	}
+}
+
+func Test_sshCertTypeModifier_Modify(t *testing.T) {
+	type test struct {
+		modifier sshCertTypeModifier
+		cert     *ssh.Certificate
+		expected uint32
+	}
+	tests := map[string](func() test){
+		"ok/user": func() test {
+			return test{
+				modifier: sshCertTypeModifier("user"),
+				cert:     new(ssh.Certificate),
+				expected: ssh.UserCert,
+			}
+		},
+		"ok/host": func() test {
+			return test{
+				modifier: sshCertTypeModifier("host"),
+				cert:     new(ssh.Certificate),
+				expected: ssh.HostCert,
+			}
+		},
+		"ok/default": func() test {
+			return test{
+				modifier: sshCertTypeModifier("foo"),
+				cert:     new(ssh.Certificate),
+				expected: 0,
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run()
+			if assert.Nil(t, tc.modifier.Modify(tc.cert)) {
+				assert.Equals(t, tc.cert.CertType, uint32(tc.expected))
+			}
+		})
+	}
+}
+
+func Test_sshCertValidAfterModifier_Modify(t *testing.T) {
+	type test struct {
+		modifier sshCertValidAfterModifier
+		cert     *ssh.Certificate
+		expected uint64
+	}
+	tests := map[string](func() test){
+		"ok": func() test {
+			return test{
+				modifier: sshCertValidAfterModifier(15),
+				cert:     new(ssh.Certificate),
+				expected: 15,
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run()
+			if assert.Nil(t, tc.modifier.Modify(tc.cert)) {
+				assert.Equals(t, tc.cert.ValidAfter, tc.expected)
+			}
+		})
+	}
+}
+
+func Test_sshCertDefaultsModifier_Modify(t *testing.T) {
+	type test struct {
+		modifier sshCertDefaultsModifier
+		cert     *ssh.Certificate
+		valid    func(*ssh.Certificate)
+	}
+	tests := map[string](func() test){
+		"ok/changes": func() test {
+			n := time.Now()
+			va := NewTimeDuration(n.Add(1 * time.Minute))
+			vb := NewTimeDuration(n.Add(5 * time.Minute))
+			so := SSHOptions{
+				Principals:  []string{"foo", "bar"},
+				CertType:    "host",
+				ValidAfter:  va,
+				ValidBefore: vb,
+			}
+			return test{
+				modifier: sshCertDefaultsModifier(so),
+				cert:     new(ssh.Certificate),
+				valid: func(cert *ssh.Certificate) {
+					assert.Equals(t, cert.ValidPrincipals, so.Principals)
+					assert.Equals(t, cert.CertType, uint32(ssh.HostCert))
+					assert.Equals(t, cert.ValidAfter, uint64(so.ValidAfter.RelativeTime(time.Now()).Unix()))
+					assert.Equals(t, cert.ValidBefore, uint64(so.ValidBefore.RelativeTime(time.Now()).Unix()))
+				},
+			}
+		},
+		"ok/no-changes": func() test {
+			n := time.Now()
+			so := SSHOptions{
+				Principals:  []string{"foo", "bar"},
+				CertType:    "host",
+				ValidAfter:  NewTimeDuration(n.Add(15 * time.Minute)),
+				ValidBefore: NewTimeDuration(n.Add(25 * time.Minute)),
+			}
+			return test{
+				modifier: sshCertDefaultsModifier(so),
+				cert: &ssh.Certificate{
+					CertType:        uint32(ssh.UserCert),
+					ValidPrincipals: []string{"zap", "zoop"},
+					ValidAfter:      15,
+					ValidBefore:     25,
+				},
+				valid: func(cert *ssh.Certificate) {
+					assert.Equals(t, cert.ValidPrincipals, []string{"zap", "zoop"})
+					assert.Equals(t, cert.CertType, uint32(ssh.UserCert))
+					assert.Equals(t, cert.ValidAfter, uint64(15))
+					assert.Equals(t, cert.ValidBefore, uint64(25))
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run()
+			if assert.Nil(t, tc.modifier.Modify(tc.cert)) {
+				tc.valid(tc.cert)
+			}
+		})
+	}
+}
+
+func Test_sshDefaultExtensionModifier_Modify(t *testing.T) {
+	type test struct {
+		modifier sshDefaultExtensionModifier
+		cert     *ssh.Certificate
+		valid    func(*ssh.Certificate)
+		err      error
+	}
+	tests := map[string](func() test){
+		"fail/unexpected-cert-type": func() test {
+			cert := &ssh.Certificate{CertType: 3}
+			return test{
+				modifier: sshDefaultExtensionModifier{},
+				cert:     cert,
+				err:      errors.New("ssh certificate type has not been set or is invalid"),
+			}
+		},
+		"ok/host": func() test {
+			cert := &ssh.Certificate{CertType: ssh.HostCert}
+			return test{
+				modifier: sshDefaultExtensionModifier{},
+				cert:     cert,
+				valid: func(cert *ssh.Certificate) {
+					assert.Len(t, 0, cert.Extensions)
+				},
+			}
+		},
+		"ok/user/extensions-exists": func() test {
+			cert := &ssh.Certificate{CertType: ssh.UserCert, Permissions: ssh.Permissions{Extensions: map[string]string{
+				"foo": "bar",
+			}}}
+			return test{
+				modifier: sshDefaultExtensionModifier{},
+				cert:     cert,
+				valid: func(cert *ssh.Certificate) {
+					val, ok := cert.Extensions["foo"]
+					assert.True(t, ok)
+					assert.Equals(t, val, "bar")
+
+					val, ok = cert.Extensions["permit-X11-forwarding"]
+					assert.True(t, ok)
+					assert.Equals(t, val, "")
+
+					val, ok = cert.Extensions["permit-agent-forwarding"]
+					assert.True(t, ok)
+					assert.Equals(t, val, "")
+
+					val, ok = cert.Extensions["permit-port-forwarding"]
+					assert.True(t, ok)
+					assert.Equals(t, val, "")
+
+					val, ok = cert.Extensions["permit-pty"]
+					assert.True(t, ok)
+					assert.Equals(t, val, "")
+
+					val, ok = cert.Extensions["permit-user-rc"]
+					assert.True(t, ok)
+					assert.Equals(t, val, "")
+				},
+			}
+		},
+		"ok/user/no-extensions": func() test {
+			return test{
+				modifier: sshDefaultExtensionModifier{},
+				cert:     &ssh.Certificate{CertType: ssh.UserCert},
+				valid: func(cert *ssh.Certificate) {
+					_, ok := cert.Extensions["foo"]
+					assert.False(t, ok)
+
+					val, ok := cert.Extensions["permit-X11-forwarding"]
+					assert.True(t, ok)
+					assert.Equals(t, val, "")
+
+					val, ok = cert.Extensions["permit-agent-forwarding"]
+					assert.True(t, ok)
+					assert.Equals(t, val, "")
+
+					val, ok = cert.Extensions["permit-port-forwarding"]
+					assert.True(t, ok)
+					assert.Equals(t, val, "")
+
+					val, ok = cert.Extensions["permit-pty"]
+					assert.True(t, ok)
+					assert.Equals(t, val, "")
+
+					val, ok = cert.Extensions["permit-user-rc"]
+					assert.True(t, ok)
+					assert.Equals(t, val, "")
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run()
+			if err := tc.modifier.Modify(tc.cert); err != nil {
+				if assert.NotNil(t, tc.err) {
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					tc.valid(tc.cert)
+				}
+			}
+		})
+	}
+}
+
+func Test_sshCertDefaultValidator_Valid(t *testing.T) {
 	pub, _, err := keys.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 	sshPub, err := ssh.NewPublicKey(pub)
 	assert.FatalError(t, err)
-	v := sshCertificateDefaultValidator{}
+	v := sshCertDefaultValidator{}
 	tests := []struct {
 		name string
 		cert *ssh.Certificate
@@ -208,7 +659,7 @@ func Test_sshCertificateDefaultValidator_Valid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := v.Valid(tt.cert); err != nil {
+			if err := v.Valid(tt.cert, SSHOptions{}); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -219,34 +670,39 @@ func Test_sshCertificateDefaultValidator_Valid(t *testing.T) {
 	}
 }
 
-func Test_sshCertificateValidityValidator(t *testing.T) {
+func Test_sshCertValidityValidator(t *testing.T) {
 	p, err := generateX5C(nil)
 	assert.FatalError(t, err)
-	v := sshCertificateValidityValidator{p.claimer}
+	v := sshCertValidityValidator{p.claimer}
 	n := now()
 	tests := []struct {
 		name string
 		cert *ssh.Certificate
+		opts SSHOptions
 		err  error
 	}{
 		{
 			"fail/validAfter-0",
 			&ssh.Certificate{CertType: ssh.UserCert},
+			SSHOptions{},
 			errors.New("ssh certificate validAfter cannot be 0"),
 		},
 		{
 			"fail/validBefore-in-past",
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: uint64(now().Unix()), ValidBefore: uint64(now().Add(-time.Minute).Unix())},
+			SSHOptions{},
 			errors.New("ssh certificate validBefore cannot be in the past"),
 		},
 		{
 			"fail/validBefore-before-validAfter",
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: uint64(now().Add(5 * time.Minute).Unix()), ValidBefore: uint64(now().Add(3 * time.Minute).Unix())},
+			SSHOptions{},
 			errors.New("ssh certificate validBefore cannot be before validAfter"),
 		},
 		{
 			"fail/cert-type-not-set",
 			&ssh.Certificate{ValidAfter: uint64(now().Unix()), ValidBefore: uint64(now().Add(10 * time.Minute).Unix())},
+			SSHOptions{},
 			errors.New("ssh certificate type has not been set"),
 		},
 		{
@@ -256,6 +712,7 @@ func Test_sshCertificateValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(now().Unix()),
 				ValidBefore: uint64(now().Add(10 * time.Minute).Unix()),
 			},
+			SSHOptions{},
 			errors.New("unknown ssh certificate type 3"),
 		},
 		{
@@ -265,7 +722,18 @@ func Test_sshCertificateValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(n.Unix()),
 				ValidBefore: uint64(n.Add(4 * time.Minute).Unix()),
 			},
+			SSHOptions{Backdate: time.Second},
 			errors.New("requested duration of 4m0s is less than minimum accepted duration for selected provisioner of 5m0s"),
+		},
+		{
+			"ok/duration-exactly-min",
+			&ssh.Certificate{
+				CertType:    1,
+				ValidAfter:  uint64(n.Unix()),
+				ValidBefore: uint64(n.Add(5 * time.Minute).Unix()),
+			},
+			SSHOptions{Backdate: time.Second},
+			nil,
 		},
 		{
 			"fail/duration>max",
@@ -274,7 +742,18 @@ func Test_sshCertificateValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(n.Unix()),
 				ValidBefore: uint64(n.Add(48 * time.Hour).Unix()),
 			},
-			errors.New("requested duration of 48h0m0s is greater than maximum accepted duration for selected provisioner of 24h0m0s"),
+			SSHOptions{Backdate: time.Second},
+			errors.New("requested duration of 48h0m0s is greater than maximum accepted duration for selected provisioner of 24h0m1s"),
+		},
+		{
+			"ok/duration-exactly-max",
+			&ssh.Certificate{
+				CertType:    1,
+				ValidAfter:  uint64(n.Unix()),
+				ValidBefore: uint64(n.Add(24*time.Hour + time.Second).Unix()),
+			},
+			SSHOptions{Backdate: time.Second},
+			nil,
 		},
 		{
 			"ok",
@@ -283,12 +762,13 @@ func Test_sshCertificateValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(now().Unix()),
 				ValidBefore: uint64(now().Add(8 * time.Hour).Unix()),
 			},
+			SSHOptions{Backdate: time.Second},
 			nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := v.Valid(tt.cert); err != nil {
+			if err := v.Valid(tt.cert, tt.opts); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -505,7 +985,7 @@ func Test_sshDefaultDuration_Option(t *testing.T) {
 		{"host backdate", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.HostCert}},
 			&ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(-1 * time.Minute), ValidBefore: unix(30 * 24 * time.Hour)}, false},
 		{"user validAfter", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(1 * time.Hour)}},
-			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(time.Minute), ValidBefore: unix(17 * time.Hour)}, false},
+			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(time.Hour), ValidBefore: unix(17 * time.Hour)}, false},
 		{"user validBefore", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.UserCert, ValidBefore: unix(1 * time.Hour)}},
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(-1 * time.Minute), ValidBefore: unix(time.Hour)}, false},
 		{"host validAfter validBefore", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(1 * time.Minute), ValidBefore: unix(2 * time.Minute)}},
@@ -541,7 +1021,7 @@ func Test_sshLimitDuration_Option(t *testing.T) {
 		name   string
 		fields fields
 		args   args
-		want   SSHCertificateModifier
+		want   SSHCertModifier
 	}{
 		// TODO: Add test cases.
 	}

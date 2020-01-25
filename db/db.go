@@ -270,6 +270,105 @@ func (db *DB) Shutdown() error {
 	return nil
 }
 
+// MockAuthDB mocks the AuthDB interface. //
+type MockAuthDB struct {
+	Err                   error
+	Ret1                  interface{}
+	MIsRevoked            func(string) (bool, error)
+	MIsSSHRevoked         func(string) (bool, error)
+	MRevoke               func(rci *RevokedCertificateInfo) error
+	MRevokeSSH            func(rci *RevokedCertificateInfo) error
+	MStoreCertificate     func(crt *x509.Certificate) error
+	MUseToken             func(id, tok string) (bool, error)
+	MIsSSHHost            func(principal string) (bool, error)
+	MStoreSSHCertificate  func(crt *ssh.Certificate) error
+	MGetSSHHostPrincipals func() ([]string, error)
+	MShutdown             func() error
+}
+
+// IsRevoked mock.
+func (m *MockAuthDB) IsRevoked(sn string) (bool, error) {
+	if m.MIsRevoked != nil {
+		return m.MIsRevoked(sn)
+	}
+	return m.Ret1.(bool), m.Err
+}
+
+// IsSSHRevoked mock.
+func (m *MockAuthDB) IsSSHRevoked(sn string) (bool, error) {
+	if m.MIsSSHRevoked != nil {
+		return m.MIsSSHRevoked(sn)
+	}
+	return m.Ret1.(bool), m.Err
+}
+
+// UseToken mock.
+func (m *MockAuthDB) UseToken(id, tok string) (bool, error) {
+	if m.MUseToken != nil {
+		return m.MUseToken(id, tok)
+	}
+	if m.Ret1 == nil {
+		return false, m.Err
+	}
+	return m.Ret1.(bool), m.Err
+}
+
+// Revoke mock.
+func (m *MockAuthDB) Revoke(rci *RevokedCertificateInfo) error {
+	if m.MRevoke != nil {
+		return m.MRevoke(rci)
+	}
+	return m.Err
+}
+
+// RevokeSSH mock.
+func (m *MockAuthDB) RevokeSSH(rci *RevokedCertificateInfo) error {
+	if m.MRevokeSSH != nil {
+		return m.MRevokeSSH(rci)
+	}
+	return m.Err
+}
+
+// StoreCertificate mock.
+func (m *MockAuthDB) StoreCertificate(crt *x509.Certificate) error {
+	if m.MStoreCertificate != nil {
+		return m.MStoreCertificate(crt)
+	}
+	return m.Err
+}
+
+// IsSSHHost mock.
+func (m *MockAuthDB) IsSSHHost(principal string) (bool, error) {
+	if m.MIsSSHHost != nil {
+		return m.MIsSSHHost(principal)
+	}
+	return m.Ret1.(bool), m.Err
+}
+
+// StoreSSHCertificate mock.
+func (m *MockAuthDB) StoreSSHCertificate(crt *ssh.Certificate) error {
+	if m.MStoreSSHCertificate != nil {
+		return m.MStoreSSHCertificate(crt)
+	}
+	return m.Err
+}
+
+// GetSSHHostPrincipals mock.
+func (m *MockAuthDB) GetSSHHostPrincipals() ([]string, error) {
+	if m.MGetSSHHostPrincipals != nil {
+		return m.MGetSSHHostPrincipals()
+	}
+	return m.Ret1.([]string), m.Err
+}
+
+// Shutdown mock.
+func (m *MockAuthDB) Shutdown() error {
+	if m.MShutdown != nil {
+		return m.MShutdown()
+	}
+	return m.Err
+}
+
 // MockNoSQLDB //
 type MockNoSQLDB struct {
 	Err          error

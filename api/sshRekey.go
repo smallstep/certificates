@@ -40,42 +40,42 @@ type SSHRekeyResponse struct {
 func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 	var body SSHRekeyRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequest(errors.Wrap(err, "error reading request body")))
+		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, errs.BadRequest(err))
+		WriteError(w, errs.BadRequestErr(err))
 		return
 	}
 
 	publicKey, err := ssh.ParsePublicKey(body.PublicKey)
 	if err != nil {
-		WriteError(w, errs.BadRequest(errors.Wrap(err, "error parsing publicKey")))
+		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error parsing publicKey"))
 		return
 	}
 
-	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.RekeySSHMethod)
+	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SSHRekeyMethod)
 	signOpts, err := h.Authority.Authorize(ctx, body.OTT)
 	if err != nil {
-		WriteError(w, errs.Unauthorized(err))
+		WriteError(w, errs.UnauthorizedErr(err))
 		return
 	}
-	oldCert, err := provisioner.ExtractSSHPOPCert(body.OTT)
+	oldCert, _, err := provisioner.ExtractSSHPOPCert(body.OTT)
 	if err != nil {
-		WriteError(w, errs.InternalServerError(err))
+		WriteError(w, errs.InternalServerErr(err))
 	}
 
 	newCert, err := h.Authority.RekeySSH(oldCert, publicKey, signOpts...)
 	if err != nil {
-		WriteError(w, errs.Forbidden(err))
+		WriteError(w, errs.ForbiddenErr(err))
 		return
 	}
 
 	identity, err := h.renewIdentityCertificate(r)
 	if err != nil {
-		WriteError(w, errs.Forbidden(err))
+		WriteError(w, errs.ForbiddenErr(err))
 		return
 	}
 

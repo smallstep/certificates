@@ -45,22 +45,22 @@ func signSSHCertificate(key crypto.PublicKey, opts SSHOptions, signOpts []SignOp
 		return nil, err
 	}
 
-	var mods []SSHCertificateModifier
-	var validators []SSHCertificateValidator
+	var mods []SSHCertModifier
+	var validators []SSHCertValidator
 
 	for _, op := range signOpts {
 		switch o := op.(type) {
 		// modify the ssh.Certificate
-		case SSHCertificateModifier:
+		case SSHCertModifier:
 			mods = append(mods, o)
 		// modify the ssh.Certificate given the SSHOptions
-		case SSHCertificateOptionModifier:
+		case SSHCertOptionModifier:
 			mods = append(mods, o.Option(opts))
 		// validate the ssh.Certificate
-		case SSHCertificateValidator:
+		case SSHCertValidator:
 			validators = append(validators, o)
 		// validate the given SSHOptions
-		case SSHCertificateOptionsValidator:
+		case SSHCertOptionsValidator:
 			if err := o.Valid(opts); err != nil {
 				return nil, err
 			}
@@ -116,7 +116,7 @@ func signSSHCertificate(key crypto.PublicKey, opts SSHOptions, signOpts []SignOp
 
 	// User provisioners validators
 	for _, v := range validators {
-		if err := v.Valid(cert); err != nil {
+		if err := v.Valid(cert, opts); err != nil {
 			return nil, err
 		}
 	}
