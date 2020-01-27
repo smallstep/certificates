@@ -6,8 +6,10 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"net/http"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/jose"
 	"golang.org/x/crypto/ed25519"
@@ -138,7 +140,8 @@ func (p *K8sSA) Init(config Config) (err error) {
 func (p *K8sSA) authorizeToken(token string, audiences []string) (*k8sSAPayload, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing token")
+		return nil, errs.Wrap(http.StatusUnauthorized, err,
+			"k8ssa.authorizeToken; error parsing k8sSA token")
 	}
 
 	var (
@@ -146,7 +149,7 @@ func (p *K8sSA) authorizeToken(token string, audiences []string) (*k8sSAPayload,
 		claims k8sSAPayload
 	)
 	if p.pubKeys == nil {
-		return nil, errors.New("TokenReview API integration not implemented")
+		return nil, errs.Unauthorized("k8ssa.authorizeToken; k8sSA TokenReview API integration not implemented")
 		/* NOTE: We plan to support the TokenReview API in a future release.
 		         Below is some code that should be useful when we prioritize
 				 this integration.
@@ -174,7 +177,7 @@ func (p *K8sSA) authorizeToken(token string, audiences []string) (*k8sSAPayload,
 		}
 	}
 	if !valid {
-		return nil, errors.New("error validating token and extracting claims")
+		return nil, errs.Unauthorized("k8ssa.authorizeToken; error validating k8sSA token and extracting claims")
 	}
 
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
@@ -182,11 +185,11 @@ func (p *K8sSA) authorizeToken(token string, audiences []string) (*k8sSAPayload,
 	if err = claims.Validate(jose.Expected{
 		Issuer: k8sSAIssuer,
 	}); err != nil {
-		return nil, errors.Wrapf(err, "invalid token claims")
+		return nil, errs.Wrap(http.StatusUnauthorized, err, "k8ssa.authorizeToken; invalid k8sSA token claims")
 	}
 
 	if claims.Subject == "" {
-		return nil, errors.New("token subject cannot be empty")
+		return nil, errs.Unauthorized("k8ssa.authorizeToken; k8sSA token subject cannot be empty")
 	}
 
 	return &claims, nil
@@ -196,14 +199,13 @@ func (p *K8sSA) authorizeToken(token string, audiences []string) (*k8sSAPayload,
 // revoke the certificate with serial number in the `sub` property.
 func (p *K8sSA) AuthorizeRevoke(ctx context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.audiences.Revoke)
-	return err
+	return errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeRevoke")
 }
 
 // AuthorizeSign validates the given token.
 func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	_, err := p.authorizeToken(token, p.audiences.Sign)
-	if err != nil {
-		return nil, err
+	if _, err := p.authorizeToken(token, p.audiences.Sign); err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSign")
 	}
 
 	return []SignOption{
@@ -219,7 +221,7 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 // AuthorizeRenew returns an error if the renewal is disabled.
 func (p *K8sSA) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
+		return errs.Unauthorized("k8ssa.AuthorizeRenew; renew is disabled for k8sSA provisioner %s", p.GetID())
 	}
 	return nil
 }
@@ -227,17 +229,14 @@ func (p *K8sSA) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) erro
 // AuthorizeSSHSign validates an request for an SSH certificate.
 func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errors.Errorf("authorizeSSHSign: ssh ca is disabled for provisioner %s", p.GetID())
+		return nil, errs.Unauthorized("k8ssa.AuthorizeSSHSign; sshCA is disabled for k8sSA provisioner %s", p.GetID())
 	}
-	_, err := p.authorizeToken(token, p.audiences.SSHSign)
-	if err != nil {
-		return nil, errors.Wrap(err, "authorizeSSHSign")
+	if _, err := p.authorizeToken(token, p.audiences.SSHSign); err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSSHSign")
 	}
 
 	// Default to a user certificate with no principals if not set
-	signOptions := []SignOption{
-		sshCertificateDefaultsModifier{CertType: SSHUserCert},
-	}
+	signOptions := []SignOption{sshCertDefaultsModifier{CertType: SSHUserCert}}
 
 	return append(signOptions,
 		// Set the default extensions.
@@ -247,9 +246,9 @@ func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertificateValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.claimer},
 		// Require and validate all the default fields in the SSH certificate.
-		&sshCertificateDefaultValidator{},
+		&sshCertDefaultValidator{},
 	), nil
 }
 

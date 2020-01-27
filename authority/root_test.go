@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/pemutil"
 )
 
@@ -16,12 +17,13 @@ func TestRoot(t *testing.T) {
 	a.certificates.Store("invaliddata", "a string") // invalid cert for testing
 
 	tests := map[string]struct {
-		sum string
-		err *apiError
+		sum  string
+		err  error
+		code int
 	}{
-		"not-found":                  {"foo", &apiError{errors.New("certificate with fingerprint foo was not found"), http.StatusNotFound, apiCtx{}}},
-		"invalid-stored-certificate": {"invaliddata", &apiError{errors.New("stored value is not a *x509.Certificate"), http.StatusInternalServerError, apiCtx{}}},
-		"success":                    {"189f573cfa159251e445530847ef80b1b62a3a380ee670dcb49e33ed34da0616", nil},
+		"not-found":                  {"foo", errors.New("certificate with fingerprint foo was not found"), http.StatusNotFound},
+		"invalid-stored-certificate": {"invaliddata", errors.New("stored value is not a *x509.Certificate"), http.StatusInternalServerError},
+		"success":                    {"189f573cfa159251e445530847ef80b1b62a3a380ee670dcb49e33ed34da0616", nil, http.StatusOK},
 	}
 
 	for name, tc := range tests {
@@ -29,14 +31,10 @@ func TestRoot(t *testing.T) {
 			crt, err := a.Root(tc.sum)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch v := err.(type) {
-					case *apiError:
-						assert.HasPrefix(t, v.err.Error(), tc.err.Error())
-						assert.Equals(t, v.code, tc.err.code)
-						assert.Equals(t, v.context, tc.err.context)
-					default:
-						t.Errorf("unexpected error type: %T", v)
-					}
+					sc, ok := err.(errs.StatusCoder)
+					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					assert.Equals(t, sc.StatusCode(), tc.code)
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
 				if assert.Nil(t, tc.err) {

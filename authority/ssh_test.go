@@ -5,8 +5,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 	"time"
@@ -15,6 +17,8 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/jose"
 	"golang.org/x/crypto/ssh"
@@ -58,7 +62,7 @@ func (m sshTestCertModifier) Modify(cert *ssh.Certificate) error {
 
 type sshTestCertValidator string
 
-func (v sshTestCertValidator) Valid(crt *ssh.Certificate) error {
+func (v sshTestCertValidator) Valid(crt *ssh.Certificate, opts provisioner.SSHOptions) error {
 	if v == "" {
 		return nil
 	}
@@ -76,7 +80,7 @@ func (v sshTestOptionsValidator) Valid(opts provisioner.SSHOptions) error {
 
 type sshTestOptionsModifier string
 
-func (m sshTestOptionsModifier) Option(opts provisioner.SSHOptions) provisioner.SSHCertificateModifier {
+func (m sshTestOptionsModifier) Option(opts provisioner.SSHOptions) provisioner.SSHCertModifier {
 	return sshTestCertModifier(string(m))
 }
 
@@ -488,18 +492,18 @@ func TestAuthority_CheckSSHHost(t *testing.T) {
 		want    bool
 		wantErr bool
 	}{
-		{"true", fields{true, nil}, args{context.TODO(), "foo.internal.com", ""}, true, false},
-		{"false", fields{false, nil}, args{context.TODO(), "foo.internal.com", ""}, false, false},
-		{"notImplemented", fields{false, db.ErrNotImplemented}, args{context.TODO(), "foo.internal.com", ""}, false, true},
-		{"notImplemented", fields{true, db.ErrNotImplemented}, args{context.TODO(), "foo.internal.com", ""}, false, true},
-		{"internal", fields{false, fmt.Errorf("an error")}, args{context.TODO(), "foo.internal.com", ""}, false, true},
-		{"internal", fields{true, fmt.Errorf("an error")}, args{context.TODO(), "foo.internal.com", ""}, false, true},
+		{"true", fields{true, nil}, args{context.Background(), "foo.internal.com", ""}, true, false},
+		{"false", fields{false, nil}, args{context.Background(), "foo.internal.com", ""}, false, false},
+		{"notImplemented", fields{false, db.ErrNotImplemented}, args{context.Background(), "foo.internal.com", ""}, false, true},
+		{"notImplemented", fields{true, db.ErrNotImplemented}, args{context.Background(), "foo.internal.com", ""}, false, true},
+		{"internal", fields{false, fmt.Errorf("an error")}, args{context.Background(), "foo.internal.com", ""}, false, true},
+		{"internal", fields{true, fmt.Errorf("an error")}, args{context.Background(), "foo.internal.com", ""}, false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := testAuthority(t)
-			a.db = &MockAuthDB{
-				isSSHHost: func(_ string) (bool, error) {
+			a.db = &db.MockAuthDB{
+				MIsSSHHost: func(_ string) (bool, error) {
 					return tt.fields.exists, tt.fields.err
 				},
 			}
@@ -640,9 +644,275 @@ func TestAuthority_GetSSHBastion(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.GetSSHBastion() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			} else if err != nil {
+				_, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Authority.GetSSHBastion() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAuthority_GetSSHHosts(t *testing.T) {
+	a := testAuthority(t)
+
+	type test struct {
+		getHostsFunc func(*x509.Certificate) ([]sshutil.Host, error)
+		auth         *Authority
+		cert         *x509.Certificate
+		cmp          func(got []sshutil.Host)
+		err          error
+		code         int
+	}
+	tests := map[string]func(t *testing.T) *test{
+		"fail/getHostsFunc-fail": func(t *testing.T) *test {
+			return &test{
+				getHostsFunc: func(cert *x509.Certificate) ([]sshutil.Host, error) {
+					return nil, errors.New("force")
+				},
+				cert: &x509.Certificate{},
+				err:  errors.New("getSSHHosts: force"),
+				code: http.StatusInternalServerError,
+			}
+		},
+		"ok/getHostsFunc-defined": func(t *testing.T) *test {
+			hosts := []sshutil.Host{
+				{HostID: "1", Hostname: "foo"},
+				{HostID: "2", Hostname: "bar"},
+			}
+
+			return &test{
+				getHostsFunc: func(cert *x509.Certificate) ([]sshutil.Host, error) {
+					return hosts, nil
+				},
+				cert: &x509.Certificate{},
+				cmp: func(got []sshutil.Host) {
+					assert.Equals(t, got, hosts)
+				},
+			}
+		},
+		"fail/db-get-fail": func(t *testing.T) *test {
+			return &test{
+				auth: testAuthority(t, WithDatabase(&db.MockAuthDB{
+					MGetSSHHostPrincipals: func() ([]string, error) {
+						return nil, errors.New("force")
+					},
+				})),
+				cert: &x509.Certificate{},
+				err:  errors.New("getSSHHosts: force"),
+				code: http.StatusInternalServerError,
+			}
+		},
+		"ok": func(t *testing.T) *test {
+			return &test{
+				auth: testAuthority(t, WithDatabase(&db.MockAuthDB{
+					MGetSSHHostPrincipals: func() ([]string, error) {
+						return []string{"foo", "bar"}, nil
+					},
+				})),
+				cert: &x509.Certificate{},
+				cmp: func(got []sshutil.Host) {
+					assert.Equals(t, got, []sshutil.Host{
+						{Hostname: "foo"},
+						{Hostname: "bar"},
+					})
+				},
+			}
+		},
+	}
+	for name, genTestCase := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := genTestCase(t)
+
+			auth := tc.auth
+			if auth == nil {
+				auth = a
+			}
+			auth.sshGetHostsFunc = tc.getHostsFunc
+
+			hosts, err := auth.GetSSHHosts(tc.cert)
+			if err != nil {
+				if assert.NotNil(t, tc.err) {
+					sc, ok := err.(errs.StatusCoder)
+					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					assert.Equals(t, sc.StatusCode(), tc.code)
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					tc.cmp(hosts)
+				}
+			}
+		})
+	}
+}
+
+func TestAuthority_RekeySSH(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.FatalError(t, err)
+	pub, err := ssh.NewPublicKey(key.Public())
+	assert.FatalError(t, err)
+	signKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	assert.FatalError(t, err)
+	signer, err := ssh.NewSignerFromKey(signKey)
+	assert.FatalError(t, err)
+
+	userOptions := sshTestModifier{
+		CertType: ssh.UserCert,
+	}
+
+	now := time.Now().UTC()
+
+	a := testAuthority(t)
+
+	type test struct {
+		auth       *Authority
+		userSigner ssh.Signer
+		hostSigner ssh.Signer
+		cert       *ssh.Certificate
+		key        ssh.PublicKey
+		signOpts   []provisioner.SignOption
+		cmpResult  func(old, n *ssh.Certificate)
+		err        error
+		code       int
+	}
+	tests := map[string]func(t *testing.T) *test{
+		"fail/opts-type": func(t *testing.T) *test {
+			return &test{
+				userSigner: signer,
+				hostSigner: signer,
+				key:        pub,
+				signOpts:   []provisioner.SignOption{userOptions},
+				err:        errors.New("rekeySSH; invalid extra option type"),
+				code:       http.StatusInternalServerError,
+			}
+		},
+		"fail/old-cert-validAfter": func(t *testing.T) *test {
+			return &test{
+				userSigner: signer,
+				hostSigner: signer,
+				cert:       &ssh.Certificate{},
+				key:        pub,
+				signOpts:   []provisioner.SignOption{},
+				err:        errors.New("rekeySSH; cannot rekey certificate without validity period"),
+				code:       http.StatusBadRequest,
+			}
+		},
+		"fail/old-cert-validBefore": func(t *testing.T) *test {
+			return &test{
+				userSigner: signer,
+				hostSigner: signer,
+				cert:       &ssh.Certificate{ValidAfter: uint64(now.Unix())},
+				key:        pub,
+				signOpts:   []provisioner.SignOption{},
+				err:        errors.New("rekeySSH; cannot rekey certificate without validity period"),
+				code:       http.StatusBadRequest,
+			}
+		},
+		"fail/old-cert-no-user-key": func(t *testing.T) *test {
+			return &test{
+				userSigner: nil,
+				hostSigner: signer,
+				cert:       &ssh.Certificate{ValidAfter: uint64(now.Unix()), ValidBefore: uint64(now.Add(10 * time.Minute).Unix()), CertType: ssh.UserCert},
+				key:        pub,
+				signOpts:   []provisioner.SignOption{},
+				err:        errors.New("rekeySSH; user certificate signing is not enabled"),
+				code:       http.StatusNotImplemented,
+			}
+		},
+		"fail/old-cert-no-host-key": func(t *testing.T) *test {
+			return &test{
+				userSigner: signer,
+				hostSigner: nil,
+				cert:       &ssh.Certificate{ValidAfter: uint64(now.Unix()), ValidBefore: uint64(now.Add(10 * time.Minute).Unix()), CertType: ssh.HostCert},
+				key:        pub,
+				signOpts:   []provisioner.SignOption{},
+				err:        errors.New("rekeySSH; host certificate signing is not enabled"),
+				code:       http.StatusNotImplemented,
+			}
+		},
+		"fail/unexpected-old-cert-type": func(t *testing.T) *test {
+			return &test{
+				userSigner: signer,
+				hostSigner: signer,
+				cert:       &ssh.Certificate{ValidAfter: uint64(now.Unix()), ValidBefore: uint64(now.Add(10 * time.Minute).Unix()), CertType: 0},
+				key:        pub,
+				signOpts:   []provisioner.SignOption{},
+				err:        errors.New("rekeySSH; unexpected ssh certificate type: 0"),
+				code:       http.StatusBadRequest,
+			}
+		},
+		"fail/db-store": func(t *testing.T) *test {
+			return &test{
+				auth: testAuthority(t, WithDatabase(&db.MockAuthDB{
+					MStoreSSHCertificate: func(cert *ssh.Certificate) error {
+						return errors.New("force")
+					},
+				})),
+				userSigner: signer,
+				hostSigner: nil,
+				cert:       &ssh.Certificate{ValidAfter: uint64(now.Unix()), ValidBefore: uint64(now.Add(10 * time.Minute).Unix()), CertType: ssh.UserCert},
+				key:        pub,
+				signOpts:   []provisioner.SignOption{},
+				err:        errors.New("rekeySSH; error storing certificate in db: force"),
+				code:       http.StatusInternalServerError,
+			}
+		},
+		"ok": func(t *testing.T) *test {
+			va1 := now.Add(-24 * time.Hour)
+			vb1 := now.Add(-23 * time.Hour)
+			return &test{
+				userSigner: signer,
+				hostSigner: nil,
+				cert: &ssh.Certificate{
+					ValidAfter:      uint64(va1.Unix()),
+					ValidBefore:     uint64(vb1.Unix()),
+					CertType:        ssh.UserCert,
+					ValidPrincipals: []string{"foo", "bar"},
+					KeyId:           "foo",
+				},
+				key:      pub,
+				signOpts: []provisioner.SignOption{},
+				cmpResult: func(old, n *ssh.Certificate) {
+					assert.Equals(t, n.CertType, old.CertType)
+					assert.Equals(t, n.ValidPrincipals, old.ValidPrincipals)
+					assert.Equals(t, n.KeyId, old.KeyId)
+
+					assert.True(t, n.ValidAfter > uint64(now.Add(-5*time.Minute).Unix()))
+					assert.True(t, n.ValidAfter < uint64(now.Add(5*time.Minute).Unix()))
+
+					l8r := now.Add(1 * time.Hour)
+					assert.True(t, n.ValidBefore > uint64(l8r.Add(-5*time.Minute).Unix()))
+					assert.True(t, n.ValidBefore < uint64(l8r.Add(5*time.Minute).Unix()))
+				},
+			}
+		},
+	}
+	for name, genTestCase := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := genTestCase(t)
+
+			auth := tc.auth
+			if auth == nil {
+				auth = a
+			}
+			a.sshCAUserCertSignKey = tc.userSigner
+			a.sshCAHostCertSignKey = tc.hostSigner
+
+			cert, err := auth.RekeySSH(tc.cert, tc.key, tc.signOpts...)
+			if err != nil {
+				if assert.NotNil(t, tc.err) {
+					sc, ok := err.(errs.StatusCoder)
+					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					assert.Equals(t, sc.StatusCode(), tc.code)
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					tc.cmpResult(tc.cert, cert)
+				}
 			}
 		})
 	}

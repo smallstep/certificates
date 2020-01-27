@@ -80,7 +80,9 @@ func NewTLSRenewer(cert *tls.Certificate, fn RenewFunc, opts ...tlsRenewerOption
 func (r *TLSRenewer) Run() {
 	cert := r.getCertificate()
 	next := r.nextRenewDuration(cert.Leaf.NotAfter)
+	r.Lock()
 	r.timer = time.AfterFunc(next, r.renewCertificate)
+	r.Unlock()
 }
 
 // RunContext starts the certificate renewer for the given certificate.

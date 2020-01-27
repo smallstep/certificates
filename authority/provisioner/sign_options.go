@@ -30,7 +30,7 @@ type SignOption interface{}
 // CertificateValidator is the interface used to validate a X.509 certificate.
 type CertificateValidator interface {
 	SignOption
-	Valid(crt *x509.Certificate) error
+	Valid(cert *x509.Certificate, o Options) error
 }
 
 // CertificateRequestValidator is the interface used to validate a X.509
@@ -106,7 +106,7 @@ func (v commonNameValidator) Valid(req *x509.CertificateRequest) error {
 		return errors.New("certificate request cannot contain an empty common name")
 	}
 	if req.Subject.CommonName != string(v) {
-		return errors.Errorf("certificate request does not contain the valid common name, got %s, want %s", req.Subject.CommonName, v)
+		return errors.Errorf("certificate request does not contain the valid common name; requested common name = %s, token subject = %s", req.Subject.CommonName, v)
 	}
 	return nil
 }
@@ -265,35 +265,32 @@ func newValidityValidator(min, max time.Duration) *validityValidator {
 
 // Valid validates the certificate validity settings (notBefore/notAfter) and
 // and total duration.
-func (v *validityValidator) Valid(crt *x509.Certificate) error {
+func (v *validityValidator) Valid(cert *x509.Certificate, o Options) error {
 	var (
-		na  = crt.NotAfter.Truncate(time.Second)
-		nb  = crt.NotBefore.Truncate(time.Second)
+		na  = cert.NotAfter.Truncate(time.Second)
+		nb  = cert.NotBefore.Truncate(time.Second)
 		now = time.Now().Truncate(time.Second)
 	)
 
-	// To not take into account the backdate, time.Now() will be used to
-	// calculate the duration if NotBefore is in the past.
-	var d time.Duration
-	if now.After(nb) {
-		d = na.Sub(now)
-	} else {
-		d = na.Sub(nb)
-	}
+	d := na.Sub(nb)
 
 	if na.Before(now) {
-		return errors.Errorf("NotAfter: %v cannot be in the past", na)
+		return errors.Errorf("notAfter cannot be in the past; na=%v", na)
 	}
 	if na.Before(nb) {
-		return errors.Errorf("NotAfter: %v cannot be before NotBefore: %v", na, nb)
+		return errors.Errorf("notAfter cannot be before notBefore; na=%v, nb=%v", na, nb)
 	}
 	if d < v.min {
 		return errors.Errorf("requested duration of %v is less than the authorized minimum certificate duration of %v",
 			d, v.min)
 	}
-	if d > v.max {
+	// NOTE: this check is not "technically correct". We're allowing the max
+	// duration of a cert to be "max + backdate" and not all certificates will
+	// be backdated (e.g. if a user passes the NotBefore value then we do not
+	// apply a backdate). This is good enough.
+	if d > v.max+o.Backdate {
 		return errors.Errorf("requested duration of %v is more than the authorized maximum certificate duration of %v",
-			d, v.max)
+			d, v.max+o.Backdate)
 	}
 	return nil
 }

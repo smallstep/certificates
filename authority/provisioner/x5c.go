@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
+	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
 )
@@ -121,19 +123,20 @@ func (p *X5C) Init(config Config) error {
 func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing token")
+		return nil, errs.Wrap(http.StatusUnauthorized, err, "x5c.authorizeToken; error parsing x5c token")
 	}
 
 	verifiedChains, err := jwt.Headers[0].Certificates(x509.VerifyOptions{
 		Roots: p.rootPool,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "error verifying x5c certificate chain")
+		return nil, errs.Wrap(http.StatusUnauthorized, err,
+			"x5c.authorizeToken; error verifying x5c certificate chain in token")
 	}
 	leaf := verifiedChains[0][0]
 
 	if leaf.KeyUsage&x509.KeyUsageDigitalSignature == 0 {
-		return nil, errors.New("certificate used to sign x5c token cannot be used for digital signature")
+		return nil, errs.Unauthorized("x5c.authorizeToken; certificate used to sign x5c token cannot be used for digital signature")
 	}
 
 	// Using the leaf certificates key to validate the claims accomplishes two
@@ -143,7 +146,7 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, err
 	//   2. Asserts that the claims are valid - have not been tampered with.
 	var claims x5cPayload
 	if err = jwt.Claims(leaf.PublicKey, &claims); err != nil {
-		return nil, errors.Wrap(err, "error parsing claims")
+		return nil, errs.Wrap(http.StatusUnauthorized, err, "x5c.authorizeToken; error parsing x5c claims")
 	}
 
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
@@ -152,16 +155,17 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, err
 		Issuer: p.Name,
 		Time:   time.Now().UTC(),
 	}, time.Minute); err != nil {
-		return nil, errors.Wrapf(err, "invalid token")
+		return nil, errs.Wrapf(http.StatusUnauthorized, err, "x5c.authorizeToken; invalid x5c claims")
 	}
 
 	// validate audiences with the defaults
 	if !matchesAudience(claims.Audience, audiences) {
-		return nil, errors.New("invalid token: invalid audience claim (aud)")
+		return nil, errs.Unauthorized("x5c.authorizeToken; x5c token has invalid audience "+
+			"claim (aud); expected %s, but got %s", audiences, claims.Audience)
 	}
 
 	if claims.Subject == "" {
-		return nil, errors.New("token subject cannot be empty")
+		return nil, errs.Unauthorized("x5c.authorizeToken; x5c token subject cannot be empty")
 	}
 
 	// Save the verified chains on the x5c payload object.
@@ -173,14 +177,14 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, err
 // revoke the certificate with serial number in the `sub` property.
 func (p *X5C) AuthorizeRevoke(ctx context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.audiences.Revoke)
-	return err
+	return errs.Wrap(http.StatusInternalServerError, err, "x5c.AuthorizeRevoke")
 }
 
 // AuthorizeSign validates the given token.
 func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.audiences.Sign)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "x5c.AuthorizeSign")
 	}
 
 	// NOTE: This is for backwards compatibility with older versions of cli
@@ -209,7 +213,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // AuthorizeRenew returns an error if the renewal is disabled.
 func (p *X5C) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errors.Errorf("renew is disabled for provisioner %s", p.GetID())
+		return errs.Unauthorized("x5c.AuthorizeRenew; renew is disabled for x5c provisioner %s", p.GetID())
 	}
 	return nil
 }
@@ -217,22 +221,22 @@ func (p *X5C) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errors.Errorf("ssh ca is disabled for provisioner %s", p.GetID())
+		return nil, errs.Unauthorized("x5c.AuthorizeSSHSign; sshCA is disabled for x5c provisioner %s", p.GetID())
 	}
 
 	claims, err := p.authorizeToken(token, p.audiences.SSHSign)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "x5c.AuthorizeSSHSign")
 	}
 
 	if claims.Step == nil || claims.Step.SSH == nil {
-		return nil, errors.New("authorization token must be an SSH provisioning token")
+		return nil, errs.Unauthorized("x5c.AuthorizeSSHSign; x5c token must be an SSH provisioning token")
 	}
 
 	opts := claims.Step.SSH
 	signOptions := []SignOption{
 		// validates user's SSHOptions with the ones in the token
-		sshCertificateOptionsValidator(*opts),
+		sshCertOptionsValidator(*opts),
 	}
 
 	// Add modifiers from custom claims
@@ -245,18 +249,18 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	}
 	t := now()
 	if !opts.ValidAfter.IsZero() {
-		signOptions = append(signOptions, sshCertificateValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
+		signOptions = append(signOptions, sshCertValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
 	}
 	if !opts.ValidBefore.IsZero() {
-		signOptions = append(signOptions, sshCertificateValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
+		signOptions = append(signOptions, sshCertValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
 	}
 	// Make sure to define the the KeyID
 	if opts.KeyID == "" {
-		signOptions = append(signOptions, sshCertificateKeyIDModifier(claims.Subject))
+		signOptions = append(signOptions, sshCertKeyIDModifier(claims.Subject))
 	}
 
 	// Default to a user certificate with no principals if not set
-	signOptions = append(signOptions, sshCertificateDefaultsModifier{CertType: SSHUserCert})
+	signOptions = append(signOptions, sshCertDefaultsModifier{CertType: SSHUserCert})
 
 	return append(signOptions,
 		// Set the default extensions.
@@ -268,8 +272,8 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertificateValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.claimer},
 		// Require all the fields in the SSH certificate
-		&sshCertificateDefaultValidator{},
+		&sshCertDefaultValidator{},
 	), nil
 }

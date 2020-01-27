@@ -7,13 +7,15 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/errs"
 )
 
 func TestGetEncryptedKey(t *testing.T) {
 	type ek struct {
-		a   *Authority
-		kid string
-		err *apiError
+		a    *Authority
+		kid  string
+		err  error
+		code int
 	}
 	tests := map[string]func(t *testing.T) *ek{
 		"ok": func(t *testing.T) *ek {
@@ -32,10 +34,10 @@ func TestGetEncryptedKey(t *testing.T) {
 			a, err := New(c)
 			assert.FatalError(t, err)
 			return &ek{
-				a:   a,
-				kid: "foo",
-				err: &apiError{errors.Errorf("encrypted key with kid foo was not found"),
-					http.StatusNotFound, apiCtx{}},
+				a:    a,
+				kid:  "foo",
+				err:  errors.New("encrypted key with kid foo was not found"),
+				code: http.StatusNotFound,
 			}
 		},
 	}
@@ -47,14 +49,10 @@ func TestGetEncryptedKey(t *testing.T) {
 			ek, err := tc.a.GetEncryptedKey(tc.kid)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch v := err.(type) {
-					case *apiError:
-						assert.HasPrefix(t, v.err.Error(), tc.err.Error())
-						assert.Equals(t, v.code, tc.err.code)
-						assert.Equals(t, v.context, tc.err.context)
-					default:
-						t.Errorf("unexpected error type: %T", v)
-					}
+					sc, ok := err.(errs.StatusCoder)
+					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					assert.Equals(t, sc.StatusCode(), tc.code)
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
@@ -71,8 +69,9 @@ func TestGetEncryptedKey(t *testing.T) {
 
 func TestGetProvisioners(t *testing.T) {
 	type gp struct {
-		a   *Authority
-		err *apiError
+		a    *Authority
+		err  error
+		code int
 	}
 	tests := map[string]func(t *testing.T) *gp{
 		"ok": func(t *testing.T) *gp {
@@ -91,14 +90,10 @@ func TestGetProvisioners(t *testing.T) {
 			ps, next, err := tc.a.GetProvisioners("", 0)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch v := err.(type) {
-					case *apiError:
-						assert.HasPrefix(t, v.err.Error(), tc.err.Error())
-						assert.Equals(t, v.code, tc.err.code)
-						assert.Equals(t, v.context, tc.err.context)
-					default:
-						t.Errorf("unexpected error type: %T", v)
-					}
+					sc, ok := err.(errs.StatusCoder)
+					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					assert.Equals(t, sc.StatusCode(), tc.code)
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
