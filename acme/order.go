@@ -253,15 +253,16 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 		return nil, ServerInternalErr(errors.Errorf("unexpected status %s for order %s", o.Status, o.ID))
 	}
 
-	// Validate identifier names against CSR alternative names //
+	// Validate identifier names against CSR alternative names. According to the
+	// RFC, the name can be either in the SANs or in the commonName.
 	csrNames := make(map[string]int)
+	if len(csr.DNSNames) == 0 && csr.Subject.CommonName != "" {
+		csr.DNSNames = []string{
+			csr.Subject.CommonName,
+		}
+	}
 	for _, n := range csr.DNSNames {
 		csrNames[n] = 1
-	}
-	// According to the RFC, the name can be either in the SANs or in the
-	// commonName.
-	if len(csrNames) == 0 && csr.Subject.CommonName != "" {
-		csrNames[csr.Subject.CommonName] = 1
 	}
 	orderNames := make(map[string]int)
 	for _, n := range o.Identifiers {
