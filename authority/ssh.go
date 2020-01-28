@@ -545,11 +545,6 @@ func (a *Authority) GetSSHHosts(cert *x509.Certificate) ([]sshutil.Host, error) 
 	for i, hn := range hostnames {
 		hosts[i] = sshutil.Host{Hostname: hn}
 	}
-
-	hosts := make([]sshutil.Host, len(hostnames))
-	for i, hn := range hostnames {
-		hosts[i] = sshutil.Host{Hostname: hn}
-	}
 	return hosts, nil
 }
 

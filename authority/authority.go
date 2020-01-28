@@ -9,12 +9,6 @@ import (
 	"sync"
 	"time"
 
-<<<<<<< HEAD
-=======
-	"github.com/smallstep/certificates/sshutil"
-	"github.com/smallstep/certificates/templates"
-
->>>>>>> Use an actual Hosts type when returning ssh hosts
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
