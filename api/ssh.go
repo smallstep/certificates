@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
 	"golang.org/x/crypto/ssh"
