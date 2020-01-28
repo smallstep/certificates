@@ -258,6 +258,11 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 	for _, n := range csr.DNSNames {
 		csrNames[n] = 1
 	}
+	// According to the RFC, the name can be either in the SANs or in the
+	// commonName.
+	if len(csrNames) == 0 && csr.Subject.CommonName != "" {
+		csrNames[csr.Subject.CommonName] = 1
+	}
 	orderNames := make(map[string]int)
 	for _, n := range o.Identifiers {
 		orderNames[n.Value] = 1

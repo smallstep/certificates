@@ -1098,6 +1098,55 @@ func TestOrderFinalize(t *testing.T) {
 				},
 			}
 		},
+		"ok-no-sans/ready/sign": func(t *testing.T) test {
+			o, err := newO()
+			assert.FatalError(t, err)
+			o.Status = StatusReady
+			o.Identifiers = []Identifier{
+				{Type: "dns", Value: "step.example.com"},
+			}
+
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "step.example.com",
+				},
+			}
+			crt := &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "step.example.com",
+				},
+				DNSNames: []string{"step.example.com"},
+			}
+			inter := &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "intermediate",
+				},
+			}
+
+			clone := *o
+			clone.Status = StatusValid
+			count := 0
+			return test{
+				o:   o,
+				res: &clone,
+				csr: csr,
+				sa: &mockSignAuth{
+					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, len(signOps), 4)
+						return []*x509.Certificate{crt, inter}, nil
+					},
+				},
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						if count == 0 {
+							clone.Certificate = string(key)
+						}
+						count++
+						return nil, true, nil
+					},
+				},
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
