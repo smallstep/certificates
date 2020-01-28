@@ -51,7 +51,7 @@ var (
 	challengeTable         = []byte("acme_challenges")
 	nonceTable             = []byte("nonces")
 	orderTable             = []byte("acme_orders")
-	ordersByAccountIDTable = []byte("acme_account-orders-index")
+	ordersByAccountIDTable = []byte("acme_account_orders_index")
 	certTable              = []byte("acme_certs")
 )
 
