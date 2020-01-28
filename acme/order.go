@@ -271,11 +271,11 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 
 	// Validate identifier names against CSR alternative names.
 	if len(csr.DNSNames) != len(orderNames) {
-		return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly"))
+		return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
 	}
 	for i := range csr.DNSNames {
 		if csr.DNSNames[i] != orderNames[i] {
-			return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly"))
+			return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
 		}
 	}
 
