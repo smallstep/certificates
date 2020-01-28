@@ -4,7 +4,8 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
-	"reflect"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -253,17 +254,29 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 		return nil, ServerInternalErr(errors.Errorf("unexpected status %s for order %s", o.Status, o.ID))
 	}
 
-	// Validate identifier names against CSR alternative names //
-	csrNames := make(map[string]int)
-	for _, n := range csr.DNSNames {
-		csrNames[n] = 1
+	// RFC8555: The CSR MUST indicate the exact same set of requested
+	// identifiers as the initial newOrder request. Identifiers of type "dns"
+	// MUST appear either in the commonName portion of the requested subject
+	// name or in an extensionRequest attribute [RFC2985] requesting a
+	// subjectAltName extension, or both.
+	if csr.Subject.CommonName != "" {
+		csr.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
 	}
-	orderNames := make(map[string]int)
-	for _, n := range o.Identifiers {
-		orderNames[n.Value] = 1
+	csr.DNSNames = uniqueLowerNames(csr.DNSNames)
+	orderNames := make([]string, len(o.Identifiers))
+	for i, n := range o.Identifiers {
+		orderNames[i] = n.Value
 	}
-	if !reflect.DeepEqual(csrNames, orderNames) {
-		return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly"))
+	orderNames = uniqueLowerNames(orderNames)
+
+	// Validate identifier names against CSR alternative names.
+	if len(csr.DNSNames) != len(orderNames) {
+		return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
+	}
+	for i := range csr.DNSNames {
+		if csr.DNSNames[i] != orderNames[i] {
+			return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
+		}
 	}
 
 	// Get authorizations from the ACME provisioner.
@@ -339,4 +352,20 @@ func (o *order) toACME(db nosql.DB, dir *directory, p provisioner.Interface) (*O
 		ao.Certificate = dir.getLink(CertificateLink, URLSafeProvisionerName(p), true, o.Certificate)
 	}
 	return ao, nil
+}
+
+// uniqueLowerNames returns the set of all unique names in the input after all
+// of them are lowercased. The returned names will be in their lowercased form
+// and sorted alphabetically.
+func uniqueLowerNames(names []string) (unique []string) {
+	nameMap := make(map[string]int, len(names))
+	for _, name := range names {
+		nameMap[strings.ToLower(name)] = 1
+	}
+	unique = make([]string, 0, len(nameMap))
+	for name := range nameMap {
+		unique = append(unique, name)
+	}
+	sort.Strings(unique)
+	return
 }
