@@ -385,11 +385,17 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 		return dc, nil
 	}
 
-	txtRecords, err := vo.lookupTxt("_acme-challenge." + dc.Value)
+	// Normalize domain for wildcard DNS names
+	// This is done to avoid making TXT lookups for domains like
+	// _acme-challenge.*.example.com
+	// Instead perform txt lookup for _acme-challenge.example.com
+	domain := strings.TrimPrefix(dc.Value, "*.")
+
+	txtRecords, err := vo.lookupTxt("_acme-challenge." + domain)
 	if err != nil {
 		if err = dc.storeError(db,
 			DNSErr(errors.Wrapf(err, "error looking up TXT "+
-				"records for domain %s", dc.Value))); err != nil {
+				"records for domain %s", domain))); err != nil {
 			return nil, err
 		}
 		return dc, nil

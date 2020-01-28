@@ -930,6 +930,47 @@ func TestDNS01Validate(t *testing.T) {
 				res: ch,
 			}
 		},
+		"ok/lookup-txt-wildcard": func(t *testing.T) test {
+			ch, err := newDNSCh()
+			assert.FatalError(t, err)
+			_ch, ok := ch.(*dns01Challenge)
+			assert.Fatal(t, ok)
+			_ch.baseChallenge.Value = "*.zap.internal"
+
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+
+			expKeyAuth, err := KeyAuthorization(ch.getToken(), jwk)
+			assert.FatalError(t, err)
+			h := sha256.Sum256([]byte(expKeyAuth))
+			expected := base64.RawURLEncoding.EncodeToString(h[:])
+
+			baseClone := ch.clone()
+			baseClone.Status = StatusValid
+			baseClone.Error = nil
+			newCh := &dns01Challenge{baseClone}
+
+			return test{
+				ch:  ch,
+				res: newCh,
+				vo: validateOptions{
+					lookupTxt: func(url string) ([]string, error) {
+						assert.Equals(t, url, "_acme-challenge.zap.internal")
+						return []string{"foo", expected}, nil
+					},
+				},
+				jwk: jwk,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						dnsCh, err := unmarshalChallenge(newval)
+						assert.FatalError(t, err)
+						assert.Equals(t, dnsCh.getStatus(), StatusValid)
+						baseClone.Validated = dnsCh.getValidated()
+						return nil, true, nil
+					},
+				},
+			}
+		},
 		"fail/key-authorization-gen-error": func(t *testing.T) test {
 			ch, err := newDNSCh()
 			assert.FatalError(t, err)
