@@ -100,8 +100,8 @@ func (a *Authority) Authorize(ctx context.Context, token string) ([]provisioner.
 		if a.sshCAHostCertSignKey == nil && a.sshCAUserCertSignKey == nil {
 			return nil, errs.NotImplemented("authority.Authorize; ssh certificate flows are not enabled", opts...)
 		}
-		_, err := a.authorizeSSHSign(ctx, token)
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Authorize", opts...)
+		signOpts, err := a.authorizeSSHSign(ctx, token)
+		return signOpts, errs.Wrap(http.StatusInternalServerError, err, "authority.Authorize", opts...)
 	case provisioner.SSHRenewMethod:
 		if a.sshCAHostCertSignKey == nil && a.sshCAUserCertSignKey == nil {
 			return nil, errs.NotImplemented("authority.Authorize; ssh certificate flows are not enabled", opts...)
