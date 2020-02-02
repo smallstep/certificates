@@ -9,7 +9,7 @@ func AccountDoesNotExistErr(err error) *Error {
 	return &Error{
 		Type:   accountDoesNotExistErr,
 		Detail: "Account does not exist",
-		Status: 404,
+		Status: 400,
 		Err:    err,
 	}
 }
