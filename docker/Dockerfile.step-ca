@@ -7,6 +7,10 @@ ENV PWDPATH="/home/step/secrets/password"
 
 COPY $BINPATH "/usr/local/bin/step-ca"
 
+USER root
+RUN apk add --no-cache libcap && setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/step-ca
+USER step
+
 VOLUME ["/home/step"]
 STOPSIGNAL SIGTERM
 
