@@ -324,9 +324,12 @@ func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo valida
 		return nil, err
 	}
 	if keyAuth != expected {
-		if err = hc.storeError(db,
-			RejectedIdentifierErr(errors.Errorf("keyAuthorization does not match; "+
-				"expected %s, but got %s", expected, keyAuth))); err != nil {
+		rejectedErr := RejectedIdentifierErr(errors.Errorf("keyAuthorization does not match; "+
+			"expected %s, but got %s", expected, keyAuth))
+		upd := hc.clone()
+		upd.Error = rejectedErr.ToACME()
+		upd.Error.Subproblems = append(upd.Error.Subproblems, rejectedErr)
+		if err = upd.save(db, hc); err != nil {
 			return nil, err
 		}
 		return hc, nil
@@ -393,9 +396,12 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 
 	txtRecords, err := vo.lookupTxt("_acme-challenge." + domain)
 	if err != nil {
-		if err = dc.storeError(db,
-			DNSErr(errors.Wrapf(err, "error looking up TXT "+
-				"records for domain %s", domain))); err != nil {
+		dnsErr := DNSErr(errors.Wrapf(err, "error looking up TXT "+
+			"records for domain %s", domain))
+		upd := dc.clone()
+		upd.Error = dnsErr.ToACME()
+		upd.Error.Subproblems = append(upd.Error.Subproblems, dnsErr)
+		if err = upd.save(db, dc); err != nil {
 			return nil, err
 		}
 		return dc, nil
@@ -415,14 +421,16 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 		}
 	}
 	if !found {
-		if err = dc.storeError(db,
-			RejectedIdentifierErr(errors.Errorf("keyAuthorization "+
-				"does not match; expected %s, but got %s", expectedKeyAuth, txtRecords))); err != nil {
+		rejectedErr := RejectedIdentifierErr(errors.Errorf("keyAuthorization "+
+			"does not match; expected %s, but got %s", expectedKeyAuth, txtRecords))
+		upd := dc.clone()
+		upd.Error = rejectedErr.ToACME()
+		upd.Error.Subproblems = append(upd.Error.Subproblems, rejectedErr)
+		if err = upd.save(db, dc); err != nil {
 			return nil, err
 		}
 		return dc, nil
 	}
-
 	// Update and store the challenge.
 	upd := &dns01Challenge{dc.baseChallenge.clone()}
 	upd.Status = StatusValid
