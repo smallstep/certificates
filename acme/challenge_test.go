@@ -433,13 +433,39 @@ func TestChallengeUnmarshal(t *testing.T) {
 				err: ServerInternalErr(errors.New("error unmarshaling challenge type: unexpected end of JSON input")),
 			}
 		},
-		"fail/unexpected-type": func(t *testing.T) test {
+		"fail/unexpected-type-http": func(t *testing.T) test {
 			httpCh, err := newHTTPCh()
 			assert.FatalError(t, err)
 			_httpCh, ok := httpCh.(*http01Challenge)
 			assert.Fatal(t, ok)
 			_httpCh.baseChallenge.Type = "foo"
 			b, err := json.Marshal(httpCh)
+			assert.FatalError(t, err)
+			return test{
+				chb: b,
+				err: ServerInternalErr(errors.New("unexpected challenge type foo")),
+			}
+		},
+		"fail/unexpected-type-alpn": func(t *testing.T) test {
+			tlsALPNCh, err := newTLSALPNCh()
+			assert.FatalError(t, err)
+			_tlsALPNCh, ok := tlsALPNCh.(*tlsALPN01Challenge)
+			assert.Fatal(t, ok)
+			_tlsALPNCh.baseChallenge.Type = "foo"
+			b, err := json.Marshal(tlsALPNCh)
+			assert.FatalError(t, err)
+			return test{
+				chb: b,
+				err: ServerInternalErr(errors.New("unexpected challenge type foo")),
+			}
+		},
+		"fail/unexpected-type-dns": func(t *testing.T) test {
+			dnsCh, err := newDNSCh()
+			assert.FatalError(t, err)
+			_tlsALPNCh, ok := dnsCh.(*dns01Challenge)
+			assert.Fatal(t, ok)
+			_tlsALPNCh.baseChallenge.Type = "foo"
+			b, err := json.Marshal(dnsCh)
 			assert.FatalError(t, err)
 			return test{
 				chb: b,
