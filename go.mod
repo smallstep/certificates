@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/Masterminds/sprig/v3 v3.0.0
+	github.com/davecgh/go-spew v1.1.1
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.8.1
