@@ -23,8 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/crypto/acme"
-
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/db"
@@ -1352,6 +1350,45 @@ func TestTLSALPN01Validate(t *testing.T) {
 				res: ch,
 			}
 		},
+		"ok/no-protocol": func(t *testing.T) test {
+			ch, err := newTLSALPNCh()
+			assert.FatalError(t, err)
+			oldb, err := json.Marshal(ch)
+			assert.FatalError(t, err)
+
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+
+			expErr := RejectedIdentifierErr(errors.New("cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge"))
+			baseClone := ch.clone()
+			baseClone.Error = expErr.ToACME()
+			newCh := &tlsALPN01Challenge{baseClone}
+			newb, err := json.Marshal(newCh)
+			assert.FatalError(t, err)
+
+			srv := httptest.NewTLSServer(nil)
+
+			return test{
+				srv: srv,
+				ch:  ch,
+				vo: validateOptions{
+					tlsDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
+						return tls.DialWithDialer(&net.Dialer{Timeout: time.Second}, "tcp", srv.Listener.Addr().String(), config)
+					},
+				},
+				jwk: jwk,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, challengeTable)
+						assert.Equals(t, key, []byte(ch.getID()))
+						assert.Equals(t, old, oldb)
+						assert.Equals(t, string(newval), string(newb))
+						return nil, true, nil
+					},
+				},
+				res: ch,
+			}
+		},
 		"ok/mismatched-token": func(t *testing.T) test {
 			ch, err := newTLSALPNCh()
 			assert.FatalError(t, err)
@@ -1563,7 +1600,7 @@ func newTestTLSALPNServer(validationCert *tls.Certificate) (*httptest.Server, tl
 
 	srv.TLS = &tls.Config{
 		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			if len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == acme.ALPNProto {
+			if len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == "acme-tls/1" {
 				return validationCert, nil
 			}
 			return nil, nil
