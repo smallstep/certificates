@@ -2,14 +2,13 @@ package api
 
 import (
 	"fmt"
-	"net/http"
-
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/jose"
+	"net/http"
 )
 
 func link(url, typ string) string {
@@ -181,13 +180,15 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	ch, err = h.Auth.ValidateChallenge(prov, acc.GetID(), chID, acc.GetKey())
 	if err != nil {
 		api.WriteError(w, err)
-		return
+	} else if ch.Status != acme.StatusValid && ch.Status != acme.StatusInvalid {
+		w.Header().Add("Retry-After", "60")
+		api.JSON(w, ch)
+	} else {
+		getLink := h.Auth.GetLink
+		w.Header().Add("Link", link(getLink(acme.AuthzLink, acme.URLSafeProvisionerName(prov), true, ch.GetAuthzID()), "up"))
+		w.Header().Set("Location", getLink(acme.ChallengeLink, acme.URLSafeProvisionerName(prov), true, ch.GetID()))
+		api.JSON(w, ch)
 	}
-
-	getLink := h.Auth.GetLink
-	w.Header().Add("Link", link(getLink(acme.AuthzLink, acme.URLSafeProvisionerName(prov), true, ch.GetAuthzID()), "up"))
-	w.Header().Set("Location", getLink(acme.ChallengeLink, acme.URLSafeProvisionerName(prov), true, ch.GetID()))
-	api.JSON(w, ch)
 }
 
 // GetCertificate ACME api for retrieving a Certificate.
