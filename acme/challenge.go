@@ -406,9 +406,6 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 	certs := cs.PeerCertificates
 
 	if len(certs) == 0 {
-		// note: it does not seem to be possible to trigger this path, as the Go TLS client will return a dial error
-		// when no certificate is served
-
 		if err = tc.storeError(db,
 			RejectedIdentifierErr(errors.Errorf("%s challenge for %s resulted in no certificates",
 				tc.Type, tc.Value))); err != nil {

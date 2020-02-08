@@ -1509,7 +1509,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				res: ch,
 			}
 		},
-		"ok/with-new-oid": func(t *testing.T) test {
+		"ok": func(t *testing.T) test {
 			ch, err := newTLSALPNCh()
 			assert.FatalError(t, err)
 			_ch, ok := ch.(*tlsALPN01Challenge)
