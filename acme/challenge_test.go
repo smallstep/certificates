@@ -1463,6 +1463,52 @@ func TestTLSALPN01Validate(t *testing.T) {
 				res: ch,
 			}
 		},
+		"ok/obsolete-oid": func(t *testing.T) test {
+			ch, err := newTLSALPNCh()
+			assert.FatalError(t, err)
+			oldb, err := json.Marshal(ch)
+			assert.FatalError(t, err)
+
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+
+			expErr := RejectedIdentifierErr(errors.New("incorrect certificate for tls-alpn-01 challenge: " +
+				"obsolete id-pe-acmeIdentifier in acmeValidationV1 extension"))
+			baseClone := ch.clone()
+			baseClone.Error = expErr.ToACME()
+			newCh := &tlsALPN01Challenge{baseClone}
+			newb, err := json.Marshal(newCh)
+			assert.FatalError(t, err)
+
+			expKeyAuth, err := KeyAuthorization(ch.getToken(), jwk)
+			assert.FatalError(t, err)
+			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
+
+			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], true, true, ch.getValue())
+			assert.FatalError(t, err)
+
+			srv, tlsDial := newTestTLSALPNServer(cert)
+			srv.Start()
+
+			return test{
+				srv: srv,
+				ch:  ch,
+				vo: validateOptions{
+					tlsDial: tlsDial,
+				},
+				jwk: jwk,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, challengeTable)
+						assert.Equals(t, key, []byte(ch.getID()))
+						assert.Equals(t, old, oldb)
+						assert.Equals(t, string(newval), string(newb))
+						return nil, true, nil
+					},
+				},
+				res: ch,
+			}
+		},
 		"ok/with-new-oid": func(t *testing.T) test {
 			ch, err := newTLSALPNCh()
 			assert.FatalError(t, err)
@@ -1503,60 +1549,6 @@ func TestTLSALPN01Validate(t *testing.T) {
 
 						return tlsDial(network, addr, config)
 					},
-				},
-				jwk: jwk,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, key, []byte(ch.getID()))
-						assert.Equals(t, old, oldb)
-
-						alpnCh, err := unmarshalChallenge(newval)
-						assert.FatalError(t, err)
-						assert.Equals(t, alpnCh.getStatus(), StatusValid)
-						assert.True(t, alpnCh.getValidated().Before(time.Now().UTC().Add(time.Minute)))
-						assert.True(t, alpnCh.getValidated().After(time.Now().UTC().Add(-1*time.Second)))
-
-						baseClone.Validated = alpnCh.getValidated()
-
-						return nil, true, nil
-					},
-				},
-				res: newCh,
-			}
-		},
-		"ok/with-obsolete-oid": func(t *testing.T) test {
-			ch, err := newTLSALPNCh()
-			assert.FatalError(t, err)
-			_ch, ok := ch.(*tlsALPN01Challenge)
-			assert.Fatal(t, ok)
-			_ch.baseChallenge.Error = MalformedErr(nil).ToACME()
-			oldb, err := json.Marshal(ch)
-			assert.FatalError(t, err)
-
-			baseClone := ch.clone()
-			baseClone.Status = StatusValid
-			baseClone.Error = nil
-			newCh := &tlsALPN01Challenge{baseClone}
-
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
-
-			expKeyAuth, err := KeyAuthorization(ch.getToken(), jwk)
-			assert.FatalError(t, err)
-			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
-
-			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], true, true, ch.getValue())
-			assert.FatalError(t, err)
-
-			srv, tlsDial := newTestTLSALPNServer(cert)
-			srv.Start()
-
-			return test{
-				srv: srv,
-				ch:  ch,
-				vo: validateOptions{
-					tlsDial: tlsDial,
 				},
 				jwk: jwk,
 				db: &db.MockNoSQLDB{

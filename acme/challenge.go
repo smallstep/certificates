@@ -439,6 +439,7 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 
 	idPeAcmeIdentifier := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 31}
 	idPeAcmeIdentifierV1Obsolete := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 30, 1}
+	foundIDPeAcmeIdentifierV1Obsolete := false
 
 	keyAuth, err := KeyAuthorization(tc.Token, jwk)
 	if err != nil {
@@ -447,8 +448,7 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 	hashedKeyAuth := sha256.Sum256([]byte(keyAuth))
 
 	for _, ext := range leafCert.Extensions {
-		if idPeAcmeIdentifier.Equal(ext.Id) || idPeAcmeIdentifierV1Obsolete.Equal(ext.Id) {
-
+		if idPeAcmeIdentifier.Equal(ext.Id) {
 			if !ext.Critical {
 				if err = tc.storeError(db,
 					RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
@@ -490,6 +490,19 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 			}
 			return upd, nil
 		}
+
+		if idPeAcmeIdentifierV1Obsolete.Equal(ext.Id) {
+			foundIDPeAcmeIdentifierV1Obsolete = true
+		}
+	}
+
+	if foundIDPeAcmeIdentifierV1Obsolete {
+		if err = tc.storeError(db,
+			RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+				"obsolete id-pe-acmeIdentifier in acmeValidationV1 extension"))); err != nil {
+			return nil, err
+		}
+		return tc, nil
 	}
 
 	if err = tc.storeError(db,
