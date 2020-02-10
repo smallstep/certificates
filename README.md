@@ -342,8 +342,8 @@ Documentation can be found in a handful of different places:
 
 1. The [docs](./docs/README.md) sub-repo has an index of documentation and tutorials.
 
-2. On the command line with `step ca help xxx` where `xxx` is the subcommand
-you are interested in. Ex: `step help ca provisioners list`.
+2. On the command line with `step help ca xxx` where `xxx` is the subcommand
+you are interested in. Ex: `step help ca provisioner list`.
 
 3. On the web at https://smallstep.com/docs/certificates.
 
