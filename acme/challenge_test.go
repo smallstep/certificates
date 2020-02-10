@@ -14,8 +14,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
-	"log"
 	"math/big"
 	"net"
 	"net/http"
@@ -1086,21 +1086,19 @@ func TestTLSALPN01Validate(t *testing.T) {
 			oldb, err := json.Marshal(ch)
 			assert.FatalError(t, err)
 
-			expErr := ConnectionErr(errors.Errorf("error doing TLS dial for %v:443: remote error: tls: internal error", ch.getValue()))
+			expErr := RejectedIdentifierErr(errors.Errorf("tls-alpn-01 challenge for %v resulted in no certificates", ch.getValue()))
 			baseClone := ch.clone()
 			baseClone.Error = expErr.ToACME()
 			newCh := &tlsALPN01Challenge{baseClone}
 			newb, err := json.Marshal(newCh)
 			assert.FatalError(t, err)
 
-			srv, tlsDial := newTestTLSALPNServer(nil)
-			srv.Start()
-
 			return test{
-				srv: srv,
-				ch:  ch,
+				ch: ch,
 				vo: validateOptions{
-					tlsDial: tlsDial,
+					tlsDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
+						return tls.Client(&noopConn{}, config), nil
+					},
 				},
 				db: &db.MockNoSQLDB{
 					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
@@ -1630,12 +1628,24 @@ func newTestTLSALPNServer(validationCert *tls.Certificate) (*httptest.Server, tl
 	}
 
 	srv.Listener = tls.NewListener(srv.Listener, srv.TLS)
-	srv.Config.ErrorLog = log.New(ioutil.Discard, "", 0) // hush
+	//srv.Config.ErrorLog = log.New(ioutil.Discard, "", 0) // hush
 
 	return srv, func(network, addr string, config *tls.Config) (conn *tls.Conn, err error) {
 		return tls.DialWithDialer(&net.Dialer{Timeout: time.Second}, "tcp", srv.Listener.Addr().String(), config)
 	}
 }
+
+// noopConn is a mock net.Conn that does nothing.
+type noopConn struct{}
+
+func (c *noopConn) Read(_ []byte) (n int, err error)   { return 0, io.EOF }
+func (c *noopConn) Write(_ []byte) (n int, err error)  { return 0, io.EOF }
+func (c *noopConn) Close() error                       { return nil }
+func (c *noopConn) LocalAddr() net.Addr                { return &net.IPAddr{IP: net.IPv4zero, Zone: ""} }
+func (c *noopConn) RemoteAddr() net.Addr               { return &net.IPAddr{IP: net.IPv4zero, Zone: ""} }
+func (c *noopConn) SetDeadline(t time.Time) error      { return nil }
+func (c *noopConn) SetReadDeadline(t time.Time) error  { return nil }
+func (c *noopConn) SetWriteDeadline(t time.Time) error { return nil }
 
 func newTLSALPNValidationCert(keyAuthHash []byte, obsoleteOID, critical bool, names ...string) (*tls.Certificate, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
