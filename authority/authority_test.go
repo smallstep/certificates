@@ -137,7 +137,8 @@ func TestAuthorityNew(t *testing.T) {
 					assert.Equals(t, auth.rootX509Certs[0], root)
 
 					assert.True(t, auth.initOnce)
-					assert.NotNil(t, auth.intermediateIdentity)
+					assert.NotNil(t, auth.x509Signer)
+					assert.NotNil(t, auth.x509Issuer)
 					for _, p := range tc.config.AuthorityConfig.Provisioners {
 						var _p provisioner.Interface
 						_p, ok = auth.provisioners.Load(p.GetID())
