@@ -462,9 +462,9 @@ func TestChallengeUnmarshal(t *testing.T) {
 		"fail/unexpected-type-dns": func(t *testing.T) test {
 			dnsCh, err := newDNSCh()
 			assert.FatalError(t, err)
-			_tlsALPNCh, ok := dnsCh.(*dns01Challenge)
+			_dnsCh, ok := dnsCh.(*dns01Challenge)
 			assert.Fatal(t, ok)
-			_tlsALPNCh.baseChallenge.Type = "foo"
+			_dnsCh.baseChallenge.Type = "foo"
 			b, err := json.Marshal(dnsCh)
 			assert.FatalError(t, err)
 			return test{
@@ -489,6 +489,16 @@ func TestChallengeUnmarshal(t *testing.T) {
 			assert.FatalError(t, err)
 			return test{
 				ch:  httpCh,
+				chb: b,
+			}
+		},
+		"ok/alpn": func(t *testing.T) test {
+			tlsALPNCh, err := newTLSALPNCh()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(tlsALPNCh)
+			assert.FatalError(t, err)
+			return test{
+				ch:  tlsALPNCh,
 				chb: b,
 			}
 		},
