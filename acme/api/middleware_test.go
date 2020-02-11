@@ -842,7 +842,7 @@ func TestHandlerLookupJWK(t *testing.T) {
 					},
 				},
 				ctx:        ctx,
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},

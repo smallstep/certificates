@@ -3,10 +3,15 @@ package acme
 import (
 	"crypto"
 	"crypto/sha256"
+	"crypto/subtle"
+	"crypto/tls"
+	"encoding/asn1"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -51,10 +56,12 @@ func (c *Challenge) GetAuthzID() string {
 
 type httpGetter func(string) (*http.Response, error)
 type lookupTxt func(string) ([]string, error)
+type tlsDialer func(network, addr string, config *tls.Config) (*tls.Conn, error)
 
 type validateOptions struct {
 	httpGet   httpGetter
 	lookupTxt lookupTxt
+	tlsDial   tlsDialer
 }
 
 // challenge is the interface ACME challenege types must implement.
@@ -258,6 +265,13 @@ func unmarshalChallenge(data []byte) (challenge, error) {
 				"challenge type into http01Challenge"))
 		}
 		return &http01Challenge{&bc}, nil
+	case "tls-alpn-01":
+		var bc baseChallenge
+		if err := json.Unmarshal(data, &bc); err != nil {
+			return nil, ServerInternalErr(errors.Wrap(err, "error unmarshaling "+
+				"challenge type into tlsALPN01Challenge"))
+		}
+		return &tlsALPN01Challenge{&bc}, nil
 	default:
 		return nil, ServerInternalErr(errors.Errorf("unexpected challenge type %s", getType.Type))
 	}
@@ -342,6 +356,158 @@ func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo valida
 		return nil, err
 	}
 	return upd, nil
+}
+
+type tlsALPN01Challenge struct {
+	*baseChallenge
+}
+
+// newTLSALPN01Challenge returns a new acme tls-alpn-01 challenge.
+func newTLSALPN01Challenge(db nosql.DB, ops ChallengeOptions) (challenge, error) {
+	bc, err := newBaseChallenge(ops.AccountID, ops.AuthzID)
+	if err != nil {
+		return nil, err
+	}
+	bc.Type = "tls-alpn-01"
+	bc.Value = ops.Identifier.Value
+
+	hc := &tlsALPN01Challenge{bc}
+	if err := hc.save(db, nil); err != nil {
+		return nil, err
+	}
+	return hc, nil
+}
+
+func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
+	// If already valid or invalid then return without performing validation.
+	if tc.getStatus() == StatusValid || tc.getStatus() == StatusInvalid {
+		return tc, nil
+	}
+
+	config := &tls.Config{
+		NextProtos:         []string{"acme-tls/1"},
+		ServerName:         tc.Value,
+		InsecureSkipVerify: true, // we expect a self-signed challenge certificate
+	}
+
+	hostPort := net.JoinHostPort(tc.Value, "443")
+
+	conn, err := vo.tlsDial("tcp", hostPort, config)
+	if err != nil {
+		if err = tc.storeError(db,
+			ConnectionErr(errors.Wrapf(err, "error doing TLS dial for %s", hostPort))); err != nil {
+			return nil, err
+		}
+		return tc, nil
+	}
+	defer conn.Close()
+
+	cs := conn.ConnectionState()
+	certs := cs.PeerCertificates
+
+	if len(certs) == 0 {
+		if err = tc.storeError(db,
+			RejectedIdentifierErr(errors.Errorf("%s challenge for %s resulted in no certificates",
+				tc.Type, tc.Value))); err != nil {
+			return nil, err
+		}
+		return tc, nil
+	}
+
+	if !cs.NegotiatedProtocolIsMutual || cs.NegotiatedProtocol != "acme-tls/1" {
+		if err = tc.storeError(db,
+			RejectedIdentifierErr(errors.Errorf("cannot negotiate ALPN acme-tls/1 protocol for "+
+				"tls-alpn-01 challenge"))); err != nil {
+			return nil, err
+		}
+		return tc, nil
+	}
+
+	leafCert := certs[0]
+
+	if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], tc.Value) {
+		if err = tc.storeError(db,
+			RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+				"leaf certificate must contain a single DNS name, %v", tc.Value))); err != nil {
+			return nil, err
+		}
+		return tc, nil
+	}
+
+	idPeAcmeIdentifier := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 31}
+	idPeAcmeIdentifierV1Obsolete := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 30, 1}
+	foundIDPeAcmeIdentifierV1Obsolete := false
+
+	keyAuth, err := KeyAuthorization(tc.Token, jwk)
+	if err != nil {
+		return nil, err
+	}
+	hashedKeyAuth := sha256.Sum256([]byte(keyAuth))
+
+	for _, ext := range leafCert.Extensions {
+		if idPeAcmeIdentifier.Equal(ext.Id) {
+			if !ext.Critical {
+				if err = tc.storeError(db,
+					RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+						"acmeValidationV1 extension not critical"))); err != nil {
+					return nil, err
+				}
+				return tc, nil
+			}
+
+			var extValue []byte
+			rest, err := asn1.Unmarshal(ext.Value, &extValue)
+
+			if err != nil || len(rest) > 0 || len(hashedKeyAuth) != len(extValue) {
+				if err = tc.storeError(db,
+					RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+						"malformed acmeValidationV1 extension value"))); err != nil {
+					return nil, err
+				}
+				return tc, nil
+			}
+
+			if subtle.ConstantTimeCompare(hashedKeyAuth[:], extValue) != 1 {
+				if err = tc.storeError(db,
+					RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+						"expected acmeValidationV1 extension value %s for this challenge but got %s",
+						hex.EncodeToString(hashedKeyAuth[:]), hex.EncodeToString(extValue)))); err != nil {
+					return nil, err
+				}
+				return tc, nil
+			}
+
+			upd := &tlsALPN01Challenge{tc.baseChallenge.clone()}
+			upd.Status = StatusValid
+			upd.Error = nil
+			upd.Validated = clock.Now()
+
+			if err := upd.save(db, tc); err != nil {
+				return nil, err
+			}
+			return upd, nil
+		}
+
+		if idPeAcmeIdentifierV1Obsolete.Equal(ext.Id) {
+			foundIDPeAcmeIdentifierV1Obsolete = true
+		}
+	}
+
+	if foundIDPeAcmeIdentifierV1Obsolete {
+		if err = tc.storeError(db,
+			RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+				"obsolete id-pe-acmeIdentifier in acmeValidationV1 extension"))); err != nil {
+			return nil, err
+		}
+		return tc, nil
+	}
+
+	if err = tc.storeError(db,
+		RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+			"missing acmeValidationV1 extension"))); err != nil {
+		return nil, err
+	}
+	return tc, nil
 }
 
 // dns01Challenge represents an dns-01 acme challenge.

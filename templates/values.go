@@ -9,6 +9,7 @@ type Step struct {
 	SSH StepSSH
 }
 
+// StepSSH holds SSH-related values for the CA.
 type StepSSH struct {
 	HostKey           ssh.PublicKey
 	UserKey           ssh.PublicKey

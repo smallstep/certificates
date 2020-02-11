@@ -372,7 +372,7 @@ func TestHandlerGetAuthz(t *testing.T) {
 			return test{
 				auth:       &mockAcmeAuthority{},
 				ctx:        context.WithValue(context.Background(), provisionerContextKey, prov),
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
@@ -382,7 +382,7 @@ func TestHandlerGetAuthz(t *testing.T) {
 			return test{
 				auth:       &mockAcmeAuthority{},
 				ctx:        ctx,
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
@@ -504,7 +504,7 @@ func TestHandlerGetCertificate(t *testing.T) {
 			return test{
 				auth:       &mockAcmeAuthority{},
 				ctx:        context.WithValue(context.Background(), provisionerContextKey, prov),
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
@@ -513,7 +513,7 @@ func TestHandlerGetCertificate(t *testing.T) {
 			return test{
 				auth:       &mockAcmeAuthority{},
 				ctx:        ctx,
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
@@ -623,7 +623,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 		"fail/no-account": func(t *testing.T) test {
 			return test{
 				ctx:        context.WithValue(context.Background(), provisionerContextKey, prov),
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
@@ -632,7 +632,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 			ctx = context.WithValue(ctx, accContextKey, nil)
 			return test{
 				ctx:        ctx,
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},

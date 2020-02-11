@@ -202,7 +202,7 @@ func TestHandlerGetOrdersByAccount(t *testing.T) {
 			return test{
 				auth:       &mockAcmeAuthority{},
 				ctx:        context.WithValue(context.Background(), provisionerContextKey, prov),
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
@@ -212,7 +212,7 @@ func TestHandlerGetOrdersByAccount(t *testing.T) {
 			return test{
 				auth:       &mockAcmeAuthority{},
 				ctx:        ctx,
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
@@ -378,7 +378,7 @@ func TestHandlerNewAccount(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			return test{
 				ctx:        ctx,
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
@@ -569,7 +569,7 @@ func TestHandlerGetUpdateAccount(t *testing.T) {
 		"fail/no-account": func(t *testing.T) test {
 			return test{
 				ctx:        context.WithValue(context.Background(), provisionerContextKey, prov),
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
@@ -578,7 +578,7 @@ func TestHandlerGetUpdateAccount(t *testing.T) {
 			ctx = context.WithValue(ctx, accContextKey, nil)
 			return test{
 				ctx:        ctx,
-				statusCode: 404,
+				statusCode: 400,
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},

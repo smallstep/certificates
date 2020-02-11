@@ -96,7 +96,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	acc, err := accountFromContext(r)
 	if err != nil {
 		acmeErr, ok := err.(*acme.Error)
-		if !ok || acmeErr.Status != http.StatusNotFound {
+		if !ok || acmeErr.Status != http.StatusBadRequest {
 			// Something went wrong ...
 			api.WriteError(w, err)
 			return

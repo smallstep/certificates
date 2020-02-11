@@ -325,7 +325,7 @@ func TestNewOrder(t *testing.T) {
 				ops: defaultOrderOps(),
 				db: &db.MockNoSQLDB{
 					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						if count >= 6 {
+						if count >= 8 {
 							return nil, false, errors.New("force")
 						}
 						count++
@@ -342,7 +342,7 @@ func TestNewOrder(t *testing.T) {
 				ops: ops,
 				db: &db.MockNoSQLDB{
 					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						if count >= 7 {
+						if count >= 9 {
 							return nil, false, errors.New("force")
 						}
 						count++
@@ -357,7 +357,7 @@ func TestNewOrder(t *testing.T) {
 		},
 		"fail/save-orderIDs-error": func(t *testing.T) test {
 			count := 0
-			oids := []string{"1", "2"}
+			oids := []string{"1", "2", "3"}
 			oidsB, err := json.Marshal(oids)
 			assert.FatalError(t, err)
 			var (
@@ -369,11 +369,11 @@ func TestNewOrder(t *testing.T) {
 				ops: ops,
 				db: &db.MockNoSQLDB{
 					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						if count >= 7 {
+						if count >= 9 {
 							assert.Equals(t, bucket, ordersByAccountIDTable)
 							assert.Equals(t, key, []byte(ops.AccountID))
 							return nil, false, errors.New("force")
-						} else if count == 6 {
+						} else if count == 8 {
 							*oid = string(key)
 						}
 						count++
@@ -393,7 +393,7 @@ func TestNewOrder(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			count := 0
-			oids := []string{"1", "2"}
+			oids := []string{"1", "2", "3"}
 			oidsB, err := json.Marshal(oids)
 			assert.FatalError(t, err)
 			authzs := &([]string{})
@@ -406,18 +406,18 @@ func TestNewOrder(t *testing.T) {
 				ops: ops,
 				db: &db.MockNoSQLDB{
 					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						if count >= 7 {
+						if count >= 9 {
 							assert.Equals(t, bucket, ordersByAccountIDTable)
 							assert.Equals(t, key, []byte(ops.AccountID))
 							assert.Equals(t, old, oidsB)
 							newB, err := json.Marshal(append(oids, *oid))
 							assert.FatalError(t, err)
 							assert.Equals(t, newval, newB)
-						} else if count == 6 {
+						} else if count == 8 {
 							*oid = string(key)
-						} else if count == 5 {
+						} else if count == 7 {
 							*authzs = append(*authzs, string(key))
-						} else if count == 2 {
+						} else if count == 3 {
 							*authzs = []string{string(key)}
 						}
 						count++
@@ -649,28 +649,36 @@ func TestOrderUpdateStatus(t *testing.T) {
 			assert.FatalError(t, err)
 			az2, err := newAz()
 			assert.FatalError(t, err)
+			az3, err := newAz()
+			assert.FatalError(t, err)
 
 			ch1, err := newHTTPCh()
 			assert.FatalError(t, err)
-			ch2, err := newDNSCh()
+			ch2, err := newTLSALPNCh()
+			assert.FatalError(t, err)
+			ch3, err := newDNSCh()
 			assert.FatalError(t, err)
 
 			ch1b, err := json.Marshal(ch1)
 			assert.FatalError(t, err)
 			ch2b, err := json.Marshal(ch2)
 			assert.FatalError(t, err)
+			ch3b, err := json.Marshal(ch3)
+			assert.FatalError(t, err)
 
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Authorizations = []string{az1.getID(), az2.getID()}
+			o.Authorizations = []string{az1.getID(), az2.getID(), az3.getID()}
 
-			_az2, ok := az2.(*dnsAuthz)
+			_az3, ok := az3.(*dnsAuthz)
 			assert.Fatal(t, ok)
-			_az2.baseAuthz.Status = StatusValid
+			_az3.baseAuthz.Status = StatusValid
 
 			b1, err := json.Marshal(az1)
 			assert.FatalError(t, err)
 			b2, err := json.Marshal(az2)
+			assert.FatalError(t, err)
+			b3, err := json.Marshal(az3)
 			assert.FatalError(t, err)
 
 			count := 0
@@ -688,7 +696,17 @@ func TestOrderUpdateStatus(t *testing.T) {
 						case 2:
 							ret = ch2b
 						case 3:
+							ret = ch3b
+						case 4:
 							ret = b2
+						case 5:
+							ret = ch1b
+						case 6:
+							ret = ch2b
+						case 7:
+							ret = ch3b
+						case 8:
+							ret = b3
 						default:
 							return nil, errors.New("unexpected count")
 						}
@@ -706,28 +724,36 @@ func TestOrderUpdateStatus(t *testing.T) {
 			assert.FatalError(t, err)
 			az2, err := newAz()
 			assert.FatalError(t, err)
+			az3, err := newAz()
+			assert.FatalError(t, err)
 
 			ch1, err := newHTTPCh()
 			assert.FatalError(t, err)
-			ch2, err := newDNSCh()
+			ch2, err := newTLSALPNCh()
+			assert.FatalError(t, err)
+			ch3, err := newDNSCh()
 			assert.FatalError(t, err)
 
 			ch1b, err := json.Marshal(ch1)
 			assert.FatalError(t, err)
 			ch2b, err := json.Marshal(ch2)
 			assert.FatalError(t, err)
+			ch3b, err := json.Marshal(ch3)
+			assert.FatalError(t, err)
 
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Authorizations = []string{az1.getID(), az2.getID()}
+			o.Authorizations = []string{az1.getID(), az2.getID(), az3.getID()}
 
-			_az2, ok := az2.(*dnsAuthz)
+			_az3, ok := az3.(*dnsAuthz)
 			assert.Fatal(t, ok)
-			_az2.baseAuthz.Status = StatusInvalid
+			_az3.baseAuthz.Status = StatusInvalid
 
 			b1, err := json.Marshal(az1)
 			assert.FatalError(t, err)
 			b2, err := json.Marshal(az2)
+			assert.FatalError(t, err)
+			b3, err := json.Marshal(az3)
 			assert.FatalError(t, err)
 
 			_o := *o
@@ -749,7 +775,17 @@ func TestOrderUpdateStatus(t *testing.T) {
 						case 2:
 							ret = ch2b
 						case 3:
+							ret = ch3b
+						case 4:
 							ret = b2
+						case 5:
+							ret = ch1b
+						case 6:
+							ret = ch2b
+						case 7:
+							ret = ch3b
+						case 8:
+							ret = b3
 						default:
 							return nil, errors.New("unexpected count")
 						}
@@ -846,28 +882,36 @@ func TestOrderFinalize(t *testing.T) {
 			assert.FatalError(t, err)
 			az2, err := newAz()
 			assert.FatalError(t, err)
+			az3, err := newAz()
+			assert.FatalError(t, err)
 
 			ch1, err := newHTTPCh()
 			assert.FatalError(t, err)
-			ch2, err := newDNSCh()
+			ch2, err := newTLSALPNCh()
+			assert.FatalError(t, err)
+			ch3, err := newDNSCh()
 			assert.FatalError(t, err)
 
 			ch1b, err := json.Marshal(ch1)
 			assert.FatalError(t, err)
 			ch2b, err := json.Marshal(ch2)
 			assert.FatalError(t, err)
+			ch3b, err := json.Marshal(ch3)
+			assert.FatalError(t, err)
 
 			o, err := newO()
 			assert.FatalError(t, err)
-			o.Authorizations = []string{az1.getID(), az2.getID()}
+			o.Authorizations = []string{az1.getID(), az2.getID(), az3.getID()}
 
-			_az2, ok := az2.(*dnsAuthz)
+			_az3, ok := az3.(*dnsAuthz)
 			assert.Fatal(t, ok)
-			_az2.baseAuthz.Status = StatusValid
+			_az3.baseAuthz.Status = StatusValid
 
 			b1, err := json.Marshal(az1)
 			assert.FatalError(t, err)
 			b2, err := json.Marshal(az2)
+			assert.FatalError(t, err)
+			b3, err := json.Marshal(az3)
 			assert.FatalError(t, err)
 
 			count := 0
@@ -885,7 +929,17 @@ func TestOrderFinalize(t *testing.T) {
 						case 2:
 							ret = ch2b
 						case 3:
+							ret = ch3b
+						case 4:
 							ret = b2
+						case 5:
+							ret = ch1b
+						case 6:
+							ret = ch2b
+						case 7:
+							ret = ch3b
+						case 8:
+							ret = b3
 						default:
 							return nil, errors.New("unexpected count")
 						}
