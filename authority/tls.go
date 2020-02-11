@@ -64,7 +64,6 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		opts           = []interface{}{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
 		mods           = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
 		certValidators = []provisioner.CertificateValidator{}
-		// issIdentity    = a.intermediateIdentity
 	)
 
 	// Set backdate with the configured value
@@ -131,9 +130,6 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 	if err := a.authorizeRenew(oldCert); err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew", opts...)
 	}
-
-	// Issuer
-	// issIdentity := a.intermediateIdentity
 
 	// Durations
 	backdate := a.config.AuthorityConfig.Backdate.Duration
@@ -313,8 +309,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 
 // GetTLSCertificate creates a new leaf certificate to be used by the CA HTTPS server.
 func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
-	profile, err := x509util.NewLeafProfile("Step Online CA",
-		a.x509Issuer, a.x509Signer,
+	profile, err := x509util.NewLeafProfile("Step Online CA", a.x509Issuer, a.x509Signer,
 		x509util.WithHosts(strings.Join(a.config.DNSNames, ",")))
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.GetTLSCertificate")
