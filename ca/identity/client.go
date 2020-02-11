@@ -23,7 +23,7 @@ func (c *Client) ResolveReference(ref *url.URL) *url.URL {
 	return c.CaURL.ResolveReference(ref)
 }
 
-// LoadStepClient configures an http.Client with the root in
+// LoadClient configures an http.Client with the root in
 // $STEPPATH/config/defaults.json and the identity defined in
 // $STEPPATH/config/identity.json
 func LoadClient() (*Client, error) {

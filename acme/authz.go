@@ -294,7 +294,7 @@ func newDNSAuthz(db nosql.DB, accID string, identifier Identifier) (authz, error
 
 	ba.Challenges = []string{}
 	if !ba.Wildcard {
-		// http challenges are only permitted if the DNS is not a wildcard dns.
+		// http and alpn challenges are only permitted if the DNS is not a wildcard dns.
 		ch1, err := newHTTP01Challenge(db, ChallengeOptions{
 			AccountID:  accID,
 			AuthzID:    ba.ID,
@@ -303,15 +303,25 @@ func newDNSAuthz(db nosql.DB, accID string, identifier Identifier) (authz, error
 			return nil, Wrap(err, "error creating http challenge")
 		}
 		ba.Challenges = append(ba.Challenges, ch1.getID())
+
+		ch2, err := newTLSALPN01Challenge(db, ChallengeOptions{
+			AccountID:  accID,
+			AuthzID:    ba.ID,
+			Identifier: ba.Identifier,
+		})
+		if err != nil {
+			return nil, Wrap(err, "error creating alpn challenge")
+		}
+		ba.Challenges = append(ba.Challenges, ch2.getID())
 	}
-	ch2, err := newDNS01Challenge(db, ChallengeOptions{
+	ch3, err := newDNS01Challenge(db, ChallengeOptions{
 		AccountID:  accID,
 		AuthzID:    ba.ID,
 		Identifier: identifier})
 	if err != nil {
 		return nil, Wrap(err, "error creating dns challenge")
 	}
-	ba.Challenges = append(ba.Challenges, ch2.getID())
+	ba.Challenges = append(ba.Challenges, ch3.getID())
 
 	da := &dnsAuthz{ba}
 	if err := da.save(db, nil); err != nil {

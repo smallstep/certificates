@@ -173,13 +173,29 @@ func TestNewAuthz(t *testing.T) {
 				err: ServerInternalErr(errors.New("error creating http challenge: error saving acme challenge: force")),
 			}
 		},
-		"fail/new-dns-chall-error": func(t *testing.T) test {
+		"fail/new-tls-alpn-chall-error": func(t *testing.T) test {
 			count := 0
 			return test{
 				iden: iden,
 				db: &db.MockNoSQLDB{
 					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 						if count == 1 {
+							return nil, false, errors.New("force")
+						}
+						count++
+						return nil, true, nil
+					},
+				},
+				err: ServerInternalErr(errors.New("error creating alpn challenge: error saving acme challenge: force")),
+			}
+		},
+		"fail/new-dns-chall-error": func(t *testing.T) test {
+			count := 0
+			return test{
+				iden: iden,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						if count == 2 {
 							return nil, false, errors.New("force")
 						}
 						count++
@@ -195,7 +211,7 @@ func TestNewAuthz(t *testing.T) {
 				iden: iden,
 				db: &db.MockNoSQLDB{
 					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						if count == 2 {
+						if count == 3 {
 							return nil, false, errors.New("force")
 						}
 						count++
@@ -212,7 +228,7 @@ func TestNewAuthz(t *testing.T) {
 				iden: iden,
 				db: &db.MockNoSQLDB{
 					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						if count == 2 {
+						if count == 3 {
 							assert.Equals(t, bucket, authzTable)
 							assert.Equals(t, old, nil)
 
@@ -690,7 +706,8 @@ func TestAuthzUpdateStatus(t *testing.T) {
 		},
 		"ok/valid": func(t *testing.T) test {
 			var (
-				ch2      challenge
+				ch3      challenge
+				ch2Bytes = &([]byte{})
 				ch1Bytes = &([]byte{})
 				err      error
 			)
@@ -701,7 +718,9 @@ func TestAuthzUpdateStatus(t *testing.T) {
 					if count == 0 {
 						*ch1Bytes = newval
 					} else if count == 1 {
-						ch2, err = unmarshalChallenge(newval)
+						*ch2Bytes = newval
+					} else if count == 2 {
+						ch3, err = unmarshalChallenge(newval)
 						assert.FatalError(t, err)
 					}
 					count++
@@ -717,10 +736,10 @@ func TestAuthzUpdateStatus(t *testing.T) {
 			assert.Fatal(t, ok)
 			_az.baseAuthz.Error = MalformedErr(nil)
 
-			_ch, ok := ch2.(*dns01Challenge)
+			_ch, ok := ch3.(*dns01Challenge)
 			assert.Fatal(t, ok)
 			_ch.baseChallenge.Status = StatusValid
-			chb, err := json.Marshal(ch2)
+			chb, err := json.Marshal(ch3)
 
 			clone := az.clone()
 			clone.Status = StatusValid
@@ -735,6 +754,10 @@ func TestAuthzUpdateStatus(t *testing.T) {
 						if count == 0 {
 							count++
 							return *ch1Bytes, nil
+						}
+						if count == 1 {
+							count++
+							return *ch2Bytes, nil
 						}
 						count++
 						return chb, nil
