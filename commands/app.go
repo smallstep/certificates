@@ -31,8 +31,8 @@ var AppCommand = cli.Command{
 intermediate private key.`,
 		},
 		cli.StringFlag{
-			Name: "resolver",
-			Usage: `address of a DNS resolver to be used instead of the default.`,
+			Name:  "resolver",
+			Usage: "address of a DNS resolver to be used instead of the default.",
 		},
 	},
 }
