@@ -113,22 +113,42 @@ func WithSSHHostSigner(s crypto.Signer) Option {
 	}
 }
 
+// WithX509RootCerts is an option that allows to define the list of root
+// certificates to use. This option will replace any root certificate defined
+// before.
+func WithX509RootCerts(rootCerts ...*x509.Certificate) Option {
+	return func(a *Authority) error {
+		a.rootX509Certs = rootCerts
+		return nil
+	}
+}
+
+// WithX509FederatedCerts is an option that allows to define the list of
+// federated certificates. This option will replace any federated certificate
+// defined before.
+func WithX509FederatedCerts(certs ...*x509.Certificate) Option {
+	return func(a *Authority) error {
+		a.federatedX509Certs = certs
+		return nil
+	}
+}
+
 // WithX509RootBundle is an option that allows to define the list of root
-// certificates.
+// certificates. This option will replace any root certificate defined before.
 func WithX509RootBundle(pemCerts []byte) Option {
 	return func(a *Authority) error {
 		certs, err := readCertificateBundle(pemCerts)
 		if err != nil {
 			return err
 		}
-		x509.NewCertPool()
 		a.rootX509Certs = certs
 		return nil
 	}
 }
 
 // WithX509FederatedBundle is an option that allows to define the list of
-// federated certificates.
+// federated certificates. This option will replace any federated certificate
+// defined before.
 func WithX509FederatedBundle(pemCerts []byte) Option {
 	return func(a *Authority) error {
 		certs, err := readCertificateBundle(pemCerts)
