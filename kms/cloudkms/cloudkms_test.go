@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -54,16 +55,21 @@ func TestNew(t *testing.T) {
 		opts apiv1.Options
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    *CloudKMS
-		wantErr bool
+		name     string
+		skipOnCI bool
+		args     args
+		want     *CloudKMS
+		wantErr  bool
 	}{
-		{"fail authentication", args{context.Background(), apiv1.Options{}}, nil, true},
-		{"fail credentials", args{context.Background(), apiv1.Options{CredentialsFile: "testdata/missing"}}, nil, true},
+		{"fail authentication", true, args{context.Background(), apiv1.Options{}}, nil, true},
+		{"fail credentials", false, args{context.Background(), apiv1.Options{CredentialsFile: "testdata/missing"}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.skipOnCI && os.Getenv("CI") == "true" {
+				t.SkipNow()
+			}
+
 			got, err := New(tt.args.ctx, tt.args.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
