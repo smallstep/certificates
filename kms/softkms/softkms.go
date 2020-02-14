@@ -44,10 +44,10 @@ var generateKey = func(kty, crv string, size int) (interface{}, interface{}, err
 	return keys.GenerateKeyPair(kty, crv, size)
 }
 
-// SoftKSM is a key manager that uses keys stored in disk.
+// SoftKMS is a key manager that uses keys stored in disk.
 type SoftKMS struct{}
 
-// New returns a new SoftKSM.
+// New returns a new SoftKMS.
 func New(ctx context.Context, opts apiv1.Options) (*SoftKMS, error) {
 	return &SoftKMS{}, nil
 }
