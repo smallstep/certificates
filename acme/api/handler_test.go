@@ -589,6 +589,7 @@ func ch() acme.Challenge {
 		URL:     "https://ca.smallstep.com/acme/challenge/chID",
 		ID:      "chID",
 		AuthzID: "authzID",
+		Retry:   &acme.Retry{Called:0, Backoffs:1, Active:false},
 	}
 }
 
@@ -733,6 +734,37 @@ func TestHandlerGetChallenge(t *testing.T) {
 				ch:         ch,
 			}
 		},
+		"ok/retry-after": func(t *testing.T) test {
+			key, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			acc := &acme.Account{ID: "accID", Key: key}
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			// TODO: Add correct key such that challenge object is already "active"
+			chiCtxInactive := chi.NewRouteContext()
+			chiCtxInactive.URLParams.Add("chID", "chID")
+			//chiCtxInactive.URLParams.Add("Active", "true")
+			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtxInactive)
+			ch := ch()
+			ch.Retry.Active = true
+			chJSON, err := json.Marshal(ch)
+			assert.FatalError(t, err)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: chJSON})
+			return test{
+				auth: &mockAcmeAuthority{
+					validateChallenge: func(p provisioner.Interface, accID, id string, jwk *jose.JSONWebKey) (*acme.Challenge, error) {
+						assert.Equals(t, p, prov)
+						assert.Equals(t, accID, acc.ID)
+						assert.Equals(t, id, ch.ID)
+						assert.Equals(t, jwk.KeyID, key.KeyID)
+						return &ch, nil
+					},
+				},
+				ctx:        ctx,
+				statusCode: 200,
+				ch:         ch,
+			}
+		},
 	}
 	for name, run := range tests {
 		tc := run(t)
@@ -760,13 +792,17 @@ func TestHandlerGetChallenge(t *testing.T) {
 				assert.Equals(t, ae.Identifier, prob.Identifier)
 				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-			} else {
+			} else if res.StatusCode >= 200 && assert.True(t,res.Header["Retry-After"] == nil){
 				expB, err := json.Marshal(tc.ch)
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<https://ca.smallstep.com/acme/authz/%s>;rel=\"up\"", tc.ch.AuthzID)})
 				assert.Equals(t, res.Header["Location"], []string{url})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
+			} else {
+				expB, err := json.Marshal(tc.ch)
+				assert.FatalError(t, err)
+				assert.Equals(t, bytes.TrimSpace(body), expB)
 			}
 		})
 	}

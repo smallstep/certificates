@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -26,8 +27,16 @@ type Challenge struct {
 	Validated string  `json:"validated,omitempty"`
 	URL       string  `json:"url"`
 	Error     *AError `json:"error,omitempty"`
+	Retry     *Retry   `json:"retry"`
 	ID        string  `json:"-"`
 	AuthzID   string  `json:"-"`
+}
+
+type Retry struct {
+	Called    int         `json:"id"`
+	Backoffs  float64     `json:"backoffs"`
+	Active    bool        `json:"active"`
+	Mux	      sync.Mutex  `json:"mux"`
 }
 
 // ToLog enables response logging.
@@ -68,6 +77,7 @@ type challenge interface {
 	getID() string
 	getAuthzID() string
 	getToken() string
+	getRetry() *Retry
 	clone() *baseChallenge
 	getAccountID() string
 	getValidated() time.Time
@@ -94,6 +104,7 @@ type baseChallenge struct {
 	Validated time.Time `json:"validated"`
 	Created   time.Time `json:"created"`
 	Error     *AError   `json:"error"`
+	Retry     *Retry     `json:"retry"`
 }
 
 func newBaseChallenge(accountID, authzID string) (*baseChallenge, error) {
@@ -113,6 +124,7 @@ func newBaseChallenge(accountID, authzID string) (*baseChallenge, error) {
 		Status:    StatusPending,
 		Token:     token,
 		Created:   clock.Now(),
+		Retry:     &Retry{Called:0, Backoffs:1, Active:false},
 	}, nil
 }
 
@@ -151,6 +163,11 @@ func (bc *baseChallenge) getToken() string {
 	return bc.Token
 }
 
+// getRetry returns the retry state of the baseChallenge
+func (bc *baseChallenge) getRetry() *Retry {
+	return bc.Retry
+}
+
 // getValidated returns the validated time of the baseChallenge.
 func (bc *baseChallenge) getValidated() time.Time {
 	return bc.Validated
@@ -182,6 +199,9 @@ func (bc *baseChallenge) toACME(db nosql.DB, dir *directory, p provisioner.Inter
 	}
 	if bc.Error != nil {
 		ac.Error = bc.Error
+	}
+	if bc.Retry != nil {
+		ac.Retry = bc.Retry
 	}
 	return ac, nil
 }
@@ -231,6 +251,11 @@ func (bc *baseChallenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validate
 func (bc *baseChallenge) storeError(db nosql.DB, err *Error) error {
 	clone := bc.clone()
 	clone.Error = err.ToACME()
+	return clone.save(db, bc)
+}
+
+func (bc *baseChallenge) storeRetry(db nosql.DB, retry *Retry) error {
+	clone := bc.clone()
 	return clone.save(db, bc)
 }
 
@@ -289,7 +314,18 @@ func newHTTP01Challenge(db nosql.DB, ops ChallengeOptions) (challenge, error) {
 // updated.
 func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
 	// If already valid or invalid then return without performing validation.
-	if hc.getStatus() == StatusValid || hc.getStatus() == StatusInvalid {
+	if hc.getStatus() == StatusValid {
+		return hc, nil
+	}
+	if hc.getStatus() == StatusInvalid {
+		// TODO: Resolve segfault on upd.save
+		upd := hc.clone()
+		upd.Status = StatusPending
+		if err := upd.save(db, hc); err != nil {
+			fmt.Printf("Error in save: %s\n\n\n", err)
+			return nil, err
+		}
+		fmt.Print("Through Save\n\n")
 		return hc, nil
 	}
 	url := fmt.Sprintf("http://%s/.well-known/acme-challenge/%s", hc.Value, hc.Token)
@@ -329,10 +365,18 @@ func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo valida
 		upd := hc.clone()
 		upd.Error = rejectedErr.ToACME()
 		upd.Error.Subproblems = append(upd.Error.Subproblems, rejectedErr)
+		upd.Retry.Called ++
+		upd.Retry.Active = true
+		if upd.Retry.Called >= 10 {
+			upd.Status = StatusInvalid
+			upd.Retry.Backoffs *= 2
+			upd.Retry.Active = false
+			upd.Retry.Called = 0
+		}
 		if err = upd.save(db, hc); err != nil {
 			return nil, err
 		}
-		return hc, nil
+		return hc, err
 	}
 
 	// Update and store the challenge.
@@ -340,6 +384,7 @@ func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo valida
 	upd.Status = StatusValid
 	upd.Error = nil
 	upd.Validated = clock.Now()
+	upd.Retry.Active = false
 
 	if err := upd.save(db, hc); err != nil {
 		return nil, err
@@ -401,6 +446,14 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 		upd := dc.clone()
 		upd.Error = dnsErr.ToACME()
 		upd.Error.Subproblems = append(upd.Error.Subproblems, dnsErr)
+		upd.Retry.Called ++
+		upd.Retry.Active = true
+		if upd.Retry.Called >= 10 {
+			upd.Status = StatusInvalid
+			upd.Retry.Backoffs *= 2
+			upd.Retry.Active = false
+			upd.Retry.Called = 0
+		}
 		if err = upd.save(db, dc); err != nil {
 			return nil, err
 		}
@@ -436,6 +489,7 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 	upd.Status = StatusValid
 	upd.Error = nil
 	upd.Validated = time.Now().UTC()
+	upd.Retry.Active = false
 
 	if err := upd.save(db, dc); err != nil {
 		return nil, err
