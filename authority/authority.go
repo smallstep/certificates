@@ -12,10 +12,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/kms"
+	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -25,21 +26,30 @@ const (
 
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
-	config                  *Config
-	rootX509Certs           []*x509.Certificate
-	intermediateIdentity    *x509util.Identity
+	config       *Config
+	keyManager   kms.KeyManager
+	provisioners *provisioner.Collection
+	db           db.AuthDB
+
+	// X509 CA
+	rootX509Certs      []*x509.Certificate
+	federatedX509Certs []*x509.Certificate
+	x509Signer         crypto.Signer
+	x509Issuer         *x509.Certificate
+	certificates       *sync.Map
+
+	// SSH CA
 	sshCAUserCertSignKey    ssh.Signer
 	sshCAHostCertSignKey    ssh.Signer
 	sshCAUserCerts          []ssh.PublicKey
 	sshCAHostCerts          []ssh.PublicKey
 	sshCAUserFederatedCerts []ssh.PublicKey
 	sshCAHostFederatedCerts []ssh.PublicKey
-	certificates            *sync.Map
-	startTime               time.Time
-	provisioners            *provisioner.Collection
-	db                      db.AuthDB
+
 	// Do not re-initialize
-	initOnce bool
+	initOnce  bool
+	startTime time.Time
+
 	// Custom functions
 	sshBastionFunc   func(user, hostname string) (*Bastion, error)
 	sshCheckHostFunc func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
@@ -59,12 +69,19 @@ func New(config *Config, opts ...Option) (*Authority, error) {
 		certificates: new(sync.Map),
 		provisioners: provisioner.NewCollection(config.getAudiences()),
 	}
-	for _, opt := range opts {
-		opt(a)
+
+	// Apply options.
+	for _, fn := range opts {
+		if err := fn(a); err != nil {
+			return nil, err
+		}
 	}
+
+	// Initialize authority from options or configuration.
 	if err := a.init(); err != nil {
 		return nil, err
 	}
+
 	return a, nil
 }
 
@@ -76,6 +93,19 @@ func (a *Authority) init() error {
 	}
 
 	var err error
+
+	// Initialize key manager if it has not been set in the options.
+	if a.keyManager == nil {
+		var options kmsapi.Options
+		if a.config.KMS != nil {
+			options = *a.config.KMS
+		}
+		a.keyManager, err = kms.New(context.Background(), options)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Initialize step-ca Database if it's not already initialized with WithDB.
 	// If a.config.DB is nil then a simple, barebones in memory DB will be used.
 	if a.db == nil {
@@ -84,50 +114,62 @@ func (a *Authority) init() error {
 		}
 	}
 
-	// Load the root certificates and add them to the certificate store
-	a.rootX509Certs = make([]*x509.Certificate, len(a.config.Root))
-	for i, path := range a.config.Root {
-		crt, err := pemutil.ReadCertificate(path)
-		if err != nil {
-			return err
+	// Read root certificates and store them in the certificates map.
+	if len(a.rootX509Certs) == 0 {
+		a.rootX509Certs = make([]*x509.Certificate, len(a.config.Root))
+		for i, path := range a.config.Root {
+			crt, err := pemutil.ReadCertificate(path)
+			if err != nil {
+				return err
+			}
+			a.rootX509Certs[i] = crt
 		}
-		// Add root certificate to the certificate map
-		sum := sha256.Sum256(crt.Raw)
-		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
-		a.rootX509Certs[i] = crt
 	}
-
-	// Add federated roots
-	for _, path := range a.config.FederatedRoots {
-		crt, err := pemutil.ReadCertificate(path)
-		if err != nil {
-			return err
-		}
+	for _, crt := range a.rootX509Certs {
 		sum := sha256.Sum256(crt.Raw)
 		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
 	}
 
-	// Decrypt and load intermediate public / private key pair.
-	if len(a.config.Password) > 0 {
-		a.intermediateIdentity, err = x509util.LoadIdentityFromDisk(
-			a.config.IntermediateCert,
-			a.config.IntermediateKey,
-			pemutil.WithPassword([]byte(a.config.Password)),
-		)
+	// Read federated certificates and store them in the certificates map.
+	if len(a.federatedX509Certs) == 0 {
+		a.federatedX509Certs = make([]*x509.Certificate, len(a.config.FederatedRoots))
+		for i, path := range a.config.FederatedRoots {
+			crt, err := pemutil.ReadCertificate(path)
+			if err != nil {
+				return err
+			}
+			a.federatedX509Certs[i] = crt
+		}
+	}
+	for _, crt := range a.federatedX509Certs {
+		sum := sha256.Sum256(crt.Raw)
+		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
+	}
+
+	// Read intermediate and create X509 signer.
+	if a.x509Signer == nil {
+		crt, err := pemutil.ReadCertificate(a.config.IntermediateCert)
 		if err != nil {
 			return err
 		}
-	} else {
-		a.intermediateIdentity, err = x509util.LoadIdentityFromDisk(a.config.IntermediateCert, a.config.IntermediateKey)
+		signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+			SigningKey: a.config.IntermediateKey,
+			Password:   []byte(a.config.Password),
+		})
 		if err != nil {
 			return err
 		}
+		a.x509Signer = signer
+		a.x509Issuer = crt
 	}
 
 	// Decrypt and load SSH keys
 	if a.config.SSH != nil {
 		if a.config.SSH.HostKey != "" {
-			signer, err := parseCryptoSigner(a.config.SSH.HostKey, a.config.Password)
+			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.SSH.HostKey,
+				Password:   []byte(a.config.Password),
+			})
 			if err != nil {
 				return err
 			}
@@ -140,7 +182,10 @@ func (a *Authority) init() error {
 			a.sshCAHostFederatedCerts = append(a.sshCAHostFederatedCerts, a.sshCAHostCertSignKey.PublicKey())
 		}
 		if a.config.SSH.UserKey != "" {
-			signer, err := parseCryptoSigner(a.config.SSH.UserKey, a.config.Password)
+			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.SSH.UserKey,
+				Password:   []byte(a.config.Password),
+			})
 			if err != nil {
 				return err
 			}
@@ -244,20 +289,4 @@ func (a *Authority) GetDatabase() db.AuthDB {
 // Shutdown safely shuts down any clients, databases, etc. held by the Authority.
 func (a *Authority) Shutdown() error {
 	return a.db.Shutdown()
-}
-
-func parseCryptoSigner(filename, password string) (crypto.Signer, error) {
-	var opts []pemutil.Options
-	if password != "" {
-		opts = append(opts, pemutil.WithPassword([]byte(password)))
-	}
-	key, err := pemutil.Read(filename, opts...)
-	if err != nil {
-		return nil, err
-	}
-	signer, ok := key.(crypto.Signer)
-	if !ok {
-		return nil, errors.Errorf("key %s of type %T cannot be used for signing operations", filename, key)
-	}
-	return signer, nil
 }
