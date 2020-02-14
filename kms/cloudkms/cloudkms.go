@@ -173,7 +173,7 @@ func (k *CloudKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 		// Create a new version if the key already exists.
 		//
 		// Note that it will have the same purpose, protection level and
-		// algorithm than the previous one.
+		// algorithm than as previous one.
 		req := &kmspb.CreateCryptoKeyVersionRequest{
 			Parent: req.Name,
 			CryptoKeyVersion: &kmspb.CryptoKeyVersion{
