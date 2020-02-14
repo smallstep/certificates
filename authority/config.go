@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
+	kms "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
@@ -54,6 +55,7 @@ type Config struct {
 	IntermediateKey  string               `json:"key"`
 	Address          string               `json:"address"`
 	DNSNames         []string             `json:"dnsNames"`
+	KMS              *kms.Options         `json:"kms,omitempty"`
 	SSH              *SSHConfig           `json:"ssh,omitempty"`
 	Logger           json.RawMessage      `json:"logger,omitempty"`
 	DB               *db.Config           `json:"db,omitempty"`
@@ -177,6 +179,11 @@ func (c *Config) Validate() error {
 			return errors.New("tls minVersion cannot exceed tls maxVersion")
 		}
 		c.TLS.Renegotiation = c.TLS.Renegotiation || DefaultTLSOptions.Renegotiation
+	}
+
+	// Validate KMS options, nil is ok.
+	if err := c.KMS.Validate(); err != nil {
+		return err
 	}
 
 	// Validate ssh: nil is ok

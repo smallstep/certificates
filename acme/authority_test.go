@@ -730,7 +730,7 @@ func TestAuthorityGetAuthz(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) test {
-			var ch1B, ch2B = &[]byte{}, &[]byte{}
+			var ch1B, ch2B, ch3B = &[]byte{}, &[]byte{}, &[]byte{}
 			count := 0
 			mockdb := &db.MockNoSQLDB{
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
@@ -739,6 +739,8 @@ func TestAuthorityGetAuthz(t *testing.T) {
 						*ch1B = newval
 					case 1:
 						*ch2B = newval
+					case 2:
+						*ch3B = newval
 					}
 					count++
 					return nil, true, nil
@@ -758,6 +760,8 @@ func TestAuthorityGetAuthz(t *testing.T) {
 			assert.FatalError(t, err)
 			ch2, err := unmarshalChallenge(*ch2B)
 			assert.FatalError(t, err)
+			ch3, err := unmarshalChallenge(*ch3B)
+			assert.FatalError(t, err)
 			count = 0
 			mockdb = &db.MockNoSQLDB{
 				MGet: func(bucket, key []byte) ([]byte, error) {
@@ -771,6 +775,10 @@ func TestAuthorityGetAuthz(t *testing.T) {
 						assert.Equals(t, bucket, challengeTable)
 						assert.Equals(t, key, []byte(ch2.getID()))
 						ret = *ch2B
+					case 2:
+						assert.Equals(t, bucket, challengeTable)
+						assert.Equals(t, key, []byte(ch3.getID()))
+						ret = *ch3B
 					}
 					count++
 					return ret, nil
@@ -796,6 +804,10 @@ func TestAuthorityGetAuthz(t *testing.T) {
 						assert.Equals(t, bucket, challengeTable)
 						assert.Equals(t, key, []byte(ch2.getID()))
 						ret = *ch2B
+					case 3:
+						assert.Equals(t, bucket, challengeTable)
+						assert.Equals(t, key, []byte(ch3.getID()))
+						ret = *ch3B
 					}
 					count++
 					return ret, nil
@@ -876,21 +888,25 @@ func TestAuthorityNewOrder(t *testing.T) {
 					case 1:
 						assert.Equals(t, bucket, challengeTable)
 					case 2:
-						assert.Equals(t, bucket, authzTable)
-					case 3:
 						assert.Equals(t, bucket, challengeTable)
+					case 3:
+						assert.Equals(t, bucket, authzTable)
 					case 4:
 						assert.Equals(t, bucket, challengeTable)
 					case 5:
-						assert.Equals(t, bucket, authzTable)
+						assert.Equals(t, bucket, challengeTable)
 					case 6:
+						assert.Equals(t, bucket, challengeTable)
+					case 7:
+						assert.Equals(t, bucket, authzTable)
+					case 8:
 						assert.Equals(t, bucket, orderTable)
 						var o order
 						assert.FatalError(t, json.Unmarshal(newval, &o))
 						*acmeO, err = o.toACME(nil, dir, prov)
 						assert.FatalError(t, err)
 						*accID = o.AccountID
-					case 7:
+					case 9:
 						assert.Equals(t, bucket, ordersByAccountIDTable)
 						assert.Equals(t, string(key), *accID)
 					}

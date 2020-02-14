@@ -2,8 +2,10 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"unicode"
@@ -20,12 +22,17 @@ var AppCommand = cli.Command{
 	Name:   "start",
 	Action: appAction,
 	UsageText: `**step-ca** <config>
-	[**--password-file**=<file>]`,
+	[**--password-file**=<file>]
+	[**--resolver**=<addr>]`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name: "password-file",
 			Usage: `path to the <file> containing the password to decrypt the
 intermediate private key.`,
+		},
+		cli.StringFlag{
+			Name:  "resolver",
+			Usage: "address of a DNS resolver to be used instead of the default.",
 		},
 	},
 }
@@ -33,6 +40,7 @@ intermediate private key.`,
 // AppAction is the action used when the top command runs.
 func appAction(ctx *cli.Context) error {
 	passFile := ctx.String("password-file")
+	resolver := ctx.String("resolver")
 
 	// If zero cmd line args show help, if >1 cmd line args show error.
 	if ctx.NArg() == 0 {
@@ -54,6 +62,14 @@ func appAction(ctx *cli.Context) error {
 			fatal(errors.Wrapf(err, "error reading %s", passFile))
 		}
 		password = bytes.TrimRightFunc(password, unicode.IsSpace)
+	}
+
+	// replace resolver if requested
+	if resolver != "" {
+		net.DefaultResolver.PreferGo = true
+		net.DefaultResolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+			return net.Dial(network, resolver)
+		}
 	}
 
 	srv, err := ca.New(config, ca.WithConfigFile(configFile), ca.WithPassword(password))

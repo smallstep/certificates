@@ -91,7 +91,7 @@ func main() {
 	app.HelpName = "step-ca"
 	app.Version = config.Version()
 	app.Usage = "an online certificate authority for secure automated certificate management"
-	app.UsageText = `**step-ca** <config> [**--password-file**=<file>] [**--help**] [**--version**]`
+	app.UsageText = `**step-ca** <config> [**--password-file**=<file>] [**--resolver**=<addr>] [**--help**] [**--version**]`
 	app.Description = `**step-ca** runs the Step Online Certificate Authority
 (Step CA) using the given configuration.
 See the README.md for more detailed configuration documentation.
@@ -116,7 +116,7 @@ $ step-ca $STEPPATH/config/ca.json --password-file ./password.txt
 '''`
 	app.Flags = append(app.Flags, commands.AppCommand.Flags...)
 	app.Flags = append(app.Flags, cli.HelpFlag)
-	app.Copyright = "(c) 2019 Smallstep Labs, Inc."
+	app.Copyright = "(c) 2018-2020 Smallstep Labs, Inc."
 
 	// All non-successful output should be written to stderr
 	app.Writer = os.Stdout

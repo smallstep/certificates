@@ -2,6 +2,7 @@ package acme
 
 import (
 	"crypto"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"math"

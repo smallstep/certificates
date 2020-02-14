@@ -50,7 +50,7 @@ It's super easy to get started and to operate `step-ca` thanks to [streamlined i
 ### [Your own private ACME Server](https://smallstep.com/blog/private-acme-server/)
 - Issue certificates using ACMEv2 ([RFC8555](https://tools.ietf.org/html/rfc8555)), **the protocol used by Let's Encrypt**
 - Great for [using ACME in development & pre-production](https://smallstep.com/blog/private-acme-server/#local-development-pre-production)
-- Supports the `http-01` and `dns-01` ACME challenge types
+- Supports the `http-01`, `tls-alpn-01`, and `dns-01` ACME challenge types
 - Works with any compliant ACME client including [certbot](https://smallstep.com/blog/private-acme-server/#certbot-uploads-acme-certbot-png-certbot-example), [acme.sh](https://smallstep.com/blog/private-acme-server/#acme-sh-uploads-acme-acme-sh-png-acme-sh-example), [Caddy](https://smallstep.com/blog/private-acme-server/#caddy-uploads-acme-caddy-png-caddy-example), and [traefik](https://smallstep.com/blog/private-acme-server/#traefik-uploads-acme-traefik-png-traefik-example)
 - Get certificates programmatically (e.g., in [Go](https://smallstep.com/blog/private-acme-server/#golang-uploads-acme-golang-png-go-example), [Python](https://smallstep.com/blog/private-acme-server/#python-uploads-acme-python-png-python-example), [Node.js](https://smallstep.com/blog/private-acme-server/#node-js-uploads-acme-node-js-png-node-js-example))
 
@@ -342,8 +342,8 @@ Documentation can be found in a handful of different places:
 
 1. The [docs](./docs/README.md) sub-repo has an index of documentation and tutorials.
 
-2. On the command line with `step ca help xxx` where `xxx` is the subcommand
-you are interested in. Ex: `step help ca provisioners list`.
+2. On the command line with `step help ca xxx` where `xxx` is the subcommand
+you are interested in. Ex: `step help ca provisioner list`.
 
 3. On the web at https://smallstep.com/docs/certificates.
 

@@ -2,6 +2,7 @@ package authority
 
 import (
 	"context"
+	"crypto"
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/x509"
@@ -156,7 +157,7 @@ func TestAuthority_Sign(t *testing.T) {
 		},
 		"fail create cert": func(t *testing.T) *signTest {
 			_a := testAuthority(t)
-			_a.intermediateIdentity.Key = nil
+			_a.x509Signer = nil
 			csr := getCSR(t, priv)
 			return &signTest{
 				auth:      _a,
@@ -303,7 +304,7 @@ ZYtQ9Ot36qc=
 					hash := sha1.Sum(pubBytes)
 					assert.Equals(t, leaf.SubjectKeyId, hash[:])
 
-					assert.Equals(t, leaf.AuthorityKeyId, a.intermediateIdentity.Crt.SubjectKeyId)
+					assert.Equals(t, leaf.AuthorityKeyId, a.x509Issuer.SubjectKeyId)
 
 					// Verify Provisioner OID
 					found := 0
@@ -322,7 +323,7 @@ ZYtQ9Ot36qc=
 					}
 					assert.Equals(t, found, 1)
 
-					realIntermediate, err := x509.ParseCertificate(a.intermediateIdentity.Crt.Raw)
+					realIntermediate, err := x509.ParseCertificate(a.x509Issuer.Raw)
 					assert.FatalError(t, err)
 					assert.Equals(t, intermediate, realIntermediate)
 				}
@@ -353,8 +354,7 @@ func TestAuthority_Renew(t *testing.T) {
 		NotAfter:  provisioner.NewTimeDuration(na1),
 	}
 
-	leaf, err := x509util.NewLeafProfile("renew", a.intermediateIdentity.Crt,
-		a.intermediateIdentity.Key,
+	leaf, err := x509util.NewLeafProfile("renew", a.x509Issuer, a.x509Signer,
 		x509util.WithNotBeforeAfterDuration(so.NotBefore.Time(), so.NotAfter.Time(), 0),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
@@ -365,8 +365,7 @@ func TestAuthority_Renew(t *testing.T) {
 	cert, err := x509.ParseCertificate(certBytes)
 	assert.FatalError(t, err)
 
-	leafNoRenew, err := x509util.NewLeafProfile("norenew", a.intermediateIdentity.Crt,
-		a.intermediateIdentity.Key,
+	leafNoRenew, err := x509util.NewLeafProfile("norenew", a.x509Issuer, a.x509Signer,
 		x509util.WithNotBeforeAfterDuration(so.NotBefore.Time(), so.NotAfter.Time(), 0),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
@@ -387,7 +386,7 @@ func TestAuthority_Renew(t *testing.T) {
 	tests := map[string]func() (*renewTest, error){
 		"fail-create-cert": func() (*renewTest, error) {
 			_a := testAuthority(t)
-			_a.intermediateIdentity.Key = nil
+			_a.x509Signer = nil
 			return &renewTest{
 				auth: _a,
 				cert: cert,
@@ -425,8 +424,8 @@ func TestAuthority_Renew(t *testing.T) {
 			assert.FatalError(t, err)
 
 			_a := testAuthority(t)
-			_a.intermediateIdentity.Key = newIntermediateProfile.SubjectPrivateKey()
-			_a.intermediateIdentity.Crt = newIntermediateCert
+			_a.x509Signer = newIntermediateProfile.SubjectPrivateKey().(crypto.Signer)
+			_a.x509Issuer = newIntermediateCert
 			return &renewTest{
 				auth: _a,
 				cert: cert,
@@ -494,8 +493,8 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.Equals(t, leaf.SubjectKeyId, hash[:])
 
 					// We did not change the intermediate before renewing.
-					if a.intermediateIdentity.Crt.SerialNumber == tc.auth.intermediateIdentity.Crt.SerialNumber {
-						assert.Equals(t, leaf.AuthorityKeyId, a.intermediateIdentity.Crt.SubjectKeyId)
+					if a.x509Issuer.SerialNumber == tc.auth.x509Issuer.SerialNumber {
+						assert.Equals(t, leaf.AuthorityKeyId, a.x509Issuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							found := false
@@ -511,7 +510,7 @@ func TestAuthority_Renew(t *testing.T) {
 						}
 					} else {
 						// We did change the intermediate before renewing.
-						assert.Equals(t, leaf.AuthorityKeyId, tc.auth.intermediateIdentity.Crt.SubjectKeyId)
+						assert.Equals(t, leaf.AuthorityKeyId, tc.auth.x509Issuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							// The authority key id extension should be different b/c the intermediates are different.
@@ -535,7 +534,7 @@ func TestAuthority_Renew(t *testing.T) {
 						}
 					}
 
-					realIntermediate, err := x509.ParseCertificate(tc.auth.intermediateIdentity.Crt.Raw)
+					realIntermediate, err := x509.ParseCertificate(tc.auth.x509Issuer.Raw)
 					assert.FatalError(t, err)
 					assert.Equals(t, intermediate, realIntermediate)
 				}

@@ -118,6 +118,7 @@ func (p *Provisioner) Token(subject string, sans ...string) (string, error) {
 	return tok.SignedString(p.jwk.Algorithm, p.jwk.Key)
 }
 
+// SSHToken generates a SSH token.
 func (p *Provisioner) SSHToken(certType, keyID string, principals []string) (string, error) {
 	jwtID, err := randutil.Hex(64)
 	if err != nil {
