@@ -193,11 +193,6 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 		return nil, errs.Wrap(http.StatusInternalServerError, err,
 			"authority.Renew; error parsing new server certificate", opts...)
 	}
-	caCert, err := x509.ParseCertificate(a.x509Issuer.Raw)
-	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.Renew; error parsing intermediate certificate", opts...)
-	}
 
 	if err = a.db.StoreCertificate(serverCert); err != nil {
 		if err != db.ErrNotImplemented {
@@ -205,7 +200,7 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 		}
 	}
 
-	return []*x509.Certificate{serverCert, caCert}, nil
+	return []*x509.Certificate{serverCert, a.x509Issuer}, nil
 }
 
 // RevokeOptions are the options for the Revoke API.
