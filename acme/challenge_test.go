@@ -772,7 +772,6 @@ func TestHTTP01Validate(t *testing.T) {
 			assert.FatalError(t, err)
 			oldb, err := json.Marshal(ch)
 			assert.FatalError(t, err)
-
 			expErr := ConnectionErr(errors.Errorf("error doing http GET for url "+
 				"http://zap.internal/.well-known/acme-challenge/%s with status code 400", ch.getToken()))
 			baseClone := ch.clone()
@@ -984,6 +983,7 @@ func TestHTTP01Validate(t *testing.T) {
 					assert.Equals(t, tc.res.getCreated(), ch.getCreated())
 					assert.Equals(t, tc.res.getValidated(), ch.getValidated())
 					assert.Equals(t, tc.res.getError(), ch.getError())
+					assert.Equals(t, tc.res.getRetry(), ch.getRetry())
 				}
 			}
 		})
