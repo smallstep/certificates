@@ -52,7 +52,7 @@ func New(ctx context.Context, opts apiv1.Options) (*SoftKMS, error) {
 	return &SoftKMS{}, nil
 }
 
-// Closes is a noop that just returns nil.
+// Close is a noop that just returns nil.
 func (k *SoftKMS) Close() error {
 	return nil
 }
