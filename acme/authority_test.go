@@ -1276,6 +1276,7 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 			assert.Fatal(t, ok)
 			_ch.baseChallenge.Status = StatusValid
 			_ch.baseChallenge.Validated = clock.Now()
+			_ch.baseChallenge.Retry.Called = 0
 			b, err := json.Marshal(ch)
 			assert.FatalError(t, err)
 			auth, err := NewAuthority(&db.MockNoSQLDB{
@@ -1309,12 +1310,10 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 				if assert.Nil(t, tc.err) {
 					gotb, err := json.Marshal(acmeCh)
 					assert.FatalError(t, err)
-
 					acmeExp, err := tc.ch.toACME(nil, tc.auth.dir, prov)
 					assert.FatalError(t, err)
 					expb, err := json.Marshal(acmeExp)
 					assert.FatalError(t, err)
-
 					assert.Equals(t, expb, gotb)
 				}
 			}

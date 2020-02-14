@@ -180,8 +180,9 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	ch, err = h.Auth.ValidateChallenge(prov, acc.GetID(), chID, acc.GetKey())
 	if err != nil {
 		api.WriteError(w, err)
-	} else if ch.Status != acme.StatusValid && ch.Status != acme.StatusInvalid {
-		w.Header().Add("Retry-After", "60")
+	} else if ch.Retry.Active {
+		retryAfter := int(ch.Retry.Backoffs) * (10 - ch.Retry.Called)
+		w.Header().Add("Retry-After", string(retryAfter))
 		api.JSON(w, ch)
 	} else {
 		getLink := h.Auth.GetLink

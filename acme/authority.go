@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"math"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -263,21 +265,38 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 	if accID != ch.getAccountID() {
 		return nil, UnauthorizedErr(errors.New("account does not own challenge"))
 	}
+	retry := ch.getRetry()
+	if retry.Active {
+		return ch.toACME(a.db, a.dir, p)
+	}
+	retry.Mux.Lock()
+	defer retry.Mux.Unlock()
+
 	client := http.Client{
 		Timeout: time.Duration(30 * time.Second),
 	}
 	dialer := &net.Dialer{
 		Timeout: 30 * time.Second,
 	}
-	ch, err = ch.validate(a.db, jwk, validateOptions{
-		httpGet:   client.Get,
-		lookupTxt: net.LookupTXT,
-		tlsDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
-			return tls.DialWithDialer(dialer, network, addr, config)
-		},
-	})
-	if err != nil {
-		return nil, Wrap(err, "error attempting challenge validation")
+	for i:=0; i < 10; i++ {
+		ch, err = ch.validate(a.db, jwk, validateOptions{
+			httpGet:   client.Get,
+			lookupTxt: net.LookupTXT,
+			tlsDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
+				return tls.DialWithDialer(dialer, network, addr, config)
+			},
+		})
+		if err != nil {
+			return nil, Wrap(err, "error attempting challenge validation")
+		}
+		if ch.getStatus() == StatusValid {
+			break
+		}
+		if ch.getStatus() == StatusInvalid {
+			return ch.toACME(a.db, a.dir, p)
+		}
+		duration := time.Duration(ch.getRetry().Backoffs + math.Mod(rand.Float64(), 5))
+		time.Sleep(duration*time.Second)
 	}
 	return ch.toACME(a.db, a.dir, p)
 }
