@@ -290,19 +290,3 @@ func (a *Authority) GetDatabase() db.AuthDB {
 func (a *Authority) Shutdown() error {
 	return a.db.Shutdown()
 }
-
-func parseCryptoSigner(filename, password string) (crypto.Signer, error) {
-	var opts []pemutil.Options
-	if password != "" {
-		opts = append(opts, pemutil.WithPassword([]byte(password)))
-	}
-	key, err := pemutil.Read(filename, opts...)
-	if err != nil {
-		return nil, err
-	}
-	signer, ok := key.(crypto.Signer)
-	if !ok {
-		return nil, errors.Errorf("key %s of type %T cannot be used for signing operations", filename, key)
-	}
-	return signer, nil
-}

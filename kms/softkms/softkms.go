@@ -23,17 +23,17 @@ type algorithmAttributes struct {
 const DefaultRSAKeySize = 3072
 
 var signatureAlgorithmMapping = map[apiv1.SignatureAlgorithm]algorithmAttributes{
-	apiv1.UnspecifiedSignAlgorithm: algorithmAttributes{"EC", "P-256"},
-	apiv1.SHA256WithRSA:            algorithmAttributes{"RSA", ""},
-	apiv1.SHA384WithRSA:            algorithmAttributes{"RSA", ""},
-	apiv1.SHA512WithRSA:            algorithmAttributes{"RSA", ""},
-	apiv1.SHA256WithRSAPSS:         algorithmAttributes{"RSA", ""},
-	apiv1.SHA384WithRSAPSS:         algorithmAttributes{"RSA", ""},
-	apiv1.SHA512WithRSAPSS:         algorithmAttributes{"RSA", ""},
-	apiv1.ECDSAWithSHA256:          algorithmAttributes{"EC", "P-256"},
-	apiv1.ECDSAWithSHA384:          algorithmAttributes{"EC", "P-384"},
-	apiv1.ECDSAWithSHA512:          algorithmAttributes{"EC", "P-521"},
-	apiv1.PureEd25519:              algorithmAttributes{"OKP", "Ed25519"},
+	apiv1.UnspecifiedSignAlgorithm: {"EC", "P-256"},
+	apiv1.SHA256WithRSA:            {"RSA", ""},
+	apiv1.SHA384WithRSA:            {"RSA", ""},
+	apiv1.SHA512WithRSA:            {"RSA", ""},
+	apiv1.SHA256WithRSAPSS:         {"RSA", ""},
+	apiv1.SHA384WithRSAPSS:         {"RSA", ""},
+	apiv1.SHA512WithRSAPSS:         {"RSA", ""},
+	apiv1.ECDSAWithSHA256:          {"EC", "P-256"},
+	apiv1.ECDSAWithSHA384:          {"EC", "P-384"},
+	apiv1.ECDSAWithSHA512:          {"EC", "P-521"},
+	apiv1.PureEd25519:              {"OKP", "Ed25519"},
 }
 
 // generateKey is used for testing purposes.
