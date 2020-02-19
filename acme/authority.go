@@ -275,7 +275,7 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 	client := http.Client{
 		Timeout: time.Duration(30 * time.Second),
 	}
-
+	
 	dialer := &net.Dialer{
 		Timeout: 30 * time.Second,
 	}
