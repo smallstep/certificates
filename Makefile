@@ -1,5 +1,7 @@
 PKG?=github.com/smallstep/certificates/cmd/step-ca
 BINNAME?=step-ca
+CLOUDKMS_BINNAME?=step-cloudkms-init
+CLOUDKMS_PKG?=github.com/smallstep/certificates/cmd/step-cloudkms-init
 
 # Set V to 1 for verbose output from the Makefile
 Q=$(if $V,,@)
@@ -56,17 +58,22 @@ GOFLAGS := CGO_ENABLED=0
 download:
 	$Q go mod download
 
-build: $(PREFIX)bin/$(BINNAME)
+build: $(PREFIX)bin/$(BINNAME) $(PREFIX)bin/$(CLOUDKMS_BINNAME)
 	@echo "Build Complete!"
 
 $(PREFIX)bin/$(BINNAME): download $(call rwildcard,*.go)
 	$Q mkdir -p $(@D)
 	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
 
+$(PREFIX)bin/$(CLOUDKMS_BINNAME): download $(call rwildcard,*.go)
+	$Q mkdir -p $(@D)
+	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(LDFLAGS) $(CLOUDKMS_PKG)
+
 # Target to force a build of step-ca without running tests
 simple:
 	$Q mkdir -p $(PREFIX)bin
 	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
+	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(LDFLAGS) $(CLOUDKMS_PKG)
 	@echo "Build Complete!"
 
 .PHONY: download build simple
@@ -113,11 +120,13 @@ lint:
 
 INSTALL_PREFIX?=/usr/
 
-install: $(PREFIX)bin/$(BINNAME)
+install: $(PREFIX)bin/$(BINNAME) $(PREFIX)bin/$(CLOUDKMS_BINNAME)
 	$Q install -D $(PREFIX)bin/$(BINNAME) $(DESTDIR)$(INSTALL_PREFIX)bin/$(BINNAME)
+	$Q install -D $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(DESTDIR)$(INSTALL_PREFIX)bin/$(CLOUDKMS_BINNAME)
 
 uninstall:
 	$Q rm -f $(DESTDIR)$(INSTALL_PREFIX)/bin/$(BINNAME)
+	$Q rm -f $(DESTDIR)$(INSTALL_PREFIX)/bin/$(CLOUDKMS_BINNAME)
 
 .PHONY: install uninstall
 
@@ -128,6 +137,9 @@ uninstall:
 clean:
 ifneq ($(BINNAME),"")
 	$Q rm -f bin/$(BINNAME)
+endif
+ifneq ($(CLOUDKMS_BINNAME),"")
+	$Q rm -f bin/$(CLOUDKMS_BINNAME)
 endif
 
 .PHONY: clean
@@ -228,7 +240,7 @@ distclean: clean
 #################################################
 
 BINARY_OUTPUT=$(OUTPUT_ROOT)binary/
-BUNDLE_MAKE=v=$v GOOS_OVERRIDE='GOOS=$(1) GOARCH=$(2)' PREFIX=$(3) make $(3)bin/$(BINNAME)
+BUNDLE_MAKE=v=$v GOOS_OVERRIDE='GOOS=$(1) GOARCH=$(2)' PREFIX=$(3) make $(3)bin/$(BINNAME) $(3)bin/$(CLOUDKMS_BINNAME)
 RELEASE=./.travis-releases
 
 binary-linux:
@@ -246,6 +258,7 @@ define BUNDLE
 	newdir=$$TMP/$$stepName; \
 	mkdir -p $$newdir/bin; \
 	cp $(BINARY_OUTPUT)$(1)/bin/$(BINNAME) $$newdir/bin/; \
+	cp $(BINARY_OUTPUT)$(1)/bin/$(CLOUDKMS_BINNAME) $$newdir/bin/; \
 	cp README.md $$newdir/; \
 	NEW_BUNDLE=$(RELEASE)/step-certificates_$(2)_$(1)_$(3).tar.gz; \
 	rm -f $$NEW_BUNDLE; \
