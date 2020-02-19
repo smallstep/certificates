@@ -183,7 +183,7 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	} else if ch.Retry.Active {
 		retryAfter := int(ch.Retry.Backoffs) * (10 - ch.Retry.Called)
 		w.Header().Add("Retry-After", string(retryAfter))
-		api.JSON(w, ch)
+		api.WriteProcessing(w, ch)
 	} else {
 		getLink := h.Auth.GetLink
 		w.Header().Add("Link", link(getLink(acme.AuthzLink, acme.URLSafeProvisionerName(prov), true, ch.GetAuthzID()), "up"))

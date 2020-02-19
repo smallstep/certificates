@@ -792,17 +792,19 @@ func TestHandlerGetChallenge(t *testing.T) {
 				assert.Equals(t, ae.Identifier, prob.Identifier)
 				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
-			} else if res.StatusCode >= 200 && assert.True(t,res.Header["Retry-After"] == nil){
+			} else if res.StatusCode >= 200 {
 				expB, err := json.Marshal(tc.ch)
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<https://ca.smallstep.com/acme/authz/%s>;rel=\"up\"", tc.ch.AuthzID)})
 				assert.Equals(t, res.Header["Location"], []string{url})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
-			} else {
+			} else if res.StatusCode >= 100 {
 				expB, err := json.Marshal(tc.ch)
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
+				assert.True(t, res.Header["Retry-After"] != nil)
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
 	}
