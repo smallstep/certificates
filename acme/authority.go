@@ -2,6 +2,7 @@ package acme
 
 import (
 	"crypto"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"math"
@@ -275,10 +276,17 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 		Timeout: time.Duration(30 * time.Second),
 	}
 
+	dialer := &net.Dialer{
+		Timeout: 30 * time.Second,
+	}
+
 	for ch.getRetry().Active {
 		ch, err = ch.validate(a.db, jwk, validateOptions{
 			httpGet:   client.Get,
 			lookupTxt: net.LookupTXT,
+			tlsDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
+				return tls.DialWithDialer(dialer, network, addr, config)
+			},
 		})
 		if err != nil {
 			return nil, Wrap(err, "error attempting challenge validation")
