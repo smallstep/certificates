@@ -275,7 +275,7 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 		Timeout: time.Duration(30 * time.Second),
 	}
 
-	for i:=0; i < 10; i++ {
+	for ch.getRetry().Active {
 		ch, err = ch.validate(a.db, jwk, validateOptions{
 			httpGet:   client.Get,
 			lookupTxt: net.LookupTXT,

@@ -254,11 +254,6 @@ func (bc *baseChallenge) storeError(db nosql.DB, err *Error) error {
 	return clone.save(db, bc)
 }
 
-func (bc *baseChallenge) storeRetry(db nosql.DB, retry *Retry) error {
-	clone := bc.clone()
-	return clone.save(db, bc)
-}
-
 // unmarshalChallenge unmarshals a challenge type into the correct sub-type.
 func unmarshalChallenge(data []byte) (challenge, error) {
 	var getType struct {
@@ -362,18 +357,7 @@ func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo valida
 	if keyAuth != expected {
 		rejectedErr := RejectedIdentifierErr(errors.Errorf("keyAuthorization does not match; "+
 			"expected %s, but got %s", expected, keyAuth))
-		upd := hc.clone()
-		upd.Error = rejectedErr.ToACME()
-		upd.Error.Subproblems = append(upd.Error.Subproblems, rejectedErr)
-		upd.Retry.Called ++
-		upd.Retry.Active = true
-		if upd.Retry.Called >= 10 {
-			upd.Status = StatusInvalid
-			upd.Retry.Backoffs *= 2
-			upd.Retry.Active = false
-			upd.Retry.Called = 0
-		}
-		if err = upd.save(db, hc); err != nil {
+		if err = hc.updateRetry(db, rejectedErr); err != nil {
 			return nil, err
 		}
 		return hc, err
@@ -443,18 +427,7 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 	if err != nil {
 		dnsErr := DNSErr(errors.Wrapf(err, "error looking up TXT "+
 			"records for domain %s", domain))
-		upd := dc.clone()
-		upd.Error = dnsErr.ToACME()
-		upd.Error.Subproblems = append(upd.Error.Subproblems, dnsErr)
-		upd.Retry.Called ++
-		upd.Retry.Active = true
-		if upd.Retry.Called >= 10 {
-			upd.Status = StatusInvalid
-			upd.Retry.Backoffs *= 2
-			upd.Retry.Active = false
-			upd.Retry.Called = 0
-		}
-		if err = upd.save(db, dc); err != nil {
+		if err = dc.updateRetry(db, dnsErr); err != nil {
 			return nil, err
 		}
 		return dc, nil
@@ -510,4 +483,23 @@ func getChallenge(db nosql.DB, id string) (challenge, error) {
 		return nil, err
 	}
 	return ch, nil
+}
+
+// updateRetry updates a challenge's retry and error objects upon a failed validation attempt
+func (bc *baseChallenge) updateRetry(db nosql.DB, error *Error) error {
+	upd := bc.clone()
+	upd.Error = error.ToACME()
+	upd.Error.Subproblems = append(upd.Error.Subproblems, error)
+	upd.Retry.Called ++
+	upd.Retry.Active = true
+	if upd.Retry.Called >= 10 {
+		upd.Status = StatusInvalid
+		upd.Retry.Backoffs *= 2
+		upd.Retry.Active = false
+		upd.Retry.Called = 0
+	}
+	if err := upd.save(db, bc); err != nil {
+		return err
+	}
+	return nil
 }
