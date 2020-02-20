@@ -62,6 +62,12 @@ func TestSSHTemplates_Validate(t *testing.T) {
 	host := []Template{
 		{Name: "ca.tpl", Type: File, TemplatePath: "../authority/testdata/templates/ca.tpl", Path: "/etc/ssh/ca.pub", Comment: "#"},
 	}
+	content := []Template{
+		{Name: "test.tpl", Type: File, Content: []byte("some content"), Path: "/test.pub", Comment: "#"},
+	}
+	badContent := []Template{
+		{Name: "ca.tpl", Type: File, TemplatePath: "../authority/testdata/templates/ca.tpl", Content: []byte("some content"), Path: "/etc/ssh/ca.pub", Comment: "#"},
+	}
 
 	type fields struct {
 		User []Template
@@ -75,8 +81,10 @@ func TestSSHTemplates_Validate(t *testing.T) {
 		{"ok", fields{user, host}, false},
 		{"user", fields{user, nil}, false},
 		{"host", fields{nil, host}, false},
+		{"content", fields{content, nil}, false},
 		{"badUser", fields{[]Template{{}}, nil}, true},
 		{"badHost", fields{nil, []Template{{}}}, true},
+		{"badContent", fields{badContent, nil}, true},
 	}
 	var nilValue *SSHTemplates
 	assert.NoError(t, nilValue.Validate())
@@ -163,8 +171,8 @@ func TestLoadAll(t *testing.T) {
 		{"ok", args{tmpl}, false},
 		{"empty", args{&Templates{}}, false},
 		{"nil", args{nil}, false},
-		{"badUser", args{&Templates{SSH: &SSHTemplates{User: []Template{{}}}}}, true},
-		{"badHost", args{&Templates{SSH: &SSHTemplates{Host: []Template{{}}}}}, true},
+		{"badUser", args{&Templates{SSH: &SSHTemplates{User: []Template{{TemplatePath: "missing"}}}}}, true},
+		{"badHost", args{&Templates{SSH: &SSHTemplates{Host: []Template{{TemplatePath: "missing"}}}}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
