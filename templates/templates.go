@@ -106,6 +106,7 @@ type Template struct {
 	TemplatePath string       `json:"template"`
 	Path         string       `json:"path"`
 	Comment      string       `json:"comment"`
+	Content      []byte       `json:"-"`
 }
 
 // Validate returns an error if the template is not valid.
@@ -117,10 +118,12 @@ func (t *Template) Validate() error {
 		return errors.New("template name cannot be empty")
 	case t.Type != Snippet && t.Type != File && t.Type != Directory:
 		return errors.Errorf("invalid template type %s, it must be %s, %s, or %s", t.Type, Snippet, File, Directory)
-	case t.TemplatePath == "" && t.Type != Directory:
+	case t.TemplatePath == "" && t.Type != Directory && len(t.Content) == 0:
 		return errors.New("template template cannot be empty")
 	case t.TemplatePath != "" && t.Type == Directory:
 		return errors.New("template template must be empty with directory type")
+	case t.TemplatePath != "" && len(t.Content) > 0:
+		return errors.New("template template must be empty with content")
 	case t.Path == "":
 		return errors.New("template path cannot be empty")
 	}
@@ -148,17 +151,27 @@ func (t *Template) Validate() error {
 // template fails.
 func (t *Template) Load() error {
 	if t.Template == nil && t.Type != Directory {
-		filename := config.StepAbs(t.TemplatePath)
-		b, err := ioutil.ReadFile(filename)
-		if err != nil {
-			return errors.Wrapf(err, "error reading %s", filename)
+		switch {
+		case t.TemplatePath != "":
+			filename := config.StepAbs(t.TemplatePath)
+			b, err := ioutil.ReadFile(filename)
+			if err != nil {
+				return errors.Wrapf(err, "error reading %s", filename)
+			}
+			return t.LoadBytes(b)
+		default:
+			return t.LoadBytes(t.Content)
 		}
-		tmpl, err := template.New(t.Name).Funcs(sprig.TxtFuncMap()).Parse(string(b))
-		if err != nil {
-			return errors.Wrapf(err, "error parsing %s", filename)
-		}
-		t.Template = tmpl
 	}
+	return nil
+}
+
+func (t *Template) LoadBytes(b []byte) error {
+	tmpl, err := template.New(t.Name).Funcs(sprig.TxtFuncMap()).Parse(string(b))
+	if err != nil {
+		return errors.Wrapf(err, "error parsing template %s", t.Name)
+	}
+	t.Template = tmpl
 	return nil
 }
 
