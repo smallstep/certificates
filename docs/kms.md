@@ -46,7 +46,8 @@ way to initialize the public key infrastructure (PKI) using Cloud KMS, but an
 experimental tool named `step-cloudkms-init` is available for this use case. At
 some point this tool will be integrated into `step` and it will be deleted.
 
-The use `step-cloudkms-init` just enable Cloud KMS and run:
+To use `step-cloudkms-init` just enable Cloud KMS in your step-ca config and
+run:
 
 ```sh
 $ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
