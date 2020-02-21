@@ -52,16 +52,16 @@ To use `step-cloudkms-init` just enable Cloud KMS in your project and run:
 $ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 $ step-cloudkms-init --project your-project-id --ssh
 Creating PKI ...
-✔ Root Key: projects/test-kms/locations/global/keyRings/pki/cryptoKeys/root/cryptoKeyVersions/1
+✔ Root Key: projects/your-project-id/locations/global/keyRings/pki/cryptoKeys/root/cryptoKeyVersions/1
 ✔ Root Certificate: root_ca.crt
-✔ Intermediate Key: projects/mariano-kms/locations/global/keyRings/pki/cryptoKeys/intermediate/cryptoKeyVersions/1
+✔ Intermediate Key: projects/your-project-id/locations/global/keyRings/pki/cryptoKeys/intermediate/cryptoKeyVersions/1
 ✔ Intermediate Certificate: intermediate_ca.crt
 
 Creating SSH Keys ...
 ✔ SSH User Public Key: ssh_user_ca_key.pub
-✔ SSH User Private Key: projects/mariano-kms/locations/global/keyRings/pki/cryptoKeys/ssh-user-key/cryptoKeyVersions/1
+✔ SSH User Private Key: projects/your-project-id/locations/global/keyRings/pki/cryptoKeys/ssh-user-key/cryptoKeyVersions/1
 ✔ SSH Host Public Key: ssh_host_ca_key.pub
-✔ SSH Host Private Key: projects/mariano-kms/locations/global/keyRings/pki/cryptoKeys/ssh-host-key/cryptoKeyVersions/1
+✔ SSH Host Private Key: projects/your-project-id/locations/global/keyRings/pki/cryptoKeys/ssh-host-key/cryptoKeyVersions/1
 ```
 
 See `step-cloudkms-init --help` for more options.
