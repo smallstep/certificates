@@ -178,7 +178,7 @@ func createPKI(c *cloudkms.CloudKMS, project, location, keyRing string, protecti
 		BasicConstraintsValid: true,
 		MaxPathLen:            0,
 		MaxPathLenZero:        true,
-		Issuer:                pkix.Name{CommonName: "Smallstep Root"},
+		Issuer:                root.Subject,
 		Subject:               pkix.Name{CommonName: "Smallstep Intermediate"},
 		SerialNumber:          mustSerialNumber(),
 		SubjectKeyId:          mustSubjectKeyID(resp.PublicKey),
