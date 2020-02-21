@@ -11,6 +11,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
+	"math/rand"
 	"net"
 	"net/http"
 	"strings"
@@ -38,10 +40,14 @@ type Challenge struct {
 }
 
 type Retry struct {
-	Called    int         `json:"id"`
-	Backoffs  float64     `json:"backoffs"`
-	Active    bool        `json:"active"`
-	Mux	      sync.Mutex  `json:"mux"`
+	Called       float64        `json:"id"`
+	BaseDelay    time.Duration  `json:"basedelay"`
+	MaxDelay     time.Duration  `json:"maxdelay"`
+	Multiplier   float64        `json:"multiplier"`
+	Jitter       float64        `json:"jitter"`
+	MaxAttempts  float64        `json:"maxattempts"`
+	Active       bool           `json:"active"`
+	Mux	         sync.Mutex     `json:"mux"`
 }
 
 // ToLog enables response logging.
@@ -85,6 +91,7 @@ type challenge interface {
 	getAuthzID() string
 	getToken() string
 	getRetry() *Retry
+	getBackoff() time.Duration
 	clone() *baseChallenge
 	getAccountID() string
 	getValidated() time.Time
@@ -131,7 +138,7 @@ func newBaseChallenge(accountID, authzID string) (*baseChallenge, error) {
 		Status:    StatusPending,
 		Token:     token,
 		Created:   clock.Now(),
-		Retry:     &Retry{Called:0, Backoffs:1, Active:false},
+		Retry:     &Retry{Called:0, BaseDelay:1, MaxDelay: 30, Jitter: 1, MaxAttempts:10, Active:false},
 	}, nil
 }
 
@@ -188,6 +195,25 @@ func (bc *baseChallenge) getCreated() time.Time {
 // getCreated returns the created time of the baseChallenge.
 func (bc *baseChallenge) getError() *AError {
 	return bc.Error
+}
+
+// getBackoff returns the backoff time of the baseChallenge.
+func (bc *baseChallenge) getBackoff() time.Duration {
+	if bc.Retry.Called == 0 {
+		return bc.Retry.BaseDelay
+	}
+
+	backoff, max := float64(bc.Retry.BaseDelay), float64(bc.Retry.MaxDelay)
+	backoff *= math.Pow(bc.Retry.Multiplier, bc.Retry.Called)
+	if backoff > max {
+		backoff = max
+	}
+	// Introduce Jitter to ensure that clustered requests wont operate in unison
+	backoff *= 1 + bc.Retry.Jitter*(rand.Float64()*2-1)
+	if backoff < 0 {
+		return 0
+	}
+	return time.Duration(backoff)
 }
 
 // toACME converts the internal Challenge type into the public acmeChallenge
@@ -341,14 +367,14 @@ func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo valida
 
 	resp, err := vo.httpGet(url)
 	if err != nil {
-		if err = hc.storeError(db, ConnectionErr(errors.Wrapf(err,
+	if err = hc.iterateRetry(db, ConnectionErr(errors.Wrapf(err,
 			"error doing http GET for url %s", url))); err != nil {
 			return nil, err
 		}
 		return hc, nil
 	}
 	if resp.StatusCode >= 400 {
-		if err = hc.storeError(db,
+		if err = hc.iterateRetry(db,
 			ConnectionErr(errors.Errorf("error doing http GET for url %s with status code %d",
 				url, resp.StatusCode))); err != nil {
 			return nil, err
@@ -366,12 +392,16 @@ func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo valida
 
 	expected, err := KeyAuthorization(hc.Token, jwk)
 	if err != nil {
+		// TODO retry?
 		return nil, err
 	}
 	if keyAuth != expected {
-		rejectedErr := RejectedIdentifierErr(errors.Errorf("keyAuthorization does not match; "+
-			"expected %s, but got %s", expected, keyAuth))
-		if err = hc.updateRetry(db, rejectedErr); err != nil {
+		// TODO should we just bail here, this is a "successful" failure.
+		if err = hc.iterateRetry(db, RejectedIdentifierErr(errors.Errorf("keyAuthorization does not match; "+
+			"expected %s, but got %s", expected, keyAuth))); err != nil {
+			// TODO what's the difference between returning nil with an error, and returning a retry-
+			// incremented challenge? I think we should probably only hard error if there are no more
+			// retries left. 
 			return nil, err
 		}
 		return hc, err
@@ -383,6 +413,7 @@ func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo valida
 	upd.Error = nil
 	upd.Validated = clock.Now()
 	upd.Retry.Active = false
+	upd.Retry.Called = 0
 
 	if err := upd.save(db, hc); err != nil {
 		return nil, err
@@ -426,7 +457,7 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 
 	conn, err := vo.tlsDial("tcp", hostPort, config)
 	if err != nil {
-		if err = tc.storeError(db,
+		if err = tc.iterateRetry(db,
 			ConnectionErr(errors.Wrapf(err, "error doing TLS dial for %s", hostPort))); err != nil {
 			return nil, err
 		}
@@ -438,7 +469,7 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 	certs := cs.PeerCertificates
 
 	if len(certs) == 0 {
-		if err = tc.storeError(db,
+		if err = tc.iterateRetry(db,
 			RejectedIdentifierErr(errors.Errorf("%s challenge for %s resulted in no certificates",
 				tc.Type, tc.Value))); err != nil {
 			return nil, err
@@ -447,9 +478,8 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 	}
 
 	if !cs.NegotiatedProtocolIsMutual || cs.NegotiatedProtocol != "acme-tls/1" {
-		if err = tc.storeError(db,
-			RejectedIdentifierErr(errors.Errorf("cannot negotiate ALPN acme-tls/1 protocol for "+
-				"tls-alpn-01 challenge"))); err != nil {
+		if err = tc.iterateRetry(db, RejectedIdentifierErr(errors.Errorf("cannot negotiate ALPN acme-tls/1 protocol for "+
+			"tls-alpn-01 challenge"))); err != nil {
 			return nil, err
 		}
 		return tc, nil
@@ -458,7 +488,7 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 	leafCert := certs[0]
 
 	if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], tc.Value) {
-		if err = tc.storeError(db,
+		if err = tc.iterateRetry(db,
 			RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
 				"leaf certificate must contain a single DNS name, %v", tc.Value))); err != nil {
 			return nil, err
@@ -479,8 +509,8 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 	for _, ext := range leafCert.Extensions {
 		if idPeAcmeIdentifier.Equal(ext.Id) {
 			if !ext.Critical {
-				if err = tc.storeError(db,
-					RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+				if err = tc.iterateRetry(db,
+					RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
 						"acmeValidationV1 extension not critical"))); err != nil {
 					return nil, err
 				}
@@ -491,7 +521,7 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 			rest, err := asn1.Unmarshal(ext.Value, &extValue)
 
 			if err != nil || len(rest) > 0 || len(hashedKeyAuth) != len(extValue) {
-				if err = tc.storeError(db,
+				if err = tc.iterateRetry(db,
 					RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
 						"malformed acmeValidationV1 extension value"))); err != nil {
 					return nil, err
@@ -500,7 +530,7 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 			}
 
 			if subtle.ConstantTimeCompare(hashedKeyAuth[:], extValue) != 1 {
-				if err = tc.storeError(db,
+				if err = tc.iterateRetry(db,
 					RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
 						"expected acmeValidationV1 extension value %s for this challenge but got %s",
 						hex.EncodeToString(hashedKeyAuth[:]), hex.EncodeToString(extValue)))); err != nil {
@@ -513,6 +543,7 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 			upd.Status = StatusValid
 			upd.Error = nil
 			upd.Validated = clock.Now()
+			upd.Retry.Active = false
 
 			if err := upd.save(db, tc); err != nil {
 				return nil, err
@@ -526,7 +557,8 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 	}
 
 	if foundIDPeAcmeIdentifierV1Obsolete {
-		if err = tc.storeError(db,
+		// TODO this isn't likely going to change without user action, this is probably a good case for a hard failure...
+		if err = tc.iterateRetry(db,
 			RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
 				"obsolete id-pe-acmeIdentifier in acmeValidationV1 extension"))); err != nil {
 			return nil, err
@@ -534,7 +566,7 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 		return tc, nil
 	}
 
-	if err = tc.storeError(db,
+	if err = tc.iterateRetry(db,
 		RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
 			"missing acmeValidationV1 extension"))); err != nil {
 		return nil, err
@@ -593,7 +625,7 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 	if err != nil {
 		dnsErr := DNSErr(errors.Wrapf(err, "error looking up TXT "+
 			"records for domain %s", domain))
-		if err = dc.updateRetry(db, dnsErr); err != nil {
+		if err = dc.iterateRetry(db, dnsErr); err != nil {
 			return nil, err
 		}
 		return dc, nil
@@ -615,10 +647,7 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 	if !found {
 		rejectedErr := RejectedIdentifierErr(errors.Errorf("keyAuthorization "+
 			"does not match; expected %s, but got %s", expectedKeyAuth, txtRecords))
-		upd := dc.clone()
-		upd.Error = rejectedErr.ToACME()
-		upd.Error.Subproblems = append(upd.Error.Subproblems, rejectedErr)
-		if err = upd.save(db, dc); err != nil {
+		if err = dc.iterateRetry(db, rejectedErr); err != nil {
 			return nil, err
 		}
 		return dc, nil
@@ -629,6 +658,7 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 	upd.Error = nil
 	upd.Validated = time.Now().UTC()
 	upd.Retry.Active = false
+	upd.Retry.Called = 0
 
 	if err := upd.save(db, dc); err != nil {
 		return nil, err
@@ -651,18 +681,16 @@ func getChallenge(db nosql.DB, id string) (challenge, error) {
 	return ch, nil
 }
 
-// updateRetry updates a challenge's retry and error objects upon a failed validation attempt
-func (bc *baseChallenge) updateRetry(db nosql.DB, error *Error) error {
+// iterateRetry iterates a challenge's retry and error objects upon a failed validation attempt
+func (bc *baseChallenge) iterateRetry(db nosql.DB, error *Error) error {
 	upd := bc.clone()
 	upd.Error = error.ToACME()
 	upd.Error.Subproblems = append(upd.Error.Subproblems, error)
 	upd.Retry.Called ++
 	upd.Retry.Active = true
-	if upd.Retry.Called >= 10 {
+	if math.Mod(upd.Retry.Called , upd.Retry.MaxAttempts) == 0 {
 		upd.Status = StatusInvalid
-		upd.Retry.Backoffs *= 2
 		upd.Retry.Active = false
-		upd.Retry.Called = 0
 	}
 	if err := upd.save(db, bc); err != nil {
 		return err
