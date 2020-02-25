@@ -3,6 +3,7 @@ package cloudkms
 import (
 	"context"
 	"crypto"
+	"log"
 	"strings"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 	"google.golang.org/api/option"
 	kmspb "google.golang.org/genproto/googleapis/cloud/kms/v1"
 )
+
+const pendingGenerationRetries = 10
 
 // protectionLevelMapping maps step protection levels with cloud kms ones.
 var protectionLevelMapping = map[apiv1.ProtectionLevel]kmspb.ProtectionLevel{
@@ -189,6 +192,12 @@ func (k *CloudKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 		crytoKeyName = response.Name + "/cryptoKeyVersions/1"
 	}
 
+	// Sleep deterministically to avoid retries because of PENDING_GENERATING.
+	// One second is often enough.
+	if protectionLevel == kmspb.ProtectionLevel_HSM {
+		time.Sleep(1 * time.Second)
+	}
+
 	// Retrieve public key to add it to the response.
 	pk, err := k.GetPublicKey(&apiv1.GetPublicKeyRequest{
 		Name: crytoKeyName,
@@ -237,12 +246,7 @@ func (k *CloudKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKe
 		return nil, errors.New("createKeyRequest 'name' cannot be empty")
 	}
 
-	ctx, cancel := defaultContext()
-	defer cancel()
-
-	response, err := k.client.GetPublicKey(ctx, &kmspb.GetPublicKeyRequest{
-		Name: req.Name,
-	})
+	response, err := k.getPublicKeyWithRetries(req.Name, pendingGenerationRetries)
 	if err != nil {
 		return nil, errors.Wrap(err, "cloudKMS GetPublicKey failed")
 	}
@@ -253,6 +257,30 @@ func (k *CloudKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKe
 	}
 
 	return pk, nil
+}
+
+// getPublicKeyWithRetries retries the request if the error is
+// FailedPrecondition, caused because the key is in the PENDING_GENERATION
+// status.
+func (k *CloudKMS) getPublicKeyWithRetries(name string, retries int) (response *kmspb.PublicKey, err error) {
+	workFn := func() (*kmspb.PublicKey, error) {
+		ctx, cancel := defaultContext()
+		defer cancel()
+		return k.client.GetPublicKey(ctx, &kmspb.GetPublicKeyRequest{
+			Name: name,
+		})
+	}
+	for i := 0; i < retries; i++ {
+		if response, err = workFn(); err == nil {
+			return
+		}
+		if status.Code(err) == codes.FailedPrecondition {
+			log.Println("Waiting for key generation ...")
+			time.Sleep(time.Duration(i+1) * time.Second)
+			continue
+		}
+	}
+	return
 }
 
 func defaultContext() (context.Context, context.CancelFunc) {

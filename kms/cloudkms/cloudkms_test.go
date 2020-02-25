@@ -175,6 +175,7 @@ func TestCloudKMS_CreateKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var retries int
 	type fields struct {
 		client KeyManagementClient
 	}
@@ -236,6 +237,24 @@ func TestCloudKMS_CreateKey(t *testing.T) {
 			}},
 			args{&apiv1.CreateKeyRequest{Name: keyName, ProtectionLevel: apiv1.HSM, SignatureAlgorithm: apiv1.ECDSAWithSHA256}},
 			&apiv1.CreateKeyResponse{Name: keyName + "/cryptoKeyVersions/2", PublicKey: pk, CreateSignerRequest: apiv1.CreateSignerRequest{SigningKey: keyName + "/cryptoKeyVersions/2"}}, false},
+		{"ok with retries", fields{
+			&MockClient{
+				getKeyRing: func(_ context.Context, _ *kmspb.GetKeyRingRequest, _ ...gax.CallOption) (*kmspb.KeyRing, error) {
+					return &kmspb.KeyRing{}, nil
+				},
+				createCryptoKey: func(_ context.Context, _ *kmspb.CreateCryptoKeyRequest, _ ...gax.CallOption) (*kmspb.CryptoKey, error) {
+					return &kmspb.CryptoKey{Name: keyName}, nil
+				},
+				getPublicKey: func(_ context.Context, _ *kmspb.GetPublicKeyRequest, _ ...gax.CallOption) (*kmspb.PublicKey, error) {
+					if retries != 2 {
+						retries++
+						return nil, status.Error(codes.FailedPrecondition, "key is not enabled, current state is: PENDING_GENERATION")
+					}
+					return &kmspb.PublicKey{Pem: string(pemBytes)}, nil
+				},
+			}},
+			args{&apiv1.CreateKeyRequest{Name: keyName, ProtectionLevel: apiv1.HSM, SignatureAlgorithm: apiv1.ECDSAWithSHA256}},
+			&apiv1.CreateKeyResponse{Name: keyName + "/cryptoKeyVersions/1", PublicKey: pk, CreateSignerRequest: apiv1.CreateSignerRequest{SigningKey: keyName + "/cryptoKeyVersions/1"}}, false},
 		{"fail name", fields{&MockClient{}}, args{&apiv1.CreateKeyRequest{}}, nil, true},
 		{"fail protection level", fields{&MockClient{}}, args{&apiv1.CreateKeyRequest{Name: keyName, ProtectionLevel: apiv1.ProtectionLevel(100)}}, nil, true},
 		{"fail signature algorithm", fields{&MockClient{}}, args{&apiv1.CreateKeyRequest{Name: keyName, ProtectionLevel: apiv1.Software, SignatureAlgorithm: apiv1.SignatureAlgorithm(100)}}, nil, true},
@@ -322,6 +341,7 @@ func TestCloudKMS_GetPublicKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var retries int
 	type fields struct {
 		client KeyManagementClient
 	}
@@ -338,6 +358,17 @@ func TestCloudKMS_GetPublicKey(t *testing.T) {
 		{"ok", fields{
 			&MockClient{
 				getPublicKey: func(_ context.Context, _ *kmspb.GetPublicKeyRequest, _ ...gax.CallOption) (*kmspb.PublicKey, error) {
+					return &kmspb.PublicKey{Pem: string(pemBytes)}, nil
+				},
+			}},
+			args{&apiv1.GetPublicKeyRequest{Name: keyName}}, pk, false},
+		{"ok with retries", fields{
+			&MockClient{
+				getPublicKey: func(_ context.Context, _ *kmspb.GetPublicKeyRequest, _ ...gax.CallOption) (*kmspb.PublicKey, error) {
+					if retries != 2 {
+						retries++
+						return nil, status.Error(codes.FailedPrecondition, "key is not enabled, current state is: PENDING_GENERATION")
+					}
 					return &kmspb.PublicKey{Pem: string(pemBytes)}, nil
 				},
 			}},
