@@ -193,7 +193,36 @@ openssl ca -config [ROOT_CA_CONFIG_FILE] \
   -out intermediate.crt
 ```
 
-This process will yield an `intermediate.crt` certificate.  Transfer this file back to the machine running `step-ca`.
+**CFSSL**
+
+For CFSSL you'll need a signing profile that specifies a 10-year expiry:
+
+```bash
+cat > ca-smallstep-config.json <<EOF
+{
+  "signing": {
+    "profiles": {
+      "smallstep": {
+        "expiry": "87660h",
+        "usages": ["signing"]
+      }
+    }
+  }
+}
+EOF
+```
+
+Now use that config to sign the intermediate certificate:
+
+```bash
+cfssl sign -ca ca.pem \
+    -ca-key ca-key.pem \
+    -config ca-smallstep-config.json \
+    -profile smallstep
+    -csr intermediate.csr | cfssljson -bare
+```
+
+This process will yield a signed `intermediate.crt` certificate (or `cert.pem` for CFSSL). Transfer this file back to the machine running `step-ca`.
 
 Finally, replace the intermediate .crt and signing key produced by `step ca init` with the new ones we just created:
 
