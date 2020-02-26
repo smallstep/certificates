@@ -171,7 +171,7 @@ aws acm-pca issue-certificate \
 --csr intermediate.csr \
 --template-arn "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1" \
 --signing-algorithm "SHA256WITHRSA" \
---validity Value=365,Type="DAYS"
+--validity Value=3650,Type="DAYS"
 ```
 
 This command will return the ARN of the certificate created. Now use [get-certificate](https://docs.aws.amazon.com/cli/latest/reference/acm-pca/get-certificate.html) to fetch the intermediate certificate:
@@ -188,7 +188,7 @@ aws acm-pca get-certificate \
 ```bash
 openssl ca -config [ROOT_CA_CONFIG_FILE] \
   -extensions v3_intermediate_ca \
-  -days 365 -notext -md sha512 \
+  -days 3650 -notext -md sha512 \
   -in intermediate.csr \
   -out intermediate.crt
 ```
