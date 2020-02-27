@@ -163,24 +163,45 @@ certreq -submit -attrib "CertificateTemplate:SubCA" intermediate.csr intermediat
 
 **AWS Certificate Manager Private CA**
 
-Use [issue-certificate](https://docs.aws.amazon.com/acm-pca/latest/userguide/PcaIssueCert.html) to process the CSR:
+Here's a Python script that uses [issue-certificate](https://docs.aws.amazon.com/acm-pca/latest/userguide/PcaIssueCert.html) to process the CSR:
 
-```bash
-aws acm-pca issue-certificate \
---certificate-authority-arn "[AWS_PRIVATE_CA_ARN]" \
---csr intermediate.csr \
---template-arn "arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1" \
---signing-algorithm "SHA256WITHRSA" \
---validity Value=3650,Type="DAYS"
+```python
+import boto3
+import sys
+
+AWS_CA_ARN = '[YOUR_PRIVATE_CA_ARN]'
+
+csr = ''.join(sys.stdin.readlines())
+
+client = boto3.client('acm-pca')
+response = client.issue_certificate(
+    CertificateAuthorityArn=AWS_CA_ARN,
+    Csr=csr,
+    SigningAlgorithm='SHA256WITHRSA',
+    TemplateArn='arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1',
+    Validity={
+        'Value': 5,
+        'Type': 'YEARS'
+    }
+)
+print(f"Creating certificate with ARN {response['CertificateArn']}...", file=sys.stderr, end='')
+waiter = client.get_waiter('certificate_issued')
+waiter.wait(
+    CertificateAuthorityArn=AWS_CA_ARN,
+    CertificateArn=response['CertificateArn']
+)
+print('done.', file=sys.stderr)
+response = client.get_certificate(
+   CertificateArn=response['CertificateArn'],
+   CertificateAuthorityArn=AWS_CA_ARN
+)
+print(response['Certificate'])
 ```
 
-This command will return the ARN of the certificate created. Now use [get-certificate](https://docs.aws.amazon.com/cli/latest/reference/acm-pca/get-certificate.html) to fetch the intermediate certificate:
+To run it, fill in the ARN of your CA and run:
 
 ```bash
-aws acm-pca get-certificate \
-    --certificate-authority-arn "[AWS_PRIVATE_CA_ARN]" \
-    --certificate-arn "[CERTIFICATE_ARN]" \
-    --output text > intermediate.crt
+python issue_certificate.py < intermediate.csr > intermediate.crt
 ```
 
 **OpenSSL**
