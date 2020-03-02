@@ -120,7 +120,7 @@ The root certificate can be in PEM or DER format, and the signing key can be a P
 
 ### Option 2: More secure
 
-That said, CAs are usually pretty locked down and it's bad practice to move the private key around. So I'm gonna assume that's not an option and give you the more complex instructions to do this "the right way", by generating a CSR for `step-ca`, getting it signed by your exiting root, and configuring `step-ca` to use it.
+That said, CAs are usually pretty locked down and it's bad practice to move the private key around. So I'm gonna assume that's not an option and give you the more complex instructions to do this "the right way", by generating a CSR for `step-ca`, getting it signed by your existing root, and configuring `step-ca` to use it.
 
 When you run `step ca init` we create a couple artifacts under `~/.step/`. The important ones for us are:
 
