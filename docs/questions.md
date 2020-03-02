@@ -106,7 +106,153 @@ automated method as your system grows.
 
 ## I already have PKI in place. Can I use this with my own root certificate?
 
-Absolutely. [Details here].
+Yes. There's a easy way, and a longer but more secure way to do this.
+
+### Option 1: The easy way
+
+If you have your root CA signing key available, you can run:
+
+```bash
+step ca init --root=[ROOT_CERT_FILE] --key=[ROOT_PRIVATE_KEY_FILE]
+```
+
+The root certificate can be in PEM or DER format, and the signing key can be a PEM file containing a PKCS#1, PKCS#8, or RFC5915 (for EC) key.
+
+### Option 2: More secure
+
+That said, CAs are usually pretty locked down and it's bad practice to move the private key around. So I'm gonna assume that's not an option and give you the more complex instructions to do this "the right way", by generating a CSR for `step-ca`, getting it signed by your existing root, and configuring `step-ca` to use it.
+
+When you run `step ca init` we create a couple artifacts under `~/.step/`. The important ones for us are:
+
+- `~/.step/certs/root_ca.crt` is your root CA certificate
+- `~/.step/secrets/root_ca_key` is your root CA signing key
+- `~/.step/certs/intermediate_ca.crt` is your intermediate CA cert
+- `~/.step/secrets/intermediate_ca_key` is the intermediate signing key used by `step-ca`
+
+The easiest thing to do is to run `step ca init` to get  this scaffolding configuration in place, then remove/replace these  artifacts with new ones that are tied to your existing root CA.
+
+First, `step-ca` does not actually need the root CA signing key. So you can simply remove that file:
+
+```bash
+rm ~/.step/secrets/root_ca_key
+```
+
+Next, replace `step-ca`'s root CA cert with your existing root certificate:
+
+```bash
+mv /path/to/your/existing/root.crt ~/.step/certs/root_ca.crt
+```
+
+Now you need to generate a new signing key and intermediate certificate, signed by your existing root CA. To do that we can use the `step certificate create` subcommand to generate a certificate signing request (CSR) that we'll have your existing root CA sign, producing an intermediate certificate.
+
+To generate those artifacts run:
+
+```bash
+step certificate create "Intermediate CA Name" intermediate.csr intermediate_ca_key --csr
+```
+
+Next, you'll need to transfer the CSR file (`intermediate.csr`) to your existing root CA and get it signed.
+
+Now you need to get the CSR executed by your existing root CA.
+
+**Active Directory Certificate Services**
+
+```bash
+certreq -submit -attrib "CertificateTemplate:SubCA" intermediate.csr intermediate.crt
+```
+
+**AWS Certificate Manager Private CA**
+
+Here's a Python script that uses [issue-certificate](https://docs.aws.amazon.com/acm-pca/latest/userguide/PcaIssueCert.html) to process the CSR:
+
+```python
+import boto3
+import sys
+
+AWS_CA_ARN = '[YOUR_PRIVATE_CA_ARN]'
+
+csr = ''.join(sys.stdin.readlines())
+
+client = boto3.client('acm-pca')
+response = client.issue_certificate(
+    CertificateAuthorityArn=AWS_CA_ARN,
+    Csr=csr,
+    SigningAlgorithm='SHA256WITHRSA',
+    TemplateArn='arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen1/V1',
+    Validity={
+        'Value': 5,
+        'Type': 'YEARS'
+    }
+)
+print(f"Creating certificate with ARN {response['CertificateArn']}...", file=sys.stderr, end='')
+waiter = client.get_waiter('certificate_issued')
+waiter.wait(
+    CertificateAuthorityArn=AWS_CA_ARN,
+    CertificateArn=response['CertificateArn']
+)
+print('done.', file=sys.stderr)
+response = client.get_certificate(
+   CertificateArn=response['CertificateArn'],
+   CertificateAuthorityArn=AWS_CA_ARN
+)
+print(response['Certificate'])
+```
+
+To run it, fill in the ARN of your CA and run:
+
+```bash
+python issue_certificate.py < intermediate.csr > intermediate.crt
+```
+
+**OpenSSL**
+
+```bash
+openssl ca -config [ROOT_CA_CONFIG_FILE] \
+  -extensions v3_intermediate_ca \
+  -days 3650 -notext -md sha512 \
+  -in intermediate.csr \
+  -out intermediate.crt
+```
+
+**CFSSL**
+
+For CFSSL you'll need a signing profile that specifies a 10-year expiry:
+
+```bash
+cat > ca-smallstep-config.json <<EOF
+{
+  "signing": {
+    "profiles": {
+      "smallstep": {
+        "expiry": "87660h",
+        "usages": ["signing"]
+      }
+    }
+  }
+}
+EOF
+```
+
+Now use that config to sign the intermediate certificate:
+
+```bash
+cfssl sign -ca ca.pem \
+    -ca-key ca-key.pem \
+    -config ca-smallstep-config.json \
+    -profile smallstep
+    -csr intermediate.csr | cfssljson -bare
+```
+
+This process will yield a signed `intermediate.crt` certificate (or `cert.pem` for CFSSL). Transfer this file back to the machine running `step-ca`.
+
+Finally, replace the intermediate .crt and signing key produced by `step ca init` with the new ones we just created:
+
+```bash
+mv intermediate.crt ~/.step/certs/intermediate_ca.crt
+mv intermediate_ca_key ~/.step/secrets/intermediate_ca_key
+```
+
+That should be it! You should be able to start `step-ca` and the certificates should be trusted by anything that trusts your existing root CA.
 
 ## Further Reading
 
