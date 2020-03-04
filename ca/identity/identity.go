@@ -203,6 +203,18 @@ func (i *Identity) TLSCertificate() (tls.Certificate, error) {
 	}
 }
 
+// GetClientCertificateFunc returns a method that can be used as the
+// GetClientCertificate property in a tls.Config.
+func (i *Identity) GetClientCertificateFunc() func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+	return func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		crt, err := tls.LoadX509KeyPair(i.Certificate, i.Key)
+		if err != nil {
+			return nil, errors.Wrap(err, "error loading identity certificate")
+		}
+		return &crt, nil
+	}
+}
+
 // Renewer is that interface that a renew client must implement.
 type Renewer interface {
 	GetRootCAs() *x509.CertPool

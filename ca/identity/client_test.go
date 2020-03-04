@@ -185,11 +185,21 @@ func TestLoadClient(t *testing.T) {
 					t.Errorf("LoadClient() = %#v, want %#v", got, tt.want)
 				}
 			} else {
-				if !reflect.DeepEqual(got.CaURL, tt.want.CaURL) ||
-					!reflect.DeepEqual(got.Client.Transport.(*http.Transport).TLSClientConfig.RootCAs, tt.want.Client.Transport.(*http.Transport).TLSClientConfig.RootCAs) ||
-					!reflect.DeepEqual(got.Client.Transport.(*http.Transport).TLSClientConfig.Certificates, tt.want.Client.Transport.(*http.Transport).TLSClientConfig.Certificates) {
+				gotTransport := got.Client.Transport.(*http.Transport)
+				wantTransport := tt.want.Client.Transport.(*http.Transport)
+				if gotTransport.TLSClientConfig.GetClientCertificate == nil {
+					t.Error("LoadClient() transport does not define GetClientCertificate")
+				} else if !reflect.DeepEqual(got.CaURL, tt.want.CaURL) || !reflect.DeepEqual(gotTransport.TLSClientConfig.RootCAs, wantTransport.TLSClientConfig.RootCAs) {
 					t.Errorf("LoadClient() = %#v, want %#v", got, tt.want)
+				} else {
+					crt, err := gotTransport.TLSClientConfig.GetClientCertificate(nil)
+					if err != nil {
+						t.Errorf("LoadClient() GetClientCertificate error = %v", err)
+					} else if !reflect.DeepEqual(*crt, wantTransport.TLSClientConfig.Certificates[0]) {
+						t.Errorf("LoadClient() GetClientCertificate crt = %#v, want %#v", *crt, wantTransport.TLSClientConfig.Certificates[0])
+					}
 				}
+
 			}
 		})
 	}

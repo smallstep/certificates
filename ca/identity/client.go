@@ -60,7 +60,9 @@ func LoadClient() (*Client, error) {
 
 	// Prepare transport with information in defaults.json and identity.json
 	tr := http.DefaultTransport.(*http.Transport).Clone()
-	tr.TLSClientConfig = &tls.Config{}
+	tr.TLSClientConfig = &tls.Config{
+		GetClientCertificate: identity.GetClientCertificateFunc(),
+	}
 
 	// RootCAs
 	b, err = ioutil.ReadFile(defaults.Root)
@@ -71,13 +73,6 @@ func LoadClient() (*Client, error) {
 	if pool.AppendCertsFromPEM(b) {
 		tr.TLSClientConfig.RootCAs = pool
 	}
-
-	// Certificate
-	crt, err := tls.LoadX509KeyPair(identity.Certificate, identity.Key)
-	if err != nil {
-		return nil, fmt.Errorf("error loading certificate: %v", err)
-	}
-	tr.TLSClientConfig.Certificates = []tls.Certificate{crt}
 
 	return &Client{
 		CaURL: caURL,
