@@ -556,19 +556,30 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 
 	p1, err := generateGCP()
 	assert.FatalError(t, err)
+	p1.DisableCustomSANs = true
 
 	p2, err := generateGCP()
 	assert.FatalError(t, err)
+	p2.DisableCustomSANs = false
+
+	p3, err := generateGCP()
+	assert.FatalError(t, err)
 	// disable sshCA
 	disable := false
-	p2.Claims = &Claims{EnableSSHCA: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p3.Claims = &Claims{EnableSSHCA: &disable}
+	p3.claimer, err = NewClaimer(p3.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	t1, err := generateGCPToken(p1.ServiceAccounts[0],
 		"https://accounts.google.com", p1.GetID(),
 		"instance-id", "instance-name", "project-id", "zone",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
+	assert.FatalError(t, err)
+
+	t2, err := generateGCPToken(p2.ServiceAccounts[0],
+		"https://accounts.google.com", p2.GetID(),
+		"instance-id", "instance-name", "project-id", "zone",
+		time.Now(), &p2.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 
 	key, err := generateJSONWebKey()
@@ -596,6 +607,10 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 		CertType: "host", Principals: []string{"instance-name.zone.c.project-id.internal"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
 	}
+	expectedCustomOptions := &SSHOptions{
+		CertType: "host", Principals: []string{"foo.bar", "bar.foo"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
 
 	type args struct {
 		token   string
@@ -618,11 +633,12 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 		{"ok-principal1", p1, args{t1, SSHOptions{Principals: []string{"instance-name.c.project-id.internal"}}, pub}, expectedHostOptionsPrincipal1, http.StatusOK, false, false},
 		{"ok-principal2", p1, args{t1, SSHOptions{Principals: []string{"instance-name.zone.c.project-id.internal"}}, pub}, expectedHostOptionsPrincipal2, http.StatusOK, false, false},
 		{"ok-options", p1, args{t1, SSHOptions{CertType: "host", Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"ok-custom", p2, args{t2, SSHOptions{Principals: []string{"foo.bar", "bar.foo"}}, pub}, expectedCustomOptions, http.StatusOK, false, false},
 		{"fail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedHostOptions, http.StatusOK, false, true},
 		{"fail-type", p1, args{t1, SSHOptions{CertType: "user"}, pub}, nil, http.StatusOK, false, true},
 		{"fail-principal", p1, args{t1, SSHOptions{Principals: []string{"smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
 		{"fail-extra-principal", p1, args{t1, SSHOptions{Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal", "smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
-		{"fail-sshCA-disabled", p2, args{"foo", SSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
+		{"fail-sshCA-disabled", p3, args{"foo", SSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
 		{"fail-invalid-token", p1, args{"foo", SSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
 	}
 	for _, tt := range tests {

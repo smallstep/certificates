@@ -582,17 +582,27 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 
 	p1, srv, err := generateAWSWithServer()
 	assert.FatalError(t, err)
+	p1.DisableCustomSANs = true
 	defer srv.Close()
 
 	p2, err := generateAWS()
 	assert.FatalError(t, err)
+	p2.Accounts = p1.Accounts
+	p2.config = p1.config
+	p2.DisableCustomSANs = false
+
+	p3, err := generateAWS()
+	assert.FatalError(t, err)
 	// disable sshCA
 	disable := false
-	p2.Claims = &Claims{EnableSSHCA: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p3.Claims = &Claims{EnableSSHCA: &disable}
+	p3.claimer, err = NewClaimer(p3.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
-	t1, err := p1.GetIdentityToken("foo.local", "https://ca.smallstep.com")
+	t1, err := p1.GetIdentityToken("127.0.0.1", "https://ca.smallstep.com")
+	assert.FatalError(t, err)
+
+	t2, err := p2.GetIdentityToken("foo.local", "https://ca.smallstep.com")
 	assert.FatalError(t, err)
 
 	key, err := generateJSONWebKey()
@@ -620,6 +630,10 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 		CertType: "host", Principals: []string{"ip-127-0-0-1.us-west-1.compute.internal"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
 	}
+	expectedCustomOptions := &SSHOptions{
+		CertType: "host", Principals: []string{"foo.local"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
 
 	type args struct {
 		token   string
@@ -642,11 +656,12 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 		{"ok-principal-ip", p1, args{t1, SSHOptions{Principals: []string{"127.0.0.1"}}, pub}, expectedHostOptionsIP, http.StatusOK, false, false},
 		{"ok-principal-hostname", p1, args{t1, SSHOptions{Principals: []string{"ip-127-0-0-1.us-west-1.compute.internal"}}, pub}, expectedHostOptionsHostname, http.StatusOK, false, false},
 		{"ok-options", p1, args{t1, SSHOptions{CertType: "host", Principals: []string{"127.0.0.1", "ip-127-0-0-1.us-west-1.compute.internal"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"ok-custom", p2, args{t2, SSHOptions{Principals: []string{"foo.local"}}, pub}, expectedCustomOptions, http.StatusOK, false, false},
 		{"fail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedHostOptions, http.StatusOK, false, true},
 		{"fail-type", p1, args{t1, SSHOptions{CertType: "user"}, pub}, nil, http.StatusOK, false, true},
 		{"fail-principal", p1, args{t1, SSHOptions{Principals: []string{"smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
 		{"fail-extra-principal", p1, args{t1, SSHOptions{Principals: []string{"127.0.0.1", "ip-127-0-0-1.us-west-1.compute.internal", "smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
-		{"fail-sshCA-disabled", p2, args{"foo", SSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
+		{"fail-sshCA-disabled", p3, args{"foo", SSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
 		{"fail-invalid-token", p1, args{"foo", SSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
 	}
 	for _, tt := range tests {

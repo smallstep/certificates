@@ -318,14 +318,20 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSSHSign")
 	}
 	signOptions := []SignOption{
-		// set the key id to the token subject
+		// set the key id to the instance name
 		sshCertKeyIDModifier(name),
+	}
+
+	// Only enforce known principals if disable custom sans is true.
+	var principals []string
+	if p.DisableCustomSANs {
+		principals = []string{name}
 	}
 
 	// Default to host + known hostnames
 	defaults := SSHOptions{
 		CertType:   SSHHostCert,
-		Principals: []string{name},
+		Principals: principals,
 	}
 	// Validate user options
 	signOptions = append(signOptions, sshCertOptionsValidator(defaults))

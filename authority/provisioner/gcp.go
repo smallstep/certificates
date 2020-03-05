@@ -358,17 +358,23 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	ce := claims.Google.ComputeEngine
 
 	signOptions := []SignOption{
-		// set the key id to the token subject
+		// set the key id to the instance name
 		sshCertKeyIDModifier(ce.InstanceName),
+	}
+
+	// Only enforce known principals if disable custom sans is true.
+	var principals []string
+	if p.DisableCustomSANs {
+		principals = []string{
+			fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
+			fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
+		}
 	}
 
 	// Default to host + known hostnames
 	defaults := SSHOptions{
-		CertType: SSHHostCert,
-		Principals: []string{
-			fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
-			fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
-		},
+		CertType:   SSHHostCert,
+		Principals: principals,
 	}
 	// Validate user options
 	signOptions = append(signOptions, sshCertOptionsValidator(defaults))
