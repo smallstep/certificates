@@ -56,7 +56,8 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 		return nil, nil, err
 	}
 	// Use mutable tls.Config on renew
-	tr.DialTLS = c.buildDialTLS(tlsCtx)
+	tr.DialTLS = c.buildDialTLS(tlsCtx) //nolint:deprecated
+	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Update client transport
@@ -107,7 +108,8 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 		return nil, err
 	}
 	// Use mutable tls.Config on renew
-	tr.DialTLS = c.buildDialTLS(tlsCtx)
+	tr.DialTLS = c.buildDialTLS(tlsCtx) //nolint:deprecated
+	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Update client transport
@@ -147,6 +149,24 @@ func (c *Client) buildDialTLS(ctx *TLSOptionCtx) func(network, addr string) (net
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		}, network, addr, ctx.mutableConfig.TLSConfig())
+	}
+}
+
+// buildDialTLSContext returns an implementation of DialTLSContext callback in http.Transport.
+func (c *Client) buildDialTLSContext(tlsCtx *TLSOptionCtx) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		// TLS dialers do not support context, but we can use the context
+		// deadline if it is set.
+		var deadline time.Time
+		if t, ok := ctx.Deadline(); ok {
+			deadline = t
+		}
+		return tls.DialWithDialer(&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			Deadline:  deadline,
+			DualStack: true,
+		}, network, addr, tlsCtx.mutableConfig.TLSConfig())
 	}
 }
 

@@ -449,18 +449,25 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	doc := claims.document
 
 	signOptions := []SignOption{
-		// set the key id to the token subject
-		sshCertKeyIDModifier(claims.Subject),
+		// set the key id to the instance id
+		sshCertKeyIDModifier(doc.InstanceID),
 	}
 
-	// Default to host + known IPs/hostnames
-	defaults := SSHOptions{
-		CertType: SSHHostCert,
-		Principals: []string{
+	// Only enforce known principals if disable custom sans is true.
+	var principals []string
+	if p.DisableCustomSANs {
+		principals = []string{
 			doc.PrivateIP,
 			fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region),
-		},
+		}
 	}
+
+	// Default to cert type to host
+	defaults := SSHOptions{
+		CertType:   SSHHostCert,
+		Principals: principals,
+	}
+
 	// Validate user options
 	signOptions = append(signOptions, sshCertOptionsValidator(defaults))
 	// Set defaults if not given as user options

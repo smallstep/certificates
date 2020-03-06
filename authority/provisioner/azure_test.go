@@ -505,17 +505,29 @@ func TestAzure_AuthorizeSSHSign(t *testing.T) {
 
 	p1, srv, err := generateAzureWithServer()
 	assert.FatalError(t, err)
+	p1.DisableCustomSANs = true
 	defer srv.Close()
 
 	p2, err := generateAzure()
 	assert.FatalError(t, err)
+	p2.TenantID = p1.TenantID
+	p2.config = p1.config
+	p2.oidcConfig = p1.oidcConfig
+	p2.keyStore = p1.keyStore
+	p2.DisableCustomSANs = false
+
+	p3, err := generateAzure()
+	assert.FatalError(t, err)
 	// disable sshCA
 	disable := false
-	p2.Claims = &Claims{EnableSSHCA: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p3.Claims = &Claims{EnableSSHCA: &disable}
+	p3.claimer, err = NewClaimer(p3.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	t1, err := p1.GetIdentityToken("subject", "caURL")
+	assert.FatalError(t, err)
+
+	t2, err := p2.GetIdentityToken("subject", "caURL")
 	assert.FatalError(t, err)
 
 	key, err := generateJSONWebKey()
@@ -533,6 +545,10 @@ func TestAzure_AuthorizeSSHSign(t *testing.T) {
 	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
 	expectedHostOptions := &SSHOptions{
 		CertType: "host", Principals: []string{"virtualMachine"},
+		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
+	expectedCustomOptions := &SSHOptions{
+		CertType: "host", Principals: []string{"foo.bar"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
 	}
 
@@ -555,11 +571,12 @@ func TestAzure_AuthorizeSSHSign(t *testing.T) {
 		{"ok-type", p1, args{t1, SSHOptions{CertType: "host"}, pub}, expectedHostOptions, http.StatusOK, false, false},
 		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"virtualMachine"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
 		{"ok-options", p1, args{t1, SSHOptions{CertType: "host", Principals: []string{"virtualMachine"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"ok-custom", p2, args{t2, SSHOptions{Principals: []string{"foo.bar"}}, pub}, expectedCustomOptions, http.StatusOK, false, false},
 		{"fail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedHostOptions, http.StatusOK, false, true},
 		{"fail-type", p1, args{t1, SSHOptions{CertType: "user"}, pub}, nil, http.StatusOK, false, true},
 		{"fail-principal", p1, args{t1, SSHOptions{Principals: []string{"smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
 		{"fail-extra-principal", p1, args{t1, SSHOptions{Principals: []string{"virtualMachine", "smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
-		{"fail-sshCA-disabled", p2, args{"foo", SSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
+		{"fail-sshCA-disabled", p3, args{"foo", SSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
 		{"fail-invalid-token", p1, args{"foo", SSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
 	}
 	for _, tt := range tests {
