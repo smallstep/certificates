@@ -7,11 +7,21 @@ to manage issues, etc.
 
 ## Table of Contents
 
+* [Building From Source](#building-from-source)
 * [Asking Support Questions](#asking-support-questions)
 * [Reporting Issues](#reporting-issues)
 * [Submitting Patches](#submitting-patches)
   * [Code Contribution Guidelines](#code-contribution-guidelines)
   * [Git Commit Message Guidelines](#git-commit-message-guidelines)
+
+## Building From Source
+
+The only prerequisites are [`go`](https://golang.org/) and make.
+
+To build from source:
+
+    make bootstrap && make
+
 
 ## Asking Support Questions
 
