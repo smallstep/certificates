@@ -92,7 +92,7 @@ func TestDefaultIdentityFunc(t *testing.T) {
 	for name, get := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := get(t)
-			identity, err := DefaultIdentityFunc(tc.p, tc.email)
+			identity, err := DefaultIdentityFunc(context.Background(), tc.p, tc.email)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.Equals(t, tc.err.Error(), err.Error())
