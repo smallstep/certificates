@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/smallstep/certificates/authority"
@@ -65,7 +64,7 @@ func (h *caHandler) SSHRevoke(w http.ResponseWriter, r *http.Request) {
 		PassiveOnly: body.Passive,
 	}
 
-	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SSHRevokeMethod)
+	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRevokeMethod)
 	// A token indicates that we are using the api via a provisioner token,
 	// otherwise it is assumed that the certificate is revoking itself over mTLS.
 	logOtt(w, body.OTT)

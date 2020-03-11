@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -56,7 +55,7 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SSHRekeyMethod)
+	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRekeyMethod)
 	signOpts, err := h.Authority.Authorize(ctx, body.OTT)
 	if err != nil {
 		WriteError(w, errs.UnauthorizedErr(err))
@@ -67,7 +66,7 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, errs.InternalServerErr(err))
 	}
 
-	newCert, err := h.Authority.RekeySSH(oldCert, publicKey, signOpts...)
+	newCert, err := h.Authority.RekeySSH(ctx, oldCert, publicKey, signOpts...)
 	if err != nil {
 		WriteError(w, errs.ForbiddenErr(err))
 		return

@@ -339,7 +339,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 
 	// Get the identity using either the default identityFunc or one injected
 	// externally.
-	iden, err := o.getIdentityFunc(o, claims.Email)
+	iden, err := o.getIdentityFunc(ctx, o, claims.Email)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSSHSign")
 	}

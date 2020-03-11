@@ -104,7 +104,7 @@ type SSHKeys struct {
 }
 
 // GetSSHRoots returns the SSH User and Host public keys.
-func (a *Authority) GetSSHRoots() (*SSHKeys, error) {
+func (a *Authority) GetSSHRoots(context.Context) (*SSHKeys, error) {
 	return &SSHKeys{
 		HostKeys: a.sshCAHostCerts,
 		UserKeys: a.sshCAUserCerts,
@@ -112,7 +112,7 @@ func (a *Authority) GetSSHRoots() (*SSHKeys, error) {
 }
 
 // GetSSHFederation returns the public keys for federated SSH signers.
-func (a *Authority) GetSSHFederation() (*SSHKeys, error) {
+func (a *Authority) GetSSHFederation(context.Context) (*SSHKeys, error) {
 	return &SSHKeys{
 		HostKeys: a.sshCAHostFederatedCerts,
 		UserKeys: a.sshCAUserFederatedCerts,
@@ -120,7 +120,7 @@ func (a *Authority) GetSSHFederation() (*SSHKeys, error) {
 }
 
 // GetSSHConfig returns rendered templates for clients (user) or servers (host).
-func (a *Authority) GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error) {
+func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error) {
 	if a.sshCAUserCertSignKey == nil && a.sshCAHostCertSignKey == nil {
 		return nil, errs.NotFound("getSSHConfig: ssh is not configured")
 	}
@@ -166,9 +166,9 @@ func (a *Authority) GetSSHConfig(typ string, data map[string]string) ([]template
 
 // GetSSHBastion returns the bastion configuration, for the given pair user,
 // hostname.
-func (a *Authority) GetSSHBastion(user string, hostname string) (*Bastion, error) {
+func (a *Authority) GetSSHBastion(ctx context.Context, user string, hostname string) (*Bastion, error) {
 	if a.sshBastionFunc != nil {
-		bs, err := a.sshBastionFunc(user, hostname)
+		bs, err := a.sshBastionFunc(ctx, user, hostname)
 		return bs, errs.Wrap(http.StatusInternalServerError, err, "authority.GetSSHBastion")
 	}
 	if a.config.SSH != nil {
@@ -181,7 +181,7 @@ func (a *Authority) GetSSHBastion(user string, hostname string) (*Bastion, error
 }
 
 // SignSSH creates a signed SSH certificate with the given public key and options.
-func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	var mods []provisioner.SSHCertModifier
 	var validators []provisioner.SSHCertValidator
 
@@ -282,7 +282,7 @@ func (a *Authority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, sign
 }
 
 // RenewSSH creates a signed SSH certificate using the old SSH certificate as a template.
-func (a *Authority) RenewSSH(oldCert *ssh.Certificate) (*ssh.Certificate, error) {
+func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ssh.Certificate, error) {
 	nonce, err := randutil.ASCII(32)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH")
@@ -353,7 +353,7 @@ func (a *Authority) RenewSSH(oldCert *ssh.Certificate) (*ssh.Certificate, error)
 }
 
 // RekeySSH creates a signed SSH certificate using the old SSH certificate as a template.
-func (a *Authority) RekeySSH(oldCert *ssh.Certificate, pub ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	var validators []provisioner.SSHCertValidator
 
 	for _, op := range signOpts {
@@ -443,7 +443,7 @@ func (a *Authority) RekeySSH(oldCert *ssh.Certificate, pub ssh.PublicKey, signOp
 }
 
 // SignSSHAddUser signs a certificate that provisions a new user in a server.
-func (a *Authority) SignSSHAddUser(key ssh.PublicKey, subject *ssh.Certificate) (*ssh.Certificate, error) {
+func (a *Authority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, subject *ssh.Certificate) (*ssh.Certificate, error) {
 	if a.sshCAUserCertSignKey == nil {
 		return nil, errs.NotImplemented("signSSHAddUser: user certificate signing is not enabled")
 	}
@@ -527,9 +527,9 @@ func (a *Authority) CheckSSHHost(ctx context.Context, principal string, token st
 }
 
 // GetSSHHosts returns a list of valid host principals.
-func (a *Authority) GetSSHHosts(cert *x509.Certificate) ([]sshutil.Host, error) {
+func (a *Authority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error) {
 	if a.sshGetHostsFunc != nil {
-		hosts, err := a.sshGetHostsFunc(cert)
+		hosts, err := a.sshGetHostsFunc(ctx, cert)
 		return hosts, errs.Wrap(http.StatusInternalServerError, err, "getSSHHosts")
 	}
 	hostnames, err := a.db.GetSSHHostPrincipals()
