@@ -550,8 +550,6 @@ type mockAuthority struct {
 	getTLSOptions                func() *tlsutil.TLSOptions
 	root                         func(shasum string) (*x509.Certificate, error)
 	sign                         func(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
-	signSSH                      func(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
-	signSSHAddUser               func(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 	renew                        func(cert *x509.Certificate) ([]*x509.Certificate, error)
 	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
 	loadProvisionerByID          func(provID string) (provisioner.Interface, error)
@@ -560,14 +558,16 @@ type mockAuthority struct {
 	getEncryptedKey              func(kid string) (string, error)
 	getRoots                     func() ([]*x509.Certificate, error)
 	getFederation                func() ([]*x509.Certificate, error)
-	renewSSH                     func(cert *ssh.Certificate) (*ssh.Certificate, error)
-	rekeySSH                     func(cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
-	getSSHHosts                  func(*x509.Certificate) ([]sshutil.Host, error)
-	getSSHRoots                  func() (*authority.SSHKeys, error)
-	getSSHFederation             func() (*authority.SSHKeys, error)
-	getSSHConfig                 func(typ string, data map[string]string) ([]templates.Output, error)
+	signSSH                      func(ctx context.Context, key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
+	signSSHAddUser               func(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
+	renewSSH                     func(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error)
+	rekeySSH                     func(ctx context.Context, cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
+	getSSHHosts                  func(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error)
+	getSSHRoots                  func(ctx context.Context) (*authority.SSHKeys, error)
+	getSSHFederation             func(ctx context.Context) (*authority.SSHKeys, error)
+	getSSHConfig                 func(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error)
 	checkSSHHost                 func(ctx context.Context, principal, token string) (bool, error)
-	getSSHBastion                func(user string, hostname string) (*authority.Bastion, error)
+	getSSHBastion                func(ctx context.Context, user string, hostname string) (*authority.Bastion, error)
 	version                      func() authority.Version
 }
 
@@ -602,20 +602,6 @@ func (m *mockAuthority) Sign(cr *x509.CertificateRequest, opts provisioner.Optio
 		return m.sign(cr, opts, signOpts...)
 	}
 	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
-}
-
-func (m *mockAuthority) SignSSH(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
-	if m.signSSH != nil {
-		return m.signSSH(key, opts, signOpts...)
-	}
-	return m.ret1.(*ssh.Certificate), m.err
-}
-
-func (m *mockAuthority) SignSSHAddUser(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error) {
-	if m.signSSHAddUser != nil {
-		return m.signSSHAddUser(key, cert)
-	}
-	return m.ret1.(*ssh.Certificate), m.err
 }
 
 func (m *mockAuthority) Renew(cert *x509.Certificate) ([]*x509.Certificate, error) {
@@ -674,44 +660,58 @@ func (m *mockAuthority) GetFederation() ([]*x509.Certificate, error) {
 	return m.ret1.([]*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) RenewSSH(cert *ssh.Certificate) (*ssh.Certificate, error) {
+func (m *mockAuthority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+	if m.signSSH != nil {
+		return m.signSSH(ctx, key, opts, signOpts...)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *mockAuthority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error) {
+	if m.signSSHAddUser != nil {
+		return m.signSSHAddUser(ctx, key, cert)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *mockAuthority) RenewSSH(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error) {
 	if m.renewSSH != nil {
-		return m.renewSSH(cert)
+		return m.renewSSH(ctx, cert)
 	}
 	return m.ret1.(*ssh.Certificate), m.err
 }
 
-func (m *mockAuthority) RekeySSH(cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+func (m *mockAuthority) RekeySSH(ctx context.Context, cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	if m.rekeySSH != nil {
-		return m.rekeySSH(cert, key, signOpts...)
+		return m.rekeySSH(ctx, cert, key, signOpts...)
 	}
 	return m.ret1.(*ssh.Certificate), m.err
 }
 
-func (m *mockAuthority) GetSSHHosts(cert *x509.Certificate) ([]sshutil.Host, error) {
+func (m *mockAuthority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error) {
 	if m.getSSHHosts != nil {
-		return m.getSSHHosts(cert)
+		return m.getSSHHosts(ctx, cert)
 	}
 	return m.ret1.([]sshutil.Host), m.err
 }
 
-func (m *mockAuthority) GetSSHRoots() (*authority.SSHKeys, error) {
+func (m *mockAuthority) GetSSHRoots(ctx context.Context) (*authority.SSHKeys, error) {
 	if m.getSSHRoots != nil {
-		return m.getSSHRoots()
+		return m.getSSHRoots(ctx)
 	}
 	return m.ret1.(*authority.SSHKeys), m.err
 }
 
-func (m *mockAuthority) GetSSHFederation() (*authority.SSHKeys, error) {
+func (m *mockAuthority) GetSSHFederation(ctx context.Context) (*authority.SSHKeys, error) {
 	if m.getSSHFederation != nil {
-		return m.getSSHFederation()
+		return m.getSSHFederation(ctx)
 	}
 	return m.ret1.(*authority.SSHKeys), m.err
 }
 
-func (m *mockAuthority) GetSSHConfig(typ string, data map[string]string) ([]templates.Output, error) {
+func (m *mockAuthority) GetSSHConfig(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error) {
 	if m.getSSHConfig != nil {
-		return m.getSSHConfig(typ, data)
+		return m.getSSHConfig(ctx, typ, data)
 	}
 	return m.ret1.([]templates.Output), m.err
 }
@@ -723,9 +723,9 @@ func (m *mockAuthority) CheckSSHHost(ctx context.Context, principal, token strin
 	return m.ret1.(bool), m.err
 }
 
-func (m *mockAuthority) GetSSHBastion(user string, hostname string) (*authority.Bastion, error) {
+func (m *mockAuthority) GetSSHBastion(ctx context.Context, user string, hostname string) (*authority.Bastion, error) {
 	if m.getSSHBastion != nil {
-		return m.getSSHBastion(user, hostname)
+		return m.getSSHBastion(ctx, user, hostname)
 	}
 	return m.ret1.(*authority.Bastion), m.err
 }

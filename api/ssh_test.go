@@ -319,10 +319,10 @@ func Test_caHandler_SSHSign(t *testing.T) {
 				authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
 					return []provisioner.SignOption{}, tt.authErr
 				},
-				signSSH: func(key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+				signSSH: func(ctx context.Context, key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 					return tt.signCert, tt.signErr
 				},
-				signSSHAddUser: func(key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error) {
+				signSSHAddUser: func(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error) {
 					return tt.addUserCert, tt.addUserErr
 				},
 				sign: func(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
@@ -379,7 +379,7 @@ func Test_caHandler_SSHRoots(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
-				getSSHRoots: func() (*authority.SSHKeys, error) {
+				getSSHRoots: func(ctx context.Context) (*authority.SSHKeys, error) {
 					return tt.keys, tt.keysErr
 				},
 			}).(*caHandler)
@@ -433,7 +433,7 @@ func Test_caHandler_SSHFederation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
-				getSSHFederation: func() (*authority.SSHKeys, error) {
+				getSSHFederation: func(ctx context.Context) (*authority.SSHKeys, error) {
 					return tt.keys, tt.keysErr
 				},
 			}).(*caHandler)
@@ -493,7 +493,7 @@ func Test_caHandler_SSHConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
-				getSSHConfig: func(typ string, data map[string]string) ([]templates.Output, error) {
+				getSSHConfig: func(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error) {
 					return tt.output, tt.err
 				},
 			}).(*caHandler)
@@ -591,7 +591,7 @@ func Test_caHandler_SSHGetHosts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
-				getSSHHosts: func(*x509.Certificate) ([]sshutil.Host, error) {
+				getSSHHosts: func(context.Context, *x509.Certificate) ([]sshutil.Host, error) {
 					return tt.hosts, tt.err
 				},
 			}).(*caHandler)
@@ -646,7 +646,7 @@ func Test_caHandler_SSHBastion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
-				getSSHBastion: func(user, hostname string) (*authority.Bastion, error) {
+				getSSHBastion: func(ctx context.Context, user, hostname string) (*authority.Bastion, error) {
 					return tt.bastion, tt.bastionErr
 				},
 			}).(*caHandler)

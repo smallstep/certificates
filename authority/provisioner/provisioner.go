@@ -330,10 +330,10 @@ type Identity struct {
 }
 
 // GetIdentityFunc is a function that returns an identity.
-type GetIdentityFunc func(p Interface, email string) (*Identity, error)
+type GetIdentityFunc func(ctx context.Context, p Interface, email string) (*Identity, error)
 
 // DefaultIdentityFunc return a default identity depending on the provisioner type.
-func DefaultIdentityFunc(p Interface, email string) (*Identity, error) {
+func DefaultIdentityFunc(ctx context.Context, p Interface, email string) (*Identity, error) {
 	switch k := p.(type) {
 	case *OIDC:
 		name := SanitizeSSHUserPrincipal(email)

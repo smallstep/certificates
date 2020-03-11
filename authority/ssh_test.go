@@ -153,7 +153,7 @@ func TestAuthority_SignSSH(t *testing.T) {
 			a.sshCAUserCertSignKey = tt.fields.sshCAUserCertSignKey
 			a.sshCAHostCertSignKey = tt.fields.sshCAHostCertSignKey
 
-			got, err := a.SignSSH(tt.args.key, tt.args.opts, tt.args.signOpts...)
+			got, err := a.SignSSH(context.Background(), tt.args.key, tt.args.opts, tt.args.signOpts...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.SignSSH() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -242,7 +242,7 @@ func TestAuthority_SignSSHAddUser(t *testing.T) {
 				AddUserPrincipal: tt.fields.addUserPrincipal,
 				AddUserCommand:   tt.fields.addUserCommand,
 			}
-			got, err := a.SignSSHAddUser(tt.args.key, tt.args.subject)
+			got, err := a.SignSSHAddUser(context.Background(), tt.args.key, tt.args.subject)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.SignSSHAddUser() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -295,7 +295,7 @@ func TestAuthority_GetSSHRoots(t *testing.T) {
 			a.sshCAUserCerts = tt.fields.sshCAUserCerts
 			a.sshCAHostCerts = tt.fields.sshCAHostCerts
 
-			got, err := a.GetSSHRoots()
+			got, err := a.GetSSHRoots(context.Background())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.GetSSHRoots() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -337,7 +337,7 @@ func TestAuthority_GetSSHFederation(t *testing.T) {
 			a.sshCAUserFederatedCerts = tt.fields.sshCAUserFederatedCerts
 			a.sshCAHostFederatedCerts = tt.fields.sshCAHostFederatedCerts
 
-			got, err := a.GetSSHFederation()
+			got, err := a.GetSSHFederation(context.Background())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.GetSSHFederation() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -463,7 +463,7 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 			a.sshCAUserCertSignKey = tt.fields.userSigner
 			a.sshCAHostCertSignKey = tt.fields.hostSigner
 
-			got, err := a.GetSSHConfig(tt.args.typ, tt.args.data)
+			got, err := a.GetSSHConfig(context.Background(), tt.args.typ, tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.GetSSHConfig() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -614,7 +614,7 @@ func TestAuthority_GetSSHBastion(t *testing.T) {
 	}
 	type fields struct {
 		config         *Config
-		sshBastionFunc func(user, hostname string) (*Bastion, error)
+		sshBastionFunc func(ctx context.Context, user, hostname string) (*Bastion, error)
 	}
 	type args struct {
 		user     string
@@ -630,8 +630,8 @@ func TestAuthority_GetSSHBastion(t *testing.T) {
 		{"config", fields{&Config{SSH: &SSHConfig{Bastion: bastion}}, nil}, args{"user", "host.local"}, bastion, false},
 		{"nil", fields{&Config{SSH: &SSHConfig{Bastion: nil}}, nil}, args{"user", "host.local"}, nil, false},
 		{"empty", fields{&Config{SSH: &SSHConfig{Bastion: &Bastion{}}}, nil}, args{"user", "host.local"}, nil, false},
-		{"func", fields{&Config{}, func(_, _ string) (*Bastion, error) { return bastion, nil }}, args{"user", "host.local"}, bastion, false},
-		{"func err", fields{&Config{}, func(_, _ string) (*Bastion, error) { return nil, errors.New("foo") }}, args{"user", "host.local"}, nil, true},
+		{"func", fields{&Config{}, func(_ context.Context, _, _ string) (*Bastion, error) { return bastion, nil }}, args{"user", "host.local"}, bastion, false},
+		{"func err", fields{&Config{}, func(_ context.Context, _, _ string) (*Bastion, error) { return nil, errors.New("foo") }}, args{"user", "host.local"}, nil, true},
 		{"error", fields{&Config{SSH: nil}, nil}, args{"user", "host.local"}, nil, true},
 	}
 	for _, tt := range tests {
@@ -640,7 +640,7 @@ func TestAuthority_GetSSHBastion(t *testing.T) {
 				config:         tt.fields.config,
 				sshBastionFunc: tt.fields.sshBastionFunc,
 			}
-			got, err := a.GetSSHBastion(tt.args.user, tt.args.hostname)
+			got, err := a.GetSSHBastion(context.Background(), tt.args.user, tt.args.hostname)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.GetSSHBastion() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -659,7 +659,7 @@ func TestAuthority_GetSSHHosts(t *testing.T) {
 	a := testAuthority(t)
 
 	type test struct {
-		getHostsFunc func(*x509.Certificate) ([]sshutil.Host, error)
+		getHostsFunc func(context.Context, *x509.Certificate) ([]sshutil.Host, error)
 		auth         *Authority
 		cert         *x509.Certificate
 		cmp          func(got []sshutil.Host)
@@ -669,7 +669,7 @@ func TestAuthority_GetSSHHosts(t *testing.T) {
 	tests := map[string]func(t *testing.T) *test{
 		"fail/getHostsFunc-fail": func(t *testing.T) *test {
 			return &test{
-				getHostsFunc: func(cert *x509.Certificate) ([]sshutil.Host, error) {
+				getHostsFunc: func(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error) {
 					return nil, errors.New("force")
 				},
 				cert: &x509.Certificate{},
@@ -684,7 +684,7 @@ func TestAuthority_GetSSHHosts(t *testing.T) {
 			}
 
 			return &test{
-				getHostsFunc: func(cert *x509.Certificate) ([]sshutil.Host, error) {
+				getHostsFunc: func(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error) {
 					return hosts, nil
 				},
 				cert: &x509.Certificate{},
@@ -732,7 +732,7 @@ func TestAuthority_GetSSHHosts(t *testing.T) {
 			}
 			auth.sshGetHostsFunc = tc.getHostsFunc
 
-			hosts, err := auth.GetSSHHosts(tc.cert)
+			hosts, err := auth.GetSSHHosts(context.Background(), tc.cert)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					sc, ok := err.(errs.StatusCoder)
@@ -901,7 +901,7 @@ func TestAuthority_RekeySSH(t *testing.T) {
 			a.sshCAUserCertSignKey = tc.userSigner
 			a.sshCAHostCertSignKey = tc.hostSigner
 
-			cert, err := auth.RekeySSH(tc.cert, tc.key, tc.signOpts...)
+			cert, err := auth.RekeySSH(context.Background(), tc.cert, tc.key, tc.signOpts...)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					sc, ok := err.(errs.StatusCoder)
