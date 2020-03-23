@@ -345,7 +345,7 @@ func TestCAProvisioners(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			rq, err := http.NewRequest("GET", fmt.Sprintf("/provisioners"), strings.NewReader(""))
+			rq, err := http.NewRequest("GET", "/provisioners", strings.NewReader(""))
 			assert.FatalError(t, err)
 			rr := httptest.NewRecorder()
 
