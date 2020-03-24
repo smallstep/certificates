@@ -153,6 +153,7 @@ func (c *Client) buildDialTLS(ctx *TLSOptionCtx) func(network, addr string) (net
 }
 
 // buildDialTLSContext returns an implementation of DialTLSContext callback in http.Transport.
+// nolint:unused
 func (c *Client) buildDialTLSContext(tlsCtx *TLSOptionCtx) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		// TLS dialers do not support context, but we can use the context
