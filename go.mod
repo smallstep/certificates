@@ -16,7 +16,7 @@ require (
 	github.com/smallstep/cli v0.14.0-rc.3
 	github.com/smallstep/nosql v0.2.0
 	github.com/urfave/cli v1.22.2
-	golang.org/x/crypto v0.0.0-20191227163750-53104e6ec876
+	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
 	google.golang.org/api v0.15.0
 	google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
