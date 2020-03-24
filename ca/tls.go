@@ -57,7 +57,7 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	}
 	// Use mutable tls.Config on renew
 	tr.DialTLS = c.buildDialTLS(tlsCtx) //nolint:deprecated
-	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
+	// tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Update client transport
@@ -109,7 +109,7 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	}
 	// Use mutable tls.Config on renew
 	tr.DialTLS = c.buildDialTLS(tlsCtx) //nolint:deprecated
-	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
+	// tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
 	// Update client transport
@@ -153,6 +153,7 @@ func (c *Client) buildDialTLS(ctx *TLSOptionCtx) func(network, addr string) (net
 }
 
 // buildDialTLSContext returns an implementation of DialTLSContext callback in http.Transport.
+// nolint:unused
 func (c *Client) buildDialTLSContext(tlsCtx *TLSOptionCtx) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		// TLS dialers do not support context, but we can use the context
