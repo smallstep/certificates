@@ -145,6 +145,15 @@ endif
 .PHONY: clean
 
 #########################################
+# Dev
+#########################################
+
+run:
+	$Q go run cmd/step-ca/main.go $(shell step path)/config/ca.json
+
+.PHONY: run
+
+#########################################
 # Building Docker Image
 #
 # Builds a dockerfile for step by building a linux version of the step-cli and
