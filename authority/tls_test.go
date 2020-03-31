@@ -41,6 +41,17 @@ type stepProvisionerASN1 struct {
 	CredentialID []byte
 }
 
+type certificateDurationEnforcer struct {
+	NotBefore time.Time
+	NotAfter  time.Time
+}
+
+func (m *certificateDurationEnforcer) Enforce(cert *x509.Certificate) error {
+	cert.NotBefore = m.NotBefore
+	cert.NotAfter = m.NotAfter
+	return nil
+}
+
 func withProvisionerOID(name, kid string) x509util.WithOption {
 	return func(p x509util.Profile) error {
 		crt := p.Subject()
@@ -114,6 +125,8 @@ func TestAuthority_Sign(t *testing.T) {
 		csr       *x509.CertificateRequest
 		signOpts  provisioner.Options
 		extraOpts []provisioner.SignOption
+		notBefore time.Time
+		notAfter  time.Time
 		err       error
 		code      int
 	}
@@ -253,6 +266,31 @@ ZYtQ9Ot36qc=
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
+				notBefore: signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:  signOpts.NotAfter.Time().Truncate(time.Second),
+			}
+		},
+		"ok with enforced modifier": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			now := time.Now().UTC()
+			enforcedExtraOptions := append(extraOpts, &certificateDurationEnforcer{
+				NotBefore: now,
+				NotAfter:  now.Add(365 * 24 * time.Hour),
+			})
+			_a := testAuthority(t)
+			_a.db = &db.MockAuthDB{
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					return nil
+				},
+			}
+			return &signTest{
+				auth:      a,
+				csr:       csr,
+				extraOpts: enforcedExtraOptions,
+				signOpts:  signOpts,
+				notBefore: now.Truncate(time.Second),
+				notAfter:  now.Add(365 * 24 * time.Hour).Truncate(time.Second),
 			}
 		},
 	}
@@ -279,8 +317,8 @@ ZYtQ9Ot36qc=
 				leaf := certChain[0]
 				intermediate := certChain[1]
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, leaf.NotBefore, signOpts.NotBefore.Time().Truncate(time.Second))
-					assert.Equals(t, leaf.NotAfter, signOpts.NotAfter.Time().Truncate(time.Second))
+					assert.Equals(t, leaf.NotBefore, tc.notBefore)
+					assert.Equals(t, leaf.NotAfter, tc.notAfter)
 					tmplt := a.config.AuthorityConfig.Template
 					assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
 						fmt.Sprintf("%v", &pkix.Name{

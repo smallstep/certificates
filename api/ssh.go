@@ -489,7 +489,7 @@ type identityModifier struct {
 	NotAfter  time.Time
 }
 
-func (m *identityModifier) Constrain(cert *x509.Certificate) error {
+func (m *identityModifier) Enforce(cert *x509.Certificate) error {
 	cert.NotBefore = m.NotBefore
 	cert.NotAfter = m.NotAfter
 	return nil

@@ -47,11 +47,11 @@ type ProfileModifier interface {
 	Option(o Options) x509util.WithOption
 }
 
-// CertificateConstrainModifier is the interface used to modify a certificate
-// after validation.
-type CertificateConstrainModifier interface {
+// CertificateEnforcer is the interface used to modify a certificate after
+// validation.
+type CertificateEnforcer interface {
 	SignOption
-	Constrain(cert *x509.Certificate) error
+	Enforce(cert *x509.Certificate) error
 }
 
 // profileWithOption is a wrapper against x509util.WithOption to conform the
