@@ -61,9 +61,10 @@ func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 // Sign creates a signed certificate from a certificate signing request.
 func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	var (
-		opts           = []interface{}{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
-		mods           = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
-		certValidators = []provisioner.CertificateValidator{}
+		opts               = []interface{}{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
+		mods               = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
+		certValidators     = []provisioner.CertificateValidator{}
+		constrainModifiers = []provisioner.CertificateConstrainModifier{}
 	)
 
 	// Set backdate with the configured value
@@ -79,6 +80,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 			}
 		case provisioner.ProfileModifier:
 			mods = append(mods, k.Option(signOpts))
+		case provisioner.CertificateConstrainModifier:
+			constrainModifiers = append(constrainModifiers, k)
 		default:
 			return nil, errs.InternalServer("authority.Sign; invalid extra option type %T", append([]interface{}{k}, opts...)...)
 		}
@@ -93,8 +96,16 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign", opts...)
 	}
 
+	// Certificate validation
 	for _, v := range certValidators {
 		if err := v.Valid(leaf.Subject(), signOpts); err != nil {
+			return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)
+		}
+	}
+
+	// Certificate modifier after validation
+	for _, m := range constrainModifiers {
+		if err := m.Constrain(leaf.Subject()); err != nil {
 			return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)
 		}
 	}
