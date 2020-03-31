@@ -308,14 +308,6 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	// Sign identity certificate if available.
 	var identityCertificate []Certificate
 	if cr := body.IdentityCSR.CertificateRequest; cr != nil {
-		var opts provisioner.Options
-		// Use same duration as ssh certificate for user certificates
-		if cert.CertType == ssh.UserCert {
-			opts = provisioner.Options{
-				NotBefore: provisioner.NewTimeDuration(time.Unix(int64(cert.ValidAfter), 0)),
-				NotAfter:  provisioner.NewTimeDuration(time.Unix(int64(cert.ValidBefore), 0)),
-			}
-		}
 		ctx := authority.NewContextWithSkipTokenReuse(r.Context())
 		ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 		signOpts, err := h.Authority.Authorize(ctx, body.OTT)
@@ -323,7 +315,14 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, errs.UnauthorizedErr(err))
 			return
 		}
-		certChain, err := h.Authority.Sign(cr, opts, signOpts...)
+
+		// Enforce the same duration as ssh certificate.
+		signOpts = append(signOpts, &identityModifier{
+			NotBefore: time.Unix(int64(cert.ValidAfter), 0),
+			NotAfter:  time.Unix(int64(cert.ValidBefore), 0),
+		})
+
+		certChain, err := h.Authority.Sign(cr, provisioner.Options{}, signOpts...)
 		if err != nil {
 			WriteError(w, errs.ForbiddenErr(err))
 			return
@@ -482,4 +481,16 @@ func (h *caHandler) SSHBastion(w http.ResponseWriter, r *http.Request) {
 		Hostname: body.Hostname,
 		Bastion:  bastion,
 	})
+}
+
+// identityModifier is a custom modifier used to force a fixed duration.
+type identityModifier struct {
+	NotBefore time.Time
+	NotAfter  time.Time
+}
+
+func (m *identityModifier) Enforce(cert *x509.Certificate) error {
+	cert.NotBefore = m.NotBefore
+	cert.NotAfter = m.NotAfter
+	return nil
 }
