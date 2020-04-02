@@ -1,14 +1,16 @@
 package sshutil
 
-// HostGroup defines expected attributes for a host group that a host might belong to.
-type HostGroup struct {
-	ID   string
-	Name string
+// Hosts are tagged with k,v pairs. These tags are how a user is ultimately
+// associated with a host.
+type HostTag struct {
+	ID    string
+	Name  string
+	Value string
 }
 
 // Host defines expected attributes for an ssh host.
 type Host struct {
-	HostID     string      `json:"hid"`
-	HostGroups []HostGroup `json:"host_groups"`
-	Hostname   string      `json:"hostname"`
+	HostID   string    `json:"hid"`
+	HostTags []HostTag `json:"host_tags"`
+	Hostname string    `json:"hostname"`
 }

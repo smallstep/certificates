@@ -570,8 +570,8 @@ func Test_caHandler_SSHCheckHost(t *testing.T) {
 
 func Test_caHandler_SSHGetHosts(t *testing.T) {
 	hosts := []sshutil.Host{
-		{HostID: "1", HostGroups: []sshutil.HostGroup{{ID: "1", Name: "group 1"}}, Hostname: "host1"},
-		{HostID: "2", HostGroups: []sshutil.HostGroup{{ID: "1", Name: "group 1"}, {ID: "2", Name: "group 2"}}, Hostname: "host2"},
+		{HostID: "1", HostTags: []sshutil.HostTag{{ID: "1", Name: "group", Value: "1"}}, Hostname: "host1"},
+		{HostID: "2", HostTags: []sshutil.HostTag{{ID: "1", Name: "group", Value: "1"}, {ID: "2", Name: "group", Value: "2"}}, Hostname: "host2"},
 	}
 	hostsJSON, err := json.Marshal(hosts)
 	assert.FatalError(t, err)
