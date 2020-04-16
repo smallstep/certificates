@@ -1,5 +1,4 @@
 Match exec "step ssh check-host %h"
-	ForwardAgent yes
 {{- if .User.User }}
 	User {{.User.User}}
 {{- end }}

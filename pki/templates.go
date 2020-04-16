@@ -42,7 +42,6 @@ var SSHTemplateData = map[string]string{
 	//
 	// Note: on windows ProxyCommand requires the full path
 	"config.tpl": `Match exec "step ssh check-host %h"
-	ForwardAgent yes
 {{- if .User.User }}
 	User {{.User.User}}
 {{- end }}
