@@ -125,7 +125,7 @@ func Test_commonNameValidator_Valid(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", "foo.bar.zar", args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: "foo.bar.zar"}}}, false},
-		{"empty", "", args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: ""}}}, true},
+		{"empty", "", args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: ""}}}, false},
 		{"wrong", "foo.bar.zar", args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: "example.com"}}}, true},
 	}
 	for _, tt := range tests {
@@ -149,7 +149,7 @@ func Test_commonNameSliceValidator_Valid(t *testing.T) {
 	}{
 		{"ok", []string{"foo.bar.zar"}, args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: "foo.bar.zar"}}}, false},
 		{"ok", []string{"example.com", "foo.bar.zar"}, args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: "foo.bar.zar"}}}, false},
-		{"empty", []string{""}, args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: ""}}}, true},
+		{"empty", []string{""}, args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: ""}}}, false},
 		{"wrong", []string{"foo.bar.zar"}, args{&x509.CertificateRequest{Subject: pkix.Name{CommonName: "example.com"}}}, true},
 	}
 	for _, tt := range tests {
