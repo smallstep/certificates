@@ -34,6 +34,11 @@ type Config struct {
 	DataSource string `json:"dataSource"`
 	ValueDir   string `json:"valueDir,omitempty"`
 	Database   string `json:"database,omitempty"`
+
+	// ValueLogLoadingMode can be set to FileIO (instead of the default
+	// options.MemoryMap) to avoid memory-mapping log files. This can be useful
+	// in environments with low RAM
+	BadgerValueLogLoadingMode string `json:"badgerValueLogLoadingMode"`
 }
 
 // AuthDB is an interface over an Authority DB client that implements a nosql.DB interface.
@@ -62,8 +67,13 @@ func New(c *Config) (AuthDB, error) {
 		return newSimpleDB(c)
 	}
 
-	db, err := nosql.New(c.Type, c.DataSource, nosql.WithDatabase(c.Database),
-		nosql.WithValueDir(c.ValueDir))
+	opts := []nosql.Option{nosql.WithDatabase(c.Database),
+		nosql.WithValueDir(c.ValueDir)}
+	if len(c.BadgerValueLogLoadingMode) > 0 {
+		opts = append(opts, nosql.WithBadgerValueLogLoadingMode(c.BadgerValueLogLoadingMode))
+	}
+
+	db, err := nosql.New(c.Type, c.DataSource, opts...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error opening database of Type %s with source %s", c.Type, c.DataSource)
 	}
