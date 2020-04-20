@@ -108,9 +108,10 @@ func (v defaultPublicKeyValidator) Valid(req *x509.CertificateRequest) error {
 type commonNameValidator string
 
 // Valid checks that certificate request common name matches the one configured.
+// An empty common name is considered valid.
 func (v commonNameValidator) Valid(req *x509.CertificateRequest) error {
 	if req.Subject.CommonName == "" {
-		return errors.New("certificate request cannot contain an empty common name")
+		return nil
 	}
 	if req.Subject.CommonName != string(v) {
 		return errors.Errorf("certificate request does not contain the valid common name; requested common name = %s, token subject = %s", req.Subject.CommonName, v)
@@ -118,12 +119,13 @@ func (v commonNameValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
-// commonNameSliceValidator validates thats the common name of a certificate request is present in the slice.
+// commonNameSliceValidator validates thats the common name of a certificate
+// request is present in the slice. An empty common name is considered valid.
 type commonNameSliceValidator []string
 
 func (v commonNameSliceValidator) Valid(req *x509.CertificateRequest) error {
 	if req.Subject.CommonName == "" {
-		return errors.New("certificate request cannot contain an empty common name")
+		return nil
 	}
 	for _, cn := range v {
 		if req.Subject.CommonName == cn {
