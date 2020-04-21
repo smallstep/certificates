@@ -13,7 +13,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smallstep/assert v0.0.0-20200103212524-b99dc1097b15
 	github.com/smallstep/cli v0.14.2
-	github.com/smallstep/nosql v0.2.1-0.20200417162056-c1de767c9d0d
+	github.com/smallstep/nosql v0.2.1-0.20200421162603-b38671a21284
 	github.com/urfave/cli v1.22.2
 	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
@@ -24,4 +24,4 @@ require (
 )
 
 //replace github.com/smallstep/cli => ../cli
-replace github.com/smallstep/nosql => ../nosql
+//replace github.com/smallstep/nosql => ../nosql
