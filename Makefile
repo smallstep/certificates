@@ -116,7 +116,7 @@ fmt:
 	$Q gofmt -l -w $(SRC)
 
 lint:
-	$Q LOG_LEVEL=error golangci-lint run
+	$Q LOG_LEVEL=error golangci-lint run --timeout=30m
 
 .PHONY: lint fmt
 
