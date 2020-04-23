@@ -289,6 +289,10 @@ func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{
 	if err != nil {
 		return err
 	}
+
+	sum := sha256.Sum256(rootCrt.Raw)
+	p.rootFingerprint = strings.ToLower(hex.EncodeToString(sum[:]))
+
 	return nil
 }
 
