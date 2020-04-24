@@ -296,7 +296,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var addUserCertificate *SSHCertificate
-	if addUserPublicKey != nil && cert.CertType == ssh.UserCert && len(cert.ValidPrincipals) == 1 {
+	if addUserPublicKey != nil && authority.IsValidForAddUser(cert) == nil {
 		addUserCert, err := h.Authority.SignSSHAddUser(ctx, addUserPublicKey, cert)
 		if err != nil {
 			WriteError(w, errs.ForbiddenErr(err))
