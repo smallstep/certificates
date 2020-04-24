@@ -929,6 +929,7 @@ func TestIsValidForAddUser(t *testing.T) {
 	}{
 		{"ok", args{&ssh.Certificate{CertType: ssh.UserCert, ValidPrincipals: []string{"john"}}}, false},
 		{"ok oidc", args{&ssh.Certificate{CertType: ssh.UserCert, ValidPrincipals: []string{"jane", "jane@smallstep.com"}}}, false},
+		{"fail at", args{&ssh.Certificate{CertType: ssh.UserCert, ValidPrincipals: []string{"jane", "@smallstep.com"}}}, true},
 		{"fail host", args{&ssh.Certificate{CertType: ssh.HostCert, ValidPrincipals: []string{"john"}}}, true},
 		{"fail principals", args{&ssh.Certificate{CertType: ssh.UserCert, ValidPrincipals: []string{"john", "jane"}}}, true},
 		{"fail no principals", args{&ssh.Certificate{CertType: ssh.UserCert, ValidPrincipals: []string{}}}, true},
