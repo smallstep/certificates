@@ -917,3 +917,28 @@ func TestAuthority_RekeySSH(t *testing.T) {
 		})
 	}
 }
+
+func TestIsValidForAddUser(t *testing.T) {
+	type args struct {
+		cert *ssh.Certificate
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"ok", args{&ssh.Certificate{CertType: ssh.UserCert, ValidPrincipals: []string{"john"}}}, false},
+		{"ok oidc", args{&ssh.Certificate{CertType: ssh.UserCert, ValidPrincipals: []string{"jane", "jane@smallstep.com"}}}, false},
+		{"fail host", args{&ssh.Certificate{CertType: ssh.HostCert, ValidPrincipals: []string{"john"}}}, true},
+		{"fail principals", args{&ssh.Certificate{CertType: ssh.UserCert, ValidPrincipals: []string{"john", "jane"}}}, true},
+		{"fail no principals", args{&ssh.Certificate{CertType: ssh.UserCert, ValidPrincipals: []string{}}}, true},
+		{"fail extra principals", args{&ssh.Certificate{CertType: ssh.UserCert, ValidPrincipals: []string{"john", "jane", "doe"}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := IsValidForAddUser(tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("IsValidForAddUser() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

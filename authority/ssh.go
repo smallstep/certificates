@@ -442,16 +442,37 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 	return cert, nil
 }
 
+// IsValidForAddUser checks if a user provisioner certificate can be issued to
+// the given certificate.
+func IsValidForAddUser(cert *ssh.Certificate) error {
+	if cert.CertType != ssh.UserCert {
+		return errors.New("certificate is not a user certificate")
+	}
+
+	switch len(cert.ValidPrincipals) {
+	case 0:
+		return errors.New("certificate does not have any principals")
+	case 1:
+		return nil
+	case 2:
+		// OIDC provisioners adds a second principal with the email address.
+		// @ cannot be the first character.
+		if strings.Index(cert.ValidPrincipals[1], "@") > 0 {
+			return nil
+		}
+		return errors.New("certificate does not have only one principal")
+	default:
+		return errors.New("certificate does not have only one principal")
+	}
+}
+
 // SignSSHAddUser signs a certificate that provisions a new user in a server.
 func (a *Authority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, subject *ssh.Certificate) (*ssh.Certificate, error) {
 	if a.sshCAUserCertSignKey == nil {
 		return nil, errs.NotImplemented("signSSHAddUser: user certificate signing is not enabled")
 	}
-	if subject.CertType != ssh.UserCert {
-		return nil, errs.Forbidden("signSSHAddUser: certificate is not a user certificate")
-	}
-	if len(subject.ValidPrincipals) != 1 {
-		return nil, errs.Forbidden("signSSHAddUser: certificate does not have only one principal")
+	if err := IsValidForAddUser(subject); err != nil {
+		return nil, errs.Wrap(http.StatusForbidden, err, "signSSHAddUser")
 	}
 
 	nonce, err := randutil.ASCII(32)
