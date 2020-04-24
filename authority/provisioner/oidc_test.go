@@ -139,11 +139,15 @@ func TestOIDC_Init(t *testing.T) {
 }
 
 func TestOIDC_authorizeToken(t *testing.T) {
-	srv := generateJWKServer(2)
+	srv := generateJWKServer(3)
 	defer srv.Close()
 
 	var keys jose.JSONWebKeySet
 	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
+
+	issuer := "the-issuer"
+	tenantID := "ab800f7d-2c87-45fb-b1d0-f90d0bc5ec25"
+	tenantIssuer := "https://login.microsoftonline.com/" + tenantID + "/v2.0"
 
 	// Create test provisioners
 	p1, err := generateOIDC()
@@ -152,6 +156,8 @@ func TestOIDC_authorizeToken(t *testing.T) {
 	assert.FatalError(t, err)
 	p3, err := generateOIDC()
 	assert.FatalError(t, err)
+	// TenantID
+	p2.TenantID = tenantID
 	// Admin + Domains
 	p3.Admins = []string{"name@smallstep.com", "root@example.com"}
 	p3.Domains = []string{"smallstep.com"}
@@ -159,20 +165,24 @@ func TestOIDC_authorizeToken(t *testing.T) {
 	// Update configuration endpoints and initialize
 	config := Config{Claims: globalProvisionerClaims}
 	p1.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
-	p2.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
+	p2.ConfigurationEndpoint = srv.URL + "/common/.well-known/openid-configuration"
 	p3.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"
 	assert.FatalError(t, p1.Init(config))
 	assert.FatalError(t, p2.Init(config))
 	assert.FatalError(t, p3.Init(config))
 
-	t1, err := generateSimpleToken("the-issuer", p1.ClientID, &keys.Keys[0])
+	t1, err := generateSimpleToken(issuer, p1.ClientID, &keys.Keys[0])
 	assert.FatalError(t, err)
-	t2, err := generateSimpleToken("the-issuer", p2.ClientID, &keys.Keys[1])
+	t2, err := generateSimpleToken(tenantIssuer, p2.ClientID, &keys.Keys[1])
+	assert.FatalError(t, err)
+	t3, err := generateToken("subject", issuer, p3.ClientID, "name@smallstep.com", []string{}, time.Now(), &keys.Keys[2])
+	assert.FatalError(t, err)
+	t4, err := generateToken("subject", issuer, p3.ClientID, "foo@smallstep.com", []string{}, time.Now(), &keys.Keys[2])
 	assert.FatalError(t, err)
 	// Invalid email
-	failEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
+	failEmail, err := generateToken("subject", issuer, p3.ClientID, "", []string{}, time.Now(), &keys.Keys[2])
 	assert.FatalError(t, err)
-	failDomain, err := generateToken("subject", "the-issuer", p3.ClientID, "name@example.com", []string{}, time.Now(), &keys.Keys[0])
+	failDomain, err := generateToken("subject", issuer, p3.ClientID, "name@example.com", []string{}, time.Now(), &keys.Keys[2])
 	assert.FatalError(t, err)
 
 	// Invalid tokens
@@ -180,7 +190,7 @@ func TestOIDC_authorizeToken(t *testing.T) {
 	key, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 	// missing key
-	failKey, err := generateSimpleToken("the-issuer", p1.ClientID, key)
+	failKey, err := generateSimpleToken(issuer, p1.ClientID, key)
 	assert.FatalError(t, err)
 	// invalid token
 	failTok := "foo." + parts[1] + "." + parts[2]
@@ -190,39 +200,42 @@ func TestOIDC_authorizeToken(t *testing.T) {
 	failIss, err := generateSimpleToken("bad-issuer", p1.ClientID, &keys.Keys[0])
 	assert.FatalError(t, err)
 	// invalid audience
-	failAud, err := generateSimpleToken("the-issuer", "foobar", &keys.Keys[0])
+	failAud, err := generateSimpleToken(issuer, "foobar", &keys.Keys[0])
 	assert.FatalError(t, err)
 	// invalid signature
 	failSig := t1[0 : len(t1)-2]
 	// expired
-	failExp, err := generateToken("subject", "the-issuer", p1.ClientID, "name@smallstep.com", []string{}, time.Now().Add(-360*time.Second), &keys.Keys[0])
+	failExp, err := generateToken("subject", issuer, p1.ClientID, "name@smallstep.com", []string{}, time.Now().Add(-360*time.Second), &keys.Keys[0])
 	assert.FatalError(t, err)
 	// not before
-	failNbf, err := generateToken("subject", "the-issuer", p1.ClientID, "name@smallstep.com", []string{}, time.Now().Add(360*time.Second), &keys.Keys[0])
+	failNbf, err := generateToken("subject", issuer, p1.ClientID, "name@smallstep.com", []string{}, time.Now().Add(360*time.Second), &keys.Keys[0])
 	assert.FatalError(t, err)
 
 	type args struct {
 		token string
 	}
 	tests := []struct {
-		name    string
-		prov    *OIDC
-		args    args
-		code    int
-		wantErr bool
+		name       string
+		prov       *OIDC
+		args       args
+		code       int
+		wantIssuer string
+		wantErr    bool
 	}{
-		{"ok1", p1, args{t1}, http.StatusOK, false},
-		{"ok2", p2, args{t2}, http.StatusOK, false},
-		{"fail-email", p3, args{failEmail}, http.StatusUnauthorized, true},
-		{"fail-domain", p3, args{failDomain}, http.StatusUnauthorized, true},
-		{"fail-key", p1, args{failKey}, http.StatusUnauthorized, true},
-		{"fail-token", p1, args{failTok}, http.StatusUnauthorized, true},
-		{"fail-claims", p1, args{failClaims}, http.StatusUnauthorized, true},
-		{"fail-issuer", p1, args{failIss}, http.StatusUnauthorized, true},
-		{"fail-audience", p1, args{failAud}, http.StatusUnauthorized, true},
-		{"fail-signature", p1, args{failSig}, http.StatusUnauthorized, true},
-		{"fail-expired", p1, args{failExp}, http.StatusUnauthorized, true},
-		{"fail-not-before", p1, args{failNbf}, http.StatusUnauthorized, true},
+		{"ok1", p1, args{t1}, http.StatusOK, issuer, false},
+		{"ok tenantid", p2, args{t2}, http.StatusOK, tenantIssuer, false},
+		{"ok admin", p3, args{t3}, http.StatusOK, issuer, false},
+		{"ok domain", p3, args{t4}, http.StatusOK, issuer, false},
+		{"fail-email", p3, args{failEmail}, http.StatusUnauthorized, "", true},
+		{"fail-domain", p3, args{failDomain}, http.StatusUnauthorized, "", true},
+		{"fail-key", p1, args{failKey}, http.StatusUnauthorized, "", true},
+		{"fail-token", p1, args{failTok}, http.StatusUnauthorized, "", true},
+		{"fail-claims", p1, args{failClaims}, http.StatusUnauthorized, "", true},
+		{"fail-issuer", p1, args{failIss}, http.StatusUnauthorized, "", true},
+		{"fail-audience", p1, args{failAud}, http.StatusUnauthorized, "", true},
+		{"fail-signature", p1, args{failSig}, http.StatusUnauthorized, "", true},
+		{"fail-expired", p1, args{failExp}, http.StatusUnauthorized, "", true},
+		{"fail-not-before", p1, args{failNbf}, http.StatusUnauthorized, "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -239,7 +252,7 @@ func TestOIDC_authorizeToken(t *testing.T) {
 				assert.Nil(t, got)
 			} else {
 				assert.NotNil(t, got)
-				assert.Equals(t, got.Issuer, "the-issuer")
+				assert.Equals(t, got.Issuer, tt.wantIssuer)
 			}
 		})
 	}

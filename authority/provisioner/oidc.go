@@ -57,6 +57,7 @@ type OIDC struct {
 	ClientID              string   `json:"clientID"`
 	ClientSecret          string   `json:"clientSecret"`
 	ConfigurationEndpoint string   `json:"configurationEndpoint"`
+	TenantID              string   `json:"tenantID,omitempty"`
 	Admins                []string `json:"admins,omitempty"`
 	Domains               []string `json:"domains,omitempty"`
 	Groups                []string `json:"groups,omitempty"`
@@ -165,6 +166,10 @@ func (o *OIDC) Init(config Config) (err error) {
 	}
 	if err := o.configuration.Validate(); err != nil {
 		return errors.Wrapf(err, "error parsing %s", o.ConfigurationEndpoint)
+	}
+	// Replace {tenantid} with the configured one
+	if o.TenantID != "" {
+		o.configuration.Issuer = strings.Replace(o.configuration.Issuer, "{tenantid}", o.TenantID, -1)
 	}
 	// Get JWK key set
 	o.keyStore, err = newKeyStore(o.configuration.JWKSetURI)

@@ -943,6 +943,8 @@ func generateJWKServer(n int) *httptest.Server {
 			writeJSON(w, hits)
 		case "/.well-known/openid-configuration":
 			writeJSON(w, openIDConfiguration{Issuer: "the-issuer", JWKSetURI: srv.URL + "/jwks_uri"})
+		case "/common/.well-known/openid-configuration":
+			writeJSON(w, openIDConfiguration{Issuer: "https://login.microsoftonline.com/{tenantid}/v2.0", JWKSetURI: srv.URL + "/jwks_uri"})
 		case "/random":
 			keySet := must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
 			w.Header().Add("Cache-Control", "max-age=5")
