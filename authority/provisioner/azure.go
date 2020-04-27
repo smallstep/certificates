@@ -84,7 +84,7 @@ type Azure struct {
 	*base
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
-	TenantID               string   `json:"tenantId"`
+	TenantID               string   `json:"tenantID"`
 	ResourceGroups         []string `json:"resourceGroups"`
 	Audience               string   `json:"audience,omitempty"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
