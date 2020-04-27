@@ -113,18 +113,22 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	})
 
 	//Add ACME api endpoints in /acme and /1.0/acme
-	dns := config.DNSNames[0]
-	u, err := url.Parse("https://" + config.Address)
-	if err != nil {
-		return nil, err
-	}
-	port := u.Port()
-	if port != "" && port != "443" {
-		dns = fmt.Sprintf("%s:%s", dns, port)
+	acmeHost := config.ACMEHost
+	if acmeHost == "" {
+		dns := config.DNSNames[0]
+		u, err := url.Parse("https://" + config.Address)
+		if err != nil {
+			return nil, err
+		}
+		port := u.Port()
+		if port != "" && port != "443" {
+			dns = fmt.Sprintf("%s:%s", dns, port)
+		}
+		acmeHost = dns
 	}
 
 	prefix := "acme"
-	acmeAuth, err := acme.NewAuthority(auth.GetDatabase().(nosql.DB), dns, prefix, auth)
+	acmeAuth, err := acme.NewAuthority(auth.GetDatabase().(nosql.DB), acmeHost, prefix, auth)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating ACME authority")
 	}

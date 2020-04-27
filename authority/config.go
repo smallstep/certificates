@@ -55,6 +55,7 @@ type Config struct {
 	IntermediateKey  string               `json:"key"`
 	Address          string               `json:"address"`
 	DNSNames         []string             `json:"dnsNames"`
+	ACMEHost         string               `json:"acmeHost,omitempty"`
 	KMS              *kms.Options         `json:"kms,omitempty"`
 	SSH              *SSHConfig           `json:"ssh,omitempty"`
 	Logger           json.RawMessage      `json:"logger,omitempty"`
