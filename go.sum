@@ -31,6 +31,7 @@ github.com/Masterminds/semver/v3 v3.0.1/go.mod h1:VPu/7SZ7ePZ3QOrcuXROw5FAcLl4a0
 github.com/Masterminds/sprig/v3 v3.0.0 h1:KSQz7Nb08/3VU9E4ns29dDxcczhOD1q7O1UfM4G3t3g=
 github.com/Masterminds/sprig/v3 v3.0.0/go.mod h1:NEUY/Qq8Gdm2xgYA+NwJM6wmfdRV9xkh8h/Rld20R0U=
 github.com/Masterminds/vcs v1.13.0/go.mod h1:N09YCmOQr6RLxC6UNHzuVwAdodYbbnycGHSmwVJjcKA=
+github.com/Microsoft/go-winio v0.4.14 h1:+hMXMk01us9KgxGb7ftKQt2Xpf5hH/yky+TDA+qxleU=
 github.com/Microsoft/go-winio v0.4.14/go.mod h1:qXqCSQ3Xa7+6tgxaGTIe4Kpcdsi+P8jBhyzoq1bpyYA=
 github.com/OneOfOne/xxhash v1.2.2 h1:KMrpdQIwFcEqXDklaen+P1axHaj9BSKzvpUUfnHldSE=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
@@ -461,8 +462,8 @@ github.com/smallstep/certinfo v1.2.0/go.mod h1:1gQJekdPwPvUwFWGTi7bZELmQT09cxC9w
 github.com/smallstep/cli v0.14.2 h1:0Z1MtcgJfVS9RstNokWSNqE20xPwdiEhZgNuZxYRWRI=
 github.com/smallstep/cli v0.14.2/go.mod h1:JOTzEzQ4/l863KUqs9qlAqPagWPOqu6lc3C59S1nYzU=
 github.com/smallstep/nosql v0.2.0/go.mod h1:qyxCqeyGwkuM6bfJSY3sg+aiXEiD0GbQOPzIF8/ZD8Q=
-github.com/smallstep/nosql v0.2.1-0.20200421162603-b38671a21284 h1:8gwsxBtvSdZT64W6Og1JfpbXkGAXzForoNV392X4CjM=
-github.com/smallstep/nosql v0.2.1-0.20200421162603-b38671a21284/go.mod h1:QG7gNOpidifn99MjZaiNbm7HPesIyBd97F/OfacNz8Q=
+github.com/smallstep/nosql v0.3.0 h1:V1X5vfDsDt89499h3jZFUlR4VnnsYYs5tXaQZ0w8z5U=
+github.com/smallstep/nosql v0.3.0/go.mod h1:QG7gNOpidifn99MjZaiNbm7HPesIyBd97F/OfacNz8Q=
 github.com/smallstep/truststore v0.9.3/go.mod h1:PRSkpRIhAYBK/KLWkHNgRdYgzWMEy45bN7PSJCfKKGE=
 github.com/smallstep/zcrypto v0.0.0-20200203191936-fbc32cf76bce/go.mod h1:+F24VU3UCxfVFvvqgm5jNUFQOm/L6ed13ImwWGFgg/g=
 github.com/smallstep/zlint v0.0.0-20180727184541-d84eaafe274f/go.mod h1:GeHHT7sJDI9ti3oEaFnvx1F4N8n3ZSw2YM1+sbEoxc4=
