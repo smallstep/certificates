@@ -19,3 +19,6 @@ coverage.txt
 vendor
 output
 .idea
+
+# vscode
+*.code-workspace
