@@ -108,14 +108,14 @@ and respond to requests.
 * `logger`: the default logging format for the CA is `text`. The other option
 is `json`.
 
-* `db`: data persistence layer. See [database documentation](./db.md) for more
+* `db`: data persistence layer. See [database documentation](./database.md) for more
 info.
 
     - type: `badger`, `bbolt`, `mysql`, etc.
 
     - dataSource: `string` that can be interpreted differently depending on the
     type of the database. Usually a path to where the data is stored. See
-    the [database configuration docs](./db.md#configuration) for more info.
+    the [database configuration docs](./database.md#configuration) for more info.
 
     - database: name of the database. Used for backends that may have
     multiple databases. e.g. MySQL
