@@ -459,8 +459,13 @@ github.com/smallstep/assert v0.0.0-20200103212524-b99dc1097b15/go.mod h1:MyOHs9P
 github.com/smallstep/certificates v0.14.2/go.mod h1:eleWnbKTXDdV9GxWNOtbdjBiitdK5SuO4FCXOvcdLEY=
 github.com/smallstep/certinfo v1.2.0 h1:XJCH6fLKwGFcUndQ6ARtFdaqoujBCQnGbGRegf6PWcc=
 github.com/smallstep/certinfo v1.2.0/go.mod h1:1gQJekdPwPvUwFWGTi7bZELmQT09cxC9wJ0VBkBNiwU=
+github.com/smallstep/certinfo v1.2.1/go.mod h1:1gQJekdPwPvUwFWGTi7bZELmQT09cxC9wJ0VBkBNiwU=
 github.com/smallstep/cli v0.14.2 h1:0Z1MtcgJfVS9RstNokWSNqE20xPwdiEhZgNuZxYRWRI=
 github.com/smallstep/cli v0.14.2/go.mod h1:JOTzEzQ4/l863KUqs9qlAqPagWPOqu6lc3C59S1nYzU=
+github.com/smallstep/cli v0.14.3-rc.1 h1:u5oUKbm6HL2lD7Xoary+DmIRJ1Ni6uov/DyA78u0CzA=
+github.com/smallstep/cli v0.14.3-rc.1/go.mod h1:9dsTyViHYZRwU+YjQYMHdRVk9jONeZSioYC5rqA3LoE=
+github.com/smallstep/cli v0.14.3-rc.1.0.20200424181552-aac2566c506c h1:768U4DPoD1jm6GNHtbVssjUXNtwj4YNRcEWD4RxdXcM=
+github.com/smallstep/cli v0.14.3-rc.1.0.20200424181552-aac2566c506c/go.mod h1:BcnWHhXfZzs7/CAh49cC47NoAA6bUJftjfDNqm6cxDY=
 github.com/smallstep/nosql v0.2.0/go.mod h1:qyxCqeyGwkuM6bfJSY3sg+aiXEiD0GbQOPzIF8/ZD8Q=
 github.com/smallstep/nosql v0.3.0 h1:V1X5vfDsDt89499h3jZFUlR4VnnsYYs5tXaQZ0w8z5U=
 github.com/smallstep/nosql v0.3.0/go.mod h1:QG7gNOpidifn99MjZaiNbm7HPesIyBd97F/OfacNz8Q=
