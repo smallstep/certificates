@@ -589,7 +589,7 @@ func ch() acme.Challenge {
 		URL:     "https://ca.smallstep.com/acme/challenge/chID",
 		ID:      "chID",
 		AuthzID: "authzID",
-		Retry:   &acme.Retry{Called:0, Backoffs:1, Active:false},
+		Retry:   &acme.Retry{Called: 0, Active: false},
 	}
 }
 
