@@ -323,8 +323,8 @@ func (a *Authority) BackoffChallenge(p provisioner.Interface, accID, chID string
 	}
 
 	remCalls := ch.getRetry().MaxAttempts - math.Mod(ch.getRetry().Called, ch.getRetry().MaxAttempts)
-	totBackoff := 0*time.Second
-	for i:=0; i < int(remCalls); i++ {
+	totBackoff := 0 * time.Second
+	for i := 0; i < int(remCalls); i++ {
 		clone := ch.clone()
 		clone.Retry.Called += float64(i)
 		totBackoff += clone.getBackoff()
