@@ -41,6 +41,7 @@ type mockAcmeAuthority struct {
 	updateAccount       func(provisioner.Interface, string, []string) (*acme.Account, error)
 	useNonce            func(string) error
 	validateChallenge   func(p provisioner.Interface, accID string, id string, jwk *jose.JSONWebKey) (*acme.Challenge, error)
+	backoffChallenge    func(p provisioner.Interface, accID, chID string, jwk *jose.JSONWebKey) (time.Duration, error)
 	ret1                interface{}
 	err                 error
 }
@@ -200,6 +201,17 @@ func (m *mockAcmeAuthority) ValidateChallenge(p provisioner.Interface, accID str
 		return nil, m.err
 	default:
 		return m.ret1.(*acme.Challenge), m.err
+	}
+}
+
+func (m *mockAcmeAuthority) BackoffChallenge(p provisioner.Interface, accID, chID string, jwk *jose.JSONWebKey) (time.Duration, error) {
+	switch {
+	case m.backoffChallenge != nil:
+		return m.backoffChallenge(p, accID, chID, jwk)
+	case m.err != nil:
+		return -1, m.err
+	default:
+		return m.ret1.(time.Duration), m.err
 	}
 }
 
