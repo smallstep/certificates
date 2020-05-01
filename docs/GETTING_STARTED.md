@@ -34,8 +34,11 @@ provisioners and its options.
 
 To initialize a PKI and configure the Step Certificate Authority run:
 
+> **NOTE**: `step ca init` only initialize an x509 CA. If you
+> would like to initialize an SSH CA as well, add the `--ssh` flag.
+
 ```
-step ca init
+step ca init [--ssh]
 ```
 
 You'll be asked for a name for your PKI. This name will appear in your CA
@@ -54,27 +57,40 @@ You should see:
 .
 ├── certs
 │   ├── intermediate_ca.crt
-│   └── root_ca.crt
+│   ├── root_ca.crt
+│   ├── ssh_host_key.pub (--ssh only)
+│   └── ssh_user_key.pub (--ssh only)
 ├── config
 │   ├── ca.json
 │   └── defaults.json
 └── secrets
     ├── intermediate_ca_key
-    └── root_ca_key
+    ├── root_ca_key
+    ├── ssh_host_key (--ssh only)
+    └── ssh_user_key (--ssh only)
 ```
 
 The files created include:
 
 * `root_ca.crt` and `root_ca_key`: the root certificate and private key for
-  your PKI
+your PKI.
+
 * `intermediate_ca.crt` and `intermediate_ca_key`: the intermediate certificate
-  and private key that will be used to sign leaf certificates
+and private key that will be used to sign leaf certificates.
+
+* `ssh_host_key.pub` and `ssh_host_key` (`--ssh` only): the SSH host pub/priv key
+pair that will be used to sign new host SSH certificates.
+
+* `ssh_user_key.pub` and `ssh_user_key` (`--ssh` only): the SSH user pub/priv key
+pair that will be used to sign new user SSH certificates.
+
 * `ca.json`: the configuration file necessary for running the Step CA.
+
 * `defaults.json`: file containing default parameters for the `step` CA cli
 interface. You can override these values with the appropriate flags or
 environment variables.
 
-All of the files endinging in `_key` are password protected using the password
+All of the files ending in `_key` are password protected using the password
 you chose during PKI initialization. We advise you to change these passwords
 (using the `step crypto change-pass` utility) if you plan to run your CA in a
 non-development environment.
@@ -146,10 +162,34 @@ ciphersuites, min/max TLS version, etc.
         against token reuse. The default value is `false`. Do not change this
         unless you know what you are doing.
 
-    - `provisioners`: list of provisioners. Each provisioner has a `name`,
-    associated public/private keys, and an optional `claims` attribute that will
-    override any values set in the global `claims` directly underneath `authority`.
+        SSH CA properties
 
+        * `minUserSSHDuration`: do not allow certificates with a duration less
+        than this value.
+
+        * `maxUserSSHDuration`: do not allow certificates with a duration
+        greater than this value.
+
+        * `defaultUserSSHDuration`: if no certificate validity period is specified,
+        use this value.
+
+        * `minHostSSHDuration`: do not allow certificates with a duration less
+        than this value.
+
+        * `maxHostSSHDuration`: do not allow certificates with a duration
+        greater than this value.
+
+        * `defaultHostSSHDuration`: if no certificate validity period is specified,
+        use this value.
+
+        * `enableSSHCA`: enable all provisioners to generate SSH Certificates.
+        The deault value is `false`. You can enable this option per provisioner
+        by setting it to `true` in the provisioner claims.
+
+    - `provisioners`: list of provisioners.
+    See the [provisioners documentation](./provisioners.md). Each provisioner
+    has an optional `claims` attribute that can override any attribute defined
+    at the level above in the `authority.claims`.
 
 `step ca init` will generate one provisioner. New provisioners can be added by
 running `step ca provisioner add`.
