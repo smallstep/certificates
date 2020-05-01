@@ -13,7 +13,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smallstep/assert v0.0.0-20200103212524-b99dc1097b15
 	github.com/smallstep/certinfo v1.2.1 // indirect
-	github.com/smallstep/cli v0.14.3-rc.1
+	github.com/smallstep/cli v0.14.3
 	github.com/smallstep/nosql v0.3.0
 	github.com/urfave/cli v1.22.2
 	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59
