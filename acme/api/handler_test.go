@@ -30,7 +30,7 @@ type mockAcmeAuthority struct {
 	getAuthz            func(p provisioner.Interface, accID string, id string) (*acme.Authz, error)
 	getCertificate      func(accID string, id string) ([]byte, error)
 	getChallenge        func(p provisioner.Interface, accID string, id string) (*acme.Challenge, error)
-	getDirectory        func(provisioner.Interface) *acme.Directory
+	getDirectory        func(provisioner.Interface, string) *acme.Directory
 	getLink             func(acme.Link, string, bool, ...string) string
 	getOrder            func(p provisioner.Interface, accID string, id string) (*acme.Order, error)
 	getOrdersByAccount  func(p provisioner.Interface, id string) ([]string, error)
@@ -108,9 +108,9 @@ func (m *mockAcmeAuthority) GetChallenge(p provisioner.Interface, accID, id stri
 	return m.ret1.(*acme.Challenge), m.err
 }
 
-func (m *mockAcmeAuthority) GetDirectory(p provisioner.Interface) *acme.Directory {
+func (m *mockAcmeAuthority) GetDirectory(p provisioner.Interface, baseURLFromRequest string) *acme.Directory {
 	if m.getDirectory != nil {
-		return m.getDirectory(p)
+		return m.getDirectory(p, baseURLFromRequest)
 	}
 	return m.ret1.(*acme.Directory)
 }
@@ -276,6 +276,7 @@ func TestHandlerGetDirectory(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			h := New(auth).(*Handler)
 			req := httptest.NewRequest("GET", url, nil)
+			req.Header.Add("X-Forwarded-Proto", "https")
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.GetDirectory(w, req)

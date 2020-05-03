@@ -102,6 +102,12 @@ func (l Link) String() string {
 
 // getLink returns an absolute or partial path to the given resource.
 func (d *directory) getLink(typ Link, provisionerName string, abs bool, inputs ...string) string {
+	return d.getLinkFromBaseURL(typ, provisionerName, abs, "", inputs...)
+}
+
+// getLinkFromBaseURL returns an absolute or partial path to the given resource and a base URL dynamically obtained from the request for which
+// the link is being calculated.
+func (d *directory) getLinkFromBaseURL(typ Link, provisionerName string, abs bool, baseURLFromRequest string, inputs ...string) string {
 	var link string
 	switch typ {
 	case NewNonceLink, NewAccountLink, NewOrderLink, NewAuthzLink, DirectoryLink, KeyChangeLink, RevokeCertLink:
@@ -114,7 +120,11 @@ func (d *directory) getLink(typ Link, provisionerName string, abs bool, inputs .
 		link = fmt.Sprintf("/%s/%s/%s/finalize", provisionerName, OrderLink.String(), inputs[0])
 	}
 	if abs {
-		return fmt.Sprintf("https://%s/%s%s", d.dns, d.prefix, link)
+		baseURL := baseURLFromRequest
+		if baseURL == "" {
+			baseURL = "https://" + d.dns
+		}
+		return fmt.Sprintf("%s/%s%s", baseURL, d.prefix, link)
 	}
 	return link
 }

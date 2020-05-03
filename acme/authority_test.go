@@ -73,13 +73,27 @@ func TestAuthorityGetDirectory(t *testing.T) {
 	auth, err := NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil)
 	assert.FatalError(t, err)
 	prov := newProv()
-	acmeDir := auth.GetDirectory(prov)
+	acmeDir := auth.GetDirectory(prov, "")
 	assert.Equals(t, acmeDir.NewNonce, fmt.Sprintf("https://ca.smallstep.com/acme/%s/new-nonce", URLSafeProvisionerName(prov)))
 	assert.Equals(t, acmeDir.NewAccount, fmt.Sprintf("https://ca.smallstep.com/acme/%s/new-account", URLSafeProvisionerName(prov)))
 	assert.Equals(t, acmeDir.NewOrder, fmt.Sprintf("https://ca.smallstep.com/acme/%s/new-order", URLSafeProvisionerName(prov)))
 	//assert.Equals(t, acmeDir.NewOrder, "httsp://ca.smallstep.com/acme/new-authz")
 	assert.Equals(t, acmeDir.RevokeCert, fmt.Sprintf("https://ca.smallstep.com/acme/%s/revoke-cert", URLSafeProvisionerName(prov)))
 	assert.Equals(t, acmeDir.KeyChange, fmt.Sprintf("https://ca.smallstep.com/acme/%s/key-change", URLSafeProvisionerName(prov)))
+}
+
+func TestAuthorityGetDirectoryWithBaseURL(t *testing.T) {
+	baseURL := "http://my.proxied.host"
+	auth, err := NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil)
+	assert.FatalError(t, err)
+	prov := newProv()
+	acmeDir := auth.GetDirectory(prov, baseURL)
+	assert.Equals(t, acmeDir.NewNonce, fmt.Sprintf("%s/acme/%s/new-nonce", baseURL, URLSafeProvisionerName(prov)))
+	assert.Equals(t, acmeDir.NewAccount, fmt.Sprintf("%s/acme/%s/new-account", baseURL, URLSafeProvisionerName(prov)))
+	assert.Equals(t, acmeDir.NewOrder, fmt.Sprintf("%s/acme/%s/new-order", baseURL, URLSafeProvisionerName(prov)))
+	//assert.Equals(t, acmeDir.NewOrder, "%s/acme/new-authz")
+	assert.Equals(t, acmeDir.RevokeCert, fmt.Sprintf("%s/acme/%s/revoke-cert", baseURL, URLSafeProvisionerName(prov)))
+	assert.Equals(t, acmeDir.KeyChange, fmt.Sprintf("%s/acme/%s/key-change", baseURL, URLSafeProvisionerName(prov)))
 }
 
 func TestAuthorityNewNonce(t *testing.T) {

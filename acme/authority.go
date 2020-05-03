@@ -25,7 +25,7 @@ type Interface interface {
 	GetAccountByKey(provisioner.Interface, *jose.JSONWebKey) (*Account, error)
 	GetAuthz(provisioner.Interface, string, string) (*Authz, error)
 	GetCertificate(string, string) ([]byte, error)
-	GetDirectory(provisioner.Interface) *Directory
+	GetDirectory(provisioner.Interface, string) *Directory
 	GetLink(Link, string, bool, ...string) string
 	GetOrder(provisioner.Interface, string, string) (*Order, error)
 	GetOrdersByAccount(provisioner.Interface, string) ([]string, error)
@@ -82,14 +82,14 @@ func (a *Authority) GetLink(typ Link, provID string, abs bool, inputs ...string)
 }
 
 // GetDirectory returns the ACME directory object.
-func (a *Authority) GetDirectory(p provisioner.Interface) *Directory {
+func (a *Authority) GetDirectory(p provisioner.Interface, baseURLFromRequest string) *Directory {
 	name := url.PathEscape(p.GetName())
 	return &Directory{
-		NewNonce:   a.dir.getLink(NewNonceLink, name, true),
-		NewAccount: a.dir.getLink(NewAccountLink, name, true),
-		NewOrder:   a.dir.getLink(NewOrderLink, name, true),
-		RevokeCert: a.dir.getLink(RevokeCertLink, name, true),
-		KeyChange:  a.dir.getLink(KeyChangeLink, name, true),
+		NewNonce:   a.dir.getLinkFromBaseURL(NewNonceLink, name, true, baseURLFromRequest),
+		NewAccount: a.dir.getLinkFromBaseURL(NewAccountLink, name, true, baseURLFromRequest),
+		NewOrder:   a.dir.getLinkFromBaseURL(NewOrderLink, name, true, baseURLFromRequest),
+		RevokeCert: a.dir.getLinkFromBaseURL(RevokeCertLink, name, true, baseURLFromRequest),
+		KeyChange:  a.dir.getLinkFromBaseURL(KeyChangeLink, name, true, baseURLFromRequest),
 	}
 }
 
