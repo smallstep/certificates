@@ -123,7 +123,7 @@ func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, err)
 		return
 	}
-	dir := h.Auth.GetDirectory(prov)
+	dir := h.Auth.GetDirectory(prov, baseURLFromRequest(r))
 	api.JSON(w, dir)
 }
 
