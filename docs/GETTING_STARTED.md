@@ -485,9 +485,17 @@ Please enter the password to decrypt ~/.step/secrets/intermediate_ca_key: passwo
 2019/02/21 12:09:51 Serving HTTPS on :9443 ...
 ```
 
-Please [`step ca provisioner`](https://smallstep.com/docs/cli/ca/provisioner/)'s docs for details on all available claims properties. The durations are strings which are a sequence of decimal numbers, each with optional fraction and a unit suffix, such as "300ms" or "2h45m". Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+See the [`provisioner doc`][1] for details on all available provisioner claims.
+The durations are strings which are a sequence of decimal numbers, each with
+optional fraction and a unit suffix, such as "300ms" or "2h45m". Valid time
+units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 
-Now certs issued by the `dev@smallstep.com` provisioner will be valid for two hours and deny renewals. Command line flags allow validity extension up to 12h, please see [`step ca certificate`](https://smallstep.com/docs/cli/ca/certificate/)'s docs for details.
+Now certs issued by the `dev@smallstep.com` provisioner will be valid for two
+hours and deny renewals. Command line flags allow validity extension up to 12h,
+please see [`step ca certificate`][2]'s docs for details.
+
+[1]: ./provisioners.md
+[2]: https://smallstep.com/docs/cli/ca/certificate/
 
 ```bash
 # grab a cert, will also work with 'step ca token' flow
