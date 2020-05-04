@@ -658,3 +658,31 @@ are features that we plan to implement, but are not yet available. In the mean
 time short lived certificates are a decent alternative.
 * Keep your hosts secure by enforcing AuthN and AuthZ for every connection. SSH
 access is a big one.
+
+<a name="step-ca-ha"></a>
+## Notes on Running Step CA as a Highly Available Service
+
+**CAUTION**: `step-ca` is built to scale horizontally. However, the creators
+and maintainers do not regularly test in an HA environment using mulitple
+instances. You may run into issues we did not plan for. If this happens, please
+[open an issue][3].
+
+### Considerations
+
+A few things to consider / implement when running multiple instances of `step-ca`:
+
+* Use `MySQL` DB: The default `Badger` DB cannot be read / written by more than one
+process simultaneously. The only supported DB that can support multiple instances
+is `MySQL`. See the [database documentation][4] for guidance on configuring `MySQL`.
+
+* Synchronize `ca.json` across instances: `step-ca` reads all of it's
+configuration (and all of the provisioner configuration) from the `ca.json` file
+specified on the command line. If the `ca.json` of one instance is modified
+(either manually or using a command like `step ca provisioner (add | remove)`)
+the other instances will not pick up on this change until the `ca.json` is
+copied over to the correct location for each instance and the instance itself
+is `SIGHUP`'ed (or restarted). It's recommended to use a configuration management
+(ansible, chef, salt, puppet, etc.) tool to synchronize `ca.json` across instances.
+
+[3]: https://github.com/smallstep/certificates/issues
+[4]: ./database.md
