@@ -75,6 +75,15 @@ type AuthConfig struct {
 	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
 }
 
+// defaultAuthConfig used when skipping validation.
+var defaultAuthConfig = &AuthConfig{
+	Provisioners: provisioner.List{},
+	Template:     &x509util.ASN1DN{},
+	Backdate: &provisioner.Duration{
+		Duration: defaultBackdate,
+	},
+}
+
 // Validate validates the authority configuration.
 func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 	if c == nil {
@@ -93,7 +102,7 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 	}
 
 	if c.Template == nil {
-		c.Template = &x509util.ASN1DN{}
+		c.Template = defaultAuthConfig.Template
 	}
 
 	if c.Backdate != nil {
@@ -101,9 +110,7 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 			return errors.New("authority.backdate cannot be less than 0")
 		}
 	} else {
-		c.Backdate = &provisioner.Duration{
-			Duration: defaultBackdate,
-		}
+		c.Backdate = defaultAuthConfig.Backdate
 	}
 
 	return nil
