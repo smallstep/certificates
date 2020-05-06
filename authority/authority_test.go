@@ -189,7 +189,7 @@ func TestAuthority_GetDatabase(t *testing.T) {
 	}
 }
 
-func TestNewEmbeddedAuthority(t *testing.T) {
+func TestNewEmbedded(t *testing.T) {
 	caPEM, err := ioutil.ReadFile("testdata/certs/root_ca.crt")
 	assert.FatalError(t, err)
 
@@ -246,9 +246,9 @@ func TestNewEmbeddedAuthority(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewEmbeddedAuthority(tt.args.opts...)
+			got, err := NewEmbedded(tt.args.opts...)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewEmbeddedAuthority() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NewEmbedded() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if err == nil {
@@ -261,7 +261,7 @@ func TestNewEmbeddedAuthority(t *testing.T) {
 	}
 }
 
-func TestNewEmbeddedAuthority_Sign(t *testing.T) {
+func TestNewEmbedded_Sign(t *testing.T) {
 	caPEM, err := ioutil.ReadFile("testdata/certs/root_ca.crt")
 	assert.FatalError(t, err)
 
@@ -270,7 +270,7 @@ func TestNewEmbeddedAuthority_Sign(t *testing.T) {
 	key, err := pemutil.Read("testdata/secrets/intermediate_ca_key", pemutil.WithPassword([]byte("pass")))
 	assert.FatalError(t, err)
 
-	a, err := NewEmbeddedAuthority(WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer)))
+	a, err := NewEmbedded(WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer)))
 	assert.FatalError(t, err)
 
 	// Sign
@@ -287,7 +287,7 @@ func TestNewEmbeddedAuthority_Sign(t *testing.T) {
 	assert.Equals(t, crt, cert[1])
 }
 
-func TestNewEmbeddedAuthority_GetTLSCertificate(t *testing.T) {
+func TestNewEmbedded_GetTLSCertificate(t *testing.T) {
 	caPEM, err := ioutil.ReadFile("testdata/certs/root_ca.crt")
 	assert.FatalError(t, err)
 
@@ -296,7 +296,7 @@ func TestNewEmbeddedAuthority_GetTLSCertificate(t *testing.T) {
 	key, err := pemutil.Read("testdata/secrets/intermediate_ca_key", pemutil.WithPassword([]byte("pass")))
 	assert.FatalError(t, err)
 
-	a, err := NewEmbeddedAuthority(WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer)))
+	a, err := NewEmbedded(WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer)))
 	assert.FatalError(t, err)
 
 	// GetTLSCertificate

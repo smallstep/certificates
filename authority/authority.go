@@ -85,9 +85,9 @@ func New(config *Config, opts ...Option) (*Authority, error) {
 	return a, nil
 }
 
-// NewEmbeddedAuthority initializes an authority that can be embedded in a
-// different project without the limitations of the config.
-func NewEmbeddedAuthority(opts ...Option) (*Authority, error) {
+// NewEmbedded initializes an authority that can be embedded in a different
+// project without the limitations of the config.
+func NewEmbedded(opts ...Option) (*Authority, error) {
 	config := &Config{
 		DNSNames:        []string{"localhost", "127.0.0.1", "::1"},
 		AuthorityConfig: defaultAuthConfig,
