@@ -207,6 +207,7 @@ func TestNewEmbedded(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", args{[]Option{WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer))}}, false},
+		{"ok empty config", args{[]Option{WithConfig(&Config{}), WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer))}}, false},
 		{"ok config file", args{[]Option{WithConfigFile("../ca/testdata/ca.json")}}, false},
 		{"ok config", args{[]Option{WithConfig(&Config{
 			Root:             []string{"testdata/certs/root_ca.crt"},
@@ -216,6 +217,7 @@ func TestNewEmbedded(t *testing.T) {
 			AuthorityConfig:  &AuthConfig{},
 		})}}, false},
 		{"fail options", args{[]Option{WithX509RootBundle([]byte("bad data"))}}, true},
+		{"fail missing config", args{[]Option{WithConfig(nil), WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer))}}, true},
 		{"fail missing root", args{[]Option{WithX509Signer(crt, key.(crypto.Signer))}}, true},
 		{"fail missing signer", args{[]Option{WithX509RootBundle(caPEM)}}, true},
 		{"fail missing root file", args{[]Option{WithConfig(&Config{
