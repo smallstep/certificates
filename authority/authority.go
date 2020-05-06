@@ -67,7 +67,6 @@ func New(config *Config, opts ...Option) (*Authority, error) {
 	var a = &Authority{
 		config:       config,
 		certificates: new(sync.Map),
-		provisioners: provisioner.NewCollection(config.getAudiences()),
 	}
 
 	// Apply options.
@@ -88,15 +87,9 @@ func New(config *Config, opts ...Option) (*Authority, error) {
 // NewEmbedded initializes an authority that can be embedded in a different
 // project without the limitations of the config.
 func NewEmbedded(opts ...Option) (*Authority, error) {
-	config := &Config{
-		DNSNames:        []string{"localhost", "127.0.0.1", "::1"},
-		AuthorityConfig: defaultAuthConfig,
-		TLS:             &DefaultTLSOptions,
-	}
 	a := &Authority{
-		config:       config,
+		config:       &Config{},
 		certificates: new(sync.Map),
-		provisioners: provisioner.NewCollection(config.getAudiences()),
 	}
 
 	// Apply options.
@@ -108,6 +101,8 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 
 	// Validate required options
 	switch {
+	case a.config == nil:
+		return nil, errors.New("cannot create an authority without a configuration")
 	case len(a.rootX509Certs) == 0 && a.config.Root.HasEmpties():
 		return nil, errors.New("cannot create an authority without a root certificate")
 	case a.x509Issuer == nil && a.config.IntermediateCert == "":
@@ -115,6 +110,9 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	case a.x509Signer == nil && a.config.IntermediateKey == "":
 		return nil, errors.New("cannot create an authority without an issuer signer")
 	}
+
+	// Initialize config required fields.
+	a.config.init()
 
 	// Initialize authority from options or configuration.
 	if err := a.init(); err != nil {
@@ -271,9 +269,11 @@ func (a *Authority) init() error {
 		return err
 	}
 	// Initialize provisioners
+	audiences := a.config.getAudiences()
+	a.provisioners = provisioner.NewCollection(audiences)
 	config := provisioner.Config{
 		Claims:    claimer.Claims(),
-		Audiences: a.config.getAudiences(),
+		Audiences: audiences,
 		DB:        a.db,
 		SSHKeys: &provisioner.SSHKeys{
 			UserKeys: sshKeys.UserKeys,
