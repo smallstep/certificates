@@ -85,6 +85,45 @@ func New(config *Config, opts ...Option) (*Authority, error) {
 	return a, nil
 }
 
+// NewEmbedded initializes an authority that can be embedded in a different
+// project without the limitations of the config.
+func NewEmbedded(opts ...Option) (*Authority, error) {
+	config := &Config{
+		DNSNames:        []string{"localhost", "127.0.0.1", "::1"},
+		AuthorityConfig: defaultAuthConfig,
+		TLS:             &DefaultTLSOptions,
+	}
+	a := &Authority{
+		config:       config,
+		certificates: new(sync.Map),
+		provisioners: provisioner.NewCollection(config.getAudiences()),
+	}
+
+	// Apply options.
+	for _, fn := range opts {
+		if err := fn(a); err != nil {
+			return nil, err
+		}
+	}
+
+	// Validate required options
+	switch {
+	case len(a.rootX509Certs) == 0 && a.config.Root.HasEmpties():
+		return nil, errors.New("cannot create an authority without a root certificate")
+	case a.x509Issuer == nil && a.config.IntermediateCert == "":
+		return nil, errors.New("cannot create an authority without an issuer certificate")
+	case a.x509Signer == nil && a.config.IntermediateKey == "":
+		return nil, errors.New("cannot create an authority without an issuer signer")
+	}
+
+	// Initialize authority from options or configuration.
+	if err := a.init(); err != nil {
+		return nil, err
+	}
+
+	return a, nil
+}
+
 // init performs validation and initializes the fields of an Authority struct.
 func (a *Authority) init() error {
 	// Check if handler has already been validated/initialized.

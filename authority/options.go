@@ -17,6 +17,24 @@ import (
 // Option sets options to the Authority.
 type Option func(*Authority) error
 
+// WithConfig replaces the current config with the given one. No validation is
+// performed in the given value.
+func WithConfig(config *Config) Option {
+	return func(a *Authority) error {
+		a.config = config
+		return nil
+	}
+}
+
+// WithConfigFile reads the given filename as a configuration file and replaces
+// the current one. No validation is performed in the given configuration.
+func WithConfigFile(filename string) Option {
+	return func(a *Authority) (err error) {
+		a.config, err = LoadConfiguration(filename)
+		return
+	}
+}
+
 // WithDatabase sets an already initialized authority database to a new
 // authority. This option is intended to be use on graceful reloads.
 func WithDatabase(db db.AuthDB) Option {
