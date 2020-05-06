@@ -148,7 +148,7 @@ func (ba *baseAuthz) toACME(db nosql.DB, dir *directory, p provisioner.Interface
 		if err != nil {
 			return nil, err
 		}
-		chs[i], err = ch.toACME(db, dir, p)
+		chs[i], err = ch.toACME(dir, p)
 		if err != nil {
 			return nil, err
 		}

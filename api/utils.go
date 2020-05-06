@@ -52,11 +52,6 @@ func JSON(w http.ResponseWriter, v interface{}) {
 	JSONStatus(w, v, http.StatusOK)
 }
 
-// JSON writes the passed value into the http.ResponseWriter.
-func WriteProcessing(w http.ResponseWriter, v interface{}) {
-	JSONStatus(w, v, http.StatusProcessing)
-}
-
 // JSONStatus writes the given value into the http.ResponseWriter and the
 // given status is written as the status code of the response.
 func JSONStatus(w http.ResponseWriter, v interface{}, status int) {

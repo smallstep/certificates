@@ -11,12 +11,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math"
-	"math/rand"
 	"net"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,20 +31,9 @@ type Challenge struct {
 	Validated string  `json:"validated,omitempty"`
 	URL       string  `json:"url"`
 	Error     *AError `json:"error,omitempty"`
-	Retry     *Retry   `json:"retry"`
+	RetryAfter string `json:"retry_after,omitempty"`
 	ID        string  `json:"-"`
 	AuthzID   string  `json:"-"`
-}
-
-type Retry struct {
-	Called       float64        `json:"id"`
-	BaseDelay    time.Duration  `json:"basedelay"`
-	MaxDelay     time.Duration  `json:"maxdelay"`
-	Multiplier   float64        `json:"multiplier"`
-	Jitter       float64        `json:"jitter"`
-	MaxAttempts  float64        `json:"maxattempts"`
-	Active       bool           `json:"active"`
-	Mux	         sync.Mutex     `json:"mux"`
 }
 
 // ToLog enables response logging.
@@ -82,7 +68,7 @@ type validateOptions struct {
 // challenge is the interface ACME challenege types must implement.
 type challenge interface {
 	save(db nosql.DB, swap challenge) error
-	validate(nosql.DB, *jose.JSONWebKey, validateOptions) (challenge, error)
+	validate(*jose.JSONWebKey, validateOptions) (challenge, error)
 	getType() string
 	getError() *AError
 	getValue() string
@@ -91,18 +77,18 @@ type challenge interface {
 	getAuthzID() string
 	getToken() string
 	getRetry() *Retry
-	getBackoff() time.Duration
 	clone() *baseChallenge
 	getAccountID() string
 	getValidated() time.Time
 	getCreated() time.Time
-	toACME(nosql.DB, *directory, provisioner.Interface) (*Challenge, error)
+	toACME(*directory, provisioner.Interface) (*Challenge, error)
 }
 
 // ChallengeOptions is the type used to created a new Challenge.
 type ChallengeOptions struct {
 	AccountID  string
 	AuthzID    string
+	ProvisionerID string
 	Identifier Identifier
 }
 
@@ -115,10 +101,10 @@ type baseChallenge struct {
 	Status    string    `json:"status"`
 	Token     string    `json:"token"`
 	Value     string    `json:"value"`
-	Validated time.Time `json:"validated"`
 	Created   time.Time `json:"created"`
+	Validated time.Time `json:"validated"`
 	Error     *AError   `json:"error"`
-	Retry     *Retry     `json:"retry"`
+	Retry     *Retry    `json:"retry"`
 }
 
 func newBaseChallenge(accountID, authzID string) (*baseChallenge, error) {
@@ -138,7 +124,6 @@ func newBaseChallenge(accountID, authzID string) (*baseChallenge, error) {
 		Status:    StatusPending,
 		Token:     token,
 		Created:   clock.Now(),
-		Retry:     &Retry{Called:0, BaseDelay:1, MaxDelay: 30, Jitter: 1, MaxAttempts:10, Active:false},
 	}, nil
 }
 
@@ -197,28 +182,9 @@ func (bc *baseChallenge) getError() *AError {
 	return bc.Error
 }
 
-// getBackoff returns the backoff time of the baseChallenge.
-func (bc *baseChallenge) getBackoff() time.Duration {
-	if bc.Retry.Called == 0 {
-		return bc.Retry.BaseDelay
-	}
-
-	backoff, max := float64(bc.Retry.BaseDelay), float64(bc.Retry.MaxDelay)
-	backoff *= math.Pow(bc.Retry.Multiplier, bc.Retry.Called)
-	if backoff > max {
-		backoff = max
-	}
-	// Introduce Jitter to ensure that clustered requests wont operate in unison
-	backoff *= 1 + bc.Retry.Jitter*(rand.Float64()*2-1)
-	if backoff < 0 {
-		return 0
-	}
-	return time.Duration(backoff)
-}
-
 // toACME converts the internal Challenge type into the public acmeChallenge
 // type for presentation in the ACME protocol.
-func (bc *baseChallenge) toACME(db nosql.DB, dir *directory, p provisioner.Interface) (*Challenge, error) {
+func (bc *baseChallenge) toACME(dir *directory, p provisioner.Interface) (*Challenge, error) {
 	ac := &Challenge{
 		Type:    bc.getType(),
 		Status:  bc.getStatus(),
@@ -233,8 +199,8 @@ func (bc *baseChallenge) toACME(db nosql.DB, dir *directory, p provisioner.Inter
 	if bc.Error != nil {
 		ac.Error = bc.Error
 	}
-	if bc.Retry != nil {
-		ac.Retry = bc.Retry
+	if bc.Retry != nil && bc.Status == StatusProcessing {
+		ac.RetryAfter = bc.Retry.NextAttempt
 	}
 	return ac, nil
 }
@@ -274,10 +240,12 @@ func (bc *baseChallenge) save(db nosql.DB, old challenge) error {
 
 func (bc *baseChallenge) clone() *baseChallenge {
 	u := *bc
+	r := *bc.Retry
+	u.Retry = &r
 	return &u
 }
 
-func (bc *baseChallenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
+func (bc *baseChallenge) validate(jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
 	return nil, ServerInternalErr(errors.New("unimplemented"))
 }
 
@@ -323,6 +291,21 @@ func unmarshalChallenge(data []byte) (challenge, error) {
 	}
 }
 
+// Challenge retry information is internally relevant and needs to be stored in the DB, but should not be part
+// of the public challenge API apart from the Retry-After header.
+type Retry struct {
+	Owner	    int    `json:"owner"`
+	ProvisionerID string `json:"provisionerid"`
+	NumAttempts int    `json:"numattempts"`
+	MaxAttempts int    `json:"maxattempts"`
+	NextAttempt string `json:"nextattempt"`
+}
+
+func (r *Retry) Active() bool {
+	return r.NumAttempts < r.MaxAttempts
+}
+
+
 // http01Challenge represents an http-01 acme challenge.
 type http01Challenge struct {
 	*baseChallenge
@@ -347,78 +330,61 @@ func newHTTP01Challenge(db nosql.DB, ops ChallengeOptions) (challenge, error) {
 // Validate attempts to validate the challenge. If the challenge has been
 // satisfactorily validated, the 'status' and 'validated' attributes are
 // updated.
-func (hc *http01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
+func (hc *http01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
 	// If already valid or invalid then return without performing validation.
-	if hc.getStatus() == StatusValid {
+	switch hc.getStatus() {
+	case StatusPending:
+		panic("pending challenges must first be moved to the processing state")
+	case StatusProcessing:
+		break
+	case StatusValid, StatusInvalid:
 		return hc, nil
+	default:
+		panic("unknown challenge state: " + hc.getStatus())
 	}
-	if hc.getStatus() == StatusInvalid {
-		// TODO: Resolve segfault on upd.save
-		upd := hc.clone()
-		upd.Status = StatusPending
-		if err := upd.save(db, hc); err != nil {
-			fmt.Printf("Error in save: %s\n\n\n", err)
-			return nil, err
-		}
-		fmt.Print("Through Save\n\n")
-		return hc, nil
-	}
-	url := fmt.Sprintf("http://%s/.well-known/acme-challenge/%s", hc.Value, hc.Token)
 
+	up := &http01Challenge{hc.baseChallenge.clone()}
+
+	url := fmt.Sprintf("http://%s/.well-known/acme-challenge/%s", hc.Value, hc.Token)
 	resp, err := vo.httpGet(url)
 	if err != nil {
-	if err = hc.iterateRetry(db, ConnectionErr(errors.Wrapf(err,
-			"error doing http GET for url %s", url))); err != nil {
-			return nil, err
-		}
-		return hc, nil
-	}
-	if resp.StatusCode >= 400 {
-		if err = hc.iterateRetry(db,
-			ConnectionErr(errors.Errorf("error doing http GET for url %s with status code %d",
-				url, resp.StatusCode))); err != nil {
-			return nil, err
-		}
-		return hc, nil
+		e := errors.Wrapf(err, "error doing http GET for url %s", url)
+		up.Error = ConnectionErr(e).ToACME()
+		return up, nil
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode >= 400 {
+		e := errors.Errorf("error doing http GET for url %s with status code %d", url, resp.StatusCode)
+		up.Error = ConnectionErr(e).ToACME()
+		return up, nil
+	}
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrapf(err, "error reading "+
-			"response body for url %s", url))
+		e := errors.Wrapf(err, "error reading response body for url %s", url)
+		up.Error = ServerInternalErr(e).ToACME()
+		return up, nil
 	}
-	keyAuth := strings.Trim(string(body), "\r\n")
 
+	keyAuth := strings.Trim(string(body), "\r\n")
 	expected, err := KeyAuthorization(hc.Token, jwk)
 	if err != nil {
-		// TODO retry?
 		return nil, err
 	}
 	if keyAuth != expected {
-		// TODO should we just bail here, this is a "successful" failure.
-		if err = hc.iterateRetry(db, RejectedIdentifierErr(errors.Errorf("keyAuthorization does not match; "+
-			"expected %s, but got %s", expected, keyAuth))); err != nil {
-			// TODO what's the difference between returning nil with an error, and returning a retry-
-			// incremented challenge? I think we should probably only hard error if there are no more
-			// retries left. 
-			return nil, err
-		}
-		return hc, err
+		// add base challenge fail validation
+		e := errors.Errorf("keyAuthorization does not match; expected %s, but got %s", expected, keyAuth)
+		up.Error = RejectedIdentifierErr(e).ToACME()
+		up.Status = StatusInvalid
+		return up, nil
 	}
 
-	// Update and store the challenge.
-	upd := &http01Challenge{hc.baseChallenge.clone()}
-	upd.Status = StatusValid
-	upd.Error = nil
-	upd.Validated = clock.Now()
-	upd.Retry.Active = false
-	upd.Retry.Called = 0
-
-	if err := upd.save(db, hc); err != nil {
-		return nil, err
-	}
-	return upd, nil
+	up.Status = StatusValid
+	up.Validated = clock.Now()
+	up.Error = nil
+	up.Retry = nil
+	return up, nil
 }
 
 type tlsALPN01Challenge struct {
@@ -434,34 +400,39 @@ func newTLSALPN01Challenge(db nosql.DB, ops ChallengeOptions) (challenge, error)
 	bc.Type = "tls-alpn-01"
 	bc.Value = ops.Identifier.Value
 
-	hc := &tlsALPN01Challenge{bc}
-	if err := hc.save(db, nil); err != nil {
+	tc := &tlsALPN01Challenge{bc}
+	if err := tc.save(db, nil); err != nil {
 		return nil, err
 	}
-	return hc, nil
+	return tc, nil
 }
 
-func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
+func (tc *tlsALPN01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
 	// If already valid or invalid then return without performing validation.
-	if tc.getStatus() == StatusValid || tc.getStatus() == StatusInvalid {
+	switch tc.getStatus() {
+	case StatusPending:
+		panic("pending challenges must first be moved to the processing state")
+	case StatusProcessing:
+		break
+	case StatusValid, StatusInvalid:
 		return tc, nil
+	default:
+		panic("unknown challenge state: " + tc.getStatus())
 	}
+
+	up := &tlsALPN01Challenge{tc.baseChallenge.clone()}
 
 	config := &tls.Config{
 		NextProtos:         []string{"acme-tls/1"},
 		ServerName:         tc.Value,
 		InsecureSkipVerify: true, // we expect a self-signed challenge certificate
 	}
-
 	hostPort := net.JoinHostPort(tc.Value, "443")
-
 	conn, err := vo.tlsDial("tcp", hostPort, config)
 	if err != nil {
-		if err = tc.iterateRetry(db,
-			ConnectionErr(errors.Wrapf(err, "error doing TLS dial for %s", hostPort))); err != nil {
-			return nil, err
-		}
-		return tc, nil
+		e := errors.Wrapf(err, "error doing TLS dial for %s", hostPort)
+		up.Error = ConnectionErr(e).ToACME()
+		return up, nil
 	}
 	defer conn.Close()
 
@@ -469,31 +440,22 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 	certs := cs.PeerCertificates
 
 	if len(certs) == 0 {
-		if err = tc.iterateRetry(db,
-			RejectedIdentifierErr(errors.Errorf("%s challenge for %s resulted in no certificates",
-				tc.Type, tc.Value))); err != nil {
-			return nil, err
-		}
-		return tc, nil
+		e := errors.Errorf("%s challenge for %s resulted in no certificates", tc.Type, tc.Value)
+		up.Error = RejectedIdentifierErr(e).ToACME()
+		return up, nil
 	}
-
 	if !cs.NegotiatedProtocolIsMutual || cs.NegotiatedProtocol != "acme-tls/1" {
-		if err = tc.iterateRetry(db, RejectedIdentifierErr(errors.Errorf("cannot negotiate ALPN acme-tls/1 protocol for "+
-			"tls-alpn-01 challenge"))); err != nil {
-			return nil, err
-		}
-		return tc, nil
+		e := errors.Errorf("cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge")
+		up.Error = RejectedIdentifierErr(e).ToACME()
+		return up, nil
 	}
 
 	leafCert := certs[0]
-
 	if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], tc.Value) {
-		if err = tc.iterateRetry(db,
-			RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
-				"leaf certificate must contain a single DNS name, %v", tc.Value))); err != nil {
-			return nil, err
-		}
-		return tc, nil
+		e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " + 
+				"leaf certificate must contain a single DNS name, %v", tc.Value)
+		up.Error = RejectedIdentifierErr(e).ToACME()
+		return up, nil
 	}
 
 	idPeAcmeIdentifier := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 31}
@@ -509,46 +471,37 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 	for _, ext := range leafCert.Extensions {
 		if idPeAcmeIdentifier.Equal(ext.Id) {
 			if !ext.Critical {
-				if err = tc.iterateRetry(db,
-					RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
-						"acmeValidationV1 extension not critical"))); err != nil {
-					return nil, err
-				}
-				return tc, nil
+				e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
+						"acmeValidationV1 extension not critical")
+				up.Error = IncorrectResponseErr(e).ToACME()
+				return up, nil
 			}
 
 			var extValue []byte
 			rest, err := asn1.Unmarshal(ext.Value, &extValue)
 
 			if err != nil || len(rest) > 0 || len(hashedKeyAuth) != len(extValue) {
-				if err = tc.iterateRetry(db,
-					RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
-						"malformed acmeValidationV1 extension value"))); err != nil {
-					return nil, err
-				}
-				return tc, nil
+				e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
+						"malformed acmeValidationV1 extension value")
+				up.Error = IncorrectResponseErr(e).ToACME()
+				return up, nil
 			}
 
 			if subtle.ConstantTimeCompare(hashedKeyAuth[:], extValue) != 1 {
-				if err = tc.iterateRetry(db,
-					RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+				e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
 						"expected acmeValidationV1 extension value %s for this challenge but got %s",
-						hex.EncodeToString(hashedKeyAuth[:]), hex.EncodeToString(extValue)))); err != nil {
-					return nil, err
-				}
-				return tc, nil
+						hex.EncodeToString(hashedKeyAuth[:]), hex.EncodeToString(extValue))
+				up.Error = IncorrectResponseErr(e).ToACME()
+				// There is an appropriate value, but it doesn't match.
+				up.Status = StatusInvalid
+				return up, nil
 			}
 
-			upd := &tlsALPN01Challenge{tc.baseChallenge.clone()}
-			upd.Status = StatusValid
-			upd.Error = nil
-			upd.Validated = clock.Now()
-			upd.Retry.Active = false
-
-			if err := upd.save(db, tc); err != nil {
-				return nil, err
-			}
-			return upd, nil
+			up.Validated = clock.Now()
+			up.Status = StatusValid
+			up.Error = nil
+			up.Retry = nil
+			return up, nil
 		}
 
 		if idPeAcmeIdentifierV1Obsolete.Equal(ext.Id) {
@@ -557,20 +510,15 @@ func (tc *tlsALPN01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo val
 	}
 
 	if foundIDPeAcmeIdentifierV1Obsolete {
-		// TODO this isn't likely going to change without user action, this is probably a good case for a hard failure...
-		if err = tc.iterateRetry(db,
-			RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
-				"obsolete id-pe-acmeIdentifier in acmeValidationV1 extension"))); err != nil {
-			return nil, err
-		}
-		return tc, nil
+		e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
+				"obsolete id-pe-acmeIdentifier in acmeValidationV1 extension")
+		up.Error = IncorrectResponseErr(e).ToACME()
+		return up, nil
 	}
 
-	if err = tc.iterateRetry(db,
-		RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
-			"missing acmeValidationV1 extension"))); err != nil {
-		return nil, err
-	}
+	e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+			"missing acmeValidationV1 extension")
+	up.Error = IncorrectResponseErr(e).ToACME()
 	return tc, nil
 }
 
@@ -595,39 +543,35 @@ func newDNS01Challenge(db nosql.DB, ops ChallengeOptions) (challenge, error) {
 	return dc, nil
 }
 
-// KeyAuthorization creates the ACME key authorization value from a token
-// and a jwk.
-func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
-	thumbprint, err := jwk.Thumbprint(crypto.SHA256)
-	if err != nil {
-		return "", ServerInternalErr(errors.Wrap(err, "error generating JWK thumbprint"))
-	}
-	encPrint := base64.RawURLEncoding.EncodeToString(thumbprint)
-	return fmt.Sprintf("%s.%s", token, encPrint), nil
-}
-
 // validate attempts to validate the challenge. If the challenge has been
 // satisfactorily validated, the 'status' and 'validated' attributes are
 // updated.
-func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
+func (dc *dns01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions) (challenge, error) {
 	// If already valid or invalid then return without performing validation.
-	if dc.getStatus() == StatusValid || dc.getStatus() == StatusInvalid {
+	switch dc.getStatus() {
+	case StatusPending:
+		panic("pending challenges must first be moved to the processing state")
+	case StatusProcessing:
+		break
+	case StatusValid, StatusInvalid:
 		return dc, nil
+	default:
+		panic("unknown challenge state: " + dc.getStatus())
 	}
+
+	up := &dns01Challenge{dc.baseChallenge.clone()}
 
 	// Normalize domain for wildcard DNS names
 	// This is done to avoid making TXT lookups for domains like
 	// _acme-challenge.*.example.com
 	// Instead perform txt lookup for _acme-challenge.example.com
 	domain := strings.TrimPrefix(dc.Value, "*.")
+	record := "_acme-challenge." + domain
 
-	txtRecords, err := vo.lookupTxt("_acme-challenge." + domain)
+	txtRecords, err := vo.lookupTxt(record)
 	if err != nil {
-		dnsErr := DNSErr(errors.Wrapf(err, "error looking up TXT "+
-			"records for domain %s", domain))
-		if err = dc.iterateRetry(db, dnsErr); err != nil {
-			return nil, err
-		}
+		e := errors.Wrapf(err, "error looking up TXT records for domain %s", domain)
+		up.Error = DNSErr(e).ToACME()
 		return dc, nil
 	}
 
@@ -637,33 +581,39 @@ func (dc *dns01Challenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validat
 	}
 	h := sha256.Sum256([]byte(expectedKeyAuth))
 	expected := base64.RawURLEncoding.EncodeToString(h[:])
-	var found bool
+
+	if len(txtRecords) == 0 {
+		e := errors.Errorf("no TXT record found at '%s'", record)
+		up.Error = DNSErr(e).ToACME()
+		return up, nil
+	}
+
 	for _, r := range txtRecords {
 		if r == expected {
-			found = true
-			break
+			up.Validated = time.Now().UTC()
+			up.Status = StatusValid
+			up.Error = nil
+			up.Retry = nil
+			return up, nil
 		}
 	}
-	if !found {
-		rejectedErr := RejectedIdentifierErr(errors.Errorf("keyAuthorization "+
-			"does not match; expected %s, but got %s", expectedKeyAuth, txtRecords))
-		if err = dc.iterateRetry(db, rejectedErr); err != nil {
-			return nil, err
-		}
-		return dc, nil
-	}
-	// Update and store the challenge.
-	upd := &dns01Challenge{dc.baseChallenge.clone()}
-	upd.Status = StatusValid
-	upd.Error = nil
-	upd.Validated = time.Now().UTC()
-	upd.Retry.Active = false
-	upd.Retry.Called = 0
 
-	if err := upd.save(db, dc); err != nil {
-		return nil, err
+	up.Status = StatusInvalid
+	e := errors.Errorf("keyAuthorization does not match; expected %s, but got %s",
+			expectedKeyAuth, txtRecords)
+	up.Error = IncorrectResponseErr(e).ToACME()
+	return up, nil
+}
+
+// KeyAuthorization creates the ACME key authorization value from a token
+// and a jwk.
+func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, *Error) {
+	thumbprint, err := jwk.Thumbprint(crypto.SHA256)
+	if err != nil {
+		return "", ServerInternalErr(errors.Wrap(err, "error generating JWK thumbprint"))
 	}
-	return upd, nil
+	encPrint := base64.RawURLEncoding.EncodeToString(thumbprint)
+	return fmt.Sprintf("%s.%s", token, encPrint), nil
 }
 
 // getChallenge retrieves and unmarshals an ACME challenge type from the database.
@@ -681,19 +631,3 @@ func getChallenge(db nosql.DB, id string) (challenge, error) {
 	return ch, nil
 }
 
-// iterateRetry iterates a challenge's retry and error objects upon a failed validation attempt
-func (bc *baseChallenge) iterateRetry(db nosql.DB, error *Error) error {
-	upd := bc.clone()
-	upd.Error = error.ToACME()
-	upd.Error.Subproblems = append(upd.Error.Subproblems, error)
-	upd.Retry.Called ++
-	upd.Retry.Active = true
-	if math.Mod(upd.Retry.Called , upd.Retry.MaxAttempts) == 0 {
-		upd.Status = StatusInvalid
-		upd.Retry.Active = false
-	}
-	if err := upd.save(db, bc); err != nil {
-		return err
-	}
-	return nil
-}
