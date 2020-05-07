@@ -170,7 +170,7 @@ Certificate:
 We are using the [Arch User Repository](https://aur.archlinux.org) to distribute
 `step` binaries for Arch Linux.
 
-* [Optional] The `step` binary tarball can be found [here](https://aur.archlinux.org/packages/step-cli-bin/).
+* [Optional] The `step-cli` binary tarball can be found [here](https://aur.archlinux.org/packages/step-cli-bin/).
 * The `step-ca` binary tarball can be found [here](https://aur.archlinux.org/packages/step-ca-bin/).
 
 You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
@@ -191,7 +191,7 @@ helm install step-certificates
 
 ### Test
 
-<pre><code><b>$ step version</b>
+<pre><code><b>$ step-cli version</b>
 Smallstep CLI/0.10.0 (darwin/amd64)
 Release Date: 2019-04-30 19:01 UTC
 
@@ -213,9 +213,9 @@ communication. Let's get started!
 
 ### Let's get started!
 
-#### 1. Run `step ca init` to create your CA's keys & certificates and configure `step-ca`:
+#### 1. Run `step-cli ca init` to create your CA's keys & certificates and configure `step-ca`:
 
-<pre><code><b>$ step ca init</b>
+<pre><code><b>$ step-cli ca init</b>
 ✔ What would you like to name your new PKI? (e.g. Smallstep): <b>Example Inc.</b>
 ✔ What DNS names or IP addresses would you like to add to your new CA? (e.g. ca.smallstep.com[,1.1.1.1,etc.]): <b>localhost</b>
 ✔ What address will your new CA listen at? (e.g. :443): <b>127.0.0.1:8080</b>
@@ -282,7 +282,7 @@ EOF
 
 #### 4. Get an identity for your server from the Step CA.
 
-<pre><code><b>$ step ca certificate localhost srv.crt srv.key</b>
+<pre><code><b>$ step-cli ca certificate localhost srv.crt srv.key</b>
 ✔ Key ID: rQxROEr7Kx9TNjSQBTETtsu3GKmuW9zm02dMXZ8GUEk (bob@example.com)
 ✔ Please enter the password to decrypt the provisioner key: abc123
 ✔ CA: https://localhost:8080/1.0/sign
@@ -323,7 +323,7 @@ Note that `step` and `step-ca` handle details like [certificate bundling](https:
 
 In a new Terminal window:
 
-<pre><code><b>$ step ca root root.crt</b>
+<pre><code><b>$ step-cli ca root root.crt</b>
 The root certificate has been saved in root.crt.</code></pre>
 
 #### 7. Make an authenticated, encrypted curl request to your server using HTTP over TLS.
