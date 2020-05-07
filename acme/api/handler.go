@@ -206,7 +206,7 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
-		ch *acme.Challenge
+		ch   *acme.Challenge
 		chID = chi.URLParam(r, "chID")
 	)
 	ch, err = h.Auth.ValidateChallenge(prov, acc.GetID(), chID, acc.GetKey())

@@ -57,12 +57,12 @@ var (
 	orderTable             = []byte("acme_orders")
 	ordersByAccountIDTable = []byte("acme_account_orders_index")
 	certTable              = []byte("acme_certs")
-	ordinal int
+	ordinal                int
 )
 
 // Ordinal is used during challenge retries to indicate ownership.
 func init() {
-	ordstr := os.Getenv("STEP_CA_ORDINAL");
+	ordstr := os.Getenv("STEP_CA_ORDINAL")
 	if ordstr == "" {
 		ordinal = 0
 	} else {
@@ -323,13 +323,12 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 	// Take ownership of the challenge status and retry state. The values must be reset.
 	up := ch.clone()
 	up.Status = StatusProcessing
-	up.Retry = &Retry {
-		Owner: ordinal,
+	up.Retry = &Retry{
+		Owner:         ordinal,
 		ProvisionerID: p.GetID(),
-		NumAttempts: 0,
-		MaxAttempts: 10,
-		NextAttempt: time.Now().Add(retryInterval).UTC().Format(time.RFC3339),
-
+		NumAttempts:   0,
+		MaxAttempts:   10,
+		NextAttempt:   time.Now().Add(retryInterval).UTC().Format(time.RFC3339),
 	}
 	err = up.save(a.db, ch)
 	if err != nil {
@@ -381,7 +380,6 @@ func (a *Authority) validate(ch challenge, jwk *jose.JSONWebKey) (challenge, err
 		},
 	})
 }
-
 
 const retryInterval = 12 * time.Second
 
@@ -458,7 +456,6 @@ func (a *Authority) RetryChallenge(chID string) {
 	}
 }
 
-
 // GetCertificate retrieves the Certificate by ID.
 func (a *Authority) GetCertificate(accID, certID string) ([]byte, error) {
 	cert, err := getCert(a.db, certID)
@@ -470,4 +467,3 @@ func (a *Authority) GetCertificate(accID, certID string) ([]byte, error) {
 	}
 	return cert.toACME(a.db, a.dir)
 }
-

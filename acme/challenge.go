@@ -25,15 +25,15 @@ import (
 // Challenge is a subset of the challenge type containing only those attributes
 // required for responses in the ACME protocol.
 type Challenge struct {
-	Type      string  `json:"type"`
-	Status    string  `json:"status"`
-	Token     string  `json:"token"`
-	Validated string  `json:"validated,omitempty"`
-	URL       string  `json:"url"`
-	Error     *AError `json:"error,omitempty"`
-	RetryAfter string `json:"retry_after,omitempty"`
-	ID        string  `json:"-"`
-	AuthzID   string  `json:"-"`
+	Type       string  `json:"type"`
+	Status     string  `json:"status"`
+	Token      string  `json:"token"`
+	Validated  string  `json:"validated,omitempty"`
+	URL        string  `json:"url"`
+	Error      *AError `json:"error,omitempty"`
+	RetryAfter string  `json:"retry_after,omitempty"`
+	ID         string  `json:"-"`
+	AuthzID    string  `json:"-"`
 }
 
 // ToLog enables response logging.
@@ -86,10 +86,10 @@ type challenge interface {
 
 // ChallengeOptions is the type used to created a new Challenge.
 type ChallengeOptions struct {
-	AccountID  string
-	AuthzID    string
+	AccountID     string
+	AuthzID       string
 	ProvisionerID string
-	Identifier Identifier
+	Identifier    Identifier
 }
 
 // baseChallenge is the base Challenge type that others build from.
@@ -294,17 +294,16 @@ func unmarshalChallenge(data []byte) (challenge, error) {
 // Challenge retry information is internally relevant and needs to be stored in the DB, but should not be part
 // of the public challenge API apart from the Retry-After header.
 type Retry struct {
-	Owner	    int    `json:"owner"`
+	Owner         int    `json:"owner"`
 	ProvisionerID string `json:"provisionerid"`
-	NumAttempts int    `json:"numattempts"`
-	MaxAttempts int    `json:"maxattempts"`
-	NextAttempt string `json:"nextattempt"`
+	NumAttempts   int    `json:"numattempts"`
+	MaxAttempts   int    `json:"maxattempts"`
+	NextAttempt   string `json:"nextattempt"`
 }
 
 func (r *Retry) Active() bool {
 	return r.NumAttempts < r.MaxAttempts
 }
-
 
 // http01Challenge represents an http-01 acme challenge.
 type http01Challenge struct {
@@ -452,8 +451,8 @@ func (tc *tlsALPN01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions)
 
 	leafCert := certs[0]
 	if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], tc.Value) {
-		e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " + 
-				"leaf certificate must contain a single DNS name, %v", tc.Value)
+		e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+			"leaf certificate must contain a single DNS name, %v", tc.Value)
 		up.Error = RejectedIdentifierErr(e).ToACME()
 		return up, nil
 	}
@@ -472,7 +471,7 @@ func (tc *tlsALPN01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions)
 		if idPeAcmeIdentifier.Equal(ext.Id) {
 			if !ext.Critical {
 				e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
-						"acmeValidationV1 extension not critical")
+					"acmeValidationV1 extension not critical")
 				up.Error = IncorrectResponseErr(e).ToACME()
 				return up, nil
 			}
@@ -482,15 +481,15 @@ func (tc *tlsALPN01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions)
 
 			if err != nil || len(rest) > 0 || len(hashedKeyAuth) != len(extValue) {
 				e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
-						"malformed acmeValidationV1 extension value")
+					"malformed acmeValidationV1 extension value")
 				up.Error = IncorrectResponseErr(e).ToACME()
 				return up, nil
 			}
 
 			if subtle.ConstantTimeCompare(hashedKeyAuth[:], extValue) != 1 {
-				e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
-						"expected acmeValidationV1 extension value %s for this challenge but got %s",
-						hex.EncodeToString(hashedKeyAuth[:]), hex.EncodeToString(extValue))
+				e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
+					"expected acmeValidationV1 extension value %s for this challenge but got %s",
+					hex.EncodeToString(hashedKeyAuth[:]), hex.EncodeToString(extValue))
 				up.Error = IncorrectResponseErr(e).ToACME()
 				// There is an appropriate value, but it doesn't match.
 				up.Status = StatusInvalid
@@ -511,13 +510,13 @@ func (tc *tlsALPN01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions)
 
 	if foundIDPeAcmeIdentifierV1Obsolete {
 		e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
-				"obsolete id-pe-acmeIdentifier in acmeValidationV1 extension")
+			"obsolete id-pe-acmeIdentifier in acmeValidationV1 extension")
 		up.Error = IncorrectResponseErr(e).ToACME()
 		return up, nil
 	}
 
-	e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
-			"missing acmeValidationV1 extension")
+	e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
+		"missing acmeValidationV1 extension")
 	up.Error = IncorrectResponseErr(e).ToACME()
 	return tc, nil
 }
@@ -600,7 +599,7 @@ func (dc *dns01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions) (ch
 
 	up.Status = StatusInvalid
 	e := errors.Errorf("keyAuthorization does not match; expected %s, but got %s",
-			expectedKeyAuth, txtRecords)
+		expectedKeyAuth, txtRecords)
 	up.Error = IncorrectResponseErr(e).ToACME()
 	return up, nil
 }
@@ -630,4 +629,3 @@ func getChallenge(db nosql.DB, id string) (challenge, error) {
 	}
 	return ch, nil
 }
-
