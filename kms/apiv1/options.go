@@ -32,6 +32,8 @@ const (
 	AmazonKMS Type = "awskms"
 	// PKCS11 is a KMS implementation using the PKCS11 standard.
 	PKCS11 Type = "pkcs11"
+	// YubiKey is a KMS implementation using a YubiKey PIV.
+	YubiKey Type = "yubikey"
 )
 
 type Options struct {
@@ -56,6 +58,7 @@ func (o *Options) Validate() error {
 
 	switch Type(strings.ToLower(o.Type)) {
 	case DefaultKMS, SoftKMS, CloudKMS:
+	case YubiKey:
 	case AmazonKMS:
 		return ErrNotImplemented{"support for AmazonKMS is not yet implemented"}
 	case PKCS11:
