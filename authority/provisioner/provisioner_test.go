@@ -85,7 +85,7 @@ func TestDefaultIdentityFunc(t *testing.T) {
 			return test{
 				p:        &OIDC{},
 				email:    "max.furman@smallstep.com",
-				identity: &Identity{Usernames: []string{"maxfurman", "max.furman@smallstep.com"}},
+				identity: &Identity{Usernames: []string{"maxfurman", "max.furman", "max.furman@smallstep.com"}},
 			}
 		},
 	}
@@ -94,6 +94,7 @@ func TestDefaultIdentityFunc(t *testing.T) {
 			tc := get(t)
 			identity, err := DefaultIdentityFunc(context.Background(), tc.p, tc.email)
 			if err != nil {
+				t.Log(err)
 				if assert.NotNil(t, tc.err) {
 					assert.Equals(t, tc.err.Error(), err.Error())
 				}

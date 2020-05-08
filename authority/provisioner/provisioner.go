@@ -253,13 +253,25 @@ func (l *List) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-var sshUserRegex = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
+var strictSSHUserRegex = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
+var sshUserRegex = regexp.MustCompile(`^[a-z][-a-z0-9_.]*$`)
 
 // SanitizeSSHUserPrincipal grabs an email or a string with the format
 // local@domain and returns a sanitized version of the local, valid to be used
 // as a user name. If the email starts with a letter between a and z, the
 // resulting string will match the regular expression `^[a-z][-a-z0-9_]*$`.
 func SanitizeSSHUserPrincipal(email string) string {
+	strictName := extractSaneUserPrincipal(email)
+
+	// drop dots
+	return strings.ReplaceAll(strictName, ".", "")
+}
+
+// extractSaneUserPrincipal grabs an email or a string with the format
+// local@domain and returns a sanitized version of the local, valid to be used
+// as a user name. If the email starts with a letter between a and z, the
+// resulting string will match the regular expression `^[a-z][.-a-z0-9_]*$`.
+func extractSaneUserPrincipal(email string) string {
 	if i := strings.LastIndex(email, "@"); i >= 0 {
 		email = email[:i]
 	}
@@ -271,8 +283,8 @@ func SanitizeSSHUserPrincipal(email string) string {
 			return r
 		case r == '-':
 			return '-'
-		case r == '.': // drop dots
-			return -1
+		case r == '.':
+			return '.'
 		default:
 			return '_'
 		}
@@ -336,11 +348,18 @@ type GetIdentityFunc func(ctx context.Context, p Interface, email string) (*Iden
 func DefaultIdentityFunc(ctx context.Context, p Interface, email string) (*Identity, error) {
 	switch k := p.(type) {
 	case *OIDC:
-		name := SanitizeSSHUserPrincipal(email)
+		strictName := SanitizeSSHUserPrincipal(email)
+		if !strictSSHUserRegex.MatchString(strictName) {
+			return nil, errors.Errorf("invalid principal '%s' from email '%s'", strictName, email)
+		}
+		name := extractSaneUserPrincipal(email)
 		if !sshUserRegex.MatchString(name) {
 			return nil, errors.Errorf("invalid principal '%s' from email '%s'", name, email)
 		}
-		return &Identity{Usernames: []string{name, email}}, nil
+		if name == strictName {
+			return &Identity{Usernames: []string{strictName, email}}, nil
+		}
+		return &Identity{Usernames: []string{strictName, name, email}}, nil
 	default:
 		return nil, errors.Errorf("provisioner type '%T' not supported by identity function", k)
 	}
