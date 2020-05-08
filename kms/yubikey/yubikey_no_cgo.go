@@ -11,8 +11,6 @@ import (
 	"github.com/smallstep/certificates/kms/apiv1"
 )
 
-// +build !cgo
-
 // YubiKey implements the KMS interface on a YubiKey.
 type YubiKey struct{}
 
