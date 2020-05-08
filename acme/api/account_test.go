@@ -143,6 +143,11 @@ func TestUpdateAccountRequestValidate(t *testing.T) {
 				},
 			}
 		},
+		"ok/accept-empty": func(t *testing.T) test {
+			return test{
+				uar: &UpdateAccountRequest{},
+			}
+		},
 	}
 	for name, run := range tests {
 		tc := run(t)
@@ -700,7 +705,29 @@ func TestHandlerGetUpdateAccount(t *testing.T) {
 				statusCode: 200,
 			}
 		},
-		"ok/new-account": func(t *testing.T) test {
+		"ok/update-empty": func(t *testing.T) test {
+			uar := &UpdateAccountRequest{}
+			b, err := json.Marshal(uar)
+			assert.FatalError(t, err)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, &acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			return test{
+				auth: &mockAcmeAuthority{
+					getLink: func(typ acme.Link, provID string, abs bool, in ...string) string {
+						assert.Equals(t, typ, acme.AccountLink)
+						assert.Equals(t, provID, acme.URLSafeProvisionerName(prov))
+						assert.True(t, abs)
+						assert.Equals(t, in, []string{accID})
+						return fmt.Sprintf("https://ca.smallstep.com/acme/%s/account/%s",
+							acme.URLSafeProvisionerName(prov), accID)
+					},
+				},
+				ctx:        ctx,
+				statusCode: 200,
+			}
+		},
+		"ok/update-contacts": func(t *testing.T) test {
 			uar := &UpdateAccountRequest{
 				Contact: []string{"foo", "bar"},
 			}
