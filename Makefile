@@ -2,6 +2,8 @@ PKG?=github.com/smallstep/certificates/cmd/step-ca
 BINNAME?=step-ca
 CLOUDKMS_BINNAME?=step-cloudkms-init
 CLOUDKMS_PKG?=github.com/smallstep/certificates/cmd/step-cloudkms-init
+YUBIKEY_BINNAME?=step-yubikey-init
+YUBIKEY_PKG?=github.com/smallstep/certificates/cmd/step-yubikey-init
 
 # Set V to 1 for verbose output from the Makefile
 Q=$(if $V,,@)
@@ -64,7 +66,7 @@ GOFLAGS := CGO_ENABLED=0
 download:
 	$Q go mod download
 
-build: $(PREFIX)bin/$(BINNAME) $(PREFIX)bin/$(CLOUDKMS_BINNAME)
+build: $(PREFIX)bin/$(BINNAME) $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(PREFIX)bin/$(YUBIKEY_BINNAME)
 	@echo "Build Complete!"
 
 $(PREFIX)bin/$(BINNAME): download $(call rwildcard,*.go)
@@ -75,12 +77,12 @@ $(PREFIX)bin/$(CLOUDKMS_BINNAME): download $(call rwildcard,*.go)
 	$Q mkdir -p $(@D)
 	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(LDFLAGS) $(CLOUDKMS_PKG)
 
+$(PREFIX)bin/$(YUBIKEY_BINNAME): download $(call rwildcard,*.go)
+	$Q mkdir -p $(@D)
+	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(YUBIKEY_BINNAME) $(LDFLAGS) $(YUBIKEY_PKG)
+
 # Target to force a build of step-ca without running tests
-simple:
-	$Q mkdir -p $(PREFIX)bin
-	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
-	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(LDFLAGS) $(CLOUDKMS_PKG)
-	@echo "Build Complete!"
+simple: build
 
 .PHONY: download build simple
 
