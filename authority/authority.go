@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"log"
 	"sync"
 	"time"
 
@@ -327,5 +328,8 @@ func (a *Authority) GetDatabase() db.AuthDB {
 
 // Shutdown safely shuts down any clients, databases, etc. held by the Authority.
 func (a *Authority) Shutdown() error {
+	if err := a.keyManager.Close(); err != nil {
+		log.Printf("error closing the key manager: %v", err)
+	}
 	return a.db.Shutdown()
 }
