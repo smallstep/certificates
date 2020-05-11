@@ -65,7 +65,9 @@ func (u *UpdateAccountRequest) Validate() error {
 		}
 		return nil
 	default:
-		return acme.MalformedErr(errors.Errorf("empty update request"))
+		// According to the ACME spec (https://tools.ietf.org/html/rfc8555#section-7.3.2)
+		// accountUpdate should ignore any fields not recognized by the server.
+		return nil
 	}
 }
 
@@ -148,6 +150,8 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If PostAsGet just respond with the account, otherwise process like a
+	// normal Post request.
 	if !payload.isPostAsGet {
 		var uar UpdateAccountRequest
 		if err := json.Unmarshal(payload.value, &uar); err != nil {
@@ -159,9 +163,12 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var err error
+		// If neither the status nor the contacts are being updated then ignore
+		// the updates and return 200. This conforms with the behavior detailed
+		// in the ACME spec (https://tools.ietf.org/html/rfc8555#section-7.3.2).
 		if uar.IsDeactivateRequest() {
 			acc, err = h.Auth.DeactivateAccount(prov, acc.GetID())
-		} else {
+		} else if len(uar.Contact) > 0 {
 			acc, err = h.Auth.UpdateAccount(prov, acc.GetID(), uar.Contact)
 		}
 		if err != nil {
