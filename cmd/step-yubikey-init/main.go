@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
 	"github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/yubikey"
 	"github.com/smallstep/cli/crypto/pemutil"
@@ -32,6 +31,7 @@ type Config struct {
 	RootFile string
 	KeyFile  string
 	Pin      string
+	Force    bool
 }
 
 func (c *Config) Validate() error {
@@ -43,8 +43,16 @@ func (c *Config) Validate() error {
 	case c.RootOnly && c.RootFile != "":
 		return errors.New("flag `--root-only` is incompatible with flag `--root`")
 	case c.RootSlot == c.CrtSlot:
-		return errors.New("flat `--root-slot` and flag `--crt-slot` cannot be the same")
+		return errors.New("flag `--root-slot` and flag `--crt-slot` cannot be the same")
+	case c.RootFile == "" && c.RootSlot == "":
+		return errors.New("one of flag `--root` or `--root-slot` is required")
 	default:
+		if c.RootFile != "" {
+			c.RootSlot = ""
+		}
+		if c.RootOnly {
+			c.CrtSlot = ""
+		}
 		return nil
 	}
 }
@@ -56,6 +64,7 @@ func main() {
 	flag.StringVar(&c.CrtSlot, "crt-slot", "9c", "Slot to store the intermediate certificate.")
 	flag.StringVar(&c.RootFile, "root", "", "Path to the root certificate to use.")
 	flag.StringVar(&c.KeyFile, "key", "", "Path to the root key to use.")
+	flag.BoolVar(&c.Force, "force", false, "Force the delete of previous keys.")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -75,6 +84,16 @@ func main() {
 	})
 	if err != nil {
 		fatal(err)
+	}
+
+	// Check if the slots are empty, fail if they are not
+	if !c.Force {
+		switch {
+		case c.RootSlot != "":
+			checkSlot(k, c.RootSlot)
+		case c.CrtSlot != "":
+			checkSlot(k, c.CrtSlot)
+		}
 	}
 
 	if err := createPKI(k, c); err != nil {
@@ -107,6 +126,16 @@ COPYRIGHT
 
   (c) 2018-2020 Smallstep Labs, Inc.`)
 	os.Exit(1)
+}
+
+func checkSlot(k *yubikey.YubiKey, slot string) {
+	if _, err := k.GetPublicKey(&apiv1.GetPublicKeyRequest{
+		Name: slot,
+	}); err == nil {
+		fmt.Fprintf(os.Stderr, "⚠️  Your YubiKey already has a key in the slot %s.\n", slot)
+		fmt.Fprintln(os.Stderr, "   If you want to delete it and start fresh, use `--force`.")
+		os.Exit(1)
+	}
 }
 
 func createPKI(k *yubikey.YubiKey, c Config) error {
