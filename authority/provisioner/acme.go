@@ -57,6 +57,8 @@ func (p *ACME) Init(config Config) (err error) {
 		return err
 	}
 
+	// TODO: https://github.com/smallstep/certificates/issues/250
+
 	return err
 }
 
