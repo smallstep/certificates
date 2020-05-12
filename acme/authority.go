@@ -372,7 +372,7 @@ func (a *Authority) validate(ch challenge, jwk *jose.JSONWebKey) (challenge, err
 	dialer := &net.Dialer{
 		Timeout: 30 * time.Second,
 	}
-	return ch.validate(jwk, validateOptions{
+	return ch.clone().morph().validate(jwk, validateOptions{
 		httpGet:   client.Get,
 		lookupTxt: net.LookupTXT,
 		tlsDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
