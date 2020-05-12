@@ -213,7 +213,7 @@ func createPKI(k *yubikey.YubiKey, c Config) error {
 			return err
 		}
 
-		ui.PrintSelected("Root Key", "yubikey:slot-id="+resp.Name)
+		ui.PrintSelected("Root Key", resp.Name)
 		ui.PrintSelected("Root Certificate", "root_ca.crt")
 	}
 
@@ -291,7 +291,7 @@ func createPKI(k *yubikey.YubiKey, c Config) error {
 	if c.RootOnly {
 		ui.PrintSelected("Intermediate Key", "intermediate_ca_key")
 	} else {
-		ui.PrintSelected("Intermediate Key", "yubikey:slot-id="+keyName)
+		ui.PrintSelected("Intermediate Key", keyName)
 	}
 
 	ui.PrintSelected("Intermediate Certificate", "intermediate_ca.crt")
