@@ -212,6 +212,7 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	ch, err = h.Auth.ValidateChallenge(prov, acc.GetID(), chID, acc.GetKey())
 	if err != nil {
 		api.WriteError(w, err)
+		return
 	}
 
 	switch ch.Status {
