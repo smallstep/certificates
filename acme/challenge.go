@@ -240,8 +240,10 @@ func (bc *baseChallenge) save(db nosql.DB, old challenge) error {
 
 func (bc *baseChallenge) clone() *baseChallenge {
 	u := *bc
-	r := *bc.Retry
-	u.Retry = &r
+	if bc.Retry != nil {
+		r := *bc.Retry
+		u.Retry = &r
+	}
 	return &u
 }
 
