@@ -621,7 +621,7 @@ func (dc *dns01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions) (ch
 
 // KeyAuthorization creates the ACME key authorization value from a token
 // and a jwk.
-func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, *Error) {
+func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
 	thumbprint, err := jwk.Thumbprint(crypto.SHA256)
 	if err != nil {
 		return "", ServerInternalErr(errors.Wrap(err, "error generating JWK thumbprint"))
