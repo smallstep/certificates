@@ -601,7 +601,6 @@ func ch() acme.Challenge {
 		URL:     "https://ca.smallstep.com/acme/challenge/chID",
 		ID:      "chID",
 		AuthzID: "authzID",
-		Retry:   &acme.Retry{Called: 0, Active: false},
 	}
 }
 
@@ -618,6 +617,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 		ch         acme.Challenge
 		problem    *acme.Error
 	}
+
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-provisioner": func(t *testing.T) test {
 			return test{
@@ -626,6 +626,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 				problem:    acme.ServerInternalErr(errors.New("provisioner expected in request context")),
 			}
 		},
+
 		"fail/nil-provisioner": func(t *testing.T) test {
 			return test{
 				ctx:        context.WithValue(context.Background(), provisionerContextKey, nil),
@@ -633,6 +634,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 				problem:    acme.ServerInternalErr(errors.New("provisioner expected in request context")),
 			}
 		},
+
 		"fail/no-account": func(t *testing.T) test {
 			return test{
 				ctx:        context.WithValue(context.Background(), provisionerContextKey, prov),
@@ -640,6 +642,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
+
 		"fail/nil-account": func(t *testing.T) test {
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, accContextKey, nil)
@@ -649,6 +652,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 				problem:    acme.AccountDoesNotExistErr(nil),
 			}
 		},
+
 		"fail/no-payload": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
@@ -659,6 +663,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 				problem:    acme.ServerInternalErr(errors.New("payload expected in request context")),
 			}
 		},
+
 		"fail/nil-payload": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
@@ -670,6 +675,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 				problem:    acme.ServerInternalErr(errors.New("payload expected in request context")),
 			}
 		},
+
 		"fail/validate-challenge-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
@@ -678,28 +684,14 @@ func TestHandlerGetChallenge(t *testing.T) {
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
 				auth: &mockAcmeAuthority{
-					err: acme.UnauthorizedErr(nil),
+					err: acme.ServerInternalErr(nil),
 				},
 				ctx:        ctx,
-				statusCode: 401,
-				problem:    acme.UnauthorizedErr(nil),
+				statusCode: 500,
+				problem:    acme.ServerInternalErr(nil),
 			}
 		},
-		"fail/get-challenge-error": func(t *testing.T) test {
-			acc := &acme.Account{ID: "accID"}
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
-			ctx = context.WithValue(ctx, accContextKey, acc)
-			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{isPostAsGet: true})
-			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
-			return test{
-				auth: &mockAcmeAuthority{
-					err: acme.UnauthorizedErr(nil),
-				},
-				ctx:        ctx,
-				statusCode: 401,
-				problem:    acme.UnauthorizedErr(nil),
-			}
-		},
+
 		"ok/validate-challenge": func(t *testing.T) test {
 			key, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
@@ -746,19 +738,19 @@ func TestHandlerGetChallenge(t *testing.T) {
 				ch:         ch,
 			}
 		},
+
 		"ok/retry-after": func(t *testing.T) test {
 			key, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			acc := &acme.Account{ID: "accID", Key: key}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, accContextKey, acc)
-			// TODO: Add correct key such that challenge object is already "active"
 			chiCtxInactive := chi.NewRouteContext()
 			chiCtxInactive.URLParams.Add("chID", "chID")
-			//chiCtxInactive.URLParams.Add("Active", "true")
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtxInactive)
 			ch := ch()
-			ch.Retry.Active = true
+			ch.Status = "processing"
+			ch.RetryAfter = time.Now().Add(1 * time.Minute).UTC().Format(time.RFC3339)
 			chJSON, err := json.Marshal(ch)
 			assert.FatalError(t, err)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: chJSON})
@@ -778,6 +770,8 @@ func TestHandlerGetChallenge(t *testing.T) {
 			}
 		},
 	}
+
+	// Run the tests
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
@@ -808,15 +802,17 @@ func TestHandlerGetChallenge(t *testing.T) {
 				expB, err := json.Marshal(tc.ch)
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
-				assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<https://ca.smallstep.com/acme/authz/%s>;rel=\"up\"", tc.ch.AuthzID)})
-				assert.Equals(t, res.Header["Location"], []string{url})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
-			} else if res.StatusCode >= 100 {
-				expB, err := json.Marshal(tc.ch)
-				assert.FatalError(t, err)
-				assert.Equals(t, bytes.TrimSpace(body), expB)
-				assert.True(t, res.Header["Retry-After"] != nil)
-				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
+				switch tc.ch.Status {
+				case "processing":
+					assert.Equals(t, res.Header["Cache-Control"], []string{"no-cache"})
+					assert.Equals(t, res.Header["Retry-After"], []string{tc.ch.RetryAfter})
+				case "valid":
+					assert.Equals(t, res.Header["Location"], []string{url})
+					assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<https://ca.smallstep.com/acme/authz/%s>;rel=\"up\"", tc.ch.AuthzID)})
+				}
+			} else {
+				assert.Fatal(t, false, "Unexpected Status Code")
 			}
 		})
 	}
