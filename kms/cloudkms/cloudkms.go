@@ -93,6 +93,12 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudKMS, error) {
 	}, nil
 }
 
+func init() {
+	apiv1.Register(apiv1.CloudKMS, func(ctx context.Context, opts apiv1.Options) (apiv1.KeyManager, error) {
+		return New(ctx, opts)
+	})
+}
+
 // NewCloudKMS creates a CloudKMS with a given client.
 func NewCloudKMS(client KeyManagementClient) *CloudKMS {
 	return &CloudKMS{

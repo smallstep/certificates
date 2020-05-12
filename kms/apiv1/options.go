@@ -1,10 +1,27 @@
 package apiv1
 
 import (
+	"crypto"
+	"crypto/x509"
 	"strings"
 
 	"github.com/pkg/errors"
 )
+
+// KeyManager is the interface implemented by all the KMS.
+type KeyManager interface {
+	GetPublicKey(req *GetPublicKeyRequest) (crypto.PublicKey, error)
+	CreateKey(req *CreateKeyRequest) (*CreateKeyResponse, error)
+	CreateSigner(req *CreateSignerRequest) (crypto.Signer, error)
+	Close() error
+}
+
+// CertificateManager is the interface implemented by the KMS that can load and
+// store x509.Certificates.
+type CertificateManager interface {
+	LoadCerticate(req *LoadCertificateRequest) (*x509.Certificate, error)
+	StoreCertificate(req *StoreCertificateRequest) error
+}
 
 // ErrNotImplemented
 type ErrNotImplemented struct {

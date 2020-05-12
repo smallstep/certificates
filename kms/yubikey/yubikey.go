@@ -42,6 +42,12 @@ func New(ctx context.Context, opts apiv1.Options) (*YubiKey, error) {
 	}, nil
 }
 
+func init() {
+	apiv1.Register(apiv1.YubiKey, func(ctx context.Context, opts apiv1.Options) (apiv1.KeyManager, error) {
+		return New(ctx, opts)
+	})
+}
+
 // LoadCertificate implements kms.CertificateManager and loads a certificate
 // from the YubiKey.
 func (k *YubiKey) LoadCertificate(req *apiv1.LoadCertificateRequest) (*x509.Certificate, error) {
