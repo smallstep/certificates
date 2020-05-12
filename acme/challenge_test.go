@@ -259,28 +259,36 @@ func TestNewDNS01Challenge(t *testing.T) {
 	}
 }
 
-func TestChallengeToACME(t *testing.T) {
+func TestChallengeToACME_Valid(t *testing.T) {
 	dir := newDirectory("ca.smallstep.com", "acme")
 
-	httpCh, err := newHTTPCh()
-	assert.FatalError(t, err)
-	_httpCh, ok := httpCh.(*http01Challenge)
-	assert.Fatal(t, ok)
-	_httpCh.baseChallenge.Validated = clock.Now()
-	dnsCh, err := newDNSCh()
-	assert.FatalError(t, err)
-	tlsALPNCh, err := newTLSALPNCh()
-	assert.FatalError(t, err)
+	n := clock.Now()
+
+	fns := []func() (challenge, error){
+		newDNSCh,
+		newHTTPCh,
+		newTLSALPNCh,
+	}
+	chs := make([]challenge, 3)
+
+	for i, f := range fns {
+		ch, err := f()
+		assert.FatalError(t, err)
+		b := ch.clone()
+		b.Validated = n
+		chs[i] = b.morph()
+	}
 
 	prov := newProv()
 	tests := map[string]challenge{
-		"dns":      dnsCh,
-		"http":     httpCh,
-		"tls-alpn": tlsALPNCh,
+		"dns":      chs[0],
+		"http":     chs[1],
+		"tls-alpn": chs[2],
 	}
+
 	for name, ch := range tests {
 		t.Run(name, func(t *testing.T) {
-			ach, err := ch.toACME(nil, dir, prov)
+			ach, err := ch.toACME(dir, prov)
 			assert.FatalError(t, err)
 
 			assert.Equals(t, ach.Type, ch.getType())
@@ -292,12 +300,70 @@ func TestChallengeToACME(t *testing.T) {
 			assert.Equals(t, ach.ID, ch.getID())
 			assert.Equals(t, ach.AuthzID, ch.getAuthzID())
 
-			if ach.Type == "http-01" {
-				v, err := time.Parse(time.RFC3339, ach.Validated)
-				assert.FatalError(t, err)
-				assert.Equals(t, v.String(), _httpCh.baseChallenge.Validated.String())
+			v, err := time.Parse(time.RFC3339, ach.Validated)
+			assert.FatalError(t, err)
+			assert.Equals(t, v, ch.getValidated())
+
+			assert.Equals(t, ach.RetryAfter, "")
+		})
+	}
+}
+
+func TestChallengeToACME_Retry(t *testing.T) {
+	dir := newDirectory("example.com", "acme")
+
+	n := clock.Now()
+
+	fns := []func() (challenge, error){
+		newDNSCh,
+		newHTTPCh,
+		newTLSALPNCh,
+	}
+	states := []*Retry{
+		nil,
+		{NextAttempt: n.Format(time.RFC3339)},
+	}
+	chs := make([]challenge, len(fns)*len(states))
+
+	for i, s := range states {
+		for j, f := range fns {
+			ch, err := f()
+			assert.FatalError(t, err)
+			b := ch.clone()
+			b.Status = "processing"
+			b.Retry = s
+			chs[j+i*len(fns)] = b.morph()
+		}
+	}
+
+	prov := newProv()
+	tests := map[string]challenge{
+		"dns_no-retry":      chs[0+0*len(fns)],
+		"http_no-retry":     chs[1+0*len(fns)],
+		"tls-alpn_no-retry": chs[2+0*len(fns)],
+		"dns_retry":         chs[0+1*len(fns)],
+		"http_retry":        chs[1+1*len(fns)],
+		"tls_alpn_retry":    chs[2+1*len(fns)],
+	}
+	for name, ch := range tests {
+		t.Run(name, func(t *testing.T) {
+			ach, err := ch.toACME(dir, prov)
+			assert.FatalError(t, err)
+
+			assert.Equals(t, ach.Type, ch.getType())
+			assert.Equals(t, ach.Status, ch.getStatus())
+			assert.Equals(t, ach.Token, ch.getToken())
+			assert.Equals(t, ach.URL,
+				fmt.Sprintf("https://example.com/acme/%s/challenge/%s",
+					URLSafeProvisionerName(prov), ch.getID()))
+			assert.Equals(t, ach.ID, ch.getID())
+			assert.Equals(t, ach.AuthzID, ch.getAuthzID())
+
+			assert.Equals(t, ach.Validated, "")
+			if ch.getRetry() != nil {
+				assert.Equals(t, ach.RetryAfter, ch.getRetry().NextAttempt)
 			} else {
-				assert.Equals(t, ach.Validated, "")
+				assert.Equals(t, ach.RetryAfter, "")
 			}
 		})
 	}
@@ -965,7 +1031,7 @@ func TestHTTP01Validate(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if ch, err := tc.ch.validate(tc.db, tc.jwk, tc.vo); err != nil {
+			if ch, err := tc.ch.validate(tc.jwk, tc.vo); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -1589,7 +1655,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				defer tc.srv.Close()
 			}
 
-			if ch, err := tc.ch.validate(tc.db, tc.jwk, tc.vo); err != nil {
+			if ch, err := tc.ch.validate(tc.jwk, tc.vo); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -1950,7 +2016,7 @@ func TestDNS01Validate(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if ch, err := tc.ch.validate(tc.db, tc.jwk, tc.vo); err != nil {
+			if ch, err := tc.ch.validate(tc.jwk, tc.vo); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)

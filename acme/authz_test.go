@@ -434,9 +434,9 @@ func TestAuthzToACME(t *testing.T) {
 					assert.Equals(t, acmeAz.Identifier, iden)
 					assert.Equals(t, acmeAz.Status, StatusPending)
 
-					acmeCh1, err := ch1.toACME(nil, dir, prov)
+					acmeCh1, err := ch1.toACME(dir, prov)
 					assert.FatalError(t, err)
-					acmeCh2, err := ch2.toACME(nil, dir, prov)
+					acmeCh2, err := ch2.toACME(dir, prov)
 					assert.FatalError(t, err)
 
 					assert.Equals(t, acmeAz.Challenges[0], acmeCh1)

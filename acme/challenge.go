@@ -306,7 +306,7 @@ func (bc *baseChallenge) morph() challenge {
 	}
 }
 
-// Challenge retry information is internally relevant and needs to be stored in the DB, but should not be part
+// Retry information for challenges is internally relevant and needs to be stored in the DB, but should not be part
 // of the public challenge API apart from the Retry-After header.
 type Retry struct {
 	Owner         int    `json:"owner"`
