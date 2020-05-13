@@ -1266,7 +1266,7 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 				auth:  auth,
 				id:    ch.getID(),
 				accID: ch.getAccountID(),
-				err:   ServerInternalErr(errors.New("error attempting challenge validation: error saving acme challenge: force")),
+				err:   ServerInternalErr(errors.New("error saving challenge: error saving acme challenge: force")),
 			}
 		},
 		"ok": func(t *testing.T) test {
