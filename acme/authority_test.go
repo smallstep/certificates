@@ -1224,6 +1224,7 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 				err:  ServerInternalErr(errors.Errorf("error loading challenge %s: force", id)),
 			}
 		},
+
 		"fail/challenge-not-owned-by-account": func(t *testing.T) test {
 			ch, err := newHTTPCh()
 			assert.FatalError(t, err)
@@ -1244,6 +1245,7 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 				err:   UnauthorizedErr(errors.New("account does not own challenge")),
 			}
 		},
+
 		"fail/validate-error": func(t *testing.T) test {
 			ch, err := newHTTPCh()
 			assert.FatalError(t, err)
@@ -1269,15 +1271,16 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 				err:   ServerInternalErr(errors.New("error saving challenge: error saving acme challenge: force")),
 			}
 		},
-		"ok": func(t *testing.T) test {
+
+		"ok/already-valid": func(t *testing.T) test {
 			ch, err := newHTTPCh()
 			assert.FatalError(t, err)
-			_ch, ok := ch.(*http01Challenge)
-			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = StatusValid
-			_ch.baseChallenge.Validated = clock.Now()
-			_ch.baseChallenge.Retry = nil
-			b, err := json.Marshal(ch)
+			bc := ch.clone()
+			bc.Status = StatusValid
+			bc.Validated = clock.Now()
+			bc.Retry = nil
+			rch := bc.morph()
+			b, err := json.Marshal(rch)
 			assert.FatalError(t, err)
 			auth, err := NewAuthority(&db.MockNoSQLDB{
 				MGet: func(bucket, key []byte) ([]byte, error) {
@@ -1291,10 +1294,11 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 				auth:  auth,
 				id:    ch.getID(),
 				accID: ch.getAccountID(),
-				ch:    ch,
+				ch:    rch,
 			}
 		},
 	}
+
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)

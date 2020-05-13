@@ -317,6 +317,14 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 	if err != nil {
 		return nil, err
 	}
+	switch ch.getStatus() {
+	case StatusPending, StatusProcessing:
+		break
+	case StatusInvalid, StatusValid:
+		return ch.toACME(a.dir, p)
+	default:
+		panic("unknown challenge state: " + ch.getStatus())
+	}
 
 	// Validate the challenge belongs to the account owned by the requester.
 	if accID != ch.getAccountID() {
