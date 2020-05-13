@@ -316,6 +316,7 @@ type Retry struct {
 	NextAttempt   string `json:"nextattempt"`
 }
 
+// Active returns a boolean indicating whether a Retry struct has remaining attempts or not.
 func (r *Retry) Active() bool {
 	return r.NumAttempts < r.MaxAttempts
 }

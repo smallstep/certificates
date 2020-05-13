@@ -29,7 +29,7 @@ var (
 	StatusInvalid = "invalid"
 	// StatusPending -- pending; e.g. an Order that is not ready to be finalized.
 	StatusPending = "pending"
-	// processing -- e.g. a Challenge that is in the process of being validated.
+	// StatusProcessing -- processing e.g. a Challenge that is in the process of being validated.
 	StatusProcessing = "processing"
 	// StatusDeactivated -- deactivated; e.g. for an Account that is not longer valid.
 	StatusDeactivated = "deactivated"

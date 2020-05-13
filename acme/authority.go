@@ -273,6 +273,8 @@ func (a *Authority) GetAuthz(p provisioner.Interface, accID, authzID string) (*A
 	return az.toACME(a.db, a.dir, p)
 }
 
+// ValidateChallenge ...
+//
 // The challenge validation state machine looks like:
 //
 // * https://tools.ietf.org/html/rfc8555#section-7.1.6
@@ -296,7 +298,8 @@ func (a *Authority) GetAuthz(p provisioner.Interface, accID, authzID string) (*A
 //
 // It's possible that another request to re-attempt the challenge comes in while a retry attempt is
 // pending from a previous request. In general, these old attempts will see that Retry.NextAttempt
-// is in the future and drop their task. But this also might have happened on another instance, etc.
+// is in the future and drop their task. Because another instance may have taken ownership, old attempts
+// would also see a different ordinal than their own.
 //
 // 4. When the retry timer fires, check to make sure the retry should still process.
 //  (a) Refresh the challenge from the DB.
@@ -383,6 +386,9 @@ func (a *Authority) validate(ch challenge, jwk *jose.JSONWebKey) (challenge, err
 
 const retryInterval = 12 * time.Second
 
+// RetryChallenge behaves similar to ValidateChallenge, but simply attempts to perform a validation and
+// write update the challenge record in the db if the challenge has remaining retry attempts.
+//
 // see: ValidateChallenge
 func (a *Authority) RetryChallenge(chID string) {
 	ch, err := getChallenge(a.db, chID)
@@ -422,7 +428,7 @@ func (a *Authority) RetryChallenge(chID string) {
 	// Update the db so that other retries simply drop when their timer fires.
 	up := ch.clone()
 	up.Retry.NextAttempt = now.Add(retryInterval).UTC().Format(time.RFC3339)
-	up.Retry.NumAttempts += 1
+	up.Retry.NumAttempts++
 	err = up.save(a.db, ch)
 	if err != nil {
 		return
