@@ -2,13 +2,14 @@ package api
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/jose"
-	"net/http"
 )
 
 func link(url, typ string) string {
@@ -148,7 +149,7 @@ func (h *Handler) GetAuthz(w http.ResponseWriter, r *http.Request) {
 	api.JSON(w, authz)
 }
 
-// ACME api for retrieving the Challenge resource.
+// GetChallenge is the ACME api for retrieving a Challenge resource.
 //
 // Potential Challenges are requested by the client when creating an order.
 // Once the client knows the appropriate validation resources are provisioned,
