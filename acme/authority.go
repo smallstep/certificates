@@ -273,7 +273,8 @@ func (a *Authority) GetAuthz(p provisioner.Interface, accID, authzID string) (*A
 	return az.toACME(a.db, a.dir, p)
 }
 
-// ValidateChallenge ...
+// ValidateChallenge loads a challenge resource and then begins the validation process if the challenge
+// is not in one of its terminal states {valid|invalid}. 
 //
 // The challenge validation state machine looks like:
 //
