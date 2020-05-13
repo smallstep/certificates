@@ -311,11 +311,11 @@ func (a *Authority) GetAuthz(p provisioner.Interface, accID, authzID string) (*A
 //
 func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID string, jwk *jose.JSONWebKey) (*Challenge, error) {
 	ch, err := getChallenge(a.db, chID)
-
-	// Validate the challenge belongs to the account owned by the requester.
 	if err != nil {
 		return nil, err
 	}
+
+	// Validate the challenge belongs to the account owned by the requester.
 	if accID != ch.getAccountID() {
 		return nil, UnauthorizedErr(errors.New("account does not own challenge"))
 	}
