@@ -302,7 +302,7 @@ func (bc *baseChallenge) morph() challenge {
 	case "tls-alpn-01":
 		return &tlsALPN01Challenge{bc}
 	default:
-		panic("unrecognized challenge type: " + bc.getType())
+		return bc
 	}
 }
 
@@ -349,13 +349,15 @@ func (hc *http01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions) (c
 	// If already valid or invalid then return without performing validation.
 	switch hc.getStatus() {
 	case StatusPending:
-		panic("pending challenges must first be moved to the processing state")
+		e := errors.New("pending challenges must first be moved to the processing state")
+		return nil, ServerInternalErr(e)
 	case StatusProcessing:
 		break
 	case StatusValid, StatusInvalid:
 		return hc, nil
 	default:
-		panic("unknown challenge state: " + hc.getStatus())
+		e := errors.Errorf("unknown challenge state: %s", hc.getStatus())
+		return nil, ServerInternalErr(e)
 	}
 
 	up := &http01Challenge{hc.baseChallenge.clone()}
@@ -426,13 +428,15 @@ func (tc *tlsALPN01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions)
 	// If already valid or invalid then return without performing validation.
 	switch tc.getStatus() {
 	case StatusPending:
-		panic("pending challenges must first be moved to the processing state")
+		e := errors.New("pending challenges must first be moved to the processing state")
+		return nil, ServerInternalErr(e)
 	case StatusProcessing:
 		break
 	case StatusValid, StatusInvalid:
 		return tc, nil
 	default:
-		panic("unknown challenge state: " + tc.getStatus())
+		e := errors.Errorf("unknown challenge state: %s", tc.getStatus())
+		return nil, ServerInternalErr(e)
 	}
 
 	up := &tlsALPN01Challenge{tc.baseChallenge.clone()}
@@ -565,13 +569,15 @@ func (dc *dns01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions) (ch
 	// If already valid or invalid then return without performing validation.
 	switch dc.getStatus() {
 	case StatusPending:
-		panic("pending challenges must first be moved to the processing state")
+		e := errors.New("pending challenges must first be moved to the processing state")
+		return nil, ServerInternalErr(e)
 	case StatusProcessing:
 		break
 	case StatusValid, StatusInvalid:
 		return dc, nil
 	default:
-		panic("unknown challenge state: " + dc.getStatus())
+		e := errors.Errorf("unknown challenge state: %s", dc.getStatus())
+		return nil, ServerInternalErr(e)
 	}
 
 	up := &dns01Challenge{dc.baseChallenge.clone()}

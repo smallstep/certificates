@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -306,7 +307,8 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 	case StatusInvalid, StatusValid:
 		return ch.toACME(a.dir, p)
 	default:
-		panic("unknown challenge state: " + ch.getStatus())
+		e:= errors.Errorf("unknown challenge state: %s", ch.getStatus())
+		return nil, ServerInternalErr(e)
 	}
 
 	// Validate the challenge belongs to the account owned by the requester.
@@ -352,7 +354,8 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 			})
 		}
 	default:
-		panic("post-validation challenge in unexpected state" + ch.getStatus())
+		e := errors.Errorf("post-validation challenge in unexpected state, %s", ch.getStatus())
+		return nil, ServerInternalErr(e)
 	}
 	return ch.toACME(a.dir, p)
 }
@@ -388,13 +391,17 @@ func (a *Authority) RetryChallenge(chID string) {
 	}
 	switch ch.getStatus() {
 	case StatusPending:
-		panic("pending challenges must first be moved to the processing state")
+		e := errors.New("pending challenges must first be moved to the processing state")
+		log.Printf("%v", e)
+		return
 	case StatusInvalid, StatusValid:
 		return
 	case StatusProcessing:
 		break
 	default:
-		panic("unknown challenge state: " + ch.getStatus())
+		e:= errors.Errorf("unknown challenge state: %s", ch.getStatus())
+		log.Printf("%v", e)
+		return
 	}
 
 	// When retrying, check to make sure the ordinal has not changed.
@@ -449,7 +456,8 @@ func (a *Authority) RetryChallenge(chID string) {
 			})
 		}
 	default:
-		panic("post-validation challenge in unexpected state " + ch.getStatus())
+		e := errors.Errorf("post-validation challenge in unexpected state, %s", ch.getStatus())
+		log.Printf("%v", e)
 	}
 }
 
