@@ -15,6 +15,7 @@ type ACME struct {
 	Type    string  `json:"type"`
 	Name    string  `json:"name"`
 	Claims  *Claims `json:"claims,omitempty"`
+	ForceCN bool    `json:"forceCN,omitempty"`
 	claimer *Claimer
 }
 
