@@ -231,7 +231,7 @@ func TestHandlerGetNonce(t *testing.T) {
 }
 
 func TestHandlerGetDirectory(t *testing.T) {
-	auth, err := acme.NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil)
+	auth, err := acme.NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil, 0)
 	assert.FatalError(t, err)
 	prov := newProv()
 	url := fmt.Sprintf("http://ca.smallstep.com/acme/%s/directory", acme.URLSafeProvisionerName(prov))

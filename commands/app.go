@@ -34,6 +34,11 @@ intermediate private key.`,
 			Name:  "resolver",
 			Usage: "address of a DNS resolver to be used instead of the default.",
 		},
+		cli.IntFlag{
+			Name:  "ordinal",
+			Usage: `Unique <index> identifying this instance of step-ca in a highly-
+available (replicated) deployment.`,
+		},
 	},
 }
 
@@ -41,6 +46,9 @@ intermediate private key.`,
 func appAction(ctx *cli.Context) error {
 	passFile := ctx.String("password-file")
 	resolver := ctx.String("resolver")
+
+	// grab the ordinal or default to 0
+	ordinal := ctx.Int("ordinal")
 
 	// If zero cmd line args show help, if >1 cmd line args show error.
 	if ctx.NArg() == 0 {
@@ -72,7 +80,7 @@ func appAction(ctx *cli.Context) error {
 		}
 	}
 
-	srv, err := ca.New(config, ca.WithConfigFile(configFile), ca.WithPassword(password))
+	srv, err := ca.New(config, ca.WithConfigFile(configFile), ca.WithPassword(password), ca.WithOrdinal(ordinal))
 	if err != nil {
 		fatal(err)
 	}

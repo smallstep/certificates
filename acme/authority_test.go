@@ -14,7 +14,7 @@ import (
 )
 
 func TestAuthorityGetLink(t *testing.T) {
-	auth, err := NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil)
+	auth, err := NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil, 0)
 	assert.FatalError(t, err)
 	provID := "acme-test-provisioner"
 	type test struct {
@@ -70,7 +70,7 @@ func TestAuthorityGetLink(t *testing.T) {
 }
 
 func TestAuthorityGetDirectory(t *testing.T) {
-	auth, err := NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil)
+	auth, err := NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil, 0)
 	assert.FatalError(t, err)
 	prov := newProv()
 	acmeDir := auth.GetDirectory(prov)
@@ -94,7 +94,7 @@ func TestAuthorityNewNonce(t *testing.T) {
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return nil, false, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -110,7 +110,7 @@ func TestAuthorityNewNonce(t *testing.T) {
 					*res = string(key)
 					return nil, true, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -149,7 +149,7 @@ func TestAuthorityUseNonce(t *testing.T) {
 				MUpdate: func(tx *database.Tx) error {
 					return errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -161,7 +161,7 @@ func TestAuthorityUseNonce(t *testing.T) {
 				MUpdate: func(tx *database.Tx) error {
 					return nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -205,7 +205,7 @@ func TestAuthorityNewAccount(t *testing.T) {
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return nil, false, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -231,7 +231,7 @@ func TestAuthorityNewAccount(t *testing.T) {
 					count++
 					return nil, true, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -281,7 +281,7 @@ func TestAuthorityGetAccount(t *testing.T) {
 					assert.Equals(t, key, []byte(id))
 					return nil, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -298,7 +298,7 @@ func TestAuthorityGetAccount(t *testing.T) {
 				MGet: func(bucket, key []byte) ([]byte, error) {
 					return b, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -348,7 +348,7 @@ func TestAuthorityGetAccountByKey(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			jwk.Key = "foo"
-			auth, err := NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil)
+			auth, err := NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -367,7 +367,7 @@ func TestAuthorityGetAccountByKey(t *testing.T) {
 					assert.Equals(t, key, []byte(kid))
 					return nil, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -399,7 +399,7 @@ func TestAuthorityGetAccountByKey(t *testing.T) {
 					count++
 					return ret, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -453,7 +453,7 @@ func TestAuthorityGetOrder(t *testing.T) {
 					assert.Equals(t, key, []byte(id))
 					return nil, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -472,7 +472,7 @@ func TestAuthorityGetOrder(t *testing.T) {
 					assert.Equals(t, key, []byte(o.ID))
 					return b, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -501,7 +501,7 @@ func TestAuthorityGetOrder(t *testing.T) {
 						return nil, ServerInternalErr(errors.New("force"))
 					}
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -522,7 +522,7 @@ func TestAuthorityGetOrder(t *testing.T) {
 					assert.Equals(t, key, []byte(o.ID))
 					return b, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -576,7 +576,7 @@ func TestAuthorityGetCertificate(t *testing.T) {
 					assert.Equals(t, key, []byte(id))
 					return nil, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -595,7 +595,7 @@ func TestAuthorityGetCertificate(t *testing.T) {
 					assert.Equals(t, key, []byte(cert.ID))
 					return b, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -615,7 +615,7 @@ func TestAuthorityGetCertificate(t *testing.T) {
 					assert.Equals(t, key, []byte(cert.ID))
 					return b, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -670,7 +670,7 @@ func TestAuthorityGetAuthz(t *testing.T) {
 					assert.Equals(t, key, []byte(id))
 					return nil, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -689,7 +689,7 @@ func TestAuthorityGetAuthz(t *testing.T) {
 					assert.Equals(t, key, []byte(az.getID()))
 					return b, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -720,7 +720,7 @@ func TestAuthorityGetAuthz(t *testing.T) {
 					count++
 					return ret, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -812,7 +812,7 @@ func TestAuthorityGetAuthz(t *testing.T) {
 					count++
 					return ret, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:   auth,
@@ -862,7 +862,7 @@ func TestAuthorityNewOrder(t *testing.T) {
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return nil, false, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -916,7 +916,7 @@ func TestAuthorityNewOrder(t *testing.T) {
 				MGet: func(bucket, key []byte) ([]byte, error) {
 					return nil, database.ErrNotFound
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -966,7 +966,7 @@ func TestAuthorityGetOrdersByAccount(t *testing.T) {
 					assert.Equals(t, key, []byte(id))
 					return nil, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -998,7 +998,7 @@ func TestAuthorityGetOrdersByAccount(t *testing.T) {
 					count++
 					return ret, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -1045,7 +1045,7 @@ func TestAuthorityGetOrdersByAccount(t *testing.T) {
 					count++
 					return ret, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -1094,7 +1094,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 					assert.Equals(t, key, []byte(id))
 					return nil, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -1113,7 +1113,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 					assert.Equals(t, key, []byte(o.ID))
 					return b, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -1139,7 +1139,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 					assert.Equals(t, key, []byte(o.ID))
 					return nil, false, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -1161,7 +1161,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 					assert.Equals(t, key, []byte(o.ID))
 					return b, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -1216,7 +1216,7 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 					assert.Equals(t, key, []byte(id))
 					return nil, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -1236,7 +1236,7 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 					assert.Equals(t, key, []byte(ch.getID()))
 					return b, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -1262,7 +1262,7 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 					assert.Equals(t, key, []byte(ch.getID()))
 					return nil, false, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -1288,7 +1288,7 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 					assert.Equals(t, key, []byte(ch.getID()))
 					return b, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:  auth,
@@ -1344,7 +1344,7 @@ func TestAuthorityUpdateAccount(t *testing.T) {
 					assert.Equals(t, key, []byte(id))
 					return nil, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:    auth,
@@ -1366,7 +1366,7 @@ func TestAuthorityUpdateAccount(t *testing.T) {
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return nil, false, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:    auth,
@@ -1394,7 +1394,7 @@ func TestAuthorityUpdateAccount(t *testing.T) {
 					assert.Equals(t, key, []byte(acc.ID))
 					return nil, true, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth:    auth,
@@ -1449,7 +1449,7 @@ func TestAuthorityDeactivateAccount(t *testing.T) {
 					assert.Equals(t, key, []byte(id))
 					return nil, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -1470,7 +1470,7 @@ func TestAuthorityDeactivateAccount(t *testing.T) {
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return nil, false, errors.New("force")
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
@@ -1498,7 +1498,7 @@ func TestAuthorityDeactivateAccount(t *testing.T) {
 					assert.Equals(t, key, []byte(acc.ID))
 					return nil, true, nil
 				},
-			}, "ca.smallstep.com", "acme", nil)
+			}, "ca.smallstep.com", "acme", nil, 0)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,

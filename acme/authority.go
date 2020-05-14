@@ -5,12 +5,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -46,6 +43,7 @@ type Authority struct {
 	db       nosql.DB
 	dir      *directory
 	signAuth SignAuthority
+	ordinal  int
 }
 
 var (
@@ -57,26 +55,10 @@ var (
 	orderTable             = []byte("acme_orders")
 	ordersByAccountIDTable = []byte("acme_account_orders_index")
 	certTable              = []byte("acme_certs")
-	ordinal                int
 )
 
-// Ordinal is used during challenge retries to indicate ownership.
-func init() {
-	ordstr := os.Getenv("STEP_CA_ORDINAL")
-	if ordstr == "" {
-		ordinal = 0
-	} else {
-		ord, err := strconv.Atoi(ordstr)
-		if err != nil {
-			log.Fatal("Unrecognized ordinal ingeter value.")
-			panic(nil)
-		}
-		ordinal = ord
-	}
-}
-
 // NewAuthority returns a new Authority that implements the ACME interface.
-func NewAuthority(db nosql.DB, dns, prefix string, signAuth SignAuthority) (*Authority, error) {
+func NewAuthority(db nosql.DB, dns, prefix string, signAuth SignAuthority, ordinal int) (*Authority, error) {
 	if _, ok := db.(*database.SimpleDB); !ok {
 		// If it's not a SimpleDB then go ahead and bootstrap the DB with the
 		// necessary ACME tables. SimpleDB should ONLY be used for testing.
@@ -91,7 +73,7 @@ func NewAuthority(db nosql.DB, dns, prefix string, signAuth SignAuthority) (*Aut
 		}
 	}
 	return &Authority{
-		db: db, dir: newDirectory(dns, prefix), signAuth: signAuth,
+		db: db, dir: newDirectory(dns, prefix), signAuth: signAuth, ordinal: ordinal,
 	}, nil
 }
 
@@ -336,7 +318,7 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 	up := ch.clone()
 	up.Status = StatusProcessing
 	up.Retry = &Retry{
-		Owner:         ordinal,
+		Owner:         a.ordinal,
 		ProvisionerID: p.GetID(),
 		NumAttempts:   0,
 		MaxAttempts:   10,
@@ -420,7 +402,7 @@ func (a *Authority) RetryChallenge(chID string) {
 	// Then check to make sure Retry.NextAttempt is in the past.
 	retry := ch.getRetry()
 	switch {
-	case retry.Owner != ordinal:
+	case retry.Owner != a.ordinal:
 		return
 	case !retry.Active():
 		return

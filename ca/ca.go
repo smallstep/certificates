@@ -26,6 +26,7 @@ type options struct {
 	configFile string
 	password   []byte
 	database   db.AuthDB
+	ordinal    int
 }
 
 func (o *options) apply(opts []Option) {
@@ -57,6 +58,14 @@ func WithPassword(password []byte) Option {
 func WithDatabase(db db.AuthDB) Option {
 	return func(o *options) {
 		o.database = db
+	}
+}
+
+
+// WithOrdinal sets the server's ordinal identifier (an int).
+func WithOrdinal(ordinal int) Option {
+	return func(o *options) {
+		o.ordinal = ordinal
 	}
 }
 
@@ -124,7 +133,7 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	}
 
 	prefix := "acme"
-	acmeAuth, err := acme.NewAuthority(auth.GetDatabase().(nosql.DB), dns, prefix, auth)
+	acmeAuth, err := acme.NewAuthority(auth.GetDatabase().(nosql.DB), dns, prefix, auth, ca.opts.ordinal)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating ACME authority")
 	}
