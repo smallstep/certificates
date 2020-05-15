@@ -7,6 +7,7 @@ addons:
     - debhelper
     - fakeroot
     - bash-completion
+    - libpcsclite-dev
 env:
   global:
   - V=1
