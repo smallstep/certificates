@@ -6,6 +6,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
+
+	// Enabled kms interfaces.
+	_ "github.com/smallstep/certificates/kms/cloudkms"
+	_ "github.com/smallstep/certificates/kms/softkms"
+
+	// Experimental kms interfaces.
+	_ "github.com/smallstep/certificates/kms/yubikey"
 )
 
 // KeyManager is the interface implemented by all the KMS.
@@ -28,7 +35,7 @@ func New(ctx context.Context, opts apiv1.Options) (KeyManager, error) {
 
 	fn, ok := apiv1.LoadKeyManagerNewFunc(t)
 	if !ok {
-		return nil, errors.Errorf("unsupported kms type '%s'", opts.Type)
+		return nil, errors.Errorf("unsupported kms type '%s'", t)
 	}
 	return fn(ctx, opts)
 }
