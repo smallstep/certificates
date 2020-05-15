@@ -58,17 +58,13 @@ func (f *FinalizeRequest) Validate() error {
 
 // NewOrder ACME api for creating a new order.
 func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
-	prov, err := provisionerFromContext(r)
+	ctx := r.Context()
+	acc, err := acme.AccountFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
-	acc, err := accountFromContext(r)
-	if err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	payload, err := payloadFromContext(r)
+	payload, err := payloadFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
@@ -84,7 +80,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	o, err := h.Auth.NewOrder(prov, acme.OrderOptions{
+	o, err := h.Auth.NewOrder(ctx, acme.OrderOptions{
 		AccountID:   acc.GetID(),
 		Identifiers: nor.Identifiers,
 		NotBefore:   nor.NotBefore,
@@ -95,46 +91,38 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, acme.URLSafeProvisionerName(prov), true, o.GetID()))
+	w.Header().Set("Location", h.Auth.GetLink(ctx, acme.OrderLink, true, o.GetID()))
 	api.JSONStatus(w, o, http.StatusCreated)
 }
 
 // GetOrder ACME api for retrieving an order.
 func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
-	prov, err := provisionerFromContext(r)
-	if err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	acc, err := accountFromContext(r)
+	ctx := r.Context()
+	acc, err := acme.AccountFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
 	oid := chi.URLParam(r, "ordID")
-	o, err := h.Auth.GetOrder(prov, acc.GetID(), oid)
+	o, err := h.Auth.GetOrder(ctx, acc.GetID(), oid)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
-	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, acme.URLSafeProvisionerName(prov), true, o.GetID()))
+	w.Header().Set("Location", h.Auth.GetLink(ctx, acme.OrderLink, true, o.GetID()))
 	api.JSON(w, o)
 }
 
 // FinalizeOrder attemptst to finalize an order and create a certificate.
 func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
-	prov, err := provisionerFromContext(r)
+	ctx := r.Context()
+	acc, err := acme.AccountFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
-	acc, err := accountFromContext(r)
-	if err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	payload, err := payloadFromContext(r)
+	payload, err := payloadFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
@@ -150,12 +138,12 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	oid := chi.URLParam(r, "ordID")
-	o, err := h.Auth.FinalizeOrder(prov, acc.GetID(), oid, fr.csr)
+	o, err := h.Auth.FinalizeOrder(ctx, acc.GetID(), oid, fr.csr)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
-	w.Header().Set("Location", h.Auth.GetLink(acme.OrderLink, acme.URLSafeProvisionerName(prov), true, o.ID))
+	w.Header().Set("Location", h.Auth.GetLink(ctx, acme.OrderLink, true, o.ID))
 	api.JSON(w, o)
 }

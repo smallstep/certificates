@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -369,7 +370,10 @@ func TestAuthzToACME(t *testing.T) {
 	}
 	az, err := newAuthz(mockdb, "1234", iden)
 	assert.FatalError(t, err)
+
 	prov := newProv()
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
 
 	type test struct {
 		db  nosql.DB
@@ -419,7 +423,7 @@ func TestAuthzToACME(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			acmeAz, err := az.toACME(tc.db, dir, prov)
+			acmeAz, err := az.toACME(ctx, tc.db, dir)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
@@ -434,9 +438,9 @@ func TestAuthzToACME(t *testing.T) {
 					assert.Equals(t, acmeAz.Identifier, iden)
 					assert.Equals(t, acmeAz.Status, StatusPending)
 
-					acmeCh1, err := ch1.toACME(nil, dir, prov)
+					acmeCh1, err := ch1.toACME(ctx, nil, dir)
 					assert.FatalError(t, err)
-					acmeCh2, err := ch2.toACME(nil, dir, prov)
+					acmeCh2, err := ch2.toACME(ctx, nil, dir)
 					assert.FatalError(t, err)
 
 					assert.Equals(t, acmeAz.Challenges[0], acmeCh1)

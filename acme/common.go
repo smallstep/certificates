@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"context"
 	"crypto/x509"
 	"net/url"
 	"time"
@@ -8,7 +9,74 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/cli/crypto/randutil"
+	"github.com/smallstep/cli/jose"
 )
+
+// ContextKey is the key type for storing and searching for ACME request
+// essentials in the context of a request.
+type ContextKey string
+
+const (
+	// AccContextKey account key
+	AccContextKey = ContextKey("acc")
+	// BaseURLContextKey baseURL key
+	BaseURLContextKey = ContextKey("baseURL")
+	// JwsContextKey jws key
+	JwsContextKey = ContextKey("jws")
+	// JwkContextKey jwk key
+	JwkContextKey = ContextKey("jwk")
+	// PayloadContextKey payload key
+	PayloadContextKey = ContextKey("payload")
+	// ProvisionerContextKey provisioner key
+	ProvisionerContextKey = ContextKey("provisioner")
+)
+
+// AccountFromContext searches the context for an ACME account. Returns the
+// account or an error.
+func AccountFromContext(ctx context.Context) (*Account, error) {
+	val, ok := ctx.Value(AccContextKey).(*Account)
+	if !ok || val == nil {
+		return nil, AccountDoesNotExistErr(nil)
+	}
+	return val, nil
+}
+
+// BaseURLFromContext returns the baseURL if one is stored in the context.
+func BaseURLFromContext(ctx context.Context) *url.URL {
+	val, ok := ctx.Value(BaseURLContextKey).(*url.URL)
+	if !ok || val == nil {
+		return nil
+	}
+	return val
+}
+
+// JwkFromContext searches the context for a JWK. Returns the JWK or an error.
+func JwkFromContext(ctx context.Context) (*jose.JSONWebKey, error) {
+	val, ok := ctx.Value(JwkContextKey).(*jose.JSONWebKey)
+	if !ok || val == nil {
+		return nil, ServerInternalErr(errors.Errorf("jwk expected in request context"))
+	}
+	return val, nil
+}
+
+// JwsFromContext searches the context for a JWS. Returns the JWS or an error.
+func JwsFromContext(ctx context.Context) (*jose.JSONWebSignature, error) {
+	val, ok := ctx.Value(JwsContextKey).(*jose.JSONWebSignature)
+	if !ok || val == nil {
+		return nil, ServerInternalErr(errors.Errorf("jws expected in request context"))
+	}
+	return val, nil
+}
+
+// ProvisionerFromContext searches the context for a provisioner. Returns the
+// provisioner or an error.
+func ProvisionerFromContext(ctx context.Context) (provisioner.Interface, error) {
+	val, ok := ctx.Value(ProvisionerContextKey).(provisioner.Interface)
+	if !ok || val == nil {
+		return nil, ServerInternalErr(errors.Errorf("provisioner expected in request context"))
+	}
+	return val, nil
+}
 
 // SignAuthority is the interface implemented by a CA authority.
 type SignAuthority interface {
@@ -57,9 +125,3 @@ func (c *Clock) Now() time.Time {
 }
 
 var clock = new(Clock)
-
-// URLSafeProvisionerName returns a path escaped version of the ACME provisioner
-// ID that is safe to use in URL paths.
-func URLSafeProvisionerName(p provisioner.Interface) string {
-	return url.PathEscape(p.GetName())
-}

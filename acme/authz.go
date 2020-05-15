@@ -1,12 +1,12 @@
 package acme
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/nosql"
 )
 
@@ -51,7 +51,7 @@ type authz interface {
 	getChallenges() []string
 	getCreated() time.Time
 	updateStatus(db nosql.DB) (authz, error)
-	toACME(nosql.DB, *directory, provisioner.Interface) (*Authz, error)
+	toACME(context.Context, nosql.DB, *directory) (*Authz, error)
 }
 
 // baseAuthz is the base authz type that others build from.
@@ -141,14 +141,14 @@ func (ba *baseAuthz) getCreated() time.Time {
 
 // toACME converts the internal Authz type into the public acmeAuthz type for
 // presentation in the ACME protocol.
-func (ba *baseAuthz) toACME(db nosql.DB, dir *directory, p provisioner.Interface) (*Authz, error) {
+func (ba *baseAuthz) toACME(ctx context.Context, db nosql.DB, dir *directory) (*Authz, error) {
 	var chs = make([]*Challenge, len(ba.Challenges))
 	for i, chID := range ba.Challenges {
 		ch, err := getChallenge(db, chID)
 		if err != nil {
 			return nil, err
 		}
-		chs[i], err = ch.toACME(db, dir, p)
+		chs[i], err = ch.toACME(ctx, db, dir)
 		if err != nil {
 			return nil, err
 		}

@@ -2,6 +2,7 @@ package acme
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -20,6 +21,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -273,6 +275,10 @@ func TestChallengeToACME(t *testing.T) {
 	assert.FatalError(t, err)
 
 	prov := newProv()
+	provName := url.PathEscape(prov.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, baseURL)
 	tests := map[string]challenge{
 		"dns":      dnsCh,
 		"http":     httpCh,
@@ -280,15 +286,15 @@ func TestChallengeToACME(t *testing.T) {
 	}
 	for name, ch := range tests {
 		t.Run(name, func(t *testing.T) {
-			ach, err := ch.toACME(nil, dir, prov)
+			ach, err := ch.toACME(ctx, nil, dir)
 			assert.FatalError(t, err)
 
 			assert.Equals(t, ach.Type, ch.getType())
 			assert.Equals(t, ach.Status, ch.getStatus())
 			assert.Equals(t, ach.Token, ch.getToken())
 			assert.Equals(t, ach.URL,
-				fmt.Sprintf("https://ca.smallstep.com/acme/%s/challenge/%s",
-					URLSafeProvisionerName(prov), ch.getID()))
+				fmt.Sprintf("%s/acme/%s/challenge/%s",
+					baseURL.String(), provName, ch.getID()))
 			assert.Equals(t, ach.ID, ch.getID())
 			assert.Equals(t, ach.AuthzID, ch.getAuthzID())
 

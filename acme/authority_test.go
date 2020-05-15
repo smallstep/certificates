@@ -1,8 +1,10 @@
 package acme
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"testing"
 	"time"
 
@@ -16,7 +18,11 @@ import (
 func TestAuthorityGetLink(t *testing.T) {
 	auth, err := NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil)
 	assert.FatalError(t, err)
-	provID := "acme-test-provisioner"
+	prov := newProv()
+	provName := url.PathEscape(prov.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, baseURL)
 	type test struct {
 		auth   *Authority
 		typ    Link
@@ -30,7 +36,7 @@ func TestAuthorityGetLink(t *testing.T) {
 				auth: auth,
 				typ:  NewAccountLink,
 				abs:  true,
-				res:  fmt.Sprintf("https://ca.smallstep.com/acme/%s/new-account", provID),
+				res:  fmt.Sprintf("%s/acme/%s/new-account", baseURL.String(), provName),
 			}
 		},
 		"ok/new-account/no-abs": func(t *testing.T) test {
@@ -38,7 +44,7 @@ func TestAuthorityGetLink(t *testing.T) {
 				auth: auth,
 				typ:  NewAccountLink,
 				abs:  false,
-				res:  fmt.Sprintf("/%s/new-account", provID),
+				res:  fmt.Sprintf("/%s/new-account", provName),
 			}
 		},
 		"ok/order/abs": func(t *testing.T) test {
@@ -47,7 +53,7 @@ func TestAuthorityGetLink(t *testing.T) {
 				typ:    OrderLink,
 				abs:    true,
 				inputs: []string{"foo"},
-				res:    fmt.Sprintf("https://ca.smallstep.com/acme/%s/order/foo", provID),
+				res:    fmt.Sprintf("%s/acme/%s/order/foo", baseURL.String(), provName),
 			}
 		},
 		"ok/order/no-abs": func(t *testing.T) test {
@@ -56,14 +62,14 @@ func TestAuthorityGetLink(t *testing.T) {
 				typ:    OrderLink,
 				abs:    false,
 				inputs: []string{"foo"},
-				res:    fmt.Sprintf("/%s/order/foo", provID),
+				res:    fmt.Sprintf("/%s/order/foo", provName),
 			}
 		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			link := tc.auth.GetLink(tc.typ, provID, tc.abs, tc.inputs...)
+			link := tc.auth.GetLink(ctx, tc.typ, tc.abs, tc.inputs...)
 			assert.Equals(t, tc.res, link)
 		})
 	}
@@ -72,14 +78,68 @@ func TestAuthorityGetLink(t *testing.T) {
 func TestAuthorityGetDirectory(t *testing.T) {
 	auth, err := NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil)
 	assert.FatalError(t, err)
+
 	prov := newProv()
-	acmeDir := auth.GetDirectory(prov)
-	assert.Equals(t, acmeDir.NewNonce, fmt.Sprintf("https://ca.smallstep.com/acme/%s/new-nonce", URLSafeProvisionerName(prov)))
-	assert.Equals(t, acmeDir.NewAccount, fmt.Sprintf("https://ca.smallstep.com/acme/%s/new-account", URLSafeProvisionerName(prov)))
-	assert.Equals(t, acmeDir.NewOrder, fmt.Sprintf("https://ca.smallstep.com/acme/%s/new-order", URLSafeProvisionerName(prov)))
-	//assert.Equals(t, acmeDir.NewOrder, "httsp://ca.smallstep.com/acme/new-authz")
-	assert.Equals(t, acmeDir.RevokeCert, fmt.Sprintf("https://ca.smallstep.com/acme/%s/revoke-cert", URLSafeProvisionerName(prov)))
-	assert.Equals(t, acmeDir.KeyChange, fmt.Sprintf("https://ca.smallstep.com/acme/%s/key-change", URLSafeProvisionerName(prov)))
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, baseURL)
+
+	type test struct {
+		ctx context.Context
+		err *Error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"ok/empty-provisioner": func(t *testing.T) test {
+			return test{
+				ctx: context.Background(),
+			}
+		},
+		"ok/no-baseURL": func(t *testing.T) test {
+			return test{
+				ctx: context.WithValue(context.Background(), ProvisionerContextKey, prov),
+			}
+		},
+		"ok/baseURL": func(t *testing.T) test {
+			return test{
+				ctx: ctx,
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if dir, err := auth.GetDirectory(tc.ctx); err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					bu := BaseURLFromContext(tc.ctx)
+					if bu == nil {
+						bu = &url.URL{Scheme: "https", Host: "ca.smallstep.com"}
+					}
+
+					var provName string
+					prov, err := ProvisionerFromContext(tc.ctx)
+					if err != nil {
+						provName = ""
+					} else {
+						provName = url.PathEscape(prov.GetName())
+					}
+
+					assert.Equals(t, dir.NewNonce, fmt.Sprintf("%s/acme/%s/new-nonce", bu.String(), provName))
+					assert.Equals(t, dir.NewAccount, fmt.Sprintf("%s/acme/%s/new-account", bu.String(), provName))
+					assert.Equals(t, dir.NewOrder, fmt.Sprintf("%s/acme/%s/new-order", bu.String(), provName))
+					assert.Equals(t, dir.RevokeCert, fmt.Sprintf("%s/acme/%s/revoke-cert", bu.String(), provName))
+					assert.Equals(t, dir.KeyChange, fmt.Sprintf("%s/acme/%s/key-change", bu.String(), provName))
+				}
+			}
+		})
+	}
 }
 
 func TestAuthorityNewNonce(t *testing.T) {
@@ -193,6 +253,8 @@ func TestAuthorityNewAccount(t *testing.T) {
 		Key: jwk, Contact: []string{"foo", "bar"},
 	}
 	prov := newProv()
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
 	type test struct {
 		auth *Authority
 		ops  AccountOptions
@@ -225,7 +287,7 @@ func TestAuthorityNewAccount(t *testing.T) {
 					if count == 1 {
 						var acc *account
 						assert.FatalError(t, json.Unmarshal(newval, &acc))
-						*acmeacc, err = acc.toACME(nil, dir, prov)
+						*acmeacc, err = acc.toACME(ctx, nil, dir)
 						return nil, true, nil
 					}
 					count++
@@ -243,7 +305,7 @@ func TestAuthorityNewAccount(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeAcc, err := tc.auth.NewAccount(prov, tc.ops); err != nil {
+			if acmeAcc, err := tc.auth.NewAccount(ctx, tc.ops); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -266,6 +328,8 @@ func TestAuthorityNewAccount(t *testing.T) {
 
 func TestAuthorityGetAccount(t *testing.T) {
 	prov := newProv()
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
 	type test struct {
 		auth *Authority
 		id   string
@@ -310,7 +374,7 @@ func TestAuthorityGetAccount(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeAcc, err := tc.auth.GetAccount(prov, tc.id); err != nil {
+			if acmeAcc, err := tc.auth.GetAccount(ctx, tc.id); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -323,7 +387,7 @@ func TestAuthorityGetAccount(t *testing.T) {
 					gotb, err := json.Marshal(acmeAcc)
 					assert.FatalError(t, err)
 
-					acmeExp, err := tc.acc.toACME(nil, tc.auth.dir, prov)
+					acmeExp, err := tc.acc.toACME(ctx, nil, tc.auth.dir)
 					assert.FatalError(t, err)
 					expb, err := json.Marshal(acmeExp)
 					assert.FatalError(t, err)
@@ -337,6 +401,8 @@ func TestAuthorityGetAccount(t *testing.T) {
 
 func TestAuthorityGetAccountByKey(t *testing.T) {
 	prov := newProv()
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
 	type test struct {
 		auth *Authority
 		jwk  *jose.JSONWebKey
@@ -411,7 +477,7 @@ func TestAuthorityGetAccountByKey(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeAcc, err := tc.auth.GetAccountByKey(prov, tc.jwk); err != nil {
+			if acmeAcc, err := tc.auth.GetAccountByKey(ctx, tc.jwk); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -424,7 +490,7 @@ func TestAuthorityGetAccountByKey(t *testing.T) {
 					gotb, err := json.Marshal(acmeAcc)
 					assert.FatalError(t, err)
 
-					acmeExp, err := tc.acc.toACME(nil, tc.auth.dir, prov)
+					acmeExp, err := tc.acc.toACME(ctx, nil, tc.auth.dir)
 					assert.FatalError(t, err)
 					expb, err := json.Marshal(acmeExp)
 					assert.FatalError(t, err)
@@ -438,6 +504,8 @@ func TestAuthorityGetAccountByKey(t *testing.T) {
 
 func TestAuthorityGetOrder(t *testing.T) {
 	prov := newProv()
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
 	type test struct {
 		auth      *Authority
 		id, accID string
@@ -535,7 +603,7 @@ func TestAuthorityGetOrder(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeO, err := tc.auth.GetOrder(prov, tc.accID, tc.id); err != nil {
+			if acmeO, err := tc.auth.GetOrder(ctx, tc.accID, tc.id); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -548,7 +616,7 @@ func TestAuthorityGetOrder(t *testing.T) {
 					gotb, err := json.Marshal(acmeO)
 					assert.FatalError(t, err)
 
-					acmeExp, err := tc.o.toACME(nil, tc.auth.dir, prov)
+					acmeExp, err := tc.o.toACME(ctx, nil, tc.auth.dir)
 					assert.FatalError(t, err)
 					expb, err := json.Marshal(acmeExp)
 					assert.FatalError(t, err)
@@ -655,6 +723,8 @@ func TestAuthorityGetCertificate(t *testing.T) {
 
 func TestAuthorityGetAuthz(t *testing.T) {
 	prov := newProv()
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
 	type test struct {
 		auth      *Authority
 		id, accID string
@@ -784,7 +854,7 @@ func TestAuthorityGetAuthz(t *testing.T) {
 					return ret, nil
 				},
 			}
-			acmeAz, err := az.toACME(mockdb, newDirectory("ca.smallstep.com", "acme"), prov)
+			acmeAz, err := az.toACME(ctx, mockdb, newDirectory("ca.smallstep.com", "acme"))
 			assert.FatalError(t, err)
 
 			count = 0
@@ -825,7 +895,7 @@ func TestAuthorityGetAuthz(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeAz, err := tc.auth.GetAuthz(prov, tc.accID, tc.id); err != nil {
+			if acmeAz, err := tc.auth.GetAuthz(ctx, tc.accID, tc.id); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -850,6 +920,8 @@ func TestAuthorityGetAuthz(t *testing.T) {
 
 func TestAuthorityNewOrder(t *testing.T) {
 	prov := newProv()
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
 	type test struct {
 		auth *Authority
 		ops  OrderOptions
@@ -903,7 +975,7 @@ func TestAuthorityNewOrder(t *testing.T) {
 						assert.Equals(t, bucket, orderTable)
 						var o order
 						assert.FatalError(t, json.Unmarshal(newval, &o))
-						*acmeO, err = o.toACME(nil, dir, prov)
+						*acmeO, err = o.toACME(ctx, nil, dir)
 						assert.FatalError(t, err)
 						*accID = o.AccountID
 					case 9:
@@ -928,7 +1000,7 @@ func TestAuthorityNewOrder(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeO, err := tc.auth.NewOrder(prov, tc.ops); err != nil {
+			if acmeO, err := tc.auth.NewOrder(ctx, tc.ops); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -951,6 +1023,10 @@ func TestAuthorityNewOrder(t *testing.T) {
 
 func TestAuthorityGetOrdersByAccount(t *testing.T) {
 	prov := newProv()
+	provName := url.PathEscape(prov.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, baseURL)
 	type test struct {
 		auth *Authority
 		id   string
@@ -1051,8 +1127,8 @@ func TestAuthorityGetOrdersByAccount(t *testing.T) {
 				auth: auth,
 				id:   id,
 				res: []string{
-					fmt.Sprintf("https://ca.smallstep.com/acme/%s/order/%s", URLSafeProvisionerName(prov), foo.ID),
-					fmt.Sprintf("https://ca.smallstep.com/acme/%s/order/%s", URLSafeProvisionerName(prov), baz.ID),
+					fmt.Sprintf("%s/acme/%s/order/%s", baseURL.String(), provName, foo.ID),
+					fmt.Sprintf("%s/acme/%s/order/%s", baseURL.String(), provName, baz.ID),
 				},
 			}
 		},
@@ -1060,7 +1136,7 @@ func TestAuthorityGetOrdersByAccount(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if orderLinks, err := tc.auth.GetOrdersByAccount(prov, tc.id); err != nil {
+			if orderLinks, err := tc.auth.GetOrdersByAccount(ctx, tc.id); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -1079,6 +1155,8 @@ func TestAuthorityGetOrdersByAccount(t *testing.T) {
 
 func TestAuthorityFinalizeOrder(t *testing.T) {
 	prov := newProv()
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
 	type test struct {
 		auth      *Authority
 		id, accID string
@@ -1174,7 +1252,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeO, err := tc.auth.FinalizeOrder(prov, tc.accID, tc.id, nil); err != nil {
+			if acmeO, err := tc.auth.FinalizeOrder(ctx, tc.accID, tc.id, nil); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -1187,7 +1265,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 					gotb, err := json.Marshal(acmeO)
 					assert.FatalError(t, err)
 
-					acmeExp, err := tc.o.toACME(nil, tc.auth.dir, prov)
+					acmeExp, err := tc.o.toACME(ctx, nil, tc.auth.dir)
 					assert.FatalError(t, err)
 					expb, err := json.Marshal(acmeExp)
 					assert.FatalError(t, err)
@@ -1201,6 +1279,8 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 
 func TestAuthorityValidateChallenge(t *testing.T) {
 	prov := newProv()
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
 	type test struct {
 		auth      *Authority
 		id, accID string
@@ -1297,7 +1377,7 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeCh, err := tc.auth.ValidateChallenge(prov, tc.accID, tc.id, nil); err != nil {
+			if acmeCh, err := tc.auth.ValidateChallenge(ctx, tc.accID, tc.id, nil); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -1310,7 +1390,7 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 					gotb, err := json.Marshal(acmeCh)
 					assert.FatalError(t, err)
 
-					acmeExp, err := tc.ch.toACME(nil, tc.auth.dir, prov)
+					acmeExp, err := tc.ch.toACME(ctx, nil, tc.auth.dir)
 					assert.FatalError(t, err)
 					expb, err := json.Marshal(acmeExp)
 					assert.FatalError(t, err)
@@ -1325,6 +1405,8 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 func TestAuthorityUpdateAccount(t *testing.T) {
 	contact := []string{"baz", "zap"}
 	prov := newProv()
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
 	type test struct {
 		auth    *Authority
 		id      string
@@ -1404,7 +1486,7 @@ func TestAuthorityUpdateAccount(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeAcc, err := tc.auth.UpdateAccount(prov, tc.id, tc.contact); err != nil {
+			if acmeAcc, err := tc.auth.UpdateAccount(ctx, tc.id, tc.contact); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -1417,7 +1499,7 @@ func TestAuthorityUpdateAccount(t *testing.T) {
 					gotb, err := json.Marshal(acmeAcc)
 					assert.FatalError(t, err)
 
-					acmeExp, err := tc.acc.toACME(nil, tc.auth.dir, prov)
+					acmeExp, err := tc.acc.toACME(ctx, nil, tc.auth.dir)
 					assert.FatalError(t, err)
 					expb, err := json.Marshal(acmeExp)
 					assert.FatalError(t, err)
@@ -1431,6 +1513,8 @@ func TestAuthorityUpdateAccount(t *testing.T) {
 
 func TestAuthorityDeactivateAccount(t *testing.T) {
 	prov := newProv()
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
 	type test struct {
 		auth *Authority
 		id   string
@@ -1507,7 +1591,7 @@ func TestAuthorityDeactivateAccount(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeAcc, err := tc.auth.DeactivateAccount(prov, tc.id); err != nil {
+			if acmeAcc, err := tc.auth.DeactivateAccount(ctx, tc.id); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -1520,7 +1604,7 @@ func TestAuthorityDeactivateAccount(t *testing.T) {
 					gotb, err := json.Marshal(acmeAcc)
 					assert.FatalError(t, err)
 
-					acmeExp, err := tc.acc.toACME(nil, tc.auth.dir, prov)
+					acmeExp, err := tc.acc.toACME(ctx, nil, tc.auth.dir)
 					assert.FatalError(t, err)
 					expb, err := json.Marshal(acmeExp)
 					assert.FatalError(t, err)
