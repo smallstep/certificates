@@ -28,7 +28,7 @@ func New(ctx context.Context, opts apiv1.Options) (*YubiKey, error) {
 		return nil, err
 	}
 	if len(cards) == 0 {
-		return nil, errors.New("error detecting yubikey")
+		return nil, errors.New("error detecting yubikey: try removing and reconnecting the device")
 	}
 
 	yk, err := piv.Open(cards[0])
