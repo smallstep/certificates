@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/kms"
 	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/certificates/kms/yubikey"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/ui"
 	"github.com/smallstep/cli/utils"
@@ -78,7 +78,7 @@ func main() {
 	}
 	c.Pin = string(pin)
 
-	k, err := yubikey.New(context.Background(), apiv1.Options{
+	k, err := kms.New(context.Background(), apiv1.Options{
 		Type: string(apiv1.YubiKey),
 		Pin:  c.Pin,
 	})
@@ -128,7 +128,7 @@ COPYRIGHT
 	os.Exit(1)
 }
 
-func checkSlot(k *yubikey.YubiKey, slot string) {
+func checkSlot(k kms.KeyManager, slot string) {
 	if _, err := k.GetPublicKey(&apiv1.GetPublicKeyRequest{
 		Name: slot,
 	}); err == nil {
@@ -138,7 +138,7 @@ func checkSlot(k *yubikey.YubiKey, slot string) {
 	}
 }
 
-func createPKI(k *yubikey.YubiKey, c Config) error {
+func createPKI(k kms.KeyManager, c Config) error {
 	var err error
 	ui.Println("Creating PKI ...")
 	now := time.Now()
@@ -199,11 +199,13 @@ func createPKI(k *yubikey.YubiKey, c Config) error {
 			return errors.Wrap(err, "error parsing root certificate")
 		}
 
-		if err = k.StoreCertificate(&apiv1.StoreCertificateRequest{
-			Name:        c.RootSlot,
-			Certificate: root,
-		}); err != nil {
-			return err
+		if cm, ok := k.(kms.CertificateManager); ok {
+			if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+				Name:        c.RootSlot,
+				Certificate: root,
+			}); err != nil {
+				return err
+			}
 		}
 
 		if err = utils.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
@@ -274,11 +276,13 @@ func createPKI(k *yubikey.YubiKey, c Config) error {
 		return errors.Wrap(err, "error parsing intermediate certificate")
 	}
 
-	if err = k.StoreCertificate(&apiv1.StoreCertificateRequest{
-		Name:        c.CrtSlot,
-		Certificate: intermediate,
-	}); err != nil {
-		return err
+	if cm, ok := k.(kms.CertificateManager); ok {
+		if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+			Name:        c.CrtSlot,
+			Certificate: intermediate,
+		}); err != nil {
+			return err
+		}
 	}
 
 	if err = utils.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
