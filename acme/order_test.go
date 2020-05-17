@@ -1137,7 +1137,7 @@ func TestOrderFinalize(t *testing.T) {
 				csr: csr,
 				sa: &mockSignAuth{
 					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
-						assert.Equals(t, len(signOps), 4)
+						assert.Equals(t, len(signOps), 5)
 						return []*x509.Certificate{crt, inter}, nil
 					},
 				},
@@ -1186,7 +1186,7 @@ func TestOrderFinalize(t *testing.T) {
 				csr: csr,
 				sa: &mockSignAuth{
 					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
-						assert.Equals(t, len(signOps), 4)
+						assert.Equals(t, len(signOps), 5)
 						return []*x509.Certificate{crt, inter}, nil
 					},
 				},
@@ -1233,7 +1233,7 @@ func TestOrderFinalize(t *testing.T) {
 				csr: csr,
 				sa: &mockSignAuth{
 					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
-						assert.Equals(t, len(signOps), 4)
+						assert.Equals(t, len(signOps), 5)
 						return []*x509.Certificate{crt, inter}, nil
 					},
 				},
