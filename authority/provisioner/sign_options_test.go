@@ -344,6 +344,88 @@ func Test_validityValidator_Valid(t *testing.T) {
 	}
 }
 
+func Test_forceCN_Option(t *testing.T) {
+	type test struct {
+		so    Options
+		fcn   forceCNOption
+		cert  *x509.Certificate
+		valid func(*x509.Certificate)
+		err   error
+	}
+
+	tests := map[string]func() test{
+		"ok/CN-not-forced": func() test {
+			return test{
+				fcn: forceCNOption{false},
+				so:  Options{},
+				cert: &x509.Certificate{
+					Subject:  pkix.Name{},
+					DNSNames: []string{"acme.example.com", "step.example.com"},
+				},
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.Subject.CommonName, "")
+				},
+			}
+		},
+		"ok/CN-forced-and-set": func() test {
+			return test{
+				fcn: forceCNOption{true},
+				so:  Options{},
+				cert: &x509.Certificate{
+					Subject: pkix.Name{
+						CommonName: "Some Common Name",
+					},
+					DNSNames: []string{"acme.example.com", "step.example.com"},
+				},
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.Subject.CommonName, "Some Common Name")
+				},
+			}
+		},
+		"ok/CN-forced-and-not-set": func() test {
+			return test{
+				fcn: forceCNOption{true},
+				so:  Options{},
+				cert: &x509.Certificate{
+					Subject:  pkix.Name{},
+					DNSNames: []string{"acme.example.com", "step.example.com"},
+				},
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.Subject.CommonName, "acme.example.com")
+				},
+			}
+		},
+		"fail/CN-forced-and-empty-DNSNames": func() test {
+			return test{
+				fcn: forceCNOption{true},
+				so:  Options{},
+				cert: &x509.Certificate{
+					Subject:  pkix.Name{},
+					DNSNames: []string{},
+				},
+				err: errors.New("Cannot force CN, DNSNames is empty"),
+			}
+		},
+	}
+
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tt := run()
+			prof := &x509util.Leaf{}
+			prof.SetSubject(tt.cert)
+			if err := tt.fcn.Option(tt.so)(prof); err != nil {
+				if assert.NotNil(t, tt.err) {
+					assert.HasPrefix(t, err.Error(), tt.err.Error())
+				}
+			} else {
+				if assert.Nil(t, tt.err) {
+					tt.valid(prof.Subject())
+				}
+			}
+		})
+	}
+}
+
 func Test_profileDefaultDuration_Option(t *testing.T) {
 	type test struct {
 		so    Options

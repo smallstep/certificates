@@ -15,6 +15,7 @@ type ACME struct {
 	Type    string  `json:"type"`
 	Name    string  `json:"name"`
 	Claims  *Claims `json:"claims,omitempty"`
+	ForceCN bool    `json:"forceCN,omitempty"`
 	claimer *Claimer
 }
 
@@ -67,6 +68,7 @@ func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	return []SignOption{
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeACME, p.Name, ""),
+		newForceCNOption(p.ForceCN),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
