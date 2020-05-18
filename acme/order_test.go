@@ -6,6 +6,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"testing"
 	"time"
 
@@ -150,6 +151,10 @@ func TestGetOrder(t *testing.T) {
 func TestOrderToACME(t *testing.T) {
 	dir := newDirectory("ca.smallstep.com", "acme")
 	prov := newProv()
+	provName := url.PathEscape(prov.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, baseURL)
 
 	type test struct {
 		o   *order
@@ -172,7 +177,7 @@ func TestOrderToACME(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			acmeOrder, err := tc.o.toACME(nil, dir, prov)
+			acmeOrder, err := tc.o.toACME(ctx, nil, dir)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
@@ -186,9 +191,10 @@ func TestOrderToACME(t *testing.T) {
 					assert.Equals(t, acmeOrder.ID, tc.o.ID)
 					assert.Equals(t, acmeOrder.Status, tc.o.Status)
 					assert.Equals(t, acmeOrder.Identifiers, tc.o.Identifiers)
-					assert.Equals(t, acmeOrder.Finalize, fmt.Sprintf("https://ca.smallstep.com/acme/%s/order/%s/finalize", URLSafeProvisionerName(prov), tc.o.ID))
+					assert.Equals(t, acmeOrder.Finalize,
+						fmt.Sprintf("%s/acme/%s/order/%s/finalize", baseURL.String(), provName, tc.o.ID))
 					if tc.o.Certificate != "" {
-						assert.Equals(t, acmeOrder.Certificate, fmt.Sprintf("https://ca.smallstep.com/acme/%s/certificate/%s", URLSafeProvisionerName(prov), tc.o.Certificate))
+						assert.Equals(t, acmeOrder.Certificate, fmt.Sprintf("%s/acme/%s/certificate/%s", baseURL.String(), provName, tc.o.Certificate))
 					}
 
 					expiry, err := time.Parse(time.RFC3339, acmeOrder.Expires)

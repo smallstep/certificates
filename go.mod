@@ -7,12 +7,14 @@ require (
 	github.com/Masterminds/sprig/v3 v3.0.0
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/googleapis/gax-go/v2 v2.0.5
+	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
+	github.com/lunixbochs/vtclean v1.0.0 // indirect
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.8.1
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smallstep/assert v0.0.0-20200103212524-b99dc1097b15
-	github.com/smallstep/cli v0.14.3-rc.1
+	github.com/smallstep/cli v0.14.3
 	github.com/smallstep/nosql v0.3.0
 	github.com/urfave/cli v1.22.2
 	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59

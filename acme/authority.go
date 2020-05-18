@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"context"
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
@@ -20,23 +21,29 @@ import (
 
 // Interface is the acme authority interface.
 type Interface interface {
-	DeactivateAccount(provisioner.Interface, string) (*Account, error)
-	FinalizeOrder(provisioner.Interface, string, string, *x509.CertificateRequest) (*Order, error)
-	GetAccount(provisioner.Interface, string) (*Account, error)
-	GetAccountByKey(provisioner.Interface, *jose.JSONWebKey) (*Account, error)
-	GetAuthz(provisioner.Interface, string, string) (*Authz, error)
-	GetCertificate(string, string) ([]byte, error)
-	GetDirectory(provisioner.Interface) *Directory
-	GetLink(Link, string, bool, ...string) string
-	GetOrder(provisioner.Interface, string, string) (*Order, error)
-	GetOrdersByAccount(provisioner.Interface, string) ([]string, error)
-	LoadProvisionerByID(string) (provisioner.Interface, error)
-	NewAccount(provisioner.Interface, AccountOptions) (*Account, error)
+	GetDirectory(ctx context.Context) (*Directory, error)
 	NewNonce() (string, error)
-	NewOrder(provisioner.Interface, OrderOptions) (*Order, error)
-	UpdateAccount(provisioner.Interface, string, []string) (*Account, error)
 	UseNonce(string) error
-	ValidateChallenge(provisioner.Interface, string, string, *jose.JSONWebKey) (*Challenge, error)
+
+	DeactivateAccount(ctx context.Context, accID string) (*Account, error)
+	GetAccount(ctx context.Context, accID string) (*Account, error)
+	GetAccountByKey(ctx context.Context, key *jose.JSONWebKey) (*Account, error)
+	NewAccount(ctx context.Context, ao AccountOptions) (*Account, error)
+	UpdateAccount(context.Context, string, []string) (*Account, error)
+
+	GetAuthz(ctx context.Context, accID string, authzID string) (*Authz, error)
+	ValidateChallenge(ctx context.Context, accID string, chID string, key *jose.JSONWebKey) (*Challenge, error)
+
+	FinalizeOrder(ctx context.Context, accID string, orderID string, csr *x509.CertificateRequest) (*Order, error)
+	GetOrder(ctx context.Context, accID string, orderID string) (*Order, error)
+	GetOrdersByAccount(ctx context.Context, accID string) ([]string, error)
+	NewOrder(ctx context.Context, oo OrderOptions) (*Order, error)
+
+	GetCertificate(string, string) ([]byte, error)
+
+	LoadProvisionerByID(string) (provisioner.Interface, error)
+	GetLink(ctx context.Context, linkType Link, absoluteLink bool, inputs ...string) string
+	GetLinkExplicit(linkType Link, provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
 }
 
 // Authority is the layer that handles all ACME interactions.
@@ -79,20 +86,24 @@ func NewAuthority(db nosql.DB, dns, prefix string, signAuth SignAuthority, ordin
 }
 
 // GetLink returns the requested link from the directory.
-func (a *Authority) GetLink(typ Link, provID string, abs bool, inputs ...string) string {
-	return a.dir.getLink(typ, provID, abs, inputs...)
+func (a *Authority) GetLink(ctx context.Context, typ Link, abs bool, inputs ...string) string {
+	return a.dir.getLink(ctx, typ, abs, inputs...)
+}
+
+// GetLinkExplicit returns the requested link from the directory.
+func (a *Authority) GetLinkExplicit(typ Link, provName string, abs bool, baseURL *url.URL, inputs ...string) string {
+	return a.dir.getLinkExplicit(typ, provName, abs, baseURL, inputs...)
 }
 
 // GetDirectory returns the ACME directory object.
-func (a *Authority) GetDirectory(p provisioner.Interface) *Directory {
-	name := url.PathEscape(p.GetName())
+func (a *Authority) GetDirectory(ctx context.Context) (*Directory, error) {
 	return &Directory{
-		NewNonce:   a.dir.getLink(NewNonceLink, name, true),
-		NewAccount: a.dir.getLink(NewAccountLink, name, true),
-		NewOrder:   a.dir.getLink(NewOrderLink, name, true),
-		RevokeCert: a.dir.getLink(RevokeCertLink, name, true),
-		KeyChange:  a.dir.getLink(KeyChangeLink, name, true),
-	}
+		NewNonce:   a.dir.getLink(ctx, NewNonceLink, true),
+		NewAccount: a.dir.getLink(ctx, NewAccountLink, true),
+		NewOrder:   a.dir.getLink(ctx, NewOrderLink, true),
+		RevokeCert: a.dir.getLink(ctx, RevokeCertLink, true),
+		KeyChange:  a.dir.getLink(ctx, KeyChangeLink, true),
+	}, nil
 }
 
 // LoadProvisionerByID calls out to the SignAuthority interface to load a
@@ -116,16 +127,16 @@ func (a *Authority) UseNonce(nonce string) error {
 }
 
 // NewAccount creates, stores, and returns a new ACME account.
-func (a *Authority) NewAccount(p provisioner.Interface, ao AccountOptions) (*Account, error) {
+func (a *Authority) NewAccount(ctx context.Context, ao AccountOptions) (*Account, error) {
 	acc, err := newAccount(a.db, ao)
 	if err != nil {
 		return nil, err
 	}
-	return acc.toACME(a.db, a.dir, p)
+	return acc.toACME(ctx, a.db, a.dir)
 }
 
 // UpdateAccount updates an ACME account.
-func (a *Authority) UpdateAccount(p provisioner.Interface, id string, contact []string) (*Account, error) {
+func (a *Authority) UpdateAccount(ctx context.Context, id string, contact []string) (*Account, error) {
 	acc, err := getAccountByID(a.db, id)
 	if err != nil {
 		return nil, ServerInternalErr(err)
@@ -133,20 +144,20 @@ func (a *Authority) UpdateAccount(p provisioner.Interface, id string, contact []
 	if acc, err = acc.update(a.db, contact); err != nil {
 		return nil, err
 	}
-	return acc.toACME(a.db, a.dir, p)
+	return acc.toACME(ctx, a.db, a.dir)
 }
 
 // GetAccount returns an ACME account.
-func (a *Authority) GetAccount(p provisioner.Interface, id string) (*Account, error) {
+func (a *Authority) GetAccount(ctx context.Context, id string) (*Account, error) {
 	acc, err := getAccountByID(a.db, id)
 	if err != nil {
 		return nil, err
 	}
-	return acc.toACME(a.db, a.dir, p)
+	return acc.toACME(ctx, a.db, a.dir)
 }
 
 // DeactivateAccount deactivates an ACME account.
-func (a *Authority) DeactivateAccount(p provisioner.Interface, id string) (*Account, error) {
+func (a *Authority) DeactivateAccount(ctx context.Context, id string) (*Account, error) {
 	acc, err := getAccountByID(a.db, id)
 	if err != nil {
 		return nil, err
@@ -154,7 +165,7 @@ func (a *Authority) DeactivateAccount(p provisioner.Interface, id string) (*Acco
 	if acc, err = acc.deactivate(a.db); err != nil {
 		return nil, err
 	}
-	return acc.toACME(a.db, a.dir, p)
+	return acc.toACME(ctx, a.db, a.dir)
 }
 
 func keyToID(jwk *jose.JSONWebKey) (string, error) {
@@ -166,7 +177,7 @@ func keyToID(jwk *jose.JSONWebKey) (string, error) {
 }
 
 // GetAccountByKey returns the ACME associated with the jwk id.
-func (a *Authority) GetAccountByKey(p provisioner.Interface, jwk *jose.JSONWebKey) (*Account, error) {
+func (a *Authority) GetAccountByKey(ctx context.Context, jwk *jose.JSONWebKey) (*Account, error) {
 	kid, err := keyToID(jwk)
 	if err != nil {
 		return nil, err
@@ -175,11 +186,11 @@ func (a *Authority) GetAccountByKey(p provisioner.Interface, jwk *jose.JSONWebKe
 	if err != nil {
 		return nil, err
 	}
-	return acc.toACME(a.db, a.dir, p)
+	return acc.toACME(ctx, a.db, a.dir)
 }
 
 // GetOrder returns an ACME order.
-func (a *Authority) GetOrder(p provisioner.Interface, accID, orderID string) (*Order, error) {
+func (a *Authority) GetOrder(ctx context.Context, accID, orderID string) (*Order, error) {
 	o, err := getOrder(a.db, orderID)
 	if err != nil {
 		return nil, err
@@ -190,11 +201,11 @@ func (a *Authority) GetOrder(p provisioner.Interface, accID, orderID string) (*O
 	if o, err = o.updateStatus(a.db); err != nil {
 		return nil, err
 	}
-	return o.toACME(a.db, a.dir, p)
+	return o.toACME(ctx, a.db, a.dir)
 }
 
 // GetOrdersByAccount returns the list of order urls owned by the account.
-func (a *Authority) GetOrdersByAccount(p provisioner.Interface, id string) ([]string, error) {
+func (a *Authority) GetOrdersByAccount(ctx context.Context, id string) ([]string, error) {
 	oids, err := getOrderIDsByAccount(a.db, id)
 	if err != nil {
 		return nil, err
@@ -209,22 +220,26 @@ func (a *Authority) GetOrdersByAccount(p provisioner.Interface, id string) ([]st
 		if o.Status == StatusInvalid {
 			continue
 		}
-		ret = append(ret, a.dir.getLink(OrderLink, URLSafeProvisionerName(p), true, o.ID))
+		ret = append(ret, a.dir.getLink(ctx, OrderLink, true, o.ID))
 	}
 	return ret, nil
 }
 
 // NewOrder generates, stores, and returns a new ACME order.
-func (a *Authority) NewOrder(p provisioner.Interface, ops OrderOptions) (*Order, error) {
+func (a *Authority) NewOrder(ctx context.Context, ops OrderOptions) (*Order, error) {
 	order, err := newOrder(a.db, ops)
 	if err != nil {
 		return nil, Wrap(err, "error creating order")
 	}
-	return order.toACME(a.db, a.dir, p)
+	return order.toACME(ctx, a.db, a.dir)
 }
 
 // FinalizeOrder attempts to finalize an order and generate a new certificate.
-func (a *Authority) FinalizeOrder(p provisioner.Interface, accID, orderID string, csr *x509.CertificateRequest) (*Order, error) {
+func (a *Authority) FinalizeOrder(ctx context.Context, accID, orderID string, csr *x509.CertificateRequest) (*Order, error) {
+	prov, err := ProvisionerFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	o, err := getOrder(a.db, orderID)
 	if err != nil {
 		return nil, err
@@ -232,16 +247,16 @@ func (a *Authority) FinalizeOrder(p provisioner.Interface, accID, orderID string
 	if accID != o.AccountID {
 		return nil, UnauthorizedErr(errors.New("account does not own order"))
 	}
-	o, err = o.finalize(a.db, csr, a.signAuth, p)
+	o, err = o.finalize(a.db, csr, a.signAuth, prov)
 	if err != nil {
 		return nil, Wrap(err, "error finalizing order")
 	}
-	return o.toACME(a.db, a.dir, p)
+	return o.toACME(ctx, a.db, a.dir)
 }
 
 // GetAuthz retrieves and attempts to update the status on an ACME authz
 // before returning.
-func (a *Authority) GetAuthz(p provisioner.Interface, accID, authzID string) (*Authz, error) {
+func (a *Authority) GetAuthz(ctx context.Context, accID, authzID string) (*Authz, error) {
 	az, err := getAuthz(a.db, authzID)
 	if err != nil {
 		return nil, err
@@ -253,7 +268,7 @@ func (a *Authority) GetAuthz(p provisioner.Interface, accID, authzID string) (*A
 	if err != nil {
 		return nil, Wrap(err, "error updating authz status")
 	}
-	return az.toACME(a.db, a.dir, p)
+	return az.toACME(ctx, a.db, a.dir)
 }
 
 // ValidateChallenge loads a challenge resource and then begins the validation process if the challenge
@@ -296,7 +311,7 @@ func (a *Authority) GetAuthz(p provisioner.Interface, accID, authzID string) (*A
 //
 // Note: the default ordinal does not need to be changed unless step-ca is running in a replicated scenario.
 //
-func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID string, jwk *jose.JSONWebKey) (*Challenge, error) {
+func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, jwk *jose.JSONWebKey) (*Challenge, error) {
 	ch, err := getChallenge(a.db, chID)
 	if err != nil {
 		return nil, err
@@ -305,7 +320,7 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 	case StatusPending, StatusProcessing:
 		break
 	case StatusInvalid, StatusValid:
-		return ch.toACME(a.dir, p)
+		return ch.toACME(ctx, a.dir)
 	default:
 		e:= errors.Errorf("unknown challenge state: %s", ch.getStatus())
 		return nil, ServerInternalErr(e)
@@ -314,6 +329,11 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 	// Validate the challenge belongs to the account owned by the requester.
 	if accID != ch.getAccountID() {
 		return nil, UnauthorizedErr(errors.New("account does not own challenge"))
+	}
+
+	p, err := ProvisionerFromContext(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	// Take ownership of the challenge status and retry state. The values must be reset.
@@ -357,7 +377,7 @@ func (a *Authority) ValidateChallenge(p provisioner.Interface, accID, chID strin
 		e := errors.Errorf("post-validation challenge in unexpected state, %s", ch.getStatus())
 		return nil, ServerInternalErr(e)
 	}
-	return ch.toACME(a.dir, p)
+	return ch.toACME(ctx, a.dir)
 }
 
 // The challenge validation process is specific to the type of challenge (dns-01, http-01, tls-alpn-01).
@@ -434,9 +454,14 @@ func (a *Authority) RetryChallenge(chID string) {
 	ch = up
 
 	p, err := a.LoadProvisionerByID(retry.ProvisionerID)
-	acc, err := a.GetAccount(p, ch.getAccountID())
+	if p.GetType() != provisioner.TypeACME {
+		log.Printf("%v", AccountDoesNotExistErr(errors.New("provisioner must be of type ACME")))
+		return
+	}
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, p)
+	acc, err := a.GetAccount(ctx, ch.getAccountID())
 
-	v, err := a.validate(up, acc.Key)
+	v, err := a.validate(ch, acc.Key)
 	if err != nil {
 		return
 	}

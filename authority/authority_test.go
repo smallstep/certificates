@@ -1,8 +1,13 @@
 package authority
 
 import (
+	"crypto"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/hex"
+	"io/ioutil"
+	"net"
 	"reflect"
 	"testing"
 
@@ -10,6 +15,7 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/cli/crypto/pemutil"
 	stepJOSE "github.com/smallstep/cli/jose"
 )
 
@@ -181,4 +187,124 @@ func TestAuthority_GetDatabase(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewEmbedded(t *testing.T) {
+	caPEM, err := ioutil.ReadFile("testdata/certs/root_ca.crt")
+	assert.FatalError(t, err)
+
+	crt, err := pemutil.ReadCertificate("testdata/certs/intermediate_ca.crt")
+	assert.FatalError(t, err)
+	key, err := pemutil.Read("testdata/secrets/intermediate_ca_key", pemutil.WithPassword([]byte("pass")))
+	assert.FatalError(t, err)
+
+	type args struct {
+		opts []Option
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"ok", args{[]Option{WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer))}}, false},
+		{"ok empty config", args{[]Option{WithConfig(&Config{}), WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer))}}, false},
+		{"ok config file", args{[]Option{WithConfigFile("../ca/testdata/ca.json")}}, false},
+		{"ok config", args{[]Option{WithConfig(&Config{
+			Root:             []string{"testdata/certs/root_ca.crt"},
+			IntermediateCert: "testdata/certs/intermediate_ca.crt",
+			IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+			Password:         "pass",
+			AuthorityConfig:  &AuthConfig{},
+		})}}, false},
+		{"fail options", args{[]Option{WithX509RootBundle([]byte("bad data"))}}, true},
+		{"fail missing config", args{[]Option{WithConfig(nil), WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer))}}, true},
+		{"fail missing root", args{[]Option{WithX509Signer(crt, key.(crypto.Signer))}}, true},
+		{"fail missing signer", args{[]Option{WithX509RootBundle(caPEM)}}, true},
+		{"fail missing root file", args{[]Option{WithConfig(&Config{
+			IntermediateCert: "testdata/certs/intermediate_ca.crt",
+			IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+			Password:         "pass",
+			AuthorityConfig:  &AuthConfig{},
+		})}}, true},
+		{"fail missing issuer", args{[]Option{WithConfig(&Config{
+			Root:            []string{"testdata/certs/root_ca.crt"},
+			IntermediateKey: "testdata/secrets/intermediate_ca_key",
+			Password:        "pass",
+			AuthorityConfig: &AuthConfig{},
+		})}}, true},
+		{"fail missing signer", args{[]Option{WithConfig(&Config{
+			Root:             []string{"testdata/certs/root_ca.crt"},
+			IntermediateCert: "testdata/certs/intermediate_ca.crt",
+			Password:         "pass",
+			AuthorityConfig:  &AuthConfig{},
+		})}}, true},
+		{"fail bad password", args{[]Option{WithConfig(&Config{
+			Root:             []string{"testdata/certs/root_ca.crt"},
+			IntermediateCert: "testdata/certs/intermediate_ca.crt",
+			IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+			Password:         "bad",
+			AuthorityConfig:  &AuthConfig{},
+		})}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewEmbedded(tt.args.opts...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewEmbedded() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err == nil {
+				assert.True(t, got.initOnce)
+				assert.NotNil(t, got.rootX509Certs)
+				assert.NotNil(t, got.x509Signer)
+				assert.NotNil(t, got.x509Issuer)
+			}
+		})
+	}
+}
+
+func TestNewEmbedded_Sign(t *testing.T) {
+	caPEM, err := ioutil.ReadFile("testdata/certs/root_ca.crt")
+	assert.FatalError(t, err)
+
+	crt, err := pemutil.ReadCertificate("testdata/certs/intermediate_ca.crt")
+	assert.FatalError(t, err)
+	key, err := pemutil.Read("testdata/secrets/intermediate_ca_key", pemutil.WithPassword([]byte("pass")))
+	assert.FatalError(t, err)
+
+	a, err := NewEmbedded(WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer)))
+	assert.FatalError(t, err)
+
+	// Sign
+	cr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
+		DNSNames: []string{"foo.bar.zar"},
+	}, key)
+	assert.FatalError(t, err)
+	csr, err := x509.ParseCertificateRequest(cr)
+	assert.FatalError(t, err)
+
+	cert, err := a.Sign(csr, provisioner.Options{})
+	assert.FatalError(t, err)
+	assert.Equals(t, []string{"foo.bar.zar"}, cert[0].DNSNames)
+	assert.Equals(t, crt, cert[1])
+}
+
+func TestNewEmbedded_GetTLSCertificate(t *testing.T) {
+	caPEM, err := ioutil.ReadFile("testdata/certs/root_ca.crt")
+	assert.FatalError(t, err)
+
+	crt, err := pemutil.ReadCertificate("testdata/certs/intermediate_ca.crt")
+	assert.FatalError(t, err)
+	key, err := pemutil.Read("testdata/secrets/intermediate_ca_key", pemutil.WithPassword([]byte("pass")))
+	assert.FatalError(t, err)
+
+	a, err := NewEmbedded(WithX509RootBundle(caPEM), WithX509Signer(crt, key.(crypto.Signer)))
+	assert.FatalError(t, err)
+
+	// GetTLSCertificate
+	cert, err := a.GetTLSCertificate()
+	assert.FatalError(t, err)
+	assert.Equals(t, []string{"localhost"}, cert.Leaf.DNSNames)
+	assert.True(t, cert.Leaf.IPAddresses[0].Equal(net.ParseIP("127.0.0.1")))
+	assert.True(t, cert.Leaf.IPAddresses[1].Equal(net.ParseIP("::1")))
 }

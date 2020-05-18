@@ -1,8 +1,10 @@
 package acme
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"testing"
 	"time"
 
@@ -332,6 +334,10 @@ func TestGetAccountIDsByAccount(t *testing.T) {
 func TestAccountToACME(t *testing.T) {
 	dir := newDirectory("ca.smallstep.com", "acme")
 	prov := newProv()
+	provName := url.PathEscape(prov.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, baseURL)
 
 	type test struct {
 		acc *account
@@ -347,7 +353,7 @@ func TestAccountToACME(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			acmeAccount, err := tc.acc.toACME(nil, dir, prov)
+			acmeAccount, err := tc.acc.toACME(ctx, nil, dir)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
@@ -363,7 +369,7 @@ func TestAccountToACME(t *testing.T) {
 					assert.Equals(t, acmeAccount.Contact, tc.acc.Contact)
 					assert.Equals(t, acmeAccount.Key.KeyID, tc.acc.Key.KeyID)
 					assert.Equals(t, acmeAccount.Orders,
-						fmt.Sprintf("https://ca.smallstep.com/acme/%s/account/%s/orders", URLSafeProvisionerName(prov), tc.acc.ID))
+						fmt.Sprintf("%s/acme/%s/account/%s/orders", baseURL.String(), provName, tc.acc.ID))
 				}
 			}
 		})

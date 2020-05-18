@@ -4,6 +4,70 @@ Provisioners are people or code that are registered with the CA and authorized
 to issue "provisioning tokens". Provisioning tokens are single-use tokens that
 can be used to authenticate with the CA and get a certificate.
 
+Each provisioner can define an optional `claims` attribute. The settings in this
+attribute override any settings in the global `claims` attribute in the authority
+configuration.
+
+Example `claims`:
+
+```
+    ...
+    "claims": {
+        "minTLSCertDuration": "5m",
+        "maxTLSCertDuration": "24h",
+        "defaultTLSCertDuration": "24h",
+        "disableRenewal": false
+        "minHostSSHCertDuration": "5m",
+        "maxHostSSHCertDuration": "1680h",
+        "minUserSSHCertDuration": "5m",
+        "maxUserSSHCertDuration": "24h",
+        "maxTLSCertDuration": "16h",
+        "enableSSHCA": true,
+    }
+    ...
+```
+
+* `claims` (optional): overwrites the default claims set in the authority.
+  You can set one or more of the following claims:
+
+  * `minTLSCertDuration`: do not allow certificates with a duration less than
+    this value.
+
+  * `maxTLSCertDuration`: do not allow certificates with a duration greater than
+    this value.
+
+  * `defaultTLSCertDuration`: if no certificate validity period is specified,
+    use this value.
+
+  * `disableIssuedAtCheck`: disable a check verifying that provisioning tokens
+    must be issued after the CA has booted. This claim is one prevention against
+    token reuse. The default value is `false`. Do not change this unless you
+    know what you are doing.
+
+  SSH CA properties
+
+  * `minUserSSHDuration`: do not allow certificates with a duration less
+  than this value.
+
+  * `maxUserSSHDuration`: do not allow certificates with a duration
+  greater than this value.
+
+  * `defaultUserSSHDuration`: if no certificate validity period is specified,
+  use this value.
+
+  * `minHostSSHDuration`: do not allow certificates with a duration less
+  than this value.
+
+  * `maxHostSSHDuration`: do not allow certificates with a duration
+  greater than this value.
+
+  * `defaultHostSSHDuration`: if no certificate validity period is specified,
+  use this value.
+
+  * `enableSSHCA`: enable all provisioners to generate SSH Certificates.
+  The deault value is `false`. You can enable this option per provisioner
+  by setting it to `true` in the provisioner claims.
+
 ## JWK
 
 JWK is the default provisioner type. It uses public-key cryptography to sign and
@@ -35,6 +99,12 @@ In the ca.json configuration file, a complete JWK provisioner example looks like
         "maxTLSCertDuration": "24h",
         "defaultTLSCertDuration": "24h",
         "disableRenewal": false
+        "minHostSSHCertDuration": "5m",
+        "maxHostSSHCertDuration": "1680h",
+        "minUserSSHCertDuration": "5m",
+        "maxUserSSHCertDuration": "24h",
+        "maxTLSCertDuration": "16h",
+        "enableSSHCA": true,
     }
 }
 ```
@@ -74,23 +144,6 @@ In the ca.json configuration file, a complete JWK provisioner example looks like
   If the ca.json does not contain the encryptedKey, the private key must be
   provided using the `--key` flag of the `step ca token` to be able to sign the
   token.
-
-* `claims` (optional): overwrites the default claims set in the authority.
-  You can set one or more of the following claims:
-
-  * `minTLSCertDuration`: do not allow certificates with a duration less than
-    this value.
-
-  * `maxTLSCertDuration`: do not allow certificates with a duration greater than
-    this value.
-
-  * `defaultTLSCertDuration`: if no certificate validity period is specified,
-    use this value.
-
-  * `disableIssuedAtCheck`: disable a check verifying that provisioning tokens
-    must be issued after the CA has booted. This claim is one prevention against
-    token reuse. The default value is `false`. Do not change this unless you
-    know what you are doing.
 
 ## OIDC
 
@@ -149,7 +202,7 @@ is G-Suite.
   port to be specified at the time of the request for loopback IP redirect URIs.
 
 * `claims` (optional): overwrites the default claims set in the authority, see
-  the [JWK](#jwk) section for all the options.
+  the [top](#provisioners) section for all the options.
 
 ## Provisioners for Cloud Identities
 
@@ -213,7 +266,7 @@ In the ca.json, an AWS provisioner looks like:
   certificate. The instance age is a string using the duration format.
 
 * `claims` (optional): overwrites the default claims set in the authority, see
-  the [JWK](#jwk) section for all the options.
+  the [top](#provisioners) section for all the options.
 
 ### GCP
 
@@ -265,7 +318,7 @@ In the ca.json, a GCP provisioner looks like:
   certificate. The instance age is a string using the duration format.
 
 * `claims` (optional): overwrites the default claims set in the authority, see
-  the [JWK](#jwk) section for all the options.
+  the [top](#provisioners) section for all the options.
 
 ### Azure
 
@@ -315,4 +368,4 @@ In the ca.json, an Azure provisioner looks like:
   and different tokens can be used to get different certificates.
 
 * `claims` (optional): overwrites the default claims set in the authority, see
-  the [JWK](#jwk) section for all the options.
+  the [top](#provisioners) section for all the options.

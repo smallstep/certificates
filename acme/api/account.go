@@ -65,18 +65,15 @@ func (u *UpdateAccountRequest) Validate() error {
 		}
 		return nil
 	default:
-		return acme.MalformedErr(errors.Errorf("empty update request"))
+		// According to the ACME spec (https://tools.ietf.org/html/rfc8555#section-7.3.2)
+		// accountUpdate should ignore any fields not recognized by the server.
+		return nil
 	}
 }
 
 // NewAccount is the handler resource for creating new ACME accounts.
 func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
-	prov, err := provisionerFromContext(r)
-	if err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	payload, err := payloadFromContext(r)
+	payload, err := payloadFromContext(r.Context())
 	if err != nil {
 		api.WriteError(w, err)
 		return
@@ -93,7 +90,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpStatus := http.StatusCreated
-	acc, err := accountFromContext(r)
+	acc, err := acme.AccountFromContext(r.Context())
 	if err != nil {
 		acmeErr, ok := err.(*acme.Error)
 		if !ok || acmeErr.Status != http.StatusBadRequest {
@@ -107,13 +104,13 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, acme.AccountDoesNotExistErr(nil))
 			return
 		}
-		jwk, err := jwkFromContext(r)
+		jwk, err := acme.JwkFromContext(r.Context())
 		if err != nil {
 			api.WriteError(w, err)
 			return
 		}
 
-		if acc, err = h.Auth.NewAccount(prov, acme.AccountOptions{
+		if acc, err = h.Auth.NewAccount(r.Context(), acme.AccountOptions{
 			Key:     jwk,
 			Contact: nar.Contact,
 		}); err != nil {
@@ -125,29 +122,26 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 		httpStatus = http.StatusOK
 	}
 
-	w.Header().Set("Location", h.Auth.GetLink(acme.AccountLink,
-		acme.URLSafeProvisionerName(prov), true, acc.GetID()))
+	w.Header().Set("Location", h.Auth.GetLink(r.Context(), acme.AccountLink,
+		true, acc.GetID()))
 	api.JSONStatus(w, acc, httpStatus)
 }
 
 // GetUpdateAccount is the api for updating an ACME account.
 func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
-	prov, err := provisionerFromContext(r)
+	acc, err := acme.AccountFromContext(r.Context())
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
-	acc, err := accountFromContext(r)
-	if err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	payload, err := payloadFromContext(r)
+	payload, err := payloadFromContext(r.Context())
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
+	// If PostAsGet just respond with the account, otherwise process like a
+	// normal Post request.
 	if !payload.isPostAsGet {
 		var uar UpdateAccountRequest
 		if err := json.Unmarshal(payload.value, &uar); err != nil {
@@ -159,17 +153,21 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var err error
+		// If neither the status nor the contacts are being updated then ignore
+		// the updates and return 200. This conforms with the behavior detailed
+		// in the ACME spec (https://tools.ietf.org/html/rfc8555#section-7.3.2).
 		if uar.IsDeactivateRequest() {
-			acc, err = h.Auth.DeactivateAccount(prov, acc.GetID())
-		} else {
-			acc, err = h.Auth.UpdateAccount(prov, acc.GetID(), uar.Contact)
+			acc, err = h.Auth.DeactivateAccount(r.Context(), acc.GetID())
+		} else if len(uar.Contact) > 0 {
+			acc, err = h.Auth.UpdateAccount(r.Context(), acc.GetID(), uar.Contact)
 		}
 		if err != nil {
 			api.WriteError(w, err)
 			return
 		}
 	}
-	w.Header().Set("Location", h.Auth.GetLink(acme.AccountLink, acme.URLSafeProvisionerName(prov), true, acc.GetID()))
+	w.Header().Set("Location", h.Auth.GetLink(r.Context(), acme.AccountLink,
+		true, acc.GetID()))
 	api.JSON(w, acc)
 }
 
@@ -184,23 +182,17 @@ func logOrdersByAccount(w http.ResponseWriter, oids []string) {
 
 // GetOrdersByAccount ACME api for retrieving the list of order urls belonging to an account.
 func (h *Handler) GetOrdersByAccount(w http.ResponseWriter, r *http.Request) {
-	prov, err := provisionerFromContext(r)
+	acc, err := acme.AccountFromContext(r.Context())
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
-	acc, err := accountFromContext(r)
-	if err != nil {
-		api.WriteError(w, err)
-		return
-	}
-
 	accID := chi.URLParam(r, "accID")
 	if acc.ID != accID {
 		api.WriteError(w, acme.UnauthorizedErr(errors.New("account ID does not match url param")))
 		return
 	}
-	orders, err := h.Auth.GetOrdersByAccount(prov, acc.GetID())
+	orders, err := h.Auth.GetOrdersByAccount(r.Context(), acc.GetID())
 	if err != nil {
 		api.WriteError(w, err)
 		return

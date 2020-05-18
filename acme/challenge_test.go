@@ -2,6 +2,7 @@ package acme
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -20,6 +21,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -280,6 +282,10 @@ func TestChallengeToACME_Valid(t *testing.T) {
 	}
 
 	prov := newProv()
+	provName := url.PathEscape(prov.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, baseURL)
 	tests := map[string]challenge{
 		"dns":      chs[0],
 		"http":     chs[1],
@@ -288,15 +294,15 @@ func TestChallengeToACME_Valid(t *testing.T) {
 
 	for name, ch := range tests {
 		t.Run(name, func(t *testing.T) {
-			ach, err := ch.toACME(dir, prov)
+			ach, err := ch.toACME(ctx, dir)
 			assert.FatalError(t, err)
 
 			assert.Equals(t, ach.Type, ch.getType())
 			assert.Equals(t, ach.Status, ch.getStatus())
 			assert.Equals(t, ach.Token, ch.getToken())
 			assert.Equals(t, ach.URL,
-				fmt.Sprintf("https://ca.smallstep.com/acme/%s/challenge/%s",
-					URLSafeProvisionerName(prov), ch.getID()))
+				fmt.Sprintf("%s/acme/%s/challenge/%s",
+					baseURL.String(), provName, ch.getID()))
 			assert.Equals(t, ach.ID, ch.getID())
 			assert.Equals(t, ach.AuthzID, ch.getAuthzID())
 
@@ -337,6 +343,11 @@ func TestChallengeToACME_Retry(t *testing.T) {
 	}
 
 	prov := newProv()
+	provName := url.PathEscape(prov.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "example.com"}
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, baseURL)
+
 	tests := map[string]challenge{
 		"dns_no-retry":      chs[0+0*len(fns)],
 		"http_no-retry":     chs[1+0*len(fns)],
@@ -347,15 +358,15 @@ func TestChallengeToACME_Retry(t *testing.T) {
 	}
 	for name, ch := range tests {
 		t.Run(name, func(t *testing.T) {
-			ach, err := ch.toACME(dir, prov)
+			ach, err := ch.toACME(ctx, dir)
 			assert.FatalError(t, err)
 
 			assert.Equals(t, ach.Type, ch.getType())
 			assert.Equals(t, ach.Status, ch.getStatus())
 			assert.Equals(t, ach.Token, ch.getToken())
 			assert.Equals(t, ach.URL,
-				fmt.Sprintf("https://example.com/acme/%s/challenge/%s",
-					URLSafeProvisionerName(prov), ch.getID()))
+				fmt.Sprintf("%s/acme/%s/challenge/%s",
+					baseURL.String(), provName, ch.getID()))
 			assert.Equals(t, ach.ID, ch.getID())
 			assert.Equals(t, ach.AuthzID, ch.getAuthzID())
 

@@ -75,11 +75,30 @@ type AuthConfig struct {
 	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
 }
 
+// init initializes the required fields in the AuthConfig if they are not
+// provided.
+func (c *AuthConfig) init() {
+	if c.Provisioners == nil {
+		c.Provisioners = provisioner.List{}
+	}
+	if c.Template == nil {
+		c.Template = &x509util.ASN1DN{}
+	}
+	if c.Backdate == nil {
+		c.Backdate = &provisioner.Duration{
+			Duration: defaultBackdate,
+		}
+	}
+}
+
 // Validate validates the authority configuration.
 func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 	if c == nil {
 		return errors.New("authority cannot be undefined")
 	}
+
+	// Initialize required fields.
+	c.init()
 
 	// Check that only one K8sSA is enabled
 	var k8sCount int
@@ -92,18 +111,8 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 		return errors.New("cannot have more than one kubernetes service account provisioner")
 	}
 
-	if c.Template == nil {
-		c.Template = &x509util.ASN1DN{}
-	}
-
-	if c.Backdate != nil {
-		if c.Backdate.Duration < 0 {
-			return errors.New("authority.backdate cannot be less than 0")
-		}
-	} else {
-		c.Backdate = &provisioner.Duration{
-			Duration: defaultBackdate,
-		}
+	if c.Backdate.Duration < 0 {
+		return errors.New("authority.backdate cannot be less than 0")
 	}
 
 	return nil
@@ -124,6 +133,21 @@ func LoadConfiguration(filename string) (*Config, error) {
 	}
 
 	return &c, nil
+}
+
+// initializes the minimal configuration required to create an authority. This
+// is mainly used on embedded authorities.
+func (c *Config) init() {
+	if c.DNSNames == nil {
+		c.DNSNames = []string{"localhost", "127.0.0.1", "::1"}
+	}
+	if c.TLS == nil {
+		c.TLS = &DefaultTLSOptions
+	}
+	if c.AuthorityConfig == nil {
+		c.AuthorityConfig = &AuthConfig{}
+	}
+	c.AuthorityConfig.init()
 }
 
 // Save saves the configuration to the given filename.
