@@ -389,17 +389,20 @@ func (hc *http01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions) (c
 	if err != nil {
 		return nil, err
 	}
-	if keyAuth != expected {
-		// add base challenge fail validation
-		e := errors.Errorf("keyAuthorization does not match; expected %s, but got %s", expected, keyAuth)
-		up.Error = RejectedIdentifierErr(e).ToACME()
-		up.Status = StatusInvalid
+
+	// success
+	if keyAuth == expected {
+		up.Validated = clock.Now()
+		up.Status = StatusValid
+		up.Error = nil
+		up.Retry = nil
 		return up, nil
 	}
 
-	up.Status = StatusValid
-	up.Validated = clock.Now()
-	up.Error = nil
+	// fail
+	up.Status = StatusInvalid
+	e := errors.Errorf("keyAuthorization does not match; expected %s, but got %s", expected, keyAuth)
+	up.Error = RejectedIdentifierErr(e).ToACME()
 	up.Retry = nil
 	return up, nil
 }
