@@ -52,6 +52,12 @@ func New(ctx context.Context, opts apiv1.Options) (*SoftKMS, error) {
 	return &SoftKMS{}, nil
 }
 
+func init() {
+	apiv1.Register(apiv1.SoftKMS, func(ctx context.Context, opts apiv1.Options) (apiv1.KeyManager, error) {
+		return New(ctx, opts)
+	})
+}
+
 // Close is a noop that just returns nil.
 func (k *SoftKMS) Close() error {
 	return nil

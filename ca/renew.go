@@ -51,6 +51,7 @@ func NewTLSRenewer(cert *tls.Certificate, fn RenewFunc, opts ...tlsRenewerOption
 	r := &TLSRenewer{
 		RenewCertificate: fn,
 		cert:             cert,
+		certNotAfter:     cert.Leaf.NotAfter.Add(-1 * time.Minute),
 	}
 
 	for _, f := range opts {

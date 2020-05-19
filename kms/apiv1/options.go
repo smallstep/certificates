@@ -1,10 +1,27 @@
 package apiv1
 
 import (
+	"crypto"
+	"crypto/x509"
 	"strings"
 
 	"github.com/pkg/errors"
 )
+
+// KeyManager is the interface implemented by all the KMS.
+type KeyManager interface {
+	GetPublicKey(req *GetPublicKeyRequest) (crypto.PublicKey, error)
+	CreateKey(req *CreateKeyRequest) (*CreateKeyResponse, error)
+	CreateSigner(req *CreateSignerRequest) (crypto.Signer, error)
+	Close() error
+}
+
+// CertificateManager is the interface implemented by the KMS that can load and
+// store x509.Certificates.
+type CertificateManager interface {
+	LoadCerticate(req *LoadCertificateRequest) (*x509.Certificate, error)
+	StoreCertificate(req *StoreCertificateRequest) error
+}
 
 // ErrNotImplemented
 type ErrNotImplemented struct {
@@ -32,6 +49,8 @@ const (
 	AmazonKMS Type = "awskms"
 	// PKCS11 is a KMS implementation using the PKCS11 standard.
 	PKCS11 Type = "pkcs11"
+	// YubiKey is a KMS implementation using a YubiKey PIV.
+	YubiKey Type = "yubikey"
 )
 
 type Options struct {
@@ -56,6 +75,7 @@ func (o *Options) Validate() error {
 
 	switch Type(strings.ToLower(o.Type)) {
 	case DefaultKMS, SoftKMS, CloudKMS:
+	case YubiKey:
 	case AmazonKMS:
 		return ErrNotImplemented{"support for AmazonKMS is not yet implemented"}
 	case PKCS11:

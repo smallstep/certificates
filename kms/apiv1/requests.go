@@ -2,6 +2,7 @@ package apiv1
 
 import (
 	"crypto"
+	"crypto/x509"
 	"fmt"
 )
 
@@ -123,4 +124,17 @@ type CreateSignerRequest struct {
 	PublicKey     string
 	PublicKeyPEM  []byte
 	Password      []byte
+}
+
+// LoadCertificateRequest is the parameter used in the LoadCertificate method of
+// a CertificateManager.
+type LoadCertificateRequest struct {
+	Name string
+}
+
+// StoreCertificateRequest is the parameter used in the StoreCertificate method
+// of a CertificateManager.
+type StoreCertificateRequest struct {
+	Name        string
+	Certificate *x509.Certificate
 }

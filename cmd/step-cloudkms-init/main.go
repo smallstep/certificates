@@ -138,6 +138,7 @@ func createPKI(c *cloudkms.CloudKMS, project, location, keyRing string, protecti
 		Subject:               pkix.Name{CommonName: "Smallstep Root"},
 		SerialNumber:          mustSerialNumber(),
 		SubjectKeyId:          mustSubjectKeyID(resp.PublicKey),
+		AuthorityKeyId:        mustSubjectKeyID(resp.PublicKey),
 	}
 
 	b, err := x509.CreateCertificate(rand.Reader, root, root, resp.PublicKey, signer)

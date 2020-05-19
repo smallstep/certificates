@@ -6,7 +6,7 @@ private keys and sign certificates.
 Support for multiple KMS are planned, but currently the only supported one is
 Google's Cloud KMS.
 
-## Google's Cloud KMS.
+## Google's Cloud KMS
 
 [Cloud KMS](https://cloud.google.com/kms) is the Google's cloud-hosted KMS that
 allows you to store the cryptographic keys, and sign certificates using their
@@ -65,3 +65,76 @@ Creating SSH Keys ...
 ```
 
 See `step-cloudkms-init --help` for more options.
+
+## YubiKey
+
+And incomplete and experimental support for [YubiKeys](https://www.yubico.com)
+is also available. Support for YubiKeys is not enabled by default and only TLS
+signing can be configured.
+
+The YubiKey implementation requires cgo, and our build system does not produce
+binaries with it. To enable YubiKey download the source code and run:
+
+```sh
+make build GOFLAGS=""
+```
+
+The implementation uses [piv-go](https://github.com/go-piv/piv-go), and it
+requires PCSC support, this is available by default on macOS and Windows
+operating systems, but on Linux piv-go requires PCSC lite.
+
+To install on Debian-based distributions, run:
+
+```sh
+sudo apt-get install libpcsclite-dev
+```
+
+On Fedora:
+
+```sh
+sudo yum install pcsc-lite-devel
+```
+
+On CentOS:
+
+```sh
+sudo yum install 'dnf-command(config-manager)'
+sudo yum config-manager --set-enabled PowerTools
+sudo yum install pcsc-lite-devel
+```
+
+The initialization of the public key infrastructure (PKI) for YubiKeys, is not
+currently integrated into [step](https://github.com/smallstep/cli), but an
+experimental tool named `step-yubikey-init` is available for this use case. At
+some point this tool will be integrated into `step` and it will be deleted.
+
+To configure your YubiKey just run:
+
+```sh
+$ bin/step-yubikey-init
+What is the YubiKey PIN?:
+Creating PKI ...
+✔ Root Key: yubikey:slot-id=9a
+✔ Root Certificate: root_ca.crt
+✔ Intermediate Key: yubikey:slot-id=9c
+✔ Intermediate Certificate: intermediate_ca.crt
+```
+
+See `step-yubikey-init --help` for more options.
+
+Finally to enable it in the ca.json, point the `root` and `crt` to the generated
+certificates, set the `key` with the yubikey URI generated in the previous step
+and configure the `kms` property with the `type` and your `pin` in it.
+
+```json
+{
+    "root": "/path/to/root_ca.crt",
+    "crt": "/path/to/intermediate_ca.crt",
+    "key": "yubikey:slot-id=9c",
+    "kms": {
+        "type": "yubikey",
+        "pin": "123456"
+    },
+    ...
+}
+```
