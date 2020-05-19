@@ -29,6 +29,19 @@ const awsIdentityURL = "http://169.254.169.254/latest/dynamic/instance-identity/
 // awsSignatureURL is the url used to retrieve the instance identity signature.
 const awsSignatureURL = "http://169.254.169.254/latest/dynamic/instance-identity/signature"
 
+// awsAPITokenURL is the url used to get the IMDSv2 API token
+const awsAPITokenURL = "http://169.254.169.254/latest/api/token"
+
+// awsAPITokenTTL is the default TTL to use when requesting IMDSv2 API tokens
+// -- we keep this short-lived since we get a new token with every call to readURL()
+const awsAPITokenTTL = "30"
+
+// awsMetadataTokenHeader is the header that must be passed with every IMDSv2 request
+const awsMetadataTokenHeader = "X-aws-ec2-metadata-token"
+
+// awsMetadataTokenTTLHeader is the header used to indicate the token TTL requested
+const awsMetadataTokenTTLHeader = "X-aws-ec2-metadata-token-ttl-seconds"
+
 // awsCertificate is the certificate used to validate the instance identity
 // signature.
 const awsCertificate = `-----BEGIN CERTIFICATE-----
@@ -332,12 +345,37 @@ func (p *AWS) checkSignature(signed, signature []byte) error {
 // using pkg/errors to avoid verbose errors, the caller should use it and write
 // the appropriate error.
 func (p *AWS) readURL(url string) ([]byte, error) {
-	r, err := http.Get(url)
+	client := &http.Client{}
+
+	// get authorization token
+	req, err := http.NewRequest(http.MethodPut, awsAPITokenURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set(awsMetadataTokenTTLHeader, awsAPITokenTTL)
+	r, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer r.Body.Close()
 	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	token := string(b)
+
+	// now get the data
+	req, err = http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set(awsMetadataTokenHeader, token)
+	r, err = client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
+	b, err = ioutil.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}
