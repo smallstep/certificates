@@ -316,6 +316,32 @@ type stepProvisionerASN1 struct {
 	KeyValuePairs []string `asn1:"optional,omitempty"`
 }
 
+type forceCNOption struct {
+	ForceCN bool
+}
+
+func newForceCNOption(forceCN bool) *forceCNOption {
+	return &forceCNOption{forceCN}
+}
+
+func (o *forceCNOption) Option(Options) x509util.WithOption {
+	return func(p x509util.Profile) error {
+		if !o.ForceCN {
+			// Forcing CN is disabled, do nothing to certificate
+			return nil
+		}
+		crt := p.Subject()
+		if crt.Subject.CommonName == "" {
+			if len(crt.DNSNames) > 0 {
+				crt.Subject.CommonName = crt.DNSNames[0]
+			} else {
+				return errors.New("Cannot force CN, DNSNames is empty")
+			}
+		}
+		return nil
+	}
+}
+
 type provisionerExtensionOption struct {
 	Type          int
 	Name          string

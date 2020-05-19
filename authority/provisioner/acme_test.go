@@ -168,7 +168,7 @@ func TestACME_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) && assert.NotNil(t, opts) {
-					assert.Len(t, 4, opts)
+					assert.Len(t, 5, opts)
 					for _, o := range opts {
 						switch v := o.(type) {
 						case *provisionerExtensionOption:
@@ -176,6 +176,8 @@ func TestACME_AuthorizeSign(t *testing.T) {
 							assert.Equals(t, v.Name, tc.p.GetName())
 							assert.Equals(t, v.CredentialID, "")
 							assert.Len(t, 0, v.KeyValuePairs)
+						case *forceCNOption:
+							assert.Equals(t, v.ForceCN, tc.p.ForceCN)
 						case profileDefaultDuration:
 							assert.Equals(t, time.Duration(v), tc.p.claimer.DefaultTLSCertDuration())
 						case defaultPublicKeyValidator:
