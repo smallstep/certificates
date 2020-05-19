@@ -187,6 +187,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			Subject:               pkix.Name{CommonName: "YubiKey Smallstep Root"},
 			SerialNumber:          mustSerialNumber(),
 			SubjectKeyId:          mustSubjectKeyID(resp.PublicKey),
+			AuthorityKeyId:        mustSubjectKeyID(resp.PublicKey),
 		}
 
 		b, err := x509.CreateCertificate(rand.Reader, template, template, resp.PublicKey, signer)
@@ -225,7 +226,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 	if c.RootOnly {
 		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
-			return errors.Wrap(err, "error creating intermediate public key")
+			return errors.Wrap(err, "error creating intermediate key")
 		}
 
 		pass, err := ui.PromptPasswordGenerate("What do you want your password to be? [leave empty and we'll generate one]",
