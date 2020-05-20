@@ -201,14 +201,14 @@ func (p *AWS) GetIdentityToken(subject, caURL string) (string, error) {
 	var idoc awsInstanceIdentityDocument
 	doc, err := p.readURL(p.config.identityURL)
 	if err != nil {
-		return "", errors.Wrap(err, "error retrieving identity document, are you in an AWS VM using the proper IMDS version?")
+		return "", errors.Wrap(err, "error retrieving identity document:\n  Are you in an AWS VM?\n  Is the metadata service enabled?\n  Are you using the proper metadata service version?")
 	}
 	if err := json.Unmarshal(doc, &idoc); err != nil {
 		return "", errors.Wrap(err, "error unmarshaling identity document")
 	}
 	sig, err := p.readURL(p.config.signatureURL)
 	if err != nil {
-		return "", errors.Wrap(err, "error retrieving identity document signature, are you in an AWS VM using the proper IMDS version?")
+		return "", errors.Wrap(err, "error retrieving identity document:\n  Are you in an AWS VM?\n  Is the metadata service enabled?\n  Are you using the proper metadata service version?")
 	}
 	signature, err := base64.StdEncoding.DecodeString(string(sig))
 	if err != nil {
