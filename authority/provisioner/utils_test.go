@@ -408,11 +408,12 @@ func generateAWS() (*AWS, error) {
 		return nil, errors.Wrap(err, "error parsing AWS certificate")
 	}
 	return &AWS{
-		Type:     "AWS",
-		Name:     name,
-		Accounts: []string{accountID},
-		Claims:   &globalProvisionerClaims,
-		claimer:  claimer,
+		Type:         "AWS",
+		Name:         name,
+		Accounts:     []string{accountID},
+		Claims:       &globalProvisionerClaims,
+		IMDSVersions: []string{"v2", "v1"},
+		claimer:      claimer,
 		config: &awsConfig{
 			identityURL:        awsIdentityURL,
 			signatureURL:       awsSignatureURL,
