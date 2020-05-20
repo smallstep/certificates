@@ -416,6 +416,8 @@ func generateAWS() (*AWS, error) {
 		config: &awsConfig{
 			identityURL:        awsIdentityURL,
 			signatureURL:       awsSignatureURL,
+			tokenURL:           awsAPITokenURL,
+			tokenTTL:           awsAPITokenTTL,
 			certificate:        cert,
 			signatureAlgorithm: awsSignatureAlgorithm,
 		},
