@@ -2,6 +2,8 @@ PKG?=github.com/smallstep/certificates/cmd/step-ca
 BINNAME?=step-ca
 CLOUDKMS_BINNAME?=step-cloudkms-init
 CLOUDKMS_PKG?=github.com/smallstep/certificates/cmd/step-cloudkms-init
+AWSKMS_BINNAME?=step-awskms-init
+AWSKMS_PKG?=github.com/smallstep/certificates/cmd/step-awskms-init
 YUBIKEY_BINNAME?=step-yubikey-init
 YUBIKEY_PKG?=github.com/smallstep/certificates/cmd/step-yubikey-init
 
@@ -66,7 +68,7 @@ GOFLAGS := CGO_ENABLED=0
 download:
 	$Q go mod download
 
-build: $(PREFIX)bin/$(BINNAME) $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(PREFIX)bin/$(YUBIKEY_BINNAME)
+build: $(PREFIX)bin/$(BINNAME) $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(PREFIX)bin/$(AWSKMS_BINNAME) $(PREFIX)bin/$(YUBIKEY_BINNAME)
 	@echo "Build Complete!"
 
 $(PREFIX)bin/$(BINNAME): download $(call rwildcard,*.go)
@@ -76,6 +78,10 @@ $(PREFIX)bin/$(BINNAME): download $(call rwildcard,*.go)
 $(PREFIX)bin/$(CLOUDKMS_BINNAME): download $(call rwildcard,*.go)
 	$Q mkdir -p $(@D)
 	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(LDFLAGS) $(CLOUDKMS_PKG)
+
+$(PREFIX)bin/$(AWSKMS_BINNAME): download $(call rwildcard,*.go)
+	$Q mkdir -p $(@D)
+	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(AWSKMS_BINNAME) $(LDFLAGS) $(AWSKMS_PKG)
 
 $(PREFIX)bin/$(YUBIKEY_BINNAME): download $(call rwildcard,*.go)
 	$Q mkdir -p $(@D)
