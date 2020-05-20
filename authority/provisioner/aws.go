@@ -71,6 +71,8 @@ const awsSignatureAlgorithm = x509.SHA256WithRSA
 type awsConfig struct {
 	identityURL        string
 	signatureURL       string
+	tokenURL           string
+	tokenTTL           string
 	certificate        *x509.Certificate
 	signatureAlgorithm x509.SignatureAlgorithm
 }
@@ -87,6 +89,8 @@ func newAWSConfig() (*awsConfig, error) {
 	return &awsConfig{
 		identityURL:        awsIdentityURL,
 		signatureURL:       awsSignatureURL,
+		tokenURL:           awsAPITokenURL,
+		tokenTTL:           awsAPITokenTTL,
 		certificate:        cert,
 		signatureAlgorithm: awsSignatureAlgorithm,
 	}, nil
@@ -348,11 +352,11 @@ func (p *AWS) readURL(url string) ([]byte, error) {
 	client := &http.Client{}
 
 	// get authorization token
-	req, err := http.NewRequest(http.MethodPut, awsAPITokenURL, nil)
+	req, err := http.NewRequest(http.MethodPut, p.config.tokenURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set(awsMetadataTokenTTLHeader, awsAPITokenTTL)
+	req.Header.Set(awsMetadataTokenTTLHeader, p.config.tokenTTL)
 	r, err := client.Do(req)
 	if err != nil {
 		return nil, err

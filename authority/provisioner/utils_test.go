@@ -457,12 +457,25 @@ func generateAWSWithServer() (*AWS, *httptest.Server, error) {
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error signing document")
 	}
+	token := "AQAEAEEO9-7Z88ewKFpboZuDlFYWz9A3AN-wMOVzjEhfAyXW31BvVw=="
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/latest/dynamic/instance-identity/document":
+			// check for API token
+			if r.Header.Get("X-aws-ec2-metadata-token") != token {
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte("401 Unauthorized"))
+			}
 			w.Write(doc)
 		case "/latest/dynamic/instance-identity/signature":
+			// check for API token
+			if r.Header.Get("X-aws-ec2-metadata-token") != token {
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte("401 Unauthorized"))
+			}
 			w.Write([]byte(base64.StdEncoding.EncodeToString(signature)))
+		case "/latest/api/token":
+			w.Write([]byte(token))
 		case "/bad-document":
 			w.Write([]byte("{}"))
 		case "/bad-signature":
@@ -475,6 +488,7 @@ func generateAWSWithServer() (*AWS, *httptest.Server, error) {
 	}))
 	aws.config.identityURL = srv.URL + "/latest/dynamic/instance-identity/document"
 	aws.config.signatureURL = srv.URL + "/latest/dynamic/instance-identity/signature"
+	aws.config.tokenURL = srv.URL + "/latest/api/token"
 	return aws, srv, nil
 }
 
