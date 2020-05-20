@@ -282,6 +282,22 @@ func (p *AWS) Init(config Config) (err error) {
 		return err
 	}
 	p.audiences = config.Audiences.WithFragment(p.GetID())
+
+	// validate IMDS versions
+	if len(p.IMDSVersions) == 0 {
+		p.IMDSVersions = []string{"v2", "v1"}
+	}
+	for _, v := range p.IMDSVersions {
+		switch v {
+		case "v1":
+			// valid
+		case "v2":
+			// valid
+		default:
+			return errors.Errorf("%s: not a supported AWS Instance Metadata Service version", v)
+		}
+	}
+
 	return nil
 }
 
