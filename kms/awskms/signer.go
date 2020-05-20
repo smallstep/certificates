@@ -12,13 +12,13 @@ import (
 )
 
 type Signer struct {
-	service   *kms.KMS
+	service   KeyManagementClient
 	keyID     string
 	publicKey crypto.PublicKey
 }
 
 // NewSigner creates a new signer using a key in the AWS KMS.
-func NewSigner(svc *kms.KMS, signingKey string) (*Signer, error) {
+func NewSigner(svc KeyManagementClient, signingKey string) (*Signer, error) {
 	keyID, err := parseKeyID(signingKey)
 	if err != nil {
 		return nil, err

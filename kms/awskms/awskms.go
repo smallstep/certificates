@@ -7,19 +7,29 @@ import (
 	"strings"
 	"time"
 
-	"github.com/smallstep/certificates/kms/uri"
-
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
+	"github.com/smallstep/certificates/kms/uri"
 	"github.com/smallstep/cli/crypto/pemutil"
 )
 
 // KMS implements a KMS using AWS Key Management Service.
 type KMS struct {
 	session *session.Session
-	service *kms.KMS
+	service KeyManagementClient
+}
+
+// KeyManagementClient defines the methods on KeyManagementClient that this
+// package will use. This interface will be used for unit testing.
+type KeyManagementClient interface {
+	GetPublicKeyWithContext(ctx aws.Context, input *kms.GetPublicKeyInput, opts ...request.Option) (*kms.GetPublicKeyOutput, error)
+	CreateKeyWithContext(ctx aws.Context, input *kms.CreateKeyInput, opts ...request.Option) (*kms.CreateKeyOutput, error)
+	CreateAliasWithContext(ctx aws.Context, input *kms.CreateAliasInput, opts ...request.Option) (*kms.CreateAliasOutput, error)
+	SignWithContext(ctx aws.Context, input *kms.SignInput, opts ...request.Option) (*kms.SignOutput, error)
 }
 
 // customerMasterKeySpecMapping is a mapping between the step signature algorithm,
