@@ -309,7 +309,7 @@ func TestOrderSave(t *testing.T) {
 	}
 }
 
-func TestNewOrder(t *testing.T) {
+func Test_newOrder(t *testing.T) {
 	type test struct {
 		ops    OrderOptions
 		db     nosql.DB
@@ -436,6 +436,49 @@ func TestNewOrder(t *testing.T) {
 				authzs: authzs,
 			}
 		},
+		"ok/validity-bounds-not-set": func(t *testing.T) test {
+			count := 0
+			oids := []string{"1", "2", "3"}
+			oidsB, err := json.Marshal(oids)
+			assert.FatalError(t, err)
+			authzs := &([]string{})
+			var (
+				_oid = ""
+				oid  = &_oid
+			)
+			ops := defaultOrderOps()
+			ops.backdate = time.Minute
+			ops.defaultDuration = 12 * time.Hour
+			ops.NotBefore = time.Time{}
+			ops.NotAfter = time.Time{}
+			return test{
+				ops: ops,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						if count >= 9 {
+							assert.Equals(t, bucket, ordersByAccountIDTable)
+							assert.Equals(t, key, []byte(ops.AccountID))
+							assert.Equals(t, old, oidsB)
+							newB, err := json.Marshal(append(oids, *oid))
+							assert.FatalError(t, err)
+							assert.Equals(t, newval, newB)
+						} else if count == 8 {
+							*oid = string(key)
+						} else if count == 7 {
+							*authzs = append(*authzs, string(key))
+						} else if count == 3 {
+							*authzs = []string{string(key)}
+						}
+						count++
+						return nil, true, nil
+					},
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						return oidsB, nil
+					},
+				},
+				authzs: authzs,
+			}
+		},
 	}
 	for name, run := range tests {
 		tc := run(t)
@@ -465,8 +508,21 @@ func TestNewOrder(t *testing.T) {
 					assert.True(t, o.Expires.Before(expiry.Add(time.Minute)))
 					assert.True(t, o.Expires.After(expiry.Add(-1*time.Minute)))
 
-					assert.Equals(t, o.NotBefore, tc.ops.NotBefore)
-					assert.Equals(t, o.NotAfter, tc.ops.NotAfter)
+					nbf := tc.ops.NotBefore
+					now := time.Now().UTC()
+					if !tc.ops.NotBefore.IsZero() {
+						assert.Equals(t, o.NotBefore, tc.ops.NotBefore)
+					} else {
+						nbf = o.NotBefore.Add(tc.ops.backdate)
+						assert.True(t, o.NotBefore.Before(now.Add(-tc.ops.backdate+time.Second)))
+						assert.True(t, o.NotBefore.Add(tc.ops.backdate+2*time.Second).After(now))
+					}
+					if !tc.ops.NotAfter.IsZero() {
+						assert.Equals(t, o.NotAfter, tc.ops.NotAfter)
+					} else {
+						naf := nbf.Add(tc.ops.defaultDuration)
+						assert.Equals(t, o.NotAfter, naf)
+					}
 				}
 			}
 		})
@@ -861,7 +917,7 @@ func TestOrderFinalize(t *testing.T) {
 		db     nosql.DB
 		csr    *x509.CertificateRequest
 		sa     SignAuthority
-		prov   provisioner.Interface
+		prov   Provisioner
 	}
 	tests := map[string]func(t *testing.T) test{
 		"fail/already-invalid": func(t *testing.T) test {
@@ -1008,7 +1064,7 @@ func TestOrderFinalize(t *testing.T) {
 				o:   o,
 				csr: csr,
 				err: ServerInternalErr(errors.New("error retrieving authorization options from ACME provisioner: force")),
-				prov: &provisioner.MockProvisioner{
+				prov: &MockProvisioner{
 					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
 						return nil, errors.New("force")
 					},

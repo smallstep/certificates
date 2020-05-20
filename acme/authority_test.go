@@ -925,10 +925,21 @@ func TestAuthorityNewOrder(t *testing.T) {
 	type test struct {
 		auth *Authority
 		ops  OrderOptions
+		ctx  context.Context
 		err  *Error
 		o    **Order
 	}
 	tests := map[string]func(t *testing.T) test{
+		"fail/no-provisioner": func(t *testing.T) test {
+			auth, err := NewAuthority(&db.MockNoSQLDB{}, "ca.smallstep.com", "acme", nil)
+			assert.FatalError(t, err)
+			return test{
+				auth: auth,
+				ops:  defaultOrderOps(),
+				ctx:  context.Background(),
+				err:  ServerInternalErr(errors.New("provisioner expected in request context")),
+			}
+		},
 		"fail/newOrder-error": func(t *testing.T) test {
 			auth, err := NewAuthority(&db.MockNoSQLDB{
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
@@ -939,6 +950,7 @@ func TestAuthorityNewOrder(t *testing.T) {
 			return test{
 				auth: auth,
 				ops:  defaultOrderOps(),
+				ctx:  ctx,
 				err:  ServerInternalErr(errors.New("error creating order: error creating http challenge: error saving acme challenge: force")),
 			}
 		},
@@ -993,6 +1005,7 @@ func TestAuthorityNewOrder(t *testing.T) {
 			return test{
 				auth: auth,
 				ops:  defaultOrderOps(),
+				ctx:  ctx,
 				o:    acmeO,
 			}
 		},
@@ -1000,7 +1013,7 @@ func TestAuthorityNewOrder(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeO, err := tc.auth.NewOrder(ctx, tc.ops); err != nil {
+			if acmeO, err := tc.auth.NewOrder(tc.ctx, tc.ops); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -1160,10 +1173,21 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 	type test struct {
 		auth      *Authority
 		id, accID string
+		ctx       context.Context
 		err       *Error
 		o         *order
 	}
 	tests := map[string]func(t *testing.T) test{
+		"fail/no-provisioner": func(t *testing.T) test {
+			auth, err := NewAuthority(&db.MockNoSQLDB{}, "ca.smallstep.com", "acme", nil)
+			assert.FatalError(t, err)
+			return test{
+				auth: auth,
+				id:   "foo",
+				ctx:  context.Background(),
+				err:  ServerInternalErr(errors.New("provisioner expected in request context")),
+			}
+		},
 		"fail/getOrder-error": func(t *testing.T) test {
 			id := "foo"
 			auth, err := NewAuthority(&db.MockNoSQLDB{
@@ -1177,6 +1201,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 			return test{
 				auth: auth,
 				id:   id,
+				ctx:  ctx,
 				err:  ServerInternalErr(errors.New("error loading order foo: force")),
 			}
 		},
@@ -1197,6 +1222,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 				auth:  auth,
 				id:    o.ID,
 				accID: "foo",
+				ctx:   ctx,
 				err:   UnauthorizedErr(errors.New("account does not own order")),
 			}
 		},
@@ -1223,6 +1249,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 				auth:  auth,
 				id:    o.ID,
 				accID: o.AccountID,
+				ctx:   ctx,
 				err:   ServerInternalErr(errors.New("error finalizing order: error storing order: force")),
 			}
 		},
@@ -1245,6 +1272,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 				auth:  auth,
 				id:    o.ID,
 				accID: o.AccountID,
+				ctx:   ctx,
 				o:     o,
 			}
 		},
@@ -1252,7 +1280,7 @@ func TestAuthorityFinalizeOrder(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeO, err := tc.auth.FinalizeOrder(ctx, tc.accID, tc.id, nil); err != nil {
+			if acmeO, err := tc.auth.FinalizeOrder(tc.ctx, tc.accID, tc.id, nil); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)

@@ -12,6 +12,47 @@ import (
 	"github.com/smallstep/cli/jose"
 )
 
+// Provisioner is an interface that implements a subset of the provisioner.Interface --
+// only those methods required by the ACME api/authority.
+type Provisioner interface {
+	AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error)
+	GetName() string
+	DefaultTLSCertDuration() time.Duration
+}
+
+// MockProvisioner for testing
+type MockProvisioner struct {
+	Mret1                   interface{}
+	Merr                    error
+	MgetName                func() string
+	MauthorizeSign          func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
+	MdefaultTLSCertDuration func() time.Duration
+}
+
+// GetName mock
+func (m *MockProvisioner) GetName() string {
+	if m.MgetName != nil {
+		return m.MgetName()
+	}
+	return m.Mret1.(string)
+}
+
+// AuthorizeSign mock
+func (m *MockProvisioner) AuthorizeSign(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
+	if m.MauthorizeSign != nil {
+		return m.MauthorizeSign(ctx, ott)
+	}
+	return m.Mret1.([]provisioner.SignOption), m.Merr
+}
+
+// DefaultTLSCertDuration mock
+func (m *MockProvisioner) DefaultTLSCertDuration() time.Duration {
+	if m.MdefaultTLSCertDuration != nil {
+		return m.MdefaultTLSCertDuration()
+	}
+	return m.Mret1.(time.Duration)
+}
+
 // ContextKey is the key type for storing and searching for ACME request
 // essentials in the context of a request.
 type ContextKey string
@@ -70,12 +111,16 @@ func JwsFromContext(ctx context.Context) (*jose.JSONWebSignature, error) {
 
 // ProvisionerFromContext searches the context for a provisioner. Returns the
 // provisioner or an error.
-func ProvisionerFromContext(ctx context.Context) (provisioner.Interface, error) {
-	val, ok := ctx.Value(ProvisionerContextKey).(provisioner.Interface)
-	if !ok || val == nil {
+func ProvisionerFromContext(ctx context.Context) (Provisioner, error) {
+	val := ctx.Value(ProvisionerContextKey)
+	if val == nil {
 		return nil, ServerInternalErr(errors.Errorf("provisioner expected in request context"))
 	}
-	return val, nil
+	pval, ok := val.(Provisioner)
+	if !ok || pval == nil {
+		return nil, ServerInternalErr(errors.Errorf("provisioner in context is not an ACME provisioner"))
+	}
+	return pval, nil
 }
 
 // SignAuthority is the interface implemented by a CA authority.

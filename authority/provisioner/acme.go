@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
@@ -42,6 +43,12 @@ func (p *ACME) GetType() Type {
 // GetEncryptedKey returns the base provisioner encrypted key if it's defined.
 func (p *ACME) GetEncryptedKey() (string, string, bool) {
 	return "", "", false
+}
+
+// DefaultTLSCertDuration returns the default TLS cert duration enforced by
+// the provisioner.
+func (p *ACME) DefaultTLSCertDuration() time.Duration {
+	return p.claimer.DefaultTLSCertDuration()
 }
 
 // Init initializes and validates the fields of a JWK type.

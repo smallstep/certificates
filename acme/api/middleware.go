@@ -278,11 +278,12 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 			api.WriteError(w, err)
 			return
 		}
-		if p.GetType() != provisioner.TypeACME {
+		acmeProv, ok := p.(*provisioner.ACME)
+		if !ok {
 			api.WriteError(w, acme.AccountDoesNotExistErr(errors.New("provisioner must be of type ACME")))
 			return
 		}
-		ctx = context.WithValue(ctx, acme.ProvisionerContextKey, p)
+		ctx = context.WithValue(ctx, acme.ProvisionerContextKey, acme.Provisioner(acmeProv))
 		next(w, r.WithContext(ctx))
 	}
 }

@@ -244,7 +244,11 @@ func TestHandlerGetNonce(t *testing.T) {
 }
 
 func TestHandlerGetDirectory(t *testing.T) {
-	auth, err := acme.NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil)
+	auth, err := acme.New(nil, acme.AuthorityOptions{
+		DB:     new(db.MockNoSQLDB),
+		DNS:    "ca.smallstep.com",
+		Prefix: "acme",
+	})
 	assert.FatalError(t, err)
 
 	prov := newProv()

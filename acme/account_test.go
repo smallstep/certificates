@@ -27,7 +27,7 @@ var (
 	}
 )
 
-func newProv() provisioner.Interface {
+func newProv() Provisioner {
 	// Initialize provisioners
 	p := &provisioner.ACME{
 		Type: "ACME",
