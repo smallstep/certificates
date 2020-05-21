@@ -454,12 +454,18 @@ func (a *Authority) RetryChallenge(chID string) {
 	ch = up
 
 	p, err := a.LoadProvisionerByID(retry.ProvisionerID)
+	if err != nil {
+		return
+	}
 	if p.GetType() != provisioner.TypeACME {
 		log.Printf("%v", AccountDoesNotExistErr(errors.New("provisioner must be of type ACME")))
 		return
 	}
 	ctx := context.WithValue(context.Background(), ProvisionerContextKey, p)
 	acc, err := a.GetAccount(ctx, ch.getAccountID())
+	if err != nil {
+		return
+	}
 
 	v, err := a.validate(ch, acc.Key)
 	if err != nil {

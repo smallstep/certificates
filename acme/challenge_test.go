@@ -786,7 +786,6 @@ func TestHTTP01Validate(t *testing.T) {
 		ch  challenge
 		res challenge
 		jwk *jose.JSONWebKey
-		db  nosql.DB
 		err *Error
 	}
 	tests := map[string]func(t *testing.T) test{
@@ -1048,7 +1047,6 @@ func TestTLSALPN01Validate(t *testing.T) {
 		ch  challenge
 		res challenge
 		jwk *jose.JSONWebKey
-		db  nosql.DB
 		err *Error
 	}
 	tests := map[string]func(t *testing.T) test{
@@ -1607,7 +1605,6 @@ func TestDNS01Validate(t *testing.T) {
 		ch  challenge
 		res challenge
 		jwk *jose.JSONWebKey
-		db  nosql.DB
 		err *Error
 	}
 	tests := map[string]func(t *testing.T) test{

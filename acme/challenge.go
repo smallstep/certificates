@@ -251,12 +251,6 @@ func (bc *baseChallenge) validate(jwk *jose.JSONWebKey, vo validateOptions) (cha
 	return nil, ServerInternalErr(errors.New("unimplemented"))
 }
 
-func (bc *baseChallenge) storeError(db nosql.DB, err *Error) error {
-	clone := bc.clone()
-	clone.Error = err.ToACME()
-	return clone.save(db, bc)
-}
-
 // unmarshalChallenge unmarshals a challenge type into the correct sub-type.
 func unmarshalChallenge(data []byte) (challenge, error) {
 	var getType struct {
