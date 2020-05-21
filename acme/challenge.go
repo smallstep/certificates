@@ -463,12 +463,12 @@ func (tc *tlsALPN01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions)
 
 	if len(certs) == 0 {
 		e := errors.Errorf("%s challenge for %s resulted in no certificates", tc.Type, tc.Value)
-		up.Error = RejectedIdentifierErr(e).ToACME()
+		up.Error = TLSErr(e).ToACME()
 		return up, nil
 	}
 	if !cs.NegotiatedProtocolIsMutual || cs.NegotiatedProtocol != "acme-tls/1" {
 		e := errors.Errorf("cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge")
-		up.Error = RejectedIdentifierErr(e).ToACME()
+		up.Error = TLSErr(e).ToACME()
 		return up, nil
 	}
 
@@ -476,7 +476,7 @@ func (tc *tlsALPN01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions)
 	if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], tc.Value) {
 		e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
 			"leaf certificate must contain a single DNS name, %v", tc.Value)
-		up.Error = RejectedIdentifierErr(e).ToACME()
+		up.Error = TLSErr(e).ToACME()
 		return up, nil
 	}
 
@@ -541,7 +541,7 @@ func (tc *tlsALPN01Challenge) validate(jwk *jose.JSONWebKey, vo validateOptions)
 	e := errors.Errorf("incorrect certificate for tls-alpn-01 challenge: " +
 		"missing acmeValidationV1 extension")
 	up.Error = IncorrectResponseErr(e).ToACME()
-	return tc, nil
+	return up, nil
 }
 
 // dns01Challenge represents an dns-01 acme challenge.
