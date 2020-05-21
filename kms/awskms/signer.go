@@ -11,6 +11,7 @@ import (
 	"github.com/smallstep/cli/crypto/pemutil"
 )
 
+// Signer implements a crypto.Signer using the AWS KMS.
 type Signer struct {
 	service   KeyManagementClient
 	keyID     string
@@ -88,30 +89,30 @@ func getSigningAlgorithm(key crypto.PublicKey, opts crypto.SignerOpts) (string, 
 		switch h := opts.HashFunc(); h {
 		case crypto.SHA256:
 			if isPSS {
-				return "RSASSA_PSS_SHA_256", nil
+				return kms.SigningAlgorithmSpecRsassaPssSha256, nil
 			}
-			return "RSASSA_PKCS1_V1_5_SHA_256", nil
+			return kms.SigningAlgorithmSpecRsassaPkcs1V15Sha256, nil
 		case crypto.SHA384:
 			if isPSS {
-				return "RSASSA_PSS_SHA_384", nil
+				return kms.SigningAlgorithmSpecRsassaPssSha384, nil
 			}
-			return "RSASSA_PKCS1_V1_5_SHA_384", nil
+			return kms.SigningAlgorithmSpecRsassaPkcs1V15Sha384, nil
 		case crypto.SHA512:
 			if isPSS {
-				return "RSASSA_PSS_SHA_512", nil
+				return kms.SigningAlgorithmSpecRsassaPssSha512, nil
 			}
-			return "RSASSA_PKCS1_V1_5_SHA_512", nil
+			return kms.SigningAlgorithmSpecRsassaPkcs1V15Sha512, nil
 		default:
 			return "", errors.Errorf("unsupported hash function %v", h)
 		}
 	case *ecdsa.PublicKey:
 		switch h := opts.HashFunc(); h {
 		case crypto.SHA256:
-			return "ECDSA_SHA_256", nil
+			return kms.SigningAlgorithmSpecEcdsaSha256, nil
 		case crypto.SHA384:
-			return "ECDSA_SHA_384", nil
+			return kms.SigningAlgorithmSpecEcdsaSha384, nil
 		case crypto.SHA512:
-			return "ECDSA_SHA_512", nil
+			return kms.SigningAlgorithmSpecEcdsaSha512, nil
 		default:
 			return "", errors.Errorf("unsupported hash function %v", h)
 		}
