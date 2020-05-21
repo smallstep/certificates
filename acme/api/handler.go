@@ -106,26 +106,57 @@ func (h *Handler) GetAuthz(w http.ResponseWriter, r *http.Request) {
 	api.JSON(w, authz)
 }
 
-// GetChallenge ACME api for retrieving a Challenge.
+// GetChallenge is the ACME api for retrieving a Challenge resource.
+//
+// Potential Challenges are requested by the client when creating an order.
+// Once the client knows the appropriate validation resources are provisioned,
+// it makes a POST-as-GET request to this endpoint in order to initiate the
+// validation flow.
+//
+// The validation state machine describes the flow for a challenge.
+//
+//   https://tools.ietf.org/html/rfc8555#section-7.1.6
+//
+// Once a validation attempt has completed without error, the challenge's
+// status is updated depending on the result (valid|invalid) of the server's
+// validation attempt. Once this is the case, a challenge cannot be reset.
+//
+// If a challenge cannot be completed because no suitable data can be
+// acquired the server (whilst communicating retry information) and the
+// client (whilst respecting the information from the server) may request
+// retries of the validation.
+//
+//   https://tools.ietf.org/html/rfc8555#section-8.2
+//
+// Retry status is communicated using the error field and by sending a
+// Retry-After header back to the client.
+//
+// The request body is challenge-specific. The current challenges (http-01,
+// dns-01, tls-alpn-01) simply expect an empty object ("{}") in the payload
+// of the JWT sent by the client. We don't gain anything by stricly enforcing
+// nonexistence of unknown attributes, or, in these three cases, enforcing
+// an empty payload. And the spec also says to just ignore it:
+//
+// > The server MUST ignore any fields in the response object
+// > that are not specified as response fields for this type of challenge.
+//
+//    https://tools.ietf.org/html/rfc8555#section-7.5.1
+//
 func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	acc, err := acme.AccountFromContext(r.Context())
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
-	// Just verify that the payload was set, since we're not strictly adhering
-	// to ACME V2 spec for reasons specified below.
+
+	// Just verify that the payload was set since the client is required
+	// to send _something_.
 	_, err = payloadFromContext(r.Context())
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
-	// NOTE: We should be checking that the request is either a POST-as-GET, or
-	// that the payload is an empty JSON block ({}). However, older ACME clients
-	// still send a vestigial body (rather than an empty JSON block) and
-	// strict enforcement would render these clients broken. For the time being
-	// we'll just ignore the body.
 	var (
 		ch   *acme.Challenge
 		chID = chi.URLParam(r, "chID")
@@ -138,6 +169,13 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Link", link(h.Auth.GetLink(r.Context(), acme.AuthzLink, true, ch.GetAuthzID()), "up"))
 	w.Header().Set("Location", h.Auth.GetLink(r.Context(), acme.ChallengeLink, true, ch.GetID()))
+
+	if ch.Status == acme.StatusProcessing {
+		w.Header().Add("Retry-After", ch.RetryAfter)
+		// 200s are cachable. Don't cache this because it will likely change.
+		w.Header().Add("Cache-Control", "no-cache")
+	}
+
 	api.JSON(w, ch)
 }
 

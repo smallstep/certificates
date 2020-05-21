@@ -148,7 +148,7 @@ func (ba *baseAuthz) toACME(ctx context.Context, db nosql.DB, dir *directory) (*
 		if err != nil {
 			return nil, err
 		}
-		chs[i], err = ch.toACME(ctx, db, dir)
+		chs[i], err = ch.toACME(ctx, dir)
 		if err != nil {
 			return nil, err
 		}
