@@ -36,7 +36,7 @@ const (
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8XWlIWkOThxNjGbZLYUgRHmsvCrW
 KF+HLktPfPTIK3lGd1k4849WQs59XIN+LXZQ6b2eRBEBKAHEyQus8UU7gw==
 -----END PUBLIC KEY-----`
-	keyId = "be468355-ca7a-40d9-a28b-8ae1c4c7f936"
+	keyID = "be468355-ca7a-40d9-a28b-8ae1c4c7f936"
 )
 
 var signature = []byte{
@@ -55,7 +55,7 @@ func getOKClient() *MockClient {
 		},
 		createKeyWithContext: func(ctx aws.Context, input *kms.CreateKeyInput, opts ...request.Option) (*kms.CreateKeyOutput, error) {
 			md := new(kms.KeyMetadata)
-			md.SetKeyId(keyId)
+			md.SetKeyId(keyID)
 			return &kms.CreateKeyOutput{
 				KeyMetadata: md,
 			}, nil
