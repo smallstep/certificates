@@ -813,7 +813,7 @@ func TestHandlerGetChallenge(t *testing.T) {
 					assert.Equals(t, res.Header["Cache-Control"], []string{"no-cache"})
 					assert.Equals(t, res.Header["Retry-After"], []string{tc.ch.RetryAfter})
 				case "valid", "invalid":
-					// 
+					//
 				}
 			} else {
 				assert.Fatal(t, false, "Unexpected Status Code")

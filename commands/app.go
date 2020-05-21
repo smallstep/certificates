@@ -35,7 +35,7 @@ intermediate private key.`,
 			Usage: "address of a DNS resolver to be used instead of the default.",
 		},
 		cli.IntFlag{
-			Name:  "ordinal",
+			Name: "ordinal",
 			Usage: `Unique <index> identifying this instance of step-ca in a highly-
 available (replicated) deployment.`,
 		},

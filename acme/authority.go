@@ -272,7 +272,7 @@ func (a *Authority) GetAuthz(ctx context.Context, accID, authzID string) (*Authz
 }
 
 // ValidateChallenge loads a challenge resource and then begins the validation process if the challenge
-// is not in one of its terminal states {valid|invalid}. 
+// is not in one of its terminal states {valid|invalid}.
 //
 // The challenge validation state machine looks like:
 //
@@ -322,7 +322,7 @@ func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, j
 	case StatusInvalid, StatusValid:
 		return ch.toACME(ctx, a.dir)
 	default:
-		e:= errors.Errorf("unknown challenge state: %s", ch.getStatus())
+		e := errors.Errorf("unknown challenge state: %s", ch.getStatus())
 		return nil, ServerInternalErr(e)
 	}
 
@@ -419,7 +419,7 @@ func (a *Authority) RetryChallenge(chID string) {
 	case StatusProcessing:
 		break
 	default:
-		e:= errors.Errorf("unknown challenge state: %s", ch.getStatus())
+		e := errors.Errorf("unknown challenge state: %s", ch.getStatus())
 		log.Printf("%v", e)
 		return
 	}

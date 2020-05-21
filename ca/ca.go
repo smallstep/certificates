@@ -61,7 +61,6 @@ func WithDatabase(db db.AuthDB) Option {
 	}
 }
 
-
 // WithOrdinal sets the server's ordinal identifier (an int).
 func WithOrdinal(ordinal int) Option {
 	return func(o *options) {
