@@ -85,7 +85,28 @@ func TestDefaultIdentityFunc(t *testing.T) {
 			return test{
 				p:        &OIDC{},
 				email:    "max.furman@smallstep.com",
-				identity: &Identity{Usernames: []string{"maxfurman", "max.furman@smallstep.com"}},
+				identity: &Identity{Usernames: []string{"maxfurman", "max.furman", "max.furman@smallstep.com"}},
+			}
+		},
+		"ok letter case": func(t *testing.T) test {
+			return test{
+				p:        &OIDC{},
+				email:    "Max.Furman@smallstep.com",
+				identity: &Identity{Usernames: []string{"maxfurman", "Max.Furman", "Max.Furman@smallstep.com"}},
+			}
+		},
+		"ok simple": func(t *testing.T) test {
+			return test{
+				p:        &OIDC{},
+				email:    "john@smallstep.com",
+				identity: &Identity{Usernames: []string{"john", "john@smallstep.com"}},
+			}
+		},
+		"ok simple letter case": func(t *testing.T) test {
+			return test{
+				p:        &OIDC{},
+				email:    "John@smallstep.com",
+				identity: &Identity{Usernames: []string{"john", "John@smallstep.com"}},
 			}
 		},
 	}
