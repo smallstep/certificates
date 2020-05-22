@@ -47,9 +47,26 @@ type Interface interface {
 
 // Authority is the layer that handles all ACME interactions.
 type Authority struct {
+	backdate provisioner.Duration
 	db       nosql.DB
 	dir      *directory
 	signAuth SignAuthority
+}
+
+// AuthorityOptions required to create a new ACME Authority.
+type AuthorityOptions struct {
+	Backdate provisioner.Duration
+	// DB is the database used by nosql.
+	DB nosql.DB
+	// DNS the host used to generate accurate ACME links. By default the authority
+	// will use the Host from the request, so this value will only be used if
+	// request.Host is empty.
+	DNS string
+	// Prefix is a URL path prefix under which the ACME api is served. This
+	// prefix is required to generate accurate ACME links.
+	// E.g. https://ca.smallstep.com/acme/my-acme-provisioner/new-account --
+	// "acme" is the prefix from which the ACME api is accessed.
+	Prefix string
 }
 
 var (
@@ -64,22 +81,34 @@ var (
 )
 
 // NewAuthority returns a new Authority that implements the ACME interface.
+//
+// Deprecated: NewAuthority exists for hitorical compatibility and should not
+// be used. Use acme.New() instead.
 func NewAuthority(db nosql.DB, dns, prefix string, signAuth SignAuthority) (*Authority, error) {
-	if _, ok := db.(*database.SimpleDB); !ok {
+	return New(signAuth, AuthorityOptions{
+		DB:     db,
+		DNS:    dns,
+		Prefix: prefix,
+	})
+}
+
+// New returns a new Autohrity that implements the ACME interface.
+func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
+	if _, ok := ops.DB.(*database.SimpleDB); !ok {
 		// If it's not a SimpleDB then go ahead and bootstrap the DB with the
 		// necessary ACME tables. SimpleDB should ONLY be used for testing.
 		tables := [][]byte{accountTable, accountByKeyIDTable, authzTable,
 			challengeTable, nonceTable, orderTable, ordersByAccountIDTable,
 			certTable}
 		for _, b := range tables {
-			if err := db.CreateTable(b); err != nil {
+			if err := ops.DB.CreateTable(b); err != nil {
 				return nil, errors.Wrapf(err, "error creating table %s",
 					string(b))
 			}
 		}
 	}
 	return &Authority{
-		db: db, dir: newDirectory(dns, prefix), signAuth: signAuth,
+		backdate: ops.Backdate, db: ops.DB, dir: newDirectory(ops.DNS, ops.Prefix), signAuth: signAuth,
 	}, nil
 }
 
@@ -225,6 +254,12 @@ func (a *Authority) GetOrdersByAccount(ctx context.Context, id string) ([]string
 
 // NewOrder generates, stores, and returns a new ACME order.
 func (a *Authority) NewOrder(ctx context.Context, ops OrderOptions) (*Order, error) {
+	prov, err := ProvisionerFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ops.backdate = a.backdate.Duration
+	ops.defaultDuration = prov.DefaultTLSCertDuration()
 	order, err := newOrder(a.db, ops)
 	if err != nil {
 		return nil, Wrap(err, "error creating order")

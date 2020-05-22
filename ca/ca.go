@@ -124,7 +124,12 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	}
 
 	prefix := "acme"
-	acmeAuth, err := acme.NewAuthority(auth.GetDatabase().(nosql.DB), dns, prefix, auth)
+	acmeAuth, err := acme.New(auth, acme.AuthorityOptions{
+		Backdate: *config.AuthorityConfig.Backdate,
+		DB:       auth.GetDatabase().(nosql.DB),
+		DNS:      dns,
+		Prefix:   prefix,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating ACME authority")
 	}

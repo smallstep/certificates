@@ -45,10 +45,12 @@ func (o *Order) GetID() string {
 
 // OrderOptions options with which to create a new Order.
 type OrderOptions struct {
-	AccountID   string       `json:"accID"`
-	Identifiers []Identifier `json:"identifiers"`
-	NotBefore   time.Time    `json:"notBefore"`
-	NotAfter    time.Time    `json:"notAfter"`
+	AccountID       string       `json:"accID"`
+	Identifiers     []Identifier `json:"identifiers"`
+	NotBefore       time.Time    `json:"notBefore"`
+	NotAfter        time.Time    `json:"notAfter"`
+	backdate        time.Duration
+	defaultDuration time.Duration
 }
 
 type order struct {
@@ -82,6 +84,17 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 	}
 
 	now := clock.Now()
+	var backdate time.Duration
+	nbf := ops.NotBefore
+	if nbf.IsZero() {
+		nbf = now
+		backdate = -1 * ops.backdate
+	}
+	naf := ops.NotAfter
+	if naf.IsZero() {
+		naf = nbf.Add(ops.defaultDuration)
+	}
+
 	o := &order{
 		ID:             id,
 		AccountID:      ops.AccountID,
@@ -89,8 +102,8 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 		Status:         StatusPending,
 		Expires:        now.Add(defaultOrderExpiry),
 		Identifiers:    ops.Identifiers,
-		NotBefore:      ops.NotBefore,
-		NotAfter:       ops.NotAfter,
+		NotBefore:      nbf.Add(backdate),
+		NotAfter:       naf,
 		Authorizations: authzs,
 	}
 	if err := o.save(db, nil); err != nil {
@@ -236,7 +249,7 @@ func (o *order) updateStatus(db nosql.DB) (*order, error) {
 
 // finalize signs a certificate if the necessary conditions for Order completion
 // have been met.
-func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAuthority, p provisioner.Interface) (*order, error) {
+func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAuthority, p Provisioner) (*order, error) {
 	var err error
 	if o, err = o.updateStatus(db); err != nil {
 		return nil, err
