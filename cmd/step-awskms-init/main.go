@@ -58,7 +58,7 @@ func fatal(err error) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "Usage: step-awskms-init --project <name>")
+	fmt.Fprintln(os.Stderr, "Usage: step-awskms-init")
 	fmt.Fprintln(os.Stderr, `
 The step-awskms-init command initializes a public key infrastructure (PKI)
 to be used by step-ca.
