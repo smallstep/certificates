@@ -194,6 +194,16 @@ func ServerInternalErr(err error) *Error {
 	}
 }
 
+// NotImplemented returns a new acme error.
+func NotImplemented(err error) *Error {
+	return &Error{
+		Type:   notImplemented,
+		Detail: "The requested operation is not implemented",
+		Status: 501,
+		Err:    err,
+	}
+}
+
 // TLSErr returns a new acme error.
 func TLSErr(err error) *Error {
 	return &Error{
@@ -296,6 +306,8 @@ const (
 	unsupportedIdentifierErr
 	// Visit the “instance” URL and take actions specified there
 	userActionRequiredErr
+	// The operation is not implemented
+	notImplemented
 )
 
 // String returns the string representation of the acme problem type,
@@ -350,6 +362,8 @@ func (ap ProbType) String() string {
 		return "unsupportedIdentifier"
 	case userActionRequiredErr:
 		return "userActionRequired"
+	case notImplemented:
+		return "notImplemented"
 	default:
 		return "unsupported type"
 	}
@@ -398,10 +412,28 @@ func (e *Error) Cause() error {
 	return e.Err
 }
 
+// Official returns true if this error is registered with the IETF.
+//
+// The RFC says:
+//
+//   This list is not exhaustive.  The server MAY return errors whose
+//   "type" field is set to a URI other than those defined above.  Servers
+//   MUST NOT use the ACME URN namespace for errors not listed in the
+//   appropriate IANA registry (see Section 9.6).  Clients SHOULD display
+//   the "detail" field of all errors.
+//
+func (e *Error) Official() bool {
+	return e.Type != notImplemented
+}
+
 // ToACME returns an acme representation of the problem type.
 func (e *Error) ToACME() *AError {
+	prefix := "urn:step:acme:error"
+	if e.Official() {
+		prefix = "urn:ietf:params:acme:error:"
+	}
 	ae := &AError{
-		Type:   "urn:ietf:params:acme:error:" + e.Type.String(),
+		Type:   prefix + e.Type.String(),
 		Detail: e.Error(),
 		Status: e.Status,
 	}
