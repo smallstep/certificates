@@ -3,8 +3,10 @@
 This document describes how to use a key management service or KMS to store the
 private keys and sign certificates.
 
-Support for multiple KMS are planned, but currently the only supported one is
-Google's Cloud KMS.
+Support for multiple KMS are planned, but currently the only Google's Cloud KMS,
+and Amazon's AWS KMS are supported. A still experimental version for YubiKeys is
+also available if you compile
+[step-certificates](https://github.com/smallstep/certificates) yourself.
 
 ## Google's Cloud KMS
 
@@ -65,6 +67,79 @@ Creating SSH Keys ...
 ```
 
 See `step-cloudkms-init --help` for more options.
+
+## AWS KMS
+
+[AWS KMS](https://docs.aws.amazon.com/kms/index.html) is the Amazon's managed
+encryption and key management service. It creates and store the cryptographic
+keys, and use their infrastructure for signing operations. Amazon KMS operations
+are always backed by hardware security modules (HSMs).
+
+To configure AWS KMS in your CA you need add the `"kms"` property to you
+`ca.json`, and replace the property`"key"` with the AWS KMS key name of your
+intermediate key:
+
+```json
+{
+    ...
+    "key": "awskms:key-id=f879f239-feb6-4596-9ed2-b1606277c7fe",
+    ...
+    "kms": {
+        "type": "awskms",
+        "region": "us-east-1"
+    }
+}
+```
+
+By default it uses the credentials in `~/.aws/credentials`, but this can be
+overridden using the `credentialsFile` option, `region` and `profile` can also
+be configured as options. These can also be configured using environment
+variables as described by their [session
+docs](https://docs.aws.amazon.com/sdk-for-go/api/aws/session/).
+
+To configure SSH certificate signing we do something similar, and replace the
+ssh keys with the ones in the KMS:
+
+```json
+{
+    ...
+    "ssh": {
+        "hostKey": "awskms:key-id=d48e502a-09bc-4bf7-9af8-ae1bccedc931",
+        "userKey": "awskms:key-id=cf28e942-1e10-4a08-b84c-5359af1b5f12"
+    },
+}
+```
+
+The keys can also be just the Amazon's Key ID or the ARN, but using the format
+based on the [RFC7512](https://tools.ietf.org/html/rfc7512) will allow more
+flexibility for future releases of `step`.
+
+Currently [step](https://github.com/smallstep/cli) does not provide an automatic
+way to initialize the public key infrastructure (PKI) using AWS KMS, but an
+experimental tool named `step-awskms-init` is available for this use case. At
+some point this tool will be integrated into `step` and it will be deleted.
+
+To use `step-awskms-init` make sure to have to have your [environment
+configured](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html)
+running `aws configure` and then just run:
+
+```sh
+$ bin/step-awskms-init --ssh --region us-east-1
+Creating PKI ...
+✔ Root Key: awskms:key-id=f53fb767-4029-40ff-b650-0dd35fb661df
+✔ Root Certificate: root_ca.crt
+✔ Intermediate Key: awskms:key-id=f879f239-feb6-4596-9ed2-b1606277c7fe
+✔ Intermediate Certificate: intermediate_ca.crt
+
+Creating SSH Keys ...
+✔ SSH User Public Key: ssh_user_ca_key.pub
+✔ SSH User Private Key: awskms:key-id=cf28e942-1e10-4a08-b84c-5359af1b5f12
+✔ SSH Host Public Key: ssh_host_ca_key.pub
+✔ SSH Host Private Key: awskms:key-id=cf28e942-1e10-4a08-b84c-5359af1b5f12
+```
+
+The `--region` parameter is only required if your aws configuration does not
+define a region. See `step-awskms-init --help` for more options.
 
 ## YubiKey
 

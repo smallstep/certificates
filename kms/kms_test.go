@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/smallstep/certificates/kms/apiv1"
+	"github.com/smallstep/certificates/kms/awskms"
 	"github.com/smallstep/certificates/kms/cloudkms"
 	"github.com/smallstep/certificates/kms/softkms"
 )
@@ -27,8 +28,8 @@ func TestNew(t *testing.T) {
 	}{
 		{"softkms", false, args{ctx, apiv1.Options{Type: "softkms"}}, &softkms.SoftKMS{}, false},
 		{"default", false, args{ctx, apiv1.Options{}}, &softkms.SoftKMS{}, false},
+		{"awskms", false, args{ctx, apiv1.Options{Type: "awskms"}}, &awskms.KMS{}, false},
 		{"cloudkms", true, args{ctx, apiv1.Options{Type: "cloudkms"}}, &cloudkms.CloudKMS{}, true}, // fails because not credentials
-		{"awskms", false, args{ctx, apiv1.Options{Type: "awskms"}}, nil, true},                     // not yet supported
 		{"pkcs11", false, args{ctx, apiv1.Options{Type: "pkcs11"}}, nil, true},                     // not yet supported
 		{"fail validation", false, args{ctx, apiv1.Options{Type: "foobar"}}, nil, true},
 	}

@@ -13,7 +13,7 @@ func TestOptions_Validate(t *testing.T) {
 		{"nil", nil, false},
 		{"softkms", &Options{Type: "softkms"}, false},
 		{"cloudkms", &Options{Type: "cloudkms"}, false},
-		{"awskms", &Options{Type: "awskms"}, true},
+		{"awskms", &Options{Type: "awskms"}, false},
 		{"pkcs11", &Options{Type: "pkcs11"}, true},
 		{"unsupported", &Options{Type: "unsupported"}, true},
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/smallstep/certificates/kms/apiv1"
 
 	// Enabled kms interfaces.
+	_ "github.com/smallstep/certificates/kms/awskms"
 	_ "github.com/smallstep/certificates/kms/cloudkms"
 	_ "github.com/smallstep/certificates/kms/softkms"
 

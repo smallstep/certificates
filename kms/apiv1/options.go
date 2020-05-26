@@ -57,7 +57,7 @@ type Options struct {
 	// The type of the KMS to use.
 	Type string `json:"type"`
 
-	// Path to the credentials file used in CloudKMS.
+	// Path to the credentials file used in CloudKMS and AmazonKMS.
 	CredentialsFile string `json:"credentialsFile"`
 
 	// Path to the module used with PKCS11 KMS.
@@ -65,6 +65,12 @@ type Options struct {
 
 	// Pin used to access the PKCS11 module.
 	Pin string `json:"pin"`
+
+	// Region to use in AmazonKMS.
+	Region string `json:"region"`
+
+	// Profile to use in AmazonKMS.
+	Profile string `json:"profile"`
 }
 
 // Validate checks the fields in Options.
@@ -74,10 +80,8 @@ func (o *Options) Validate() error {
 	}
 
 	switch Type(strings.ToLower(o.Type)) {
-	case DefaultKMS, SoftKMS, CloudKMS:
+	case DefaultKMS, SoftKMS, CloudKMS, AmazonKMS:
 	case YubiKey:
-	case AmazonKMS:
-		return ErrNotImplemented{"support for AmazonKMS is not yet implemented"}
 	case PKCS11:
 		return ErrNotImplemented{"support for PKCS11 is not yet implemented"}
 	default:
