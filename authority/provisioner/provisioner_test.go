@@ -109,6 +109,13 @@ func TestDefaultIdentityFunc(t *testing.T) {
 				identity: &Identity{Usernames: []string{"john", "John@smallstep.com"}},
 			}
 		},
+		"ok symbol": func(t *testing.T) test {
+			return test{
+				p:        &OIDC{},
+				email:    "John+Doe@smallstep.com",
+				identity: &Identity{Usernames: []string{"john_doe", "John+Doe", "John+Doe@smallstep.com"}},
+			}
+		},
 	}
 	for name, get := range tests {
 		t.Run(name, func(t *testing.T) {
