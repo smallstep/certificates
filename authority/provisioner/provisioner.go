@@ -336,11 +336,24 @@ type GetIdentityFunc func(ctx context.Context, p Interface, email string) (*Iden
 func DefaultIdentityFunc(ctx context.Context, p Interface, email string) (*Identity, error) {
 	switch k := p.(type) {
 	case *OIDC:
+		// OIDC principals would be:
+		// 1. Sanitized local.
+		// 2. Raw local (if different).
+		// 3. Email address.
 		name := SanitizeSSHUserPrincipal(email)
 		if !sshUserRegex.MatchString(name) {
 			return nil, errors.Errorf("invalid principal '%s' from email '%s'", name, email)
 		}
-		return &Identity{Usernames: []string{name, email}}, nil
+		usernames := []string{name}
+		if i := strings.LastIndex(email, "@"); i >= 0 {
+			if local := email[:i]; !strings.EqualFold(local, name) {
+				usernames = append(usernames, local)
+			}
+		}
+		usernames = append(usernames, email)
+		return &Identity{
+			Usernames: usernames,
+		}, nil
 	default:
 		return nil, errors.Errorf("provisioner type '%T' not supported by identity function", k)
 	}
