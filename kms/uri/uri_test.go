@@ -99,6 +99,10 @@ func TestParse(t *testing.T) {
 			URL:    &url.URL{Scheme: "yubikey", Opaque: "slot-id=9a"},
 			Values: url.Values{"slot-id": []string{"9a"}},
 		}, false},
+		{"ok query", args{"yubikey:slot-id=9a;foo=bar?pin=123456&foo=bar"}, &URI{
+			URL:    &url.URL{Scheme: "yubikey", Opaque: "slot-id=9a;foo=bar", RawQuery: "pin=123456&foo=bar"},
+			Values: url.Values{"slot-id": []string{"9a"}, "foo": []string{"bar"}},
+		}, false},
 		{"ok file", args{"file:///tmp/ca.cert"}, &URI{
 			URL:    &url.URL{Scheme: "file", Path: "/tmp/ca.cert"},
 			Values: url.Values{},
