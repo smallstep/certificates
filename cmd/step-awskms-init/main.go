@@ -40,7 +40,7 @@ func main() {
 		fatal(err)
 	}
 
-	if err := createPKI(c); err != nil {
+	if err := createX509(c); err != nil {
 		fatal(err)
 	}
 
@@ -75,8 +75,8 @@ COPYRIGHT
 	os.Exit(1)
 }
 
-func createPKI(c *awskms.KMS) error {
-	ui.Println("Creating PKI ...")
+func createX509(c *awskms.KMS) error {
+	ui.Println("Creating X.509 PKI ...")
 
 	// Root Certificate
 	resp, err := c.CreateKey(&apiv1.CreateKeyRequest{
