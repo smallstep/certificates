@@ -167,7 +167,7 @@ func (k *KMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyResponse, 
 	}
 
 	// Names uses Amazon Resource Name
-	// https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#arn-syntax-kms
+	// https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html
 	return &apiv1.CreateKeyResponse{
 		Name:      name,
 		PublicKey: publicKey,
