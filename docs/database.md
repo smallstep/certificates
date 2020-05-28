@@ -62,7 +62,8 @@ more info).  Below are a few examples for supported databases:
 * `valueDir` [optional] - path, value directory, only if different from `dataSource`.
 * `badgerValueLogLoadingMode` [optional] - can be set to `FileIO` (instead of the default
         `MemoryMap`) to avoid memory-mapping log files. This can be
-        useful in environments with low RAM.
+        useful in environments with low RAM. Make sure to use `badgerV2` as the
+        database `type` if using this option.
     * `MemoryMap` - default.
     * `FileIO` - This can be useful in environments with low RAM.
 
