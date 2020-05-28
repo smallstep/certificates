@@ -67,7 +67,6 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("POST", getLink(acme.AuthzLink, "{provisionerID}", false, nil, "{authzID}"), extractPayloadByKid(h.isPostAsGet(h.GetAuthz)))
 	r.MethodFunc("POST", getLink(acme.ChallengeLink, "{provisionerID}", false, nil, "{chID}"), extractPayloadByKid(h.GetChallenge))
 	r.MethodFunc("POST", getLink(acme.CertificateLink, "{provisionerID}", false, nil, "{certID}"), extractPayloadByKid(h.isPostAsGet(h.GetCertificate)))
-
 }
 
 // GetNonce just sets the right header since a Nonce is added to each response
@@ -91,7 +90,8 @@ func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
 	api.JSON(w, dir)
 }
 
-// NotImplemented returns a 501. This is a place holder for future functionality.
+// NotImplemented returns a 501 and is generally a placeholder for functionality which
+// MAY be added at some point in the future but is not in any way a guarantee of such.
 func (h *Handler) NotImplemented(w http.ResponseWriter, r *http.Request) {
 	api.WriteError(w, acme.NotImplemented(nil).ToACME())
 }

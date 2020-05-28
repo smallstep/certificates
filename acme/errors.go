@@ -412,9 +412,15 @@ func (e *Error) Cause() error {
 	return e.Err
 }
 
-// Official returns true if this error is registered with the IETF.
+// Official returns true if this error's type is listed in §6.7 of RFC 8555.
+// Error types in §6.7 are registered under IETF urn namespace:
 //
-// The RFC says:
+//   "urn:ietf:params:acme:error:"
+//
+// and should include the namespace as a prefix when appearing as a problem
+// document.
+//
+// RFC 8555 also says:
 //
 //   This list is not exhaustive.  The server MAY return errors whose
 //   "type" field is set to a URI other than those defined above.  Servers
@@ -422,11 +428,15 @@ func (e *Error) Cause() error {
 //   appropriate IANA registry (see Section 9.6).  Clients SHOULD display
 //   the "detail" field of all errors.
 //
+// In this case Official returns `false` so that a different namespace can
+// be used.
 func (e *Error) Official() bool {
 	return e.Type != notImplemented
 }
 
 // ToACME returns an acme representation of the problem type.
+// For official errors, the IETF ACME namespace is prepended to the error type.
+// For our own errors, we use an (yet) unregistered smallstep acme namespace.
 func (e *Error) ToACME() *AError {
 	prefix := "urn:step:acme:error"
 	if e.Official() {
