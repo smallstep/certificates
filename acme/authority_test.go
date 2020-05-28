@@ -1092,56 +1092,78 @@ func TestAuthorityGetOrdersByAccount(t *testing.T) {
 			return test{
 				auth: auth,
 				id:   id,
-				err:  ServerInternalErr(errors.New("error loading order foo: force")),
+				err:  ServerInternalErr(errors.New("error loading order foo for account zap: error loading order foo: force")),
 			}
 		},
 		"ok": func(t *testing.T) test {
-			var (
-				id    = "zap"
-				count = 0
-				err   error
-			)
-			foo, err := newO()
-			bar, err := newO()
-			baz, err := newO()
-			bar.Status = StatusInvalid
+			accID := "zap"
 
+			foo, err := newO()
+			assert.FatalError(t, err)
+			bfoo, err := json.Marshal(foo)
+			assert.FatalError(t, err)
+
+			bar, err := newO()
+			assert.FatalError(t, err)
+			bar.Status = StatusInvalid
+			bbar, err := json.Marshal(bar)
+			assert.FatalError(t, err)
+
+			zap, err := newO()
+			assert.FatalError(t, err)
+			bzap, err := json.Marshal(zap)
+			assert.FatalError(t, err)
+
+			az, err := newAz()
+			assert.FatalError(t, err)
+			baz, err := json.Marshal(az)
+			assert.FatalError(t, err)
+
+			ch, err := newDNSCh()
+			assert.FatalError(t, err)
+			bch, err := json.Marshal(ch)
+			assert.FatalError(t, err)
+
+			dbGetOrder := 0
 			auth, err := NewAuthority(&db.MockNoSQLDB{
 				MGet: func(bucket, key []byte) ([]byte, error) {
-					var ret []byte
-					switch count {
-					case 0:
+					switch string(bucket) {
+					case string(orderTable):
+						dbGetOrder++
+						switch dbGetOrder {
+						case 1:
+							return bfoo, nil
+						case 2:
+							return bbar, nil
+						case 3:
+							return bzap, nil
+						}
+					case string(ordersByAccountIDTable):
 						assert.Equals(t, bucket, ordersByAccountIDTable)
-						assert.Equals(t, key, []byte(id))
-						ret, err = json.Marshal([]string{foo.ID, bar.ID, baz.ID})
+						assert.Equals(t, key, []byte(accID))
+						ret, err := json.Marshal([]string{foo.ID, bar.ID, zap.ID})
 						assert.FatalError(t, err)
-					case 1:
-						assert.Equals(t, bucket, orderTable)
-						assert.Equals(t, key, []byte(foo.ID))
-						ret, err = json.Marshal(foo)
-						assert.FatalError(t, err)
-					case 2:
-						assert.Equals(t, bucket, orderTable)
-						assert.Equals(t, key, []byte(bar.ID))
-						ret, err = json.Marshal(bar)
-						assert.FatalError(t, err)
-					case 3:
-						assert.Equals(t, bucket, orderTable)
-						assert.Equals(t, key, []byte(baz.ID))
-						ret, err = json.Marshal(baz)
-						assert.FatalError(t, err)
+						return ret, nil
+					case string(challengeTable):
+						return bch, nil
+					case string(authzTable):
+						return baz, nil
 					}
-					count++
-					return ret, nil
+					return nil, errors.Errorf("should not be query db table %s", bucket)
+				},
+				MCmpAndSwap: func(bucket, key, old, newVal []byte) ([]byte, bool, error) {
+					assert.Equals(t, bucket, ordersByAccountIDTable)
+					assert.Equals(t, string(key), accID)
+					return nil, true, nil
 				},
 			}, "ca.smallstep.com", "acme", nil)
 			assert.FatalError(t, err)
 			return test{
 				auth: auth,
-				id:   id,
+				id:   accID,
 				res: []string{
 					fmt.Sprintf("%s/acme/%s/order/%s", baseURL.String(), provName, foo.ID),
-					fmt.Sprintf("%s/acme/%s/order/%s", baseURL.String(), provName, baz.ID),
+					fmt.Sprintf("%s/acme/%s/order/%s", baseURL.String(), provName, zap.ID),
 				},
 			}
 		},

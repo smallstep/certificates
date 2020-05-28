@@ -240,14 +240,7 @@ func (a *Authority) GetOrdersByAccount(ctx context.Context, id string) ([]string
 
 	var ret = []string{}
 	for _, oid := range oids {
-		o, err := getOrder(a.db, oid)
-		if err != nil {
-			return nil, ServerInternalErr(err)
-		}
-		if o.Status == StatusInvalid {
-			continue
-		}
-		ret = append(ret, a.dir.getLink(ctx, OrderLink, true, o.ID))
+		ret = append(ret, a.dir.getLink(ctx, OrderLink, true, oid))
 	}
 	return ret, nil
 }
