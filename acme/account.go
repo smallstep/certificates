@@ -198,17 +198,40 @@ func getAccountByKeyID(db nosql.DB, kid string) (*account, error) {
 
 // getOrderIDsByAccount retrieves a list of Order IDs that were created by the
 // account.
-func getOrderIDsByAccount(db nosql.DB, id string) ([]string, error) {
-	b, err := db.Get(ordersByAccountIDTable, []byte(id))
+func getOrderIDsByAccount(db nosql.DB, accID string) ([]string, error) {
+	b, err := db.Get(ordersByAccountIDTable, []byte(accID))
 	if err != nil {
 		if nosql.IsErrNotFound(err) {
 			return []string{}, nil
 		}
-		return nil, ServerInternalErr(errors.Wrapf(err, "error loading orderIDs for account %s", id))
+		return nil, ServerInternalErr(errors.Wrapf(err, "error loading orderIDs for account %s", accID))
 	}
-	var orderIDs []string
-	if err := json.Unmarshal(b, &orderIDs); err != nil {
-		return nil, ServerInternalErr(errors.Wrapf(err, "error unmarshaling orderIDs for account %s", id))
+	var oids []string
+	if err := json.Unmarshal(b, &oids); err != nil {
+		return nil, ServerInternalErr(errors.Wrapf(err, "error unmarshaling orderIDs for account %s", accID))
 	}
-	return orderIDs, nil
+
+	// Remove any order that is not in PENDING state.
+	//
+	// According to RFC 8555:
+	// The server SHOULD include pending orders and SHOULD NOT include orders
+	// that are invalid in the array of URLs.
+	pendOrders := []string
+	for _, oid := range oids {
+		o, err := db.Get(orderTable, []byte(oid))
+		if err != nil {
+			fmt.Printf("todo")
+		}
+		if o, err = o.updateStatus(db); err != nil {
+			fmt.Printf("todo")
+		}
+		if !o.Status == StatusPending {
+			pendOrders = append(pendOrders, oid)
+		}
+	}
+	if oids, err = orderIDs(pendOrders).save(db, oids, accID); err != nil {
+			fmt.Printf("todo")
+	}
+
+	return oids, nil
 }
