@@ -194,6 +194,16 @@ func ServerInternalErr(err error) *Error {
 	}
 }
 
+// NotImplemented returns a new acme error.
+func NotImplemented(err error) *Error {
+	return &Error{
+		Type:   notImplemented,
+		Detail: "The requested operation is not implemented",
+		Status: 501,
+		Err:    err,
+	}
+}
+
 // TLSErr returns a new acme error.
 func TLSErr(err error) *Error {
 	return &Error{
@@ -296,6 +306,8 @@ const (
 	unsupportedIdentifierErr
 	// Visit the “instance” URL and take actions specified there
 	userActionRequiredErr
+	// The operation is not implemented
+	notImplemented
 )
 
 // String returns the string representation of the acme problem type,
@@ -350,6 +362,8 @@ func (ap ProbType) String() string {
 		return "unsupportedIdentifier"
 	case userActionRequiredErr:
 		return "userActionRequired"
+	case notImplemented:
+		return "notImplemented"
 	default:
 		return "unsupported type"
 	}
@@ -398,10 +412,38 @@ func (e *Error) Cause() error {
 	return e.Err
 }
 
+// Official returns true if this error's type is listed in §6.7 of RFC 8555.
+// Error types in §6.7 are registered under IETF urn namespace:
+//
+//   "urn:ietf:params:acme:error:"
+//
+// and should include the namespace as a prefix when appearing as a problem
+// document.
+//
+// RFC 8555 also says:
+//
+//   This list is not exhaustive.  The server MAY return errors whose
+//   "type" field is set to a URI other than those defined above.  Servers
+//   MUST NOT use the ACME URN namespace for errors not listed in the
+//   appropriate IANA registry (see Section 9.6).  Clients SHOULD display
+//   the "detail" field of all errors.
+//
+// In this case Official returns `false` so that a different namespace can
+// be used.
+func (e *Error) Official() bool {
+	return e.Type != notImplemented
+}
+
 // ToACME returns an acme representation of the problem type.
+// For official errors, the IETF ACME namespace is prepended to the error type.
+// For our own errors, we use an (yet) unregistered smallstep acme namespace.
 func (e *Error) ToACME() *AError {
+	prefix := "urn:step:acme:error"
+	if e.Official() {
+		prefix = "urn:ietf:params:acme:error:"
+	}
 	ae := &AError{
-		Type:   "urn:ietf:params:acme:error:" + e.Type.String(),
+		Type:   prefix + e.Type.String(),
 		Detail: e.Error(),
 		Status: e.Status,
 	}
