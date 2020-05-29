@@ -44,7 +44,7 @@ more info).  Below are a few examples for supported databases:
     "type": "badger",
     "dataSource": "./.step/db",
     "valueDir": "./.step/valuedb"
-    "badgerValueLogLoadingMode": "MemoryMap"
+    "badgerFileLoadingMode": "MemoryMap"
   },
   ...
 },
@@ -60,7 +60,7 @@ more info).  Below are a few examples for supported databases:
     will need to set it explicitly until it becomes the default.
 * `dataSource` - path, database directory.
 * `valueDir` [optional] - path, value directory, only if different from `dataSource`.
-* `badgerValueLogLoadingMode` [optional] - can be set to `FileIO` (instead of the default
+* `badgerFileLoadingMode` [optional] - can be set to `FileIO` (instead of the default
         `MemoryMap`) to avoid memory-mapping log files. This can be
         useful in environments with low RAM. Make sure to use `badgerV2` as the
         database `type` if using this option.
