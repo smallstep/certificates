@@ -251,7 +251,7 @@ func TestGetAccountByKeyID(t *testing.T) {
 	}
 }
 
-func TestGetAccountIDsByAccount(t *testing.T) {
+func Test_getOrderIDsByAccount(t *testing.T) {
 	type test struct {
 		id  string
 		db  nosql.DB
@@ -294,20 +294,234 @@ func TestGetAccountIDsByAccount(t *testing.T) {
 				err: ServerInternalErr(errors.New("error unmarshaling orderIDs for account foo: unexpected end of JSON input")),
 			}
 		},
-		"ok": func(t *testing.T) test {
-			oids := []string{"foo", "bar", "baz"}
-			b, err := json.Marshal(oids)
+		"fail/error-loading-order-from-order-IDs": func(t *testing.T) test {
+			oids := []string{"o1", "o2", "o3"}
+			boids, err := json.Marshal(oids)
 			assert.FatalError(t, err)
+			dbHit := 0
 			return test{
 				id: "foo",
 				db: &db.MockNoSQLDB{
 					MGet: func(bucket, key []byte) ([]byte, error) {
-						assert.Equals(t, bucket, ordersByAccountIDTable)
-						assert.Equals(t, key, []byte("foo"))
-						return b, nil
+						dbHit++
+						switch dbHit {
+						case 1:
+							assert.Equals(t, bucket, ordersByAccountIDTable)
+							assert.Equals(t, key, []byte("foo"))
+							return boids, nil
+						case 2:
+							assert.Equals(t, bucket, orderTable)
+							assert.Equals(t, key, []byte("o1"))
+							return nil, errors.New("force")
+						default:
+							assert.FatalError(t, errors.New("should not be here"))
+							return nil, nil
+						}
+					},
+				},
+				err: ServerInternalErr(errors.New("error loading order o1 for account foo: error loading order o1: force")),
+			}
+		},
+		"fail/error-updating-order-from-order-IDs": func(t *testing.T) test {
+			oids := []string{"o1", "o2", "o3"}
+			boids, err := json.Marshal(oids)
+			assert.FatalError(t, err)
+
+			o, err := newO()
+			assert.FatalError(t, err)
+			bo, err := json.Marshal(o)
+			assert.FatalError(t, err)
+
+			dbHit := 0
+			return test{
+				id: "foo",
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						dbHit++
+						switch dbHit {
+						case 1:
+							assert.Equals(t, bucket, ordersByAccountIDTable)
+							assert.Equals(t, key, []byte("foo"))
+							return boids, nil
+						case 2:
+							assert.Equals(t, bucket, orderTable)
+							assert.Equals(t, key, []byte("o1"))
+							return bo, nil
+						case 3:
+							assert.Equals(t, bucket, authzTable)
+							assert.Equals(t, key, []byte(o.Authorizations[0]))
+							return nil, errors.New("force")
+						default:
+							assert.FatalError(t, errors.New("should not be here"))
+							return nil, nil
+						}
+					},
+				},
+				err: ServerInternalErr(errors.Errorf("error updating order o1 for account foo: error loading authz %s: force", o.Authorizations[0])),
+			}
+		},
+		"ok/no-change-to-pending-orders": func(t *testing.T) test {
+			oids := []string{"o1", "o2", "o3"}
+			boids, err := json.Marshal(oids)
+			assert.FatalError(t, err)
+
+			o, err := newO()
+			assert.FatalError(t, err)
+			bo, err := json.Marshal(o)
+			assert.FatalError(t, err)
+
+			az, err := newAz()
+			assert.FatalError(t, err)
+			baz, err := json.Marshal(az)
+			assert.FatalError(t, err)
+
+			ch, err := newDNSCh()
+			assert.FatalError(t, err)
+			bch, err := json.Marshal(ch)
+			assert.FatalError(t, err)
+
+			return test{
+				id: "foo",
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(ordersByAccountIDTable):
+							assert.Equals(t, key, []byte("foo"))
+							return boids, nil
+						case string(orderTable):
+							return bo, nil
+						case string(authzTable):
+							return baz, nil
+						case string(challengeTable):
+							return bch, nil
+						default:
+							assert.FatalError(t, errors.Errorf("did not expect query to table %s", bucket))
+							return nil, nil
+						}
+					},
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						return nil, false, errors.New("should not be attempting to store anything")
 					},
 				},
 				res: oids,
+			}
+		},
+		"fail/error-storing-new-oids": func(t *testing.T) test {
+			oids := []string{"o1", "o2", "o3"}
+			boids, err := json.Marshal(oids)
+			assert.FatalError(t, err)
+
+			o, err := newO()
+			assert.FatalError(t, err)
+			bo, err := json.Marshal(o)
+			assert.FatalError(t, err)
+
+			invalidOrder, err := newO()
+			assert.FatalError(t, err)
+			invalidOrder.Status = StatusInvalid
+			binvalidOrder, err := json.Marshal(invalidOrder)
+			assert.FatalError(t, err)
+
+			az, err := newAz()
+			assert.FatalError(t, err)
+			baz, err := json.Marshal(az)
+			assert.FatalError(t, err)
+
+			ch, err := newDNSCh()
+			assert.FatalError(t, err)
+			bch, err := json.Marshal(ch)
+			assert.FatalError(t, err)
+
+			dbGetOrder := 0
+			return test{
+				id: "foo",
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(ordersByAccountIDTable):
+							assert.Equals(t, key, []byte("foo"))
+							return boids, nil
+						case string(orderTable):
+							dbGetOrder++
+							if dbGetOrder == 1 {
+								return binvalidOrder, nil
+							}
+							return bo, nil
+						case string(authzTable):
+							return baz, nil
+						case string(challengeTable):
+							return bch, nil
+						default:
+							assert.FatalError(t, errors.Errorf("did not expect query to table %s", bucket))
+							return nil, nil
+						}
+					},
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, ordersByAccountIDTable)
+						assert.Equals(t, key, []byte("foo"))
+						return nil, false, errors.New("force")
+					},
+				},
+				err: ServerInternalErr(errors.New("error storing orderIDs as part of getOrderIDsByAccount logic: len(orderIDs) = 2: error storing order IDs for account foo: force")),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			oids := []string{"o1", "o2", "o3", "o4"}
+			boids, err := json.Marshal(oids)
+			assert.FatalError(t, err)
+
+			o, err := newO()
+			assert.FatalError(t, err)
+			bo, err := json.Marshal(o)
+			assert.FatalError(t, err)
+
+			invalidOrder, err := newO()
+			assert.FatalError(t, err)
+			invalidOrder.Status = StatusInvalid
+			binvalidOrder, err := json.Marshal(invalidOrder)
+			assert.FatalError(t, err)
+
+			az, err := newAz()
+			assert.FatalError(t, err)
+			baz, err := json.Marshal(az)
+			assert.FatalError(t, err)
+
+			ch, err := newDNSCh()
+			assert.FatalError(t, err)
+			bch, err := json.Marshal(ch)
+			assert.FatalError(t, err)
+
+			dbGetOrder := 0
+			return test{
+				id: "foo",
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(ordersByAccountIDTable):
+							assert.Equals(t, key, []byte("foo"))
+							return boids, nil
+						case string(orderTable):
+							dbGetOrder++
+							if dbGetOrder == 1 || dbGetOrder == 3 {
+								return binvalidOrder, nil
+							}
+							return bo, nil
+						case string(authzTable):
+							return baz, nil
+						case string(challengeTable):
+							return bch, nil
+						default:
+							assert.FatalError(t, errors.Errorf("did not expect query to table %s", bucket))
+							return nil, nil
+						}
+					},
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, ordersByAccountIDTable)
+						assert.Equals(t, key, []byte("foo"))
+						return nil, true, nil
+					},
+				},
+				res: []string{"o2", "o4"},
 			}
 		},
 	}

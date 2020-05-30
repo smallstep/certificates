@@ -38,17 +38,13 @@ func newO() (*order, error) {
 			return []byte("foo"), true, nil
 		},
 		MGet: func(bucket, key []byte) ([]byte, error) {
-			b, err := json.Marshal([]string{"1", "2"})
-			if err != nil {
-				return nil, err
-			}
-			return b, nil
+			return nil, database.ErrNotFound
 		},
 	}
 	return newOrder(mockdb, defaultOrderOps())
 }
 
-func TestGetOrder(t *testing.T) {
+func Test_getOrder(t *testing.T) {
 	type test struct {
 		id  string
 		db  nosql.DB
@@ -363,9 +359,6 @@ func Test_newOrder(t *testing.T) {
 		},
 		"fail/save-orderIDs-error": func(t *testing.T) test {
 			count := 0
-			oids := []string{"1", "2", "3"}
-			oidsB, err := json.Marshal(oids)
-			assert.FatalError(t, err)
 			var (
 				_oid = ""
 				oid  = &_oid
@@ -386,7 +379,7 @@ func Test_newOrder(t *testing.T) {
 						return nil, true, nil
 					},
 					MGet: func(bucket, key []byte) ([]byte, error) {
-						return oidsB, nil
+						return nil, database.ErrNotFound
 					},
 					MDel: func(bucket, key []byte) error {
 						assert.Equals(t, bucket, orderTable)
@@ -399,9 +392,6 @@ func Test_newOrder(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			count := 0
-			oids := []string{"1", "2", "3"}
-			oidsB, err := json.Marshal(oids)
-			assert.FatalError(t, err)
 			authzs := &([]string{})
 			var (
 				_oid = ""
@@ -415,8 +405,8 @@ func Test_newOrder(t *testing.T) {
 						if count >= 9 {
 							assert.Equals(t, bucket, ordersByAccountIDTable)
 							assert.Equals(t, key, []byte(ops.AccountID))
-							assert.Equals(t, old, oidsB)
-							newB, err := json.Marshal(append(oids, *oid))
+							assert.Equals(t, old, nil)
+							newB, err := json.Marshal([]string{*oid})
 							assert.FatalError(t, err)
 							assert.Equals(t, newval, newB)
 						} else if count == 8 {
@@ -430,7 +420,7 @@ func Test_newOrder(t *testing.T) {
 						return nil, true, nil
 					},
 					MGet: func(bucket, key []byte) ([]byte, error) {
-						return oidsB, nil
+						return nil, database.ErrNotFound
 					},
 				},
 				authzs: authzs,
@@ -438,9 +428,6 @@ func Test_newOrder(t *testing.T) {
 		},
 		"ok/validity-bounds-not-set": func(t *testing.T) test {
 			count := 0
-			oids := []string{"1", "2", "3"}
-			oidsB, err := json.Marshal(oids)
-			assert.FatalError(t, err)
 			authzs := &([]string{})
 			var (
 				_oid = ""
@@ -458,8 +445,8 @@ func Test_newOrder(t *testing.T) {
 						if count >= 9 {
 							assert.Equals(t, bucket, ordersByAccountIDTable)
 							assert.Equals(t, key, []byte(ops.AccountID))
-							assert.Equals(t, old, oidsB)
-							newB, err := json.Marshal(append(oids, *oid))
+							assert.Equals(t, old, nil)
+							newB, err := json.Marshal([]string{*oid})
 							assert.FatalError(t, err)
 							assert.Equals(t, newval, newB)
 						} else if count == 8 {
@@ -473,7 +460,7 @@ func Test_newOrder(t *testing.T) {
 						return nil, true, nil
 					},
 					MGet: func(bucket, key []byte) ([]byte, error) {
-						return oidsB, nil
+						return nil, database.ErrNotFound
 					},
 				},
 				authzs: authzs,

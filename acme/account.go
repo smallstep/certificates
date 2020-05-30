@@ -3,6 +3,7 @@ package acme
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
@@ -211,27 +212,33 @@ func getOrderIDsByAccount(db nosql.DB, accID string) ([]string, error) {
 		return nil, ServerInternalErr(errors.Wrapf(err, "error unmarshaling orderIDs for account %s", accID))
 	}
 
-	// Remove any order that is not in PENDING state.
+	// Remove any order that is not in PENDING state and update the stored list
+	// before returning.
 	//
 	// According to RFC 8555:
 	// The server SHOULD include pending orders and SHOULD NOT include orders
 	// that are invalid in the array of URLs.
-	pendOrders := []string
+	pendOids := []string{}
 	for _, oid := range oids {
-		o, err := db.Get(orderTable, []byte(oid))
+		o, err := getOrder(db, oid)
 		if err != nil {
-			fmt.Printf("todo")
+			return nil, ServerInternalErr(errors.Wrapf(err, "error loading order %s for account %s", oid, accID))
 		}
 		if o, err = o.updateStatus(db); err != nil {
-			fmt.Printf("todo")
+			return nil, ServerInternalErr(errors.Wrapf(err, "error updating order %s for account %s", oid, accID))
 		}
-		if !o.Status == StatusPending {
-			pendOrders = append(pendOrders, oid)
+		if o.Status == StatusPending {
+			pendOids = append(pendOids, oid)
 		}
 	}
-	if oids, err = orderIDs(pendOrders).save(db, oids, accID); err != nil {
-			fmt.Printf("todo")
+	// If there have been changes to the pending orders list, then store the
+	// new list.
+	if !reflect.DeepEqual(pendOids, oids) {
+		if err = orderIDs(pendOids).save(db, oids, accID); err != nil {
+			return nil, ServerInternalErr(errors.Wrapf(err, "error storing orderIDs as part of getOrderIDsByAccount logic: "+
+				"len(orderIDs) = %d", len(pendOids)))
+		}
 	}
 
-	return oids, nil
+	return pendOids, nil
 }
