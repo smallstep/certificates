@@ -230,10 +230,15 @@ func (o *order) updateStatus(db nosql.DB) (*order, error) {
 		switch {
 		case count[StatusInvalid] > 0:
 			newOrder.Status = StatusInvalid
+
+		// No change in the order status, so just return the order as is -
+		// without writing any changes.
 		case count[StatusPending] > 0:
-			break
+			return newOrder, nil
+
 		case count[StatusValid] == len(o.Authorizations):
 			newOrder.Status = StatusReady
+
 		default:
 			return nil, ServerInternalErr(errors.New("unexpected authz status"))
 		}
