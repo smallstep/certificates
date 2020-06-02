@@ -516,7 +516,7 @@ func Test_newOrder(t *testing.T) {
 	}
 }
 
-func TestOrderIDsSave(t *testing.T) {
+func TestOrderIDs_save(t *testing.T) {
 	accID := "acc-id"
 	newOids := func() orderIDs {
 		return []string{"1", "2"}
@@ -584,6 +584,26 @@ func TestOrderIDsSave(t *testing.T) {
 					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 						assert.Equals(t, old, oldb)
 						assert.Equals(t, newval, b)
+						assert.Equals(t, bucket, ordersByAccountIDTable)
+						assert.Equals(t, key, []byte(accID))
+						return nil, true, nil
+					},
+				},
+			}
+		},
+		"ok/new-empty-saved-as-nil": func(t *testing.T) test {
+			oldOids := newOids()
+			oids := []string{}
+
+			oldb, err := json.Marshal(oldOids)
+			assert.FatalError(t, err)
+			return test{
+				oids: oids,
+				old:  oldOids,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, old, oldb)
+						assert.Equals(t, newval, nil)
 						assert.Equals(t, bucket, ordersByAccountIDTable)
 						assert.Equals(t, key, []byte(accID))
 						return nil, true, nil
