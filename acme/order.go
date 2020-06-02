@@ -125,10 +125,17 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 
 type orderIDs []string
 
+// save is used to update the list of orderIDs keyed by ACME account ID
+// stored in the database.
+//
+// This method always converts empty lists to 'nil' when storing to the DB. We
+// do this to avoid any confusion between an empty list and a nil value in the
+// db.
 func (oids orderIDs) save(db nosql.DB, old orderIDs, accID string) error {
 	var (
 		err  error
 		oldb []byte
+		newb []byte
 	)
 	if len(old) == 0 {
 		oldb = nil
@@ -138,9 +145,13 @@ func (oids orderIDs) save(db nosql.DB, old orderIDs, accID string) error {
 			return ServerInternalErr(errors.Wrap(err, "error marshaling old order IDs slice"))
 		}
 	}
-	newb, err := json.Marshal(oids)
-	if err != nil {
-		return ServerInternalErr(errors.Wrap(err, "error marshaling new order IDs slice"))
+	if len(oids) == 0 {
+		newb = nil
+	} else {
+		newb, err = json.Marshal(oids)
+		if err != nil {
+			return ServerInternalErr(errors.Wrap(err, "error marshaling new order IDs slice"))
+		}
 	}
 	_, swapped, err := db.CmpAndSwap(ordersByAccountIDTable, []byte(accID), oldb, newb)
 	switch {

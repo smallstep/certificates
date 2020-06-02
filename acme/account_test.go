@@ -524,6 +524,43 @@ func Test_getOrderIDsByAccount(t *testing.T) {
 				res: []string{"o2", "o4"},
 			}
 		},
+		"ok/no-pending-orders": func(t *testing.T) test {
+			oids := []string{"o1"}
+			boids, err := json.Marshal(oids)
+			assert.FatalError(t, err)
+
+			invalidOrder, err := newO()
+			assert.FatalError(t, err)
+			invalidOrder.Status = StatusInvalid
+			binvalidOrder, err := json.Marshal(invalidOrder)
+			assert.FatalError(t, err)
+
+			return test{
+				id: "foo",
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(ordersByAccountIDTable):
+							assert.Equals(t, key, []byte("foo"))
+							return boids, nil
+						case string(orderTable):
+							return binvalidOrder, nil
+						default:
+							assert.FatalError(t, errors.Errorf("did not expect query to table %s", bucket))
+							return nil, nil
+						}
+					},
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, ordersByAccountIDTable)
+						assert.Equals(t, key, []byte("foo"))
+						assert.Equals(t, old, boids)
+						assert.Nil(t, newval)
+						return nil, true, nil
+					},
+				},
+				res: []string{},
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
