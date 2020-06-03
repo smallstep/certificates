@@ -175,6 +175,89 @@ We are using the [Arch User Repository](https://aur.archlinux.org) to distribute
 
 You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
 
+#### RHEL/CentOS
+
+There are a few subtle yet important things to getting this setup, at the time of this writing the package cannot be installed via yum (its a feature request). So this is how we setup this on RHEL following some best practices.
+
+1. [Required] Install `step`.
+
+    Download the latest Linux package from
+    [`step` releases](https://github.com/smallstep/cli/releases):
+
+    ```
+    $ wget -O step-cert.tar.gz https://github.com/smallstep/cli/releases/download/vX.Y.Z/step_linux_X.Y.Z_amd64.tar.gz
+    ```
+
+    Install the Package by unzipping in bin:
+
+    ```
+    $ tar -xf step.tar.gz
+    $ cd step-_X.Y.Z/bin/
+    $ mv step /usr/bin
+    ```
+
+2. Install `step-ca`.
+
+    Download the latest Linux package from [releases](https://github.com/smallstep/certificates/releases):
+
+    ```
+    $ wget -O step-ca.tar.gz https://github.com/smallstep/cli/releases/download/vX.Y.Z/step_linux_X.Y.Z_amd64.tar.gz
+    ```
+
+    Install the Package by unzipping in bin:
+
+    ```
+    $ tar -xf step-ca.tar.gz
+    $ cd step-certificates_X.Y.Z/bin/
+    $ mv step-ca /usr/bin
+    ```
+
+3. Now your users can call the step and step-ca commands, create a 'smallstep' user that doesn't have login permitted and will only be used as a service user for systemctl to manage this service.
+
+    ```
+    $ useradd smallstep
+    $ passwd -l smallstep
+    ```
+    
+    This creates a home directory for smallstep, as root sudo to the smallstep user, and perform the getting-started steps to setup the CA on this box as that user, we chose to put the password in a file in this example but you can mess with other solutions, we then made this systemctl service file
+    
+    ```
+    [Unit]
+    Description=Smallstep
+    After=syslog.target network.target
+
+    [Service]
+
+    User=smallstep
+    Group=smallstep
+    ExecStart=/bin/sh -c '/bin/step-ca /home/smallstep/.step/config/ca.json --password-file=/home/smallstep/.step/pwd >>   /var/log/smallstep/output.log 2>&1'
+    Type=simple
+    Restart=on-failure
+    RestartSec=10
+
+
+    [Install]
+    WantedBy=multi-user.target
+    ```
+    This also assumes you want logs going to a log file (we don't have a log rotation strategy at this time, perhaps the community can contribute :)
+   
+   To setup this, perform the following
+    ```
+    $ mkdir /var/log/smallstep
+    $ chown -R smallstep:smallstep /var/log/smallstep
+    ```
+
+   
+    
+    Then do the following to startup the service.
+    ```
+    $ systemctl status smallstep
+    $ systemctl enable smallstep (startup on reboot automatically)
+    $ systemctl start smallstep
+    ```
+If you have issues, you can debug by grabbing the execStart command from systemctl, sudo to smallstep, and start seeing what it is complaining about.
+    
+  
 ### Kubernetes
 
 We publish [helm charts](https://hub.helm.sh/charts/smallstep/step-certificates) for easy installation on kubernetes:
