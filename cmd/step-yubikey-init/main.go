@@ -22,6 +22,9 @@ import (
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/ui"
 	"github.com/smallstep/cli/utils"
+
+	// Enable yubikey.
+	_ "github.com/smallstep/certificates/kms/yubikey"
 )
 
 type Config struct {

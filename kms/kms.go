@@ -7,13 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
 
-	// Enabled kms interfaces.
-	_ "github.com/smallstep/certificates/kms/awskms"
-	_ "github.com/smallstep/certificates/kms/cloudkms"
+	// Enable default implementation
 	_ "github.com/smallstep/certificates/kms/softkms"
-
-	// Experimental kms interfaces.
-	_ "github.com/smallstep/certificates/kms/yubikey"
 )
 
 // KeyManager is the interface implemented by all the KMS.
