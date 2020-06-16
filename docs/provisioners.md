@@ -46,22 +46,22 @@ Example `claims`:
 
   SSH CA properties
 
-  * `minUserSSHDuration`: do not allow certificates with a duration less
+  * `minUserSSHCertDuration`: do not allow certificates with a duration less
   than this value.
 
-  * `maxUserSSHDuration`: do not allow certificates with a duration
+  * `maxUserSSHCertDuration`: do not allow certificates with a duration
   greater than this value.
 
-  * `defaultUserSSHDuration`: if no certificate validity period is specified,
+  * `defaultUserSSHCertDuration`: if no certificate validity period is specified,
   use this value.
 
-  * `minHostSSHDuration`: do not allow certificates with a duration less
+  * `minHostSSHCertDuration`: do not allow certificates with a duration less
   than this value.
 
-  * `maxHostSSHDuration`: do not allow certificates with a duration
+  * `maxHostSSHCertDuration`: do not allow certificates with a duration
   greater than this value.
 
-  * `defaultHostSSHDuration`: if no certificate validity period is specified,
+  * `defaultHostSSHCertDuration`: if no certificate validity period is specified,
   use this value.
 
   * `enableSSHCA`: enable all provisioners to generate SSH Certificates.
