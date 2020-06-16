@@ -485,7 +485,7 @@ func Test_profileDefaultDuration_Option(t *testing.T) {
 				cert: new(x509.Certificate),
 				valid: func(cert *x509.Certificate) {
 					n := now()
-					assert.True(t, n.After(cert.NotBefore), fmt.Sprintf("expected now = %s to be after cert.NotBefore = %s", n, cert.NotBefore))
+					assert.True(t, n.Add(3*time.Second).After(cert.NotBefore), fmt.Sprintf("expected now = %s to be after cert.NotBefore = %s", n.Add(3*time.Second), cert.NotBefore))
 					assert.True(t, n.Add(-1*time.Minute).Before(cert.NotBefore))
 
 					assert.Equals(t, cert.NotAfter, na)
@@ -530,14 +530,14 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 		err   error
 	}
 	tests := map[string]func() test{
-		"fail/notBefore-after-limit": func() test {
-			d, err := ParseTimeDuration("8h")
+		"fail/notBefore-before-active-window": func() test {
+			d, err := ParseTimeDuration("6h")
 			assert.FatalError(t, err)
 			return test{
-				pld:  profileLimitDuration{def: 4 * time.Hour, notAfter: n.Add(6 * time.Hour)},
+				pld:  profileLimitDuration{def: 4 * time.Hour, notBefore: n.Add(8 * time.Hour)},
 				so:   Options{NotBefore: d},
 				cert: new(x509.Certificate),
-				err:  errors.New("provisioning credential expiration ("),
+				err:  errors.New("requested certificate notBefore ("),
 			}
 		},
 		"fail/requested-notAfter-after-limit": func() test {
@@ -547,7 +547,7 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 				pld:  profileLimitDuration{def: 4 * time.Hour, notAfter: n.Add(6 * time.Hour)},
 				so:   Options{NotBefore: NewTimeDuration(n.Add(3 * time.Hour)), NotAfter: d},
 				cert: new(x509.Certificate),
-				err:  errors.New("provisioning credential expiration ("),
+				err:  errors.New("requested certificate notAfter ("),
 			}
 		},
 		"ok/valid-notAfter-requested": func() test {

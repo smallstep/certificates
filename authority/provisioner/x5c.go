@@ -199,7 +199,8 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	return []SignOption{
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeX5C, p.Name, ""),
-		profileLimitDuration{p.claimer.DefaultTLSCertDuration(), claims.chains[0][0].NotAfter},
+		profileLimitDuration{p.claimer.DefaultTLSCertDuration(),
+			claims.chains[0][0].NotBefore, claims.chains[0][0].NotAfter},
 		// validators
 		commonNameValidator(claims.Subject),
 		defaultPublicKeyValidator{},

@@ -221,8 +221,8 @@ func (v profileDefaultDuration) Option(so Options) x509util.WithOption {
 // profileLimitDuration is an x509 profile option that modifies an x509 validity
 // period according to an imposed expiration time.
 type profileLimitDuration struct {
-	def      time.Duration
-	notAfter time.Time
+	def                 time.Duration
+	notBefore, notAfter time.Time
 }
 
 // Option returns an x509util option that limits the validity period of a
@@ -236,15 +236,17 @@ func (v profileLimitDuration) Option(so Options) x509util.WithOption {
 			notBefore = n
 			backdate = -1 * so.Backdate
 		}
-		if notBefore.After(v.notAfter) {
-			return errors.Errorf("provisioning credential expiration (%s) is before "+
-				"requested certificate notBefore (%s)", v.notAfter, notBefore)
+		if notBefore.Before(v.notBefore) {
+			return errors.Errorf("requested certificate notBefore (%s) is before "+
+				"the active validity window of the provisioning credential (%s)",
+				notBefore, v.notBefore)
 		}
 
 		notAfter := so.NotAfter.RelativeTime(notBefore)
 		if notAfter.After(v.notAfter) {
-			return errors.Errorf("provisioning credential expiration (%s) is before "+
-				"requested certificate notAfter (%s)", v.notAfter, notBefore)
+			return errors.Errorf("requested certificate notAfter (%s) is after "+
+				"the expiration of the provisioning credential (%s)",
+				notAfter, v.notAfter)
 		}
 		if notAfter.IsZero() {
 			t := notBefore.Add(v.def)
