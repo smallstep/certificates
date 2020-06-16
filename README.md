@@ -126,7 +126,7 @@ Certificate:
 
 > Note: If you have installed `step` previously through the `smallstep/smallstep`
 > tap you will need to run the following commands before installing:
-> 
+>
 > ```
 > $ brew untap smallstep/smallstep
 > $ brew uninstall step
@@ -174,6 +174,43 @@ We are using the [Arch User Repository](https://aur.archlinux.org) to distribute
 * The `step-ca` binary tarball can be found [here](https://aur.archlinux.org/packages/step-ca-bin/).
 
 You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
+
+#### RHEL/CentOS
+
+1. [Optional] Install `step`.
+
+    Download the latest Linux tarball from
+    [`step` releases](https://github.com/smallstep/cli/releases):
+
+    ```
+    $ wget -O step-cli.tar.gz https://github.com/smallstep/cli/releases/download/vX.Y.Z/step_linux_X.Y.Z_amd64.tar.gz
+    ```
+
+    Install `step` by unzipping and copying the executable over to `/usr/bin`:
+
+    ```
+    $ tar -xf step-cli.tar.gz
+    $ sudo cp step_X.Y.Z/bin/step /usr/bin
+    ```
+
+2. Install `step-ca`.
+
+    Download the latest Linux package from [releases](https://github.com/smallstep/certificates/releases):
+
+    ```
+    $ wget -O step-ca.tar.gz https://github.com/smallstep/cli/releases/download/vX.Y.Z/step_linux_X.Y.Z_amd64.tar.gz
+    ```
+
+    Install `step-ca` by unzipping and copying the executable over to `/usr/bin`:
+
+    ```
+    $ tar -xf step-ca.tar.gz
+    $ sudo cp step-certificates_X.Y.Z/bin/step-ca /usr/bin
+    ```
+
+See the [`systemctl` setup section](./docs/GETTING_STARTED.md#systemctl) for a
+guide on configuring `step-ca` as a daemon.
+
 
 ### Kubernetes
 

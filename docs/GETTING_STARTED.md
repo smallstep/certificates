@@ -203,6 +203,49 @@ export STEPPATH=$(step path)
 step-ca $STEPPATH/config/ca.json
 ```
 
+### Systemctl
+
+Consider adding a service user that will only be used by `systemctl` to manage
+the service.
+
+```
+$ useradd step
+$ passwd -l step
+```
+
+Use the following example as a base for your `systemctl` service file:
+
+```
+[Unit]
+Description=step-ca
+After=syslog.target network.target
+
+[Service]
+
+User=smallstep
+Group=smallstep
+ExecStart=/bin/sh -c '/bin/step-ca /home/smallstep/.step/config/ca.json --password-file=/home/smallstep/.step/pwd >>   /var/log/smallstep/output.log 2>&1'
+Type=simple
+Restart=on-failure
+RestartSec=10
+
+
+[Install]
+WantedBy=multi-user.target
+```
+
+The following are a few example commands you can use to check the status,
+enable on restart, and start your `systemctl` service.
+
+```
+# Check the current status of the `step-ca` service
+$ systemctl status step-ca
+# Configure the `step-ca` process to startup on reboot automatically
+$ systemctl enable step-ca
+# Start the `step-ca` service.
+$ systemctl start smallstep
+```
+
 ## Configure Your Environment
 
 **Note**: Configuring your environment is only necessary for remote servers
@@ -442,7 +485,9 @@ types of certs. Each of these provisioners must have unique keys.
 
 ## Use Custom Claims for Provisioners to Control Certificate Validity etc
 
-It's possible to configure provisioners on the CA to issue certs using properties specific to their target environments. Most commonly different validity periods and disabling renewals for certs. Here's how:
+It's possible to configure provisioners on the CA to issue certs using
+properties specific to their target environments. Most commonly different
+validity periods and disabling renewals for certs. Here's how:
 
 ```bash
 $ step ca init
