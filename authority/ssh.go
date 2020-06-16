@@ -125,6 +125,10 @@ func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[strin
 		return nil, errs.NotFound("getSSHConfig: ssh is not configured")
 	}
 
+	if a.config.Templates == nil {
+		return nil, errs.NotFound("getSSHConfig: ssh templates are not configured")
+	}
+
 	var ts []templates.Template
 	switch typ {
 	case provisioner.SSHUserCert:
