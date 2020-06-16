@@ -455,6 +455,7 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 		{"badType", fields{tmplConfig, userSigner, hostSigner}, args{"bad", nil}, nil, true},
 		{"userError", fields{tmplConfigErr, userSigner, hostSigner}, args{"user", nil}, nil, true},
 		{"hostError", fields{tmplConfigErr, userSigner, hostSigner}, args{"host", map[string]string{"Function": "foo"}}, nil, true},
+		{"noTemplates", fields{nil, userSigner, hostSigner}, args{"user", nil}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
