@@ -460,7 +460,7 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := testAuthority(t)
-			a.config.Templates = tt.fields.templates
+			a.templates = tt.fields.templates
 			a.sshCAUserCertSignKey = tt.fields.userSigner
 			a.sshCAHostCertSignKey = tt.fields.hostSigner
 

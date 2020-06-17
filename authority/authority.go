@@ -31,6 +31,7 @@ type Authority struct {
 	keyManager   kms.KeyManager
 	provisioners *provisioner.Collection
 	db           db.AuthDB
+	templates    *templates.Templates
 
 	// X509 CA
 	rootX509Certs      []*x509.Certificate
@@ -301,13 +302,14 @@ func (a *Authority) init() error {
 
 	// Configure templates, currently only ssh templates are supported.
 	if a.sshCAHostCertSignKey != nil || a.sshCAUserCertSignKey != nil {
-		if a.config.Templates == nil {
-			a.config.Templates = templates.DefaultTemplates()
+		a.templates = a.config.Templates
+		if a.templates == nil {
+			a.templates = templates.DefaultTemplates()
 		}
-		if a.config.Templates.Data == nil {
-			a.config.Templates.Data = make(map[string]interface{})
+		if a.templates.Data == nil {
+			a.templates.Data = make(map[string]interface{})
 		}
-		a.config.Templates.Data["Step"] = tmplVars
+		a.templates.Data["Step"] = tmplVars
 	}
 
 	// JWT numeric dates are seconds.
