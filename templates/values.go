@@ -115,9 +115,11 @@ HostKey /etc/ssh/{{.User.Key}}`,
 func DefaultTemplates() *Templates {
 	sshTemplates := DefaultSSHTemplates
 	for i, t := range sshTemplates.User {
+		sshTemplates.User[i].TemplatePath = ""
 		sshTemplates.User[i].Content = []byte(DefaultSSHTemplateData[t.Name])
 	}
 	for i, t := range sshTemplates.Host {
+		sshTemplates.Host[i].TemplatePath = ""
 		sshTemplates.Host[i].Content = []byte(DefaultSSHTemplateData[t.Name])
 	}
 	return &Templates{
