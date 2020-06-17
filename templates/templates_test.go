@@ -428,3 +428,39 @@ func TestOutput_Write(t *testing.T) {
 		})
 	}
 }
+
+func TestTemplate_ValidateRequiredData(t *testing.T) {
+	data := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
+	type fields struct {
+		RequiredData []string
+	}
+	type args struct {
+		data map[string]string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"ok nil", fields{nil}, args{nil}, false},
+		{"ok empty", fields{[]string{}}, args{data}, false},
+		{"ok one", fields{[]string{"key1"}}, args{data}, false},
+		{"ok multiple", fields{[]string{"key1", "key2"}}, args{data}, false},
+		{"fail nil", fields{[]string{"missing"}}, args{nil}, true},
+		{"fail missing", fields{[]string{"missing"}}, args{data}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpl := &Template{
+				RequiredData: tt.fields.RequiredData,
+			}
+			if err := tmpl.ValidateRequiredData(tt.args.data); (err != nil) != tt.wantErr {
+				t.Errorf("Template.ValidateRequiredData() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

@@ -159,6 +159,15 @@ func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[strin
 	// Render templates
 	output := []templates.Output{}
 	for _, t := range ts {
+		if err := t.Load(); err != nil {
+			return nil, err
+		}
+
+		// Check for required variables.
+		if err := t.ValidateRequiredData(data); err != nil {
+			return nil, errs.BadRequestErr(err, errs.WithMessage("%v, please use `--set <key=value>` flag", err))
+		}
+
 		o, err := t.Output(mergedData)
 		if err != nil {
 			return nil, err
