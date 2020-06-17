@@ -202,6 +202,7 @@ func (a *Authority) init() error {
 	}
 
 	// Decrypt and load SSH keys
+	var tmplVars templates.Step
 	if a.config.SSH != nil {
 		if a.config.SSH.HostKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
@@ -218,6 +219,9 @@ func (a *Authority) init() error {
 			// Append public key to list of host certs
 			a.sshCAHostCerts = append(a.sshCAHostCerts, a.sshCAHostCertSignKey.PublicKey())
 			a.sshCAHostFederatedCerts = append(a.sshCAHostFederatedCerts, a.sshCAHostCertSignKey.PublicKey())
+			// Configure template variables
+			tmplVars.SSH.HostKey = a.sshCAHostCertSignKey.PublicKey()
+			tmplVars.SSH.HostFederatedKeys = append(tmplVars.SSH.HostFederatedKeys, a.sshCAHostFederatedCerts[1:]...)
 		}
 		if a.config.SSH.UserKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
@@ -234,6 +238,9 @@ func (a *Authority) init() error {
 			// Append public key to list of user certs
 			a.sshCAUserCerts = append(a.sshCAUserCerts, a.sshCAUserCertSignKey.PublicKey())
 			a.sshCAUserFederatedCerts = append(a.sshCAUserFederatedCerts, a.sshCAUserCertSignKey.PublicKey())
+			// Configure template variables
+			tmplVars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
+			tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts[1:]...)
 		}
 
 		// Append other public keys
@@ -292,23 +299,15 @@ func (a *Authority) init() error {
 		}
 	}
 
-	// Configure protected template variables:
-	if t := a.config.Templates; t != nil {
-		if t.Data == nil {
-			t.Data = make(map[string]interface{})
+	// Configure templates, currently only ssh templates are supported.
+	if a.sshCAHostCertSignKey != nil || a.sshCAUserCertSignKey != nil {
+		if a.config.Templates == nil {
+			a.config.Templates = templates.DefaultTemplates()
 		}
-		var vars templates.Step
-		if a.config.SSH != nil {
-			if a.sshCAHostCertSignKey != nil {
-				vars.SSH.HostKey = a.sshCAHostCertSignKey.PublicKey()
-				vars.SSH.HostFederatedKeys = append(vars.SSH.HostFederatedKeys, a.sshCAHostFederatedCerts[1:]...)
-			}
-			if a.sshCAUserCertSignKey != nil {
-				vars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
-				vars.SSH.UserFederatedKeys = append(vars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts[1:]...)
-			}
+		if a.config.Templates.Data == nil {
+			a.config.Templates.Data = make(map[string]interface{})
 		}
-		t.Data["Step"] = vars
+		a.config.Templates.Data["Step"] = tmplVars
 	}
 
 	// JWT numeric dates are seconds.
