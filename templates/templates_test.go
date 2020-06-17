@@ -197,6 +197,7 @@ func TestTemplate_Load(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", fields{"include.tpl", Snippet, "../authority/testdata/templates/include.tpl", "~/.ssh/config", "#"}, false},
+		{"ok backfill", fields{"sshd_config.tpl", Snippet, "../authority/testdata/templates/sshd_config.tpl", "/etc/ssh/sshd_config", "#"}, false},
 		{"error", fields{"error.tpl", Snippet, "../authority/testdata/templates/error.tpl", "/tmp/error", "#"}, true},
 		{"missing", fields{"include.tpl", Snippet, "./testdata/include.tpl", "~/.ssh/config", "#"}, true},
 	}
