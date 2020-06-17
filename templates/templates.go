@@ -106,7 +106,7 @@ type Template struct {
 	TemplatePath string       `json:"template"`
 	Path         string       `json:"path"`
 	Comment      string       `json:"comment"`
-	RequiredData []string     `json:"requires"`
+	RequiredData []string     `json:"requires,omitempty"`
 	Content      []byte       `json:"-"`
 }
 
