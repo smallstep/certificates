@@ -177,7 +177,17 @@ func (a *Authority) GetSSHBastion(ctx context.Context, user string, hostname str
 	}
 	if a.config.SSH != nil {
 		if a.config.SSH.Bastion != nil && a.config.SSH.Bastion.Hostname != "" {
-			return a.config.SSH.Bastion, nil
+			// Do not return a bastion for a bastion host.
+			//
+			// This condition might fail if a different name or IP is used.
+			// Trying to resolve hostnames to IPs and compare them won't be a
+			// complete solution because it depends on the network
+			// configuration, of the CA and clients and can also return false
+			// positives. Although not perfect, this simple solution will work
+			// in most cases.
+			if !strings.EqualFold(hostname, a.config.SSH.Bastion.Hostname) {
+				return a.config.SSH.Bastion, nil
+			}
 		}
 		return nil, nil
 	}
