@@ -646,6 +646,7 @@ func TestAuthority_GetSSHBastion(t *testing.T) {
 		wantErr bool
 	}{
 		{"config", fields{&Config{SSH: &SSHConfig{Bastion: bastion}}, nil}, args{"user", "host.local"}, bastion, false},
+		{"bastion", fields{&Config{SSH: &SSHConfig{Bastion: bastion}}, nil}, args{"user", "bastion.local"}, nil, false},
 		{"nil", fields{&Config{SSH: &SSHConfig{Bastion: nil}}, nil}, args{"user", "host.local"}, nil, false},
 		{"empty", fields{&Config{SSH: &SSHConfig{Bastion: &Bastion{}}}, nil}, args{"user", "host.local"}, nil, false},
 		{"func", fields{&Config{}, func(_ context.Context, _, _ string) (*Bastion, error) { return bastion, nil }}, args{"user", "host.local"}, bastion, false},
