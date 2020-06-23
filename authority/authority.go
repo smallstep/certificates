@@ -220,9 +220,6 @@ func (a *Authority) init() error {
 			// Append public key to list of host certs
 			a.sshCAHostCerts = append(a.sshCAHostCerts, a.sshCAHostCertSignKey.PublicKey())
 			a.sshCAHostFederatedCerts = append(a.sshCAHostFederatedCerts, a.sshCAHostCertSignKey.PublicKey())
-			// Configure template variables
-			tmplVars.SSH.HostKey = a.sshCAHostCertSignKey.PublicKey()
-			tmplVars.SSH.HostFederatedKeys = append(tmplVars.SSH.HostFederatedKeys, a.sshCAHostFederatedCerts[1:]...)
 		}
 		if a.config.SSH.UserKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
@@ -239,9 +236,6 @@ func (a *Authority) init() error {
 			// Append public key to list of user certs
 			a.sshCAUserCerts = append(a.sshCAUserCerts, a.sshCAUserCertSignKey.PublicKey())
 			a.sshCAUserFederatedCerts = append(a.sshCAUserFederatedCerts, a.sshCAUserCertSignKey.PublicKey())
-			// Configure template variables
-			tmplVars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
-			tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts[1:]...)
 		}
 
 		// Append other public keys
@@ -263,6 +257,14 @@ func (a *Authority) init() error {
 				return errors.Errorf("unsupported type %s", key.Type)
 			}
 		}
+
+		// Configure template variables.
+		tmplVars.SSH.HostKey = a.sshCAHostCertSignKey.PublicKey()
+		tmplVars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
+		// On the templates we skip the first one because there's a distinction
+		// between the main key and federated keys.
+		tmplVars.SSH.HostFederatedKeys = append(tmplVars.SSH.HostFederatedKeys, a.sshCAHostFederatedCerts[1:]...)
+		tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts[1:]...)
 	}
 
 	// Merge global and configuration claims
