@@ -197,6 +197,7 @@ func TestTemplate_Load(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", fields{"include.tpl", Snippet, "../authority/testdata/templates/include.tpl", "~/.ssh/config", "#"}, false},
+		{"ok backfill", fields{"sshd_config.tpl", Snippet, "../authority/testdata/templates/sshd_config.tpl", "/etc/ssh/sshd_config", "#"}, false},
 		{"error", fields{"error.tpl", Snippet, "../authority/testdata/templates/error.tpl", "/tmp/error", "#"}, true},
 		{"missing", fields{"include.tpl", Snippet, "./testdata/include.tpl", "~/.ssh/config", "#"}, true},
 	}
@@ -424,6 +425,42 @@ func TestOutput_Write(t *testing.T) {
 						assert.Equals(t, os.FileMode(0600), st.Mode())
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestTemplate_ValidateRequiredData(t *testing.T) {
+	data := map[string]string{
+		"key1": "value1",
+		"key2": "value2",
+	}
+	type fields struct {
+		RequiredData []string
+	}
+	type args struct {
+		data map[string]string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"ok nil", fields{nil}, args{nil}, false},
+		{"ok empty", fields{[]string{}}, args{data}, false},
+		{"ok one", fields{[]string{"key1"}}, args{data}, false},
+		{"ok multiple", fields{[]string{"key1", "key2"}}, args{data}, false},
+		{"fail nil", fields{[]string{"missing"}}, args{nil}, true},
+		{"fail missing", fields{[]string{"missing"}}, args{data}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpl := &Template{
+				RequiredData: tt.fields.RequiredData,
+			}
+			if err := tmpl.ValidateRequiredData(tt.args.data); (err != nil) != tt.wantErr {
+				t.Errorf("Template.ValidateRequiredData() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

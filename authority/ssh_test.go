@@ -398,7 +398,14 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 				{Name: "config.tpl", Type: templates.File, TemplatePath: "./testdata/templates/config.tpl", Path: "ssh/config", Comment: "#"},
 			},
 			Host: []templates.Template{
-				{Name: "sshd_config.tpl", Type: templates.File, TemplatePath: "./testdata/templates/sshd_config.tpl", Path: "/etc/ssh/sshd_config", Comment: "#"},
+				{
+					Name:         "sshd_config.tpl",
+					Type:         templates.File,
+					TemplatePath: "./testdata/templates/sshd_config.tpl",
+					Path:         "/etc/ssh/sshd_config",
+					Comment:      "#",
+					RequiredData: []string{"Certificate", "Key"},
+				},
 			},
 		},
 		Data: map[string]interface{}{
@@ -425,6 +432,14 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 			},
 			Host: []templates.Template{
 				{Name: "error.tpl", Type: templates.File, TemplatePath: "./testdata/templates/error.tpl", Path: "ssh/error", Comment: "#"},
+			},
+		},
+	}
+
+	tmplConfigFail := &templates.Templates{
+		SSH: &templates.SSHTemplates{
+			User: []templates.Template{
+				{Name: "fail.tpl", Type: templates.File, TemplatePath: "./testdata/templates/fail.tpl", Path: "ssh/fail", Comment: "#"},
 			},
 		},
 	}
@@ -456,11 +471,13 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 		{"userError", fields{tmplConfigErr, userSigner, hostSigner}, args{"user", nil}, nil, true},
 		{"hostError", fields{tmplConfigErr, userSigner, hostSigner}, args{"host", map[string]string{"Function": "foo"}}, nil, true},
 		{"noTemplates", fields{nil, userSigner, hostSigner}, args{"user", nil}, nil, true},
+		{"missingData", fields{tmplConfigWithUserData, userSigner, hostSigner}, args{"host", map[string]string{"Certificate": "ssh_host_ecdsa_key-cert.pub"}}, nil, true},
+		{"failError", fields{tmplConfigFail, userSigner, hostSigner}, args{"user", nil}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := testAuthority(t)
-			a.config.Templates = tt.fields.templates
+			a.templates = tt.fields.templates
 			a.sshCAUserCertSignKey = tt.fields.userSigner
 			a.sshCAHostCertSignKey = tt.fields.hostSigner
 

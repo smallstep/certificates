@@ -125,19 +125,19 @@ func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[strin
 		return nil, errs.NotFound("getSSHConfig: ssh is not configured")
 	}
 
-	if a.config.Templates == nil {
+	if a.templates == nil {
 		return nil, errs.NotFound("getSSHConfig: ssh templates are not configured")
 	}
 
 	var ts []templates.Template
 	switch typ {
 	case provisioner.SSHUserCert:
-		if a.config.Templates != nil && a.config.Templates.SSH != nil {
-			ts = a.config.Templates.SSH.User
+		if a.templates != nil && a.templates.SSH != nil {
+			ts = a.templates.SSH.User
 		}
 	case provisioner.SSHHostCert:
-		if a.config.Templates != nil && a.config.Templates.SSH != nil {
-			ts = a.config.Templates.SSH.Host
+		if a.templates != nil && a.templates.SSH != nil {
+			ts = a.templates.SSH.Host
 		}
 	default:
 		return nil, errs.BadRequest("getSSHConfig: type %s is not valid", typ)
@@ -147,11 +147,11 @@ func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[strin
 	var mergedData map[string]interface{}
 
 	if len(data) == 0 {
-		mergedData = a.config.Templates.Data
+		mergedData = a.templates.Data
 	} else {
-		mergedData = make(map[string]interface{}, len(a.config.Templates.Data)+1)
+		mergedData = make(map[string]interface{}, len(a.templates.Data)+1)
 		mergedData["User"] = data
-		for k, v := range a.config.Templates.Data {
+		for k, v := range a.templates.Data {
 			mergedData[k] = v
 		}
 	}
@@ -159,6 +159,15 @@ func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[strin
 	// Render templates
 	output := []templates.Output{}
 	for _, t := range ts {
+		if err := t.Load(); err != nil {
+			return nil, err
+		}
+
+		// Check for required variables.
+		if err := t.ValidateRequiredData(data); err != nil {
+			return nil, errs.BadRequestErr(err, errs.WithMessage("%v, please use `--set <key=value>` flag", err))
+		}
+
 		o, err := t.Output(mergedData)
 		if err != nil {
 			return nil, err

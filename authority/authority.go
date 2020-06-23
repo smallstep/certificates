@@ -31,6 +31,7 @@ type Authority struct {
 	keyManager   kms.KeyManager
 	provisioners *provisioner.Collection
 	db           db.AuthDB
+	templates    *templates.Templates
 
 	// X509 CA
 	rootX509Certs      []*x509.Certificate
@@ -202,6 +203,7 @@ func (a *Authority) init() error {
 	}
 
 	// Decrypt and load SSH keys
+	var tmplVars templates.Step
 	if a.config.SSH != nil {
 		if a.config.SSH.HostKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
@@ -255,6 +257,14 @@ func (a *Authority) init() error {
 				return errors.Errorf("unsupported type %s", key.Type)
 			}
 		}
+
+		// Configure template variables.
+		tmplVars.SSH.HostKey = a.sshCAHostCertSignKey.PublicKey()
+		tmplVars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
+		// On the templates we skip the first one because there's a distinction
+		// between the main key and federated keys.
+		tmplVars.SSH.HostFederatedKeys = append(tmplVars.SSH.HostFederatedKeys, a.sshCAHostFederatedCerts[1:]...)
+		tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts[1:]...)
 	}
 
 	// Merge global and configuration claims
@@ -292,23 +302,16 @@ func (a *Authority) init() error {
 		}
 	}
 
-	// Configure protected template variables:
-	if t := a.config.Templates; t != nil {
-		if t.Data == nil {
-			t.Data = make(map[string]interface{})
+	// Configure templates, currently only ssh templates are supported.
+	if a.sshCAHostCertSignKey != nil || a.sshCAUserCertSignKey != nil {
+		a.templates = a.config.Templates
+		if a.templates == nil {
+			a.templates = templates.DefaultTemplates()
 		}
-		var vars templates.Step
-		if a.config.SSH != nil {
-			if a.sshCAHostCertSignKey != nil {
-				vars.SSH.HostKey = a.sshCAHostCertSignKey.PublicKey()
-				vars.SSH.HostFederatedKeys = append(vars.SSH.HostFederatedKeys, a.sshCAHostFederatedCerts[1:]...)
-			}
-			if a.sshCAUserCertSignKey != nil {
-				vars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
-				vars.SSH.UserFederatedKeys = append(vars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts[1:]...)
-			}
+		if a.templates.Data == nil {
+			a.templates.Data = make(map[string]interface{})
 		}
-		t.Data["Step"] = vars
+		a.templates.Data["Step"] = tmplVars
 	}
 
 	// JWT numeric dates are seconds.
