@@ -246,6 +246,42 @@ func Test_ipAddressesValidator_Valid(t *testing.T) {
 	}
 }
 
+func Test_urisValidator_Valid(t *testing.T) {
+	u1, err := url.Parse("https://ca.smallstep.com")
+	assert.FatalError(t, err)
+	u2, err := url.Parse("https://google.com/index.html")
+	assert.FatalError(t, err)
+	u3, err := url.Parse("https://foo.bar.baz")
+	assert.FatalError(t, err)
+	fu, err := url.Parse("https://unexpected.com")
+	assert.FatalError(t, err)
+
+	type args struct {
+		req *x509.CertificateRequest
+	}
+	tests := []struct {
+		name    string
+		v       urisValidator
+		args    args
+		wantErr bool
+	}{
+		{"ok0", []*url.URL{}, args{&x509.CertificateRequest{URIs: []*url.URL{}}}, false},
+		{"ok1", []*url.URL{u1}, args{&x509.CertificateRequest{URIs: []*url.URL{u1}}}, false},
+		{"ok2", []*url.URL{u1, u2}, args{&x509.CertificateRequest{URIs: []*url.URL{u2, u1}}}, false},
+		{"ok3", []*url.URL{u2, u1, u3}, args{&x509.CertificateRequest{URIs: []*url.URL{u3, u2, u1}}}, false},
+		{"fail1", []*url.URL{u1}, args{&x509.CertificateRequest{URIs: []*url.URL{u2}}}, true},
+		{"fail2", []*url.URL{u1}, args{&x509.CertificateRequest{URIs: []*url.URL{u2, u1}}}, true},
+		{"fail3", []*url.URL{u1, u2}, args{&x509.CertificateRequest{URIs: []*url.URL{u1, fu}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.v.Valid(tt.args.req); (err != nil) != tt.wantErr {
+				t.Errorf("urisValidator.Valid() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func Test_validityValidator_Valid(t *testing.T) {
 	type test struct {
 		cert *x509.Certificate

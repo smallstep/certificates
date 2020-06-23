@@ -103,8 +103,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		}
 	}
 
-	// Certificate modifier after validation
-	for _, m := range forcedModifiers {
+	// Certificate modifiers after validation
+	for _, m := range append(forcedModifiers, provisioner.ExtraExtensionsEnforcer{}) {
 		if err := m.Enforce(leaf.Subject()); err != nil {
 			return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)
 		}

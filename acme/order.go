@@ -308,6 +308,16 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 		}
 	}
 
+	if len(csr.IPAddresses) > 0 {
+		return nil, BadCSRErr(errors.Errorf("CSR contains IP Address SANs, but should only contain DNS Names"))
+	}
+	if len(csr.EmailAddresses) > 0 {
+		return nil, BadCSRErr(errors.Errorf("CSR contains Email Address SANs, but should only contain DNS Names"))
+	}
+	if len(csr.URIs) > 0 {
+		return nil, BadCSRErr(errors.Errorf("CSR contains URI SANs, but should only contain DNS Names"))
+	}
+
 	// Get authorizations from the ACME provisioner.
 	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod)
 	signOps, err := p.AuthorizeSign(ctx, "")

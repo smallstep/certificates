@@ -7,6 +7,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"net"
+	"net/url"
 	"reflect"
 	"time"
 
@@ -192,6 +193,50 @@ func (v emailAddressesValidator) Valid(req *x509.CertificateRequest) error {
 	if !reflect.DeepEqual(want, got) {
 		return errors.Errorf("certificate request does not contain the valid Email Addresses - got %v, want %v", req.EmailAddresses, v)
 	}
+	return nil
+}
+
+// urisValidator validates the URI SANs of a certificate request.
+type urisValidator []*url.URL
+
+// Valid checks that certificate request IP Addresses match those configured in
+// the bootstrap (token) flow.
+func (v urisValidator) Valid(req *x509.CertificateRequest) error {
+	want := make(map[string]bool)
+	for _, u := range v {
+		want[u.String()] = true
+	}
+	got := make(map[string]bool)
+	for _, u := range req.URIs {
+		got[u.String()] = true
+	}
+	if !reflect.DeepEqual(want, got) {
+		return errors.Errorf("URIs claim failed - got %v, want %v", req.URIs, v)
+	}
+	return nil
+}
+
+func sansValidators(sans []string) []SignOption {
+	dnsNames, ips, emails, uris := x509util.SplitSANs(sans)
+	return []SignOption{dnsNamesValidator(dnsNames), emailAddressesValidator(emails),
+		ipAddressesValidator(ips), urisValidator(uris)}
+}
+
+// ExtraExtensionsEnforcer enforces only those extra extensions that are strictly
+// managed by step-ca. All other "extra extensions" are dropped.
+type ExtraExtensionsEnforcer struct{}
+
+// Enforce removes all extensions except the step provisioner extension, if it
+// exists. If the step provisioner extension is not present, then remove all
+// extra extensions from the cert.
+func (eee ExtraExtensionsEnforcer) Enforce(cert *x509.Certificate) error {
+	for _, ext := range cert.Extensions {
+		if ext.Id.Equal(stepOIDProvisioner) {
+			cert.ExtraExtensions = []pkix.Extension{ext}
+			return nil
+		}
+	}
+	cert.ExtraExtensions = nil
 	return nil
 }
 

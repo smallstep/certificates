@@ -228,6 +228,9 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		so = append(so, dnsNamesValidator([]string{
 			dnsName1, dnsName2,
 		}))
+		so = append(so, ipAddressesValidator(nil))
+		so = append(so, emailAddressesValidator(nil))
+		so = append(so, urisValidator(nil))
 	}
 
 	return append(so,
