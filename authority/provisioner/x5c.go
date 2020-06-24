@@ -193,16 +193,17 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		claims.SANs = []string{claims.Subject}
 	}
 
-	return append([]SignOption{
+	return []SignOption{
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeX5C, p.Name, ""),
 		profileLimitDuration{p.claimer.DefaultTLSCertDuration(),
 			claims.chains[0][0].NotBefore, claims.chains[0][0].NotAfter},
 		// validators
 		commonNameValidator(claims.Subject),
+		defaultSANsValidator(claims.SANs),
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
-	}, sansValidators(claims.SANs)), nil
+	}, nil
 }
 
 // AuthorizeRenew returns an error if the renewal is disabled.

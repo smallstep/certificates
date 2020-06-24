@@ -151,15 +151,16 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		claims.SANs = []string{claims.Subject}
 	}
 
-	return append([]SignOption{
+	return []SignOption{
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		// validators
 		commonNameValidator(claims.Subject),
+		defaultSANsValidator(claims.SANs),
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
-	}, sansValidators(claims.SANs)), nil
+	}, nil
 }
 
 // AuthorizeRenew returns an error if the renewal is disabled.

@@ -216,10 +216,20 @@ func (v urisValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
-func sansValidators(sans []string) []SignOption {
-	dnsNames, ips, emails, uris := x509util.SplitSANs(sans)
-	return []SignOption{dnsNamesValidator(dnsNames), emailAddressesValidator(emails),
-		ipAddressesValidator(ips), urisValidator(uris)}
+type defaultSANsValidator []string
+
+func (v defaultSANsValidator) Valid(req *x509.CertificateRequest) (err error) {
+	dnsNames, ips, emails, uris := x509util.SplitSANs(v)
+	if err = dnsNamesValidator(dnsNames).Valid(req); err != nil {
+		return
+	} else if err = emailAddressesValidator(emails).Valid(req); err != nil {
+		return
+	} else if err = ipAddressesValidator(ips).Valid(req); err != nil {
+		return
+	} else if err = urisValidator(uris).Valid(req); err != nil {
+		return
+	}
+	return
 }
 
 // ExtraExtensionsEnforcer enforces only those extra extensions that are strictly
