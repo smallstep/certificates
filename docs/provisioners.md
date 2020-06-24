@@ -4,6 +4,8 @@ Provisioners are people or code that are registered with the CA and authorized
 to issue "provisioning tokens". Provisioning tokens are single-use tokens that
 can be used to authenticate with the CA and get a certificate.
 
+## Claims
+
 Each provisioner can define an optional `claims` attribute. The settings in this
 attribute override any settings in the global `claims` attribute in the authority
 configuration.
@@ -16,14 +18,14 @@ Example `claims`:
         "minTLSCertDuration": "5m",
         "maxTLSCertDuration": "24h",
         "defaultTLSCertDuration": "24h",
-        "disableRenewal": false
+        "disableRenewal": false,
         "minHostSSHCertDuration": "5m",
         "maxHostSSHCertDuration": "1680h",
         "minUserSSHCertDuration": "5m",
         "maxUserSSHCertDuration": "24h",
         "maxTLSCertDuration": "16h",
-        "enableSSHCA": true,
-    }
+        "enableSSHCA": true
+    },
     ...
 ```
 
@@ -68,7 +70,34 @@ Example `claims`:
   The deault value is `false`. You can enable this option per provisioner
   by setting it to `true` in the provisioner claims.
 
-## JWK
+## Provisioner Types
+
+Each provisioner has a different method of authentication with the CA.
+
+  - A JWK provisioner uses a JWT signed by a JWK.
+  - An OIDC provisioner uses a OIDC token signed by an Identity Provider e.g. Google, Okta, Azure.
+  - An AWS provisioner uses an Instance Identity Document signed by AWS.
+  - etc.
+
+### Capabilities by Type
+
+Provisioners are used to authenticate certificate signing requests, and every
+provisioner has a slightly different scope of authorization. Below is a table
+detailing the authorization capabilities of each provisioner.
+
+Provisioner | Authorization Capabilities
+----------- | --------------------------
+JWK         | * x509-sign, x509-renew, x509-revoke <br/> * ssh-sign, ssh-revoke
+OIDC        | * x509-sign, x509-renew, x509-revoke <br/> * ssh-sign, ssh-revoke
+X5C         | * x509-sign, x509-renew, x509-revoke <br/> * ssh-sign
+K8sSA       | * x509-sign, x509-renew, x509-revoke <br/> * ssh-sign
+ACME        | * x509-sign, x509-renew
+SSHPOP      | * ssh-renew, ssh-revoke, ssh-rekey
+AWS         | * x509-sign, x509-renew <br/> * ssh-sign
+Azure       | * x509-sign, x509-renew <br/> * ssh-sign
+GCP         | * x509-sign, x509-renew <br/> * ssh-sign
+
+### JWK
 
 JWK is the default provisioner type. It uses public-key cryptography to sign and
 validate a JSON Web Token (JWT).
@@ -145,7 +174,7 @@ In the ca.json configuration file, a complete JWK provisioner example looks like
   provided using the `--key` flag of the `step ca token` to be able to sign the
   token.
 
-## OIDC
+### OIDC
 
 An OIDC provisioner allows a user to get a certificate after authenticating
 himself with an OAuth OpenID Connect identity provider. The ID token provided
@@ -204,7 +233,7 @@ is G-Suite.
 * `claims` (optional): overwrites the default claims set in the authority, see
   the [top](#provisioners) section for all the options.
 
-## Provisioners for Cloud Identities
+### Provisioners for Cloud Identities
 
 [Step certificates](https://github.com/smallstep/certificates) can grant
 certificates to code running in a machine without any other authentication than
@@ -219,7 +248,7 @@ you can only grant a certificate once. After this first grant, the same machine
 will need to renew the certificate using mTLS, and the CA will block any other
 attempt to grant a certificate to that instance.
 
-### AWS
+#### AWS
 
 The AWS provisioner allows granting a certificate to an Amazon EC2 instance
 using the [Instance Identity Documents](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-identity-documents.html)
@@ -268,7 +297,7 @@ In the ca.json, an AWS provisioner looks like:
 * `claims` (optional): overwrites the default claims set in the authority, see
   the [top](#provisioners) section for all the options.
 
-### GCP
+#### GCP
 
 The GCP provisioner grants certificates to Google Compute Engine instance using
 its [identity](https://cloud.google.com/compute/docs/instances/verifying-instance-identity)
@@ -320,7 +349,7 @@ In the ca.json, a GCP provisioner looks like:
 * `claims` (optional): overwrites the default claims set in the authority, see
   the [top](#provisioners) section for all the options.
 
-### Azure
+#### Azure
 
 The Azure provisioner grants certificates to Microsoft Azure instances using
 the [managed identities tokens](https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/how-to-use-vm-token).
