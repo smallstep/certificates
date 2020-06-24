@@ -251,7 +251,7 @@ func Test_urisValidator_Valid(t *testing.T) {
 	assert.FatalError(t, err)
 	u2, err := url.Parse("https://google.com/index.html")
 	assert.FatalError(t, err)
-	u3, err := url.Parse("https://foo.bar.baz")
+	u3, err := url.Parse("urn:uuid:ddfe62ba-7e99-4bc1-83b3-8f57fe3e9959")
 	assert.FatalError(t, err)
 	fu, err := url.Parse("https://unexpected.com")
 	assert.FatalError(t, err)
@@ -278,6 +278,120 @@ func Test_urisValidator_Valid(t *testing.T) {
 			if err := tt.v.Valid(tt.args.req); (err != nil) != tt.wantErr {
 				t.Errorf("urisValidator.Valid() error = %v, wantErr %v", err, tt.wantErr)
 			}
+		})
+	}
+}
+
+func Test_defaultSANsValidator_Valid(t *testing.T) {
+	type test struct {
+		csr          *x509.CertificateRequest
+		expectedSANs []string
+		err          error
+	}
+	tests := map[string]func() test{
+		"fail/dnsNamesValidator": func() test {
+			return test{
+				csr:          &x509.CertificateRequest{DNSNames: []string{"foo", "bar"}},
+				expectedSANs: []string{"foo"},
+				err:          errors.New("certificate request does not contain the valid DNS names"),
+			}
+		},
+		"fail/emailAddressesValidator": func() test {
+			return test{
+				csr:          &x509.CertificateRequest{EmailAddresses: []string{"max@fx.com", "mariano@fx.com"}},
+				expectedSANs: []string{"dcow@fx.com"},
+				err:          errors.New("certificate request does not contain the valid Email Addresses"),
+			}
+		},
+		"fail/ipAddressesValidator": func() test {
+			return test{
+				csr:          &x509.CertificateRequest{IPAddresses: []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("127.0.0.1")}},
+				expectedSANs: []string{"127.0.0.1"},
+				err:          errors.New("IP Addresses claim failed"),
+			}
+		},
+		"fail/urisValidator": func() test {
+			u1, err := url.Parse("https://google.com")
+			assert.FatalError(t, err)
+			u2, err := url.Parse("urn:uuid:ddfe62ba-7e99-4bc1-83b3-8f57fe3e9959")
+			assert.FatalError(t, err)
+			return test{
+				csr:          &x509.CertificateRequest{URIs: []*url.URL{u1, u2}},
+				expectedSANs: []string{"urn:uuid:ddfe62ba-7e99-4bc1-83b3-8f57fe3e9959"},
+				err:          errors.New("URIs claim failed"),
+			}
+		},
+		"ok": func() test {
+			u1, err := url.Parse("https://google.com")
+			assert.FatalError(t, err)
+			u2, err := url.Parse("urn:uuid:ddfe62ba-7e99-4bc1-83b3-8f57fe3e9959")
+			assert.FatalError(t, err)
+			return test{
+				csr: &x509.CertificateRequest{
+					DNSNames:       []string{"foo", "bar"},
+					EmailAddresses: []string{"max@fx.com", "mariano@fx.com"},
+					IPAddresses:    []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("127.0.0.1")},
+					URIs:           []*url.URL{u1, u2},
+				},
+				expectedSANs: []string{"foo", "127.0.0.1", "max@fx.com", "mariano@fx.com", "https://google.com", "1.1.1.1", "bar", "urn:uuid:ddfe62ba-7e99-4bc1-83b3-8f57fe3e9959"},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tt := run()
+			if err := defaultSANsValidator(tt.expectedSANs).Valid(tt.csr); err != nil {
+				if assert.NotNil(t, tt.err, fmt.Sprintf("expected no error, but got err = %s", err.Error())) {
+					assert.True(t, strings.Contains(err.Error(), tt.err.Error()),
+						fmt.Sprintf("want err = %s, but got err = %s", tt.err.Error(), err.Error()))
+				}
+			} else {
+				assert.Nil(t, tt.err, fmt.Sprintf("expected err = %s, but not <nil>", tt.err))
+			}
+		})
+	}
+}
+
+func Test_ExtraExtsEnforcer_Enforce(t *testing.T) {
+	e1 := pkix.Extension{Id: []int{1, 2, 3, 4, 5}, Critical: false, Value: []byte("foo")}
+	e2 := pkix.Extension{Id: []int{2, 2, 2}, Critical: false, Value: []byte("bar")}
+	stepExt := pkix.Extension{Id: stepOIDProvisioner, Critical: false, Value: []byte("baz")}
+	type test struct {
+		cert  *x509.Certificate
+		check func(*x509.Certificate)
+	}
+	tests := map[string]func() test{
+		"ok/empty-exts": func() test {
+			return test{
+				cert: &x509.Certificate{},
+				check: func(cert *x509.Certificate) {
+					assert.Equals(t, len(cert.ExtraExtensions), 0)
+				},
+			}
+		},
+		"ok/no-step-provisioner-ext": func() test {
+			return test{
+				cert: &x509.Certificate{ExtraExtensions: []pkix.Extension{e1, e2}},
+				check: func(cert *x509.Certificate) {
+					assert.Equals(t, len(cert.ExtraExtensions), 0)
+				},
+			}
+		},
+		"ok/step-provisioner-ext": func() test {
+			return test{
+				cert: &x509.Certificate{ExtraExtensions: []pkix.Extension{e1, stepExt, e2}},
+				check: func(cert *x509.Certificate) {
+					assert.Equals(t, len(cert.ExtraExtensions), 1)
+					assert.Equals(t, cert.ExtraExtensions[0], stepExt)
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tt := run()
+			ExtraExtsEnforcer{}.Enforce(tt.cert)
+			tt.check(tt.cert)
 		})
 	}
 }

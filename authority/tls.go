@@ -64,7 +64,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		opts            = []interface{}{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
 		mods            = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
 		certValidators  = []provisioner.CertificateValidator{}
-		forcedModifiers = []provisioner.CertificateEnforcer{provisioner.ExtraExtensionsEnforcer{}}
+		forcedModifiers = []provisioner.CertificateEnforcer{provisioner.ExtraExtsEnforcer{}}
 	)
 
 	// Set backdate with the configured value

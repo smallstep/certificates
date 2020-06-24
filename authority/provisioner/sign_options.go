@@ -216,8 +216,12 @@ func (v urisValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
+// defaultsSANsValidator stores a set of SANs to eventually validate 1:1 against
+// the SANs in an x509 certificate request.
 type defaultSANsValidator []string
 
+// Valid verifies that the SANs stored in the validator match 1:1 with those
+// requested in the x509 certificate request.
 func (v defaultSANsValidator) Valid(req *x509.CertificateRequest) (err error) {
 	dnsNames, ips, emails, uris := x509util.SplitSANs(v)
 	if err = dnsNamesValidator(dnsNames).Valid(req); err != nil {
@@ -232,15 +236,15 @@ func (v defaultSANsValidator) Valid(req *x509.CertificateRequest) (err error) {
 	return
 }
 
-// ExtraExtensionsEnforcer enforces only those extra extensions that are strictly
+// ExtraExtsEnforcer enforces only those extra extensions that are strictly
 // managed by step-ca. All other "extra extensions" are dropped.
-type ExtraExtensionsEnforcer struct{}
+type ExtraExtsEnforcer struct{}
 
 // Enforce removes all extensions except the step provisioner extension, if it
 // exists. If the step provisioner extension is not present, then remove all
 // extra extensions from the cert.
-func (eee ExtraExtensionsEnforcer) Enforce(cert *x509.Certificate) error {
-	for _, ext := range cert.Extensions {
+func (eee ExtraExtsEnforcer) Enforce(cert *x509.Certificate) error {
+	for _, ext := range cert.ExtraExtensions {
 		if ext.Id.Equal(stepOIDProvisioner) {
 			cert.ExtraExtensions = []pkix.Extension{ext}
 			return nil

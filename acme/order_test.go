@@ -6,6 +6,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"testing"
 	"time"
@@ -1054,6 +1055,62 @@ func TestOrderFinalize(t *testing.T) {
 				o:   o,
 				csr: csr,
 				err: BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly")),
+			}
+		},
+		"fail/ready/no-ipAddresses": func(t *testing.T) test {
+			o, err := newO()
+			assert.FatalError(t, err)
+			o.Status = StatusReady
+
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "",
+				},
+				DNSNames:    []string{"acme.example.com", "step.example.com"},
+				IPAddresses: []net.IP{net.ParseIP("1.1.1.1")},
+			}
+			return test{
+				o:   o,
+				csr: csr,
+				err: BadCSRErr(errors.Errorf("CSR contains IP Address SANs, but should only contain DNS Names")),
+			}
+		},
+		"fail/ready/no-emailAddresses": func(t *testing.T) test {
+			o, err := newO()
+			assert.FatalError(t, err)
+			o.Status = StatusReady
+
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "",
+				},
+				DNSNames:       []string{"acme.example.com", "step.example.com"},
+				EmailAddresses: []string{"max@smallstep.com", "mariano@smallstep.com"},
+			}
+			return test{
+				o:   o,
+				csr: csr,
+				err: BadCSRErr(errors.Errorf("CSR contains Email Address SANs, but should only contain DNS Names")),
+			}
+		},
+		"fail/ready/no-URIs": func(t *testing.T) test {
+			o, err := newO()
+			assert.FatalError(t, err)
+			o.Status = StatusReady
+
+			u, err := url.Parse("https://google.com")
+			assert.FatalError(t, err)
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "",
+				},
+				DNSNames: []string{"acme.example.com", "step.example.com"},
+				URIs:     []*url.URL{u},
+			}
+			return test{
+				o:   o,
+				csr: csr,
+				err: BadCSRErr(errors.Errorf("CSR contains URI SANs, but should only contain DNS Names")),
 			}
 		},
 		"fail/ready/provisioner-auth-sign-error": func(t *testing.T) test {
