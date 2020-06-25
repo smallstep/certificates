@@ -426,7 +426,6 @@ func (o *provisionerExtensionOption) Option(Options) x509util.WithOption {
 		if err != nil {
 			return err
 		}
-		// NOTE: HACK.
 		// Prepend the provisioner extension. In the auth.Sign code we will
 		// force the resulting certificate to only have one extension, the
 		// first stepOIDProvisioner that is found in the ExtraExtensions.
