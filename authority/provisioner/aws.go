@@ -287,6 +287,8 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		so = append(so, ipAddressesValidator([]net.IP{
 			net.ParseIP(doc.PrivateIP),
 		}))
+		so = append(so, emailAddressesValidator(nil))
+		so = append(so, urisValidator(nil))
 	}
 
 	return append(so,

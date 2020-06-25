@@ -1066,7 +1066,7 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 		return nil, nil, errors.Wrap(err, "error generating key")
 	}
 
-	dnsNames, ips, emails := x509util.SplitSANs(claims.SANs)
+	dnsNames, ips, emails, uris := x509util.SplitSANs(claims.SANs)
 	if claims.Email != "" {
 		emails = append(emails, claims.Email)
 	}
@@ -1079,6 +1079,7 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 		DNSNames:           dnsNames,
 		IPAddresses:        ips,
 		EmailAddresses:     emails,
+		URIs:               uris,
 	}
 
 	csr, err := x509.CreateCertificateRequest(rand.Reader, template, pk)
@@ -1137,7 +1138,7 @@ func createCertificateRequest(commonName string, sans []string, key crypto.Priva
 	if len(sans) == 0 {
 		sans = []string{commonName}
 	}
-	dnsNames, ips, emails := x509util.SplitSANs(sans)
+	dnsNames, ips, emails, uris := x509util.SplitSANs(sans)
 	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName: commonName,
@@ -1145,6 +1146,7 @@ func createCertificateRequest(commonName string, sans []string, key crypto.Priva
 		DNSNames:       dnsNames,
 		IPAddresses:    ips,
 		EmailAddresses: emails,
+		URIs:           uris,
 	}
 	csr, err := x509.CreateCertificateRequest(rand.Reader, template, key)
 	if err != nil {

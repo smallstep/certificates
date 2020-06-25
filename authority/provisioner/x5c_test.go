@@ -2,7 +2,6 @@ package provisioner
 
 import (
 	"context"
-	"net"
 	"net/http"
 	"testing"
 	"time"
@@ -407,13 +406,11 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 	assert.FatalError(t, err)
 
 	type test struct {
-		p      *X5C
-		token  string
-		code   int
-		err    error
-		dns    []string
-		emails []string
-		ips    []net.IP
+		p     *X5C
+		token string
+		code  int
+		err   error
+		sans  []string
 	}
 	tests := map[string]func(*testing.T) test{
 		"fail/invalid-token": func(t *testing.T) test {
@@ -434,11 +431,9 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 				withX5CHdr(certs))
 			assert.FatalError(t, err)
 			return test{
-				p:      p,
-				token:  tok,
-				dns:    []string{"foo"},
-				emails: []string{},
-				ips:    []net.IP{},
+				p:     p,
+				token: tok,
+				sans:  []string{"foo"},
 			}
 		},
 		"ok/multi-sans": func(t *testing.T) test {
@@ -449,11 +444,9 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 				withX5CHdr(certs))
 			assert.FatalError(t, err)
 			return test{
-				p:      p,
-				token:  tok,
-				dns:    []string{"foo"},
-				emails: []string{"max@smallstep.com"},
-				ips:    []net.IP{net.ParseIP("127.0.0.1")},
+				p:     p,
+				token: tok,
+				sans:  []string{"127.0.0.1", "foo", "max@smallstep.com"},
 			}
 		},
 	}
@@ -470,7 +463,7 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
-						tot := 0
+						assert.Equals(t, len(opts), 6)
 						for _, o := range opts {
 							switch v := o.(type) {
 							case *provisionerExtensionOption:
@@ -487,21 +480,15 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 							case commonNameValidator:
 								assert.Equals(t, string(v), "foo")
 							case defaultPublicKeyValidator:
-							case dnsNamesValidator:
-								assert.Equals(t, []string(v), tc.dns)
-							case emailAddressesValidator:
-								assert.Equals(t, []string(v), tc.emails)
-							case ipAddressesValidator:
-								assert.Equals(t, []net.IP(v), tc.ips)
+							case defaultSANsValidator:
+								assert.Equals(t, []string(v), tc.sans)
 							case *validityValidator:
 								assert.Equals(t, v.min, tc.p.claimer.MinTLSCertDuration())
 								assert.Equals(t, v.max, tc.p.claimer.MaxTLSCertDuration())
 							default:
 								assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
 							}
-							tot++
 						}
-						assert.Equals(t, tot, 8)
 					}
 				}
 			}

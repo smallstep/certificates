@@ -284,6 +284,9 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		// name will work only inside the virtual network
 		so = append(so, commonNameValidator(name))
 		so = append(so, dnsNamesValidator([]string{name}))
+		so = append(so, ipAddressesValidator(nil))
+		so = append(so, emailAddressesValidator(nil))
+		so = append(so, urisValidator(nil))
 	}
 
 	return append(so,

@@ -7,6 +7,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"net"
+	"net/url"
 	"reflect"
 	"time"
 
@@ -195,6 +196,64 @@ func (v emailAddressesValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
+// urisValidator validates the URI SANs of a certificate request.
+type urisValidator []*url.URL
+
+// Valid checks that certificate request IP Addresses match those configured in
+// the bootstrap (token) flow.
+func (v urisValidator) Valid(req *x509.CertificateRequest) error {
+	want := make(map[string]bool)
+	for _, u := range v {
+		want[u.String()] = true
+	}
+	got := make(map[string]bool)
+	for _, u := range req.URIs {
+		got[u.String()] = true
+	}
+	if !reflect.DeepEqual(want, got) {
+		return errors.Errorf("URIs claim failed - got %v, want %v", req.URIs, v)
+	}
+	return nil
+}
+
+// defaultsSANsValidator stores a set of SANs to eventually validate 1:1 against
+// the SANs in an x509 certificate request.
+type defaultSANsValidator []string
+
+// Valid verifies that the SANs stored in the validator match 1:1 with those
+// requested in the x509 certificate request.
+func (v defaultSANsValidator) Valid(req *x509.CertificateRequest) (err error) {
+	dnsNames, ips, emails, uris := x509util.SplitSANs(v)
+	if err = dnsNamesValidator(dnsNames).Valid(req); err != nil {
+		return
+	} else if err = emailAddressesValidator(emails).Valid(req); err != nil {
+		return
+	} else if err = ipAddressesValidator(ips).Valid(req); err != nil {
+		return
+	} else if err = urisValidator(uris).Valid(req); err != nil {
+		return
+	}
+	return
+}
+
+// ExtraExtsEnforcer enforces only those extra extensions that are strictly
+// managed by step-ca. All other "extra extensions" are dropped.
+type ExtraExtsEnforcer struct{}
+
+// Enforce removes all extensions except the step provisioner extension, if it
+// exists. If the step provisioner extension is not present, then remove all
+// extra extensions from the cert.
+func (eee ExtraExtsEnforcer) Enforce(cert *x509.Certificate) error {
+	for _, ext := range cert.ExtraExtensions {
+		if ext.Id.Equal(stepOIDProvisioner) {
+			cert.ExtraExtensions = []pkix.Extension{ext}
+			return nil
+		}
+	}
+	cert.ExtraExtensions = nil
+	return nil
+}
+
 // profileDefaultDuration is a wrapper against x509util.WithOption to conform
 // the SignOption interface.
 type profileDefaultDuration time.Duration
@@ -367,7 +426,14 @@ func (o *provisionerExtensionOption) Option(Options) x509util.WithOption {
 		if err != nil {
 			return err
 		}
-		crt.ExtraExtensions = append(crt.ExtraExtensions, ext)
+		// Prepend the provisioner extension. In the auth.Sign code we will
+		// force the resulting certificate to only have one extension, the
+		// first stepOIDProvisioner that is found in the ExtraExtensions.
+		// A client could pass a csr containing a malicious stepOIDProvisioner
+		// ExtraExtension. If we were to append (rather than prepend) the correct
+		// stepOIDProvisioner extension, then the resulting certificate would
+		// contain the malicious extension, rather than the one applied by step-ca.
+		crt.ExtraExtensions = append([]pkix.Extension{ext}, crt.ExtraExtensions...)
 		return nil
 	}
 }

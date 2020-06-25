@@ -64,7 +64,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		opts            = []interface{}{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
 		mods            = []x509util.WithOption{withDefaultASN1DN(a.config.AuthorityConfig.Template)}
 		certValidators  = []provisioner.CertificateValidator{}
-		forcedModifiers = []provisioner.CertificateEnforcer{}
+		forcedModifiers = []provisioner.CertificateEnforcer{provisioner.ExtraExtsEnforcer{}}
 	)
 
 	// Set backdate with the configured value
@@ -103,7 +103,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		}
 	}
 
-	// Certificate modifier after validation
+	// Certificate modifiers after validation
 	for _, m := range forcedModifiers {
 		if err := m.Enforce(leaf.Subject()); err != nil {
 			return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)
