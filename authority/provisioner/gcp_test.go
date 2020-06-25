@@ -516,7 +516,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", p1, args{t1}, 4, http.StatusOK, false},
-		{"ok", p2, args{t2}, 6, http.StatusOK, false},
+		{"ok", p2, args{t2}, 9, http.StatusOK, false},
 		{"ok", p3, args{t3}, 4, http.StatusOK, false},
 		{"fail token", p1, args{"token"}, 0, http.StatusUnauthorized, true},
 		{"fail key", p1, args{failKey}, 0, http.StatusUnauthorized, true},
@@ -545,6 +545,33 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			} else {
 				assert.Len(t, tt.wantLen, got)
+				for _, o := range got {
+					switch v := o.(type) {
+					case *provisionerExtensionOption:
+						assert.Equals(t, v.Type, int(TypeGCP))
+						assert.Equals(t, v.Name, tt.gcp.GetName())
+						assert.Equals(t, v.CredentialID, tt.gcp.ServiceAccounts[0])
+						assert.Len(t, 4, v.KeyValuePairs)
+					case profileDefaultDuration:
+						assert.Equals(t, time.Duration(v), tt.gcp.claimer.DefaultTLSCertDuration())
+					case commonNameSliceValidator:
+						assert.Equals(t, []string(v), []string{"instance-name", "instance-id", "instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"})
+					case defaultPublicKeyValidator:
+					case *validityValidator:
+						assert.Equals(t, v.min, tt.gcp.claimer.MinTLSCertDuration())
+						assert.Equals(t, v.max, tt.gcp.claimer.MaxTLSCertDuration())
+					case ipAddressesValidator:
+						assert.Equals(t, v, nil)
+					case emailAddressesValidator:
+						assert.Equals(t, v, nil)
+					case urisValidator:
+						assert.Equals(t, v, nil)
+					case dnsNamesValidator:
+						assert.Equals(t, []string(v), []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"})
+					default:
+						assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+					}
+				}
 			}
 		})
 	}

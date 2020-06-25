@@ -89,6 +89,17 @@ func getCSR(t *testing.T, priv interface{}, opts ...func(*x509.CertificateReques
 	return csr
 }
 
+func setExtraExtsCSR(exts []pkix.Extension) func(*x509.CertificateRequest) {
+	return func(csr *x509.CertificateRequest) {
+		csr.ExtraExtensions = exts
+	}
+}
+
+type basicConstraints struct {
+	IsCA       bool `asn1:"optional"`
+	MaxPathLen int  `asn1:"optional,default:-1"`
+}
+
 func TestAuthority_Sign(t *testing.T) {
 	pub, priv, err := keys.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
@@ -271,7 +282,16 @@ ZYtQ9Ot36qc=
 			}
 		},
 		"ok with enforced modifier": func(t *testing.T) *signTest {
-			csr := getCSR(t, priv)
+			bcExt := pkix.Extension{}
+			bcExt.Id = asn1.ObjectIdentifier{2, 5, 29, 19}
+			bcExt.Critical = false
+			bcExt.Value, err = asn1.Marshal(basicConstraints{IsCA: true, MaxPathLen: 4})
+			assert.FatalError(t, err)
+
+			csr := getCSR(t, priv, setExtraExtsCSR([]pkix.Extension{
+				bcExt,
+				{Id: stepOIDProvisioner, Value: []byte("foo")},
+				{Id: []int{1, 1, 1}, Value: []byte("bar")}}))
 			now := time.Now().UTC()
 			enforcedExtraOptions := append(extraOpts, &certificateDurationEnforcer{
 				NotBefore: now,
@@ -347,19 +367,26 @@ ZYtQ9Ot36qc=
 					// Verify Provisioner OID
 					found := 0
 					for _, ext := range leaf.Extensions {
-						id := ext.Id.String()
-						if id != stepOIDProvisioner.String() {
-							continue
+						switch {
+						case ext.Id.Equal(stepOIDProvisioner):
+							found++
+							val := stepProvisionerASN1{}
+							_, err := asn1.Unmarshal(ext.Value, &val)
+							assert.FatalError(t, err)
+							assert.Equals(t, val.Type, provisionerTypeJWK)
+							assert.Equals(t, val.Name, []byte(p.Name))
+							assert.Equals(t, val.CredentialID, []byte(p.Key.KeyID))
+						// Basic Constraints
+						case ext.Id.Equal(asn1.ObjectIdentifier([]int{2, 5, 29, 19})):
+							val := basicConstraints{}
+							_, err := asn1.Unmarshal(ext.Value, &val)
+							assert.FatalError(t, err)
+							assert.False(t, val.IsCA, false)
+							assert.Equals(t, val.MaxPathLen, 0)
 						}
-						found++
-						val := stepProvisionerASN1{}
-						_, err := asn1.Unmarshal(ext.Value, &val)
-						assert.FatalError(t, err)
-						assert.Equals(t, val.Type, provisionerTypeJWK)
-						assert.Equals(t, val.Name, []byte(p.Name))
-						assert.Equals(t, val.CredentialID, []byte(p.Key.KeyID))
 					}
 					assert.Equals(t, found, 1)
+					assert.Len(t, 6, leaf.Extensions)
 
 					realIntermediate, err := x509.ParseCertificate(a.x509Issuer.Raw)
 					assert.FatalError(t, err)

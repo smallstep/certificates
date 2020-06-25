@@ -426,7 +426,15 @@ func (o *provisionerExtensionOption) Option(Options) x509util.WithOption {
 		if err != nil {
 			return err
 		}
-		crt.ExtraExtensions = append(crt.ExtraExtensions, ext)
+		// NOTE: HACK.
+		// Prepend the provisioner extension. In the auth.Sign code we will
+		// force the resulting certificate to only have one extension, the
+		// first stepOIDProvisioner that is found in the ExtraExtensions.
+		// A client could pass a csr containing a malicious stepOIDProvisioner
+		// ExtraExtension. If we were to append (rather than prepend) the correct
+		// stepOIDProvisioner extension, then the resulting certificate would
+		// contain the malicious extension, rather than the one applied by step-ca.
+		crt.ExtraExtensions = append([]pkix.Extension{ext}, crt.ExtraExtensions...)
 		return nil
 	}
 }

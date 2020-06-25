@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -529,7 +530,7 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 	assert.FatalError(t, err)
 
 	type args struct {
-		token string
+		token, cn string
 	}
 	tests := []struct {
 		name    string
@@ -539,24 +540,24 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 5, http.StatusOK, false},
-		{"ok", p2, args{t2}, 7, http.StatusOK, false},
-		{"ok", p2, args{t2Hostname}, 7, http.StatusOK, false},
-		{"ok", p2, args{t2PrivateIP}, 7, http.StatusOK, false},
-		{"ok", p1, args{t4}, 5, http.StatusOK, false},
-		{"fail account", p3, args{t3}, 0, http.StatusUnauthorized, true},
-		{"fail token", p1, args{"token"}, 0, http.StatusUnauthorized, true},
-		{"fail subject", p1, args{failSubject}, 0, http.StatusUnauthorized, true},
-		{"fail issuer", p1, args{failIssuer}, 0, http.StatusUnauthorized, true},
-		{"fail audience", p1, args{failAudience}, 0, http.StatusUnauthorized, true},
-		{"fail account", p1, args{failAccount}, 0, http.StatusUnauthorized, true},
-		{"fail instanceID", p1, args{failInstanceID}, 0, http.StatusUnauthorized, true},
-		{"fail privateIP", p1, args{failPrivateIP}, 0, http.StatusUnauthorized, true},
-		{"fail region", p1, args{failRegion}, 0, http.StatusUnauthorized, true},
-		{"fail exp", p1, args{failExp}, 0, http.StatusUnauthorized, true},
-		{"fail nbf", p1, args{failNbf}, 0, http.StatusUnauthorized, true},
-		{"fail key", p1, args{failKey}, 0, http.StatusUnauthorized, true},
-		{"fail instance age", p2, args{failInstanceAge}, 0, http.StatusUnauthorized, true},
+		{"ok", p1, args{t1, "foo.local"}, 5, http.StatusOK, false},
+		{"ok", p2, args{t2, "instance-id"}, 9, http.StatusOK, false},
+		{"ok", p2, args{t2Hostname, "ip-127-0-0-1.us-west-1.compute.internal"}, 9, http.StatusOK, false},
+		{"ok", p2, args{t2PrivateIP, "127.0.0.1"}, 9, http.StatusOK, false},
+		{"ok", p1, args{t4, "instance-id"}, 5, http.StatusOK, false},
+		{"fail account", p3, args{token: t3}, 0, http.StatusUnauthorized, true},
+		{"fail token", p1, args{token: "token"}, 0, http.StatusUnauthorized, true},
+		{"fail subject", p1, args{token: failSubject}, 0, http.StatusUnauthorized, true},
+		{"fail issuer", p1, args{token: failIssuer}, 0, http.StatusUnauthorized, true},
+		{"fail audience", p1, args{token: failAudience}, 0, http.StatusUnauthorized, true},
+		{"fail account", p1, args{token: failAccount}, 0, http.StatusUnauthorized, true},
+		{"fail instanceID", p1, args{token: failInstanceID}, 0, http.StatusUnauthorized, true},
+		{"fail privateIP", p1, args{token: failPrivateIP}, 0, http.StatusUnauthorized, true},
+		{"fail region", p1, args{token: failRegion}, 0, http.StatusUnauthorized, true},
+		{"fail exp", p1, args{token: failExp}, 0, http.StatusUnauthorized, true},
+		{"fail nbf", p1, args{token: failNbf}, 0, http.StatusUnauthorized, true},
+		{"fail key", p1, args{token: failKey}, 0, http.StatusUnauthorized, true},
+		{"fail instance age", p2, args{token: failInstanceAge}, 0, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -571,6 +572,33 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			} else {
 				assert.Len(t, tt.wantLen, got)
+				for _, o := range got {
+					switch v := o.(type) {
+					case *provisionerExtensionOption:
+						assert.Equals(t, v.Type, int(TypeAWS))
+						assert.Equals(t, v.Name, tt.aws.GetName())
+						assert.Equals(t, v.CredentialID, tt.aws.Accounts[0])
+						assert.Len(t, 2, v.KeyValuePairs)
+					case profileDefaultDuration:
+						assert.Equals(t, time.Duration(v), tt.aws.claimer.DefaultTLSCertDuration())
+					case commonNameValidator:
+						assert.Equals(t, string(v), tt.args.cn)
+					case defaultPublicKeyValidator:
+					case *validityValidator:
+						assert.Equals(t, v.min, tt.aws.claimer.MinTLSCertDuration())
+						assert.Equals(t, v.max, tt.aws.claimer.MaxTLSCertDuration())
+					case ipAddressesValidator:
+						assert.Equals(t, []net.IP(v), []net.IP{net.ParseIP("127.0.0.1")})
+					case emailAddressesValidator:
+						assert.Equals(t, v, nil)
+					case urisValidator:
+						assert.Equals(t, v, nil)
+					case dnsNamesValidator:
+						assert.Equals(t, []string(v), []string{"ip-127-0-0-1.us-west-1.compute.internal"})
+					default:
+						assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+					}
+				}
 			}
 		})
 	}

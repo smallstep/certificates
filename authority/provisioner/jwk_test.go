@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -253,18 +252,36 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 		token string
 	}
 	tests := []struct {
-		name   string
-		prov   *JWK
-		args   args
-		code   int
-		err    error
-		dns    []string
-		emails []string
-		ips    []net.IP
+		name string
+		prov *JWK
+		args args
+		code int
+		err  error
+		sans []string
 	}{
-		{name: "fail-signature", prov: p1, args: args{failSig}, code: http.StatusUnauthorized, err: errors.New("jwk.AuthorizeSign: jwk.authorizeToken; error parsing jwk claims: square/go-jose: error in cryptographic primitive")},
-		{"ok-sans", p1, args{t1}, http.StatusOK, nil, []string{"foo"}, []string{"max@smallstep.com"}, []net.IP{net.ParseIP("127.0.0.1")}},
-		{"ok-no-sans", p1, args{t2}, http.StatusOK, nil, []string{"subject"}, []string{}, []net.IP{}},
+		{
+			name: "fail-signature",
+			prov: p1,
+			args: args{failSig},
+			code: http.StatusUnauthorized,
+			err:  errors.New("jwk.AuthorizeSign: jwk.authorizeToken; error parsing jwk claims: square/go-jose: error in cryptographic primitive"),
+		},
+		{
+			name: "ok-sans",
+			prov: p1,
+			args: args{t1},
+			code: http.StatusOK,
+			err:  nil,
+			sans: []string{"127.0.0.1", "max@smallstep.com", "foo"},
+		},
+		{
+			name: "ok-no-sans",
+			prov: p1,
+			args: args{t2},
+			code: http.StatusOK,
+			err:  nil,
+			sans: []string{"subject"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -278,7 +295,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.NotNil(t, got) {
-					assert.Len(t, 8, got)
+					assert.Len(t, 6, got)
 					for _, o := range got {
 						switch v := o.(type) {
 						case *provisionerExtensionOption:
@@ -291,15 +308,11 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 						case commonNameValidator:
 							assert.Equals(t, string(v), "subject")
 						case defaultPublicKeyValidator:
-						case dnsNamesValidator:
-							assert.Equals(t, []string(v), tt.dns)
-						case emailAddressesValidator:
-							assert.Equals(t, []string(v), tt.emails)
-						case ipAddressesValidator:
-							assert.Equals(t, []net.IP(v), tt.ips)
 						case *validityValidator:
 							assert.Equals(t, v.min, tt.prov.claimer.MinTLSCertDuration())
 							assert.Equals(t, v.max, tt.prov.claimer.MaxTLSCertDuration())
+						case defaultSANsValidator:
+							assert.Equals(t, []string(v), tt.sans)
 						default:
 							assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
 						}

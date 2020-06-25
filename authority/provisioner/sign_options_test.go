@@ -356,6 +356,7 @@ func Test_ExtraExtsEnforcer_Enforce(t *testing.T) {
 	e1 := pkix.Extension{Id: []int{1, 2, 3, 4, 5}, Critical: false, Value: []byte("foo")}
 	e2 := pkix.Extension{Id: []int{2, 2, 2}, Critical: false, Value: []byte("bar")}
 	stepExt := pkix.Extension{Id: stepOIDProvisioner, Critical: false, Value: []byte("baz")}
+	fakeStepExt := pkix.Extension{Id: stepOIDProvisioner, Critical: false, Value: []byte("zap")}
 	type test struct {
 		cert  *x509.Certificate
 		check func(*x509.Certificate)
@@ -379,7 +380,7 @@ func Test_ExtraExtsEnforcer_Enforce(t *testing.T) {
 		},
 		"ok/step-provisioner-ext": func() test {
 			return test{
-				cert: &x509.Certificate{ExtraExtensions: []pkix.Extension{e1, stepExt, e2}},
+				cert: &x509.Certificate{ExtraExtensions: []pkix.Extension{e1, stepExt, fakeStepExt, e2}},
 				check: func(cert *x509.Certificate) {
 					assert.Equals(t, len(cert.ExtraExtensions), 1)
 					assert.Equals(t, cert.ExtraExtensions[0], stepExt)
@@ -663,6 +664,47 @@ func Test_profileDefaultDuration_Option(t *testing.T) {
 			prof := &x509util.Leaf{}
 			prof.SetSubject(tt.cert)
 			assert.FatalError(t, tt.pdd.Option(tt.so)(prof), "unexpected error")
+			tt.valid(prof.Subject())
+		})
+	}
+}
+
+func Test_newProvisionerExtension_Option(t *testing.T) {
+	type test struct {
+		cert  *x509.Certificate
+		valid func(*x509.Certificate)
+	}
+	tests := map[string]func() test{
+		"ok/one-element": func() test {
+			return test{
+				cert: new(x509.Certificate),
+				valid: func(cert *x509.Certificate) {
+					if assert.Len(t, 1, cert.ExtraExtensions) {
+						ext := cert.ExtraExtensions[0]
+						assert.Equals(t, ext.Id, stepOIDProvisioner)
+					}
+				},
+			}
+		},
+		"ok/prepend": func() test {
+			return test{
+				cert: &x509.Certificate{ExtraExtensions: []pkix.Extension{{Id: stepOIDProvisioner, Critical: true}, {Id: []int{1, 2, 3}}}},
+				valid: func(cert *x509.Certificate) {
+					if assert.Len(t, 3, cert.ExtraExtensions) {
+						ext := cert.ExtraExtensions[0]
+						assert.Equals(t, ext.Id, stepOIDProvisioner)
+						assert.False(t, ext.Critical)
+					}
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tt := run()
+			prof := &x509util.Leaf{}
+			prof.SetSubject(tt.cert)
+			assert.FatalError(t, newProvisionerExtensionOption(TypeJWK, "foo", "bar", "baz", "zap").Option(Options{})(prof))
 			tt.valid(prof.Subject())
 		})
 	}

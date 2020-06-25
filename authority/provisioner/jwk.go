@@ -157,8 +157,8 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
 		// validators
 		commonNameValidator(claims.Subject),
-		defaultSANsValidator(claims.SANs),
 		defaultPublicKeyValidator{},
+		defaultSANsValidator(claims.SANs),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
 	}, nil
 }

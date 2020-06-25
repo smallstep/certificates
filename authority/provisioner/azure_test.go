@@ -432,7 +432,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", p1, args{t1}, 4, http.StatusOK, false},
-		{"ok", p2, args{t2}, 6, http.StatusOK, false},
+		{"ok", p2, args{t2}, 9, http.StatusOK, false},
 		{"ok", p1, args{t11}, 4, http.StatusOK, false},
 		{"fail tenant", p3, args{t3}, 0, http.StatusUnauthorized, true},
 		{"fail resource group", p4, args{t4}, 0, http.StatusUnauthorized, true},
@@ -456,6 +456,33 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			} else {
 				assert.Len(t, tt.wantLen, got)
+				for _, o := range got {
+					switch v := o.(type) {
+					case *provisionerExtensionOption:
+						assert.Equals(t, v.Type, int(TypeAzure))
+						assert.Equals(t, v.Name, tt.azure.GetName())
+						assert.Equals(t, v.CredentialID, tt.azure.TenantID)
+						assert.Len(t, 0, v.KeyValuePairs)
+					case profileDefaultDuration:
+						assert.Equals(t, time.Duration(v), tt.azure.claimer.DefaultTLSCertDuration())
+					case commonNameValidator:
+						assert.Equals(t, string(v), "virtualMachine")
+					case defaultPublicKeyValidator:
+					case *validityValidator:
+						assert.Equals(t, v.min, tt.azure.claimer.MinTLSCertDuration())
+						assert.Equals(t, v.max, tt.azure.claimer.MaxTLSCertDuration())
+					case ipAddressesValidator:
+						assert.Equals(t, v, nil)
+					case emailAddressesValidator:
+						assert.Equals(t, v, nil)
+					case urisValidator:
+						assert.Equals(t, v, nil)
+					case dnsNamesValidator:
+						assert.Equals(t, []string(v), []string{"virtualMachine"})
+					default:
+						assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+					}
+				}
 			}
 		})
 	}
