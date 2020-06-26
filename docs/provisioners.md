@@ -341,6 +341,7 @@ Below is an example of an ACME provisioner in the `ca.json`:
 {
     "type": "ACME",
     "name": "my-acme-provisioner",
+    "forceCN": true,
     "claims": {
         "maxTLSCertDuration": "8h",
         "defaultTLSCertDuration": "2h",
@@ -352,6 +353,9 @@ Below is an example of an ACME provisioner in the `ca.json`:
 
 * `name` (mandatory): a string used to identify the provider when the CLI is
   used.
+
+* `forceCN` (optional): force one of the SANs to become the Common Name, if a
+  common name is not provided.
 
 * `claims` (optional): overwrites the default claims set in the authority, see
   the [top](#provisioners) section for all the options.
