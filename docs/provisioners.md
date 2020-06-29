@@ -282,7 +282,7 @@ Below is an example of an X5C provisioner in the `ca.json`:
 }
 ```
 
-* `type` (mandatory): indicates the provisioner type and must be `OIDC`.
+* `type` (mandatory): indicates the provisioner type and must be `X5C`.
 
 * `name` (mandatory): a string used to identify the provider when the CLI is
   used.
@@ -319,7 +319,7 @@ Below is an example of an SSHPOP provisioner in the `ca.json`:
 }
 ```
 
-* `type` (mandatory): indicates the provisioner type and must be `OIDC`.
+* `type` (mandatory): indicates the provisioner type and must be `SSHPOP`.
 
 * `name` (mandatory): a string used to identify the provider when the CLI is
   used.
@@ -349,7 +349,7 @@ Below is an example of an ACME provisioner in the `ca.json`:
 }
 ```
 
-* `type` (mandatory): indicates the provisioner type and must be `OIDC`.
+* `type` (mandatory): indicates the provisioner type and must be `ACME`.
 
 * `name` (mandatory): a string used to identify the provider when the CLI is
   used.
@@ -396,7 +396,7 @@ Below is an example of a K8sSA provisioner in the `ca.json`:
 }
 ```
 
-* `type` (mandatory): indicates the provisioner type and must be `OIDC`.
+* `type` (mandatory): indicates the provisioner type and must be `K8sSA`.
 
 * `name` (mandatory): a string used to identify the provider when the CLI is
   used.
