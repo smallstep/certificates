@@ -9,6 +9,8 @@ require (
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/go-piv/piv-go v1.5.0
 	github.com/googleapis/gax-go/v2 v2.0.5
+	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
+	github.com/lunixbochs/vtclean v1.0.0 // indirect
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
