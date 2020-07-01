@@ -203,6 +203,89 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err,
 			"authority.Renew; error parsing new server certificate", opts...)
+		}
+
+	if err = a.db.StoreCertificate(serverCert); err != nil {
+		if err != db.ErrNotImplemented {
+			return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew; error storing certificate in db", opts...)
+		}
+	}
+
+	return []*x509.Certificate{serverCert, a.x509Issuer}, nil
+}
+
+// Rekey is similar to renew except that the certificate will be renewed with new key from csr argument.
+func (a *Authority) Rekey(oldCert *x509.Certificate, csr *x509.CertificateRequest) ([]*x509.Certificate, error) {
+	opts := []interface{}{errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String())}
+
+	// Check step provisioner extensions
+	if err := a.authorizeRenew(oldCert); err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew", opts...)
+	}
+
+
+	// Durations
+	backdate := a.config.AuthorityConfig.Backdate.Duration
+	duration := oldCert.NotAfter.Sub(oldCert.NotBefore)
+	now := time.Now().UTC()
+
+
+	newCert := &x509.Certificate{
+		PublicKey:                   csr.PublicKey,
+		Issuer:                      a.x509Issuer.Subject,
+		Subject:                     oldCert.Subject,
+		NotBefore:                   now.Add(-1 * backdate),
+		NotAfter:                    now.Add(duration - backdate),
+		KeyUsage:                    oldCert.KeyUsage,
+		UnhandledCriticalExtensions: oldCert.UnhandledCriticalExtensions,
+		ExtKeyUsage:                 oldCert.ExtKeyUsage,
+		UnknownExtKeyUsage:          oldCert.UnknownExtKeyUsage,
+		BasicConstraintsValid:       oldCert.BasicConstraintsValid,
+		IsCA:                        oldCert.IsCA,
+		MaxPathLen:                  oldCert.MaxPathLen,
+		MaxPathLenZero:              oldCert.MaxPathLenZero,
+		OCSPServer:                  oldCert.OCSPServer,
+		IssuingCertificateURL:       oldCert.IssuingCertificateURL,
+		PermittedDNSDomainsCritical: oldCert.PermittedDNSDomainsCritical,
+		PermittedEmailAddresses:     oldCert.PermittedEmailAddresses,
+		DNSNames:                    oldCert.DNSNames,
+		EmailAddresses:              oldCert.EmailAddresses,
+		IPAddresses:                 oldCert.IPAddresses,
+		URIs:                        oldCert.URIs,
+		PermittedDNSDomains:         oldCert.PermittedDNSDomains,
+		ExcludedDNSDomains:          oldCert.ExcludedDNSDomains,
+		PermittedIPRanges:           oldCert.PermittedIPRanges,
+		ExcludedIPRanges:            oldCert.ExcludedIPRanges,
+		ExcludedEmailAddresses:      oldCert.ExcludedEmailAddresses,
+		PermittedURIDomains:         oldCert.PermittedURIDomains,
+		ExcludedURIDomains:          oldCert.ExcludedURIDomains,
+		CRLDistributionPoints:       oldCert.CRLDistributionPoints,
+		PolicyIdentifiers:           oldCert.PolicyIdentifiers,
+	}
+
+	// Copy all extensions except for Authority Key Identifier. This one might
+	// be different if we rotate the intermediate certificate and it will cause
+	// a TLS bad certificate error.
+	for _, ext := range oldCert.Extensions {
+		if !ext.Id.Equal(oidAuthorityKeyIdentifier) {
+			newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
+		}
+	}
+
+	leaf, err := x509util.NewLeafProfileWithTemplate(newCert, a.x509Issuer, a.x509Signer)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew", opts...)
+	}
+	crtBytes, err := leaf.CreateCertificate()
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err,
+			"authority.Renew; error renewing certificate from existing server certificate", opts...)
+	}
+
+	serverCert, err := x509.ParseCertificate(crtBytes)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err,
+			"authority.Renew; error parsing new server certificate", opts...)
 	}
 
 	if err = a.db.StoreCertificate(serverCert); err != nil {
@@ -213,6 +296,7 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 
 	return []*x509.Certificate{serverCert, a.x509Issuer}, nil
 }
+
 
 // RevokeOptions are the options for the Revoke API.
 type RevokeOptions struct {
