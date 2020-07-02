@@ -42,7 +42,5 @@ func (c *CertificateRequest) GetCertificate() *Certificate {
 		Extensions:         c.Extensions,
 		PublicKey:          c.PublicKey,
 		PublicKeyAlgorithm: c.PublicKeyAlgorithm,
-		PublicKey:          c.PublicKey,
-		PublicKeyAlgorithm: c.PublicKeyAlgorithm,
 	}
 }

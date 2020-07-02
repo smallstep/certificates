@@ -5,33 +5,34 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"math/big"
-	"strings"
 
 	"github.com/pkg/errors"
 )
 
 type Certificate struct {
-	Version               int                     `json:"version"`
-	Subject               Subject                 `json:"subject"`
-	SerialNumber          SerialNumber            `json:"serialNumber"`
-	DNSNames              MultiString             `json:"dnsNames"`
-	EmailAddresses        MultiString             `json:"emailAddresses"`
-	IPAddresses           MultiIP                 `json:"ipAddresses"`
-	URIs                  MultiURL                `json:"uris"`
-	Extensions            []Extension             `json:"extensions"`
-	KeyUsage              KeyUsage                `json:"keyUsage"`
-	ExtKeyUsage           ExtKeyUsage             `json:"extKeyUsage"`
-	SubjectKeyID          SubjectKeyID            `json:"subjectKeyId"`
-	AuthorityKeyID        AuthorityKeyID          `json:"authorityKeyId"`
-	OCSPServer            OCSPServer              `json:"ocspServer"`
-	IssuingCertificateURL IssuingCertificateURL   `json:"issuingCertificateURL"`
-	CRLDistributionPoints CRLDistributionPoints   `json:"crlDistributionPoints"`
-	PolicyIdentifiers     PolicyIdentifiers       `json:"policyIdentifiers"`
-	BasicConstraints      *BasicConstraints       `json:"basicConstraints"`
-	NameConstaints        *NameConstraints        `json:"nameConstraints"`
-	SignatureAlgorithm    SignatureAlgorithm      `json:"signatureAlgorithm"`
-	PublicKeyAlgorithm    x509.PublicKeyAlgorithm `json:"-"`
-	PublicKey             interface{}             `json:"-"`
+	Version               int                      `json:"version"`
+	Subject               Subject                  `json:"subject"`
+	Issuer                Issuer                   `json:"issuer"`
+	SerialNumber          SerialNumber             `json:"serialNumber"`
+	DNSNames              MultiString              `json:"dnsNames"`
+	EmailAddresses        MultiString              `json:"emailAddresses"`
+	IPAddresses           MultiIP                  `json:"ipAddresses"`
+	URIs                  MultiURL                 `json:"uris"`
+	SANs                  []SubjectAlternativeName `json:"sans"`
+	Extensions            []Extension              `json:"extensions"`
+	KeyUsage              KeyUsage                 `json:"keyUsage"`
+	ExtKeyUsage           ExtKeyUsage              `json:"extKeyUsage"`
+	SubjectKeyID          SubjectKeyID             `json:"subjectKeyId"`
+	AuthorityKeyID        AuthorityKeyID           `json:"authorityKeyId"`
+	OCSPServer            OCSPServer               `json:"ocspServer"`
+	IssuingCertificateURL IssuingCertificateURL    `json:"issuingCertificateURL"`
+	CRLDistributionPoints CRLDistributionPoints    `json:"crlDistributionPoints"`
+	PolicyIdentifiers     PolicyIdentifiers        `json:"policyIdentifiers"`
+	BasicConstraints      *BasicConstraints        `json:"basicConstraints"`
+	NameConstaints        *NameConstraints         `json:"nameConstraints"`
+	SignatureAlgorithm    SignatureAlgorithm       `json:"signatureAlgorithm"`
+	PublicKeyAlgorithm    x509.PublicKeyAlgorithm  `json:"-"`
+	PublicKey             interface{}              `json:"-"`
 }
 
 func NewCertificate(cr *x509.CertificateRequest, opts ...Option) (*Certificate, error) {
@@ -104,8 +105,9 @@ func (c *Certificate) GetCertificate() *x509.Certificate {
 	return cert
 }
 
-// Subject is the JSON representation of the X509 subject field.
-type Subject struct {
+// Name is the JSON representation of X.501 type Name, used in the X.509 subject
+// and issuer fields.
+type Name struct {
 	Country            MultiString `json:"country"`
 	Organization       MultiString `json:"organization"`
 	OrganizationalUnit MultiString `json:"organizationUnit"`
@@ -116,6 +118,26 @@ type Subject struct {
 	SerialNumber       string      `json:"serialNumber"`
 	CommonName         string      `json:"commonName"`
 }
+
+// UnmarshalJSON implements the json.Unmarshal interface and unmarshals a JSON
+// object in the Subject struct or a string as just the subject common name.
+func (n *Name) UnmarshalJSON(data []byte) error {
+	if cn, ok := maybeString(data); ok {
+		n.CommonName = cn
+		return nil
+	}
+
+	type nameAlias Name
+	var nn nameAlias
+	if err := json.Unmarshal(data, &nn); err != nil {
+		return errors.Wrap(err, "error unmarshaling json")
+	}
+	*n = Name(nn)
+	return nil
+}
+
+// Subject is the JSON representation of the X.509 subject field.
+type Subject Name
 
 func newSubject(n pkix.Name) Subject {
 	return Subject{
@@ -146,21 +168,36 @@ func (s Subject) Set(c *x509.Certificate) {
 	}
 }
 
-// UnmarshalJSON implements the json.Unmarshal interface and unmarshals a JSON
-// object in the Subject struct or a string as just the subject common name.
-func (s *Subject) UnmarshalJSON(data []byte) error {
-	if cn, ok := maybeString(data); ok {
-		s.CommonName = cn
-		return nil
-	}
+// Issuer is the JSON representation of the X.509 issuer field.
+type Issuer Name
 
-	type subjectAlias Subject
-	var ss subjectAlias
-	if err := json.Unmarshal(data, &ss); err != nil {
-		return errors.Wrap(err, "error unmarshaling json")
+func newIssuer(n pkix.Name) Issuer {
+	return Issuer{
+		Country:            n.Country,
+		Organization:       n.Organization,
+		OrganizationalUnit: n.OrganizationalUnit,
+		Locality:           n.Locality,
+		Province:           n.Province,
+		StreetAddress:      n.StreetAddress,
+		PostalCode:         n.PostalCode,
+		SerialNumber:       n.SerialNumber,
+		CommonName:         n.CommonName,
 	}
-	*s = Subject(ss)
-	return nil
+}
+
+// Set sets the issuer in the given certificate.
+func (i Issuer) Set(c *x509.Certificate) {
+	c.Issuer = pkix.Name{
+		Country:            i.Country,
+		Organization:       i.Organization,
+		OrganizationalUnit: i.OrganizationalUnit,
+		Locality:           i.Locality,
+		Province:           i.Province,
+		StreetAddress:      i.StreetAddress,
+		PostalCode:         i.PostalCode,
+		SerialNumber:       i.SerialNumber,
+		CommonName:         i.CommonName,
+	}
 }
 
 // SerialNumber is the JSON representation of the X509 serial number.
@@ -171,6 +208,13 @@ type SerialNumber struct {
 // Set sets the serial number in the given certificate.
 func (s SerialNumber) Set(c *x509.Certificate) {
 	c.SerialNumber = s.Int
+}
+
+func (s *SerialNumber) MarshalJSON() ([]byte, error) {
+	if s == nil || s.Int == nil {
+		return []byte(`null`), nil
+	}
+	return s.Int.MarshalJSON()
 }
 
 // UnmarshalJSON implements the json.Unmarshal interface and unmarshals an
@@ -199,65 +243,5 @@ func (s *SerialNumber) UnmarshalJSON(data []byte) error {
 	*s = SerialNumber{
 		Int: new(big.Int).SetInt64(i),
 	}
-	return nil
-}
-
-// SignatureAlgorithm is the JSON representation of the X509 signature algorithms
-type SignatureAlgorithm x509.SignatureAlgorithm
-
-// Set sets the signature algorithm in the given certificate.
-func (s SignatureAlgorithm) Set(c *x509.Certificate) {
-	c.SignatureAlgorithm = s
-}
-
-// UnmarshalJSON implements the json.Unmarshal interface and unmarshals a JSON
-// object in the Subject struct or a string as just the subject common name.
-func (s *SignatureAlgorithm) UnmarshalJSON(data []byte) error {
-	s, err := unmarshalString(data)
-	if err != nil {
-		return err
-	}
-
-	var sa x509.SignatureAlgorithm
-	switch strings.ToUpper(s) {
-	case "MD2-RSA":
-		sa = x509.MD2WithRSA
-	case "MD5-RSA":
-		sa = x509.MD5WithRSA
-	case "SHA1-RSA":
-		sa = x509.SHA1WithRSA
-	case "SHA1-RSA":
-		sa = x509.SHA1WithRSA
-	case "SHA256-RSA":
-		sa = x509.SHA256WithRSA
-	case "SHA384-RSA":
-		sa = x509.SHA384WithRSA
-	case "SHA512-RSA":
-		sa = x509.SHA512WithRSA
-	case "SHA256-RSAPSS":
-		sa = x509.SHA256WithRSAPSS
-	case "SHA384-RSAPSS":
-		sa = x509.SHA384WithRSAPSS
-	case "SHA512-RSAPSS":
-		sa = x509.SHA512WithRSAPSS
-	case "DSA-SHA1":
-		sa = x509.DSAWithSHA1
-	case "DSA-SHA256":
-		sa = x509.DSAWithSHA256
-	case "ECDSA-SHA1":
-		sa = x509.ECDSAWithSHA1
-	case "ECDSA-SHA256":
-		sa = x509.ECDSAWithSHA256
-	case "ECDSA-SHA384":
-		sa = x509.ECDSAWithSHA384
-	case "ECDSA-SHA512":
-		sa = x509.ECDSAWithSHA512
-	case "ED25519":
-		sa = x509.PureEd25519
-	default:
-		return errors.Errorf("unsupported signatureAlgorithm %s", s)
-	}
-
-	*s = SignatureAlgorithm(sa)
 	return nil
 }

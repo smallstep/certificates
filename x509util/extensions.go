@@ -4,7 +4,12 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"fmt"
+	"net"
+	"net/url"
 	"strings"
+
+	"github.com/smallstep/cli/crypto/x509util"
 
 	"github.com/pkg/errors"
 )
@@ -78,6 +83,38 @@ func (o *ObjectIdentifier) UnmarshalJSON(data []byte) error {
 	}
 	*o = ObjectIdentifier(oid)
 	return nil
+}
+
+type SubjectAlternativeName struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+func (s SubjectAlternativeName) Set(c *x509.Certificate) {
+	switch strings.ToLower(s.Type) {
+	case "dns":
+		c.DNSNames = append(c.DNSNames, s.Value)
+	case "email":
+		c.EmailAddresses = append(c.EmailAddresses, s.Value)
+	case "ip":
+		// The validation of the IP would happen in the unmarshaling, but just
+		// to be sure we are only adding valid IPs.
+		if ip := net.ParseIP(s.Value); ip != nil {
+			c.IPAddresses = append(c.IPAddresses, ip)
+		}
+	case "uri":
+		if u, err := url.Parse(s.Value); err != nil {
+			c.URIs = append(c.URIs, u)
+		}
+	case "auto", "":
+		dnsNames, ips, emails, uris := x509util.SplitSANs([]string{s.Value})
+		c.DNSNames = append(c.DNSNames, dnsNames...)
+		c.IPAddresses = append(c.IPAddresses, ips...)
+		c.EmailAddresses = append(c.EmailAddresses, emails...)
+		c.URIs = append(c.URIs, uris...)
+	default:
+		panic(fmt.Sprintf("unsupported subject alternative name type %s", s.Type))
+	}
 }
 
 // KeyUsage type represents the JSON array used to represent the key usages of a
