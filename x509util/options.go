@@ -25,7 +25,23 @@ func (o *Options) apply(opts []Option) (*Options, error) {
 
 type Option func(o *Options) error
 
-func WithTemplate(path string, data map[string]interface{}) Option {
+func WithTemplate(text string, data map[string]interface{}) Option {
+	return func(o *Options) error {
+		tmpl, err := template.New("template").Funcs(sprig.TxtFuncMap()).Parse(text)
+		if err != nil {
+			return errors.Wrapf(err, "error parsing template")
+		}
+
+		buf := new(bytes.Buffer)
+		if err := tmpl.Execute(buf, data); err != nil {
+			return errors.Wrapf(err, "error executing template")
+		}
+		o.CertBuffer = buf
+		return nil
+	}
+}
+
+func WithTemplateFile(path string, data map[string]interface{}) Option {
 	return func(o *Options) error {
 		filename := config.StepAbs(path)
 		b, err := ioutil.ReadFile(filename)
