@@ -34,17 +34,17 @@ func (h *caHandler) Rekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := body.Validate(); err != nil {
-		WriteError(w, err)
-		return
-	}
-
 	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
 		WriteError(w, errs.BadRequest("missing peer certificate"))
 		return
 	}
 
-	certChain, err := h.Authority.Rekey(r.TLS.PeerCertificates[0],body.CsrPEM.CertificateRequest)
+	if err := body.Validate(); err != nil {
+		WriteError(w, err)
+		return
+	}
+
+	certChain, err := h.Authority.RenewOrRekey(r.TLS.PeerCertificates[0],body.CsrPEM.CertificateRequest.PublicKey)
 	if err != nil {
 		WriteError(w, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Rekey"))
 		return

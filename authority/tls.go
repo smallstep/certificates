@@ -2,6 +2,7 @@ package authority
 
 import (
 	"context"
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/asn1"
@@ -135,92 +136,17 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 // Renew creates a new Certificate identical to the old certificate, except
 // with a validity window that begins 'now'.
 func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error) {
-	opts := []interface{}{errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String())}
-
-	// Check step provisioner extensions
-	if err := a.authorizeRenew(oldCert); err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew", opts...)
-	}
-
-	// Durations
-	backdate := a.config.AuthorityConfig.Backdate.Duration
-	duration := oldCert.NotAfter.Sub(oldCert.NotBefore)
-	now := time.Now().UTC()
-
-	newCert := &x509.Certificate{
-		PublicKey:                   oldCert.PublicKey,
-		Issuer:                      a.x509Issuer.Subject,
-		Subject:                     oldCert.Subject,
-		NotBefore:                   now.Add(-1 * backdate),
-		NotAfter:                    now.Add(duration - backdate),
-		KeyUsage:                    oldCert.KeyUsage,
-		UnhandledCriticalExtensions: oldCert.UnhandledCriticalExtensions,
-		ExtKeyUsage:                 oldCert.ExtKeyUsage,
-		UnknownExtKeyUsage:          oldCert.UnknownExtKeyUsage,
-		BasicConstraintsValid:       oldCert.BasicConstraintsValid,
-		IsCA:                        oldCert.IsCA,
-		MaxPathLen:                  oldCert.MaxPathLen,
-		MaxPathLenZero:              oldCert.MaxPathLenZero,
-		OCSPServer:                  oldCert.OCSPServer,
-		IssuingCertificateURL:       oldCert.IssuingCertificateURL,
-		PermittedDNSDomainsCritical: oldCert.PermittedDNSDomainsCritical,
-		PermittedEmailAddresses:     oldCert.PermittedEmailAddresses,
-		DNSNames:                    oldCert.DNSNames,
-		EmailAddresses:              oldCert.EmailAddresses,
-		IPAddresses:                 oldCert.IPAddresses,
-		URIs:                        oldCert.URIs,
-		PermittedDNSDomains:         oldCert.PermittedDNSDomains,
-		ExcludedDNSDomains:          oldCert.ExcludedDNSDomains,
-		PermittedIPRanges:           oldCert.PermittedIPRanges,
-		ExcludedIPRanges:            oldCert.ExcludedIPRanges,
-		ExcludedEmailAddresses:      oldCert.ExcludedEmailAddresses,
-		PermittedURIDomains:         oldCert.PermittedURIDomains,
-		ExcludedURIDomains:          oldCert.ExcludedURIDomains,
-		CRLDistributionPoints:       oldCert.CRLDistributionPoints,
-		PolicyIdentifiers:           oldCert.PolicyIdentifiers,
-	}
-
-	// Copy all extensions except for Authority Key Identifier. This one might
-	// be different if we rotate the intermediate certificate and it will cause
-	// a TLS bad certificate error.
-	for _, ext := range oldCert.Extensions {
-		if !ext.Id.Equal(oidAuthorityKeyIdentifier) {
-			newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
-		}
-	}
-
-	leaf, err := x509util.NewLeafProfileWithTemplate(newCert, a.x509Issuer, a.x509Signer)
-	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew", opts...)
-	}
-	crtBytes, err := leaf.CreateCertificate()
-	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.Renew; error renewing certificate from existing server certificate", opts...)
-	}
-
-	serverCert, err := x509.ParseCertificate(crtBytes)
-	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.Renew; error parsing new server certificate", opts...)
-		}
-
-	if err = a.db.StoreCertificate(serverCert); err != nil {
-		if err != db.ErrNotImplemented {
-			return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew; error storing certificate in db", opts...)
-		}
-	}
-
-	return []*x509.Certificate{serverCert, a.x509Issuer}, nil
+	return a.RenewOrRekey(oldCert, oldCert.PublicKey)
 }
 
-// Rekey is similar to renew except that the certificate will be renewed with new key from csr argument.
-func (a *Authority) Rekey(oldCert *x509.Certificate, csr *x509.CertificateRequest) ([]*x509.Certificate, error) {
+// Rekey is similar to renew except that the certificate will be renewed with new key.
+// Function does rekeying if a new public key is passed as pk else if same key is passed, certificate will be just renewed.
+func (a *Authority) RenewOrRekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
 	opts := []interface{}{errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String())}
 
 	// Check step provisioner extensions
 	if err := a.authorizeRenew(oldCert); err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew", opts...)
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.RenewOrRekey", opts...)
 	}
 
 
@@ -231,7 +157,7 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, csr *x509.CertificateReques
 
 
 	newCert := &x509.Certificate{
-		PublicKey:                   csr.PublicKey,
+		PublicKey:                   pk,
 		Issuer:                      a.x509Issuer.Subject,
 		Subject:                     oldCert.Subject,
 		NotBefore:                   now.Add(-1 * backdate),
@@ -274,23 +200,23 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, csr *x509.CertificateReques
 
 	leaf, err := x509util.NewLeafProfileWithTemplate(newCert, a.x509Issuer, a.x509Signer)
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew", opts...)
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.RenewOrRekey", opts...)
 	}
 	crtBytes, err := leaf.CreateCertificate()
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.Renew; error renewing certificate from existing server certificate", opts...)
+			"authority.RenewOrRenew; error renewing certificate from existing server certificate", opts...)
 	}
 
 	serverCert, err := x509.ParseCertificate(crtBytes)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.Renew; error parsing new server certificate", opts...)
+			"authority.RenewOrRekey; error parsing new server certificate", opts...)
 	}
 
 	if err = a.db.StoreCertificate(serverCert); err != nil {
 		if err != db.ErrNotImplemented {
-			return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew; error storing certificate in db", opts...)
+			return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.RenewOrRekey; error storing certificate in db", opts...)
 		}
 	}
 
