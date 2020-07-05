@@ -8,7 +8,7 @@ import (
 
 // RekeyRequest is the request body for a certificate rekey request.
 type RekeyRequest struct {
-	CsrPEM    CertificateRequest `json:"csr"`
+	CsrPEM CertificateRequest `json:"csr"`
 }
 
 // Validate checks the fields of the RekeyRequest and returns nil if they are ok
@@ -24,7 +24,6 @@ func (s *RekeyRequest) Validate() error {
 	return nil
 }
 
-
 // Rekey is similar to renew except that the certificate will be renewed with new key from csr.
 func (h *caHandler) Rekey(w http.ResponseWriter, r *http.Request) {
 
@@ -39,13 +38,12 @@ func (h *caHandler) Rekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	if err := body.Validate(); err != nil {
 		WriteError(w, err)
 		return
 	}
 
-	certChain, err := h.Authority.RenewOrRekey(r.TLS.PeerCertificates[0],body.CsrPEM.CertificateRequest.PublicKey)
+	certChain, err := h.Authority.RenewOrRekey(r.TLS.PeerCertificates[0], body.CsrPEM.CertificateRequest.PublicKey)
 	if err != nil {
 		WriteError(w, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Rekey"))
 		return
