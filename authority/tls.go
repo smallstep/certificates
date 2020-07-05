@@ -201,7 +201,7 @@ func (a *Authority) RenewOrRekey(oldCert *x509.Certificate, pk crypto.PublicKey)
 			pubBytes, err := x509.MarshalPKIXPublicKey(pk)
 			if err != nil {
 				return nil, errs.Wrap(http.StatusInternalServerError, err,
-					"authority.RenewOrRekey; error marshalling public key", opts...)
+					"authority.RenewOrRekey; error marshaling public key", opts...)
 			}
 			hash := sha1.Sum(pubBytes)
 			skiExtension := pkix.Extension{
