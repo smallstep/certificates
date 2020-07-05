@@ -372,6 +372,7 @@ ZYtQ9Ot36qc=
 
 func TestAuthority_RenewOrRekey(t *testing.T) {
 	pub, _, err := keys.GenerateDefaultKeyPair()
+	assert.FatalError(t, err)
 	pub1, _, err := keys.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 
@@ -479,9 +480,9 @@ func TestAuthority_RenewOrRekey(t *testing.T) {
 
 			var certChain []*x509.Certificate
 			if tc.auth != nil {
-				certChain, err = tc.auth.RenewOrRekey(tc.cert,pub1)
+				certChain, err = tc.auth.RenewOrRekey(tc.cert, pub1)
 			} else {
-				certChain, err = a.RenewOrRekey(tc.cert,pub1)
+				certChain, err = a.RenewOrRekey(tc.cert, pub1)
 			}
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
@@ -525,7 +526,7 @@ func TestAuthority_RenewOrRekey(t *testing.T) {
 					assert.Equals(t, leaf.ExtKeyUsage,
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 					assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com", "test"})
-                                        assert.Equals(t, leaf.PublicKey, pub1)
+					assert.Equals(t, leaf.PublicKey, pub1)
 
 					pubBytes, err := x509.MarshalPKIXPublicKey(pub1)
 					assert.FatalError(t, err)
