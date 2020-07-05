@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto"
 	"crypto/tls"
+	"crypto/sha1"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
@@ -28,6 +30,7 @@ func (a *Authority) GetTLSOptions() *tlsutil.TLSOptions {
 }
 
 var oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
+var oidSubjectKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 14}
 
 func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 	return func(p x509util.Profile) error {
@@ -139,8 +142,8 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 	return a.RenewOrRekey(oldCert, oldCert.PublicKey)
 }
 
-// Rekey is similar to renew except that the certificate will be renewed with new key.
-// Function does rekeying if a new public key is passed as pk else if same key is passed, certificate will be just renewed.
+
+// Func is used for renewing or rekeying based on the public key passed. 
 func (a *Authority) RenewOrRekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
 	opts := []interface{}{errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String())}
 
@@ -189,15 +192,26 @@ func (a *Authority) RenewOrRekey(oldCert *x509.Certificate, pk crypto.PublicKey)
 		PolicyIdentifiers:           oldCert.PolicyIdentifiers,
 	}
 
-	// Copy all extensions except for Authority Key Identifier. This one might
-	// be different if we rotate the intermediate certificate and it will cause
-	// a TLS bad certificate error.
+	// Copy all extensions except:
+	//	1. Authority Key Identifier - This one might be different if we rotate the intermediate certificate 
+	//					and it will cause a TLS bad certificate error.
+	//	2. Subject Key Identifier - This should be calculated for the public key passed to this function.
 	for _, ext := range oldCert.Extensions {
-		if !ext.Id.Equal(oidAuthorityKeyIdentifier) {
+		if ((!ext.Id.Equal(oidAuthorityKeyIdentifier)) && (!ext.Id.Equal(oidSubjectKeyIdentifier))) {
 			newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
 		}
+		if ext.Id.Equal(oidSubjectKeyIdentifier) {
+			pubBytes, _ := x509.MarshalPKIXPublicKey(pk)
+			hash := sha1.Sum(pubBytes)
+			skiExtension := pkix.Extension{
+				Id:	oidSubjectKeyIdentifier,
+				Value:	append([]byte{4,20}, hash[:]...),
+			}
+			newCert.ExtraExtensions = append(newCert.ExtraExtensions, skiExtension)
+		}
 	}
-
+	
+	
 	leaf, err := x509util.NewLeafProfileWithTemplate(newCert, a.x509Issuer, a.x509Signer)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.RenewOrRekey", opts...)
@@ -205,7 +219,7 @@ func (a *Authority) RenewOrRekey(oldCert *x509.Certificate, pk crypto.PublicKey)
 	crtBytes, err := leaf.CreateCertificate()
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.RenewOrRenew; error renewing certificate from existing server certificate", opts...)
+			"authority.RenewOrRekey; error renewing certificate from existing server certificate", opts...)
 	}
 
 	serverCert, err := x509.ParseCertificate(crtBytes)
