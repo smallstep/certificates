@@ -3,8 +3,8 @@ package authority
 import (
 	"context"
 	"crypto"
-	"crypto/tls"
 	"crypto/sha1"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -142,8 +142,7 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 	return a.RenewOrRekey(oldCert, oldCert.PublicKey)
 }
 
-
-// Func is used for renewing or rekeying based on the public key passed. 
+// Func is used for renewing or rekeying based on the public key passed.
 func (a *Authority) RenewOrRekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
 	opts := []interface{}{errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String())}
 
@@ -152,12 +151,10 @@ func (a *Authority) RenewOrRekey(oldCert *x509.Certificate, pk crypto.PublicKey)
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.RenewOrRekey", opts...)
 	}
 
-
 	// Durations
 	backdate := a.config.AuthorityConfig.Backdate.Duration
 	duration := oldCert.NotAfter.Sub(oldCert.NotBefore)
 	now := time.Now().UTC()
-
 
 	newCert := &x509.Certificate{
 		PublicKey:                   pk,
@@ -193,25 +190,28 @@ func (a *Authority) RenewOrRekey(oldCert *x509.Certificate, pk crypto.PublicKey)
 	}
 
 	// Copy all extensions except:
-	//	1. Authority Key Identifier - This one might be different if we rotate the intermediate certificate 
+	//	1. Authority Key Identifier - This one might be different if we rotate the intermediate certificate
 	//					and it will cause a TLS bad certificate error.
 	//	2. Subject Key Identifier - This should be calculated for the public key passed to this function.
 	for _, ext := range oldCert.Extensions {
-		if ((!ext.Id.Equal(oidAuthorityKeyIdentifier)) && (!ext.Id.Equal(oidSubjectKeyIdentifier))) {
+		if (!ext.Id.Equal(oidAuthorityKeyIdentifier)) && (!ext.Id.Equal(oidSubjectKeyIdentifier)) {
 			newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
 		}
 		if ext.Id.Equal(oidSubjectKeyIdentifier) {
-			pubBytes, _ := x509.MarshalPKIXPublicKey(pk)
+			pubBytes, err := x509.MarshalPKIXPublicKey(pk)
+			if err != nil {
+				return nil, errs.Wrap(http.StatusInternalServerError, err,
+					"authority.RenewOrRekey; error marshalling public key", opts...)
+			}
 			hash := sha1.Sum(pubBytes)
 			skiExtension := pkix.Extension{
-				Id:	oidSubjectKeyIdentifier,
-				Value:	append([]byte{4,20}, hash[:]...),
+				Id:    oidSubjectKeyIdentifier,
+				Value: append([]byte{4, 20}, hash[:]...),
 			}
 			newCert.ExtraExtensions = append(newCert.ExtraExtensions, skiExtension)
 		}
 	}
-	
-	
+
 	leaf, err := x509util.NewLeafProfileWithTemplate(newCert, a.x509Issuer, a.x509Signer)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.RenewOrRekey", opts...)
@@ -236,7 +236,6 @@ func (a *Authority) RenewOrRekey(oldCert *x509.Certificate, pk crypto.PublicKey)
 
 	return []*x509.Certificate{serverCert, a.x509Issuer}, nil
 }
-
 
 // RevokeOptions are the options for the Revoke API.
 type RevokeOptions struct {
