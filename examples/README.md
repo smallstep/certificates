@@ -341,6 +341,8 @@ This example creates 3 different docker images:
   certificate and sets a cron that renews the certificate (the cron
   runs every minute for testing purposes).
 
+On Linux, you will need the `libpcsclite-dev` package.
+
 To run this test you need to have the docker daemon running. With docker running
 swith to the `examples/docker directory` and run `make`:
 
