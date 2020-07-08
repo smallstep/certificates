@@ -104,6 +104,155 @@ designs, to help with this. If you integrate with our other tools its easy to
 start with a manual identity proofing mechanism and move to a more sophisticated
 automated method as your system grows.
 
+## What are the security risks of exposing the OAuth Client Secret in the output of `step ca provisioner list`?
+
+It would be nice if we could have the CA operate as an OAuth confidential
+client, keeping the client secret private and redirecting back to the CA
+instead of to loopback. But, to be clear, this is not an abuse of the OAuth
+spec. The way this was implemented in step, as an OAuth native application
+using a public client, is standard, was intentional, (mostly) conforms to best
+current practices, and the flow we're using is widely used in practice. A
+confidential client is (strictly?) more secure. But a public client that
+redirects to loopback isn’t a significant security risk under a normal threat
+model.
+
+### The current flow
+The advantage of the current flow is that it’s more general purpose. For
+example, `step oauth` works without any additional infrastructure. An issued
+access token can be used from the command line, and OIDC identity tokens can be
+safely used to authenticate to remote services (including remote services that
+        don’t speak OAuth OIDC, or don’t even speak HTTP, but can validate a
+        JWT). `step-ca` is one example of a remote service that can authenticate
+step users via OIDC identity token. You can also use `step crypto jwt verify` to
+authenticate using OIDC at the command line.
+
+The particular details of the OAuth flow we selected has pros & cons, as does
+any flow. The relevant security risks are:
+
+1. Since the OAuth access token isn’t issued directly to a remote server (e.g.,
+        `step-ca`), remote servers can’t safely use the issued access tokens
+without significant care. If they did, an attacker might be able to maliciously
+trick the remote server into using an access token that was issued to a
+different client.
+
+2. The redirect back from the OAuth authorization server to the
+client can be intercepted by another process running on the local machine. This
+isn’t really necessary though, because...
+
+3. The `client_secret` is public, so anyone can initiate (and complete) an OAuth
+flow using our client (but it will always redirect back to 127.0.0.1).
+
+The first threat is moot since we don't actually use the access token for
+anything when we're connecting to `step-ca`. Unfortunately there's no way to not
+get an access token. So we just ignore it.
+
+Note that it *is* safe to use the access token from the command line to access
+resources at a remote API. For example, it’s safe to user `step oauth` to obtain
+an OAuth access token from Google and use it to access Google’s APIs in a bash
+script.
+
+More generally, access tokens are for accessing resources (authorization) and
+are not useful for authenticating a user since they're not audience-addressed.
+If you and I both have a Google OAuth client, I could get Alice to OAuth into
+my app and use the issued access token to masquerade as Alice to you. But OIDC
+identity tokens are audience-addressed. An identity token is a JWT with the
+`client_id` baked in as the `aud` (audience) parameter. As long as clients check
+this parameter (which `step-ca` does) they're not susceptible to this attack. In
+fact, OIDC identity tokens were designed and developed precisely to solve this
+problem.
+
+So it's completely safe for one entity to obtain an *identity token* from an IdP
+on behalf of a user and use it to authenticate to another entity (like `step`
+        does). That's exactly the use case OIDC was designed to support.
+
+The second and third threats are related. They involve a malicious attempt to
+initiate an OAuth OIDC flow using our client credentials. There's a lot of
+analysis we could do here comparing this situation to a non-native (e.g., *web*)
+client and to other flows (e.g., the *implicit flow*, which also makes the
+client secret public). Skipping that detail, we know two things for sure:
+
+1. OAuth flows generally require user consent to complete (e.g., a user has to
+"approve" an application's authentication / authorization request)
+
+2. An OAuth flow initiated using our client will always redirect back to 127.0.0.1
+
+So a malicious attacker trying to obtain an *identity token* needs two things:
+
+1. They need to get user consent to complete an OAuth flow
+2. They need to have local access to the user's machine
+
+This is already a pretty high bar. It’s worth noting, however, that the first
+part is *much* easier if the user is already logged in and the identity provider
+is configured to not require consent (i.e., the OAuth flow is automatically
+        completed without the user having to click any buttons). Okta seems to
+do this for some applications by default.
+
+It's also worth noting that a process with local access could probably obtain
+an access/identity token for a *confidential client* without knowing the client
+secret. That's the main reason I don't think the flow we're using has a
+meaningful security impact under most threat models. The biggest difference is
+that attacking a confidential client would probably require privileged (root)
+    access, whereas our flow could be attacked by an unprivileged process. But
+    the fruit of our OAuth flow — the SSH certificate — is also available for
+    use by an unprivileged process running locally via the `ssh-agent`. So the
+    only thing possibly gained is the ability to exfiltrate.
+
+### Stuff we should consider doing
+There are at least three OAuth features that are relevant to this discussion.
+Two have already been mentioned:
+
+1. OAuth *public clients* for *native applications* can be (er, are *supposed*
+to be) created without a client secret
+
+2. Proof Key for Code Exchange (PKCE) helps ensure that the process requesting the access token / identity token is the same process that initiated the flow
+
+The first feature, clients without secrets, is mostly cosmetic. There's no real
+difference between a public secret and no secret, except that it's confusing to
+have something called a "secret" that's not actually secret. (Caveat: IdPs that
+support "native applications" without secrets typically enforce other rules for
+these clients — they often require PKCE and might not issue a renew token, for
+example. But these features can often be turned on/of for other client types,
+too.)
+
+The reason we don't assume a *public client* without a secret is that,
+unfortunately, not all IdPs support them. Significantly, Google does not. In
+fact, gcloud (Google Cloud's CLI tool) uses OAuth OIDC and uses the exact same
+technique we're using. If you look at the source you'll find their
+"NOTSOSECRET" All of that said, we should support "native clients" without
+secrets at some point.
+
+We should also implement Proof Key for Code Exchange (PKCE). This has been on
+our backlog for a while, and it's actually really simple and useful. It's
+definitely low-hanging fruit. Before initiating the OAuth flow your client
+generates a random number. It hashes that number and passes the hash to the IdP
+as part of the authorization request (the URL that users are sent to for
+        login). After authenticating and consenting, when the user is
+redirected back to the client, the client makes a request to the IdP to get an
+access token & identity token. In *that* request the client must include the
+*unhashed* random number. The IdP re-hashes it and compares it to the value it
+received in the authorization request. If they match, the IdP can be certain
+that the entity making the access token request is the same entity that
+initiated the flow. In other words, the request has not been intercepted by
+some malicious intermediary.
+
+The last hardening mechanism to be aware of are the `acr` and `amr` parameters.
+Basically, when the OAuth flow is initiated the client can request that the IdP
+require consent, do 2FA, and a bunch of other stuff. The issued identity token
+includes parameters to indicate that these processes did, indeed, occur.
+Leveraging this mechanism one could configure `step-ca` to check these parameters
+and be sure that users have consented and undergone a 2FA presence check (e.g.,
+        tapped a security token). Unfortunately, like a bunch of other optional
+OAuth features, many IdPs (*cough* Google *cough*) don't support this stuff.
+
+### Summary
+
+Implementing PKCE should be our highest priority item. Support for "native"
+clients without secrets would also be nice. Forcing 2FA & consent via `acr` & `amr`
+is also a good idea. Support for non-native clients that redirect back to the
+CA, and where the secret is *actually* secret, would also be nice. But it's a
+bigger architectural change and the security implications aren't actually that
+severe.
+
 ## I already have PKI in place. Can I use this with my own root certificate?
 
 Yes. There's a easy way, and a longer but more secure way to do this.
