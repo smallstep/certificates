@@ -1,6 +1,9 @@
 package x509util
 
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
@@ -75,6 +78,11 @@ func (c *Certificate) GetCertificate() *x509.Certificate {
 	cert.IPAddresses = c.IPAddresses
 	cert.URIs = c.URIs
 
+	// SANs slice.
+	for _, san := range c.SANs {
+		san.Set(cert)
+	}
+
 	// Subject.
 	c.Subject.Set(cert)
 
@@ -103,6 +111,41 @@ func (c *Certificate) GetCertificate() *x509.Certificate {
 	c.SignatureAlgorithm.Set(cert)
 
 	return cert
+}
+
+func CreateCertificate(template, parent *x509.Certificate, pub crypto.PublicKey, signer crypto.Signer) (*x509.Certificate, error) {
+	var err error
+	// Complete certificate.
+	if template.SerialNumber == nil {
+		if template.SerialNumber, err = generateSerialNumber(); err != nil {
+			return nil, err
+		}
+	}
+	if template.SubjectKeyId == nil {
+		if template.SubjectKeyId, err = generateSubjectKeyID(pub); err != nil {
+			return nil, err
+		}
+	}
+
+	// Remove KeyEncipherment and DataEncipherment for non-rsa keys.
+	// See:
+	// https://github.com/golang/go/issues/36499
+	// https://tools.ietf.org/html/draft-ietf-lamps-5480-ku-clarifications-02
+	if _, ok := pub.(*rsa.PublicKey); !ok {
+		template.KeyUsage &= ^x509.KeyUsageKeyEncipherment
+		template.KeyUsage &= ^x509.KeyUsageDataEncipherment
+	}
+
+	// Sign certificate
+	asn1Data, err := x509.CreateCertificate(rand.Reader, template, parent, pub, signer)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating certificate")
+	}
+	cert, err := x509.ParseCertificate(asn1Data)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing certificate")
+	}
+	return cert, nil
 }
 
 // Name is the JSON representation of X.501 type Name, used in the X.509 subject
