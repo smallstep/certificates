@@ -153,6 +153,8 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}
 
 	data := x509util.CreateTemplateData(claims.Subject, claims.SANs)
+	data.SetToken(claims)
+
 	templateOptions, err := TemplateOptions(p.Options, data)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
