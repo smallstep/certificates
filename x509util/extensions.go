@@ -293,9 +293,17 @@ type BasicConstraints struct {
 // Set sets the basic constraints to the given certificate.
 func (b BasicConstraints) Set(c *x509.Certificate) {
 	c.IsCA = b.IsCA
-	c.MaxPathLen = b.MaxPathLen
-	if c.MaxPathLen < 0 {
-		c.MaxPathLen = -1
+	if c.IsCA {
+		c.BasicConstraintsValid = true
+		switch {
+		case b.MaxPathLen == 0:
+			c.MaxPathLen = b.MaxPathLen
+			c.MaxPathLenZero = true
+		case b.MaxPathLen < 0:
+			c.MaxPathLen = -1
+		default:
+			c.MaxPathLen = b.MaxPathLen
+		}
 	}
 }
 
