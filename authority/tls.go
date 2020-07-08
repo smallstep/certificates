@@ -3,10 +3,8 @@ package authority
 import (
 	"context"
 	"crypto"
-	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
@@ -139,7 +137,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 // Renew creates a new Certificate identical to the old certificate, except
 // with a validity window that begins 'now'.
 func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error) {
-	return a.Rekey(oldCert, oldCert.PublicKey)
+	return a.Rekey(oldCert, nil)
 }
 
 // Func is used for renewing or rekeying based on the public key passed.
@@ -157,7 +155,6 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 	now := time.Now().UTC()
 
 	newCert := &x509.Certificate{
-		PublicKey:                   pk,
 		Issuer:                      a.x509Issuer.Subject,
 		Subject:                     oldCert.Subject,
 		NotBefore:                   now.Add(-1 * backdate),
@@ -189,27 +186,26 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 		PolicyIdentifiers:           oldCert.PolicyIdentifiers,
 	}
 
+	if pk == nil {
+		newCert.PublicKey = oldCert.PublicKey
+	} else {
+		newCert.PublicKey = pk
+	}
+
 	// Copy all extensions except:
 	//	1. Authority Key Identifier - This one might be different if we rotate the intermediate certificate
 	//					and it will cause a TLS bad certificate error.
-	//	2. Subject Key Identifier - This should be calculated for the public key passed to this function.
+	//	2. Subject Key Identifier, if rekey - For rekey, SubjectKeyIdentifier extension will be calculated
+	//	        for the new public key by NewLeafProfilewithTemplate()
 	for _, ext := range oldCert.Extensions {
-		if (!ext.Id.Equal(oidAuthorityKeyIdentifier)) && (!ext.Id.Equal(oidSubjectKeyIdentifier)) {
-			newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
+		if ext.Id.Equal(oidAuthorityKeyIdentifier) {
+			continue
 		}
-		if ext.Id.Equal(oidSubjectKeyIdentifier) {
-			pubBytes, err := x509.MarshalPKIXPublicKey(pk)
-			if err != nil {
-				return nil, errs.Wrap(http.StatusInternalServerError, err,
-					"authority.Rekey; error marshaling public key", opts...)
-			}
-			hash := sha1.Sum(pubBytes)
-			skiExtension := pkix.Extension{
-				Id:    oidSubjectKeyIdentifier,
-				Value: append([]byte{4, 20}, hash[:]...),
-			}
-			newCert.ExtraExtensions = append(newCert.ExtraExtensions, skiExtension)
+		if ext.Id.Equal(oidSubjectKeyIdentifier) && (pk != nil) {
+			newCert.SubjectKeyId = nil
+			continue
 		}
+		newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
 	}
 
 	leaf, err := x509util.NewLeafProfileWithTemplate(newCert, a.x509Issuer, a.x509Signer)
