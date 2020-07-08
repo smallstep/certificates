@@ -37,3 +37,22 @@ const DefaultLeafTemplate = `{
 	"keyUsage": ["keyEncipherment", "digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
 }`
+
+const DefaultIntermediateTemplate = `{
+	"subject": {{ toJson .Subject }},
+	"keyUsage": ["certSign", "crlSign"],
+	"basicConstraints": {
+		"isCA": true,
+		"maxPathLen": 0
+	}
+}`
+
+const DefaultRootTemplate = `{
+	"subject": {{ toJson .Subject }},
+	"issuer": {{ toJson .Subject }},
+	"keyUsage": ["certSign", "crlSign"],
+	"basicConstraints": {
+		"isCA": true,
+		"maxPathLen": 1
+	}
+}`
