@@ -1,15 +1,14 @@
 package x509util
 
+const (
+	UserKey    = "User"
+	SubjectKey = "Subject"
+	SANsKey    = "SANs"
+)
+
 const DefaultLeafTemplate = `{
 	"subject": {{ toJson .Subject }},
-	"sans": [
-	{{- range $index, $san := initial .SANs }}
-		{"type": "{{ $san.Type }}", "value": "{{ $san.Value }}"},
-	{{- end }}
-	{{- with last .SANs }}
-		{"type": "{{ .Type }}", "value": "{{ .Value }}"}
-	{{- end }}
-	],
+	"sans": {{ toJson .SANs }},
 	"keyUsage": ["keyEncipherment", "digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
 }`
