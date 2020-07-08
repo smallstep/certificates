@@ -9,8 +9,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/smallstep/cli/crypto/x509util"
-
 	"github.com/pkg/errors"
 )
 
@@ -107,7 +105,7 @@ func (s SubjectAlternativeName) Set(c *x509.Certificate) {
 			c.URIs = append(c.URIs, u)
 		}
 	case "auto", "":
-		dnsNames, ips, emails, uris := x509util.SplitSANs([]string{s.Value})
+		dnsNames, ips, emails, uris := SplitSANs([]string{s.Value})
 		c.DNSNames = append(c.DNSNames, dnsNames...)
 		c.IPAddresses = append(c.IPAddresses, ips...)
 		c.EmailAddresses = append(c.EmailAddresses, emails...)
@@ -282,7 +280,7 @@ func (p PolicyIdentifiers) Set(c *x509.Certificate) {
 	c.PolicyIdentifiers = p
 }
 
-// BasicConstraints represents the X509 basic constraints exception and defines
+// BasicConstraints represents the X509 basic constraints extension and defines
 // if a certificate is a CA and then maximum depth of valid certification paths
 // that include the certificate. A MaxPathLen of zero indicates that no non-
 // self-issued intermediate CA certificates may follow in a valid certification
