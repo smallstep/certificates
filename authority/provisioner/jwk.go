@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
 )
 
@@ -25,7 +26,7 @@ type stepPayload struct {
 // JWK is the default provisioner, an entity that can sign tokens necessary for
 // signature requests.
 type JWK struct {
-	*base
+	base
 	Type         string           `json:"type"`
 	Name         string           `json:"name"`
 	Key          *jose.JSONWebKey `json:"key"`
@@ -151,7 +152,14 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		claims.SANs = []string{claims.Subject}
 	}
 
+	data := x509util.CreateTemplateData(claims.Subject, claims.SANs)
+	templateOptions, err := TemplateOptions(p.Options, data)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
+	}
+
 	return []SignOption{
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),

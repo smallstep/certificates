@@ -279,7 +279,9 @@ func SanitizeSSHUserPrincipal(email string) string {
 	}, strings.ToLower(email))
 }
 
-type base struct{}
+type base struct {
+	Options *ProvisionerOptions `json:"options"`
+}
 
 // AuthorizeSign returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for signing x509 Certificates.
