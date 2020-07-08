@@ -36,7 +36,7 @@ func TemplateOptions(o *ProvisionerOptions, data x509util.TemplateData) (Certifi
 
 		// Add template data if any.
 		if len(o.TemplateData) > 0 {
-			if err := json.Unmarshal(o.TemplateData, data); err != nil {
+			if err := json.Unmarshal(o.TemplateData, &data); err != nil {
 				return nil, errors.Wrap(err, "error unmarshaling template data")
 			}
 		}
@@ -52,9 +52,9 @@ func TemplateOptions(o *ProvisionerOptions, data x509util.TemplateData) (Certifi
 		}
 
 		// Add user provided data.
-		if len(so.UserData) > 0 {
+		if len(so.TemplateData) > 0 {
 			userObject := make(map[string]interface{})
-			if err := json.Unmarshal(so.UserData, userObject); err != nil {
+			if err := json.Unmarshal(so.TemplateData, &userObject); err != nil {
 				data[x509util.UserKey] = map[string]interface{}{}
 			} else {
 				data[x509util.UserKey] = userObject

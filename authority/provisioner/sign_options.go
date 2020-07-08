@@ -22,7 +22,7 @@ import (
 type Options struct {
 	NotAfter  TimeDuration    `json:"notAfter"`
 	NotBefore TimeDuration    `json:"notBefore"`
-	UserData  json.RawMessage `json:"data"`
+	TemplateData  json.RawMessage `json:"templateData"`
 	Backdate  time.Duration   `json:"-"`
 }
 
