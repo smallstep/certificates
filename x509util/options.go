@@ -10,6 +10,7 @@ import (
 	"github.com/smallstep/cli/config"
 )
 
+// Options are the options that can be passed to NewCertificate.
 type Options struct {
 	CertBuffer *bytes.Buffer
 }
@@ -23,8 +24,15 @@ func (o *Options) apply(opts []Option) (*Options, error) {
 	return o, nil
 }
 
+// TemplateData is an alias for map[string]interface{}. It represents the data
+// passed to the templates.
+type TemplateData map[string]interface{}
+
+// Option is the type used as a variadic argument in NewCertificate.
 type Option func(o *Options) error
 
+// WithTemplate is an options that executes the given template text with the
+// given data.
 func WithTemplate(text string, data map[string]interface{}) Option {
 	return func(o *Options) error {
 		tmpl, err := template.New("template").Funcs(sprig.TxtFuncMap()).Parse(text)
@@ -41,6 +49,8 @@ func WithTemplate(text string, data map[string]interface{}) Option {
 	}
 }
 
+// WithTemplateFile is an options that reads the template file and executes it
+// with the given data.
 func WithTemplateFile(path string, data map[string]interface{}) Option {
 	return func(o *Options) error {
 		filename := config.StepAbs(path)
