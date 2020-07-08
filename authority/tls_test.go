@@ -370,7 +370,7 @@ ZYtQ9Ot36qc=
 	}
 }
 
-func TestAuthority_RenewOrRekey(t *testing.T) {
+func TestAuthority_Rekey(t *testing.T) {
 	pub, _, err := keys.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 	pub1, _, err := keys.GenerateDefaultKeyPair()
@@ -430,14 +430,14 @@ func TestAuthority_RenewOrRekey(t *testing.T) {
 			return &renewTest{
 				auth: _a,
 				cert: cert,
-				err:  errors.New("authority.RenewOrRekey; error renewing certificate from existing server certificate"),
+				err:  errors.New("authority.Rekey; error renewing certificate from existing server certificate"),
 				code: http.StatusInternalServerError,
 			}, nil
 		},
 		"fail-unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.RenewOrRekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -480,9 +480,9 @@ func TestAuthority_RenewOrRekey(t *testing.T) {
 
 			var certChain []*x509.Certificate
 			if tc.auth != nil {
-				certChain, err = tc.auth.RenewOrRekey(tc.cert, pub1)
+				certChain, err = tc.auth.Rekey(tc.cert, pub1)
 			} else {
-				certChain, err = a.RenewOrRekey(tc.cert, pub1)
+				certChain, err = a.Rekey(tc.cert, pub1)
 			}
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {

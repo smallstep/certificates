@@ -613,7 +613,7 @@ func (m *mockAuthority) Renew(cert *x509.Certificate) ([]*x509.Certificate, erro
 	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
 }
 
-func (m *mockAuthority) RenewOrRekey(oldcert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
+func (m *mockAuthority) Rekey(oldcert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
 	if m.renewOrRekey != nil {
 		return m.renewOrRekey(oldcert, pk)
 	}
