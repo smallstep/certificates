@@ -24,10 +24,6 @@ func (o *Options) apply(opts []Option) (*Options, error) {
 	return o, nil
 }
 
-// TemplateData is an alias for map[string]interface{}. It represents the data
-// passed to the templates.
-type TemplateData map[string]interface{}
-
 // Option is the type used as a variadic argument in NewCertificate.
 type Option func(o *Options) error
 
