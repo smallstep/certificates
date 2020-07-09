@@ -63,6 +63,6 @@ func (c *CertificateRequest) GetLeafCertificate() *Certificate {
 	cert.ExtKeyUsage = ExtKeyUsage([]x509.ExtKeyUsage{
 		x509.ExtKeyUsageServerAuth,
 		x509.ExtKeyUsageClientAuth,
-	}
+	})
 	return cert
 }
