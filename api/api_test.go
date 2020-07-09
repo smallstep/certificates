@@ -552,7 +552,7 @@ type mockAuthority struct {
 	root                         func(shasum string) (*x509.Certificate, error)
 	sign                         func(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	renew                        func(cert *x509.Certificate) ([]*x509.Certificate, error)
-	renewOrRekey                 func(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
+	rekey                        func(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
 	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
 	loadProvisionerByID          func(provID string) (provisioner.Interface, error)
 	getProvisioners              func(nextCursor string, limit int) (provisioner.List, string, error)
@@ -614,8 +614,8 @@ func (m *mockAuthority) Renew(cert *x509.Certificate) ([]*x509.Certificate, erro
 }
 
 func (m *mockAuthority) Rekey(oldcert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
-	if m.renewOrRekey != nil {
-		return m.renewOrRekey(oldcert, pk)
+	if m.rekey != nil {
+		return m.rekey(oldcert, pk)
 	}
 	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
 }

@@ -140,8 +140,17 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 	return a.Rekey(oldCert, nil)
 }
 
-// Func is used for renewing or rekeying based on the public key passed.
+// Rekey is used for rekeying and renewing based on the public key.
+// If the public key is 'nil' then it's assumed that the cert should be renewed
+// using the existing public key. If the public key is not 'nil' then it's
+// assumed that the cert should be rekeyed.
+// For both Rekey and Renew all other attributes of the new certificate should
+// match the old certificate. The exceptions are 'AuthorityKeyId' (which may
+// have changed), 'SubjectKeyId' (different in case of rekey), and
+// 'NotBefore/NotAfter' (the validity duration of the new certificate should be
+// equal to the old one, but starting 'now').
 func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
+	isRekey := (pk != nil)
 	opts := []interface{}{errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String())}
 
 	// Check step provisioner extensions
@@ -186,10 +195,10 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 		PolicyIdentifiers:           oldCert.PolicyIdentifiers,
 	}
 
-	if pk == nil {
-		newCert.PublicKey = oldCert.PublicKey
-	} else {
+	if isRekey {
 		newCert.PublicKey = pk
+	} else {
+		newCert.PublicKey = oldCert.PublicKey
 	}
 
 	// Copy all extensions except:
@@ -201,7 +210,7 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 		if ext.Id.Equal(oidAuthorityKeyIdentifier) {
 			continue
 		}
-		if ext.Id.Equal(oidSubjectKeyIdentifier) && (pk != nil) {
+		if ext.Id.Equal(oidSubjectKeyIdentifier) && isRekey {
 			newCert.SubjectKeyId = nil
 			continue
 		}
