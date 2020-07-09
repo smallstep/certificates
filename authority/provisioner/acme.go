@@ -3,20 +3,23 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/x509util"
 )
 
 // ACME is the acme provisioner type, an entity that can authorize the ACME
 // provisioning flow.
 type ACME struct {
 	*base
-	Type    string  `json:"type"`
-	Name    string  `json:"name"`
-	Claims  *Claims `json:"claims,omitempty"`
-	ForceCN bool    `json:"forceCN,omitempty"`
+	Type    string              `json:"type"`
+	Name    string              `json:"name"`
+	ForceCN bool                `json:"forceCN,omitempty"`
+	Claims  *Claims             `json:"claims,omitempty"`
+	Options *ProvisionerOptions `json:"options,omitempty"`
 	claimer *Claimer
 }
 
@@ -72,7 +75,14 @@ func (p *ACME) Init(config Config) (err error) {
 // in the ACME protocol. This method returns a list of modifiers / constraints
 // on the resulting certificate.
 func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+	// Certificate templates
+	templateOptions, err := TemplateOptions(p.Options, x509util.NewTemplateData())
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
+	}
+
 	return []SignOption{
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeACME, p.Name, ""),
 		newForceCNOption(p.ForceCN),
