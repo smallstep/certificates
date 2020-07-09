@@ -26,12 +26,13 @@ type stepPayload struct {
 // JWK is the default provisioner, an entity that can sign tokens necessary for
 // signature requests.
 type JWK struct {
-	base
-	Type         string           `json:"type"`
-	Name         string           `json:"name"`
-	Key          *jose.JSONWebKey `json:"key"`
-	EncryptedKey string           `json:"encryptedKey,omitempty"`
-	Claims       *Claims          `json:"claims,omitempty"`
+	*base
+	Type         string              `json:"type"`
+	Name         string              `json:"name"`
+	Key          *jose.JSONWebKey    `json:"key"`
+	EncryptedKey string              `json:"encryptedKey,omitempty"`
+	Claims       *Claims             `json:"claims,omitempty"`
+	Options      *ProvisionerOptions `json:"options"`
 	claimer      *Claimer
 	audiences    Audiences
 }
