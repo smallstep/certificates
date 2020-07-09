@@ -13,6 +13,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
 )
 
@@ -52,17 +53,18 @@ type openIDPayload struct {
 // ClientSecret is mandatory, but it can be an empty string.
 type OIDC struct {
 	*base
-	Type                  string   `json:"type"`
-	Name                  string   `json:"name"`
-	ClientID              string   `json:"clientID"`
-	ClientSecret          string   `json:"clientSecret"`
-	ConfigurationEndpoint string   `json:"configurationEndpoint"`
-	TenantID              string   `json:"tenantID,omitempty"`
-	Admins                []string `json:"admins,omitempty"`
-	Domains               []string `json:"domains,omitempty"`
-	Groups                []string `json:"groups,omitempty"`
-	ListenAddress         string   `json:"listenAddress,omitempty"`
-	Claims                *Claims  `json:"claims,omitempty"`
+	Type                  string              `json:"type"`
+	Name                  string              `json:"name"`
+	ClientID              string              `json:"clientID"`
+	ClientSecret          string              `json:"clientSecret"`
+	ConfigurationEndpoint string              `json:"configurationEndpoint"`
+	TenantID              string              `json:"tenantID,omitempty"`
+	Admins                []string            `json:"admins,omitempty"`
+	Domains               []string            `json:"domains,omitempty"`
+	Groups                []string            `json:"groups,omitempty"`
+	ListenAddress         string              `json:"listenAddress,omitempty"`
+	Claims                *Claims             `json:"claims,omitempty"`
+	Options               *ProvisionerOptions `json:"options,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
 	claimer               *Claimer
@@ -301,7 +303,16 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSign")
 	}
 
+	data := x509util.CreateTemplateData(claims.Subject, []string{claims.Email})
+	data.SetToken(claims)
+
+	templateOptions, err := TemplateOptions(o.Options, data)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSign")
+	}
+
 	so := []SignOption{
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
 		profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
