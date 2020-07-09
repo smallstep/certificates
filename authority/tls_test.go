@@ -397,8 +397,10 @@ ZYtQ9Ot36qc=
 	}
 }
 
-func TestAuthority_Renew(t *testing.T) {
+func TestAuthority_Rekey(t *testing.T) {
 	pub, _, err := keys.GenerateDefaultKeyPair()
+	assert.FatalError(t, err)
+	pub1, _, err := keys.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 
 	a := testAuthority(t)
@@ -455,14 +457,14 @@ func TestAuthority_Renew(t *testing.T) {
 			return &renewTest{
 				auth: _a,
 				cert: cert,
-				err:  errors.New("authority.Renew; error renewing certificate from existing server certificate"),
+				err:  errors.New("authority.Rekey; error renewing certificate from existing server certificate"),
 				code: http.StatusInternalServerError,
 			}, nil
 		},
 		"fail-unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Renew: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -505,9 +507,9 @@ func TestAuthority_Renew(t *testing.T) {
 
 			var certChain []*x509.Certificate
 			if tc.auth != nil {
-				certChain, err = tc.auth.Renew(tc.cert)
+				certChain, err = tc.auth.Rekey(tc.cert, pub1)
 			} else {
-				certChain, err = a.Renew(tc.cert)
+				certChain, err = a.Rekey(tc.cert, pub1)
 			}
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
@@ -551,8 +553,9 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.Equals(t, leaf.ExtKeyUsage,
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 					assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com", "test"})
+					assert.Equals(t, leaf.PublicKey, pub1)
 
-					pubBytes, err := x509.MarshalPKIXPublicKey(pub)
+					pubBytes, err := x509.MarshalPKIXPublicKey(pub1)
 					assert.FatalError(t, err)
 					hash := sha1.Sum(pubBytes)
 					assert.Equals(t, leaf.SubjectKeyId, hash[:])
@@ -562,6 +565,10 @@ func TestAuthority_Renew(t *testing.T) {
 						assert.Equals(t, leaf.AuthorityKeyId, a.x509Issuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
+							//skip SubjectKeyIdentifier
+							if ext1.Id.Equal(oidSubjectKeyIdentifier) {
+								continue
+							}
 							found := false
 							for _, ext2 := range leaf.Extensions {
 								if reflect.DeepEqual(ext1, ext2) {
@@ -578,6 +585,10 @@ func TestAuthority_Renew(t *testing.T) {
 						assert.Equals(t, leaf.AuthorityKeyId, tc.auth.x509Issuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
+							//skip SubjectKeyIdentifier
+							if ext1.Id.Equal(oidSubjectKeyIdentifier) {
+								continue
+							}
 							// The authority key id extension should be different b/c the intermediates are different.
 							if ext1.Id.Equal(oidAuthorityKeyIdentifier) {
 								for _, ext2 := range leaf.Extensions {

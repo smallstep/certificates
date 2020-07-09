@@ -2,6 +2,7 @@ package authority
 
 import (
 	"context"
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/asn1"
@@ -27,6 +28,7 @@ func (a *Authority) GetTLSOptions() *tlsutil.TLSOptions {
 }
 
 var oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
+var oidSubjectKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 14}
 
 func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
 	return func(p x509util.Profile) error {
@@ -135,11 +137,16 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 // Renew creates a new Certificate identical to the old certificate, except
 // with a validity window that begins 'now'.
 func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error) {
+	return a.Rekey(oldCert, nil)
+}
+
+// Func is used for renewing or rekeying based on the public key passed.
+func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
 	opts := []interface{}{errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String())}
 
 	// Check step provisioner extensions
 	if err := a.authorizeRenew(oldCert); err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew", opts...)
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey", opts...)
 	}
 
 	// Durations
@@ -148,7 +155,6 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 	now := time.Now().UTC()
 
 	newCert := &x509.Certificate{
-		PublicKey:                   oldCert.PublicKey,
 		Issuer:                      a.x509Issuer.Subject,
 		Subject:                     oldCert.Subject,
 		NotBefore:                   now.Add(-1 * backdate),
@@ -180,34 +186,47 @@ func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error
 		PolicyIdentifiers:           oldCert.PolicyIdentifiers,
 	}
 
-	// Copy all extensions except for Authority Key Identifier. This one might
-	// be different if we rotate the intermediate certificate and it will cause
-	// a TLS bad certificate error.
+	if pk == nil {
+		newCert.PublicKey = oldCert.PublicKey
+	} else {
+		newCert.PublicKey = pk
+	}
+
+	// Copy all extensions except:
+	//	1. Authority Key Identifier - This one might be different if we rotate the intermediate certificate
+	//					and it will cause a TLS bad certificate error.
+	//	2. Subject Key Identifier, if rekey - For rekey, SubjectKeyIdentifier extension will be calculated
+	//	        for the new public key by NewLeafProfilewithTemplate()
 	for _, ext := range oldCert.Extensions {
-		if !ext.Id.Equal(oidAuthorityKeyIdentifier) {
-			newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
+		if ext.Id.Equal(oidAuthorityKeyIdentifier) {
+			continue
 		}
+		if ext.Id.Equal(oidSubjectKeyIdentifier) && (pk != nil) {
+			newCert.SubjectKeyId = nil
+			continue
+		}
+		newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
 	}
 
 	leaf, err := x509util.NewLeafProfileWithTemplate(newCert, a.x509Issuer, a.x509Signer)
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew", opts...)
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey", opts...)
 	}
 	crtBytes, err := leaf.CreateCertificate()
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.Renew; error renewing certificate from existing server certificate", opts...)
+			"authority.Rekey; error renewing certificate from existing server certificate", opts...)
 	}
 
 	serverCert, err := x509.ParseCertificate(crtBytes)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.Renew; error parsing new server certificate", opts...)
+			"authority.Rekey; error parsing new server certificate", opts...)
 	}
 
 	if err = a.db.StoreCertificate(serverCert); err != nil {
 		if err != db.ErrNotImplemented {
-			return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Renew; error storing certificate in db", opts...)
+			return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey; error storing certificate in db", opts...)
 		}
 	}
 

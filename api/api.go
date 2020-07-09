@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto"
 	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/rsa"
@@ -35,6 +36,7 @@ type Authority interface {
 	Root(shasum string) (*x509.Certificate, error)
 	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	Renew(peer *x509.Certificate) ([]*x509.Certificate, error)
+	Rekey(peer *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
 	LoadProvisionerByCertificate(*x509.Certificate) (provisioner.Interface, error)
 	LoadProvisionerByID(string) (provisioner.Interface, error)
 	GetProvisioners(cursor string, limit int) (provisioner.List, string, error)
@@ -249,6 +251,7 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/root/{sha}", h.Root)
 	r.MethodFunc("POST", "/sign", h.Sign)
 	r.MethodFunc("POST", "/renew", h.Renew)
+	r.MethodFunc("POST", "/rekey", h.Rekey)
 	r.MethodFunc("POST", "/revoke", h.Revoke)
 	r.MethodFunc("GET", "/provisioners", h.Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
