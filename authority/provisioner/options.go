@@ -31,7 +31,7 @@ type ProvisionerOptions struct {
 func TemplateOptions(o *ProvisionerOptions, data x509util.TemplateData) (CertificateOptions, error) {
 	if o != nil {
 		if data == nil {
-			data = make(x509util.TemplateData)
+			data = x509util.NewTemplateData()
 		}
 
 		// Add template data if any.

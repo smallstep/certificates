@@ -303,6 +303,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSign")
 	}
 
+	// Certificate templates
 	data := x509util.CreateTemplateData(claims.Subject, []string{claims.Email})
 	data.SetToken(claims)
 

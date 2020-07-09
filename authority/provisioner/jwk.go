@@ -32,7 +32,7 @@ type JWK struct {
 	Key          *jose.JSONWebKey    `json:"key"`
 	EncryptedKey string              `json:"encryptedKey,omitempty"`
 	Claims       *Claims             `json:"claims,omitempty"`
-	Options      *ProvisionerOptions `json:"options"`
+	Options      *ProvisionerOptions `json:"options,omitempty"`
 	claimer      *Claimer
 	audiences    Audiences
 }
@@ -153,6 +153,7 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		claims.SANs = []string{claims.Subject}
 	}
 
+	// Certificate templates
 	data := x509util.CreateTemplateData(claims.Subject, claims.SANs)
 	data.SetToken(claims)
 
