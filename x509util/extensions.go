@@ -54,6 +54,15 @@ type Extension struct {
 	Value    []byte           `json:"value"`
 }
 
+// newExtensions creates an Extension from a standard pkix.Extension.
+func newExtension(e pkix.Extension) Extension {
+	return Extension{
+		ID:       ObjectIdentifier(e.Id),
+		Critical: e.Critical,
+		Value:    e.Value,
+	}
+}
+
 // Set adds the extension to the given X509 certificate.
 func (e Extension) Set(c *x509.Certificate) {
 	c.ExtraExtensions = append(c.ExtraExtensions, pkix.Extension{

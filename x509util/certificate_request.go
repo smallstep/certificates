@@ -1,6 +1,9 @@
 package x509util
 
-import "crypto/x509"
+import (
+	"crypto/rsa"
+	"crypto/x509"
+)
 
 type CertificateRequest struct {
 	Version            int                     `json:"version"`
@@ -17,6 +20,10 @@ type CertificateRequest struct {
 }
 
 func newCertificateRequest(cr *x509.CertificateRequest) *CertificateRequest {
+	extensions := make([]Extension, len(cr.Extensions))
+	for i, e := range cr.Extensions {
+		extensions[i] = newExtension(e)
+	}
 	return &CertificateRequest{
 		Version:            cr.Version,
 		Subject:            newSubject(cr.Subject),
@@ -24,7 +31,7 @@ func newCertificateRequest(cr *x509.CertificateRequest) *CertificateRequest {
 		EmailAddresses:     cr.EmailAddresses,
 		IPAddresses:        cr.IPAddresses,
 		URIs:               cr.URIs,
-		Extensions:         nil,
+		Extensions:         extensions,
 		PublicKey:          cr.PublicKey,
 		PublicKeyAlgorithm: cr.PublicKeyAlgorithm,
 		Signature:          cr.Signature,
@@ -43,4 +50,19 @@ func (c *CertificateRequest) GetCertificate() *Certificate {
 		PublicKey:          c.PublicKey,
 		PublicKeyAlgorithm: c.PublicKeyAlgorithm,
 	}
+}
+
+func (c *CertificateRequest) GetLeafCertificate() *Certificate {
+	keyUsage := x509.KeyUsageDigitalSignature
+	if _, ok := c.PublicKey.(*rsa.PublicKey); ok {
+		keyUsage |= x509.KeyUsageKeyEncipherment
+	}
+
+	cert := c.GetCertificate()
+	cert.KeyUsage = KeyUsage(keyUsage)
+	cert.ExtKeyUsage = ExtKeyUsage([]x509.ExtKeyUsage{
+		x509.ExtKeyUsageServerAuth,
+		x509.ExtKeyUsageClientAuth,
+	}
+	return cert
 }
