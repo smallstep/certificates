@@ -1,10 +1,13 @@
 package x509util
 
+import "crypto/x509"
+
 const (
-	UserKey    = "User"
-	SubjectKey = "Subject"
-	SANsKey    = "SANs"
-	TokenKey   = "Token"
+	UserKey               = "User"
+	SubjectKey            = "Subject"
+	SANsKey               = "SANs"
+	TokenKey              = "Token"
+	CertificateRequestKey = "CR"
 )
 
 // TemplateData is an alias for map[string]interface{}. It represents the data
@@ -29,6 +32,10 @@ func (t TemplateData) SetSANs(sans []string) {
 
 func (t TemplateData) SetToken(v interface{}) {
 	t[TokenKey] = v
+}
+
+func (t TemplateData) SetCertificateRequest(cr *x509.CertificateRequest) {
+	t[CertificateRequestKey] = newCertificateRequest(cr)
 }
 
 const DefaultLeafTemplate = `{

@@ -43,7 +43,7 @@ func NewCertificate(cr *x509.CertificateRequest, opts ...Option) (*Certificate, 
 		return nil, errors.Wrap(err, "error validating certificate request")
 	}
 
-	o, err := new(Options).apply(opts)
+	o, err := new(Options).apply(cr, opts)
 	if err != nil {
 		return nil, err
 	}

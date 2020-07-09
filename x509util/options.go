@@ -2,6 +2,7 @@ package x509util
 
 import (
 	"bytes"
+	"crypto/x509"
 	"io/ioutil"
 	"text/template"
 
@@ -15,9 +16,9 @@ type Options struct {
 	CertBuffer *bytes.Buffer
 }
 
-func (o *Options) apply(opts []Option) (*Options, error) {
+func (o *Options) apply(cr *x509.CertificateRequest, opts []Option) (*Options, error) {
 	for _, fn := range opts {
-		if err := fn(o); err != nil {
+		if err := fn(cr, o); err != nil {
 			return o, err
 		}
 	}
@@ -25,18 +26,19 @@ func (o *Options) apply(opts []Option) (*Options, error) {
 }
 
 // Option is the type used as a variadic argument in NewCertificate.
-type Option func(o *Options) error
+type Option func(cr *x509.CertificateRequest, o *Options) error
 
 // WithTemplate is an options that executes the given template text with the
 // given data.
-func WithTemplate(text string, data map[string]interface{}) Option {
-	return func(o *Options) error {
+func WithTemplate(text string, data TemplateData) Option {
+	return func(cr *x509.CertificateRequest, o *Options) error {
 		tmpl, err := template.New("template").Funcs(sprig.TxtFuncMap()).Parse(text)
 		if err != nil {
 			return errors.Wrapf(err, "error parsing template")
 		}
 
 		buf := new(bytes.Buffer)
+		data.SetCertificateRequest(cr)
 		if err := tmpl.Execute(buf, data); err != nil {
 			return errors.Wrapf(err, "error executing template")
 		}
@@ -47,8 +49,8 @@ func WithTemplate(text string, data map[string]interface{}) Option {
 
 // WithTemplateFile is an options that reads the template file and executes it
 // with the given data.
-func WithTemplateFile(path string, data map[string]interface{}) Option {
-	return func(o *Options) error {
+func WithTemplateFile(path string, data TemplateData) Option {
+	return func(cr *x509.CertificateRequest, o *Options) error {
 		filename := config.StepAbs(path)
 		b, err := ioutil.ReadFile(filename)
 		if err != nil {
@@ -61,6 +63,7 @@ func WithTemplateFile(path string, data map[string]interface{}) Option {
 		}
 
 		buf := new(bytes.Buffer)
+		data.SetCertificateRequest(cr)
 		if err := tmpl.Execute(buf, data); err != nil {
 			return errors.Wrapf(err, "error executing %s", path)
 		}
