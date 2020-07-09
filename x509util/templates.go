@@ -14,6 +14,21 @@ const (
 // passed to the templates.
 type TemplateData map[string]interface{}
 
+// NewTemplateData creates a new map for templates data.
+func NewTemplateData() TemplateData {
+	return TemplateData{}
+}
+
+// CreateTemplateData creates a new TemplateData with the given common name and SANs.
+func CreateTemplateData(commonName string, sans []string) TemplateData {
+	return TemplateData{
+		SubjectKey: Subject{
+			CommonName: commonName,
+		},
+		SANsKey: CreateSANs(sans),
+	}
+}
+
 func (t TemplateData) Set(key string, v interface{}) {
 	t[key] = v
 }

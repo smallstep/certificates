@@ -38,15 +38,6 @@ func CreateSANs(sans []string) []SubjectAlternativeName {
 	return sanTypes
 }
 
-func CreateTemplateData(commonName string, sans []string) TemplateData {
-	return TemplateData{
-		SubjectKey: Subject{
-			CommonName: commonName,
-		},
-		SANsKey: CreateSANs(sans),
-	}
-}
-
 // generateSerialNumber returns a random serial number.
 func generateSerialNumber() (*big.Int, error) {
 	limit := new(big.Int).Lsh(big.NewInt(1), 128)
