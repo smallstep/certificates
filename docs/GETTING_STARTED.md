@@ -209,8 +209,8 @@ Consider adding a service user that will only be used by `systemctl` to manage
 the service.
 
 ```
-$ useradd step
-$ passwd -l step
+$ useradd smallstep
+$ passwd -l smallstep
 ```
 
 Use the following example as a base for your `systemctl` service file:
