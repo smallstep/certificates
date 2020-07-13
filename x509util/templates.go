@@ -78,7 +78,7 @@ const DefaultLeafTemplate = `{
 // The keyUsage "keyEncipherment" is special and it will be only used for RSA
 // keys.
 const DefaultIIDLeafTemplate = `{
-	"subject": {{ toJson .Subject }},
+	"subject": {{ toJson .CR.Subject }},
 	{{- if .SANs }}
 	"sans": {{ toJson .SANs }},
 	{{- else }}

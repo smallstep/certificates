@@ -290,14 +290,15 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	var so []SignOption
 	if p.DisableCustomSANs {
 		dnsName := fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region)
-		data.SetSANs([]string{dnsName, doc.PrivateIP})
-
 		so = append(so, dnsNamesValidator([]string{dnsName}))
 		so = append(so, ipAddressesValidator([]net.IP{
 			net.ParseIP(doc.PrivateIP),
 		}))
 		so = append(so, emailAddressesValidator(nil))
 		so = append(so, urisValidator(nil))
+
+		// Template options
+		data.SetSANs([]string{dnsName, doc.PrivateIP})
 	}
 
 	templateOptions, err := CustomTemplateOptions(p.Options, data, x509util.DefaultIIDLeafTemplate)
