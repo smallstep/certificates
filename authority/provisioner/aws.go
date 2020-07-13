@@ -281,6 +281,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 
 	// Template options
 	data := x509util.NewTemplateData()
+	data.SetToken(payload)
 	data.SetCommonName(payload.Claims.Subject)
 
 	// Enforce known CN and default DNS and IP if configured.
