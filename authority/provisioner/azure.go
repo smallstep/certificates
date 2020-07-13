@@ -14,6 +14,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
 )
 
@@ -82,14 +83,15 @@ type azurePayload struct {
 // and https://docs.microsoft.com/en-us/azure/virtual-machines/windows/instance-metadata-service
 type Azure struct {
 	*base
-	Type                   string   `json:"type"`
-	Name                   string   `json:"name"`
-	TenantID               string   `json:"tenantID"`
-	ResourceGroups         []string `json:"resourceGroups"`
-	Audience               string   `json:"audience,omitempty"`
-	DisableCustomSANs      bool     `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
-	Claims                 *Claims  `json:"claims,omitempty"`
+	Type                   string              `json:"type"`
+	Name                   string              `json:"name"`
+	TenantID               string              `json:"tenantID"`
+	ResourceGroups         []string            `json:"resourceGroups"`
+	Audience               string              `json:"audience,omitempty"`
+	DisableCustomSANs      bool                `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool                `json:"disableTrustOnFirstUse"`
+	Claims                 *Claims             `json:"claims,omitempty"`
+	Options                *ProvisionerOptions `json:"options,omitempty"`
 	claimer                *Claimer
 	config                 *azureConfig
 	oidcConfig             openIDConfiguration
@@ -257,7 +259,7 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, err
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
 func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	_, name, group, err := p.authorizeToken(token)
+	payload, name, group, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSign")
 	}
@@ -276,6 +278,11 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		}
 	}
 
+	// Template options
+	data := x509util.NewTemplateData()
+	data.SetToken(payload)
+	data.SetCommonName(name)
+
 	// Enforce known common name and default DNS if configured.
 	// By default we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
@@ -287,9 +294,18 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		so = append(so, ipAddressesValidator(nil))
 		so = append(so, emailAddressesValidator(nil))
 		so = append(so, urisValidator(nil))
+
+		// Enforce SANs in the template.
+		data.SetSANs([]string{name})
+	}
+
+	templateOptions, err := CustomTemplateOptions(p.Options, data, x509util.DefaultIIDLeafTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "aws.AuthorizeSign")
 	}
 
 	return append(so,
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
