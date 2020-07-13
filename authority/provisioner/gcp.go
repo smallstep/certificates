@@ -15,6 +15,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
 )
 
@@ -76,14 +77,15 @@ func newGCPConfig() *gcpConfig {
 // https://cloud.google.com/compute/docs/instances/verifying-instance-identity
 type GCP struct {
 	*base
-	Type                   string   `json:"type"`
-	Name                   string   `json:"name"`
-	ServiceAccounts        []string `json:"serviceAccounts"`
-	ProjectIDs             []string `json:"projectIDs"`
-	DisableCustomSANs      bool     `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
-	InstanceAge            Duration `json:"instanceAge,omitempty"`
-	Claims                 *Claims  `json:"claims,omitempty"`
+	Type                   string              `json:"type"`
+	Name                   string              `json:"name"`
+	ServiceAccounts        []string            `json:"serviceAccounts"`
+	ProjectIDs             []string            `json:"projectIDs"`
+	DisableCustomSANs      bool                `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool                `json:"disableTrustOnFirstUse"`
+	InstanceAge            Duration            `json:"instanceAge,omitempty"`
+	Claims                 *Claims             `json:"claims,omitempty"`
+	Options                *ProvisionerOptions `json:"options,omitempty"`
 	claimer                *Claimer
 	config                 *gcpConfig
 	keyStore               *keyStore
@@ -215,6 +217,11 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}
 
 	ce := claims.Google.ComputeEngine
+
+	// Template options
+	data := x509util.NewTemplateData()
+	data.SetToken(claims)
+
 	// Enforce known common name and default DNS if configured.
 	// By default we we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
@@ -231,9 +238,18 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		so = append(so, ipAddressesValidator(nil))
 		so = append(so, emailAddressesValidator(nil))
 		so = append(so, urisValidator(nil))
+
+		// Template SANs
+		data.SetSANs([]string{dnsName1, dnsName2})
+	}
+
+	templateOptions, err := CustomTemplateOptions(p.Options, data, x509util.DefaultIIDLeafTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSign")
 	}
 
 	return append(so,
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeGCP, p.Name, claims.Subject, "InstanceID", ce.InstanceID, "InstanceName", ce.InstanceName),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
