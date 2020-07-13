@@ -1,8 +1,8 @@
 all: binaries build up
 
 binaries:
-	GOOS=linux go build -o ca/step-ca github.com/smallstep/certificates/cmd/step-ca
-	GOOS=linux go build -o renewer/step github.com/smallstep/cli/cmd/step
+	CGO_ENABLED=0 GOOS=linux go build -o ca/step-ca github.com/smallstep/certificates/cmd/step-ca
+	CGO_ENABLED=0 GOOS=linux go build -o renewer/step github.com/smallstep/cli/cmd/step
 
 build: build-nginx build-ca build-renewer
 build-nginx:
