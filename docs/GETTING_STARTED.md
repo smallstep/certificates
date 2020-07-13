@@ -222,13 +222,12 @@ After=syslog.target network.target
 
 [Service]
 
-User=smallstep
-Group=smallstep
-ExecStart=/bin/sh -c '/bin/step-ca /home/smallstep/.step/config/ca.json --password-file=/home/smallstep/.step/pwd >>   /var/log/smallstep/output.log 2>&1'
+User=step
+Group=step
+ExecStart=/bin/sh -c '/bin/step-ca /home/step/.step/config/ca.json --password-file=/home/step/.step/pwd >> /var/log/smallstep/output.log 2>&1'
 Type=simple
 Restart=on-failure
 RestartSec=10
-
 
 [Install]
 WantedBy=multi-user.target
