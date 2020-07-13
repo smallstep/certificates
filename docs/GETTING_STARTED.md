@@ -242,7 +242,7 @@ $ systemctl status step-ca
 # Configure the `step-ca` process to startup on reboot automatically
 $ systemctl enable step-ca
 # Start the `step-ca` service.
-$ systemctl start smallstep
+$ systemctl start step-ca
 ```
 
 ## Configure Your Environment
