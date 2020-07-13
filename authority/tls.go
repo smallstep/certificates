@@ -31,12 +31,11 @@ func (a *Authority) GetTLSOptions() *tlsutil.TLSOptions {
 var oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
 var oidSubjectKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 14}
 
-func withDefaultASN1DN(def *x509util.ASN1DN) x509util.WithOption {
-	return func(p x509util.Profile) error {
+func withDefaultASN1DN(def *x509util.ASN1DN) provisioner.CertificateModifierFunc {
+	return func(crt *x509.Certificate, opts provisioner.Options) error {
 		if def == nil {
 			return errors.New("default ASN1DN template cannot be nil")
 		}
-		crt := p.Subject()
 
 		if len(crt.Subject.Country) == 0 && def.Country != "" {
 			crt.Subject.Country = append(crt.Subject.Country, def.Country)
@@ -114,6 +113,12 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 
 	// Certificate modifiers before validation
 	leaf := cert.GetCertificate()
+
+	// Set default subject
+	if err := withDefaultASN1DN(a.config.AuthorityConfig.Template).Modify(leaf, signOpts); err != nil {
+		return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)
+	}
+
 	for _, m := range certModifiers {
 		if err := m.Modify(leaf, signOpts); err != nil {
 			return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)

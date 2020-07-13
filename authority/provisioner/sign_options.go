@@ -20,10 +20,10 @@ import (
 // Options contains the options that can be passed to the Sign method. Backdate
 // is automatically filled and can only be configured in the CA.
 type Options struct {
-	NotAfter  TimeDuration    `json:"notAfter"`
-	NotBefore TimeDuration    `json:"notBefore"`
-	TemplateData  json.RawMessage `json:"templateData"`
-	Backdate  time.Duration   `json:"-"`
+	NotAfter     TimeDuration    `json:"notAfter"`
+	NotBefore    TimeDuration    `json:"notBefore"`
+	TemplateData json.RawMessage `json:"templateData"`
+	Backdate     time.Duration   `json:"-"`
 }
 
 // SignOption is the interface used to collect all extra options used in the
@@ -52,6 +52,24 @@ type CertificateModifier interface {
 // CertificateValidator.
 type CertificateEnforcer interface {
 	Enforce(cert *x509.Certificate) error
+}
+
+// CertificateModifierFunc allows to create simple certificate modifiers just
+// with a function.
+type CertificateModifierFunc func(cert *x509.Certificate, opts Options) error
+
+// Modify implements CertificateModifier and just calls the defined function.
+func (fn CertificateModifierFunc) Modify(cert *x509.Certificate, opts Options) error {
+	return fn(cert, opts)
+}
+
+// CertificateEnforcerFunc allows to create simple certificate enforcer just
+// with a function.
+type CertificateEnforcerFunc func(cert *x509.Certificate) error
+
+// Modify implements CertificateEnforcer and just calls the defined function.
+func (fn CertificateEnforcerFunc) Enforce(cert *x509.Certificate) error {
+	return fn(cert)
 }
 
 // emailOnlyIdentity is a CertificateRequestValidator that checks that the only
