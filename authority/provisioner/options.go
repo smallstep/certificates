@@ -21,14 +21,23 @@ func (fn certificateOptionsFunc) Options(so Options) []x509util.Option {
 
 type ProvisionerOptions struct {
 	Template     string          `json:"template"`
-	TemplateFile string          `json:"templateFile`
+	TemplateFile string          `json:"templateFile"`
 	TemplateData json.RawMessage `json:"templateData"`
 }
 
-// TemplateOptions generate a CertificateOptions with the template and data
+// TemplateOptions generates a CertificateOptions with the template and data
 // defined in the ProvisionerOptions, the provisioner generated data, and the
-// user data provided in the request.
+// user data provided in the request. If no template has been provided,
+// x509util.DefaultLeafTemplate will be used.
 func TemplateOptions(o *ProvisionerOptions, data x509util.TemplateData) (CertificateOptions, error) {
+	return CustomTemplateOptions(o, data, x509util.DefaultLeafTemplate)
+}
+
+// CustomTemplateOptions generates a CertificateOptions with the template, data
+// defined in the ProvisionerOptions, the provisioner generated data and the
+// user data provided in the request. If no template has been provided in the
+// ProvisionerOptions, the given template will be used.
+func CustomTemplateOptions(o *ProvisionerOptions, data x509util.TemplateData, defaultTemplate string) (CertificateOptions, error) {
 	if o != nil {
 		if data == nil {
 			data = x509util.NewTemplateData()
@@ -40,14 +49,13 @@ func TemplateOptions(o *ProvisionerOptions, data x509util.TemplateData) (Certifi
 				return nil, errors.Wrap(err, "error unmarshaling template data")
 			}
 		}
-
 	}
 
 	return certificateOptionsFunc(func(so Options) []x509util.Option {
 		// We're not provided user data without custom templates.
 		if o == nil || (o.Template == "" && o.TemplateFile == "") {
 			return []x509util.Option{
-				x509util.WithTemplate(x509util.DefaultLeafTemplate, data),
+				x509util.WithTemplate(defaultTemplate, data),
 			}
 		}
 

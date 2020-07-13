@@ -82,6 +82,15 @@ func (m *MultiIPNet) UnmarshalJSON(data []byte) error {
 // into a []*url.URL.
 type MultiURL []*url.URL
 
+// MarshalJSON implements the json.Marshaler interface for MultiURL.
+func (m MultiURL) MarshalJSON() ([]byte, error) {
+	urls := make([]string, len(m))
+	for i, u := range m {
+		urls[i] = u.String()
+	}
+	return json.Marshal(urls)
+}
+
 // UnmarshalJSON implements the json.Unmarshaler interface for MultiURL.
 func (m *MultiURL) UnmarshalJSON(data []byte) error {
 	ms, err := unmarshalMultiString(data)

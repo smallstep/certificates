@@ -17,6 +17,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
 )
 
@@ -125,13 +126,14 @@ type awsInstanceIdentityDocument struct {
 // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-identity-documents.html
 type AWS struct {
 	*base
-	Type                   string   `json:"type"`
-	Name                   string   `json:"name"`
-	Accounts               []string `json:"accounts"`
-	DisableCustomSANs      bool     `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
-	InstanceAge            Duration `json:"instanceAge,omitempty"`
-	Claims                 *Claims  `json:"claims,omitempty"`
+	Type                   string              `json:"type"`
+	Name                   string              `json:"name"`
+	Accounts               []string            `json:"accounts"`
+	DisableCustomSANs      bool                `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool                `json:"disableTrustOnFirstUse"`
+	InstanceAge            Duration            `json:"instanceAge,omitempty"`
+	Claims                 *Claims             `json:"claims,omitempty"`
+	Options                *ProvisionerOptions `json:"options,omitempty"`
 	claimer                *Claimer
 	config                 *awsConfig
 	audiences              Audiences
@@ -276,14 +278,20 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}
 
 	doc := payload.document
+
+	// Template options
+	data := x509util.NewTemplateData()
+	data.SetCommonName(payload.Claims.Subject)
+
 	// Enforce known CN and default DNS and IP if configured.
 	// By default we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
 	var so []SignOption
 	if p.DisableCustomSANs {
-		so = append(so, dnsNamesValidator([]string{
-			fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region),
-		}))
+		dnsName := fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region)
+		data.SetSANs([]string{dnsName, doc.PrivateIP})
+
+		so = append(so, dnsNamesValidator([]string{dnsName}))
 		so = append(so, ipAddressesValidator([]net.IP{
 			net.ParseIP(doc.PrivateIP),
 		}))
@@ -291,7 +299,13 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		so = append(so, urisValidator(nil))
 	}
 
+	templateOptions, err := CustomTemplateOptions(p.Options, data, x509util.DefaultIIDLeafTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "aws.AuthorizeSign")
+	}
+
 	return append(so,
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeAWS, p.Name, doc.AccountID, "InstanceID", doc.InstanceID),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),

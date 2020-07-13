@@ -41,6 +41,12 @@ func (t TemplateData) SetSubject(v Subject) {
 	t[SubjectKey] = v
 }
 
+func (t TemplateData) SetCommonName(cn string) {
+	s, _ := t[SubjectKey].(Subject)
+	s.CommonName = cn
+	t[SubjectKey] = s
+}
+
 func (t TemplateData) SetSANs(sans []string) {
 	t[SANsKey] = CreateSANs(sans)
 }
@@ -53,6 +59,9 @@ func (t TemplateData) SetCertificateRequest(cr *x509.CertificateRequest) {
 	t[CertificateRequestKey] = newCertificateRequest(cr)
 }
 
+// DefaultLeafTemplate is the default templated used to generate a leaf
+// certificate. The keyUsage "keyEncipherment" is special and it will be only
+// used for RSA keys.
 const DefaultLeafTemplate = `{
 	"subject": {{ toJson .Subject }},
 	"sans": {{ toJson .SANs }},
@@ -60,6 +69,30 @@ const DefaultLeafTemplate = `{
 	"extKeyUsage": ["serverAuth", "clientAuth"]
 }`
 
+// DefaultIIDLeafTemplate is the template used by default on instance identity
+// provisioners like AWS, GCP or Azure. By default, those provisioners allow the
+// SANs provided in the certificate request, but the option `DisableCustomSANs`
+// can be provided to force only the verified domains, if the option is true
+// `.SANs` will be set with the verified domains.
+//
+// The keyUsage "keyEncipherment" is special and it will be only used for RSA
+// keys.
+const DefaultIIDLeafTemplate = `{
+	"subject": {{ toJson .Subject }},
+	{{- if .SANs }}
+	"sans": {{ toJson .SANs }},
+	{{- else }}
+	"dnsNames": {{ toJson .CR.DNSNames }},
+	"emailAddresses": {{ toJson .CR.EmailAddresses }},
+	"ipAddresses": {{ toJson .CR.IPAddresses }},
+	"uris": {{ toJson .CR.URIs }},
+	{{- end }}
+	"keyUsage": ["keyEncipherment", "digitalSignature"],
+	"extKeyUsage": ["serverAuth", "clientAuth"]
+}`
+
+// DefaultIntermediateTemplate is a template that can be used to generate an
+// intermediate certificate.
 const DefaultIntermediateTemplate = `{
 	"subject": {{ toJson .Subject }},
 	"keyUsage": ["certSign", "crlSign"],
@@ -69,6 +102,8 @@ const DefaultIntermediateTemplate = `{
 	}
 }`
 
+// DefaultRootTemplate is a template that can be used to generate a root
+// certificate.
 const DefaultRootTemplate = `{
 	"subject": {{ toJson .Subject }},
 	"issuer": {{ toJson .Subject }},
