@@ -48,7 +48,7 @@ For human use, `step-ca` has a command line counterpart: the [`step` CLI tool](h
 - Kubernetes [helm charts](https://hub.helm.sh/charts/smallstep/step-certificates), [autocert](https://github.com/smallstep/autocert), and [cert-manager integration](https://github.com/smallstep/step-issuer)
 - [Short-lived certificates](https://smallstep.com/blog/passive-revocation.html) with automated enrollment, renewal, and revocation
 - Capable of high availability (HA) deployment using [root federation](https://smallstep.com/blog/step-v0.8.3-federation-root-rotation.html) and/or multiple intermediaries
-- Operate as an online intermediate for an existing root CA
+- Operate as [an online intermediate CA](https://github.com/smallstep/certificates/blob/master/docs/questions.md#i-already-have-pki-in-place-can-i-use-this-with-my-own-root-certificate) for an existing root CA
 - [Pluggable database backends](https://github.com/smallstep/certificates/blob/master/docs/database.md) for persistence
 
 ### Lots of (automatable) ways to get certificates
@@ -58,13 +58,18 @@ Configure the CA to issue certificates in exchange for:
 - [Single sign-on tokens](https://smallstep.com/blog/easily-curl-services-secured-by-https-tls.html) from Okta, GSuite, Active Directory, or any OAuth OIDC provider
 - [Cloud instance identity documents](https://smallstep.com/blog/embarrassingly-easy-certificates-on-aws-azure-gcp/) for VMs on AWS, GCP, and Azure
 - [Single-use, short-lived JWK tokens](https://smallstep.com/docs/design-document/#jwk-provisioner) issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
+- Responding to an ACME challenge from the CA (see below!)
 
 ### Your own private ACME server
 
 ACME is the protocol used by Let's Encrypt. It's _super easy_ to issue certificates to any ACMEv2 ([RFC8555](https://tools.ietf.org/html/rfc8555)) client.
 
 - [Use ACME in development & pre-production](https://smallstep.com/blog/private-acme-server/#local-development--pre-production)
-- Supports the `http-01`, `tls-alpn-01`, and `dns-01` ACME challenge types
+- Supports the most popular [ACME challenge types](https://letsencrypt.org/docs/challenge-types/):
+  - For `http-01`, place a token at a well-known URL to prove that you control the web server
+  - For `dns-01`, add a `TXT` record to prove that you control the DNS record set
+  - For `tls-alpn-01`, respond to the challenge at the TLS layer ([as Caddy does](https://caddy.community/t/caddy-supports-the-acme-tls-alpn-challenge/4860)) to prove that you control the web server
+
 - Works with any ACME client. We've written examples for:
   - [certbot](https://smallstep.com/blog/private-acme-server/#certbotuploadsacme-certbotpng-certbot-example)
   - [acme.sh](https://smallstep.com/blog/private-acme-server/#acmeshuploadsacme-acme-shpng-acmesh-example)
@@ -76,6 +81,7 @@ ACME is the protocol used by Let's Encrypt. It's _super easy_ to issue certifica
   - [`lego`](https://github.com/go-acme/lego) for Golang ([example usage](https://smallstep.com/blog/private-acme-server/#golanguploadsacme-golangpng-go-example))
   - certbot's [`acme` module](https://github.com/certbot/certbot/tree/master/acme) for Python ([example usage](https://smallstep.com/blog/private-acme-server/#pythonuploadsacme-pythonpng-python-example))
   - [`acme-client`](https://github.com/publishlab/node-acme-client) for Node.js ([example usage](https://smallstep.com/blog/private-acme-server/#nodejsuploadsacme-node-jspng-nodejs-example))
+- Our own [`step` CLI tool](github.com/smallstep/cli) is also an ACME client!
 - See our [ACME docs](https://smallstep.com/blog/private-acme-server/) for more
 
 ### [SSH Certificates](https://smallstep.com/blog/use-ssh-certificates/)
