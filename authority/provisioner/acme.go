@@ -78,7 +78,7 @@ func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	// Certificate templates
 	templateOptions, err := TemplateOptions(p.Options, x509util.NewTemplateData())
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "acme.AuthorizeSign")
 	}
 
 	return []SignOption{
