@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/jose"
 	"golang.org/x/crypto/ed25519"
@@ -40,10 +41,11 @@ type k8sSAPayload struct {
 // entity trusted to make signature requests.
 type K8sSA struct {
 	*base
-	Type      string  `json:"type"`
-	Name      string  `json:"name"`
-	Claims    *Claims `json:"claims,omitempty"`
-	PubKeys   []byte  `json:"publicKeys,omitempty"`
+	Type      string              `json:"type"`
+	Name      string              `json:"name"`
+	PubKeys   []byte              `json:"publicKeys,omitempty"`
+	Claims    *Claims             `json:"claims,omitempty"`
+	Options   *ProvisionerOptions `json:"options,omitempty"`
 	claimer   *Claimer
 	audiences Audiences
 	//kauthn    kauthn.AuthenticationV1Interface
@@ -208,7 +210,15 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSign")
 	}
 
+	// Certificate templates: on K8sSA the default template is the certificate
+	// request.
+	templateOptions, err := CustomTemplateOptions(p.Options, x509util.NewTemplateData(), x509util.CertificateRequestTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSign")
+	}
+
 	return []SignOption{
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeK8sSA, p.Name, ""),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),

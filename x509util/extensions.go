@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/url"
@@ -75,6 +76,12 @@ func (e Extension) Set(c *x509.Certificate) {
 // ObjectIdentifier represents a JSON strings that unmarshals into an ASN1
 // object identifier or OID.
 type ObjectIdentifier asn1.ObjectIdentifier
+
+// MarshalJSON implements the json.Marshaler interface and returns the string
+// version of the asn1.ObjectIdentifier.
+func (o ObjectIdentifier) MarshalJSON() ([]byte, error) {
+	return json.Marshal(asn1.ObjectIdentifier(o).String())
+}
 
 // UnmarshalJSON implements the json.Unmarshaler interface and coverts a strings
 // like "2.5.29.17" into an ASN1 object identifier.

@@ -113,3 +113,7 @@ const DefaultRootTemplate = `{
 		"maxPathLen": 1
 	}
 }`
+
+// CertificateRequestTemplate is a template that will sign the given certificate
+// request.
+const CertificateRequestTemplate = `{{ toJson .CR }}`

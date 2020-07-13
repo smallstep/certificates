@@ -3,7 +3,6 @@ package x509util
 import (
 	"bytes"
 	"crypto/x509"
-	"fmt"
 	"io/ioutil"
 	"text/template"
 
@@ -43,7 +42,6 @@ func WithTemplate(text string, data TemplateData) Option {
 		if err := tmpl.Execute(buf, data); err != nil {
 			return errors.Wrapf(err, "error executing template")
 		}
-		fmt.Println(buf.String())
 		o.CertBuffer = buf
 		return nil
 	}
