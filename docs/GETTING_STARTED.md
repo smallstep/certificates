@@ -224,7 +224,7 @@ After=syslog.target network.target
 
 User=step
 Group=step
-ExecStart=/bin/sh -c '/bin/step-ca /home/step/.step/config/ca.json --password-file=/home/step/.step/pwd >> /var/log/smallstep/output.log 2>&1'
+ExecStart=/bin/sh -c '/bin/step-ca /home/step/.step/config/ca.json --password-file=/home/step/.step/pwd >> /var/log/step-ca/output.log 2>&1'
 Type=simple
 Restart=on-failure
 RestartSec=10
