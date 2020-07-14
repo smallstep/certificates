@@ -74,7 +74,7 @@ func CustomTemplateOptions(o *ProvisionerOptions, data x509util.TemplateData, de
 			}
 		}
 		return []x509util.Option{
-			x509util.WithTemplateFile(o.Template, data),
+			x509util.WithTemplate(o.Template, data),
 		}
 	}), nil
 }
