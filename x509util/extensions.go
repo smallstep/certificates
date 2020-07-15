@@ -117,7 +117,7 @@ func (s SubjectAlternativeName) Set(c *x509.Certificate) {
 			c.IPAddresses = append(c.IPAddresses, ip)
 		}
 	case "uri":
-		if u, err := url.Parse(s.Value); err != nil {
+		if u, err := url.Parse(s.Value); err == nil {
 			c.URIs = append(c.URIs, u)
 		}
 	case "auto", "":
