@@ -3,10 +3,11 @@ package x509util
 import "crypto/x509"
 
 const (
-	UserKey               = "User"
 	SubjectKey            = "Subject"
 	SANsKey               = "SANs"
 	TokenKey              = "Token"
+	InsecureKey           = "Insecure"
+	UserKey               = "User"
 	CertificateRequestKey = "CR"
 )
 
@@ -33,12 +34,16 @@ func (t TemplateData) Set(key string, v interface{}) {
 	t[key] = v
 }
 
-func (t TemplateData) SetUserData(v Subject) {
-	t[UserKey] = v
+func (t TemplateData) SetInsecure(key string, v interface{}) {
+	if m, ok := t[InsecureKey].(TemplateData); ok {
+		m[key] = v
+	} else {
+		t[InsecureKey] = TemplateData{key: v}
+	}
 }
 
 func (t TemplateData) SetSubject(v Subject) {
-	t[SubjectKey] = v
+	t.Set(SubjectKey, v)
 }
 
 func (t TemplateData) SetCommonName(cn string) {
@@ -48,15 +53,19 @@ func (t TemplateData) SetCommonName(cn string) {
 }
 
 func (t TemplateData) SetSANs(sans []string) {
-	t[SANsKey] = CreateSANs(sans)
+	t.Set(SANsKey, CreateSANs(sans))
 }
 
 func (t TemplateData) SetToken(v interface{}) {
-	t[TokenKey] = v
+	t.Set(TokenKey, v)
+}
+
+func (t TemplateData) SetUserData(v interface{}) {
+	t.SetInsecure(UserKey, v)
 }
 
 func (t TemplateData) SetCertificateRequest(cr *x509.CertificateRequest) {
-	t[CertificateRequestKey] = newCertificateRequest(cr)
+	t.SetInsecure(CertificateRequestKey, newCertificateRequest(cr))
 }
 
 // DefaultLeafTemplate is the default templated used to generate a leaf
@@ -79,14 +88,14 @@ const DefaultLeafTemplate = `{
 // keys.
 const DefaultIIDLeafTemplate = `{
 	{{- if .SANs }}
-	"subject": {"commonName": "{{ .CR.Subject.CommonName }}"},
+	"subject": {"commonName": "{{ .Insecure.CR.Subject.CommonName }}"},
 	"sans": {{ toJson .SANs }},
 	{{- else }}
-	"subject": {{ toJson .CR.Subject }},
-	"dnsNames": {{ toJson .CR.DNSNames }},
-	"emailAddresses": {{ toJson .CR.EmailAddresses }},
-	"ipAddresses": {{ toJson .CR.IPAddresses }},
-	"uris": {{ toJson .CR.URIs }},
+	"subject": {{ toJson .Insecure.CR.Subject }},
+	"dnsNames": {{ toJson .Insecure.CR.DNSNames }},
+	"emailAddresses": {{ toJson .Insecure.CR.EmailAddresses }},
+	"ipAddresses": {{ toJson .Insecure.CR.IPAddresses }},
+	"uris": {{ toJson .Insecure.CR.URIs }},
 	{{- end }}
 	"keyUsage": ["keyEncipherment", "digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
@@ -117,4 +126,4 @@ const DefaultRootTemplate = `{
 
 // CertificateRequestTemplate is a template that will sign the given certificate
 // request.
-const CertificateRequestTemplate = `{{ toJson .CR }}`
+const CertificateRequestTemplate = `{{ toJson .Insecure.CR }}`

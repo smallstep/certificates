@@ -19,9 +19,18 @@ func (fn certificateOptionsFunc) Options(so Options) []x509util.Option {
 	return fn(so)
 }
 
+// ProvisionerOptions are a collection of custom options that can be added to
+// each provisioner.
 type ProvisionerOptions struct {
-	Template     string          `json:"template"`
-	TemplateFile string          `json:"templateFile"`
+	// Template contains a X.509 certificate template. It can be a JSON template
+	// escaped in a string or it can be also encoded in base64.
+	Template string `json:"template"`
+
+	// TemplateFile points to a file containing a X.509 certificate template.
+	TemplateFile string `json:"templateFile"`
+
+	// TemplateData is a JSON object with variables that can be used in custom
+	// templates.
 	TemplateData json.RawMessage `json:"templateData"`
 }
 
@@ -63,11 +72,13 @@ func CustomTemplateOptions(o *ProvisionerOptions, data x509util.TemplateData, de
 		if len(so.TemplateData) > 0 {
 			userObject := make(map[string]interface{})
 			if err := json.Unmarshal(so.TemplateData, &userObject); err != nil {
-				data[x509util.UserKey] = map[string]interface{}{}
+				data.SetUserData(map[string]interface{}{})
 			} else {
-				data[x509util.UserKey] = userObject
+				data.SetUserData(userObject)
 			}
 		}
+
+		// Load a template from a file if Template is not defined.
 		if o.Template == "" && o.TemplateFile != "" {
 			return []x509util.Option{
 				x509util.WithTemplateFile(o.TemplateFile, data),

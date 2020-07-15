@@ -3,6 +3,7 @@ package x509util
 import (
 	"bytes"
 	"crypto/x509"
+	"encoding/base64"
 	"io/ioutil"
 	"text/template"
 
@@ -47,6 +48,19 @@ func WithTemplate(text string, data TemplateData) Option {
 	}
 }
 
+// WithTemplateBase64 is an options that executes the given template base64
+// string with the given data.
+func WithTemplateBase64(s string, data TemplateData) Option {
+	return func(cr *x509.CertificateRequest, o *Options) error {
+		b, err := base64.StdEncoding.DecodeString(s)
+		if err != nil {
+			return errors.Wrap(err, "error decoding template")
+		}
+		fn := WithTemplate(string(b), data)
+		return fn(cr, o)
+	}
+}
+
 // WithTemplateFile is an options that reads the template file and executes it
 // with the given data.
 func WithTemplateFile(path string, data TemplateData) Option {
@@ -56,18 +70,7 @@ func WithTemplateFile(path string, data TemplateData) Option {
 		if err != nil {
 			return errors.Wrapf(err, "error reading %s", path)
 		}
-
-		tmpl, err := template.New(path).Funcs(sprig.TxtFuncMap()).Parse(string(b))
-		if err != nil {
-			return errors.Wrapf(err, "error parsing %s", path)
-		}
-
-		buf := new(bytes.Buffer)
-		data.SetCertificateRequest(cr)
-		if err := tmpl.Execute(buf, data); err != nil {
-			return errors.Wrapf(err, "error executing %s", path)
-		}
-		o.CertBuffer = buf
-		return nil
+		fn := WithTemplate(string(b), data)
+		return fn(cr, o)
 	}
 }
