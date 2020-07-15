@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"math/big"
 	"net"
 	"net/url"
@@ -48,11 +50,27 @@ func generateSerialNumber() (*big.Int, error) {
 	return sn, nil
 }
 
+// subjectPublicKeyInfo is a PKIX public key structure defined in RFC 5280.
+type subjectPublicKeyInfo struct {
+	Algorithm        pkix.AlgorithmIdentifier
+	SubjectPublicKey asn1.BitString
+}
+
+// generateSubjectKeyID generates the key identifier according the the RFC 5280
+// section 4.2.1.2.
+//
+// The keyIdentifier is composed of the 160-bit SHA-1 hash of the value of the
+// BIT STRING subjectPublicKey (excluding the tag, length, and number of unused
+// bits).
 func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
 	b, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling public key")
 	}
-	hash := sha1.Sum(b)
+	var info subjectPublicKeyInfo
+	if _, err = asn1.Unmarshal(b, &info); err != nil {
+		return nil, errors.Wrap(err, "error unmarshaling public key")
+	}
+	hash := sha1.Sum(info.SubjectPublicKey.Bytes)
 	return hash[:], nil
 }
