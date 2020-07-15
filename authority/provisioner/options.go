@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/x509util"
@@ -84,8 +85,18 @@ func CustomTemplateOptions(o *ProvisionerOptions, data x509util.TemplateData, de
 				x509util.WithTemplateFile(o.TemplateFile, data),
 			}
 		}
+
+		// Load a template from the Template fields
+		// 1. As a JSON in a string.
+		template := strings.TrimSpace(o.Template)
+		if strings.HasPrefix(template, "{") {
+			return []x509util.Option{
+				x509util.WithTemplate(template, data),
+			}
+		}
+		// 2. As a base64 encoded JSON.
 		return []x509util.Option{
-			x509util.WithTemplate(o.Template, data),
+			x509util.WithTemplateBase64(template, data),
 		}
 	}), nil
 }
