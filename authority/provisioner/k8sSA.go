@@ -206,13 +206,19 @@ func (p *K8sSA) AuthorizeRevoke(ctx context.Context, token string) error {
 
 // AuthorizeSign validates the given token.
 func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	if _, err := p.authorizeToken(token, p.audiences.Sign); err != nil {
+	claims, err := p.authorizeToken(token, p.audiences.Sign)
+	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSign")
 	}
 
+	// Add some values to use in custom templates.
+	data := x509util.NewTemplateData()
+	data.SetToken(claims)
+	data.SetCommonName(claims.ServiceAccountName)
+
 	// Certificate templates: on K8sSA the default template is the certificate
 	// request.
-	templateOptions, err := CustomTemplateOptions(p.Options, x509util.NewTemplateData(), x509util.CertificateRequestTemplate)
+	templateOptions, err := CustomTemplateOptions(p.Options, data, x509util.CertificateRequestTemplate)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSign")
 	}
