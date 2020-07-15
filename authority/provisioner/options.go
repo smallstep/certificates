@@ -35,6 +35,11 @@ type ProvisionerOptions struct {
 	TemplateData json.RawMessage `json:"templateData"`
 }
 
+// HasTemplate returns true if a template is defined in the provisioner options.
+func (o *ProvisionerOptions) HasTemplate() bool {
+	return o != nil && (o.Template != "" || o.TemplateFile != "")
+}
+
 // TemplateOptions generates a CertificateOptions with the template and data
 // defined in the ProvisionerOptions, the provisioner generated data, and the
 // user data provided in the request. If no template has been provided,
@@ -63,7 +68,7 @@ func CustomTemplateOptions(o *ProvisionerOptions, data x509util.TemplateData, de
 
 	return certificateOptionsFunc(func(so Options) []x509util.Option {
 		// We're not provided user data without custom templates.
-		if o == nil || (o.Template == "" && o.TemplateFile == "") {
+		if !o.HasTemplate() {
 			return []x509util.Option{
 				x509util.WithTemplate(defaultTemplate, data),
 			}
