@@ -1,6 +1,8 @@
 package x509util
 
-import "crypto/x509"
+import (
+	"crypto/x509"
+)
 
 const (
 	SubjectKey            = "Subject"
@@ -68,13 +70,16 @@ func (t TemplateData) SetCertificateRequest(cr *x509.CertificateRequest) {
 	t.SetInsecure(CertificateRequestKey, newCertificateRequest(cr))
 }
 
-// DefaultLeafTemplate is the default templated used to generate a leaf
-// certificate. The keyUsage "keyEncipherment" is special and it will be only
-// used for RSA keys.
+// DefaultLeafTemplate is the default template used to generate a leaf
+// certificate.
 const DefaultLeafTemplate = `{
 	"subject": {{ toJson .Subject }},
 	"sans": {{ toJson .SANs }},
+{{- if typeIs "*rsa.PublicKey" .Insecure.CR.PublicKey }}
 	"keyUsage": ["keyEncipherment", "digitalSignature"],
+{{- else }}
+	"keyUsage": ["digitalSignature"],
+{{- end }}
 	"extKeyUsage": ["serverAuth", "clientAuth"]
 }`
 
@@ -83,20 +88,21 @@ const DefaultLeafTemplate = `{
 // SANs provided in the certificate request, but the option `DisableCustomSANs`
 // can be provided to force only the verified domains, if the option is true
 // `.SANs` will be set with the verified domains.
-//
-// The keyUsage "keyEncipherment" is special and it will be only used for RSA
-// keys.
 const DefaultIIDLeafTemplate = `{
 	"subject": {"commonName": "{{ .Insecure.CR.Subject.CommonName }}"},
-	{{- if .SANs }}
+{{- if .SANs }}
 	"sans": {{ toJson .SANs }},
-	{{- else }}
+{{- else }}
 	"dnsNames": {{ toJson .Insecure.CR.DNSNames }},
 	"emailAddresses": {{ toJson .Insecure.CR.EmailAddresses }},
 	"ipAddresses": {{ toJson .Insecure.CR.IPAddresses }},
 	"uris": {{ toJson .Insecure.CR.URIs }},
-	{{- end }}
+{{- end }}
+{{- if typeIs "*rsa.PublicKey" .Insecure.CR.PublicKey }}
 	"keyUsage": ["keyEncipherment", "digitalSignature"],
+{{- else }}
+	"keyUsage": ["digitalSignature"],
+{{- end }}
 	"extKeyUsage": ["serverAuth", "clientAuth"]
 }`
 

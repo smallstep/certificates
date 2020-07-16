@@ -3,7 +3,6 @@ package x509util
 import (
 	"crypto"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
@@ -126,15 +125,6 @@ func CreateCertificate(template, parent *x509.Certificate, pub crypto.PublicKey,
 		if template.SubjectKeyId, err = generateSubjectKeyID(pub); err != nil {
 			return nil, err
 		}
-	}
-
-	// Remove KeyEncipherment and DataEncipherment for non-rsa keys.
-	// See:
-	// https://github.com/golang/go/issues/36499
-	// https://tools.ietf.org/html/draft-ietf-lamps-5480-ku-clarifications-02
-	if _, ok := pub.(*rsa.PublicKey); !ok {
-		template.KeyUsage &= ^x509.KeyUsageKeyEncipherment
-		template.KeyUsage &= ^x509.KeyUsageDataEncipherment
 	}
 
 	// Sign certificate
