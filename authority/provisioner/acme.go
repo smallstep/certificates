@@ -3,12 +3,10 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
-	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/x509util"
 )
 
 // ACME is the acme provisioner type, an entity that can authorize the ACME
@@ -48,6 +46,11 @@ func (p *ACME) GetEncryptedKey() (string, string, bool) {
 	return "", "", false
 }
 
+// GetOptions returns the configured provisioner options.
+func (p *ACME) GetOptions() *ProvisionerOptions {
+	return p.Options
+}
+
 // DefaultTLSCertDuration returns the default TLS cert duration enforced by
 // the provisioner.
 func (p *ACME) DefaultTLSCertDuration() time.Duration {
@@ -75,14 +78,7 @@ func (p *ACME) Init(config Config) (err error) {
 // in the ACME protocol. This method returns a list of modifiers / constraints
 // on the resulting certificate.
 func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	// Certificate templates
-	templateOptions, err := TemplateOptions(p.Options, x509util.NewTemplateData())
-	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "acme.AuthorizeSign")
-	}
-
 	return []SignOption{
-		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeACME, p.Name, ""),
 		newForceCNOption(p.ForceCN),

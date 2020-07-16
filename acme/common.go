@@ -18,6 +18,7 @@ type Provisioner interface {
 	AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error)
 	GetName() string
 	DefaultTLSCertDuration() time.Duration
+	GetOptions() *provisioner.ProvisionerOptions
 }
 
 // MockProvisioner for testing

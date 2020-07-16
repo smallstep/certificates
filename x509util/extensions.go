@@ -48,6 +48,15 @@ var (
 	ExtKeyUsageMicrosoftKernelCodeSigning     = convertName("MicrosoftKernelCodeSigning")
 )
 
+// Names used and SubjectAlternativeNames types.
+const (
+	AutoType  = "auto"
+	DNSType   = "dns"
+	EmailType = "email"
+	IPType    = "ip"
+	URIType   = "uri"
+)
+
 // Extension is the JSON representation of a raw X.509 extensions.
 type Extension struct {
 	ID       ObjectIdentifier `json:"id"`
@@ -106,21 +115,21 @@ type SubjectAlternativeName struct {
 
 func (s SubjectAlternativeName) Set(c *x509.Certificate) {
 	switch strings.ToLower(s.Type) {
-	case "dns":
+	case DNSType:
 		c.DNSNames = append(c.DNSNames, s.Value)
-	case "email":
+	case EmailType:
 		c.EmailAddresses = append(c.EmailAddresses, s.Value)
-	case "ip":
+	case IPType:
 		// The validation of the IP would happen in the unmarshaling, but just
 		// to be sure we are only adding valid IPs.
 		if ip := net.ParseIP(s.Value); ip != nil {
 			c.IPAddresses = append(c.IPAddresses, ip)
 		}
-	case "uri":
+	case URIType:
 		if u, err := url.Parse(s.Value); err == nil {
 			c.URIs = append(c.URIs, u)
 		}
-	case "auto", "":
+	case "", AutoType:
 		dnsNames, ips, emails, uris := SplitSANs([]string{s.Value})
 		c.DNSNames = append(c.DNSNames, dnsNames...)
 		c.IPAddresses = append(c.IPAddresses, ips...)
