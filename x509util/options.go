@@ -12,6 +12,15 @@ import (
 	"github.com/smallstep/cli/config"
 )
 
+func getFuncMap(failMessage *string) template.FuncMap {
+	m := sprig.TxtFuncMap()
+	m["fail"] = func(msg string) (string, error) {
+		*failMessage = msg
+		return "", errors.New(msg)
+	}
+	return m
+}
+
 // Options are the options that can be passed to NewCertificate.
 type Options struct {
 	CertBuffer *bytes.Buffer
@@ -33,7 +42,10 @@ type Option func(cr *x509.CertificateRequest, o *Options) error
 // given data.
 func WithTemplate(text string, data TemplateData) Option {
 	return func(cr *x509.CertificateRequest, o *Options) error {
-		tmpl, err := template.New("template").Funcs(sprig.TxtFuncMap()).Parse(text)
+		terr := new(TemplateError)
+		funcMap := getFuncMap(&terr.Message)
+
+		tmpl, err := template.New("template").Funcs(funcMap).Parse(text)
 		if err != nil {
 			return errors.Wrapf(err, "error parsing template")
 		}
@@ -41,6 +53,9 @@ func WithTemplate(text string, data TemplateData) Option {
 		buf := new(bytes.Buffer)
 		data.SetCertificateRequest(cr)
 		if err := tmpl.Execute(buf, data); err != nil {
+			if terr.Message != "" {
+				return terr
+			}
 			return errors.Wrapf(err, "error executing template")
 		}
 		o.CertBuffer = buf

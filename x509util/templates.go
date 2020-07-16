@@ -13,6 +13,14 @@ const (
 	CertificateRequestKey = "CR"
 )
 
+type TemplateError struct {
+	Message string
+}
+
+func (e *TemplateError) Error() string {
+	return e.Message
+}
+
 // TemplateData is an alias for map[string]interface{}. It represents the data
 // passed to the templates.
 type TemplateData map[string]interface{}
