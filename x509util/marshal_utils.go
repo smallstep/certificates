@@ -163,6 +163,10 @@ func unmarshalMultiString(data []byte) ([]string, error) {
 }
 
 func parseObjectIdentifier(oid string) (asn1.ObjectIdentifier, error) {
+	if oid == "" {
+		return asn1.ObjectIdentifier{}, nil
+	}
+
 	parts := strings.Split(oid, ".")
 	oids := make([]int, len(parts))
 

@@ -340,9 +340,15 @@ func (b BasicConstraints) Set(c *x509.Certificate) {
 			c.MaxPathLenZero = true
 		case b.MaxPathLen < 0:
 			c.MaxPathLen = -1
+			c.MaxPathLenZero = false
 		default:
 			c.MaxPathLen = b.MaxPathLen
+			c.MaxPathLenZero = false
 		}
+	} else {
+		c.BasicConstraintsValid = false
+		c.MaxPathLen = 0
+		c.MaxPathLenZero = false
 	}
 }
 
