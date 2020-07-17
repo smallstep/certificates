@@ -6,6 +6,7 @@ import (
 	"encoding/asn1"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net"
 	"net/url"
 	"strings"
@@ -372,4 +373,50 @@ func (n NameConstraints) Set(c *x509.Certificate) {
 	c.ExcludedEmailAddresses = n.ExcludedEmailAddresses
 	c.PermittedURIDomains = n.PermittedURIDomains
 	c.ExcludedURIDomains = n.ExcludedURIDomains
+}
+
+// SerialNumber is the JSON representation of the X509 serial number.
+type SerialNumber struct {
+	*big.Int
+}
+
+// Set sets the serial number in the given certificate.
+func (s SerialNumber) Set(c *x509.Certificate) {
+	c.SerialNumber = s.Int
+}
+
+func (s *SerialNumber) MarshalJSON() ([]byte, error) {
+	if s == nil || s.Int == nil {
+		return []byte(`null`), nil
+	}
+	return s.Int.MarshalJSON()
+}
+
+// UnmarshalJSON implements the json.Unmarshal interface and unmarshals an
+// integer or a string into a serial number. If a string is used, a prefix of
+// “0b” or “0B” selects base 2, “0”, “0o” or “0O” selects base 8, and “0x” or
+// “0X” selects base 16. Otherwise, the selected base is 10 and no prefix is
+// accepted.
+func (s *SerialNumber) UnmarshalJSON(data []byte) error {
+	if sn, ok := maybeString(data); ok {
+		// Using base 0 to accept prefixes 0b, 0o, 0x but defaults as base 10.
+		b, ok := new(big.Int).SetString(sn, 0)
+		if !ok {
+			return errors.Errorf("error unmarshaling json: serialNumber %s is not valid", sn)
+		}
+		*s = SerialNumber{
+			Int: b,
+		}
+		return nil
+	}
+
+	// Assume a number.
+	var i int64
+	if err := json.Unmarshal(data, &i); err != nil {
+		return errors.Wrap(err, "error unmarshaling json")
+	}
+	*s = SerialNumber{
+		Int: new(big.Int).SetInt64(i),
+	}
+	return nil
 }
