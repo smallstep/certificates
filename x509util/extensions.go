@@ -73,6 +73,19 @@ func newExtension(e pkix.Extension) Extension {
 	}
 }
 
+// newExtensions creates a slice of Extension from a slice of pkix.Exntesion.
+func newExtensions(extensions []pkix.Extension) []Extension {
+	if extensions == nil {
+		return nil
+	}
+	ret := make([]Extension, len(extensions))
+	for i, e := range extensions {
+		ret[i] = newExtension(e)
+	}
+	return ret
+
+}
+
 // Set adds the extension to the given X509 certificate.
 func (e Extension) Set(c *x509.Certificate) {
 	c.ExtraExtensions = append(c.ExtraExtensions, pkix.Extension{
@@ -322,7 +335,7 @@ func (b BasicConstraints) Set(c *x509.Certificate) {
 		c.BasicConstraintsValid = true
 		switch {
 		case b.MaxPathLen == 0:
-			c.MaxPathLen = b.MaxPathLen
+			c.MaxPathLen = 0
 			c.MaxPathLenZero = true
 		case b.MaxPathLen < 0:
 			c.MaxPathLen = -1

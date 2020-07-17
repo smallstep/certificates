@@ -20,10 +20,6 @@ type CertificateRequest struct {
 }
 
 func newCertificateRequest(cr *x509.CertificateRequest) *CertificateRequest {
-	extensions := make([]Extension, len(cr.Extensions))
-	for i, e := range cr.Extensions {
-		extensions[i] = newExtension(e)
-	}
 	return &CertificateRequest{
 		Version:            cr.Version,
 		Subject:            newSubject(cr.Subject),
@@ -31,7 +27,7 @@ func newCertificateRequest(cr *x509.CertificateRequest) *CertificateRequest {
 		EmailAddresses:     cr.EmailAddresses,
 		IPAddresses:        cr.IPAddresses,
 		URIs:               cr.URIs,
-		Extensions:         extensions,
+		Extensions:         newExtensions(cr.Extensions),
 		PublicKey:          cr.PublicKey,
 		PublicKeyAlgorithm: cr.PublicKeyAlgorithm,
 		Signature:          cr.Signature,

@@ -13,10 +13,14 @@ const (
 	CertificateRequestKey = "CR"
 )
 
+// TemplateError represents an error in a template produced by the fail
+// function.
 type TemplateError struct {
 	Message string
 }
 
+// Error implements the error interface and returns the error string when a
+// template executes the `fail "message"` function.
 func (e *TemplateError) Error() string {
 	return e.Message
 }

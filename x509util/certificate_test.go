@@ -1,0 +1,224 @@
+package x509util
+
+import (
+	"crypto"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
+	"math/big"
+	"net"
+	"net/url"
+	"reflect"
+	"testing"
+)
+
+func createCertificateRequest(t *testing.T, commonName string, sans []string) (*x509.CertificateRequest, crypto.Signer) {
+	dnsNames, ips, emails, uris := SplitSANs(sans)
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	asn1Data, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{
+		Subject:            pkix.Name{CommonName: commonName},
+		DNSNames:           dnsNames,
+		IPAddresses:        ips,
+		EmailAddresses:     emails,
+		URIs:               uris,
+		SignatureAlgorithm: x509.PureEd25519,
+	}, priv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cr, err := x509.ParseCertificateRequest(asn1Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cr, priv
+}
+
+func TestNewCertificate(t *testing.T) {
+	cr, priv := createCertificateRequest(t, "commonName", []string{"foo.com"})
+	crBadSignateure, _ := createCertificateRequest(t, "fail", []string{"foo.com"})
+	crBadSignateure.PublicKey = priv.Public()
+
+	type args struct {
+		cr   *x509.CertificateRequest
+		opts []Option
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *Certificate
+		wantErr bool
+	}{
+		{"okSimple", args{cr, nil}, &Certificate{
+			Subject:  Subject{CommonName: "commonName"},
+			DNSNames: []string{"foo.com"},
+			KeyUsage: KeyUsage(x509.KeyUsageDigitalSignature),
+			ExtKeyUsage: ExtKeyUsage([]x509.ExtKeyUsage{
+				x509.ExtKeyUsageServerAuth,
+				x509.ExtKeyUsageClientAuth,
+			}),
+			Extensions:         newExtensions(cr.Extensions),
+			PublicKey:          priv.Public(),
+			PublicKeyAlgorithm: x509.Ed25519,
+		}, false},
+		{"okDefaultTemplate", args{cr, []Option{WithTemplate(DefaultLeafTemplate, CreateTemplateData("commonName", []string{"foo.com"}))}}, &Certificate{
+			Subject:  Subject{CommonName: "commonName"},
+			SANs:     []SubjectAlternativeName{{Type: DNSType, Value: "foo.com"}},
+			KeyUsage: KeyUsage(x509.KeyUsageDigitalSignature),
+			ExtKeyUsage: ExtKeyUsage([]x509.ExtKeyUsage{
+				x509.ExtKeyUsageServerAuth,
+				x509.ExtKeyUsageClientAuth,
+			}),
+			PublicKey:          priv.Public(),
+			PublicKeyAlgorithm: x509.Ed25519,
+		}, false},
+		{"badSignature", args{crBadSignateure, nil}, nil, true},
+		{"failTemplate", args{cr, []Option{WithTemplate(`{{ fail "fatal error }}`, CreateTemplateData("commonName", []string{"foo.com"}))}}, nil, true},
+		{"badJson", args{cr, []Option{WithTemplate(`"this is not a json object"`, CreateTemplateData("commonName", []string{"foo.com"}))}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewCertificate(tt.args.cr, tt.args.opts...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewCertificate() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewCertificate() = \n%v, want \n%v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCertificate_GetCertificate(t *testing.T) {
+	type fields struct {
+		Version               int
+		Subject               Subject
+		Issuer                Issuer
+		SerialNumber          SerialNumber
+		DNSNames              MultiString
+		EmailAddresses        MultiString
+		IPAddresses           MultiIP
+		URIs                  MultiURL
+		SANs                  []SubjectAlternativeName
+		Extensions            []Extension
+		KeyUsage              KeyUsage
+		ExtKeyUsage           ExtKeyUsage
+		SubjectKeyID          SubjectKeyID
+		AuthorityKeyID        AuthorityKeyID
+		OCSPServer            OCSPServer
+		IssuingCertificateURL IssuingCertificateURL
+		CRLDistributionPoints CRLDistributionPoints
+		PolicyIdentifiers     PolicyIdentifiers
+		BasicConstraints      *BasicConstraints
+		NameConstaints        *NameConstraints
+		SignatureAlgorithm    SignatureAlgorithm
+		PublicKeyAlgorithm    x509.PublicKeyAlgorithm
+		PublicKey             interface{}
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *x509.Certificate
+	}{
+		{"ok", fields{
+			Version:        3,
+			Subject:        Subject{CommonName: "commonName", Organization: []string{"smallstep"}},
+			Issuer:         Issuer{CommonName: "issuer", Organization: []string{"smallstep"}},
+			SerialNumber:   SerialNumber{big.NewInt(123)},
+			DNSNames:       []string{"foo.bar"},
+			EmailAddresses: []string{"root@foo.com"},
+			IPAddresses:    []net.IP{net.ParseIP("::1")},
+			URIs:           []*url.URL{{Scheme: "mailto", Opaque: "root@foo.com"}},
+			SANs: []SubjectAlternativeName{
+				{Type: DNSType, Value: "www.foo.bar"},
+				{Type: IPType, Value: "127.0.0.1"},
+				{Type: EmailType, Value: "admin@foo.com"},
+				{Type: URIType, Value: "mailto:admin@foo.com"},
+			},
+			Extensions: []Extension{{ID: []int{1, 2, 3, 4}, Critical: true, Value: []byte("custom extension")}},
+			KeyUsage:   KeyUsage(x509.KeyUsageDigitalSignature),
+			ExtKeyUsage: ExtKeyUsage([]x509.ExtKeyUsage{
+				x509.ExtKeyUsageServerAuth,
+				x509.ExtKeyUsageClientAuth,
+			}),
+			SubjectKeyID:          []byte("subject-key-id"),
+			AuthorityKeyID:        []byte("authority-key-id"),
+			OCSPServer:            []string{"https://oscp.server"},
+			IssuingCertificateURL: []string{"https://ca.com"},
+			CRLDistributionPoints: []string{"https://ca.com/crl"},
+			PolicyIdentifiers:     []asn1.ObjectIdentifier{[]int{1, 2, 3, 4}},
+			BasicConstraints:      &BasicConstraints{IsCA: true, MaxPathLen: 0},
+			NameConstaints:        &NameConstraints{PermittedDNSDomains: []string{"foo.bar"}},
+			SignatureAlgorithm:    SignatureAlgorithm(x509.PureEd25519),
+			PublicKeyAlgorithm:    x509.Ed25519,
+			PublicKey:             ed25519.PublicKey("public key"),
+		}, &x509.Certificate{
+			Version:         0,
+			Subject:         pkix.Name{CommonName: "commonName", Organization: []string{"smallstep"}},
+			Issuer:          pkix.Name{},
+			SerialNumber:    big.NewInt(123),
+			DNSNames:        []string{"foo.bar", "www.foo.bar"},
+			EmailAddresses:  []string{"root@foo.com", "admin@foo.com"},
+			IPAddresses:     []net.IP{net.ParseIP("::1"), net.ParseIP("127.0.0.1")},
+			URIs:            []*url.URL{{Scheme: "mailto", Opaque: "root@foo.com"}, {Scheme: "mailto", Opaque: "admin@foo.com"}},
+			ExtraExtensions: []pkix.Extension{{Id: []int{1, 2, 3, 4}, Critical: true, Value: []byte("custom extension")}},
+			KeyUsage:        x509.KeyUsageDigitalSignature,
+			ExtKeyUsage: []x509.ExtKeyUsage{
+				x509.ExtKeyUsageServerAuth,
+				x509.ExtKeyUsageClientAuth,
+			},
+			SubjectKeyId:          []byte("subject-key-id"),
+			AuthorityKeyId:        []byte("authority-key-id"),
+			OCSPServer:            []string{"https://oscp.server"},
+			IssuingCertificateURL: []string{"https://ca.com"},
+			CRLDistributionPoints: []string{"https://ca.com/crl"},
+			PolicyIdentifiers:     []asn1.ObjectIdentifier{[]int{1, 2, 3, 4}},
+			IsCA:                  true,
+			MaxPathLen:            0,
+			MaxPathLenZero:        true,
+			BasicConstraintsValid: true,
+			PermittedDNSDomains:   []string{"foo.bar"},
+			SignatureAlgorithm:    x509.PureEd25519,
+			PublicKeyAlgorithm:    x509.Ed25519,
+			PublicKey:             ed25519.PublicKey("public key"),
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Certificate{
+				Version:               tt.fields.Version,
+				Subject:               tt.fields.Subject,
+				Issuer:                tt.fields.Issuer,
+				SerialNumber:          tt.fields.SerialNumber,
+				DNSNames:              tt.fields.DNSNames,
+				EmailAddresses:        tt.fields.EmailAddresses,
+				IPAddresses:           tt.fields.IPAddresses,
+				URIs:                  tt.fields.URIs,
+				SANs:                  tt.fields.SANs,
+				Extensions:            tt.fields.Extensions,
+				KeyUsage:              tt.fields.KeyUsage,
+				ExtKeyUsage:           tt.fields.ExtKeyUsage,
+				SubjectKeyID:          tt.fields.SubjectKeyID,
+				AuthorityKeyID:        tt.fields.AuthorityKeyID,
+				OCSPServer:            tt.fields.OCSPServer,
+				IssuingCertificateURL: tt.fields.IssuingCertificateURL,
+				CRLDistributionPoints: tt.fields.CRLDistributionPoints,
+				PolicyIdentifiers:     tt.fields.PolicyIdentifiers,
+				BasicConstraints:      tt.fields.BasicConstraints,
+				NameConstaints:        tt.fields.NameConstaints,
+				SignatureAlgorithm:    tt.fields.SignatureAlgorithm,
+				PublicKeyAlgorithm:    tt.fields.PublicKeyAlgorithm,
+				PublicKey:             tt.fields.PublicKey,
+			}
+			if got := c.GetCertificate(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Certificate.GetCertificate() = \n%+v, want \n%+v", got, tt.want)
+			}
+		})
+	}
+}

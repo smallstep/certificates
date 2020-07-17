@@ -93,6 +93,7 @@ func (c *Certificate) GetCertificate() *x509.Certificate {
 	c.AuthorityKeyID.Set(cert)
 	c.OCSPServer.Set(cert)
 	c.IssuingCertificateURL.Set(cert)
+	c.CRLDistributionPoints.Set(cert)
 	c.PolicyIdentifiers.Set(cert)
 	if c.BasicConstraints != nil {
 		c.BasicConstraints.Set(cert)
