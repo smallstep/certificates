@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"math/big"
 	"net"
 	"net/url"
 	"reflect"
@@ -163,7 +164,7 @@ func TestObjectIdentifier_UnmarshalJSON(t *testing.T) {
 		{"empty", args{[]byte(`""`)}, []int{}, false},
 		{"null", args{[]byte(`null`)}, []int{}, false},
 		{"number", args{[]byte(`123`)}, nil, true},
-		{"badFormat", args{[]byte(`"1.2.foo.4`)}, nil, true},
+		{"badFormat", args{[]byte(`"1.2.foo.4"`)}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -656,6 +657,92 @@ func TestNameConstraints_Set(t *testing.T) {
 			n.Set(tt.args.c)
 			if !reflect.DeepEqual(tt.args.c, tt.want) {
 				t.Errorf("NameConstraints.Set() = %v, want %v", tt.args.c, tt.want)
+			}
+		})
+	}
+}
+
+func TestSerialNumber_Set(t *testing.T) {
+	type fields struct {
+		Int *big.Int
+	}
+	type args struct {
+		c *x509.Certificate
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *x509.Certificate
+	}{
+		{"ok", fields{big.NewInt(1234)}, args{&x509.Certificate{}}, &x509.Certificate{SerialNumber: big.NewInt(1234)}},
+		{"overwrite", fields{big.NewInt(4321)}, args{&x509.Certificate{SerialNumber: big.NewInt(1234)}}, &x509.Certificate{SerialNumber: big.NewInt(4321)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := SerialNumber{
+				Int: tt.fields.Int,
+			}
+			s.Set(tt.args.c)
+			if !reflect.DeepEqual(tt.args.c, tt.want) {
+				t.Errorf("SerialNumber.Set() = %v, want %v", tt.args.c, tt.want)
+			}
+		})
+	}
+}
+
+func TestSerialNumber_MarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		sn      *SerialNumber
+		want    []byte
+		wantErr bool
+	}{
+		{"ok", &SerialNumber{big.NewInt(1234)}, []byte("1234"), false},
+		{"nilStruct", nil, []byte("null"), false},
+		{"nilBigInt", &SerialNumber{}, []byte("null"), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.sn.MarshalJSON()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SerialNumber.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("SerialNumber.MarshalJSON() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSerialNumber_UnmarshalJSON(t *testing.T) {
+	expected := SerialNumber{big.NewInt(12345)}
+
+	type args struct {
+		data []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    SerialNumber
+		wantErr bool
+	}{
+		{"string", args{[]byte(`"12345"`)}, expected, false},
+		{"stringHex", args{[]byte(`"0x3039"`)}, expected, false},
+		{"number", args{[]byte(`12345`)}, expected, false},
+		{"badString", args{[]byte(`"123s"`)}, SerialNumber{}, true},
+		{"object", args{[]byte(`{}`)}, SerialNumber{}, true},
+		{"badJSON", args{[]byte(`{`)}, SerialNumber{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var s SerialNumber
+			if err := s.UnmarshalJSON(tt.args.data); (err != nil) != tt.wantErr {
+				t.Errorf("SerialNumber.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(s, tt.want) {
+				t.Errorf("SerialNumber.UnmarshalJSON() = %v, want %v", s, tt.want)
 			}
 		})
 	}
