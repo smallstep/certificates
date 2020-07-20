@@ -1,31 +1,33 @@
 # Step Certificates
 
-`step-ca` is an online certificate authority for secure, automated certificate management.
+`step-ca` is an online certificate authority for secure, automated certificate management. It's the server counterpart to the [`step` CLI tool](https://github.com/smallstep/cli).
 
 You can use it to:
-- Issue X.509 certificates for all of your internal infrastructure
-- Enable mutual TLS for encryption and authentication to your VMs, containers, devices, databases, APIs, and anything else you can think of, using internal hostnames
-- Issue SSH certificates in exchange for single sign-on tokens and cloud instance identity documents.
-- Easily automate certificate management with any ACME v2 client
-- And do a _lot_ more...
+- Issue X.509 certificates for your internal infrastructure:
+  - HTTPS certificates that [work in browsers](https://smallstep.com/blog/step-v0-8-6-valid-HTTPS-certificates-for-dev-pre-prod.html) ([RFC5280](https://tools.ietf.org/html/rfc5280) and [CA/Browser Forum](https://cabforum.org/baseline-requirements-documents/) compliance)
+  - TLS certificates for VMs, containers, APIs, mobile clients, database connections, printers, wifi networks, toaster ovens...
+  - Client certificates to [enable mutual TLS (mTLS)](https://smallstep.com/hello-mtls) in your infra. mTLS is an optional feature in TLS where both client and server authenticate each other. Why add the complexity of a VPN when you can safely use mTLS over the public internet?
+- Issue SSH certificates:
+  - For people, in exchange for single sign-on ID tokens
+  - For hosts, in exchange for cloud instance identity documents
+- Easily automate certificate management:
+  - It's an ACME v2 server
+  - It has a JSON API
+  - It comes with a [Go wrapper](./examples#user-content-basic-client-usage)
+  - ... and there's a [command-line client](https://github.com/smallstep/cli) you can use in scripts!
 
-It's easy to use and hard to misuse, thanks to [safe, sane defaults](https://github.com/smallstep/certificates/blob/master/docs/defaults.md).
-
-For automation, `step-ca` has full ACME v2 support, a JSON API, and a [Go wrapper](https://github.com/smallstep/certificates/tree/master/examples#user-content-basic-client-usage).
-
-For human use, `step-ca` has a command line counterpart: the [`step` CLI tool](https://github.com/smallstep/cli).
+Whatever your use case, `step-ca` is easy to use and hard to misuse, thanks to [safe, sane defaults](./docs/defaults.md).
 
 **Questions? Find us [on gitter](https://gitter.im/smallstep/community).**
 
 [Website](https://smallstep.com/certificates) |
 [Documentation](#documentation) |
 [Installation Guide](#installation-guide) |
-[Quickstart](https://github.com/smallstep/certificates#quickstart) |
+[Quickstart](#quickstart) |
 [Getting Started](./docs/GETTING_STARTED.md) |
 [Contribution Guide](./docs/CONTRIBUTING.md)
 
-[![GitHub release](https://img.shields.io/github/release/smallstep/certificates.svg)](https://github.com/smallstep/certificates/releases)
-[![Join the chat at https://gitter.im/smallstep/community](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/smallstep/community)
+[![GitHub release](https://img.shields.io/github/release/smallstep/certificates.svg)](https://github.com/smallstep/certificates/releases/latest)
 [![CA Image](https://images.microbadger.com/badges/image/smallstep/step-ca.svg)](https://microbadger.com/images/smallstep/step-ca)
 [![Go Report Card](https://goreportcard.com/badge/github.com/smallstep/certificates)](https://goreportcard.com/report/github.com/smallstep/certificates)
 [![Build Status](https://travis-ci.com/smallstep/certificates.svg?branch=master)](https://travis-ci.com/smallstep/certificates)
@@ -35,34 +37,36 @@ For human use, `step-ca` has a command line counterpart: the [`step` CLI tool](h
 [![GitHub stars](https://img.shields.io/github/stars/smallstep/certificates.svg?style=social)](https://github.com/smallstep/certificates/stargazers)
 [![Twitter followers](https://img.shields.io/twitter/follow/smallsteplabs.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=smallsteplabs)
 
-![Animated terminal showing step certificates in practice](https://github.com/smallstep/certificates/raw/master/docs/images/step-ca-2-legged.gif)
-
 ## Features
 
-### A fast, stable, private CA you run yourself
+### 🦾 A fast, stable, flexible private CA
 
-- Issue certificates for VMs, containers, devices, databases, APIs, and anything else you can think of, using internal hostnames.
-- Issue TLS and SSH certificates for people, using their emails.
-- Certificates work with TLS and HTTPS (they are [RFC5280](https://tools.ietf.org/html/rfc5280) and [CA/Browser Forum](https://cabforum.org/baseline-requirements-documents/) compliant).
-- Choose key types (RSA, ECDSA, EdDSA) & lifetimes to suit your needs
-- Kubernetes [helm charts](https://hub.helm.sh/charts/smallstep/step-certificates), [autocert](https://github.com/smallstep/autocert), and [cert-manager integration](https://github.com/smallstep/step-issuer)
-- [Short-lived certificates](https://smallstep.com/blog/passive-revocation.html) with automated enrollment, renewal, and revocation
+Setting up a *public key infrastructure* (PKI) is out of reach for many small teams. `step-ca` makes it easier.
+
+- Choose key types (RSA, ECDSA, EdDSA) and lifetimes to suit your needs
+- [Short-lived certificates](https://smallstep.com/blog/passive-revocation.html) with automated enrollment, renewal, and passive revocation
 - Capable of high availability (HA) deployment using [root federation](https://smallstep.com/blog/step-v0.8.3-federation-root-rotation.html) and/or multiple intermediaries
-- Operate as [an online intermediate CA](https://github.com/smallstep/certificates/blob/master/docs/questions.md#i-already-have-pki-in-place-can-i-use-this-with-my-own-root-certificate) for an existing root CA
-- [Pluggable database backends](https://github.com/smallstep/certificates/blob/master/docs/database.md) for persistence
+- Can operate as [an online intermediate CA](./docs/questions.md#i-already-have-pki-in-place-can-i-use-this-with-my-own-root-certificate) for an existing root CA
+- [Badger, BoltDB, and MySQL database backends](https://github.com/smallstep/certificates/blob/master/docs/database.md)
 
-### Lots of (automatable) ways to get certificates
+### ⚙️ Many ways to automate 
 
-Configure the CA to issue certificates in exchange for:
+There are several ways to authorize a request with the CA and establish a chain of trust that suits your flow.
 
-- [Single sign-on tokens](https://smallstep.com/blog/easily-curl-services-secured-by-https-tls.html) from Okta, GSuite, Active Directory, or any OAuth OIDC provider
-- [Cloud instance identity documents](https://smallstep.com/blog/embarrassingly-easy-certificates-on-aws-azure-gcp/) for VMs on AWS, GCP, and Azure
+You can issue certificates in exchange for:
+- [ACME challenge responses](#your-own-private-acme-server) from any ACMEv2 client
+- [OAuth OIDC single sign-on tokens](https://smallstep.com/blog/easily-curl-services-secured-by-https-tls.html), eg:
+  - ID tokens from Okta, GSuite, Azure AD, Auth0.
+  - ID tokens from an OAuth OIDC service that you host, like [Keycloak](https://www.keycloak.org/) or [Dex](https://github.com/dexidp/dex)
+- [Cloud instance identity documents](https://smallstep.com/blog/embarrassingly-easy-certificates-on-aws-azure-gcp/), for VMs on AWS, GCP, and Azure
 - [Single-use, short-lived JWK tokens](https://smallstep.com/docs/design-document/#jwk-provisioner) issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
-- Responding to an ACME challenge from the CA (see below!)
+- A trusted X.509 certificate (X5C provisioner)
+- Expiring SSH host certificates needing rotation (the SSHPOP provisioner)
+- Learn more in our [provisioner documentation](./docs/provisioners.md)
 
-### Your own private ACME server
+### 🏔 Your own private ACME server
 
-ACME is the protocol used by Let's Encrypt. It's _super easy_ to issue certificates to any ACMEv2 ([RFC8555](https://tools.ietf.org/html/rfc8555)) client.
+ACME is the protocol used by Let's Encrypt to automate the issuance of HTTPS certificates. It's _super easy_ to issue certificates to any ACMEv2 ([RFC8555](https://tools.ietf.org/html/rfc8555)) client.
 
 - [Use ACME in development & pre-production](https://smallstep.com/blog/private-acme-server/#local-development--pre-production)
 - Supports the most popular [ACME challenge types](https://letsencrypt.org/docs/challenge-types/):
@@ -84,52 +88,20 @@ ACME is the protocol used by Let's Encrypt. It's _super easy_ to issue certifica
 - Our own [`step` CLI tool](github.com/smallstep/cli) is also an ACME client!
 - See our [ACME docs](https://smallstep.com/blog/private-acme-server/) for more
 
-### [SSH Certificates](https://smallstep.com/blog/use-ssh-certificates/)
+### 👩🏽‍💻 An online SSH Certificate Authority
 
-- Use [certificate authentication for SSH](https://smallstep.com/blog/use-ssh-certificates/): connect SSH to SSO, improve security, and eliminate warnings & errors
-- Issue SSH user certificates using OAuth OIDC
-- Issue SSH host certificates to cloud VMs using instance identity documents
+- Delegate SSH authentication to `step-ca` by using [SSH certificates](https://smallstep.com/blog/use-ssh-certificates/) instead of public keys and `authorized_keys` files
+- For user certificates, [connect SSH to your single sign-on provider](https://smallstep.com/blog/diy-single-sign-on-for-ssh/), to improve security with short-lived certificates and MFA (or other security policies) via any OAuth OIDC provider.
+- For host certificates, improve security, [eliminate TOFU warnings](https://smallstep.com/blog/use-ssh-certificates/), and set up automated host certificate renewal.
 
-### Easy certificate management and automation via [`step` CLI](https://github.com/smallstep/cli) [integration](https://smallstep.com/docs/cli/ca/)
+### 🤓 A general purpose PKI tool, via [`step` CLI](https://github.com/smallstep/cli) [integration](https://smallstep.com/docs/cli/ca/)
 
 - Generate key pairs where they're needed so private keys are never transmitted across the network
-- [Authenticate and obtain a certificate](https://smallstep.com/docs/cli/ca/certificate/) using any enrollment mechanism supported by `step-ca`
+- [Authenticate and obtain a certificate](https://smallstep.com/docs/cli/ca/certificate/) using any provisioner supported by `step-ca`
 - Securely [distribute root certificates](https://smallstep.com/docs/cli/ca/root/) and [bootstrap](https://smallstep.com/docs/cli/ca/bootstrap/) PKI relying parties
 - [Renew](https://smallstep.com/docs/cli/ca/renew/) and [revoke](https://smallstep.com/docs/cli/ca/revoke/) certificates issued by `step-ca`
-- [Install root certificates](https://smallstep.com/docs/cli/certificate/install/) so your CA is trusted by default (issue development certificates **that [work in browsers](https://smallstep.com/blog/step-v0-8-6-valid-HTTPS-certificates-for-dev-pre-prod.html)**)
+- [Install root certificates](https://smallstep.com/docs/cli/certificate/install/) on your machine and browsers, so your CA is trusted
 - [Inspect](https://smallstep.com/docs/cli/certificate/inspect/) and [lint](https://smallstep.com/docs/cli/certificate/lint/) certificates
-
-## Motivation
-
-Managing your own *public key infrastructure* (PKI) can be tedious and error
-prone. Good security hygiene is hard. Setting up simple PKI is out of reach for
-many small teams, and following best practices like proper certificate
-revocation and rolling is challenging even for experts.
-
-Amongst numerous use cases, proper PKI makes it easy to use mTLS (mutual TLS)
-to improve security and to make it possible to connect services across the
-public internet. Unlike VPNs & SDNs, deploying and scaling mTLS is pretty
-easy. You're (hopefully) already using TLS, and your existing tools and
-standard libraries will provide most of what you need. If you know how to
-operate DNS and reverse proxies, you know how to operate mTLS
-infrastructure.
-
-![Connect it all with
-mTLS](https://raw.githubusercontent.com/smallstep/certificates/master/docs/images/connect-with-mtls-2.png)
-
-There's just one problem: **you need certificates issued by your own
-certificate authority (CA)**. Building and operating a CA, issuing
-certificates, and making sure they're renewed before they expire is tricky.
-This project provides the infrastructure, automations, and workflows you'll
-need.
-
-`step certificates` is part of smallstep's broader security architecture, which
-makes it much easier to implement good security practices early, and
-incrementally improve them as your system matures.
-
-For more information and [docs](https://smallstep.com/docs) see [the smallstep
-website](https://smallstep.com/certificates) and the [blog
-post](https://smallstep.com/blog/step-certificates.html) announcing this project.
 
 ## Installation Guide
 
@@ -138,7 +110,7 @@ your local machine.
 
 ### Mac OS
 
-Install `step`  and `step-ca` together via [Homebrew](https://brew.sh/):
+Install `step`  and `step-ca` together, via [Homebrew](https://brew.sh/):
 
 ```
 $ brew install step
@@ -146,7 +118,7 @@ $ brew install step
 
 ### Linux
 
-> **Note:** While the `step` CLI tool is not required to run `step-ca`, it will make your life easier so you'll probably want to [install it](https://github.com/smallstep/cli#installation-guide) too.
+> **Note:** Though it's not required, you will probably also want the [`step` CLI tool](https://github.com/smallstep/cli#installation-guide).
 
 #### Debian
 
@@ -225,7 +197,6 @@ You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
 See the [`systemctl` setup section](./docs/GETTING_STARTED.md#systemctl) for a
 guide on configuring `step-ca` as a daemon.
 
-
 ### Kubernetes
 
 We publish [helm charts](https://hub.helm.sh/charts/smallstep/step-certificates) for easy installation on kubernetes:
@@ -239,6 +210,10 @@ helm install step-certificates
 > If you're using Kubernetes, make sure you [check out
 > autocert](https://github.com/smallstep/autocert): a kubernetes add-on that builds on `step
 > certificates` to automatically inject TLS/HTTPS certificates into your containers.
+
+### Docker
+
+See our [Docker getting started guide](./docs/docker.md)
 
 ### Test
 
@@ -255,7 +230,11 @@ Release Date: 2019-04-30 19:02 UTC</code></pre>
 In the following guide we'll run a simple `hello` server that requires clients
 to connect over an authorized and encrypted channel using HTTPS. `step-ca`
 will issue certificates to our server, allowing it to authenticate and encrypt
-communication. Let's get started!
+communication.
+
+![Animated terminal showing step certificates in practice](https://github.com/smallstep/certificates/raw/master/docs/images/step-ca-2-legged.gif)
+
+Let's get started!
 
 ### Prerequisites
 
@@ -402,17 +381,8 @@ you are interested in. Ex: `step help ca provisioner list`.
 and visiting http://localhost:8080.
 
 
-## The Future
-
-We plan to build more tools that facilitate the use and management of zero trust
-networks.
+## Feedback?
 
 * Tell us what you like and don't like about managing your PKI - we're eager to
 help solve problems in this space.
-* Tell us what features you'd like to see - open issues or hit us on
-[Twitter](https://twitter.com/smallsteplabs).
-
-## Further Reading
-
-Check out the [Getting Started](https://smallstep.com/docs/getting-started/) guide for more examples
-and best practices on running Step CA in production.
+* Tell us about a feature you'd like to see - open an issue, [ask on gitter](https://gitter.im/smallstep/community), or hit us up on [Twitter](https://twitter.com/smallsteplabs).
