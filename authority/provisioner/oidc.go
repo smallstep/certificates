@@ -69,7 +69,7 @@ type OIDC struct {
 	getIdentityFunc       GetIdentityFunc
 }
 
-// IsAdmin returns true if the given email is in the Admins whitelist, false
+// IsAdmin returns true if the given email is in the Admins allowlist, false
 // otherwise.
 func (o *OIDC) IsAdmin(email string) bool {
 	email = sanitizeEmail(email)
