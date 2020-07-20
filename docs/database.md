@@ -18,28 +18,25 @@ that will be used to enforce passive revocation.
 Current implementations include Badger (default), BoltDB, and MysQL.
 
 - [ ] Memory
+- [x] No database
 - [x] [BoltDB](https://github.com/etcd-io/bbolt) -- etcd fork.
 - [x] [Badger](https://github.com/dgraph-io/badger)
-- [x] [MariaDB/MySQL](https://github.com/go-sql-driver/mysql)
+- [x] [MySQL/MariaDB](https://github.com/go-sql-driver/mysql)
 - [ ] PostgreSQL
 - [ ] Cassandra
-- [ ] ...
 
 Let us know which integration you would like to see next by opening an issue or PR.
 
 ## Configuration
 
 Configuring `step certificates` to use a database is as simple as adding a
-top-level `db` stanza to your `step-ca.config` (see getting started doc for
-more info).  Below are a few examples for supported databases:
+top-level `db` stanza to `$(step path)/config/ca.json`.  Below are a few examples for supported databases:
 
 ### Badger
 
 ```
 {
   ...
-  "crt": ".step/certs/intermediate_ca.crt",
-  "key": ".step/secrets/intermediate_ca_key",
   "db": {
     "type": "badger",
     "dataSource": "./.step/db",
@@ -47,10 +44,10 @@ more info).  Below are a few examples for supported databases:
     "badgerFileLoadingMode": "MemoryMap"
   },
   ...
-},
+}
 ```
 
-#### Options
+#### Options for `db`:
 
 * `type`
     * `badger` - currently refers to Badger V1. However, as Badger V1 is deprecated,
@@ -72,8 +69,6 @@ more info).  Below are a few examples for supported databases:
 ```
 {
   ...
-  "crt": ".step/certs/intermediate_ca.crt",
-  "key": ".step/secrets/intermediate_ca_key",
   "db": {
     "type": "bbolt",
     "dataSource": "./stepdb"
@@ -87,8 +82,6 @@ more info).  Below are a few examples for supported databases:
 ```
 {
   ...
-  "crt": ".step/certs/intermediate_ca.crt",
-  "key": ".step/secrets/intermediate_ca_key",
   "db": {
     "type": "mysql",
     "dataSource": "user:password@tcp(127.0.0.1:3306)/",
