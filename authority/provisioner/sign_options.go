@@ -17,6 +17,9 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
+// DefaultCertValidity is the default validity for a certificate if none is specified.
+const DefaultCertValidity = 24 * time.Hour
+
 // Options contains the options that can be passed to the Sign method. Backdate
 // is automatically filled and can only be configured in the CA.
 type Options struct {
@@ -277,7 +280,11 @@ func (v profileDefaultDuration) Modify(cert *x509.Certificate, so Options) error
 	}
 	notAfter := so.NotAfter.RelativeTime(notBefore)
 	if notAfter.IsZero() {
-		notAfter = notBefore.Add(time.Duration(v))
+		if v != 0 {
+			notAfter = notBefore.Add(time.Duration(v))
+		} else {
+			notAfter = notBefore.Add(DefaultCertValidity)
+		}
 	}
 
 	cert.NotBefore = notBefore.Add(backdate)

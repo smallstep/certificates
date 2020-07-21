@@ -363,6 +363,10 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSSHSign")
 	}
+	// Enforce an email claim
+	if claims.Email == "" {
+		return nil, errs.Unauthorized("oidc.AuthorizeSSHSign: failed to validate oidc token payload: email not found")
+	}
 	signOptions := []SignOption{
 		// set the key id to the token email
 		sshCertKeyIDModifier(claims.Email),

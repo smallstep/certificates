@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/x509util"
 )
 
 func Test_emailOnlyIdentity_Valid(t *testing.T) {
@@ -562,15 +561,13 @@ func Test_forceCN_Option(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tt := run()
-			prof := &x509util.Leaf{}
-			prof.SetSubject(tt.cert)
-			if err := tt.fcn.Option(tt.so)(prof); err != nil {
+			if err := tt.fcn.Modify(tt.cert, tt.so); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
 			} else {
 				if assert.Nil(t, tt.err) {
-					tt.valid(prof.Subject())
+					tt.valid(tt.cert)
 				}
 			}
 		})
@@ -661,10 +658,9 @@ func Test_profileDefaultDuration_Option(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tt := run()
-			prof := &x509util.Leaf{}
-			prof.SetSubject(tt.cert)
-			assert.FatalError(t, tt.pdd.Option(tt.so)(prof), "unexpected error")
-			tt.valid(prof.Subject())
+			assert.FatalError(t, tt.pdd.Modify(tt.cert, tt.so), "unexpected error")
+			time.Sleep(1 * time.Nanosecond)
+			tt.valid(tt.cert)
 		})
 	}
 }
@@ -702,10 +698,8 @@ func Test_newProvisionerExtension_Option(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tt := run()
-			prof := &x509util.Leaf{}
-			prof.SetSubject(tt.cert)
-			assert.FatalError(t, newProvisionerExtensionOption(TypeJWK, "foo", "bar", "baz", "zap").Option(Options{})(prof))
-			tt.valid(prof.Subject())
+			assert.FatalError(t, newProvisionerExtensionOption(TypeJWK, "foo", "bar", "baz", "zap").Modify(tt.cert, Options{}))
+			tt.valid(tt.cert)
 		})
 	}
 }
@@ -803,15 +797,13 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tt := run()
-			prof := &x509util.Leaf{}
-			prof.SetSubject(tt.cert)
-			if err := tt.pld.Option(tt.so)(prof); err != nil {
+			if err := tt.pld.Modify(tt.cert, tt.so); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
 			} else {
 				if assert.Nil(t, tt.err) {
-					tt.valid(prof.Subject())
+					tt.valid(tt.cert)
 				}
 			}
 		})

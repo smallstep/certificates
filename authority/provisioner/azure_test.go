@@ -431,9 +431,9 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 4, http.StatusOK, false},
-		{"ok", p2, args{t2}, 9, http.StatusOK, false},
-		{"ok", p1, args{t11}, 4, http.StatusOK, false},
+		{"ok", p1, args{t1}, 5, http.StatusOK, false},
+		{"ok", p2, args{t2}, 10, http.StatusOK, false},
+		{"ok", p1, args{t11}, 5, http.StatusOK, false},
 		{"fail tenant", p3, args{t3}, 0, http.StatusUnauthorized, true},
 		{"fail resource group", p4, args{t4}, 0, http.StatusUnauthorized, true},
 		{"fail token", p1, args{"token"}, 0, http.StatusUnauthorized, true},
@@ -458,6 +458,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 				assert.Len(t, tt.wantLen, got)
 				for _, o := range got {
 					switch v := o.(type) {
+					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
 						assert.Equals(t, v.Type, int(TypeAzure))
 						assert.Equals(t, v.Name, tt.azure.GetName())

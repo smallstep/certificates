@@ -9,6 +9,7 @@ import (
 
 // List of signature algorithms, all of them have values in upper case to match
 // them with the string representation.
+// nolint:golint
 const (
 	MD2_RSA       = "MD2-RSA"
 	MD5_RSA       = "MD5-RSA"

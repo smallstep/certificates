@@ -22,6 +22,7 @@ func (fn certificateOptionsFunc) Options(so Options) []x509util.Option {
 
 // ProvisionerOptions are a collection of custom options that can be added to
 // each provisioner.
+// nolint:golint
 type ProvisionerOptions struct {
 	// Template contains a X.509 certificate template. It can be a JSON template
 	// escaped in a string or it can be also encoded in base64.

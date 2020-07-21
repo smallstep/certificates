@@ -179,12 +179,12 @@ func TestOIDC_authorizeToken(t *testing.T) {
 	assert.FatalError(t, err)
 	t4, err := generateToken("subject", issuer, p3.ClientID, "foo@smallstep.com", []string{}, time.Now(), &keys.Keys[2])
 	assert.FatalError(t, err)
-	// Invalid email
-	failEmail, err := generateToken("subject", issuer, p3.ClientID, "", []string{}, time.Now(), &keys.Keys[2])
-	assert.FatalError(t, err)
-	failDomain, err := generateToken("subject", issuer, p3.ClientID, "name@example.com", []string{}, time.Now(), &keys.Keys[2])
+	t5, err := generateToken("subject", issuer, p3.ClientID, "", []string{}, time.Now(), &keys.Keys[2])
 	assert.FatalError(t, err)
 
+	// Invalid email
+	failDomain, err := generateToken("subject", issuer, p3.ClientID, "name@example.com", []string{}, time.Now(), &keys.Keys[2])
+	assert.FatalError(t, err)
 	// Invalid tokens
 	parts := strings.Split(t1, ".")
 	key, err := generateJSONWebKey()
@@ -226,7 +226,7 @@ func TestOIDC_authorizeToken(t *testing.T) {
 		{"ok tenantid", p2, args{t2}, http.StatusOK, tenantIssuer, false},
 		{"ok admin", p3, args{t3}, http.StatusOK, issuer, false},
 		{"ok domain", p3, args{t4}, http.StatusOK, issuer, false},
-		{"fail-email", p3, args{failEmail}, http.StatusUnauthorized, "", true},
+		{"ok no email", p3, args{t5}, http.StatusOK, issuer, false},
 		{"fail-domain", p3, args{failDomain}, http.StatusUnauthorized, "", true},
 		{"fail-key", p1, args{failKey}, http.StatusUnauthorized, "", true},
 		{"fail-token", p1, args{failTok}, http.StatusUnauthorized, "", true},
@@ -290,8 +290,8 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 	// Admin email not in domains
 	okAdmin, err := generateToken("subject", "the-issuer", p3.ClientID, "root@example.com", []string{"test.smallstep.com"}, time.Now(), &keys.Keys[0])
 	assert.FatalError(t, err)
-	// Invalid email
-	failEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
+	// No email
+	noEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
 	assert.FatalError(t, err)
 
 	type args struct {
@@ -306,7 +306,8 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 	}{
 		{"ok1", p1, args{t1}, http.StatusOK, false},
 		{"admin", p3, args{okAdmin}, http.StatusOK, false},
-		{"fail-email", p3, args{failEmail}, http.StatusUnauthorized, true},
+		{"no-email", p3, args{noEmail}, http.StatusOK, false},
+		{"bad-token", p3, args{"foobar"}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -323,12 +324,13 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 			} else {
 				if assert.NotNil(t, got) {
 					if tt.name == "admin" {
-						assert.Len(t, 4, got)
+						assert.Len(t, 5, got)
 					} else {
 						assert.Len(t, 5, got)
 					}
 					for _, o := range got {
 						switch v := o.(type) {
+						case certificateOptionsFunc:
 						case *provisionerExtensionOption:
 							assert.Equals(t, v.Type, int(TypeOIDC))
 							assert.Equals(t, v.Name, tt.prov.GetName())
@@ -514,7 +516,7 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	// Admin email not in domains
 	okAdmin, err := generateToken("subject", "the-issuer", p3.ClientID, "root@example.com", []string{}, time.Now(), &keys.Keys[0])
 	assert.FatalError(t, err)
-	// Invalid email
+	// Empty email
 	failEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
 	assert.FatalError(t, err)
 

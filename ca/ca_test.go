@@ -2,11 +2,13 @@ package ca
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -50,6 +52,22 @@ func getCSR(priv interface{}) (*x509.CertificateRequest, error) {
 		return nil, err
 	}
 	return x509.ParseCertificateRequest(csrBytes)
+}
+
+func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
+	b, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling public key")
+	}
+	info := struct {
+		Algorithm        pkix.AlgorithmIdentifier
+		SubjectPublicKey asn1.BitString
+	}{}
+	if _, err = asn1.Unmarshal(b, &info); err != nil {
+		return nil, errors.Wrap(err, "error unmarshaling public key")
+	}
+	hash := sha1.Sum(info.SubjectPublicKey.Bytes)
+	return hash[:], nil
 }
 
 func TestMain(m *testing.M) {
@@ -299,10 +317,9 @@ ZEp7knvU2psWRw==
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 					assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
 
-					pubBytes, err := x509.MarshalPKIXPublicKey(pub)
+					subjectKeyID, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
-					hash := sha1.Sum(pubBytes)
-					assert.Equals(t, leaf.SubjectKeyId, hash[:])
+					assert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
 
 					assert.Equals(t, leaf.AuthorityKeyId, intermediateIdentity.Crt.SubjectKeyId)
 
@@ -641,11 +658,9 @@ func TestCARenew(t *testing.T) {
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 					assert.Equals(t, leaf.DNSNames, []string{"funk"})
 
-					pubBytes, err := x509.MarshalPKIXPublicKey(pub)
+					subjectKeyID, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
-					hash := sha1.Sum(pubBytes)
-					assert.Equals(t, leaf.SubjectKeyId, hash[:])
-
+					assert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
 					assert.Equals(t, leaf.AuthorityKeyId, intermediateIdentity.Crt.SubjectKeyId)
 
 					realIntermediate, err := x509.ParseCertificate(intermediateIdentity.Crt.Raw)

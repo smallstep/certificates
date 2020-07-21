@@ -28,6 +28,7 @@ type MockProvisioner struct {
 	MgetName                func() string
 	MauthorizeSign          func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	MdefaultTLSCertDuration func() time.Duration
+	MgetOptions             func() *provisioner.ProvisionerOptions
 }
 
 // GetName mock
@@ -52,6 +53,13 @@ func (m *MockProvisioner) DefaultTLSCertDuration() time.Duration {
 		return m.MdefaultTLSCertDuration()
 	}
 	return m.Mret1.(time.Duration)
+}
+
+func (m *MockProvisioner) GetOptions() *provisioner.ProvisionerOptions {
+	if m.MgetOptions != nil {
+		return m.MgetOptions()
+	}
+	return m.Mret1.(*provisioner.ProvisionerOptions)
 }
 
 // ContextKey is the key type for storing and searching for ACME request
