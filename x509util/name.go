@@ -11,15 +11,15 @@ import (
 // Name is the JSON representation of X.501 type Name, used in the X.509 subject
 // and issuer fields.
 type Name struct {
-	Country            MultiString `json:"country"`
-	Organization       MultiString `json:"organization"`
-	OrganizationalUnit MultiString `json:"organizationUnit"`
-	Locality           MultiString `json:"locality"`
-	Province           MultiString `json:"province"`
-	StreetAddress      MultiString `json:"streetAddress"`
-	PostalCode         MultiString `json:"postalCode"`
-	SerialNumber       string      `json:"serialNumber"`
-	CommonName         string      `json:"commonName"`
+	Country            MultiString `json:"country,omitempty"`
+	Organization       MultiString `json:"organization,omitempty"`
+	OrganizationalUnit MultiString `json:"organizationalUnit,omitempty"`
+	Locality           MultiString `json:"locality,omitempty"`
+	Province           MultiString `json:"province,omitempty"`
+	StreetAddress      MultiString `json:"streetAddress,omitempty"`
+	PostalCode         MultiString `json:"postalCode,omitempty"`
+	SerialNumber       string      `json:"serialNumber,omitempty"`
+	CommonName         string      `json:"commonName,omitempty"`
 }
 
 // UnmarshalJSON implements the json.Unmarshal interface and unmarshals a JSON
@@ -74,6 +74,7 @@ func (s Subject) Set(c *x509.Certificate) {
 // Issuer is the JSON representation of the X.509 issuer field.
 type Issuer Name
 
+// nolint:unused
 func newIssuer(n pkix.Name) Issuer {
 	return Issuer{
 		Country:            n.Country,

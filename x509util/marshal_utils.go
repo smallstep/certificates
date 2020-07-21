@@ -40,17 +40,18 @@ func (m *MultiIP) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-
-	ips := make([]net.IP, len(ms))
-	for i, s := range ms {
-		ip := net.ParseIP(s)
-		if ip == nil {
-			return errors.Errorf("error unmarshaling json: ip %s is not valid", s)
+	if ms != nil {
+		ips := make([]net.IP, len(ms))
+		for i, s := range ms {
+			ip := net.ParseIP(s)
+			if ip == nil {
+				return errors.Errorf("error unmarshaling json: ip %s is not valid", s)
+			}
+			ips[i] = ip
 		}
-		ips[i] = ip
-	}
 
-	*m = MultiIP(ips)
+		*m = MultiIP(ips)
+	}
 	return nil
 }
 
@@ -58,23 +59,36 @@ func (m *MultiIP) UnmarshalJSON(data []byte) error {
 // into a []*net.IPNet.
 type MultiIPNet []*net.IPNet
 
+// MarshalJSON implements the json.Marshaler interface for MultiIPNet.
+func (m MultiIPNet) MarshalJSON() ([]byte, error) {
+	if m == nil {
+		return []byte("null"), nil
+	}
+	ipNets := make([]string, len(m))
+	for i, v := range m {
+		ipNets[i] = v.String()
+	}
+	return json.Marshal(ipNets)
+}
+
 // UnmarshalJSON implements the json.Unmarshaler interface for MultiIPNet.
 func (m *MultiIPNet) UnmarshalJSON(data []byte) error {
 	ms, err := unmarshalMultiString(data)
 	if err != nil {
 		return err
 	}
-
-	ipNets := make([]*net.IPNet, len(ms))
-	for i, s := range ms {
-		_, ipNet, err := net.ParseCIDR(s)
-		if err != nil {
-			return errors.Wrap(err, "error unmarshaling json")
+	if ms != nil {
+		ipNets := make([]*net.IPNet, len(ms))
+		for i, s := range ms {
+			_, ipNet, err := net.ParseCIDR(s)
+			if err != nil {
+				return errors.Wrap(err, "error unmarshaling json")
+			}
+			ipNets[i] = ipNet
 		}
-		ipNets[i] = ipNet
-	}
 
-	*m = MultiIPNet(ipNets)
+		*m = MultiIPNet(ipNets)
+	}
 	return nil
 }
 
@@ -84,6 +98,9 @@ type MultiURL []*url.URL
 
 // MarshalJSON implements the json.Marshaler interface for MultiURL.
 func (m MultiURL) MarshalJSON() ([]byte, error) {
+	if m == nil {
+		return []byte("null"), nil
+	}
 	urls := make([]string, len(m))
 	for i, u := range m {
 		urls[i] = u.String()
@@ -97,23 +114,36 @@ func (m *MultiURL) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-
-	urls := make([]*url.URL, len(ms))
-	for i, s := range ms {
-		u, err := url.Parse(s)
-		if err != nil {
-			return errors.Wrap(err, "error unmarshaling json")
+	if ms != nil {
+		urls := make([]*url.URL, len(ms))
+		for i, s := range ms {
+			u, err := url.Parse(s)
+			if err != nil {
+				return errors.Wrap(err, "error unmarshaling json")
+			}
+			urls[i] = u
 		}
-		urls[i] = u
-	}
 
-	*m = MultiURL(urls)
+		*m = MultiURL(urls)
+	}
 	return nil
 }
 
 // MultiObjectIdentifier is a type used to unmarshal a JSON string or an array
 // of strings into a []asn1.ObjectIdentifier.
 type MultiObjectIdentifier []asn1.ObjectIdentifier
+
+// MarshalJSON implements the json.Marshaler interface for MultiObjectIdentifier.
+func (m MultiObjectIdentifier) MarshalJSON() ([]byte, error) {
+	if m == nil {
+		return []byte("null"), nil
+	}
+	oids := make([]string, len(m))
+	for i, u := range m {
+		oids[i] = u.String()
+	}
+	return json.Marshal(oids)
+}
 
 // UnmarshalJSON implements the json.Unmarshaler interface for
 // MultiObjectIdentifier.
@@ -122,17 +152,18 @@ func (m *MultiObjectIdentifier) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-
-	oids := make([]asn1.ObjectIdentifier, len(ms))
-	for i, s := range ms {
-		oid, err := parseObjectIdentifier(s)
-		if err != nil {
-			return err
+	if ms != nil {
+		oids := make([]asn1.ObjectIdentifier, len(ms))
+		for i, s := range ms {
+			oid, err := parseObjectIdentifier(s)
+			if err != nil {
+				return err
+			}
+			oids[i] = oid
 		}
-		oids[i] = oid
-	}
 
-	*m = MultiObjectIdentifier(oids)
+		*m = MultiObjectIdentifier(oids)
+	}
 	return nil
 }
 

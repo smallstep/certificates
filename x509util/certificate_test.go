@@ -105,7 +105,7 @@ func (b *badSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) 
 }
 
 func TestNewCertificate(t *testing.T) {
-	cr, priv := createCertificateRequest(t, "commonName", []string{"foo.com"})
+	cr, priv := createCertificateRequest(t, "commonName", []string{"foo.com", "root@foo.com"})
 	crBadSignateure, _ := createCertificateRequest(t, "fail", []string{"foo.com"})
 	crBadSignateure.PublicKey = priv.Public()
 
@@ -120,9 +120,10 @@ func TestNewCertificate(t *testing.T) {
 		wantErr bool
 	}{
 		{"okSimple", args{cr, nil}, &Certificate{
-			Subject:  Subject{CommonName: "commonName"},
-			DNSNames: []string{"foo.com"},
-			KeyUsage: KeyUsage(x509.KeyUsageDigitalSignature),
+			Subject:        Subject{CommonName: "commonName"},
+			DNSNames:       []string{"foo.com"},
+			EmailAddresses: []string{"root@foo.com"},
+			KeyUsage:       KeyUsage(x509.KeyUsageDigitalSignature),
 			ExtKeyUsage: ExtKeyUsage([]x509.ExtKeyUsage{
 				x509.ExtKeyUsageServerAuth,
 				x509.ExtKeyUsageClientAuth,
@@ -142,8 +143,30 @@ func TestNewCertificate(t *testing.T) {
 			PublicKey:          priv.Public(),
 			PublicKeyAlgorithm: x509.Ed25519,
 		}, false},
+		{"okExample", args{cr, []Option{WithTemplateFile("./testdata/example.tpl", TemplateData{
+			SANsKey: []SubjectAlternativeName{
+				{Type: "dns", Value: "foo.com"},
+			},
+			TokenKey: map[string]string{
+				"Issuer":  "https://iss",
+				"Subject": "sub",
+			},
+		})}}, &Certificate{
+			Subject:        Subject{CommonName: "commonName"},
+			SANs:           []SubjectAlternativeName{{Type: DNSType, Value: "foo.com"}},
+			EmailAddresses: []string{"root@foo.com"},
+			URIs:           []*url.URL{{Scheme: "https", Host: "iss", Fragment: "sub"}},
+			KeyUsage:       KeyUsage(x509.KeyUsageDigitalSignature),
+			ExtKeyUsage: ExtKeyUsage([]x509.ExtKeyUsage{
+				x509.ExtKeyUsageServerAuth,
+				x509.ExtKeyUsageClientAuth,
+			}),
+			PublicKey:          priv.Public(),
+			PublicKeyAlgorithm: x509.Ed25519,
+		}, false},
 		{"badSignature", args{crBadSignateure, nil}, nil, true},
 		{"failTemplate", args{cr, []Option{WithTemplate(`{{ fail "fatal error }}`, CreateTemplateData("commonName", []string{"foo.com"}))}}, nil, true},
+		{"missingTemplate", args{cr, []Option{WithTemplateFile("./testdata/missing.tpl", CreateTemplateData("commonName", []string{"foo.com"}))}}, nil, true},
 		{"badJson", args{cr, []Option{WithTemplate(`"this is not a json object"`, CreateTemplateData("commonName", []string{"foo.com"}))}}, nil, true},
 	}
 	for _, tt := range tests {

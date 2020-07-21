@@ -101,7 +101,7 @@ const DefaultLeafTemplate = `{
 // can be provided to force only the verified domains, if the option is true
 // `.SANs` will be set with the verified domains.
 const DefaultIIDLeafTemplate = `{
-	"subject": {"commonName": "{{ .Insecure.CR.Subject.CommonName }}"},
+	"subject": {"commonName":"{{ .Insecure.CR.Subject.CommonName }}"},
 {{- if .SANs }}
 	"sans": {{ toJson .SANs }},
 {{- else }}
