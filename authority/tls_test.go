@@ -95,6 +95,22 @@ func setExtraExtsCSR(exts []pkix.Extension) func(*x509.CertificateRequest) {
 	}
 }
 
+func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
+	b, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling public key")
+	}
+	info := struct {
+		Algorithm        pkix.AlgorithmIdentifier
+		SubjectPublicKey asn1.BitString
+	}{}
+	if _, err = asn1.Unmarshal(b, &info); err != nil {
+		return nil, errors.Wrap(err, "error unmarshaling public key")
+	}
+	hash := sha1.Sum(info.SubjectPublicKey.Bytes)
+	return hash[:], nil
+}
+
 type basicConstraints struct {
 	IsCA       bool `asn1:"optional"`
 	MaxPathLen int  `asn1:"optional,default:-1"`
@@ -176,7 +192,7 @@ func TestAuthority_Sign(t *testing.T) {
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
 				err:       errors.New("authority.Sign: default ASN1DN template cannot be nil"),
-				code:      http.StatusInternalServerError,
+				code:      http.StatusUnauthorized,
 			}
 		},
 		"fail create cert": func(t *testing.T) *signTest {
@@ -188,7 +204,7 @@ func TestAuthority_Sign(t *testing.T) {
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
-				err:       errors.New("authority.Sign; error creating new leaf certificate"),
+				err:       errors.New("authority.Sign; error creating certificate"),
 				code:      http.StatusInternalServerError,
 			}
 		},
@@ -357,10 +373,9 @@ ZYtQ9Ot36qc=
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 					assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
 
-					pubBytes, err := x509.MarshalPKIXPublicKey(pub)
+					subjectKeyID, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
-					hash := sha1.Sum(pubBytes)
-					assert.Equals(t, leaf.SubjectKeyId, hash[:])
+					assert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
 
 					assert.Equals(t, leaf.AuthorityKeyId, a.x509Issuer.SubjectKeyId)
 
@@ -411,6 +426,13 @@ func TestAuthority_Renew(t *testing.T) {
 		CommonName:    "renew",
 	}
 
+	certModToWithOptions := func(m provisioner.CertificateModifierFunc) x509util.WithOption {
+		return func(p x509util.Profile) error {
+			crt := p.Subject()
+			return m.Modify(crt, provisioner.Options{})
+		}
+	}
+
 	now := time.Now().UTC()
 	nb1 := now.Add(-time.Minute * 7)
 	na1 := now
@@ -421,7 +443,7 @@ func TestAuthority_Renew(t *testing.T) {
 
 	leaf, err := x509util.NewLeafProfile("renew", a.x509Issuer, a.x509Signer,
 		x509util.WithNotBeforeAfterDuration(so.NotBefore.Time(), so.NotAfter.Time(), 0),
-		withDefaultASN1DN(a.config.AuthorityConfig.Template),
+		certModToWithOptions(withDefaultASN1DN(a.config.AuthorityConfig.Template)),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
 		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID))
 	assert.FatalError(t, err)
@@ -432,7 +454,7 @@ func TestAuthority_Renew(t *testing.T) {
 
 	leafNoRenew, err := x509util.NewLeafProfile("norenew", a.x509Issuer, a.x509Signer,
 		x509util.WithNotBeforeAfterDuration(so.NotBefore.Time(), so.NotAfter.Time(), 0),
-		withDefaultASN1DN(a.config.AuthorityConfig.Template),
+		certModToWithOptions(withDefaultASN1DN(a.config.AuthorityConfig.Template)),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
 		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].(*provisioner.JWK).Key.KeyID),
 	)
@@ -552,13 +574,9 @@ func TestAuthority_Renew(t *testing.T) {
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 					assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com", "test"})
 
-					// Test Public Key and SubjectKeyId
-					assert.Equals(t, leaf.PublicKey, cert.PublicKey)
-					pubBytes, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+					subjectKeyID, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
-					hash := sha1.Sum(pubBytes)
-					assert.Equals(t, leaf.SubjectKeyId, hash[:])
-					assert.Equals(t, leaf.SubjectKeyId, cert.SubjectKeyId)
+					assert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
 
 					// We did not change the intermediate before renewing.
 					if a.x509Issuer.SerialNumber == tc.auth.x509Issuer.SerialNumber {
