@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/x509util"
+	"github.com/smallstep/cli/jose"
 )
 
 // CertificateOptions is an interface that returns a list of options passed when
@@ -105,4 +106,18 @@ func CustomTemplateOptions(o *ProvisionerOptions, data x509util.TemplateData, de
 			x509util.WithTemplateBase64(template, data),
 		}
 	}), nil
+}
+
+// unsafeParseSigned parses the given token and returns all the claims without
+// verifying the signature of the token.
+func unsafeParseSigned(s string) (map[string]interface{}, error) {
+	token, err := jose.ParseSigned(s)
+	if err != nil {
+		return nil, err
+	}
+	claims := make(map[string]interface{})
+	if err = token.UnsafeClaimsWithoutVerification(&claims); err != nil {
+		return nil, err
+	}
+	return claims, nil
 }

@@ -259,7 +259,7 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, err
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
 func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	payload, name, group, err := p.authorizeToken(token)
+	_, name, group, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSign")
 	}
@@ -280,8 +280,10 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 
 	// Template options
 	data := x509util.NewTemplateData()
-	data.SetToken(payload)
 	data.SetCommonName(name)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
 
 	// Enforce known common name and default DNS if configured.
 	// By default we'll accept the CN and SANs in the CSR.

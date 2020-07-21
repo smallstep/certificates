@@ -220,8 +220,10 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 
 	// Template options
 	data := x509util.NewTemplateData()
-	data.SetToken(claims)
 	data.SetCommonName(ce.InstanceName)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
 
 	// Enforce known common name and default DNS if configured.
 	// By default we we'll accept the CN and SANs in the CSR.

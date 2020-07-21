@@ -147,9 +147,9 @@ func TestNewCertificate(t *testing.T) {
 			SANsKey: []SubjectAlternativeName{
 				{Type: "dns", Value: "foo.com"},
 			},
-			TokenKey: map[string]string{
-				"Issuer":  "https://iss",
-				"Subject": "sub",
+			TokenKey: map[string]interface{}{
+				"iss": "https://iss",
+				"sub": "sub",
 			},
 		})}}, &Certificate{
 			Subject:        Subject{CommonName: "commonName"},

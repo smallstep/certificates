@@ -44,10 +44,12 @@ func CreateTemplateData(commonName string, sans []string) TemplateData {
 	}
 }
 
+// Set sets a key-value pair in the template data.
 func (t TemplateData) Set(key string, v interface{}) {
 	t[key] = v
 }
 
+// SetInsecure sets a key-value pair in the insecure template data.
 func (t TemplateData) SetInsecure(key string, v interface{}) {
 	if m, ok := t[InsecureKey].(TemplateData); ok {
 		m[key] = v
@@ -56,28 +58,36 @@ func (t TemplateData) SetInsecure(key string, v interface{}) {
 	}
 }
 
+// SetSubject sets the given subject in the template data.
 func (t TemplateData) SetSubject(v Subject) {
 	t.Set(SubjectKey, v)
 }
 
+// SetCommonName sets the given common name in the subject in the template data.
 func (t TemplateData) SetCommonName(cn string) {
 	s, _ := t[SubjectKey].(Subject)
 	s.CommonName = cn
 	t[SubjectKey] = s
 }
 
+// SetSANs sets the given SANs in the template data.
 func (t TemplateData) SetSANs(sans []string) {
 	t.Set(SANsKey, CreateSANs(sans))
 }
 
+// SetToken sets the given token in the template data.
 func (t TemplateData) SetToken(v interface{}) {
 	t.Set(TokenKey, v)
 }
 
+// SetUserData sets the given user provided object in the insecure template
+// data.
 func (t TemplateData) SetUserData(v interface{}) {
 	t.SetInsecure(UserKey, v)
 }
 
+// SetCertificateRequest sets the given certificate request in the insecure
+// template data.
 func (t TemplateData) SetCertificateRequest(cr *x509.CertificateRequest) {
 	t.SetInsecure(CertificateRequestKey, newCertificateRequest(cr))
 }

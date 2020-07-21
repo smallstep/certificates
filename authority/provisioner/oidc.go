@@ -318,7 +318,9 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	}
 
 	data := x509util.CreateTemplateData(claims.Subject, sans)
-	data.SetToken(claims)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
 
 	// Use the default template unless no-templates are configured and email is
 	// an admin, in that case we will use the CR template.

@@ -281,8 +281,10 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 
 	// Template options
 	data := x509util.NewTemplateData()
-	data.SetToken(payload)
 	data.SetCommonName(payload.Claims.Subject)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
 
 	// Enforce known CN and default DNS and IP if configured.
 	// By default we'll accept the CN and SANs in the CSR.

@@ -155,7 +155,9 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 
 	// Certificate templates
 	data := x509util.CreateTemplateData(claims.Subject, claims.SANs)
-	data.SetToken(claims)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
 
 	templateOptions, err := TemplateOptions(p.Options, data)
 	if err != nil {

@@ -213,8 +213,10 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 
 	// Add some values to use in custom templates.
 	data := x509util.NewTemplateData()
-	data.SetToken(claims)
 	data.SetCommonName(claims.ServiceAccountName)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
 
 	// Certificate templates: on K8sSA the default template is the certificate
 	// request.
