@@ -16,10 +16,10 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	x509cert "github.com/smallstep/certificates/x509util"
+	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/tlsutil"
-	"github.com/smallstep/cli/crypto/x509util"
+	x509legacy "github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
 )
 
@@ -31,7 +31,7 @@ func (a *Authority) GetTLSOptions() *tlsutil.TLSOptions {
 var oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
 var oidSubjectKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 14}
 
-func withDefaultASN1DN(def *x509util.ASN1DN) provisioner.CertificateModifierFunc {
+func withDefaultASN1DN(def *x509legacy.ASN1DN) provisioner.CertificateModifierFunc {
 	return func(crt *x509.Certificate, opts provisioner.Options) error {
 		if def == nil {
 			return errors.New("default ASN1DN template cannot be nil")
@@ -63,7 +63,7 @@ func withDefaultASN1DN(def *x509util.ASN1DN) provisioner.CertificateModifierFunc
 // Sign creates a signed certificate from a certificate signing request.
 func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	var (
-		certOptions    []x509cert.Option
+		certOptions    []x509util.Option
 		certValidators []provisioner.CertificateValidator
 		certModifiers  []provisioner.CertificateModifier
 		certEnforcers  []provisioner.CertificateEnforcer
@@ -106,9 +106,9 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		}
 	}
 
-	cert, err := x509cert.NewCertificate(csr, certOptions...)
+	cert, err := x509util.NewCertificate(csr, certOptions...)
 	if err != nil {
-		if _, ok := err.(*x509cert.TemplateError); ok {
+		if _, ok := err.(*x509util.TemplateError); ok {
 			return nil, errs.NewErr(http.StatusBadRequest, err, errs.WithMessage(err.Error()))
 		}
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign", opts...)
@@ -142,7 +142,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Opti
 		}
 	}
 
-	serverCert, err := x509cert.CreateCertificate(leaf, a.x509Issuer, csr.PublicKey, a.x509Signer)
+	serverCert, err := x509util.CreateCertificate(leaf, a.x509Issuer, csr.PublicKey, a.x509Signer)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err,
 			"authority.Sign; error creating certificate", opts...)
@@ -241,7 +241,7 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 		newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
 	}
 
-	leaf, err := x509util.NewLeafProfileWithTemplate(newCert, a.x509Issuer, a.x509Signer)
+	leaf, err := x509legacy.NewLeafProfileWithTemplate(newCert, a.x509Issuer, a.x509Signer)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey", opts...)
 	}
@@ -367,8 +367,8 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 
 // GetTLSCertificate creates a new leaf certificate to be used by the CA HTTPS server.
 func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
-	profile, err := x509util.NewLeafProfile("Step Online CA", a.x509Issuer, a.x509Signer,
-		x509util.WithHosts(strings.Join(a.config.DNSNames, ",")))
+	profile, err := x509legacy.NewLeafProfile("Step Online CA", a.x509Issuer, a.x509Signer,
+		x509legacy.WithHosts(strings.Join(a.config.DNSNames, ",")))
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.GetTLSCertificate")
 	}
