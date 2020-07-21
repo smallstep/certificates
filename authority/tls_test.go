@@ -653,6 +653,13 @@ func TestAuthority_Rekey(t *testing.T) {
 		CommonName:    "renew",
 	}
 
+	certModToWithOptions := func(m provisioner.CertificateModifierFunc) x509util.WithOption {
+		return func(p x509util.Profile) error {
+			crt := p.Subject()
+			return m.Modify(crt, provisioner.Options{})
+		}
+	}
+
 	now := time.Now().UTC()
 	nb1 := now.Add(-time.Minute * 7)
 	na1 := now
@@ -663,7 +670,7 @@ func TestAuthority_Rekey(t *testing.T) {
 
 	leaf, err := x509util.NewLeafProfile("renew", a.x509Issuer, a.x509Signer,
 		x509util.WithNotBeforeAfterDuration(so.NotBefore.Time(), so.NotAfter.Time(), 0),
-		withDefaultASN1DN(a.config.AuthorityConfig.Template),
+		certModToWithOptions(withDefaultASN1DN(a.config.AuthorityConfig.Template)),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
 		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID))
 	assert.FatalError(t, err)
@@ -674,7 +681,7 @@ func TestAuthority_Rekey(t *testing.T) {
 
 	leafNoRenew, err := x509util.NewLeafProfile("norenew", a.x509Issuer, a.x509Signer,
 		x509util.WithNotBeforeAfterDuration(so.NotBefore.Time(), so.NotAfter.Time(), 0),
-		withDefaultASN1DN(a.config.AuthorityConfig.Template),
+		certModToWithOptions(withDefaultASN1DN(a.config.AuthorityConfig.Template)),
 		x509util.WithPublicKey(pub), x509util.WithHosts("test.smallstep.com,test"),
 		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].(*provisioner.JWK).Key.KeyID),
 	)
@@ -809,10 +816,9 @@ func TestAuthority_Rekey(t *testing.T) {
 					}
 					assert.Equals(t, leaf.PublicKey, expectedPK)
 
-					pubBytes, err := x509.MarshalPKIXPublicKey(expectedPK)
+					subjectKeyID, err := generateSubjectKeyID(expectedPK)
 					assert.FatalError(t, err)
-					hash := sha1.Sum(pubBytes)
-					assert.Equals(t, leaf.SubjectKeyId, hash[:])
+					assert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
 					if tc.pk == nil {
 						assert.Equals(t, leaf.SubjectKeyId, cert.SubjectKeyId)
 					}
