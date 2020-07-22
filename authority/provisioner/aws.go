@@ -386,6 +386,9 @@ func (p *AWS) readURL(url string) ([]byte, error) {
 		default:
 			return nil, fmt.Errorf("%s: not a supported AWS Instance Metadata Service version", v)
 		}
+		if resp != nil {
+			resp.Body.Close()
+		}
 	}
 
 	// all versions have been exhausted and we haven't returned successfully yet so pass

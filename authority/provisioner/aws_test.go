@@ -187,6 +187,31 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 	}
 }
 
+func TestAWS_GetIdentityTokenV1Only(t *testing.T) {
+	aws, srv, err := generateAWSWithServerV1Only()
+	assert.FatalError(t, err)
+	defer srv.Close()
+
+	subject := "foo.local"
+	caURL := "https://ca.smallstep.com"
+	u, err := url.Parse(caURL)
+	assert.Nil(t, err)
+
+	token, err := aws.GetIdentityToken(subject, caURL)
+	assert.Nil(t, err)
+
+	_, c, err := parseAWSToken(token)
+	if assert.NoError(t, err) {
+		assert.Equals(t, awsIssuer, c.Issuer)
+		assert.Equals(t, subject, c.Subject)
+		assert.Equals(t, jose.Audience{u.ResolveReference(&url.URL{Path: "/1.0/sign", Fragment: aws.GetID()}).String()}, c.Audience)
+		assert.Equals(t, aws.Accounts[0], c.document.AccountID)
+		err = aws.config.certificate.CheckSignature(
+			aws.config.signatureAlgorithm, c.Amazon.Document, c.Amazon.Signature)
+		assert.NoError(t, err)
+	}
+}
+
 func TestAWS_Init(t *testing.T) {
 	config := Config{
 		Claims: globalProvisionerClaims,
@@ -203,6 +228,7 @@ func TestAWS_Init(t *testing.T) {
 		DisableCustomSANs      bool
 		DisableTrustOnFirstUse bool
 		InstanceAge            Duration
+		IMDSVersions           []string
 		Claims                 *Claims
 	}
 	type args struct {
@@ -214,12 +240,15 @@ func TestAWS_Init(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{"AWS", "name", []string{"account"}, false, false, zero, nil}, args{config}, false},
-		{"ok", fields{"AWS", "name", []string{"account"}, true, true, Duration{Duration: 1 * time.Minute}, nil}, args{config}, false},
-		{"fail type ", fields{"", "name", []string{"account"}, false, false, zero, nil}, args{config}, true},
-		{"fail name", fields{"AWS", "", []string{"account"}, false, false, zero, nil}, args{config}, true},
-		{"bad instance age", fields{"AWS", "name", []string{"account"}, false, false, Duration{Duration: -1 * time.Minute}, nil}, args{config}, true},
-		{"fail claims", fields{"AWS", "name", []string{"account"}, false, false, zero, badClaims}, args{config}, true},
+		{"ok", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, nil}, args{config}, false},
+		{"ok/v1", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1"}, nil}, args{config}, false},
+		{"ok/v2", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v2"}, nil}, args{config}, false},
+		{"ok/duration", fields{"AWS", "name", []string{"account"}, true, true, Duration{Duration: 1 * time.Minute}, []string{"v1", "v2"}, nil}, args{config}, false},
+		{"fail type ", fields{"", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, nil}, args{config}, true},
+		{"fail name", fields{"AWS", "", []string{"account"}, false, false, zero, []string{"v1", "v2"}, nil}, args{config}, true},
+		{"bad instance age", fields{"AWS", "name", []string{"account"}, false, false, Duration{Duration: -1 * time.Minute}, []string{"v1", "v2"}, nil}, args{config}, true},
+		{"fail/imds", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"bad"}, nil}, args{config}, true},
+		{"fail claims", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, badClaims}, args{config}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -230,6 +259,7 @@ func TestAWS_Init(t *testing.T) {
 				DisableCustomSANs:      tt.fields.DisableCustomSANs,
 				DisableTrustOnFirstUse: tt.fields.DisableTrustOnFirstUse,
 				InstanceAge:            tt.fields.InstanceAge,
+				IMDSVersions:           tt.fields.IMDSVersions,
 				Claims:                 tt.fields.Claims,
 			}
 			if err := p.Init(tt.args.config); (err != nil) != tt.wantErr {

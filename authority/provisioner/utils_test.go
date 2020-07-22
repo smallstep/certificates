@@ -495,6 +495,101 @@ func generateAWSWithServer() (*AWS, *httptest.Server, error) {
 	return aws, srv, nil
 }
 
+func generateAWSV1Only() (*AWS, error) {
+	name, err := randutil.Alphanumeric(10)
+	if err != nil {
+		return nil, err
+	}
+	accountID, err := randutil.Alphanumeric(10)
+	if err != nil {
+		return nil, err
+	}
+	claimer, err := NewClaimer(nil, globalProvisionerClaims)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode([]byte(awsTestCertificate))
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, errors.New("error decoding AWS certificate")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing AWS certificate")
+	}
+	return &AWS{
+		Type:         "AWS",
+		Name:         name,
+		Accounts:     []string{accountID},
+		Claims:       &globalProvisionerClaims,
+		IMDSVersions: []string{"v1"},
+		claimer:      claimer,
+		config: &awsConfig{
+			identityURL:        awsIdentityURL,
+			signatureURL:       awsSignatureURL,
+			tokenURL:           awsAPITokenURL,
+			tokenTTL:           awsAPITokenTTL,
+			certificate:        cert,
+			signatureAlgorithm: awsSignatureAlgorithm,
+		},
+		audiences: testAudiences.WithFragment("aws/" + name),
+	}, nil
+}
+
+func generateAWSWithServerV1Only() (*AWS, *httptest.Server, error) {
+	aws, err := generateAWSV1Only()
+	if err != nil {
+		return nil, nil, err
+	}
+	block, _ := pem.Decode([]byte(awsTestKey))
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		return nil, nil, errors.New("error decoding AWS key")
+	}
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "error parsing AWS private key")
+	}
+	doc, err := json.MarshalIndent(awsInstanceIdentityDocument{
+		AccountID:        aws.Accounts[0],
+		Architecture:     "x86_64",
+		AvailabilityZone: "us-west-2b",
+		ImageID:          "image-id",
+		InstanceID:       "instance-id",
+		InstanceType:     "t2.micro",
+		PendingTime:      time.Now(),
+		PrivateIP:        "127.0.0.1",
+		Region:           "us-west-1",
+		Version:          "2017-09-30",
+	}, "", "  ")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sum := sha256.Sum256(doc)
+	signature, err := key.Sign(rand.Reader, sum[:], crypto.SHA256)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "error signing document")
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/latest/dynamic/instance-identity/document":
+			w.Write(doc)
+		case "/latest/dynamic/instance-identity/signature":
+			w.Write([]byte(base64.StdEncoding.EncodeToString(signature)))
+		case "/bad-document":
+			w.Write([]byte("{}"))
+		case "/bad-signature":
+			w.Write([]byte("YmFkLXNpZ25hdHVyZQo="))
+		case "/bad-json":
+			w.Write([]byte("{"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	aws.config.identityURL = srv.URL + "/latest/dynamic/instance-identity/document"
+	aws.config.signatureURL = srv.URL + "/latest/dynamic/instance-identity/signature"
+	return aws, srv, nil
+}
+
 func generateAzure() (*Azure, error) {
 	name, err := randutil.Alphanumeric(10)
 	if err != nil {
