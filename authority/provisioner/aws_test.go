@@ -104,36 +104,42 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 	p2.Accounts = p1.Accounts
 	p2.config.identityURL = srv.URL + "/bad-document"
 	p2.config.signatureURL = p1.config.signatureURL
+	p2.config.tokenURL = p1.config.tokenURL
 
 	p3, err := generateAWS()
 	assert.FatalError(t, err)
 	p3.Accounts = p1.Accounts
 	p3.config.signatureURL = srv.URL
 	p3.config.identityURL = p1.config.identityURL
+	p3.config.tokenURL = p1.config.tokenURL
 
 	p4, err := generateAWS()
 	assert.FatalError(t, err)
 	p4.Accounts = p1.Accounts
 	p4.config.signatureURL = srv.URL + "/bad-signature"
 	p4.config.identityURL = p1.config.identityURL
+	p4.config.tokenURL = p1.config.tokenURL
 
 	p5, err := generateAWS()
 	assert.FatalError(t, err)
 	p5.Accounts = p1.Accounts
 	p5.config.identityURL = "https://1234.1234.1234.1234"
 	p5.config.signatureURL = p1.config.signatureURL
+	p5.config.tokenURL = p1.config.tokenURL
 
 	p6, err := generateAWS()
 	assert.FatalError(t, err)
 	p6.Accounts = p1.Accounts
 	p6.config.identityURL = p1.config.identityURL
 	p6.config.signatureURL = "https://1234.1234.1234.1234"
+	p6.config.tokenURL = p1.config.tokenURL
 
 	p7, err := generateAWS()
 	assert.FatalError(t, err)
 	p7.Accounts = p1.Accounts
 	p7.config.identityURL = srv.URL + "/bad-json"
 	p7.config.signatureURL = p1.config.signatureURL
+	p7.config.tokenURL = p1.config.tokenURL
 
 	caURL := "https://ca.smallstep.com"
 	u, err := url.Parse(caURL)
