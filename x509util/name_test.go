@@ -97,6 +97,56 @@ func Test_newSubject(t *testing.T) {
 	}
 }
 
+func TestSubject_UnmarshalJSON(t *testing.T) {
+	type args struct {
+		data []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    Subject
+		wantErr bool
+	}{
+		{"null", args{[]byte("null")}, Subject{}, false},
+		{"empty", args{[]byte("{}")}, Subject{}, false},
+		{"commonName", args{[]byte(`"commonName"`)}, Subject{CommonName: "commonName"}, false},
+		{"object", args{[]byte(`{
+			"country": "The country",
+			"organization": "The organization",
+			"organizationalUnit": ["The organizationalUnit 1", "The organizationalUnit 2"],
+			"locality": ["The locality 1", "The locality 2"],
+			"province": "The province",
+			"streetAddress": "The streetAddress",
+			"postalCode": "The postalCode",
+			"serialNumber": "The serialNumber",
+			"commonName": "The commonName"
+		}`)}, Subject{
+			Country:            []string{"The country"},
+			Organization:       []string{"The organization"},
+			OrganizationalUnit: []string{"The organizationalUnit 1", "The organizationalUnit 2"},
+			Locality:           []string{"The locality 1", "The locality 2"},
+			Province:           []string{"The province"},
+			StreetAddress:      []string{"The streetAddress"},
+			PostalCode:         []string{"The postalCode"},
+			SerialNumber:       "The serialNumber",
+			CommonName:         "The commonName",
+		}, false},
+		{"number", args{[]byte("1234")}, Subject{}, true},
+		{"badJSON", args{[]byte("'badJSON'")}, Subject{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got Subject
+			if err := got.UnmarshalJSON(tt.args.data); (err != nil) != tt.wantErr {
+				t.Errorf("Subject.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Subject.UnmarshalJSON() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSubject_Set(t *testing.T) {
 	type fields struct {
 		Country            MultiString
@@ -205,6 +255,56 @@ func Test_newIssuer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := newIssuer(tt.args.n); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("newIssuer() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIssuer_UnmarshalJSON(t *testing.T) {
+	type args struct {
+		data []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    Issuer
+		wantErr bool
+	}{
+		{"null", args{[]byte("null")}, Issuer{}, false},
+		{"empty", args{[]byte("{}")}, Issuer{}, false},
+		{"commonName", args{[]byte(`"commonName"`)}, Issuer{CommonName: "commonName"}, false},
+		{"object", args{[]byte(`{
+			"country": "The country",
+			"organization": "The organization",
+			"organizationalUnit": ["The organizationalUnit 1", "The organizationalUnit 2"],
+			"locality": ["The locality 1", "The locality 2"],
+			"province": "The province",
+			"streetAddress": "The streetAddress",
+			"postalCode": "The postalCode",
+			"serialNumber": "The serialNumber",
+			"commonName": "The commonName"
+		}`)}, Issuer{
+			Country:            []string{"The country"},
+			Organization:       []string{"The organization"},
+			OrganizationalUnit: []string{"The organizationalUnit 1", "The organizationalUnit 2"},
+			Locality:           []string{"The locality 1", "The locality 2"},
+			Province:           []string{"The province"},
+			StreetAddress:      []string{"The streetAddress"},
+			PostalCode:         []string{"The postalCode"},
+			SerialNumber:       "The serialNumber",
+			CommonName:         "The commonName",
+		}, false},
+		{"number", args{[]byte("1234")}, Issuer{}, true},
+		{"badJSON", args{[]byte("'badJSON'")}, Issuer{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got Issuer
+			if err := got.UnmarshalJSON(tt.args.data); (err != nil) != tt.wantErr {
+				t.Errorf("Issuer.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Issuer.UnmarshalJSON() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -23,7 +23,7 @@ type Name struct {
 }
 
 // UnmarshalJSON implements the json.Unmarshal interface and unmarshals a JSON
-// object in the Subject struct or a string as just the subject common name.
+// object in the Name struct or a string as just the subject common name.
 func (n *Name) UnmarshalJSON(data []byte) error {
 	if cn, ok := maybeString(data); ok {
 		n.CommonName = cn
@@ -54,6 +54,17 @@ func newSubject(n pkix.Name) Subject {
 		SerialNumber:       n.SerialNumber,
 		CommonName:         n.CommonName,
 	}
+}
+
+// UnmarshalJSON implements the json.Unmarshal interface and unmarshals a JSON
+// object in the Subject struct or a string as just the subject common name.
+func (s *Subject) UnmarshalJSON(data []byte) error {
+	var name Name
+	if err := name.UnmarshalJSON(data); err != nil {
+		return err
+	}
+	*s = Subject(name)
+	return nil
 }
 
 // Set sets the subject in the given certificate.
@@ -87,6 +98,17 @@ func newIssuer(n pkix.Name) Issuer {
 		SerialNumber:       n.SerialNumber,
 		CommonName:         n.CommonName,
 	}
+}
+
+// UnmarshalJSON implements the json.Unmarshal interface and unmarshals a JSON
+// object in the Issuer struct or a string as just the subject common name.
+func (i *Issuer) UnmarshalJSON(data []byte) error {
+	var name Name
+	if err := name.UnmarshalJSON(data); err != nil {
+		return err
+	}
+	*i = Issuer(name)
+	return nil
 }
 
 // Set sets the issuer in the given certificate.
