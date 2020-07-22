@@ -109,6 +109,14 @@ func TestNewCertificate(t *testing.T) {
 	crBadSignateure, _ := createCertificateRequest(t, "fail", []string{"foo.com"})
 	crBadSignateure.PublicKey = priv.Public()
 
+	ipNet := func(s string) *net.IPNet {
+		_, ipNet, err := net.ParseCIDR(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ipNet
+	}
+
 	type args struct {
 		cr   *x509.CertificateRequest
 		opts []Option
@@ -164,6 +172,45 @@ func TestNewCertificate(t *testing.T) {
 			PublicKey:          priv.Public(),
 			PublicKeyAlgorithm: x509.Ed25519,
 		}, false},
+		{"okFullSimple", args{cr, []Option{WithTemplateFile("./testdata/fullsimple.tpl", TemplateData{})}}, &Certificate{
+			Version:               3,
+			Subject:               Subject{CommonName: "subjectCommonName"},
+			SerialNumber:          SerialNumber{big.NewInt(78187493520)},
+			Issuer:                Issuer{CommonName: "issuerCommonName"},
+			DNSNames:              []string{"doe.com"},
+			IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
+			EmailAddresses:        []string{"jane@doe.com"},
+			URIs:                  []*url.URL{{Scheme: "https", Host: "doe.com"}},
+			SANs:                  []SubjectAlternativeName{{Type: DNSType, Value: "www.doe.com"}},
+			Extensions:            []Extension{{ID: []int{1, 2, 3, 4}, Critical: true, Value: []byte("extension")}},
+			KeyUsage:              KeyUsage(x509.KeyUsageDigitalSignature),
+			ExtKeyUsage:           ExtKeyUsage([]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}),
+			SubjectKeyID:          []byte("subjectKeyId"),
+			AuthorityKeyID:        []byte("authorityKeyId"),
+			OCSPServer:            []string{"https://ocsp.server"},
+			IssuingCertificateURL: []string{"https://ca.com"},
+			CRLDistributionPoints: []string{"https://ca.com/ca.crl"},
+			PolicyIdentifiers:     PolicyIdentifiers{[]int{5, 6, 7, 8, 9, 0}},
+			BasicConstraints: &BasicConstraints{
+				IsCA:       false,
+				MaxPathLen: 0,
+			},
+			NameConstraints: &NameConstraints{
+				Critical:                true,
+				PermittedDNSDomains:     []string{"jane.doe.com"},
+				ExcludedDNSDomains:      []string{"john.doe.com"},
+				PermittedIPRanges:       []*net.IPNet{ipNet("127.0.0.1/32")},
+				ExcludedIPRanges:        []*net.IPNet{ipNet("0.0.0.0/0")},
+				PermittedEmailAddresses: []string{"jane@doe.com"},
+				ExcludedEmailAddresses:  []string{"john@doe.com"},
+				PermittedURIDomains:     []string{"https://jane.doe.com"},
+				ExcludedURIDomains:      []string{"https://john.doe.com"},
+			},
+			SignatureAlgorithm: SignatureAlgorithm(x509.PureEd25519),
+			PublicKey:          priv.Public(),
+			PublicKeyAlgorithm: x509.Ed25519,
+		},
+			false},
 		{"badSignature", args{crBadSignateure, nil}, nil, true},
 		{"failTemplate", args{cr, []Option{WithTemplate(`{{ fail "fatal error }}`, CreateTemplateData("commonName", []string{"foo.com"}))}}, nil, true},
 		{"missingTemplate", args{cr, []Option{WithTemplateFile("./testdata/missing.tpl", CreateTemplateData("commonName", []string{"foo.com"}))}}, nil, true},
@@ -177,7 +224,7 @@ func TestNewCertificate(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewCertificate() = \n%v, want \n%v", got, tt.want)
+				t.Errorf("NewCertificate() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -204,7 +251,7 @@ func TestCertificate_GetCertificate(t *testing.T) {
 		CRLDistributionPoints CRLDistributionPoints
 		PolicyIdentifiers     PolicyIdentifiers
 		BasicConstraints      *BasicConstraints
-		NameConstaints        *NameConstraints
+		NameConstraints       *NameConstraints
 		SignatureAlgorithm    SignatureAlgorithm
 		PublicKeyAlgorithm    x509.PublicKeyAlgorithm
 		PublicKey             interface{}
@@ -242,7 +289,7 @@ func TestCertificate_GetCertificate(t *testing.T) {
 			CRLDistributionPoints: []string{"https://ca.com/crl"},
 			PolicyIdentifiers:     []asn1.ObjectIdentifier{[]int{1, 2, 3, 4}},
 			BasicConstraints:      &BasicConstraints{IsCA: true, MaxPathLen: 0},
-			NameConstaints:        &NameConstraints{PermittedDNSDomains: []string{"foo.bar"}},
+			NameConstraints:       &NameConstraints{PermittedDNSDomains: []string{"foo.bar"}},
 			SignatureAlgorithm:    SignatureAlgorithm(x509.PureEd25519),
 			PublicKeyAlgorithm:    x509.Ed25519,
 			PublicKey:             ed25519.PublicKey("public key"),
@@ -299,7 +346,7 @@ func TestCertificate_GetCertificate(t *testing.T) {
 				CRLDistributionPoints: tt.fields.CRLDistributionPoints,
 				PolicyIdentifiers:     tt.fields.PolicyIdentifiers,
 				BasicConstraints:      tt.fields.BasicConstraints,
-				NameConstaints:        tt.fields.NameConstaints,
+				NameConstraints:       tt.fields.NameConstraints,
 				SignatureAlgorithm:    tt.fields.SignatureAlgorithm,
 				PublicKeyAlgorithm:    tt.fields.PublicKeyAlgorithm,
 				PublicKey:             tt.fields.PublicKey,

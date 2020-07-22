@@ -29,7 +29,7 @@ type Certificate struct {
 	CRLDistributionPoints CRLDistributionPoints    `json:"crlDistributionPoints"`
 	PolicyIdentifiers     PolicyIdentifiers        `json:"policyIdentifiers"`
 	BasicConstraints      *BasicConstraints        `json:"basicConstraints"`
-	NameConstaints        *NameConstraints         `json:"nameConstraints"`
+	NameConstraints       *NameConstraints         `json:"nameConstraints"`
 	SignatureAlgorithm    SignatureAlgorithm       `json:"signatureAlgorithm"`
 	PublicKeyAlgorithm    x509.PublicKeyAlgorithm  `json:"-"`
 	PublicKey             interface{}              `json:"-"`
@@ -96,8 +96,8 @@ func (c *Certificate) GetCertificate() *x509.Certificate {
 	if c.BasicConstraints != nil {
 		c.BasicConstraints.Set(cert)
 	}
-	if c.NameConstaints != nil {
-		c.NameConstaints.Set(cert)
+	if c.NameConstraints != nil {
+		c.NameConstraints.Set(cert)
 	}
 
 	// Custom Extensions.
