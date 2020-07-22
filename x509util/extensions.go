@@ -287,6 +287,16 @@ func (id AuthorityKeyID) Set(c *x509.Certificate) {
 // authority information access extension.
 type OCSPServer MultiString
 
+// UnmarshalJSON implements the json.Unmarshaler interface in OCSPServer.
+func (o *OCSPServer) UnmarshalJSON(data []byte) error {
+	ms, err := unmarshalMultiString(data)
+	if err != nil {
+		return err
+	}
+	*o = ms
+	return nil
+}
+
 // Set sets the list of OSCP servers to the given certificate.
 func (o OCSPServer) Set(c *x509.Certificate) {
 	c.OCSPServer = o
@@ -295,6 +305,16 @@ func (o OCSPServer) Set(c *x509.Certificate) {
 // IssuingCertificateURL contains the list of the issuing certificate url that
 // will be encoded in the authority information access extension.
 type IssuingCertificateURL MultiString
+
+// UnmarshalJSON implements the json.Unmarshaler interface in IssuingCertificateURL.
+func (u *IssuingCertificateURL) UnmarshalJSON(data []byte) error {
+	ms, err := unmarshalMultiString(data)
+	if err != nil {
+		return err
+	}
+	*u = ms
+	return nil
+}
 
 // Set sets the list of issuing certificate urls to the given certificate.
 func (u IssuingCertificateURL) Set(c *x509.Certificate) {
@@ -305,6 +325,16 @@ func (u IssuingCertificateURL) Set(c *x509.Certificate) {
 // be encoded in the CRL distribution points extension.
 type CRLDistributionPoints MultiString
 
+// UnmarshalJSON implements the json.Unmarshaler interface in CRLDistributionPoints.
+func (u *CRLDistributionPoints) UnmarshalJSON(data []byte) error {
+	ms, err := unmarshalMultiString(data)
+	if err != nil {
+		return err
+	}
+	*u = ms
+	return nil
+}
+
 // Set sets the CRL distribution points to the given certificate.
 func (u CRLDistributionPoints) Set(c *x509.Certificate) {
 	c.CRLDistributionPoints = u
@@ -313,6 +343,21 @@ func (u CRLDistributionPoints) Set(c *x509.Certificate) {
 // PolicyIdentifiers represents the list of OIDs to set in the certificate
 // policies extension.
 type PolicyIdentifiers MultiObjectIdentifier
+
+// MarshalJSON implements the json.Marshaler interface in PolicyIdentifiers.
+func (p PolicyIdentifiers) MarshalJSON() ([]byte, error) {
+	return MultiObjectIdentifier(p).MarshalJSON()
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface in PolicyIdentifiers.
+func (p *PolicyIdentifiers) UnmarshalJSON(data []byte) error {
+	var v MultiObjectIdentifier
+	if err := json.Unmarshal(data, &v); err != nil {
+		return errors.Wrap(err, "error unmarshaling json")
+	}
+	*p = PolicyIdentifiers(v)
+	return nil
+}
 
 // Sets sets the policy identifiers to the given certificate.
 func (p PolicyIdentifiers) Set(c *x509.Certificate) {

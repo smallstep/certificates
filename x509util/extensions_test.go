@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"encoding/json"
 	"math/big"
 	"net"
 	"net/url"
@@ -451,6 +452,35 @@ func TestAuthorityKeyID_Set(t *testing.T) {
 	}
 }
 
+func TestOCSPServer_UnmarshalJSON(t *testing.T) {
+	type args struct {
+		data []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    OCSPServer
+		wantErr bool
+	}{
+		{"string", args{[]byte(`"foo"`)}, []string{"foo"}, false},
+		{"array", args{[]byte(`["foo", "bar", "zar"]`)}, []string{"foo", "bar", "zar"}, false},
+		{"empty", args{[]byte(`[]`)}, []string{}, false},
+		{"null", args{[]byte(`null`)}, nil, false},
+		{"fail", args{[]byte(`["foo"`)}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got OCSPServer
+			if err := got.UnmarshalJSON(tt.args.data); (err != nil) != tt.wantErr {
+				t.Errorf("OCSPServer.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("OCSPServer.UnmarshalJSON() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestOCSPServer_Set(t *testing.T) {
 	type args struct {
 		c *x509.Certificate
@@ -469,6 +499,35 @@ func TestOCSPServer_Set(t *testing.T) {
 			tt.o.Set(tt.args.c)
 			if !reflect.DeepEqual(tt.args.c, tt.want) {
 				t.Errorf("OCSPServer.Set() = %v, want %v", tt.args.c, tt.want)
+			}
+		})
+	}
+}
+
+func TestIssuingCertificateURL_UnmarshalJSON(t *testing.T) {
+	type args struct {
+		data []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    IssuingCertificateURL
+		wantErr bool
+	}{
+		{"string", args{[]byte(`"foo"`)}, []string{"foo"}, false},
+		{"array", args{[]byte(`["foo", "bar", "zar"]`)}, []string{"foo", "bar", "zar"}, false},
+		{"empty", args{[]byte(`[]`)}, []string{}, false},
+		{"null", args{[]byte(`null`)}, nil, false},
+		{"fail", args{[]byte(`["foo"`)}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got IssuingCertificateURL
+			if err := got.UnmarshalJSON(tt.args.data); (err != nil) != tt.wantErr {
+				t.Errorf("IssuingCertificateURL.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("IssuingCertificateURL.UnmarshalJSON() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -497,6 +556,35 @@ func TestIssuingCertificateURL_Set(t *testing.T) {
 	}
 }
 
+func TestCRLDistributionPoints_UnmarshalJSON(t *testing.T) {
+	type args struct {
+		data []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    CRLDistributionPoints
+		wantErr bool
+	}{
+		{"string", args{[]byte(`"foo"`)}, []string{"foo"}, false},
+		{"array", args{[]byte(`["foo", "bar", "zar"]`)}, []string{"foo", "bar", "zar"}, false},
+		{"empty", args{[]byte(`[]`)}, []string{}, false},
+		{"null", args{[]byte(`null`)}, nil, false},
+		{"fail", args{[]byte(`["foo"`)}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got CRLDistributionPoints
+			if err := got.UnmarshalJSON(tt.args.data); (err != nil) != tt.wantErr {
+				t.Errorf("CRLDistributionPoints.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CRLDistributionPoints.UnmarshalJSON() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCRLDistributionPoints_Set(t *testing.T) {
 	type args struct {
 		c *x509.Certificate
@@ -515,6 +603,61 @@ func TestCRLDistributionPoints_Set(t *testing.T) {
 			tt.o.Set(tt.args.c)
 			if !reflect.DeepEqual(tt.args.c, tt.want) {
 				t.Errorf("CRLDistributionPoints.Set() = %v, want %v", tt.args.c, tt.want)
+			}
+		})
+	}
+}
+
+func TestPolicyIdentifiers_MarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		m       PolicyIdentifiers
+		want    []byte
+		wantErr bool
+	}{
+		{"ok", []asn1.ObjectIdentifier{[]int{1, 2, 3, 4}, []int{5, 6, 7, 8, 9, 0}}, []byte(`["1.2.3.4","5.6.7.8.9.0"]`), false},
+		{"empty", []asn1.ObjectIdentifier{}, []byte(`[]`), false},
+		{"nil", nil, []byte(`null`), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := json.Marshal(tt.m)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PolicyIdentifiers.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("PolicyIdentifiers.MarshalJSON() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPolicyIdentifiers_UnmarshalJSON(t *testing.T) {
+	type args struct {
+		data []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    PolicyIdentifiers
+		wantErr bool
+	}{
+		{"string", args{[]byte(`"1.2.3.4"`)}, []asn1.ObjectIdentifier{[]int{1, 2, 3, 4}}, false},
+		{"array", args{[]byte(`["1.2.3.4", "5.6.7.8.9.0"]`)}, []asn1.ObjectIdentifier{[]int{1, 2, 3, 4}, []int{5, 6, 7, 8, 9, 0}}, false},
+		{"empty", args{[]byte(`[]`)}, []asn1.ObjectIdentifier{}, false},
+		{"null", args{[]byte(`null`)}, nil, false},
+		{"fail", args{[]byte(`":foo:bar"`)}, nil, true},
+		{"failJSON", args{[]byte(`["https://iss#sub"`)}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got PolicyIdentifiers
+			if err := got.UnmarshalJSON(tt.args.data); (err != nil) != tt.wantErr {
+				t.Errorf("PolicyIdentifiers.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("PolicyIdentifiers.UnmarshalJSON() = %v, want %v", got, tt.want)
 			}
 		})
 	}
