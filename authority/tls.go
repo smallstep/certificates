@@ -109,7 +109,11 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	cert, err := x509util.NewCertificate(csr, certOptions...)
 	if err != nil {
 		if _, ok := err.(*x509util.TemplateError); ok {
-			return nil, errs.NewErr(http.StatusBadRequest, err, errs.WithMessage(err.Error()))
+			return nil, errs.NewErr(http.StatusBadRequest, err,
+				errs.WithMessage(err.Error()),
+				errs.WithKeyVal("csr", csr),
+				errs.WithKeyVal("signOptions", signOpts),
+			)
 		}
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign", opts...)
 	}

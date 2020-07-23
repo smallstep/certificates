@@ -135,6 +135,7 @@ func TestAuthority_Sign(t *testing.T) {
 	signOpts := provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(nb),
 		NotAfter:  provisioner.NewTimeDuration(nb.Add(time.Minute * 5)),
+		Backdate:  1 * time.Minute,
 	}
 
 	// Create a token to get test extra opts.
@@ -279,6 +280,33 @@ ZYtQ9Ot36qc=
 				code:      http.StatusInternalServerError,
 			}
 		},
+		"fail custom template": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			testAuthority := testAuthority(t)
+			p, ok := testAuthority.provisioners.Load("step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
+			if !ok {
+				t.Fatal("provisioner not found")
+			}
+			p.(*provisioner.JWK).Options = &provisioner.Options{
+				Template: `{{ fail "fail message" }}`,
+			}
+			testExtraOpts, err := testAuthority.Authorize(ctx, token)
+			assert.FatalError(t, err)
+			testAuthority.db = &db.MockAuthDB{
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					return nil
+				},
+			}
+			return &signTest{
+				auth:      testAuthority,
+				csr:       csr,
+				extraOpts: testExtraOpts,
+				signOpts:  signOpts,
+				err:       errors.New("fail message"),
+				code:      http.StatusBadRequest,
+			}
+		},
 		"ok": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			_a := testAuthority(t)
@@ -327,6 +355,39 @@ ZYtQ9Ot36qc=
 				signOpts:  signOpts,
 				notBefore: now.Truncate(time.Second),
 				notAfter:  now.Add(365 * 24 * time.Hour).Truncate(time.Second),
+			}
+		},
+		"ok with custom template": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			testAuthority := testAuthority(t)
+			testAuthority.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			p, ok := testAuthority.provisioners.Load("step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
+			if !ok {
+				t.Fatal("provisioner not found")
+			}
+			p.(*provisioner.JWK).Options = &provisioner.Options{
+				Template: `{
+					"subject": {{toJson .Subject}},
+					"dnsNames": {{ toJson .Insecure.CR.DNSNames }},
+					"keyUsage": ["digitalSignature"],
+					"extKeyUsage": ["serverAuth","clientAuth"]
+				}`,
+			}
+			testExtraOpts, err := testAuthority.Authorize(ctx, token)
+			assert.FatalError(t, err)
+			testAuthority.db = &db.MockAuthDB{
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					return nil
+				},
+			}
+			return &signTest{
+				auth:      testAuthority,
+				csr:       csr,
+				extraOpts: testExtraOpts,
+				signOpts:  signOpts,
+				notBefore: signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:  signOpts.NotAfter.Time().Truncate(time.Second),
 			}
 		},
 	}
