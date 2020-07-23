@@ -403,7 +403,7 @@ func (p *AWS) readURL(url string) ([]byte, error) {
 func (p *AWS) readURLv1(url string) (*http.Response, error) {
 	client := http.Client{}
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +437,7 @@ func (p *AWS) readURLv2(url string) (*http.Response, error) {
 	}
 
 	// now make the request
-	req, err = http.NewRequest(http.MethodGet, url, nil)
+	req, err = http.NewRequest(http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
