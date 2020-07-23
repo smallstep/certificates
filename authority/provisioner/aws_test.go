@@ -187,7 +187,7 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 	}
 }
 
-func TestAWS_GetIdentityTokenV1Only(t *testing.T) {
+func TestAWS_GetIdentityToken_V1Only(t *testing.T) {
 	aws, srv, err := generateAWSWithServerV1Only()
 	assert.FatalError(t, err)
 	defer srv.Close()
@@ -210,6 +210,24 @@ func TestAWS_GetIdentityTokenV1Only(t *testing.T) {
 			aws.config.signatureAlgorithm, c.Amazon.Document, c.Amazon.Signature)
 		assert.NoError(t, err)
 	}
+}
+
+func TestAWS_GetIdentityToken_BadIDMS(t *testing.T) {
+	aws, srv, err := generateAWSWithServer()
+
+	aws.IMDSVersions = []string{"bad"}
+
+	assert.FatalError(t, err)
+	defer srv.Close()
+
+	subject := "foo.local"
+	caURL := "https://ca.smallstep.com"
+
+	token, err := aws.GetIdentityToken(subject, caURL)
+	assert.Equals(t, token, "")
+
+	badIDMS := errors.New("bad: not a supported AWS Instance Metadata Service version")
+	assert.HasSuffix(t, err.Error(), badIDMS.Error())
 }
 
 func TestAWS_Init(t *testing.T) {
