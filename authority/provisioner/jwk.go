@@ -20,19 +20,19 @@ type jwtPayload struct {
 }
 
 type stepPayload struct {
-	SSH *SSHOptions `json:"ssh,omitempty"`
+	SSH *SignSSHOptions `json:"ssh,omitempty"`
 }
 
 // JWK is the default provisioner, an entity that can sign tokens necessary for
 // signature requests.
 type JWK struct {
 	*base
-	Type         string              `json:"type"`
-	Name         string              `json:"name"`
-	Key          *jose.JSONWebKey    `json:"key"`
-	EncryptedKey string              `json:"encryptedKey,omitempty"`
-	Claims       *Claims             `json:"claims,omitempty"`
-	Options      *ProvisionerOptions `json:"options,omitempty"`
+	Type         string           `json:"type"`
+	Name         string           `json:"name"`
+	Key          *jose.JSONWebKey `json:"key"`
+	EncryptedKey string           `json:"encryptedKey,omitempty"`
+	Claims       *Claims          `json:"claims,omitempty"`
+	Options      *Options         `json:"options,omitempty"`
 	claimer      *Claimer
 	audiences    Audiences
 }

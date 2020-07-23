@@ -696,7 +696,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 					Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 					Audience:  []string{testAudiences.SSHSign[0]},
 				},
-				Step: &stepPayload{SSH: &SSHOptions{
+				Step: &stepPayload{SSH: &SignSSHOptions{
 					CertType:    SSHHostCert,
 					Principals:  []string{"max", "mariano", "alan"},
 					ValidAfter:  TimeDuration{d: 5 * time.Minute},
@@ -728,7 +728,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 					Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 					Audience:  []string{testAudiences.SSHSign[0]},
 				},
-				Step: &stepPayload{SSH: &SSHOptions{}},
+				Step: &stepPayload{SSH: &SignSSHOptions{}},
 			}
 			tok, err := generateX5CSSHToken(x5cJWK, claims, withX5CHdr(x5cCerts))
 			assert.FatalError(t, err)
@@ -759,7 +759,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 							case sshCertOptionsValidator:
 								tc.claims.Step.SSH.ValidAfter.t = time.Time{}
 								tc.claims.Step.SSH.ValidBefore.t = time.Time{}
-								assert.Equals(t, SSHOptions(v), *tc.claims.Step.SSH)
+								assert.Equals(t, SignSSHOptions(v), *tc.claims.Step.SSH)
 							case sshCertKeyIDModifier:
 								assert.Equals(t, string(v), "foo")
 							case sshCertTypeModifier:
@@ -771,7 +771,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 							case sshCertValidBeforeModifier:
 								assert.Equals(t, int64(v), tc.claims.Step.SSH.ValidBefore.RelativeTime(nw).Unix())
 							case sshCertDefaultsModifier:
-								assert.Equals(t, SSHOptions(v), SSHOptions{CertType: SSHUserCert})
+								assert.Equals(t, SignSSHOptions(v), SignSSHOptions{CertType: SSHUserCert})
 							case *sshLimitDuration:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
 								assert.Equals(t, v.NotAfter, x5cCerts[0].NotAfter)

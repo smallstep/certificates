@@ -20,9 +20,9 @@ import (
 // DefaultCertValidity is the default validity for a certificate if none is specified.
 const DefaultCertValidity = 24 * time.Hour
 
-// Options contains the options that can be passed to the Sign method. Backdate
+// SignOptions contains the options that can be passed to the Sign method. Backdate
 // is automatically filled and can only be configured in the CA.
-type Options struct {
+type SignOptions struct {
 	NotAfter     TimeDuration    `json:"notAfter"`
 	NotBefore    TimeDuration    `json:"notBefore"`
 	TemplateData json.RawMessage `json:"templateData"`
@@ -35,7 +35,7 @@ type SignOption interface{}
 
 // CertificateValidator is an interface used to validate a given X.509 certificate.
 type CertificateValidator interface {
-	Valid(cert *x509.Certificate, opts Options) error
+	Valid(cert *x509.Certificate, opts SignOptions) error
 }
 
 // CertificateRequestValidator is an interface used to validate a given X.509 certificate request.
@@ -47,7 +47,7 @@ type CertificateRequestValidator interface {
 // Types implementing this interface will be validated with a
 // CertificateValidator.
 type CertificateModifier interface {
-	Modify(cert *x509.Certificate, opts Options) error
+	Modify(cert *x509.Certificate, opts SignOptions) error
 }
 
 // CertificateEnforcer is an interface used to modify a given X.509 certificate.
@@ -59,10 +59,10 @@ type CertificateEnforcer interface {
 
 // CertificateModifierFunc allows to create simple certificate modifiers just
 // with a function.
-type CertificateModifierFunc func(cert *x509.Certificate, opts Options) error
+type CertificateModifierFunc func(cert *x509.Certificate, opts SignOptions) error
 
 // Modify implements CertificateModifier and just calls the defined function.
-func (fn CertificateModifierFunc) Modify(cert *x509.Certificate, opts Options) error {
+func (fn CertificateModifierFunc) Modify(cert *x509.Certificate, opts SignOptions) error {
 	return fn(cert, opts)
 }
 
@@ -270,7 +270,7 @@ func (eee ExtraExtsEnforcer) Enforce(cert *x509.Certificate) error {
 // duration.
 type profileDefaultDuration time.Duration
 
-func (v profileDefaultDuration) Modify(cert *x509.Certificate, so Options) error {
+func (v profileDefaultDuration) Modify(cert *x509.Certificate, so SignOptions) error {
 	var backdate time.Duration
 	notBefore := so.NotBefore.Time()
 	if notBefore.IsZero() {
@@ -301,7 +301,7 @@ type profileLimitDuration struct {
 
 // Option returns an x509util option that limits the validity period of a
 // certificate to one that is superficially imposed.
-func (v profileLimitDuration) Modify(cert *x509.Certificate, so Options) error {
+func (v profileLimitDuration) Modify(cert *x509.Certificate, so SignOptions) error {
 	var backdate time.Duration
 	notBefore := so.NotBefore.Time()
 	if notBefore.IsZero() {
@@ -347,7 +347,7 @@ func newValidityValidator(min, max time.Duration) *validityValidator {
 
 // Valid validates the certificate validity settings (notBefore/notAfter) and
 // and total duration.
-func (v *validityValidator) Valid(cert *x509.Certificate, o Options) error {
+func (v *validityValidator) Valid(cert *x509.Certificate, o SignOptions) error {
 	var (
 		na  = cert.NotAfter.Truncate(time.Second)
 		nb  = cert.NotBefore.Truncate(time.Second)
@@ -397,7 +397,7 @@ func newForceCNOption(forceCN bool) *forceCNOption {
 	return &forceCNOption{forceCN}
 }
 
-func (o *forceCNOption) Modify(cert *x509.Certificate, _ Options) error {
+func (o *forceCNOption) Modify(cert *x509.Certificate, _ SignOptions) error {
 	if !o.ForceCN {
 		// Forcing CN is disabled, do nothing to certificate
 		return nil
@@ -430,7 +430,7 @@ func newProvisionerExtensionOption(typ Type, name, credentialID string, keyValue
 	}
 }
 
-func (o *provisionerExtensionOption) Modify(cert *x509.Certificate, _ Options) error {
+func (o *provisionerExtensionOption) Modify(cert *x509.Certificate, _ SignOptions) error {
 	ext, err := createProvisionerExtension(o.Type, o.Name, o.CredentialID, o.KeyValuePairs...)
 	if err != nil {
 		return err

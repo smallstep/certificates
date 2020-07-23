@@ -12,19 +12,18 @@ import (
 // CertificateOptions is an interface that returns a list of options passed when
 // creating a new certificate.
 type CertificateOptions interface {
-	Options(Options) []x509util.Option
+	Options(SignOptions) []x509util.Option
 }
 
-type certificateOptionsFunc func(Options) []x509util.Option
+type certificateOptionsFunc func(SignOptions) []x509util.Option
 
-func (fn certificateOptionsFunc) Options(so Options) []x509util.Option {
+func (fn certificateOptionsFunc) Options(so SignOptions) []x509util.Option {
 	return fn(so)
 }
 
-// ProvisionerOptions are a collection of custom options that can be added to
+// Options are a collection of custom options that can be added to
 // each provisioner.
-// nolint:golint
-type ProvisionerOptions struct {
+type Options struct {
 	// Template contains a X.509 certificate template. It can be a JSON template
 	// escaped in a string or it can be also encoded in base64.
 	Template string `json:"template"`
@@ -38,7 +37,7 @@ type ProvisionerOptions struct {
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
-func (o *ProvisionerOptions) HasTemplate() bool {
+func (o *Options) HasTemplate() bool {
 	return o != nil && (o.Template != "" || o.TemplateFile != "")
 }
 
@@ -46,7 +45,7 @@ func (o *ProvisionerOptions) HasTemplate() bool {
 // defined in the ProvisionerOptions, the provisioner generated data, and the
 // user data provided in the request. If no template has been provided,
 // x509util.DefaultLeafTemplate will be used.
-func TemplateOptions(o *ProvisionerOptions, data x509util.TemplateData) (CertificateOptions, error) {
+func TemplateOptions(o *Options, data x509util.TemplateData) (CertificateOptions, error) {
 	return CustomTemplateOptions(o, data, x509util.DefaultLeafTemplate)
 }
 
@@ -54,7 +53,7 @@ func TemplateOptions(o *ProvisionerOptions, data x509util.TemplateData) (Certifi
 // defined in the ProvisionerOptions, the provisioner generated data and the
 // user data provided in the request. If no template has been provided in the
 // ProvisionerOptions, the given template will be used.
-func CustomTemplateOptions(o *ProvisionerOptions, data x509util.TemplateData, defaultTemplate string) (CertificateOptions, error) {
+func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTemplate string) (CertificateOptions, error) {
 	if o != nil {
 		if data == nil {
 			data = x509util.NewTemplateData()
@@ -68,7 +67,7 @@ func CustomTemplateOptions(o *ProvisionerOptions, data x509util.TemplateData, de
 		}
 	}
 
-	return certificateOptionsFunc(func(so Options) []x509util.Option {
+	return certificateOptionsFunc(func(so SignOptions) []x509util.Option {
 		// We're not provided user data without custom templates.
 		if !o.HasTemplate() {
 			return []x509util.Option{

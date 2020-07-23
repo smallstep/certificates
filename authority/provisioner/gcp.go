@@ -77,15 +77,15 @@ func newGCPConfig() *gcpConfig {
 // https://cloud.google.com/compute/docs/instances/verifying-instance-identity
 type GCP struct {
 	*base
-	Type                   string              `json:"type"`
-	Name                   string              `json:"name"`
-	ServiceAccounts        []string            `json:"serviceAccounts"`
-	ProjectIDs             []string            `json:"projectIDs"`
-	DisableCustomSANs      bool                `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool                `json:"disableTrustOnFirstUse"`
-	InstanceAge            Duration            `json:"instanceAge,omitempty"`
-	Claims                 *Claims             `json:"claims,omitempty"`
-	Options                *ProvisionerOptions `json:"options,omitempty"`
+	Type                   string   `json:"type"`
+	Name                   string   `json:"name"`
+	ServiceAccounts        []string `json:"serviceAccounts"`
+	ProjectIDs             []string `json:"projectIDs"`
+	DisableCustomSANs      bool     `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
+	InstanceAge            Duration `json:"instanceAge,omitempty"`
+	Claims                 *Claims  `json:"claims,omitempty"`
+	Options                *Options `json:"options,omitempty"`
 	claimer                *Claimer
 	config                 *gcpConfig
 	keyStore               *keyStore
@@ -394,7 +394,7 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	}
 
 	// Default to host + known hostnames
-	defaults := SSHOptions{
+	defaults := SignSSHOptions{
 		CertType:   SSHHostCert,
 		Principals: principals,
 	}

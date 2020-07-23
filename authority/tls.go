@@ -32,7 +32,7 @@ var oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
 var oidSubjectKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 14}
 
 func withDefaultASN1DN(def *x509legacy.ASN1DN) provisioner.CertificateModifierFunc {
-	return func(crt *x509.Certificate, opts provisioner.Options) error {
+	return func(crt *x509.Certificate, opts provisioner.SignOptions) error {
 		if def == nil {
 			return errors.New("default ASN1DN template cannot be nil")
 		}
@@ -61,7 +61,7 @@ func withDefaultASN1DN(def *x509legacy.ASN1DN) provisioner.CertificateModifierFu
 }
 
 // Sign creates a signed certificate from a certificate signing request.
-func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	var (
 		certOptions    []x509util.Option
 		certValidators []provisioner.CertificateValidator

@@ -895,13 +895,13 @@ func TestOrderUpdateStatus(t *testing.T) {
 }
 
 type mockSignAuth struct {
-	sign                func(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	sign                func(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	loadProvisionerByID func(string) (provisioner.Interface, error)
 	ret1, ret2          interface{}
 	err                 error
 }
 
-func (m *mockSignAuth) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+func (m *mockSignAuth) Sign(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	if m.sign != nil {
 		return m.sign(csr, signOpts, extraOpts...)
 	} else if m.err != nil {
@@ -1262,7 +1262,7 @@ func TestOrderFinalize(t *testing.T) {
 				res: clone,
 				csr: csr,
 				sa: &mockSignAuth{
-					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					sign: func(csr *x509.CertificateRequest, pops provisioner.SignOptions, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, len(signOps), 6)
 						return []*x509.Certificate{crt, inter}, nil
 					},
@@ -1311,7 +1311,7 @@ func TestOrderFinalize(t *testing.T) {
 				res: &clone,
 				csr: csr,
 				sa: &mockSignAuth{
-					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					sign: func(csr *x509.CertificateRequest, pops provisioner.SignOptions, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, len(signOps), 6)
 						return []*x509.Certificate{crt, inter}, nil
 					},
@@ -1358,7 +1358,7 @@ func TestOrderFinalize(t *testing.T) {
 				res: &clone,
 				csr: csr,
 				sa: &mockSignAuth{
-					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					sign: func(csr *x509.CertificateRequest, pops provisioner.SignOptions, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, len(signOps), 6)
 						return []*x509.Certificate{crt, inter}, nil
 					},

@@ -30,20 +30,20 @@ type SSHCertModifier interface {
 // to modify the SSH certificate.
 type SSHCertOptionModifier interface {
 	SignOption
-	Option(o SSHOptions) SSHCertModifier
+	Option(o SignSSHOptions) SSHCertModifier
 }
 
 // SSHCertValidator is the interface used to validate an SSH certificate.
 type SSHCertValidator interface {
 	SignOption
-	Valid(cert *ssh.Certificate, opts SSHOptions) error
+	Valid(cert *ssh.Certificate, opts SignSSHOptions) error
 }
 
 // SSHCertOptionsValidator is the interface used to validate the custom
 // options used to modify the SSH certificate.
 type SSHCertOptionsValidator interface {
 	SignOption
-	Valid(got SSHOptions) error
+	Valid(got SignSSHOptions) error
 }
 
 // sshModifierFunc is an adapter to allow the use of ordinary functions as SSH
@@ -54,8 +54,8 @@ func (f sshModifierFunc) Modify(cert *ssh.Certificate) error {
 	return f(cert)
 }
 
-// SSHOptions contains the options that can be passed to the SignSSH method.
-type SSHOptions struct {
+// SignSSHOptions contains the options that can be passed to the SignSSH method.
+type SignSSHOptions struct {
 	CertType    string        `json:"certType"`
 	KeyID       string        `json:"keyID"`
 	Principals  []string      `json:"principals"`
@@ -65,12 +65,12 @@ type SSHOptions struct {
 }
 
 // Type returns the uint32 representation of the CertType.
-func (o SSHOptions) Type() uint32 {
+func (o SignSSHOptions) Type() uint32 {
 	return sshCertTypeUInt32(o.CertType)
 }
 
 // Modify implements SSHCertModifier and sets the SSHOption in the ssh.Certificate.
-func (o SSHOptions) Modify(cert *ssh.Certificate) error {
+func (o SignSSHOptions) Modify(cert *ssh.Certificate) error {
 	switch o.CertType {
 	case "": // ignore
 	case SSHUserCert:
@@ -100,7 +100,7 @@ func (o SSHOptions) Modify(cert *ssh.Certificate) error {
 
 // match compares two SSHOptions and return an error if they don't match. It
 // ignores zero values.
-func (o SSHOptions) match(got SSHOptions) error {
+func (o SignSSHOptions) match(got SignSSHOptions) error {
 	if o.CertType != "" && got.CertType != "" && o.CertType != got.CertType {
 		return errors.Errorf("ssh certificate type does not match - got %v, want %v", got.CertType, o.CertType)
 	}
@@ -165,7 +165,7 @@ func (m sshCertValidBeforeModifier) Modify(cert *ssh.Certificate) error {
 
 // sshCertDefaultsModifier implements a SSHCertModifier that
 // modifies the certificate with the given options if they are not set.
-type sshCertDefaultsModifier SSHOptions
+type sshCertDefaultsModifier SignSSHOptions
 
 // Modify implements the SSHCertModifier interface.
 func (m sshCertDefaultsModifier) Modify(cert *ssh.Certificate) error {
@@ -215,7 +215,7 @@ type sshDefaultDuration struct {
 	*Claimer
 }
 
-func (m *sshDefaultDuration) Option(o SSHOptions) SSHCertModifier {
+func (m *sshDefaultDuration) Option(o SignSSHOptions) SSHCertModifier {
 	return sshModifierFunc(func(cert *ssh.Certificate) error {
 		d, err := m.DefaultSSHCertDuration(cert.CertType)
 		if err != nil {
@@ -248,7 +248,7 @@ type sshLimitDuration struct {
 	NotAfter time.Time
 }
 
-func (m *sshLimitDuration) Option(o SSHOptions) SSHCertModifier {
+func (m *sshLimitDuration) Option(o SignSSHOptions) SSHCertModifier {
 	if m.NotAfter.IsZero() {
 		defaultDuration := &sshDefaultDuration{m.Claimer}
 		return defaultDuration.Option(o)
@@ -297,12 +297,12 @@ func (m *sshLimitDuration) Option(o SSHOptions) SSHCertModifier {
 
 // sshCertOptionsValidator validates the user SSHOptions with the ones
 // usually present in the token.
-type sshCertOptionsValidator SSHOptions
+type sshCertOptionsValidator SignSSHOptions
 
 // Valid implements SSHCertOptionsValidator and returns nil if both
 // SSHOptions match.
-func (v sshCertOptionsValidator) Valid(got SSHOptions) error {
-	want := SSHOptions(v)
+func (v sshCertOptionsValidator) Valid(got SignSSHOptions) error {
+	want := SignSSHOptions(v)
 	return want.match(got)
 }
 
@@ -310,7 +310,7 @@ type sshCertValidityValidator struct {
 	*Claimer
 }
 
-func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SSHOptions) error {
+func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOptions) error {
 	switch {
 	case cert.ValidAfter == 0:
 		return errors.New("ssh certificate validAfter cannot be 0")
@@ -355,7 +355,7 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SSHOptions)
 type sshCertDefaultValidator struct{}
 
 // Valid returns an error if the given certificate does not contain the necessary fields.
-func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate, o SSHOptions) error {
+func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate, o SignSSHOptions) error {
 	switch {
 	case len(cert.Nonce) == 0:
 		return errors.New("ssh certificate nonce cannot be empty")
@@ -390,7 +390,7 @@ func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate, o SSHOptions) err
 type sshDefaultPublicKeyValidator struct{}
 
 // Valid checks that certificate request common name matches the one configured.
-func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, o SSHOptions) error {
+func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, o SignSSHOptions) error {
 	if cert.Key == nil {
 		return errors.New("ssh certificate key cannot be nil")
 	}
@@ -420,7 +420,7 @@ func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, o SSHOptions)
 type sshCertKeyIDValidator string
 
 // Valid returns an error if the given certificate does not contain the necessary fields.
-func (v sshCertKeyIDValidator) Valid(cert *ssh.Certificate, o SSHOptions) error {
+func (v sshCertKeyIDValidator) Valid(cert *ssh.Certificate, o SignSSHOptions) error {
 	if string(v) != cert.KeyId {
 		return errors.Errorf("invalid ssh certificate KeyId; want %s, but got %s", string(v), cert.KeyId)
 	}

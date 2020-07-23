@@ -132,7 +132,7 @@ func TestAuthority_Sign(t *testing.T) {
 	}
 
 	nb := time.Now()
-	signOpts := provisioner.Options{
+	signOpts := provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(nb),
 		NotAfter:  provisioner.NewTimeDuration(nb.Add(time.Minute * 5)),
 	}
@@ -150,7 +150,7 @@ func TestAuthority_Sign(t *testing.T) {
 	type signTest struct {
 		auth      *Authority
 		csr       *x509.CertificateRequest
-		signOpts  provisioner.Options
+		signOpts  provisioner.SignOptions
 		extraOpts []provisioner.SignOption
 		notBefore time.Time
 		notAfter  time.Time
@@ -210,7 +210,7 @@ func TestAuthority_Sign(t *testing.T) {
 		},
 		"fail provisioner duration claim": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
-			_signOpts := provisioner.Options{
+			_signOpts := provisioner.SignOptions{
 				NotBefore: provisioner.NewTimeDuration(nb),
 				NotAfter:  provisioner.NewTimeDuration(nb.Add(time.Hour * 25)),
 			}
@@ -429,14 +429,14 @@ func TestAuthority_Renew(t *testing.T) {
 	certModToWithOptions := func(m provisioner.CertificateModifierFunc) x509util.WithOption {
 		return func(p x509util.Profile) error {
 			crt := p.Subject()
-			return m.Modify(crt, provisioner.Options{})
+			return m.Modify(crt, provisioner.SignOptions{})
 		}
 	}
 
 	now := time.Now().UTC()
 	nb1 := now.Add(-time.Minute * 7)
 	na1 := now
-	so := &provisioner.Options{
+	so := &provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(nb1),
 		NotAfter:  provisioner.NewTimeDuration(na1),
 	}
@@ -656,14 +656,14 @@ func TestAuthority_Rekey(t *testing.T) {
 	certModToWithOptions := func(m provisioner.CertificateModifierFunc) x509util.WithOption {
 		return func(p x509util.Profile) error {
 			crt := p.Subject()
-			return m.Modify(crt, provisioner.Options{})
+			return m.Modify(crt, provisioner.SignOptions{})
 		}
 	}
 
 	now := time.Now().UTC()
 	nb1 := now.Add(-time.Minute * 7)
 	na1 := now
-	so := &provisioner.Options{
+	so := &provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(nb1),
 		NotAfter:  provisioner.NewTimeDuration(na1),
 	}

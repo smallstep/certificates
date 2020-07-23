@@ -713,20 +713,20 @@ func generateK8sSAToken(jwk *jose.JSONWebKey, claims *k8sSAPayload, tokOpts ...t
 }
 
 func generateSimpleSSHUserToken(iss, aud string, jwk *jose.JSONWebKey) (string, error) {
-	return generateSSHToken("subject@localhost", iss, aud, time.Now(), &SSHOptions{
+	return generateSSHToken("subject@localhost", iss, aud, time.Now(), &SignSSHOptions{
 		CertType:   "user",
 		Principals: []string{"name"},
 	}, jwk)
 }
 
 func generateSimpleSSHHostToken(iss, aud string, jwk *jose.JSONWebKey) (string, error) {
-	return generateSSHToken("subject@localhost", iss, aud, time.Now(), &SSHOptions{
+	return generateSSHToken("subject@localhost", iss, aud, time.Now(), &SignSSHOptions{
 		CertType:   "host",
 		Principals: []string{"smallstep.com"},
 	}, jwk)
 }
 
-func generateSSHToken(sub, iss, aud string, iat time.Time, sshOpts *SSHOptions, jwk *jose.JSONWebKey) (string, error) {
+func generateSSHToken(sub, iss, aud string, iat time.Time, sshOpts *SignSSHOptions, jwk *jose.JSONWebKey) (string, error) {
 	sig, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
 		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID),

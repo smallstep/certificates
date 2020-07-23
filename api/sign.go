@@ -60,7 +60,7 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	opts := provisioner.Options{
+	opts := provisioner.SignOptions{
 		NotBefore:    body.NotBefore,
 		NotAfter:     body.NotAfter,
 		TemplateData: body.TemplateData,

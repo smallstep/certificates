@@ -13,11 +13,11 @@ import (
 // provisioning flow.
 type ACME struct {
 	*base
-	Type    string              `json:"type"`
-	Name    string              `json:"name"`
-	ForceCN bool                `json:"forceCN,omitempty"`
-	Claims  *Claims             `json:"claims,omitempty"`
-	Options *ProvisionerOptions `json:"options,omitempty"`
+	Type    string   `json:"type"`
+	Name    string   `json:"name"`
+	ForceCN bool     `json:"forceCN,omitempty"`
+	Claims  *Claims  `json:"claims,omitempty"`
+	Options *Options `json:"options,omitempty"`
 	claimer *Claimer
 }
 
@@ -47,7 +47,7 @@ func (p *ACME) GetEncryptedKey() (string, string, bool) {
 }
 
 // GetOptions returns the configured provisioner options.
-func (p *ACME) GetOptions() *ProvisionerOptions {
+func (p *ACME) GetOptions() *Options {
 	return p.Options
 }
 

@@ -42,7 +42,7 @@ func TestProvisionerOptions_HasTemplate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			o := &ProvisionerOptions{
+			o := &Options{
 				Template:     tt.fields.Template,
 				TemplateFile: tt.fields.TemplateFile,
 				TemplateData: tt.fields.TemplateData,
@@ -65,7 +65,7 @@ func TestTemplateOptions(t *testing.T) {
 		},
 	}
 	type args struct {
-		o    *ProvisionerOptions
+		o    *Options
 		data x509util.TemplateData
 	}
 	tests := []struct {
@@ -81,14 +81,14 @@ func TestTemplateOptions(t *testing.T) {
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
 }`)}, false},
-		{"okCustomTemplate", args{&ProvisionerOptions{Template: x509util.DefaultIIDLeafTemplate}, data}, x509util.Options{
+		{"okCustomTemplate", args{&Options{Template: x509util.DefaultIIDLeafTemplate}, data}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"subject": {"commonName":"foo"},
 	"sans": [{"type":"dns","value":"foo.com"}],
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
 }`)}, false},
-		{"fail", args{&ProvisionerOptions{TemplateData: []byte(`{"badJSON`)}, data}, x509util.Options{}, true},
+		{"fail", args{&Options{TemplateData: []byte(`{"badJSON`)}, data}, x509util.Options{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -99,7 +99,7 @@ func TestTemplateOptions(t *testing.T) {
 			}
 			var opts x509util.Options
 			if cof != nil {
-				for _, fn := range cof.Options(Options{}) {
+				for _, fn := range cof.Options(SignOptions{}) {
 					if err := fn(csr, &opts); err != nil {
 						t.Errorf("x509util.Options() error = %v", err)
 						return
@@ -125,10 +125,10 @@ func TestCustomTemplateOptions(t *testing.T) {
 		},
 	}
 	type args struct {
-		o               *ProvisionerOptions
+		o               *Options
 		data            x509util.TemplateData
 		defaultTemplate string
-		userOptions     Options
+		userOptions     SignOptions
 	}
 	tests := []struct {
 		name    string
@@ -136,48 +136,48 @@ func TestCustomTemplateOptions(t *testing.T) {
 		want    x509util.Options
 		wantErr bool
 	}{
-		{"ok", args{nil, data, x509util.DefaultLeafTemplate, Options{}}, x509util.Options{
+		{"ok", args{nil, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"subject": {"commonName":"foobar"},
 	"sans": [{"type":"dns","value":"foo.com"}],
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
 }`)}, false},
-		{"okIID", args{nil, data, x509util.DefaultIIDLeafTemplate, Options{}}, x509util.Options{
+		{"okIID", args{nil, data, x509util.DefaultIIDLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"subject": {"commonName":"foo"},
 	"sans": [{"type":"dns","value":"foo.com"}],
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
 }`)}, false},
-		{"okNoData", args{&ProvisionerOptions{}, nil, x509util.DefaultLeafTemplate, Options{}}, x509util.Options{
+		{"okNoData", args{&Options{}, nil, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"subject": null,
 	"sans": null,
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
 }`)}, false},
-		{"okTemplateData", args{&ProvisionerOptions{TemplateData: []byte(`{"foo":"bar"}`)}, data, x509util.DefaultLeafTemplate, Options{}}, x509util.Options{
+		{"okTemplateData", args{&Options{TemplateData: []byte(`{"foo":"bar"}`)}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"subject": {"commonName":"foobar"},
 	"sans": [{"type":"dns","value":"foo.com"}],
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
 }`)}, false},
-		{"okTemplate", args{&ProvisionerOptions{Template: "{{ toJson .Insecure.CR }}"}, data, x509util.DefaultLeafTemplate, Options{}}, x509util.Options{
+		{"okTemplate", args{&Options{Template: "{{ toJson .Insecure.CR }}"}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(csrCertificate)}, false},
-		{"okFile", args{&ProvisionerOptions{TemplateFile: "./testdata/templates/cr.tpl"}, data, x509util.DefaultLeafTemplate, Options{}}, x509util.Options{
+		{"okFile", args{&Options{TemplateFile: "./testdata/templates/cr.tpl"}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(csrCertificate)}, false},
-		{"okBase64", args{&ProvisionerOptions{Template: "e3sgdG9Kc29uIC5JbnNlY3VyZS5DUiB9fQ=="}, data, x509util.DefaultLeafTemplate, Options{}}, x509util.Options{
+		{"okBase64", args{&Options{Template: "e3sgdG9Kc29uIC5JbnNlY3VyZS5DUiB9fQ=="}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(csrCertificate)}, false},
-		{"okUserOptions", args{&ProvisionerOptions{Template: `{"foo": "{{.Insecure.User.foo}}"}`}, data, x509util.DefaultLeafTemplate, Options{TemplateData: []byte(`{"foo":"bar"}`)}}, x509util.Options{
+		{"okUserOptions", args{&Options{Template: `{"foo": "{{.Insecure.User.foo}}"}`}, data, x509util.DefaultLeafTemplate, SignOptions{TemplateData: []byte(`{"foo":"bar"}`)}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{"foo": "bar"}`),
 		}, false},
-		{"okBadUserOptions", args{&ProvisionerOptions{Template: `{"foo": "{{.Insecure.User.foo}}"}`}, data, x509util.DefaultLeafTemplate, Options{TemplateData: []byte(`{"badJSON"}`)}}, x509util.Options{
+		{"okBadUserOptions", args{&Options{Template: `{"foo": "{{.Insecure.User.foo}}"}`}, data, x509util.DefaultLeafTemplate, SignOptions{TemplateData: []byte(`{"badJSON"}`)}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{"foo": "<no value>"}`),
 		}, false},
-		{"fail", args{&ProvisionerOptions{TemplateData: []byte(`{"badJSON`)}, data, x509util.DefaultLeafTemplate, Options{}}, x509util.Options{}, true},
-		{"failTemplateData", args{&ProvisionerOptions{TemplateData: []byte(`{"badJSON}`)}, data, x509util.DefaultLeafTemplate, Options{}}, x509util.Options{}, true},
+		{"fail", args{&Options{TemplateData: []byte(`{"badJSON`)}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{}, true},
+		{"failTemplateData", args{&Options{TemplateData: []byte(`{"badJSON}`)}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

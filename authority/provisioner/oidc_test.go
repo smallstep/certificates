@@ -534,64 +534,64 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 
 	userDuration := p1.claimer.DefaultUserSSHCertDuration()
 	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
-	expectedUserOptions := &SSHOptions{
+	expectedUserOptions := &SignSSHOptions{
 		CertType: "user", Principals: []string{"name", "name@smallstep.com"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
 	}
-	expectedAdminOptions := &SSHOptions{
+	expectedAdminOptions := &SignSSHOptions{
 		CertType: "user", Principals: []string{"root", "root@example.com"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
 	}
-	expectedHostOptions := &SSHOptions{
+	expectedHostOptions := &SignSSHOptions{
 		CertType: "host", Principals: []string{"smallstep.com"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
 	}
 
 	type args struct {
 		token   string
-		sshOpts SSHOptions
+		sshOpts SignSSHOptions
 		key     interface{}
 	}
 	tests := []struct {
 		name        string
 		prov        *OIDC
 		args        args
-		expected    *SSHOptions
+		expected    *SignSSHOptions
 		code        int
 		wantErr     bool
 		wantSignErr bool
 	}{
-		{"ok", p1, args{t1, SSHOptions{}, pub}, expectedUserOptions, http.StatusOK, false, false},
-		{"ok-rsa2048", p1, args{t1, SSHOptions{}, rsa2048.Public()}, expectedUserOptions, http.StatusOK, false, false},
-		{"ok-user", p1, args{t1, SSHOptions{CertType: "user"}, pub}, expectedUserOptions, http.StatusOK, false, false},
-		{"ok-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}, pub},
-			&SSHOptions{CertType: "user", Principals: []string{"name"},
+		{"ok", p1, args{t1, SignSSHOptions{}, pub}, expectedUserOptions, http.StatusOK, false, false},
+		{"ok-rsa2048", p1, args{t1, SignSSHOptions{}, rsa2048.Public()}, expectedUserOptions, http.StatusOK, false, false},
+		{"ok-user", p1, args{t1, SignSSHOptions{CertType: "user"}, pub}, expectedUserOptions, http.StatusOK, false, false},
+		{"ok-principals", p1, args{t1, SignSSHOptions{Principals: []string{"name"}}, pub},
+			&SignSSHOptions{CertType: "user", Principals: []string{"name"},
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
-		{"ok-principals-getIdentity", p4, args{okGetIdentityToken, SSHOptions{Principals: []string{"mariano"}}, pub},
-			&SSHOptions{CertType: "user", Principals: []string{"mariano"},
+		{"ok-principals-getIdentity", p4, args{okGetIdentityToken, SignSSHOptions{Principals: []string{"mariano"}}, pub},
+			&SignSSHOptions{CertType: "user", Principals: []string{"mariano"},
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
-		{"ok-emptyPrincipals-getIdentity", p4, args{okGetIdentityToken, SSHOptions{}, pub},
-			&SSHOptions{CertType: "user", Principals: []string{"max", "mariano"},
+		{"ok-emptyPrincipals-getIdentity", p4, args{okGetIdentityToken, SignSSHOptions{}, pub},
+			&SignSSHOptions{CertType: "user", Principals: []string{"max", "mariano"},
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
-		{"ok-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub},
-			&SSHOptions{CertType: "user", Principals: []string{"name"},
+		{"ok-options", p1, args{t1, SignSSHOptions{CertType: "user", Principals: []string{"name"}}, pub},
+			&SignSSHOptions{CertType: "user", Principals: []string{"name"},
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
-		{"admin", p3, args{okAdmin, SSHOptions{}, pub}, expectedAdminOptions, http.StatusOK, false, false},
-		{"admin-user", p3, args{okAdmin, SSHOptions{CertType: "user"}, pub}, expectedAdminOptions, http.StatusOK, false, false},
-		{"admin-principals", p3, args{okAdmin, SSHOptions{Principals: []string{"root"}}, pub},
-			&SSHOptions{CertType: "user", Principals: []string{"root"},
+		{"admin", p3, args{okAdmin, SignSSHOptions{}, pub}, expectedAdminOptions, http.StatusOK, false, false},
+		{"admin-user", p3, args{okAdmin, SignSSHOptions{CertType: "user"}, pub}, expectedAdminOptions, http.StatusOK, false, false},
+		{"admin-principals", p3, args{okAdmin, SignSSHOptions{Principals: []string{"root"}}, pub},
+			&SignSSHOptions{CertType: "user", Principals: []string{"root"},
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
-		{"admin-options", p3, args{okAdmin, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub},
-			&SSHOptions{CertType: "user", Principals: []string{"name"},
+		{"admin-options", p3, args{okAdmin, SignSSHOptions{CertType: "user", Principals: []string{"name"}}, pub},
+			&SignSSHOptions{CertType: "user", Principals: []string{"name"},
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
-		{"admin-host", p3, args{okAdmin, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub},
+		{"admin-host", p3, args{okAdmin, SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub},
 			expectedHostOptions, http.StatusOK, false, false},
-		{"fail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedUserOptions, http.StatusOK, false, true},
-		{"fail-user-host", p1, args{t1, SSHOptions{CertType: "host"}, pub}, nil, http.StatusOK, false, true},
-		{"fail-user-principals", p1, args{t1, SSHOptions{Principals: []string{"root"}}, pub}, nil, http.StatusOK, false, true},
-		{"fail-email", p3, args{failEmail, SSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
-		{"fail-getIdentity", p5, args{failGetIdentityToken, SSHOptions{}, pub}, nil, http.StatusInternalServerError, true, false},
-		{"fail-sshCA-disabled", p6, args{"foo", SSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
+		{"fail-rsa1024", p1, args{t1, SignSSHOptions{}, rsa1024.Public()}, expectedUserOptions, http.StatusOK, false, true},
+		{"fail-user-host", p1, args{t1, SignSSHOptions{CertType: "host"}, pub}, nil, http.StatusOK, false, true},
+		{"fail-user-principals", p1, args{t1, SignSSHOptions{Principals: []string{"root"}}, pub}, nil, http.StatusOK, false, true},
+		{"fail-email", p3, args{failEmail, SignSSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
+		{"fail-getIdentity", p5, args{failGetIdentityToken, SignSSHOptions{}, pub}, nil, http.StatusInternalServerError, true, false},
+		{"fail-sshCA-disabled", p6, args{"foo", SignSSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

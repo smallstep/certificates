@@ -338,7 +338,7 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 	signOps = append(signOps, templateOptions)
 
 	// Create and store a new certificate.
-	certChain, err := auth.Sign(csr, provisioner.Options{
+	certChain, err := auth.Sign(csr, provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
 		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
 	}, signOps...)

@@ -83,15 +83,15 @@ type azurePayload struct {
 // and https://docs.microsoft.com/en-us/azure/virtual-machines/windows/instance-metadata-service
 type Azure struct {
 	*base
-	Type                   string              `json:"type"`
-	Name                   string              `json:"name"`
-	TenantID               string              `json:"tenantID"`
-	ResourceGroups         []string            `json:"resourceGroups"`
-	Audience               string              `json:"audience,omitempty"`
-	DisableCustomSANs      bool                `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool                `json:"disableTrustOnFirstUse"`
-	Claims                 *Claims             `json:"claims,omitempty"`
-	Options                *ProvisionerOptions `json:"options,omitempty"`
+	Type                   string   `json:"type"`
+	Name                   string   `json:"name"`
+	TenantID               string   `json:"tenantID"`
+	ResourceGroups         []string `json:"resourceGroups"`
+	Audience               string   `json:"audience,omitempty"`
+	DisableCustomSANs      bool     `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
+	Claims                 *Claims  `json:"claims,omitempty"`
+	Options                *Options `json:"options,omitempty"`
 	claimer                *Claimer
 	config                 *azureConfig
 	oidcConfig             openIDConfiguration
@@ -350,7 +350,7 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 	}
 
 	// Default to host + known hostnames
-	defaults := SSHOptions{
+	defaults := SignSSHOptions{
 		CertType:   SSHHostCert,
 		Principals: principals,
 	}

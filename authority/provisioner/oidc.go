@@ -53,18 +53,18 @@ type openIDPayload struct {
 // ClientSecret is mandatory, but it can be an empty string.
 type OIDC struct {
 	*base
-	Type                  string              `json:"type"`
-	Name                  string              `json:"name"`
-	ClientID              string              `json:"clientID"`
-	ClientSecret          string              `json:"clientSecret"`
-	ConfigurationEndpoint string              `json:"configurationEndpoint"`
-	TenantID              string              `json:"tenantID,omitempty"`
-	Admins                []string            `json:"admins,omitempty"`
-	Domains               []string            `json:"domains,omitempty"`
-	Groups                []string            `json:"groups,omitempty"`
-	ListenAddress         string              `json:"listenAddress,omitempty"`
-	Claims                *Claims             `json:"claims,omitempty"`
-	Options               *ProvisionerOptions `json:"options,omitempty"`
+	Type                  string   `json:"type"`
+	Name                  string   `json:"name"`
+	ClientID              string   `json:"clientID"`
+	ClientSecret          string   `json:"clientSecret"`
+	ConfigurationEndpoint string   `json:"configurationEndpoint"`
+	TenantID              string   `json:"tenantID,omitempty"`
+	Admins                []string `json:"admins,omitempty"`
+	Domains               []string `json:"domains,omitempty"`
+	Groups                []string `json:"groups,omitempty"`
+	ListenAddress         string   `json:"listenAddress,omitempty"`
+	Claims                *Claims  `json:"claims,omitempty"`
+	Options               *Options `json:"options,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
 	claimer               *Claimer
@@ -380,7 +380,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSSHSign")
 	}
-	defaults := SSHOptions{
+	defaults := SignSSHOptions{
 		CertType:   SSHUserCert,
 		Principals: iden.Usernames,
 	}

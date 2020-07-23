@@ -25,11 +25,11 @@ type x5cPayload struct {
 // signature requests.
 type X5C struct {
 	*base
-	Type      string              `json:"type"`
-	Name      string              `json:"name"`
-	Roots     []byte              `json:"roots"`
-	Claims    *Claims             `json:"claims,omitempty"`
-	Options   *ProvisionerOptions `json:"options,omitempty"`
+	Type      string   `json:"type"`
+	Name      string   `json:"name"`
+	Roots     []byte   `json:"roots"`
+	Claims    *Claims  `json:"claims,omitempty"`
+	Options   *Options `json:"options,omitempty"`
 	claimer   *Claimer
 	audiences Audiences
 	rootPool  *x509.CertPool

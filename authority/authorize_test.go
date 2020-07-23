@@ -830,17 +830,17 @@ func TestAuthority_authorizeRenew(t *testing.T) {
 }
 
 func generateSimpleSSHUserToken(iss, aud string, jwk *jose.JSONWebKey) (string, error) {
-	return generateSSHToken("subject@localhost", iss, aud, time.Now(), &provisioner.SSHOptions{
+	return generateSSHToken("subject@localhost", iss, aud, time.Now(), &provisioner.SignSSHOptions{
 		CertType:   "user",
 		Principals: []string{"name"},
 	}, jwk)
 }
 
 type stepPayload struct {
-	SSH *provisioner.SSHOptions `json:"ssh,omitempty"`
+	SSH *provisioner.SignSSHOptions `json:"ssh,omitempty"`
 }
 
-func generateSSHToken(sub, iss, aud string, iat time.Time, sshOpts *provisioner.SSHOptions, jwk *jose.JSONWebKey) (string, error) {
+func generateSSHToken(sub, iss, aud string, iat time.Time, sshOpts *provisioner.SignSSHOptions, jwk *jose.JSONWebKey) (string, error) {
 	sig, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
 		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID),
