@@ -205,56 +205,66 @@ func (a *Authority) GetSSHBastion(ctx context.Context, user string, hostname str
 
 // SignSSH creates a signed SSH certificate with the given public key and options.
 func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
-	var mods []provisioner.SSHCertModifier
-	var validators []provisioner.SSHCertValidator
+	var (
+		certOptions []sshutil.Option
+		mods        []provisioner.SSHCertModifier
+		validators  []provisioner.SSHCertValidator
+	)
 
 	// Set backdate with the configured value
 	opts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
 	for _, op := range signOpts {
 		switch o := op.(type) {
+		// add options to NewCertificate
+		case provisioner.SSHCertificateOptions:
+			certOptions = append(certOptions, o.Options(opts)...)
+
 		// modify the ssh.Certificate
 		case provisioner.SSHCertModifier:
 			mods = append(mods, o)
+
 		// modify the ssh.Certificate given the SSHOptions
 		case provisioner.SSHCertOptionModifier:
 			mods = append(mods, o.Option(opts))
+
 		// validate the ssh.Certificate
 		case provisioner.SSHCertValidator:
 			validators = append(validators, o)
+
 		// validate the given SSHOptions
 		case provisioner.SSHCertOptionsValidator:
 			if err := o.Valid(opts); err != nil {
 				return nil, errs.Wrap(http.StatusForbidden, err, "signSSH")
 			}
+
 		default:
 			return nil, errs.InternalServer("signSSH: invalid extra option type %T", o)
 		}
 	}
 
-	nonce, err := randutil.ASCII(32)
+	// Create certificate from template.
+	certificate, err := sshutil.NewCertificate(key, certOptions...)
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH")
+		if _, ok := err.(*sshutil.TemplateError); ok {
+			return nil, errs.NewErr(http.StatusBadRequest, err,
+				errs.WithMessage(err.Error()),
+				errs.WithKeyVal("signOptions", signOpts),
+			)
+		}
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH")
 	}
 
-	var serial uint64
-	if err := binary.Read(rand.Reader, binary.BigEndian, &serial); err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error reading random number")
-	}
+	// Get actual *ssh.Certificate and continue with user and provisioner
+	// modifiers.
+	cert := certificate.GetCertificate()
 
-	// Build base certificate with the key and some random values
-	cert := &ssh.Certificate{
-		Nonce:  []byte(nonce),
-		Key:    key,
-		Serial: serial,
-	}
-
-	// Use opts to modify the certificate
+	// Use SignSSHOptions to modify the certificate.
 	if err := opts.Modify(cert); err != nil {
 		return nil, errs.Wrap(http.StatusForbidden, err, "signSSH")
 	}
 
-	// Use provisioner modifiers
+	// Use provisioner modifiers.
 	for _, m := range mods {
 		if err := m.Modify(cert); err != nil {
 			return nil, errs.Wrap(http.StatusForbidden, err, "signSSH")
@@ -277,20 +287,14 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	default:
 		return nil, errs.InternalServer("signSSH: unexpected ssh certificate type: %d", cert.CertType)
 	}
-	cert.SignatureKey = signer.PublicKey()
 
-	// Get bytes for signing trailing the signature length.
-	data := cert.Marshal()
-	data = data[:len(data)-4]
-
-	// Sign the certificate
-	sig, err := signer.Sign(rand.Reader, data)
+	// Sign certificate.
+	cert, err = sshutil.CreateCertificate(cert, signer)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 	}
-	cert.Signature = sig
 
-	// User provisioners validators
+	// User provisioners validators.
 	for _, v := range validators {
 		if err := v.Valid(cert, opts); err != nil {
 			return nil, errs.Wrap(http.StatusForbidden, err, "signSSH")
