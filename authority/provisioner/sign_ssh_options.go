@@ -356,7 +356,9 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 // fields in the SSH certificate.
 type sshCertDefaultValidator struct{}
 
-// Valid returns an error if the given certificate does not contain the necessary fields.
+// Valid returns an error if the given certificate does not contain the
+// necessary fields. We skip ValidPrincipals and Extensions as with custom
+// templates you can set them empty.
 func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate, o SignSSHOptions) error {
 	switch {
 	case len(cert.Nonce) == 0:
@@ -369,16 +371,12 @@ func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate, o SignSSHOptions)
 		return errors.Errorf("ssh certificate has an unknown type: %d", cert.CertType)
 	case cert.KeyId == "":
 		return errors.New("ssh certificate key id cannot be empty")
-	case len(cert.ValidPrincipals) == 0:
-		return errors.New("ssh certificate valid principals cannot be empty")
 	case cert.ValidAfter == 0:
 		return errors.New("ssh certificate validAfter cannot be 0")
 	case cert.ValidBefore < uint64(now().Unix()):
 		return errors.New("ssh certificate validBefore cannot be in the past")
 	case cert.ValidBefore < cert.ValidAfter:
 		return errors.New("ssh certificate validBefore cannot be before validAfter")
-	case cert.CertType == ssh.UserCert && len(cert.Extensions) == 0:
-		return errors.New("ssh certificate extensions cannot be empty")
 	case cert.SignatureKey == nil:
 		return errors.New("ssh certificate signature key cannot be nil")
 	case cert.Signature == nil:
