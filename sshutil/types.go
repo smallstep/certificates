@@ -40,6 +40,18 @@ const (
 	hostString = "host"
 )
 
+// CertTypeFromString returns the CertType for the string "user" and "host".
+func CertTypeFromString(s string) (CertType, error) {
+	switch strings.ToLower(s) {
+	case userString:
+		return UserCert, nil
+	case hostString:
+		return HostCert, nil
+	default:
+		return 0, errors.Errorf("unknown certificate type '%s'", s)
+	}
+}
+
 // String returns "user" for user certificates and "host" for host certificates.
 // It will return the empty string for any other value.
 func (c CertType) String() string {
@@ -68,14 +80,10 @@ func (c *CertType) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return errors.Wrap(err, "error unmarshaling certificate type")
 	}
-	switch strings.ToLower(s) {
-	case userString:
-		*c = UserCert
-		return nil
-	case hostString:
-		*c = HostCert
-		return nil
-	default:
+	certType, err := CertTypeFromString(s)
+	if err != nil {
 		return errors.Errorf("error unmarshaling '%s' as a certificate type", s)
 	}
+	*c = certType
+	return nil
 }

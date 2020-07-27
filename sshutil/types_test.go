@@ -5,6 +5,37 @@ import (
 	"testing"
 )
 
+func TestCertTypeFromString(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    CertType
+		wantErr bool
+	}{
+		{"user", args{"user"}, UserCert, false},
+		{"USER", args{"USER"}, UserCert, false},
+		{"host", args{"host"}, HostCert, false},
+		{"Host", args{"Host"}, HostCert, false},
+		{" user ", args{" user "}, 0, true},
+		{"invalid", args{"invalid"}, 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CertTypeFromString(tt.args.s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CertTypeFromString() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("CertTypeFromString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCertType_String(t *testing.T) {
 	tests := []struct {
 		name string
