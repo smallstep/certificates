@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
 )
@@ -33,6 +34,7 @@ type JWK struct {
 	EncryptedKey string           `json:"encryptedKey,omitempty"`
 	Claims       *Claims          `json:"claims,omitempty"`
 	Options      *Options         `json:"options,omitempty"`
+	SSHOptions   *SSHOptions      `json:"sshOptions,omitempty"`
 	claimer      *Claimer
 	audiences    Audiences
 }
@@ -207,33 +209,46 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		sshCertOptionsValidator(*opts),
 	}
 
-	t := now()
-	// Add modifiers from custom claims
-	// FIXME: this is also set in the sign method using SSHOptions.Modify.
+	// Default template attributes.
+	certType := sshutil.UserCert
+	keyID := claims.Subject
+	principals := []string{claims.Subject}
+
+	// Use options in the token.
 	if opts.CertType != "" {
-		signOptions = append(signOptions, sshCertTypeModifier(opts.CertType))
+		if certType, err = sshutil.CertTypeFromString(opts.CertType); err != nil {
+			return nil, errs.Wrap(http.StatusBadRequest, err, "jwk.AuthorizeSSHSign")
+		}
+	}
+	if opts.KeyID != "" {
+		keyID = opts.KeyID
 	}
 	if len(opts.Principals) > 0 {
-		signOptions = append(signOptions, sshCertPrincipalsModifier(opts.Principals))
+		principals = opts.Principals
 	}
+
+	// Certificate templates.
+	data := sshutil.CreateTemplateData(certType, keyID, principals)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
+	templateOptions, err := TemplateSSHOptions(p.SSHOptions, data)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
+	}
+	signOptions = append(signOptions, templateOptions)
+
+	// Add modifiers from custom claims
+	t := now()
 	if !opts.ValidAfter.IsZero() {
 		signOptions = append(signOptions, sshCertValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
 	}
 	if !opts.ValidBefore.IsZero() {
 		signOptions = append(signOptions, sshCertValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
 	}
-	if opts.KeyID != "" {
-		signOptions = append(signOptions, sshCertKeyIDModifier(opts.KeyID))
-	} else {
-		signOptions = append(signOptions, sshCertKeyIDModifier(claims.Subject))
-	}
-
-	// Default to a user certificate with no principals if not set
-	signOptions = append(signOptions, sshCertDefaultsModifier{CertType: SSHUserCert})
 
 	return append(signOptions,
-		// Set the default extensions.
-		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{p.claimer},
 		// Validate that the keyID is equivalent to the token subject.
