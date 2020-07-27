@@ -310,16 +310,6 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 
 // RenewSSH creates a signed SSH certificate using the old SSH certificate as a template.
 func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ssh.Certificate, error) {
-	nonce, err := randutil.ASCII(32)
-	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH")
-	}
-
-	var serial uint64
-	if err := binary.Read(rand.Reader, binary.BigEndian, &serial); err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error reading random number")
-	}
-
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
 		return nil, errs.BadRequest("rewnewSSH: cannot renew certificate without validity period")
 	}
@@ -330,15 +320,15 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 	va := now.Add(-1 * backdate)
 	vb := now.Add(duration - backdate)
 
-	// Build base certificate with the key and some random values
+	// Build base certificate with the old key.
+	// Nonce and serial will be automatically generated on signing.
 	cert := &ssh.Certificate{
-		Nonce:           []byte(nonce),
 		Key:             oldCert.Key,
-		Serial:          serial,
 		CertType:        oldCert.CertType,
 		KeyId:           oldCert.KeyId,
 		ValidPrincipals: oldCert.ValidPrincipals,
 		Permissions:     oldCert.Permissions,
+		Reserved:        oldCert.Reserved,
 		ValidAfter:      uint64(va.Unix()),
 		ValidBefore:     uint64(vb.Unix()),
 	}
@@ -359,18 +349,13 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 	default:
 		return nil, errs.InternalServer("renewSSH: unexpected ssh certificate type: %d", cert.CertType)
 	}
-	cert.SignatureKey = signer.PublicKey()
 
-	// Get bytes for signing trailing the signature length.
-	data := cert.Marshal()
-	data = data[:len(data)-4]
-
-	// Sign the certificate
-	sig, err := signer.Sign(rand.Reader, data)
+	var err error
+	// Sign certificate.
+	cert, err = sshutil.CreateCertificate(cert, signer)
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error signing certificate")
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 	}
-	cert.Signature = sig
 
 	if err = a.db.StoreSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error storing certificate in db")
@@ -393,16 +378,6 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 		}
 	}
 
-	nonce, err := randutil.ASCII(32)
-	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "rekeySSH")
-	}
-
-	var serial uint64
-	if err := binary.Read(rand.Reader, binary.BigEndian, &serial); err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "rekeySSH; error reading random number")
-	}
-
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
 		return nil, errs.BadRequest("rekeySSH; cannot rekey certificate without validity period")
 	}
@@ -413,15 +388,15 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 	va := now.Add(-1 * backdate)
 	vb := now.Add(duration - backdate)
 
-	// Build base certificate with the key and some random values
+	// Build base certificate with the new key.
+	// Nonce and serial will be automatically generated on signing.
 	cert := &ssh.Certificate{
-		Nonce:           []byte(nonce),
 		Key:             pub,
-		Serial:          serial,
 		CertType:        oldCert.CertType,
 		KeyId:           oldCert.KeyId,
 		ValidPrincipals: oldCert.ValidPrincipals,
 		Permissions:     oldCert.Permissions,
+		Reserved:        oldCert.Reserved,
 		ValidAfter:      uint64(va.Unix()),
 		ValidBefore:     uint64(vb.Unix()),
 	}
@@ -442,18 +417,13 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 	default:
 		return nil, errs.BadRequest("rekeySSH; unexpected ssh certificate type: %d", cert.CertType)
 	}
-	cert.SignatureKey = signer.PublicKey()
 
-	// Get bytes for signing trailing the signature length.
-	data := cert.Marshal()
-	data = data[:len(data)-4]
-
-	// Sign the certificate.
-	sig, err := signer.Sign(rand.Reader, data)
+	var err error
+	// Sign certificate.
+	cert, err = sshutil.CreateCertificate(cert, signer)
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "rekeySSH; error signing certificate")
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 	}
-	cert.Signature = sig
 
 	// Apply validators from provisioner.
 	for _, v := range validators {
