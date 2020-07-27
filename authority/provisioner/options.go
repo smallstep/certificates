@@ -39,14 +39,14 @@ func (o *Options) GetX509Options() *X509Options {
 type X509Options struct {
 	// Template contains a X.509 certificate template. It can be a JSON template
 	// escaped in a string or it can be also encoded in base64.
-	Template string `json:"template"`
+	Template string `json:"template,omitempty"`
 
 	// TemplateFile points to a file containing a X.509 certificate template.
-	TemplateFile string `json:"templateFile"`
+	TemplateFile string `json:"templateFile,omitempty"`
 
 	// TemplateData is a JSON object with variables that can be used in custom
 	// templates.
-	TemplateData json.RawMessage `json:"templateData"`
+	TemplateData json.RawMessage `json:"templateData,omitempty"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
