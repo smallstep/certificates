@@ -3,6 +3,7 @@ package provisioner
 import (
 	"crypto/rsa"
 	"encoding/binary"
+	"encoding/json"
 	"math/big"
 	"time"
 
@@ -56,12 +57,13 @@ func (f sshModifierFunc) Modify(cert *ssh.Certificate) error {
 
 // SignSSHOptions contains the options that can be passed to the SignSSH method.
 type SignSSHOptions struct {
-	CertType    string        `json:"certType"`
-	KeyID       string        `json:"keyID"`
-	Principals  []string      `json:"principals"`
-	ValidAfter  TimeDuration  `json:"validAfter,omitempty"`
-	ValidBefore TimeDuration  `json:"validBefore,omitempty"`
-	Backdate    time.Duration `json:"-"`
+	CertType     string          `json:"certType"`
+	KeyID        string          `json:"keyID"`
+	Principals   []string        `json:"principals"`
+	ValidAfter   TimeDuration    `json:"validAfter,omitempty"`
+	ValidBefore  TimeDuration    `json:"validBefore,omitempty"`
+	TemplateData json.RawMessage `json:"templateData"`
+	Backdate     time.Duration   `json:"-"`
 }
 
 // Type returns the uint32 representation of the CertType.
