@@ -357,10 +357,9 @@ ZYtQ9Ot36qc=
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 					assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
 
-					pubBytes, err := x509.MarshalPKIXPublicKey(pub)
+					kid, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
-					hash := sha1.Sum(pubBytes)
-					assert.Equals(t, leaf.SubjectKeyId, hash[:])
+					assert.Equals(t, leaf.SubjectKeyId, kid)
 
 					assert.Equals(t, leaf.AuthorityKeyId, a.x509Issuer.SubjectKeyId)
 
@@ -395,6 +394,31 @@ ZYtQ9Ot36qc=
 			}
 		})
 	}
+}
+
+// subjectPublicKeyInfo is a PKIX public key structure defined in RFC 5280.
+type subjectPublicKeyInfo struct {
+	Algorithm        pkix.AlgorithmIdentifier
+	SubjectPublicKey asn1.BitString
+}
+
+// generateSubjectKeyID generates the key identifier according the the RFC 5280
+// section 4.2.1.2.
+//
+// The keyIdentifier is composed of the 160-bit SHA-1 hash of the value of the
+// BIT STRING subjectPublicKey (excluding the tag, length, and number of unused
+// bits).
+func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
+	b, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling public key")
+	}
+	var info subjectPublicKeyInfo
+	if _, err = asn1.Unmarshal(b, &info); err != nil {
+		return nil, errors.Wrap(err, "error unmarshaling public key")
+	}
+	hash := sha1.Sum(info.SubjectPublicKey.Bytes)
+	return hash[:], nil
 }
 
 func TestAuthority_Renew(t *testing.T) {
@@ -554,10 +578,9 @@ func TestAuthority_Renew(t *testing.T) {
 
 					// Test Public Key and SubjectKeyId
 					assert.Equals(t, leaf.PublicKey, cert.PublicKey)
-					pubBytes, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+					kid, err := generateSubjectKeyID(cert.PublicKey)
 					assert.FatalError(t, err)
-					hash := sha1.Sum(pubBytes)
-					assert.Equals(t, leaf.SubjectKeyId, hash[:])
+					assert.Equals(t, leaf.SubjectKeyId, kid)
 					assert.Equals(t, leaf.SubjectKeyId, cert.SubjectKeyId)
 
 					// We did not change the intermediate before renewing.
@@ -791,10 +814,9 @@ func TestAuthority_Rekey(t *testing.T) {
 					}
 					assert.Equals(t, leaf.PublicKey, expectedPK)
 
-					pubBytes, err := x509.MarshalPKIXPublicKey(expectedPK)
+					kid, err := generateSubjectKeyID(expectedPK)
 					assert.FatalError(t, err)
-					hash := sha1.Sum(pubBytes)
-					assert.Equals(t, leaf.SubjectKeyId, hash[:])
+					assert.Equals(t, leaf.SubjectKeyId, kid)
 					if tc.pk == nil {
 						assert.Equals(t, leaf.SubjectKeyId, cert.SubjectKeyId)
 					}

@@ -2,11 +2,13 @@ package ca
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -31,6 +33,31 @@ import (
 	jose "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
+
+// subjectPublicKeyInfo is a PKIX public key structure defined in RFC 5280.
+type subjectPublicKeyInfo struct {
+	Algorithm        pkix.AlgorithmIdentifier
+	SubjectPublicKey asn1.BitString
+}
+
+// generateSubjectKeyID generates the key identifier according the the RFC 5280
+// section 4.2.1.2.
+//
+// The keyIdentifier is composed of the 160-bit SHA-1 hash of the value of the
+// BIT STRING subjectPublicKey (excluding the tag, length, and number of unused
+// bits).
+func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
+	b, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling public key")
+	}
+	var info subjectPublicKeyInfo
+	if _, err = asn1.Unmarshal(b, &info); err != nil {
+		return nil, errors.Wrap(err, "error unmarshaling public key")
+	}
+	hash := sha1.Sum(info.SubjectPublicKey.Bytes)
+	return hash[:], nil
+}
 
 type ClosingBuffer struct {
 	*bytes.Buffer
@@ -299,10 +326,9 @@ ZEp7knvU2psWRw==
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 					assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
 
-					pubBytes, err := x509.MarshalPKIXPublicKey(pub)
+					kid, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
-					hash := sha1.Sum(pubBytes)
-					assert.Equals(t, leaf.SubjectKeyId, hash[:])
+					assert.Equals(t, leaf.SubjectKeyId, kid)
 
 					assert.Equals(t, leaf.AuthorityKeyId, intermediateIdentity.Crt.SubjectKeyId)
 
@@ -641,10 +667,9 @@ func TestCARenew(t *testing.T) {
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 					assert.Equals(t, leaf.DNSNames, []string{"funk"})
 
-					pubBytes, err := x509.MarshalPKIXPublicKey(pub)
+					kid, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
-					hash := sha1.Sum(pubBytes)
-					assert.Equals(t, leaf.SubjectKeyId, hash[:])
+					assert.Equals(t, leaf.SubjectKeyId, kid)
 
 					assert.Equals(t, leaf.AuthorityKeyId, intermediateIdentity.Crt.SubjectKeyId)
 

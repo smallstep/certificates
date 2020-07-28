@@ -14,7 +14,7 @@ SRC=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
 GOOS_OVERRIDE ?=
 OUTPUT_ROOT=output/
 
-all: build test lint
+all: lint build test
 
 .PHONY: all
 
