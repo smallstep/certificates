@@ -13,6 +13,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
 )
@@ -53,18 +54,19 @@ type openIDPayload struct {
 // ClientSecret is mandatory, but it can be an empty string.
 type OIDC struct {
 	*base
-	Type                  string   `json:"type"`
-	Name                  string   `json:"name"`
-	ClientID              string   `json:"clientID"`
-	ClientSecret          string   `json:"clientSecret"`
-	ConfigurationEndpoint string   `json:"configurationEndpoint"`
-	TenantID              string   `json:"tenantID,omitempty"`
-	Admins                []string `json:"admins,omitempty"`
-	Domains               []string `json:"domains,omitempty"`
-	Groups                []string `json:"groups,omitempty"`
-	ListenAddress         string   `json:"listenAddress,omitempty"`
-	Claims                *Claims  `json:"claims,omitempty"`
-	Options               *Options `json:"options,omitempty"`
+	Type                  string      `json:"type"`
+	Name                  string      `json:"name"`
+	ClientID              string      `json:"clientID"`
+	ClientSecret          string      `json:"clientSecret"`
+	ConfigurationEndpoint string      `json:"configurationEndpoint"`
+	TenantID              string      `json:"tenantID,omitempty"`
+	Admins                []string    `json:"admins,omitempty"`
+	Domains               []string    `json:"domains,omitempty"`
+	Groups                []string    `json:"groups,omitempty"`
+	ListenAddress         string      `json:"listenAddress,omitempty"`
+	Claims                *Claims     `json:"claims,omitempty"`
+	Options               *Options    `json:"options,omitempty"`
+	SSHOptions            *SSHOptions `json:"sshOptions,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
 	claimer               *Claimer
@@ -369,10 +371,6 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	if claims.Email == "" {
 		return nil, errs.Unauthorized("oidc.AuthorizeSSHSign: failed to validate oidc token payload: email not found")
 	}
-	signOptions := []SignOption{
-		// set the key id to the token email
-		sshCertKeyIDModifier(claims.Email),
-	}
 
 	// Get the identity using either the default identityFunc or one injected
 	// externally.
@@ -385,6 +383,18 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		Principals: iden.Usernames,
 	}
 
+	// Certificate templates.
+	data := sshutil.CreateTemplateData(sshutil.UserCert, claims.Email, iden.Usernames)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
+	templateOptions, err := TemplateSSHOptions(o.SSHOptions, data)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
+	}
+	signOptions := []SignOption{templateOptions}
+
 	// Admin users can use any principal, and can sign user and host certificates.
 	// Non-admin users can only use principals returned by the identityFunc, and
 	// can only sign user certificates.
@@ -392,13 +402,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		signOptions = append(signOptions, sshCertOptionsValidator(defaults))
 	}
 
-	// Default to a user certificate with usernames as principals if those options
-	// are not set.
-	signOptions = append(signOptions, sshCertDefaultsModifier(defaults))
-
 	return append(signOptions,
-		// Set the default extensions
-		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{o.claimer},
 		// Validate public key
