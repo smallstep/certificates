@@ -24,14 +24,7 @@ const (
 // certificate.
 type SSHCertModifier interface {
 	SignOption
-	Modify(cert *ssh.Certificate) error
-}
-
-// SSHCertOptionModifier is the interface used to add custom options used
-// to modify the SSH certificate.
-type SSHCertOptionModifier interface {
-	SignOption
-	Option(o SignSSHOptions) SSHCertModifier
+	Modify(cert *ssh.Certificate, opts SignSSHOptions) error
 }
 
 // SSHCertValidator is the interface used to validate an SSH certificate.
@@ -45,14 +38,6 @@ type SSHCertValidator interface {
 type SSHCertOptionsValidator interface {
 	SignOption
 	Valid(got SignSSHOptions) error
-}
-
-// sshModifierFunc is an adapter to allow the use of ordinary functions as SSH
-// certificate modifiers.
-type sshModifierFunc func(cert *ssh.Certificate) error
-
-func (f sshModifierFunc) Modify(cert *ssh.Certificate) error {
-	return f(cert)
 }
 
 // SignSSHOptions contains the options that can be passed to the SignSSH method.
@@ -72,7 +57,7 @@ func (o SignSSHOptions) Type() uint32 {
 }
 
 // Modify implements SSHCertModifier and sets the SSHOption in the ssh.Certificate.
-func (o SignSSHOptions) Modify(cert *ssh.Certificate) error {
+func (o SignSSHOptions) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
 	switch o.CertType {
 	case "": // ignore
 	case SSHUserCert:
@@ -86,6 +71,12 @@ func (o SignSSHOptions) Modify(cert *ssh.Certificate) error {
 	cert.KeyId = o.KeyID
 	cert.ValidPrincipals = o.Principals
 
+	return o.ModifyValidity(cert)
+}
+
+// ModifyValidity modifies only the ValidAfter and ValidBefore on the given
+// ssh.Certificate.
+func (o SignSSHOptions) ModifyValidity(cert *ssh.Certificate) error {
 	t := now()
 	if !o.ValidAfter.IsZero() {
 		cert.ValidAfter = uint64(o.ValidAfter.RelativeTime(t).Unix())
@@ -96,7 +87,6 @@ func (o SignSSHOptions) Modify(cert *ssh.Certificate) error {
 	if cert.ValidAfter > 0 && cert.ValidBefore > 0 && cert.ValidAfter > cert.ValidBefore {
 		return errors.New("ssh certificate valid after cannot be greater than valid before")
 	}
-
 	return nil
 }
 
@@ -123,7 +113,7 @@ func (o SignSSHOptions) match(got SignSSHOptions) error {
 type sshCertPrincipalsModifier []string
 
 // Modify the ValidPrincipals value of the cert.
-func (o sshCertPrincipalsModifier) Modify(cert *ssh.Certificate) error {
+func (o sshCertPrincipalsModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
 	cert.ValidPrincipals = []string(o)
 	return nil
 }
@@ -132,7 +122,7 @@ func (o sshCertPrincipalsModifier) Modify(cert *ssh.Certificate) error {
 // Key ID in the SSH certificate.
 type sshCertKeyIDModifier string
 
-func (m sshCertKeyIDModifier) Modify(cert *ssh.Certificate) error {
+func (m sshCertKeyIDModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
 	cert.KeyId = string(m)
 	return nil
 }
@@ -142,7 +132,7 @@ func (m sshCertKeyIDModifier) Modify(cert *ssh.Certificate) error {
 type sshCertTypeModifier string
 
 // Modify sets the CertType for the ssh certificate.
-func (m sshCertTypeModifier) Modify(cert *ssh.Certificate) error {
+func (m sshCertTypeModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
 	cert.CertType = sshCertTypeUInt32(string(m))
 	return nil
 }
@@ -151,7 +141,7 @@ func (m sshCertTypeModifier) Modify(cert *ssh.Certificate) error {
 // ValidAfter in the SSH certificate.
 type sshCertValidAfterModifier uint64
 
-func (m sshCertValidAfterModifier) Modify(cert *ssh.Certificate) error {
+func (m sshCertValidAfterModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
 	cert.ValidAfter = uint64(m)
 	return nil
 }
@@ -160,7 +150,7 @@ func (m sshCertValidAfterModifier) Modify(cert *ssh.Certificate) error {
 // ValidBefore in the SSH certificate.
 type sshCertValidBeforeModifier uint64
 
-func (m sshCertValidBeforeModifier) Modify(cert *ssh.Certificate) error {
+func (m sshCertValidBeforeModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
 	cert.ValidBefore = uint64(m)
 	return nil
 }
@@ -217,27 +207,27 @@ type sshDefaultDuration struct {
 	*Claimer
 }
 
-func (m *sshDefaultDuration) Option(o SignSSHOptions) SSHCertModifier {
-	return sshModifierFunc(func(cert *ssh.Certificate) error {
-		d, err := m.DefaultSSHCertDuration(cert.CertType)
-		if err != nil {
-			return err
-		}
+// Modify implements SSHCertModifier and sets the validity if it has not been
+// set, but it always applies the backdate.
+func (m *sshDefaultDuration) Modify(cert *ssh.Certificate, o SignSSHOptions) error {
+	d, err := m.DefaultSSHCertDuration(cert.CertType)
+	if err != nil {
+		return err
+	}
 
-		var backdate uint64
-		if cert.ValidAfter == 0 {
-			backdate = uint64(o.Backdate / time.Second)
-			cert.ValidAfter = uint64(now().Truncate(time.Second).Unix())
-		}
-		if cert.ValidBefore == 0 {
-			cert.ValidBefore = cert.ValidAfter + uint64(d/time.Second)
-		}
-		// Apply backdate safely
-		if cert.ValidAfter > backdate {
-			cert.ValidAfter -= backdate
-		}
-		return nil
-	})
+	var backdate uint64
+	if cert.ValidAfter == 0 {
+		backdate = uint64(o.Backdate / time.Second)
+		cert.ValidAfter = uint64(now().Truncate(time.Second).Unix())
+	}
+	if cert.ValidBefore == 0 {
+		cert.ValidBefore = cert.ValidAfter + uint64(d/time.Second)
+	}
+	// Apply backdate safely
+	if cert.ValidAfter > backdate {
+		cert.ValidAfter -= backdate
+	}
+	return nil
 }
 
 // sshLimitDuration adjusts the duration to min(default, remaining provisioning
@@ -250,51 +240,52 @@ type sshLimitDuration struct {
 	NotAfter time.Time
 }
 
-func (m *sshLimitDuration) Option(o SignSSHOptions) SSHCertModifier {
+// Modify implements SSHCertModifier and modifies the validity of the
+// certificate to expire before the configured limit.
+func (m *sshLimitDuration) Modify(cert *ssh.Certificate, o SignSSHOptions) error {
 	if m.NotAfter.IsZero() {
 		defaultDuration := &sshDefaultDuration{m.Claimer}
-		return defaultDuration.Option(o)
+		return defaultDuration.Modify(cert, o)
 	}
 
-	return sshModifierFunc(func(cert *ssh.Certificate) error {
-		d, err := m.DefaultSSHCertDuration(cert.CertType)
-		if err != nil {
-			return err
-		}
+	// Make sure the duration is within the limits.
+	d, err := m.DefaultSSHCertDuration(cert.CertType)
+	if err != nil {
+		return err
+	}
 
-		var backdate uint64
-		if cert.ValidAfter == 0 {
-			backdate = uint64(o.Backdate / time.Second)
-			cert.ValidAfter = uint64(now().Truncate(time.Second).Unix())
-		}
+	var backdate uint64
+	if cert.ValidAfter == 0 {
+		backdate = uint64(o.Backdate / time.Second)
+		cert.ValidAfter = uint64(now().Truncate(time.Second).Unix())
+	}
 
-		certValidAfter := time.Unix(int64(cert.ValidAfter), 0)
-		if certValidAfter.After(m.NotAfter) {
-			return errors.Errorf("provisioning credential expiration (%s) is before requested certificate validAfter (%s)",
-				m.NotAfter, certValidAfter)
-		}
+	certValidAfter := time.Unix(int64(cert.ValidAfter), 0)
+	if certValidAfter.After(m.NotAfter) {
+		return errors.Errorf("provisioning credential expiration (%s) is before requested certificate validAfter (%s)",
+			m.NotAfter, certValidAfter)
+	}
 
-		if cert.ValidBefore == 0 {
-			certValidBefore := certValidAfter.Add(d)
-			if m.NotAfter.Before(certValidBefore) {
-				certValidBefore = m.NotAfter
-			}
-			cert.ValidBefore = uint64(certValidBefore.Unix())
-		} else {
-			certValidBefore := time.Unix(int64(cert.ValidBefore), 0)
-			if m.NotAfter.Before(certValidBefore) {
-				return errors.Errorf("provisioning credential expiration (%s) is before requested certificate validBefore (%s)",
-					m.NotAfter, certValidBefore)
-			}
+	if cert.ValidBefore == 0 {
+		certValidBefore := certValidAfter.Add(d)
+		if m.NotAfter.Before(certValidBefore) {
+			certValidBefore = m.NotAfter
 		}
-
-		// Apply backdate safely
-		if cert.ValidAfter > backdate {
-			cert.ValidAfter -= backdate
+		cert.ValidBefore = uint64(certValidBefore.Unix())
+	} else {
+		certValidBefore := time.Unix(int64(cert.ValidBefore), 0)
+		if m.NotAfter.Before(certValidBefore) {
+			return errors.Errorf("provisioning credential expiration (%s) is before requested certificate validBefore (%s)",
+				m.NotAfter, certValidBefore)
 		}
+	}
 
-		return nil
-	})
+	// Apply backdate safely
+	if cert.ValidAfter > backdate {
+		cert.ValidAfter -= backdate
+	}
+
+	return nil
 }
 
 // sshCertOptionsValidator validates the user SSHOptions with the ones
