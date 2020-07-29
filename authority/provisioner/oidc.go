@@ -378,10 +378,6 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSSHSign")
 	}
-	defaults := SignSSHOptions{
-		CertType:   SSHUserCert,
-		Principals: iden.Usernames,
-	}
 
 	// Certificate templates.
 	data := sshutil.CreateTemplateData(sshutil.UserCert, claims.Email, iden.Usernames)
@@ -399,7 +395,10 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	// Non-admin users can only use principals returned by the identityFunc, and
 	// can only sign user certificates.
 	if !o.IsAdmin(claims.Email) {
-		signOptions = append(signOptions, sshCertOptionsValidator(defaults))
+		signOptions = append(signOptions, sshCertOptionsValidator(SignSSHOptions{
+			CertType:   SSHUserCert,
+			Principals: iden.Usernames,
+		}))
 	}
 
 	return append(signOptions,
