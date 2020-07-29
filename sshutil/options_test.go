@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/ssh"
 )
 
 func Test_getFuncMap_fail(t *testing.T) {
@@ -28,11 +27,14 @@ func Test_getFuncMap_fail(t *testing.T) {
 
 func TestWithTemplate(t *testing.T) {
 	key := mustGeneratePublicKey(t)
+	cr := CertificateRequest{
+		Key: key,
+	}
 
 	type args struct {
 		text string
 		data TemplateData
-		key  ssh.PublicKey
+		cr   CertificateRequest
 	}
 	tests := []struct {
 		name    string
@@ -45,7 +47,7 @@ func TestWithTemplate(t *testing.T) {
 			KeyIDKey:      "jane@doe.com",
 			PrincipalsKey: []string{"jane", "jane@doe.com"},
 			ExtensionsKey: DefaultExtensions(UserCert),
-		}, key}, Options{
+		}, cr}, Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"type": "user",
 	"keyId": "jane@doe.com",
@@ -56,24 +58,24 @@ func TestWithTemplate(t *testing.T) {
 			TypeKey:       "host",
 			KeyIDKey:      "foo",
 			PrincipalsKey: []string{"foo.internal"},
-		}, key}, Options{
+		}, cr}, Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"type": "host",
 	"keyId": "foo",
 	"principals": ["foo.internal"],
 	"extensions": null
 }`)}, false},
-		{"fail", args{`{{ fail "a message" }}`, TemplateData{}, key}, Options{}, true},
-		{"failTemplate", args{`{{ fail "fatal error }}`, TemplateData{}, key}, Options{}, true},
+		{"fail", args{`{{ fail "a message" }}`, TemplateData{}, cr}, Options{}, true},
+		{"failTemplate", args{`{{ fail "fatal error }}`, TemplateData{}, cr}, Options{}, true},
 		{"error", args{`{{ mustHas 3 .Data }}`, TemplateData{
 			"Data": 3,
-		}, key}, Options{}, true},
+		}, cr}, Options{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var got Options
 			fn := WithTemplate(tt.args.text, tt.args.data)
-			if err := fn(tt.args.key, &got); (err != nil) != tt.wantErr {
+			if err := fn(tt.args.cr, &got); (err != nil) != tt.wantErr {
 				t.Errorf("WithTemplate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
@@ -85,11 +87,14 @@ func TestWithTemplate(t *testing.T) {
 
 func TestWithTemplateBase64(t *testing.T) {
 	key := mustGeneratePublicKey(t)
+	cr := CertificateRequest{
+		Key: key,
+	}
 
 	type args struct {
 		s    string
 		data TemplateData
-		key  ssh.PublicKey
+		cr   CertificateRequest
 	}
 	tests := []struct {
 		name    string
@@ -102,20 +107,20 @@ func TestWithTemplateBase64(t *testing.T) {
 			KeyIDKey:      "foo.internal",
 			PrincipalsKey: []string{"foo.internal", "bar.internal"},
 			ExtensionsKey: map[string]interface{}{"foo": "bar"},
-		}, key}, Options{
+		}, cr}, Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"type": "host",
 	"keyId": "foo.internal",
 	"principals": ["foo.internal","bar.internal"],
 	"extensions": {"foo":"bar"}
 }`)}, false},
-		{"badBase64", args{"foobar", TemplateData{}, key}, Options{}, true},
+		{"badBase64", args{"foobar", TemplateData{}, cr}, Options{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var got Options
 			fn := WithTemplateBase64(tt.args.s, tt.args.data)
-			if err := fn(tt.args.key, &got); (err != nil) != tt.wantErr {
+			if err := fn(tt.args.cr, &got); (err != nil) != tt.wantErr {
 				t.Errorf("WithTemplateBase64() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
@@ -127,13 +132,16 @@ func TestWithTemplateBase64(t *testing.T) {
 
 func TestWithTemplateFile(t *testing.T) {
 	key := mustGeneratePublicKey(t)
+	cr := CertificateRequest{
+		Key: key,
+	}
 
 	data := TemplateData{
 		TypeKey:       "user",
 		KeyIDKey:      "jane@doe.com",
 		PrincipalsKey: []string{"jane", "jane@doe.com"},
 		ExtensionsKey: DefaultExtensions(UserCert),
-		InsecureKey: map[string]interface{}{
+		InsecureKey: TemplateData{
 			UserKey: map[string]interface{}{
 				"username": "jane",
 			},
@@ -143,7 +151,7 @@ func TestWithTemplateFile(t *testing.T) {
 	type args struct {
 		path string
 		data TemplateData
-		key  ssh.PublicKey
+		cr   CertificateRequest
 	}
 	tests := []struct {
 		name    string
@@ -151,7 +159,7 @@ func TestWithTemplateFile(t *testing.T) {
 		want    Options
 		wantErr bool
 	}{
-		{"github.com", args{"./testdata/github.tpl", data, key}, Options{
+		{"github.com", args{"./testdata/github.tpl", data, cr}, Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"type": "user",
 	"keyId": "jane@doe.com",
@@ -159,13 +167,13 @@ func TestWithTemplateFile(t *testing.T) {
 	"extensions": {"login@github.com":"jane","permit-X11-forwarding":"","permit-agent-forwarding":"","permit-port-forwarding":"","permit-pty":"","permit-user-rc":""}
 }`),
 		}, false},
-		{"missing", args{"./testdata/missing.tpl", data, key}, Options{}, true},
+		{"missing", args{"./testdata/missing.tpl", data, cr}, Options{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var got Options
 			fn := WithTemplateFile(tt.args.path, tt.args.data)
-			if err := fn(tt.args.key, &got); (err != nil) != tt.wantErr {
+			if err := fn(tt.args.cr, &got); (err != nil) != tt.wantErr {
 				t.Errorf("WithTemplateFile() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !reflect.DeepEqual(got, tt.want) {

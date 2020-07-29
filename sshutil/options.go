@@ -9,7 +9,6 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/pkg/errors"
 	"github.com/smallstep/cli/config"
-	"golang.org/x/crypto/ssh"
 )
 
 func getFuncMap(failMessage *string) template.FuncMap {
@@ -26,9 +25,9 @@ type Options struct {
 	CertBuffer *bytes.Buffer
 }
 
-func (o *Options) apply(key ssh.PublicKey, opts []Option) (*Options, error) {
+func (o *Options) apply(cr CertificateRequest, opts []Option) (*Options, error) {
 	for _, fn := range opts {
-		if err := fn(key, o); err != nil {
+		if err := fn(cr, o); err != nil {
 			return o, err
 		}
 	}
@@ -36,12 +35,12 @@ func (o *Options) apply(key ssh.PublicKey, opts []Option) (*Options, error) {
 }
 
 // Option is the type used as a variadic argument in NewCertificate.
-type Option func(key ssh.PublicKey, o *Options) error
+type Option func(cr CertificateRequest, o *Options) error
 
 // WithTemplate is an options that executes the given template text with the
 // given data.
 func WithTemplate(text string, data TemplateData) Option {
-	return func(key ssh.PublicKey, o *Options) error {
+	return func(cr CertificateRequest, o *Options) error {
 		terr := new(TemplateError)
 		funcMap := getFuncMap(&terr.Message)
 
@@ -51,7 +50,7 @@ func WithTemplate(text string, data TemplateData) Option {
 		}
 
 		buf := new(bytes.Buffer)
-		data.SetPublicKey(key)
+		data.SetCertificateRequest(cr)
 		if err := tmpl.Execute(buf, data); err != nil {
 			if terr.Message != "" {
 				return terr
@@ -66,26 +65,26 @@ func WithTemplate(text string, data TemplateData) Option {
 // WithTemplateBase64 is an options that executes the given template base64
 // string with the given data.
 func WithTemplateBase64(s string, data TemplateData) Option {
-	return func(key ssh.PublicKey, o *Options) error {
+	return func(cr CertificateRequest, o *Options) error {
 		b, err := base64.StdEncoding.DecodeString(s)
 		if err != nil {
 			return errors.Wrap(err, "error decoding template")
 		}
 		fn := WithTemplate(string(b), data)
-		return fn(key, o)
+		return fn(cr, o)
 	}
 }
 
 // WithTemplateFile is an options that reads the template file and executes it
 // with the given data.
 func WithTemplateFile(path string, data TemplateData) Option {
-	return func(key ssh.PublicKey, o *Options) error {
+	return func(cr CertificateRequest, o *Options) error {
 		filename := config.StepAbs(path)
 		b, err := ioutil.ReadFile(filename)
 		if err != nil {
 			return errors.Wrapf(err, "error reading %s", path)
 		}
 		fn := WithTemplate(string(b), data)
-		return fn(key, o)
+		return fn(cr, o)
 	}
 }

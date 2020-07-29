@@ -29,8 +29,8 @@ type Certificate struct {
 
 // NewCertificate creates a new certificate with the given key after parsing a
 // template given in the options.
-func NewCertificate(key ssh.PublicKey, opts ...Option) (*Certificate, error) {
-	o, err := new(Options).apply(key, opts)
+func NewCertificate(cr CertificateRequest, opts ...Option) (*Certificate, error) {
+	o, err := new(Options).apply(cr, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func NewCertificate(key ssh.PublicKey, opts ...Option) (*Certificate, error) {
 	}
 
 	// Complete with public key
-	cert.Key = key
+	cert.Key = cr.Key
 
 	return &cert, nil
 }

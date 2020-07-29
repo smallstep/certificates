@@ -1,16 +1,14 @@
 package sshutil
 
-import "golang.org/x/crypto/ssh"
-
 const (
-	TypeKey       = "Type"
-	KeyIDKey      = "KeyID"
-	PrincipalsKey = "Principals"
-	ExtensionsKey = "Extensions"
-	TokenKey      = "Token"
-	InsecureKey   = "Insecure"
-	UserKey       = "User"
-	PublicKey     = "PublicKey"
+	TypeKey               = "Type"
+	KeyIDKey              = "KeyID"
+	PrincipalsKey         = "Principals"
+	ExtensionsKey         = "Extensions"
+	TokenKey              = "Token"
+	InsecureKey           = "Insecure"
+	UserKey               = "User"
+	CertificateRequestKey = "CR"
 )
 
 // TemplateError represents an error in a template produced by the fail
@@ -117,10 +115,10 @@ func (t TemplateData) SetUserData(v interface{}) {
 	t.SetInsecure(UserKey, v)
 }
 
-// SetUserData sets the given user provided object in the insecure template
-// data.
-func (t TemplateData) SetPublicKey(v ssh.PublicKey) {
-	t.Set(PublicKey, v)
+// SetCertificateRequest sets the simulated ssh certificate request the insecure
+// template data.
+func (t TemplateData) SetCertificateRequest(cr CertificateRequest) {
+	t.SetInsecure(CertificateRequestKey, cr)
 }
 
 // DefaultCertificate is the default template for an SSH certificate.
@@ -128,5 +126,20 @@ const DefaultCertificate = `{
 	"type": "{{ .Type }}",
 	"keyId": "{{ .KeyID }}",
 	"principals": {{ toJson .Principals }},
+	"extensions": {{ toJson .Extensions }}
+}`
+
+const DefaultIIDCertificate = `{
+	"type": "{{ .Type }}",
+{{- if .Insecure.CR.KeyID }}
+	"keyId": "{{ .Insecure.CR.KeyID }}",
+{{- else }}
+	"keyId": "{{ .KeyID }}",
+{{- end}}
+{{- if .Insecure.CR.Principals }}
+	"principals": {{ toJson .Insecure.CR.Principals }},
+{{- else }}
+	"principals": {{ toJson .Principals }},
+{{- end }}
 	"extensions": {{ toJson .Extensions }}
 }`

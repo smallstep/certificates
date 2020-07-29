@@ -36,9 +36,12 @@ func mustGeneratePublicKey(t *testing.T) ssh.PublicKey {
 
 func TestNewCertificate(t *testing.T) {
 	key := mustGeneratePublicKey(t)
+	cr := CertificateRequest{
+		Key: key,
+	}
 
 	type args struct {
-		key  ssh.PublicKey
+		cr   CertificateRequest
 		opts []Option
 	}
 	tests := []struct {
@@ -47,7 +50,7 @@ func TestNewCertificate(t *testing.T) {
 		want    *Certificate
 		wantErr bool
 	}{
-		{"user", args{key, []Option{WithTemplate(DefaultCertificate, CreateTemplateData(UserCert, "jane@doe.com", []string{"jane"}))}}, &Certificate{
+		{"user", args{cr, []Option{WithTemplate(DefaultCertificate, CreateTemplateData(UserCert, "jane@doe.com", []string{"jane"}))}}, &Certificate{
 			Nonce:           nil,
 			Key:             key,
 			Serial:          0,
@@ -68,7 +71,7 @@ func TestNewCertificate(t *testing.T) {
 			SignatureKey: nil,
 			Signature:    nil,
 		}, false},
-		{"host", args{key, []Option{WithTemplate(DefaultCertificate, CreateTemplateData(HostCert, "foobar", []string{"foo.internal", "bar.internal"}))}}, &Certificate{
+		{"host", args{cr, []Option{WithTemplate(DefaultCertificate, CreateTemplateData(HostCert, "foobar", []string{"foo.internal", "bar.internal"}))}}, &Certificate{
 			Nonce:           nil,
 			Key:             key,
 			Serial:          0,
@@ -83,12 +86,12 @@ func TestNewCertificate(t *testing.T) {
 			SignatureKey:    nil,
 			Signature:       nil,
 		}, false},
-		{"file", args{key, []Option{WithTemplateFile("./testdata/github.tpl", TemplateData{
+		{"file", args{cr, []Option{WithTemplateFile("./testdata/github.tpl", TemplateData{
 			TypeKey:       UserCert,
 			KeyIDKey:      "john@doe.com",
 			PrincipalsKey: []string{"john", "john@doe.com"},
 			ExtensionsKey: DefaultExtensions(UserCert),
-			InsecureKey: map[string]interface{}{
+			InsecureKey: TemplateData{
 				"User": map[string]interface{}{"username": "john"},
 			},
 		})}}, &Certificate{
@@ -102,18 +105,18 @@ func TestNewCertificate(t *testing.T) {
 			ValidBefore:     0,
 			CriticalOptions: nil,
 			Extensions: map[string]string{
+				"login@github.com":        "john",
 				"permit-X11-forwarding":   "",
 				"permit-agent-forwarding": "",
 				"permit-port-forwarding":  "",
 				"permit-pty":              "",
 				"permit-user-rc":          "",
-				"login@github.com":        "john",
 			},
 			Reserved:     nil,
 			SignatureKey: nil,
 			Signature:    nil,
 		}, false},
-		{"base64", args{key, []Option{WithTemplateBase64(base64.StdEncoding.EncodeToString([]byte(DefaultCertificate)), CreateTemplateData(HostCert, "foo.internal", nil))}}, &Certificate{
+		{"base64", args{cr, []Option{WithTemplateBase64(base64.StdEncoding.EncodeToString([]byte(DefaultCertificate)), CreateTemplateData(HostCert, "foo.internal", nil))}}, &Certificate{
 			Nonce:           nil,
 			Key:             key,
 			Serial:          0,
@@ -128,22 +131,22 @@ func TestNewCertificate(t *testing.T) {
 			SignatureKey:    nil,
 			Signature:       nil,
 		}, false},
-		{"failNilOptions", args{key, nil}, nil, true},
-		{"failEmptyOptions", args{key, nil}, nil, true},
-		{"badBase64Template", args{key, []Option{WithTemplateBase64("foobar", TemplateData{})}}, nil, true},
-		{"badFileTemplate", args{key, []Option{WithTemplateFile("./testdata/missing.tpl", TemplateData{})}}, nil, true},
-		{"badJsonTemplate", args{key, []Option{WithTemplate(`{"type":{{ .Type }}}`, TemplateData{})}}, nil, true},
-		{"failTemplate", args{key, []Option{WithTemplate(`{{ fail "an error" }}`, TemplateData{})}}, nil, true},
+		{"failNilOptions", args{cr, nil}, nil, true},
+		{"failEmptyOptions", args{cr, nil}, nil, true},
+		{"badBase64Template", args{cr, []Option{WithTemplateBase64("foobar", TemplateData{})}}, nil, true},
+		{"badFileTemplate", args{cr, []Option{WithTemplateFile("./testdata/missing.tpl", TemplateData{})}}, nil, true},
+		{"badJsonTemplate", args{cr, []Option{WithTemplate(`{"type":{{ .Type }}}`, TemplateData{})}}, nil, true},
+		{"failTemplate", args{cr, []Option{WithTemplate(`{{ fail "an error" }}`, TemplateData{})}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewCertificate(tt.args.key, tt.args.opts...)
+			got, err := NewCertificate(tt.args.cr, tt.args.opts...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewCertificate() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewCertificate() = %v, want %v", got, tt.want)
+				t.Errorf("NewCertificate() = \n%+v, want \n%+v", got, tt.want)
 			}
 		})
 	}

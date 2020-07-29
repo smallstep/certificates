@@ -3,8 +3,6 @@ package sshutil
 import (
 	"reflect"
 	"testing"
-
-	"golang.org/x/crypto/ssh"
 )
 
 func TestTemplateError_Error(t *testing.T) {
@@ -374,11 +372,11 @@ func TestTemplateData_SetUserData(t *testing.T) {
 	}
 }
 
-func TestTemplateData_SetPublicKey(t *testing.T) {
-	k1 := mustGeneratePublicKey(t)
-	k2 := mustGeneratePublicKey(t)
+func TestTemplateData_SetCertificateRequest(t *testing.T) {
+	cr1 := CertificateRequest{Key: mustGeneratePublicKey(t)}
+	cr2 := CertificateRequest{Key: mustGeneratePublicKey(t)}
 	type args struct {
-		v ssh.PublicKey
+		cr CertificateRequest
 	}
 	tests := []struct {
 		name string
@@ -386,20 +384,28 @@ func TestTemplateData_SetPublicKey(t *testing.T) {
 		args args
 		want TemplateData
 	}{
-		{"ok", TemplateData{}, args{k1}, TemplateData{
-			PublicKey: k1,
+		{"ok", TemplateData{}, args{cr1}, TemplateData{
+			InsecureKey: TemplateData{
+				CertificateRequestKey: cr1,
+			},
 		}},
 		{"overwrite", TemplateData{
-			PublicKey: k1,
-		}, args{k2}, TemplateData{
-			PublicKey: k2,
+			InsecureKey: TemplateData{
+				UserKey:               "data",
+				CertificateRequestKey: cr1,
+			},
+		}, args{cr2}, TemplateData{
+			InsecureKey: TemplateData{
+				UserKey:               "data",
+				CertificateRequestKey: cr2,
+			},
 		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.t.SetPublicKey(tt.args.v)
+			tt.t.SetCertificateRequest(tt.args.cr)
 			if !reflect.DeepEqual(tt.t, tt.want) {
-				t.Errorf("TemplateData.SetPublicKey() = %v, want %v", tt.t, tt.want)
+				t.Errorf("TemplateData.SetCertificateRequest() = %v, want %v", tt.t, tt.want)
 			}
 		})
 	}
