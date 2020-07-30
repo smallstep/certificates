@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/jose"
@@ -41,13 +42,14 @@ type k8sSAPayload struct {
 // entity trusted to make signature requests.
 type K8sSA struct {
 	*base
-	Type      string   `json:"type"`
-	Name      string   `json:"name"`
-	PubKeys   []byte   `json:"publicKeys,omitempty"`
-	Claims    *Claims  `json:"claims,omitempty"`
-	Options   *Options `json:"options,omitempty"`
-	claimer   *Claimer
-	audiences Audiences
+	Type       string      `json:"type"`
+	Name       string      `json:"name"`
+	PubKeys    []byte      `json:"publicKeys,omitempty"`
+	Claims     *Claims     `json:"claims,omitempty"`
+	Options    *Options    `json:"options,omitempty"`
+	SSHOptions *SSHOptions `json:"sshOptions,omitempty"`
+	claimer    *Claimer
+	audiences  Audiences
 	//kauthn    kauthn.AuthenticationV1Interface
 	pubKeys []interface{}
 }
@@ -249,16 +251,27 @@ func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 	if !p.claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("k8ssa.AuthorizeSSHSign; sshCA is disabled for k8sSA provisioner %s", p.GetID())
 	}
-	if _, err := p.authorizeToken(token, p.audiences.SSHSign); err != nil {
+	claims, err := p.authorizeToken(token, p.audiences.SSHSign)
+	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSSHSign")
 	}
 
-	// Default to a user certificate with no principals if not set
-	signOptions := []SignOption{sshCertDefaultsModifier{CertType: SSHUserCert}}
+	// Certificate templates.
+	// Set some default variables to be used in the templates.
+	data := sshutil.CreateTemplateData(sshutil.HostCert, claims.ServiceAccountName, []string{claims.ServiceAccountName})
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
+	templateOptions, err := CustomSSHTemplateOptions(p.SSHOptions, data, sshutil.CertificateRequestTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSSHSign")
+	}
+	signOptions := []SignOption{templateOptions}
 
 	return append(signOptions,
-		// Set the default extensions.
-		&sshDefaultExtensionModifier{},
+		// Require type, key-id and principals in the SignSSHOptions.
+		&sshCertOptionsRequireValidator{CertType: true, KeyID: true, Principals: true},
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{p.claimer},
 		// Validate public key

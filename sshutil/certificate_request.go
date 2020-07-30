@@ -11,7 +11,7 @@ import "golang.org/x/crypto/ssh"
 // passed with the API instead of the validated ones.
 type CertificateRequest struct {
 	Key        ssh.PublicKey
-	Type       CertType
+	Type       string
 	KeyID      string
 	Principals []string
 }

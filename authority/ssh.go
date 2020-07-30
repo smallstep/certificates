@@ -206,8 +206,6 @@ func (a *Authority) GetSSHBastion(ctx context.Context, user string, hostname str
 // SignSSH creates a signed SSH certificate with the given public key and options.
 func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	var (
-		err         error
-		certType    sshutil.CertType
 		certOptions []sshutil.Option
 		mods        []provisioner.SSHCertModifier
 		validators  []provisioner.SSHCertValidator
@@ -215,14 +213,6 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 
 	// Set backdate with the configured value
 	opts.Backdate = a.config.AuthorityConfig.Backdate.Duration
-
-	// Validate certificate type.
-	if opts.CertType != "" {
-		certType, err = sshutil.CertTypeFromString(opts.CertType)
-		if err != nil {
-			return nil, errs.Wrap(http.StatusBadRequest, err, "authority.SignSSH")
-		}
-	}
 
 	for _, op := range signOpts {
 		switch o := op.(type) {
@@ -251,7 +241,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 
 	// Simulated certificate request with request options.
 	cr := sshutil.CertificateRequest{
-		Type:       certType,
+		Type:       opts.CertType,
 		KeyID:      opts.KeyID,
 		Principals: opts.Principals,
 		Key:        key,

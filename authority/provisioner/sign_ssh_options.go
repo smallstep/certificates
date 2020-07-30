@@ -299,6 +299,26 @@ func (v sshCertOptionsValidator) Valid(got SignSSHOptions) error {
 	return want.match(got)
 }
 
+// sshCertOptionsRequireValidator defines which elements in the SignSSHOptions are required.
+type sshCertOptionsRequireValidator struct {
+	CertType   bool
+	KeyID      bool
+	Principals bool
+}
+
+func (v sshCertOptionsRequireValidator) Valid(got SignSSHOptions) error {
+	switch {
+	case v.CertType && got.CertType == "":
+		return errors.New("ssh certificate certType cannot be empty")
+	case v.KeyID && got.KeyID == "":
+		return errors.New("ssh certificate keyID cannot be empty")
+	case v.Principals && len(got.Principals) == 0:
+		return errors.New("ssh certificate principals cannot be empty")
+	default:
+		return nil
+	}
+}
+
 type sshCertValidityValidator struct {
 	*Claimer
 }

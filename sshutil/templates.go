@@ -143,3 +143,18 @@ const DefaultIIDCertificate = `{
 {{- end }}
 	"extensions": {{ toJson .Extensions }}
 }`
+
+const CertificateRequestTemplate = `{
+	"type": "{{ .Insecure.CR.Type }}",
+	"keyId": "{{ .Insecure.CR.KeyID }}",
+	"principals": {{ toJson .Insecure.CR.Principals }}
+{{- if eq .Insecure.CR.Type "user" }}
+	, "extensions": {
+		"permit-X11-forwarding":   "",
+		"permit-agent-forwarding": "",
+		"permit-port-forwarding":  "",
+		"permit-pty":              "",
+		"permit-user-rc":          ""
+	}
+{{- end }}
+}`
