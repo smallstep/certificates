@@ -14,6 +14,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
 )
@@ -83,15 +84,16 @@ type azurePayload struct {
 // and https://docs.microsoft.com/en-us/azure/virtual-machines/windows/instance-metadata-service
 type Azure struct {
 	*base
-	Type                   string   `json:"type"`
-	Name                   string   `json:"name"`
-	TenantID               string   `json:"tenantID"`
-	ResourceGroups         []string `json:"resourceGroups"`
-	Audience               string   `json:"audience,omitempty"`
-	DisableCustomSANs      bool     `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
-	Claims                 *Claims  `json:"claims,omitempty"`
-	Options                *Options `json:"options,omitempty"`
+	Type                   string      `json:"type"`
+	Name                   string      `json:"name"`
+	TenantID               string      `json:"tenantID"`
+	ResourceGroups         []string    `json:"resourceGroups"`
+	Audience               string      `json:"audience,omitempty"`
+	DisableCustomSANs      bool        `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool        `json:"disableTrustOnFirstUse"`
+	Claims                 *Claims     `json:"claims,omitempty"`
+	Options                *Options    `json:"options,omitempty"`
+	SSHOptions             *SSHOptions `json:"sshOptions,omitempty"`
 	claimer                *Claimer
 	config                 *azureConfig
 	oidcConfig             openIDConfiguration
@@ -338,30 +340,40 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSSHSign")
 	}
-	signOptions := []SignOption{
-		// set the key id to the instance name
-		sshCertKeyIDModifier(name),
+
+	// Validated principals
+	principals := []string{name}
+
+	// Default options and template
+	defaults := SignSSHOptions{
+		CertType: SSHHostCert,
 	}
+	defaultTemplate := sshutil.DefaultIIDCertificate
 
 	// Only enforce known principals if disable custom sans is true.
-	var principals []string
 	if p.DisableCustomSANs {
-		principals = []string{name}
+		defaults.Principals = principals
+		defaultTemplate = sshutil.DefaultCertificate
 	}
 
-	// Default to host + known hostnames
-	defaults := SignSSHOptions{
-		CertType:   SSHHostCert,
-		Principals: principals,
-	}
 	// Validate user options
-	signOptions = append(signOptions, sshCertOptionsValidator(defaults))
-	// Set defaults if not given as user options
-	signOptions = append(signOptions, sshCertDefaultsModifier(defaults))
+	signOptions := []SignOption{
+		sshCertOptionsValidator(defaults),
+	}
+
+	// Certificate templates.
+	data := sshutil.CreateTemplateData(sshutil.HostCert, name, principals)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
+	templateOptions, err := CustomSSHTemplateOptions(p.SSHOptions, data, defaultTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSSHSign")
+	}
+	signOptions = append(signOptions, templateOptions)
 
 	return append(signOptions,
-		// Set the default extensions.
-		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{p.claimer},
 		// Validate public key

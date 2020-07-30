@@ -15,6 +15,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
 )
@@ -77,15 +78,16 @@ func newGCPConfig() *gcpConfig {
 // https://cloud.google.com/compute/docs/instances/verifying-instance-identity
 type GCP struct {
 	*base
-	Type                   string   `json:"type"`
-	Name                   string   `json:"name"`
-	ServiceAccounts        []string `json:"serviceAccounts"`
-	ProjectIDs             []string `json:"projectIDs"`
-	DisableCustomSANs      bool     `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
-	InstanceAge            Duration `json:"instanceAge,omitempty"`
-	Claims                 *Claims  `json:"claims,omitempty"`
-	Options                *Options `json:"options,omitempty"`
+	Type                   string      `json:"type"`
+	Name                   string      `json:"name"`
+	ServiceAccounts        []string    `json:"serviceAccounts"`
+	ProjectIDs             []string    `json:"projectIDs"`
+	DisableCustomSANs      bool        `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool        `json:"disableTrustOnFirstUse"`
+	InstanceAge            Duration    `json:"instanceAge,omitempty"`
+	Claims                 *Claims     `json:"claims,omitempty"`
+	Options                *Options    `json:"options,omitempty"`
+	SSHOptions             *SSHOptions `json:"sshOptions,omitempty"`
 	claimer                *Claimer
 	config                 *gcpConfig
 	keyStore               *keyStore
@@ -379,33 +381,42 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 
 	ce := claims.Google.ComputeEngine
 
-	signOptions := []SignOption{
-		// set the key id to the instance name
-		sshCertKeyIDModifier(ce.InstanceName),
+	// Validated principals
+	principals := []string{
+		fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
+		fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
 	}
+
+	// Default options and template
+	defaults := SignSSHOptions{
+		CertType: SSHHostCert,
+	}
+	defaultTemplate := sshutil.DefaultIIDCertificate
 
 	// Only enforce known principals if disable custom sans is true.
-	var principals []string
 	if p.DisableCustomSANs {
-		principals = []string{
-			fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
-			fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
-		}
+		defaults.Principals = principals
+		defaultTemplate = sshutil.DefaultCertificate
 	}
 
-	// Default to host + known hostnames
-	defaults := SignSSHOptions{
-		CertType:   SSHHostCert,
-		Principals: principals,
-	}
 	// Validate user options
-	signOptions = append(signOptions, sshCertOptionsValidator(defaults))
-	// Set defaults if not given as user options
-	signOptions = append(signOptions, sshCertDefaultsModifier(defaults))
+	signOptions := []SignOption{
+		sshCertOptionsValidator(defaults),
+	}
+
+	// Certificate templates.
+	data := sshutil.CreateTemplateData(sshutil.HostCert, ce.InstanceName, principals)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
+	templateOptions, err := CustomSSHTemplateOptions(p.SSHOptions, data, defaultTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSSHSign")
+	}
+	signOptions = append(signOptions, templateOptions)
 
 	return append(signOptions,
-		// Set the default extensions
-		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{p.claimer},
 		// Validate public key
