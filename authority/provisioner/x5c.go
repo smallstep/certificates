@@ -249,6 +249,8 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	signOptions := []SignOption{
 		// validates user's SSHOptions with the ones in the token
 		sshCertOptionsValidator(*opts),
+		// validate users's KeyID is the token subject.
+		sshCertOptionsValidator(SignSSHOptions{KeyID: claims.Subject}),
 	}
 
 	// Default template attributes.
@@ -293,8 +295,6 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	return append(signOptions,
 		// Checks the validity bounds, and set the validity if has not been set.
 		&sshLimitDuration{p.claimer, claims.chains[0][0].NotAfter},
-		// set the key id to the token subject
-		sshCertKeyIDValidator(claims.Subject),
 		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.

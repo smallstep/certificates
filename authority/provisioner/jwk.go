@@ -207,6 +207,8 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	signOptions := []SignOption{
 		// validates user's SSHOptions with the ones in the token
 		sshCertOptionsValidator(*opts),
+		// validate users's KeyID is the token subject.
+		sshCertOptionsValidator(SignSSHOptions{KeyID: claims.Subject}),
 	}
 
 	// Default template attributes.
@@ -251,8 +253,6 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	return append(signOptions,
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{p.claimer},
-		// Validate that the keyID is equivalent to the token subject.
-		sshCertKeyIDValidator(claims.Subject),
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
