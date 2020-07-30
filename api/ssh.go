@@ -36,12 +36,13 @@ type SSHSignRequest struct {
 	PublicKey        []byte             `json:"publicKey"` // base64 encoded
 	OTT              string             `json:"ott"`
 	CertType         string             `json:"certType,omitempty"`
+	KeyID            string             `json:"keyID,omitempty"`
 	Principals       []string           `json:"principals,omitempty"`
 	ValidAfter       TimeDuration       `json:"validAfter,omitempty"`
 	ValidBefore      TimeDuration       `json:"validBefore,omitempty"`
 	AddUserPublicKey []byte             `json:"addUserPublicKey,omitempty"`
-	KeyID            string             `json:"keyID"`
 	IdentityCSR      CertificateRequest `json:"identityCSR,omitempty"`
+	TemplateData     json.RawMessage    `json:"templateData,omitempty"`
 }
 
 // Validate validates the SSHSignRequest.
@@ -275,11 +276,12 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	opts := provisioner.SignSSHOptions{
-		CertType:    body.CertType,
-		KeyID:       body.KeyID,
-		Principals:  body.Principals,
-		ValidBefore: body.ValidBefore,
-		ValidAfter:  body.ValidAfter,
+		CertType:     body.CertType,
+		KeyID:        body.KeyID,
+		Principals:   body.Principals,
+		ValidBefore:  body.ValidBefore,
+		ValidAfter:   body.ValidAfter,
+		TemplateData: body.TemplateData,
 	}
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHSignMethod)

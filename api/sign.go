@@ -14,9 +14,9 @@ import (
 type SignRequest struct {
 	CsrPEM       CertificateRequest `json:"csr"`
 	OTT          string             `json:"ott"`
-	NotAfter     TimeDuration       `json:"notAfter"`
-	NotBefore    TimeDuration       `json:"notBefore"`
-	TemplateData json.RawMessage    `json:"templateData"`
+	NotAfter     TimeDuration       `json:"notAfter,omitempty"`
+	NotBefore    TimeDuration       `json:"notBefore,omitempty"`
+	TemplateData json.RawMessage    `json:"templateData,omitempty"`
 }
 
 // Validate checks the fields of the SignRequest and returns nil if they are ok
