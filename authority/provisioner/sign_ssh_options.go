@@ -160,7 +160,7 @@ func (m sshCertValidBeforeModifier) Modify(cert *ssh.Certificate, _ SignSSHOptio
 type sshCertDefaultsModifier SignSSHOptions
 
 // Modify implements the SSHCertModifier interface.
-func (m sshCertDefaultsModifier) Modify(cert *ssh.Certificate) error {
+func (m sshCertDefaultsModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
 	if cert.CertType == 0 {
 		cert.CertType = sshCertTypeUInt32(m.CertType)
 	}
@@ -180,7 +180,7 @@ func (m sshCertDefaultsModifier) Modify(cert *ssh.Certificate) error {
 // the default extensions in an SSH certificate.
 type sshDefaultExtensionModifier struct{}
 
-func (m *sshDefaultExtensionModifier) Modify(cert *ssh.Certificate) error {
+func (m *sshDefaultExtensionModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
 	switch cert.CertType {
 	// Default to no extensions for HostCert.
 	case ssh.HostCert:
