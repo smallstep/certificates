@@ -259,7 +259,7 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	// Use options in the token.
 	if opts.CertType != "" {
 		if certType, err = sshutil.CertTypeFromString(opts.CertType); err != nil {
-			return nil, errs.Wrap(http.StatusBadRequest, err, "jwk.AuthorizeSSHSign")
+			return nil, errs.Wrap(http.StatusBadRequest, err, "x5c.AuthorizeSSHSign")
 		}
 	}
 	if opts.KeyID != "" {
@@ -277,7 +277,7 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 
 	templateOptions, err := TemplateSSHOptions(p.SSHOptions, data)
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "x5c.AuthorizeSSHSign")
 	}
 	signOptions = append(signOptions, templateOptions)
 
