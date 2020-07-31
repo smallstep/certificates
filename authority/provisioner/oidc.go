@@ -325,7 +325,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	// Use the default template unless no-templates are configured and email is
 	// an admin, in that case we will use the CR template.
 	defaultTemplate := x509util.DefaultLeafTemplate
-	if !o.Options.HasTemplate() && o.IsAdmin(claims.Email) {
+	if !o.Options.GetX509Options().HasTemplate() && o.IsAdmin(claims.Email) {
 		defaultTemplate = x509util.CertificateRequestTemplate
 	}
 

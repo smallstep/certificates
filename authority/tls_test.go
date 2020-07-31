@@ -288,7 +288,7 @@ ZYtQ9Ot36qc=
 				t.Fatal("provisioner not found")
 			}
 			p.(*provisioner.JWK).Options = &provisioner.Options{
-				Template: `{{ fail "fail message" }}`,
+				X509: &provisioner.X509Options{Template: `{{ fail "fail message" }}`},
 			}
 			testExtraOpts, err := testAuthority.Authorize(ctx, token)
 			assert.FatalError(t, err)
@@ -366,12 +366,12 @@ ZYtQ9Ot36qc=
 				t.Fatal("provisioner not found")
 			}
 			p.(*provisioner.JWK).Options = &provisioner.Options{
-				Template: `{
+				X509: &provisioner.X509Options{Template: `{
 					"subject": {{toJson .Subject}},
 					"dnsNames": {{ toJson .Insecure.CR.DNSNames }},
 					"keyUsage": ["digitalSignature"],
 					"extKeyUsage": ["serverAuth","clientAuth"]
-				}`,
+				}`},
 			}
 			testExtraOpts, err := testAuthority.Authorize(ctx, token)
 			assert.FatalError(t, err)
