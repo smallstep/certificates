@@ -157,6 +157,46 @@ func TestTemplateData_AddExtension(t *testing.T) {
 	}
 }
 
+func TestTemplateData_AddCriticalOption(t *testing.T) {
+	type args struct {
+		key   string
+		value string
+	}
+	tests := []struct {
+		name string
+		t    TemplateData
+		args args
+		want TemplateData
+	}{
+		{"empty", TemplateData{}, args{"key", "value"}, TemplateData{
+			CriticalOptionsKey: map[string]interface{}{"key": "value"},
+		}},
+		{"overwrite", TemplateData{
+			CriticalOptionsKey: map[string]interface{}{"key": "value"},
+		}, args{"key", "value"}, TemplateData{
+			CriticalOptionsKey: map[string]interface{}{
+				"key": "value",
+			},
+		}},
+		{"add", TemplateData{
+			CriticalOptionsKey: map[string]interface{}{"foo": "bar"},
+		}, args{"key", "value"}, TemplateData{
+			CriticalOptionsKey: map[string]interface{}{
+				"key": "value",
+				"foo": "bar",
+			},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.t.AddCriticalOption(tt.args.key, tt.args.value)
+			if !reflect.DeepEqual(tt.t, tt.want) {
+				t.Errorf("AddCriticalOption() = %v, want %v", tt.t, tt.want)
+			}
+		})
+	}
+}
+
 func TestTemplateData_Set(t *testing.T) {
 	type args struct {
 		key string
@@ -320,6 +360,35 @@ func TestTemplateData_SetExtensions(t *testing.T) {
 			tt.t.SetExtensions(tt.args.e)
 			if !reflect.DeepEqual(tt.t, tt.want) {
 				t.Errorf("SetExtensions() = %v, want %v", tt.t, tt.want)
+			}
+		})
+	}
+}
+
+func TestTemplateData_SetCriticalOptions(t *testing.T) {
+	type args struct {
+		e map[string]interface{}
+	}
+	tests := []struct {
+		name string
+		t    TemplateData
+		args args
+		want TemplateData
+	}{
+		{"ok", TemplateData{}, args{map[string]interface{}{"foo": "bar"}}, TemplateData{
+			CriticalOptionsKey: map[string]interface{}{"foo": "bar"},
+		}},
+		{"overwrite", TemplateData{
+			CriticalOptionsKey: map[string]interface{}{"foo": "bar"},
+		}, args{map[string]interface{}{"key": "value"}}, TemplateData{
+			CriticalOptionsKey: map[string]interface{}{"key": "value"},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.t.SetCriticalOptions(tt.args.e)
+			if !reflect.DeepEqual(tt.t, tt.want) {
+				t.Errorf("SetCriticalOptions() = %v, want %v", tt.t, tt.want)
 			}
 		})
 	}

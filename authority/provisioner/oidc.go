@@ -384,6 +384,14 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	if v, err := unsafeParseSigned(token); err == nil {
 		data.SetToken(v)
 	}
+	// Add custom extensions added in the identity function.
+	for k, v := range iden.Permissions.Extensions {
+		data.AddExtension(k, v)
+	}
+	// Add custom critical options added in the identity function.
+	for k, v := range iden.Permissions.CriticalOptions {
+		data.AddCriticalOption(k, v)
+	}
 
 	templateOptions, err := TemplateSSHOptions(o.SSHOptions, data)
 	if err != nil {

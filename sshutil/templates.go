@@ -5,6 +5,7 @@ const (
 	KeyIDKey              = "KeyID"
 	PrincipalsKey         = "Principals"
 	ExtensionsKey         = "Extensions"
+	CriticalOptionsKey    = "CriticalOptions"
 	TokenKey              = "Token"
 	InsecureKey           = "Insecure"
 	UserKey               = "User"
@@ -70,6 +71,17 @@ func (t TemplateData) AddExtension(key, value string) {
 	}
 }
 
+// AddCriticalOption adds one critical option to the templates data.
+func (t TemplateData) AddCriticalOption(key, value string) {
+	if m, ok := t[CriticalOptionsKey].(map[string]interface{}); ok {
+		m[key] = value
+	} else {
+		t[CriticalOptionsKey] = map[string]interface{}{
+			key: value,
+		}
+	}
+}
+
 // Set sets a key-value pair in the template data.
 func (t TemplateData) Set(key string, v interface{}) {
 	t[key] = v
@@ -104,6 +116,12 @@ func (t TemplateData) SetExtensions(e map[string]interface{}) {
 	t.Set(ExtensionsKey, e)
 }
 
+// SetCriticalOptions sets the certificate critical options in the template
+// data.
+func (t TemplateData) SetCriticalOptions(o map[string]interface{}) {
+	t.Set(CriticalOptionsKey, o)
+}
+
 // SetToken sets the given token in the template data.
 func (t TemplateData) SetToken(v interface{}) {
 	t.Set(TokenKey, v)
@@ -126,7 +144,8 @@ const DefaultCertificate = `{
 	"type": "{{ .Type }}",
 	"keyId": "{{ .KeyID }}",
 	"principals": {{ toJson .Principals }},
-	"extensions": {{ toJson .Extensions }}
+	"extensions": {{ toJson .Extensions }},
+	"criticalOptions": {{ toJson .CriticalOptions }}
 }`
 
 const DefaultIIDCertificate = `{
