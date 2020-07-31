@@ -52,18 +52,21 @@ func TestWithTemplate(t *testing.T) {
 	"type": "user",
 	"keyId": "jane@doe.com",
 	"principals": ["jane","jane@doe.com"],
-	"extensions": {"permit-X11-forwarding":"","permit-agent-forwarding":"","permit-port-forwarding":"","permit-pty":"","permit-user-rc":""}
+	"extensions": {"permit-X11-forwarding":"","permit-agent-forwarding":"","permit-port-forwarding":"","permit-pty":"","permit-user-rc":""},
+	"criticalOptions": null
 }`)}, false},
 		{"host", args{DefaultCertificate, TemplateData{
-			TypeKey:       "host",
-			KeyIDKey:      "foo",
-			PrincipalsKey: []string{"foo.internal"},
+			TypeKey:            "host",
+			KeyIDKey:           "foo",
+			PrincipalsKey:      []string{"foo.internal"},
+			CriticalOptionsKey: map[string]string{"foo": "bar"},
 		}, cr}, Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"type": "host",
 	"keyId": "foo",
 	"principals": ["foo.internal"],
-	"extensions": null
+	"extensions": null,
+	"criticalOptions": {"foo":"bar"}
 }`)}, false},
 		{"fail", args{`{{ fail "a message" }}`, TemplateData{}, cr}, Options{}, true},
 		{"failTemplate", args{`{{ fail "fatal error }}`, TemplateData{}, cr}, Options{}, true},
@@ -103,16 +106,18 @@ func TestWithTemplateBase64(t *testing.T) {
 		wantErr bool
 	}{
 		{"host", args{base64.StdEncoding.EncodeToString([]byte(DefaultCertificate)), TemplateData{
-			TypeKey:       "host",
-			KeyIDKey:      "foo.internal",
-			PrincipalsKey: []string{"foo.internal", "bar.internal"},
-			ExtensionsKey: map[string]interface{}{"foo": "bar"},
+			TypeKey:            "host",
+			KeyIDKey:           "foo.internal",
+			PrincipalsKey:      []string{"foo.internal", "bar.internal"},
+			ExtensionsKey:      map[string]interface{}{"foo": "bar"},
+			CriticalOptionsKey: map[string]interface{}{"bar": "foo"},
 		}, cr}, Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"type": "host",
 	"keyId": "foo.internal",
 	"principals": ["foo.internal","bar.internal"],
-	"extensions": {"foo":"bar"}
+	"extensions": {"foo":"bar"},
+	"criticalOptions": {"bar":"foo"}
 }`)}, false},
 		{"badBase64", args{"foobar", TemplateData{}, cr}, Options{}, true},
 	}
