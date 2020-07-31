@@ -37,8 +37,8 @@ func (s SignatureAlgorithm) Set(c *x509.Certificate) {
 	c.SignatureAlgorithm = x509.SignatureAlgorithm(s)
 }
 
-// UnmarshalJSON implements the json.Unmarshal interface and unmarshals a JSON
-// object in the Subject struct or a string as just the subject common name.
+// UnmarshalJSON implements the json.Unmarshal interface and unmarshals and
+// validates a string as a SignatureAlgorithm.
 func (s *SignatureAlgorithm) UnmarshalJSON(data []byte) error {
 	name, err := unmarshalString(data)
 	if err != nil {
