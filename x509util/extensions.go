@@ -65,7 +65,7 @@ type Extension struct {
 	Value    []byte           `json:"value"`
 }
 
-// newExtensions creates an Extension from a standard pkix.Extension.
+// newExtension creates an Extension from a standard pkix.Extension.
 func newExtension(e pkix.Extension) Extension {
 	return Extension{
 		ID:       ObjectIdentifier(e.Id),
