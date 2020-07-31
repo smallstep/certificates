@@ -26,15 +26,14 @@ type x5cPayload struct {
 // signature requests.
 type X5C struct {
 	*base
-	Type       string      `json:"type"`
-	Name       string      `json:"name"`
-	Roots      []byte      `json:"roots"`
-	Claims     *Claims     `json:"claims,omitempty"`
-	Options    *Options    `json:"options,omitempty"`
-	SSHOptions *SSHOptions `json:"sshOptions,omitempty"`
-	claimer    *Claimer
-	audiences  Audiences
-	rootPool   *x509.CertPool
+	Type      string   `json:"type"`
+	Name      string   `json:"name"`
+	Roots     []byte   `json:"roots"`
+	Claims    *Claims  `json:"claims,omitempty"`
+	Options   *Options `json:"options,omitempty"`
+	claimer   *Claimer
+	audiences Audiences
+	rootPool  *x509.CertPool
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -277,7 +276,7 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		data.SetToken(v)
 	}
 
-	templateOptions, err := TemplateSSHOptions(p.SSHOptions, data)
+	templateOptions, err := TemplateSSHOptions(p.Options, data)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "x5c.AuthorizeSSHSign")
 	}

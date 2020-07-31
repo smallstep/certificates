@@ -84,16 +84,15 @@ type azurePayload struct {
 // and https://docs.microsoft.com/en-us/azure/virtual-machines/windows/instance-metadata-service
 type Azure struct {
 	*base
-	Type                   string      `json:"type"`
-	Name                   string      `json:"name"`
-	TenantID               string      `json:"tenantID"`
-	ResourceGroups         []string    `json:"resourceGroups"`
-	Audience               string      `json:"audience,omitempty"`
-	DisableCustomSANs      bool        `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool        `json:"disableTrustOnFirstUse"`
-	Claims                 *Claims     `json:"claims,omitempty"`
-	Options                *Options    `json:"options,omitempty"`
-	SSHOptions             *SSHOptions `json:"sshOptions,omitempty"`
+	Type                   string   `json:"type"`
+	Name                   string   `json:"name"`
+	TenantID               string   `json:"tenantID"`
+	ResourceGroups         []string `json:"resourceGroups"`
+	Audience               string   `json:"audience,omitempty"`
+	DisableCustomSANs      bool     `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
+	Claims                 *Claims  `json:"claims,omitempty"`
+	Options                *Options `json:"options,omitempty"`
 	claimer                *Claimer
 	config                 *azureConfig
 	oidcConfig             openIDConfiguration
@@ -367,7 +366,7 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		data.SetToken(v)
 	}
 
-	templateOptions, err := CustomSSHTemplateOptions(p.SSHOptions, data, defaultTemplate)
+	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, defaultTemplate)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSSHSign")
 	}

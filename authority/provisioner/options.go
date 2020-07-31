@@ -25,14 +25,23 @@ func (fn certificateOptionsFunc) Options(so SignOptions) []x509util.Option {
 // each provisioner.
 type Options struct {
 	X509 *X509Options `json:"x509,omitempty"`
+	SSH  *SSHOptions  `json:"ssh,omitempty"`
 }
 
-// GetX509Options returns the X.509Options
+// GetX509Options returns the X.509 options.
 func (o *Options) GetX509Options() *X509Options {
 	if o == nil {
 		return nil
 	}
 	return o.X509
+}
+
+// GetSSHOptions returns the SSH options.
+func (o *Options) GetSSHOptions() *SSHOptions {
+	if o == nil {
+		return nil
+	}
+	return o.SSH
 }
 
 // X509Options contains specific options for X.509 certificates.

@@ -34,7 +34,6 @@ type JWK struct {
 	EncryptedKey string           `json:"encryptedKey,omitempty"`
 	Claims       *Claims          `json:"claims,omitempty"`
 	Options      *Options         `json:"options,omitempty"`
-	SSHOptions   *SSHOptions      `json:"sshOptions,omitempty"`
 	claimer      *Claimer
 	audiences    Audiences
 }
@@ -205,7 +204,7 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 
 	opts := claims.Step.SSH
 	signOptions := []SignOption{
-		// validates user's SSHOptions with the ones in the token
+		// validates user's SignSSHOptions with the ones in the token
 		sshCertOptionsValidator(*opts),
 		// validate users's KeyID is the token subject.
 		sshCertOptionsValidator(SignSSHOptions{KeyID: claims.Subject}),
@@ -235,7 +234,7 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		data.SetToken(v)
 	}
 
-	templateOptions, err := TemplateSSHOptions(p.SSHOptions, data)
+	templateOptions, err := TemplateSSHOptions(p.Options, data)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
 	}

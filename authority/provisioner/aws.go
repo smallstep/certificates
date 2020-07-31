@@ -127,15 +127,14 @@ type awsInstanceIdentityDocument struct {
 // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-identity-documents.html
 type AWS struct {
 	*base
-	Type                   string      `json:"type"`
-	Name                   string      `json:"name"`
-	Accounts               []string    `json:"accounts"`
-	DisableCustomSANs      bool        `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool        `json:"disableTrustOnFirstUse"`
-	InstanceAge            Duration    `json:"instanceAge,omitempty"`
-	Claims                 *Claims     `json:"claims,omitempty"`
-	Options                *Options    `json:"options,omitempty"`
-	SSHOptions             *SSHOptions `json:"sshOptions,omitempty"`
+	Type                   string   `json:"type"`
+	Name                   string   `json:"name"`
+	Accounts               []string `json:"accounts"`
+	DisableCustomSANs      bool     `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
+	InstanceAge            Duration `json:"instanceAge,omitempty"`
+	Claims                 *Claims  `json:"claims,omitempty"`
+	Options                *Options `json:"options,omitempty"`
 	claimer                *Claimer
 	config                 *awsConfig
 	audiences              Audiences
@@ -499,7 +498,7 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		data.SetToken(v)
 	}
 
-	templateOptions, err := CustomSSHTemplateOptions(p.SSHOptions, data, defaultTemplate)
+	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, defaultTemplate)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "aws.AuthorizeSSHSign")
 	}

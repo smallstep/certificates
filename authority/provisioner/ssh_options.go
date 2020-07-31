@@ -44,7 +44,7 @@ func (o *SSHOptions) HasTemplate() bool {
 // defined in the ProvisionerOptions, the provisioner generated data, and the
 // user data provided in the request. If no template has been provided,
 // x509util.DefaultLeafTemplate will be used.
-func TemplateSSHOptions(o *SSHOptions, data sshutil.TemplateData) (SSHCertificateOptions, error) {
+func TemplateSSHOptions(o *Options, data sshutil.TemplateData) (SSHCertificateOptions, error) {
 	return CustomSSHTemplateOptions(o, data, sshutil.DefaultCertificate)
 }
 
@@ -52,15 +52,16 @@ func TemplateSSHOptions(o *SSHOptions, data sshutil.TemplateData) (SSHCertificat
 // defined in the ProvisionerOptions, the provisioner generated data and the
 // user data provided in the request. If no template has been provided in the
 // ProvisionerOptions, the given template will be used.
-func CustomSSHTemplateOptions(o *SSHOptions, data sshutil.TemplateData, defaultTemplate string) (SSHCertificateOptions, error) {
-	if o != nil {
-		if data == nil {
-			data = sshutil.NewTemplateData()
-		}
+func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemplate string) (SSHCertificateOptions, error) {
+	opts := o.GetSSHOptions()
+	if data == nil {
+		data = sshutil.NewTemplateData()
+	}
 
+	if opts != nil {
 		// Add template data if any.
-		if len(o.TemplateData) > 0 {
-			if err := json.Unmarshal(o.TemplateData, &data); err != nil {
+		if len(opts.TemplateData) > 0 {
+			if err := json.Unmarshal(opts.TemplateData, &data); err != nil {
 				return nil, errors.Wrap(err, "error unmarshaling template data")
 			}
 		}
@@ -68,7 +69,7 @@ func CustomSSHTemplateOptions(o *SSHOptions, data sshutil.TemplateData, defaultT
 
 	return sshCertificateOptionsFunc(func(so SignSSHOptions) []sshutil.Option {
 		// We're not provided user data without custom templates.
-		if !o.HasTemplate() {
+		if !opts.HasTemplate() {
 			return []sshutil.Option{
 				sshutil.WithTemplate(defaultTemplate, data),
 			}
@@ -85,15 +86,15 @@ func CustomSSHTemplateOptions(o *SSHOptions, data sshutil.TemplateData, defaultT
 		}
 
 		// Load a template from a file if Template is not defined.
-		if o.Template == "" && o.TemplateFile != "" {
+		if opts.Template == "" && opts.TemplateFile != "" {
 			return []sshutil.Option{
-				sshutil.WithTemplateFile(o.TemplateFile, data),
+				sshutil.WithTemplateFile(opts.TemplateFile, data),
 			}
 		}
 
 		// Load a template from the Template fields
 		// 1. As a JSON in a string.
-		template := strings.TrimSpace(o.Template)
+		template := strings.TrimSpace(opts.Template)
 		if strings.HasPrefix(template, "{") {
 			return []sshutil.Option{
 				sshutil.WithTemplate(template, data),

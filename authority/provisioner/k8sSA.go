@@ -42,14 +42,13 @@ type k8sSAPayload struct {
 // entity trusted to make signature requests.
 type K8sSA struct {
 	*base
-	Type       string      `json:"type"`
-	Name       string      `json:"name"`
-	PubKeys    []byte      `json:"publicKeys,omitempty"`
-	Claims     *Claims     `json:"claims,omitempty"`
-	Options    *Options    `json:"options,omitempty"`
-	SSHOptions *SSHOptions `json:"sshOptions,omitempty"`
-	claimer    *Claimer
-	audiences  Audiences
+	Type      string   `json:"type"`
+	Name      string   `json:"name"`
+	PubKeys   []byte   `json:"publicKeys,omitempty"`
+	Claims    *Claims  `json:"claims,omitempty"`
+	Options   *Options `json:"options,omitempty"`
+	claimer   *Claimer
+	audiences Audiences
 	//kauthn    kauthn.AuthenticationV1Interface
 	pubKeys []interface{}
 }
@@ -263,7 +262,7 @@ func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		data.SetToken(v)
 	}
 
-	templateOptions, err := CustomSSHTemplateOptions(p.SSHOptions, data, sshutil.CertificateRequestTemplate)
+	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, sshutil.CertificateRequestTemplate)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSSHSign")
 	}

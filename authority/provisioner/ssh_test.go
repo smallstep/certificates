@@ -53,9 +53,6 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 		// modify the ssh.Certificate
 		case SSHCertModifier:
 			mods = append(mods, o)
-		// modify the ssh.Certificate given the SSHOptions
-		case SSHCertOptionModifier:
-			mods = append(mods, o.Option(opts))
 		// validate the ssh.Certificate
 		case SSHCertValidator:
 			validators = append(validators, o)
@@ -77,13 +74,13 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 	}
 
 	// Use opts to modify the certificate
-	if err := opts.Modify(cert); err != nil {
+	if err := opts.Modify(cert, opts); err != nil {
 		return nil, err
 	}
 
 	// Use provisioner modifiers
 	for _, m := range mods {
-		if err := m.Modify(cert); err != nil {
+		if err := m.Modify(cert, opts); err != nil {
 			return nil, err
 		}
 	}

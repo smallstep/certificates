@@ -46,6 +46,28 @@ func TestOptions_GetX509Options(t *testing.T) {
 	}
 }
 
+func TestOptions_GetSSHOptions(t *testing.T) {
+	type fields struct {
+		o *Options
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *SSHOptions
+	}{
+		{"ok", fields{&Options{SSH: &SSHOptions{Template: "foo"}}}, &SSHOptions{Template: "foo"}},
+		{"nil", fields{&Options{}}, nil},
+		{"nilOptions", fields{nil}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.fields.o.GetSSHOptions(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Options.GetSSHOptions() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestProvisionerX509Options_HasTemplate(t *testing.T) {
 	type fields struct {
 		Template     string
