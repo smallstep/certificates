@@ -392,7 +392,15 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		data.AddCriticalOption(k, v)
 	}
 
-	templateOptions, err := TemplateSSHOptions(o.Options, data)
+	// Use the default template unless no-templates are configured and email is
+	// an admin, in that case we will use the parameters in the request.
+	isAdmin := o.IsAdmin(claims.Email)
+	defaultTemplate := sshutil.DefaultCertificate
+	if isAdmin && !o.Options.GetSSHOptions().HasTemplate() {
+		defaultTemplate = sshutil.DefaultAdminCertificate
+	}
+
+	templateOptions, err := CustomSSHTemplateOptions(o.Options, data, defaultTemplate)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
 	}
@@ -401,7 +409,13 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	// Admin users can use any principal, and can sign user and host certificates.
 	// Non-admin users can only use principals returned by the identityFunc, and
 	// can only sign user certificates.
-	if !o.IsAdmin(claims.Email) {
+	if isAdmin {
+		signOptions = append(signOptions, &sshCertOptionsRequireValidator{
+			CertType:   true,
+			KeyID:      true,
+			Principals: true,
+		})
+	} else {
 		signOptions = append(signOptions, sshCertOptionsValidator(SignSSHOptions{
 			CertType:   SSHUserCert,
 			Principals: iden.Usernames,

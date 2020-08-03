@@ -1,5 +1,6 @@
 package sshutil
 
+// Variables used to hold template data.
 const (
 	TypeKey               = "Type"
 	KeyIDKey              = "KeyID"
@@ -101,7 +102,7 @@ func (t TemplateData) SetType(typ CertType) {
 	t.Set(TypeKey, typ.String())
 }
 
-// SetType sets the certificate key id in the template data.
+// SetKeyID sets the certificate key id in the template data.
 func (t TemplateData) SetKeyID(id string) {
 	t.Set(KeyIDKey, id)
 }
@@ -148,13 +149,25 @@ const DefaultCertificate = `{
 	"criticalOptions": {{ toJson .CriticalOptions }}
 }`
 
+// DefaultAdminCertificate is the template used by an admin user in a OIDC
+// provisioner.
+const DefaultAdminCertificate = `{
+	"type": "{{ .Insecure.CR.Type }}",
+	"keyId": "{{ .Insecure.CR.KeyID }}",
+	"principals": {{ toJson .Insecure.CR.Principals }}
+{{- if eq .Insecure.CR.Type "user" }}
+	, "extensions": {{ toJson .Extensions }},
+	"criticalOptions": {{ toJson .CriticalOptions }}
+{{- end }}
+}`
+
+// DefaultIIDCertificate is the default template for IID provisioners. By
+// default certificate type will be set always to host, key id to the instance
+// id. Principals will be only enforced by the provisioner if disableCustomSANs
+// is set to true.
 const DefaultIIDCertificate = `{
 	"type": "{{ .Type }}",
-{{- if .Insecure.CR.KeyID }}
-	"keyId": "{{ .Insecure.CR.KeyID }}",
-{{- else }}
 	"keyId": "{{ .KeyID }}",
-{{- end}}
 {{- if .Insecure.CR.Principals }}
 	"principals": {{ toJson .Insecure.CR.Principals }},
 {{- else }}
@@ -163,6 +176,9 @@ const DefaultIIDCertificate = `{
 	"extensions": {{ toJson .Extensions }}
 }`
 
+// CertificateRequestTemplate is the template used for provisioners that accepts
+// any certificate request. The provisioner must validate that type, keyId and
+// principals are passed in the request.
 const CertificateRequestTemplate = `{
 	"type": "{{ .Insecure.CR.Type }}",
 	"keyId": "{{ .Insecure.CR.KeyID }}",
