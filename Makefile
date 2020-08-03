@@ -50,10 +50,12 @@ PUSHTYPE := master
 endif
 
 VERSION := $(shell echo $(VERSION) | sed 's/^v//')
+DEB_VERSION := $(shell echo $(VERSION) | sed 's/-/~/g')
 
 ifdef V
 $(info    TRAVIS_TAG is $(TRAVIS_TAG))
 $(info    VERSION is $(VERSION))
+$(info    DEB_VERSION is $(DEB_VERSION))
 $(info    PUSHTYPE is $(PUSHTYPE))
 endif
 
@@ -242,7 +244,7 @@ docker-release: docker-release-candidate docker-push-tag-latest
 #########################################
 
 changelog:
-	$Q echo "step-certificates ($(VERSION)) unstable; urgency=medium" > debian/changelog
+	$Q echo "step-certificates ($(DEB_VERSION)) unstable; urgency=medium" > debian/changelog
 	$Q echo >> debian/changelog
 	$Q echo "  * See https://github.com/smallstep/certificates/releases" >> debian/changelog
 	$Q echo >> debian/changelog
