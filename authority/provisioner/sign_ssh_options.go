@@ -306,7 +306,7 @@ type sshCertOptionsRequireValidator struct {
 	Principals bool
 }
 
-func (v sshCertOptionsRequireValidator) Valid(got SignSSHOptions) error {
+func (v *sshCertOptionsRequireValidator) Valid(got SignSSHOptions) error {
 	switch {
 	case v.CertType && got.CertType == "":
 		return errors.New("ssh certificate certType cannot be empty")

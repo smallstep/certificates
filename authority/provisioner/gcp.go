@@ -379,28 +379,27 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	}
 
 	ce := claims.Google.ComputeEngine
+	signOptions := []SignOption{}
 
-	// Validated principals
+	// Enforce host certificate.
+	defaults := SignSSHOptions{
+		CertType: SSHHostCert,
+	}
+
+	// Validated principals.
 	principals := []string{
 		fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
 		fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
 	}
 
-	// Default options and template
-	defaults := SignSSHOptions{
-		CertType: SSHHostCert,
-	}
-	defaultTemplate := sshutil.DefaultIIDCertificate
-
 	// Only enforce known principals if disable custom sans is true.
 	if p.DisableCustomSANs {
 		defaults.Principals = principals
-		defaultTemplate = sshutil.DefaultCertificate
-	}
-
-	// Validate user options
-	signOptions := []SignOption{
-		sshCertOptionsValidator(defaults),
+	} else {
+		// Check that at least one principal is sent in the request.
+		signOptions = append(signOptions, &sshCertOptionsRequireValidator{
+			Principals: true,
+		})
 	}
 
 	// Certificate templates.
@@ -409,13 +408,15 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		data.SetToken(v)
 	}
 
-	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, defaultTemplate)
+	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, sshutil.DefaultIIDCertificate)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSSHSign")
 	}
 	signOptions = append(signOptions, templateOptions)
 
 	return append(signOptions,
+		// Validate user SignSSHOptions.
+		sshCertOptionsValidator(defaults),
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{p.claimer},
 		// Validate public key

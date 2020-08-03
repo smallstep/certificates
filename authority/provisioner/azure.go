@@ -340,24 +340,24 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSSHSign")
 	}
 
-	// Validated principals
-	principals := []string{name}
+	signOptions := []SignOption{}
 
-	// Default options and template
+	// Enforce host certificate.
 	defaults := SignSSHOptions{
 		CertType: SSHHostCert,
 	}
-	defaultTemplate := sshutil.DefaultIIDCertificate
+
+	// Validated principals.
+	principals := []string{name}
 
 	// Only enforce known principals if disable custom sans is true.
 	if p.DisableCustomSANs {
 		defaults.Principals = principals
-		defaultTemplate = sshutil.DefaultCertificate
-	}
-
-	// Validate user options
-	signOptions := []SignOption{
-		sshCertOptionsValidator(defaults),
+	} else {
+		// Check that at least one principal is sent in the request.
+		signOptions = append(signOptions, &sshCertOptionsRequireValidator{
+			Principals: true,
+		})
 	}
 
 	// Certificate templates.
@@ -366,13 +366,15 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		data.SetToken(v)
 	}
 
-	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, defaultTemplate)
+	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, sshutil.DefaultIIDCertificate)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSSHSign")
 	}
 	signOptions = append(signOptions, templateOptions)
 
 	return append(signOptions,
+		// Validate user SignSSHOptions.
+		sshCertOptionsValidator(defaults),
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{p.claimer},
 		// Validate public key
