@@ -435,17 +435,6 @@ func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, o SignSSHOpti
 	}
 }
 
-// sshCertKeyIDValidator implements a validator for the KeyId attribute.
-type sshCertKeyIDValidator string
-
-// Valid returns an error if the given certificate does not contain the necessary fields.
-func (v sshCertKeyIDValidator) Valid(cert *ssh.Certificate, o SignSSHOptions) error {
-	if string(v) != cert.KeyId {
-		return errors.Errorf("invalid ssh certificate KeyId; want %s, but got %s", string(v), cert.KeyId)
-	}
-	return nil
-}
-
 // sshCertTypeUInt32
 func sshCertTypeUInt32(ct string) uint32 {
 	switch ct {
