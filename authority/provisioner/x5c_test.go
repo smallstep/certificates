@@ -698,6 +698,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 				},
 				Step: &stepPayload{SSH: &SignSSHOptions{
 					CertType:    SSHHostCert,
+					KeyID:       "foo",
 					Principals:  []string{"max", "mariano", "alan"},
 					ValidAfter:  TimeDuration{d: 5 * time.Minute},
 					ValidBefore: TimeDuration{d: 10 * time.Minute},
@@ -753,19 +754,19 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
 						tot := 0
+						firstValidator := true
 						nw := now()
 						for _, o := range opts {
 							switch v := o.(type) {
 							case sshCertOptionsValidator:
 								tc.claims.Step.SSH.ValidAfter.t = time.Time{}
 								tc.claims.Step.SSH.ValidBefore.t = time.Time{}
-								assert.Equals(t, SignSSHOptions(v), *tc.claims.Step.SSH)
-							case sshCertKeyIDModifier:
-								assert.Equals(t, string(v), "foo")
-							case sshCertTypeModifier:
-								assert.Equals(t, string(v), tc.claims.Step.SSH.CertType)
-							case sshCertPrincipalsModifier:
-								assert.Equals(t, []string(v), tc.claims.Step.SSH.Principals)
+								if firstValidator {
+									assert.Equals(t, SignSSHOptions(v), *tc.claims.Step.SSH)
+								} else {
+									assert.Equals(t, SignSSHOptions(v), SignSSHOptions{KeyID: tc.claims.Subject})
+								}
+								firstValidator = false
 							case sshCertValidAfterModifier:
 								assert.Equals(t, int64(v), tc.claims.Step.SSH.ValidAfter.RelativeTime(nw).Unix())
 							case sshCertValidBeforeModifier:
@@ -777,19 +778,16 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 								assert.Equals(t, v.NotAfter, x5cCerts[0].NotAfter)
 							case *sshCertValidityValidator:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
-							case *sshDefaultExtensionModifier, *sshDefaultPublicKeyValidator,
-								*sshCertDefaultValidator:
-							case sshCertKeyIDValidator:
-								assert.Equals(t, string(v), "foo")
+							case *sshDefaultPublicKeyValidator, *sshCertDefaultValidator, sshCertificateOptionsFunc:
 							default:
 								assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
 							}
 							tot++
 						}
 						if len(tc.claims.Step.SSH.CertType) > 0 {
-							assert.Equals(t, tot, 13)
-						} else {
 							assert.Equals(t, tot, 9)
+						} else {
+							assert.Equals(t, tot, 7)
 						}
 					}
 				}

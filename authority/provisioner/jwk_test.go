@@ -512,10 +512,6 @@ func TestJWK_AuthorizeSign_SSHOptions(t *testing.T) {
 	}{
 		{"ok-user", p1, args{sub, iss, aud, iat, &SignSSHOptions{CertType: "user", Principals: []string{"name"}}, &SignSSHOptions{}, jwk}, expectedUserOptions, false, false},
 		{"ok-host", p1, args{sub, iss, aud, iat, &SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, &SignSSHOptions{}, jwk}, expectedHostOptions, false, false},
-		{"ok-user-opts", p1, args{sub, iss, aud, iat, &SignSSHOptions{}, &SignSSHOptions{CertType: "user", Principals: []string{"name"}}, jwk}, expectedUserOptions, false, false},
-		{"ok-host-opts", p1, args{sub, iss, aud, iat, &SignSSHOptions{}, &SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, jwk}, expectedHostOptions, false, false},
-		{"ok-user-mixed", p1, args{sub, iss, aud, iat, &SignSSHOptions{CertType: "user"}, &SignSSHOptions{Principals: []string{"name"}}, jwk}, expectedUserOptions, false, false},
-		{"ok-host-mixed", p1, args{sub, iss, aud, iat, &SignSSHOptions{Principals: []string{"smallstep.com"}}, &SignSSHOptions{CertType: "host"}, jwk}, expectedHostOptions, false, false},
 		{"ok-user-validAfter", p1, args{sub, iss, aud, iat, &SignSSHOptions{
 			CertType: "user", Principals: []string{"name"},
 		}, &SignSSHOptions{

@@ -47,7 +47,7 @@ type SignSSHOptions struct {
 	Principals   []string        `json:"principals"`
 	ValidAfter   TimeDuration    `json:"validAfter,omitempty"`
 	ValidBefore  TimeDuration    `json:"validBefore,omitempty"`
-	TemplateData json.RawMessage `json:"templateData"`
+	TemplateData json.RawMessage `json:"templateData,omitempty"`
 	Backdate     time.Duration   `json:"-"`
 }
 
