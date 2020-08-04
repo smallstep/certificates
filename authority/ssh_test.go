@@ -112,6 +112,20 @@ func TestAuthority_SignSSH(t *testing.T) {
 	assert.FatalError(t, err)
 	hostTemplateWithHosts, err := provisioner.TemplateSSHOptions(nil, sshutil.CreateTemplateData(sshutil.HostCert, "key-id", []string{"foo.test.com", "bar.test.com"}))
 	assert.FatalError(t, err)
+	userCustomTemplate, err := provisioner.TemplateSSHOptions(&provisioner.Options{
+		SSH: &provisioner.SSHOptions{Template: `{
+			"type": "{{ .Type }}",
+			"keyId": "{{ .KeyID }}",
+			"principals": {{ append .Principals "admin" | toJson }},
+			"extensions": {{ set .Extensions "login@github.com" .Insecure.User.username | toJson }},
+			"criticalOptions": {{ toJson .CriticalOptions }}
+		}`},
+	}, sshutil.CreateTemplateData(sshutil.UserCert, "key-id", []string{"user"}))
+	assert.FatalError(t, err)
+	userFailTemplate, err := provisioner.TemplateSSHOptions(&provisioner.Options{
+		SSH: &provisioner.SSHOptions{Template: `{{ fail "an error"}}`},
+	}, sshutil.CreateTemplateData(sshutil.UserCert, "key-id", []string{"user"}))
+	assert.FatalError(t, err)
 
 	now := time.Now()
 
@@ -149,6 +163,7 @@ func TestAuthority_SignSSH(t *testing.T) {
 		{"ok-cert-modifier", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions, sshTestCertModifier("")}}, want{CertType: ssh.UserCert}, false},
 		{"ok-opts-validator", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions, sshTestOptionsValidator("")}}, want{CertType: ssh.UserCert}, false},
 		{"ok-opts-modifier", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions, sshTestOptionsModifier("")}}, want{CertType: ssh.UserCert}, false},
+		{"ok-custom-template", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userCustomTemplate, userOptions}}, want{CertType: ssh.UserCert, Principals: []string{"user", "admin"}}, false},
 		{"fail-opts-type", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{CertType: "foo"}, []provisioner.SignOption{userTemplate}}, want{}, true},
 		{"fail-cert-validator", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions, sshTestCertValidator("an error")}}, want{}, true},
 		{"fail-cert-modifier", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions, sshTestCertModifier("an error")}}, want{}, true},
@@ -158,6 +173,7 @@ func TestAuthority_SignSSH(t *testing.T) {
 		{"fail-no-user-key", fields{nil, signer}, args{pub, provisioner.SignSSHOptions{CertType: "user"}, []provisioner.SignOption{userTemplate}}, want{}, true},
 		{"fail-no-host-key", fields{signer, nil}, args{pub, provisioner.SignSSHOptions{CertType: "host"}, []provisioner.SignOption{hostTemplate}}, want{}, true},
 		{"fail-bad-type", fields{signer, nil}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, sshTestModifier{CertType: 100}}}, want{}, true},
+		{"fail-custom-template", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userFailTemplate, userOptions}}, want{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
