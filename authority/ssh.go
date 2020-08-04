@@ -211,6 +211,11 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		validators  []provisioner.SSHCertValidator
 	)
 
+	// Validate given options.
+	if err := opts.Validate(); err != nil {
+		return nil, errs.Wrap(http.StatusBadRequest, err, "authority.SignSSH")
+	}
+
 	// Set backdate with the configured value
 	opts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 

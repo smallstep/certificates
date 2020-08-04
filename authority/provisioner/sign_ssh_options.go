@@ -51,6 +51,14 @@ type SignSSHOptions struct {
 	Backdate     time.Duration   `json:"-"`
 }
 
+// Validate validates the given SignSSHOptions.
+func (o SignSSHOptions) Validate() error {
+	if o.CertType != "" && o.CertType != SSHUserCert && o.CertType != SSHHostCert {
+		return errors.Errorf("unknown certType %s", o.CertType)
+	}
+	return nil
+}
+
 // Type returns the uint32 representation of the CertType.
 func (o SignSSHOptions) Type() uint32 {
 	return sshCertTypeUInt32(o.CertType)
