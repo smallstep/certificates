@@ -65,3 +65,18 @@ docker-release: docker-prepare docker-login
 	$(call DOCKER_BUILDX,$(VERSION),--push)
 
 .PHONY: docker-branch docker-master docker-release-candidate docker-release
+
+# XXX We put the output for the build in 'output' so we don't mess with how we
+# do rule overriding from the base Makefile (if you name it 'build' it messes up
+# the wildcarding).
+DOCKER_OUTPUT=$(OUTPUT_ROOT)docker/
+
+DOCKER_MAKE=V=$V GOOS_OVERRIDE='GOOS=linux GOARCH=amd64' PREFIX=$(1) make $(1)bin/$(BINNAME)
+DOCKER_BUILD=$Q docker build -t $(DOCKER_IMAGE_NAME):latest -f docker/Dockerfile.step-ca --build-arg BINPATH=$(DOCKER_OUTPUT)bin/$(BINNAME) .
+
+docker-dev: docker/Dockerfile.step-ca
+	mkdir -p $(DOCKER_OUTPUT)
+	$(call DOCKER_MAKE,$(DOCKER_OUTPUT),step-ca)
+	$(call DOCKER_BUILD)
+
+.PHONY: docker-dev
