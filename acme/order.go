@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/nosql"
+	"go.step.sm/crypto/x509util"
 )
 
 var defaultOrderExpiry = time.Hour * 24

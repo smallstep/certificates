@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -10,10 +11,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/jose"
-	"golang.org/x/crypto/ed25519"
+	"go.step.sm/crypto/x509util"
 )
 
 // NOTE: There can be at most one kubernetes service account provisioner configured

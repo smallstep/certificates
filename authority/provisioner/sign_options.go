@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -13,8 +14,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/x509util"
-	"golang.org/x/crypto/ed25519"
+	"go.step.sm/crypto/x509util"
 )
 
 // DefaultCertValidity is the default validity for a certificate if none is specified.
