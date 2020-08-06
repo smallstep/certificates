@@ -16,8 +16,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/sshutil"
-	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/x509util"
 )
 
 // gcpCertsURL is the url that serves Google OAuth2 public keys.

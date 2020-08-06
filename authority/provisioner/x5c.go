@@ -10,8 +10,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/sshutil"
-	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/x509util"
 )
 
 // x5cPayload extends jwt.Claims with step attributes.

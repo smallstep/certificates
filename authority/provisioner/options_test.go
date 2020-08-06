@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/crypto/pemutil"
+	"go.step.sm/crypto/x509util"
 )
 
 func parseCertificateRequest(t *testing.T, filename string) *x509.CertificateRequest {

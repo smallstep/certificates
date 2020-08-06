@@ -16,11 +16,11 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	x509legacy "github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/x509util"
 )
 
 // GetTLSOptions returns the tls options configured.

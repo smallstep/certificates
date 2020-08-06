@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/x509util"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/x509util"
 )
 
 // CertificateOptions is an interface that returns a list of options passed when
