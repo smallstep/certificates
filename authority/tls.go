@@ -245,20 +245,9 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 		newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
 	}
 
-	leaf, err := x509legacy.NewLeafProfileWithTemplate(newCert, a.x509Issuer, a.x509Signer)
+	serverCert, err := x509util.CreateCertificate(newCert, a.x509Issuer, newCert.PublicKey, a.x509Signer)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey", opts...)
-	}
-	crtBytes, err := leaf.CreateCertificate()
-	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.Rekey; error renewing certificate from existing server certificate", opts...)
-	}
-
-	serverCert, err := x509.ParseCertificate(crtBytes)
-	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.Rekey; error parsing new server certificate", opts...)
 	}
 
 	if err = a.db.StoreCertificate(serverCert); err != nil {

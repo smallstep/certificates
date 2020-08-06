@@ -538,7 +538,7 @@ func TestAuthority_Renew(t *testing.T) {
 			return &renewTest{
 				auth: _a,
 				cert: cert,
-				err:  errors.New("authority.Rekey; error renewing certificate from existing server certificate"),
+				err:  errors.New("authority.Rekey: error creating certificate"),
 				code: http.StatusInternalServerError,
 			}, nil
 		},
@@ -766,7 +766,7 @@ func TestAuthority_Rekey(t *testing.T) {
 			return &renewTest{
 				auth: _a,
 				cert: cert,
-				err:  errors.New("authority.Rekey; error renewing certificate from existing server certificate"),
+				err:  errors.New("authority.Rekey: error creating certificate"),
 				code: http.StatusInternalServerError,
 			}, nil
 		},
