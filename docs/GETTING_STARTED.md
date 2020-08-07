@@ -718,6 +718,10 @@ A few things to consider / implement when running multiple instances of `step-ca
 * Use `MySQL` DB: The default `Badger` DB cannot be read / written by more than one
 process simultaneously. The only supported DB that can support multiple instances
 is `MySQL`. See the [database documentation][4] for guidance on configuring `MySQL`.
+  * On this note, for the ACME server there are known concurrency limitations when using
+    the same account to manage multiple orders. It is recommended to generate an ephemeral
+    account keypair for every ACME order, or to ensure that multiple orders for the same
+    account are managed serially, not concurrently.
 
 * Synchronize `ca.json` across instances: `step-ca` reads all of it's
 configuration (and all of the provisioner configuration) from the `ca.json` file
