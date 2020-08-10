@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/sshutil"
+	"go.step.sm/crypto/sshutil"
 	"golang.org/x/crypto/ssh"
 )
 

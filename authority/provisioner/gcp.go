@@ -15,8 +15,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -408,7 +408,7 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		data.SetToken(v)
 	}
 
-	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, sshutil.DefaultIIDCertificate)
+	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, sshutil.DefaultIIDTemplate)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSSHSign")
 	}

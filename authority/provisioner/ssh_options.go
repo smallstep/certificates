@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/sshutil"
+	"go.step.sm/crypto/sshutil"
 )
 
-// CertificateOptions is an interface that returns a list of options passed when
+// SSHCertificateOptions is an interface that returns a list of options passed when
 // creating a new certificate.
 type SSHCertificateOptions interface {
 	Options(SignSSHOptions) []sshutil.Option
@@ -45,7 +45,7 @@ func (o *SSHOptions) HasTemplate() bool {
 // user data provided in the request. If no template has been provided,
 // x509util.DefaultLeafTemplate will be used.
 func TemplateSSHOptions(o *Options, data sshutil.TemplateData) (SSHCertificateOptions, error) {
-	return CustomSSHTemplateOptions(o, data, sshutil.DefaultCertificate)
+	return CustomSSHTemplateOptions(o, data, sshutil.DefaultTemplate)
 }
 
 // CustomTemplateOptions generates a CertificateOptions with the template, data

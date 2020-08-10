@@ -10,8 +10,8 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/randutil"
 )
 
 func TestX5C_Getters(t *testing.T) {

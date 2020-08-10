@@ -27,9 +27,9 @@ import (
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	stepJOSE "github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/randutil"
 	jose "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )

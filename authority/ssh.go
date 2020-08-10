@@ -13,10 +13,10 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
-	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/randutil"
+	"go.step.sm/crypto/sshutil"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -49,6 +49,21 @@ type Bastion struct {
 	Port     string `json:"port,omitempty"`
 	Command  string `json:"cmd,omitempty"`
 	Flags    string `json:"flags,omitempty"`
+}
+
+// HostTag are tagged with k,v pairs. These tags are how a user is ultimately
+// associated with a host.
+type HostTag struct {
+	ID    string
+	Name  string
+	Value string
+}
+
+// Host defines expected attributes for an ssh host.
+type Host struct {
+	HostID   string    `json:"hid"`
+	HostTags []HostTag `json:"host_tags"`
+	Hostname string    `json:"hostname"`
 }
 
 // Validate checks the fields in SSHConfig.
@@ -554,7 +569,7 @@ func (a *Authority) CheckSSHHost(ctx context.Context, principal string, token st
 }
 
 // GetSSHHosts returns a list of valid host principals.
-func (a *Authority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error) {
+func (a *Authority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]Host, error) {
 	if a.sshGetHostsFunc != nil {
 		hosts, err := a.sshGetHostsFunc(ctx, cert)
 		return hosts, errs.Wrap(http.StatusInternalServerError, err, "getSSHHosts")
@@ -564,9 +579,9 @@ func (a *Authority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "getSSHHosts")
 	}
 
-	hosts := make([]sshutil.Host, len(hostnames))
+	hosts := make([]Host, len(hostnames))
 	for i, hn := range hostnames {
-		hosts[i] = sshutil.Host{Hostname: hn}
+		hosts[i] = Host{Hostname: hn}
 	}
 	return hosts, nil
 }

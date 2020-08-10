@@ -13,8 +13,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -395,9 +395,9 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	// Use the default template unless no-templates are configured and email is
 	// an admin, in that case we will use the parameters in the request.
 	isAdmin := o.IsAdmin(claims.Email)
-	defaultTemplate := sshutil.DefaultCertificate
+	defaultTemplate := sshutil.DefaultTemplate
 	if isAdmin && !o.Options.GetSSHOptions().HasTemplate() {
-		defaultTemplate = sshutil.DefaultAdminCertificate
+		defaultTemplate = sshutil.DefaultAdminTemplate
 	}
 
 	templateOptions, err := CustomSSHTemplateOptions(o.Options, data, defaultTemplate)

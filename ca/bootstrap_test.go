@@ -15,8 +15,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
-	"github.com/smallstep/cli/crypto/randutil"
 	stepJOSE "github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/randutil"
 	jose "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )

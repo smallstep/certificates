@@ -18,8 +18,8 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/randutil"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/square/go-jose.v2/jwt"
 )

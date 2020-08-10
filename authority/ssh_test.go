@@ -18,9 +18,9 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/sshutil"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -706,17 +706,17 @@ func TestAuthority_GetSSHHosts(t *testing.T) {
 	a := testAuthority(t)
 
 	type test struct {
-		getHostsFunc func(context.Context, *x509.Certificate) ([]sshutil.Host, error)
+		getHostsFunc func(context.Context, *x509.Certificate) ([]Host, error)
 		auth         *Authority
 		cert         *x509.Certificate
-		cmp          func(got []sshutil.Host)
+		cmp          func(got []Host)
 		err          error
 		code         int
 	}
 	tests := map[string]func(t *testing.T) *test{
 		"fail/getHostsFunc-fail": func(t *testing.T) *test {
 			return &test{
-				getHostsFunc: func(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error) {
+				getHostsFunc: func(ctx context.Context, cert *x509.Certificate) ([]Host, error) {
 					return nil, errors.New("force")
 				},
 				cert: &x509.Certificate{},
@@ -725,17 +725,17 @@ func TestAuthority_GetSSHHosts(t *testing.T) {
 			}
 		},
 		"ok/getHostsFunc-defined": func(t *testing.T) *test {
-			hosts := []sshutil.Host{
+			hosts := []Host{
 				{HostID: "1", Hostname: "foo"},
 				{HostID: "2", Hostname: "bar"},
 			}
 
 			return &test{
-				getHostsFunc: func(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error) {
+				getHostsFunc: func(ctx context.Context, cert *x509.Certificate) ([]Host, error) {
 					return hosts, nil
 				},
 				cert: &x509.Certificate{},
-				cmp: func(got []sshutil.Host) {
+				cmp: func(got []Host) {
 					assert.Equals(t, got, hosts)
 				},
 			}
@@ -760,8 +760,8 @@ func TestAuthority_GetSSHHosts(t *testing.T) {
 					},
 				})),
 				cert: &x509.Certificate{},
-				cmp: func(got []sshutil.Host) {
-					assert.Equals(t, got, []sshutil.Host{
+				cmp: func(got []Host) {
+					assert.Equals(t, got, []Host{
 						{Hostname: "foo"},
 						{Hostname: "bar"},
 					})

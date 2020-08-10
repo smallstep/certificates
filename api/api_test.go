@@ -31,7 +31,6 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
-	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/jose"
@@ -564,7 +563,7 @@ type mockAuthority struct {
 	signSSHAddUser               func(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 	renewSSH                     func(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error)
 	rekeySSH                     func(ctx context.Context, cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
-	getSSHHosts                  func(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error)
+	getSSHHosts                  func(ctx context.Context, cert *x509.Certificate) ([]authority.Host, error)
 	getSSHRoots                  func(ctx context.Context) (*authority.SSHKeys, error)
 	getSSHFederation             func(ctx context.Context) (*authority.SSHKeys, error)
 	getSSHConfig                 func(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error)
@@ -697,11 +696,11 @@ func (m *mockAuthority) RekeySSH(ctx context.Context, cert *ssh.Certificate, key
 	return m.ret1.(*ssh.Certificate), m.err
 }
 
-func (m *mockAuthority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error) {
+func (m *mockAuthority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]authority.Host, error) {
 	if m.getSSHHosts != nil {
 		return m.getSSHHosts(ctx, cert)
 	}
-	return m.ret1.([]sshutil.Host), m.err
+	return m.ret1.([]authority.Host), m.err
 }
 
 func (m *mockAuthority) GetSSHRoots(ctx context.Context) (*authority.SSHKeys, error) {

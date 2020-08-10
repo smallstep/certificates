@@ -13,11 +13,11 @@ import (
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/pki"
 	"github.com/smallstep/cli/command"
-	"github.com/smallstep/cli/crypto/randutil"
 	"github.com/smallstep/cli/errs"
 	"github.com/smallstep/cli/ui"
 	"github.com/smallstep/cli/utils"
 	"github.com/urfave/cli"
+	"go.step.sm/crypto/randutil"
 )
 
 // defaultOnboardingURL is the production onboarding url, to use a development

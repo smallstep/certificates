@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/cli/crypto/randutil"
+	"go.step.sm/crypto/randutil"
 	"golang.org/x/crypto/ssh"
 )
 
