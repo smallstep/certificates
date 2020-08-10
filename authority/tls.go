@@ -9,15 +9,14 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/pemutil"
-	x509legacy "github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
 	"go.step.sm/crypto/x509util"
 )
@@ -359,48 +358,62 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 
 // GetTLSCertificate creates a new leaf certificate to be used by the CA HTTPS server.
 func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
-	profile, err := x509legacy.NewLeafProfile("Step Online CA", a.x509Issuer, a.x509Signer,
-		x509legacy.WithHosts(strings.Join(a.config.DNSNames, ",")))
-	if err != nil {
+	fatal := func(err error) (*tls.Certificate, error) {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.GetTLSCertificate")
 	}
 
-	crtBytes, err := profile.CreateCertificate()
+	// Generate default key.
+	priv, err := keys.GenerateDefaultKey()
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.GetTLSCertificate")
+		return fatal(err)
+	}
+	signer, ok := priv.(crypto.Signer)
+	if !ok {
+		return fatal(errors.New("private key is not a crypto.Signer"))
 	}
 
-	keyPEM, err := pemutil.Serialize(profile.SubjectPrivateKey())
+	// Create initial certificate request.
+	cr, err := x509util.CreateCertificateRequest("Step Online CA", a.config.DNSNames, signer)
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.GetTLSCertificate")
+		return fatal(err)
 	}
 
+	// Generate certificate directly from the certificate request.
+	certificate, err := x509util.NewCertificate(cr)
+	if err != nil {
+		return fatal(err)
+	}
+
+	// Get certificate template, set validity and sign it.
+	now := time.Now()
+	template := certificate.GetCertificate()
+	template.NotBefore = now.Add(-1 * time.Minute)
+	template.NotAfter = now.Add(24 * time.Hour)
+
+	cert, err := x509util.CreateCertificate(template, a.x509Issuer, cr.PublicKey, a.x509Signer)
+	if err != nil {
+		return fatal(err)
+	}
+
+	// Generate PEM blocks to create tls.Certificate
 	crtPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
-		Bytes: crtBytes,
+		Bytes: cert.Raw,
 	})
-
-	// Load the x509 key pair (combining server and intermediate blocks)
-	// to a tls.Certificate.
 	intermediatePEM, err := pemutil.Serialize(a.x509Issuer)
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.GetTLSCertificate")
+		return fatal(err)
 	}
-	tlsCrt, err := tls.X509KeyPair(append(crtPEM,
-		pem.EncodeToMemory(intermediatePEM)...),
-		pem.EncodeToMemory(keyPEM))
+	keyPEM, err := pemutil.Serialize(priv)
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.GetTLSCertificate; error creating tls certificate")
+		return fatal(err)
 	}
 
-	// Get the 'leaf' certificate and set the attribute accordingly.
-	leaf, err := x509.ParseCertificate(tlsCrt.Certificate[0])
+	tlsCrt, err := tls.X509KeyPair(append(crtPEM, pem.EncodeToMemory(intermediatePEM)...), pem.EncodeToMemory(keyPEM))
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.GetTLSCertificate; error parsing tls certificate")
+		return fatal(err)
 	}
-	tlsCrt.Leaf = leaf
-
+	// Set leaf certificate
+	tlsCrt.Leaf = cert
 	return &tlsCrt, nil
 }
