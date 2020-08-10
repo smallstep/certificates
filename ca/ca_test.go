@@ -79,7 +79,7 @@ func TestCASign(t *testing.T) {
 	pub, priv, err := keys.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 
-	asn1dn := &x509util.ASN1DN{
+	asn1dn := &authority.ASN1DN{
 		Country:       "Tazmania",
 		Organization:  "Acme Co",
 		Locality:      "Landscapes",
@@ -558,7 +558,7 @@ func TestCARenew(t *testing.T) {
 	pub, _, err := keys.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 
-	asn1dn := &x509util.ASN1DN{
+	asn1dn := &authority.ASN1DN{
 		Country:       "Tazmania",
 		Organization:  "Acme Co",
 		Locality:      "Landscapes",

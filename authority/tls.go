@@ -17,21 +17,20 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/tlsutil"
 	x509legacy "github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
 	"go.step.sm/crypto/x509util"
 )
 
 // GetTLSOptions returns the tls options configured.
-func (a *Authority) GetTLSOptions() *tlsutil.TLSOptions {
+func (a *Authority) GetTLSOptions() *TLSOptions {
 	return a.config.TLS
 }
 
 var oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
 var oidSubjectKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 14}
 
-func withDefaultASN1DN(def *x509legacy.ASN1DN) provisioner.CertificateModifierFunc {
+func withDefaultASN1DN(def *ASN1DN) provisioner.CertificateModifierFunc {
 	return func(crt *x509.Certificate, opts provisioner.SignOptions) error {
 		if def == nil {
 			return errors.New("default ASN1DN template cannot be nil")

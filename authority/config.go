@@ -12,15 +12,13 @@ import (
 	"github.com/smallstep/certificates/db"
 	kms "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/templates"
-	"github.com/smallstep/cli/crypto/tlsutil"
-	"github.com/smallstep/cli/crypto/x509util"
 )
 
 var (
 	// DefaultTLSOptions represents the default TLS version as well as the cipher
 	// suites used in the TLS certificates.
-	DefaultTLSOptions = tlsutil.TLSOptions{
-		CipherSuites: x509util.CipherSuites{
+	DefaultTLSOptions = TLSOptions{
+		CipherSuites: CipherSuites{
 			"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
 			"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
 			"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
@@ -61,15 +59,27 @@ type Config struct {
 	DB               *db.Config           `json:"db,omitempty"`
 	Monitoring       json.RawMessage      `json:"monitoring,omitempty"`
 	AuthorityConfig  *AuthConfig          `json:"authority,omitempty"`
-	TLS              *tlsutil.TLSOptions  `json:"tls,omitempty"`
+	TLS              *TLSOptions          `json:"tls,omitempty"`
 	Password         string               `json:"password,omitempty"`
 	Templates        *templates.Templates `json:"templates,omitempty"`
+}
+
+// ASN1DN contains ASN1.DN attributes that are used in Subject and Issuer
+// x509 Certificate blocks.
+type ASN1DN struct {
+	Country            string `json:"country,omitempty" step:"country"`
+	Organization       string `json:"organization,omitempty" step:"organization"`
+	OrganizationalUnit string `json:"organizationalUnit,omitempty" step:"organizationalUnit"`
+	Locality           string `json:"locality,omitempty" step:"locality"`
+	Province           string `json:"province,omitempty" step:"province"`
+	StreetAddress      string `json:"streetAddress,omitempty" step:"streetAddress"`
+	CommonName         string `json:"commonName,omitempty" step:"commonName"`
 }
 
 // AuthConfig represents the configuration options for the authority.
 type AuthConfig struct {
 	Provisioners         provisioner.List      `json:"provisioners"`
-	Template             *x509util.ASN1DN      `json:"template,omitempty"`
+	Template             *ASN1DN               `json:"template,omitempty"`
 	Claims               *provisioner.Claims   `json:"claims,omitempty"`
 	DisableIssuedAtCheck bool                  `json:"disableIssuedAtCheck,omitempty"`
 	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
@@ -82,7 +92,7 @@ func (c *AuthConfig) init() {
 		c.Provisioners = provisioner.List{}
 	}
 	if c.Template == nil {
-		c.Template = &x509util.ASN1DN{}
+		c.Template = &ASN1DN{}
 	}
 	if c.Backdate == nil {
 		c.Backdate = &provisioner.Duration{

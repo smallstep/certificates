@@ -22,7 +22,6 @@ import (
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -122,7 +121,7 @@ func TestAuthority_Sign(t *testing.T) {
 
 	a := testAuthority(t)
 	assert.FatalError(t, err)
-	a.config.AuthorityConfig.Template = &x509util.ASN1DN{
+	a.config.AuthorityConfig.Template = &ASN1DN{
 		Country:       "Tazmania",
 		Organization:  "Acme Co",
 		Locality:      "Landscapes",
@@ -478,7 +477,7 @@ func TestAuthority_Renew(t *testing.T) {
 	assert.FatalError(t, err)
 
 	a := testAuthority(t)
-	a.config.AuthorityConfig.Template = &x509util.ASN1DN{
+	a.config.AuthorityConfig.Template = &ASN1DN{
 		Country:       "Tazmania",
 		Organization:  "Acme Co",
 		Locality:      "Landscapes",
@@ -705,7 +704,7 @@ func TestAuthority_Rekey(t *testing.T) {
 	assert.FatalError(t, err)
 
 	a := testAuthority(t)
-	a.config.AuthorityConfig.Template = &x509util.ASN1DN{
+	a.config.AuthorityConfig.Template = &ASN1DN{
 		Country:       "Tazmania",
 		Organization:  "Acme Co",
 		Locality:      "Landscapes",
@@ -946,7 +945,7 @@ func TestAuthority_Rekey(t *testing.T) {
 func TestAuthority_GetTLSOptions(t *testing.T) {
 	type renewTest struct {
 		auth *Authority
-		opts *tlsutil.TLSOptions
+		opts *TLSOptions
 	}
 	tests := map[string]func() (*renewTest, error){
 		"default": func() (*renewTest, error) {
@@ -955,8 +954,8 @@ func TestAuthority_GetTLSOptions(t *testing.T) {
 		},
 		"non-default": func() (*renewTest, error) {
 			a := testAuthority(t)
-			a.config.TLS = &tlsutil.TLSOptions{
-				CipherSuites: x509util.CipherSuites{
+			a.config.TLS = &TLSOptions{
+				CipherSuites: CipherSuites{
 					"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
 					"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
 				},

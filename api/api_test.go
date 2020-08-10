@@ -32,7 +32,6 @@ import (
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/templates"
-	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/jose"
 	"golang.org/x/crypto/ssh"
 )
@@ -547,7 +546,7 @@ type mockAuthority struct {
 	ret1, ret2                   interface{}
 	err                          error
 	authorizeSign                func(ott string) ([]provisioner.SignOption, error)
-	getTLSOptions                func() *tlsutil.TLSOptions
+	getTLSOptions                func() *authority.TLSOptions
 	root                         func(shasum string) (*x509.Certificate, error)
 	sign                         func(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	renew                        func(cert *x509.Certificate) ([]*x509.Certificate, error)
@@ -584,11 +583,11 @@ func (m *mockAuthority) AuthorizeSign(ott string) ([]provisioner.SignOption, err
 	return m.ret1.([]provisioner.SignOption), m.err
 }
 
-func (m *mockAuthority) GetTLSOptions() *tlsutil.TLSOptions {
+func (m *mockAuthority) GetTLSOptions() *authority.TLSOptions {
 	if m.getTLSOptions != nil {
 		return m.getTLSOptions()
 	}
-	return m.ret1.(*tlsutil.TLSOptions)
+	return m.ret1.(*authority.TLSOptions)
 }
 
 func (m *mockAuthority) Root(shasum string) (*x509.Certificate, error) {
@@ -881,7 +880,7 @@ func Test_caHandler_Sign(t *testing.T) {
 				authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
 					return tt.certAttrOpts, tt.autherr
 				},
-				getTLSOptions: func() *tlsutil.TLSOptions {
+				getTLSOptions: func() *authority.TLSOptions {
 					return nil
 				},
 			}).(*caHandler)
@@ -932,7 +931,7 @@ func Test_caHandler_Renew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.err,
-				getTLSOptions: func() *tlsutil.TLSOptions {
+				getTLSOptions: func() *authority.TLSOptions {
 					return nil
 				},
 			}).(*caHandler)
@@ -993,7 +992,7 @@ func Test_caHandler_Rekey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.err,
-				getTLSOptions: func() *tlsutil.TLSOptions {
+				getTLSOptions: func() *authority.TLSOptions {
 					return nil
 				},
 			}).(*caHandler)

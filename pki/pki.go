@@ -23,7 +23,6 @@ import (
 	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/tlsutil"
 	"github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/errs"
 	"github.com/smallstep/cli/jose"
@@ -432,11 +431,11 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 			DisableIssuedAtCheck: false,
 			Provisioners:         provisioner.List{prov},
 		},
-		TLS: &tlsutil.TLSOptions{
-			MinVersion:    x509util.DefaultTLSMinVersion,
-			MaxVersion:    x509util.DefaultTLSMaxVersion,
-			Renegotiation: x509util.DefaultTLSRenegotiation,
-			CipherSuites:  x509util.DefaultTLSCipherSuites,
+		TLS: &authority.TLSOptions{
+			MinVersion:    authority.DefaultTLSMinVersion,
+			MaxVersion:    authority.DefaultTLSMaxVersion,
+			Renegotiation: authority.DefaultTLSRenegotiation,
+			CipherSuites:  authority.DefaultTLSCipherSuites,
 		},
 		Templates: p.getTemplates(),
 	}
