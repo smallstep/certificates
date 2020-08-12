@@ -22,7 +22,7 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/crypto/x509util"
+	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 )
 

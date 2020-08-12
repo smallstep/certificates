@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/x509util"
 )
 
 func getTestProvisioner(t *testing.T, caURL string) *Provisioner {

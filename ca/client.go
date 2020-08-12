@@ -30,7 +30,7 @@ import (
 	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/x509util"
+	"go.step.sm/crypto/x509util"
 	"golang.org/x/net/http2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )

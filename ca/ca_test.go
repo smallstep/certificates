@@ -27,9 +27,9 @@ import (
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/keys"
 	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/x509util"
 	stepJOSE "github.com/smallstep/cli/jose"
 	"go.step.sm/crypto/randutil"
+	"go.step.sm/crypto/x509util"
 	jose "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
@@ -93,13 +93,9 @@ func TestCASign(t *testing.T) {
 	config.AuthorityConfig.Template = asn1dn
 	ca, err := New(config)
 	assert.FatalError(t, err)
-
-	intermediateIdentity, err := x509util.LoadIdentityFromDisk("testdata/secrets/intermediate_ca.crt",
-		"testdata/secrets/intermediate_ca_key", pemutil.WithPassword([]byte("password")))
+	intermediateCert, err := pemutil.ReadCertificate("testdata/secrets/intermediate_ca.crt")
 	assert.FatalError(t, err)
-
-	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_priv.jwk",
-		stepJOSE.WithPassword([]byte("pass")))
+	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_priv.jwk", stepJOSE.WithPassword([]byte("pass")))
 	assert.FatalError(t, err)
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: clijwk.Key},
 		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", clijwk.KeyID))
@@ -321,9 +317,9 @@ ZEp7knvU2psWRw==
 					assert.FatalError(t, err)
 					assert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
 
-					assert.Equals(t, leaf.AuthorityKeyId, intermediateIdentity.Crt.SubjectKeyId)
+					assert.Equals(t, leaf.AuthorityKeyId, intermediateCert.SubjectKeyId)
 
-					realIntermediate, err := x509.ParseCertificate(intermediateIdentity.Crt.Raw)
+					realIntermediate, err := x509.ParseCertificate(intermediateCert.Raw)
 					assert.FatalError(t, err)
 					assert.Equals(t, intermediate, realIntermediate)
 				} else {
@@ -555,7 +551,7 @@ func TestCAHealth(t *testing.T) {
 }
 
 func TestCARenew(t *testing.T) {
-	pub, _, err := keys.GenerateDefaultKeyPair()
+	pub, priv, err := keys.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 
 	asn1dn := &authority.ASN1DN{
@@ -574,8 +570,9 @@ func TestCARenew(t *testing.T) {
 	assert.FatalError(t, err)
 	assert.FatalError(t, err)
 
-	intermediateIdentity, err := x509util.LoadIdentityFromDisk("testdata/secrets/intermediate_ca.crt",
-		"testdata/secrets/intermediate_ca_key", pemutil.WithPassword([]byte("password")))
+	intermediateCert, err := pemutil.ReadCertificate("testdata/secrets/intermediate_ca.crt")
+	assert.FatalError(t, err)
+	intermediateKey, err := pemutil.Read("testdata/secrets/intermediate_ca_key", pemutil.WithPassword([]byte("password")))
 	assert.FatalError(t, err)
 
 	now := time.Now().UTC()
@@ -605,15 +602,15 @@ func TestCARenew(t *testing.T) {
 			}
 		},
 		"success": func(t *testing.T) *renewTest {
-			profile, err := x509util.NewLeafProfile("test", intermediateIdentity.Crt,
-				intermediateIdentity.Key, x509util.WithPublicKey(pub),
-				x509util.WithNotBeforeAfterDuration(now, leafExpiry, 0), x509util.WithHosts("funk"))
+			cr, err := x509util.CreateCertificateRequest("test", []string{"funk"}, priv.(crypto.Signer))
 			assert.FatalError(t, err)
-			crtBytes, err := profile.CreateCertificate()
+			cert, err := x509util.NewCertificate(cr)
 			assert.FatalError(t, err)
-			crt, err := x509.ParseCertificate(crtBytes)
+			crt := cert.GetCertificate()
+			crt.NotBefore = time.Now()
+			crt.NotAfter = leafExpiry
+			crt, err = x509util.CreateCertificate(crt, intermediateCert, pub, intermediateKey.(crypto.Signer))
 			assert.FatalError(t, err)
-
 			return &renewTest{
 				ca: ca,
 				tlsConnState: &tls.ConnectionState{
@@ -661,9 +658,9 @@ func TestCARenew(t *testing.T) {
 					subjectKeyID, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
 					assert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
-					assert.Equals(t, leaf.AuthorityKeyId, intermediateIdentity.Crt.SubjectKeyId)
+					assert.Equals(t, leaf.AuthorityKeyId, intermediateCert.SubjectKeyId)
 
-					realIntermediate, err := x509.ParseCertificate(intermediateIdentity.Crt.Raw)
+					realIntermediate, err := x509.ParseCertificate(intermediateCert.Raw)
 					assert.FatalError(t, err)
 					assert.Equals(t, intermediate, realIntermediate)
 
