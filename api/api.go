@@ -395,7 +395,8 @@ func logOtt(w http.ResponseWriter, token string) {
 	}
 }
 
-func logCertificate(w http.ResponseWriter, cert *x509.Certificate) {
+// LogCertificate add certificate fields to the log message.
+func LogCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
 		m := map[string]interface{}{
 			"serial":      cert.SerialNumber,
@@ -413,7 +414,10 @@ func logCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 				if err != nil || len(rest) > 0 {
 					break
 				}
-				m["provisioner"] = fmt.Sprintf("%s (%s)", val.Name, val.CredentialID)
+				m["provisioner"] = fmt.Sprintf("%s", val.Name)
+				if len(val.CredentialID) > 0 {
+					m["provisioner"] = fmt.Sprintf("%s (%s)", m["provisioner"], val.CredentialID)
+				}
 				break
 			}
 		}
