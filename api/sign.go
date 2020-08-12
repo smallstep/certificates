@@ -79,7 +79,7 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 	if len(certChainPEM) > 1 {
 		caPEM = certChainPEM[1]
 	}
-	logCertificate(w, certChain[0])
+	LogCertificate(w, certChain[0])
 	JSONStatus(w, &SignResponse{
 		ServerPEM:    certChainPEM[0],
 		CaPEM:        caPEM,

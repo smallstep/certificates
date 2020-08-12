@@ -526,6 +526,43 @@ func TestHandlerGetCertificate(t *testing.T) {
 				problem:    acme.ServerInternalErr(errors.New("force")),
 			}
 		},
+		"fail/decode-leaf-for-loggger": func(t *testing.T) test {
+			acc := &acme.Account{ID: "accID"}
+			ctx := context.WithValue(context.Background(), acme.AccContextKey, acc)
+			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
+			return test{
+				auth: &mockAcmeAuthority{
+					getCertificate: func(accID, id string) ([]byte, error) {
+						assert.Equals(t, accID, acc.ID)
+						assert.Equals(t, id, certID)
+						return []byte("foo"), nil
+					},
+				},
+				ctx:        ctx,
+				statusCode: 500,
+				problem:    acme.ServerInternalErr(errors.New("failed to decode any certificates from generated certBytes")),
+			}
+		},
+		"fail/parse-x509-leaf-for-logger": func(t *testing.T) test {
+			acc := &acme.Account{ID: "accID"}
+			ctx := context.WithValue(context.Background(), acme.AccContextKey, acc)
+			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
+			return test{
+				auth: &mockAcmeAuthority{
+					getCertificate: func(accID, id string) ([]byte, error) {
+						assert.Equals(t, accID, acc.ID)
+						assert.Equals(t, id, certID)
+						return pem.EncodeToMemory(&pem.Block{
+							Type:  "CERTIFICATE REQUEST",
+							Bytes: []byte("foo"),
+						}), nil
+					},
+				},
+				ctx:        ctx,
+				statusCode: 500,
+				problem:    acme.ServerInternalErr(errors.New("failed to parse generated leaf certificate")),
+			}
+		},
 		"ok": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
 			ctx := context.WithValue(context.Background(), acme.AccContextKey, acc)
@@ -565,7 +602,7 @@ func TestHandlerGetCertificate(t *testing.T) {
 				prob := tc.problem.ToACME()
 
 				assert.Equals(t, ae.Type, prob.Type)
-				assert.Equals(t, ae.Detail, prob.Detail)
+				assert.HasPrefix(t, ae.Detail, prob.Detail)
 				assert.Equals(t, ae.Identifier, prob.Identifier)
 				assert.Equals(t, ae.Subproblems, prob.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
