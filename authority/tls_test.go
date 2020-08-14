@@ -22,9 +22,9 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/crypto/keys"
-	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
@@ -196,7 +196,7 @@ type basicConstraints struct {
 }
 
 func TestAuthority_Sign(t *testing.T) {
-	pub, priv, err := keys.GenerateDefaultKeyPair()
+	pub, priv, err := keyutil.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 
 	a := testAuthority(t)
@@ -745,7 +745,7 @@ func TestAuthority_Renew(t *testing.T) {
 }
 
 func TestAuthority_Rekey(t *testing.T) {
-	pub, _, err := keys.GenerateDefaultKeyPair()
+	pub, _, err := keyutil.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 
 	a := testAuthority(t)

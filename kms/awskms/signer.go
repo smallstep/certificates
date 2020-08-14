@@ -8,7 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/pkg/errors"
-	"github.com/smallstep/cli/crypto/pemutil"
+	"go.step.sm/crypto/pemutil"
 )
 
 // Signer implements a crypto.Signer using the AWS KMS.

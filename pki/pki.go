@@ -22,12 +22,12 @@ import (
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/config"
-	"github.com/smallstep/cli/crypto/keys"
-	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/errs"
 	"github.com/smallstep/cli/jose"
 	"github.com/smallstep/cli/ui"
 	"github.com/smallstep/cli/utils"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 )
@@ -115,7 +115,7 @@ func GetProvisioners(caURL, rootFile string) (provisioner.List, error) {
 }
 
 func generateDefaultKey() (crypto.Signer, error) {
-	priv, err := keys.GenerateDefaultKey()
+	priv, err := keyutil.GenerateDefaultKey()
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +369,7 @@ func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 	var pubNames = []string{p.sshHostPubKey, p.sshUserPubKey}
 	var privNames = []string{p.sshHostKey, p.sshUserKey}
 	for i := 0; i < 2; i++ {
-		pub, priv, err := keys.GenerateDefaultKeyPair()
+		pub, priv, err := keyutil.GenerateDefaultKeyPair()
 		if err != nil {
 			return err
 		}

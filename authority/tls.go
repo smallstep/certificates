@@ -15,9 +15,9 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/crypto/keys"
-	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -363,7 +363,7 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	}
 
 	// Generate default key.
-	priv, err := keys.GenerateDefaultKey()
+	priv, err := keyutil.GenerateDefaultKey()
 	if err != nil {
 		return fatal(err)
 	}

@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/cli/crypto/keys"
+	"go.step.sm/crypto/keyutil"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -489,7 +489,7 @@ func Test_sshDefaultExtensionModifier_Modify(t *testing.T) {
 }
 
 func Test_sshCertDefaultValidator_Valid(t *testing.T) {
-	pub, _, err := keys.GenerateDefaultKeyPair()
+	pub, _, err := keyutil.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 	sshPub, err := ssh.NewPublicKey(pub)
 	assert.FatalError(t, err)

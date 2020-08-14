@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/smallstep/cli/crypto/pemutil"
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 )
 

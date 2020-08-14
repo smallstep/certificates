@@ -25,9 +25,9 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/crypto/keys"
-	"github.com/smallstep/cli/crypto/pemutil"
 	stepJOSE "github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"
 	jose "gopkg.in/square/go-jose.v2"
@@ -76,7 +76,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestCASign(t *testing.T) {
-	pub, priv, err := keys.GenerateDefaultKeyPair()
+	pub, priv, err := keyutil.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 
 	asn1dn := &authority.ASN1DN{
@@ -551,7 +551,7 @@ func TestCAHealth(t *testing.T) {
 }
 
 func TestCARenew(t *testing.T) {
-	pub, priv, err := keys.GenerateDefaultKeyPair()
+	pub, priv, err := keyutil.GenerateDefaultKeyPair()
 	assert.FatalError(t, err)
 
 	asn1dn := &authority.ASN1DN{

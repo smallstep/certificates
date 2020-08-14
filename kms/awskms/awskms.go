@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/uri"
-	"github.com/smallstep/cli/crypto/pemutil"
+	"go.step.sm/crypto/pemutil"
 )
 
 // KMS implements a KMS using AWS Key Management Service.

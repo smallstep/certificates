@@ -19,8 +19,8 @@ import (
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/pemutil"
 )
 
 type mockAcmeAuthority struct {

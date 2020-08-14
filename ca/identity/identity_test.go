@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/cli/crypto/pemutil"
+	"go.step.sm/crypto/pemutil"
 )
 
 func TestLoadDefaultIdentity(t *testing.T) {

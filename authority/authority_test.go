@@ -15,8 +15,8 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/cli/crypto/pemutil"
 	stepJOSE "github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/pemutil"
 )
 
 func testAuthority(t *testing.T, opts ...Option) *Authority {
