@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 
@@ -162,6 +164,18 @@ func (h *Handler) GetCertificate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	block, _ := pem.Decode(certBytes)
+	if block == nil {
+		api.WriteError(w, acme.ServerInternalErr(errors.New("failed to decode any certificates from generated certBytes")))
+		return
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		api.WriteError(w, acme.Wrap(err, "failed to parse generated leaf certificate"))
+		return
+	}
+
+	api.LogCertificate(w, cert)
 	w.Header().Set("Content-Type", "application/pem-certificate-chain; charset=utf-8")
 	w.Write(certBytes)
 }

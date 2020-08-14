@@ -104,36 +104,42 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 	p2.Accounts = p1.Accounts
 	p2.config.identityURL = srv.URL + "/bad-document"
 	p2.config.signatureURL = p1.config.signatureURL
+	p2.config.tokenURL = p1.config.tokenURL
 
 	p3, err := generateAWS()
 	assert.FatalError(t, err)
 	p3.Accounts = p1.Accounts
 	p3.config.signatureURL = srv.URL
 	p3.config.identityURL = p1.config.identityURL
+	p3.config.tokenURL = p1.config.tokenURL
 
 	p4, err := generateAWS()
 	assert.FatalError(t, err)
 	p4.Accounts = p1.Accounts
 	p4.config.signatureURL = srv.URL + "/bad-signature"
 	p4.config.identityURL = p1.config.identityURL
+	p4.config.tokenURL = p1.config.tokenURL
 
 	p5, err := generateAWS()
 	assert.FatalError(t, err)
 	p5.Accounts = p1.Accounts
 	p5.config.identityURL = "https://1234.1234.1234.1234"
 	p5.config.signatureURL = p1.config.signatureURL
+	p5.config.tokenURL = p1.config.tokenURL
 
 	p6, err := generateAWS()
 	assert.FatalError(t, err)
 	p6.Accounts = p1.Accounts
 	p6.config.identityURL = p1.config.identityURL
 	p6.config.signatureURL = "https://1234.1234.1234.1234"
+	p6.config.tokenURL = p1.config.tokenURL
 
 	p7, err := generateAWS()
 	assert.FatalError(t, err)
 	p7.Accounts = p1.Accounts
 	p7.config.identityURL = srv.URL + "/bad-json"
 	p7.config.signatureURL = p1.config.signatureURL
+	p7.config.tokenURL = p1.config.tokenURL
 
 	caURL := "https://ca.smallstep.com"
 	u, err := url.Parse(caURL)
@@ -181,6 +187,49 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 	}
 }
 
+func TestAWS_GetIdentityToken_V1Only(t *testing.T) {
+	aws, srv, err := generateAWSWithServerV1Only()
+	assert.FatalError(t, err)
+	defer srv.Close()
+
+	subject := "foo.local"
+	caURL := "https://ca.smallstep.com"
+	u, err := url.Parse(caURL)
+	assert.Nil(t, err)
+
+	token, err := aws.GetIdentityToken(subject, caURL)
+	assert.Nil(t, err)
+
+	_, c, err := parseAWSToken(token)
+	if assert.NoError(t, err) {
+		assert.Equals(t, awsIssuer, c.Issuer)
+		assert.Equals(t, subject, c.Subject)
+		assert.Equals(t, jose.Audience{u.ResolveReference(&url.URL{Path: "/1.0/sign", Fragment: aws.GetID()}).String()}, c.Audience)
+		assert.Equals(t, aws.Accounts[0], c.document.AccountID)
+		err = aws.config.certificate.CheckSignature(
+			aws.config.signatureAlgorithm, c.Amazon.Document, c.Amazon.Signature)
+		assert.NoError(t, err)
+	}
+}
+
+func TestAWS_GetIdentityToken_BadIDMS(t *testing.T) {
+	aws, srv, err := generateAWSWithServer()
+
+	aws.IMDSVersions = []string{"bad"}
+
+	assert.FatalError(t, err)
+	defer srv.Close()
+
+	subject := "foo.local"
+	caURL := "https://ca.smallstep.com"
+
+	token, err := aws.GetIdentityToken(subject, caURL)
+	assert.Equals(t, token, "")
+
+	badIDMS := errors.New("bad: not a supported AWS Instance Metadata Service version")
+	assert.HasSuffix(t, err.Error(), badIDMS.Error())
+}
+
 func TestAWS_Init(t *testing.T) {
 	config := Config{
 		Claims: globalProvisionerClaims,
@@ -197,6 +246,7 @@ func TestAWS_Init(t *testing.T) {
 		DisableCustomSANs      bool
 		DisableTrustOnFirstUse bool
 		InstanceAge            Duration
+		IMDSVersions           []string
 		Claims                 *Claims
 	}
 	type args struct {
@@ -208,12 +258,16 @@ func TestAWS_Init(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{"AWS", "name", []string{"account"}, false, false, zero, nil}, args{config}, false},
-		{"ok", fields{"AWS", "name", []string{"account"}, true, true, Duration{Duration: 1 * time.Minute}, nil}, args{config}, false},
-		{"fail type ", fields{"", "name", []string{"account"}, false, false, zero, nil}, args{config}, true},
-		{"fail name", fields{"AWS", "", []string{"account"}, false, false, zero, nil}, args{config}, true},
-		{"bad instance age", fields{"AWS", "name", []string{"account"}, false, false, Duration{Duration: -1 * time.Minute}, nil}, args{config}, true},
-		{"fail claims", fields{"AWS", "name", []string{"account"}, false, false, zero, badClaims}, args{config}, true},
+		{"ok", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, nil}, args{config}, false},
+		{"ok/v1", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1"}, nil}, args{config}, false},
+		{"ok/v2", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v2"}, nil}, args{config}, false},
+		{"ok/empty", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{}, nil}, args{config}, false},
+		{"ok/duration", fields{"AWS", "name", []string{"account"}, true, true, Duration{Duration: 1 * time.Minute}, []string{"v1", "v2"}, nil}, args{config}, false},
+		{"fail type ", fields{"", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, nil}, args{config}, true},
+		{"fail name", fields{"AWS", "", []string{"account"}, false, false, zero, []string{"v1", "v2"}, nil}, args{config}, true},
+		{"bad instance age", fields{"AWS", "name", []string{"account"}, false, false, Duration{Duration: -1 * time.Minute}, []string{"v1", "v2"}, nil}, args{config}, true},
+		{"fail/imds", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"bad"}, nil}, args{config}, true},
+		{"fail claims", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, badClaims}, args{config}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -224,6 +278,7 @@ func TestAWS_Init(t *testing.T) {
 				DisableCustomSANs:      tt.fields.DisableCustomSANs,
 				DisableTrustOnFirstUse: tt.fields.DisableTrustOnFirstUse,
 				InstanceAge:            tt.fields.InstanceAge,
+				IMDSVersions:           tt.fields.IMDSVersions,
 				Claims:                 tt.fields.Claims,
 			}
 			if err := p.Init(tt.args.config); (err != nil) != tt.wantErr {

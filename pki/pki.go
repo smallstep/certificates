@@ -446,9 +446,19 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 			HostKey: p.sshHostKey,
 			UserKey: p.sshUserKey,
 		}
+		// Enable SSH authorization for default JWK provisioner
 		prov.Claims = &provisioner.Claims{
 			EnableSSHCA: &enableSSHCA,
 		}
+		// Add default SSHPOP provisioner
+		sshpop := &provisioner.SSHPOP{
+			Type: "SSHPOP",
+			Name: "sshpop",
+			Claims: &provisioner.Claims{
+				EnableSSHCA: &enableSSHCA,
+			},
+		}
+		config.AuthorityConfig.Provisioners = append(config.AuthorityConfig.Provisioners, sshpop)
 	}
 
 	// Apply configuration modifiers

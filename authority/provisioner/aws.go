@@ -30,6 +30,19 @@ const awsIdentityURL = "http://169.254.169.254/latest/dynamic/instance-identity/
 // awsSignatureURL is the url used to retrieve the instance identity signature.
 const awsSignatureURL = "http://169.254.169.254/latest/dynamic/instance-identity/signature"
 
+// awsAPITokenURL is the url used to get the IMDSv2 API token
+const awsAPITokenURL = "http://169.254.169.254/latest/api/token"
+
+// awsAPITokenTTL is the default TTL to use when requesting IMDSv2 API tokens
+// -- we keep this short-lived since we get a new token with every call to readURL()
+const awsAPITokenTTL = "30"
+
+// awsMetadataTokenHeader is the header that must be passed with every IMDSv2 request
+const awsMetadataTokenHeader = "X-aws-ec2-metadata-token"
+
+// awsMetadataTokenTTLHeader is the header used to indicate the token TTL requested
+const awsMetadataTokenTTLHeader = "X-aws-ec2-metadata-token-ttl-seconds"
+
 // awsCertificate is the certificate used to validate the instance identity
 // signature.
 const awsCertificate = `-----BEGIN CERTIFICATE-----
@@ -59,6 +72,8 @@ const awsSignatureAlgorithm = x509.SHA256WithRSA
 type awsConfig struct {
 	identityURL        string
 	signatureURL       string
+	tokenURL           string
+	tokenTTL           string
 	certificate        *x509.Certificate
 	signatureAlgorithm x509.SignatureAlgorithm
 }
@@ -75,6 +90,8 @@ func newAWSConfig() (*awsConfig, error) {
 	return &awsConfig{
 		identityURL:        awsIdentityURL,
 		signatureURL:       awsSignatureURL,
+		tokenURL:           awsAPITokenURL,
+		tokenTTL:           awsAPITokenTTL,
 		certificate:        cert,
 		signatureAlgorithm: awsSignatureAlgorithm,
 	}, nil
@@ -131,6 +148,7 @@ type AWS struct {
 	Accounts               []string `json:"accounts"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
+	IMDSVersions           []string `json:"imdsVersions"`
 	InstanceAge            Duration `json:"instanceAge,omitempty"`
 	Claims                 *Claims  `json:"claims,omitempty"`
 	Options                *Options `json:"options,omitempty"`
@@ -185,14 +203,14 @@ func (p *AWS) GetIdentityToken(subject, caURL string) (string, error) {
 	var idoc awsInstanceIdentityDocument
 	doc, err := p.readURL(p.config.identityURL)
 	if err != nil {
-		return "", errors.Wrap(err, "error retrieving identity document, are you in an AWS VM?")
+		return "", errors.Wrap(err, "error retrieving identity document:\n  Are you in an AWS VM?\n  Is the metadata service enabled?\n  Are you using the proper metadata service version?")
 	}
 	if err := json.Unmarshal(doc, &idoc); err != nil {
 		return "", errors.Wrap(err, "error unmarshaling identity document")
 	}
 	sig, err := p.readURL(p.config.signatureURL)
 	if err != nil {
-		return "", errors.Wrap(err, "error retrieving identity document signature, are you in an AWS VM?")
+		return "", errors.Wrap(err, "error retrieving identity document:\n  Are you in an AWS VM?\n  Is the metadata service enabled?\n  Are you using the proper metadata service version?")
 	}
 	signature, err := base64.StdEncoding.DecodeString(string(sig))
 	if err != nil {
@@ -266,6 +284,22 @@ func (p *AWS) Init(config Config) (err error) {
 		return err
 	}
 	p.audiences = config.Audiences.WithFragment(p.GetID())
+
+	// validate IMDS versions
+	if len(p.IMDSVersions) == 0 {
+		p.IMDSVersions = []string{"v2", "v1"}
+	}
+	for _, v := range p.IMDSVersions {
+		switch v {
+		case "v1":
+			// valid
+		case "v2":
+			// valid
+		default:
+			return errors.Errorf("%s: not a supported AWS Instance Metadata Service version", v)
+		}
+	}
+
 	return nil
 }
 
@@ -352,12 +386,90 @@ func (p *AWS) checkSignature(signed, signature []byte) error {
 // using pkg/errors to avoid verbose errors, the caller should use it and write
 // the appropriate error.
 func (p *AWS) readURL(url string) ([]byte, error) {
-	r, err := http.Get(url)
+	var resp *http.Response
+	var err error
+
+	for _, v := range p.IMDSVersions {
+		switch v {
+		case "v1":
+			resp, err = p.readURLv1(url)
+			if err == nil && resp.StatusCode < 400 {
+				return p.readResponseBody(resp)
+			}
+		case "v2":
+			resp, err = p.readURLv2(url)
+			if err == nil && resp.StatusCode < 400 {
+				return p.readResponseBody(resp)
+			}
+		default:
+			return nil, fmt.Errorf("%s: not a supported AWS Instance Metadata Service version", v)
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+	}
+
+	// all versions have been exhausted and we haven't returned successfully yet so pass
+	// the error on to the caller
 	if err != nil {
 		return nil, err
 	}
-	defer r.Body.Close()
-	b, err := ioutil.ReadAll(r.Body)
+	return nil, fmt.Errorf("Request for metadata returned non-successful status code %d",
+		resp.StatusCode)
+}
+
+func (p *AWS) readURLv1(url string) (*http.Response, error) {
+	client := http.Client{}
+
+	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (p *AWS) readURLv2(url string) (*http.Response, error) {
+	client := http.Client{}
+
+	// first get the token
+	req, err := http.NewRequest(http.MethodPut, p.config.tokenURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set(awsMetadataTokenTTLHeader, p.config.tokenTTL)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("Request for API token returned non-successful status code %d", resp.StatusCode)
+	}
+	token, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// now make the request
+	req, err = http.NewRequest(http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set(awsMetadataTokenHeader, string(token))
+	resp, err = client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (p *AWS) readResponseBody(resp *http.Response) ([]byte, error) {
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
