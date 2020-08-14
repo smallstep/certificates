@@ -283,7 +283,7 @@ func TestNewEmbedded_Sign(t *testing.T) {
 	csr, err := x509.ParseCertificateRequest(cr)
 	assert.FatalError(t, err)
 
-	cert, err := a.Sign(csr, provisioner.Options{})
+	cert, err := a.Sign(csr, provisioner.SignOptions{})
 	assert.FatalError(t, err)
 	assert.Equals(t, []string{"foo.bar.zar"}, cert[0].DNSNames)
 	assert.Equals(t, crt, cert[1])

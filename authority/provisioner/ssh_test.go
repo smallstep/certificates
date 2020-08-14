@@ -10,7 +10,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func validateSSHCertificate(cert *ssh.Certificate, opts *SSHOptions) error {
+func validateSSHCertificate(cert *ssh.Certificate, opts *SignSSHOptions) error {
 	switch {
 	case cert == nil:
 		return fmt.Errorf("certificate is nil")
@@ -39,7 +39,7 @@ func validateSSHCertificate(cert *ssh.Certificate, opts *SSHOptions) error {
 	}
 }
 
-func signSSHCertificate(key crypto.PublicKey, opts SSHOptions, signOpts []SignOption, signKey crypto.Signer) (*ssh.Certificate, error) {
+func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []SignOption, signKey crypto.Signer) (*ssh.Certificate, error) {
 	pub, err := ssh.NewPublicKey(key)
 	if err != nil {
 		return nil, err

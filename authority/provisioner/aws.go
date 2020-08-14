@@ -18,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/x509util"
 )
 
 // awsIssuer is the string used as issuer in the generated tokens.
@@ -150,6 +151,7 @@ type AWS struct {
 	IMDSVersions           []string `json:"imdsVersions"`
 	InstanceAge            Duration `json:"instanceAge,omitempty"`
 	Claims                 *Claims  `json:"claims,omitempty"`
+	Options                *Options `json:"options,omitempty"`
 	claimer                *Claimer
 	config                 *awsConfig
 	audiences              Audiences
@@ -310,22 +312,38 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}
 
 	doc := payload.document
+
+	// Template options
+	data := x509util.NewTemplateData()
+	data.SetCommonName(payload.Claims.Subject)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
 	// Enforce known CN and default DNS and IP if configured.
 	// By default we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
 	var so []SignOption
 	if p.DisableCustomSANs {
-		so = append(so, dnsNamesValidator([]string{
-			fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region),
-		}))
+		dnsName := fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region)
+		so = append(so, dnsNamesValidator([]string{dnsName}))
 		so = append(so, ipAddressesValidator([]net.IP{
 			net.ParseIP(doc.PrivateIP),
 		}))
 		so = append(so, emailAddressesValidator(nil))
 		so = append(so, urisValidator(nil))
+
+		// Template options
+		data.SetSANs([]string{dnsName, doc.PrivateIP})
+	}
+
+	templateOptions, err := CustomTemplateOptions(p.Options, data, x509util.DefaultIIDLeafTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "aws.AuthorizeSign")
 	}
 
 	return append(so,
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeAWS, p.Name, doc.AccountID, "InstanceID", doc.InstanceID),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
@@ -577,7 +595,7 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	}
 
 	// Default to cert type to host
-	defaults := SSHOptions{
+	defaults := SignSSHOptions{
 		CertType:   SSHHostCert,
 		Principals: principals,
 	}

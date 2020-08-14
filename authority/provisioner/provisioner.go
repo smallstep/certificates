@@ -245,7 +245,7 @@ func (l *List) UnmarshalJSON(data []byte) error {
 			continue
 		}
 		if err := json.Unmarshal(data, p); err != nil {
-			return errors.Errorf("error unmarshaling provisioner")
+			return errors.Wrap(err, "error unmarshaling provisioner")
 		}
 		*l = append(*l, p)
 	}

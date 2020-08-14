@@ -28,7 +28,7 @@ func TestSSHOptions_Type(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			o := SSHOptions{
+			o := SignSSHOptions{
 				CertType: tt.fields.CertType,
 			}
 			if got := o.Type(); got != tt.want {
@@ -40,7 +40,7 @@ func TestSSHOptions_Type(t *testing.T) {
 
 func TestSSHOptions_Modify(t *testing.T) {
 	type test struct {
-		so    *SSHOptions
+		so    *SignSSHOptions
 		cert  *ssh.Certificate
 		valid func(*ssh.Certificate)
 		err   error
@@ -48,21 +48,21 @@ func TestSSHOptions_Modify(t *testing.T) {
 	tests := map[string](func() test){
 		"fail/unexpected-cert-type": func() test {
 			return test{
-				so:   &SSHOptions{CertType: "foo"},
+				so:   &SignSSHOptions{CertType: "foo"},
 				cert: new(ssh.Certificate),
 				err:  errors.Errorf("ssh certificate has an unknown type - foo"),
 			}
 		},
 		"fail/validAfter-greater-validBefore": func() test {
 			return test{
-				so:   &SSHOptions{CertType: "user"},
+				so:   &SignSSHOptions{CertType: "user"},
 				cert: &ssh.Certificate{ValidAfter: uint64(15), ValidBefore: uint64(10)},
 				err:  errors.Errorf("ssh certificate valid after cannot be greater than valid before"),
 			}
 		},
 		"ok/user-cert": func() test {
 			return test{
-				so:   &SSHOptions{CertType: "user"},
+				so:   &SignSSHOptions{CertType: "user"},
 				cert: new(ssh.Certificate),
 				valid: func(cert *ssh.Certificate) {
 					assert.Equals(t, cert.CertType, uint32(ssh.UserCert))
@@ -71,7 +71,7 @@ func TestSSHOptions_Modify(t *testing.T) {
 		},
 		"ok/host-cert": func() test {
 			return test{
-				so:   &SSHOptions{CertType: "host"},
+				so:   &SignSSHOptions{CertType: "host"},
 				cert: new(ssh.Certificate),
 				valid: func(cert *ssh.Certificate) {
 					assert.Equals(t, cert.CertType, uint32(ssh.HostCert))
@@ -81,7 +81,7 @@ func TestSSHOptions_Modify(t *testing.T) {
 		"ok": func() test {
 			va := time.Now().Add(5 * time.Minute)
 			vb := time.Now().Add(1 * time.Hour)
-			so := &SSHOptions{CertType: "host", KeyID: "foo", Principals: []string{"foo", "bar"},
+			so := &SignSSHOptions{CertType: "host", KeyID: "foo", Principals: []string{"foo", "bar"},
 				ValidAfter: NewTimeDuration(va), ValidBefore: NewTimeDuration(vb)}
 			return test{
 				so:   so,
@@ -114,43 +114,43 @@ func TestSSHOptions_Modify(t *testing.T) {
 
 func TestSSHOptions_Match(t *testing.T) {
 	type test struct {
-		so  SSHOptions
-		cmp SSHOptions
+		so  SignSSHOptions
+		cmp SignSSHOptions
 		err error
 	}
 	tests := map[string](func() test){
 		"fail/cert-type": func() test {
 			return test{
-				so:  SSHOptions{CertType: "foo"},
-				cmp: SSHOptions{CertType: "bar"},
+				so:  SignSSHOptions{CertType: "foo"},
+				cmp: SignSSHOptions{CertType: "bar"},
 				err: errors.Errorf("ssh certificate type does not match - got bar, want foo"),
 			}
 		},
 		"fail/pricipals": func() test {
 			return test{
-				so:  SSHOptions{Principals: []string{"foo"}},
-				cmp: SSHOptions{Principals: []string{"bar"}},
+				so:  SignSSHOptions{Principals: []string{"foo"}},
+				cmp: SignSSHOptions{Principals: []string{"bar"}},
 				err: errors.Errorf("ssh certificate principals does not match - got [bar], want [foo]"),
 			}
 		},
 		"fail/validAfter": func() test {
 			return test{
-				so:  SSHOptions{ValidAfter: NewTimeDuration(time.Now().Add(1 * time.Minute))},
-				cmp: SSHOptions{ValidAfter: NewTimeDuration(time.Now().Add(5 * time.Minute))},
+				so:  SignSSHOptions{ValidAfter: NewTimeDuration(time.Now().Add(1 * time.Minute))},
+				cmp: SignSSHOptions{ValidAfter: NewTimeDuration(time.Now().Add(5 * time.Minute))},
 				err: errors.Errorf("ssh certificate valid after does not match"),
 			}
 		},
 		"fail/validBefore": func() test {
 			return test{
-				so:  SSHOptions{ValidBefore: NewTimeDuration(time.Now().Add(1 * time.Minute))},
-				cmp: SSHOptions{ValidBefore: NewTimeDuration(time.Now().Add(5 * time.Minute))},
+				so:  SignSSHOptions{ValidBefore: NewTimeDuration(time.Now().Add(1 * time.Minute))},
+				cmp: SignSSHOptions{ValidBefore: NewTimeDuration(time.Now().Add(5 * time.Minute))},
 				err: errors.Errorf("ssh certificate valid before does not match"),
 			}
 		},
 		"ok/original-empty": func() test {
 			return test{
-				so: SSHOptions{},
-				cmp: SSHOptions{
+				so: SignSSHOptions{},
+				cmp: SignSSHOptions{
 					CertType:    "foo",
 					Principals:  []string{"foo"},
 					ValidAfter:  NewTimeDuration(time.Now().Add(1 * time.Minute)),
@@ -160,8 +160,8 @@ func TestSSHOptions_Match(t *testing.T) {
 		},
 		"ok/cmp-empty": func() test {
 			return test{
-				cmp: SSHOptions{},
-				so: SSHOptions{
+				cmp: SignSSHOptions{},
+				so: SignSSHOptions{
 					CertType:    "foo",
 					Principals:  []string{"foo"},
 					ValidAfter:  NewTimeDuration(time.Now().Add(1 * time.Minute)),
@@ -174,13 +174,13 @@ func TestSSHOptions_Match(t *testing.T) {
 			va := NewTimeDuration(n.Add(1 * time.Minute))
 			vb := NewTimeDuration(n.Add(5 * time.Minute))
 			return test{
-				cmp: SSHOptions{
+				cmp: SignSSHOptions{
 					CertType:    "foo",
 					Principals:  []string{"foo"},
 					ValidAfter:  va,
 					ValidBefore: vb,
 				},
-				so: SSHOptions{
+				so: SignSSHOptions{
 					CertType:    "foo",
 					Principals:  []string{"foo"},
 					ValidAfter:  va,
@@ -330,7 +330,7 @@ func Test_sshCertDefaultsModifier_Modify(t *testing.T) {
 			n := time.Now()
 			va := NewTimeDuration(n.Add(1 * time.Minute))
 			vb := NewTimeDuration(n.Add(5 * time.Minute))
-			so := SSHOptions{
+			so := SignSSHOptions{
 				Principals:  []string{"foo", "bar"},
 				CertType:    "host",
 				ValidAfter:  va,
@@ -349,7 +349,7 @@ func Test_sshCertDefaultsModifier_Modify(t *testing.T) {
 		},
 		"ok/no-changes": func() test {
 			n := time.Now()
-			so := SSHOptions{
+			so := SignSSHOptions{
 				Principals:  []string{"foo", "bar"},
 				CertType:    "host",
 				ValidAfter:  NewTimeDuration(n.Add(15 * time.Minute)),
@@ -659,7 +659,7 @@ func Test_sshCertDefaultValidator_Valid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := v.Valid(tt.cert, SSHOptions{}); err != nil {
+			if err := v.Valid(tt.cert, SignSSHOptions{}); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -678,31 +678,31 @@ func Test_sshCertValidityValidator(t *testing.T) {
 	tests := []struct {
 		name string
 		cert *ssh.Certificate
-		opts SSHOptions
+		opts SignSSHOptions
 		err  error
 	}{
 		{
 			"fail/validAfter-0",
 			&ssh.Certificate{CertType: ssh.UserCert},
-			SSHOptions{},
+			SignSSHOptions{},
 			errors.New("ssh certificate validAfter cannot be 0"),
 		},
 		{
 			"fail/validBefore-in-past",
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: uint64(now().Unix()), ValidBefore: uint64(now().Add(-time.Minute).Unix())},
-			SSHOptions{},
+			SignSSHOptions{},
 			errors.New("ssh certificate validBefore cannot be in the past"),
 		},
 		{
 			"fail/validBefore-before-validAfter",
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: uint64(now().Add(5 * time.Minute).Unix()), ValidBefore: uint64(now().Add(3 * time.Minute).Unix())},
-			SSHOptions{},
+			SignSSHOptions{},
 			errors.New("ssh certificate validBefore cannot be before validAfter"),
 		},
 		{
 			"fail/cert-type-not-set",
 			&ssh.Certificate{ValidAfter: uint64(now().Unix()), ValidBefore: uint64(now().Add(10 * time.Minute).Unix())},
-			SSHOptions{},
+			SignSSHOptions{},
 			errors.New("ssh certificate type has not been set"),
 		},
 		{
@@ -712,7 +712,7 @@ func Test_sshCertValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(now().Unix()),
 				ValidBefore: uint64(now().Add(10 * time.Minute).Unix()),
 			},
-			SSHOptions{},
+			SignSSHOptions{},
 			errors.New("unknown ssh certificate type 3"),
 		},
 		{
@@ -722,7 +722,7 @@ func Test_sshCertValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(n.Unix()),
 				ValidBefore: uint64(n.Add(4 * time.Minute).Unix()),
 			},
-			SSHOptions{Backdate: time.Second},
+			SignSSHOptions{Backdate: time.Second},
 			errors.New("requested duration of 4m0s is less than minimum accepted duration for selected provisioner of 5m0s"),
 		},
 		{
@@ -732,7 +732,7 @@ func Test_sshCertValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(n.Unix()),
 				ValidBefore: uint64(n.Add(5 * time.Minute).Unix()),
 			},
-			SSHOptions{Backdate: time.Second},
+			SignSSHOptions{Backdate: time.Second},
 			nil,
 		},
 		{
@@ -742,7 +742,7 @@ func Test_sshCertValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(n.Unix()),
 				ValidBefore: uint64(n.Add(48 * time.Hour).Unix()),
 			},
-			SSHOptions{Backdate: time.Second},
+			SignSSHOptions{Backdate: time.Second},
 			errors.New("requested duration of 48h0m0s is greater than maximum accepted duration for selected provisioner of 24h0m1s"),
 		},
 		{
@@ -752,7 +752,7 @@ func Test_sshCertValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(n.Unix()),
 				ValidBefore: uint64(n.Add(24*time.Hour + time.Second).Unix()),
 			},
-			SSHOptions{Backdate: time.Second},
+			SignSSHOptions{Backdate: time.Second},
 			nil,
 		},
 		{
@@ -762,7 +762,7 @@ func Test_sshCertValidityValidator(t *testing.T) {
 				ValidAfter:  uint64(now().Unix()),
 				ValidBefore: uint64(now().Add(8 * time.Hour).Unix()),
 			},
-			SSHOptions{Backdate: time.Second},
+			SignSSHOptions{Backdate: time.Second},
 			nil,
 		},
 	}
@@ -908,7 +908,7 @@ func Test_sshValidityModifier(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tt := run()
-			if err := tt.svm.Option(SSHOptions{}).Modify(tt.cert); err != nil {
+			if err := tt.svm.Option(SignSSHOptions{}).Modify(tt.cert); err != nil {
 				if assert.NotNil(t, tt.err) {
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -962,7 +962,7 @@ func Test_sshDefaultDuration_Option(t *testing.T) {
 		Claimer *Claimer
 	}
 	type args struct {
-		o    SSHOptions
+		o    SignSSHOptions
 		cert *ssh.Certificate
 	}
 	tests := []struct {
@@ -972,26 +972,26 @@ func Test_sshDefaultDuration_Option(t *testing.T) {
 		want    *ssh.Certificate
 		wantErr bool
 	}{
-		{"user", fields{newClaimer(nil)}, args{SSHOptions{}, &ssh.Certificate{CertType: ssh.UserCert}},
+		{"user", fields{newClaimer(nil)}, args{SignSSHOptions{}, &ssh.Certificate{CertType: ssh.UserCert}},
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(0), ValidBefore: unix(16 * time.Hour)}, false},
-		{"host", fields{newClaimer(nil)}, args{SSHOptions{}, &ssh.Certificate{CertType: ssh.HostCert}},
+		{"host", fields{newClaimer(nil)}, args{SignSSHOptions{}, &ssh.Certificate{CertType: ssh.HostCert}},
 			&ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(0), ValidBefore: unix(30 * 24 * time.Hour)}, false},
-		{"user claim", fields{newClaimer(&Claims{DefaultUserSSHDur: &Duration{1 * time.Hour}})}, args{SSHOptions{}, &ssh.Certificate{CertType: ssh.UserCert}},
+		{"user claim", fields{newClaimer(&Claims{DefaultUserSSHDur: &Duration{1 * time.Hour}})}, args{SignSSHOptions{}, &ssh.Certificate{CertType: ssh.UserCert}},
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(0), ValidBefore: unix(1 * time.Hour)}, false},
-		{"host claim", fields{newClaimer(&Claims{DefaultHostSSHDur: &Duration{1 * time.Hour}})}, args{SSHOptions{}, &ssh.Certificate{CertType: ssh.HostCert}},
+		{"host claim", fields{newClaimer(&Claims{DefaultHostSSHDur: &Duration{1 * time.Hour}})}, args{SignSSHOptions{}, &ssh.Certificate{CertType: ssh.HostCert}},
 			&ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(0), ValidBefore: unix(1 * time.Hour)}, false},
-		{"user backdate", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.UserCert}},
+		{"user backdate", fields{newClaimer(nil)}, args{SignSSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.UserCert}},
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(-1 * time.Minute), ValidBefore: unix(16 * time.Hour)}, false},
-		{"host backdate", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.HostCert}},
+		{"host backdate", fields{newClaimer(nil)}, args{SignSSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.HostCert}},
 			&ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(-1 * time.Minute), ValidBefore: unix(30 * 24 * time.Hour)}, false},
-		{"user validAfter", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(1 * time.Hour)}},
+		{"user validAfter", fields{newClaimer(nil)}, args{SignSSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(1 * time.Hour)}},
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(time.Hour), ValidBefore: unix(17 * time.Hour)}, false},
-		{"user validBefore", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.UserCert, ValidBefore: unix(1 * time.Hour)}},
+		{"user validBefore", fields{newClaimer(nil)}, args{SignSSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.UserCert, ValidBefore: unix(1 * time.Hour)}},
 			&ssh.Certificate{CertType: ssh.UserCert, ValidAfter: unix(-1 * time.Minute), ValidBefore: unix(time.Hour)}, false},
-		{"host validAfter validBefore", fields{newClaimer(nil)}, args{SSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(1 * time.Minute), ValidBefore: unix(2 * time.Minute)}},
+		{"host validAfter validBefore", fields{newClaimer(nil)}, args{SignSSHOptions{Backdate: 1 * time.Minute}, &ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(1 * time.Minute), ValidBefore: unix(2 * time.Minute)}},
 			&ssh.Certificate{CertType: ssh.HostCert, ValidAfter: unix(1 * time.Minute), ValidBefore: unix(2 * time.Minute)}, false},
-		{"fail zero", fields{newClaimer(nil)}, args{SSHOptions{}, &ssh.Certificate{}}, &ssh.Certificate{}, true},
-		{"fail type", fields{newClaimer(nil)}, args{SSHOptions{}, &ssh.Certificate{CertType: 3}}, &ssh.Certificate{CertType: 3}, true},
+		{"fail zero", fields{newClaimer(nil)}, args{SignSSHOptions{}, &ssh.Certificate{}}, &ssh.Certificate{}, true},
+		{"fail type", fields{newClaimer(nil)}, args{SignSSHOptions{}, &ssh.Certificate{CertType: 3}}, &ssh.Certificate{CertType: 3}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1015,7 +1015,7 @@ func Test_sshLimitDuration_Option(t *testing.T) {
 		NotAfter time.Time
 	}
 	type args struct {
-		o SSHOptions
+		o SignSSHOptions
 	}
 	tests := []struct {
 		name   string

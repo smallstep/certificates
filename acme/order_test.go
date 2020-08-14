@@ -895,13 +895,13 @@ func TestOrderUpdateStatus(t *testing.T) {
 }
 
 type mockSignAuth struct {
-	sign                func(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	sign                func(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	loadProvisionerByID func(string) (provisioner.Interface, error)
 	ret1, ret2          interface{}
 	err                 error
 }
 
-func (m *mockSignAuth) Sign(csr *x509.CertificateRequest, signOpts provisioner.Options, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+func (m *mockSignAuth) Sign(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	if m.sign != nil {
 		return m.sign(csr, signOpts, extraOpts...)
 	} else if m.err != nil {
@@ -1066,13 +1066,13 @@ func TestOrderFinalize(t *testing.T) {
 				Subject: pkix.Name{
 					CommonName: "",
 				},
-				DNSNames:    []string{"acme.example.com", "step.example.com"},
+				// DNSNames:    []string{"acme.example.com", "step.example.com"},
 				IPAddresses: []net.IP{net.ParseIP("1.1.1.1")},
 			}
 			return test{
 				o:   o,
 				csr: csr,
-				err: BadCSRErr(errors.Errorf("CSR contains IP Address SANs, but should only contain DNS Names")),
+				err: BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly")),
 			}
 		},
 		"fail/ready/no-emailAddresses": func(t *testing.T) test {
@@ -1084,13 +1084,13 @@ func TestOrderFinalize(t *testing.T) {
 				Subject: pkix.Name{
 					CommonName: "",
 				},
-				DNSNames:       []string{"acme.example.com", "step.example.com"},
+				// DNSNames:       []string{"acme.example.com", "step.example.com"},
 				EmailAddresses: []string{"max@smallstep.com", "mariano@smallstep.com"},
 			}
 			return test{
 				o:   o,
 				csr: csr,
-				err: BadCSRErr(errors.Errorf("CSR contains Email Address SANs, but should only contain DNS Names")),
+				err: BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly")),
 			}
 		},
 		"fail/ready/no-URIs": func(t *testing.T) test {
@@ -1104,13 +1104,13 @@ func TestOrderFinalize(t *testing.T) {
 				Subject: pkix.Name{
 					CommonName: "",
 				},
-				DNSNames: []string{"acme.example.com", "step.example.com"},
-				URIs:     []*url.URL{u},
+				// DNSNames: []string{"acme.example.com", "step.example.com"},
+				URIs: []*url.URL{u},
 			}
 			return test{
 				o:   o,
 				csr: csr,
-				err: BadCSRErr(errors.Errorf("CSR contains URI SANs, but should only contain DNS Names")),
+				err: BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly")),
 			}
 		},
 		"fail/ready/provisioner-auth-sign-error": func(t *testing.T) test {
@@ -1262,8 +1262,8 @@ func TestOrderFinalize(t *testing.T) {
 				res: clone,
 				csr: csr,
 				sa: &mockSignAuth{
-					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
-						assert.Equals(t, len(signOps), 5)
+					sign: func(csr *x509.CertificateRequest, pops provisioner.SignOptions, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, len(signOps), 6)
 						return []*x509.Certificate{crt, inter}, nil
 					},
 				},
@@ -1311,8 +1311,8 @@ func TestOrderFinalize(t *testing.T) {
 				res: &clone,
 				csr: csr,
 				sa: &mockSignAuth{
-					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
-						assert.Equals(t, len(signOps), 5)
+					sign: func(csr *x509.CertificateRequest, pops provisioner.SignOptions, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, len(signOps), 6)
 						return []*x509.Certificate{crt, inter}, nil
 					},
 				},
@@ -1358,8 +1358,8 @@ func TestOrderFinalize(t *testing.T) {
 				res: &clone,
 				csr: csr,
 				sa: &mockSignAuth{
-					sign: func(csr *x509.CertificateRequest, pops provisioner.Options, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
-						assert.Equals(t, len(signOps), 5)
+					sign: func(csr *x509.CertificateRequest, pops provisioner.SignOptions, signOps ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, len(signOps), 6)
 						return []*x509.Certificate{crt, inter}, nil
 					},
 				},

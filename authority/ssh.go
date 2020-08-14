@@ -204,7 +204,7 @@ func (a *Authority) GetSSHBastion(ctx context.Context, user string, hostname str
 }
 
 // SignSSH creates a signed SSH certificate with the given public key and options.
-func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	var mods []provisioner.SSHCertModifier
 	var validators []provisioner.SSHCertValidator
 
@@ -453,7 +453,7 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 
 	// Apply validators from provisioner.
 	for _, v := range validators {
-		if err := v.Valid(cert, provisioner.SSHOptions{Backdate: backdate}); err != nil {
+		if err := v.Valid(cert, provisioner.SignSSHOptions{Backdate: backdate}); err != nil {
 			return nil, errs.Wrap(http.StatusForbidden, err, "rekeySSH")
 		}
 	}

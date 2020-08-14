@@ -319,13 +319,13 @@ func Test_caHandler_SSHSign(t *testing.T) {
 				authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
 					return []provisioner.SignOption{}, tt.authErr
 				},
-				signSSH: func(ctx context.Context, key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+				signSSH: func(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 					return tt.signCert, tt.signErr
 				},
 				signSSHAddUser: func(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error) {
 					return tt.addUserCert, tt.addUserErr
 				},
-				sign: func(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+				sign: func(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 					return tt.tlsSignCerts, tt.tlsSignErr
 				},
 			}).(*caHandler)

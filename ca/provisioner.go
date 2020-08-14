@@ -133,7 +133,7 @@ func (p *Provisioner) SSHToken(certType, keyID string, principals []string) (str
 		token.WithIssuer(p.name),
 		token.WithAudience(p.sshAudience),
 		token.WithValidity(notBefore, notAfter),
-		token.WithSSH(provisioner.SSHOptions{
+		token.WithSSH(provisioner.SignSSHOptions{
 			CertType:   certType,
 			Principals: principals,
 			KeyID:      keyID,

@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"net/http"
 
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -11,10 +12,11 @@ import (
 
 // SignRequest is the request body for a certificate signature request.
 type SignRequest struct {
-	CsrPEM    CertificateRequest `json:"csr"`
-	OTT       string             `json:"ott"`
-	NotAfter  TimeDuration       `json:"notAfter"`
-	NotBefore TimeDuration       `json:"notBefore"`
+	CsrPEM       CertificateRequest `json:"csr"`
+	OTT          string             `json:"ott"`
+	NotAfter     TimeDuration       `json:"notAfter"`
+	NotBefore    TimeDuration       `json:"notBefore"`
+	TemplateData json.RawMessage    `json:"templateData"`
 }
 
 // Validate checks the fields of the SignRequest and returns nil if they are ok
@@ -58,9 +60,10 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	opts := provisioner.Options{
-		NotBefore: body.NotBefore,
-		NotAfter:  body.NotAfter,
+	opts := provisioner.SignOptions{
+		NotBefore:    body.NotBefore,
+		NotAfter:     body.NotAfter,
+		TemplateData: body.TemplateData,
 	}
 
 	signOpts, err := h.Authority.AuthorizeSign(body.OTT)

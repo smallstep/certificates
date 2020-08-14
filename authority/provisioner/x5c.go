@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/x509util"
 )
 
 // x5cPayload extends jwt.Claims with step attributes.
@@ -24,10 +25,11 @@ type x5cPayload struct {
 // signature requests.
 type X5C struct {
 	*base
-	Type      string  `json:"type"`
-	Name      string  `json:"name"`
-	Roots     []byte  `json:"roots"`
-	Claims    *Claims `json:"claims,omitempty"`
+	Type      string   `json:"type"`
+	Name      string   `json:"name"`
+	Roots     []byte   `json:"roots"`
+	Claims    *Claims  `json:"claims,omitempty"`
+	Options   *Options `json:"options,omitempty"`
 	claimer   *Claimer
 	audiences Audiences
 	rootPool  *x509.CertPool
@@ -193,7 +195,19 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		claims.SANs = []string{claims.Subject}
 	}
 
+	// Certificate templates
+	data := x509util.CreateTemplateData(claims.Subject, claims.SANs)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
+	templateOptions, err := TemplateOptions(p.Options, data)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
+	}
+
 	return []SignOption{
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeX5C, p.Name, ""),
 		profileLimitDuration{p.claimer.DefaultTLSCertDuration(),

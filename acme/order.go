@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/nosql"
+	"go.step.sm/crypto/x509util"
 )
 
 var defaultOrderExpiry = time.Hour * 24
@@ -299,23 +300,23 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 	orderNames = uniqueLowerNames(orderNames)
 
 	// Validate identifier names against CSR alternative names.
+	//
+	// Note that with certificate templates we are not going to check for the
+	// absence of other SANs as they will only be set if the templates allows
+	// them.
 	if len(csr.DNSNames) != len(orderNames) {
 		return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
 	}
+
+	sans := make([]x509util.SubjectAlternativeName, len(csr.DNSNames))
 	for i := range csr.DNSNames {
 		if csr.DNSNames[i] != orderNames[i] {
 			return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
 		}
-	}
-
-	if len(csr.IPAddresses) > 0 {
-		return nil, BadCSRErr(errors.Errorf("CSR contains IP Address SANs, but should only contain DNS Names"))
-	}
-	if len(csr.EmailAddresses) > 0 {
-		return nil, BadCSRErr(errors.Errorf("CSR contains Email Address SANs, but should only contain DNS Names"))
-	}
-	if len(csr.URIs) > 0 {
-		return nil, BadCSRErr(errors.Errorf("CSR contains URI SANs, but should only contain DNS Names"))
+		sans[i] = x509util.SubjectAlternativeName{
+			Type:  x509util.DNSType,
+			Value: csr.DNSNames[i],
+		}
 	}
 
 	// Get authorizations from the ACME provisioner.
@@ -325,8 +326,19 @@ func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAut
 		return nil, ServerInternalErr(errors.Wrapf(err, "error retrieving authorization options from ACME provisioner"))
 	}
 
+	// Template data
+	data := x509util.NewTemplateData()
+	data.SetCommonName(csr.Subject.CommonName)
+	data.Set(x509util.SANsKey, sans)
+
+	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
+	if err != nil {
+		return nil, ServerInternalErr(errors.Wrapf(err, "error creating template options from ACME provisioner"))
+	}
+	signOps = append(signOps, templateOptions)
+
 	// Create and store a new certificate.
-	certChain, err := auth.Sign(csr, provisioner.Options{
+	certChain, err := auth.Sign(csr, provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
 		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
 	}, signOps...)

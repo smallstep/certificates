@@ -295,9 +295,10 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.NotNil(t, got) {
-					assert.Len(t, 6, got)
+					assert.Len(t, 7, got)
 					for _, o := range got {
 						switch v := o.(type) {
+						case certificateOptionsFunc:
 						case *provisionerExtensionOption:
 							assert.Equals(t, v.Type, int(TypeJWK))
 							assert.Equals(t, v.Name, tt.prov.GetName())
@@ -403,41 +404,41 @@ func TestJWK_AuthorizeSSHSign(t *testing.T) {
 
 	userDuration := p1.claimer.DefaultUserSSHCertDuration()
 	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
-	expectedUserOptions := &SSHOptions{
+	expectedUserOptions := &SignSSHOptions{
 		CertType: "user", Principals: []string{"name"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
 	}
-	expectedHostOptions := &SSHOptions{
+	expectedHostOptions := &SignSSHOptions{
 		CertType: "host", Principals: []string{"smallstep.com"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
 	}
 
 	type args struct {
 		token   string
-		sshOpts SSHOptions
+		sshOpts SignSSHOptions
 		key     interface{}
 	}
 	tests := []struct {
 		name        string
 		prov        *JWK
 		args        args
-		expected    *SSHOptions
+		expected    *SignSSHOptions
 		code        int
 		wantErr     bool
 		wantSignErr bool
 	}{
-		{"user", p1, args{t1, SSHOptions{}, pub}, expectedUserOptions, http.StatusOK, false, false},
-		{"user-rsa2048", p1, args{t1, SSHOptions{}, rsa2048.Public()}, expectedUserOptions, http.StatusOK, false, false},
-		{"user-type", p1, args{t1, SSHOptions{CertType: "user"}, pub}, expectedUserOptions, http.StatusOK, false, false},
-		{"user-principals", p1, args{t1, SSHOptions{Principals: []string{"name"}}, pub}, expectedUserOptions, http.StatusOK, false, false},
-		{"user-options", p1, args{t1, SSHOptions{CertType: "user", Principals: []string{"name"}}, pub}, expectedUserOptions, http.StatusOK, false, false},
-		{"host", p1, args{t2, SSHOptions{}, pub}, expectedHostOptions, http.StatusOK, false, false},
-		{"host-type", p1, args{t2, SSHOptions{CertType: "host"}, pub}, expectedHostOptions, http.StatusOK, false, false},
-		{"host-principals", p1, args{t2, SSHOptions{Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
-		{"host-options", p1, args{t2, SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
-		{"fail-sshCA-disabled", p2, args{"foo", SSHOptions{}, pub}, expectedUserOptions, http.StatusUnauthorized, true, false},
-		{"fail-signature", p1, args{failSig, SSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
-		{"rail-rsa1024", p1, args{t1, SSHOptions{}, rsa1024.Public()}, expectedUserOptions, http.StatusOK, false, true},
+		{"user", p1, args{t1, SignSSHOptions{}, pub}, expectedUserOptions, http.StatusOK, false, false},
+		{"user-rsa2048", p1, args{t1, SignSSHOptions{}, rsa2048.Public()}, expectedUserOptions, http.StatusOK, false, false},
+		{"user-type", p1, args{t1, SignSSHOptions{CertType: "user"}, pub}, expectedUserOptions, http.StatusOK, false, false},
+		{"user-principals", p1, args{t1, SignSSHOptions{Principals: []string{"name"}}, pub}, expectedUserOptions, http.StatusOK, false, false},
+		{"user-options", p1, args{t1, SignSSHOptions{CertType: "user", Principals: []string{"name"}}, pub}, expectedUserOptions, http.StatusOK, false, false},
+		{"host", p1, args{t2, SignSSHOptions{}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"host-type", p1, args{t2, SignSSHOptions{CertType: "host"}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"host-principals", p1, args{t2, SignSSHOptions{Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"host-options", p1, args{t2, SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"fail-sshCA-disabled", p2, args{"foo", SignSSHOptions{}, pub}, expectedUserOptions, http.StatusUnauthorized, true, false},
+		{"fail-signature", p1, args{failSig, SignSSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
+		{"rail-rsa1024", p1, args{t1, SignSSHOptions{}, rsa1024.Public()}, expectedUserOptions, http.StatusOK, false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -486,72 +487,72 @@ func TestJWK_AuthorizeSign_SSHOptions(t *testing.T) {
 
 	userDuration := p1.claimer.DefaultUserSSHCertDuration()
 	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
-	expectedUserOptions := &SSHOptions{
+	expectedUserOptions := &SignSSHOptions{
 		CertType: "user", Principals: []string{"name"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
 	}
-	expectedHostOptions := &SSHOptions{
+	expectedHostOptions := &SignSSHOptions{
 		CertType: "host", Principals: []string{"smallstep.com"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
 	}
 	type args struct {
 		sub, iss, aud string
 		iat           time.Time
-		tokSSHOpts    *SSHOptions
-		userSSHOpts   *SSHOptions
+		tokSSHOpts    *SignSSHOptions
+		userSSHOpts   *SignSSHOptions
 		jwk           *jose.JSONWebKey
 	}
 	tests := []struct {
 		name        string
 		prov        *JWK
 		args        args
-		expected    *SSHOptions
+		expected    *SignSSHOptions
 		wantErr     bool
 		wantSignErr bool
 	}{
-		{"ok-user", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, expectedUserOptions, false, false},
-		{"ok-host", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, &SSHOptions{}, jwk}, expectedHostOptions, false, false},
-		{"ok-user-opts", p1, args{sub, iss, aud, iat, &SSHOptions{}, &SSHOptions{CertType: "user", Principals: []string{"name"}}, jwk}, expectedUserOptions, false, false},
-		{"ok-host-opts", p1, args{sub, iss, aud, iat, &SSHOptions{}, &SSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, jwk}, expectedHostOptions, false, false},
-		{"ok-user-mixed", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user"}, &SSHOptions{Principals: []string{"name"}}, jwk}, expectedUserOptions, false, false},
-		{"ok-host-mixed", p1, args{sub, iss, aud, iat, &SSHOptions{Principals: []string{"smallstep.com"}}, &SSHOptions{CertType: "host"}, jwk}, expectedHostOptions, false, false},
-		{"ok-user-validAfter", p1, args{sub, iss, aud, iat, &SSHOptions{
+		{"ok-user", p1, args{sub, iss, aud, iat, &SignSSHOptions{CertType: "user", Principals: []string{"name"}}, &SignSSHOptions{}, jwk}, expectedUserOptions, false, false},
+		{"ok-host", p1, args{sub, iss, aud, iat, &SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, &SignSSHOptions{}, jwk}, expectedHostOptions, false, false},
+		{"ok-user-opts", p1, args{sub, iss, aud, iat, &SignSSHOptions{}, &SignSSHOptions{CertType: "user", Principals: []string{"name"}}, jwk}, expectedUserOptions, false, false},
+		{"ok-host-opts", p1, args{sub, iss, aud, iat, &SignSSHOptions{}, &SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, jwk}, expectedHostOptions, false, false},
+		{"ok-user-mixed", p1, args{sub, iss, aud, iat, &SignSSHOptions{CertType: "user"}, &SignSSHOptions{Principals: []string{"name"}}, jwk}, expectedUserOptions, false, false},
+		{"ok-host-mixed", p1, args{sub, iss, aud, iat, &SignSSHOptions{Principals: []string{"smallstep.com"}}, &SignSSHOptions{CertType: "host"}, jwk}, expectedHostOptions, false, false},
+		{"ok-user-validAfter", p1, args{sub, iss, aud, iat, &SignSSHOptions{
 			CertType: "user", Principals: []string{"name"},
-		}, &SSHOptions{
+		}, &SignSSHOptions{
 			ValidAfter: NewTimeDuration(tm.Add(-time.Hour)),
-		}, jwk}, &SSHOptions{
+		}, jwk}, &SignSSHOptions{
 			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm.Add(-time.Hour)), ValidBefore: NewTimeDuration(tm.Add(userDuration - time.Hour)),
 		}, false, false},
-		{"ok-user-validBefore", p1, args{sub, iss, aud, iat, &SSHOptions{
+		{"ok-user-validBefore", p1, args{sub, iss, aud, iat, &SignSSHOptions{
 			CertType: "user", Principals: []string{"name"},
-		}, &SSHOptions{
+		}, &SignSSHOptions{
 			ValidBefore: NewTimeDuration(tm.Add(time.Hour)),
-		}, jwk}, &SSHOptions{
+		}, jwk}, &SignSSHOptions{
 			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(time.Hour)),
 		}, false, false},
-		{"ok-user-validAfter-validBefore", p1, args{sub, iss, aud, iat, &SSHOptions{
+		{"ok-user-validAfter-validBefore", p1, args{sub, iss, aud, iat, &SignSSHOptions{
 			CertType: "user", Principals: []string{"name"},
-		}, &SSHOptions{
+		}, &SignSSHOptions{
 			ValidAfter: NewTimeDuration(tm.Add(10 * time.Minute)), ValidBefore: NewTimeDuration(tm.Add(time.Hour)),
-		}, jwk}, &SSHOptions{
+		}, jwk}, &SignSSHOptions{
 			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm.Add(10 * time.Minute)), ValidBefore: NewTimeDuration(tm.Add(time.Hour)),
 		}, false, false},
-		{"ok-user-match", p1, args{sub, iss, aud, iat, &SSHOptions{
+		{"ok-user-match", p1, args{sub, iss, aud, iat, &SignSSHOptions{
 			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(1 * time.Hour)),
-		}, &SSHOptions{
+		}, &SignSSHOptions{
 			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(1 * time.Hour)),
-		}, jwk}, &SSHOptions{
+		}, jwk}, &SignSSHOptions{
 			CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(time.Hour)),
 		}, false, false},
-		{"fail-certType", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{CertType: "host"}, jwk}, nil, false, true},
-		{"fail-principals", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{Principals: []string{"root"}}, jwk}, nil, false, true},
-		{"fail-validAfter", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm)}, &SSHOptions{ValidAfter: NewTimeDuration(tm.Add(time.Hour))}, jwk}, nil, false, true},
-		{"fail-validBefore", p1, args{sub, iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}, ValidBefore: NewTimeDuration(tm.Add(time.Hour))}, &SSHOptions{ValidBefore: NewTimeDuration(tm.Add(10 * time.Hour))}, jwk}, nil, false, true},
-		{"fail-subject", p1, args{"", iss, aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, nil, true, false},
-		{"fail-issuer", p1, args{sub, "invalid", aud, iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, nil, true, false},
-		{"fail-audience", p1, args{sub, iss, "invalid", iat, &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, nil, true, false},
-		{"fail-expired", p1, args{sub, iss, aud, iat.Add(-6 * time.Minute), &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, nil, true, false},
-		{"fail-notBefore", p1, args{sub, iss, aud, iat.Add(5 * time.Minute), &SSHOptions{CertType: "user", Principals: []string{"name"}}, &SSHOptions{}, jwk}, nil, true, false},
+		{"fail-certType", p1, args{sub, iss, aud, iat, &SignSSHOptions{CertType: "user", Principals: []string{"name"}}, &SignSSHOptions{CertType: "host"}, jwk}, nil, false, true},
+		{"fail-principals", p1, args{sub, iss, aud, iat, &SignSSHOptions{CertType: "user", Principals: []string{"name"}}, &SignSSHOptions{Principals: []string{"root"}}, jwk}, nil, false, true},
+		{"fail-validAfter", p1, args{sub, iss, aud, iat, &SignSSHOptions{CertType: "user", Principals: []string{"name"}, ValidAfter: NewTimeDuration(tm)}, &SignSSHOptions{ValidAfter: NewTimeDuration(tm.Add(time.Hour))}, jwk}, nil, false, true},
+		{"fail-validBefore", p1, args{sub, iss, aud, iat, &SignSSHOptions{CertType: "user", Principals: []string{"name"}, ValidBefore: NewTimeDuration(tm.Add(time.Hour))}, &SignSSHOptions{ValidBefore: NewTimeDuration(tm.Add(10 * time.Hour))}, jwk}, nil, false, true},
+		{"fail-subject", p1, args{"", iss, aud, iat, &SignSSHOptions{CertType: "user", Principals: []string{"name"}}, &SignSSHOptions{}, jwk}, nil, true, false},
+		{"fail-issuer", p1, args{sub, "invalid", aud, iat, &SignSSHOptions{CertType: "user", Principals: []string{"name"}}, &SignSSHOptions{}, jwk}, nil, true, false},
+		{"fail-audience", p1, args{sub, iss, "invalid", iat, &SignSSHOptions{CertType: "user", Principals: []string{"name"}}, &SignSSHOptions{}, jwk}, nil, true, false},
+		{"fail-expired", p1, args{sub, iss, aud, iat.Add(-6 * time.Minute), &SignSSHOptions{CertType: "user", Principals: []string{"name"}}, &SignSSHOptions{}, jwk}, nil, true, false},
+		{"fail-notBefore", p1, args{sub, iss, aud, iat.Add(5 * time.Minute), &SignSSHOptions{CertType: "user", Principals: []string{"name"}}, &SignSSHOptions{}, jwk}, nil, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -560,7 +561,7 @@ func TestJWK_AuthorizeSign_SSHOptions(t *testing.T) {
 			if got, err := tt.prov.AuthorizeSSHSign(context.Background(), token); (err != nil) != tt.wantErr {
 				t.Errorf("JWK.AuthorizeSSHSign() error = %v, wantErr %v", err, tt.wantErr)
 			} else if !tt.wantErr && assert.NotNil(t, got) {
-				var opts SSHOptions
+				var opts SignSSHOptions
 				if tt.args.userSSHOpts != nil {
 					opts = *tt.args.userSSHOpts
 				}

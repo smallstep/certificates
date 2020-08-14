@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/x509util"
 )
 
 // openIDConfiguration contains the necessary properties in the
@@ -63,6 +64,7 @@ type OIDC struct {
 	Groups                []string `json:"groups,omitempty"`
 	ListenAddress         string   `json:"listenAddress,omitempty"`
 	Claims                *Claims  `json:"claims,omitempty"`
+	Options               *Options `json:"options,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
 	claimer               *Claimer
@@ -72,10 +74,12 @@ type OIDC struct {
 // IsAdmin returns true if the given email is in the Admins allowlist, false
 // otherwise.
 func (o *OIDC) IsAdmin(email string) bool {
-	email = sanitizeEmail(email)
-	for _, e := range o.Admins {
-		if email == sanitizeEmail(e) {
-			return true
+	if email != "" {
+		email = sanitizeEmail(email)
+		for _, e := range o.Admins {
+			if email == sanitizeEmail(e) {
+				return true
+			}
 		}
 	}
 	return false
@@ -203,13 +207,8 @@ func (o *OIDC) ValidatePayload(p openIDPayload) error {
 		return errs.Unauthorized("validatePayload: failed to validate oidc token payload: invalid azp")
 	}
 
-	// Enforce an email claim
-	if p.Email == "" {
-		return errs.Unauthorized("validatePayload: failed to validate oidc token payload: email not found")
-	}
-
 	// Validate domains (case-insensitive)
-	if !o.IsAdmin(p.Email) && len(o.Domains) > 0 {
+	if p.Email != "" && len(o.Domains) > 0 && !o.IsAdmin(p.Email) {
 		email := sanitizeEmail(p.Email)
 		var found bool
 		for _, d := range o.Domains {
@@ -301,20 +300,49 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSign")
 	}
 
-	so := []SignOption{
+	// Certificate templates
+	sans := []string{}
+	if claims.Email != "" {
+		sans = append(sans, claims.Email)
+	}
+
+	// Add uri SAN with iss#sub if issuer is a URL with schema.
+	//
+	// According to https://openid.net/specs/openid-connect-core-1_0.html the
+	// iss value is a case sensitive URL using the https scheme that contains
+	// scheme, host, and optionally, port number and path components and no
+	// query or fragment components.
+	if iss, err := url.Parse(claims.Issuer); err == nil && iss.Scheme != "" {
+		iss.Fragment = claims.Subject
+		sans = append(sans, iss.String())
+	}
+
+	data := x509util.CreateTemplateData(claims.Subject, sans)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
+	// Use the default template unless no-templates are configured and email is
+	// an admin, in that case we will use the CR template.
+	defaultTemplate := x509util.DefaultLeafTemplate
+	if !o.Options.GetX509Options().HasTemplate() && o.IsAdmin(claims.Email) {
+		defaultTemplate = x509util.CertificateRequestTemplate
+	}
+
+	templateOptions, err := CustomTemplateOptions(o.Options, data, defaultTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSign")
+	}
+
+	return []SignOption{
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
 		profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
-	}
-	// Admins should be able to authorize any SAN
-	if o.IsAdmin(claims.Email) {
-		return so, nil
-	}
-
-	return append(so, emailOnlyIdentity(claims.Email)), nil
+	}, nil
 }
 
 // AuthorizeRenew returns an error if the renewal is disabled.
@@ -337,6 +365,10 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSSHSign")
 	}
+	// Enforce an email claim
+	if claims.Email == "" {
+		return nil, errs.Unauthorized("oidc.AuthorizeSSHSign: failed to validate oidc token payload: email not found")
+	}
 	signOptions := []SignOption{
 		// set the key id to the token email
 		sshCertKeyIDModifier(claims.Email),
@@ -348,7 +380,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSSHSign")
 	}
-	defaults := SSHOptions{
+	defaults := SignSSHOptions{
 		CertType:   SSHUserCert,
 		Principals: iden.Usernames,
 	}

@@ -18,6 +18,7 @@ type Provisioner interface {
 	AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error)
 	GetName() string
 	DefaultTLSCertDuration() time.Duration
+	GetOptions() *provisioner.Options
 }
 
 // MockProvisioner for testing
@@ -27,6 +28,7 @@ type MockProvisioner struct {
 	MgetName                func() string
 	MauthorizeSign          func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	MdefaultTLSCertDuration func() time.Duration
+	MgetOptions             func() *provisioner.Options
 }
 
 // GetName mock
@@ -51,6 +53,13 @@ func (m *MockProvisioner) DefaultTLSCertDuration() time.Duration {
 		return m.MdefaultTLSCertDuration()
 	}
 	return m.Mret1.(time.Duration)
+}
+
+func (m *MockProvisioner) GetOptions() *provisioner.Options {
+	if m.MgetOptions != nil {
+		return m.MgetOptions()
+	}
+	return m.Mret1.(*provisioner.Options)
 }
 
 // ContextKey is the key type for storing and searching for ACME request
@@ -125,7 +134,7 @@ func ProvisionerFromContext(ctx context.Context) (Provisioner, error) {
 
 // SignAuthority is the interface implemented by a CA authority.
 type SignAuthority interface {
-	Sign(cr *x509.CertificateRequest, opts provisioner.Options, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	LoadProvisionerByID(string) (provisioner.Interface, error)
 }
 

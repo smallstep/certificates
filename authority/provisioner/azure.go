@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/x509util"
 )
 
 // azureOIDCBaseURL is the base discovery url for Microsoft Azure tokens.
@@ -90,6 +91,7 @@ type Azure struct {
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
 	Claims                 *Claims  `json:"claims,omitempty"`
+	Options                *Options `json:"options,omitempty"`
 	claimer                *Claimer
 	config                 *azureConfig
 	oidcConfig             openIDConfiguration
@@ -276,6 +278,13 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		}
 	}
 
+	// Template options
+	data := x509util.NewTemplateData()
+	data.SetCommonName(name)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
 	// Enforce known common name and default DNS if configured.
 	// By default we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
@@ -287,9 +296,18 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		so = append(so, ipAddressesValidator(nil))
 		so = append(so, emailAddressesValidator(nil))
 		so = append(so, urisValidator(nil))
+
+		// Enforce SANs in the template.
+		data.SetSANs([]string{name})
+	}
+
+	templateOptions, err := CustomTemplateOptions(p.Options, data, x509util.DefaultIIDLeafTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "aws.AuthorizeSign")
 	}
 
 	return append(so,
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
@@ -332,7 +350,7 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 	}
 
 	// Default to host + known hostnames
-	defaults := SSHOptions{
+	defaults := SignSSHOptions{
 		CertType:   SSHHostCert,
 		Principals: principals,
 	}

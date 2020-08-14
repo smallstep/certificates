@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/x509util"
 )
 
 // jwtPayload extends jwt.Claims with step attributes.
@@ -19,7 +20,7 @@ type jwtPayload struct {
 }
 
 type stepPayload struct {
-	SSH *SSHOptions `json:"ssh,omitempty"`
+	SSH *SignSSHOptions `json:"ssh,omitempty"`
 }
 
 // JWK is the default provisioner, an entity that can sign tokens necessary for
@@ -31,6 +32,7 @@ type JWK struct {
 	Key          *jose.JSONWebKey `json:"key"`
 	EncryptedKey string           `json:"encryptedKey,omitempty"`
 	Claims       *Claims          `json:"claims,omitempty"`
+	Options      *Options         `json:"options,omitempty"`
 	claimer      *Claimer
 	audiences    Audiences
 }
@@ -151,7 +153,19 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		claims.SANs = []string{claims.Subject}
 	}
 
+	// Certificate templates
+	data := x509util.CreateTemplateData(claims.Subject, claims.SANs)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
+	templateOptions, err := TemplateOptions(p.Options, data)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
+	}
+
 	return []SignOption{
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),

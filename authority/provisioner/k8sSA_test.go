@@ -274,6 +274,7 @@ func TestK8sSA_AuthorizeSign(t *testing.T) {
 						tot := 0
 						for _, o := range opts {
 							switch v := o.(type) {
+							case certificateOptionsFunc:
 							case *provisionerExtensionOption:
 								assert.Equals(t, v.Type, int(TypeK8sSA))
 								assert.Equals(t, v.Name, tc.p.GetName())
@@ -290,7 +291,7 @@ func TestK8sSA_AuthorizeSign(t *testing.T) {
 							}
 							tot++
 						}
-						assert.Equals(t, tot, 4)
+						assert.Equals(t, tot, 5)
 					}
 				}
 			}

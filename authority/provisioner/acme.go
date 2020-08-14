@@ -13,10 +13,11 @@ import (
 // provisioning flow.
 type ACME struct {
 	*base
-	Type    string  `json:"type"`
-	Name    string  `json:"name"`
-	Claims  *Claims `json:"claims,omitempty"`
-	ForceCN bool    `json:"forceCN,omitempty"`
+	Type    string   `json:"type"`
+	Name    string   `json:"name"`
+	ForceCN bool     `json:"forceCN,omitempty"`
+	Claims  *Claims  `json:"claims,omitempty"`
+	Options *Options `json:"options,omitempty"`
 	claimer *Claimer
 }
 
@@ -43,6 +44,11 @@ func (p *ACME) GetType() Type {
 // GetEncryptedKey returns the base provisioner encrypted key if it's defined.
 func (p *ACME) GetEncryptedKey() (string, string, bool) {
 	return "", "", false
+}
+
+// GetOptions returns the configured provisioner options.
+func (p *ACME) GetOptions() *Options {
+	return p.Options
 }
 
 // DefaultTLSCertDuration returns the default TLS cert duration enforced by

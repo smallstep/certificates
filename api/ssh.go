@@ -19,7 +19,7 @@ import (
 
 // SSHAuthority is the interface implemented by a SSH CA authority.
 type SSHAuthority interface {
-	SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
+	SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	RenewSSH(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error)
 	RekeySSH(ctx context.Context, cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	SignSSHAddUser(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
@@ -274,7 +274,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	opts := provisioner.SSHOptions{
+	opts := provisioner.SignSSHOptions{
 		CertType:    body.CertType,
 		KeyID:       body.KeyID,
 		Principals:  body.Principals,
@@ -322,7 +322,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 			NotAfter:  time.Unix(int64(cert.ValidBefore), 0),
 		})
 
-		certChain, err := h.Authority.Sign(cr, provisioner.Options{}, signOpts...)
+		certChain, err := h.Authority.Sign(cr, provisioner.SignOptions{}, signOpts...)
 		if err != nil {
 			WriteError(w, errs.ForbiddenErr(err))
 			return

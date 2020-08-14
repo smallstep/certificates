@@ -34,31 +34,6 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-// subjectPublicKeyInfo is a PKIX public key structure defined in RFC 5280.
-type subjectPublicKeyInfo struct {
-	Algorithm        pkix.AlgorithmIdentifier
-	SubjectPublicKey asn1.BitString
-}
-
-// generateSubjectKeyID generates the key identifier according the the RFC 5280
-// section 4.2.1.2.
-//
-// The keyIdentifier is composed of the 160-bit SHA-1 hash of the value of the
-// BIT STRING subjectPublicKey (excluding the tag, length, and number of unused
-// bits).
-func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
-	b, err := x509.MarshalPKIXPublicKey(pub)
-	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling public key")
-	}
-	var info subjectPublicKeyInfo
-	if _, err = asn1.Unmarshal(b, &info); err != nil {
-		return nil, errors.Wrap(err, "error unmarshaling public key")
-	}
-	hash := sha1.Sum(info.SubjectPublicKey.Bytes)
-	return hash[:], nil
-}
-
 type ClosingBuffer struct {
 	*bytes.Buffer
 }
@@ -77,6 +52,22 @@ func getCSR(priv interface{}) (*x509.CertificateRequest, error) {
 		return nil, err
 	}
 	return x509.ParseCertificateRequest(csrBytes)
+}
+
+func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
+	b, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling public key")
+	}
+	info := struct {
+		Algorithm        pkix.AlgorithmIdentifier
+		SubjectPublicKey asn1.BitString
+	}{}
+	if _, err = asn1.Unmarshal(b, &info); err != nil {
+		return nil, errors.Wrap(err, "error unmarshaling public key")
+	}
+	hash := sha1.Sum(info.SubjectPublicKey.Bytes)
+	return hash[:], nil
 }
 
 func TestMain(m *testing.M) {
@@ -326,9 +317,9 @@ ZEp7knvU2psWRw==
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 					assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
 
-					kid, err := generateSubjectKeyID(pub)
+					subjectKeyID, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
-					assert.Equals(t, leaf.SubjectKeyId, kid)
+					assert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
 
 					assert.Equals(t, leaf.AuthorityKeyId, intermediateIdentity.Crt.SubjectKeyId)
 
@@ -667,10 +658,9 @@ func TestCARenew(t *testing.T) {
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 					assert.Equals(t, leaf.DNSNames, []string{"funk"})
 
-					kid, err := generateSubjectKeyID(pub)
+					subjectKeyID, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
-					assert.Equals(t, leaf.SubjectKeyId, kid)
-
+					assert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
 					assert.Equals(t, leaf.AuthorityKeyId, intermediateIdentity.Crt.SubjectKeyId)
 
 					realIntermediate, err := x509.ParseCertificate(intermediateIdentity.Crt.Raw)

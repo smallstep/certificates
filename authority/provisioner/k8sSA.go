@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -12,7 +13,7 @@ import (
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/jose"
-	"golang.org/x/crypto/ed25519"
+	"go.step.sm/crypto/x509util"
 )
 
 // NOTE: There can be at most one kubernetes service account provisioner configured
@@ -40,10 +41,11 @@ type k8sSAPayload struct {
 // entity trusted to make signature requests.
 type K8sSA struct {
 	*base
-	Type      string  `json:"type"`
-	Name      string  `json:"name"`
-	Claims    *Claims `json:"claims,omitempty"`
-	PubKeys   []byte  `json:"publicKeys,omitempty"`
+	Type      string   `json:"type"`
+	Name      string   `json:"name"`
+	PubKeys   []byte   `json:"publicKeys,omitempty"`
+	Claims    *Claims  `json:"claims,omitempty"`
+	Options   *Options `json:"options,omitempty"`
 	claimer   *Claimer
 	audiences Audiences
 	//kauthn    kauthn.AuthenticationV1Interface
@@ -204,11 +206,27 @@ func (p *K8sSA) AuthorizeRevoke(ctx context.Context, token string) error {
 
 // AuthorizeSign validates the given token.
 func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	if _, err := p.authorizeToken(token, p.audiences.Sign); err != nil {
+	claims, err := p.authorizeToken(token, p.audiences.Sign)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSign")
+	}
+
+	// Add some values to use in custom templates.
+	data := x509util.NewTemplateData()
+	data.SetCommonName(claims.ServiceAccountName)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
+	// Certificate templates: on K8sSA the default template is the certificate
+	// request.
+	templateOptions, err := CustomTemplateOptions(p.Options, data, x509util.CertificateRequestTemplate)
+	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSign")
 	}
 
 	return []SignOption{
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeK8sSA, p.Name, ""),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),

@@ -56,7 +56,7 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 		return nil, nil, err
 	}
 	// Use mutable tls.Config on renew
-	tr.DialTLS = c.buildDialTLS(tlsCtx) //nolint:deprecated
+	tr.DialTLS = c.buildDialTLS(tlsCtx) // nolint:staticcheck
 	// tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
@@ -108,7 +108,7 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 		return nil, err
 	}
 	// Use mutable tls.Config on renew
-	tr.DialTLS = c.buildDialTLS(tlsCtx) //nolint:deprecated
+	tr.DialTLS = c.buildDialTLS(tlsCtx) // nolint:staticcheck
 	// tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 

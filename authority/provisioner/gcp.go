@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/x509util"
 )
 
 // gcpCertsURL is the url that serves Google OAuth2 public keys.
@@ -84,6 +85,7 @@ type GCP struct {
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
 	InstanceAge            Duration `json:"instanceAge,omitempty"`
 	Claims                 *Claims  `json:"claims,omitempty"`
+	Options                *Options `json:"options,omitempty"`
 	claimer                *Claimer
 	config                 *gcpConfig
 	keyStore               *keyStore
@@ -215,6 +217,14 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}
 
 	ce := claims.Google.ComputeEngine
+
+	// Template options
+	data := x509util.NewTemplateData()
+	data.SetCommonName(ce.InstanceName)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
+	}
+
 	// Enforce known common name and default DNS if configured.
 	// By default we we'll accept the CN and SANs in the CSR.
 	// There's no way to trust them other than TOFU.
@@ -231,9 +241,18 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		so = append(so, ipAddressesValidator(nil))
 		so = append(so, emailAddressesValidator(nil))
 		so = append(so, urisValidator(nil))
+
+		// Template SANs
+		data.SetSANs([]string{dnsName1, dnsName2})
+	}
+
+	templateOptions, err := CustomTemplateOptions(p.Options, data, x509util.DefaultIIDLeafTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSign")
 	}
 
 	return append(so,
+		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeGCP, p.Name, claims.Subject, "InstanceID", ce.InstanceID, "InstanceName", ce.InstanceName),
 		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
@@ -375,7 +394,7 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	}
 
 	// Default to host + known hostnames
-	defaults := SSHOptions{
+	defaults := SignSSHOptions{
 		CertType:   SSHHostCert,
 		Principals: principals,
 	}
