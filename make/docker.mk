@@ -31,7 +31,9 @@ endif
 		(wget -O $$HOME/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.$(DOCKER_CLIENT_OS)-amd64 && \
 		chmod +x $$HOME/.docker/cli-plugins/docker-buildx)
 
-	docker buildx create --use --name mybuilder --platform="$(DOCKER_PLATFORMS)" || true
+	# Called directly instead of via `docker buildx` because
+	# Travis runs a pre-19.03 Docker that doesn't support plugin discovery
+	$$HOME/.docker/cli-plugins/docker-buildx create --use --name mybuilder --platform="$(DOCKER_PLATFORMS)" || true
 
 .PHONY: docker-prepare
 
@@ -56,7 +58,7 @@ docker-login:
 define DOCKER_BUILDX
 	# $(1) -- Image Tag
 	# $(2) -- Push (empty is no push | --push will push to dockerhub)
-	docker buildx build . --progress plain -t $(DOCKER_IMAGE_NAME):$(1) -f docker/Dockerfile.step-ca --platform="$(DOCKER_PLATFORMS)" $(2)
+	$$HOME/.docker/cli-plugins/docker-buildx build . --progress plain -t $(DOCKER_IMAGE_NAME):$(1) -f docker/Dockerfile.step-ca --platform="$(DOCKER_PLATFORMS)" $(2)
 endef
 
 # For non-master builds don't build the docker containers.
