@@ -27,7 +27,7 @@ endif
 	# Register buildx builder
 	mkdir -p $$HOME/.docker/cli-plugins
 
-	docker buildx >/dev/null || \
+	test -f $$HOME/.docker/cli-plugins/docker-buildx || \
 		(wget -O $$HOME/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.$(DOCKER_CLIENT_OS)-amd64 && \
 		chmod +x $$HOME/.docker/cli-plugins/docker-buildx)
 
