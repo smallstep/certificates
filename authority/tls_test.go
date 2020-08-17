@@ -1179,7 +1179,7 @@ func TestAuthority_Revoke(t *testing.T) {
 					assert.Equals(t, ctxErr.Details["reasonCode"], tc.opts.ReasonCode)
 					assert.Equals(t, ctxErr.Details["reason"], tc.opts.Reason)
 					assert.Equals(t, ctxErr.Details["MTLS"], tc.opts.MTLS)
-					assert.Equals(t, ctxErr.Details["context"], string(provisioner.RevokeMethod))
+					assert.Equals(t, ctxErr.Details["context"], fmt.Sprint(provisioner.RevokeMethod))
 
 					if tc.checkErrDetails != nil {
 						tc.checkErrDetails(ctxErr)

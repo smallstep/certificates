@@ -8,6 +8,7 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -294,7 +295,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		errs.WithKeyVal("reason", revokeOpts.Reason),
 		errs.WithKeyVal("passiveOnly", revokeOpts.PassiveOnly),
 		errs.WithKeyVal("MTLS", revokeOpts.MTLS),
-		errs.WithKeyVal("context", string(provisioner.MethodFromContext(ctx))),
+		errs.WithKeyVal("context", fmt.Sprint(provisioner.MethodFromContext(ctx))),
 	}
 	if revokeOpts.MTLS {
 		opts = append(opts, errs.WithKeyVal("certificate", base64.StdEncoding.EncodeToString(revokeOpts.Crt.Raw)))

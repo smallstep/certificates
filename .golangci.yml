@@ -64,6 +64,7 @@ issues:
     - should have a package comment, unless it's in another file for this package
     - error strings should not be capitalized or end with punctuation or a newline
     - Wrapf call needs 1 arg but has 2 args
+    - cs.NegotiatedProtocolIsMutual is deprecated
 # golangci.com configuration
 # https://github.com/golangci/golangci/wiki/Configuration
 service:
