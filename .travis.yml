@@ -8,6 +8,7 @@ addons:
     - fakeroot
     - bash-completion
     - libpcsclite-dev
+    - docker-ce
 env:
   global:
   - V=1
