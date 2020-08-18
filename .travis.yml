@@ -1,5 +1,5 @@
 language: go
-dist: bionic
+dist: focal
 services:
 - docker
 go:
