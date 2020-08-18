@@ -1,27 +1,32 @@
 language: go
 dist: focal
 services:
-- docker
+  - docker
 go:
-- 1.14.x
+  - 1.14.x
 addons:
   apt:
     packages:
-    - debhelper
-    - fakeroot
-    - bash-completion
-    - libpcsclite-dev
+      - debhelper
+      - fakeroot
+      - bash-completion
+      - libpcsclite-dev
 env:
   global:
-  - V=1
+    - V=1
 before_script:
-- make bootstrap
-script:
-- make
-- make artifacts
+  - make bootstrap
+jobs:
+  include:
+    - script: make lint
+    - script: make test
+    - stage: build
+      script:
+        - make build
+        - make artifacts
 after_success:
-- bash <(curl -s https://codecov.io/bash) -t "$CODECOV_TOKEN" || echo "Codecov did
-  not collect coverage reports"
+  - bash <(curl -s https://codecov.io/bash) -t "$CODECOV_TOKEN" || echo "Codecov did
+    not collect coverage reports"
 notifications:
   email: false
 deploy:

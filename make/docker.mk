@@ -6,9 +6,6 @@
 # binary is copied to a new image that is optimized for size.
 #########################################
 
-# Testing: output images to out/ with -o out, like this:
-# docker buildx build . --progress plain -t step-ca:master  -f docker/Dockerfile --platform linux/amd64,linux/arm/v7,linux/386,linux/arm64 -o out
-
 ifeq (, $(shell which docker))
 	DOCKER_CLIENT_OS := linux
 else
@@ -33,7 +30,7 @@ endif
 
 	# Called directly instead of via `docker buildx` because
 	# Travis runs a pre-19.03 Docker that doesn't support plugin discovery
-	$$HOME/.docker/cli-plugins/docker-buildx create --use --name mybuilder --platform="$(DOCKER_PLATFORMS)" || true
+	docker buildx create --use --name mybuilder --platform="$(DOCKER_PLATFORMS)" || true
 
 .PHONY: docker-prepare
 
@@ -58,11 +55,12 @@ docker-login:
 define DOCKER_BUILDX
 	# $(1) -- Image Tag
 	# $(2) -- Push (empty is no push | --push will push to dockerhub)
-	$$HOME/.docker/cli-plugins/docker-buildx build . --progress plain -t $(DOCKER_IMAGE_NAME):$(1) -f docker/Dockerfile.step-ca --platform="$(DOCKER_PLATFORMS)" $(2)
+	docker buildx build . --progress plain -t $(DOCKER_IMAGE_NAME):$(1) -f docker/Dockerfile.step-ca --platform="$(DOCKER_PLATFORMS)" $(2)
 endef
 
 # For non-master builds don't build the docker containers.
-docker-branch:
+docker-branch: docker-prepare
+	$(call DOCKER_BUILDX,$(VERSION),)
 
 # For master builds don't build the docker containers.
 docker-master:
