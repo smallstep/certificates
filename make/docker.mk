@@ -21,14 +21,14 @@ DOCKER_IMAGE_NAME = smallstep/step-ca
 docker-prepare:
 	# Ensure, we can build for ARM architecture
 ifeq (linux,$(DOCKER_CLIENT_OS))
-	[ -f /proc/sys/fs/binfmt_misc/qemu-arm ] || docker run --rm --privileged docker/binfmt:a7996909642ee92942dcd6cff44b9b95f08dad64
+	[ -f /proc/sys/fs/binfmt_misc/qemu-arm ] || docker run --rm --privileged linuxkit/binfmt:v0.8-amd64
 endif
 
 	# Register buildx builder
 	mkdir -p $$HOME/.docker/cli-plugins
 
 	test -f $$HOME/.docker/cli-plugins/docker-buildx || \
-		(wget -O $$HOME/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.$(DOCKER_CLIENT_OS)-amd64 && \
+		(wget -q -O $$HOME/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.$(DOCKER_CLIENT_OS)-amd64 && \
 		chmod +x $$HOME/.docker/cli-plugins/docker-buildx)
 
 	# Called directly instead of via `docker buildx` because
