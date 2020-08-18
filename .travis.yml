@@ -1,4 +1,7 @@
 language: go
+dist: bionic
+services:
+- docker
 go:
 - 1.14.x
 addons:
@@ -8,7 +11,6 @@ addons:
     - fakeroot
     - bash-completion
     - libpcsclite-dev
-    - docker-ce
 env:
   global:
   - V=1
