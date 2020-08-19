@@ -17,14 +17,9 @@ env:
     - V=1
 before_script:
   - make bootstrap
-jobs:
-  include:
-    - stage: lint
-      script: make lint
-    - script:
-        - make test
-        - make build
-        - make artifacts
+script:
+  - make
+  - make artifacts
 after_success:
   - bash <(curl -s https://codecov.io/bash) -t "$CODECOV_TOKEN" || echo "Codecov did
     not collect coverage reports"
