@@ -17,9 +17,9 @@ DOCKER_IMAGE_NAME = smallstep/step-ca
 
 docker-prepare:
 	# Ensure, we can build for ARM architecture
-ifeq (linux,$(DOCKER_CLIENT_OS))
-	[ -f /proc/sys/fs/binfmt_misc/qemu-arm ] || docker run --rm --privileged linuxkit/binfmt:v0.8-amd64
-endif
+# ifeq (linux,$(DOCKER_CLIENT_OS))
+	# [ -f /proc/sys/fs/binfmt_misc/qemu-arm ] || docker run --rm --privileged linuxkit/binfmt:v0.8-amd64
+# endif
 
 	# Register buildx builder
 	mkdir -p $$HOME/.docker/cli-plugins
@@ -28,8 +28,6 @@ endif
 		(wget -q -O $$HOME/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.$(DOCKER_CLIENT_OS)-amd64 && \
 		chmod +x $$HOME/.docker/cli-plugins/docker-buildx)
 
-	# Called directly instead of via `docker buildx` because
-	# Travis runs a pre-19.03 Docker that doesn't support plugin discovery
 	docker buildx create --use --name mybuilder --platform="$(DOCKER_PLATFORMS)" || true
 
 .PHONY: docker-prepare
