@@ -6,9 +6,6 @@
 # binary is copied to a new image that is optimized for size.
 #########################################
 
-# Testing: output images to out/ with -o out, like this:
-# docker buildx build . --progress plain -t step-ca:master  -f docker/Dockerfile --platform linux/amd64,linux/arm/v7,linux/386,linux/arm64 -o out
-
 ifeq (, $(shell which docker))
 	DOCKER_CLIENT_OS := linux
 else
@@ -21,19 +18,17 @@ DOCKER_IMAGE_NAME = smallstep/step-ca
 docker-prepare:
 	# Ensure, we can build for ARM architecture
 ifeq (linux,$(DOCKER_CLIENT_OS))
-	[ -f /proc/sys/fs/binfmt_misc/qemu-arm ] || docker run --rm --privileged docker/binfmt:a7996909642ee92942dcd6cff44b9b95f08dad64
+	[ -f /proc/sys/fs/binfmt_misc/qemu-arm ] || docker run --rm --privileged linuxkit/binfmt:v0.8-amd64
 endif
 
 	# Register buildx builder
 	mkdir -p $$HOME/.docker/cli-plugins
 
 	test -f $$HOME/.docker/cli-plugins/docker-buildx || \
-		(wget -O $$HOME/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.$(DOCKER_CLIENT_OS)-amd64 && \
+		(wget -q -O $$HOME/.docker/cli-plugins/docker-buildx https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.$(DOCKER_CLIENT_OS)-amd64 && \
 		chmod +x $$HOME/.docker/cli-plugins/docker-buildx)
 
-	# Called directly instead of via `docker buildx` because
-	# Travis runs a pre-19.03 Docker that doesn't support plugin discovery
-	$$HOME/.docker/cli-plugins/docker-buildx create --use --name mybuilder --platform="$(DOCKER_PLATFORMS)" || true
+	docker buildx create --use --name mybuilder --platform="$(DOCKER_PLATFORMS)" || true
 
 .PHONY: docker-prepare
 
@@ -58,7 +53,7 @@ docker-login:
 define DOCKER_BUILDX
 	# $(1) -- Image Tag
 	# $(2) -- Push (empty is no push | --push will push to dockerhub)
-	$$HOME/.docker/cli-plugins/docker-buildx build . --progress plain -t $(DOCKER_IMAGE_NAME):$(1) -f docker/Dockerfile.step-ca --platform="$(DOCKER_PLATFORMS)" $(2)
+	docker buildx build . --progress plain -t $(DOCKER_IMAGE_NAME):$(1) -f docker/Dockerfile.step-ca --platform="$(DOCKER_PLATFORMS)" $(2)
 endef
 
 # For non-master builds don't build the docker containers.

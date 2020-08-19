@@ -1,31 +1,34 @@
 language: go
+os: linux
+dist: focal
+services:
+  - docker
 go:
-- 1.14.x
+  - 1.14.x
 addons:
   apt:
     packages:
-    - debhelper
-    - fakeroot
-    - bash-completion
-    - libpcsclite-dev
-    - docker-ce
+      - debhelper
+      - fakeroot
+      - bash-completion
+      - libpcsclite-dev
 env:
   global:
-  - V=1
+    - V=1
 before_script:
-- make bootstrap
+  - make bootstrap
 script:
-- make
-- make artifacts
+  - make
+  - make artifacts
 after_success:
-- bash <(curl -s https://codecov.io/bash) -t "$CODECOV_TOKEN" || echo "Codecov did
-  not collect coverage reports"
+  - bash <(curl -s https://codecov.io/bash) -t "$CODECOV_TOKEN" || echo "Codecov did
+    not collect coverage reports"
 notifications:
   email: false
 deploy:
   provider: releases
-  skip_cleanup: true
-  api_key:
+  cleanup: false
+  token:
     secure: EVV43Vkqn67hhKGYn4WhQp2YO6KFmUDSkLXjYXYGX07Fm8p5KjRFBPOz9LV83QrvVmLigvg0CtR8Jqqcnq2SUhus3nhZaN2g19NhMypZLioyOVP0kAkas8ocuvxkwz3YxIK/yMrmTKbQ7JGXtbc8IjAox9ovNo1fFIQmVMAzPfu++OWBJ0j+gUqKtpaNA7gzsSv8UOw3/T3hNm6E1IbpWxl9BPSOzUOE9F/QOThANzifGfdxvqNJFkAgqu5DVPz8zQNbMrz4zH+KwASKxd6hjhzSSMzouKzOEHTA/elDCHEjke0Jos29MkGWHcIydLtCD95DGecqM8BFSC9f2acHDjmUO1rdfoLA3Pt+UiZJuTwyQm/jrHHhRnH8oJpK15G5LvxSqzY9YDWpAk38+jMw/udW6wt7BGAU8FEXLbq0bsFL3yfTepeWjmzT5WS0YXdiBz2SEK+Og9R2bSdtl4owghRzKNio5DNPuYAbqbpi+jqzqQVLj27x7LWoQ0MHvZcz9U+oO00r6M1tDCmFVRdtfgb2H+MIDY69qYGo5qoGMfH1btCWR8bA9wSYB/Z7hW/xZT9r7f/d5/P40k8yKINmTZqyUTQeplrE3y4BPVzKksclczBZa67syIUQ49I35QppnH4GFQHUwlra7r3W9zfZRvaLnp5qOIKAQe3MAIZqtLg=
   file_glob: true
   file: .travis-releases/*
