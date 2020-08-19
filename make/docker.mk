@@ -17,9 +17,9 @@ DOCKER_IMAGE_NAME = smallstep/step-ca
 
 docker-prepare:
 	# Ensure, we can build for ARM architecture
-# ifeq (linux,$(DOCKER_CLIENT_OS))
-	# [ -f /proc/sys/fs/binfmt_misc/qemu-arm ] || docker run --rm --privileged linuxkit/binfmt:v0.8-amd64
-# endif
+ifeq (linux,$(DOCKER_CLIENT_OS))
+	[ -f /proc/sys/fs/binfmt_misc/qemu-arm ] || docker run --rm --privileged linuxkit/binfmt:v0.8-amd64
+endif
 
 	# Register buildx builder
 	mkdir -p $$HOME/.docker/cli-plugins
