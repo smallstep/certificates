@@ -85,7 +85,7 @@ ACME is the protocol used by Let's Encrypt to automate the issuance of HTTPS cer
   - [`lego`](https://github.com/go-acme/lego) for Golang ([example usage](https://smallstep.com/blog/private-acme-server/#golanguploadsacme-golangpng-go-example))
   - certbot's [`acme` module](https://github.com/certbot/certbot/tree/master/acme) for Python ([example usage](https://smallstep.com/blog/private-acme-server/#pythonuploadsacme-pythonpng-python-example))
   - [`acme-client`](https://github.com/publishlab/node-acme-client) for Node.js ([example usage](https://smallstep.com/blog/private-acme-server/#nodejsuploadsacme-node-jspng-nodejs-example))
-- Our own [`step` CLI tool](github.com/smallstep/cli) is also an ACME client!
+- Our own [`step` CLI tool](https://github.com/smallstep/cli) is also an ACME client!
 - See our [ACME docs](https://smallstep.com/blog/private-acme-server/) for more
 
 ### 👩🏽‍💻 An online SSH Certificate Authority
