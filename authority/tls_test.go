@@ -390,6 +390,34 @@ ZYtQ9Ot36qc=
 				notAfter:  signOpts.NotAfter.Time().Truncate(time.Second),
 			}
 		},
+		"ok/csr with no template critical SAN extension": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv, func(csr *x509.CertificateRequest) {
+				csr.Subject = pkix.Name{}
+			}, func(csr *x509.CertificateRequest) {
+				csr.DNSNames = []string{"foo", "bar"}
+			})
+			now := time.Now().UTC()
+			enforcedExtraOptions := []provisioner.SignOption{&certificateDurationEnforcer{
+				NotBefore: now,
+				NotAfter:  now.Add(365 * 24 * time.Hour),
+			}}
+			_a := testAuthority(t)
+			_a.config.AuthorityConfig.Template = &x509util.ASN1DN{}
+			_a.db = &db.MockAuthDB{
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					assert.Equals(t, crt.Subject, pkix.Name{})
+					return nil
+				},
+			}
+			return &signTest{
+				auth:      _a,
+				csr:       csr,
+				extraOpts: enforcedExtraOptions,
+				signOpts:  provisioner.SignOptions{},
+				notBefore: now.Truncate(time.Second),
+				notAfter:  now.Add(365 * 24 * time.Hour).Truncate(time.Second),
+			}
+		},
 	}
 
 	for name, genTestCase := range tests {
@@ -417,22 +445,26 @@ ZYtQ9Ot36qc=
 					assert.Equals(t, leaf.NotBefore, tc.notBefore)
 					assert.Equals(t, leaf.NotAfter, tc.notAfter)
 					tmplt := a.config.AuthorityConfig.Template
-					assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
-						fmt.Sprintf("%v", &pkix.Name{
-							Country:       []string{tmplt.Country},
-							Organization:  []string{tmplt.Organization},
-							Locality:      []string{tmplt.Locality},
-							StreetAddress: []string{tmplt.StreetAddress},
-							Province:      []string{tmplt.Province},
-							CommonName:    "smallstep test",
-						}))
+					if tc.csr.Subject.CommonName == "" {
+						assert.Equals(t, leaf.Subject, pkix.Name{})
+					} else {
+						assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
+							fmt.Sprintf("%v", &pkix.Name{
+								Country:       []string{tmplt.Country},
+								Organization:  []string{tmplt.Organization},
+								Locality:      []string{tmplt.Locality},
+								StreetAddress: []string{tmplt.StreetAddress},
+								Province:      []string{tmplt.Province},
+								CommonName:    "smallstep test",
+							}))
+						assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
+					}
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
 
 					assert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
 					assert.Equals(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
 					assert.Equals(t, leaf.ExtKeyUsage,
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
-					assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
 
 					subjectKeyID, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
@@ -452,6 +484,7 @@ ZYtQ9Ot36qc=
 							assert.Equals(t, val.Type, provisionerTypeJWK)
 							assert.Equals(t, val.Name, []byte(p.Name))
 							assert.Equals(t, val.CredentialID, []byte(p.Key.KeyID))
+
 						// Basic Constraints
 						case ext.Id.Equal(asn1.ObjectIdentifier([]int{2, 5, 29, 19})):
 							val := basicConstraints{}
@@ -459,10 +492,20 @@ ZYtQ9Ot36qc=
 							assert.FatalError(t, err)
 							assert.False(t, val.IsCA, false)
 							assert.Equals(t, val.MaxPathLen, 0)
+
+						// SAN extension
+						case ext.Id.Equal(asn1.ObjectIdentifier([]int{2, 5, 29, 17})):
+							if tc.csr.Subject.CommonName == "" {
+								// Empty CSR subject test does not use any provisioner extensions.
+								// So provisioner ID ext will be missing.
+								found = 1
+								assert.Len(t, 5, leaf.Extensions)
+							} else {
+								assert.Len(t, 6, leaf.Extensions)
+							}
 						}
 					}
 					assert.Equals(t, found, 1)
-					assert.Len(t, 6, leaf.Extensions)
 
 					realIntermediate, err := x509.ParseCertificate(a.x509Issuer.Raw)
 					assert.FatalError(t, err)
