@@ -70,7 +70,7 @@ func (fn CertificateModifierFunc) Modify(cert *x509.Certificate, opts SignOption
 // with a function.
 type CertificateEnforcerFunc func(cert *x509.Certificate) error
 
-// Modify implements CertificateEnforcer and just calls the defined function.
+// Enforce implements CertificateEnforcer and just calls the defined function.
 func (fn CertificateEnforcerFunc) Enforce(cert *x509.Certificate) error {
 	return fn(cert)
 }
@@ -246,24 +246,6 @@ func (v defaultSANsValidator) Valid(req *x509.CertificateRequest) (err error) {
 		return
 	}
 	return
-}
-
-// ExtraExtsEnforcer enforces only those extra extensions that are strictly
-// managed by step-ca. All other "extra extensions" are dropped.
-type ExtraExtsEnforcer struct{}
-
-// Enforce removes all extensions except the step provisioner extension, if it
-// exists. If the step provisioner extension is not present, then remove all
-// extra extensions from the cert.
-func (eee ExtraExtsEnforcer) Enforce(cert *x509.Certificate) error {
-	for _, ext := range cert.ExtraExtensions {
-		if ext.Id.Equal(stepOIDProvisioner) {
-			cert.ExtraExtensions = []pkix.Extension{ext}
-			return nil
-		}
-	}
-	cert.ExtraExtensions = nil
-	return nil
 }
 
 // profileDefaultDuration is a modifier that sets the certificate

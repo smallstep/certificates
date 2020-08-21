@@ -351,51 +351,6 @@ func Test_defaultSANsValidator_Valid(t *testing.T) {
 	}
 }
 
-func Test_ExtraExtsEnforcer_Enforce(t *testing.T) {
-	e1 := pkix.Extension{Id: []int{1, 2, 3, 4, 5}, Critical: false, Value: []byte("foo")}
-	e2 := pkix.Extension{Id: []int{2, 2, 2}, Critical: false, Value: []byte("bar")}
-	stepExt := pkix.Extension{Id: stepOIDProvisioner, Critical: false, Value: []byte("baz")}
-	fakeStepExt := pkix.Extension{Id: stepOIDProvisioner, Critical: false, Value: []byte("zap")}
-	type test struct {
-		cert  *x509.Certificate
-		check func(*x509.Certificate)
-	}
-	tests := map[string]func() test{
-		"ok/empty-exts": func() test {
-			return test{
-				cert: &x509.Certificate{},
-				check: func(cert *x509.Certificate) {
-					assert.Equals(t, len(cert.ExtraExtensions), 0)
-				},
-			}
-		},
-		"ok/no-step-provisioner-ext": func() test {
-			return test{
-				cert: &x509.Certificate{ExtraExtensions: []pkix.Extension{e1, e2}},
-				check: func(cert *x509.Certificate) {
-					assert.Equals(t, len(cert.ExtraExtensions), 0)
-				},
-			}
-		},
-		"ok/step-provisioner-ext": func() test {
-			return test{
-				cert: &x509.Certificate{ExtraExtensions: []pkix.Extension{e1, stepExt, fakeStepExt, e2}},
-				check: func(cert *x509.Certificate) {
-					assert.Equals(t, len(cert.ExtraExtensions), 1)
-					assert.Equals(t, cert.ExtraExtensions[0], stepExt)
-				},
-			}
-		},
-	}
-	for name, run := range tests {
-		t.Run(name, func(t *testing.T) {
-			tt := run()
-			ExtraExtsEnforcer{}.Enforce(tt.cert)
-			tt.check(tt.cert)
-		})
-	}
-}
-
 func Test_validityValidator_Valid(t *testing.T) {
 	type test struct {
 		cert *x509.Certificate
@@ -589,10 +544,10 @@ func Test_profileDefaultDuration_Option(t *testing.T) {
 				cert: new(x509.Certificate),
 				valid: func(cert *x509.Certificate) {
 					n := now()
-					assert.True(t, n.After(cert.NotBefore))
+					assert.True(t, n.After(cert.NotBefore.Add(-time.Second)))
 					assert.True(t, n.Add(-1*time.Minute).Before(cert.NotBefore))
 
-					assert.True(t, n.Add(24*time.Hour).After(cert.NotAfter))
+					assert.True(t, n.Add(24*time.Hour).After(cert.NotAfter.Add(-time.Second)))
 					assert.True(t, n.Add(24*time.Hour).Add(-1*time.Minute).Before(cert.NotAfter))
 				},
 			}
