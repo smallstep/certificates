@@ -91,7 +91,7 @@ func (h *caHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 		// TODO: should probably be checking if the certificate was revoked here.
 		// Will need to thread that request down to the authority, so will need
 		// to add API for that.
-		logCertificate(w, opts.Crt)
+		LogCertificate(w, opts.Crt)
 		opts.MTLS = true
 	}
 

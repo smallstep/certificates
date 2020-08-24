@@ -81,7 +81,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		case provisioner.CertificateOptions:
 			certOptions = append(certOptions, k.Options(signOpts)...)
 
-		// Validate tie given certificate request.
+		// Validate the given certificate request.
 		case provisioner.CertificateRequestValidator:
 			if err := k.Valid(csr); err != nil {
 				return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)
