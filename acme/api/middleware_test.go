@@ -18,8 +18,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
-	"github.com/smallstep/cli/jose"
 	"github.com/smallstep/nosql/database"
+	"go.step.sm/crypto/jose"
 )
 
 var testBody = []byte("foo")

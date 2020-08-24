@@ -14,8 +14,8 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
-	"github.com/smallstep/cli/jose"
 	"github.com/smallstep/nosql"
+	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 )
 

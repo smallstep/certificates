@@ -25,13 +25,11 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
-	stepJOSE "github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"
-	jose "gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 type ClosingBuffer struct {
@@ -95,7 +93,7 @@ func TestCASign(t *testing.T) {
 	assert.FatalError(t, err)
 	intermediateCert, err := pemutil.ReadCertificate("testdata/secrets/intermediate_ca.crt")
 	assert.FatalError(t, err)
-	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_priv.jwk", stepJOSE.WithPassword([]byte("pass")))
+	clijwk, err := jose.ReadKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
 	assert.FatalError(t, err)
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: clijwk.Key},
 		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", clijwk.KeyID))
@@ -177,20 +175,20 @@ ZEp7knvU2psWRw==
 			jti, err := randutil.ASCII(32)
 			assert.FatalError(t, err)
 			cl := struct {
-				jwt.Claims
+				jose.Claims
 				SANS []string `json:"sans"`
 			}{
-				Claims: jwt.Claims{
+				Claims: jose.Claims{
 					Subject:   "invalid",
 					Issuer:    "step-cli",
-					NotBefore: jwt.NewNumericDate(now),
-					Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+					NotBefore: jose.NewNumericDate(now),
+					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 					Audience:  validAud,
 					ID:        jti,
 				},
 				SANS: []string{"invalid"},
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 			csr, err := getCSR(priv)
 			assert.FatalError(t, err)
@@ -210,20 +208,20 @@ ZEp7knvU2psWRw==
 			jti, err := randutil.ASCII(32)
 			assert.FatalError(t, err)
 			cl := struct {
-				jwt.Claims
+				jose.Claims
 				SANS []string `json:"sans"`
 			}{
-				Claims: jwt.Claims{
+				Claims: jose.Claims{
 					Subject:   "test.smallstep.com",
 					Issuer:    "step-cli",
-					NotBefore: jwt.NewNumericDate(now),
-					Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+					NotBefore: jose.NewNumericDate(now),
+					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 					Audience:  validAud,
 					ID:        jti,
 				},
 				SANS: []string{"test.smallstep.com"},
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 			csr, err := getCSR(priv)
 			assert.FatalError(t, err)
@@ -244,19 +242,19 @@ ZEp7knvU2psWRw==
 			jti, err := randutil.ASCII(32)
 			assert.FatalError(t, err)
 			cl := struct {
-				jwt.Claims
+				jose.Claims
 				SANS []string `json:"sans"`
 			}{
-				Claims: jwt.Claims{
+				Claims: jose.Claims{
 					Subject:   "test.smallstep.com",
 					Issuer:    "step-cli",
-					NotBefore: jwt.NewNumericDate(now),
-					Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+					NotBefore: jose.NewNumericDate(now),
+					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 					Audience:  validAud,
 					ID:        jti,
 				},
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 			csr, err := getCSR(priv)
 			assert.FatalError(t, err)

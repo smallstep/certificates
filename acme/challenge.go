@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/cli/jose"
 	"github.com/smallstep/nosql"
+	"go.step.sm/crypto/jose"
 )
 
 // Challenge is a subset of the challenge type containing only those attributes

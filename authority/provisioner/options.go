@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/x509util"
 )
 

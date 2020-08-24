@@ -15,14 +15,14 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
-	stepJOSE "github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 )
 
 func testAuthority(t *testing.T, opts ...Option) *Authority {
-	maxjwk, err := stepJOSE.ParseKey("testdata/secrets/max_pub.jwk")
+	maxjwk, err := jose.ReadKey("testdata/secrets/max_pub.jwk")
 	assert.FatalError(t, err)
-	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
+	clijwk, err := jose.ReadKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	disableRenewal := true
 	enableSSHCA := true

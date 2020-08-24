@@ -7,13 +7,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
-	stepJOSE "github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 )
 
 func TestConfigValidate(t *testing.T) {
-	maxjwk, err := stepJOSE.ParseKey("testdata/secrets/max_pub.jwk")
+	maxjwk, err := jose.ReadKey("testdata/secrets/max_pub.jwk")
 	assert.FatalError(t, err)
-	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
+	clijwk, err := jose.ReadKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	ac := &AuthConfig{
 		Provisioners: provisioner.List{
@@ -224,9 +224,9 @@ func TestAuthConfigValidate(t *testing.T) {
 		CommonName:    "test",
 	}
 
-	maxjwk, err := stepJOSE.ParseKey("testdata/secrets/max_pub.jwk")
+	maxjwk, err := jose.ReadKey("testdata/secrets/max_pub.jwk")
 	assert.FatalError(t, err)
-	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
+	clijwk, err := jose.ReadKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	p := provisioner.List{
 		&provisioner.JWK{

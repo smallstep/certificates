@@ -32,7 +32,7 @@ import (
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/templates"
-	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 	"golang.org/x/crypto/ssh"
 )
 

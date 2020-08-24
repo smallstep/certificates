@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/randutil"
 )
@@ -154,7 +154,7 @@ M46l92gdOozT
 func TestX5C_authorizeToken(t *testing.T) {
 	x5cCerts, err := pemutil.ReadCertificateBundle("./testdata/certs/x5c-leaf.crt")
 	assert.FatalError(t, err)
-	x5cJWK, err := jose.ParseKey("./testdata/secrets/x5c-leaf.key")
+	x5cJWK, err := jose.ReadKey("./testdata/secrets/x5c-leaf.key")
 	assert.FatalError(t, err)
 
 	type test struct {
@@ -402,7 +402,7 @@ lgsqsR63is+0YQ==
 func TestX5C_AuthorizeSign(t *testing.T) {
 	certs, err := pemutil.ReadCertificateBundle("./testdata/certs/x5c-leaf.crt")
 	assert.FatalError(t, err)
-	jwk, err := jose.ParseKey("./testdata/secrets/x5c-leaf.key")
+	jwk, err := jose.ReadKey("./testdata/secrets/x5c-leaf.key")
 	assert.FatalError(t, err)
 
 	type test struct {
@@ -518,7 +518,7 @@ func TestX5C_AuthorizeRevoke(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			certs, err := pemutil.ReadCertificateBundle("./testdata/certs/x5c-leaf.crt")
 			assert.FatalError(t, err)
-			jwk, err := jose.ParseKey("./testdata/secrets/x5c-leaf.key")
+			jwk, err := jose.ReadKey("./testdata/secrets/x5c-leaf.key")
 			assert.FatalError(t, err)
 
 			p, err := generateX5C(nil)
@@ -599,7 +599,7 @@ func TestX5C_AuthorizeRenew(t *testing.T) {
 func TestX5C_AuthorizeSSHSign(t *testing.T) {
 	x5cCerts, err := pemutil.ReadCertificateBundle("./testdata/certs/x5c-leaf.crt")
 	assert.FatalError(t, err)
-	x5cJWK, err := jose.ParseKey("./testdata/secrets/x5c-leaf.key")
+	x5cJWK, err := jose.ReadKey("./testdata/secrets/x5c-leaf.key")
 	assert.FatalError(t, err)
 
 	_, fn := mockNow()

@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 	"golang.org/x/crypto/ssh"
 )
 

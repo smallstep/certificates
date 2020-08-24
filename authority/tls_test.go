@@ -22,7 +22,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
@@ -219,7 +219,7 @@ func TestAuthority_Sign(t *testing.T) {
 
 	// Create a token to get test extra opts.
 	p := a.config.AuthorityConfig.Provisioners[1].(*provisioner.JWK)
-	key, err := jose.ParseKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
+	key, err := jose.ReadKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
 	assert.FatalError(t, err)
 	token, err := generateToken("smallstep test", "step-cli", testAudiences.Sign[0], []string{"test.smallstep.com"}, time.Now(), key)
 	assert.FatalError(t, err)
@@ -1000,7 +1000,7 @@ func TestAuthority_Revoke(t *testing.T) {
 	validAudience := testAudiences.Revoke
 	now := time.Now().UTC()
 
-	jwk, err := jose.ParseKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
+	jwk, err := jose.ReadKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
 	assert.FatalError(t, err)
 
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
@@ -1193,7 +1193,7 @@ func TestAuthority_Revoke(t *testing.T) {
 					assert.Equals(t, ctxErr.Details["reasonCode"], tc.opts.ReasonCode)
 					assert.Equals(t, ctxErr.Details["reason"], tc.opts.Reason)
 					assert.Equals(t, ctxErr.Details["MTLS"], tc.opts.MTLS)
-					assert.Equals(t, ctxErr.Details["context"], string(provisioner.RevokeMethod))
+					assert.Equals(t, ctxErr.Details["context"], provisioner.RevokeMethod.String())
 
 					if tc.checkErrDetails != nil {
 						tc.checkErrDetails(ctxErr)

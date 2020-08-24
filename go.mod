@@ -13,7 +13,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.4.2
-	github.com/smallstep/assert v0.0.0-20200103212524-b99dc1097b15
+	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/cli v0.14.7-rc.1.0.20200721180458-731b7c4c8c95
 	github.com/smallstep/nosql v0.3.0
 	github.com/urfave/cli v1.22.2
@@ -23,9 +23,9 @@ require (
 	google.golang.org/api v0.15.0
 	google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
 	google.golang.org/grpc v1.26.0
-	gopkg.in/square/go-jose.v2 v2.4.0
+	gopkg.in/square/go-jose.v2 v2.5.1
 )
 
 // replace github.com/smallstep/cli => ../cli
 // replace github.com/smallstep/nosql => ../nosql
-// replace go.step.sm/crypto => ../crypto
+replace go.step.sm/crypto => ../crypto

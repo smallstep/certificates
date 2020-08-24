@@ -15,7 +15,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
@@ -281,7 +281,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		errs.WithKeyVal("reason", revokeOpts.Reason),
 		errs.WithKeyVal("passiveOnly", revokeOpts.PassiveOnly),
 		errs.WithKeyVal("MTLS", revokeOpts.MTLS),
-		errs.WithKeyVal("context", string(provisioner.MethodFromContext(ctx))),
+		errs.WithKeyVal("context", provisioner.MethodFromContext(ctx).String()),
 	}
 	if revokeOpts.MTLS {
 		opts = append(opts, errs.WithKeyVal("certificate", base64.StdEncoding.EncodeToString(revokeOpts.Crt.Raw)))

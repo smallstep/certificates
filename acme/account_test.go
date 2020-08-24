@@ -12,9 +12,9 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/cli/jose"
 	"github.com/smallstep/nosql"
 	"github.com/smallstep/nosql/database"
+	"go.step.sm/crypto/jose"
 )
 
 var (
