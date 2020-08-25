@@ -19,7 +19,7 @@ require (
 	github.com/smallstep/cli v0.15.0
 	github.com/smallstep/nosql v0.3.0
 	github.com/urfave/cli v1.22.2
-	go.step.sm/crypto v0.2.0
+	go.step.sm/crypto v0.3.0
 	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
 	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
 	google.golang.org/api v0.15.0
@@ -30,4 +30,4 @@ require (
 
 // replace github.com/smallstep/cli => ../cli
 // replace github.com/smallstep/nosql => ../nosql
-replace go.step.sm/crypto => ../crypto
+// replace go.step.sm/crypto => ../crypto
