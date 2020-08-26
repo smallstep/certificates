@@ -9,7 +9,7 @@
 ifeq (, $(shell which docker))
 	DOCKER_CLIENT_OS := linux
 else
-	DOCKER_CLIENT_OS := $(strip $(shell docker version -f '{{.Client.Os}}'))
+	DOCKER_CLIENT_OS := $(strip $(shell docker version -f '{{.Client.Os}}' 2>/dev/null))
 endif
 
 DOCKER_PLATFORMS = linux/amd64,linux/386,linux/arm,linux/arm64
