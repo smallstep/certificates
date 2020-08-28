@@ -12,7 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/cli/crypto/pemutil"
+	"go.step.sm/crypto/pemutil"
 )
 
 func Test_emailOnlyIdentity_Valid(t *testing.T) {
@@ -614,7 +614,7 @@ func Test_profileDefaultDuration_Option(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tt := run()
 			assert.FatalError(t, tt.pdd.Modify(tt.cert, tt.so), "unexpected error")
-			time.Sleep(1 * time.Nanosecond)
+			time.Sleep(100 * time.Millisecond)
 			tt.valid(tt.cert)
 		})
 	}

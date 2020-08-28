@@ -19,9 +19,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms"
 	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/cli/crypto/pemutil"
 	"github.com/smallstep/cli/ui"
 	"github.com/smallstep/cli/utils"
+	"go.step.sm/crypto/pemutil"
 
 	// Enable yubikey.
 	_ "github.com/smallstep/certificates/kms/yubikey"

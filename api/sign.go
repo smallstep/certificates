@@ -5,18 +5,18 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/crypto/tlsutil"
 )
 
 // SignRequest is the request body for a certificate signature request.
 type SignRequest struct {
 	CsrPEM       CertificateRequest `json:"csr"`
 	OTT          string             `json:"ott"`
-	NotAfter     TimeDuration       `json:"notAfter"`
-	NotBefore    TimeDuration       `json:"notBefore"`
-	TemplateData json.RawMessage    `json:"templateData"`
+	NotAfter     TimeDuration       `json:"notAfter,omitempty"`
+	NotBefore    TimeDuration       `json:"notBefore,omitempty"`
+	TemplateData json.RawMessage    `json:"templateData,omitempty"`
 }
 
 // Validate checks the fields of the SignRequest and returns nil if they are ok
@@ -37,11 +37,11 @@ func (s *SignRequest) Validate() error {
 
 // SignResponse is the response object of the certificate signature request.
 type SignResponse struct {
-	ServerPEM    Certificate          `json:"crt"`
-	CaPEM        Certificate          `json:"ca"`
-	CertChainPEM []Certificate        `json:"certChain"`
-	TLSOptions   *tlsutil.TLSOptions  `json:"tlsOptions,omitempty"`
-	TLS          *tls.ConnectionState `json:"-"`
+	ServerPEM    Certificate           `json:"crt"`
+	CaPEM        Certificate           `json:"ca"`
+	CertChainPEM []Certificate         `json:"certChain"`
+	TLSOptions   *authority.TLSOptions `json:"tlsOptions,omitempty"`
+	TLS          *tls.ConnectionState  `json:"-"`
 }
 
 // Sign is an HTTP handler that reads a certificate request and an

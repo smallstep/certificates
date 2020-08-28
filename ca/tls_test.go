@@ -18,15 +18,13 @@ import (
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
-	"github.com/smallstep/cli/crypto/randutil"
-	stepJOSE "github.com/smallstep/cli/jose"
-	jose "gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/randutil"
 )
 
 func generateOTT(subject string) string {
 	now := time.Now()
-	jwk, err := stepJOSE.ParseKey("testdata/secrets/ott_mariano_priv.jwk", stepJOSE.WithPassword([]byte("password")))
+	jwk, err := jose.ReadKey("testdata/secrets/ott_mariano_priv.jwk", jose.WithPassword([]byte("password")))
 	if err != nil {
 		panic(err)
 	}
@@ -40,20 +38,20 @@ func generateOTT(subject string) string {
 		panic(err)
 	}
 	cl := struct {
-		jwt.Claims
+		jose.Claims
 		SANS []string `json:"sans"`
 	}{
-		Claims: jwt.Claims{
+		Claims: jose.Claims{
 			ID:        id,
 			Subject:   subject,
 			Issuer:    "mariano",
-			NotBefore: jwt.NewNumericDate(now),
-			Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+			NotBefore: jose.NewNumericDate(now),
+			Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 			Audience:  []string{"https://127.0.0.1:0/sign"},
 		},
 		SANS: []string{subject},
 	}
-	raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+	raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 	if err != nil {
 		panic(err)
 	}

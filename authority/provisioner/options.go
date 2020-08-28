@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -25,9 +25,10 @@ func (fn certificateOptionsFunc) Options(so SignOptions) []x509util.Option {
 // each provisioner.
 type Options struct {
 	X509 *X509Options `json:"x509,omitempty"`
+	SSH  *SSHOptions  `json:"ssh,omitempty"`
 }
 
-// GetX509Options returns the X.509Options
+// GetX509Options returns the X.509 options.
 func (o *Options) GetX509Options() *X509Options {
 	if o == nil {
 		return nil
@@ -35,18 +36,26 @@ func (o *Options) GetX509Options() *X509Options {
 	return o.X509
 }
 
+// GetSSHOptions returns the SSH options.
+func (o *Options) GetSSHOptions() *SSHOptions {
+	if o == nil {
+		return nil
+	}
+	return o.SSH
+}
+
 // X509Options contains specific options for X.509 certificates.
 type X509Options struct {
 	// Template contains a X.509 certificate template. It can be a JSON template
 	// escaped in a string or it can be also encoded in base64.
-	Template string `json:"template"`
+	Template string `json:"template,omitempty"`
 
 	// TemplateFile points to a file containing a X.509 certificate template.
-	TemplateFile string `json:"templateFile"`
+	TemplateFile string `json:"templateFile,omitempty"`
 
 	// TemplateData is a JSON object with variables that can be used in custom
 	// templates.
-	TemplateData json.RawMessage `json:"templateData"`
+	TemplateData json.RawMessage `json:"templateData,omitempty"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.

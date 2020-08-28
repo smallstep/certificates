@@ -16,7 +16,7 @@ import (
 	"testing"
 
 	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/cli/crypto/pemutil"
+	"go.step.sm/crypto/pemutil"
 )
 
 func TestNew(t *testing.T) {

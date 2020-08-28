@@ -31,10 +31,8 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
-	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
-	"github.com/smallstep/cli/crypto/tlsutil"
-	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -548,7 +546,7 @@ type mockAuthority struct {
 	ret1, ret2                   interface{}
 	err                          error
 	authorizeSign                func(ott string) ([]provisioner.SignOption, error)
-	getTLSOptions                func() *tlsutil.TLSOptions
+	getTLSOptions                func() *authority.TLSOptions
 	root                         func(shasum string) (*x509.Certificate, error)
 	sign                         func(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	renew                        func(cert *x509.Certificate) ([]*x509.Certificate, error)
@@ -564,7 +562,7 @@ type mockAuthority struct {
 	signSSHAddUser               func(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 	renewSSH                     func(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error)
 	rekeySSH                     func(ctx context.Context, cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
-	getSSHHosts                  func(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error)
+	getSSHHosts                  func(ctx context.Context, cert *x509.Certificate) ([]authority.Host, error)
 	getSSHRoots                  func(ctx context.Context) (*authority.SSHKeys, error)
 	getSSHFederation             func(ctx context.Context) (*authority.SSHKeys, error)
 	getSSHConfig                 func(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error)
@@ -585,11 +583,11 @@ func (m *mockAuthority) AuthorizeSign(ott string) ([]provisioner.SignOption, err
 	return m.ret1.([]provisioner.SignOption), m.err
 }
 
-func (m *mockAuthority) GetTLSOptions() *tlsutil.TLSOptions {
+func (m *mockAuthority) GetTLSOptions() *authority.TLSOptions {
 	if m.getTLSOptions != nil {
 		return m.getTLSOptions()
 	}
-	return m.ret1.(*tlsutil.TLSOptions)
+	return m.ret1.(*authority.TLSOptions)
 }
 
 func (m *mockAuthority) Root(shasum string) (*x509.Certificate, error) {
@@ -697,11 +695,11 @@ func (m *mockAuthority) RekeySSH(ctx context.Context, cert *ssh.Certificate, key
 	return m.ret1.(*ssh.Certificate), m.err
 }
 
-func (m *mockAuthority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error) {
+func (m *mockAuthority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]authority.Host, error) {
 	if m.getSSHHosts != nil {
 		return m.getSSHHosts(ctx, cert)
 	}
-	return m.ret1.([]sshutil.Host), m.err
+	return m.ret1.([]authority.Host), m.err
 }
 
 func (m *mockAuthority) GetSSHRoots(ctx context.Context) (*authority.SSHKeys, error) {
@@ -882,7 +880,7 @@ func Test_caHandler_Sign(t *testing.T) {
 				authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
 					return tt.certAttrOpts, tt.autherr
 				},
-				getTLSOptions: func() *tlsutil.TLSOptions {
+				getTLSOptions: func() *authority.TLSOptions {
 					return nil
 				},
 			}).(*caHandler)
@@ -933,7 +931,7 @@ func Test_caHandler_Renew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.err,
-				getTLSOptions: func() *tlsutil.TLSOptions {
+				getTLSOptions: func() *authority.TLSOptions {
 					return nil
 				},
 			}).(*caHandler)
@@ -994,7 +992,7 @@ func Test_caHandler_Rekey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.err,
-				getTLSOptions: func() *tlsutil.TLSOptions {
+				getTLSOptions: func() *authority.TLSOptions {
 					return nil
 				},
 			}).(*caHandler)

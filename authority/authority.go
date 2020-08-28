@@ -15,9 +15,8 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/kms"
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/certificates/sshutil"
 	"github.com/smallstep/certificates/templates"
-	"github.com/smallstep/cli/crypto/pemutil"
+	"go.step.sm/crypto/pemutil"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -55,7 +54,7 @@ type Authority struct {
 	// Custom functions
 	sshBastionFunc   func(ctx context.Context, user, hostname string) (*Bastion, error)
 	sshCheckHostFunc func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
-	sshGetHostsFunc  func(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error)
+	sshGetHostsFunc  func(ctx context.Context, cert *x509.Certificate) ([]Host, error)
 	getIdentityFunc  provisioner.GetIdentityFunc
 }
 

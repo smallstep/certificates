@@ -13,7 +13,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -369,10 +370,6 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	if claims.Email == "" {
 		return nil, errs.Unauthorized("oidc.AuthorizeSSHSign: failed to validate oidc token payload: email not found")
 	}
-	signOptions := []SignOption{
-		// set the key id to the token email
-		sshCertKeyIDModifier(claims.Email),
-	}
 
 	// Get the identity using either the default identityFunc or one injected
 	// externally.
@@ -380,25 +377,52 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSSHSign")
 	}
-	defaults := SignSSHOptions{
-		CertType:   SSHUserCert,
-		Principals: iden.Usernames,
+
+	// Certificate templates.
+	data := sshutil.CreateTemplateData(sshutil.UserCert, claims.Email, iden.Usernames)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
 	}
+	// Add custom extensions added in the identity function.
+	for k, v := range iden.Permissions.Extensions {
+		data.AddExtension(k, v)
+	}
+	// Add custom critical options added in the identity function.
+	for k, v := range iden.Permissions.CriticalOptions {
+		data.AddCriticalOption(k, v)
+	}
+
+	// Use the default template unless no-templates are configured and email is
+	// an admin, in that case we will use the parameters in the request.
+	isAdmin := o.IsAdmin(claims.Email)
+	defaultTemplate := sshutil.DefaultTemplate
+	if isAdmin && !o.Options.GetSSHOptions().HasTemplate() {
+		defaultTemplate = sshutil.DefaultAdminTemplate
+	}
+
+	templateOptions, err := CustomSSHTemplateOptions(o.Options, data, defaultTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
+	}
+	signOptions := []SignOption{templateOptions}
 
 	// Admin users can use any principal, and can sign user and host certificates.
 	// Non-admin users can only use principals returned by the identityFunc, and
 	// can only sign user certificates.
-	if !o.IsAdmin(claims.Email) {
-		signOptions = append(signOptions, sshCertOptionsValidator(defaults))
+	if isAdmin {
+		signOptions = append(signOptions, &sshCertOptionsRequireValidator{
+			CertType:   true,
+			KeyID:      true,
+			Principals: true,
+		})
+	} else {
+		signOptions = append(signOptions, sshCertOptionsValidator(SignSSHOptions{
+			CertType:   SSHUserCert,
+			Principals: iden.Usernames,
+		}))
 	}
 
-	// Default to a user certificate with usernames as principals if those options
-	// are not set.
-	signOptions = append(signOptions, sshCertDefaultsModifier(defaults))
-
 	return append(signOptions,
-		// Set the default extensions
-		&sshDefaultExtensionModifier{},
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{o.claimer},
 		// Validate public key

@@ -10,7 +10,6 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/kms"
-	"github.com/smallstep/certificates/sshutil"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -64,7 +63,7 @@ func WithSSHBastionFunc(fn func(ctx context.Context, user, host string) (*Bastio
 
 // WithSSHGetHosts sets a custom function to get the bastion for a
 // given user-host pair.
-func WithSSHGetHosts(fn func(ctx context.Context, cert *x509.Certificate) ([]sshutil.Host, error)) Option {
+func WithSSHGetHosts(fn func(ctx context.Context, cert *x509.Certificate) ([]Host, error)) Option {
 	return func(a *Authority) error {
 		a.sshGetHostsFunc = fn
 		return nil

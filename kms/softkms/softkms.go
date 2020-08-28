@@ -10,8 +10,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/cli/crypto/keys"
-	"github.com/smallstep/cli/crypto/pemutil"
+	"github.com/smallstep/cli/ui"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
 )
 
 type algorithmAttributes struct {
@@ -41,7 +42,7 @@ var generateKey = func(kty, crv string, size int) (interface{}, interface{}, err
 	if kty == "RSA" && size == 0 {
 		size = DefaultRSAKeySize
 	}
-	return keys.GenerateKeyPair(kty, crv, size)
+	return keyutil.GenerateKeyPair(kty, crv, size)
 }
 
 // SoftKMS is a key manager that uses keys stored in disk.
@@ -53,6 +54,9 @@ func New(ctx context.Context, opts apiv1.Options) (*SoftKMS, error) {
 }
 
 func init() {
+	pemutil.PromptPassword = func(msg string) ([]byte, error) {
+		return ui.PromptPassword(msg)
+	}
 	apiv1.Register(apiv1.SoftKMS, func(ctx context.Context, opts apiv1.Options) (apiv1.KeyManager, error) {
 		return New(ctx, opts)
 	})
@@ -98,6 +102,8 @@ func (k *SoftKMS) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, e
 	}
 }
 
+// CreateKey generates a new key using Golang crypto and returns both public and
+// private key.
 func (k *SoftKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyResponse, error) {
 	v, ok := signatureAlgorithmMapping[req.SignatureAlgorithm]
 	if !ok {
@@ -123,6 +129,7 @@ func (k *SoftKMS) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespon
 	}, nil
 }
 
+// GetPublicKey returns the public key from the file passed in the request name.
 func (k *SoftKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey, error) {
 	v, err := pemutil.Read(req.Name)
 	if err != nil {

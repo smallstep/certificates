@@ -8,8 +8,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/cli/jose"
-	"gopkg.in/square/go-jose.v2/jwt"
+	"go.step.sm/crypto/jose"
 )
 
 type tokenClaims struct {
@@ -20,7 +19,7 @@ type tokenClaims struct {
 // Bootstrap is a helper function that initializes a client with the
 // configuration in the bootstrap token.
 func Bootstrap(token string) (*Client, error) {
-	tok, err := jwt.ParseSigned(token)
+	tok, err := jose.ParseSigned(token)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing token")
 	}

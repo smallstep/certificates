@@ -2,11 +2,13 @@ package provisioner
 
 import (
 	"crypto"
-	"crypto/rand"
 	"fmt"
+	"net/http"
 	"reflect"
 	"time"
 
+	"github.com/smallstep/certificates/errs"
+	"go.step.sm/crypto/sshutil"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -46,16 +48,17 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 	}
 
 	var mods []SSHCertModifier
+	var certOptions []sshutil.Option
 	var validators []SSHCertValidator
 
 	for _, op := range signOpts {
 		switch o := op.(type) {
+		// add options to NewCertificate
+		case SSHCertificateOptions:
+			certOptions = append(certOptions, o.Options(opts)...)
 		// modify the ssh.Certificate
 		case SSHCertModifier:
 			mods = append(mods, o)
-		// modify the ssh.Certificate given the SSHOptions
-		case SSHCertOptionModifier:
-			mods = append(mods, o.Option(opts))
 		// validate the ssh.Certificate
 		case SSHCertValidator:
 			validators = append(validators, o)
@@ -69,22 +72,39 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 		}
 	}
 
-	// Build base certificate with the key and some random values
-	cert := &ssh.Certificate{
-		Nonce:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0},
-		Key:    pub,
-		Serial: 1234567890,
+	// Simulated certificate request with request options.
+	cr := sshutil.CertificateRequest{
+		Type:       opts.CertType,
+		KeyID:      opts.KeyID,
+		Principals: opts.Principals,
+		Key:        pub,
 	}
 
-	// Use opts to modify the certificate
-	if err := opts.Modify(cert); err != nil {
-		return nil, err
+	// Create certificate from template.
+	certificate, err := sshutil.NewCertificate(cr, certOptions...)
+	if err != nil {
+		if _, ok := err.(*sshutil.TemplateError); ok {
+			return nil, errs.NewErr(http.StatusBadRequest, err,
+				errs.WithMessage(err.Error()),
+				errs.WithKeyVal("signOptions", signOpts),
+			)
+		}
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH")
 	}
 
-	// Use provisioner modifiers
+	// Get actual *ssh.Certificate and continue with provisioner modifiers.
+	cert := certificate.GetCertificate()
+
+	// Use SignSSHOptions to modify the certificate validity. It will be later
+	// checked or set if not defined.
+	if err := opts.ModifyValidity(cert); err != nil {
+		return nil, errs.Wrap(http.StatusBadRequest, err, "authority.SignSSH")
+	}
+
+	// Use provisioner modifiers.
 	for _, m := range mods {
-		if err := m.Modify(cert); err != nil {
-			return nil, err
+		if err := m.Modify(cert, opts); err != nil {
+			return nil, errs.Wrap(http.StatusForbidden, err, "authority.SignSSH")
 		}
 	}
 
@@ -101,23 +121,17 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 	if err != nil {
 		return nil, err
 	}
-	cert.SignatureKey = signer.PublicKey()
 
-	// Get bytes for signing trailing the signature length.
-	data := cert.Marshal()
-	data = data[:len(data)-4]
-
-	// Sign the certificate
-	sig, err := signer.Sign(rand.Reader, data)
+	// Sign certificate.
+	cert, err = sshutil.CreateCertificate(cert, signer)
 	if err != nil {
-		return nil, err
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error signing certificate")
 	}
-	cert.Signature = sig
 
-	// User provisioners validators
+	// User provisioners validators.
 	for _, v := range validators {
 		if err := v.Valid(cert, opts); err != nil {
-			return nil, err
+			return nil, errs.Wrap(http.StatusForbidden, err, "authority.SignSSH")
 		}
 	}
 

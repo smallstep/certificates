@@ -1,6 +1,6 @@
 module github.com/smallstep/certificates
 
-go 1.13
+go 1.14
 
 require (
 	cloud.google.com/go v0.51.0
@@ -19,14 +19,15 @@ require (
 	github.com/smallstep/cli v0.15.0
 	github.com/smallstep/nosql v0.3.0
 	github.com/urfave/cli v1.22.2
-	go.step.sm/crypto v0.2.0
+	go.step.sm/crypto v0.3.0
 	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
 	golang.org/x/net v0.0.0-20200202094626-16171245cfb2
 	google.golang.org/api v0.15.0
 	google.golang.org/genproto v0.0.0-20191230161307-f3c370f40bfb
 	google.golang.org/grpc v1.26.0
-	gopkg.in/square/go-jose.v2 v2.4.0
+	gopkg.in/square/go-jose.v2 v2.5.1
 )
 
-//replace github.com/smallstep/cli => ../cli
-//replace github.com/smallstep/nosql => ../nosql
+// replace github.com/smallstep/cli => ../cli
+// replace github.com/smallstep/nosql => ../nosql
+// replace go.step.sm/crypto => ../crypto

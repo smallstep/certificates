@@ -15,7 +15,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -378,34 +379,44 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	}
 
 	ce := claims.Google.ComputeEngine
+	signOptions := []SignOption{}
 
-	signOptions := []SignOption{
-		// set the key id to the instance name
-		sshCertKeyIDModifier(ce.InstanceName),
+	// Enforce host certificate.
+	defaults := SignSSHOptions{
+		CertType: SSHHostCert,
+	}
+
+	// Validated principals.
+	principals := []string{
+		fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
+		fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
 	}
 
 	// Only enforce known principals if disable custom sans is true.
-	var principals []string
 	if p.DisableCustomSANs {
-		principals = []string{
-			fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
-			fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
-		}
+		defaults.Principals = principals
+	} else {
+		// Check that at least one principal is sent in the request.
+		signOptions = append(signOptions, &sshCertOptionsRequireValidator{
+			Principals: true,
+		})
 	}
 
-	// Default to host + known hostnames
-	defaults := SignSSHOptions{
-		CertType:   SSHHostCert,
-		Principals: principals,
+	// Certificate templates.
+	data := sshutil.CreateTemplateData(sshutil.HostCert, ce.InstanceName, principals)
+	if v, err := unsafeParseSigned(token); err == nil {
+		data.SetToken(v)
 	}
-	// Validate user options
-	signOptions = append(signOptions, sshCertOptionsValidator(defaults))
-	// Set defaults if not given as user options
-	signOptions = append(signOptions, sshCertDefaultsModifier(defaults))
+
+	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, sshutil.DefaultIIDTemplate)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSSHSign")
+	}
+	signOptions = append(signOptions, templateOptions)
 
 	return append(signOptions,
-		// Set the default extensions
-		&sshDefaultExtensionModifier{},
+		// Validate user SignSSHOptions.
+		sshCertOptionsValidator(defaults),
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{p.claimer},
 		// Validate public key

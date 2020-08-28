@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 )
 
 func TestK8sSA_Getters(t *testing.T) {
@@ -361,9 +361,9 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 						tot := 0
 						for _, o := range opts {
 							switch v := o.(type) {
-							case sshCertDefaultsModifier:
-								assert.Equals(t, v.CertType, SSHUserCert)
-							case *sshDefaultExtensionModifier:
+							case sshCertificateOptionsFunc:
+							case *sshCertOptionsRequireValidator:
+								assert.Equals(t, v, &sshCertOptionsRequireValidator{CertType: true, KeyID: true, Principals: true})
 							case *sshCertValidityValidator:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
 							case *sshDefaultPublicKeyValidator:

@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	gax "github.com/googleapis/gax-go/v2"
-	"github.com/smallstep/cli/crypto/pemutil"
+	"go.step.sm/crypto/pemutil"
 	kmspb "google.golang.org/genproto/googleapis/cloud/kms/v1"
 )
 

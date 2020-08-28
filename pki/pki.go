@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
@@ -21,14 +22,13 @@ import (
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/config"
-	"github.com/smallstep/cli/crypto/keys"
-	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/tlsutil"
-	"github.com/smallstep/cli/crypto/x509util"
 	"github.com/smallstep/cli/errs"
-	"github.com/smallstep/cli/jose"
 	"github.com/smallstep/cli/ui"
 	"github.com/smallstep/cli/utils"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -112,6 +112,18 @@ func GetProvisioners(caURL, rootFile string) (provisioner.List, error) {
 		}
 		cursor = resp.NextCursor
 	}
+}
+
+func generateDefaultKey() (crypto.Signer, error) {
+	priv, err := keyutil.GenerateDefaultKey()
+	if err != nil {
+		return nil, err
+	}
+	signer, ok := priv.(crypto.Signer)
+	if !ok {
+		return nil, errors.Errorf("type %T is not a cyrpto.Signer", priv)
+	}
+	return signer, nil
 }
 
 // GetProvisionerKey returns the encrypted provisioner key with the for the
@@ -255,25 +267,35 @@ func (p *PKI) GenerateKeyPairs(pass []byte) error {
 
 // GenerateRootCertificate generates a root certificate with the given name.
 func (p *PKI) GenerateRootCertificate(name string, pass []byte) (*x509.Certificate, interface{}, error) {
-	rootProfile, err := x509util.NewRootProfile(name)
+	signer, err := generateDefaultKey()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	rootBytes, err := rootProfile.CreateWriteCertificate(p.root, p.rootKey, string(pass))
+	cr, err := x509util.CreateCertificateRequest(name, []string{}, signer)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	rootCrt, err := x509.ParseCertificate(rootBytes)
+	data := x509util.CreateTemplateData(name, []string{})
+	cert, err := x509util.NewCertificate(cr, x509util.WithTemplate(x509util.DefaultRootTemplate, data))
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "error parsing root certificate")
+		return nil, nil, err
 	}
 
-	sum := sha256.Sum256(rootCrt.Raw)
-	p.rootFingerprint = strings.ToLower(hex.EncodeToString(sum[:]))
+	template := cert.GetCertificate()
+	template.NotBefore = time.Now()
+	template.NotAfter = template.NotBefore.AddDate(10, 0, 0)
+	rootCrt, err := x509util.CreateCertificate(template, template, signer.Public(), signer)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	return rootCrt, rootProfile.SubjectPrivateKey(), nil
+	if err := p.WriteRootCertificate(rootCrt, signer, pass); err != nil {
+		return nil, nil, err
+	}
+
+	return rootCrt, signer, nil
 }
 
 // WriteRootCertificate writes to disk the given certificate and key.
@@ -285,7 +307,7 @@ func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{
 		return err
 	}
 
-	_, err := pemutil.Serialize(rootKey, pemutil.WithPassword([]byte(pass)), pemutil.ToFile(p.rootKey, 0600))
+	_, err := pemutil.Serialize(rootKey, pemutil.WithPassword(pass), pemutil.ToFile(p.rootKey, 0600))
 	if err != nil {
 		return err
 	}
@@ -299,12 +321,46 @@ func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{
 // GenerateIntermediateCertificate generates an intermediate certificate with
 // the given name.
 func (p *PKI) GenerateIntermediateCertificate(name string, rootCrt *x509.Certificate, rootKey interface{}, pass []byte) error {
-	interProfile, err := x509util.NewIntermediateProfile(name, rootCrt, rootKey)
+	key, err := generateDefaultKey()
 	if err != nil {
 		return err
 	}
-	_, err = interProfile.CreateWriteCertificate(p.intermediate, p.intermediateKey, string(pass))
-	return err
+
+	cr, err := x509util.CreateCertificateRequest(name, []string{}, key)
+	if err != nil {
+		return err
+	}
+
+	data := x509util.CreateTemplateData(name, []string{})
+	cert, err := x509util.NewCertificate(cr, x509util.WithTemplate(x509util.DefaultIntermediateTemplate, data))
+	if err != nil {
+		return err
+	}
+
+	template := cert.GetCertificate()
+	template.NotBefore = rootCrt.NotBefore
+	template.NotAfter = rootCrt.NotAfter
+	intermediateCrt, err := x509util.CreateCertificate(template, rootCrt, key.Public(), rootKey.(crypto.Signer))
+	if err != nil {
+		return err
+	}
+
+	return p.WriteIntermediateCertificate(intermediateCrt, key, pass)
+}
+
+// WriteIntermediateCertificate writes to disk the given certificate and key.
+func (p *PKI) WriteIntermediateCertificate(crt *x509.Certificate, key interface{}, pass []byte) error {
+	if err := utils.WriteFile(p.intermediate, pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: crt.Raw,
+	}), 0600); err != nil {
+		return err
+	}
+	_, err := pemutil.Serialize(key, pemutil.WithPassword(pass), pemutil.ToFile(p.intermediateKey, 0600))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // GenerateSSHSigningKeys generates and encrypts a private key used for signing
@@ -313,7 +369,7 @@ func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 	var pubNames = []string{p.sshHostPubKey, p.sshUserPubKey}
 	var privNames = []string{p.sshHostKey, p.sshUserKey}
 	for i := 0; i < 2; i++ {
-		pub, priv, err := keys.GenerateDefaultKeyPair()
+		pub, priv, err := keyutil.GenerateDefaultKeyPair()
 		if err != nil {
 			return err
 		}
@@ -432,11 +488,11 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 			DisableIssuedAtCheck: false,
 			Provisioners:         provisioner.List{prov},
 		},
-		TLS: &tlsutil.TLSOptions{
-			MinVersion:    x509util.DefaultTLSMinVersion,
-			MaxVersion:    x509util.DefaultTLSMaxVersion,
-			Renegotiation: x509util.DefaultTLSRenegotiation,
-			CipherSuites:  x509util.DefaultTLSCipherSuites,
+		TLS: &authority.TLSOptions{
+			MinVersion:    authority.DefaultTLSMinVersion,
+			MaxVersion:    authority.DefaultTLSMaxVersion,
+			Renegotiation: authority.DefaultTLSRenegotiation,
+			CipherSuites:  authority.DefaultTLSCipherSuites,
 		},
 		Templates: p.getTemplates(),
 	}

@@ -28,9 +28,9 @@ import (
 	"github.com/smallstep/certificates/ca/identity"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/cli/config"
-	"github.com/smallstep/cli/crypto/keys"
-	"github.com/smallstep/cli/crypto/pemutil"
-	"github.com/smallstep/cli/crypto/x509util"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/x509util"
 	"golang.org/x/net/http2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
@@ -1102,7 +1102,7 @@ func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) 
 // CreateCertificateRequest creates a new CSR with the given common name and
 // SANs. If no san is provided the commonName will set also a SAN.
 func CreateCertificateRequest(commonName string, sans ...string) (*api.CertificateRequest, crypto.PrivateKey, error) {
-	key, err := keys.GenerateDefaultKey()
+	key, err := keyutil.GenerateDefaultKey()
 	if err != nil {
 		return nil, nil, err
 	}

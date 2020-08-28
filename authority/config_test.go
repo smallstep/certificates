@@ -7,15 +7,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/cli/crypto/tlsutil"
-	"github.com/smallstep/cli/crypto/x509util"
-	stepJOSE "github.com/smallstep/cli/jose"
+	"go.step.sm/crypto/jose"
 )
 
 func TestConfigValidate(t *testing.T) {
-	maxjwk, err := stepJOSE.ParseKey("testdata/secrets/max_pub.jwk")
+	maxjwk, err := jose.ReadKey("testdata/secrets/max_pub.jwk")
 	assert.FatalError(t, err)
-	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
+	clijwk, err := jose.ReadKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	ac := &AuthConfig{
 		Provisioners: provisioner.List{
@@ -35,7 +33,7 @@ func TestConfigValidate(t *testing.T) {
 	type ConfigValidateTest struct {
 		config *Config
 		err    error
-		tls    tlsutil.TLSOptions
+		tls    TLSOptions
 	}
 	tests := map[string]func(*testing.T) ConfigValidateTest{
 		"empty-address": func(t *testing.T) ConfigValidateTest {
@@ -141,7 +139,7 @@ func TestConfigValidate(t *testing.T) {
 					DNSNames:         []string{"test.smallstep.com"},
 					Password:         "pass",
 					AuthorityConfig:  ac,
-					TLS:              &tlsutil.TLSOptions{},
+					TLS:              &TLSOptions{},
 				},
 				tls: DefaultTLSOptions,
 			}
@@ -156,8 +154,8 @@ func TestConfigValidate(t *testing.T) {
 					DNSNames:         []string{"test.smallstep.com"},
 					Password:         "pass",
 					AuthorityConfig:  ac,
-					TLS: &tlsutil.TLSOptions{
-						CipherSuites: x509util.CipherSuites{
+					TLS: &TLSOptions{
+						CipherSuites: CipherSuites{
 							"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
 						},
 						MinVersion:    1.0,
@@ -165,8 +163,8 @@ func TestConfigValidate(t *testing.T) {
 						Renegotiation: true,
 					},
 				},
-				tls: tlsutil.TLSOptions{
-					CipherSuites: x509util.CipherSuites{
+				tls: TLSOptions{
+					CipherSuites: CipherSuites{
 						"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
 					},
 					MinVersion:    1.0,
@@ -185,8 +183,8 @@ func TestConfigValidate(t *testing.T) {
 					DNSNames:         []string{"test.smallstep.com"},
 					Password:         "pass",
 					AuthorityConfig:  ac,
-					TLS: &tlsutil.TLSOptions{
-						CipherSuites: x509util.CipherSuites{
+					TLS: &TLSOptions{
+						CipherSuites: CipherSuites{
 							"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
 						},
 						MinVersion:    1.2,
@@ -217,7 +215,7 @@ func TestConfigValidate(t *testing.T) {
 }
 
 func TestAuthConfigValidate(t *testing.T) {
-	asn1dn := x509util.ASN1DN{
+	asn1dn := ASN1DN{
 		Country:       "Tazmania",
 		Organization:  "Acme Co",
 		Locality:      "Landscapes",
@@ -226,9 +224,9 @@ func TestAuthConfigValidate(t *testing.T) {
 		CommonName:    "test",
 	}
 
-	maxjwk, err := stepJOSE.ParseKey("testdata/secrets/max_pub.jwk")
+	maxjwk, err := jose.ReadKey("testdata/secrets/max_pub.jwk")
 	assert.FatalError(t, err)
-	clijwk, err := stepJOSE.ParseKey("testdata/secrets/step_cli_key_pub.jwk")
+	clijwk, err := jose.ReadKey("testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	p := provisioner.List{
 		&provisioner.JWK{
@@ -245,7 +243,7 @@ func TestAuthConfigValidate(t *testing.T) {
 
 	type AuthConfigValidateTest struct {
 		ac     *AuthConfig
-		asn1dn x509util.ASN1DN
+		asn1dn ASN1DN
 		err    error
 	}
 	tests := map[string]func(*testing.T) AuthConfigValidateTest{
@@ -258,7 +256,7 @@ func TestAuthConfigValidate(t *testing.T) {
 		"ok-empty-provisioners": func(t *testing.T) AuthConfigValidateTest {
 			return AuthConfigValidateTest{
 				ac:     &AuthConfig{},
-				asn1dn: x509util.ASN1DN{},
+				asn1dn: ASN1DN{},
 			}
 		},
 		"ok-empty-asn1dn-template": func(t *testing.T) AuthConfigValidateTest {
@@ -266,7 +264,7 @@ func TestAuthConfigValidate(t *testing.T) {
 				ac: &AuthConfig{
 					Provisioners: p,
 				},
-				asn1dn: x509util.ASN1DN{},
+				asn1dn: ASN1DN{},
 			}
 		},
 		"ok-custom-asn1dn": func(t *testing.T) AuthConfigValidateTest {
