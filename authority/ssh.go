@@ -280,24 +280,24 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	}
 
 	// Get actual *ssh.Certificate and continue with provisioner modifiers.
-	cert := certificate.GetCertificate()
+	certTpl := certificate.GetCertificate()
 
 	// Use SignSSHOptions to modify the certificate validity. It will be later
 	// checked or set if not defined.
-	if err := opts.ModifyValidity(cert); err != nil {
+	if err := opts.ModifyValidity(certTpl); err != nil {
 		return nil, errs.Wrap(http.StatusBadRequest, err, "authority.SignSSH")
 	}
 
 	// Use provisioner modifiers.
 	for _, m := range mods {
-		if err := m.Modify(cert, opts); err != nil {
+		if err := m.Modify(certTpl, opts); err != nil {
 			return nil, errs.Wrap(http.StatusForbidden, err, "authority.SignSSH")
 		}
 	}
 
 	// Get signer from authority keys
 	var signer ssh.Signer
-	switch cert.CertType {
+	switch certTpl.CertType {
 	case ssh.UserCert:
 		if a.sshCAUserCertSignKey == nil {
 			return nil, errs.NotImplemented("authority.SignSSH: user certificate signing is not enabled")
@@ -309,11 +309,11 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		}
 		signer = a.sshCAHostCertSignKey
 	default:
-		return nil, errs.InternalServer("authority.SignSSH: unexpected ssh certificate type: %d", cert.CertType)
+		return nil, errs.InternalServer("authority.SignSSH: unexpected ssh certificate type: %d", certTpl.CertType)
 	}
 
 	// Sign certificate.
-	cert, err = sshutil.CreateCertificate(cert, signer)
+	cert, err := sshutil.CreateCertificate(certTpl, signer)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error signing certificate")
 	}
@@ -346,7 +346,7 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 
 	// Build base certificate with the old key.
 	// Nonce and serial will be automatically generated on signing.
-	cert := &ssh.Certificate{
+	certTpl := &ssh.Certificate{
 		Key:             oldCert.Key,
 		CertType:        oldCert.CertType,
 		KeyId:           oldCert.KeyId,
@@ -359,7 +359,7 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 
 	// Get signer from authority keys
 	var signer ssh.Signer
-	switch cert.CertType {
+	switch certTpl.CertType {
 	case ssh.UserCert:
 		if a.sshCAUserCertSignKey == nil {
 			return nil, errs.NotImplemented("renewSSH: user certificate signing is not enabled")
@@ -371,12 +371,11 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 		}
 		signer = a.sshCAHostCertSignKey
 	default:
-		return nil, errs.InternalServer("renewSSH: unexpected ssh certificate type: %d", cert.CertType)
+		return nil, errs.InternalServer("renewSSH: unexpected ssh certificate type: %d", certTpl.CertType)
 	}
 
-	var err error
 	// Sign certificate.
-	cert, err = sshutil.CreateCertificate(cert, signer)
+	cert, err := sshutil.CreateCertificate(certTpl, signer)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 	}
