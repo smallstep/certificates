@@ -40,9 +40,9 @@ func (o *SSHOptions) HasTemplate() bool {
 	return o != nil && (o.Template != "" || o.TemplateFile != "")
 }
 
-// SSHTemplateOptions generates a CertificateOptions with the template and data
-// defined in the ProvisionerOptions, the provisioner generated data, and the
-// user data provided in the request. If no template has been provided,
+// SSHTemplateOptions generates a SSHCertificateOptions with the template and
+// data defined in the ProvisionerOptions, the provisioner generated data, and
+// the user data provided in the request. If no template has been provided,
 // x509util.DefaultLeafTemplate will be used.
 func TemplateSSHOptions(o *Options, data sshutil.TemplateData) (SSHCertificateOptions, error) {
 	return CustomSSHTemplateOptions(o, data, sshutil.DefaultTemplate)
