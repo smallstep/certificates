@@ -481,7 +481,7 @@ ZYtQ9Ot36qc=
 				NotAfter:  now.Add(365 * 24 * time.Hour),
 			}}
 			_a := testAuthority(t)
-			_a.config.AuthorityConfig.Template = &x509util.ASN1DN{}
+			_a.config.AuthorityConfig.Template = &ASN1DN{}
 			_a.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
 					assert.Equals(t, crt.Subject, pkix.Name{})
