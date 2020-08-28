@@ -378,19 +378,19 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 		return fatal(err)
 	}
 
-	// Generate certificate directly from the certificate request.
-	certificate, err := x509util.NewCertificate(cr)
+	// Generate certificate template directly from the certificate request.
+	template, err := x509util.NewCertificate(cr)
 	if err != nil {
 		return fatal(err)
 	}
 
-	// Get certificate template, set validity and sign it.
+	// Get x509 certificate template, set validity and sign it.
 	now := time.Now()
-	template := certificate.GetCertificate()
-	template.NotBefore = now.Add(-1 * time.Minute)
-	template.NotAfter = now.Add(24 * time.Hour)
+	certTpl := template.GetCertificate()
+	certTpl.NotBefore = now.Add(-1 * time.Minute)
+	certTpl.NotAfter = now.Add(24 * time.Hour)
 
-	cert, err := x509util.CreateCertificate(template, a.x509Issuer, cr.PublicKey, a.x509Signer)
+	cert, err := x509util.CreateCertificate(certTpl, a.x509Issuer, cr.PublicKey, a.x509Signer)
 	if err != nil {
 		return fatal(err)
 	}
