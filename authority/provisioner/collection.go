@@ -37,9 +37,8 @@ func (p provisionerSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 // provisioner.
 type loadByTokenPayload struct {
 	jose.Claims
-	AuthorizedParty    string `json:"azp"`                                               // OIDC client id
-	TenantID           string `json:"tid"`                                               // Microsoft Azure tenant id
-	ServiceAccountName string `json:"kubernetes.io/serviceaccount/service-account.name"` // Kubernetes Service Acct Name
+	AuthorizedParty string `json:"azp"` // OIDC client id
+	TenantID        string `json:"tid"` // Microsoft Azure tenant id
 }
 
 // Collection is a memory map of provisioners.
@@ -94,7 +93,7 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 	}
 
 	// Kubernetes Service Account tokens.
-	if len(payload.ServiceAccountName) > 0 {
+	if payload.Issuer == k8sSAIssuer {
 		if p, ok := c.Load(K8sSAID); ok {
 			return p, ok
 		}
