@@ -544,8 +544,8 @@ go.step.sm/crypto v0.0.0-20200805202904-ec18b6df3cf0 h1:FymMl8TrXGxFf80BWpO0CnkS
 go.step.sm/crypto v0.0.0-20200805202904-ec18b6df3cf0/go.mod h1:8VYxmvSKt5yOTBx3MGsD2Gk4F1Es/3FIxrjnfeYWE8U=
 go.step.sm/crypto v0.1.1 h1:xg3kUS30hEnwgbxtKwq9a4MJaeiU616HSug60LU9B2E=
 go.step.sm/crypto v0.1.1/go.mod h1:cIoSWTfTQ5xqvwTeZH9ZXZzi6jdMepjK4A/TDWMUvw8=
-go.step.sm/crypto v0.4.0 h1:QAFQ5mLKzTKkNcfW3XfJkCnjgYFziXcGJjWNi7R9e4Y=
-go.step.sm/crypto v0.4.0/go.mod h1:AKS4yMZVZD4EGjpSkY4eibuMenrvKCscb+BpWMet8c0=
+go.step.sm/crypto v0.5.0 h1:bubafLtMXhlL+Nd0sTNARFArIAzo70+66N9IbA+V0Yc=
+go.step.sm/crypto v0.5.0/go.mod h1:AKS4yMZVZD4EGjpSkY4eibuMenrvKCscb+BpWMet8c0=
 go.uber.org/atomic v1.4.0/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/atomic v1.5.0/go.mod h1:sABNBOSYdrvTF6hTgEIbc7YasKWGhgEQZyfxyTvoXHQ=
 go.uber.org/atomic v1.5.1/go.mod h1:sABNBOSYdrvTF6hTgEIbc7YasKWGhgEQZyfxyTvoXHQ=
