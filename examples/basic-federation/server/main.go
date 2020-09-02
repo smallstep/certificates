@@ -34,7 +34,7 @@ func main() {
 
 			w.Write([]byte(fmt.Sprintf("Hello %s (cert issued by '%s') at %s", name, issuer, time.Now().UTC())))
 		}),
-	}, ca.AddFederationToRootCAs(), ListTrustedRoots())
+	}, ca.AddFederationToClientCAs(), ListTrustedRoots())
 	if err != nil {
 		panic(err)
 	}
