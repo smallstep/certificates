@@ -159,7 +159,7 @@ func TestTemplateOptions(t *testing.T) {
 
 func TestCustomTemplateOptions(t *testing.T) {
 	csr := parseCertificateRequest(t, "testdata/certs/ecdsa.csr")
-	csrCertificate := `{"version":0,"subject":{"commonName":"foo"},"dnsNames":["foo"],"emailAddresses":null,"ipAddresses":null,"uris":null,"sans":null,"extensions":[{"id":"2.5.29.17","critical":false,"value":"MAWCA2Zvbw=="}],"signatureAlgorithm":"ECDSA-SHA256"}`
+	csrCertificate := `{"version":0,"subject":{"commonName":"foo"},"dnsNames":["foo"],"emailAddresses":null,"ipAddresses":null,"uris":null,"sans":null,"extensions":[{"id":"2.5.29.17","critical":false,"value":"MAWCA2Zvbw=="}],"signatureAlgorithm":""}`
 	data := x509util.TemplateData{
 		x509util.SubjectKey: x509util.Subject{
 			CommonName: "foobar",
