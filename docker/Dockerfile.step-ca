@@ -22,6 +22,6 @@ ENV PWDPATH="/home/step/secrets/password"
 
 VOLUME ["/home/step"]
 STOPSIGNAL SIGTERM
-HEALTHCHECK CMD curl --cacert /home/step/certs/root_ca.crt -sSf https://localhost/health >/dev/null || exit 1
+HEALTHCHECK CMD step ca health 2>/dev/null | grep "^ok" >/dev/null
 
-CMD exec /bin/sh -c "/usr/local/bin/step-ca --password-file $PWDPATH $CONFIGPATH"
+CMD exec /usr/local/bin/step-ca --password-file $PWDPATH $CONFIGPATH
