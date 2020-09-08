@@ -220,6 +220,13 @@ func TestCustomTemplateOptions(t *testing.T) {
 		{"okBadUserOptions", args{&Options{X509: &X509Options{Template: `{"foo": "{{.Insecure.User.foo}}"}`}}, data, x509util.DefaultLeafTemplate, SignOptions{TemplateData: []byte(`{"badJSON"}`)}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{"foo": "<no value>"}`),
 		}, false},
+		{"okNullTemplateData", args{&Options{X509: &X509Options{TemplateData: []byte(`null`)}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
+			CertBuffer: bytes.NewBufferString(`{
+	"subject": {"commonName":"foobar"},
+	"sans": [{"type":"dns","value":"foo.com"}],
+	"keyUsage": ["digitalSignature"],
+	"extKeyUsage": ["serverAuth", "clientAuth"]
+}`)}, false},
 		{"fail", args{&Options{X509: &X509Options{TemplateData: []byte(`{"badJSON`)}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{}, true},
 		{"failTemplateData", args{&Options{X509: &X509Options{TemplateData: []byte(`{"badJSON}`)}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{}, true},
 	}

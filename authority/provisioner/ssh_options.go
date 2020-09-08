@@ -40,7 +40,7 @@ func (o *SSHOptions) HasTemplate() bool {
 	return o != nil && (o.Template != "" || o.TemplateFile != "")
 }
 
-// SSHTemplateOptions generates a SSHCertificateOptions with the template and
+// TemplateSSHOptions generates a SSHCertificateOptions with the template and
 // data defined in the ProvisionerOptions, the provisioner generated data, and
 // the user data provided in the request. If no template has been provided,
 // x509util.DefaultLeafTemplate will be used.
@@ -48,7 +48,7 @@ func TemplateSSHOptions(o *Options, data sshutil.TemplateData) (SSHCertificateOp
 	return CustomSSHTemplateOptions(o, data, sshutil.DefaultTemplate)
 }
 
-// CustomTemplateOptions generates a CertificateOptions with the template, data
+// CustomSSHTemplateOptions generates a CertificateOptions with the template, data
 // defined in the ProvisionerOptions, the provisioner generated data and the
 // user data provided in the request. If no template has been provided in the
 // ProvisionerOptions, the given template will be used.
@@ -60,7 +60,7 @@ func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemp
 
 	if opts != nil {
 		// Add template data if any.
-		if len(opts.TemplateData) > 0 {
+		if len(opts.TemplateData) > 0 && string(opts.TemplateData) != "null" {
 			if err := json.Unmarshal(opts.TemplateData, &data); err != nil {
 				return nil, errors.Wrap(err, "error unmarshaling template data")
 			}

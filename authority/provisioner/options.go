@@ -83,7 +83,7 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 
 	if opts != nil {
 		// Add template data if any.
-		if len(opts.TemplateData) > 0 {
+		if len(opts.TemplateData) > 0 && string(opts.TemplateData) != "null" {
 			if err := json.Unmarshal(opts.TemplateData, &data); err != nil {
 				return nil, errors.Wrap(err, "error unmarshaling template data")
 			}
