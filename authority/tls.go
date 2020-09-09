@@ -13,6 +13,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
@@ -144,11 +145,23 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
-	serverCert, err := x509util.CreateCertificate(leaf, a.x509Issuer, csr.PublicKey, a.x509Signer)
+	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(-1 * signOpts.Backdate))
+	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
+		Template: leaf,
+		Issuer:   a.x509Issuer,
+		Signer:   a.x509Signer,
+		Lifetime: lifetime,
+	})
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"authority.Sign; error creating certificate", opts...)
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign; error creating certificate", opts...)
 	}
+	serverCert := resp.Certificate
+
+	// serverCert, err := x509util.CreateCertificate(leaf, a.x509Issuer, csr.PublicKey, a.x509Signer)
+	// if err != nil {
+	// 	return nil, errs.Wrap(http.StatusInternalServerError, err,
+	// 		"authority.Sign; error creating certificate", opts...)
+	// }
 
 	if err = a.db.StoreCertificate(serverCert); err != nil {
 		if err != db.ErrNotImplemented {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	cas "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	kms "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/templates"
@@ -54,6 +55,7 @@ type Config struct {
 	Address          string               `json:"address"`
 	DNSNames         []string             `json:"dnsNames"`
 	KMS              *kms.Options         `json:"kms,omitempty"`
+	CAS              *cas.Options         `json:"cas,omitempty"`
 	SSH              *SSHConfig           `json:"ssh,omitempty"`
 	Logger           json.RawMessage      `json:"logger,omitempty"`
 	DB               *db.Config           `json:"db,omitempty"`
@@ -217,6 +219,11 @@ func (c *Config) Validate() error {
 
 	// Validate KMS options, nil is ok.
 	if err := c.KMS.Validate(); err != nil {
+		return err
+	}
+
+	// Validate CAS options, nil is ok.
+	if err := c.CAS.Validate(); err != nil {
 		return err
 	}
 

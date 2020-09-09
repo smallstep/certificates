@@ -10,8 +10,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smallstep/certificates/cas"
+
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/kms"
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
@@ -33,6 +36,7 @@ type Authority struct {
 	templates    *templates.Templates
 
 	// X509 CA
+	x509CAService      cas.CertificateAuthorityService
 	rootX509Certs      []*x509.Certificate
 	federatedX509Certs []*x509.Certificate
 	x509Signer         crypto.Signer
@@ -141,6 +145,18 @@ func (a *Authority) init() error {
 		a.keyManager, err = kms.New(context.Background(), options)
 		if err != nil {
 			return err
+		}
+	}
+
+	// Initialize the X.509 CA Service if it has not been set in the options
+	if a.x509CAService == nil {
+		var options casapi.Options
+		if a.config.CAS != nil {
+			options = *a.config.CAS
+		}
+		a.x509CAService, err = cas.New(context.Background(), options)
+		if err != nil {
+			return nil
 		}
 	}
 
