@@ -181,7 +181,7 @@ func StatusCodeError(code int, e error, opts ...Option) error {
 var (
 	seeLogs = "Please see the certificate authority logs for more info."
 	// BadRequestDefaultMsg 400 default msg
-	BadRequestDefaultMsg = "The request could not be completed; malformed or missing data" + seeLogs
+	BadRequestDefaultMsg = "The request could not be completed; malformed or missing data. " + seeLogs
 	// UnauthorizedDefaultMsg 401 default msg
 	UnauthorizedDefaultMsg = "The request lacked necessary authorization to be completed. " + seeLogs
 	// ForbiddenDefaultMsg 403 default msg
