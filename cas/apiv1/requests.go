@@ -7,11 +7,11 @@ import (
 )
 
 type CreateCertificateRequest struct {
-	Template *x509.Certificate
-	Issuer   *x509.Certificate
-	Signer   crypto.Signer
-	Lifetime time.Duration
-
+	Template  *x509.Certificate
+	Issuer    *x509.Certificate
+	Signer    crypto.Signer
+	Lifetime  time.Duration
+	Backdate  time.Duration
 	RequestID string
 }
 type CreateCertificateResponse struct {
@@ -19,8 +19,24 @@ type CreateCertificateResponse struct {
 	CertificateChain []*x509.Certificate
 }
 
-type RenewCertificateRequest struct{}
-type RenewCertificateResponse struct{}
+type RenewCertificateRequest struct {
+	Template  *x509.Certificate
+	Issuer    *x509.Certificate
+	Signer    crypto.Signer
+	Lifetime  time.Duration
+	Backdate  time.Duration
+	RequestID string
+}
+type RenewCertificateResponse struct {
+	Certificate      *x509.Certificate
+	CertificateChain []*x509.Certificate
+}
 
-type RevokeCertificateRequest struct{}
-type RevokeCertificateResponse struct{}
+// RevokeCertificateRequest is the request used to revoke a certificate.
+type RevokeCertificateRequest struct {
+	Certificate *x509.Certificate
+}
+type RevokeCertificateResponse struct {
+	Certificate      *x509.Certificate
+	CertificateChain []*x509.Certificate
+}

@@ -63,7 +63,6 @@ func createCertificateConfig(tpl *x509.Certificate) (*pb.Certificate_Config, err
 }
 
 func createPublicKey(key crypto.PublicKey) (*pb.PublicKey, error) {
-	pk := new(pb.PublicKey)
 	switch key := key.(type) {
 	case *ecdsa.PublicKey:
 		asn1Bytes, err := x509.MarshalPKIXPublicKey(key)
@@ -88,8 +87,6 @@ func createPublicKey(key crypto.PublicKey) (*pb.PublicKey, error) {
 	default:
 		return nil, errors.Errorf("unsupported public key type: %T", key)
 	}
-
-	return pk, nil
 }
 
 func createSubject(cert *x509.Certificate) *pb.Subject {
@@ -138,12 +135,43 @@ func createSubjectAlternativeNames(cert *x509.Certificate) *pb.SubjectAltNames {
 
 	// Add extra SANs coming from the extensions
 	if ext, ok := findExtraExtension(cert, oidExtensionSubjectAltName); ok {
-		ret.CustomSans = []*pb.X509Extension{{
-			ObjectId: createObjectID(ext.Id),
-			Critical: ext.Critical,
-			Value:    ext.Value,
-		}}
+		var rawValues []asn1.RawValue
+		if _, err := asn1.Unmarshal(ext.Value, &rawValues); err == nil {
+			var newValues []asn1.RawValue
+			for _, v := range rawValues {
+				switch v.Tag {
+				case nameTypeDNS:
+					if len(ret.DnsNames) == 0 {
+						newValues = append(newValues, v)
+					}
+				case nameTypeEmail:
+					if len(ret.EmailAddresses) == 0 {
+						newValues = append(newValues, v)
+					}
+				case nameTypeIP:
+					if len(ret.IpAddresses) == 0 {
+						newValues = append(newValues, v)
+					}
+				case nameTypeURI:
+					if len(ret.Uris) == 0 {
+						newValues = append(newValues, v)
+					}
+				default:
+					newValues = append(newValues, v)
+				}
+			}
+			if len(newValues) > 0 {
+				if b, err := asn1.Marshal(newValues); err == nil {
+					ret.CustomSans = []*pb.X509Extension{{
+						ObjectId: createObjectID(ext.Id),
+						Critical: ext.Critical,
+						Value:    b,
+					}}
+				}
+			}
+		}
 	}
+
 	return ret
 }
 
@@ -210,12 +238,14 @@ func createReusableConfig(cert *x509.Certificate) *pb.ReusableConfigWrapper {
 		}
 	}
 
-	extraExtensions := make([]*pb.X509Extension, len(cert.ExtraExtensions))
-	for i, ext := range cert.ExtraExtensions {
-		extraExtensions[i] = &pb.X509Extension{
-			ObjectId: createObjectID(ext.Id),
-			Critical: ext.Critical,
-			Value:    ext.Value,
+	var extraExtensions []*pb.X509Extension
+	for _, ext := range cert.ExtraExtensions {
+		if !ext.Id.Equal(oidExtensionSubjectAltName) {
+			extraExtensions = append(extraExtensions, &pb.X509Extension{
+				ObjectId: createObjectID(ext.Id),
+				Critical: ext.Critical,
+				Value:    ext.Value,
+			})
 		}
 	}
 

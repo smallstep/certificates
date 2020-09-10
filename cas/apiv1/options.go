@@ -30,3 +30,11 @@ func (o *Options) Validate() error {
 
 	return nil
 }
+
+// HasType returns if the options have the given type.
+func (o *Options) HasType(t Type) bool {
+	if o == nil {
+		return SoftCAS == t.String()
+	}
+	return Type(o.Type).String() == t.String()
+}
