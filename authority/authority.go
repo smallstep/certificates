@@ -218,21 +218,8 @@ func (a *Authority) init() error {
 
 		// Set issuer and signer for default CAS.
 		if options.HasType(casapi.SoftCAS) {
-			crt, err := pemutil.ReadCertificate(a.config.IntermediateCert)
-			if err != nil {
-				return err
-			}
-
-			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-				SigningKey: a.config.IntermediateKey,
-				Password:   []byte(a.config.Password),
-			})
-			if err != nil {
-				return err
-			}
-
-			options.Issuer = crt
-			options.Signer = signer
+			options.Issuer = a.x509Issuer
+			options.Signer = a.x509Signer
 		}
 
 		a.x509CAService, err = cas.New(context.Background(), options)
