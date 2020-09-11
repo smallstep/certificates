@@ -5,7 +5,9 @@ import (
 	"sync"
 )
 
-var registry = new(sync.Map)
+var (
+	registry = new(sync.Map)
+)
 
 // CertificateAuthorityServiceNewFunc is the type that represents the method to initialize a new
 // CertificateAuthorityService.
@@ -13,12 +15,12 @@ type CertificateAuthorityServiceNewFunc func(ctx context.Context, opts Options) 
 
 // Register adds to the registry a method to create a KeyManager of type t.
 func Register(t Type, fn CertificateAuthorityServiceNewFunc) {
-	registry.Store(t, fn)
+	registry.Store(t.String(), fn)
 }
 
 // LoadCertificateAuthorityServiceNewFunc returns the function initialize a KayManager.
 func LoadCertificateAuthorityServiceNewFunc(t Type) (CertificateAuthorityServiceNewFunc, bool) {
-	v, ok := registry.Load(t)
+	v, ok := registry.Load(t.String())
 	if !ok {
 		return nil, false
 	}

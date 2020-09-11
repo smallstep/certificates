@@ -1,13 +1,7 @@
 package apiv1
 
 import (
-	"encoding/asn1"
 	"strings"
-)
-
-var (
-	oidStepRoot                 = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
-	oidStepCertificateAuthority = append(asn1.ObjectIdentifier(nil), append(oidStepRoot, 2)...)
 )
 
 // CertificateAuthorityService is the interface implemented to support external
@@ -18,27 +12,24 @@ type CertificateAuthorityService interface {
 	RevokeCertificate(req *RevokeCertificateRequest) (*RevokeCertificateResponse, error)
 }
 
-// Type represents the KMS type used.
+// Type represents the CAS type used.
 type Type string
 
 const (
 	// DefaultCAS is a CertificateAuthorityService using software.
 	DefaultCAS = ""
 	// SoftCAS is a CertificateAuthorityService using software.
-	SoftCAS = "SoftCAS"
+	SoftCAS = "softcas"
 	// CloudCAS is a CertificateAuthorityService using Google Cloud CAS.
-	CloudCAS = "CloudCAS"
+	CloudCAS = "cloudcas"
 )
 
-// String returns the given type as a string. All the letters will be lowercase.
+// String returns a string from the type. It will always return the lower case
+// version of the Type, as we need a standard type to compare and use as the
+// registry key.
 func (t Type) String() string {
 	if t == "" {
 		return SoftCAS
 	}
-	for _, s := range []string{SoftCAS, CloudCAS} {
-		if strings.EqualFold(s, string(t)) {
-			return s
-		}
-	}
-	return string(t)
+	return strings.ToLower(string(t))
 }

@@ -45,6 +45,10 @@ type caClient interface{}
 // New creates a new CertificateAuthorityService implementation using Google
 // Cloud CAS.
 func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
+	if opts.Certificateauthority == "" {
+		return nil, errors.New("cloudCAS 'certificateAuthority' cannot be empty")
+	}
+
 	var cloudOpts []option.ClientOption
 	if opts.CredentialsFile != "" {
 		cloudOpts = append(cloudOpts, option.WithCredentialsFile(opts.CredentialsFile))
@@ -57,7 +61,7 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 
 	return &CloudCAS{
 		client:               client,
-		certificateAuthority: "projects/smallstep-cas-test/locations/us-west1/certificateAuthorities/Smallstep-Test-Intermediate-CA",
+		certificateAuthority: opts.Certificateauthority,
 	}, nil
 }
 
@@ -87,9 +91,9 @@ func (c *CloudCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv
 func (c *CloudCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
 	switch {
 	case req.Template == nil:
-		return nil, errors.New("renewCertificate `template` cannot be nil")
+		return nil, errors.New("renewCertificateRequest `template` cannot be nil")
 	case req.Lifetime == 0:
-		return nil, errors.New("renewCertificate `lifetime` cannot be 0")
+		return nil, errors.New("renewCertificateRequest `lifetime` cannot be 0")
 	}
 
 	cert, chain, err := c.createCertificate(req.Template, req.Lifetime, req.RequestID)
@@ -106,7 +110,7 @@ func (c *CloudCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.
 // RevokeCertificate a certificate using Google Cloud CAS.
 func (c *CloudCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {
 	if req.Certificate == nil {
-		return nil, errors.New("revokeCertificate `certificate` cannot be nil")
+		return nil, errors.New("revokeCertificateRequest `certificate` cannot be nil")
 	}
 
 	ext, ok := apiv1.FindCertificateAuthorityExtension(req.Certificate)

@@ -1,15 +1,12 @@
 package apiv1
 
 import (
-	"crypto"
 	"crypto/x509"
 	"time"
 )
 
 type CreateCertificateRequest struct {
 	Template  *x509.Certificate
-	Issuer    *x509.Certificate
-	Signer    crypto.Signer
 	Lifetime  time.Duration
 	Backdate  time.Duration
 	RequestID string
@@ -21,8 +18,6 @@ type CreateCertificateResponse struct {
 
 type RenewCertificateRequest struct {
 	Template  *x509.Certificate
-	Issuer    *x509.Certificate
-	Signer    crypto.Signer
 	Lifetime  time.Duration
 	Backdate  time.Duration
 	RequestID string

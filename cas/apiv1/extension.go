@@ -8,6 +8,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	oidStepRoot                 = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
+	oidStepCertificateAuthority = append(asn1.ObjectIdentifier(nil), append(oidStepRoot, 2)...)
+)
+
 // CertificateAuthorityExtension is type used to encode the certificate
 // authority extension.
 type CertificateAuthorityExtension struct {

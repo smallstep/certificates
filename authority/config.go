@@ -187,7 +187,7 @@ func (c *Config) Validate() error {
 	case c.IntermediateCert == "":
 		return errors.New("crt cannot be empty")
 
-	case c.IntermediateKey == "":
+	case c.IntermediateKey == "" && c.CAS.HasType(cas.SoftCAS):
 		return errors.New("key cannot be empty")
 
 	case len(c.DNSNames) == 0:

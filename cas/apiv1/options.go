@@ -1,7 +1,8 @@
 package apiv1
 
 import (
-	"strings"
+	"crypto"
+	"crypto/x509"
 
 	"github.com/pkg/errors"
 )
@@ -14,27 +15,36 @@ type Options struct {
 
 	// Path to the credentials file used in CloudCAS
 	CredentialsFile string `json:"credentialsFile"`
+
+	// CertificateAuthority reference. In CloudCAS the format is
+	// `projects/*/locations/*/certificateAuthorities/*`.
+	Certificateauthority string `json:"certificateAuthority"`
+
+	// Issuer and signer are the issuer certificate and signer used in SoftCAS.
+	// They are configured in ca.json crt and key properties.
+	Issuer *x509.Certificate `json:"-"`
+	Signer crypto.Signer     `json:"-"`
 }
 
 // Validate checks the fields in Options.
 func (o *Options) Validate() error {
+	var typ Type
 	if o == nil {
-		return nil
+		typ = Type(SoftCAS)
+	} else {
+		typ = Type(o.Type)
 	}
-
-	switch Type(strings.ToLower(o.Type)) {
-	case DefaultCAS, SoftCAS, CloudCAS:
-	default:
-		return errors.Errorf("unsupported kms type %s", o.Type)
+	// Check that the type can be loaded.
+	if _, ok := LoadCertificateAuthorityServiceNewFunc(typ); !ok {
+		return errors.Errorf("unsupported cas type %s", typ)
 	}
-
 	return nil
 }
 
 // HasType returns if the options have the given type.
 func (o *Options) HasType(t Type) bool {
 	if o == nil {
-		return SoftCAS == t.String()
+		return t.String() == SoftCAS
 	}
 	return Type(o.Type).String() == t.String()
 }

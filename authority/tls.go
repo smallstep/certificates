@@ -145,32 +145,24 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
-	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(-1 * signOpts.Backdate))
+	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
 		Template: leaf,
-		Issuer:   a.x509Issuer,
-		Signer:   a.x509Signer,
 		Lifetime: lifetime,
+		Backdate: signOpts.Backdate,
 	})
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign; error creating certificate", opts...)
 	}
-	serverCert := resp.Certificate
 
-	// serverCert, err := x509util.CreateCertificate(leaf, a.x509Issuer, csr.PublicKey, a.x509Signer)
-	// if err != nil {
-	// 	return nil, errs.Wrap(http.StatusInternalServerError, err,
-	// 		"authority.Sign; error creating certificate", opts...)
-	// }
-
-	if err = a.db.StoreCertificate(serverCert); err != nil {
+	if err = a.db.StoreCertificate(resp.Certificate); err != nil {
 		if err != db.ErrNotImplemented {
 			return nil, errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Sign; error storing certificate in db", opts...)
 		}
 	}
 
-	return []*x509.Certificate{serverCert, a.x509Issuer}, nil
+	return append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...), nil
 }
 
 // Renew creates a new Certificate identical to the old certificate, except
@@ -200,13 +192,12 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 	// Durations
 	backdate := a.config.AuthorityConfig.Backdate.Duration
 	duration := oldCert.NotAfter.Sub(oldCert.NotBefore)
-	now := time.Now().UTC()
+	lifetime := duration - backdate
 
+	// Create new certificate from previous values.
+	// Issuer, NotBefore, NotAfter and SubjectKeyId will be set by the CAS.
 	newCert := &x509.Certificate{
-		Issuer:                      a.x509Issuer.Subject,
 		Subject:                     oldCert.Subject,
-		NotBefore:                   now.Add(-1 * backdate),
-		NotAfter:                    now.Add(duration - backdate),
 		KeyUsage:                    oldCert.KeyUsage,
 		UnhandledCriticalExtensions: oldCert.UnhandledCriticalExtensions,
 		ExtKeyUsage:                 oldCert.ExtKeyUsage,
@@ -241,10 +232,14 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 	}
 
 	// Copy all extensions except:
-	//	1. Authority Key Identifier - This one might be different if we rotate the intermediate certificate
-	//					and it will cause a TLS bad certificate error.
-	//	2. Subject Key Identifier, if rekey - For rekey, SubjectKeyIdentifier extension will be calculated
-	//	        for the new public key by NewLeafProfilewithTemplate()
+	//
+	//  1. Authority Key Identifier - This one might be different if we rotate
+	//  the intermediate certificate and it will cause a TLS bad certificate
+	//  error.
+	//
+	//  2. Subject Key Identifier, if rekey - For rekey, SubjectKeyIdentifier
+	//  extension will be calculated for the new public key by
+	//  x509util.CreateCertificate()
 	for _, ext := range oldCert.Extensions {
 		if ext.Id.Equal(oidAuthorityKeyIdentifier) {
 			continue
@@ -256,18 +251,22 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 		newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
 	}
 
-	serverCert, err := x509util.CreateCertificate(newCert, a.x509Issuer, newCert.PublicKey, a.x509Signer)
+	resp, err := a.x509CAService.RenewCertificate(&casapi.RenewCertificateRequest{
+		Template: newCert,
+		Lifetime: lifetime,
+		Backdate: backdate,
+	})
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey", opts...)
 	}
 
-	if err = a.db.StoreCertificate(serverCert); err != nil {
+	if err = a.db.StoreCertificate(resp.Certificate); err != nil {
 		if err != db.ErrNotImplemented {
 			return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey; error storing certificate in db", opts...)
 		}
 	}
 
-	return []*x509.Certificate{serverCert, a.x509Issuer}, nil
+	return append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...), nil
 }
 
 // RevokeOptions are the options for the Revoke API.
@@ -403,30 +402,36 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	certTpl.NotBefore = now.Add(-1 * time.Minute)
 	certTpl.NotAfter = now.Add(24 * time.Hour)
 
-	cert, err := x509util.CreateCertificate(certTpl, a.x509Issuer, cr.PublicKey, a.x509Signer)
+	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
+		Template: certTpl,
+		Lifetime: 24 * time.Hour,
+		Backdate: 1 * time.Minute,
+	})
 	if err != nil {
 		return fatal(err)
 	}
 
 	// Generate PEM blocks to create tls.Certificate
-	crtPEM := pem.EncodeToMemory(&pem.Block{
+	pemBlocks := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
-		Bytes: cert.Raw,
+		Bytes: resp.Certificate.Raw,
 	})
-	intermediatePEM, err := pemutil.Serialize(a.x509Issuer)
-	if err != nil {
-		return fatal(err)
+	for _, crt := range resp.CertificateChain {
+		pemBlocks = append(pemBlocks, pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: crt.Raw,
+		})...)
 	}
 	keyPEM, err := pemutil.Serialize(priv)
 	if err != nil {
 		return fatal(err)
 	}
 
-	tlsCrt, err := tls.X509KeyPair(append(crtPEM, pem.EncodeToMemory(intermediatePEM)...), pem.EncodeToMemory(keyPEM))
+	tlsCrt, err := tls.X509KeyPair(pemBlocks, pem.EncodeToMemory(keyPEM))
 	if err != nil {
 		return fatal(err)
 	}
 	// Set leaf certificate
-	tlsCrt.Leaf = cert
+	tlsCrt.Leaf = resp.Certificate
 	return &tlsCrt, nil
 }

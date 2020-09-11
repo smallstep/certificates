@@ -148,18 +148,6 @@ func (a *Authority) init() error {
 		}
 	}
 
-	// Initialize the X.509 CA Service if it has not been set in the options
-	if a.x509CAService == nil {
-		var options casapi.Options
-		if a.config.CAS != nil {
-			options = *a.config.CAS
-		}
-		a.x509CAService, err = cas.New(context.Background(), options)
-		if err != nil {
-			return nil
-		}
-	}
-
 	// Initialize step-ca Database if it's not already initialized with WithDB.
 	// If a.config.DB is nil then a simple, barebones in memory DB will be used.
 	if a.db == nil {
@@ -206,15 +194,51 @@ func (a *Authority) init() error {
 		if err != nil {
 			return err
 		}
-		signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-			SigningKey: a.config.IntermediateKey,
-			Password:   []byte(a.config.Password),
-		})
-		if err != nil {
-			return err
-		}
-		a.x509Signer = signer
 		a.x509Issuer = crt
+
+		// Read signer only is the CAS is the default one.
+		if a.config.CAS.HasType(casapi.SoftCAS) {
+			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.IntermediateKey,
+				Password:   []byte(a.config.Password),
+			})
+			if err != nil {
+				return err
+			}
+			a.x509Signer = signer
+		}
+	}
+
+	// Initialize the X.509 CA Service if it has not been set in the options
+	if a.x509CAService == nil {
+		var options casapi.Options
+		if a.config.CAS != nil {
+			options = *a.config.CAS
+		}
+
+		// Set issuer and signer for default CAS.
+		if options.HasType(casapi.SoftCAS) {
+			crt, err := pemutil.ReadCertificate(a.config.IntermediateCert)
+			if err != nil {
+				return err
+			}
+
+			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.IntermediateKey,
+				Password:   []byte(a.config.Password),
+			})
+			if err != nil {
+				return err
+			}
+
+			options.Issuer = crt
+			options.Signer = signer
+		}
+
+		a.x509CAService, err = cas.New(context.Background(), options)
+		if err != nil {
+			return nil
+		}
 	}
 
 	// Decrypt and load SSH keys
