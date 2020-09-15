@@ -138,6 +138,7 @@ func createSubjectAlternativeNames(cert *x509.Certificate) *pb.SubjectAltNames {
 		var rawValues []asn1.RawValue
 		if _, err := asn1.Unmarshal(ext.Value, &rawValues); err == nil {
 			var newValues []asn1.RawValue
+
 			for _, v := range rawValues {
 				switch v.Tag {
 				case nameTypeDNS:
@@ -252,15 +253,15 @@ func createReusableConfig(cert *x509.Certificate) *pb.ReusableConfigWrapper {
 	values := &pb.ReusableConfigValues{
 		KeyUsage: &pb.KeyUsage{
 			BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
-				DigitalSignature:  cert.KeyUsage&x509.KeyUsageDigitalSignature == 1,
-				ContentCommitment: cert.KeyUsage&x509.KeyUsageContentCommitment == 1,
-				KeyEncipherment:   cert.KeyUsage&x509.KeyUsageKeyEncipherment == 1,
-				DataEncipherment:  cert.KeyUsage&x509.KeyUsageDataEncipherment == 1,
-				KeyAgreement:      cert.KeyUsage&x509.KeyUsageKeyAgreement == 1,
-				CertSign:          cert.KeyUsage&x509.KeyUsageCertSign == 1,
-				CrlSign:           cert.KeyUsage&x509.KeyUsageCRLSign == 1,
-				EncipherOnly:      cert.KeyUsage&x509.KeyUsageEncipherOnly == 1,
-				DecipherOnly:      cert.KeyUsage&x509.KeyUsageDecipherOnly == 1,
+				DigitalSignature:  cert.KeyUsage&x509.KeyUsageDigitalSignature > 0,
+				ContentCommitment: cert.KeyUsage&x509.KeyUsageContentCommitment > 0,
+				KeyEncipherment:   cert.KeyUsage&x509.KeyUsageKeyEncipherment > 0,
+				DataEncipherment:  cert.KeyUsage&x509.KeyUsageDataEncipherment > 0,
+				KeyAgreement:      cert.KeyUsage&x509.KeyUsageKeyAgreement > 0,
+				CertSign:          cert.KeyUsage&x509.KeyUsageCertSign > 0,
+				CrlSign:           cert.KeyUsage&x509.KeyUsageCRLSign > 0,
+				EncipherOnly:      cert.KeyUsage&x509.KeyUsageEncipherOnly > 0,
+				DecipherOnly:      cert.KeyUsage&x509.KeyUsageDecipherOnly > 0,
 			},
 			ExtendedKeyUsage:         ekuOptions,
 			UnknownExtendedKeyUsages: unknownEKUs,
