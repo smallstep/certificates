@@ -2,15 +2,15 @@ package cloudcas
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/asn1"
-	"encoding/json"
 	"encoding/pem"
-	"fmt"
 	"time"
 
 	privateca "cloud.google.com/go/security/privateca/apiv1beta1"
 	"github.com/google/uuid"
+	gax "github.com/googleapis/gax-go/v2"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"google.golang.org/api/option"
@@ -24,9 +24,11 @@ func init() {
 	})
 }
 
-func debug(v interface{}) {
-	b, _ := json.MarshalIndent(v, "", "  ")
-	fmt.Println(string(b))
+// CertificateAuthorityClient is the interface implemented by the Google CAS
+// client.
+type CertificateAuthorityClient interface {
+	CreateCertificate(ctx context.Context, req *pb.CreateCertificateRequest, opts ...gax.CallOption) (*pb.Certificate, error)
+	RevokeCertificate(ctx context.Context, req *pb.RevokeCertificateRequest, opts ...gax.CallOption) (*pb.Certificate, error)
 }
 
 var (
@@ -34,13 +36,40 @@ var (
 	stepOIDCertificateAuthority = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 2)...)
 )
 
+// recocationCodeMap maps revocation reason codes from RFC 5280, to Google CAS
+// revocation reasons. Revocation reason 7 is not used, and revocation reason 8
+// (removeFromCRL) is not supported by Google CAS.
+var revocationCodeMap = map[int]pb.RevocationReason{
+	0:  pb.RevocationReason_REVOCATION_REASON_UNSPECIFIED,
+	1:  pb.RevocationReason_KEY_COMPROMISE,
+	2:  pb.RevocationReason_CERTIFICATE_AUTHORITY_COMPROMISE,
+	3:  pb.RevocationReason_AFFILIATION_CHANGED,
+	4:  pb.RevocationReason_SUPERSEDED,
+	5:  pb.RevocationReason_CESSATION_OF_OPERATION,
+	6:  pb.RevocationReason_CERTIFICATE_HOLD,
+	9:  pb.RevocationReason_PRIVILEGE_WITHDRAWN,
+	10: pb.RevocationReason_ATTRIBUTE_AUTHORITY_COMPROMISE,
+}
+
 // CloudCAS implements a Certificate Authority Service using Google Cloud CAS.
 type CloudCAS struct {
-	client               *privateca.CertificateAuthorityClient
+	client               CertificateAuthorityClient
 	certificateAuthority string
 }
 
-type caClient interface{}
+// newCertificateAuthorityClient creates the certificate authority client. This
+// function is used for testing purposes.
+var newCertificateAuthorityClient = func(ctx context.Context, credentialsFile string) (CertificateAuthorityClient, error) {
+	var cloudOpts []option.ClientOption
+	if credentialsFile != "" {
+		cloudOpts = append(cloudOpts, option.WithCredentialsFile(credentialsFile))
+	}
+	client, err := privateca.NewCertificateAuthorityClient(ctx, cloudOpts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating client")
+	}
+	return client, nil
+}
 
 // New creates a new CertificateAuthorityService implementation using Google
 // Cloud CAS.
@@ -49,14 +78,9 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 		return nil, errors.New("cloudCAS 'certificateAuthority' cannot be empty")
 	}
 
-	var cloudOpts []option.ClientOption
-	if opts.CredentialsFile != "" {
-		cloudOpts = append(cloudOpts, option.WithCredentialsFile(opts.CredentialsFile))
-	}
-
-	client, err := privateca.NewCertificateAuthorityClient(ctx, cloudOpts...)
+	client, err := newCertificateAuthorityClient(ctx, opts.CredentialsFile)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating client")
+		return nil, err
 	}
 
 	return &CloudCAS{
@@ -109,7 +133,11 @@ func (c *CloudCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.
 
 // RevokeCertificate a certificate using Google Cloud CAS.
 func (c *CloudCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {
-	if req.Certificate == nil {
+	reason, ok := revocationCodeMap[req.ReasonCode]
+	switch {
+	case !ok:
+		return nil, errors.Errorf("revokeCertificate 'reasonCode=%d' is invalid or not supported", req.ReasonCode)
+	case req.Certificate == nil:
 		return nil, errors.New("revokeCertificateRequest `certificate` cannot be nil")
 	}
 
@@ -119,7 +147,7 @@ func (c *CloudCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv
 	}
 
 	var cae apiv1.CertificateAuthorityExtension
-	if _, err := asn1.Unmarshal(ext.Value, &ext); err != nil {
+	if _, err := asn1.Unmarshal(ext.Value, &cae); err != nil {
 		return nil, errors.Wrap(err, "error unmarshaling certificate authority extension")
 	}
 
@@ -127,8 +155,9 @@ func (c *CloudCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv
 	defer cancel()
 
 	certpb, err := c.client.RevokeCertificate(ctx, &pb.RevokeCertificateRequest{
-		Name:   c.certificateAuthority + "/certificates/" + cae.CertificateID,
-		Reason: pb.RevocationReason_REVOCATION_REASON_UNSPECIFIED,
+		Name:      c.certificateAuthority + "/certificates/" + cae.CertificateID,
+		Reason:    reason,
+		RequestId: req.RequestID,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cloudCAS RevokeCertificate failed")
@@ -192,7 +221,7 @@ func defaultContext() (context.Context, context.CancelFunc) {
 }
 
 func createCertificateID() (string, error) {
-	id, err := uuid.NewRandom()
+	id, err := uuid.NewRandomFromReader(rand.Reader)
 	if err != nil {
 		return "", errors.Wrap(err, "error creating certificate id")
 	}

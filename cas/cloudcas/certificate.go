@@ -70,7 +70,7 @@ func createPublicKey(key crypto.PublicKey) (*pb.PublicKey, error) {
 			return nil, errors.Wrap(err, "error marshaling public key")
 		}
 		return &pb.PublicKey{
-			Type: pb.PublicKey_PEM_RSA_KEY,
+			Type: pb.PublicKey_PEM_EC_KEY,
 			Key: pem.EncodeToMemory(&pem.Block{
 				Type:  "PUBLIC KEY",
 				Bytes: asn1Bytes,
@@ -215,9 +215,9 @@ func createReusableConfig(cert *x509.Certificate) *pb.ReusableConfigWrapper {
 		unknownEKUs = append(unknownEKUs, createObjectID(oid))
 	}
 
-	policyIDs := make([]*pb.ObjectId, len(cert.PolicyIdentifiers))
-	for i, oid := range cert.PolicyIdentifiers {
-		policyIDs[i] = createObjectID(oid)
+	var policyIDs []*pb.ObjectId
+	for _, oid := range cert.PolicyIdentifiers {
+		policyIDs = append(policyIDs, createObjectID(oid))
 	}
 
 	var caOptions *pb.ReusableConfigValues_CaOptions
