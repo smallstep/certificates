@@ -33,7 +33,7 @@ func TestRegister(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			Register(tt.args.t, tt.args.fn)
 			fmt.Println(registry)
-			fn, ok := registry.LoadAndDelete(tt.args.t.String())
+			fn, ok := registry.Load(tt.args.t.String())
 			if !ok {
 				t.Errorf("Register() failed")
 				return
