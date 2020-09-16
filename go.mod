@@ -7,7 +7,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.1.0
 	github.com/aws/aws-sdk-go v1.30.29
 	github.com/go-chi/chi v4.0.2+incompatible
-	github.com/go-piv/piv-go v1.5.0
+	github.com/go-piv/piv-go v1.6.0
 	github.com/googleapis/gax-go/v2 v2.0.5
 	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
 	github.com/lunixbochs/vtclean v1.0.0 // indirect
