@@ -8,6 +8,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/cas"
+	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/kms"
 	"golang.org/x/crypto/ssh"
@@ -92,8 +94,15 @@ func WithKeyManager(k kms.KeyManager) Option {
 // WithX509Signer defines the signer used to sign X509 certificates.
 func WithX509Signer(crt *x509.Certificate, s crypto.Signer) Option {
 	return func(a *Authority) error {
-		a.x509Issuer = crt
-		a.x509Signer = s
+		srv, err := cas.New(context.Background(), casapi.Options{
+			Type:   casapi.SoftCAS,
+			Issuer: crt,
+			Signer: s,
+		})
+		if err != nil {
+			return err
+		}
+		a.x509CAService = srv
 		return nil
 	}
 }

@@ -55,6 +55,14 @@ func (m *certificateDurationEnforcer) Enforce(cert *x509.Certificate) error {
 	return nil
 }
 
+func getDefaultIssuer(a *Authority) *x509.Certificate {
+	return a.x509CAService.(*softcas.SoftCAS).Issuer
+}
+
+func getDefaultSigner(a *Authority) crypto.Signer {
+	return a.x509CAService.(*softcas.SoftCAS).Signer
+}
+
 func generateCertificate(t *testing.T, commonName string, sans []string, opts ...interface{}) *x509.Certificate {
 	t.Helper()
 
@@ -541,17 +549,15 @@ ZYtQ9Ot36qc=
 						assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
 					}
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
-
 					assert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
 					assert.Equals(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
-					assert.Equals(t, leaf.ExtKeyUsage,
-						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
+					assert.Equals(t, leaf.ExtKeyUsage, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 
+					issuer := getDefaultIssuer(a)
 					subjectKeyID, err := generateSubjectKeyID(pub)
 					assert.FatalError(t, err)
 					assert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
-
-					assert.Equals(t, leaf.AuthorityKeyId, a.x509Issuer.SubjectKeyId)
+					assert.Equals(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
 
 					// Verify Provisioner OID
 					found := 0
@@ -587,8 +593,7 @@ ZYtQ9Ot36qc=
 						}
 					}
 					assert.Equals(t, found, 1)
-
-					realIntermediate, err := x509.ParseCertificate(a.x509Issuer.Raw)
+					realIntermediate, err := x509.ParseCertificate(issuer.Raw)
 					assert.FatalError(t, err)
 					assert.Equals(t, intermediate, realIntermediate)
 				}
@@ -616,17 +621,20 @@ func TestAuthority_Renew(t *testing.T) {
 		NotAfter:  provisioner.NewTimeDuration(na1),
 	}
 
+	issuer := getDefaultIssuer(a)
+	signer := getDefaultSigner(a)
+
 	cert := generateCertificate(t, "renew", []string{"test.smallstep.com", "test"},
 		withNotBeforeNotAfter(so.NotBefore.Time(), so.NotAfter.Time()),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID),
-		withSigner(a.x509Issuer, a.x509Signer))
+		withSigner(issuer, signer))
 
 	certNoRenew := generateCertificate(t, "renew", []string{"test.smallstep.com", "test"},
 		withNotBeforeNotAfter(so.NotBefore.Time(), so.NotAfter.Time()),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].(*provisioner.JWK).Key.KeyID),
-		withSigner(a.x509Issuer, a.x509Signer))
+		withSigner(issuer, signer))
 
 	type renewTest struct {
 		auth *Authority
@@ -665,8 +673,6 @@ func TestAuthority_Renew(t *testing.T) {
 			_a := testAuthority(t)
 			_a.x509CAService.(*softcas.SoftCAS).Issuer = intCert
 			_a.x509CAService.(*softcas.SoftCAS).Signer = intSigner
-			_a.x509Signer = intSigner
-			_a.x509Issuer = intCert
 			return &renewTest{
 				auth: _a,
 				cert: cert,
@@ -733,8 +739,9 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
 
 					// We did not change the intermediate before renewing.
-					if a.x509Issuer.SerialNumber == tc.auth.x509Issuer.SerialNumber {
-						assert.Equals(t, leaf.AuthorityKeyId, a.x509Issuer.SubjectKeyId)
+					authIssuer := getDefaultIssuer(tc.auth)
+					if issuer.SerialNumber == authIssuer.SerialNumber {
+						assert.Equals(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -754,7 +761,7 @@ func TestAuthority_Renew(t *testing.T) {
 						}
 					} else {
 						// We did change the intermediate before renewing.
-						assert.Equals(t, leaf.AuthorityKeyId, tc.auth.x509Issuer.SubjectKeyId)
+						assert.Equals(t, leaf.AuthorityKeyId, authIssuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -782,7 +789,7 @@ func TestAuthority_Renew(t *testing.T) {
 						}
 					}
 
-					realIntermediate, err := x509.ParseCertificate(tc.auth.x509Issuer.Raw)
+					realIntermediate, err := x509.ParseCertificate(authIssuer.Raw)
 					assert.FatalError(t, err)
 					assert.Equals(t, intermediate, realIntermediate)
 				}
@@ -813,17 +820,20 @@ func TestAuthority_Rekey(t *testing.T) {
 		NotAfter:  provisioner.NewTimeDuration(na1),
 	}
 
+	issuer := getDefaultIssuer(a)
+	signer := getDefaultSigner(a)
+
 	cert := generateCertificate(t, "renew", []string{"test.smallstep.com", "test"},
 		withNotBeforeNotAfter(so.NotBefore.Time(), so.NotAfter.Time()),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID),
-		withSigner(a.x509Issuer, a.x509Signer))
+		withSigner(issuer, signer))
 
 	certNoRenew := generateCertificate(t, "renew", []string{"test.smallstep.com", "test"},
 		withNotBeforeNotAfter(so.NotBefore.Time(), so.NotAfter.Time()),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
 		withProvisionerOID("dev", a.config.AuthorityConfig.Provisioners[2].(*provisioner.JWK).Key.KeyID),
-		withSigner(a.x509Issuer, a.x509Signer))
+		withSigner(issuer, signer))
 
 	type renewTest struct {
 		auth *Authority
@@ -870,8 +880,6 @@ func TestAuthority_Rekey(t *testing.T) {
 			_a := testAuthority(t)
 			_a.x509CAService.(*softcas.SoftCAS).Issuer = intCert
 			_a.x509CAService.(*softcas.SoftCAS).Signer = intSigner
-			_a.x509Signer = intSigner
-			_a.x509Issuer = intCert
 			return &renewTest{
 				auth: _a,
 				cert: cert,
@@ -948,8 +956,9 @@ func TestAuthority_Rekey(t *testing.T) {
 					}
 
 					// We did not change the intermediate before renewing.
-					if a.x509Issuer.SerialNumber == tc.auth.x509Issuer.SerialNumber {
-						assert.Equals(t, leaf.AuthorityKeyId, a.x509Issuer.SubjectKeyId)
+					authIssuer := getDefaultIssuer(tc.auth)
+					if issuer.SerialNumber == authIssuer.SerialNumber {
+						assert.Equals(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -969,7 +978,7 @@ func TestAuthority_Rekey(t *testing.T) {
 						}
 					} else {
 						// We did change the intermediate before renewing.
-						assert.Equals(t, leaf.AuthorityKeyId, tc.auth.x509Issuer.SubjectKeyId)
+						assert.Equals(t, leaf.AuthorityKeyId, authIssuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -997,7 +1006,7 @@ func TestAuthority_Rekey(t *testing.T) {
 						}
 					}
 
-					realIntermediate, err := x509.ParseCertificate(tc.auth.x509Issuer.Raw)
+					realIntermediate, err := x509.ParseCertificate(authIssuer.Raw)
 					assert.FatalError(t, err)
 					assert.Equals(t, intermediate, realIntermediate)
 				}

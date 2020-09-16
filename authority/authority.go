@@ -2,7 +2,6 @@ package authority
 
 import (
 	"context"
-	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -39,8 +38,6 @@ type Authority struct {
 	x509CAService      cas.CertificateAuthorityService
 	rootX509Certs      []*x509.Certificate
 	federatedX509Certs []*x509.Certificate
-	x509Signer         crypto.Signer
-	x509Issuer         *x509.Certificate
 	certificates       *sync.Map
 
 	// SSH CA
@@ -110,9 +107,9 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 		return nil, errors.New("cannot create an authority without a configuration")
 	case len(a.rootX509Certs) == 0 && a.config.Root.HasEmpties():
 		return nil, errors.New("cannot create an authority without a root certificate")
-	case a.x509Issuer == nil && a.config.IntermediateCert == "":
+	case a.x509CAService == nil && a.config.IntermediateCert == "":
 		return nil, errors.New("cannot create an authority without an issuer certificate")
-	case a.x509Signer == nil && a.config.IntermediateKey == "":
+	case a.x509CAService == nil && a.config.IntermediateKey == "":
 		return nil, errors.New("cannot create an authority without an issuer signer")
 	}
 
@@ -188,38 +185,26 @@ func (a *Authority) init() error {
 		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
 	}
 
-	// Read intermediate and create X509 signer.
-	if a.x509Signer == nil {
-		crt, err := pemutil.ReadCertificate(a.config.IntermediateCert)
-		if err != nil {
-			return err
-		}
-		a.x509Issuer = crt
-
-		// Read signer only is the CAS is the default one.
-		if a.config.CAS.HasType(casapi.SoftCAS) {
-			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-				SigningKey: a.config.IntermediateKey,
-				Password:   []byte(a.config.Password),
-			})
-			if err != nil {
-				return err
-			}
-			a.x509Signer = signer
-		}
-	}
-
-	// Initialize the X.509 CA Service if it has not been set in the options
+	// Initialize the X.509 CA Service if it has not been set in the options.
 	if a.x509CAService == nil {
 		var options casapi.Options
 		if a.config.CAS != nil {
 			options = *a.config.CAS
 		}
 
-		// Set issuer and signer for default CAS.
+		// Read intermediate and create X509 signer for default CAS.
 		if options.HasType(casapi.SoftCAS) {
-			options.Issuer = a.x509Issuer
-			options.Signer = a.x509Signer
+			options.Issuer, err = pemutil.ReadCertificate(a.config.IntermediateCert)
+			if err != nil {
+				return err
+			}
+			options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.IntermediateKey,
+				Password:   []byte(a.config.Password),
+			})
+			if err != nil {
+				return err
+			}
 		}
 
 		a.x509CAService, err = cas.New(context.Background(), options)
