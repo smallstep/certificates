@@ -239,18 +239,22 @@ func TestNew_real(t *testing.T) {
 		opts apiv1.Options
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name     string
+		skipOnCI bool
+		args     args
+		wantErr  bool
 	}{
-		{"fail default credentials", args{context.Background(), apiv1.Options{Certificateauthority: testAuthorityName}}, true},
-		{"fail certificate authority", args{context.Background(), apiv1.Options{}}, true},
-		{"fail with credentials", args{context.Background(), apiv1.Options{
+		{"fail default credentials", true, args{context.Background(), apiv1.Options{Certificateauthority: testAuthorityName}}, true},
+		{"fail certificate authority", false, args{context.Background(), apiv1.Options{}}, true},
+		{"fail with credentials", false, args{context.Background(), apiv1.Options{
 			Certificateauthority: testAuthorityName, CredentialsFile: "testdata/missing.json",
 		}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.skipOnCI && os.Getenv("CI") == "true" {
+				t.SkipNow()
+			}
 			_, err := New(tt.args.ctx, tt.args.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
