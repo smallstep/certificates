@@ -31,11 +31,6 @@ type CertificateAuthorityClient interface {
 	RevokeCertificate(ctx context.Context, req *pb.RevokeCertificateRequest, opts ...gax.CallOption) (*pb.Certificate, error)
 }
 
-var (
-	stepOIDRoot                 = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
-	stepOIDCertificateAuthority = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 2)...)
-)
-
 // recocationCodeMap maps revocation reason codes from RFC 5280, to Google CAS
 // revocation reasons. Revocation reason 7 is not used, and revocation reason 8
 // (removeFromCRL) is not supported by Google CAS.

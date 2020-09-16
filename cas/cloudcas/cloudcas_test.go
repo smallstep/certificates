@@ -343,7 +343,7 @@ func TestCloudCAS_createCertificate(t *testing.T) {
 		{"fail create id", fields{okTestClient(), testAuthorityName}, args{leaf, 24 * time.Hour, "request-id"}, nil, nil, true},
 	}
 
-	// Pre-calulate rand.Random
+	// Pre-calculate rand.Random
 	buf := new(bytes.Buffer)
 	setTeeReader(t, buf)
 	for i := 0; i < len(tests)-1; i++ {
