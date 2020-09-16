@@ -193,6 +193,39 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestNew_register(t *testing.T) {
+	tmp := newCertificateAuthorityClient
+	newCertificateAuthorityClient = func(ctx context.Context, credentialsFile string) (CertificateAuthorityClient, error) {
+		return newTestClient(credentialsFile)
+	}
+	t.Cleanup(func() {
+		newCertificateAuthorityClient = tmp
+	})
+
+	want := &CloudCAS{
+		client:               &testClient{credentialsFile: "testdata/credentials.json"},
+		certificateAuthority: testAuthorityName,
+	}
+
+	newFn, ok := apiv1.LoadCertificateAuthorityServiceNewFunc(apiv1.CloudCAS)
+	if !ok {
+		t.Error("apiv1.LoadCertificateAuthorityServiceNewFunc(apiv1.CloudCAS) was not found")
+		return
+	}
+
+	got, err := newFn(context.Background(), apiv1.Options{
+		Certificateauthority: testAuthorityName, CredentialsFile: "testdata/credentials.json",
+	})
+	if err != nil {
+		t.Errorf("New() error = %v", err)
+		return
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("New() = %v, want %v", got, want)
+	}
+
+}
+
 func TestNew_real(t *testing.T) {
 	if v, ok := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS"); ok {
 		os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")

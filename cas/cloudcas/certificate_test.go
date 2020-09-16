@@ -8,14 +8,18 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
+	"net"
+	"net/url"
 	"reflect"
 	"testing"
 
 	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1beta1"
+	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 var (
-	testLeafPrivateKey = `-----BEGIN PUBLIC KEY-----
+	testLeafPublicKey = `-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEAdUSRBrpgHFilN4eaGlNnX2+xfjX
 a1Iwk2/+AensjFTXJi1UAIB0e+4pqi7Sen5E2QVBhntEHCrA3xOf7czgPw==
 -----END PUBLIC KEY-----
@@ -85,7 +89,7 @@ func Test_createCertificateConfig(t *testing.T) {
 				},
 				PublicKey: &pb.PublicKey{
 					Type: pb.PublicKey_PEM_EC_KEY,
-					Key:  []byte(testLeafPrivateKey),
+					Key:  []byte(testLeafPublicKey),
 				},
 			},
 		}, false},
@@ -123,7 +127,7 @@ func Test_createPublicKey(t *testing.T) {
 	}{
 		{"ok ec", args{ecCert.PublicKey}, &pb.PublicKey{
 			Type: pb.PublicKey_PEM_EC_KEY,
-			Key:  []byte(testLeafPrivateKey),
+			Key:  []byte(testLeafPublicKey),
 		}, false},
 		{"ok rsa", args{rsaCert.PublicKey}, &pb.PublicKey{
 			Type: pb.PublicKey_PEM_RSA_KEY,
@@ -192,6 +196,21 @@ func Test_createSubject(t *testing.T) {
 }
 
 func Test_createSubjectAlternativeNames(t *testing.T) {
+	marshalRawValues := func(rawValues []asn1.RawValue) []byte {
+		b, err := asn1.Marshal(rawValues)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+
+	uri := func(s string) *url.URL {
+		u, err := url.Parse(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
 	type args struct {
 		cert *x509.Certificate
 	}
@@ -201,12 +220,328 @@ func Test_createSubjectAlternativeNames(t *testing.T) {
 		want *pb.SubjectAltNames
 	}{
 		{"ok empty", args{&x509.Certificate{}}, &pb.SubjectAltNames{}},
-		// TODO
+		{"ok dns", args{&x509.Certificate{DNSNames: []string{
+			"doe.com", "doe.org",
+		}}}, &pb.SubjectAltNames{DnsNames: []string{"doe.com", "doe.org"}}},
+		{"ok emails", args{&x509.Certificate{EmailAddresses: []string{
+			"john@doe.com", "jane@doe.com",
+		}}}, &pb.SubjectAltNames{EmailAddresses: []string{"john@doe.com", "jane@doe.com"}}},
+		{"ok ips", args{&x509.Certificate{IPAddresses: []net.IP{
+			net.ParseIP("127.0.0.1"), net.ParseIP("1.2.3.4"),
+			net.ParseIP("::1"), net.ParseIP("2001:0db8:85a3:a0b:12f0:8a2e:0370:7334"), net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+		}}}, &pb.SubjectAltNames{IpAddresses: []string{"127.0.0.1", "1.2.3.4", "::1", "2001:db8:85a3:a0b:12f0:8a2e:370:7334", "2001:db8:85a3::8a2e:370:7334"}}},
+		{"ok uris", args{&x509.Certificate{URIs: []*url.URL{
+			uri("mailto:john@doe.com"), uri("https://john@doe.com/hello"),
+		}}}, &pb.SubjectAltNames{Uris: []string{"mailto:john@doe.com", "https://john@doe.com/hello"}}},
+		{"ok extensions", args{&x509.Certificate{
+			ExtraExtensions: []pkix.Extension{{
+				Id: []int{2, 5, 29, 17}, Critical: true, Value: []byte{
+					0x30, 0x48, 0x82, 0x0b, 0x77, 0x77, 0x77, 0x2e, 0x64, 0x6f, 0x65, 0x2e, 0x63, 0x6f, 0x6d, 0x81,
+					0x0c, 0x6a, 0x61, 0x6e, 0x65, 0x40, 0x64, 0x6f, 0x65, 0x2e, 0x63, 0x6f, 0x6d, 0x87, 0x04, 0x01,
+					0x02, 0x03, 0x04, 0x87, 0x10, 0x20, 0x01, 0x0d, 0xb8, 0x85, 0xa3, 0x0a, 0x0b, 0x12, 0xf0, 0x8a,
+					0x2e, 0x03, 0x70, 0x73, 0x34, 0x86, 0x13, 0x6d, 0x61, 0x69, 0x6c, 0x74, 0x6f, 0x3a, 0x6a, 0x61,
+					0x6e, 0x65, 0x40, 0x64, 0x6f, 0x65, 0x2e, 0x63, 0x6f, 0x6d,
+				},
+			}},
+		}}, &pb.SubjectAltNames{
+			CustomSans: []*pb.X509Extension{{
+				ObjectId: &pb.ObjectId{ObjectIdPath: []int32{2, 5, 29, 17}},
+				Critical: true,
+				Value: []byte{
+					0x30, 0x48, 0x82, 0x0b, 0x77, 0x77, 0x77, 0x2e, 0x64, 0x6f, 0x65, 0x2e, 0x63, 0x6f, 0x6d, 0x81,
+					0x0c, 0x6a, 0x61, 0x6e, 0x65, 0x40, 0x64, 0x6f, 0x65, 0x2e, 0x63, 0x6f, 0x6d, 0x87, 0x04, 0x01,
+					0x02, 0x03, 0x04, 0x87, 0x10, 0x20, 0x01, 0x0d, 0xb8, 0x85, 0xa3, 0x0a, 0x0b, 0x12, 0xf0, 0x8a,
+					0x2e, 0x03, 0x70, 0x73, 0x34, 0x86, 0x13, 0x6d, 0x61, 0x69, 0x6c, 0x74, 0x6f, 0x3a, 0x6a, 0x61,
+					0x6e, 0x65, 0x40, 0x64, 0x6f, 0x65, 0x2e, 0x63, 0x6f, 0x6d,
+				},
+			}},
+		}},
+		{"ok extra extensions", args{&x509.Certificate{
+			DNSNames: []string{"doe.com"},
+			ExtraExtensions: []pkix.Extension{{
+				Id: []int{2, 5, 29, 17}, Critical: true, Value: marshalRawValues([]asn1.RawValue{
+					{Class: asn1.ClassApplication, Tag: 2, IsCompound: true, Bytes: []byte{}},
+					{Class: asn1.ClassContextSpecific, Tag: nameTypeDNS, Bytes: []byte("doe.com")},
+					{Class: asn1.ClassContextSpecific, Tag: nameTypeEmail, Bytes: []byte("jane@doe.com")},
+					{Class: asn1.ClassContextSpecific, Tag: 8, Bytes: []byte("foo.bar")},
+				}),
+			}},
+		}}, &pb.SubjectAltNames{
+			DnsNames: []string{"doe.com"},
+			CustomSans: []*pb.X509Extension{{
+				ObjectId: &pb.ObjectId{ObjectIdPath: []int32{2, 5, 29, 17}},
+				Critical: true,
+				Value: marshalRawValues([]asn1.RawValue{
+					{Class: asn1.ClassApplication, Tag: 2, IsCompound: true, Bytes: []byte{}},
+					{Class: asn1.ClassContextSpecific, Tag: nameTypeEmail, Bytes: []byte("jane@doe.com")},
+					{Class: asn1.ClassContextSpecific, Tag: 8, Bytes: []byte("foo.bar")},
+				}),
+			}},
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := createSubjectAlternativeNames(tt.args.cert); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("createSubjectAlternativeNames() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_createReusableConfig(t *testing.T) {
+	withKU := func(ku *pb.KeyUsage) *pb.ReusableConfigWrapper {
+		if ku.BaseKeyUsage == nil {
+			ku.BaseKeyUsage = &pb.KeyUsage_KeyUsageOptions{}
+		}
+		if ku.ExtendedKeyUsage == nil {
+			ku.ExtendedKeyUsage = &pb.KeyUsage_ExtendedKeyUsageOptions{}
+		}
+		return &pb.ReusableConfigWrapper{
+			ConfigValues: &pb.ReusableConfigWrapper_ReusableConfigValues{
+				ReusableConfigValues: &pb.ReusableConfigValues{
+					KeyUsage: ku,
+				},
+			},
+		}
+	}
+	withRCV := func(rcv *pb.ReusableConfigValues) *pb.ReusableConfigWrapper {
+		if rcv.KeyUsage == nil {
+			rcv.KeyUsage = &pb.KeyUsage{
+				BaseKeyUsage:     &pb.KeyUsage_KeyUsageOptions{},
+				ExtendedKeyUsage: &pb.KeyUsage_ExtendedKeyUsageOptions{},
+			}
+		}
+		return &pb.ReusableConfigWrapper{
+			ConfigValues: &pb.ReusableConfigWrapper_ReusableConfigValues{
+				ReusableConfigValues: rcv,
+			},
+		}
+	}
+
+	type args struct {
+		cert *x509.Certificate
+	}
+	tests := []struct {
+		name string
+		args args
+		want *pb.ReusableConfigWrapper
+	}{
+		{"keyUsageDigitalSignature", args{&x509.Certificate{
+			KeyUsage: x509.KeyUsageDigitalSignature,
+		}}, &pb.ReusableConfigWrapper{
+			ConfigValues: &pb.ReusableConfigWrapper_ReusableConfigValues{
+				ReusableConfigValues: &pb.ReusableConfigValues{
+					KeyUsage: &pb.KeyUsage{
+						BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
+							DigitalSignature: true,
+						},
+						ExtendedKeyUsage:         &pb.KeyUsage_ExtendedKeyUsageOptions{},
+						UnknownExtendedKeyUsages: nil,
+					},
+					CaOptions:            nil,
+					PolicyIds:            nil,
+					AiaOcspServers:       nil,
+					AdditionalExtensions: nil,
+				},
+			},
+		}},
+		// KeyUsage
+		{"KeyUsageDigitalSignature", args{&x509.Certificate{KeyUsage: x509.KeyUsageDigitalSignature}}, withKU(&pb.KeyUsage{
+			BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
+				DigitalSignature: true,
+			},
+		})},
+		{"KeyUsageContentCommitment", args{&x509.Certificate{KeyUsage: x509.KeyUsageContentCommitment}}, withKU(&pb.KeyUsage{
+			BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
+				ContentCommitment: true,
+			},
+		})},
+		{"KeyUsageKeyEncipherment", args{&x509.Certificate{KeyUsage: x509.KeyUsageKeyEncipherment}}, withKU(&pb.KeyUsage{
+			BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
+				KeyEncipherment: true,
+			},
+		})},
+		{"KeyUsageDataEncipherment", args{&x509.Certificate{KeyUsage: x509.KeyUsageDataEncipherment}}, withKU(&pb.KeyUsage{
+			BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
+				DataEncipherment: true,
+			},
+		})},
+		{"KeyUsageKeyAgreement", args{&x509.Certificate{KeyUsage: x509.KeyUsageKeyAgreement}}, withKU(&pb.KeyUsage{
+			BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
+				KeyAgreement: true,
+			},
+		})},
+		{"KeyUsageCertSign", args{&x509.Certificate{KeyUsage: x509.KeyUsageCertSign}}, withKU(&pb.KeyUsage{
+			BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
+				CertSign: true,
+			},
+		})},
+		{"KeyUsageCRLSign", args{&x509.Certificate{KeyUsage: x509.KeyUsageCRLSign}}, withKU(&pb.KeyUsage{
+			BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
+				CrlSign: true,
+			},
+		})},
+		{"KeyUsageEncipherOnly", args{&x509.Certificate{KeyUsage: x509.KeyUsageEncipherOnly}}, withKU(&pb.KeyUsage{
+			BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
+				EncipherOnly: true,
+			},
+		})},
+		{"KeyUsageDecipherOnly", args{&x509.Certificate{KeyUsage: x509.KeyUsageDecipherOnly}}, withKU(&pb.KeyUsage{
+			BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
+				DecipherOnly: true,
+			},
+		})},
+		// ExtKeyUsage
+		{"ExtKeyUsageAny", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageAny}}}, withKU(&pb.KeyUsage{
+			UnknownExtendedKeyUsages: []*pb.ObjectId{{ObjectIdPath: []int32{2, 5, 29, 37, 0}}},
+		})},
+		{"ExtKeyUsageServerAuth", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}}, withKU(&pb.KeyUsage{
+			ExtendedKeyUsage: &pb.KeyUsage_ExtendedKeyUsageOptions{
+				ServerAuth: true,
+			},
+		})},
+		{"ExtKeyUsageClientAuth", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}}, withKU(&pb.KeyUsage{
+			ExtendedKeyUsage: &pb.KeyUsage_ExtendedKeyUsageOptions{
+				ClientAuth: true,
+			},
+		})},
+		{"ExtKeyUsageCodeSigning", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning}}}, withKU(&pb.KeyUsage{
+			ExtendedKeyUsage: &pb.KeyUsage_ExtendedKeyUsageOptions{
+				CodeSigning: true,
+			},
+		})},
+		{"ExtKeyUsageEmailProtection", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageEmailProtection}}}, withKU(&pb.KeyUsage{
+			ExtendedKeyUsage: &pb.KeyUsage_ExtendedKeyUsageOptions{
+				EmailProtection: true,
+			},
+		})},
+		{"ExtKeyUsageIPSECEndSystem", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageIPSECEndSystem}}}, withKU(&pb.KeyUsage{
+			UnknownExtendedKeyUsages: []*pb.ObjectId{{ObjectIdPath: []int32{1, 3, 6, 1, 5, 5, 7, 3, 5}}},
+		})},
+		{"ExtKeyUsageIPSECTunnel", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageIPSECTunnel}}}, withKU(&pb.KeyUsage{
+			UnknownExtendedKeyUsages: []*pb.ObjectId{{ObjectIdPath: []int32{1, 3, 6, 1, 5, 5, 7, 3, 6}}},
+		})},
+		{"ExtKeyUsageIPSECUser", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageIPSECUser}}}, withKU(&pb.KeyUsage{
+			UnknownExtendedKeyUsages: []*pb.ObjectId{{ObjectIdPath: []int32{1, 3, 6, 1, 5, 5, 7, 3, 7}}},
+		})},
+		{"ExtKeyUsageTimeStamping", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageTimeStamping}}}, withKU(&pb.KeyUsage{
+			ExtendedKeyUsage: &pb.KeyUsage_ExtendedKeyUsageOptions{
+				TimeStamping: true,
+			},
+		})},
+		{"ExtKeyUsageOCSPSigning", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageOCSPSigning}}}, withKU(&pb.KeyUsage{
+			ExtendedKeyUsage: &pb.KeyUsage_ExtendedKeyUsageOptions{
+				OcspSigning: true,
+			},
+		})},
+		{"ExtKeyUsageMicrosoftServerGatedCrypto", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageMicrosoftServerGatedCrypto}}}, withKU(&pb.KeyUsage{
+			UnknownExtendedKeyUsages: []*pb.ObjectId{{ObjectIdPath: []int32{1, 3, 6, 1, 4, 1, 311, 10, 3, 3}}},
+		})},
+		{"ExtKeyUsageNetscapeServerGatedCrypto", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageNetscapeServerGatedCrypto}}}, withKU(&pb.KeyUsage{
+			UnknownExtendedKeyUsages: []*pb.ObjectId{{ObjectIdPath: []int32{2, 16, 840, 1, 113730, 4, 1}}},
+		})},
+		{"ExtKeyUsageMicrosoftCommercialCodeSigning", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageMicrosoftCommercialCodeSigning}}}, withKU(&pb.KeyUsage{
+			UnknownExtendedKeyUsages: []*pb.ObjectId{{ObjectIdPath: []int32{1, 3, 6, 1, 4, 1, 311, 2, 1, 22}}},
+		})},
+		{"ExtKeyUsageMicrosoftKernelCodeSigning", args{&x509.Certificate{ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageMicrosoftKernelCodeSigning}}}, withKU(&pb.KeyUsage{
+			UnknownExtendedKeyUsages: []*pb.ObjectId{{ObjectIdPath: []int32{1, 3, 6, 1, 4, 1, 311, 61, 1, 1}}},
+		})},
+		// UnknownExtendedKeyUsages
+		{"UnknownExtKeyUsage", args{&x509.Certificate{UnknownExtKeyUsage: []asn1.ObjectIdentifier{{1, 2, 3, 4}, {4, 3, 2, 1}}}}, withKU(&pb.KeyUsage{
+			UnknownExtendedKeyUsages: []*pb.ObjectId{
+				{ObjectIdPath: []int32{1, 2, 3, 4}},
+				{ObjectIdPath: []int32{4, 3, 2, 1}},
+			},
+		})},
+		// BasicCre
+		{"BasicConstraintsCAMax0", args{&x509.Certificate{BasicConstraintsValid: true, IsCA: true, MaxPathLen: 0, MaxPathLenZero: true}}, withRCV(&pb.ReusableConfigValues{
+			CaOptions: &pb.ReusableConfigValues_CaOptions{
+				IsCa:                wrapperspb.Bool(true),
+				MaxIssuerPathLength: wrapperspb.Int32(0),
+			},
+		})},
+		{"BasicConstraintsCAMax1", args{&x509.Certificate{BasicConstraintsValid: true, IsCA: true, MaxPathLen: 1, MaxPathLenZero: false}}, withRCV(&pb.ReusableConfigValues{
+			CaOptions: &pb.ReusableConfigValues_CaOptions{
+				IsCa:                wrapperspb.Bool(true),
+				MaxIssuerPathLength: wrapperspb.Int32(1),
+			},
+		})},
+		{"BasicConstraintsCANoMax", args{&x509.Certificate{BasicConstraintsValid: true, IsCA: true, MaxPathLen: -1, MaxPathLenZero: false}}, withRCV(&pb.ReusableConfigValues{
+			CaOptions: &pb.ReusableConfigValues_CaOptions{
+				IsCa:                wrapperspb.Bool(true),
+				MaxIssuerPathLength: nil,
+			},
+		})},
+		{"BasicConstraintsCANoMax0", args{&x509.Certificate{BasicConstraintsValid: true, IsCA: true, MaxPathLen: 0, MaxPathLenZero: false}}, withRCV(&pb.ReusableConfigValues{
+			CaOptions: &pb.ReusableConfigValues_CaOptions{
+				IsCa:                wrapperspb.Bool(true),
+				MaxIssuerPathLength: nil,
+			},
+		})},
+		{"BasicConstraintsNoCA", args{&x509.Certificate{BasicConstraintsValid: true, IsCA: false, MaxPathLen: 0, MaxPathLenZero: false}}, withRCV(&pb.ReusableConfigValues{
+			CaOptions: &pb.ReusableConfigValues_CaOptions{
+				IsCa:                wrapperspb.Bool(false),
+				MaxIssuerPathLength: nil,
+			},
+		})},
+		{"BasicConstraintsNoValid", args{&x509.Certificate{BasicConstraintsValid: false, IsCA: false, MaxPathLen: 0, MaxPathLenZero: false}}, withRCV(&pb.ReusableConfigValues{
+			CaOptions: nil,
+		})},
+		// PolicyIdentifiers
+		{"PolicyIdentifiers", args{&x509.Certificate{PolicyIdentifiers: []asn1.ObjectIdentifier{{1, 2, 3, 4}, {4, 3, 2, 1}}}}, withRCV(&pb.ReusableConfigValues{
+			PolicyIds: []*pb.ObjectId{
+				{ObjectIdPath: []int32{1, 2, 3, 4}},
+				{ObjectIdPath: []int32{4, 3, 2, 1}},
+			},
+		})},
+		// OCSPServer
+		{"OCPServers", args{&x509.Certificate{OCSPServer: []string{"https://oscp.doe.com", "https://doe.com/ocsp"}}}, withRCV(&pb.ReusableConfigValues{
+			AiaOcspServers: []string{"https://oscp.doe.com", "https://doe.com/ocsp"},
+		})},
+		// Extensions
+		{"Extensions", args{&x509.Certificate{ExtraExtensions: []pkix.Extension{
+			{Id: []int{1, 2, 3, 4}, Critical: true, Value: []byte("foobar")},
+			{Id: []int{2, 5, 29, 17}, Critical: true, Value: []byte("SANs")},
+			{Id: []int{4, 3, 2, 1}, Critical: false, Value: []byte("zoobar")},
+		}}}, withRCV(&pb.ReusableConfigValues{
+			AdditionalExtensions: []*pb.X509Extension{
+				{ObjectId: &pb.ObjectId{ObjectIdPath: []int32{1, 2, 3, 4}}, Critical: true, Value: []byte("foobar")},
+				{ObjectId: &pb.ObjectId{ObjectIdPath: []int32{4, 3, 2, 1}}, Critical: false, Value: []byte("zoobar")},
+			},
+		})},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := createReusableConfig(tt.args.cert); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("createReusableConfig() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_isExtraExtension(t *testing.T) {
+	type args struct {
+		oid asn1.ObjectIdentifier
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"oidExtensionSubjectKeyID", args{oidExtensionSubjectKeyID}, false},
+		{"oidExtensionKeyUsage", args{oidExtensionKeyUsage}, false},
+		{"oidExtensionExtendedKeyUsage", args{oidExtensionExtendedKeyUsage}, false},
+		{"oidExtensionAuthorityKeyID", args{oidExtensionAuthorityKeyID}, false},
+		{"oidExtensionBasicConstraints", args{oidExtensionBasicConstraints}, false},
+		{"oidExtensionSubjectAltName", args{oidExtensionSubjectAltName}, false},
+		{"oidExtensionCertificatePolicies", args{oidExtensionCertificatePolicies}, false},
+		{"oidExtensionAuthorityInfoAccess", args{oidExtensionAuthorityInfoAccess}, false},
+		{"other", args{[]int{1, 2, 3, 4}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isExtraExtension(tt.args.oid); got != tt.want {
+				t.Errorf("isExtraExtension() = %v, want %v", got, tt.want)
 			}
 		})
 	}

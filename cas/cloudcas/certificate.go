@@ -15,8 +15,26 @@ import (
 )
 
 var (
-	oidExtensionSubjectAltName = []int{2, 5, 29, 17}
+	oidExtensionSubjectKeyID        = []int{2, 5, 29, 14}
+	oidExtensionKeyUsage            = []int{2, 5, 29, 15}
+	oidExtensionExtendedKeyUsage    = []int{2, 5, 29, 37}
+	oidExtensionAuthorityKeyID      = []int{2, 5, 29, 35}
+	oidExtensionBasicConstraints    = []int{2, 5, 29, 19}
+	oidExtensionSubjectAltName      = []int{2, 5, 29, 17}
+	oidExtensionCertificatePolicies = []int{2, 5, 29, 32}
+	oidExtensionAuthorityInfoAccess = []int{1, 3, 6, 1, 5, 5, 7, 1, 1}
 )
+
+var extraExtensions = [...]asn1.ObjectIdentifier{
+	oidExtensionSubjectKeyID,        // Added by CAS
+	oidExtensionKeyUsage,            // Added in CertificateConfig.ReusableConfig
+	oidExtensionExtendedKeyUsage,    // Added in CertificateConfig.ReusableConfig
+	oidExtensionAuthorityKeyID,      // Added by CAS
+	oidExtensionBasicConstraints,    // Added in CertificateConfig.ReusableConfig
+	oidExtensionSubjectAltName,      // Added in CertificateConfig.SubjectConfig.SubjectAltName
+	oidExtensionCertificatePolicies, // Added in CertificateConfig.ReusableConfig
+	oidExtensionAuthorityInfoAccess, // Added in CertificateConfig.ReusableConfig and by CAS
+}
 
 var (
 	oidExtKeyUsageAny                            = asn1.ObjectIdentifier{2, 5, 29, 37, 0}
@@ -140,24 +158,28 @@ func createSubjectAlternativeNames(cert *x509.Certificate) *pb.SubjectAltNames {
 			var newValues []asn1.RawValue
 
 			for _, v := range rawValues {
-				switch v.Tag {
-				case nameTypeDNS:
-					if len(ret.DnsNames) == 0 {
+				if v.Class == asn1.ClassContextSpecific {
+					switch v.Tag {
+					case nameTypeDNS:
+						if len(ret.DnsNames) == 0 {
+							newValues = append(newValues, v)
+						}
+					case nameTypeEmail:
+						if len(ret.EmailAddresses) == 0 {
+							newValues = append(newValues, v)
+						}
+					case nameTypeIP:
+						if len(ret.IpAddresses) == 0 {
+							newValues = append(newValues, v)
+						}
+					case nameTypeURI:
+						if len(ret.Uris) == 0 {
+							newValues = append(newValues, v)
+						}
+					default:
 						newValues = append(newValues, v)
 					}
-				case nameTypeEmail:
-					if len(ret.EmailAddresses) == 0 {
-						newValues = append(newValues, v)
-					}
-				case nameTypeIP:
-					if len(ret.IpAddresses) == 0 {
-						newValues = append(newValues, v)
-					}
-				case nameTypeURI:
-					if len(ret.Uris) == 0 {
-						newValues = append(newValues, v)
-					}
-				default:
+				} else {
 					newValues = append(newValues, v)
 				}
 			}
@@ -241,7 +263,7 @@ func createReusableConfig(cert *x509.Certificate) *pb.ReusableConfigWrapper {
 
 	var extraExtensions []*pb.X509Extension
 	for _, ext := range cert.ExtraExtensions {
-		if !ext.Id.Equal(oidExtensionSubjectAltName) {
+		if isExtraExtension(ext.Id) {
 			extraExtensions = append(extraExtensions, &pb.X509Extension{
 				ObjectId: createObjectID(ext.Id),
 				Critical: ext.Critical,
@@ -277,6 +299,17 @@ func createReusableConfig(cert *x509.Certificate) *pb.ReusableConfigWrapper {
 			ReusableConfigValues: values,
 		},
 	}
+}
+
+// isExtraExtension returns true if the extension oid is not managed in a
+// different way.
+func isExtraExtension(oid asn1.ObjectIdentifier) bool {
+	for _, id := range extraExtensions {
+		if id.Equal(oid) {
+			return false
+		}
+	}
+	return true
 }
 
 func createObjectID(oid asn1.ObjectIdentifier) *pb.ObjectId {
