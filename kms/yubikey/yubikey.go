@@ -141,7 +141,7 @@ func (k *YubiKey) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, e
 	}
 
 	priv, err := k.yk.PrivateKey(slot, cert.PublicKey, piv.KeyAuth{
-		PIN: k.pin,
+		PIN:       k.pin,
 		PINPolicy: piv.PINPolicyAlways,
 	})
 	if err != nil {
