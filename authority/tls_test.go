@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smallstep/certificates/cas/softcas"
+
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -277,7 +279,7 @@ func TestAuthority_Sign(t *testing.T) {
 		},
 		"fail create cert": func(t *testing.T) *signTest {
 			_a := testAuthority(t)
-			_a.x509Signer = nil
+			_a.x509CAService.(*softcas.SoftCAS).Signer = nil
 			csr := getCSR(t, priv)
 			return &signTest{
 				auth:      _a,
@@ -635,7 +637,7 @@ func TestAuthority_Renew(t *testing.T) {
 	tests := map[string]func() (*renewTest, error){
 		"fail/create-cert": func() (*renewTest, error) {
 			_a := testAuthority(t)
-			_a.x509Signer = nil
+			_a.x509CAService.(*softcas.SoftCAS).Signer = nil
 			return &renewTest{
 				auth: _a,
 				cert: cert,
@@ -661,6 +663,8 @@ func TestAuthority_Renew(t *testing.T) {
 			intCert, intSigner := generateIntermidiateCertificate(t, rootCert, rootSigner)
 
 			_a := testAuthority(t)
+			_a.x509CAService.(*softcas.SoftCAS).Issuer = intCert
+			_a.x509CAService.(*softcas.SoftCAS).Signer = intSigner
 			_a.x509Signer = intSigner
 			_a.x509Issuer = intCert
 			return &renewTest{
@@ -831,7 +835,7 @@ func TestAuthority_Rekey(t *testing.T) {
 	tests := map[string]func() (*renewTest, error){
 		"fail/create-cert": func() (*renewTest, error) {
 			_a := testAuthority(t)
-			_a.x509Signer = nil
+			_a.x509CAService.(*softcas.SoftCAS).Signer = nil
 			return &renewTest{
 				auth: _a,
 				cert: cert,
@@ -864,6 +868,8 @@ func TestAuthority_Rekey(t *testing.T) {
 			intCert, intSigner := generateIntermidiateCertificate(t, rootCert, rootSigner)
 
 			_a := testAuthority(t)
+			_a.x509CAService.(*softcas.SoftCAS).Issuer = intCert
+			_a.x509CAService.(*softcas.SoftCAS).Signer = intSigner
 			_a.x509Signer = intSigner
 			_a.x509Issuer = intCert
 			return &renewTest{
@@ -1107,6 +1113,9 @@ func TestAuthority_Revoke(t *testing.T) {
 				MUseToken: func(id, tok string) (bool, error) {
 					return true, nil
 				},
+				MGetCertificate: func(sn string) (*x509.Certificate, error) {
+					return nil, nil
+				},
 				Err: errors.New("force"),
 			}))
 
@@ -1143,6 +1152,9 @@ func TestAuthority_Revoke(t *testing.T) {
 				MUseToken: func(id, tok string) (bool, error) {
 					return true, nil
 				},
+				MGetCertificate: func(sn string) (*x509.Certificate, error) {
+					return nil, nil
+				},
 				Err: db.ErrAlreadyExists,
 			}))
 
@@ -1178,6 +1190,9 @@ func TestAuthority_Revoke(t *testing.T) {
 			_a := testAuthority(t, WithDatabase(&db.MockAuthDB{
 				MUseToken: func(id, tok string) (bool, error) {
 					return true, nil
+				},
+				MGetCertificate: func(sn string) (*x509.Certificate, error) {
+					return nil, errors.New("not found")
 				},
 			}))
 

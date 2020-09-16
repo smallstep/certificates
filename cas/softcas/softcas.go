@@ -5,7 +5,6 @@ import (
 	"crypto"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/smallstep/certificates/cas/apiv1"
@@ -54,8 +53,12 @@ func (c *SoftCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 	}
 
 	t := now()
-	req.Template.NotBefore = t.Add(-1 * req.Backdate)
-	req.Template.NotAfter = t.Add(req.Lifetime)
+	if req.Template.NotBefore.IsZero() {
+		req.Template.NotBefore = t.Add(-1 * req.Backdate)
+	}
+	if req.Template.NotAfter.IsZero() {
+		req.Template.NotAfter = t.Add(req.Lifetime)
+	}
 	req.Template.Issuer = c.Issuer.Subject
 
 	cert, err := x509util.CreateCertificate(req.Template, c.Issuer, req.Template.PublicKey, c.Signer)
@@ -98,7 +101,14 @@ func (c *SoftCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.R
 	}, nil
 }
 
-// RevokeCertificate revokes the given certificate in step-ca.
+// RevokeCertificate revokes the given certificate in step-ca. In SoftCAS this
+// operation is a no-op as the actual revoke will happen when we store the entry
+// in the db.
 func (c *SoftCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	return &apiv1.RevokeCertificateResponse{
+		Certificate: req.Certificate,
+		CertificateChain: []*x509.Certificate{
+			c.Issuer,
+		},
+	}, nil
 }
