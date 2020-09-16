@@ -352,7 +352,28 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 
 	if provisioner.MethodFromContext(ctx) == provisioner.SSHRevokeMethod {
 		err = a.db.RevokeSSH(rci)
-	} else { // default to revoke x509
+	} else {
+		// Revoke an X.509 certificate using CAS. If the certificate is not
+		// provided we will try to read it from the db.
+		var revokedCert *x509.Certificate
+		if revokeOpts.Crt != nil {
+			revokedCert = revokeOpts.Crt
+		} else if rci.Serial != "" {
+			revokedCert, _ = a.db.GetCertificate(rci.Serial)
+		}
+
+		// CAS operation, note that SoftCAS (default) is a noop.
+		// The revoke happens when this is stored in the db.
+		_, err = a.x509CAService.RevokeCertificate(&casapi.RevokeCertificateRequest{
+			Certificate: revokedCert,
+			Reason:      rci.Reason,
+			ReasonCode:  rci.ReasonCode,
+		})
+		if err != nil {
+			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
+		}
+
+		// Save as revoked in the Db.
 		err = a.db.Revoke(rci)
 	}
 	switch err {
