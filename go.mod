@@ -4,11 +4,10 @@ go 1.14
 
 require (
 	cloud.google.com/go v0.65.1-0.20200904011802-3c2db50b5678
-	
 	github.com/Masterminds/sprig/v3 v3.1.0
 	github.com/aws/aws-sdk-go v1.30.29
 	github.com/go-chi/chi v4.0.2+incompatible
-	github.com/go-piv/piv-go v1.5.0
+	github.com/go-piv/piv-go v1.6.0
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gax-go/v2 v2.0.5
 	github.com/juju/ansiterm v0.0.0-20180109212912-720a0952cc2a // indirect
@@ -29,8 +28,8 @@ require (
 	google.golang.org/grpc v1.32.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/square/go-jose.v2 v2.5.1
-	// cloud.google.com/go/security/privateca/apiv1alpha1 v0.0.0
-	// google.golang.org/genproto/googleapis/cloud/security/privateca/v1alpha1 v0.0.0
+// cloud.google.com/go/security/privateca/apiv1alpha1 v0.0.0
+// google.golang.org/genproto/googleapis/cloud/security/privateca/v1alpha1 v0.0.0
 )
 
 // replace github.com/smallstep/cli => ../cli
