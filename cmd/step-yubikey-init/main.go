@@ -9,6 +9,7 @@ import (
 	"crypto/sha1"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/hex"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -27,18 +28,23 @@ import (
 	_ "github.com/smallstep/certificates/kms/yubikey"
 )
 
+// Config is a mapping of the cli flags.
 type Config struct {
-	RootOnly bool
-	RootSlot string
-	CrtSlot  string
-	RootFile string
-	KeyFile  string
-	Pin      string
-	Force    bool
+	RootOnly      bool
+	RootSlot      string
+	CrtSlot       string
+	RootFile      string
+	KeyFile       string
+	Pin           string
+	ManagementKey string
+	Force         bool
 }
 
+// Validate checks the flags in the config.
 func (c *Config) Validate() error {
 	switch {
+	case c.ManagementKey != "" && len(c.ManagementKey) != 48:
+		return errors.New("flag `--management-key` must be 48 hexadecimal characters (24 bytes)")
 	case c.RootFile != "" && c.KeyFile == "":
 		return errors.New("flag `--root` requires flag `--key`")
 	case c.KeyFile != "" && c.RootFile == "":
@@ -56,12 +62,18 @@ func (c *Config) Validate() error {
 		if c.RootOnly {
 			c.CrtSlot = ""
 		}
+		if c.ManagementKey != "" {
+			if _, err := hex.DecodeString(c.ManagementKey); err != nil {
+				return errors.Wrap(err, "flag `--management-key` is not valid")
+			}
+		}
 		return nil
 	}
 }
 
 func main() {
 	var c Config
+	flag.StringVar(&c.ManagementKey, "management-key", "", `Management key to use in hexadecimal format. (default "010203040506070801020304050607080102030405060708")`)
 	flag.BoolVar(&c.RootOnly, "root-only", false, "Slot only the root certificate and sign and intermediate.")
 	flag.StringVar(&c.RootSlot, "root-slot", "9a", "Slot to store the root certificate.")
 	flag.StringVar(&c.CrtSlot, "crt-slot", "9c", "Slot to store the intermediate certificate.")
@@ -82,8 +94,9 @@ func main() {
 	c.Pin = string(pin)
 
 	k, err := kms.New(context.Background(), apiv1.Options{
-		Type: string(apiv1.YubiKey),
-		Pin:  c.Pin,
+		Type:          string(apiv1.YubiKey),
+		Pin:           c.Pin,
+		ManagementKey: c.ManagementKey,
 	})
 	if err != nil {
 		fatal(err)
@@ -109,7 +122,11 @@ func main() {
 }
 
 func fatal(err error) {
-	fmt.Fprintln(os.Stderr, err)
+	if os.Getenv("STEPDEBUG") == "1" {
+		fmt.Fprintf(os.Stderr, "%+v\n", err)
+	} else {
+		fmt.Fprintln(os.Stderr, err)
+	}
 	os.Exit(1)
 }
 
