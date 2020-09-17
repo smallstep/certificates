@@ -19,11 +19,12 @@ type KeyManager interface {
 // CertificateManager is the interface implemented by the KMS that can load and
 // store x509.Certificates.
 type CertificateManager interface {
-	LoadCerticate(req *LoadCertificateRequest) (*x509.Certificate, error)
+	LoadCertificate(req *LoadCertificateRequest) (*x509.Certificate, error)
 	StoreCertificate(req *StoreCertificateRequest) error
 }
 
-// ErrNotImplemented
+// ErrNotImplemented is the type of error returned if an operation is not
+// implemented.
 type ErrNotImplemented struct {
 	msg string
 }
@@ -53,6 +54,7 @@ const (
 	YubiKey Type = "yubikey"
 )
 
+// Options are the KMS options. They represent the kms object in the ca.json.
 type Options struct {
 	// The type of the KMS to use.
 	Type string `json:"type"`
@@ -65,6 +67,15 @@ type Options struct {
 
 	// Pin used to access the PKCS11 module.
 	Pin string `json:"pin"`
+
+	// ManagementKey used in YubiKeys. Default management key is the hexadecimal
+	// string 010203040506070801020304050607080102030405060708:
+	//   []byte{
+	//       0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+	//       0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+	//       0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+	//   }
+	ManagementKey string `json:"managementKey"`
 
 	// Region to use in AmazonKMS.
 	Region string `json:"region"`

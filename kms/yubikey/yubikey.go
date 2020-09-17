@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
+	"encoding/hex"
 	"net/url"
 	"strings"
 
@@ -16,13 +17,26 @@ import (
 
 // YubiKey implements the KMS interface on a YubiKey.
 type YubiKey struct {
-	yk  *piv.YubiKey
-	pin string
+	yk            *piv.YubiKey
+	pin           string
+	managementKey [24]byte
 }
 
 // New initializes a new YubiKey.
 // TODO(mariano): only one card is currently supported.
 func New(ctx context.Context, opts apiv1.Options) (*YubiKey, error) {
+	managementKey := piv.DefaultManagementKey
+	if opts.ManagementKey != "" {
+		b, err := hex.DecodeString(opts.ManagementKey)
+		if err != nil {
+			return nil, errors.Wrap(err, "error decoding managementKey")
+		}
+		if len(b) != 24 {
+			return nil, errors.New("invalid managementKey: length is not 24 bytes")
+		}
+		copy(managementKey[:], b[:24])
+	}
+
 	cards, err := piv.Cards()
 	if err != nil {
 		return nil, err
@@ -37,8 +51,9 @@ func New(ctx context.Context, opts apiv1.Options) (*YubiKey, error) {
 	}
 
 	return &YubiKey{
-		yk:  yk,
-		pin: opts.Pin,
+		yk:            yk,
+		pin:           opts.Pin,
+		managementKey: managementKey,
 	}, nil
 }
 
@@ -76,7 +91,7 @@ func (k *YubiKey) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 		return err
 	}
 
-	err = k.yk.SetCertificate(piv.DefaultManagementKey, slot, req.Certificate)
+	err = k.yk.SetCertificate(k.managementKey, slot, req.Certificate)
 	if err != nil {
 		return errors.Wrap(err, "error storing certificate")
 	}
@@ -110,7 +125,7 @@ func (k *YubiKey) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespon
 		return nil, err
 	}
 
-	pub, err := k.yk.GenerateKey(piv.DefaultManagementKey, slot, piv.Key{
+	pub, err := k.yk.GenerateKey(k.managementKey, slot, piv.Key{
 		Algorithm:   alg,
 		PINPolicy:   piv.PINPolicyAlways,
 		TouchPolicy: piv.TouchPolicyNever,
