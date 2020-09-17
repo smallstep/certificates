@@ -49,7 +49,7 @@ Setting up a *public key infrastructure* (PKI) is out of reach for many small te
 - Can operate as [an online intermediate CA](./docs/questions.md#i-already-have-pki-in-place-can-i-use-this-with-my-own-root-certificate) for an existing root CA
 - [Badger, BoltDB, and MySQL database backends](https://github.com/smallstep/certificates/blob/master/docs/database.md)
 
-### ⚙️ Many ways to automate 
+### ⚙️ Many ways to automate
 
 There are several ways to authorize a request with the CA and establish a chain of trust that suits your flow.
 
@@ -165,7 +165,7 @@ You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
 
 1. [Optional] Install `step`.
 
-    Download the Linux tarball from the 
+    Download the Linux tarball from the
     [latest `step` release](https://github.com/smallstep/cli/releases/latest):
 
     ```
@@ -184,7 +184,7 @@ You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
     Download the Linux package from the [latest `step-ca` release](https://github.com/smallstep/certificates/releases/latest):
 
     ```
-    $ wget -O step-ca.tar.gz https://github.com/smallstep/cli/releases/download/vX.Y.Z/step_linux_X.Y.Z_amd64.tar.gz
+    $ wget -O step-ca.tar.gz https://github.com/smallstep/certificates/releases/download/vX.Y.Z/step-certificates_linux_X.Y.Z_amd64.tar.gz
     ```
 
     Install `step-ca` by unzipping and copying the executable over to `/usr/bin`:
