@@ -188,6 +188,41 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				code:  http.StatusUnauthorized,
 			}
 		},
+		"ok/sha256": func(t *testing.T) *authorizeTest {
+			cl := jose.Claims{
+				Subject:   "test.smallstep.com",
+				Issuer:    validIssuer,
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+			}
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+			return &authorizeTest{
+				auth:  a,
+				token: raw,
+			}
+		},
+		"fail/sha256/token-already-used": func(t *testing.T) *authorizeTest {
+			_a := testAuthority(t)
+			cl := jose.Claims{
+				Subject:   "test.smallstep.com",
+				Issuer:    validIssuer,
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+			}
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+			_, err = _a.authorizeToken(context.Background(), raw)
+			assert.FatalError(t, err)
+			return &authorizeTest{
+				auth:  _a,
+				token: raw,
+				err:   errors.New("authority.authorizeToken: token already used"),
+				code:  http.StatusUnauthorized,
+			}
+		},
 		"ok/mockNoSQLDB": func(t *testing.T) *authorizeTest {
 			_a := testAuthority(t)
 			_a.db = &db.MockAuthDB{
