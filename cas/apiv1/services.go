@@ -12,6 +12,12 @@ type CertificateAuthorityService interface {
 	RevokeCertificate(req *RevokeCertificateRequest) (*RevokeCertificateResponse, error)
 }
 
+// CertificateAuthorityGetter is an interface implemented by a
+// CertificateAuthorityService that has a method to get the root certificate.
+type CertificateAuthorityGetter interface {
+	GetCertificateAuthority(req *GetCertificateAuthorityRequest) (*GetCertificateAuthorityResponse, error)
+}
+
 // Type represents the CAS type used.
 type Type string
 

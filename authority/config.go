@@ -181,17 +181,20 @@ func (c *Config) Validate() error {
 	case c.Address == "":
 		return errors.New("address cannot be empty")
 
-	case c.Root.HasEmpties():
-		return errors.New("root cannot be empty")
-
-	case c.IntermediateCert == "":
-		return errors.New("crt cannot be empty")
-
-	case c.IntermediateKey == "" && c.CAS.HasType(cas.SoftCAS):
-		return errors.New("key cannot be empty")
-
 	case len(c.DNSNames) == 0:
 		return errors.New("dnsNames cannot be empty")
+	}
+
+	// The default CAS requires root, crt and key.
+	if c.CAS.Is(cas.SoftCAS) {
+		switch {
+		case c.Root.HasEmpties():
+			return errors.New("root cannot be empty")
+		case c.IntermediateCert == "":
+			return errors.New("crt cannot be empty")
+		case c.IntermediateKey == "":
+			return errors.New("key cannot be empty")
+		}
 	}
 
 	// Validate address (a port is required)

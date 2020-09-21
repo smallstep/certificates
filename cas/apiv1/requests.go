@@ -46,3 +46,15 @@ type RevokeCertificateResponse struct {
 	Certificate      *x509.Certificate
 	CertificateChain []*x509.Certificate
 }
+
+// GetCertificateAuthorityRequest is the request used to get the root
+// certificate from a CAS.
+type GetCertificateAuthorityRequest struct {
+	Name string
+}
+
+// GetCertificateAuthorityResponse is the response that contains
+// the root certificate.
+type GetCertificateAuthorityResponse struct {
+	RootCertificate *x509.Certificate
+}

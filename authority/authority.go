@@ -133,6 +133,14 @@ func (a *Authority) init() error {
 
 	var err error
 
+	// Initialize step-ca Database if it's not already initialized with WithDB.
+	// If a.config.DB is nil then a simple, barebones in memory DB will be used.
+	if a.db == nil {
+		if a.db, err = db.New(a.config.DB); err != nil {
+			return err
+		}
+	}
+
 	// Initialize key manager if it has not been set in the options.
 	if a.keyManager == nil {
 		var options kmsapi.Options
@@ -145,11 +153,42 @@ func (a *Authority) init() error {
 		}
 	}
 
-	// Initialize step-ca Database if it's not already initialized with WithDB.
-	// If a.config.DB is nil then a simple, barebones in memory DB will be used.
-	if a.db == nil {
-		if a.db, err = db.New(a.config.DB); err != nil {
+	// Initialize the X.509 CA Service if it has not been set in the options.
+	if a.x509CAService == nil {
+		var options casapi.Options
+		if a.config.CAS != nil {
+			options = *a.config.CAS
+		}
+
+		// Read intermediate and create X509 signer for default CAS.
+		if options.Is(casapi.SoftCAS) {
+			options.Issuer, err = pemutil.ReadCertificate(a.config.IntermediateCert)
+			if err != nil {
+				return err
+			}
+			options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.IntermediateKey,
+				Password:   []byte(a.config.Password),
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		a.x509CAService, err = cas.New(context.Background(), options)
+		if err != nil {
 			return err
+		}
+
+		// Get root certificate from CAS.
+		if srv, ok := a.x509CAService.(casapi.CertificateAuthorityGetter); ok {
+			resp, err := srv.GetCertificateAuthority(&casapi.GetCertificateAuthorityRequest{
+				Name: options.Certificateauthority,
+			})
+			if err != nil {
+				return err
+			}
+			a.rootX509Certs = append(a.rootX509Certs, resp.RootCertificate)
 		}
 	}
 
@@ -183,34 +222,6 @@ func (a *Authority) init() error {
 	for _, crt := range a.federatedX509Certs {
 		sum := sha256.Sum256(crt.Raw)
 		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
-	}
-
-	// Initialize the X.509 CA Service if it has not been set in the options.
-	if a.x509CAService == nil {
-		var options casapi.Options
-		if a.config.CAS != nil {
-			options = *a.config.CAS
-		}
-
-		// Read intermediate and create X509 signer for default CAS.
-		if options.HasType(casapi.SoftCAS) {
-			options.Issuer, err = pemutil.ReadCertificate(a.config.IntermediateCert)
-			if err != nil {
-				return err
-			}
-			options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-				SigningKey: a.config.IntermediateKey,
-				Password:   []byte(a.config.Password),
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		a.x509CAService, err = cas.New(context.Background(), options)
-		if err != nil {
-			return nil
-		}
 	}
 
 	// Decrypt and load SSH keys

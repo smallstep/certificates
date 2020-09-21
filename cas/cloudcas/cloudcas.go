@@ -29,6 +29,7 @@ func init() {
 type CertificateAuthorityClient interface {
 	CreateCertificate(ctx context.Context, req *pb.CreateCertificateRequest, opts ...gax.CallOption) (*pb.Certificate, error)
 	RevokeCertificate(ctx context.Context, req *pb.RevokeCertificateRequest, opts ...gax.CallOption) (*pb.Certificate, error)
+	GetCertificateAuthority(ctx context.Context, req *pb.GetCertificateAuthorityRequest, opts ...gax.CallOption) (*pb.CertificateAuthority, error)
 }
 
 // recocationCodeMap maps revocation reason codes from RFC 5280, to Google CAS
@@ -81,6 +82,39 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 	return &CloudCAS{
 		client:               client,
 		certificateAuthority: opts.Certificateauthority,
+	}, nil
+}
+
+// GetCertificateAuthority returns the root certificate for the given
+// certificate authority. It implements apiv1.CertificateAuthorityGetter
+// interface.
+func (c *CloudCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
+	name := req.Name
+	if name == "" {
+		name = c.certificateAuthority
+	}
+
+	ctx, cancel := defaultContext()
+	defer cancel()
+
+	resp, err := c.client.GetCertificateAuthority(ctx, &pb.GetCertificateAuthorityRequest{
+		Name: name,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "cloudCAS GetCertificateAuthority failed")
+	}
+	if len(resp.PemCaCertificates) == 0 {
+		return nil, errors.New("cloudCAS GetCertificateAuthority: PemCACertificate should not be empty")
+	}
+
+	// Last certificate in the chain is the root.
+	root, err := parseCertificate(resp.PemCaCertificates[len(resp.PemCaCertificates)-1])
+	if err != nil {
+		return nil, err
+	}
+
+	return &apiv1.GetCertificateAuthorityResponse{
+		RootCertificate: root,
 	}, nil
 }
 

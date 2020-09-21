@@ -74,9 +74,10 @@ zemu3bhWLFaGg3s8i+HTEhw4RqkHP74vF7AVYp88bAw=
 )
 
 type testClient struct {
-	credentialsFile string
-	certificate     *pb.Certificate
-	err             error
+	credentialsFile      string
+	certificate          *pb.Certificate
+	certificateAuthority *pb.CertificateAuthority
+	err                  error
 }
 
 func newTestClient(credentialsFile string) (CertificateAuthorityClient, error) {
@@ -96,6 +97,9 @@ func okTestClient() *testClient {
 			PemCertificate:      testSignedCertificate,
 			PemCertificateChain: []string{testIntermediateCertificate, testRootCertificate},
 		},
+		certificateAuthority: &pb.CertificateAuthority{
+			PemCaCertificates: []string{testIntermediateCertificate, testRootCertificate},
+		},
 	}
 }
 
@@ -113,6 +117,9 @@ func badTestClient() *testClient {
 			Name:                testCertificateName,
 			PemCertificate:      "not a pem cert",
 			PemCertificateChain: []string{testIntermediateCertificate, testRootCertificate},
+		},
+		certificateAuthority: &pb.CertificateAuthority{
+			PemCaCertificates: []string{testIntermediateCertificate, "not a pem cert"},
 		},
 	}
 }
@@ -132,6 +139,10 @@ func (c *testClient) CreateCertificate(ctx context.Context, req *pb.CreateCertif
 
 func (c *testClient) RevokeCertificate(ctx context.Context, req *pb.RevokeCertificateRequest, opts ...gax.CallOption) (*pb.Certificate, error) {
 	return c.certificate, c.err
+}
+
+func (c *testClient) GetCertificateAuthority(ctx context.Context, req *pb.GetCertificateAuthorityRequest, opts ...gax.CallOption) (*pb.CertificateAuthority, error) {
+	return c.certificateAuthority, c.err
 }
 
 func mustParseCertificate(t *testing.T, pemCert string) *x509.Certificate {
@@ -258,6 +269,52 @@ func TestNew_real(t *testing.T) {
 			_, err := New(tt.args.ctx, tt.args.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCloudCAS_GetCertificateAuthority(t *testing.T) {
+	root := mustParseCertificate(t, testRootCertificate)
+	type fields struct {
+		client               CertificateAuthorityClient
+		certificateAuthority string
+	}
+	type args struct {
+		req *apiv1.GetCertificateAuthorityRequest
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *apiv1.GetCertificateAuthorityResponse
+		wantErr bool
+	}{
+		{"ok", fields{okTestClient(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, &apiv1.GetCertificateAuthorityResponse{
+			RootCertificate: root,
+		}, false},
+		{"ok with name", fields{okTestClient(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{
+			Name: testCertificateName,
+		}}, &apiv1.GetCertificateAuthorityResponse{
+			RootCertificate: root,
+		}, false},
+		{"fail GetCertificateAuthority", fields{failTestClient(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, nil, true},
+		{"fail bad root", fields{badTestClient(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, nil, true},
+		{"fail no pems", fields{&testClient{certificateAuthority: &pb.CertificateAuthority{}}, testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &CloudCAS{
+				client:               tt.fields.client,
+				certificateAuthority: tt.fields.certificateAuthority,
+			}
+			got, err := c.GetCertificateAuthority(tt.args.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CloudCAS.GetCertificateAuthority() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CloudCAS.GetCertificateAuthority() = %v, want %v", got, tt.want)
 			}
 		})
 	}
