@@ -221,7 +221,7 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 
 	// Certificate templates: on K8sSA the default template is the certificate
 	// request.
-	templateOptions, err := CustomTemplateOptions(p.Options, data, x509util.CertificateRequestTemplate)
+	templateOptions, err := CustomTemplateOptions(p.Options, data, x509util.DefaultAdminLeafTemplate)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSign")
 	}
