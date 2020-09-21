@@ -80,7 +80,7 @@ func TestOptions_Validate(t *testing.T) {
 	}
 }
 
-func TestOptions_HasType(t *testing.T) {
+func TestOptions_Is(t *testing.T) {
 	mockRegister(t)
 
 	type fields struct {
@@ -110,8 +110,8 @@ func TestOptions_HasType(t *testing.T) {
 	}
 	t.Run("nil", func(t *testing.T) {
 		var o *Options
-		if got := o.HasType(SoftCAS); got != true {
-			t.Errorf("Options.HasType() = %v, want %v", got, true)
+		if got := o.Is(SoftCAS); got != true {
+			t.Errorf("Options.Is() = %v, want %v", got, true)
 		}
 	})
 	for _, tt := range tests {
@@ -123,8 +123,8 @@ func TestOptions_HasType(t *testing.T) {
 				Issuer:               tt.fields.Issuer,
 				Signer:               tt.fields.Signer,
 			}
-			if got := o.HasType(tt.args.t); got != tt.want {
-				t.Errorf("Options.HasType() = %v, want %v", got, tt.want)
+			if got := o.Is(tt.args.t); got != tt.want {
+				t.Errorf("Options.Is() = %v, want %v", got, tt.want)
 			}
 		})
 	}

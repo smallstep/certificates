@@ -41,8 +41,8 @@ func (o *Options) Validate() error {
 	return nil
 }
 
-// HasType returns if the options have the given type.
-func (o *Options) HasType(t Type) bool {
+// Is returns if the options have the given type.
+func (o *Options) Is(t Type) bool {
 	if o == nil {
 		return t.String() == SoftCAS
 	}
