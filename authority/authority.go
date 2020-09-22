@@ -189,6 +189,8 @@ func (a *Authority) init() error {
 				return err
 			}
 			a.rootX509Certs = append(a.rootX509Certs, resp.RootCertificate)
+			sum := sha256.Sum256(resp.RootCertificate.Raw)
+			log.Printf("Using root fingerprint '%s'", hex.EncodeToString(sum[:]))
 		}
 	}
 
