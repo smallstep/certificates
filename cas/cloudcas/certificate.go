@@ -15,25 +15,27 @@ import (
 )
 
 var (
-	oidExtensionSubjectKeyID        = []int{2, 5, 29, 14}
-	oidExtensionKeyUsage            = []int{2, 5, 29, 15}
-	oidExtensionExtendedKeyUsage    = []int{2, 5, 29, 37}
-	oidExtensionAuthorityKeyID      = []int{2, 5, 29, 35}
-	oidExtensionBasicConstraints    = []int{2, 5, 29, 19}
-	oidExtensionSubjectAltName      = []int{2, 5, 29, 17}
-	oidExtensionCertificatePolicies = []int{2, 5, 29, 32}
-	oidExtensionAuthorityInfoAccess = []int{1, 3, 6, 1, 5, 5, 7, 1, 1}
+	oidExtensionSubjectKeyID          = []int{2, 5, 29, 14}
+	oidExtensionKeyUsage              = []int{2, 5, 29, 15}
+	oidExtensionExtendedKeyUsage      = []int{2, 5, 29, 37}
+	oidExtensionAuthorityKeyID        = []int{2, 5, 29, 35}
+	oidExtensionBasicConstraints      = []int{2, 5, 29, 19}
+	oidExtensionSubjectAltName        = []int{2, 5, 29, 17}
+	oidExtensionCRLDistributionPoints = []int{2, 5, 29, 31}
+	oidExtensionCertificatePolicies   = []int{2, 5, 29, 32}
+	oidExtensionAuthorityInfoAccess   = []int{1, 3, 6, 1, 5, 5, 7, 1, 1}
 )
 
 var extraExtensions = [...]asn1.ObjectIdentifier{
-	oidExtensionSubjectKeyID,        // Added by CAS
-	oidExtensionKeyUsage,            // Added in CertificateConfig.ReusableConfig
-	oidExtensionExtendedKeyUsage,    // Added in CertificateConfig.ReusableConfig
-	oidExtensionAuthorityKeyID,      // Added by CAS
-	oidExtensionBasicConstraints,    // Added in CertificateConfig.ReusableConfig
-	oidExtensionSubjectAltName,      // Added in CertificateConfig.SubjectConfig.SubjectAltName
-	oidExtensionCertificatePolicies, // Added in CertificateConfig.ReusableConfig
-	oidExtensionAuthorityInfoAccess, // Added in CertificateConfig.ReusableConfig and by CAS
+	oidExtensionSubjectKeyID,          // Added by CAS
+	oidExtensionKeyUsage,              // Added in CertificateConfig.ReusableConfig
+	oidExtensionExtendedKeyUsage,      // Added in CertificateConfig.ReusableConfig
+	oidExtensionAuthorityKeyID,        // Added by CAS
+	oidExtensionBasicConstraints,      // Added in CertificateConfig.ReusableConfig
+	oidExtensionSubjectAltName,        // Added in CertificateConfig.SubjectConfig.SubjectAltName
+	oidExtensionCRLDistributionPoints, // Added by CAS
+	oidExtensionCertificatePolicies,   // Added in CertificateConfig.ReusableConfig
+	oidExtensionAuthorityInfoAccess,   // Added in CertificateConfig.ReusableConfig and by CAS
 }
 
 var (

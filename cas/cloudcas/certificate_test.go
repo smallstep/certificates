@@ -501,8 +501,9 @@ func Test_createReusableConfig(t *testing.T) {
 		// Extensions
 		{"Extensions", args{&x509.Certificate{ExtraExtensions: []pkix.Extension{
 			{Id: []int{1, 2, 3, 4}, Critical: true, Value: []byte("foobar")},
-			{Id: []int{2, 5, 29, 17}, Critical: true, Value: []byte("SANs")},
+			{Id: []int{2, 5, 29, 17}, Critical: true, Value: []byte("SANs")}, //
 			{Id: []int{4, 3, 2, 1}, Critical: false, Value: []byte("zoobar")},
+			{Id: []int{2, 5, 29, 31}, Critical: false, Value: []byte("CRL Distribution points")},
 		}}}, withRCV(&pb.ReusableConfigValues{
 			AdditionalExtensions: []*pb.X509Extension{
 				{ObjectId: &pb.ObjectId{ObjectIdPath: []int32{1, 2, 3, 4}}, Critical: true, Value: []byte("foobar")},
@@ -534,6 +535,7 @@ func Test_isExtraExtension(t *testing.T) {
 		{"oidExtensionAuthorityKeyID", args{oidExtensionAuthorityKeyID}, false},
 		{"oidExtensionBasicConstraints", args{oidExtensionBasicConstraints}, false},
 		{"oidExtensionSubjectAltName", args{oidExtensionSubjectAltName}, false},
+		{"oidExtensionCRLDistributionPoints", args{oidExtensionCRLDistributionPoints}, false},
 		{"oidExtensionCertificatePolicies", args{oidExtensionCertificatePolicies}, false},
 		{"oidExtensionAuthorityInfoAccess", args{oidExtensionAuthorityInfoAccess}, false},
 		{"other", args{[]int{1, 2, 3, 4}}, true},
