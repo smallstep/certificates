@@ -12,8 +12,7 @@ intend for this document be an accurate representation of current best practices
 in the industry, and to have these practices codified as defaults in the `step
 certificates` code base. If you have questions, suggestions, or comments about
 any of these decisions please let us know by opening an issue on this repo,
-reaching out through [Twitter](twitter.com/smallsteplabs), or through our
-[Gitter](https://gitter.im/smallstep/community) to chat with us in real time.
+reaching out through [GitHub Discussions](https://github.com/smallstep/certificates/discussions).
 
 ## Tokens
 

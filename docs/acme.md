@@ -155,6 +155,7 @@ to the top of your renewal configuration (e.g., in `/etc/letsencrypt/renewal/foo
 
 `step-ca` should work with any ACMEv2
 ([RFC8555](https://tools.ietf.org/html/rfc8555)) compliant client that supports
-the http-01 or dns-01 challenge. If you run into any issues please let us know
-[on gitter](https://gitter.im/smallstep/community) or [in an
-issue](https://github.com/smallstep/certificates/issues/new?template=bug_report.md).
+the http-01 or dns-01 challenge.
+
+Post feedback on [our GitHub Discussions tab](https://github.com/smallstep/certificates/discussions),
+or [create a bug report issue](https://github.com/smallstep/certificates/issues/new?template=bug_report.md).
