@@ -85,18 +85,18 @@ or using `gcloud` CLI:
 
    ```sh
    # Create service account
-   gcloud iam service-accounts create mariano-ca-sa \
+   gcloud iam service-accounts create step-ca-sa \
        --project smallstep-cas-test \
-       --description "Mariano-CA Service Account" \
-       --display-name "mariano-CA Service Account"
+       --description "Step-CA Service Account" \
+       --display-name "Step-CA Service Account"
    # Add permissions to use the privateca API
    gcloud projects add-iam-policy-binding smallstep-cas-test \
-       --member=serviceAccount:mariano-ca-sa@smallstep-cas-test.iam.gserviceaccount.com \
+       --member=serviceAccount:step-ca-sa@smallstep-cas-test.iam.gserviceaccount.com \
        --role=roles/privateca.caManager \
        --role=roles/privateca.certificateRequester
    # Download the credentials.file
    gcloud iam service-accounts keys create credentials.json \
-      --iam-account mariano-ca-sa@smallstep-cas-test.iam.gserviceaccount.com
+      --iam-account step-ca-sa@smallstep-cas-test.iam.gserviceaccount.com
    ```
 
 5. Create a Root CA. You can do this on the console or running:
