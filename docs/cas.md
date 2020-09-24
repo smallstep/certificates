@@ -92,7 +92,7 @@ or using `gcloud` CLI:
    # Add permissions to use the privateca API
    gcloud projects add-iam-policy-binding smallstep-cas-test \
        --member=serviceAccount:step-ca-sa@smallstep-cas-test.iam.gserviceaccount.com \
-       --role=roles/privateca.caManager
+       --role=roles/privateca.certificateRequester
    # Download the credentials.file
    gcloud iam service-accounts keys create credentials.json \
       --iam-account step-ca-sa@smallstep-cas-test.iam.gserviceaccount.com
