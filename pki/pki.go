@@ -401,7 +401,7 @@ func (p *PKI) askFeedback() {
 	ui.Println("      phone home. But your feedback is extremely valuable. Any information you")
 	ui.Println("      can provide regarding how you’re using `step` helps. Please send us a")
 	ui.Println("      sentence or two, good or bad: \033[1mfeedback@smallstep.com\033[0m or join")
-	ui.Println("      \033[1mhttps://gitter.im/smallstep/community\033[0m.")
+	ui.Println("      \033[1mhttps://github.com/smallstep/certificates/discussions\033[0m.")
 }
 
 // TellPKI outputs the locations of public and private keys generated

@@ -18,7 +18,7 @@ You can use it to:
 
 Whatever your use case, `step-ca` is easy to use and hard to misuse, thanks to [safe, sane defaults](./docs/defaults.md).
 
-**Questions? Find us [on gitter](https://gitter.im/smallstep/community).**
+**Questions? Find us in [Discussions](https://github.com/smallstep/certificates/discussions).**
 
 [Website](https://smallstep.com/certificates) |
 [Documentation](#documentation) |
@@ -383,6 +383,5 @@ and visiting http://localhost:8080.
 
 ## Feedback?
 
-* Tell us what you like and don't like about managing your PKI - we're eager to
-help solve problems in this space.
-* Tell us about a feature you'd like to see - open an issue, [ask on gitter](https://gitter.im/smallstep/community), or hit us up on [Twitter](https://twitter.com/smallsteplabs).
+* Tell us what you like and don't like about managing your PKI - we're eager to help solve problems in this space.
+* Tell us about a feature you'd like to see! [Add a feature request Issue](https://github.com/smallstep/certificates/issues/new?assignees=&labels=enhancement%2C+needs+triage&template=enhancement.md&title=), [ask on Discussions](https://github.com/smallstep/certificates/discussions), or hit us up on [Twitter](https://twitter.com/smallsteplabs).

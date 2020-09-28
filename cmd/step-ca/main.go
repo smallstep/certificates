@@ -77,7 +77,7 @@ This documentation is available online at https://smallstep.com/docs/certificate
 	`
 The **step-ca** utility is not instrumented for usage statistics. It does not phone home.
 But your feedback is extremely valuable. Any information you can provide regarding how you’re using **step-ca** helps.
-Please send us a sentence or two, good or bad: **feedback@smallstep.com** or join https://gitter.im/smallstep/community.
+Please send us a sentence or two, good or bad: **feedback@smallstep.com** or https://github.com/smallstep/certificates/discussions.
 {{end}}
 `
 
