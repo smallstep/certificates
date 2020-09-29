@@ -103,6 +103,7 @@ or using `gcloud` CLI:
 
    ```sh
    gcloud beta privateca roots create prod-root-ca \
+       --location us-west1 \
        --kms-key-version "$KMS_ROOT_KEY_VERSION" \
        --subject "CN=Example Root CA, O=Example LLC" \
        --max-chain-length 2
@@ -112,7 +113,9 @@ or using `gcloud` CLI:
 
    ```sh
    gcloud beta privateca subordinates create prod-intermediate-ca \
-       --issuer prod-root-ca --issuer-location us-west1 \
+       --location us-west1 \
+       --issuer prod-root-ca \
+       --issuer-location us-west1 \
        --kms-key-version "$KMS_INTERMEDIATE_KEY_VERSION" \
        --subject "CN=Example Intermediate CA, O=Example LLC" \
        --reusable-config "subordinate-server-tls-pathlen-0"
