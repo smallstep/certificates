@@ -354,7 +354,9 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		err = a.db.RevokeSSH(rci)
 	} else {
 		// Revoke an X.509 certificate using CAS. If the certificate is not
-		// provided we will try to read it from the db.
+		// provided we will try to read it from the db. If the read fails we
+		// won't throw an error as it will be responsability of the CAS
+		// implementation to require a certificate.
 		var revokedCert *x509.Certificate
 		if revokeOpts.Crt != nil {
 			revokedCert = revokeOpts.Crt
