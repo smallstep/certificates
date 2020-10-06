@@ -13,7 +13,7 @@ var (
 	oidStepCertificateAuthority = append(asn1.ObjectIdentifier(nil), append(oidStepRoot, 2)...)
 )
 
-// CertificateAuthorityExtension is type used to encode the certificate
+// CertificateAuthorityExtension type is used to encode the certificate
 // authority extension.
 type CertificateAuthorityExtension struct {
 	Type          string

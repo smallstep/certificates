@@ -190,11 +190,11 @@ func (db *DB) RevokeSSH(rci *RevokedCertificateInfo) error {
 
 // GetCertificate retrieves a certificate by the serial number.
 func (db *DB) GetCertificate(serialNumber string) (*x509.Certificate, error) {
-	ans1Data, err := db.Get(certsTable, []byte(serialNumber))
+	asn1Data, err := db.Get(certsTable, []byte(serialNumber))
 	if err != nil {
 		return nil, errors.Wrap(err, "database Get error")
 	}
-	cert, err := x509.ParseCertificate(ans1Data)
+	cert, err := x509.ParseCertificate(asn1Data)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing certificate with serial number %s", serialNumber)
 	}
