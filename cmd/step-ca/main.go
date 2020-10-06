@@ -31,6 +31,10 @@ import (
 
 	// Experimental kms interfaces.
 	_ "github.com/smallstep/certificates/kms/yubikey"
+
+	// Enabled cas interfaces.
+	_ "github.com/smallstep/certificates/cas/cloudcas"
+	_ "github.com/smallstep/certificates/cas/softcas"
 )
 
 // commit and buildTime are filled in during build by the Makefile

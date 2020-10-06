@@ -47,6 +47,7 @@ type AuthDB interface {
 	IsSSHRevoked(sn string) (bool, error)
 	Revoke(rci *RevokedCertificateInfo) error
 	RevokeSSH(rci *RevokedCertificateInfo) error
+	GetCertificate(serialNumber string) (*x509.Certificate, error)
 	StoreCertificate(crt *x509.Certificate) error
 	UseToken(id, tok string) (bool, error)
 	IsSSHHost(name string) (bool, error)
@@ -187,6 +188,19 @@ func (db *DB) RevokeSSH(rci *RevokedCertificateInfo) error {
 	}
 }
 
+// GetCertificate retrieves a certificate by the serial number.
+func (db *DB) GetCertificate(serialNumber string) (*x509.Certificate, error) {
+	asn1Data, err := db.Get(certsTable, []byte(serialNumber))
+	if err != nil {
+		return nil, errors.Wrap(err, "database Get error")
+	}
+	cert, err := x509.ParseCertificate(asn1Data)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing certificate with serial number %s", serialNumber)
+	}
+	return cert, nil
+}
+
 // StoreCertificate stores a certificate PEM.
 func (db *DB) StoreCertificate(crt *x509.Certificate) error {
 	if err := db.Set(certsTable, []byte(crt.SerialNumber.String()), crt.Raw); err != nil {
@@ -288,6 +302,7 @@ type MockAuthDB struct {
 	MIsSSHRevoked         func(string) (bool, error)
 	MRevoke               func(rci *RevokedCertificateInfo) error
 	MRevokeSSH            func(rci *RevokedCertificateInfo) error
+	MGetCertificate       func(serialNumber string) (*x509.Certificate, error)
 	MStoreCertificate     func(crt *x509.Certificate) error
 	MUseToken             func(id, tok string) (bool, error)
 	MIsSSHHost            func(principal string) (bool, error)
@@ -337,6 +352,14 @@ func (m *MockAuthDB) RevokeSSH(rci *RevokedCertificateInfo) error {
 		return m.MRevokeSSH(rci)
 	}
 	return m.Err
+}
+
+// GetCertificate mock.
+func (m *MockAuthDB) GetCertificate(serialNumber string) (*x509.Certificate, error) {
+	if m.MGetCertificate != nil {
+		return m.MGetCertificate(serialNumber)
+	}
+	return m.Ret1.(*x509.Certificate), m.Err
 }
 
 // StoreCertificate mock.

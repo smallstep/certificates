@@ -143,8 +143,7 @@ func TestAuthorityNew(t *testing.T) {
 					assert.Equals(t, auth.rootX509Certs[0], root)
 
 					assert.True(t, auth.initOnce)
-					assert.NotNil(t, auth.x509Signer)
-					assert.NotNil(t, auth.x509Issuer)
+					assert.NotNil(t, auth.x509CAService)
 					for _, p := range tc.config.AuthorityConfig.Provisioners {
 						var _p provisioner.Interface
 						_p, ok = auth.provisioners.Load(p.GetID())
@@ -256,8 +255,7 @@ func TestNewEmbedded(t *testing.T) {
 			if err == nil {
 				assert.True(t, got.initOnce)
 				assert.NotNil(t, got.rootX509Certs)
-				assert.NotNil(t, got.x509Signer)
-				assert.NotNil(t, got.x509Issuer)
+				assert.NotNil(t, got.x509CAService)
 			}
 		})
 	}
