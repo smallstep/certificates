@@ -538,7 +538,7 @@ func (p *PKI) Save(opt ...Option) error {
 		return err
 	}
 
-	b, err := json.MarshalIndent(config, "", "   ")
+	b, err := json.MarshalIndent(config, "", "\t")
 	if err != nil {
 		return errors.Wrapf(err, "error marshaling %s", p.config)
 	}
@@ -568,7 +568,7 @@ func (p *PKI) Save(opt ...Option) error {
 		CAUrl:       p.caURL,
 		Fingerprint: p.rootFingerprint,
 	}
-	b, err = json.MarshalIndent(defaults, "", "   ")
+	b, err = json.MarshalIndent(defaults, "", "\t")
 	if err != nil {
 		return errors.Wrapf(err, "error marshaling %s", p.defaults)
 	}
