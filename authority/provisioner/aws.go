@@ -75,25 +75,49 @@ type awsConfig struct {
 	signatureURL       string
 	tokenURL           string
 	tokenTTL           string
-	certificate        *x509.Certificate
+	certificates       []*x509.Certificate
 	signatureAlgorithm x509.SignatureAlgorithm
 }
 
-func newAWSConfig() (*awsConfig, error) {
-	block, _ := pem.Decode([]byte(awsCertificate))
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, errors.New("error decoding AWS certificate")
+func newAWSConfig(certPath string) (*awsConfig, error) {
+	var certBytes []byte
+	if certPath == "" {
+		certBytes = []byte(awsCertificate)
+	} else {
+		if b, err := ioutil.ReadFile(certPath); err == nil {
+			certBytes = b
+		} else {
+			return nil, errors.Wrapf(err, "error reading %s", certPath)
+		}
 	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "error parsing AWS certificate")
+
+	// Read all the certificates.
+	var certs []*x509.Certificate
+	for len(certBytes) > 0 {
+		var block *pem.Block
+		block, certBytes = pem.Decode(certBytes)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+			continue
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, errors.Wrap(err, "error parsing AWS IID certificate")
+		}
+		certs = append(certs, cert)
 	}
+	if len(certs) == 0 {
+		return nil, errors.New("error parsing AWS IID certificate: no certificates found")
+	}
+
 	return &awsConfig{
 		identityURL:        awsIdentityURL,
 		signatureURL:       awsSignatureURL,
 		tokenURL:           awsAPITokenURL,
 		tokenTTL:           awsAPITokenTTL,
-		certificate:        cert,
+		certificates:       certs,
 		signatureAlgorithm: awsSignatureAlgorithm,
 	}, nil
 }
@@ -140,6 +164,9 @@ type awsInstanceIdentityDocument struct {
 // If InstanceAge is set, only the instances with a pendingTime within the given
 // period will be accepted.
 //
+// IIDRoots can be used to specify a path to the certificates used to verify the
+// identity certificate signature.
+//
 // Amazon Identity docs are available at
 // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-identity-documents.html
 type AWS struct {
@@ -151,6 +178,7 @@ type AWS struct {
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
 	IMDSVersions           []string `json:"imdsVersions"`
 	InstanceAge            Duration `json:"instanceAge,omitempty"`
+	IIDRoots               string   `json:"iidRoots,omitempty"`
 	Claims                 *Claims  `json:"claims,omitempty"`
 	Options                *Options `json:"options,omitempty"`
 	claimer                *Claimer
@@ -260,7 +288,7 @@ func (p *AWS) GetIdentityToken(subject, caURL string) (string, error) {
 
 	tok, err := jose.Signed(signer).Claims(payload).CompactSerialize()
 	if err != nil {
-		return "", errors.Wrap(err, "error serialiazing token")
+		return "", errors.Wrap(err, "error serializing token")
 	}
 
 	return tok, nil
@@ -281,7 +309,7 @@ func (p *AWS) Init(config Config) (err error) {
 		return err
 	}
 	// Add default config
-	if p.config, err = newAWSConfig(); err != nil {
+	if p.config, err = newAWSConfig(p.IIDRoots); err != nil {
 		return err
 	}
 	p.audiences = config.Audiences.WithFragment(p.GetID())
@@ -371,16 +399,18 @@ func (p *AWS) assertConfig() (err error) {
 	if p.config != nil {
 		return
 	}
-	p.config, err = newAWSConfig()
+	p.config, err = newAWSConfig(p.IIDRoots)
 	return err
 }
 
 // checkSignature returns an error if the signature is not valid.
 func (p *AWS) checkSignature(signed, signature []byte) error {
-	if err := p.config.certificate.CheckSignature(p.config.signatureAlgorithm, signed, signature); err != nil {
-		return errors.Wrap(err, "error validating identity document signature")
+	for _, crt := range p.config.certificates {
+		if err := crt.CheckSignature(p.config.signatureAlgorithm, signed, signature); err == nil {
+			return nil
+		}
 	}
-	return nil
+	return errors.New("error validating identity document signature")
 }
 
 // readURL does a GET request to the given url and returns the body. It's not

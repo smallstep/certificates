@@ -441,6 +441,7 @@ In the ca.json, an AWS provisioner looks like:
     "disableCustomSANs": false,
     "disableTrustOnFirstUse": false,
     "instanceAge": "1h",
+    "iidRoots": "/path/to/aws.crt",
     "claims": {
         "maxTLSCertDuration": "2160h",
         "defaultTLSCertDuration": "2160h"
@@ -467,6 +468,9 @@ In the ca.json, an AWS provisioner looks like:
 
 * `instanceAge` (optional): the maximum age of an instance to grant a
   certificate. The instance age is a string using the duration format.
+
+* `iidRoots` (optional): the path to one or more public certificates in PEM
+  format used to validate the signature of the instance identity document.
 
 * `claims` (optional): overwrites the default claims set in the authority, see
   the [top](#provisioners) section for all the options.

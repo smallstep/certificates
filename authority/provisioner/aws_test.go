@@ -178,8 +178,12 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 					assert.Equals(t, tt.args.subject, c.Subject)
 					assert.Equals(t, jose.Audience{u.ResolveReference(&url.URL{Path: "/1.0/sign", Fragment: tt.aws.GetID()}).String()}, c.Audience)
 					assert.Equals(t, tt.aws.Accounts[0], c.document.AccountID)
-					err = tt.aws.config.certificate.CheckSignature(
-						tt.aws.config.signatureAlgorithm, c.Amazon.Document, c.Amazon.Signature)
+					for _, crt := range tt.aws.config.certificates {
+						err = crt.CheckSignature(tt.aws.config.signatureAlgorithm, c.Amazon.Document, c.Amazon.Signature)
+						if err == nil {
+							break
+						}
+					}
 					assert.NoError(t, err)
 				}
 			}
@@ -206,8 +210,12 @@ func TestAWS_GetIdentityToken_V1Only(t *testing.T) {
 		assert.Equals(t, subject, c.Subject)
 		assert.Equals(t, jose.Audience{u.ResolveReference(&url.URL{Path: "/1.0/sign", Fragment: aws.GetID()}).String()}, c.Audience)
 		assert.Equals(t, aws.Accounts[0], c.document.AccountID)
-		err = aws.config.certificate.CheckSignature(
-			aws.config.signatureAlgorithm, c.Amazon.Document, c.Amazon.Signature)
+		for _, crt := range aws.config.certificates {
+			err = crt.CheckSignature(aws.config.signatureAlgorithm, c.Amazon.Document, c.Amazon.Signature)
+			if err == nil {
+				break
+			}
+		}
 		assert.NoError(t, err)
 	}
 }
@@ -247,6 +255,7 @@ func TestAWS_Init(t *testing.T) {
 		DisableTrustOnFirstUse bool
 		InstanceAge            Duration
 		IMDSVersions           []string
+		IIDRoots               string
 		Claims                 *Claims
 	}
 	type args struct {
@@ -258,16 +267,19 @@ func TestAWS_Init(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, nil}, args{config}, false},
-		{"ok/v1", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1"}, nil}, args{config}, false},
-		{"ok/v2", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v2"}, nil}, args{config}, false},
-		{"ok/empty", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{}, nil}, args{config}, false},
-		{"ok/duration", fields{"AWS", "name", []string{"account"}, true, true, Duration{Duration: 1 * time.Minute}, []string{"v1", "v2"}, nil}, args{config}, false},
-		{"fail type ", fields{"", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, nil}, args{config}, true},
-		{"fail name", fields{"AWS", "", []string{"account"}, false, false, zero, []string{"v1", "v2"}, nil}, args{config}, true},
-		{"bad instance age", fields{"AWS", "name", []string{"account"}, false, false, Duration{Duration: -1 * time.Minute}, []string{"v1", "v2"}, nil}, args{config}, true},
-		{"fail/imds", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"bad"}, nil}, args{config}, true},
-		{"fail claims", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, badClaims}, args{config}, true},
+		{"ok", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, "", nil}, args{config}, false},
+		{"ok/v1", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1"}, "", nil}, args{config}, false},
+		{"ok/v2", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v2"}, "", nil}, args{config}, false},
+		{"ok/empty", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{}, "", nil}, args{config}, false},
+		{"ok/duration", fields{"AWS", "name", []string{"account"}, true, true, Duration{Duration: 1 * time.Minute}, []string{"v1", "v2"}, "", nil}, args{config}, false},
+		{"ok/cert", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, "testdata/certs/aws.crt", nil}, args{config}, false},
+		{"fail type ", fields{"", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, "", nil}, args{config}, true},
+		{"fail name", fields{"AWS", "", []string{"account"}, false, false, zero, []string{"v1", "v2"}, "", nil}, args{config}, true},
+		{"bad instance age", fields{"AWS", "name", []string{"account"}, false, false, Duration{Duration: -1 * time.Minute}, []string{"v1", "v2"}, "", nil}, args{config}, true},
+		{"fail/imds", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"bad"}, "", nil}, args{config}, true},
+		{"fail/missing", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"bad"}, "testdata/missing.crt", nil}, args{config}, true},
+		{"fail/cert", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"bad"}, "testdata/certs/rsa.csr", nil}, args{config}, true},
+		{"fail claims", fields{"AWS", "name", []string{"account"}, false, false, zero, []string{"v1", "v2"}, "", badClaims}, args{config}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -279,6 +291,7 @@ func TestAWS_Init(t *testing.T) {
 				DisableTrustOnFirstUse: tt.fields.DisableTrustOnFirstUse,
 				InstanceAge:            tt.fields.InstanceAge,
 				IMDSVersions:           tt.fields.IMDSVersions,
+				IIDRoots:               tt.fields.IIDRoots,
 				Claims:                 tt.fields.Claims,
 			}
 			if err := p.Init(tt.args.config); (err != nil) != tt.wantErr {
@@ -457,8 +470,34 @@ func TestAWS_authorizeToken(t *testing.T) {
 				err:   errors.New("aws.authorizeToken; aws identity document pendingTime is too old"),
 			}
 		},
+		"fail/identityCert": func(t *testing.T) test {
+			p, err := generateAWS()
+			p.IIDRoots = "testdata/certs/aws.crt"
+			assert.FatalError(t, err)
+			tok, err := generateAWSToken(
+				"instance-id", awsIssuer, p.GetID(), p.Accounts[0], "instance-id",
+				"127.0.0.1", "us-west-1", time.Now(), key)
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+			}
+		},
 		"ok": func(t *testing.T) test {
 			p, err := generateAWS()
+			assert.FatalError(t, err)
+			tok, err := generateAWSToken(
+				"instance-id", awsIssuer, p.GetID(), p.Accounts[0], "instance-id",
+				"127.0.0.1", "us-west-1", time.Now(), key)
+			assert.FatalError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+			}
+		},
+		"ok/identityCert": func(t *testing.T) test {
+			p, err := generateAWS()
+			p.IIDRoots = "testdata/certs/aws-test.crt"
 			assert.FatalError(t, err)
 			tok, err := generateAWSToken(
 				"instance-id", awsIssuer, p.GetID(), p.Accounts[0], "instance-id",
