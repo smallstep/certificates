@@ -1,6 +1,6 @@
-# Certificate Management Services
+# Certificate Authority Services
 
-This document describes how to use a certificate management service or CAS to
+This document describes how to use a certificate authority service or CAS to
 sign X.509 certificates requests.
 
 A CAS is a system that implements an API to sign certificate requests, the
