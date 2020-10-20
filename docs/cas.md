@@ -1,14 +1,7 @@
-<<<<<<< HEAD
 # Registration Authorities
 
 This document describes how to use an external registration authority (RA), aka
 certificate authority service (CAS) to sign X.509 certificates requests.
-=======
-# Certificate Authority Services
-
-This document describes how to use a certificate authority service or CAS to
-sign X.509 certificates requests.
->>>>>>> master
 
 A CAS is a system that implements an API to sign certificate requests, the
 difference between CAS and KMS is that the latter can sign any data, while CAS
