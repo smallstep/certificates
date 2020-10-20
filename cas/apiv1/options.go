@@ -18,7 +18,7 @@ type Options struct {
 
 	// CertificateAuthority reference. In CloudCAS the format is
 	// `projects/*/locations/*/certificateAuthorities/*`.
-	Certificateauthority string `json:"certificateAuthority"`
+	CertificateAuthority string `json:"certificateAuthority"`
 
 	// Issuer and signer are the issuer certificate and signer used in SoftCAS.
 	// They are configured in ca.json crt and key properties.
