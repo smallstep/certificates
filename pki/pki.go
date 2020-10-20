@@ -1,6 +1,7 @@
 package pki
 
 import (
+	"context"
 	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
@@ -20,6 +21,8 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
+	"github.com/smallstep/certificates/cas"
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/cli/config"
 	"github.com/smallstep/cli/errs"
@@ -157,6 +160,7 @@ type PKI struct {
 	dnsNames                       []string
 	caURL                          string
 	enableSSH                      bool
+	authorityOptions               *apiv1.Options
 }
 
 // New creates a new PKI configuration.
@@ -233,6 +237,12 @@ func (p *PKI) GetRootFingerprint() string {
 	return p.rootFingerprint
 }
 
+// SetAuthorityOptions sets the authority options object, these options are used
+// to configure a registration authority.
+func (p *PKI) SetAuthorityOptions(opts *apiv1.Options) {
+	p.authorityOptions = opts
+}
+
 // SetProvisioner sets the provisioner name of the OTT keys.
 func (p *PKI) SetProvisioner(s string) {
 	p.provisioner = s
@@ -307,13 +317,46 @@ func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{
 		return err
 	}
 
-	_, err := pemutil.Serialize(rootKey, pemutil.WithPassword(pass), pemutil.ToFile(p.rootKey, 0600))
-	if err != nil {
-		return err
+	if rootKey != nil {
+		_, err := pemutil.Serialize(rootKey, pemutil.WithPassword(pass), pemutil.ToFile(p.rootKey, 0600))
+		if err != nil {
+			return err
+		}
 	}
 
 	sum := sha256.Sum256(rootCrt.Raw)
 	p.rootFingerprint = strings.ToLower(hex.EncodeToString(sum[:]))
+
+	return nil
+}
+
+// GetCertificateAuthority attempts to load the certificate authority from the
+// RA.
+func (p *PKI) GetCertificateAuthority() error {
+	ca, err := cas.New(context.Background(), *p.authorityOptions)
+	if err != nil {
+		return err
+	}
+
+	srv, ok := ca.(apiv1.CertificateAuthorityGetter)
+	if !ok {
+		return nil
+	}
+
+	resp, err := srv.GetCertificateAuthority(&apiv1.GetCertificateAuthorityRequest{
+		Name: p.authorityOptions.CertificateAuthority,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := p.WriteRootCertificate(resp.RootCertificate, nil, nil); err != nil {
+		return err
+	}
+
+	// Issuer is in the RA
+	p.intermediate = ""
+	p.intermediateKey = ""
 
 	return nil
 }
@@ -414,11 +457,18 @@ func (p *PKI) TellPKI() {
 
 func (p *PKI) tellPKI() {
 	ui.Println()
-	ui.PrintSelected("Root certificate", p.root)
-	ui.PrintSelected("Root private key", p.rootKey)
-	ui.PrintSelected("Root fingerprint", p.rootFingerprint)
-	ui.PrintSelected("Intermediate certificate", p.intermediate)
-	ui.PrintSelected("Intermediate private key", p.intermediateKey)
+	if p.authorityOptions == nil || p.authorityOptions.Is(apiv1.SoftCAS) {
+		ui.PrintSelected("Root certificate", p.root)
+		ui.PrintSelected("Root private key", p.rootKey)
+		ui.PrintSelected("Root fingerprint", p.rootFingerprint)
+		ui.PrintSelected("Intermediate certificate", p.intermediate)
+		ui.PrintSelected("Intermediate private key", p.intermediateKey)
+	} else if p.rootFingerprint != "" {
+		ui.PrintSelected("Root certificate", p.root)
+		ui.PrintSelected("Root fingerprint", p.rootFingerprint)
+	} else {
+		ui.Printf(`{{ "%s" | red }} {{ "Root certificate:" | bold }} failed to retrieve it from RA`+"\n", ui.IconBad)
+	}
 	if p.enableSSH {
 		ui.PrintSelected("SSH user root certificate", p.sshUserPubKey)
 		ui.PrintSelected("SSH user root private key", p.sshUserKey)
@@ -485,6 +535,7 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 			DataSource: GetDBPath(),
 		},
 		AuthorityConfig: &authority.AuthConfig{
+			Options:              p.authorityOptions,
 			DisableIssuedAtCheck: false,
 			Provisioners:         provisioner.List{prov},
 		},
@@ -591,7 +642,11 @@ func (p *PKI) Save(opt ...Option) error {
 	ui.PrintSelected("Default configuration", p.defaults)
 	ui.PrintSelected("Certificate Authority configuration", p.config)
 	ui.Println()
-	ui.Println("Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.")
+	if p.authorityOptions == nil || p.authorityOptions.Is(apiv1.SoftCAS) {
+		ui.Println("Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.")
+	} else {
+		ui.Println("Your registration authority is ready to go. To generate certificates for individual services see 'step help ca'.")
+	}
 
 	p.askFeedback()
 
