@@ -55,7 +55,6 @@ type Config struct {
 	Address          string               `json:"address"`
 	DNSNames         []string             `json:"dnsNames"`
 	KMS              *kms.Options         `json:"kms,omitempty"`
-	CAS              *cas.Options         `json:"cas,omitempty"`
 	SSH              *SSHConfig           `json:"ssh,omitempty"`
 	Logger           json.RawMessage      `json:"logger,omitempty"`
 	DB               *db.Config           `json:"db,omitempty"`
@@ -78,8 +77,11 @@ type ASN1DN struct {
 	CommonName         string `json:"commonName,omitempty" step:"commonName"`
 }
 
-// AuthConfig represents the configuration options for the authority.
+// AuthConfig represents the configuration options for the authority. An
+// underlaying registration authority can also be configured using the
+// cas.Options.
 type AuthConfig struct {
+	*cas.Options
 	Provisioners         provisioner.List      `json:"provisioners"`
 	Template             *ASN1DN               `json:"template,omitempty"`
 	Claims               *provisioner.Claims   `json:"claims,omitempty"`
@@ -185,8 +187,11 @@ func (c *Config) Validate() error {
 		return errors.New("dnsNames cannot be empty")
 	}
 
-	// The default CAS requires root, crt and key.
-	if c.CAS.Is(cas.SoftCAS) {
+	// Options holds the RA/CAS configuration.
+	ra := c.AuthorityConfig.Options
+
+	// The default RA/CAS requires root, crt and key.
+	if ra.Is(cas.SoftCAS) {
 		switch {
 		case c.Root.HasEmpties():
 			return errors.New("root cannot be empty")
@@ -225,8 +230,8 @@ func (c *Config) Validate() error {
 		return err
 	}
 
-	// Validate CAS options, nil is ok.
-	if err := c.CAS.Validate(); err != nil {
+	// Validate RA/CAS options, nil is ok.
+	if err := ra.Validate(); err != nil {
 		return err
 	}
 

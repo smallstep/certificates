@@ -156,8 +156,8 @@ func (a *Authority) init() error {
 	// Initialize the X.509 CA Service if it has not been set in the options.
 	if a.x509CAService == nil {
 		var options casapi.Options
-		if a.config.CAS != nil {
-			options = *a.config.CAS
+		if a.config.AuthorityConfig.Options != nil {
+			options = *a.config.AuthorityConfig.Options
 		}
 
 		// Read intermediate and create X509 signer for default CAS.
@@ -183,7 +183,7 @@ func (a *Authority) init() error {
 		// Get root certificate from CAS.
 		if srv, ok := a.x509CAService.(casapi.CertificateAuthorityGetter); ok {
 			resp, err := srv.GetCertificateAuthority(&casapi.GetCertificateAuthorityRequest{
-				Name: options.Certificateauthority,
+				Name: options.CertificateAuthority,
 			})
 			if err != nil {
 				return err
