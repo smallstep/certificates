@@ -3,7 +3,7 @@ Upstream-Name: step-certificates
 Source: https://github.com/smallstep/certificates
 
 Files: *
-Copyright: 2019 Smallstep Labs, Inc.
+Copyright: 2020 Smallstep Labs, Inc.
 License: Apache 2.0
 
 License: Apache 2.0
