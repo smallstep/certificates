@@ -233,8 +233,11 @@ func (a *Authority) GetOrder(ctx context.Context, accID, orderID string) (*Order
 
 // GetOrdersByAccount returns the list of order urls owned by the account.
 func (a *Authority) GetOrdersByAccount(ctx context.Context, id string) ([]string, error) {
+	ordersByAccountMux.Lock()
+	defer ordersByAccountMux.Unlock()
+
 	var oiba = orderIDsByAccount{}
-	oids, err := oiba.getOrderIDsByAccount(a.db, id, false)
+	oids, err := oiba.unsafeGetOrderIDsByAccount(a.db, id)
 	if err != nil {
 		return nil, err
 	}

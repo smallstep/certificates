@@ -125,12 +125,15 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 
 type orderIDsByAccount struct{}
 
+// addOrderID adds an order ID to a users index of in progress order IDs.
+// This method will also cull any orders that are no longer in the `pending`
+// state from the index before returning it.
 func (oiba orderIDsByAccount) addOrderID(db nosql.DB, accID string, oid string) ([]string, error) {
 	ordersByAccountMux.Lock()
 	defer ordersByAccountMux.Unlock()
 
 	// Update the "order IDs by account ID" index
-	oids, err := oiba.getOrderIDsByAccount(db, accID, true)
+	oids, err := oiba.unsafeGetOrderIDsByAccount(db, accID)
 	if err != nil {
 		return nil, err
 	}
@@ -143,15 +146,9 @@ func (oiba orderIDsByAccount) addOrderID(db nosql.DB, accID string, oid string) 
 	return newOids, nil
 }
 
-// getOrderIDsByAccount retrieves a list of Order IDs that were created by the
+// unsafeGetOrderIDsByAccount retrieves a list of Order IDs that were created by the
 // account.
-func (oiba orderIDsByAccount) getOrderIDsByAccount(db nosql.DB, accID string, alreadyLocked bool) ([]string, error) {
-	if !alreadyLocked {
-		ordersByAccountMux.Lock()
-
-		defer ordersByAccountMux.Unlock()
-	}
-
+func (oiba orderIDsByAccount) unsafeGetOrderIDsByAccount(db nosql.DB, accID string) ([]string, error) {
 	b, err := db.Get(ordersByAccountIDTable, []byte(accID))
 	if err != nil {
 		if nosql.IsErrNotFound(err) {
