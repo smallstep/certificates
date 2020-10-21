@@ -1,14 +1,15 @@
-# Certificate Authority Services
+# Registration Authorities
 
-This document describes how to use a certificate authority service or CAS to
-sign X.509 certificates requests.
+This document describes how to use an external registration authority (RA), aka
+certificate authority service (CAS) to sign X.509 certificates requests.
 
 A CAS is a system that implements an API to sign certificate requests, the
 difference between CAS and KMS is that the latter can sign any data, while CAS
 is intended to sign only X.509 certificates.
 
 `step-ca` defines an interface that can be implemented to support other
-services, currently only CloudCAS and the default SoftCAS are implemented.
+registration authorities, currently only CloudCAS and the default SoftCAS are
+implemented.
 
 The `CertificateAuthorityService` is defined in the package
 `github.com/smallstep/certificates/cas/apiv1` and it is:
@@ -123,15 +124,15 @@ or using `gcloud` CLI:
        --reusable-config "subordinate-server-tls-pathlen-0"
    ```
 
-Not it's time to enable it in `step-ca` adding the new property `"cas"` must be added
-to the `ca.json`.
+Now it's time to enable it in `step-ca` by adding some new files in the
+`"authority"` section of the `ca.json`.
 
 ```json
 {
-    "cas": {
+    "authority": {
         "type": "cloudCAS",
         "credentialsFile": "/path/to/credentials.json",
-        "certificateAuthority": "projects/<name>/locations/<loc>/certificateAuthorities/<ca-name>"
+        "certificateAuthority": "projects/<name>/locations/<loc>/certificateAuthorities/<ca-name>",
     }
 }
 ```
@@ -161,12 +162,10 @@ need to configure `"root"`, and because the intermediate is in Google Cloud,
       "type": "badger",
       "dataSource": "/home/jane/.step/db",
    },
-   "cas": {
+   "authority": {
       "type": "cloudCAS",
       "credentialsFile": "/home/jane/.step/credentials.json",
-      "certificateAuthority": "projects/smallstep-cas-test/locations/us-west1/certificateAuthorities/prod-intermediate-ca"
-   },
-   "authority": {
+      "certificateAuthority": "projects/smallstep-cas-test/locations/us-west1/certificateAuthorities/prod-intermediate-ca",
       "provisioners": [
          {
             "type": "JWK",

@@ -174,20 +174,20 @@ func TestNew(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", args{context.Background(), apiv1.Options{
-			Certificateauthority: testAuthorityName,
+			CertificateAuthority: testAuthorityName,
 		}}, &CloudCAS{
 			client:               &testClient{},
 			certificateAuthority: testAuthorityName,
 		}, false},
 		{"ok with credentials", args{context.Background(), apiv1.Options{
-			Certificateauthority: testAuthorityName, CredentialsFile: "testdata/credentials.json",
+			CertificateAuthority: testAuthorityName, CredentialsFile: "testdata/credentials.json",
 		}}, &CloudCAS{
 			client:               &testClient{credentialsFile: "testdata/credentials.json"},
 			certificateAuthority: testAuthorityName,
 		}, false},
 		{"fail certificate authority", args{context.Background(), apiv1.Options{}}, nil, true},
 		{"fail with credentials", args{context.Background(), apiv1.Options{
-			Certificateauthority: testAuthorityName, CredentialsFile: "testdata/error.json",
+			CertificateAuthority: testAuthorityName, CredentialsFile: "testdata/error.json",
 		}}, nil, true},
 	}
 	for _, tt := range tests {
@@ -225,7 +225,7 @@ func TestNew_register(t *testing.T) {
 	}
 
 	got, err := newFn(context.Background(), apiv1.Options{
-		Certificateauthority: testAuthorityName, CredentialsFile: "testdata/credentials.json",
+		CertificateAuthority: testAuthorityName, CredentialsFile: "testdata/credentials.json",
 	})
 	if err != nil {
 		t.Errorf("New() error = %v", err)
@@ -255,10 +255,10 @@ func TestNew_real(t *testing.T) {
 		args     args
 		wantErr  bool
 	}{
-		{"fail default credentials", true, args{context.Background(), apiv1.Options{Certificateauthority: testAuthorityName}}, true},
+		{"fail default credentials", true, args{context.Background(), apiv1.Options{CertificateAuthority: testAuthorityName}}, true},
 		{"fail certificate authority", false, args{context.Background(), apiv1.Options{}}, true},
 		{"fail with credentials", false, args{context.Background(), apiv1.Options{
-			Certificateauthority: testAuthorityName, CredentialsFile: "testdata/missing.json",
+			CertificateAuthority: testAuthorityName, CredentialsFile: "testdata/missing.json",
 		}}, true},
 	}
 	for _, tt := range tests {

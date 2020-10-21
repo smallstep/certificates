@@ -70,7 +70,7 @@ var newCertificateAuthorityClient = func(ctx context.Context, credentialsFile st
 // New creates a new CertificateAuthorityService implementation using Google
 // Cloud CAS.
 func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
-	if opts.Certificateauthority == "" {
+	if opts.CertificateAuthority == "" {
 		return nil, errors.New("cloudCAS 'certificateAuthority' cannot be empty")
 	}
 
@@ -81,7 +81,7 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 
 	return &CloudCAS{
 		client:               client,
-		certificateAuthority: opts.Certificateauthority,
+		certificateAuthority: opts.CertificateAuthority,
 	}, nil
 }
 

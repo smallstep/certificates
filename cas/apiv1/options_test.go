@@ -42,7 +42,7 @@ func TestOptions_Validate(t *testing.T) {
 	type fields struct {
 		Type                 string
 		CredentialsFile      string
-		Certificateauthority string
+		CertificateAuthority string
 		Issuer               *x509.Certificate
 		Signer               crypto.Signer
 	}
@@ -69,7 +69,7 @@ func TestOptions_Validate(t *testing.T) {
 			o := &Options{
 				Type:                 tt.fields.Type,
 				CredentialsFile:      tt.fields.CredentialsFile,
-				Certificateauthority: tt.fields.Certificateauthority,
+				CertificateAuthority: tt.fields.CertificateAuthority,
 				Issuer:               tt.fields.Issuer,
 				Signer:               tt.fields.Signer,
 			}
@@ -86,7 +86,7 @@ func TestOptions_Is(t *testing.T) {
 	type fields struct {
 		Type                 string
 		CredentialsFile      string
-		Certificateauthority string
+		CertificateAuthority string
 		Issuer               *x509.Certificate
 		Signer               crypto.Signer
 	}
@@ -119,7 +119,7 @@ func TestOptions_Is(t *testing.T) {
 			o := &Options{
 				Type:                 tt.fields.Type,
 				CredentialsFile:      tt.fields.CredentialsFile,
-				Certificateauthority: tt.fields.Certificateauthority,
+				CertificateAuthority: tt.fields.CertificateAuthority,
 				Issuer:               tt.fields.Issuer,
 				Signer:               tt.fields.Signer,
 			}
