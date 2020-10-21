@@ -18,7 +18,7 @@ import (
 var defaultOrderExpiry = time.Hour * 24
 
 // Mutex for locking ordersByAccount index operations.
-var ordersByAccountMux = &sync.Mutex{}
+var ordersByAccountMux sync.Mutex
 
 // Order contains order metadata for the ACME protocol order type.
 type Order struct {
