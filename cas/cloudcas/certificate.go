@@ -8,8 +8,10 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
+	"fmt"
 
 	"github.com/pkg/errors"
+	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1beta1"
 	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -325,4 +327,46 @@ func findExtraExtension(cert *x509.Certificate, oid asn1.ObjectIdentifier) (pkix
 		}
 	}
 	return pkix.Extension{}, false
+}
+
+func createKeyVersionSpec(alg kmsapi.SignatureAlgorithm, bits int) (*pb.CertificateAuthority_KeyVersionSpec, error) {
+	switch alg {
+	case kmsapi.UnspecifiedSignAlgorithm, kmsapi.ECDSAWithSHA256:
+		return &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_EC_P256_SHA256,
+			},
+		}, nil
+	case kmsapi.ECDSAWithSHA384:
+		return &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_EC_P384_SHA384,
+			},
+		}, nil
+	case kmsapi.SHA256WithRSAPSS:
+		algo, err := getRSAPSSAlgorithm(bits)
+		if err != nil {
+			return nil, err
+		}
+		return &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: algo,
+			},
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown or unsupported signature algorithm '%s'", bits)
+	}
+}
+
+func getRSAPSSAlgorithm(bits int) (pb.CertificateAuthority_SignHashAlgorithm, error) {
+	switch bits {
+	case 0, 3072:
+		return pb.CertificateAuthority_RSA_PSS_3072_SHA_256, nil
+	case 2048:
+		return pb.CertificateAuthority_RSA_PSS_2048_SHA_256, nil
+	case 4096:
+		return pb.CertificateAuthority_RSA_PSS_4096_SHA_256, nil
+	default:
+		return 0, fmt.Errorf("unsupported RSA-PSS key size '%d'", bits)
+	}
 }

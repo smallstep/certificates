@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"io"
 	"os"
@@ -672,4 +673,63 @@ func Test_getCertificateAndChain(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCloudCAS(t *testing.T) {
+	cas, err := New(context.Background(), apiv1.Options{
+		Type:                 "cloudCAS",
+		CertificateAuthority: "projects/smallstep-cas-test/locations/us-west1",
+		CredentialsFile:      "/Users/mariano/smallstep-cas-test-8a068f3e4540.json",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// resp, err := cas.CreateCertificateAuthority(&apiv1.CreateCertificateAuthorityRequest{
+	// 	Type: apiv1.RootCA,
+	// 	Template: &x509.Certificate{
+	// 		Subject: pkix.Name{
+	// 			CommonName: "Test Mariano Root CA",
+	// 		},
+	// 		BasicConstraintsValid: true,
+	// 		IsCA:                  true,
+	// 		MaxPathLen:            1,
+	// 		MaxPathLenZero:        false,
+	// 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	// 	},
+	// 	Lifetime: time.Duration(30 * 24 * time.Hour),
+	// 	Project:  "smallstep-cas-test",
+	// 	Location: "us-west1",
+	// })
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+	// debug(resp)
+	resp := &apiv1.CreateCertificateAuthorityResponse{
+		Name: "projects/smallstep-cas-test/locations/us-west1/certificateAuthorities/9a593da4-61af-4426-a2f8-0650373b9c8e",
+	}
+
+	resp, err = cas.CreateCertificateAuthority(&apiv1.CreateCertificateAuthorityRequest{
+		Type: apiv1.IntermediateCA,
+		Template: &x509.Certificate{
+			Subject: pkix.Name{
+				Country:    []string{"US"},
+				CommonName: "Test Mariano Intermediate CA",
+			},
+			BasicConstraintsValid: true,
+			IsCA:                  true,
+			MaxPathLen:            0,
+			MaxPathLenZero:        true,
+			KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		},
+		Lifetime: time.Duration(24 * time.Hour),
+		Parent:   resp,
+		Project:  "smallstep-cas-test",
+		Location: "us-west1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// debug(resp)
+	t.Error("foo")
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/kms"
 )
 
 // Options represents the configuration options used to select and configure the
@@ -24,6 +25,18 @@ type Options struct {
 	// They are configured in ca.json crt and key properties.
 	Issuer *x509.Certificate `json:"-"`
 	Signer crypto.Signer     `json:"-"`
+
+	// IsCreator is set to true when we're creating a certificate authority. Is
+	// used to skip some validations when initializing a CertificateAuthority.
+	IsCreator bool `json:"-"`
+
+	// KeyManager is the KMS used to generate keys in SoftCAS.
+	KeyManager kms.KeyManager `json:"-"`
+
+	// Project and Location are parameters used in CloudCAS to create a new
+	// certificate authority.
+	Project  string `json:"-"`
+	Location string `json:"-"`
 }
 
 // Validate checks the fields in Options.

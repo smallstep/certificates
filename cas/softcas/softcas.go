@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
-	"errors"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
+	"github.com/smallstep/certificates/kms"
+	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -24,22 +26,26 @@ var now = func() time.Time {
 // SoftCAS implements a Certificate Authority Service using Golang or KMS
 // crypto. This is the default CAS used in step-ca.
 type SoftCAS struct {
-	Issuer *x509.Certificate
-	Signer crypto.Signer
+	Issuer     *x509.Certificate
+	Signer     crypto.Signer
+	KeyManager kms.KeyManager
 }
 
 // New creates a new CertificateAuthorityService implementation using Golang or KMS
 // crypto.
 func New(ctx context.Context, opts apiv1.Options) (*SoftCAS, error) {
-	switch {
-	case opts.Issuer == nil:
-		return nil, errors.New("softCAS 'issuer' cannot be nil")
-	case opts.Signer == nil:
-		return nil, errors.New("softCAS 'signer' cannot be nil")
+	if !opts.IsCreator {
+		switch {
+		case opts.Issuer == nil:
+			return nil, errors.New("softCAS 'issuer' cannot be nil")
+		case opts.Signer == nil:
+			return nil, errors.New("softCAS 'signer' cannot be nil")
+		}
 	}
 	return &SoftCAS{
-		Issuer: opts.Issuer,
-		Signer: opts.Signer,
+		Issuer:     opts.Issuer,
+		Signer:     opts.Signer,
+		KeyManager: opts.KeyManager,
 	}, nil
 }
 
@@ -112,4 +118,103 @@ func (c *SoftCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1
 			c.Issuer,
 		},
 	}, nil
+}
+
+// CreateCertificateAuthority creates a root or an intermediate certificate.
+func (c *SoftCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthorityRequest) (*apiv1.CreateCertificateAuthorityResponse, error) {
+	switch {
+	case req.Template == nil:
+		return nil, errors.New("createCertificateAuthorityRequest `template` cannot be nil")
+	case req.Lifetime == 0:
+		return nil, errors.New("createCertificateAuthorityRequest `lifetime` cannot be 0")
+	case req.Type == apiv1.IntermediateCA && req.Parent == nil:
+		return nil, errors.New("createCertificateAuthorityRequest `parent` cannot be nil")
+	case req.Type == apiv1.IntermediateCA && req.Parent.Certificate == nil:
+		return nil, errors.New("createCertificateAuthorityRequest `parent.template` cannot be nil")
+	case req.Type == apiv1.IntermediateCA && req.Parent.Signer == nil:
+		return nil, errors.New("createCertificateAuthorityRequest `parent.signer` cannot be nil")
+	}
+
+	key, err := c.createKey(req.CreateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	signer, err := c.createSigner(&key.CreateSignerRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	t := now()
+	if req.Template.NotBefore.IsZero() {
+		req.Template.NotBefore = t.Add(-1 * req.Backdate)
+	}
+	if req.Template.NotAfter.IsZero() {
+		req.Template.NotAfter = t.Add(req.Lifetime)
+	}
+
+	var cert *x509.Certificate
+	switch req.Type {
+	case apiv1.RootCA:
+		cert, err = x509util.CreateCertificate(req.Template, req.Template, signer.Public(), signer)
+		if err != nil {
+			return nil, err
+		}
+	case apiv1.IntermediateCA:
+		cert, err = x509util.CreateCertificate(req.Template, req.Parent.Certificate, signer.Public(), req.Parent.Signer)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.Errorf("createCertificateAuthorityRequest `type=%d' is invalid or not supported", req.Type)
+	}
+
+	// Add the parent
+	var chain []*x509.Certificate
+	if req.Parent != nil {
+		chain = append(chain, req.Parent.Certificate)
+		for _, crt := range req.Parent.CertificateChain {
+			chain = append(chain, crt)
+		}
+	}
+
+	return &apiv1.CreateCertificateAuthorityResponse{
+		Name:             cert.Subject.CommonName,
+		Certificate:      cert,
+		CertificateChain: chain,
+		PublicKey:        key.PublicKey,
+		PrivateKey:       key.PrivateKey,
+		Signer:           signer,
+	}, nil
+}
+
+// initializeKeyManager initiazes the default key manager if was not given.
+func (c *SoftCAS) initializeKeyManager() (err error) {
+	if c.KeyManager == nil {
+		c.KeyManager, err = kms.New(context.Background(), kmsapi.Options{
+			Type: string(kmsapi.DefaultKMS),
+		})
+	}
+	return
+}
+
+// createKey uses the configured kms to create a key.
+func (c *SoftCAS) createKey(req *kmsapi.CreateKeyRequest) (*kmsapi.CreateKeyResponse, error) {
+	if err := c.initializeKeyManager(); err != nil {
+		return nil, err
+	}
+	if req == nil {
+		req = &kmsapi.CreateKeyRequest{
+			SignatureAlgorithm: kmsapi.ECDSAWithSHA256,
+		}
+	}
+	return c.KeyManager.CreateKey(req)
+}
+
+// createSigner uses the configured kms to create a singer
+func (c *SoftCAS) createSigner(req *kmsapi.CreateSignerRequest) (crypto.Signer, error) {
+	if err := c.initializeKeyManager(); err != nil {
+		return nil, err
+	}
+	return c.KeyManager.CreateSigner(req)
 }

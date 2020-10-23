@@ -20,19 +20,15 @@ require (
 	github.com/urfave/cli v1.22.2
 	go.step.sm/cli-utils v0.1.0
 	go.step.sm/crypto v0.6.1
-	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
-	golang.org/x/net v0.0.0-20200822124328-c89045814202
+	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
+	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	google.golang.org/api v0.31.0
 	google.golang.org/genproto v0.0.0-20200904004341-0bd0a958aa1d
 	google.golang.org/grpc v1.32.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/square/go-jose.v2 v2.5.1
-// cloud.google.com/go/security/privateca/apiv1alpha1 v0.0.0
-// google.golang.org/genproto/googleapis/cloud/security/privateca/v1alpha1 v0.0.0
 )
 
+// replace github.com/smallstep/cli => ../cli
 // replace github.com/smallstep/nosql => ../nosql
 // replace go.step.sm/crypto => ../crypto
-
-// replace cloud.google.com/go/security/privateca/apiv1alpha1 => ./pkg/cloud.google.com/go/security/privateca/apiv1alpha1
-// replace google.golang.org/genproto/googleapis/cloud/security/privateca/v1alpha1 => ./pkg/google.golang.org/genproto/googleapis/cloud/security/privateca/v1alpha1
