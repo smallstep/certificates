@@ -376,6 +376,18 @@ func (p *PKI) WriteIntermediateCertificate(crt *x509.Certificate, key interface{
 	return nil
 }
 
+// CreateCertificateAuthorityResponse returns a
+// CreateCertificateAuthorityResponse that can be used as a parent of a
+// CreateCertificateAuthority request.
+func (p *PKI) CreateCertificateAuthorityResponse(cert *x509.Certificate, key crypto.PrivateKey) *apiv1.CreateCertificateAuthorityResponse {
+	signer, _ := key.(crypto.Signer)
+	return &apiv1.CreateCertificateAuthorityResponse{
+		Certificate: cert,
+		PrivateKey:  key,
+		Signer:      signer,
+	}
+}
+
 // GetCertificateAuthority attempts to load the certificate authority from the
 // RA.
 func (p *PKI) GetCertificateAuthority() error {
