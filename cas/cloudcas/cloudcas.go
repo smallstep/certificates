@@ -15,6 +15,7 @@ import (
 	gax "github.com/googleapis/gax-go/v2"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
+	"go.step.sm/crypto/x509util"
 	"google.golang.org/api/option"
 	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1beta1"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -24,6 +25,10 @@ func init() {
 	apiv1.Register(apiv1.CloudCAS, func(ctx context.Context, opts apiv1.Options) (apiv1.CertificateAuthorityService, error) {
 		return New(ctx, opts)
 	})
+}
+
+var now = func() time.Time {
+	return time.Now()
 }
 
 // The actual regular expression that matches a certificate authority is:
@@ -253,7 +258,7 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 		return nil, errors.New("createCertificateAuthorityRequest `lifetime` cannot be 0")
 	case req.Type == apiv1.IntermediateCA && req.Parent == nil:
 		return nil, errors.New("createCertificateAuthorityRequest `parent` cannot be nil")
-	case req.Type == apiv1.IntermediateCA && req.Parent.Name == "":
+	case req.Type == apiv1.IntermediateCA && req.Parent.Name == "" && (req.Parent.Certificate == nil || req.Parent.Signer == nil):
 		return nil, errors.New("createCertificateAuthorityRequest `parent.name` cannot be empty")
 	}
 
@@ -433,35 +438,71 @@ func (c *CloudCAS) signIntermediateCA(name string, req *apiv1.CreateCertificateA
 	}
 
 	// Sign the CSR with the ca.
-	ctx, cancel = defaultInitiatorContext()
-	defer cancel()
+	var cert *pb.Certificate
+	if req.Parent.Certificate != nil && req.Parent.Signer != nil {
+		// Using a local certificate and key.
+		cr, err := parseCertificateRequest(csr.PemCsr)
+		if err != nil {
+			return nil, err
+		}
+		template, err := x509util.CreateCertificateTemplate(cr)
+		if err != nil {
+			return nil, err
+		}
 
-	sign, err := c.client.CreateCertificate(ctx, &pb.CreateCertificateRequest{
-		Parent:        req.Parent.Name,
-		CertificateId: id,
-		Certificate: &pb.Certificate{
-			// Name: "projects/" + c.project + "/locations/" + c.location + "/certificates/" + id,
-			CertificateConfig: &pb.Certificate_PemCsr{
-				PemCsr: csr.PemCsr,
+		t := now()
+		template.NotBefore = t.Add(-1 * req.Backdate)
+		template.NotAfter = t.Add(req.Lifetime)
+
+		// Sign certificate
+		crt, err := x509util.CreateCertificate(template, req.Parent.Certificate, template.PublicKey, req.Parent.Signer)
+		if err != nil {
+			return nil, err
+		}
+
+		// Build pb.Certificate for activaion
+		chain := []string{
+			encodeCertificate(req.Parent.Certificate),
+		}
+		for _, c := range req.Parent.CertificateChain {
+			chain = append(chain, encodeCertificate(c))
+		}
+		cert = &pb.Certificate{
+			PemCertificate:      encodeCertificate(crt),
+			PemCertificateChain: chain,
+		}
+	} else {
+		// Using the parent in CloudCAS.
+		ctx, cancel = defaultInitiatorContext()
+		defer cancel()
+
+		cert, err = c.client.CreateCertificate(ctx, &pb.CreateCertificateRequest{
+			Parent:        req.Parent.Name,
+			CertificateId: id,
+			Certificate: &pb.Certificate{
+				CertificateConfig: &pb.Certificate_PemCsr{
+					PemCsr: csr.PemCsr,
+				},
+				Lifetime: durationpb.New(req.Lifetime),
+				Labels:   map[string]string{},
 			},
-			Lifetime: durationpb.New(req.Lifetime),
-			Labels:   map[string]string{},
-		},
-		RequestId: req.RequestID,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "cloudCAS CreateCertificate failed")
+			RequestId: req.RequestID,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "cloudCAS CreateCertificate failed")
+		}
 	}
 
+	// Activate the intermediate certificate.
 	ctx, cancel = defaultInitiatorContext()
 	defer cancel()
 	resp, err := c.client.ActivateCertificateAuthority(ctx, &pb.ActivateCertificateAuthorityRequest{
 		Name:             name,
-		PemCaCertificate: sign.PemCertificate,
+		PemCaCertificate: cert.PemCertificate,
 		SubordinateConfig: &pb.SubordinateConfig{
 			SubordinateConfig: &pb.SubordinateConfig_PemIssuerChain{
 				PemIssuerChain: &pb.SubordinateConfig_SubordinateConfigChain{
-					PemCertificates: sign.PemCertificateChain,
+					PemCertificates: cert.PemCertificateChain,
 				},
 			},
 		},
@@ -509,6 +550,25 @@ func parseCertificate(pemCert string) (*x509.Certificate, error) {
 		return nil, errors.Wrap(err, "error parsing certificate")
 	}
 	return cert, nil
+}
+
+func parseCertificateRequest(pemCsr string) (*x509.CertificateRequest, error) {
+	block, _ := pem.Decode([]byte(pemCsr))
+	if block == nil {
+		return nil, errors.New("error decoding certificate request: not a valid PEM encoded block")
+	}
+	cr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing certificate request")
+	}
+	return cr, nil
+}
+
+func encodeCertificate(cert *x509.Certificate) string {
+	return string(pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	}))
 }
 
 func getCertificateAndChain(certpb *pb.Certificate) (*x509.Certificate, []*x509.Certificate, error) {
