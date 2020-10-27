@@ -16,16 +16,16 @@ You can use it to:
   - It comes with a [Go wrapper](./examples#user-content-basic-client-usage)
   - ... and there's a [command-line client](https://github.com/smallstep/cli) you can use in scripts!
 
-Whatever your use case, `step-ca` is easy to use and hard to misuse, thanks to [safe, sane defaults](./docs/defaults.md).
+Whatever your use case, `step-ca` is easy to use and hard to misuse, thanks to [safe, sane defaults](https://smallstep.com/docs/step-ca/certificate-authority-server-production#sane-cryptographic-defaults).
 
 **Questions? Find us in [Discussions](https://github.com/smallstep/certificates/discussions).**
 
 [Website](https://smallstep.com/certificates) |
-[Documentation](#documentation) |
+[Documentation](https://smallstep.com/docs) |
 [Installation Guide](#installation-guide) |
 [Quickstart](#quickstart) |
-[Getting Started](./docs/GETTING_STARTED.md) |
-[Contribution Guide](./docs/CONTRIBUTING.md)
+[Getting Started](https://smallstep.com/docs/step-ca/getting-started) |
+[Contributor's Guide](./docs/CONTRIBUTING.md)
 
 [![GitHub release](https://img.shields.io/github/release/smallstep/certificates.svg)](https://github.com/smallstep/certificates/releases/latest)
 [![CA Image](https://images.microbadger.com/badges/image/smallstep/step-ca.svg)](https://microbadger.com/images/smallstep/step-ca)
@@ -46,8 +46,8 @@ Setting up a *public key infrastructure* (PKI) is out of reach for many small te
 - Choose key types (RSA, ECDSA, EdDSA) and lifetimes to suit your needs
 - [Short-lived certificates](https://smallstep.com/blog/passive-revocation.html) with automated enrollment, renewal, and passive revocation
 - Capable of high availability (HA) deployment using [root federation](https://smallstep.com/blog/step-v0.8.3-federation-root-rotation.html) and/or multiple intermediaries
-- Can operate as [an online intermediate CA](./docs/questions.md#i-already-have-pki-in-place-can-i-use-this-with-my-own-root-certificate) for an existing root CA
-- [Badger, BoltDB, and MySQL database backends](https://github.com/smallstep/certificates/blob/master/docs/database.md)
+- Can operate as [an online intermediate CA for an existing root CA](https://smallstep.com/docs/tutorials/intermediate-ca-new-ca)
+- [Badger, BoltDB, and MySQL database backends](https://smallstep.com/docs/step-ca/configuration#databases)
 
 ### ⚙️ Many ways to automate
 
@@ -59,10 +59,10 @@ You can issue certificates in exchange for:
   - ID tokens from Okta, GSuite, Azure AD, Auth0.
   - ID tokens from an OAuth OIDC service that you host, like [Keycloak](https://www.keycloak.org/) or [Dex](https://github.com/dexidp/dex)
 - [Cloud instance identity documents](https://smallstep.com/blog/embarrassingly-easy-certificates-on-aws-azure-gcp/), for VMs on AWS, GCP, and Azure
-- [Single-use, short-lived JWK tokens](https://smallstep.com/docs/design-document/#jwk-provisioner) issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
+- [Single-use, short-lived JWK tokens]() issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
 - A trusted X.509 certificate (X5C provisioner)
 - Expiring SSH host certificates needing rotation (the SSHPOP provisioner)
-- Learn more in our [provisioner documentation](./docs/provisioners.md)
+- Learn more in our [provisioner documentation](https://smallstep.com/docs/step-ca/configuration#jwk)
 
 ### 🏔 Your own private ACME server
 
@@ -86,7 +86,7 @@ ACME is the protocol used by Let's Encrypt to automate the issuance of HTTPS cer
   - certbot's [`acme` module](https://github.com/certbot/certbot/tree/master/acme) for Python ([example usage](https://smallstep.com/blog/private-acme-server/#pythonuploadsacme-pythonpng-python-example))
   - [`acme-client`](https://github.com/publishlab/node-acme-client) for Node.js ([example usage](https://smallstep.com/blog/private-acme-server/#nodejsuploadsacme-node-jspng-nodejs-example))
 - Our own [`step` CLI tool](https://github.com/smallstep/cli) is also an ACME client!
-- See our [ACME docs](https://smallstep.com/blog/private-acme-server/) for more
+- See our [ACME tutorial](https://smallstep.com/docs/tutorials/acme-challenge) for more
 
 ### 👩🏽‍💻 An online SSH Certificate Authority
 
@@ -94,14 +94,14 @@ ACME is the protocol used by Let's Encrypt to automate the issuance of HTTPS cer
 - For user certificates, [connect SSH to your single sign-on provider](https://smallstep.com/blog/diy-single-sign-on-for-ssh/), to improve security with short-lived certificates and MFA (or other security policies) via any OAuth OIDC provider.
 - For host certificates, improve security, [eliminate TOFU warnings](https://smallstep.com/blog/use-ssh-certificates/), and set up automated host certificate renewal.
 
-### 🤓 A general purpose PKI tool, via [`step` CLI](https://github.com/smallstep/cli) [integration](https://smallstep.com/docs/cli/ca/)
+### 🤓 A general purpose PKI tool, via [`step` CLI](https://github.com/smallstep/cli) [integration](https://smallstep.com/docs/step-cli/reference/ca/)
 
 - Generate key pairs where they're needed so private keys are never transmitted across the network
-- [Authenticate and obtain a certificate](https://smallstep.com/docs/cli/ca/certificate/) using any provisioner supported by `step-ca`
-- Securely [distribute root certificates](https://smallstep.com/docs/cli/ca/root/) and [bootstrap](https://smallstep.com/docs/cli/ca/bootstrap/) PKI relying parties
-- [Renew](https://smallstep.com/docs/cli/ca/renew/) and [revoke](https://smallstep.com/docs/cli/ca/revoke/) certificates issued by `step-ca`
-- [Install root certificates](https://smallstep.com/docs/cli/certificate/install/) on your machine and browsers, so your CA is trusted
-- [Inspect](https://smallstep.com/docs/cli/certificate/inspect/) and [lint](https://smallstep.com/docs/cli/certificate/lint/) certificates
+- [Authenticate and obtain a certificate](https://smallstep.com/docs/step-cli/reference/ca/certificate/) using any provisioner supported by `step-ca`
+- Securely [distribute root certificates](https://smallstep.com/docs/step-cli/reference/ca/root/) and [bootstrap](https://smallstep.com/docs/step-cli/reference/ca/bootstrap/) PKI relying parties
+- [Renew](https://smallstep.com/docs/step-cli/reference/ca/renew/) and [revoke](https://smallstep.com/docs/step-cli/reference/ca/revoke/) certificates issued by `step-ca`
+- [Install root certificates](https://smallstep.com/docs/step-cli/reference/certificate/install/) on your machine and browsers, so your CA is trusted
+- [Inspect](https://smallstep.com/docs/step-cli/reference/certificate/inspect/) and [lint](https://smallstep.com/docs/step-cli/reference/certificate/lint/) certificates
 
 ## Installation Guide
 
@@ -118,11 +118,11 @@ $ brew install step
 
 ### Linux
 
-> **Note:** Though it's not required, you will probably also want the [`step` CLI tool](https://github.com/smallstep/cli#installation-guide).
+> **Note:** The [`step` CLI tool](https://github.com/smallstep/cli) is the easiest way to initialize, configure, and control `step-ca`. While `step` is not technically required to run `step-ca`, it is very much recommended.
 
 #### Debian
 
-1. [Optional] Install `step`.
+1. Install `step`.
 
     Download the Debian package from the
     [latest `step` release](https://github.com/smallstep/cli/releases/latest):
@@ -156,14 +156,14 @@ $ brew install step
 We are using the [Arch User Repository](https://aur.archlinux.org) to distribute
 `step` binaries for Arch Linux.
 
-* [Optional] The `step` binary tarball can be found [here](https://aur.archlinux.org/packages/step-cli-bin/).
+* The `step` binary tarball can be found [here](https://aur.archlinux.org/packages/step-cli-bin/).
 * The `step-ca` binary tarball can be found [here](https://aur.archlinux.org/packages/step-ca-bin/).
 
 You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
 
 #### RHEL/CentOS
 
-1. [Optional] Install `step`.
+1. Install `step`.
 
     Download the Linux tarball from the
     [latest `step` release](https://github.com/smallstep/cli/releases/latest):
@@ -194,7 +194,7 @@ You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
     $ sudo cp step-certificates_X.Y.Z/bin/step-ca /usr/bin
     ```
 
-See the [`systemctl` setup section](./docs/GETTING_STARTED.md#systemctl) for a
+See the [`systemctl` setup section](https://smallstep.com/docs/step-ca/certificate-authority-server-production#running-step-ca-as-a-daemon) for a
 guide on configuring `step-ca` as a daemon.
 
 ### Kubernetes
@@ -213,7 +213,7 @@ helm install step-certificates
 
 ### Docker
 
-See our [Docker getting started guide](./docs/docker.md)
+See our [Docker getting started guide](https://smallstep.com/docs/tutorials/docker-tls-certificate-authority)
 
 ### Test
 
@@ -272,7 +272,7 @@ This command will:
 
 - Generate [password protected](https://github.com/smallstep/certificates/blob/master/docs/GETTING_STARTED.md#passwords)  private keys for your CA to sign certificates
 - Generate a root and [intermediate signing certificate](https://security.stackexchange.com/questions/128779/why-is-it-more-secure-to-use-intermediate-ca-certificates) for your CA
-- Create a JSON configuration file for `step-ca` (see [getting started](./docs/GETTING_STARTED.md) for details)
+- Create a JSON configuration file for `step-ca` (see [configuration docs](https://smallstep.com/docs/step-ca/configuration) for details)
 
 You can find these artifacts in `$STEPPATH` (or `~/.step` by default).
 
@@ -370,16 +370,15 @@ and best practices on running Step CA in production.
 
 Documentation can be found in a handful of different places:
 
-1. The [docs](./docs/README.md) sub-repo has an index of documentation and tutorials.
+1. On the web at https://smallstep.com/docs/step-ca.
 
 2. On the command line with `step help ca xxx` where `xxx` is the subcommand
 you are interested in. Ex: `step help ca provisioner list`.
 
-3. On the web at https://smallstep.com/docs/certificates.
-
-4. On your browser by running `step help --http=:8080 ca` from the command line
+3. In your browser, by running `step help --http=:8080 ca` from the command line
 and visiting http://localhost:8080.
 
+4. The [docs](./docs/README.md) folder is being deprecated, but it still has some documentation and tutorials.
 
 ## Feedback?
 
