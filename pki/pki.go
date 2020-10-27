@@ -117,18 +117,6 @@ func GetProvisioners(caURL, rootFile string) (provisioner.List, error) {
 	}
 }
 
-func generateDefaultKey() (crypto.Signer, error) {
-	priv, err := keyutil.GenerateDefaultKey()
-	if err != nil {
-		return nil, err
-	}
-	signer, ok := priv.(crypto.Signer)
-	if !ok {
-		return nil, errors.Errorf("type %T is not a cyrpto.Signer", priv)
-	}
-	return signer, nil
-}
-
 // GetProvisionerKey returns the encrypted provisioner key with the for the
 // given kid.
 func GetProvisionerKey(caURL, rootFile, kid string) (string, error) {
