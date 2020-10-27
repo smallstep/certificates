@@ -5,25 +5,34 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"io"
+	"net"
 	"os"
 	"reflect"
 	"testing"
 	"time"
 
+	lroauto "cloud.google.com/go/longrunning/autogen"
+	privateca "cloud.google.com/go/security/privateca/apiv1beta1"
+	gomock "github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	gax "github.com/googleapis/gax-go/v2"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
+	"google.golang.org/api/option"
 	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1beta1"
+	longrunningpb "google.golang.org/genproto/googleapis/longrunning"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 var (
 	errTest             = errors.New("test error")
 	testAuthorityName   = "projects/test-project/locations/us-west1/certificateAuthorities/test-ca"
 	testCertificateName = "projects/test-project/locations/us-west1/certificateAuthorities/test-ca/certificates/test-certificate"
+	testProject         = "test-project"
+	testLocation        = "us-west1"
 	testRootCertificate = `-----BEGIN CERTIFICATE-----
 MIIBhjCCAS2gAwIBAgIQLbKTuXau4+t3KFbGpJJAADAKBggqhkjOPQQDAjAiMSAw
 HgYDVQQDExdHb29nbGUgQ0FTIFRlc3QgUm9vdCBDQTAeFw0yMDA5MTQyMjQ4NDla
@@ -72,6 +81,21 @@ ZGNhcxMkZDhkMThhNjgtNTI5Ni00YWYzLWFlNGItMmY4NzdkYTNmYmQ5MAoGCCqG
 SM49BAMCA0gAMEUCIGxl+pqJ50WYWUqK2l4V1FHoXSi0Nht5kwTxFxnWZu1xAiEA
 zemu3bhWLFaGg3s8i+HTEhw4RqkHP74vF7AVYp88bAw=
 -----END CERTIFICATE-----`
+	testIntermediateCsr = `-----BEGIN CERTIFICATE REQUEST-----
+MIIBIjCByQIBADAqMSgwJgYDVQQDEx9Hb29nbGUgQ0FTIFRlc3QgSW50ZXJtZWRp
+YXRlIENBMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqoztio0c4XuaaGxHFiU7
+UBk3YRGTae9GtlKwyZJDk740hg6ZIoKcaXrzJT5taUpPiQLi7rP1eRui0dhl/bHo
+o6A9MDsGCSqGSIb3DQEJDjEuMCwwKgYDVR0RBCMwIYIfR29vZ2xlIENBUyBUZXN0
+IEludGVybWVkaWF0ZSBDQTAKBggqhkjOPQQDAgNIADBFAiEAvRKBPE32scAvsMe8
+R7ecx91q58ZmeLaRdSzL7stsnJYCIEBu+vQUSTbUpKL2YQNclT9kbilips5pEMr3
+ojxK6mk3
+-----END CERTIFICATE REQUEST-----`
+
+// 	testIntermediateKey = `-----BEGIN EC PRIVATE KEY-----
+// MHcCAQEEIMM+DSPChJgcYyqDWs0eRA5BctIo+VSNqRzCTL2ARYAqoAoGCCqGSM49
+// AwEHoUQDQgAEqoztio0c4XuaaGxHFiU7UBk3YRGTae9GtlKwyZJDk740hg6ZIoKc
+// aXrzJT5taUpPiQLi7rP1eRui0dhl/bHoow==
+// -----END EC PRIVATE KEY-----`
 )
 
 type testClient struct {
@@ -146,6 +170,18 @@ func (c *testClient) GetCertificateAuthority(ctx context.Context, req *pb.GetCer
 	return c.certificateAuthority, c.err
 }
 
+func (c *testClient) CreateCertificateAuthority(ctx context.Context, req *pb.CreateCertificateAuthorityRequest, opts ...gax.CallOption) (*privateca.CreateCertificateAuthorityOperation, error) {
+	return nil, errors.New("use NewMockCertificateAuthorityClient")
+}
+
+func (c *testClient) FetchCertificateAuthorityCsr(ctx context.Context, req *pb.FetchCertificateAuthorityCsrRequest, opts ...gax.CallOption) (*pb.FetchCertificateAuthorityCsrResponse, error) {
+	return nil, errors.New("use NewMockCertificateAuthorityClient")
+}
+
+func (c *testClient) ActivateCertificateAuthority(ctx context.Context, req *pb.ActivateCertificateAuthorityRequest, opts ...gax.CallOption) (*privateca.ActivateCertificateAuthorityOperation, error) {
+	return nil, errors.New("use NewMockCertificateAuthorityClient")
+}
+
 func mustParseCertificate(t *testing.T, pemCert string) *x509.Certificate {
 	t.Helper()
 	crt, err := parseCertificate(pemCert)
@@ -179,16 +215,33 @@ func TestNew(t *testing.T) {
 		}}, &CloudCAS{
 			client:               &testClient{},
 			certificateAuthority: testAuthorityName,
+			project:              testProject,
+			location:             testLocation,
 		}, false},
 		{"ok with credentials", args{context.Background(), apiv1.Options{
 			CertificateAuthority: testAuthorityName, CredentialsFile: "testdata/credentials.json",
 		}}, &CloudCAS{
 			client:               &testClient{credentialsFile: "testdata/credentials.json"},
 			certificateAuthority: testAuthorityName,
+			project:              testProject,
+			location:             testLocation,
+		}, false},
+		{"ok creator", args{context.Background(), apiv1.Options{
+			IsCreator: true, Project: testProject, Location: testLocation,
+		}}, &CloudCAS{
+			client:   &testClient{},
+			project:  testProject,
+			location: testLocation,
 		}, false},
 		{"fail certificate authority", args{context.Background(), apiv1.Options{}}, nil, true},
 		{"fail with credentials", args{context.Background(), apiv1.Options{
 			CertificateAuthority: testAuthorityName, CredentialsFile: "testdata/error.json",
+		}}, nil, true},
+		{"fail creator project", args{context.Background(), apiv1.Options{
+			IsCreator: true, Project: "", Location: testLocation,
+		}}, nil, true},
+		{"fail creator location", args{context.Background(), apiv1.Options{
+			IsCreator: true, Project: testProject, Location: "",
 		}}, nil, true},
 	}
 	for _, tt := range tests {
@@ -217,6 +270,8 @@ func TestNew_register(t *testing.T) {
 	want := &CloudCAS{
 		client:               &testClient{credentialsFile: "testdata/credentials.json"},
 		certificateAuthority: testAuthorityName,
+		project:              testProject,
+		location:             testLocation,
 	}
 
 	newFn, ok := apiv1.LoadCertificateAuthorityServiceNewFunc(apiv1.CloudCAS)
@@ -675,61 +730,150 @@ func Test_getCertificateAndChain(t *testing.T) {
 	}
 }
 
-func TestCloudCAS(t *testing.T) {
-	cas, err := New(context.Background(), apiv1.Options{
-		Type:                 "cloudCAS",
-		CertificateAuthority: "projects/smallstep-cas-test/locations/us-west1",
-		CredentialsFile:      "/Users/mariano/smallstep-cas-test-8a068f3e4540.json",
-	})
+func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
+	must := func(a, b interface{}) interface{} {
+		return a
+	}
+
+	// client, close := mockTestClient()
+	// defer close()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mosCtrl := gomock.NewController(t)
+	defer mosCtrl.Finish()
+
+	m := NewMockCertificateAuthorityClient(ctrl)
+	mos := NewMockOperationsServer(mosCtrl)
+
+	// Create operation server
+	lis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// resp, err := cas.CreateCertificateAuthority(&apiv1.CreateCertificateAuthorityRequest{
-	// 	Type: apiv1.RootCA,
-	// 	Template: &x509.Certificate{
-	// 		Subject: pkix.Name{
-	// 			CommonName: "Test Mariano Root CA",
-	// 		},
-	// 		BasicConstraintsValid: true,
-	// 		IsCA:                  true,
-	// 		MaxPathLen:            1,
-	// 		MaxPathLenZero:        false,
-	// 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-	// 	},
-	// 	Lifetime: time.Duration(30 * 24 * time.Hour),
-	// 	Project:  "smallstep-cas-test",
-	// 	Location: "us-west1",
-	// })
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// debug(resp)
-	resp := &apiv1.CreateCertificateAuthorityResponse{
-		Name: "projects/smallstep-cas-test/locations/us-west1/certificateAuthorities/9a593da4-61af-4426-a2f8-0650373b9c8e",
+	srv := grpc.NewServer()
+	longrunningpb.RegisterOperationsServer(srv, mos)
+
+	go srv.Serve(lis)
+	defer srv.Stop()
+
+	// Create fake privateca client
+	conn, err := grpc.Dial(lis.Addr().String(), grpc.WithInsecure())
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	resp, err = cas.CreateCertificateAuthority(&apiv1.CreateCertificateAuthorityRequest{
-		Type: apiv1.IntermediateCA,
-		Template: &x509.Certificate{
-			Subject: pkix.Name{
-				Country:    []string{"US"},
-				CommonName: "Test Mariano Intermediate CA",
-			},
-			BasicConstraintsValid: true,
-			IsCA:                  true,
-			MaxPathLen:            0,
-			MaxPathLenZero:        true,
-			KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	client, err := lroauto.NewOperationsClient(context.Background(), option.WithGRPCConn(conn))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &privateca.CertificateAuthorityClient{
+		LROClient: client,
+	}
+
+	// Configure mocks
+	any := gomock.Any()
+
+	// ok root
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name:              testAuthorityName,
+				PemCaCertificates: []string{testRootCertificate},
+			})).(*anypb.Any),
 		},
-		Lifetime: time.Duration(24 * time.Hour),
-		Parent:   resp,
-		Project:  "smallstep-cas-test",
-		Location: "us-west1",
-	})
-	if err != nil {
-		t.Fatal(err)
+	}, nil)
+
+	// ok intermediate
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name: testAuthorityName,
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
+		PemCsr: testIntermediateCsr,
+	}, nil)
+	m.EXPECT().CreateCertificate(any, any).Return(&pb.Certificate{
+		PemCertificate:      testIntermediateCertificate,
+		PemCertificateChain: []string{testRootCertificate},
+	}, nil)
+	m.EXPECT().ActivateCertificateAuthority(any, any).Return(fake.ActivateCertificateAuthorityOperation("ActivateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "ActivateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name:              testAuthorityName,
+				PemCaCertificates: []string{testIntermediateCertificate, testRootCertificate},
+			})).(*anypb.Any),
+		},
+	}, nil)
+
+	rootCrt := mustParseCertificate(t, testRootCertificate)
+	intCrt := mustParseCertificate(t, testIntermediateCertificate)
+
+	type fields struct {
+		client               CertificateAuthorityClient
+		certificateAuthority string
+		project              string
+		location             string
 	}
-	// debug(resp)
-	t.Error("foo")
+	type args struct {
+		req *apiv1.CreateCertificateAuthorityRequest
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *apiv1.CreateCertificateAuthorityResponse
+		wantErr bool
+	}{
+		{"ok root", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+		}}, &apiv1.CreateCertificateAuthorityResponse{
+			Name:        testAuthorityName,
+			Certificate: rootCrt,
+		}, false},
+		{"ok intermediate", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testIntermediateCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Name:        testAuthorityName,
+				Certificate: rootCrt,
+			},
+		}}, &apiv1.CreateCertificateAuthorityResponse{
+			Name:             testAuthorityName,
+			Certificate:      intCrt,
+			CertificateChain: []*x509.Certificate{rootCrt},
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &CloudCAS{
+				client:               tt.fields.client,
+				certificateAuthority: tt.fields.certificateAuthority,
+				project:              tt.fields.project,
+				location:             tt.fields.location,
+			}
+			got, err := c.CreateCertificateAuthority(tt.args.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CloudCAS.CreateCertificateAuthority() error = %+v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CloudCAS.CreateCertificateAuthority() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
