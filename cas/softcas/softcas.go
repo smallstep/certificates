@@ -173,9 +173,7 @@ func (c *SoftCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthori
 	var chain []*x509.Certificate
 	if req.Parent != nil {
 		chain = append(chain, req.Parent.Certificate)
-		for _, crt := range req.Parent.CertificateChain {
-			chain = append(chain, crt)
-		}
+		chain = append(chain, req.Parent.CertificateChain...)
 	}
 
 	return &apiv1.CreateCertificateAuthorityResponse{

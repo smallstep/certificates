@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go v1.30.29
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/go-piv/piv-go v1.6.0
+	github.com/golang/mock v1.4.4
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gax-go/v2 v2.0.5
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
