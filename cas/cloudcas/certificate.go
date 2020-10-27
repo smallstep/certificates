@@ -354,7 +354,7 @@ func createKeyVersionSpec(alg kmsapi.SignatureAlgorithm, bits int) (*pb.Certific
 			},
 		}, nil
 	default:
-		return nil, fmt.Errorf("unknown or unsupported signature algorithm '%s'", bits)
+		return nil, fmt.Errorf("unknown or unsupported signature algorithm '%s'", alg)
 	}
 }
 
