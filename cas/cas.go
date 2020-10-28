@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
-	"github.com/smallstep/certificates/cas/softcas"
 )
 
 // CertificateAuthorityService is the interface implemented by all the CAS.
@@ -35,14 +34,11 @@ func New(ctx context.Context, opts apiv1.Options) (CertificateAuthorityService, 
 
 // NewCreator creates a new CertificateAuthorityCreator using the given options.
 func NewCreator(ctx context.Context, opts apiv1.Options) (CertificateAuthorityCreator, error) {
+	opts.IsCreator = true
+
 	t := apiv1.Type(strings.ToLower(opts.Type))
 	if t == apiv1.DefaultCAS {
 		t = apiv1.SoftCAS
-	}
-	if t == apiv1.SoftCAS {
-		return &softcas.SoftCAS{
-			KeyManager: opts.KeyManager,
-		}, nil
 	}
 
 	svc, err := New(ctx, opts)
@@ -52,7 +48,6 @@ func NewCreator(ctx context.Context, opts apiv1.Options) (CertificateAuthorityCr
 
 	creator, ok := svc.(CertificateAuthorityCreator)
 	if !ok {
-
 		return nil, errors.Errorf("cas type '%s' does not implements CertificateAuthorityCreator", t)
 	}
 
