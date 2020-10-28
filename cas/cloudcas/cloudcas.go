@@ -262,6 +262,16 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 		return nil, errors.New("createCertificateAuthorityRequest `parent.name` cannot be empty")
 	}
 
+	var caType pb.CertificateAuthority_Type
+	switch req.Type {
+	case apiv1.RootCA:
+		caType = pb.CertificateAuthority_SELF_SIGNED
+	case apiv1.IntermediateCA:
+		caType = pb.CertificateAuthority_SUBORDINATE
+	default:
+		return nil, errors.Errorf("createCertificateAuthorityRequest `type=%d' is invalid or not supported", req.Type)
+	}
+
 	// Select key and signature algorithm to use
 	var err error
 	var keySpec *pb.CertificateAuthority_KeyVersionSpec
@@ -276,17 +286,17 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 	}
 
 	// Normalize or generate id.
-	certificateAuthorityID := normalizeCertificateAuthorityName(req.Name)
-	if certificateAuthorityID == "" {
+	caID := normalizeCertificateAuthorityName(req.Name)
+	if caID == "" {
 		id, err := createCertificateID()
 		if err != nil {
 			return nil, err
 		}
-		certificateAuthorityID = id
+		caID = id
 	}
 
 	// Add CertificateAuthority extension
-	casExtension, err := apiv1.CreateCertificateAuthorityExtension(apiv1.CloudCAS, certificateAuthorityID)
+	casExtension, err := apiv1.CreateCertificateAuthorityExtension(apiv1.CloudCAS, caID)
 	if err != nil {
 		return nil, err
 	}
@@ -295,10 +305,10 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 	// Prepare CreateCertificateAuthorityRequest
 	pbReq := &pb.CreateCertificateAuthorityRequest{
 		Parent:                 "projects/" + c.project + "/locations/" + c.location,
-		CertificateAuthorityId: certificateAuthorityID,
+		CertificateAuthorityId: caID,
 		RequestId:              req.RequestID,
 		CertificateAuthority: &pb.CertificateAuthority{
-			Type: pb.CertificateAuthority_TYPE_UNSPECIFIED,
+			Type: caType,
 			Tier: pb.CertificateAuthority_ENTERPRISE,
 			Config: &pb.CertificateConfig{
 				SubjectConfig: &pb.CertificateConfig_SubjectConfig{
@@ -315,15 +325,6 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 			},
 			Labels: map[string]string{},
 		},
-	}
-
-	switch req.Type {
-	case apiv1.RootCA:
-		pbReq.CertificateAuthority.Type = pb.CertificateAuthority_SELF_SIGNED
-	case apiv1.IntermediateCA:
-		pbReq.CertificateAuthority.Type = pb.CertificateAuthority_SUBORDINATE
-	default:
-		return nil, errors.Errorf("createCertificateAuthorityRequest `type=%d' is invalid or not supported", req.Type)
 	}
 
 	// Create certificate authority.

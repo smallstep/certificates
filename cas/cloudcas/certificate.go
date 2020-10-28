@@ -343,6 +343,16 @@ func createKeyVersionSpec(alg kmsapi.SignatureAlgorithm, bits int) (*pb.Certific
 				Algorithm: pb.CertificateAuthority_EC_P384_SHA384,
 			},
 		}, nil
+	case kmsapi.SHA256WithRSA:
+		algo, err := getRSAPKCS1Algorithm(bits)
+		if err != nil {
+			return nil, err
+		}
+		return &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: algo,
+			},
+		}, nil
 	case kmsapi.SHA256WithRSAPSS:
 		algo, err := getRSAPSSAlgorithm(bits)
 		if err != nil {
@@ -358,14 +368,27 @@ func createKeyVersionSpec(alg kmsapi.SignatureAlgorithm, bits int) (*pb.Certific
 	}
 }
 
+func getRSAPKCS1Algorithm(bits int) (pb.CertificateAuthority_SignHashAlgorithm, error) {
+	switch bits {
+	case 0, 3072:
+		return pb.CertificateAuthority_RSA_PKCS1_3072_SHA256, nil
+	case 2048:
+		return pb.CertificateAuthority_RSA_PKCS1_2048_SHA256, nil
+	case 4096:
+		return pb.CertificateAuthority_RSA_PKCS1_4096_SHA256, nil
+	default:
+		return 0, fmt.Errorf("unsupported RSA PKCS #1 key size '%d'", bits)
+	}
+}
+
 func getRSAPSSAlgorithm(bits int) (pb.CertificateAuthority_SignHashAlgorithm, error) {
 	switch bits {
 	case 0, 3072:
-		return pb.CertificateAuthority_RSA_PSS_3072_SHA_256, nil
+		return pb.CertificateAuthority_RSA_PSS_3072_SHA256, nil
 	case 2048:
-		return pb.CertificateAuthority_RSA_PSS_2048_SHA_256, nil
+		return pb.CertificateAuthority_RSA_PSS_2048_SHA256, nil
 	case 4096:
-		return pb.CertificateAuthority_RSA_PSS_4096_SHA_256, nil
+		return pb.CertificateAuthority_RSA_PSS_4096_SHA256, nil
 	default:
 		return 0, fmt.Errorf("unsupported RSA-PSS key size '%d'", bits)
 	}

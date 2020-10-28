@@ -3,7 +3,7 @@ module github.com/smallstep/certificates
 go 1.14
 
 require (
-	cloud.google.com/go v0.65.1-0.20200904011802-3c2db50b5678
+	cloud.google.com/go v0.70.0
 	github.com/Masterminds/sprig/v3 v3.1.0
 	github.com/aws/aws-sdk-go v1.30.29
 	github.com/go-chi/chi v4.0.2+incompatible
@@ -28,8 +28,8 @@ require (
 >>>>>>> Update go.step.sm/crypto dependency.
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974
-	google.golang.org/api v0.31.0
-	google.golang.org/genproto v0.0.0-20200904004341-0bd0a958aa1d
+	google.golang.org/api v0.33.0
+	google.golang.org/genproto v0.0.0-20201019141844-1ed22bb0c154
 	google.golang.org/grpc v1.32.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/square/go-jose.v2 v2.5.1
