@@ -97,6 +97,7 @@ MHcCAQEEIN51Rgg6YcQVLeCRzumdw4pjM3VWqFIdCbnsV3Up1e/goAoGCCqGSM49
 AwEHoUQDQgAEjJIcDhvvxi7gu4aFkiW/8+E3BfPhmhXU5RlDQusre+MHXc7XYMtk
 Lm6PXPeTF1DNdS21Ju1G/j1yUykGJOmxkg==
 -----END EC PRIVATE KEY-----`
+	// nolint:unused,deadcode
 	testIntermediateKey = `-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIMMX/XkXGnRDD4fYu7Z4rHACdJn/iyOy2UTwsv+oZ0C+oAoGCCqGSM49
 AwEHoUQDQgAE8u6rGAFj5CZpdzzMogLwUyCMnp0X9wtv4OKDRcpzkYf9PU5GuGA6
