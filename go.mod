@@ -18,7 +18,7 @@ require (
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/nosql v0.3.0
 	github.com/urfave/cli v1.22.2
-	go.step.sm/cli-utils v0.0.0-20201029200626-a2850dda4607
+	go.step.sm/cli-utils v0.1.0
 	go.step.sm/crypto v0.6.1
 	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
 	golang.org/x/net v0.0.0-20200822124328-c89045814202
