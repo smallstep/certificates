@@ -18,11 +18,11 @@ import (
 
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/commands"
-	"github.com/smallstep/cli/command"
-	"github.com/smallstep/cli/command/version"
-	"github.com/smallstep/cli/config"
-	"github.com/smallstep/cli/usage"
 	"github.com/urfave/cli"
+	"go.step.sm/cli-utils/command"
+	"go.step.sm/cli-utils/command/version"
+	"go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/usage"
 
 	// Enabled kms interfaces.
 	_ "github.com/smallstep/certificates/kms/awskms"

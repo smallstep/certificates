@@ -24,10 +24,10 @@ import (
 	"github.com/smallstep/certificates/cas"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/cli/config"
-	"github.com/smallstep/cli/errs"
-	"github.com/smallstep/cli/ui"
-	"github.com/smallstep/cli/utils"
+	"go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/errs"
+	"go.step.sm/cli-utils/fileutil"
+	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
@@ -310,7 +310,7 @@ func (p *PKI) GenerateRootCertificate(name string, pass []byte) (*x509.Certifica
 
 // WriteRootCertificate writes to disk the given certificate and key.
 func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{}, pass []byte) error {
-	if err := utils.WriteFile(p.root, pem.EncodeToMemory(&pem.Block{
+	if err := fileutil.WriteFile(p.root, pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: rootCrt.Raw,
 	}), 0600); err != nil {
@@ -393,7 +393,7 @@ func (p *PKI) GenerateIntermediateCertificate(name string, rootCrt *x509.Certifi
 
 // WriteIntermediateCertificate writes to disk the given certificate and key.
 func (p *PKI) WriteIntermediateCertificate(crt *x509.Certificate, key interface{}, pass []byte) error {
-	if err := utils.WriteFile(p.intermediate, pem.EncodeToMemory(&pem.Block{
+	if err := fileutil.WriteFile(p.intermediate, pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: crt.Raw,
 	}), 0600); err != nil {
@@ -427,7 +427,7 @@ func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 		if err != nil {
 			return err
 		}
-		if err = utils.WriteFile(pubNames[i], ssh.MarshalAuthorizedKey(sshKey), 0600); err != nil {
+		if err = fileutil.WriteFile(pubNames[i], ssh.MarshalAuthorizedKey(sshKey), 0600); err != nil {
 			return err
 		}
 	}
@@ -593,7 +593,7 @@ func (p *PKI) Save(opt ...Option) error {
 	if err != nil {
 		return errors.Wrapf(err, "error marshaling %s", p.config)
 	}
-	if err = utils.WriteFile(p.config, b, 0644); err != nil {
+	if err = fileutil.WriteFile(p.config, b, 0644); err != nil {
 		return errs.FileError(err, p.config)
 	}
 
@@ -623,7 +623,7 @@ func (p *PKI) Save(opt ...Option) error {
 	if err != nil {
 		return errors.Wrapf(err, "error marshaling %s", p.defaults)
 	}
-	if err = utils.WriteFile(p.defaults, b, 0644); err != nil {
+	if err = fileutil.WriteFile(p.defaults, b, 0644); err != nil {
 		return errs.FileError(err, p.defaults)
 	}
 

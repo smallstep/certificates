@@ -10,14 +10,15 @@ require (
 	github.com/go-piv/piv-go v1.6.0
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gax-go/v2 v2.0.5
+	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
-	github.com/smallstep/cli v0.15.3
 	github.com/smallstep/nosql v0.3.0
 	github.com/urfave/cli v1.22.2
+	go.step.sm/cli-utils v0.0.0-20201029200626-a2850dda4607
 	go.step.sm/crypto v0.6.1
 	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
 	golang.org/x/net v0.0.0-20200822124328-c89045814202
@@ -30,7 +31,6 @@ require (
 // google.golang.org/genproto/googleapis/cloud/security/privateca/v1alpha1 v0.0.0
 )
 
-// replace github.com/smallstep/cli => ../cli
 // replace github.com/smallstep/nosql => ../nosql
 // replace go.step.sm/crypto => ../crypto
 

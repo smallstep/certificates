@@ -9,8 +9,8 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/pkg/errors"
-	"github.com/smallstep/cli/config"
-	"github.com/smallstep/cli/utils"
+	"go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/fileutil"
 )
 
 // TemplateType defines how a template will be written in disk.
@@ -260,10 +260,10 @@ func (o *Output) Write() error {
 	}
 
 	if o.Type == File {
-		return utils.WriteFile(path, o.Content, 0600)
+		return fileutil.WriteFile(path, o.Content, 0600)
 	}
 
-	return utils.WriteSnippet(path, o.Content, 0600)
+	return fileutil.WriteSnippet(path, o.Content, 0600)
 }
 
 func mkdir(path string, perm os.FileMode) error {
