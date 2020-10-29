@@ -10,7 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/cli/ui"
+	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 )

@@ -20,8 +20,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms"
 	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/cli/ui"
-	"github.com/smallstep/cli/utils"
+	"go.step.sm/cli-utils/fileutil"
+	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/pemutil"
 
 	// Enable yubikey.
@@ -229,7 +229,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			}
 		}
 
-		if err = utils.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
+		if err = fileutil.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
 			Type:  "CERTIFICATE",
 			Bytes: b,
 		}), 0600); err != nil {
@@ -306,7 +306,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 	}
 
-	if err = utils.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
+	if err = fileutil.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: b,
 	}), 0600); err != nil {

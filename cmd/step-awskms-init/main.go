@@ -16,8 +16,8 @@ import (
 
 	"github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/awskms"
-	"github.com/smallstep/cli/ui"
-	"github.com/smallstep/cli/utils"
+	"go.step.sm/cli-utils/fileutil"
+	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/pemutil"
 	"golang.org/x/crypto/ssh"
 )
@@ -113,7 +113,7 @@ func createX509(c *awskms.KMS) error {
 		return err
 	}
 
-	if err = utils.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
+	if err = fileutil.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: b,
 	}), 0600); err != nil {
@@ -156,7 +156,7 @@ func createX509(c *awskms.KMS) error {
 		return err
 	}
 
-	if err = utils.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
+	if err = fileutil.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: b,
 	}), 0600); err != nil {
@@ -186,7 +186,7 @@ func createSSH(c *awskms.KMS) error {
 		return err
 	}
 
-	if err = utils.WriteFile("ssh_user_ca_key.pub", ssh.MarshalAuthorizedKey(key), 0600); err != nil {
+	if err = fileutil.WriteFile("ssh_user_ca_key.pub", ssh.MarshalAuthorizedKey(key), 0600); err != nil {
 		return err
 	}
 
@@ -207,7 +207,7 @@ func createSSH(c *awskms.KMS) error {
 		return err
 	}
 
-	if err = utils.WriteFile("ssh_host_ca_key.pub", ssh.MarshalAuthorizedKey(key), 0600); err != nil {
+	if err = fileutil.WriteFile("ssh_host_ca_key.pub", ssh.MarshalAuthorizedKey(key), 0600); err != nil {
 		return err
 	}
 

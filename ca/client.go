@@ -27,7 +27,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca/identity"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/cli/config"
+	"go.step.sm/cli-utils/config"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"

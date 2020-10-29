@@ -16,7 +16,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/cli/config"
+	"go.step.sm/cli-utils/config"
 	"go.step.sm/crypto/pemutil"
 )
 
