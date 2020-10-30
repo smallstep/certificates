@@ -1,5 +1,7 @@
 # Step Certificates Documentation
 
+## Note: Much of [our documentation has moved](https://smallstep.com/docs)
+
 Index of Documentation and Tutorials for using and deploying the `step certificates`.
 
 [![GitHub release](https://img.shields.io/github/release/smallstep/certificates.svg)](https://github.com/smallstep/certificates/releases)
@@ -16,18 +18,18 @@ Index of Documentation and Tutorials for using and deploying the `step certifica
 
 * **General Info**
     * [Website](https://smallstep.com)
-    * [Installation Guide](../README.md#installation-guide)
-    * [Getting Started](./GETTING_STARTED.md): in depth guide on getting started
-      with `step certificates`, including all configuration options.
-    * [Contribution Guide](./CONTRIBUTING.md)
-    * [Sane Defaults](./defaults.md): default algorithms and attributes used
+    * [Installation Guide](https://smallstep.com/docs/step-ca/installation)
+    * [Getting Started](https://smallstep.com/docs/step-ca/getting-started): in depth guide on getting started
+      with `step-ca`, including all configuration options.
+    * [Contributor's Guide](./CONTRIBUTING.md)
+    * [Sane Defaults](https://smallstep.com/docs/step-ca/certificate-authority-server-production#sane-cryptographic-defaults): default algorithms and attributes used
       in cryptographic primitives and why they were selected.
     * [Frequently Asked Questions](./questions.md)
     * Check out our [Blog](https://smallstep.com/blog/). We post quality
       educational content as well as periodic updates on new releases.
 * **API**: Guides to using the API via the `step` CLI.
-    * [Revoking Certificates](./revocation.md)
-    * [Persistence Layer](./database.md): description and guide to using `step certificates`'
+    * [Revoking Certificates](https://smallstep.com/docs/step-ca/certificate-authority-server-production#x509-certificate-revocation)
+    * [Persistence Layer](https://smallstep.com/docs/step-ca/configuration#databases): description and guide to using `step certificates`'
       persistence layer for storing certificate management metadata.
 * **Tutorials**: Guides for deploying and getting started with `step` in various environments.
     * [Docker](./docker.md)
