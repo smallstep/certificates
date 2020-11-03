@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"reflect"
@@ -30,6 +31,7 @@ import (
 	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1beta1"
 	longrunningpb "google.golang.org/genproto/googleapis/longrunning"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -790,21 +792,20 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 	mos := NewMockOperationsServer(mosCtrl)
 
 	// Create operation server
-	lis, err := net.Listen("tcp", "localhost:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	srv := grpc.NewServer()
 	longrunningpb.RegisterOperationsServer(srv, mos)
 
+	lis := bufconn.Listen(2)
 	go srv.Serve(lis)
 	defer srv.Stop()
 
 	// Create fake privateca client
-	conn, err := grpc.Dial(lis.Addr().String(), grpc.WithInsecure())
+	conn, err := grpc.DialContext(context.Background(), "", grpc.WithInsecure(),
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			return lis.Dial()
+		}))
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 	}
 
 	client, err := lroauto.NewOperationsClient(context.Background(), option.WithGRPCConn(conn))
