@@ -126,7 +126,7 @@ type CreateCertificateAuthorityRequest struct {
 }
 
 // CreateCertificateAuthorityResponse is the response for
-// CreateCertificateAuthority method and contains the root or intermedate
+// CreateCertificateAuthority method and contains the root or intermediate
 // certificate generated as well as the CA chain.
 type CreateCertificateAuthorityResponse struct {
 	Name             string
