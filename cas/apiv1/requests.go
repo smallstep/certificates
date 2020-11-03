@@ -104,8 +104,8 @@ type GetCertificateAuthorityResponse struct {
 	RootCertificate *x509.Certificate
 }
 
-// CreateCertificateAuthorityRequest ...
-// This is a work in progress
+// CreateCertificateAuthorityRequest is the request used to generate a root or
+// intermediate certificate.
 type CreateCertificateAuthorityRequest struct {
 	Name      string
 	Type      CertificateAuthorityType
@@ -125,8 +125,9 @@ type CreateCertificateAuthorityRequest struct {
 	CreateKey *apiv1.CreateKeyRequest
 }
 
-// CreateCertificateAuthorityResponse ...
-// This is a work in progress
+// CreateCertificateAuthorityResponse is the response for
+// CreateCertificateAuthority method and contains the root or intermedate
+// certificate generated as well as the CA chain.
 type CreateCertificateAuthorityResponse struct {
 	Name             string
 	Certificate      *x509.Certificate
