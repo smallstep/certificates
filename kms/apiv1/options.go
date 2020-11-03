@@ -52,6 +52,8 @@ const (
 	PKCS11 Type = "pkcs11"
 	// YubiKey is a KMS implementation using a YubiKey PIV.
 	YubiKey Type = "yubikey"
+	// SSHAgentKMS is a KMS implementation using ssh-agent to access keys.
+	SSHAgentKMS Type = "sshagentkms"
 )
 
 // Options are the KMS options. They represent the kms object in the ca.json.
@@ -91,7 +93,7 @@ func (o *Options) Validate() error {
 	}
 
 	switch Type(strings.ToLower(o.Type)) {
-	case DefaultKMS, SoftKMS, CloudKMS, AmazonKMS:
+	case DefaultKMS, SoftKMS, CloudKMS, AmazonKMS, SSHAgentKMS:
 	case YubiKey:
 	case PKCS11:
 		return ErrNotImplemented{"support for PKCS11 is not yet implemented"}
