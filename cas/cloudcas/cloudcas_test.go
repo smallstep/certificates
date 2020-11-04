@@ -3,48 +3,64 @@ package cloudcas
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/asn1"
+	"encoding/pem"
+	"fmt"
 	"io"
+	"log"
+	"net"
 	"os"
 	"reflect"
 	"testing"
 	"time"
 
+	lroauto "cloud.google.com/go/longrunning/autogen"
+	privateca "cloud.google.com/go/security/privateca/apiv1beta1"
+	gomock "github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	gax "github.com/googleapis/gax-go/v2"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
+	kmsapi "github.com/smallstep/certificates/kms/apiv1"
+	"google.golang.org/api/option"
 	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1beta1"
+	longrunningpb "google.golang.org/genproto/googleapis/longrunning"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 var (
 	errTest             = errors.New("test error")
 	testAuthorityName   = "projects/test-project/locations/us-west1/certificateAuthorities/test-ca"
 	testCertificateName = "projects/test-project/locations/us-west1/certificateAuthorities/test-ca/certificates/test-certificate"
+	testProject         = "test-project"
+	testLocation        = "us-west1"
 	testRootCertificate = `-----BEGIN CERTIFICATE-----
-MIIBhjCCAS2gAwIBAgIQLbKTuXau4+t3KFbGpJJAADAKBggqhkjOPQQDAjAiMSAw
-HgYDVQQDExdHb29nbGUgQ0FTIFRlc3QgUm9vdCBDQTAeFw0yMDA5MTQyMjQ4NDla
-Fw0zMDA5MTIyMjQ4NDlaMCIxIDAeBgNVBAMTF0dvb2dsZSBDQVMgVGVzdCBSb290
-IENBMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYKGgQ3/0D7+oBTc0CXoYfSC6
-M8hOqLsmzBapPZSYpfwjgEsjdNU84jdrYmW1zF1+p+MrL4c7qJv9NLo/picCuqNF
-MEMwDgYDVR0PAQH/BAQDAgEGMBIGA1UdEwEB/wQIMAYBAf8CAQEwHQYDVR0OBBYE
-FFVn9V7Qymd7cUJh9KAhnUDAQL5YMAoGCCqGSM49BAMCA0cAMEQCIA4LzttYoT3u
-8TYgSrvFT+Z+cklfi4UrPBU6aSbcUaW2AiAPfaqbyccQT3CxMVyHg+xZZjAirZp8
-lAeA/T4FxAonHA==
+MIIBeDCCAR+gAwIBAgIQcXWWjtSZ/PAyH8D1Ou4L9jAKBggqhkjOPQQDAjAbMRkw
+FwYDVQQDExBDbG91ZENBUyBSb290IENBMB4XDTIwMTAyNzIyNTM1NFoXDTMwMTAy
+NzIyNTM1NFowGzEZMBcGA1UEAxMQQ2xvdWRDQVMgUm9vdCBDQTBZMBMGByqGSM49
+AgEGCCqGSM49AwEHA0IABIySHA4b78Yu4LuGhZIlv/PhNwXz4ZoV1OUZQ0LrK3vj
+B13O12DLZC5uj1z3kxdQzXUttSbtRv49clMpBiTpsZKjRTBDMA4GA1UdDwEB/wQE
+AwIBBjASBgNVHRMBAf8ECDAGAQH/AgEBMB0GA1UdDgQWBBSZ+t9RMHbFTl5BatM3
+5bJlHPOu3DAKBggqhkjOPQQDAgNHADBEAiASah6gg0tVM3WI0meCQ4SEKk7Mjhbv
++SmhuZHWV1QlXQIgRXNyWcpVUrAoG6Uy1KQg07LDpF5dFeK9InrDxSJAkVo=
 -----END CERTIFICATE-----`
 	testIntermediateCertificate = `-----BEGIN CERTIFICATE-----
-MIIBsDCCAVagAwIBAgIQOb91kHxWKVzSJ9ESW1ViVzAKBggqhkjOPQQDAjAiMSAw
-HgYDVQQDExdHb29nbGUgQ0FTIFRlc3QgUm9vdCBDQTAeFw0yMDA5MTQyMjQ4NDla
-Fw0zMDA5MTIyMjQ4NDlaMCoxKDAmBgNVBAMTH0dvb2dsZSBDQVMgVGVzdCBJbnRl
-cm1lZGlhdGUgQ0EwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASUHN1cNyId4Ei/
-4MxD5VrZFc51P50caMUdDZVrPveidChBYCU/9IM6vnRlZHx2HLjQ0qAvqHwY3rT0
-xc7n+PfCo2YwZDAOBgNVHQ8BAf8EBAMCAQYwEgYDVR0TAQH/BAgwBgEB/wIBADAd
-BgNVHQ4EFgQUSDlasiw0pRKyS7llhL0ZuVFNa9UwHwYDVR0jBBgwFoAUVWf1XtDK
-Z3txQmH0oCGdQMBAvlgwCgYIKoZIzj0EAwIDSAAwRQIgMmsLcoC4KriXw+s+cZx2
-bJMf6Mx/WESj31buJJhpzY0CIQCBUa/JtvS3nyce/4DF5tK2v49/NWHREgqAaZ57
-DcYyHQ==
+MIIBpDCCAUmgAwIBAgIRALLKxnxyl0GBeKevIcbx02wwCgYIKoZIzj0EAwIwGzEZ
+MBcGA1UEAxMQQ2xvdWRDQVMgUm9vdCBDQTAeFw0yMDEwMjcyMjUzNTRaFw0zMDEw
+MjcyMjUzNTRaMCMxITAfBgNVBAMTGENsb3VkQ0FTIEludGVybWVkaWF0ZSBDQTBZ
+MBMGByqGSM49AgEGCCqGSM49AwEHA0IABPLuqxgBY+QmaXc8zKIC8FMgjJ6dF/cL
+b+Dig0XKc5GH/T1ORrhgOkRayrQcjPMu+jkjg25qn6vvp43LRtUKPXOjZjBkMA4G
+A1UdDwEB/wQEAwIBBjASBgNVHRMBAf8ECDAGAQH/AgEAMB0GA1UdDgQWBBQ8RVQI
+VgXAmRNDX8qItalVpSBEGjAfBgNVHSMEGDAWgBSZ+t9RMHbFTl5BatM35bJlHPOu
+3DAKBggqhkjOPQQDAgNJADBGAiEA70MVYVqjm8SBHJf5cOlWfiXXOfHUsctTJ+/F
+pLsKBogCIQDJJkoQqYl9B59Dq3zydl8bpJevQxsoaa4Wqg+ZBMkvbQ==
 -----END CERTIFICATE-----`
 	testLeafCertificate = `-----BEGIN CERTIFICATE-----
 MIIB1jCCAX2gAwIBAgIQQfOn+COMeuD8VYF1TiDkEzAKBggqhkjOPQQDAjAqMSgw
@@ -71,6 +87,24 @@ ZGNhcxMkZDhkMThhNjgtNTI5Ni00YWYzLWFlNGItMmY4NzdkYTNmYmQ5MAoGCCqG
 SM49BAMCA0gAMEUCIGxl+pqJ50WYWUqK2l4V1FHoXSi0Nht5kwTxFxnWZu1xAiEA
 zemu3bhWLFaGg3s8i+HTEhw4RqkHP74vF7AVYp88bAw=
 -----END CERTIFICATE-----`
+	testIntermediateCsr = `-----BEGIN CERTIFICATE REQUEST-----
+MIHeMIGFAgEAMCMxITAfBgNVBAMTGENsb3VkQ0FTIEludGVybWVkaWF0ZSBDQTBZ
+MBMGByqGSM49AgEGCCqGSM49AwEHA0IABPLuqxgBY+QmaXc8zKIC8FMgjJ6dF/cL
+b+Dig0XKc5GH/T1ORrhgOkRayrQcjPMu+jkjg25qn6vvp43LRtUKPXOgADAKBggq
+hkjOPQQDAgNIADBFAiEAn3pkYXb2OzoQZ+AExFqd7qZ7pg2nyP2kBZZ01Pl8KfcC
+IHKplBXDR79/i7kjOtv1iWfgf5S/XQHrz178gXA0YQe7
+-----END CERTIFICATE REQUEST-----`
+	testRootKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIN51Rgg6YcQVLeCRzumdw4pjM3VWqFIdCbnsV3Up1e/goAoGCCqGSM49
+AwEHoUQDQgAEjJIcDhvvxi7gu4aFkiW/8+E3BfPhmhXU5RlDQusre+MHXc7XYMtk
+Lm6PXPeTF1DNdS21Ju1G/j1yUykGJOmxkg==
+-----END EC PRIVATE KEY-----`
+	// nolint:unused,deadcode
+	testIntermediateKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIMMX/XkXGnRDD4fYu7Z4rHACdJn/iyOy2UTwsv+oZ0C+oAoGCCqGSM49
+AwEHoUQDQgAE8u6rGAFj5CZpdzzMogLwUyCMnp0X9wtv4OKDRcpzkYf9PU5GuGA6
+RFrKtByM8y76OSODbmqfq++njctG1Qo9cw==
+-----END EC PRIVATE KEY-----`
 )
 
 type testClient struct {
@@ -133,6 +167,29 @@ func setTeeReader(t *testing.T, w *bytes.Buffer) {
 	rand.Reader = io.TeeReader(reader, w)
 }
 
+type badSigner struct {
+	pub crypto.PublicKey
+}
+
+func createBadSigner(t *testing.T) *badSigner {
+	t.Helper()
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &badSigner{
+		pub: pub,
+	}
+}
+
+func (b *badSigner) Public() crypto.PublicKey {
+	return b.pub
+}
+
+func (b *badSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	return nil, fmt.Errorf("💥")
+}
+
 func (c *testClient) CreateCertificate(ctx context.Context, req *pb.CreateCertificateRequest, opts ...gax.CallOption) (*pb.Certificate, error) {
 	return c.certificate, c.err
 }
@@ -145,6 +202,18 @@ func (c *testClient) GetCertificateAuthority(ctx context.Context, req *pb.GetCer
 	return c.certificateAuthority, c.err
 }
 
+func (c *testClient) CreateCertificateAuthority(ctx context.Context, req *pb.CreateCertificateAuthorityRequest, opts ...gax.CallOption) (*privateca.CreateCertificateAuthorityOperation, error) {
+	return nil, errors.New("use NewMockCertificateAuthorityClient")
+}
+
+func (c *testClient) FetchCertificateAuthorityCsr(ctx context.Context, req *pb.FetchCertificateAuthorityCsrRequest, opts ...gax.CallOption) (*pb.FetchCertificateAuthorityCsrResponse, error) {
+	return nil, errors.New("use NewMockCertificateAuthorityClient")
+}
+
+func (c *testClient) ActivateCertificateAuthority(ctx context.Context, req *pb.ActivateCertificateAuthorityRequest, opts ...gax.CallOption) (*privateca.ActivateCertificateAuthorityOperation, error) {
+	return nil, errors.New("use NewMockCertificateAuthorityClient")
+}
+
 func mustParseCertificate(t *testing.T, pemCert string) *x509.Certificate {
 	t.Helper()
 	crt, err := parseCertificate(pemCert)
@@ -152,6 +221,19 @@ func mustParseCertificate(t *testing.T, pemCert string) *x509.Certificate {
 		t.Fatal(err)
 	}
 	return crt
+}
+
+func mustParseECKey(t *testing.T, pemKey string) *ecdsa.PrivateKey {
+	t.Helper()
+	block, _ := pem.Decode([]byte(pemKey))
+	if block == nil {
+		t.Fatal("failed to parse key")
+	}
+	key, err := x509.ParseECPrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return key
 }
 
 func TestNew(t *testing.T) {
@@ -178,16 +260,36 @@ func TestNew(t *testing.T) {
 		}}, &CloudCAS{
 			client:               &testClient{},
 			certificateAuthority: testAuthorityName,
+			project:              testProject,
+			location:             testLocation,
 		}, false},
 		{"ok with credentials", args{context.Background(), apiv1.Options{
 			CertificateAuthority: testAuthorityName, CredentialsFile: "testdata/credentials.json",
 		}}, &CloudCAS{
 			client:               &testClient{credentialsFile: "testdata/credentials.json"},
 			certificateAuthority: testAuthorityName,
+			project:              testProject,
+			location:             testLocation,
 		}, false},
-		{"fail certificate authority", args{context.Background(), apiv1.Options{}}, nil, true},
+		{"ok creator", args{context.Background(), apiv1.Options{
+			IsCreator: true, Project: testProject, Location: testLocation,
+		}}, &CloudCAS{
+			client:   &testClient{},
+			project:  testProject,
+			location: testLocation,
+		}, false},
+		{"fail certificate authority", args{context.Background(), apiv1.Options{
+			CertificateAuthority: "projects/ok1234/locations/ok1234/certificateAuthorities/ok1234/bad",
+		}}, nil, true},
+		{"fail certificate authority regex", args{context.Background(), apiv1.Options{}}, nil, true},
 		{"fail with credentials", args{context.Background(), apiv1.Options{
 			CertificateAuthority: testAuthorityName, CredentialsFile: "testdata/error.json",
+		}}, nil, true},
+		{"fail creator project", args{context.Background(), apiv1.Options{
+			IsCreator: true, Project: "", Location: testLocation,
+		}}, nil, true},
+		{"fail creator location", args{context.Background(), apiv1.Options{
+			IsCreator: true, Project: testProject, Location: "",
 		}}, nil, true},
 	}
 	for _, tt := range tests {
@@ -216,6 +318,8 @@ func TestNew_register(t *testing.T) {
 	want := &CloudCAS{
 		client:               &testClient{credentialsFile: "testdata/credentials.json"},
 		certificateAuthority: testAuthorityName,
+		project:              testProject,
+		location:             testLocation,
 	}
 
 	newFn, ok := apiv1.LoadCertificateAuthorityServiceNewFunc(apiv1.CloudCAS)
@@ -669,6 +773,447 @@ func Test_getCertificateAndChain(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got1, tt.want1) {
 				t.Errorf("getCertificateAndChain() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
+	must := func(a, b interface{}) interface{} {
+		return a
+	}
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mosCtrl := gomock.NewController(t)
+	defer mosCtrl.Finish()
+
+	m := NewMockCertificateAuthorityClient(ctrl)
+	mos := NewMockOperationsServer(mosCtrl)
+
+	// Create operation server
+	srv := grpc.NewServer()
+	longrunningpb.RegisterOperationsServer(srv, mos)
+
+	lis := bufconn.Listen(2)
+	go srv.Serve(lis)
+	defer srv.Stop()
+
+	// Create fake privateca client
+	conn, err := grpc.DialContext(context.Background(), "", grpc.WithInsecure(),
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			return lis.Dial()
+		}))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client, err := lroauto.NewOperationsClient(context.Background(), option.WithGRPCConn(conn))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &privateca.CertificateAuthorityClient{
+		LROClient: client,
+	}
+
+	// Configure mocks
+	any := gomock.Any()
+
+	// ok root
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name:              testAuthorityName,
+				PemCaCertificates: []string{testRootCertificate},
+			})).(*anypb.Any),
+		},
+	}, nil)
+
+	// ok intermediate
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name: testAuthorityName,
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
+		PemCsr: testIntermediateCsr,
+	}, nil)
+	m.EXPECT().ActivateCertificateAuthority(any, any).Return(fake.ActivateCertificateAuthorityOperation("ActivateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "ActivateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name:              testAuthorityName,
+				PemCaCertificates: []string{testIntermediateCertificate, testRootCertificate},
+			})).(*anypb.Any),
+		},
+	}, nil)
+	// ok intermediate local signer
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name: testAuthorityName,
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
+		PemCsr: testIntermediateCsr,
+	}, nil)
+	m.EXPECT().CreateCertificate(any, any).Return(&pb.Certificate{
+		PemCertificate:      testIntermediateCertificate,
+		PemCertificateChain: []string{testRootCertificate},
+	}, nil)
+	m.EXPECT().ActivateCertificateAuthority(any, any).Return(fake.ActivateCertificateAuthorityOperation("ActivateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "ActivateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name:              testAuthorityName,
+				PemCaCertificates: []string{testIntermediateCertificate, testRootCertificate},
+			})).(*anypb.Any),
+		},
+	}, nil)
+
+	// ok create key
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name:              testAuthorityName,
+				PemCaCertificates: []string{testRootCertificate},
+			})).(*anypb.Any),
+		},
+	}, nil)
+
+	// fail CreateCertificateAuthority
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(nil, errTest)
+
+	// fail CreateCertificateAuthority.Wait
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(nil, errTest)
+
+	// fail FetchCertificateAuthorityCsr
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name: testAuthorityName,
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(nil, errTest)
+
+	// fail CreateCertificate
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name: testAuthorityName,
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
+		PemCsr: testIntermediateCsr,
+	}, nil)
+	m.EXPECT().CreateCertificate(any, any).Return(nil, errTest)
+
+	// fail ActivateCertificateAuthority
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name: testAuthorityName,
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
+		PemCsr: testIntermediateCsr,
+	}, nil)
+	m.EXPECT().CreateCertificate(any, any).Return(&pb.Certificate{
+		PemCertificate:      testIntermediateCertificate,
+		PemCertificateChain: []string{testRootCertificate},
+	}, nil)
+	m.EXPECT().ActivateCertificateAuthority(any, any).Return(nil, errTest)
+
+	// fail ActivateCertificateAuthority.Wait
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name: testAuthorityName,
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
+		PemCsr: testIntermediateCsr,
+	}, nil)
+	m.EXPECT().CreateCertificate(any, any).Return(&pb.Certificate{
+		PemCertificate:      testIntermediateCertificate,
+		PemCertificateChain: []string{testRootCertificate},
+	}, nil)
+	m.EXPECT().ActivateCertificateAuthority(any, any).Return(fake.ActivateCertificateAuthorityOperation("ActivateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(nil, errTest)
+
+	// fail x509util.CreateCertificate
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name: testAuthorityName,
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
+		PemCsr: testIntermediateCsr,
+	}, nil)
+
+	// fail parseCertificateRequest
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name: testAuthorityName,
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
+		PemCsr: "Not a CSR",
+	}, nil)
+
+	rootCrt := mustParseCertificate(t, testRootCertificate)
+	intCrt := mustParseCertificate(t, testIntermediateCertificate)
+
+	type fields struct {
+		client               CertificateAuthorityClient
+		certificateAuthority string
+		project              string
+		location             string
+	}
+	type args struct {
+		req *apiv1.CreateCertificateAuthorityRequest
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *apiv1.CreateCertificateAuthorityResponse
+		wantErr bool
+	}{
+		{"ok root", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+		}}, &apiv1.CreateCertificateAuthorityResponse{
+			Name:        testAuthorityName,
+			Certificate: rootCrt,
+		}, false},
+		{"ok intermediate", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testIntermediateCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Name:        testAuthorityName,
+				Certificate: rootCrt,
+			},
+		}}, &apiv1.CreateCertificateAuthorityResponse{
+			Name:             testAuthorityName,
+			Certificate:      intCrt,
+			CertificateChain: []*x509.Certificate{rootCrt},
+		}, false},
+		{"ok intermediate local signer", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testIntermediateCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Certificate: rootCrt,
+				Signer:      mustParseECKey(t, testRootKey),
+			},
+		}}, &apiv1.CreateCertificateAuthorityResponse{
+			Name:             testAuthorityName,
+			Certificate:      intCrt,
+			CertificateChain: []*x509.Certificate{rootCrt},
+		}, false},
+		{"ok create key", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+			CreateKey: &kmsapi.CreateKeyRequest{
+				SignatureAlgorithm: kmsapi.ECDSAWithSHA256,
+			},
+		}}, &apiv1.CreateCertificateAuthorityResponse{
+			Name:        testAuthorityName,
+			Certificate: rootCrt,
+		}, false},
+		{"fail project", fields{m, "", "", testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+		}}, nil, true},
+		{"fail location", fields{m, "", testProject, ""}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+		}}, nil, true},
+		{"fail template", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Lifetime: 24 * time.Hour,
+		}}, nil, true},
+		{"fail lifetime", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+		}}, nil, true},
+		{"fail parent", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+		}}, nil, true},
+		{"fail parent name", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent:   &apiv1.CreateCertificateAuthorityResponse{},
+		}}, nil, true},
+		{"fail type", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     0,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+		}}, nil, true},
+		{"fail create key", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+			CreateKey: &kmsapi.CreateKeyRequest{
+				SignatureAlgorithm: kmsapi.PureEd25519,
+			},
+		}}, nil, true},
+		{"fail CreateCertificateAuthority", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+		}}, nil, true},
+		{"fail CreateCertificateAuthority.Wait", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+		}}, nil, true},
+		{"fail FetchCertificateAuthorityCsr", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testIntermediateCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Name:        testAuthorityName,
+				Certificate: rootCrt,
+			},
+		}}, nil, true},
+		{"fail CreateCertificate", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testIntermediateCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Name:        testAuthorityName,
+				Certificate: rootCrt,
+			},
+		}}, nil, true},
+		{"fail ActivateCertificateAuthority", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testIntermediateCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Name:        testAuthorityName,
+				Certificate: rootCrt,
+			},
+		}}, nil, true},
+		{"fail ActivateCertificateAuthority.Wait", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testIntermediateCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Name:        testAuthorityName,
+				Certificate: rootCrt,
+			},
+		}}, nil, true},
+		{"fail x509util.CreateCertificate", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testIntermediateCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Certificate: rootCrt,
+				Signer:      createBadSigner(t),
+			},
+		}}, nil, true},
+		{"fail parseCertificateRequest", fields{m, "", testProject, testLocation}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testIntermediateCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Certificate: rootCrt,
+				Signer:      createBadSigner(t),
+			},
+		}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &CloudCAS{
+				client:               tt.fields.client,
+				certificateAuthority: tt.fields.certificateAuthority,
+				project:              tt.fields.project,
+				location:             tt.fields.location,
+			}
+			got, err := c.CreateCertificateAuthority(tt.args.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CloudCAS.CreateCertificateAuthority() error = %+v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CloudCAS.CreateCertificateAuthority() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_normalizeCertificateAuthorityName(t *testing.T) {
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{"ok", args{"Test-CA-Name_1234"}, "Test-CA-Name_1234"},
+		{"change", args{"💥 CA"}, "--CA"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeCertificateAuthorityName(tt.args.name); got != tt.want {
+				t.Errorf("normalizeCertificateAuthorityName() = %v, want %v", got, tt.want)
 			}
 		})
 	}

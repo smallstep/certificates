@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -31,7 +32,6 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
-	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -117,18 +117,6 @@ func GetProvisioners(caURL, rootFile string) (provisioner.List, error) {
 	}
 }
 
-func generateDefaultKey() (crypto.Signer, error) {
-	priv, err := keyutil.GenerateDefaultKey()
-	if err != nil {
-		return nil, err
-	}
-	signer, ok := priv.(crypto.Signer)
-	if !ok {
-		return nil, errors.Errorf("type %T is not a cyrpto.Signer", priv)
-	}
-	return signer, nil
-}
-
 // GetProvisionerKey returns the encrypted provisioner key with the for the
 // given kid.
 func GetProvisionerKey(caURL, rootFile, kid string) (string, error) {
@@ -148,6 +136,8 @@ func GetProvisionerKey(caURL, rootFile, kid string) (string, error) {
 
 // PKI represents the Public Key Infrastructure used by a certificate authority.
 type PKI struct {
+	casOptions                     apiv1.Options
+	caCreator                      apiv1.CertificateAuthorityCreator
 	root, rootKey, rootFingerprint string
 	intermediate, intermediateKey  string
 	sshHostPubKey, sshHostKey      string
@@ -160,11 +150,15 @@ type PKI struct {
 	dnsNames                       []string
 	caURL                          string
 	enableSSH                      bool
-	authorityOptions               *apiv1.Options
 }
 
 // New creates a new PKI configuration.
-func New() (*PKI, error) {
+func New(opts apiv1.Options) (*PKI, error) {
+	caCreator, err := cas.NewCreator(context.Background(), opts)
+	if err != nil {
+		return nil, err
+	}
+
 	public := GetPublicPath()
 	private := GetSecretsPath()
 	config := GetConfigPath()
@@ -185,8 +179,9 @@ func New() (*PKI, error) {
 		return s, errors.Wrapf(err, "error getting absolute path for %s", name)
 	}
 
-	var err error
 	p := &PKI{
+		casOptions:  opts,
+		caCreator:   caCreator,
 		provisioner: "step-cli",
 		address:     "127.0.0.1:9000",
 		dnsNames:    []string{"127.0.0.1"},
@@ -237,12 +232,6 @@ func (p *PKI) GetRootFingerprint() string {
 	return p.rootFingerprint
 }
 
-// SetAuthorityOptions sets the authority options object, these options are used
-// to configure a registration authority.
-func (p *PKI) SetAuthorityOptions(opts *apiv1.Options) {
-	p.authorityOptions = opts
-}
-
 // SetProvisioner sets the provisioner name of the OTT keys.
 func (p *PKI) SetProvisioner(s string) {
 	p.provisioner = s
@@ -275,37 +264,65 @@ func (p *PKI) GenerateKeyPairs(pass []byte) error {
 	return nil
 }
 
-// GenerateRootCertificate generates a root certificate with the given name.
-func (p *PKI) GenerateRootCertificate(name string, pass []byte) (*x509.Certificate, interface{}, error) {
-	signer, err := generateDefaultKey()
+// GenerateRootCertificate generates a root certificate with the given name
+// and using the default key type.
+func (p *PKI) GenerateRootCertificate(name, org, resource string, pass []byte) (*apiv1.CreateCertificateAuthorityResponse, error) {
+	resp, err := p.caCreator.CreateCertificateAuthority(&apiv1.CreateCertificateAuthorityRequest{
+		Name:      resource + "-Root-CA",
+		Type:      apiv1.RootCA,
+		Lifetime:  10 * 365 * 24 * time.Hour,
+		CreateKey: nil, // use default
+		Template: &x509.Certificate{
+			Subject: pkix.Name{
+				CommonName:   name + " Root CA",
+				Organization: []string{org},
+			},
+			KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+			BasicConstraintsValid: true,
+			IsCA:                  true,
+			MaxPathLen:            1,
+			MaxPathLenZero:        false,
+		},
+	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	cr, err := x509util.CreateCertificateRequest(name, []string{}, signer)
+	// PrivateKey will only be set if we have access to it (SoftCAS).
+	if err := p.WriteRootCertificate(resp.Certificate, resp.PrivateKey, pass); err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// GenerateIntermediateCertificate generates an intermediate certificate with
+// the given name and using the default key type.
+func (p *PKI) GenerateIntermediateCertificate(name, org, resource string, parent *apiv1.CreateCertificateAuthorityResponse, pass []byte) error {
+	resp, err := p.caCreator.CreateCertificateAuthority(&apiv1.CreateCertificateAuthorityRequest{
+		Name:      resource + "-Intermediate-CA",
+		Type:      apiv1.IntermediateCA,
+		Lifetime:  10 * 365 * 24 * time.Hour,
+		CreateKey: nil, // use default
+		Template: &x509.Certificate{
+			Subject: pkix.Name{
+				CommonName:   name + " Intermediate CA",
+				Organization: []string{org},
+			},
+			KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+			BasicConstraintsValid: true,
+			IsCA:                  true,
+			MaxPathLen:            0,
+			MaxPathLenZero:        true,
+		},
+		Parent: parent,
+	})
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	data := x509util.CreateTemplateData(name, []string{})
-	cert, err := x509util.NewCertificate(cr, x509util.WithTemplate(x509util.DefaultRootTemplate, data))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	template := cert.GetCertificate()
-	template.NotBefore = time.Now()
-	template.NotAfter = template.NotBefore.AddDate(10, 0, 0)
-	rootCrt, err := x509util.CreateCertificate(template, template, signer.Public(), signer)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if err := p.WriteRootCertificate(rootCrt, signer, pass); err != nil {
-		return nil, nil, err
-	}
-
-	return rootCrt, signer, nil
+	p.casOptions.CertificateAuthority = resp.Name
+	return p.WriteIntermediateCertificate(resp.Certificate, resp.PrivateKey, pass)
 }
 
 // WriteRootCertificate writes to disk the given certificate and key.
@@ -330,21 +347,45 @@ func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{
 	return nil
 }
 
+// WriteIntermediateCertificate writes to disk the given certificate and key.
+func (p *PKI) WriteIntermediateCertificate(crt *x509.Certificate, key interface{}, pass []byte) error {
+	if err := fileutil.WriteFile(p.intermediate, pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: crt.Raw,
+	}), 0600); err != nil {
+		return err
+	}
+	if key != nil {
+		_, err := pemutil.Serialize(key, pemutil.WithPassword(pass), pemutil.ToFile(p.intermediateKey, 0600))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CreateCertificateAuthorityResponse returns a
+// CreateCertificateAuthorityResponse that can be used as a parent of a
+// CreateCertificateAuthority request.
+func (p *PKI) CreateCertificateAuthorityResponse(cert *x509.Certificate, key crypto.PrivateKey) *apiv1.CreateCertificateAuthorityResponse {
+	signer, _ := key.(crypto.Signer)
+	return &apiv1.CreateCertificateAuthorityResponse{
+		Certificate: cert,
+		PrivateKey:  key,
+		Signer:      signer,
+	}
+}
+
 // GetCertificateAuthority attempts to load the certificate authority from the
 // RA.
 func (p *PKI) GetCertificateAuthority() error {
-	ca, err := cas.New(context.Background(), *p.authorityOptions)
-	if err != nil {
-		return err
-	}
-
-	srv, ok := ca.(apiv1.CertificateAuthorityGetter)
+	srv, ok := p.caCreator.(apiv1.CertificateAuthorityGetter)
 	if !ok {
 		return nil
 	}
 
 	resp, err := srv.GetCertificateAuthority(&apiv1.GetCertificateAuthorityRequest{
-		Name: p.authorityOptions.CertificateAuthority,
+		Name: p.casOptions.CertificateAuthority,
 	})
 	if err != nil {
 		return err
@@ -358,51 +399,6 @@ func (p *PKI) GetCertificateAuthority() error {
 	p.intermediate = ""
 	p.intermediateKey = ""
 
-	return nil
-}
-
-// GenerateIntermediateCertificate generates an intermediate certificate with
-// the given name.
-func (p *PKI) GenerateIntermediateCertificate(name string, rootCrt *x509.Certificate, rootKey interface{}, pass []byte) error {
-	key, err := generateDefaultKey()
-	if err != nil {
-		return err
-	}
-
-	cr, err := x509util.CreateCertificateRequest(name, []string{}, key)
-	if err != nil {
-		return err
-	}
-
-	data := x509util.CreateTemplateData(name, []string{})
-	cert, err := x509util.NewCertificate(cr, x509util.WithTemplate(x509util.DefaultIntermediateTemplate, data))
-	if err != nil {
-		return err
-	}
-
-	template := cert.GetCertificate()
-	template.NotBefore = rootCrt.NotBefore
-	template.NotAfter = rootCrt.NotAfter
-	intermediateCrt, err := x509util.CreateCertificate(template, rootCrt, key.Public(), rootKey.(crypto.Signer))
-	if err != nil {
-		return err
-	}
-
-	return p.WriteIntermediateCertificate(intermediateCrt, key, pass)
-}
-
-// WriteIntermediateCertificate writes to disk the given certificate and key.
-func (p *PKI) WriteIntermediateCertificate(crt *x509.Certificate, key interface{}, pass []byte) error {
-	if err := fileutil.WriteFile(p.intermediate, pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: crt.Raw,
-	}), 0600); err != nil {
-		return err
-	}
-	_, err := pemutil.Serialize(key, pemutil.WithPassword(pass), pemutil.ToFile(p.intermediateKey, 0600))
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -457,7 +453,7 @@ func (p *PKI) TellPKI() {
 
 func (p *PKI) tellPKI() {
 	ui.Println()
-	if p.authorityOptions == nil || p.authorityOptions.Is(apiv1.SoftCAS) {
+	if p.casOptions.Is(apiv1.SoftCAS) {
 		ui.PrintSelected("Root certificate", p.root)
 		ui.PrintSelected("Root private key", p.rootKey)
 		ui.PrintSelected("Root fingerprint", p.rootFingerprint)
@@ -522,6 +518,11 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 		EncryptedKey: key,
 	}
 
+	var authorityOptions *apiv1.Options
+	if !p.casOptions.Is(apiv1.SoftCAS) {
+		authorityOptions = &p.casOptions
+	}
+
 	config := &authority.Config{
 		Root:             []string{p.root},
 		FederatedRoots:   []string{},
@@ -535,7 +536,7 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 			DataSource: GetDBPath(),
 		},
 		AuthorityConfig: &authority.AuthConfig{
-			Options:              p.authorityOptions,
+			Options:              authorityOptions,
 			DisableIssuedAtCheck: false,
 			Provisioners:         provisioner.List{prov},
 		},
@@ -642,7 +643,7 @@ func (p *PKI) Save(opt ...Option) error {
 	ui.PrintSelected("Default configuration", p.defaults)
 	ui.PrintSelected("Certificate Authority configuration", p.config)
 	ui.Println()
-	if p.authorityOptions == nil || p.authorityOptions.Is(apiv1.SoftCAS) {
+	if p.casOptions.Is(apiv1.SoftCAS) {
 		ui.Println("Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.")
 	} else {
 		ui.Println("Your registration authority is ready to go. To generate certificates for individual services see 'step help ca'.")

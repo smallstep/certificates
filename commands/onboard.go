@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/ca"
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/pki"
 	"github.com/urfave/cli"
 	"go.step.sm/cli-utils/command"
@@ -162,7 +163,10 @@ func onboardAction(ctx *cli.Context) error {
 }
 
 func onboardPKI(config onboardingConfiguration) (*authority.Config, string, error) {
-	p, err := pki.New()
+	p, err := pki.New(apiv1.Options{
+		Type:      apiv1.SoftCAS,
+		IsCreator: true,
+	})
 	if err != nil {
 		return nil, "", err
 	}
@@ -171,13 +175,13 @@ func onboardPKI(config onboardingConfiguration) (*authority.Config, string, erro
 	p.SetDNSNames([]string{config.DNS})
 
 	ui.Println("Generating root certificate...")
-	rootCrt, rootKey, err := p.GenerateRootCertificate(config.Name+" Root CA", config.password)
+	root, err := p.GenerateRootCertificate(config.Name, config.Name, config.Name, config.password)
 	if err != nil {
 		return nil, "", err
 	}
 
 	ui.Println("Generating intermediate certificate...")
-	err = p.GenerateIntermediateCertificate(config.Name+" Intermediate CA", rootCrt, rootKey, config.password)
+	err = p.GenerateIntermediateCertificate(config.Name, config.Name, config.Name, root, config.password)
 	if err != nil {
 		return nil, "", err
 	}

@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"testing"
 
+	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1beta1"
 	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -544,6 +545,79 @@ func Test_isExtraExtension(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isExtraExtension(tt.args.oid); got != tt.want {
 				t.Errorf("isExtraExtension() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_createKeyVersionSpec(t *testing.T) {
+	type args struct {
+		alg  kmsapi.SignatureAlgorithm
+		bits int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *pb.CertificateAuthority_KeyVersionSpec
+		wantErr bool
+	}{
+		{"ok P256", args{0, 0}, &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_EC_P256_SHA256,
+			}}, false},
+		{"ok P256", args{kmsapi.ECDSAWithSHA256, 0}, &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_EC_P256_SHA256,
+			}}, false},
+		{"ok P384", args{kmsapi.ECDSAWithSHA384, 0}, &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_EC_P384_SHA384,
+			}}, false},
+		{"ok RSA default", args{kmsapi.SHA256WithRSA, 0}, &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_RSA_PKCS1_3072_SHA256,
+			}}, false},
+		{"ok RSA 2048", args{kmsapi.SHA256WithRSA, 2048}, &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_RSA_PKCS1_2048_SHA256,
+			}}, false},
+		{"ok RSA 3072", args{kmsapi.SHA256WithRSA, 3072}, &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_RSA_PKCS1_3072_SHA256,
+			}}, false},
+		{"ok RSA 4096", args{kmsapi.SHA256WithRSA, 4096}, &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_RSA_PKCS1_4096_SHA256,
+			}}, false},
+		{"ok RSA-PSS default", args{kmsapi.SHA256WithRSAPSS, 0}, &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_RSA_PSS_3072_SHA256,
+			}}, false},
+		{"ok RSA-PSS 2048", args{kmsapi.SHA256WithRSAPSS, 2048}, &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_RSA_PSS_2048_SHA256,
+			}}, false},
+		{"ok RSA-PSS 3072", args{kmsapi.SHA256WithRSAPSS, 3072}, &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_RSA_PSS_3072_SHA256,
+			}}, false},
+		{"ok RSA-PSS 4096", args{kmsapi.SHA256WithRSAPSS, 4096}, &pb.CertificateAuthority_KeyVersionSpec{
+			KeyVersion: &pb.CertificateAuthority_KeyVersionSpec_Algorithm{
+				Algorithm: pb.CertificateAuthority_RSA_PSS_4096_SHA256,
+			}}, false},
+		{"fail Ed25519", args{kmsapi.PureEd25519, 0}, nil, true},
+		{"fail RSA size", args{kmsapi.SHA256WithRSA, 1024}, nil, true},
+		{"fail RSA-PSS size", args{kmsapi.SHA256WithRSAPSS, 1024}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := createKeyVersionSpec(tt.args.alg, tt.args.bits)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("createKeyVersionSpec() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("createKeyVersionSpec() = %v, want %v", got, tt.want)
 			}
 		})
 	}

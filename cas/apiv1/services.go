@@ -18,6 +18,13 @@ type CertificateAuthorityGetter interface {
 	GetCertificateAuthority(req *GetCertificateAuthorityRequest) (*GetCertificateAuthorityResponse, error)
 }
 
+// CertificateAuthorityCreator is an interface implamented by a
+// CertificateAuthorityService that has a method to create a new certificate
+// authority.
+type CertificateAuthorityCreator interface {
+	CreateCertificateAuthority(req *CreateCertificateAuthorityRequest) (*CreateCertificateAuthorityResponse, error)
+}
+
 // Type represents the CAS type used.
 type Type string
 
