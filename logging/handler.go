@@ -3,6 +3,8 @@ package logging
 import (
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -10,18 +12,31 @@ import (
 
 // LoggerHandler creates a logger handler
 type LoggerHandler struct {
-	name   string
-	logger *logrus.Logger
-	next   http.Handler
+	name    string
+	logger  *logrus.Logger
+	options options
+	next    http.Handler
+}
+
+// options encapsulates any overriding parameters for the logger handler
+type options struct {
+	// onlyTraceHealthEndpoint determines if the kube-probe requests to the /health
+	// endpoint should only be logged at the TRACE level in the (expected) HTTP
+	// 200 case
+	onlyTraceHealthEndpoint bool
 }
 
 // NewLoggerHandler returns the given http.Handler with the logger integrated.
 func NewLoggerHandler(name string, logger *Logger, next http.Handler) http.Handler {
 	h := RequestID(logger.GetTraceHeader())
+	onlyTraceHealthEndpoint, _ := strconv.ParseBool(os.Getenv("STEP_LOGGER_ONLY_TRACE_HEALTH_ENDPOINT"))
 	return h(&LoggerHandler{
 		name:   name,
 		logger: logger.GetImpl(),
-		next:   next,
+		options: options{
+			onlyTraceHealthEndpoint: onlyTraceHealthEndpoint,
+		},
+		next: next,
 	})
 }
 
@@ -91,7 +106,11 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 
 	switch {
 	case status < http.StatusBadRequest:
-		l.logger.WithFields(fields).Info()
+		if l.options.onlyTraceHealthEndpoint && uri == "/health" {
+			l.logger.WithFields(fields).Trace()
+		} else {
+			l.logger.WithFields(fields).Info()
+		}
 	case status < http.StatusInternalServerError:
 		l.logger.WithFields(fields).Warn()
 	default:
