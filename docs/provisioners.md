@@ -1,5 +1,9 @@
 # Provisioners
 
+> Note: The canonical documentation for `step-ca` provisioners now lives at
+> https://smallstep.com/docs/step-ca/configuration#provisioners. Documentation
+> found on this page may be out of date.
+
 Provisioners are people or code that are registered with the CA and authorized
 to issue "provisioning tokens". Provisioning tokens are single-use tokens that
 can be used to authenticate with the CA and get a certificate.
@@ -29,9 +33,10 @@ Example `claims`:
         "disableRenewal": false,
         "minHostSSHCertDuration": "5m",
         "maxHostSSHCertDuration": "1680h",
+        "defaultHostSSHCertDuration": "720h",
         "minUserSSHCertDuration": "5m",
         "maxUserSSHCertDuration": "24h",
-        "maxTLSCertDuration": "16h",
+        "defaultUserSSHCertDuration": "16h",
         "enableSSHCA": true
     },
     ...
@@ -142,7 +147,6 @@ In the ca.json configuration file, a complete JWK provisioner example looks like
         "maxHostSSHCertDuration": "1680h",
         "minUserSSHCertDuration": "5m",
         "maxUserSSHCertDuration": "24h",
-        "maxTLSCertDuration": "16h",
         "enableSSHCA": true
     }
 }
