@@ -20,7 +20,7 @@ require (
 	github.com/smallstep/nosql v0.3.0
 	github.com/urfave/cli v1.22.4
 	go.step.sm/cli-utils v0.1.0
-	go.step.sm/crypto v0.7.0
+	go.step.sm/crypto v0.7.1
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	google.golang.org/api v0.33.0
