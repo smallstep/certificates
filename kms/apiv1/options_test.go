@@ -14,6 +14,7 @@ func TestOptions_Validate(t *testing.T) {
 		{"softkms", &Options{Type: "softkms"}, false},
 		{"cloudkms", &Options{Type: "cloudkms"}, false},
 		{"awskms", &Options{Type: "awskms"}, false},
+		{"sshagentkms", &Options{Type: "sshagentkms"}, false},
 		{"pkcs11", &Options{Type: "pkcs11"}, true},
 		{"unsupported", &Options{Type: "unsupported"}, true},
 	}

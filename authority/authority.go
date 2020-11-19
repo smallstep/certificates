@@ -2,6 +2,7 @@ package authority
 
 import (
 	"context"
+	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -17,6 +18,7 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/kms"
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
+	"github.com/smallstep/certificates/kms/sshagentkms"
 	"github.com/smallstep/certificates/templates"
 	"go.step.sm/crypto/pemutil"
 	"golang.org/x/crypto/ssh"
@@ -237,7 +239,17 @@ func (a *Authority) init() error {
 			if err != nil {
 				return err
 			}
-			a.sshCAHostCertSignKey, err = ssh.NewSignerFromSigner(signer)
+			// If our signer is from sshagentkms, just unwrap it instead of
+			// wrapping it in another layer, and this prevents crypto from
+			// erroring out with: ssh: unsupported key type *agent.Key
+			switch s := signer.(type) {
+			case *sshagentkms.WrappedSSHSigner:
+				a.sshCAHostCertSignKey = s.Sshsigner
+			case crypto.Signer:
+				a.sshCAHostCertSignKey, err = ssh.NewSignerFromSigner(s)
+			default:
+				return errors.Errorf("unsupported signer type %T", signer)
+			}
 			if err != nil {
 				return errors.Wrap(err, "error creating ssh signer")
 			}
@@ -253,7 +265,17 @@ func (a *Authority) init() error {
 			if err != nil {
 				return err
 			}
-			a.sshCAUserCertSignKey, err = ssh.NewSignerFromSigner(signer)
+			// If our signer is from sshagentkms, just unwrap it instead of
+			// wrapping it in another layer, and this prevents crypto from
+			// erroring out with: ssh: unsupported key type *agent.Key
+			switch s := signer.(type) {
+			case *sshagentkms.WrappedSSHSigner:
+				a.sshCAUserCertSignKey = s.Sshsigner
+			case crypto.Signer:
+				a.sshCAUserCertSignKey, err = ssh.NewSignerFromSigner(s)
+			default:
+				return errors.Errorf("unsupported signer type %T", signer)
+			}
 			if err != nil {
 				return errors.Wrap(err, "error creating ssh signer")
 			}

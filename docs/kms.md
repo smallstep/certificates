@@ -213,3 +213,25 @@ and configure the `kms` property with the `type` and your `pin` in it.
     ...
 }
 ```
+
+## SSHAgentKMS
+
+SSHAgentKMS is a KMS that wrapps a ssh-agent which has access to the keys to
+sign ssh certificates. This was primarly written to be able to use gpg-agent
+to provide the keys stored in a YubiKeys openpgp interface.
+
+```json
+{
+    "kms": {
+        "type": "sshagentkms"
+    },
+    "ssh": {
+        "hostKey": "sshagentkms:cardno:000123456789",
+        "userKey": "sshagentkms:cardno:000123456789",
+    },
+    ...
+}
+```
+
+This KMS requires that "root", "crt" and "key" are stored in plain files as for
+SoftKMS.
