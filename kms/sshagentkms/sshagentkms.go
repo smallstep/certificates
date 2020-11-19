@@ -8,7 +8,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"io"
-	"log"
 	"net"
 	"os"
 	"strings"
@@ -32,7 +31,7 @@ func New(ctx context.Context, opts apiv1.Options) (*SSHAgentKMS, error) {
 	socket := os.Getenv("SSH_AUTH_SOCK")
 	conn, err := net.Dial("unix", socket)
 	if err != nil {
-		log.Fatalf("Failed to open SSH_AUTH_SOCK: %v", err)
+		return nil, errors.Wrap(err, "failed to open SSH_AUTH_SOCK")
 	}
 
 	agentClient := agent.NewClient(conn)
@@ -42,7 +41,8 @@ func New(ctx context.Context, opts apiv1.Options) (*SSHAgentKMS, error) {
 	}, nil
 }
 
-// For testing
+// NewFromAgent initializes an SSHAgentKMS from a given agent, this method is
+// used for testing purposes.
 func NewFromAgent(ctx context.Context, opts apiv1.Options, agentClient agent.Agent) (*SSHAgentKMS, error) {
 	return &SSHAgentKMS{
 		agentClient: agentClient,
@@ -55,20 +55,23 @@ func init() {
 	})
 }
 
+// Close closes the agent. This is a noop for the SSHAgentKMS.
 func (k *SSHAgentKMS) Close() error {
-	// TODO: Is there any cleanup in Agent we can do?
 	return nil
 }
 
-// Utility class to wrap a ssh.Signer as a crypto.Signer
+// WrappedSSHSigner is a utility type to wrap a ssh.Signer as a crypto.Signer
 type WrappedSSHSigner struct {
 	Sshsigner ssh.Signer
 }
 
+// Public returns the agent public key. The type of this public key is
+// *agent.Key.
 func (s *WrappedSSHSigner) Public() crypto.PublicKey {
 	return s.Sshsigner.PublicKey()
 }
 
+// Sign signs the given digest using the ssh agent and returns the signature.
 func (s *WrappedSSHSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
 	sig, err := s.Sshsigner.Sign(rand, digest)
 	if err != nil {
@@ -77,6 +80,8 @@ func (s *WrappedSSHSigner) Sign(rand io.Reader, digest []byte, opts crypto.Signe
 	return sig.Blob, nil
 }
 
+// NewWrappedSignerFromSSHSigner returns a new crypto signer wrapping the given
+// one.
 func NewWrappedSignerFromSSHSigner(signer ssh.Signer) crypto.Signer {
 	return &WrappedSSHSigner{signer}
 }
