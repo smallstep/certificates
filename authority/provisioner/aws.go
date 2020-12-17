@@ -631,6 +631,13 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 		return nil, errs.Unauthorized("aws.authorizeToken; aws identity document region cannot be empty")
 	}
 
+	// Recalculate and validate payload.ID
+	unique := fmt.Sprintf("%s.%s", p.GetID(), doc.InstanceID)
+	sum := sha256.Sum256([]byte(unique))
+	if payload.ID != strings.ToLower(hex.EncodeToString(sum[:])) {
+		return nil, errs.Unauthorized("aws.authorizeToken; invalid token id")
+	}
+
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
 	// more than a few minutes.
 	now := time.Now().UTC()

@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -910,7 +911,7 @@ func generateGCPToken(sub, iss, aud, instanceID, instanceName, projectID, zone s
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }
 
-func generateAWSToken(sub, iss, aud, accountID, instanceID, privateIP, region string, iat time.Time, key crypto.Signer) (string, error) {
+func generateAWSToken(p *AWS, sub, iss, aud, accountID, instanceID, privateIP, region string, iat time.Time, key crypto.Signer) (string, error) {
 	doc, err := json.MarshalIndent(awsInstanceIdentityDocument{
 		AccountID:        accountID,
 		Architecture:     "x86_64",
@@ -946,8 +947,12 @@ func generateAWSToken(sub, iss, aud, accountID, instanceID, privateIP, region st
 		return "", err
 	}
 
+	unique := fmt.Sprintf("%s.%s", p.GetID(), instanceID)
+	sum = sha256.Sum256([]byte(unique))
+
 	claims := awsPayload{
 		Claims: jose.Claims{
+			ID:        strings.ToLower(hex.EncodeToString(sum[:])),
 			Subject:   sub,
 			Issuer:    iss,
 			IssuedAt:  jose.NewNumericDate(iat),
