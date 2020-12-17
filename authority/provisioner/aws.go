@@ -284,7 +284,11 @@ func (p *AWS) GetTokenID(token string) (string, error) {
 		sum := sha256.Sum256([]byte(token))
 		return strings.ToLower(hex.EncodeToString(sum[:])), nil
 	}
-	return payload.ID, nil
+
+	// Use provisioner + instance-id as the identifier.
+	unique := fmt.Sprintf("%s.%s", p.GetID(), payload.document.InstanceID)
+	sum := sha256.Sum256([]byte(unique))
+	return strings.ToLower(hex.EncodeToString(sum[:])), nil
 }
 
 // GetName returns the name of the provisioner.

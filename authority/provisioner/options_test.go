@@ -127,7 +127,7 @@ func TestTemplateOptions(t *testing.T) {
 }`)}, false},
 		{"okCustomTemplate", args{&Options{X509: &X509Options{Template: x509util.DefaultIIDLeafTemplate}}, data}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
-	"subject": {"commonName":"foo"},
+	"subject": {"commonName": "foo"},
 	"sans": [{"type":"dns","value":"foo.com"}],
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
@@ -189,7 +189,7 @@ func TestCustomTemplateOptions(t *testing.T) {
 }`)}, false},
 		{"okIID", args{nil, data, x509util.DefaultIIDLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
-	"subject": {"commonName":"foo"},
+	"subject": {"commonName": "foo"},
 	"sans": [{"type":"dns","value":"foo.com"}],
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
