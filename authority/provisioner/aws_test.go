@@ -470,22 +470,6 @@ func TestAWS_authorizeToken(t *testing.T) {
 				err:   errors.New("aws.authorizeToken; aws identity document pendingTime is too old"),
 			}
 		},
-		"fail/payloadId": func(t *testing.T) test {
-			p, err := generateAWS()
-			assert.FatalError(t, err)
-			p2, err := generateAWS()
-			assert.FatalError(t, err)
-			tok, err := generateAWSToken(
-				p2, "instance-id", awsIssuer, p.GetID(), p.Accounts[0], "instance-id",
-				"127.0.0.1", "us-west-1", time.Now(), key)
-			assert.FatalError(t, err)
-			return test{
-				p:     p,
-				token: tok,
-				code:  http.StatusUnauthorized,
-				err:   errors.New("aws.authorizeToken; invalid token id"),
-			}
-		},
 		"ok": func(t *testing.T) test {
 			p, err := generateAWS()
 			assert.FatalError(t, err)

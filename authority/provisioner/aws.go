@@ -284,7 +284,11 @@ func (p *AWS) GetTokenID(token string) (string, error) {
 		sum := sha256.Sum256([]byte(token))
 		return strings.ToLower(hex.EncodeToString(sum[:])), nil
 	}
-	return payload.ID, nil
+
+	// Use provisioner + instance-id as the identifier.
+	unique := fmt.Sprintf("%s.%s", p.GetID(), payload.document.InstanceID)
+	sum := sha256.Sum256([]byte(unique))
+	return strings.ToLower(hex.EncodeToString(sum[:])), nil
 }
 
 // GetName returns the name of the provisioner.
@@ -629,13 +633,6 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 		return nil, errs.Unauthorized("aws.authorizeToken; aws identity document privateIp cannot be empty")
 	case doc.Region == "":
 		return nil, errs.Unauthorized("aws.authorizeToken; aws identity document region cannot be empty")
-	}
-
-	// Recalculate and validate payload.ID
-	unique := fmt.Sprintf("%s.%s", p.GetID(), doc.InstanceID)
-	sum := sha256.Sum256([]byte(unique))
-	if payload.ID != strings.ToLower(hex.EncodeToString(sum[:])) {
-		return nil, errs.Unauthorized("aws.authorizeToken; invalid token id")
 	}
 
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
