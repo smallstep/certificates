@@ -39,8 +39,8 @@ func TestCustomSSHTemplateOptions(t *testing.T) {
 		}, false},
 		{"okNoData", args{nil, nil, sshutil.DefaultTemplate, SignSSHOptions{}}, sshutil.Options{
 			CertBuffer: bytes.NewBufferString(`{
-	"type": "<no value>",
-	"keyId": "<no value>",
+	"type": null,
+	"keyId": null,
 	"principals": null,
 	"extensions": null,
 	"criticalOptions": null
