@@ -1507,7 +1507,6 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					fmt.Printf("acmeCh = %+v\n", acmeCh)
 					gotb, err := json.Marshal(acmeCh)
 					assert.FatalError(t, err)
 
