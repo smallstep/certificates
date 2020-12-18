@@ -238,7 +238,10 @@ func (bc *baseChallenge) validate(db nosql.DB, jwk *jose.JSONWebKey, vo validate
 func (bc *baseChallenge) storeError(db nosql.DB, err *Error) error {
 	clone := bc.clone()
 	clone.Error = err.ToACME()
-	return clone.save(db, bc)
+	if err := clone.save(db, bc); err != nil {
+		return ServerInternalErr(errors.Wrap(err, "failure saving error to acme challenge"))
+	}
+	return nil
 }
 
 // unmarshalChallenge unmarshals a challenge type into the correct sub-type.
