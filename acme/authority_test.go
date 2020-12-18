@@ -2,9 +2,14 @@ package acme
 
 import (
 	"context"
+	"crypto"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -1331,11 +1336,14 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 	prov := newProv()
 	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
 	ctx = context.WithValue(ctx, BaseURLContextKey, "https://test.ca.smallstep.com:8080")
+
 	type test struct {
 		auth      *Authority
 		id, accID string
 		err       *Error
 		ch        challenge
+		jwk       *jose.JSONWebKey
+		server    *httptest.Server
 	}
 	tests := map[string]func(t *testing.T) test{
 		"fail/getChallenge-error": func(t *testing.T) test {
@@ -1375,8 +1383,25 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 			}
 		},
 		"fail/validate-error": func(t *testing.T) test {
-			ch, err := newHTTPCh()
+			keyauth := "temp"
+			keyauthp := &keyauth
+			// Create test server that returns challenge auth
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprintf(w, "%s\r\n", *keyauthp)
+			}))
+			t.Cleanup(func() { ts.Close() })
+
+			ch, err := newHTTPChWithServer(strings.TrimPrefix(ts.URL, "http://"))
 			assert.FatalError(t, err)
+
+			jwk, _, err := jose.GenerateDefaultKeyPair([]byte("pass"))
+			assert.FatalError(t, err)
+
+			thumbprint, err := jwk.Thumbprint(crypto.SHA256)
+			assert.FatalError(t, err)
+			encPrint := base64.RawURLEncoding.EncodeToString(thumbprint)
+			*keyauthp = fmt.Sprintf("%s.%s", ch.getToken(), encPrint)
+
 			b, err := json.Marshal(ch)
 			assert.FatalError(t, err)
 			auth, err := NewAuthority(&db.MockNoSQLDB{
@@ -1393,13 +1418,15 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 			}, "ca.smallstep.com", "acme", nil)
 			assert.FatalError(t, err)
 			return test{
-				auth:  auth,
-				id:    ch.getID(),
-				accID: ch.getAccountID(),
-				err:   ServerInternalErr(errors.New("error attempting challenge validation: error saving acme challenge: force")),
+				auth:   auth,
+				id:     ch.getID(),
+				accID:  ch.getAccountID(),
+				jwk:    jwk,
+				server: ts,
+				err:    ServerInternalErr(errors.New("error attempting challenge validation: error saving acme challenge: force")),
 			}
 		},
-		"ok": func(t *testing.T) test {
+		"ok/already-valid": func(t *testing.T) test {
 			ch, err := newHTTPCh()
 			assert.FatalError(t, err)
 			_ch, ok := ch.(*http01Challenge)
@@ -1423,11 +1450,54 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 				ch:    ch,
 			}
 		},
+		"ok": func(t *testing.T) test {
+			keyauth := "temp"
+			keyauthp := &keyauth
+			// Create test server that returns challenge auth
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprintf(w, "%s\r\n", *keyauthp)
+			}))
+			t.Cleanup(func() { ts.Close() })
+
+			ch, err := newHTTPChWithServer(strings.TrimPrefix(ts.URL, "http://"))
+			assert.FatalError(t, err)
+
+			jwk, _, err := jose.GenerateDefaultKeyPair([]byte("pass"))
+			assert.FatalError(t, err)
+
+			thumbprint, err := jwk.Thumbprint(crypto.SHA256)
+			assert.FatalError(t, err)
+			encPrint := base64.RawURLEncoding.EncodeToString(thumbprint)
+			*keyauthp = fmt.Sprintf("%s.%s", ch.getToken(), encPrint)
+
+			b, err := json.Marshal(ch)
+			assert.FatalError(t, err)
+			auth, err := NewAuthority(&db.MockNoSQLDB{
+				MGet: func(bucket, key []byte) ([]byte, error) {
+					assert.Equals(t, bucket, challengeTable)
+					assert.Equals(t, key, []byte(ch.getID()))
+					return b, nil
+				},
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					assert.Equals(t, bucket, challengeTable)
+					assert.Equals(t, key, []byte(ch.getID()))
+					return nil, true, nil
+				},
+			}, "ca.smallstep.com", "acme", nil)
+			assert.FatalError(t, err)
+			return test{
+				auth:   auth,
+				id:     ch.getID(),
+				accID:  ch.getAccountID(),
+				jwk:    jwk,
+				server: ts,
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if acmeCh, err := tc.auth.ValidateChallenge(ctx, tc.accID, tc.id, nil); err != nil {
+			if acmeCh, err := tc.auth.ValidateChallenge(ctx, tc.accID, tc.id, tc.jwk); err != nil {
 				if assert.NotNil(t, tc.err) {
 					ae, ok := err.(*Error)
 					assert.True(t, ok)
@@ -1440,12 +1510,14 @@ func TestAuthorityValidateChallenge(t *testing.T) {
 					gotb, err := json.Marshal(acmeCh)
 					assert.FatalError(t, err)
 
-					acmeExp, err := tc.ch.toACME(ctx, nil, tc.auth.dir)
-					assert.FatalError(t, err)
-					expb, err := json.Marshal(acmeExp)
-					assert.FatalError(t, err)
+					if tc.ch != nil {
+						acmeExp, err := tc.ch.toACME(ctx, nil, tc.auth.dir)
+						assert.FatalError(t, err)
+						expb, err := json.Marshal(acmeExp)
+						assert.FatalError(t, err)
 
-					assert.Equals(t, expb, gotb)
+						assert.Equals(t, expb, gotb)
+					}
 				}
 			}
 		})
