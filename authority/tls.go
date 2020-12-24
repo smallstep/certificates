@@ -8,8 +8,6 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"time"
 
@@ -69,7 +67,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		certModifiers  []provisioner.CertificateModifier
 		certEnforcers  []provisioner.CertificateEnforcer
 	)
-	var thecertfile = signOpts.AppendedCertsFile
+
 	opts := []interface{}{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
 	if err := csr.CheckSignature(); err != nil {
 		return nil, errs.Wrap(http.StatusBadRequest, err, "authority.Sign; invalid certificate request", opts...)
@@ -163,35 +161,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 				"authority.Sign; error storing certificate in db", opts...)
 		}
 	}
-	//If the user defined a file to append to in ca.json
-	//log.Fatal(string(thecertfile))
-	if thecertfile != "" {
-		content, err := ioutil.ReadFile(string(thecertfile))
-		if err != nil {
-			log.Fatal(err)
-		}
-		block, _ := pem.Decode([]byte(content))
-		if block == nil {
-			log.Fatal(err)
-		}
-		certs, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			log.Fatal(err)
-		}
-		var thecert = make([]*x509.Certificate, len(resp.CertificateChain)+1)
-		for i, aid := range resp.CertificateChain {
-			//log.wr(aid)
-			thecert[i] = aid
-		}
-		thecert[len(resp.CertificateChain)] = certs
-		return append([]*x509.Certificate{resp.Certificate}, thecert...), nil
-	}
-	var thecert = make([]*x509.Certificate, len(resp.CertificateChain))
-	for i, aid := range resp.CertificateChain {
-		thecert[i] = aid
-	}
-	return append([]*x509.Certificate{resp.Certificate}, thecert...), nil
 
+	return append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...), nil
 }
 
 // Renew creates a new Certificate identical to the old certificate, except

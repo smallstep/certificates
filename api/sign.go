@@ -12,12 +12,11 @@ import (
 
 // SignRequest is the request body for a certificate signature request.
 type SignRequest struct {
-	CsrPEM            CertificateRequest `json:"csr"`
-	OTT               string             `json:"ott"`
-	NotAfter          TimeDuration       `json:"notAfter,omitempty"`
-	NotBefore         TimeDuration       `json:"notBefore,omitempty"`
-	AppendedCertsFile string             `json:"AppendedCertsFile,omitempty"`
-	TemplateData      json.RawMessage    `json:"templateData,omitempty"`
+	CsrPEM       CertificateRequest `json:"csr"`
+	OTT          string             `json:"ott"`
+	NotAfter     TimeDuration       `json:"notAfter,omitempty"`
+	NotBefore    TimeDuration       `json:"notBefore,omitempty"`
+	TemplateData json.RawMessage    `json:"templateData,omitempty"`
 }
 
 // Validate checks the fields of the SignRequest and returns nil if they are ok
@@ -62,10 +61,9 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	opts := provisioner.SignOptions{
-		NotBefore:         body.NotBefore,
-		NotAfter:          body.NotAfter,
-		TemplateData:      body.TemplateData,
-		AppendedCertsFile: body.AppendedCertsFile,
+		NotBefore:    body.NotBefore,
+		NotAfter:     body.NotAfter,
+		TemplateData: body.TemplateData,
 	}
 
 	signOpts, err := h.Authority.AuthorizeSign(body.OTT)
