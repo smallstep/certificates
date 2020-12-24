@@ -56,7 +56,7 @@ func (m *certificateDurationEnforcer) Enforce(cert *x509.Certificate) error {
 }
 
 func getDefaultIssuer(a *Authority) *x509.Certificate {
-	return a.x509CAService.(*softcas.SoftCAS).Issuer
+	return a.x509CAService.(*softcas.SoftCAS).CertificateChain[len(a.x509CAService.(*softcas.SoftCAS).CertificateChain)-1]
 }
 
 func getDefaultSigner(a *Authority) crypto.Signer {
@@ -671,7 +671,7 @@ func TestAuthority_Renew(t *testing.T) {
 			intCert, intSigner := generateIntermidiateCertificate(t, rootCert, rootSigner)
 
 			_a := testAuthority(t)
-			_a.x509CAService.(*softcas.SoftCAS).Issuer = intCert
+			_a.x509CAService.(*softcas.SoftCAS).CertificateChain = []*x509.Certificate{intCert}
 			_a.x509CAService.(*softcas.SoftCAS).Signer = intSigner
 			return &renewTest{
 				auth: _a,
@@ -878,7 +878,7 @@ func TestAuthority_Rekey(t *testing.T) {
 			intCert, intSigner := generateIntermidiateCertificate(t, rootCert, rootSigner)
 
 			_a := testAuthority(t)
-			_a.x509CAService.(*softcas.SoftCAS).Issuer = intCert
+			_a.x509CAService.(*softcas.SoftCAS).CertificateChain = []*x509.Certificate{intCert}
 			_a.x509CAService.(*softcas.SoftCAS).Signer = intSigner
 			return &renewTest{
 				auth: _a,

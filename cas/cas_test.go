@@ -31,8 +31,8 @@ func (m *mockCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1
 
 func TestNew(t *testing.T) {
 	expected := &softcas.SoftCAS{
-		Issuer: &x509.Certificate{Subject: pkix.Name{CommonName: "Test Issuer"}},
-		Signer: ed25519.PrivateKey{},
+		CertificateChain: []*x509.Certificate{{Subject: pkix.Name{CommonName: "Test Issuer"}}},
+		Signer:           ed25519.PrivateKey{},
 	}
 
 	apiv1.Register(apiv1.Type("nockCAS"), func(ctx context.Context, opts apiv1.Options) (apiv1.CertificateAuthorityService, error) {
@@ -50,18 +50,18 @@ func TestNew(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok default", args{context.Background(), apiv1.Options{
-			Issuer: &x509.Certificate{Subject: pkix.Name{CommonName: "Test Issuer"}},
-			Signer: ed25519.PrivateKey{},
+			CertificateChain: []*x509.Certificate{{Subject: pkix.Name{CommonName: "Test Issuer"}}},
+			Signer:           ed25519.PrivateKey{},
 		}}, expected, false},
 		{"ok softcas", args{context.Background(), apiv1.Options{
-			Type:   "softcas",
-			Issuer: &x509.Certificate{Subject: pkix.Name{CommonName: "Test Issuer"}},
-			Signer: ed25519.PrivateKey{},
+			Type:             "softcas",
+			CertificateChain: []*x509.Certificate{{Subject: pkix.Name{CommonName: "Test Issuer"}}},
+			Signer:           ed25519.PrivateKey{},
 		}}, expected, false},
 		{"ok SoftCAS", args{context.Background(), apiv1.Options{
-			Type:   "SoftCAS",
-			Issuer: &x509.Certificate{Subject: pkix.Name{CommonName: "Test Issuer"}},
-			Signer: ed25519.PrivateKey{},
+			Type:             "SoftCAS",
+			CertificateChain: []*x509.Certificate{{Subject: pkix.Name{CommonName: "Test Issuer"}}},
+			Signer:           ed25519.PrivateKey{},
 		}}, expected, false},
 		{"fail empty", args{context.Background(), apiv1.Options{}}, (*softcas.SoftCAS)(nil), true},
 		{"fail type", args{context.Background(), apiv1.Options{Type: "FailCAS"}}, nil, true},

@@ -23,8 +23,8 @@ type Options struct {
 
 	// Issuer and signer are the issuer certificate and signer used in SoftCAS.
 	// They are configured in ca.json crt and key properties.
-	Issuer *x509.Certificate `json:"-"`
-	Signer crypto.Signer     `json:"-"`
+	CertificateChain []*x509.Certificate
+	Signer           crypto.Signer `json:"-"`
 
 	// IsCreator is set to true when we're creating a certificate authority. Is
 	// used to skip some validations when initializing a CertificateAuthority.

@@ -182,9 +182,9 @@ func TestNew(t *testing.T) {
 		want    *SoftCAS
 		wantErr bool
 	}{
-		{"ok", args{context.Background(), apiv1.Options{Issuer: testIssuer, Signer: testSigner}}, &SoftCAS{Issuer: testIssuer, Signer: testSigner}, false},
+		{"ok", args{context.Background(), apiv1.Options{CertificateChain: []*x509.Certificate{testIssuer}, Signer: testSigner}}, &SoftCAS{CertificateChain: []*x509.Certificate{testIssuer}, Signer: testSigner}, false},
 		{"fail no issuer", args{context.Background(), apiv1.Options{Signer: testSigner}}, nil, true},
-		{"fail no signer", args{context.Background(), apiv1.Options{Issuer: testIssuer}}, nil, true},
+		{"fail no signer", args{context.Background(), apiv1.Options{CertificateChain: []*x509.Certificate{testIssuer}}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -208,11 +208,11 @@ func TestNew_register(t *testing.T) {
 	}
 
 	want := &SoftCAS{
-		Issuer: testIssuer,
-		Signer: testSigner,
+		CertificateChain: []*x509.Certificate{testIssuer},
+		Signer:           testSigner,
 	}
 
-	got, err := newFn(context.Background(), apiv1.Options{Issuer: testIssuer, Signer: testSigner})
+	got, err := newFn(context.Background(), apiv1.Options{CertificateChain: []*x509.Certificate{testIssuer}, Signer: testSigner})
 	if err != nil {
 		t.Errorf("New() error = %v", err)
 		return
@@ -286,8 +286,8 @@ func TestSoftCAS_CreateCertificate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &SoftCAS{
-				Issuer: tt.fields.Issuer,
-				Signer: tt.fields.Signer,
+				CertificateChain: []*x509.Certificate{tt.fields.Issuer},
+				Signer:           tt.fields.Signer,
 			}
 			got, err := c.CreateCertificate(tt.args.req)
 			if (err != nil) != tt.wantErr {
@@ -342,8 +342,8 @@ func TestSoftCAS_RenewCertificate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &SoftCAS{
-				Issuer: tt.fields.Issuer,
-				Signer: tt.fields.Signer,
+				CertificateChain: []*x509.Certificate{tt.fields.Issuer},
+				Signer:           tt.fields.Signer,
 			}
 			got, err := c.RenewCertificate(tt.args.req)
 			if (err != nil) != tt.wantErr {
@@ -395,8 +395,8 @@ func TestSoftCAS_RevokeCertificate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &SoftCAS{
-				Issuer: tt.fields.Issuer,
-				Signer: tt.fields.Signer,
+				CertificateChain: []*x509.Certificate{tt.fields.Issuer},
+				Signer:           tt.fields.Signer,
 			}
 			got, err := c.RevokeCertificate(tt.args.req)
 			if (err != nil) != tt.wantErr {
@@ -524,9 +524,9 @@ func TestSoftCAS_CreateCertificateAuthority(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &SoftCAS{
-				Issuer:     tt.fields.Issuer,
-				Signer:     tt.fields.Signer,
-				KeyManager: tt.fields.KeyManager,
+				CertificateChain: []*x509.Certificate{tt.fields.Issuer},
+				Signer:           tt.fields.Signer,
+				KeyManager:       tt.fields.KeyManager,
 			}
 			got, err := c.CreateCertificateAuthority(tt.args.req)
 			if (err != nil) != tt.wantErr {
