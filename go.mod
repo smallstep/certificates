@@ -7,7 +7,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.1.0
 	github.com/aws/aws-sdk-go v1.30.29
 	github.com/go-chi/chi v4.0.2+incompatible
-	github.com/go-piv/piv-go v1.6.0
+	github.com/go-piv/piv-go v1.7.0
 	github.com/golang/mock v1.4.4
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gax-go/v2 v2.0.5
