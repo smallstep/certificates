@@ -35,8 +35,8 @@ type SoftCAS struct {
 // crypto.
 func New(ctx context.Context, opts apiv1.Options) (*SoftCAS, error) {
 	if !opts.IsCreator {
-		switch {
-		case opts.CertificateChain == nil:
+		switch {			
+		case len(opts.CertificateChain) == 0:
 			return nil, errors.New("softCAS 'CertificateChain' cannot be nil")
 		case opts.Signer == nil:
 			return nil, errors.New("softCAS 'signer' cannot be nil")
