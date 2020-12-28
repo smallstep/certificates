@@ -21,7 +21,7 @@ type Options struct {
 	// `projects/*/locations/*/certificateAuthorities/*`.
 	CertificateAuthority string `json:"certificateAuthority"`
 
-	// Issuer and signer are the issuer certificate and signer used in SoftCAS.
+	// Certificate and signer are the issuer certificate,along with any other bundled certificates to be returned in the chain for consumers, and signer used in SoftCAS.
 	// They are configured in ca.json crt and key properties.
 	CertificateChain []*x509.Certificate
 	Signer           crypto.Signer `json:"-"`
