@@ -26,9 +26,9 @@ var now = func() time.Time {
 // SoftCAS implements a Certificate Authority Service using Golang or KMS
 // crypto. This is the default CAS used in step-ca.
 type SoftCAS struct {
-	Issuer     *x509.Certificate
-	Signer     crypto.Signer
-	KeyManager kms.KeyManager
+	CertificateChain []*x509.Certificate
+	Signer           crypto.Signer
+	KeyManager       kms.KeyManager
 }
 
 // New creates a new CertificateAuthorityService implementation using Golang or KMS
@@ -36,16 +36,16 @@ type SoftCAS struct {
 func New(ctx context.Context, opts apiv1.Options) (*SoftCAS, error) {
 	if !opts.IsCreator {
 		switch {
-		case opts.Issuer == nil:
-			return nil, errors.New("softCAS 'issuer' cannot be nil")
+		case len(opts.CertificateChain) == 0:
+			return nil, errors.New("softCAS 'CertificateChain' cannot be nil")
 		case opts.Signer == nil:
 			return nil, errors.New("softCAS 'signer' cannot be nil")
 		}
 	}
 	return &SoftCAS{
-		Issuer:     opts.Issuer,
-		Signer:     opts.Signer,
-		KeyManager: opts.KeyManager,
+		CertificateChain: opts.CertificateChain,
+		Signer:           opts.Signer,
+		KeyManager:       opts.KeyManager,
 	}, nil
 }
 
@@ -66,18 +66,16 @@ func (c *SoftCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 	if req.Template.NotAfter.IsZero() {
 		req.Template.NotAfter = t.Add(req.Lifetime)
 	}
-	req.Template.Issuer = c.Issuer.Subject
+	req.Template.Issuer = c.CertificateChain[0].Subject
 
-	cert, err := x509util.CreateCertificate(req.Template, c.Issuer, req.Template.PublicKey, c.Signer)
+	cert, err := x509util.CreateCertificate(req.Template, c.CertificateChain[0], req.Template.PublicKey, c.Signer)
 	if err != nil {
 		return nil, err
 	}
 
 	return &apiv1.CreateCertificateResponse{
-		Certificate: cert,
-		CertificateChain: []*x509.Certificate{
-			c.Issuer,
-		},
+		Certificate:      cert,
+		CertificateChain: c.CertificateChain,
 	}, nil
 }
 
@@ -93,18 +91,16 @@ func (c *SoftCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.R
 	t := now()
 	req.Template.NotBefore = t.Add(-1 * req.Backdate)
 	req.Template.NotAfter = t.Add(req.Lifetime)
-	req.Template.Issuer = c.Issuer.Subject
+	req.Template.Issuer = c.CertificateChain[0].Subject
 
-	cert, err := x509util.CreateCertificate(req.Template, c.Issuer, req.Template.PublicKey, c.Signer)
+	cert, err := x509util.CreateCertificate(req.Template, c.CertificateChain[0], req.Template.PublicKey, c.Signer)
 	if err != nil {
 		return nil, err
 	}
 
 	return &apiv1.RenewCertificateResponse{
-		Certificate: cert,
-		CertificateChain: []*x509.Certificate{
-			c.Issuer,
-		},
+		Certificate:      cert,
+		CertificateChain: c.CertificateChain,
 	}, nil
 }
 
@@ -113,10 +109,8 @@ func (c *SoftCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.R
 // in the db.
 func (c *SoftCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {
 	return &apiv1.RevokeCertificateResponse{
-		Certificate: req.Certificate,
-		CertificateChain: []*x509.Certificate{
-			c.Issuer,
-		},
+		Certificate:      req.Certificate,
+		CertificateChain: c.CertificateChain,
 	}, nil
 }
 

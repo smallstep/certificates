@@ -95,9 +95,9 @@ func WithKeyManager(k kms.KeyManager) Option {
 func WithX509Signer(crt *x509.Certificate, s crypto.Signer) Option {
 	return func(a *Authority) error {
 		srv, err := cas.New(context.Background(), casapi.Options{
-			Type:   casapi.SoftCAS,
-			Issuer: crt,
-			Signer: s,
+			Type:             casapi.SoftCAS,
+			Signer:           s,
+			CertificateChain: []*x509.Certificate{crt},
 		})
 		if err != nil {
 			return err

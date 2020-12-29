@@ -164,7 +164,7 @@ func (a *Authority) init() error {
 
 		// Read intermediate and create X509 signer for default CAS.
 		if options.Is(casapi.SoftCAS) {
-			options.Issuer, err = pemutil.ReadCertificate(a.config.IntermediateCert)
+			options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
 			if err != nil {
 				return err
 			}

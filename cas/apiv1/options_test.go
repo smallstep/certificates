@@ -70,7 +70,7 @@ func TestOptions_Validate(t *testing.T) {
 				Type:                 tt.fields.Type,
 				CredentialsFile:      tt.fields.CredentialsFile,
 				CertificateAuthority: tt.fields.CertificateAuthority,
-				Issuer:               tt.fields.Issuer,
+				CertificateChain:     []*x509.Certificate{tt.fields.Issuer},
 				Signer:               tt.fields.Signer,
 			}
 			if err := o.Validate(); (err != nil) != tt.wantErr {
@@ -120,7 +120,7 @@ func TestOptions_Is(t *testing.T) {
 				Type:                 tt.fields.Type,
 				CredentialsFile:      tt.fields.CredentialsFile,
 				CertificateAuthority: tt.fields.CertificateAuthority,
-				Issuer:               tt.fields.Issuer,
+				CertificateChain:     []*x509.Certificate{tt.fields.Issuer},
 				Signer:               tt.fields.Signer,
 			}
 			if got := o.Is(tt.args.t); got != tt.want {
