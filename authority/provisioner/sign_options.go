@@ -154,6 +154,9 @@ type dnsNamesValidator []string
 // Valid checks that certificate request DNS Names match those configured in
 // the bootstrap (token) flow.
 func (v dnsNamesValidator) Valid(req *x509.CertificateRequest) error {
+	if len(req.DNSNames) == 0 {
+		return nil
+	}
 	want := make(map[string]bool)
 	for _, s := range v {
 		want[s] = true
@@ -174,6 +177,9 @@ type ipAddressesValidator []net.IP
 // Valid checks that certificate request IP Addresses match those configured in
 // the bootstrap (token) flow.
 func (v ipAddressesValidator) Valid(req *x509.CertificateRequest) error {
+	if len(req.IPAddresses) == 0 {
+		return nil
+	}
 	want := make(map[string]bool)
 	for _, ip := range v {
 		want[ip.String()] = true
@@ -194,6 +200,9 @@ type emailAddressesValidator []string
 // Valid checks that certificate request IP Addresses match those configured in
 // the bootstrap (token) flow.
 func (v emailAddressesValidator) Valid(req *x509.CertificateRequest) error {
+	if len(req.EmailAddresses) == 0 {
+		return nil
+	}
 	want := make(map[string]bool)
 	for _, s := range v {
 		want[s] = true
@@ -214,6 +223,9 @@ type urisValidator []*url.URL
 // Valid checks that certificate request IP Addresses match those configured in
 // the bootstrap (token) flow.
 func (v urisValidator) Valid(req *x509.CertificateRequest) error {
+	if len(req.URIs) == 0 {
+		return nil
+	}
 	want := make(map[string]bool)
 	for _, u := range v {
 		want[u.String()] = true
