@@ -15,7 +15,7 @@ func TestOptions_Validate(t *testing.T) {
 		{"cloudkms", &Options{Type: "cloudkms"}, false},
 		{"awskms", &Options{Type: "awskms"}, false},
 		{"sshagentkms", &Options{Type: "sshagentkms"}, false},
-		{"pkcs11", &Options{Type: "pkcs11"}, true},
+		{"pkcs11", &Options{Type: "pkcs11"}, false},
 		{"unsupported", &Options{Type: "unsupported"}, true},
 	}
 	for _, tt := range tests {

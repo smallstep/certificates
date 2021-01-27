@@ -189,8 +189,9 @@ func TestURI_Get(t *testing.T) {
 		{"ok", mustParse("yubikey:slot-id=9a"), args{"slot-id"}, "9a"},
 		{"ok first", mustParse("yubikey:slot-id=9a;slot-id=9b"), args{"slot-id"}, "9a"},
 		{"ok multiple", mustParse("yubikey:slot-id=9a;foo=bar"), args{"foo"}, "bar"},
+		{"ok in query", mustParse("yubikey:slot-id=9a?foo=bar"), args{"foo"}, "bar"},
 		{"fail missing", mustParse("yubikey:slot-id=9a"), args{"foo"}, ""},
-		{"fail in query", mustParse("yubikey:slot-id=9a?foo=bar"), args{"foo"}, ""},
+		{"fail missing query", mustParse("yubikey:slot-id=9a?bar=zar"), args{"foo"}, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
