@@ -1,0 +1,31 @@
+[Unit]
+Description=Certificate renewer for %I
+After=network-online.target
+Documentation=https://smallstep.com/docs/step-ca/certificate-authority-server-production
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+User=root
+
+Environment=STEPPATH=/etc/step-ca \
+            CERT_LOCATION=/etc/step/certs/%i.crt \
+            KEY_LOCATION=/etc/step/certs/%i.key
+
+; ExecStartPre checks if the certificate is ready for renewal,
+; based on the exit status of the command.
+; (In systemd 243 and above, you can use ExecCondition= here.)
+ExecStartPre=/usr/bin/bash -c \
+  'step certificate inspect $CERT_LOCATION --format json --roots "$STEPPATH/certs/root_ca.crt" | \
+  jq -e "(((.validity.start | fromdate) + \
+          ((.validity.end | fromdate) - (.validity.start | fromdate)) * 0.66) \
+           - now) <= 0" > /dev/null'
+
+; ExecStart renews the certificate, if ExecStartPre was successful.
+ExecStart=/usr/bin/step ca renew --force $CERT_LOCATION $KEY_LOCATION
+
+; Try to reload or restart the systemd service that relies on this cert-renewer
+ExecStartPost=/usr/bin/bash -c 'systemctl --quiet is-enabled %i && systemctl try-reload-or-restart %i'
+
+[Install]
+WantedBy=multi-user.target
