@@ -21,9 +21,25 @@ import (
 // specified.
 const DefaultRSASize = 3072
 
+// P11 defines the methods on crypto11.Context that this package will use. This
+// interface will be used for unit testing.
+type P11 interface {
+	FindKeyPair(id, label []byte) (crypto11.Signer, error)
+	FindCertificate(id, label []byte, serial *big.Int) (*x509.Certificate, error)
+	ImportCertificateWithLabel(id, label []byte, cert *x509.Certificate) error
+	DeleteCertificate(id, label []byte, serial *big.Int) error
+	GenerateRSAKeyPairWithLabel(id, label []byte, bits int) (crypto11.SignerDecrypter, error)
+	GenerateECDSAKeyPairWithLabel(id, label []byte, curve elliptic.Curve) (crypto11.Signer, error)
+	Close() error
+}
+
+var p11Configure = func(config *crypto11.Config) (P11, error) {
+	return crypto11.Configure(config)
+}
+
 // PKCS11 is the implementation of a KMS using the PKCS #11 standard.
 type PKCS11 struct {
-	context *crypto11.Context
+	p11 P11
 }
 
 // New returns a new PKCS11 KMS.
@@ -54,13 +70,13 @@ func New(ctx context.Context, opts apiv1.Options) (*PKCS11, error) {
 		return nil, errors.New("kms uri 'token' or 'serial' are mutually exclusive")
 	}
 
-	p11Ctx, err := crypto11.Configure(&config)
+	p11, err := p11Configure(&config)
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing PKCS#11")
 	}
 
 	return &PKCS11{
-		context: p11Ctx,
+		p11: p11,
 	}, nil
 }
 
@@ -76,7 +92,7 @@ func (k *PKCS11) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey,
 		return nil, errors.New("getPublicKeyRequest 'name' cannot be empty")
 	}
 
-	signer, err := findSigner(k.context, req.Name)
+	signer, err := findSigner(k.p11, req.Name)
 	if err != nil {
 		return nil, errors.Wrap(err, "getPublicKey failed")
 	}
@@ -93,7 +109,7 @@ func (k *PKCS11) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespons
 		return nil, errors.New("createKeyRequest 'bits' cannot be negative")
 	}
 
-	signer, err := generateKey(k.context, req)
+	signer, err := generateKey(k.p11, req)
 	if err != nil {
 		return nil, errors.Wrap(err, "createKey failed")
 	}
@@ -115,7 +131,7 @@ func (k *PKCS11) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, er
 		return nil, errors.New("createSignerRequest 'signingKey' cannot be empty")
 	}
 
-	signer, err := findSigner(k.context, req.SigningKey)
+	signer, err := findSigner(k.p11, req.SigningKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "createSigner failed")
 	}
@@ -129,7 +145,7 @@ func (k *PKCS11) LoadCertificate(req *apiv1.LoadCertificateRequest) (*x509.Certi
 	if req.Name == "" {
 		return nil, errors.New("loadCertificateRequest 'name' cannot be nil")
 	}
-	cert, err := findCertificate(k.context, req.Name)
+	cert, err := findCertificate(k.p11, req.Name)
 	if err != nil {
 		return nil, errors.Wrap(err, "loadCertificate failed")
 	}
@@ -151,7 +167,7 @@ func (k *PKCS11) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 		return errors.Wrap(err, "storeCertificate failed")
 	}
 
-	if err := k.context.ImportCertificateWithLabel(id, object, req.Certificate); err != nil {
+	if err := k.p11.ImportCertificateWithLabel(id, object, req.Certificate); err != nil {
 		return errors.Wrap(err, "storeCertificate failed")
 	}
 
@@ -164,7 +180,7 @@ func (k *PKCS11) DeleteKey(uri string) error {
 	if err != nil {
 		return errors.Wrap(err, "deleteKey failed")
 	}
-	signer, err := k.context.FindKeyPair(id, object)
+	signer, err := k.p11.FindKeyPair(id, object)
 	if err != nil {
 		return errors.Wrap(err, "deleteKey failed")
 	}
@@ -183,7 +199,7 @@ func (k *PKCS11) DeleteCertificate(uri string) error {
 	if err != nil {
 		return errors.Wrap(err, "deleteCertificate failed")
 	}
-	if err := k.context.DeleteCertificate(id, object, nil); err != nil {
+	if err := k.p11.DeleteCertificate(id, object, nil); err != nil {
 		return errors.Wrap(err, "deleteCertificate failed")
 	}
 	return nil
@@ -191,7 +207,7 @@ func (k *PKCS11) DeleteCertificate(uri string) error {
 
 // Close releases the connection to the PKCS#11 module.
 func (k *PKCS11) Close() error {
-	return errors.Wrap(k.context.Close(), "error closing pkcs#11 context")
+	return errors.Wrap(k.p11.Close(), "error closing pkcs#11 context")
 }
 
 func toByte(s string) []byte {
@@ -201,7 +217,24 @@ func toByte(s string) []byte {
 	return []byte(s)
 }
 
-func generateKey(ctx *crypto11.Context, req *apiv1.CreateKeyRequest) (crypto11.Signer, error) {
+func parseObject(rawuri string) ([]byte, []byte, error) {
+	u, err := uri.ParseWithScheme("pkcs11", rawuri)
+	if err != nil {
+		return nil, nil, err
+	}
+	id, err := u.GetHex("id")
+	if err != nil {
+		return nil, nil, err
+	}
+	object := u.Get("object")
+	if len(id) == 0 && object == "" {
+		return nil, nil, errors.Errorf("key with uri %s is not valid, id or object are required", rawuri)
+	}
+
+	return id, toByte(object), nil
+}
+
+func generateKey(ctx P11, req *apiv1.CreateKeyRequest) (crypto11.Signer, error) {
 	id, object, err := parseObject(req.Name)
 	if err != nil {
 		return nil, err
@@ -211,7 +244,9 @@ func generateKey(ctx *crypto11.Context, req *apiv1.CreateKeyRequest) (crypto11.S
 		return nil, err
 	}
 	if signer != nil {
-		return nil, errors.Errorf("%s already exists", req.Name)
+		return nil, apiv1.ErrAlreadyExists{
+			Message: req.Name + " already exists",
+		}
 	}
 
 	bits := req.Bits
@@ -239,24 +274,7 @@ func generateKey(ctx *crypto11.Context, req *apiv1.CreateKeyRequest) (crypto11.S
 	}
 }
 
-func parseObject(rawuri string) ([]byte, []byte, error) {
-	u, err := uri.ParseWithScheme("pkcs11", rawuri)
-	if err != nil {
-		return nil, nil, err
-	}
-	id, err := u.GetHex("id")
-	if err != nil {
-		return nil, nil, err
-	}
-	object := u.Get("object")
-	if len(id) == 0 && object == "" {
-		return nil, nil, errors.Errorf("key with uri %s is not valid, id or object are required", rawuri)
-	}
-
-	return id, toByte(object), nil
-}
-
-func findSigner(ctx *crypto11.Context, rawuri string) (crypto11.Signer, error) {
+func findSigner(ctx P11, rawuri string) (crypto11.Signer, error) {
 	id, object, err := parseObject(rawuri)
 	if err != nil {
 		return nil, err
@@ -271,7 +289,7 @@ func findSigner(ctx *crypto11.Context, rawuri string) (crypto11.Signer, error) {
 	return signer, nil
 }
 
-func findCertificate(ctx *crypto11.Context, rawuri string) (*x509.Certificate, error) {
+func findCertificate(ctx P11, rawuri string) (*x509.Certificate, error) {
 	u, err := uri.ParseWithScheme("pkcs11", rawuri)
 	if err != nil {
 		return nil, err

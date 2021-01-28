@@ -189,7 +189,9 @@ func StringDecode(s string) string {
 // HexDecode deocdes the string s using Percent-Encoding or regular hex
 // encoding.
 func HexDecode(s string) ([]byte, error) {
-	if strings.HasPrefix(s, "%") {
+	if s == "" {
+		return nil, nil
+	} else if strings.HasPrefix(s, "%") {
 		return PercentDecode(s)
 	}
 

@@ -26,14 +26,27 @@ type CertificateManager interface {
 // ErrNotImplemented is the type of error returned if an operation is not
 // implemented.
 type ErrNotImplemented struct {
-	msg string
+	Message string
 }
 
 func (e ErrNotImplemented) Error() string {
-	if e.msg != "" {
-		return e.msg
+	if e.Message != "" {
+		return e.Message
 	}
 	return "not implemented"
+}
+
+// ErrAlreadyExists is the type of error returned if a key already exists. This
+// is currently only implmented on pkcs11.
+type ErrAlreadyExists struct {
+	Message string
+}
+
+func (e ErrAlreadyExists) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return "key already exists"
 }
 
 // Type represents the KMS type used.
