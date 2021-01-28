@@ -45,78 +45,49 @@ func TestNew(t *testing.T) {
 }
 
 func TestPKCS11_GetPublicKey(t *testing.T) {
-	setupSoftHSM2, setupYubiHSM2 := setupFuncs(t)
+	k := setupPKCS11(t)
 	type args struct {
 		req *apiv1.GetPublicKeyRequest
 	}
 	tests := []struct {
 		name    string
-		setup   func(t *testing.T) *PKCS11
 		args    args
 		want    crypto.PublicKey
 		wantErr bool
 	}{
-		// SoftHSM2
-		{"softhsm RSA", setupSoftHSM2, args{&apiv1.GetPublicKeyRequest{
+		{"RSA", args{&apiv1.GetPublicKeyRequest{
 			Name: "pkcs11:id=7371;object=rsa-key",
 		}}, &rsa.PublicKey{}, false},
-		{"softhsm RSA by id", setupSoftHSM2, args{&apiv1.GetPublicKeyRequest{
+		{"RSA by id", args{&apiv1.GetPublicKeyRequest{
 			Name: "pkcs11:id=7371",
 		}}, &rsa.PublicKey{}, false},
-		{"softhsm RSA by label", setupSoftHSM2, args{&apiv1.GetPublicKeyRequest{
+		{"RSA by label", args{&apiv1.GetPublicKeyRequest{
 			Name: "pkcs11:object=rsa-key",
 		}}, &rsa.PublicKey{}, false},
-		{"softhsm ECDSA", setupSoftHSM2, args{&apiv1.GetPublicKeyRequest{
+		{"ECDSA", args{&apiv1.GetPublicKeyRequest{
 			Name: "pkcs11:id=7373;object=ecdsa-p256-key",
 		}}, &ecdsa.PublicKey{}, false},
-		{"softhsm ECDSA by id", setupSoftHSM2, args{&apiv1.GetPublicKeyRequest{
+		{"ECDSA by id", args{&apiv1.GetPublicKeyRequest{
 			Name: "pkcs11:id=7373",
 		}}, &ecdsa.PublicKey{}, false},
-		{"softhsm ECDSA by label", setupSoftHSM2, args{&apiv1.GetPublicKeyRequest{
+		{"ECDSA by label", args{&apiv1.GetPublicKeyRequest{
 			Name: "pkcs11:object=ecdsa-p256-key",
 		}}, &ecdsa.PublicKey{}, false},
-		// YubiHSM2
-		{"yubiHSM2 RSA", setupYubiHSM2, args{&apiv1.GetPublicKeyRequest{
-			Name: "pkcs11:id=7371;object=rsa-key",
-		}}, &rsa.PublicKey{}, false},
-		{"yubiHSM2 RSA by id", setupYubiHSM2, args{&apiv1.GetPublicKeyRequest{
-			Name: "pkcs11:id=7371",
-		}}, &rsa.PublicKey{}, false},
-		{"yubiHSM2 RSA by label", setupYubiHSM2, args{&apiv1.GetPublicKeyRequest{
-			Name: "pkcs11:object=rsa-key",
-		}}, &rsa.PublicKey{}, false},
-		{"yubiHSM2 ECDSA", setupYubiHSM2, args{&apiv1.GetPublicKeyRequest{
-			Name: "pkcs11:id=7373;object=ecdsa-p256-key",
-		}}, &ecdsa.PublicKey{}, false},
-		{"yubiHSM2 ECDSA by id", setupYubiHSM2, args{&apiv1.GetPublicKeyRequest{
-			Name: "pkcs11:id=7373",
-		}}, &ecdsa.PublicKey{}, false},
-		{"yubiHSM2 ECDSA by label", setupYubiHSM2, args{&apiv1.GetPublicKeyRequest{
-			Name: "pkcs11:object=ecdsa-p256-key",
-		}}, &ecdsa.PublicKey{}, false},
-		// Errors
-		{"fail name", setupSoftHSM2, args{&apiv1.GetPublicKeyRequest{
+		{"fail name", args{&apiv1.GetPublicKeyRequest{
 			Name: "",
 		}}, nil, true},
-		{"fail uri", setupSoftHSM2, args{&apiv1.GetPublicKeyRequest{
+		{"fail uri", args{&apiv1.GetPublicKeyRequest{
 			Name: "https:id=9999;object=https",
 		}}, nil, true},
-		{"fail softhsm missing", setupSoftHSM2, args{&apiv1.GetPublicKeyRequest{
+		{"fail missing", args{&apiv1.GetPublicKeyRequest{
 			Name: "pkcs11:id=9999;object=rsa-key",
 		}}, nil, true},
-		{"fail yubiHSM2 missing", setupYubiHSM2, args{&apiv1.GetPublicKeyRequest{
-			Name: "pkcs11:id=9999;object=ecdsa-p256-key",
-		}}, nil, true},
-		{"fail softhsm FindKeyPair", setupSoftHSM2, args{&apiv1.GetPublicKeyRequest{
-			Name: "pkcs11:foo=bar",
-		}}, nil, true},
-		{"fail yubiHSM2 FindKeyPair", setupYubiHSM2, args{&apiv1.GetPublicKeyRequest{
+		{"fail FindKeyPair", args{&apiv1.GetPublicKeyRequest{
 			Name: "pkcs11:foo=bar",
 		}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			k := tt.setup(t)
 			got, err := k.GetPublicKey(tt.args.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("PKCS11.GetPublicKey() error = %v, wantErr %v", err, tt.wantErr)
@@ -130,244 +101,170 @@ func TestPKCS11_GetPublicKey(t *testing.T) {
 }
 
 func TestPKCS11_CreateKey(t *testing.T) {
-	setupSoftHSM2, setupYubiHSM2 := setupFuncs(t)
+	k := setupPKCS11(t)
+
+	// Make sure to delete the created key
+	keyName := "pkcs11:id=7771;object=create-key"
+	k.DeleteKey(keyName)
+
 	type args struct {
 		req *apiv1.CreateKeyRequest
 	}
 	tests := []struct {
 		name    string
-		setup   func(t *testing.T) *PKCS11
 		args    args
 		want    *apiv1.CreateKeyResponse
 		wantErr bool
 	}{
 		// SoftHSM2
-		{"softhsm Default", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name: "pkcs11:id=7771;object=ecdsa-create-key",
+		{"default", args{&apiv1.CreateKeyRequest{
+			Name: keyName,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=ecdsa-create-key",
+			Name:      keyName,
 			PublicKey: &ecdsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=ecdsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		{"softhsm RSA SHA256WithRSA", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
+		{"RSA SHA256WithRSA", args{&apiv1.CreateKeyRequest{
+			Name:               keyName,
 			SignatureAlgorithm: apiv1.SHA256WithRSA,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
+			Name:      keyName,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		{"softhsm RSA SHA384WithRSA", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
+		{"RSA SHA384WithRSA", args{&apiv1.CreateKeyRequest{
+			Name:               keyName,
 			SignatureAlgorithm: apiv1.SHA384WithRSA,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
+			Name:      keyName,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		{"softhsm RSA SHA512WithRSA", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
+		{"RSA SHA512WithRSA", args{&apiv1.CreateKeyRequest{
+			Name:               keyName,
 			SignatureAlgorithm: apiv1.SHA512WithRSA,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
+			Name:      keyName,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		{"softhsm RSA SHA256WithRSAPSS", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
+		{"RSA SHA256WithRSAPSS", args{&apiv1.CreateKeyRequest{
+			Name:               keyName,
 			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
+			Name:      keyName,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		{"softhsm RSA SHA384WithRSAPSS", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
+		{"RSA SHA384WithRSAPSS", args{&apiv1.CreateKeyRequest{
+			Name:               keyName,
 			SignatureAlgorithm: apiv1.SHA384WithRSAPSS,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
+			Name:      keyName,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		{"softhsm RSA SHA512WithRSAPSS", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
+		{"RSA SHA512WithRSAPSS", args{&apiv1.CreateKeyRequest{
+			Name:               keyName,
 			SignatureAlgorithm: apiv1.SHA512WithRSAPSS,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
+			Name:      keyName,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		{"softhsm RSA 2048", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
+		{"RSA 2048", args{&apiv1.CreateKeyRequest{
+			Name:               keyName,
 			SignatureAlgorithm: apiv1.SHA256WithRSA,
 			Bits:               2048,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
+			Name:      keyName,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		{"softhsm RSA 4096", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
+		{"RSA 4096", args{&apiv1.CreateKeyRequest{
+			Name:               keyName,
 			SignatureAlgorithm: apiv1.SHA256WithRSA,
 			Bits:               4096,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
+			Name:      keyName,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		{"softhsm ECDSA P256", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
+		{"ECDSA P256", args{&apiv1.CreateKeyRequest{
+			Name:               keyName,
 			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
+			Name:      keyName,
 			PublicKey: &ecdsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		{"softhsm ECDSA P384", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
+		{"ECDSA P384", args{&apiv1.CreateKeyRequest{
+			Name:               keyName,
 			SignatureAlgorithm: apiv1.ECDSAWithSHA384,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
+			Name:      keyName,
 			PublicKey: &ecdsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		{"softhsm ECDSA P521", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
+		{"ECDSA P521", args{&apiv1.CreateKeyRequest{
+			Name:               keyName,
 			SignatureAlgorithm: apiv1.ECDSAWithSHA512,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
+			Name:      keyName,
 			PublicKey: &ecdsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
+				SigningKey: keyName,
 			},
 		}, false},
-		// YubiHSM2
-		{"yubihsm RSA", setupYubiHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
-			SignatureAlgorithm: apiv1.SHA256WithRSA,
-		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
-			PublicKey: &rsa.PublicKey{},
-			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
-			},
-		}, false},
-		{"yubihsm RSA 2048", setupYubiHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
-			SignatureAlgorithm: apiv1.SHA256WithRSA,
-			Bits:               2048,
-		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
-			PublicKey: &rsa.PublicKey{},
-			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
-			},
-		}, false},
-		{"yubihsm RSA 4096", setupYubiHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
-			SignatureAlgorithm: apiv1.SHA256WithRSA,
-			Bits:               4096,
-		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
-			PublicKey: &rsa.PublicKey{},
-			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
-			},
-		}, false},
-		{"yubihsm Default", setupYubiHSM2, args{&apiv1.CreateKeyRequest{
-			Name: "pkcs11:id=7771;object=ecdsa-create-key",
-		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=ecdsa-create-key",
-			PublicKey: &ecdsa.PublicKey{},
-			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=ecdsa-create-key",
-			},
-		}, false},
-		{"yubihsm ECDSA P256", setupYubiHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
-			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
-		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
-			PublicKey: &ecdsa.PublicKey{},
-			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
-			},
-		}, false},
-		{"yubihsm ECDSA P384", setupYubiHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
-			SignatureAlgorithm: apiv1.ECDSAWithSHA384,
-		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
-			PublicKey: &ecdsa.PublicKey{},
-			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
-			},
-		}, false},
-		{"yubihsm ECDSA P521", setupYubiHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=7771;object=rsa-create-key",
-			SignatureAlgorithm: apiv1.ECDSAWithSHA512,
-		}}, &apiv1.CreateKeyResponse{
-			Name:      "pkcs11:id=7771;object=rsa-create-key",
-			PublicKey: &ecdsa.PublicKey{},
-			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "pkcs11:id=7771;object=rsa-create-key",
-			},
-		}, false},
-		// Errors
-		{"fail name", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
+		{"fail name", args{&apiv1.CreateKeyRequest{
 			Name: "",
 		}}, nil, true},
-		{"fail bits", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
+		{"fail bits", args{&apiv1.CreateKeyRequest{
 			Name:               "pkcs11:id=9999;object=rsa-create-key",
 			Bits:               -1,
 			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
 		}}, nil, true},
-		{"fail ed25519", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
+		{"fail ed25519", args{&apiv1.CreateKeyRequest{
 			Name:               "pkcs11:id=9999;object=rsa-create-key",
 			SignatureAlgorithm: apiv1.PureEd25519,
 		}}, nil, true},
-		{"fail unknown", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
+		{"fail unknown", args{&apiv1.CreateKeyRequest{
 			Name:               "pkcs11:id=9999;object=rsa-create-key",
 			SignatureAlgorithm: apiv1.SignatureAlgorithm(100),
 		}}, nil, true},
-		{"fail uri", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
+		{"fail uri", args{&apiv1.CreateKeyRequest{
 			Name:               "pkcs11:id=xxxx;object=https",
 			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
 		}}, nil, true},
-		{"fail softhsm FindKeyPair", setupSoftHSM2, args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:foo=bar",
-			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
-		}}, nil, true},
-		{"fail yubihsm FindKeyPair", setupYubiHSM2, args{&apiv1.CreateKeyRequest{
+		{"fail FindKeyPair", args{&apiv1.CreateKeyRequest{
 			Name:               "pkcs11:foo=bar",
 			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
 		}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			k := tt.setup(t)
 			got, err := k.CreateKey(tt.args.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("PKCS11.CreateKey() error = %v, wantErr %v", err, tt.wantErr)
@@ -389,8 +286,8 @@ func TestPKCS11_CreateKey(t *testing.T) {
 }
 
 func TestPKCS11_CreateSigner(t *testing.T) {
+	k := setupPKCS11(t)
 	data := []byte("buggy-coheir-RUBRIC-rabbet-liberal-eaglet-khartoum-stagger")
-	setupSoftHSM2, setupYubiHSM2 := setupFuncs(t)
 
 	// VerifyASN1 verifies the ASN.1 encoded signature, sig, of hash using the
 	// public key, pub. Its return value records whether the signature is valid.
@@ -415,61 +312,39 @@ func TestPKCS11_CreateSigner(t *testing.T) {
 	}
 	tests := []struct {
 		name       string
-		setup      func(t *testing.T) *PKCS11
 		args       args
 		algorithm  apiv1.SignatureAlgorithm
 		signerOpts crypto.SignerOpts
 		wantErr    bool
 	}{
 		// SoftHSM2
-		{"softhsm RSA", setupSoftHSM2, args{&apiv1.CreateSignerRequest{
+		{"RSA", args{&apiv1.CreateSignerRequest{
 			SigningKey: "pkcs11:id=7371;object=rsa-key",
 		}}, apiv1.SHA256WithRSA, crypto.SHA256, false},
-		{"softhsm RSA PSS", setupSoftHSM2, args{&apiv1.CreateSignerRequest{
+		{"RSA PSS", args{&apiv1.CreateSignerRequest{
 			SigningKey: "pkcs11:id=7371;object=rsa-key",
 		}}, apiv1.SHA256WithRSA, crypto.SHA256, false},
-		{"softhsm ECDSA P256", setupSoftHSM2, args{&apiv1.CreateSignerRequest{
+		{"ECDSA P256", args{&apiv1.CreateSignerRequest{
 			SigningKey: "pkcs11:id=7373;object=ecdsa-p256-key",
 		}}, apiv1.ECDSAWithSHA256, crypto.SHA256, false},
-		{"softhsm ECDSA P384", setupSoftHSM2, args{&apiv1.CreateSignerRequest{
+		{"ECDSA P384", args{&apiv1.CreateSignerRequest{
 			SigningKey: "pkcs11:id=7374;object=ecdsa-p384-key",
 		}}, apiv1.ECDSAWithSHA384, crypto.SHA384, false},
-		{"softhsm ECDSA P521", setupSoftHSM2, args{&apiv1.CreateSignerRequest{
+		{"ECDSA P521", args{&apiv1.CreateSignerRequest{
 			SigningKey: "pkcs11:id=7375;object=ecdsa-p521-key",
 		}}, apiv1.ECDSAWithSHA512, crypto.SHA512, false},
-		// YubiHSM2
-		{"yubihsm RSA", setupYubiHSM2, args{&apiv1.CreateSignerRequest{
-			SigningKey: "pkcs11:id=7371;object=rsa-key",
-		}}, apiv1.SHA256WithRSA, crypto.SHA256, false},
-		{"yubihsm RSA PSS", setupYubiHSM2, args{&apiv1.CreateSignerRequest{
-			SigningKey: "pkcs11:id=7371;object=rsa-key",
-		}}, apiv1.SHA256WithRSA, crypto.SHA256, false},
-		{"yubihsm ECDSA P256", setupYubiHSM2, args{&apiv1.CreateSignerRequest{
-			SigningKey: "pkcs11:id=7373;object=ecdsa-p256-key",
-		}}, apiv1.ECDSAWithSHA256, crypto.SHA256, false},
-		{"yubihsm ECDSA P384", setupYubiHSM2, args{&apiv1.CreateSignerRequest{
-			SigningKey: "pkcs11:id=7374;object=ecdsa-p384-key",
-		}}, apiv1.ECDSAWithSHA384, crypto.SHA384, false},
-		{"yubihsm ECDSA P521", setupYubiHSM2, args{&apiv1.CreateSignerRequest{
-			SigningKey: "pkcs11:id=7375;object=ecdsa-p521-key",
-		}}, apiv1.ECDSAWithSHA512, crypto.SHA512, false},
-		// Errors
-		{"fail SigningKey", setupSoftHSM2, args{&apiv1.CreateSignerRequest{
+		{"fail SigningKey", args{&apiv1.CreateSignerRequest{
 			SigningKey: "",
 		}}, 0, nil, true},
-		{"fail uri", setupSoftHSM2, args{&apiv1.CreateSignerRequest{
+		{"fail uri", args{&apiv1.CreateSignerRequest{
 			SigningKey: "https:id=7375;object=ecdsa-p521-key",
 		}}, 0, nil, true},
-		{"fail softhsm FindKeyPair", setupSoftHSM2, args{&apiv1.CreateSignerRequest{
-			SigningKey: "pkcs11:foo=bar",
-		}}, 0, nil, true},
-		{"fail yubihsm FindKeyPair", setupYubiHSM2, args{&apiv1.CreateSignerRequest{
+		{"fail FindKeyPair", args{&apiv1.CreateSignerRequest{
 			SigningKey: "pkcs11:foo=bar",
 		}}, 0, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			k := tt.setup(t)
 			got, err := k.CreateSigner(tt.args.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("PKCS11.CreateSigner() error = %v, wantErr %v", err, tt.wantErr)
@@ -513,7 +388,7 @@ func TestPKCS11_CreateSigner(t *testing.T) {
 }
 
 func TestPKCS11_LoadCertificate(t *testing.T) {
-	setupSoftHSM2, setupYubiHSM2 := setupFuncs(t)
+	k := setupPKCS11(t)
 
 	getCertFn := func(i, j int) func() *x509.Certificate {
 		return func() *x509.Certificate {
@@ -526,51 +401,34 @@ func TestPKCS11_LoadCertificate(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		setup   func(t *testing.T) *PKCS11
 		args    args
 		wantFn  func() *x509.Certificate
 		wantErr bool
 	}{
-		{"softhsm", setupSoftHSM2, args{&apiv1.LoadCertificateRequest{
+		{"load", args{&apiv1.LoadCertificateRequest{
 			Name: "pkcs11:id=7370;object=root",
 		}}, getCertFn(0, 0), false},
-		{"softhsm by id", setupSoftHSM2, args{&apiv1.LoadCertificateRequest{
+		{"load by id", args{&apiv1.LoadCertificateRequest{
 			Name: "pkcs11:id=7370",
 		}}, getCertFn(0, 0), false},
-		{"softhsm by label", setupSoftHSM2, args{&apiv1.LoadCertificateRequest{
+		{"load by label", args{&apiv1.LoadCertificateRequest{
 			Name: "pkcs11:object=root",
 		}}, getCertFn(0, 0), false},
-		{"yubihsm", setupYubiHSM2, args{&apiv1.LoadCertificateRequest{
-			Name: "pkcs11:id=7370;object=root",
-		}}, getCertFn(0, 1), false},
-		{"yubihsm by id", setupYubiHSM2, args{&apiv1.LoadCertificateRequest{
-			Name: "pkcs11:id=7370",
-		}}, getCertFn(0, 1), false},
-		{"yubihsm by label", setupYubiHSM2, args{&apiv1.LoadCertificateRequest{
-			Name: "pkcs11:object=root",
-		}}, getCertFn(0, 1), false},
-		{"fail softhsm missing", setupSoftHSM2, args{&apiv1.LoadCertificateRequest{
+		{"fail missing", args{&apiv1.LoadCertificateRequest{
 			Name: "pkcs11:id=9999;object=root",
 		}}, nil, true},
-		{"fail yubihsm missing", setupSoftHSM2, args{&apiv1.LoadCertificateRequest{
-			Name: "pkcs11:id=9999;object=root",
-		}}, nil, true},
-		{"fail name", setupSoftHSM2, args{&apiv1.LoadCertificateRequest{
+		{"fail name", args{&apiv1.LoadCertificateRequest{
 			Name: "",
 		}}, nil, true},
-		{"fail uri", setupSoftHSM2, args{&apiv1.LoadCertificateRequest{
+		{"fail uri", args{&apiv1.LoadCertificateRequest{
 			Name: "pkcs11:id=xxxx;object=root",
 		}}, nil, true},
-		{"fail softhsm FindCertificate", setupSoftHSM2, args{&apiv1.LoadCertificateRequest{
-			Name: "pkcs11:foo=bar",
-		}}, nil, true},
-		{"fail yubihsm FindCertificate", setupYubiHSM2, args{&apiv1.LoadCertificateRequest{
+		{"fail FindCertificate", args{&apiv1.LoadCertificateRequest{
 			Name: "pkcs11:foo=bar",
 		}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			k := tt.setup(t)
 			got, err := k.LoadCertificate(tt.args.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("PKCS11.LoadCertificate() error = %v, wantErr %v", err, tt.wantErr)
@@ -590,7 +448,7 @@ func TestPKCS11_LoadCertificate(t *testing.T) {
 }
 
 func TestPKCS11_StoreCertificate(t *testing.T) {
-	setupSoftHSM2, setupYubiHSM2 := setupFuncs(t)
+	k := setupPKCS11(t)
 
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -607,42 +465,32 @@ func TestPKCS11_StoreCertificate(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		setup   func(t *testing.T) *PKCS11
 		args    args
 		wantErr bool
 	}{
-		{"softhsm", setupSoftHSM2, args{&apiv1.StoreCertificateRequest{
+		{"ok", args{&apiv1.StoreCertificateRequest{
 			Name:        "pkcs11:id=7771;object=root",
 			Certificate: cert,
 		}}, false},
-		{"yubihsm", setupYubiHSM2, args{&apiv1.StoreCertificateRequest{
-			Name:        "pkcs11:id=7771;object=root",
-			Certificate: cert,
-		}}, false},
-		{"fail name", setupSoftHSM2, args{&apiv1.StoreCertificateRequest{
+		{"fail name", args{&apiv1.StoreCertificateRequest{
 			Name:        "",
 			Certificate: cert,
 		}}, true},
-		{"fail certificate", setupSoftHSM2, args{&apiv1.StoreCertificateRequest{
+		{"fail certificate", args{&apiv1.StoreCertificateRequest{
 			Name:        "pkcs11:id=7771;object=root",
 			Certificate: nil,
 		}}, true},
-		{"fail uri", setupSoftHSM2, args{&apiv1.StoreCertificateRequest{
+		{"fail uri", args{&apiv1.StoreCertificateRequest{
 			Name:        "http:id=7771;object=root",
 			Certificate: cert,
 		}}, true},
-		{"fail softhsm ImportCertificateWithLabel", setupSoftHSM2, args{&apiv1.StoreCertificateRequest{
-			Name:        "pkcs11:foo=bar",
-			Certificate: cert,
-		}}, true},
-		{"fail yubihsm ImportCertificateWithLabel", setupYubiHSM2, args{&apiv1.StoreCertificateRequest{
+		{"fail ImportCertificateWithLabel", args{&apiv1.StoreCertificateRequest{
 			Name:        "pkcs11:foo=bar",
 			Certificate: cert,
 		}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			k := tt.setup(t)
 			if err := k.StoreCertificate(tt.args.req); (err != nil) != tt.wantErr {
 				t.Errorf("PKCS11.StoreCertificate() error = %v, wantErr %v", err, tt.wantErr)
 			}

@@ -8,24 +8,17 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"math/big"
-	"runtime"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/pkg/errors"
 
-	"github.com/ThalesIgnite/crypto11"
 	"github.com/smallstep/certificates/kms/apiv1"
 )
 
 var (
-	softHSM2Once sync.Once
-	yubiHSM2Once sync.Once
-)
-
-var (
-	testKeys = []struct {
+	testModule = ""
+	testKeys   = []struct {
 		Name               string
 		SignatureAlgorithm apiv1.SignatureAlgorithm
 		Bits               int
@@ -68,6 +61,7 @@ func generateCertificate(pub crypto.PublicKey, signer crypto.Signer) (*x509.Cert
 }
 
 func setup(t *testing.T, k *PKCS11) {
+	t.Log("Running using", testModule)
 	for _, tk := range testKeys {
 		_, err := k.CreateKey(&apiv1.CreateKeyRequest{
 			Name:               tk.Name,
@@ -118,118 +112,10 @@ func teardown(t *testing.T, k *PKCS11) {
 	}
 }
 
-type setupFunc func(t *testing.T) *PKCS11
-
-func setupFuncs(t *testing.T) (setupFunc, setupFunc) {
-	var sh2, yh2 *PKCS11
+func setupPKCS11(t *testing.T) *PKCS11 {
+	k := mustPKCS11(t)
 	t.Cleanup(func() {
-		if sh2 != nil {
-			sh2.Close()
-		}
-		if yh2 != nil {
-			yh2.Close()
-		}
+		k.Close()
 	})
-	setupSoftHSM2 := func(t *testing.T) *PKCS11 {
-		if sh2 != nil {
-			return sh2
-		}
-		sh2 = softHSM2(t)
-		return sh2
-	}
-	setupYubiHSM2 := func(t *testing.T) *PKCS11 {
-		if yh2 != nil {
-			return yh2
-		}
-		yh2 = yubiHSM2(t)
-		return yh2
-	}
-	return setupSoftHSM2, setupYubiHSM2
-}
-
-// softHSM2 configures a *PKCS11 KMS to be used with softHSM2. To initialize
-// this tests, we should run:
-//   softhsm2-util --init-token --free \
-//   --token pkcs11-test --label pkcs11-test \
-//   --so-pin password --pin password
-//
-// To delete we should run:
-// 	softhsm2-util --delete-token --token pkcs11-test
-func softHSM2(t *testing.T) *PKCS11 {
-	t.Helper()
-	if runtime.GOARCH != "amd64" {
-		t.Skipf("softHSM2 test skipped on %s:%s", runtime.GOOS, runtime.GOARCH)
-	}
-
-	var path string
-	switch runtime.GOOS {
-	case "darwin":
-		path = "/usr/local/lib/softhsm/libsofthsm2.so"
-	case "linux":
-		path = "/usr/lib/softhsm/libsofthsm2.so"
-	default:
-		t.Skipf("softHSM2 test skipped on %s", runtime.GOOS)
-		return nil
-	}
-	p11, err := crypto11.Configure(&crypto11.Config{
-		Path:       path,
-		TokenLabel: "pkcs11-test",
-		Pin:        "password",
-	})
-	if err != nil {
-		t.Skipf("softHSM test skipped on %s: %v", runtime.GOOS, err)
-	}
-
-	k := &PKCS11{
-		p11: p11,
-	}
-
-	// Setup
-	softHSM2Once.Do(func() {
-		teardown(t, k)
-		setup(t, k)
-	})
-
-	return k
-}
-
-// yubiHSM2 configures a *PKCS11 KMS to be used with YubiHSM2. To initialize
-// this tests, we should run:
-// 	yubihsm-connector -d
-func yubiHSM2(t *testing.T) *PKCS11 {
-	t.Helper()
-	if runtime.GOARCH != "amd64" {
-		t.Skipf("yubiHSM2 test skipped on %s:%s", runtime.GOOS, runtime.GOARCH)
-	}
-
-	var path string
-	switch runtime.GOOS {
-	case "darwin":
-		path = "/usr/local/lib/pkcs11/yubihsm_pkcs11.dylib"
-	case "linux":
-		path = "/usr/lib/x86_64-linux-gnu/pkcs11/yubihsm_pkcs11.so"
-	default:
-		t.Skipf("yubiHSM2 test skipped on %s", runtime.GOOS)
-		return nil
-	}
-	p11, err := crypto11.Configure(&crypto11.Config{
-		Path:       path,
-		TokenLabel: "YubiHSM",
-		Pin:        "0001password",
-	})
-	if err != nil {
-		t.Skipf("yubiHSM2 test skipped on %s: %v", runtime.GOOS, err)
-	}
-
-	k := &PKCS11{
-		p11: p11,
-	}
-
-	// Setup
-	yubiHSM2Once.Do(func() {
-		teardown(t, k)
-		setup(t, k)
-	})
-
 	return k
 }
