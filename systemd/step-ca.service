@@ -30,6 +30,7 @@ SecureBits=keep-caps
 NoNewPrivileges=yes
 
 ; Sandboxing
+; This works with YubiKey PIV (via pcscd), and presumably with YubiHSM2 via http connector
 ProtectSystem=full
 ProtectHome=true
 RestrictNamespaces=true
@@ -44,8 +45,8 @@ LockPersonality=true
 RestrictSUIDSGID=true
 RemoveIPC=true
 RestrictRealtime=true
-; confirmed this works, even with YubiKey PIV, and presumably with YubiHSM2:
 PrivateDevices=true
+SystemCallFilter=@system-service
 MemoryDenyWriteExecute=true
 ReadWriteDirectories=/etc/step-ca/db
 
