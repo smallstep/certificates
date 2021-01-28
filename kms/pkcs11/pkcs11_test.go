@@ -10,10 +10,13 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"math/big"
 	"reflect"
 	"testing"
 
 	"github.com/smallstep/certificates/kms/apiv1"
+	"golang.org/x/crypto/cryptobyte"
+	"golang.org/x/crypto/cryptobyte/asn1"
 )
 
 func TestNew(t *testing.T) {
@@ -478,7 +481,7 @@ func TestPKCS11_CreateSigner(t *testing.T) {
 					}
 				case apiv1.ECDSAWithSHA256, apiv1.ECDSAWithSHA384, apiv1.ECDSAWithSHA512:
 					pub := got.Public().(*ecdsa.PublicKey)
-					if !ecdsa.VerifyASN1(pub, digest, sig) {
+					if !VerifyASN1(pub, digest, sig) {
 						t.Error("ecdsa.VerifyASN1() failed")
 					}
 				default:
@@ -641,4 +644,22 @@ func TestPKCS11_StoreCertificate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// VerifyASN1 verifies the ASN.1 encoded signature, sig, of hash using the
+// public key, pub. Its return value records whether the signature is valid.
+func VerifyASN1(pub *ecdsa.PublicKey, hash, sig []byte) bool {
+	var (
+		r, s  = &big.Int{}, &big.Int{}
+		inner cryptobyte.String
+	)
+	input := cryptobyte.String(sig)
+	if !input.ReadASN1(&inner, asn1.SEQUENCE) ||
+		input.Empty() ||
+		inner.ReadASN1Integer(r) ||
+		inner.ReadASN1Integer(s) ||
+		inner.Empty() {
+		return false
+	}
+	return ecdsa.Verify(pub, hash, r, s)
 }
