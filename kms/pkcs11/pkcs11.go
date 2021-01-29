@@ -345,5 +345,5 @@ func findCertificate(ctx P11, rawuri string) (*x509.Certificate, error) {
 	if cert == nil {
 		return nil, errors.Errorf("certificate with uri %s not found", rawuri)
 	}
-
+	return cert, nil
 }
