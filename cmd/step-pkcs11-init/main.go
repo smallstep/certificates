@@ -42,6 +42,7 @@ type Config struct {
 	RootFile         string
 	KeyFile          string
 	Pin              string
+	NoCerts          bool
 	EnableSSH        bool
 	Force            bool
 }
@@ -105,6 +106,7 @@ func main() {
 	flag.StringVar(&c.RootFile, "root", "", "Path to the root certificate to use.")
 	flag.StringVar(&c.KeyFile, "key", "", "Path to the root key to use.")
 	flag.BoolVar(&c.EnableSSH, "ssh", false, "Enable the creation of ssh keys.")
+	flag.BoolVar(&c.NoCerts, "no-certs", false, "Do not store certificates in the module.")
 	flag.BoolVar(&c.Force, "force", false, "Force the delete of previous keys.")
 	flag.Usage = usage
 	flag.Parse()
@@ -145,7 +147,7 @@ func main() {
 	}
 	if !c.Force {
 		for _, u := range certUris {
-			if u != "" {
+			if u != "" && !c.NoCerts {
 				checkObject(k, u)
 			}
 		}
@@ -161,7 +163,7 @@ func main() {
 		})
 		if ok {
 			for _, u := range certUris {
-				if u != "" {
+				if u != "" && !c.NoCerts {
 					if err := deleter.DeleteCertificate(u); err != nil {
 						fatal(err)
 					}
@@ -285,7 +287,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			return errors.Wrap(err, "error parsing root certificate")
 		}
 
-		if cm, ok := k.(kms.CertificateManager); ok {
+		if cm, ok := k.(kms.CertificateManager); ok && !c.NoCerts {
 			if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 				Name:        c.RootObject,
 				Certificate: root,
@@ -362,7 +364,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		return errors.Wrap(err, "error parsing intermediate certificate")
 	}
 
-	if cm, ok := k.(kms.CertificateManager); ok {
+	if cm, ok := k.(kms.CertificateManager); ok && !c.NoCerts {
 		if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 			Name:        c.CrtObject,
 			Certificate: intermediate,
