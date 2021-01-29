@@ -10,12 +10,16 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/ThalesIgnite/crypto11"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/uri"
 )
+
+// Scheme is the scheme used in uris.
+const Scheme = "pkcs11"
 
 // DefaultRSASize is the number of bits of a new RSA key if not bitsize has been
 // specified.
@@ -46,14 +50,22 @@ type PKCS11 struct {
 func New(ctx context.Context, opts apiv1.Options) (*PKCS11, error) {
 	var config crypto11.Config
 	if opts.URI != "" {
-		u, err := uri.ParseWithScheme("pkcs11", opts.URI)
+		u, err := uri.ParseWithScheme(Scheme, opts.URI)
 		if err != nil {
 			return nil, err
 		}
+
+		config.Pin = u.Pin()
 		config.Path = u.Get("module-path")
 		config.TokenLabel = u.Get("token")
 		config.TokenSerial = u.Get("serial")
-		config.Pin = u.Pin()
+		if v := u.Get("slot-id"); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, errors.Wrap(err, "kms uri 'slot-id' is not valid")
+			}
+			config.SlotNumber = &n
+		}
 	}
 	if config.Pin == "" && opts.Pin != "" {
 		config.Pin = opts.Pin
@@ -62,12 +74,16 @@ func New(ctx context.Context, opts apiv1.Options) (*PKCS11, error) {
 	switch {
 	case config.Path == "":
 		return nil, errors.New("kms uri 'module-path' are required")
-	case config.TokenLabel == "" && config.TokenSerial == "":
-		return nil, errors.New("kms uri 'token' or 'serial' are required")
+	case config.TokenLabel == "" && config.TokenSerial == "" && config.SlotNumber == nil:
+		return nil, errors.New("kms uri 'token', 'serial' or 'slot-id' are required")
 	case config.Pin == "":
 		return nil, errors.New("kms 'pin' cannot be empty")
 	case config.TokenLabel != "" && config.TokenSerial != "":
-		return nil, errors.New("kms uri 'token' or 'serial' are mutually exclusive")
+		return nil, errors.New("kms uri 'token' and 'serial' are mutually exclusive")
+	case config.TokenLabel != "" && config.SlotNumber != nil:
+		return nil, errors.New("kms uri 'token' and 'slot-id' are mutually exclusive")
+	case config.TokenSerial != "" && config.SlotNumber != nil:
+		return nil, errors.New("kms uri 'serial' and 'slot-id' are mutually exclusive")
 	}
 
 	p11, err := p11Configure(&config)
@@ -167,6 +183,16 @@ func (k *PKCS11) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 		return errors.Wrap(err, "storeCertificate failed")
 	}
 
+	cert, err := k.p11.FindCertificate(id, object, nil)
+	if err != nil {
+		return errors.Wrap(err, "storeCertificate failed")
+	}
+	if cert != nil {
+		return errors.Wrap(apiv1.ErrAlreadyExists{
+			Message: req.Name + " already exists",
+		}, "storeCertificate failed")
+	}
+
 	if err := k.p11.ImportCertificateWithLabel(id, object, req.Certificate); err != nil {
 		return errors.Wrap(err, "storeCertificate failed")
 	}
@@ -218,7 +244,7 @@ func toByte(s string) []byte {
 }
 
 func parseObject(rawuri string) ([]byte, []byte, error) {
-	u, err := uri.ParseWithScheme("pkcs11", rawuri)
+	u, err := uri.ParseWithScheme(Scheme, rawuri)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -290,7 +316,7 @@ func findSigner(ctx P11, rawuri string) (crypto11.Signer, error) {
 }
 
 func findCertificate(ctx P11, rawuri string) (*x509.Certificate, error) {
-	u, err := uri.ParseWithScheme("pkcs11", rawuri)
+	u, err := uri.ParseWithScheme(Scheme, rawuri)
 	if err != nil {
 		return nil, err
 	}

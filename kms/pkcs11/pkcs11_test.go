@@ -12,14 +12,30 @@ import (
 	"crypto/x509"
 	"math/big"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/ThalesIgnite/crypto11"
+	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
 	"golang.org/x/crypto/cryptobyte"
 	"golang.org/x/crypto/cryptobyte/asn1"
 )
 
 func TestNew(t *testing.T) {
+	tmp := p11Configure
+	t.Cleanup(func() {
+		p11Configure = tmp
+	})
+
+	k := mustPKCS11(t)
+	p11Configure = func(config *crypto11.Config) (P11, error) {
+		if strings.Index(config.Path, "fail") >= 0 {
+			return nil, errors.New("an error")
+		}
+		return k.p11, nil
+	}
+
 	type args struct {
 		ctx  context.Context
 		opts apiv1.Options
@@ -29,7 +45,71 @@ func TestNew(t *testing.T) {
 		args    args
 		want    *PKCS11
 		wantErr bool
-	}{}
+	}{
+		{"ok", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/softhsm/libsofthsm2.so;token=pkcs11-test?pin-value=password",
+		}}, k, false},
+		{"ok with serial", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/softhsm/libsofthsm2.so;serial=0123456789?pin-value=password",
+		}}, k, false},
+		{"ok with slot-id", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/softhsm/libsofthsm2.so;slot-id=0?pin-value=password",
+		}}, k, false},
+		{"ok with pin", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/softhsm/libsofthsm2.so;token=pkcs11-test",
+			Pin:  "passowrd",
+		}}, k, false},
+		{"fail missing module", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:token=pkcs11-test",
+			Pin:  "passowrd",
+		}}, nil, true},
+		{"fail missing pin", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/softhsm/libsofthsm2.so;token=pkcs11-test",
+		}}, nil, true},
+		{"fail missing token/serial/slot-id", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/softhsm/libsofthsm2.so",
+			Pin:  "passowrd",
+		}}, nil, true},
+		{"fail token+serial+slot-id", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/softhsm/libsofthsm2.so;token=pkcs11-test;serial=0123456789;slot-id=0",
+			Pin:  "passowrd",
+		}}, nil, true},
+		{"fail token+serial", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/softhsm/libsofthsm2.so;token=pkcs11-test;serial=0123456789",
+			Pin:  "passowrd",
+		}}, nil, true},
+		{"fail token+slot-id", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/softhsm/libsofthsm2.so;token=pkcs11-test;slot-id=0",
+			Pin:  "passowrd",
+		}}, nil, true},
+		{"fail serial+slot-id", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/softhsm/libsofthsm2.so;serial=0123456789;slot-id=0",
+			Pin:  "passowrd",
+		}}, nil, true},
+		{"fail slot-id", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/softhsm/libsofthsm2.so;slot-id=x?pin-value=password",
+		}}, nil, true},
+		{"fail scheme", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "foo:module-path=/usr/local/lib/softhsm/libsofthsm2.so;token=pkcs11-test?pin-value=password",
+		}}, nil, true},
+		{"fail configure", args{context.Background(), apiv1.Options{
+			Type: "pkcs11",
+			URI:  "pkcs11:module-path=/usr/local/lib/fail.so;token=pkcs11-test?pin-value=password",
+		}}, nil, true},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := New(tt.args.ctx, tt.args.opts)
@@ -104,8 +184,7 @@ func TestPKCS11_CreateKey(t *testing.T) {
 	k := setupPKCS11(t)
 
 	// Make sure to delete the created key
-	keyName := "pkcs11:id=7771;object=create-key"
-	k.DeleteKey(keyName)
+	k.DeleteKey(testObject)
 
 	type args struct {
 		req *apiv1.CreateKeyRequest
@@ -118,140 +197,140 @@ func TestPKCS11_CreateKey(t *testing.T) {
 	}{
 		// SoftHSM2
 		{"default", args{&apiv1.CreateKeyRequest{
-			Name: keyName,
+			Name: testObject,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &ecdsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"RSA SHA256WithRSA", args{&apiv1.CreateKeyRequest{
-			Name:               keyName,
+			Name:               testObject,
 			SignatureAlgorithm: apiv1.SHA256WithRSA,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"RSA SHA384WithRSA", args{&apiv1.CreateKeyRequest{
-			Name:               keyName,
+			Name:               testObject,
 			SignatureAlgorithm: apiv1.SHA384WithRSA,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"RSA SHA512WithRSA", args{&apiv1.CreateKeyRequest{
-			Name:               keyName,
+			Name:               testObject,
 			SignatureAlgorithm: apiv1.SHA512WithRSA,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"RSA SHA256WithRSAPSS", args{&apiv1.CreateKeyRequest{
-			Name:               keyName,
+			Name:               testObject,
 			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"RSA SHA384WithRSAPSS", args{&apiv1.CreateKeyRequest{
-			Name:               keyName,
+			Name:               testObject,
 			SignatureAlgorithm: apiv1.SHA384WithRSAPSS,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"RSA SHA512WithRSAPSS", args{&apiv1.CreateKeyRequest{
-			Name:               keyName,
+			Name:               testObject,
 			SignatureAlgorithm: apiv1.SHA512WithRSAPSS,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"RSA 2048", args{&apiv1.CreateKeyRequest{
-			Name:               keyName,
+			Name:               testObject,
 			SignatureAlgorithm: apiv1.SHA256WithRSA,
 			Bits:               2048,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"RSA 4096", args{&apiv1.CreateKeyRequest{
-			Name:               keyName,
+			Name:               testObject,
 			SignatureAlgorithm: apiv1.SHA256WithRSA,
 			Bits:               4096,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &rsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"ECDSA P256", args{&apiv1.CreateKeyRequest{
-			Name:               keyName,
+			Name:               testObject,
 			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &ecdsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"ECDSA P384", args{&apiv1.CreateKeyRequest{
-			Name:               keyName,
+			Name:               testObject,
 			SignatureAlgorithm: apiv1.ECDSAWithSHA384,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &ecdsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"ECDSA P521", args{&apiv1.CreateKeyRequest{
-			Name:               keyName,
+			Name:               testObject,
 			SignatureAlgorithm: apiv1.ECDSAWithSHA512,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      keyName,
+			Name:      testObject,
 			PublicKey: &ecdsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: keyName,
+				SigningKey: testObject,
 			},
 		}, false},
 		{"fail name", args{&apiv1.CreateKeyRequest{
 			Name: "",
 		}}, nil, true},
 		{"fail bits", args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=9999;object=rsa-create-key",
+			Name:               "pkcs11:id=9999;object=create-key",
 			Bits:               -1,
 			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
 		}}, nil, true},
 		{"fail ed25519", args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=9999;object=rsa-create-key",
+			Name:               "pkcs11:id=9999;object=create-key",
 			SignatureAlgorithm: apiv1.PureEd25519,
 		}}, nil, true},
 		{"fail unknown", args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=9999;object=rsa-create-key",
+			Name:               "pkcs11:id=9999;object=create-key",
 			SignatureAlgorithm: apiv1.SignatureAlgorithm(100),
 		}}, nil, true},
 		{"fail uri", args{&apiv1.CreateKeyRequest{
@@ -261,6 +340,10 @@ func TestPKCS11_CreateKey(t *testing.T) {
 		{"fail FindKeyPair", args{&apiv1.CreateKeyRequest{
 			Name:               "pkcs11:foo=bar",
 			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
+		}}, nil, true},
+		{"fail already exists", args{&apiv1.CreateKeyRequest{
+			Name:               "pkcs11:id=7373;object=ecdsa-p256-key",
+			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
 		}}, nil, true},
 	}
 	for _, tt := range tests {
@@ -322,8 +405,11 @@ func TestPKCS11_CreateSigner(t *testing.T) {
 			SigningKey: "pkcs11:id=7371;object=rsa-key",
 		}}, apiv1.SHA256WithRSA, crypto.SHA256, false},
 		{"RSA PSS", args{&apiv1.CreateSignerRequest{
-			SigningKey: "pkcs11:id=7371;object=rsa-key",
-		}}, apiv1.SHA256WithRSA, crypto.SHA256, false},
+			SigningKey: "pkcs11:id=7372;object=rsa-pss-key",
+		}}, apiv1.SHA256WithRSAPSS, &rsa.PSSOptions{
+			SaltLength: rsa.PSSSaltLengthEqualsHash,
+			Hash:       crypto.SHA256,
+		}, false},
 		{"ECDSA P256", args{&apiv1.CreateSignerRequest{
 			SigningKey: "pkcs11:id=7373;object=ecdsa-p256-key",
 		}}, apiv1.ECDSAWithSHA256, crypto.SHA256, false},
@@ -406,22 +492,31 @@ func TestPKCS11_LoadCertificate(t *testing.T) {
 		wantErr bool
 	}{
 		{"load", args{&apiv1.LoadCertificateRequest{
-			Name: "pkcs11:id=7370;object=root",
+			Name: "pkcs11:id=7376;object=test-root",
 		}}, getCertFn(0, 0), false},
 		{"load by id", args{&apiv1.LoadCertificateRequest{
-			Name: "pkcs11:id=7370",
+			Name: "pkcs11:id=7376",
 		}}, getCertFn(0, 0), false},
 		{"load by label", args{&apiv1.LoadCertificateRequest{
-			Name: "pkcs11:object=root",
+			Name: "pkcs11:object=test-root",
+		}}, getCertFn(0, 0), false},
+		{"load by serial", args{&apiv1.LoadCertificateRequest{
+			Name: "pkcs11:serial=64",
 		}}, getCertFn(0, 0), false},
 		{"fail missing", args{&apiv1.LoadCertificateRequest{
-			Name: "pkcs11:id=9999;object=root",
+			Name: "pkcs11:id=9999;object=test-root",
 		}}, nil, true},
 		{"fail name", args{&apiv1.LoadCertificateRequest{
 			Name: "",
 		}}, nil, true},
 		{"fail uri", args{&apiv1.LoadCertificateRequest{
-			Name: "pkcs11:id=xxxx;object=root",
+			Name: "pkcs11:id=xxxx;object=test-root",
+		}}, nil, true},
+		{"fail scheme", args{&apiv1.LoadCertificateRequest{
+			Name: "foo:id=7376;object=test-root",
+		}}, nil, true},
+		{"fail serial", args{&apiv1.LoadCertificateRequest{
+			Name: "pkcs11:serial=foo",
 		}}, nil, true},
 		{"fail FindCertificate", args{&apiv1.LoadCertificateRequest{
 			Name: "pkcs11:foo=bar",
@@ -460,6 +555,11 @@ func TestPKCS11_StoreCertificate(t *testing.T) {
 		t.Fatalf("x509.CreateCertificate() error = %v", err)
 	}
 
+	// Make sure to delete the created certificate
+	t.Cleanup(func() {
+		k.DeleteCertificate(testObject)
+	})
+
 	type args struct {
 		req *apiv1.StoreCertificateRequest
 	}
@@ -469,19 +569,23 @@ func TestPKCS11_StoreCertificate(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", args{&apiv1.StoreCertificateRequest{
-			Name:        "pkcs11:id=7771;object=root",
+			Name:        testObject,
 			Certificate: cert,
 		}}, false},
+		{"fail already exists", args{&apiv1.StoreCertificateRequest{
+			Name:        testObject,
+			Certificate: cert,
+		}}, true},
 		{"fail name", args{&apiv1.StoreCertificateRequest{
 			Name:        "",
 			Certificate: cert,
 		}}, true},
 		{"fail certificate", args{&apiv1.StoreCertificateRequest{
-			Name:        "pkcs11:id=7771;object=root",
+			Name:        testObject,
 			Certificate: nil,
 		}}, true},
 		{"fail uri", args{&apiv1.StoreCertificateRequest{
-			Name:        "http:id=7771;object=root",
+			Name:        "http:id=7770;object=create-cert",
 			Certificate: cert,
 		}}, true},
 		{"fail ImportCertificateWithLabel", args{&apiv1.StoreCertificateRequest{
@@ -504,9 +608,101 @@ func TestPKCS11_StoreCertificate(t *testing.T) {
 				if !reflect.DeepEqual(got, cert) {
 					t.Errorf("PKCS11.LoadCertificate() = %v, want %v", got, cert)
 				}
-				if err := k.DeleteCertificate(tt.args.req.Name); err != nil {
-					t.Errorf("PKCS11.DeleteCertificate() error = %v", err)
-				}
+			}
+		})
+	}
+}
+
+func TestPKCS11_DeleteKey(t *testing.T) {
+	k := setupPKCS11(t)
+
+	type args struct {
+		uri string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"delete", args{testObject}, false},
+		{"delete by id", args{testObjectByID}, false},
+		{"delete by label", args{testObjectByLabel}, false},
+		{"delete missing", args{"pkcs11:id=9999;object=missing-key"}, false},
+		{"fail name", args{""}, true},
+		{"fail uri", args{"pkcs11:id=xxxx;object=missing-key"}, true},
+		{"fail FindKeyPair", args{"pkcs11:foo=bar"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := k.CreateKey(&apiv1.CreateKeyRequest{
+				Name: testObject,
+			}); err != nil {
+				t.Fatalf("PKCS1.CreateKey() error = %v", err)
+			}
+			if err := k.DeleteKey(tt.args.uri); (err != nil) != tt.wantErr {
+				t.Errorf("PKCS11.DeleteKey() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if _, err := k.GetPublicKey(&apiv1.GetPublicKeyRequest{
+				Name: tt.args.uri,
+			}); err == nil {
+				t.Error("PKCS11.GetPublicKey() public key found and not expected")
+			}
+			// Make sure to delete the created one.
+			if err := k.DeleteKey(testObject); err != nil {
+				t.Errorf("PKCS11.DeleteKey() error = %v", err)
+			}
+		})
+	}
+}
+
+func TestPKCS11_DeleteCertificate(t *testing.T) {
+	k := setupPKCS11(t)
+
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("ed25519.GenerateKey() error = %v", err)
+	}
+
+	cert, err := generateCertificate(pub, priv)
+	if err != nil {
+		t.Fatalf("x509.CreateCertificate() error = %v", err)
+	}
+
+	type args struct {
+		uri string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"delete", args{testObject}, false},
+		{"delete by id", args{testObjectByID}, false},
+		{"delete by label", args{testObjectByLabel}, false},
+		{"delete missing", args{"pkcs11:id=9999;object=missing-key"}, false},
+		{"fail name", args{""}, true},
+		{"fail uri", args{"pkcs11:id=xxxx;object=missing-key"}, true},
+		{"fail DeleteCertificate", args{"pkcs11:foo=bar"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := k.StoreCertificate(&apiv1.StoreCertificateRequest{
+				Name:        testObject,
+				Certificate: cert,
+			}); err != nil {
+				t.Fatalf("PKCS11.StoreCertificate() error = %v", err)
+			}
+			if err := k.DeleteCertificate(tt.args.uri); (err != nil) != tt.wantErr {
+				t.Errorf("PKCS11.DeleteCertificate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if _, err := k.LoadCertificate(&apiv1.LoadCertificateRequest{
+				Name: tt.args.uri,
+			}); err == nil {
+				t.Error("PKCS11.LoadCertificate() certificate found and not expected")
+			}
+			// Make sure to delete the created one.
+			if err := k.DeleteCertificate(testObject); err != nil {
+				t.Errorf("PKCS11.DeleteCertificate() error = %v", err)
 			}
 		})
 	}

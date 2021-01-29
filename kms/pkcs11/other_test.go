@@ -1,4 +1,4 @@
-// +build !softhsm2,!yubihsm2
+// +build !softhsm2,!yubihsm2,!nitrokey
 
 package pkcs11
 
@@ -9,16 +9,14 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"fmt"
 	"io"
 	"math/big"
-	"testing"
 
 	"github.com/ThalesIgnite/crypto11"
 	"github.com/pkg/errors"
 )
 
-func mustPKCS11(t *testing.T) *PKCS11 {
+func mustPKCS11(t TBTesting) *PKCS11 {
 	t.Helper()
 	testModule = "Golang crypto"
 	k := &PKCS11{
@@ -63,10 +61,7 @@ func (s *stubPKCS11) FindKeyPair(id, label []byte) (crypto11.Signer, error) {
 	if id == nil && label == nil {
 		return nil, errors.New("id and label cannot both be nil")
 	}
-	i, ok := s.signerIndex[newKey(id, label, nil)]
-	fmt.Println(i, ok)
-	if ok {
-
+	if i, ok := s.signerIndex[newKey(id, label, nil)]; ok {
 		return s.signers[i], nil
 	}
 	return nil, nil

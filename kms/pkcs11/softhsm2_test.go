@@ -1,11 +1,10 @@
-// +build softhsm2,!yubihsm2
+// +build softhsm2
 
 package pkcs11
 
 import (
 	"runtime"
 	"sync"
-	"testing"
 
 	"github.com/ThalesIgnite/crypto11"
 )
@@ -13,14 +12,14 @@ import (
 var softHSM2Once sync.Once
 
 // mustPKCS11 configures a *PKCS11 KMS to be used with SoftHSM2. To initialize
-// this tests, we should run:
+// these tests, we should run:
 //   softhsm2-util --init-token --free \
 //   --token pkcs11-test --label pkcs11-test \
 //   --so-pin password --pin password
 //
 // To delete we should run:
 // 	softhsm2-util --delete-token --token pkcs11-test
-func mustPKCS11(t *testing.T) *PKCS11 {
+func mustPKCS11(t TBTesting) *PKCS11 {
 	t.Helper()
 	testModule = "SoftHSM2"
 	if runtime.GOARCH != "amd64" {

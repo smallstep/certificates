@@ -1,11 +1,10 @@
-// +build !softhsm2,yubihsm2
+// +build yubihsm2
 
 package pkcs11
 
 import (
 	"runtime"
 	"sync"
-	"testing"
 
 	"github.com/ThalesIgnite/crypto11"
 )
@@ -13,9 +12,9 @@ import (
 var yubiHSM2Once sync.Once
 
 // mustPKCS11 configures a *PKCS11 KMS to be used with YubiHSM2. To initialize
-// this tests, we should run:
+// these tests, we should run:
 // 	yubihsm-connector -d
-func mustPKCS11(t *testing.T) *PKCS11 {
+func mustPKCS11(t TBTesting) *PKCS11 {
 	t.Helper()
 	testModule = "YubiHSM2"
 	if runtime.GOARCH != "amd64" {

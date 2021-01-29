@@ -8,17 +8,18 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"math/big"
-	"testing"
 	"time"
 
 	"github.com/pkg/errors"
-
 	"github.com/smallstep/certificates/kms/apiv1"
 )
 
 var (
-	testModule = ""
-	testKeys   = []struct {
+	testModule        = ""
+	testObject        = "pkcs11:id=7370;object=test-name"
+	testObjectByID    = "pkcs11:id=7370"
+	testObjectByLabel = "pkcs11:object=test-name"
+	testKeys          = []struct {
 		Name               string
 		SignatureAlgorithm apiv1.SignatureAlgorithm
 		Bits               int
@@ -35,9 +36,18 @@ var (
 		Key          string
 		Certificates []*x509.Certificate
 	}{
-		{"pkcs11:id=7370;object=root", "pkcs11:id=7373;object=ecdsa-p256-key", nil},
+		{"pkcs11:id=7376;object=test-root", "pkcs11:id=7373;object=ecdsa-p256-key", nil},
 	}
 )
+
+type TBTesting interface {
+	Helper()
+	Cleanup(f func())
+	Log(args ...interface{})
+	Errorf(format string, args ...interface{})
+	Fatalf(format string, args ...interface{})
+	Skipf(format string, args ...interface{})
+}
 
 func generateCertificate(pub crypto.PublicKey, signer crypto.Signer) (*x509.Certificate, error) {
 	now := time.Now()
@@ -60,7 +70,7 @@ func generateCertificate(pub crypto.PublicKey, signer crypto.Signer) (*x509.Cert
 	return x509.ParseCertificate(b)
 }
 
-func setup(t *testing.T, k *PKCS11) {
+func setup(t TBTesting, k *PKCS11) {
 	t.Log("Running using", testModule)
 	for _, tk := range testKeys {
 		_, err := k.CreateKey(&apiv1.CreateKeyRequest{
@@ -91,15 +101,26 @@ func setup(t *testing.T, k *PKCS11) {
 		if err := k.StoreCertificate(&apiv1.StoreCertificateRequest{
 			Name:        c.Name,
 			Certificate: cert,
-		}); err != nil {
-			t.Errorf("PKCS1.StoreCertificate() error = %v", err)
+		}); err != nil && !errors.Is(errors.Cause(err), apiv1.ErrAlreadyExists{
+			Message: c.Name + " already exists",
+		}) {
+			t.Errorf("PKCS1.StoreCertificate() error = %+v", err)
 			continue
 		}
 		testCerts[i].Certificates = append(testCerts[i].Certificates, cert)
 	}
 }
 
-func teardown(t *testing.T, k *PKCS11) {
+func teardown(t TBTesting, k *PKCS11) {
+	testObjects := []string{testObject, testObjectByID, testObjectByLabel}
+	for _, name := range testObjects {
+		if err := k.DeleteKey(name); err != nil {
+			t.Errorf("PKCS11.DeleteKey() error = %v", err)
+		}
+		if err := k.DeleteCertificate(name); err != nil {
+			t.Errorf("PKCS11.DeleteCertificate() error = %v", err)
+		}
+	}
 	for _, tk := range testKeys {
 		if err := k.DeleteKey(tk.Name); err != nil {
 			t.Errorf("PKCS11.DeleteKey() error = %v", err)
@@ -112,7 +133,8 @@ func teardown(t *testing.T, k *PKCS11) {
 	}
 }
 
-func setupPKCS11(t *testing.T) *PKCS11 {
+func setupPKCS11(t TBTesting) *PKCS11 {
+	t.Helper()
 	k := mustPKCS11(t)
 	t.Cleanup(func() {
 		k.Close()
