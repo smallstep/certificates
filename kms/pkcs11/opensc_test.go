@@ -1,4 +1,4 @@
-// +build nitrokey
+// +build opensc
 
 package pkcs11
 
@@ -11,8 +11,8 @@ import (
 
 var softHSM2Once sync.Once
 
-// mustPKCS11 configures a *PKCS11 KMS to be used with NitroKey through OpenSC.
-// To initialize these tests we should run:
+// mustPKCS11 configures a *PKCS11 KMS to be used with OpenSC, using for example
+// a Nitrokey HSM. To initialize these tests we should run:
 //   sc-hsm-tool --initialize --so-pin 3537363231383830 --pin 123456
 //  Or:
 //   pkcs11-tool --module /usr/local/lib/opensc-pkcs11.so \
@@ -21,9 +21,9 @@ var softHSM2Once sync.Once
 //   --label="pkcs11-test"
 func mustPKCS11(t TBTesting) *PKCS11 {
 	t.Helper()
-	testModule = "NitrokeyHSM"
+	testModule = "OpenSC"
 	if runtime.GOARCH != "amd64" {
-		t.Fatalf("softHSM2 test skipped on %s:%s", runtime.GOOS, runtime.GOARCH)
+		t.Fatalf("opensc test skipped on %s:%s", runtime.GOOS, runtime.GOARCH)
 	}
 
 	var path string
@@ -33,7 +33,7 @@ func mustPKCS11(t TBTesting) *PKCS11 {
 	case "linux":
 		path = "/usr/local/lib/opensc-pkcs11.so"
 	default:
-		t.Skipf("softHSM2 test skipped on %s", runtime.GOOS)
+		t.Skipf("opensc test skipped on %s", runtime.GOOS)
 		return nil
 	}
 	var zero int
@@ -43,7 +43,7 @@ func mustPKCS11(t TBTesting) *PKCS11 {
 		Pin:        "123456",
 	})
 	if err != nil {
-		t.Fatalf("failed to configure softHSM2 on %s: %v", runtime.GOOS, err)
+		t.Fatalf("failed to configure opensc on %s: %v", runtime.GOOS, err)
 	}
 
 	k := &PKCS11{

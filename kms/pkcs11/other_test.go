@@ -1,4 +1,4 @@
-// +build !softhsm2,!yubihsm2,!nitrokey
+// +build !softhsm2,!yubihsm2,!opensc
 
 package pkcs11
 
