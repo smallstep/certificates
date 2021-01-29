@@ -149,6 +149,7 @@ func main() {
 		for _, u := range certUris {
 			if u != "" && !c.NoCerts {
 				checkObject(k, u)
+				checkCertificate(k, u)
 			}
 		}
 		for _, u := range keyUris {
@@ -164,6 +165,11 @@ func main() {
 		if ok {
 			for _, u := range certUris {
 				if u != "" && !c.NoCerts {
+					// Some HSMs like Nitrokey will overwrite the key with the
+					// certificate label.
+					if err := deleter.DeleteKey(u); err != nil {
+						fatal(err)
+					}
 					if err := deleter.DeleteCertificate(u); err != nil {
 						fatal(err)
 					}
@@ -213,6 +219,18 @@ COPYRIGHT
 
   (c) 2018-2021 Smallstep Labs, Inc.`)
 	os.Exit(1)
+}
+
+func checkCertificate(k kms.KeyManager, rawuri string) {
+	if cm, ok := k.(kms.CertificateManager); ok {
+		if _, err := cm.LoadCertificate(&apiv1.LoadCertificateRequest{
+			Name: rawuri,
+		}); err == nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Your PKCS #11 module already has a certificate on %s.\n", rawuri)
+			fmt.Fprintln(os.Stderr, "   If you want to delete it and start fresh, use `--force`.")
+			os.Exit(1)
+		}
+	}
 }
 
 func checkObject(k kms.KeyManager, rawuri string) {
