@@ -248,10 +248,7 @@ func parseObject(rawuri string) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	id, err := u.GetHex("id")
-	if err != nil {
-		return nil, nil, err
-	}
+	id := u.GetEncoded("id")
 	object := u.Get("object")
 	if len(id) == 0 && object == "" {
 		return nil, nil, errors.Errorf("key with uri %s is not valid, id or object are required", rawuri)
@@ -320,11 +317,7 @@ func findCertificate(ctx P11, rawuri string) (*x509.Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
-	id, err := u.GetHex("id")
-	if err != nil {
-		return nil, err
-	}
-	object, serial := u.Get("object"), u.Get("serial")
+	id, object, serial := u.GetEncoded("id"), u.Get("object"), u.Get("serial")
 	if len(id) == 0 && object == "" && serial == "" {
 		return nil, errors.Errorf("key with uri %s is not valid, id, object or serial are required", rawuri)
 	}
