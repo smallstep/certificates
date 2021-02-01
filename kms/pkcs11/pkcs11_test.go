@@ -33,7 +33,7 @@ func TestNew(t *testing.T) {
 		k.Close()
 	})
 	p11Configure = func(config *crypto11.Config) (P11, error) {
-		if strings.Index(config.Path, "fail") >= 0 {
+		if strings.Contains(config.Path, "fail") {
 			return nil, errors.New("an error")
 		}
 		return k.p11, nil

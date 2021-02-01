@@ -28,6 +28,7 @@ func mustPKCS11(t TBTesting) *PKCS11 {
 	for i := range testCerts {
 		testCerts[i].Certificates = nil
 	}
+	teardown(t, k)
 	setup(t, k)
 	return k
 }
