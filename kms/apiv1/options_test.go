@@ -50,3 +50,27 @@ func TestErrNotImplemented_Error(t *testing.T) {
 		})
 	}
 }
+
+func TestErrAlreadyExists_Error(t *testing.T) {
+	type fields struct {
+		msg string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"default", fields{}, "key already exists"},
+		{"custom", fields{"custom message: key already exists"}, "custom message: key already exists"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := ErrAlreadyExists{
+				Message: tt.fields.msg,
+			}
+			if got := e.Error(); got != tt.want {
+				t.Errorf("ErrAlreadyExists.Error() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
