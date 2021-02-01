@@ -48,6 +48,7 @@ RemoveIPC=true
 RestrictRealtime=true
 PrivateDevices=true
 SystemCallFilter=@system-service
+SystemCallArchitectures=native
 MemoryDenyWriteExecute=true
 ReadWriteDirectories=/etc/step-ca/db
 
