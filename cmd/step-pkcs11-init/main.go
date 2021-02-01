@@ -137,6 +137,10 @@ func main() {
 		fatal(err)
 	}
 
+	defer func() {
+		_ = k.Close()
+	}()
+
 	// Check if the slots are empty, fail if they are not
 	certUris := []string{
 		c.RootObject, c.CrtObject,
@@ -168,17 +172,17 @@ func main() {
 					// Some HSMs like Nitrokey will overwrite the key with the
 					// certificate label.
 					if err := deleter.DeleteKey(u); err != nil {
-						fatal(err)
+						fatalClose(err, k)
 					}
 					if err := deleter.DeleteCertificate(u); err != nil {
-						fatal(err)
+						fatalClose(err, k)
 					}
 				}
 			}
 			for _, u := range keyUris {
 				if u != "" {
 					if err := deleter.DeleteKey(u); err != nil {
-						fatal(err)
+						fatalClose(err, k)
 					}
 				}
 			}
@@ -186,12 +190,8 @@ func main() {
 	}
 
 	if err := createPKI(k, c); err != nil {
-		fatal(err)
+		fatalClose(err, k)
 	}
-
-	defer func() {
-		_ = k.Close()
-	}()
 }
 
 func fatal(err error) {
@@ -201,6 +201,11 @@ func fatal(err error) {
 		fmt.Fprintln(os.Stderr, err)
 	}
 	os.Exit(1)
+}
+
+func fatalClose(err error, k kms.KeyManager) {
+	_ = k.Close()
+	fatal(err)
 }
 
 func usage() {
@@ -228,6 +233,7 @@ func checkCertificate(k kms.KeyManager, rawuri string) {
 		}); err == nil {
 			fmt.Fprintf(os.Stderr, "⚠️  Your PKCS #11 module already has a certificate on %s.\n", rawuri)
 			fmt.Fprintln(os.Stderr, "   If you want to delete it and start fresh, use `--force`.")
+			_ = k.Close()
 			os.Exit(1)
 		}
 	}
@@ -239,6 +245,7 @@ func checkObject(k kms.KeyManager, rawuri string) {
 	}); err == nil {
 		fmt.Fprintf(os.Stderr, "⚠️  Your PKCS #11 module already has a key on %s.\n", rawuri)
 		fmt.Fprintln(os.Stderr, "   If you want to delete it and start fresh, use `--force`.")
+		_ = k.Close()
 		os.Exit(1)
 	}
 }
