@@ -201,3 +201,66 @@ func TestURI_Get(t *testing.T) {
 		})
 	}
 }
+
+func TestURI_GetEncoded(t *testing.T) {
+	mustParse := func(s string) *URI {
+		u, err := Parse(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
+	type args struct {
+		key string
+	}
+	tests := []struct {
+		name string
+		uri  *URI
+		args args
+		want []byte
+	}{
+		{"ok", mustParse("yubikey:slot-id=9a"), args{"slot-id"}, []byte{0x9a}},
+		{"ok first", mustParse("yubikey:slot-id=9a9b;slot-id=9b"), args{"slot-id"}, []byte{0x9a, 0x9b}},
+		{"ok percent", mustParse("yubikey:slot-id=9a;foo=%9a%9b%9c"), args{"foo"}, []byte{0x9a, 0x9b, 0x9c}},
+		{"ok in query", mustParse("yubikey:slot-id=9a?foo=9a"), args{"foo"}, []byte{0x9a}},
+		{"ok in query percent", mustParse("yubikey:slot-id=9a?foo=%9a"), args{"foo"}, []byte{0x9a}},
+		{"ok missing", mustParse("yubikey:slot-id=9a"), args{"foo"}, nil},
+		{"ok missing query", mustParse("yubikey:slot-id=9a?bar=zar"), args{"foo"}, nil},
+		{"ok no hex", mustParse("yubikey:slot-id=09a?bar=zar"), args{"slot-id"}, []byte{'0', '9', 'a'}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.uri.GetEncoded(tt.args.key)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("URI.GetEncoded() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestURI_Pin(t *testing.T) {
+	mustParse := func(s string) *URI {
+		u, err := Parse(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
+	tests := []struct {
+		name string
+		uri  *URI
+		want string
+	}{
+		{"from value", mustParse("pkcs11:id=%72%73?pin-value=0123456789"), "0123456789"},
+		{"from source", mustParse("pkcs11:id=%72%73?pin-source=testdata/pin.txt"), "trim-this-pin"},
+		{"from missing", mustParse("pkcs11:id=%72%73"), ""},
+		{"from source missing", mustParse("pkcs11:id=%72%73?pin-source=testdata/foo.txt"), ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.uri.Pin(); got != tt.want {
+				t.Errorf("URI.Pin() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
