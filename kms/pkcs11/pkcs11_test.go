@@ -29,6 +29,9 @@ func TestNew(t *testing.T) {
 	})
 
 	k := mustPKCS11(t)
+	t.Cleanup(func() {
+		k.Close()
+	})
 	p11Configure = func(config *crypto11.Config) (P11, error) {
 		if strings.Index(config.Path, "fail") >= 0 {
 			return nil, errors.New("an error")
@@ -333,10 +336,6 @@ func TestPKCS11_CreateKey(t *testing.T) {
 			Name:               "pkcs11:id=9999;object=create-key",
 			SignatureAlgorithm: apiv1.SignatureAlgorithm(100),
 		}}, nil, true},
-		{"fail uri", args{&apiv1.CreateKeyRequest{
-			Name:               "pkcs11:id=xxxx;object=https",
-			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
-		}}, nil, true},
 		{"fail FindKeyPair", args{&apiv1.CreateKeyRequest{
 			Name:               "pkcs11:foo=bar",
 			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
@@ -509,9 +508,6 @@ func TestPKCS11_LoadCertificate(t *testing.T) {
 		{"fail name", args{&apiv1.LoadCertificateRequest{
 			Name: "",
 		}}, nil, true},
-		{"fail uri", args{&apiv1.LoadCertificateRequest{
-			Name: "pkcs11:id=xxxx;object=test-root",
-		}}, nil, true},
 		{"fail scheme", args{&apiv1.LoadCertificateRequest{
 			Name: "foo:id=7376;object=test-root",
 		}}, nil, true},
@@ -629,7 +625,6 @@ func TestPKCS11_DeleteKey(t *testing.T) {
 		{"delete by label", args{testObjectByLabel}, false},
 		{"delete missing", args{"pkcs11:id=9999;object=missing-key"}, false},
 		{"fail name", args{""}, true},
-		{"fail uri", args{"pkcs11:id=xxxx;object=missing-key"}, true},
 		{"fail FindKeyPair", args{"pkcs11:foo=bar"}, true},
 	}
 	for _, tt := range tests {
@@ -681,7 +676,6 @@ func TestPKCS11_DeleteCertificate(t *testing.T) {
 		{"delete by label", args{testObjectByLabel}, false},
 		{"delete missing", args{"pkcs11:id=9999;object=missing-key"}, false},
 		{"fail name", args{""}, true},
-		{"fail uri", args{"pkcs11:id=xxxx;object=missing-key"}, true},
 		{"fail DeleteCertificate", args{"pkcs11:foo=bar"}, true},
 	}
 	for _, tt := range tests {
