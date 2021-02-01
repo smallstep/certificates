@@ -30,7 +30,8 @@ SecureBits=keep-caps
 NoNewPrivileges=yes
 
 ; Sandboxing
-; This works with YubiKey PIV (via pcscd), and presumably with YubiHSM2 via http connector
+; This sandboxing works with YubiKey PIV (via pcscd HTTP API), but it is likely
+; too restrictive for PKCS#11 HSMs.
 ProtectSystem=full
 ProtectHome=true
 RestrictNamespaces=true
