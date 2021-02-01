@@ -99,7 +99,8 @@ var DefaultSSHTemplateData = map[string]string{
 `,
 
 	// sshd_config.tpl adds the configuration to support certificates
-	"sshd_config.tpl": `TrustedUserCAKeys /etc/ssh/ca.pub
+	"sshd_config.tpl": `Match all
+TrustedUserCAKeys /etc/ssh/ca.pub
 HostCertificate /etc/ssh/{{.User.Certificate}}
 HostKey /etc/ssh/{{.User.Key}}`,
 
