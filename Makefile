@@ -119,7 +119,7 @@ generate:
 # Test
 #########################################
 test:
-	$Q $(GOFLAGS) go test -short -coverprofile=coverage.out ./...
+	$Q go test -short -coverprofile=coverage.out ./...
 
 .PHONY: test
 
