@@ -382,3 +382,10 @@ func (a *Authority) Shutdown() error {
 	}
 	return a.db.Shutdown()
 }
+
+// CloseForReload closes internal services, to allow a safe reload.
+func (a *Authority) CloseForReload() {
+	if err := a.keyManager.Close(); err != nil {
+		log.Printf("error closing the key manager: %v", err)
+	}
+}
