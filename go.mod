@@ -17,7 +17,7 @@ require (
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
-	github.com/smallstep/nosql v0.3.5
+	github.com/smallstep/nosql v0.3.6
 	github.com/urfave/cli v1.22.4
 	go.step.sm/cli-utils v0.1.0
 	go.step.sm/crypto v0.7.3
