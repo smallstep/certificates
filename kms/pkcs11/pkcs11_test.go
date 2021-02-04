@@ -198,7 +198,6 @@ func TestPKCS11_CreateKey(t *testing.T) {
 		want    *apiv1.CreateKeyResponse
 		wantErr bool
 	}{
-		// SoftHSM2
 		{"default", args{&apiv1.CreateKeyRequest{
 			Name: testObject,
 		}}, &apiv1.CreateKeyResponse{
@@ -322,6 +321,15 @@ func TestPKCS11_CreateKey(t *testing.T) {
 		}, false},
 		{"fail name", args{&apiv1.CreateKeyRequest{
 			Name: "",
+		}}, nil, true},
+		{"fail no id", args{&apiv1.CreateKeyRequest{
+			Name: "pkcs11:object=create-key",
+		}}, nil, true},
+		{"fail no object", args{&apiv1.CreateKeyRequest{
+			Name: "pkcs11:id=9999",
+		}}, nil, true},
+		{"fail schema", args{&apiv1.CreateKeyRequest{
+			Name: "pkcs12:id=9999;object=create-key",
 		}}, nil, true},
 		{"fail bits", args{&apiv1.CreateKeyRequest{
 			Name:               "pkcs11:id=9999;object=create-key",

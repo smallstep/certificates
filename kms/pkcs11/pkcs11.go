@@ -262,6 +262,7 @@ func generateKey(ctx P11, req *apiv1.CreateKeyRequest) (crypto11.Signer, error) 
 	if err != nil {
 		return nil, err
 	}
+
 	signer, err := ctx.FindKeyPair(id, object)
 	if err != nil {
 		return nil, err
@@ -270,6 +271,12 @@ func generateKey(ctx P11, req *apiv1.CreateKeyRequest) (crypto11.Signer, error) 
 		return nil, apiv1.ErrAlreadyExists{
 			Message: req.Name + " already exists",
 		}
+	}
+
+	// Enforce the use of both id and labels. This is not strictly necessary in
+	// PKCS #11, but it's a good practice.
+	if len(id) == 0 || len(object) == 0 {
+		return nil, errors.Errorf("key with uri %s is not valid, id and object are required", req.Name)
 	}
 
 	bits := req.Bits
