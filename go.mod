@@ -5,7 +5,7 @@ go 1.14
 require (
 	cloud.google.com/go v0.70.0
 	github.com/Masterminds/sprig/v3 v3.1.0
-	github.com/ThalesIgnite/crypto11 v1.2.3
+	github.com/ThalesIgnite/crypto11 v1.2.4
 	github.com/aws/aws-sdk-go v1.30.29
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/go-piv/piv-go v1.7.0
@@ -34,4 +34,3 @@ require (
 // replace github.com/smallstep/nosql => ../nosql
 // replace go.step.sm/crypto => ../crypto
 // replace github.com/smallstep/nosql => ../nosql
-replace github.com/ThalesIgnite/crypto11 => github.com/maraino/crypto11 v1.2.4-0.20210127032225-7ed5319b45a1
