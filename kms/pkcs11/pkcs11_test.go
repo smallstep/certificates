@@ -709,3 +709,21 @@ func TestPKCS11_DeleteCertificate(t *testing.T) {
 		})
 	}
 }
+
+func TestPKCS11_Close(t *testing.T) {
+	k := mustPKCS11(t)
+	tests := []struct {
+		name    string
+		wantErr bool
+	}{
+		{"ok", false},
+		{"second", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := k.Close(); (err != nil) != tt.wantErr {
+				t.Errorf("PKCS11.Close() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

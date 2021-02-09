@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"sync"
 
 	"github.com/ThalesIgnite/crypto11"
 	"github.com/pkg/errors"
@@ -43,7 +44,8 @@ var p11Configure = func(config *crypto11.Config) (P11, error) {
 
 // PKCS11 is the implementation of a KMS using the PKCS #11 standard.
 type PKCS11 struct {
-	p11 P11
+	p11    P11
+	closed sync.Once
 }
 
 // New returns a new PKCS11 KMS.
@@ -232,8 +234,11 @@ func (k *PKCS11) DeleteCertificate(uri string) error {
 }
 
 // Close releases the connection to the PKCS#11 module.
-func (k *PKCS11) Close() error {
-	return errors.Wrap(k.p11.Close(), "error closing pkcs#11 context")
+func (k *PKCS11) Close() (err error) {
+	k.closed.Do(func() {
+		err = errors.Wrap(k.p11.Close(), "error closing pkcs#11 context")
+	})
+	return
 }
 
 func toByte(s string) []byte {

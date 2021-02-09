@@ -37,7 +37,7 @@ func mustPKCS11(t TBTesting) *PKCS11 {
 		Pin:        "0001password",
 	})
 	if err != nil {
-		t.Fatalf("failed to configure yubiHSM2 on %s: %v", runtime.GOOS, err)
+		t.Fatalf("failed to configure YubiHSM2 on %s: %v", runtime.GOOS, err)
 	}
 
 	k := &PKCS11{
