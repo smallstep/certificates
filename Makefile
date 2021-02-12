@@ -20,7 +20,7 @@ all: lint test build
 
 travis: lintcgo testcgo build
 
-.PHONY: all
+.PHONY: all travis
 
 #########################################
 # Bootstrapping
