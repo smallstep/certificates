@@ -83,7 +83,7 @@ func ParseWithScheme(scheme, rawuri string) (*URI, error) {
 	return u, nil
 }
 
-// Get returns the first value in the uri with the give n key, it will return
+// Get returns the first value in the uri with the given key, it will return
 // empty string if that field is not present.
 func (u *URI) Get(key string) string {
 	v := u.Values.Get(key)
@@ -93,7 +93,7 @@ func (u *URI) Get(key string) string {
 	return v
 }
 
-// GetEncoded returns the first value in the uri with the give n key, it will
+// GetEncoded returns the first value in the uri with the given key, it will
 // return empty nil if that field is not present or is empty. If the return
 // value is hex encoded it will decode it and return it.
 func (u *URI) GetEncoded(key string) []byte {

@@ -22,7 +22,7 @@ import (
 // Scheme is the scheme used in uris.
 const Scheme = "pkcs11"
 
-// DefaultRSASize is the number of bits of a new RSA key if not bitsize has been
+// DefaultRSASize is the number of bits of a new RSA key if no size has been
 // specified.
 const DefaultRSASize = 3072
 
