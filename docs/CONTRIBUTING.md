@@ -16,7 +16,7 @@ to manage issues, etc.
 
 ## Building From Source
 
-The only prerequisites are [`go`](https://golang.org/) and make.
+The only prerequisites are [`go`](https://golang.org/), `make` and `libpcsclite` for YubiKey support.
 
 To build from source:
 
