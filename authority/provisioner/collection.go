@@ -157,6 +157,8 @@ func (c *Collection) LoadByCertificate(cert *x509.Certificate) (Interface, bool)
 				return c.Load("gcp/" + string(provisioner.Name))
 			case TypeACME:
 				return c.Load("acme/" + string(provisioner.Name))
+			case TypeSCEP:
+				return c.Load("scep/" + string(provisioner.Name))
 			case TypeX5C:
 				return c.Load("x5c/" + string(provisioner.Name))
 			case TypeK8sSA:

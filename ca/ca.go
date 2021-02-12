@@ -23,6 +23,7 @@ import (
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/scep"
+	scepAPI "github.com/smallstep/certificates/scep/api"
 	"github.com/smallstep/certificates/server"
 	"github.com/smallstep/nosql"
 )
@@ -180,8 +181,8 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 			mgmtHandler.Route(r)
 		})
 	}
-	if ca.shouldServeSCEPEndpoints() {
 
+	if ca.shouldServeSCEPEndpoints() {
 		scepPrefix := "scep"
 		scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
 			Service: auth.GetSCEPService(),

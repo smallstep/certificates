@@ -1,4 +1,4 @@
-package scep
+package api
 
 import (
 	"context"
@@ -19,17 +19,38 @@ import (
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/scep"
 
 	microscep "github.com/micromdm/scep/scep"
 )
 
-// Handler is the ACME request handler.
-type Handler struct {
-	Auth Interface
+const (
+	opnGetCACert    = "GetCACert"
+	opnGetCACaps    = "GetCACaps"
+	opnPKIOperation = "PKIOperation"
+)
+
+// SCEPRequest is a SCEP server request.
+type SCEPRequest struct {
+	Operation string
+	Message   []byte
 }
 
-// New returns a new ACME API router.
-func NewAPI(scepAuth Interface) api.RouterHandler {
+// SCEPResponse is a SCEP server response.
+type SCEPResponse struct {
+	Operation string
+	CACertNum int
+	Data      []byte
+	Err       error
+}
+
+// Handler is the SCEP request handler.
+type Handler struct {
+	Auth scep.Interface
+}
+
+// New returns a new SCEP API router.
+func New(scepAuth scep.Interface) api.RouterHandler {
 	return &Handler{scepAuth}
 }
 
@@ -156,7 +177,6 @@ type nextHTTP = func(http.ResponseWriter, *http.Request)
 // Responds 404 if the provisioner does not exist.
 func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
 
 		// TODO: make this configurable; and we might want to look at being able to provide multiple,
 		// like the actual ACME one? The below assumes a SCEP provider (scep/) called "scep1" exists.
@@ -168,26 +188,22 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 
 		scepProvisioner, ok := p.(*provisioner.SCEP)
 		if !ok {
-			api.WriteError(w, acme.AccountDoesNotExistErr(errors.New("provisioner must be of type SCEP")))
+			api.WriteError(w, errors.New("provisioner must be of type SCEP"))
 			return
 		}
 
-		ctx = context.WithValue(ctx, acme.ProvisionerContextKey, Provisioner(scepProvisioner))
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, acme.ProvisionerContextKey, scep.Provisioner(scepProvisioner))
 		next(w, r.WithContext(ctx))
 	}
 }
 
 func (h *Handler) GetCACert(w http.ResponseWriter, r *http.Request, scepResponse SCEPResponse) error {
 
-	ctx := r.Context()
-
-	p, err := ProvisionerFromContext(ctx)
+	certs, err := h.Auth.GetCACertificates()
 	if err != nil {
 		return err
 	}
-
-	// TODO: get the CA Certificates from the (signing) authority instead? I think that should be doable
-	certs := p.GetCACertificates()
 
 	if len(certs) == 0 {
 		scepResponse.CACertNum = 0
@@ -226,13 +242,16 @@ func (h *Handler) PKIOperation(w http.ResponseWriter, r *http.Request, scepReque
 		return err
 	}
 
-	ctx := r.Context()
-	p, err := ProvisionerFromContext(ctx)
+	certs, err := h.Auth.GetCACertificates()
 	if err != nil {
 		return err
 	}
-	certs := p.GetCACertificates()
-	key := p.GetSigningKey()
+
+	// TODO: instead of getting the key to decrypt, add a decrypt function to the auth; less leaky
+	key, err := h.Auth.GetSigningKey()
+	if err != nil {
+		return err
+	}
 
 	ca := certs[0]
 	if err := msg.DecryptPKIEnvelope(ca, key); err != nil {
@@ -276,9 +295,11 @@ func (h *Handler) PKIOperation(w http.ResponseWriter, r *http.Request, scepReque
 	//name := certName(cert)
 
 	// TODO: check if CN already exists, if renewal is allowed and if existing should be revoked; fail if not
-	// TODO: store the new cert for CN locally
+	// TODO: store the new cert for CN locally; should go into the DB
 
 	scepResponse.Data = certRep.Raw
+
+	api.LogCertificate(w, certRep.Certificate)
 
 	return writeSCEPResponse(w, scepResponse)
 }
@@ -354,14 +375,14 @@ func contentHeader(operation string, certNum int) string {
 
 // ProvisionerFromContext searches the context for a provisioner. Returns the
 // provisioner or an error.
-func ProvisionerFromContext(ctx context.Context) (Provisioner, error) {
+func ProvisionerFromContext(ctx context.Context) (scep.Provisioner, error) {
 	val := ctx.Value(acme.ProvisionerContextKey)
 	if val == nil {
-		return nil, acme.ServerInternalErr(errors.New("provisioner expected in request context"))
+		return nil, errors.New("provisioner expected in request context")
 	}
-	pval, ok := val.(Provisioner)
+	pval, ok := val.(scep.Provisioner)
 	if !ok || pval == nil {
-		return nil, acme.ServerInternalErr(errors.New("provisioner in context is not a SCEP provisioner"))
+		return nil, errors.New("provisioner in context is not a SCEP provisioner")
 	}
 	return pval, nil
 }
