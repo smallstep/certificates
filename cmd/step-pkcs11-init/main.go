@@ -51,7 +51,7 @@ type Config struct {
 func (c *Config) Validate() error {
 	switch {
 	case c.KMS == "":
-		return errors.New("one of flag `--kms` is required")
+		return errors.New("flag `--kms` is required")
 	case c.RootFile != "" && c.KeyFile == "":
 		return errors.New("flag `--root` requires flag `--key`")
 	case c.KeyFile != "" && c.RootFile == "":
