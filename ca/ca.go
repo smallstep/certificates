@@ -227,7 +227,7 @@ func (ca *CA) Reload() error {
 	}
 
 	// 1. Stop previous renewer
-	// 2. Close key manager
+	// 2. Safely shutdown any internal resources (e.g. key manager)
 	// 3. Replace ca properties
 	// Do not replace ca.srv
 	ca.renewer.Stop()
