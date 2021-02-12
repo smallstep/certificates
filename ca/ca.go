@@ -217,6 +217,7 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 			mgmtHandler.Route(r)
 		})
 	}
+
 	if ca.shouldServeSCEPEndpoints() {
 		scepPrefix := "scep"
 		scepAuthority, err := scep.New(auth, scep.AuthorityOptions{

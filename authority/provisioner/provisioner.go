@@ -183,10 +183,6 @@ type SSHKeys struct {
 // Config defines the default parameters used in the initialization of
 // provisioners.
 type Config struct {
-	// TODO: these probably shouldn't be here but passed via SignAuth
-	IntermediateCert string
-	SigningKey       string
-	CACertificates   []*x509.Certificate
 	// Claims are the default claims.
 	Claims Claims
 	// Audiences are the audiences used in the default provisioner, (JWK).
