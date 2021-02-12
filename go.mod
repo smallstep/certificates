@@ -16,6 +16,7 @@ require (
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
+	github.com/micromdm/scep v1.0.0
 	github.com/micromdm/scep/v2 v2.0.0
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.9.1

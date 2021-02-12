@@ -217,8 +217,37 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 			mgmtHandler.Route(r)
 		})
 	}
+	if ca.shouldServeSCEPEndpoints() {
+		scepPrefix := "scep"
+		scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
+			Service: auth.GetSCEPService(),
+			DNS:     dns,
+			Prefix:  scepPrefix,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "error creating SCEP authority")
+		}
+		scepRouterHandler := scepAPI.New(scepAuthority)
 
-	// helpful routine for logging all routes
+		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
+		// SCEP operations are performed using HTTP, so that's why the API is mounted
+		// to the insecure mux.
+		insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
+			scepRouterHandler.Route(r)
+		})
+
+		// The RFC also mentions usage of HTTPS, but seems to advise
+		// against it, because of potential interoperability issues.
+		// Currently I think it's not bad to use HTTPS also, so that's
+		// why I've kept the API endpoints in both muxes and both HTTP
+		// as well as HTTPS can be used to request certificates
+		// using SCEP.
+		mux.Route("/"+scepPrefix, func(r chi.Router) {
+			scepRouterHandler.Route(r)
+		})
+	}
+
+	// helpful routine for logging all routes //
 	//dumpRoutes(mux)
 
 	// Add monitoring if configured
