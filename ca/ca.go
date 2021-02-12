@@ -22,6 +22,7 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
+	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/server"
 	"github.com/smallstep/nosql"
 )
@@ -179,17 +180,39 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 			mgmtHandler.Route(r)
 		})
 	}
+	if ca.shouldServeSCEPEndpoints() {
+
+		scepPrefix := "scep"
+		scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
+			Service: auth.GetSCEPService(),
+			DNS:     dns,
+			Prefix:  scepPrefix,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "error creating SCEP authority")
+		}
+		scepRouterHandler := scepAPI.New(scepAuthority)
+
+		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
+		// SCEP operations are performed using HTTP, so that's why the API is mounted
+		// to the insecure mux.
+		insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
+			scepRouterHandler.Route(r)
+		})
+
+		// The RFC also mentions usage of HTTPS, but seems to advise
+		// against it, because of potential interoperability issues.
+		// Currently I think it's not bad to use HTTPS also, so that's
+		// why I've kept the API endpoints in both muxes and both HTTP
+		// as well as HTTPS can be used to request certificates
+		// using SCEP.
+		mux.Route("/"+scepPrefix, func(r chi.Router) {
+			scepRouterHandler.Route(r)
+		})
+	}
 
 	// helpful routine for logging all routes //
-	/*
-		walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
-			fmt.Printf("%s %s\n", method, route)
-			return nil
-		}
-		if err := chi.Walk(mux, walkFunc); err != nil {
-			fmt.Printf("Logging err: %s\n", err.Error())
-		}
-	*/
+	//dumpRoutes(mux)
 
 	// Add monitoring if configured
 	if len(config.Monitoring) > 0 {
@@ -330,4 +353,24 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	tlsConfig.PreferServerCipherSuites = true
 
 	return tlsConfig, nil
+}
+
+// shouldMountSCEPEndpoints returns if the CA should be
+// configured with endpoints for SCEP. This is assumed to be
+// true if a SCEPService exists, which is true in case a
+// SCEP provisioner was configured.
+func (ca *CA) shouldServeSCEPEndpoints() bool {
+	return ca.auth.GetSCEPService() != nil
+}
+
+//nolint // ignore linters to allow keeping this function around for debugging
+func dumpRoutes(mux chi.Routes) {
+	// helpful routine for logging all routes //
+	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		fmt.Printf("%s %s\n", method, route)
+		return nil
+	}
+	if err := chi.Walk(mux, walkFunc); err != nil {
+		fmt.Printf("Logging err: %s\n", err.Error())
+	}
 }

@@ -142,6 +142,8 @@ const (
 	TypeK8sSA Type = 8
 	// TypeSSHPOP is used to indicate the SSHPOP provisioners.
 	TypeSSHPOP Type = 9
+	// TypeSCEP is used to indicate the SCEP provisioners
+	TypeSCEP Type = 10
 )
 
 // String returns the string representation of the type.
@@ -165,6 +167,8 @@ func (t Type) String() string {
 		return "K8sSA"
 	case TypeSSHPOP:
 		return "SSHPOP"
+	case TypeSCEP:
+		return "SCEP"
 	default:
 		return ""
 	}
@@ -179,6 +183,10 @@ type SSHKeys struct {
 // Config defines the default parameters used in the initialization of
 // provisioners.
 type Config struct {
+	// TODO: these probably shouldn't be here but passed via SignAuth
+	IntermediateCert string
+	SigningKey       string
+	CACertificates   []*x509.Certificate
 	// Claims are the default claims.
 	Claims Claims
 	// Audiences are the audiences used in the default provisioner, (JWK).
@@ -233,6 +241,8 @@ func (l *List) UnmarshalJSON(data []byte) error {
 			p = &K8sSA{}
 		case "sshpop":
 			p = &SSHPOP{}
+		case "scep":
+			p = &SCEP{}
 		default:
 			// Skip unsupported provisioners. A client using this method may be
 			// compiled with a version of smallstep/certificates that does not
