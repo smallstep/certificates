@@ -99,6 +99,10 @@ func TestParse(t *testing.T) {
 			URL:    &url.URL{Scheme: "yubikey", Opaque: "slot-id=9a"},
 			Values: url.Values{"slot-id": []string{"9a"}},
 		}, false},
+		{"ok schema", args{"cloudkms:"}, &URI{
+			URL:    &url.URL{Scheme: "cloudkms"},
+			Values: url.Values{},
+		}, false},
 		{"ok query", args{"yubikey:slot-id=9a;foo=bar?pin=123456&foo=bar"}, &URI{
 			URL:    &url.URL{Scheme: "yubikey", Opaque: "slot-id=9a;foo=bar", RawQuery: "pin=123456&foo=bar"},
 			Values: url.Values{"slot-id": []string{"9a"}, "foo": []string{"bar"}},
@@ -115,6 +119,7 @@ func TestParse(t *testing.T) {
 			URL:    &url.URL{Scheme: "file", Host: "tmp", Path: "/ca.cert"},
 			Values: url.Values{},
 		}, false},
+		{"fail schema", args{"cloudkms"}, nil, true},
 		{"fail parse", args{"yubi%key:slot-id=9a"}, nil, true},
 		{"fail scheme", args{"yubikey"}, nil, true},
 		{"fail parse opaque", args{"yubikey:slot-id=%ZZ"}, nil, true},
@@ -148,12 +153,17 @@ func TestParseWithScheme(t *testing.T) {
 			URL:    &url.URL{Scheme: "yubikey", Opaque: "slot-id=9a"},
 			Values: url.Values{"slot-id": []string{"9a"}},
 		}, false},
+		{"ok schema", args{"cloudkms", "cloudkms:"}, &URI{
+			URL:    &url.URL{Scheme: "cloudkms"},
+			Values: url.Values{},
+		}, false},
 		{"ok file", args{"file", "file:///tmp/ca.cert"}, &URI{
 			URL:    &url.URL{Scheme: "file", Path: "/tmp/ca.cert"},
 			Values: url.Values{},
 		}, false},
 		{"fail parse", args{"yubikey", "yubikey"}, nil, true},
 		{"fail scheme", args{"yubikey", "awskms:slot-id=9a"}, nil, true},
+		{"fail schema", args{"cloudkms", "cloudkms"}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
