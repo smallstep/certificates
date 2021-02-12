@@ -306,3 +306,17 @@ func TestNewEmbedded_GetTLSCertificate(t *testing.T) {
 	assert.True(t, cert.Leaf.IPAddresses[0].Equal(net.ParseIP("127.0.0.1")))
 	assert.True(t, cert.Leaf.IPAddresses[1].Equal(net.ParseIP("::1")))
 }
+
+func TestAuthority_CloseForReload(t *testing.T) {
+	tests := []struct {
+		name string
+		auth *Authority
+	}{
+		{"ok", testAuthority(t)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.auth.CloseForReload()
+		})
+	}
+}

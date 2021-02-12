@@ -5,6 +5,7 @@ go 1.14
 require (
 	cloud.google.com/go v0.70.0
 	github.com/Masterminds/sprig/v3 v3.1.0
+	github.com/ThalesIgnite/crypto11 v1.2.4
 	github.com/aws/aws-sdk-go v1.30.29
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/go-piv/piv-go v1.7.0
