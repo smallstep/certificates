@@ -90,8 +90,6 @@ func main() {
 		if home, err := os.UserHomeDir(); err == nil {
 			kmsuri = "pkcs11:module-path=" + home + "\\yubihsm2-sdk\\bin\\yubihsm_pkcs11.dll" + ";token=YubiHSM"
 		}
-	default:
-
 	}
 
 	var c Config
