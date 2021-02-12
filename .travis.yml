@@ -18,7 +18,7 @@ env:
 before_script:
   - make bootstrap
 script:
-  - make
+  - make travis
   - make artifacts
 after_success:
   - bash <(curl -s https://codecov.io/bash) -t "$CODECOV_TOKEN" || echo "Codecov did
