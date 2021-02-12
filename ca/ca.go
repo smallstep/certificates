@@ -18,6 +18,7 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
+	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/server"
 	"github.com/smallstep/nosql"
 )
@@ -141,6 +142,27 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	// of the ACME spec.
 	mux.Route("/2.0/"+prefix, func(r chi.Router) {
 		acmeRouterHandler.Route(r)
+	})
+
+	// TODO: THIS SHOULDN'T HAPPEN (or should become configurable)
+	// Current SCEP client I'm testing with doesn't seem to easily trust untrusted certs.
+	tlsConfig = nil
+
+	scepPrefix := "scep"
+	scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
+		//Certificates: certificates,
+		//AuthConfig: *config.AuthorityConfig,
+		//Backdate: *config.AuthorityConfig.Backdate,
+		DB:     auth.GetDatabase().(nosql.DB),
+		DNS:    dns,
+		Prefix: scepPrefix,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating SCEP authority")
+	}
+	scepRouterHandler := scep.NewAPI(scepAuthority)
+	mux.Route("/"+scepPrefix, func(r chi.Router) {
+		scepRouterHandler.Route(r)
 	})
 
 	/*
