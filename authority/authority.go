@@ -329,13 +329,14 @@ func (a *Authority) init() error {
 	audiences := a.config.getAudiences()
 	a.provisioners = provisioner.NewCollection(audiences)
 	config := provisioner.Config{
-		// TODO: this probably shouldn't happen like this; via SignAuth instead?
-		IntermediateCert: a.config.IntermediateCert,
-		SigningKey:       a.config.IntermediateKey,
-		CACertificates:   a.rootX509Certs,
-		Claims:           claimer.Claims(),
-		Audiences:        audiences,
-		DB:               a.db,
+		// TODO: I'm not sure if extending this configuration is a good way to integrate
+		// It's powerful, but leaks quite some seemingly internal stuff to the provisioner.
+		// IntermediateCert: a.config.IntermediateCert,
+		// SigningKey:       a.config.IntermediateKey,
+		// CACertificates:   a.rootX509Certs,
+		Claims:    claimer.Claims(),
+		Audiences: audiences,
+		DB:        a.db,
 		SSHKeys: &provisioner.SSHKeys{
 			UserKeys: sshKeys.UserKeys,
 			HostKeys: sshKeys.HostKeys,

@@ -1,9 +1,15 @@
 package scep
 
 import (
+	"crypto/rsa"
 	"crypto/x509"
+	"encoding/pem"
+	"errors"
+	"io/ioutil"
 
 	"github.com/smallstep/certificates/authority/provisioner"
+	database "github.com/smallstep/certificates/db"
+	"go.step.sm/crypto/pemutil"
 
 	"github.com/smallstep/nosql"
 )
@@ -34,23 +40,33 @@ type Interface interface {
 	// GetLink(ctx context.Context, linkType Link, absoluteLink bool, inputs ...string) string
 	// GetLinkExplicit(linkType Link, provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
 
-	GetCACerts() ([]*x509.Certificate, error)
+	GetCACertificates() ([]*x509.Certificate, error)
+	GetSigningKey() (*rsa.PrivateKey, error)
 }
 
 // Authority is the layer that handles all SCEP interactions.
 type Authority struct {
-	//certificates []*x509.Certificate
-	//authConfig   authority.AuthConfig
 	backdate provisioner.Duration
 	db       nosql.DB
+	prefix   string
+	dns      string
+
 	// dir      *directory
+
+	intermediateCertificate *x509.Certificate
+	intermediateKey         *rsa.PrivateKey
+
+	//signer crypto.Signer
+
 	signAuth SignAuthority
 }
 
 // AuthorityOptions required to create a new SCEP Authority.
 type AuthorityOptions struct {
-	Certificates []*x509.Certificate
-	//AuthConfig authority.AuthConfig
+	IntermediateCertificatePath string
+	IntermediateKeyPath         string
+
+	// Backdate
 	Backdate provisioner.Duration
 	// DB is the database used by nosql.
 	DB nosql.DB
@@ -69,17 +85,83 @@ type SignAuthority interface {
 	LoadProvisionerByID(string) (provisioner.Interface, error)
 }
 
+// New returns a new Authority that implements the SCEP interface.
+func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
+	if _, ok := ops.DB.(*database.SimpleDB); !ok {
+		// TODO: see ACME implementation
+	}
+
+	// TODO: the below is a bit similar as what happens in the core Authority class, which
+	// creates the full x509 service. However, those aren't accessible directly, which is
+	// why I reimplemented this (for now). There might be an alternative that I haven't
+	// found yet.
+	certificateChain, err := pemutil.ReadCertificateBundle(ops.IntermediateCertificatePath)
+	if err != nil {
+		return nil, err
+	}
+
+	intermediateKey, err := readPrivateKey(ops.IntermediateKeyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Authority{
+		backdate:                ops.Backdate,
+		db:                      ops.DB,
+		prefix:                  ops.Prefix,
+		dns:                     ops.DNS,
+		intermediateCertificate: certificateChain[0],
+		intermediateKey:         intermediateKey,
+		signAuth:                signAuth,
+	}, nil
+}
+
+func readPrivateKey(path string) (*rsa.PrivateKey, error) {
+
+	keyBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	block, _ := pem.Decode([]byte(keyBytes))
+	if block == nil {
+		return nil, nil
+	}
+
+	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
+}
+
 // LoadProvisionerByID calls out to the SignAuthority interface to load a
 // provisioner by ID.
 func (a *Authority) LoadProvisionerByID(id string) (provisioner.Interface, error) {
 	return a.signAuth.LoadProvisionerByID(id)
 }
 
-func (a *Authority) GetCACerts() ([]*x509.Certificate, error) {
+// GetCACertificates returns the certificate (chain) for the CA
+func (a *Authority) GetCACertificates() ([]*x509.Certificate, error) {
 
-	// TODO: implement the SCEP authority
+	if a.intermediateCertificate == nil {
+		return nil, errors.New("no intermediate certificate available in SCEP authority")
+	}
 
-	return []*x509.Certificate{}, nil
+	return []*x509.Certificate{a.intermediateCertificate}, nil
+}
+
+// GetSigningKey returns the RSA private key for the CA
+// TODO: we likely should provide utility functions for decrypting and
+// signing instead of providing the signing key directly
+func (a *Authority) GetSigningKey() (*rsa.PrivateKey, error) {
+
+	if a.intermediateKey == nil {
+		return nil, errors.New("no intermediate key available in SCEP authority")
+	}
+
+	return a.intermediateKey, nil
 }
 
 // Interface guards

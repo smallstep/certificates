@@ -19,6 +19,7 @@ import (
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/scep"
+	scepAPI "github.com/smallstep/certificates/scep/api"
 	"github.com/smallstep/certificates/server"
 	"github.com/smallstep/nosql"
 )
@@ -150,17 +151,17 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 
 	scepPrefix := "scep"
 	scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
-		//Certificates: certificates,
-		//AuthConfig: *config.AuthorityConfig,
-		//Backdate: *config.AuthorityConfig.Backdate,
-		DB:     auth.GetDatabase().(nosql.DB),
-		DNS:    dns,
-		Prefix: scepPrefix,
+		IntermediateCertificatePath: config.IntermediateCert,
+		IntermediateKeyPath:         config.IntermediateKey,
+		Backdate:                    *config.AuthorityConfig.Backdate,
+		DB:                          auth.GetDatabase().(nosql.DB),
+		DNS:                         dns,
+		Prefix:                      scepPrefix,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating SCEP authority")
 	}
-	scepRouterHandler := scep.NewAPI(scepAuthority)
+	scepRouterHandler := scepAPI.New(scepAuthority)
 	mux.Route("/"+scepPrefix, func(r chi.Router) {
 		scepRouterHandler.Route(r)
 	})
