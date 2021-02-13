@@ -18,7 +18,9 @@ OUTPUT_ROOT=output/
 
 all: lint test build
 
-.PHONY: all
+travis: lintcgo testcgo build
+
+.PHONY: all travis
 
 #########################################
 # Bootstrapping
@@ -119,9 +121,12 @@ generate:
 # Test
 #########################################
 test:
+	$Q $(GOFLAGS) go test -short -coverprofile=coverage.out ./...
+
+testcgo:
 	$Q go test -short -coverprofile=coverage.out ./...
 
-.PHONY: test
+.PHONY: test testcgo
 
 integrate: integration
 
@@ -138,9 +143,12 @@ fmt:
 	$Q gofmt -l -w $(SRC)
 
 lint:
+	$Q $(GOFLAGS) LOG_LEVEL=error golangci-lint run --timeout=30m
+
+lintcgo:
 	$Q LOG_LEVEL=error golangci-lint run --timeout=30m
 
-.PHONY: lint fmt
+.PHONY: fmt lint lintcgo
 
 #########################################
 # Install
