@@ -89,7 +89,7 @@ func New(ctx context.Context, opts apiv1.Options) (*KMS, error) {
 		}
 	}
 
-	// Deprecated way to setting configuration parameters.
+	// Deprecated way to set configuration parameters.
 	if opts.Region != "" {
 		o.Config.Region = &opts.Region
 	}

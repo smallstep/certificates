@@ -98,7 +98,7 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudKMS, error) {
 		}
 	}
 
-	// Deprecated way to setting configuration parameters.
+	// Deprecated way to set configuration parameters.
 	if opts.CredentialsFile != "" {
 		cloudOpts = append(cloudOpts, option.WithCredentialsFile(opts.CredentialsFile))
 	}
