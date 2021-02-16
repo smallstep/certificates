@@ -13,7 +13,11 @@ import (
 	"github.com/go-piv/piv-go/piv"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
+	"github.com/smallstep/certificates/kms/uri"
 )
+
+// Scheme is the scheme used in uris.
+const Scheme = "yubikey"
 
 // YubiKey implements the KMS interface on a YubiKey.
 type YubiKey struct {
@@ -26,6 +30,21 @@ type YubiKey struct {
 // TODO(mariano): only one card is currently supported.
 func New(ctx context.Context, opts apiv1.Options) (*YubiKey, error) {
 	managementKey := piv.DefaultManagementKey
+
+	if opts.URI != "" {
+		u, err := uri.ParseWithScheme(Scheme, opts.URI)
+		if err != nil {
+			return nil, err
+		}
+		if v := u.Pin(); v != "" {
+			opts.Pin = v
+		}
+		if v := u.Get("management-key"); v != "" {
+			opts.ManagementKey = v
+		}
+	}
+
+	// Deprecated way to set configuration parameters.
 	if opts.ManagementKey != "" {
 		b, err := hex.DecodeString(opts.ManagementKey)
 		if err != nil {
