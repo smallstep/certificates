@@ -17,6 +17,9 @@ import (
 	"go.step.sm/crypto/pemutil"
 )
 
+// Scheme is the scheme used in uris.
+const Scheme = "awskms"
+
 // KMS implements a KMS using AWS Key Management Service.
 type KMS struct {
 	session *session.Session
@@ -69,7 +72,24 @@ var customerMasterKeySpecMapping = map[apiv1.SignatureAlgorithm]interface{}{
 // AWS sessions can also be configured with environment variables, see docs at
 // https://docs.aws.amazon.com/sdk-for-go/api/aws/session/ for all the options.
 func New(ctx context.Context, opts apiv1.Options) (*KMS, error) {
-	o := session.Options{}
+	var o session.Options
+
+	if opts.URI != "" {
+		u, err := uri.ParseWithScheme(Scheme, opts.URI)
+		if err != nil {
+			return nil, err
+		}
+		o.Profile = u.Get("profile")
+		if v := u.Get("region"); v != "" {
+			o.Config.Region = new(string)
+			*o.Config.Region = v
+		}
+		if f := u.Get("credentials-file"); f != "" {
+			o.SharedConfigFiles = []string{opts.CredentialsFile}
+		}
+	}
+
+	// Deprecated way to set configuration parameters.
 	if opts.Region != "" {
 		o.Config.Region = &opts.Region
 	}

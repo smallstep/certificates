@@ -5,13 +5,13 @@ import (
 	"crypto"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"reflect"
 	"testing"
 
 	gax "github.com/googleapis/gax-go/v2"
 	"github.com/smallstep/certificates/kms/apiv1"
 	"go.step.sm/crypto/pemutil"
+	"google.golang.org/api/option"
 	kmspb "google.golang.org/genproto/googleapis/cloud/kms/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -50,26 +50,63 @@ func TestParent(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
+	tmp := newKeyManagementClient
+	t.Cleanup(func() {
+		newKeyManagementClient = tmp
+	})
+	newKeyManagementClient = func(ctx context.Context, opts ...option.ClientOption) (KeyManagementClient, error) {
+		if len(opts) > 0 {
+			return nil, fmt.Errorf("test error")
+		}
+		return &MockClient{}, nil
+	}
+
 	type args struct {
 		ctx  context.Context
 		opts apiv1.Options
 	}
 	tests := []struct {
-		name     string
-		skipOnCI bool
-		args     args
-		want     *CloudKMS
-		wantErr  bool
+		name    string
+		args    args
+		want    *CloudKMS
+		wantErr bool
 	}{
-		{"fail authentication", true, args{context.Background(), apiv1.Options{}}, nil, true},
-		{"fail credentials", false, args{context.Background(), apiv1.Options{CredentialsFile: "testdata/missing"}}, nil, true},
+		{"ok", args{context.Background(), apiv1.Options{}}, &CloudKMS{client: &MockClient{}}, false},
+		{"ok with uri", args{context.Background(), apiv1.Options{URI: "cloudkms:"}}, &CloudKMS{client: &MockClient{}}, false},
+		{"fail credentials", args{context.Background(), apiv1.Options{CredentialsFile: "testdata/missing"}}, nil, true},
+		{"fail with uri", args{context.Background(), apiv1.Options{URI: "cloudkms:credentials-file=testdata/missing"}}, nil, true},
+		{"fail schema", args{context.Background(), apiv1.Options{URI: "pkcs11:"}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.skipOnCI && os.Getenv("CI") == "true" {
-				t.SkipNow()
+			got, err := New(tt.args.ctx, tt.args.opts)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("New() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
+func TestNew_real(t *testing.T) {
+	type args struct {
+		ctx  context.Context
+		opts apiv1.Options
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *CloudKMS
+		wantErr bool
+	}{
+		{"fail credentials", args{context.Background(), apiv1.Options{CredentialsFile: "testdata/missing"}}, nil, true},
+		{"fail with uri", args{context.Background(), apiv1.Options{URI: "cloudkms:credentials-file=testdata/missing"}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			got, err := New(tt.args.ctx, tt.args.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
