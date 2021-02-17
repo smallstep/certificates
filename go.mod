@@ -33,4 +33,3 @@ require (
 
 // replace github.com/smallstep/nosql => ../nosql
 // replace go.step.sm/crypto => ../crypto
-// replace github.com/smallstep/nosql => ../nosql
