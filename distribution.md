@@ -16,42 +16,19 @@ e.g. `v1.0.2`
 `-rc*` suffix. e.g. `v1.0.2-rc` or `v1.0.2-rc.4`
 
 ---
-1. **Release `cli` first**
+1. **Tag it!**
 
-    If you plan to release [`cli`](https://github.com/smallstep/cli) as part of
-    this release, `cli` must be released first. The `certificates` docker container
-    depends on the `cli` container. Make certain to wait until the `cli` travis
-    build has completed.
+    1. Find the most recent tag.
 
-2. **Update the version of step/cli**
-
-    <pre><code>
-    <b>$ go get -u github.com/smallstep/cli</b>
-    </code></pre>
-
-3. **Commit all changes.**
-
-    Make sure that the local checkout is up to date with the remote origin and
-    that all local changes have been pushed.
-
-    <pre><code>
-    <b>$ git pull --rebase origin master</b>
-    <b>$ git push</b>
-    </code></pre>
-
-4. **Tag it!**
-
-    1. **Find the most recent tag.**
-
-        <pre><code>
-        <b>$ git fetch --tags</b>
-        <b>$ git tag</b>
-        </code></pre>
+        ```
+        $> git fetch --tags
+        $> git tag
+        ```
 
         The new tag needs to be the logical successor of the most recent existing tag.
         See [versioning](#versioning) section for more information on version numbers.
 
-    2. **Select the type and value of the next tag.**
+    2. Select the type and value of the next tag.
 
         Is the new release a *release candidate* or a *standard release*?
 
@@ -62,7 +39,7 @@ e.g. `v1.0.2`
             is a release candidate, say `v1.0.2-rc.3`, then the version of the next
             release candidate should be `v1.0.2-rc.4`.
 
-        2. **Standard Release**
+        2. Standard Release
 
             If the most recent tag is a standard release, say `v1.0.2`, then the version
             of the next standard release should be `v1.0.3`. If the most recent tag
@@ -70,27 +47,27 @@ e.g. `v1.0.2`
             standard release should be `v1.0.3`.
 
 
-    3. **Create a local tag.**
+    3. Create a local tag.
 
-        <pre><code>
+        ```
         # standard release
-        <b>$ git tag v1.0.3</b>
+        $> git tag v1.0.3
         ...or
         # release candidate
-        <b>$ git tag v1.0.3-rc.1</b>
-        </code></pre>
+        $> git tag v1.0.3-rc.1
+        ```
 
-    4. **Push the new tag to the remote origin.**
+    4. Push the new tag to the remote origin.
 
-        <pre><code>
+        ```
         # standard release
-        <b>$ git push origin tag v1.0.3</b>
+        $> git push origin tag v1.0.3
         ...or
         # release candidate
-        <b>$ git push origin tag v1.0.3-rc.1</b>
-        </code></pre>
+        $> git push origin tag v1.0.3-rc.1
+        ```
 
-5. **Check the build status at**
+2. **Check the build status at**
 [Travis-CI](https://travis-ci.com/smallstep/certificates/builds/).
 
     Travis will begin by verifying that there are no compilation or linting errors
@@ -105,7 +82,7 @@ e.g. `v1.0.2`
     * **step-certificates_1.0.3_darwin_amd64.tar.gz**: tarball containing a statically compiled darwin binary.
     * **step-certificates.tar.gz**: tarball containing a git archive of the full repo.
 
-6. **Update the AUR Arch Linux package**
+3. **Update the AUR Arch Linux package**
 
     > **NOTE**: if you plan to release `cli` next then you can skip this step.
 
@@ -119,7 +96,7 @@ e.g. `v1.0.2`
     <b>$ ./update --ca v1.0.3</b>
     </code></pre>
 
-7. **Update the Helm packages**
+4. **Update the Helm packages**
 
     > **NOTE**: This is an optional step, only necessary if we want to release a
     > new helm package.
