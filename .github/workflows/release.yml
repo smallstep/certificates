@@ -67,7 +67,6 @@ jobs:
     name: Build & Upload Docker Images
     runs-on: ubuntu-latest
     needs: release
-    if: needs.test.outputs.is_prerelease == 'false'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
