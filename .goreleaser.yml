@@ -8,6 +8,7 @@ before:
     # - go generate ./...
 builds:
   -
+    id: step-ca
     env:
       - CGO_ENABLED=0
     goos:
@@ -27,6 +28,7 @@ builds:
     ldflags:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
   -
+    id: step-cloudkms-init
     env:
       - CGO_ENABLED=0
     goos:
@@ -46,6 +48,7 @@ builds:
     ldflags:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
   -
+    id: step-awskms-init
     env:
       - CGO_ENABLED=0
     goos:
