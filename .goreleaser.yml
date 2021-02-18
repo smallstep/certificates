@@ -5,7 +5,6 @@ before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod download
-    # - go generate ./...
 builds:
   -
     id: step-ca
@@ -24,7 +23,7 @@ builds:
     flags:
       - -trimpath
     main: ./cmd/step-ca/main.go
-    binary: bin/step
+    binary: bin/step-ca
     ldflags:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
   -
@@ -124,41 +123,42 @@ release:
   #  - glob: ./path/to/file.txt
   #  - glob: ./glob/**/to/**/file/**/*
   #  - glob: ./glob/foo/to/bar/file/foobar/override_from_previous
-scoop:
-  # Template for the url which is determined by the given Token (github or gitlab)
-  # Default for github is "https://github.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-  # Default for gitlab is "https://gitlab.com/<repo_owner>/<repo_name>/uploads/{{ .ArtifactUploadHash }}/{{ .ArtifactName }}"
-  # Default for gitea is "https://gitea.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-  url_template: "http://github.com/smallstep/certificates/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
 
-  # Repository to push the app manifest to.
-  bucket:
-    owner: smallstep
-    name: scoop-bucket
-
-  # Git author used to commit to the repository.
-  # Defaults are shown.
-  commit_author:
-    name: goreleaserbot
-    email: goreleaser@smallstep.com
-
-  # The project name and current git tag are used in the format string.
-  commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
-
-  # Your app's homepage.
-  # Default is empty.
-  homepage: "https://smallstep.com/docs/step-ca"
-
-  # Skip uploads for prerelease.
-  skip_upload: auto
-
-  # Your app's description.
-  # Default is empty.
-  description: "A private certificate authority (X.509 & SSH) & ACME server for secure automated certificate management, so you can use TLS everywhere & SSO for SSH."
-
-  # Your app's license
-  # Default is empty.
-  license: "Apache-2.0"
+  #scoop:
+  #  # Template for the url which is determined by the given Token (github or gitlab)
+  #  # Default for github is "https://github.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+  #  # Default for gitlab is "https://gitlab.com/<repo_owner>/<repo_name>/uploads/{{ .ArtifactUploadHash }}/{{ .ArtifactName }}"
+  #  # Default for gitea is "https://gitea.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+  #  url_template: "http://github.com/smallstep/certificates/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+  #
+  #  # Repository to push the app manifest to.
+  #  bucket:
+  #    owner: smallstep
+  #    name: scoop-bucket
+  #
+  #  # Git author used to commit to the repository.
+  #  # Defaults are shown.
+  #  commit_author:
+  #    name: goreleaserbot
+  #    email: goreleaser@smallstep.com
+  #
+  #  # The project name and current git tag are used in the format string.
+  #  commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+  #
+  #  # Your app's homepage.
+  #  # Default is empty.
+  #  homepage: "https://smallstep.com/docs/step-ca"
+  #
+  #  # Skip uploads for prerelease.
+  #  skip_upload: auto
+  #
+  #  # Your app's description.
+  #  # Default is empty.
+  #  description: "A private certificate authority (X.509 & SSH) & ACME server for secure automated certificate management, so you can use TLS everywhere & SSO for SSH."
+  #
+  #  # Your app's license
+  #  # Default is empty.
+  #  license: "Apache-2.0"
 
   #dockers:
   #  - dockerfile: docker/Dockerfile

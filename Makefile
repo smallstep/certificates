@@ -267,38 +267,10 @@ bundle-darwin: binary-darwin
 .PHONY: binary-linux binary-darwin bundle-linux bundle-darwin
 
 #################################################
-# Targets for creating OS specific artifacts and archives
-#################################################
-
-artifacts-linux-tag: bundle-linux debian
-
-artifacts-darwin-tag: bundle-darwin
-
-artifacts-archive-tag:
-	$Q mkdir -p $(RELEASE)
-	$Q git archive v$(VERSION) | gzip > $(RELEASE)/step-certificates_$(VERSION).tar.gz
-
-artifacts-tag: artifacts-linux-tag artifacts-darwin-tag artifacts-archive-tag
-
-.PHONY: artifacts-linux-tag artifacts-darwin-tag artifacts-archive-tag artifacts-tag
-
-#################################################
 # Targets for creating step artifacts
 #################################################
 
-# For all builds that are not tagged and not on the master branch
-artifacts-branch:
-
-# For all builds that are not tagged
-artifacts-master:
-
-# For all builds with a release-candidate (-rc) tag
-artifacts-release-candidate: artifacts-tag
-
-# For all builds with a release tag
-artifacts-release: artifacts-tag
-
 # This command is called by travis directly *after* a successful build
-artifacts: artifacts-$(PUSHTYPE) docker-$(PUSHTYPE)
+docker-artifacts: docker-$(PUSHTYPE)
 
-.PHONY: artifacts-master artifacts-release-candidate artifacts-release artifacts
+.PHONY: docker-artifacts
