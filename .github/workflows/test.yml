@@ -1,0 +1,31 @@
+name: Lint, Test, Build
+
+on:
+  push:
+    tags-ignore:
+    - 'v*'
+    branches:
+    - "**"
+  pull_request:
+
+jobs:
+  lintTestBuild:
+    name: Lint, Test, Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '^1.15.6'
+      - name: Lint, Test, Build
+        id: lintTestBuild
+        run: V=1 make -j1 bootstrap all
+      - name: Codecov
+        uses: codecov/codecov-action@v1.2.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+          file: ./coverage.out # optional
+          name: codecov-umbrella # optional
+          fail_ci_if_error: true # optional (default = false)
