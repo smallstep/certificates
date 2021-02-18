@@ -7,43 +7,30 @@ on:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
-  lintTestBuild:
+  lint_test_build:
     name: Lint, Test, Build
     runs-on: ubuntu-latest
+    outputs:
+      is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
     steps:
-      - name: Checkout
+      -
+        name: Checkout
         uses: actions/checkout@v2
-      - name: Setup Go
+      -
+        name: Setup Go
         uses: actions/setup-go@v2
         with:
           go-version: '^1.15.6'
-      - name: Install Deps
+      -
+        name: Install Deps
         id: install-deps
         run: sudo apt-get -y install libpcsclite-dev
-      - name: Lint, Test, Build
+      -
+        name: Lint, Test, Build
         id: lintTestBuild
         run: V=1 make -j1 bootstrap travis
-
-  create_release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: lintTestBuild
-    outputs:
-      version: ${{ steps.extract-tag.outputs.VERSION }}
-      vversion: ${{ steps.extract-tag.outputs.VVERSION }}
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Extract Tag Names
-        id: extract-tag
-        run: |
-          VVERSION=${GITHUB_REF#refs/tags/}
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "::set-output name=VVERSION::${VVERSION}"
-          echo "::set-output name=VERSION::${VERSION}"
-      - name: Is Pre-release
+      -
+        name: Is Pre-release
         id: is_prerelease
         run: |
           set +e
@@ -51,21 +38,11 @@ jobs:
           OUT=$?
           if [ $OUT -eq 0 ]; then IS_PRERELEASE=true; else IS_PRERELEASE=false; fi
           echo "::set-output name=IS_PRERELEASE::${IS_PRERELEASE}"
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
 
   build_upload_github_assets:
     name: Build & Upload Mac OS | Linux | Windows Assets To Github Release
     runs-on: ubuntu-latest
-    needs: create_release
+    needs: lint_test_build
     steps:
       -
         name: Checkout
