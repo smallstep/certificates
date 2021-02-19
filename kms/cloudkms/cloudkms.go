@@ -140,19 +140,7 @@ func (k *CloudKMS) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, 
 	if req.SigningKey == "" {
 		return nil, errors.New("signing key cannot be empty")
 	}
-
-	// Validate that the key exists
-	ctx, cancel := defaultContext()
-	defer cancel()
-
-	_, err := k.client.GetPublicKey(ctx, &kmspb.GetPublicKeyRequest{
-		Name: req.SigningKey,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "cloudKMS GetPublicKey failed")
-	}
-
-	return NewSigner(k.client, req.SigningKey), nil
+	return NewSigner(k.client, req.SigningKey)
 }
 
 // CreateKey creates in Google's Cloud KMS a new asymmetric key for signing.
