@@ -222,6 +222,7 @@ func (h *Handler) GetCACert(w http.ResponseWriter, r *http.Request, scepResponse
 		scepResponse.CACertNum = 1
 	} else {
 		data, err := microscep.DegenerateCertificates(certs)
+		scepResponse.CACertNum = len(certs)
 		scepResponse.Data = data
 		scepResponse.Err = err
 	}
@@ -335,7 +336,7 @@ func createKeyIdentifier(pub crypto.PublicKey) ([]byte, error) {
 }
 
 func formatCapabilities(caps []string) []byte {
-	return []byte(strings.Join(caps, "\n"))
+	return []byte(strings.Join(caps, "\r\n"))
 }
 
 // writeSCEPResponse writes a SCEP response back to the SCEP client.
@@ -350,7 +351,7 @@ func writeSCEPResponse(w http.ResponseWriter, response SCEPResponse) error {
 }
 
 var (
-	// TODO: check the default capabilities
+	// TODO: check the default capabilities; https://tools.ietf.org/html/rfc8894#section-3.5.2
 	defaultCapabilities = []string{
 		"Renewal",
 		"SHA-1",
