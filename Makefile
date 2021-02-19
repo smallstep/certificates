@@ -18,7 +18,7 @@ OUTPUT_ROOT=output/
 
 all: lint test build
 
-travis: lintcgo testcgo build
+ci: lintcgo testcgo build
 
 .PHONY: all travis
 

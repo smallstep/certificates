@@ -20,7 +20,7 @@ jobs:
         name: Setup Go
         uses: actions/setup-go@v2
         with:
-          go-version: '^1.15.6'
+          go-version: '^1.16.0'
       -
         name: Install Deps
         id: install-deps
@@ -28,7 +28,7 @@ jobs:
       -
         name: Lint, Test, Build
         id: lint_test_build
-        run: V=1 make -j1 bootstrap travis
+        run: V=1 make -j1 bootstrap ci
       -
         name: Is Pre-release
         id: is_prerelease
