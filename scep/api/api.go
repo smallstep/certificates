@@ -178,9 +178,18 @@ type nextHTTP = func(http.ResponseWriter, *http.Request)
 func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 
+		// name := chi.URLParam(r, "provisionerID")
+		// provisionerID, err := url.PathUnescape(name)
+		// if err != nil {
+		// 	api.WriteError(w, fmt.Errorf("error url unescaping provisioner id '%s'", name))
+		// 	return
+		// }
+
 		// TODO: make this configurable; and we might want to look at being able to provide multiple,
-		// like the actual ACME one? The below assumes a SCEP provider (scep/) called "scep1" exists.
-		p, err := h.Auth.LoadProvisionerByID("scep/scep1")
+		// like the ACME one? The below assumes a SCEP provider (scep/) called "scep1" exists.
+		provisionerID := "scep1"
+
+		p, err := h.Auth.LoadProvisionerByID("scep/" + provisionerID)
 		if err != nil {
 			api.WriteError(w, err)
 			return
