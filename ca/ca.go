@@ -147,6 +147,13 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 
 	// TODO: THIS SHOULDN'T HAPPEN (or should become configurable)
 	// Current SCEP client I'm testing with doesn't seem to easily trust untrusted certs.
+	// Idea: provide a second mux/handler that runs without TLS. It probably should only
+	// have routes that are intended to be ran without TLS, like the SCEP ones. Look into
+	// option to not enable it in case no SCEP providers are configured. It might
+	// be nice to still include the SCEP routes in the secure handler too, for
+	// client that do understand HTTPS. The RFC does not seem to explicitly exclude HTTPS
+	// usage, but it mentions some caveats related to managing web PKI certificates as
+	// well as certificates via SCEP.
 	tlsConfig = nil
 
 	scepPrefix := "scep"
@@ -166,16 +173,8 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		scepRouterHandler.Route(r)
 	})
 
-	/*
-		// helpful routine for logging all routes //
-		walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
-			fmt.Printf("%s %s\n", method, route)
-			return nil
-		}
-		if err := chi.Walk(mux, walkFunc); err != nil {
-			fmt.Printf("Logging err: %s\n", err.Error())
-		}
-	*/
+	// helpful routine for logging all routes //
+	//dumpRoutes(mux)
 
 	// Add monitoring if configured
 	if len(config.Monitoring) > 0 {
@@ -315,4 +314,15 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	tlsConfig.PreferServerCipherSuites = true
 
 	return tlsConfig, nil
+}
+
+func dumpRoutes(mux chi.Routes) {
+	// helpful routine for logging all routes //
+	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		fmt.Printf("%s %s\n", method, route)
+		return nil
+	}
+	if err := chi.Walk(mux, walkFunc); err != nil {
+		fmt.Printf("Logging err: %s\n", err.Error())
+	}
 }
