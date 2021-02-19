@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"crypto"
-	"crypto/dsa"
+	"crypto/dsa" //nolint
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
