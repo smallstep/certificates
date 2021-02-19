@@ -31,6 +31,7 @@ import (
 	_ "github.com/smallstep/certificates/kms/sshagentkms"
 
 	// Experimental kms interfaces.
+	_ "github.com/smallstep/certificates/kms/pkcs11"
 	_ "github.com/smallstep/certificates/kms/yubikey"
 
 	// Enabled cas interfaces.

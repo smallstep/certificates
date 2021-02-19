@@ -14,10 +14,14 @@ import (
 	gax "github.com/googleapis/gax-go/v2"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
+	"github.com/smallstep/certificates/kms/uri"
 	"go.step.sm/crypto/pemutil"
 	"google.golang.org/api/option"
 	kmspb "google.golang.org/genproto/googleapis/cloud/kms/v1"
 )
+
+// Scheme is the scheme used in uris.
+const Scheme = "cloudkms"
 
 const pendingGenerationRetries = 10
 
@@ -71,6 +75,10 @@ type KeyManagementClient interface {
 	CreateCryptoKeyVersion(ctx context.Context, req *kmspb.CreateCryptoKeyVersionRequest, opts ...gax.CallOption) (*kmspb.CryptoKeyVersion, error)
 }
 
+var newKeyManagementClient = func(ctx context.Context, opts ...option.ClientOption) (KeyManagementClient, error) {
+	return cloudkms.NewKeyManagementClient(ctx, opts...)
+}
+
 // CloudKMS implements a KMS using Google's Cloud apiv1.
 type CloudKMS struct {
 	client KeyManagementClient
@@ -79,11 +87,23 @@ type CloudKMS struct {
 // New creates a new CloudKMS configured with a new client.
 func New(ctx context.Context, opts apiv1.Options) (*CloudKMS, error) {
 	var cloudOpts []option.ClientOption
+
+	if opts.URI != "" {
+		u, err := uri.ParseWithScheme(Scheme, opts.URI)
+		if err != nil {
+			return nil, err
+		}
+		if f := u.Get("credentials-file"); f != "" {
+			cloudOpts = append(cloudOpts, option.WithCredentialsFile(f))
+		}
+	}
+
+	// Deprecated way to set configuration parameters.
 	if opts.CredentialsFile != "" {
 		cloudOpts = append(cloudOpts, option.WithCredentialsFile(opts.CredentialsFile))
 	}
 
-	client, err := cloudkms.NewKeyManagementClient(ctx, cloudOpts...)
+	client, err := newKeyManagementClient(ctx, cloudOpts...)
 	if err != nil {
 		return nil, err
 	}

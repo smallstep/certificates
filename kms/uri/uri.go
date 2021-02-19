@@ -1,8 +1,12 @@
 package uri
 
 import (
+	"bytes"
+	"encoding/hex"
+	"io/ioutil"
 	"net/url"
 	"strings"
+	"unicode"
 
 	"github.com/pkg/errors"
 )
@@ -79,8 +83,54 @@ func ParseWithScheme(scheme, rawuri string) (*URI, error) {
 	return u, nil
 }
 
-// Get returns the first value in the uri with the give n key, it will return
+// Get returns the first value in the uri with the given key, it will return
 // empty string if that field is not present.
 func (u *URI) Get(key string) string {
-	return u.Values.Get(key)
+	v := u.Values.Get(key)
+	if v == "" {
+		v = u.URL.Query().Get(key)
+	}
+	return v
+}
+
+// GetEncoded returns the first value in the uri with the given key, it will
+// return empty nil if that field is not present or is empty. If the return
+// value is hex encoded it will decode it and return it.
+func (u *URI) GetEncoded(key string) []byte {
+	v := u.Get(key)
+	if v == "" {
+		return nil
+	}
+	if len(v)%2 == 0 {
+		if b, err := hex.DecodeString(v); err == nil {
+			return b
+		}
+	}
+	return []byte(v)
+}
+
+// Pin returns the pin encoded in the url. It will read the pin from the
+// pin-value or the pin-source attributes.
+func (u *URI) Pin() string {
+	if value := u.Get("pin-value"); value != "" {
+		return value
+	}
+	if path := u.Get("pin-source"); path != "" {
+		if b, err := readFile(path); err == nil {
+			return string(bytes.TrimRightFunc(b, unicode.IsSpace))
+		}
+	}
+	return ""
+}
+
+func readFile(path string) ([]byte, error) {
+	u, err := url.Parse(path)
+	if err == nil && (u.Scheme == "" || u.Scheme == "file") && u.Path != "" {
+		path = u.Path
+	}
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", path)
+	}
+	return b, nil
 }

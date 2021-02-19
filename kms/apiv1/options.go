@@ -26,14 +26,27 @@ type CertificateManager interface {
 // ErrNotImplemented is the type of error returned if an operation is not
 // implemented.
 type ErrNotImplemented struct {
-	msg string
+	Message string
 }
 
 func (e ErrNotImplemented) Error() string {
-	if e.msg != "" {
-		return e.msg
+	if e.Message != "" {
+		return e.Message
 	}
 	return "not implemented"
+}
+
+// ErrAlreadyExists is the type of error returned if a key already exists. This
+// is currently only implmented on pkcs11.
+type ErrAlreadyExists struct {
+	Message string
+}
+
+func (e ErrAlreadyExists) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return "key already exists"
 }
 
 // Type represents the KMS type used.
@@ -64,10 +77,15 @@ type Options struct {
 	// Path to the credentials file used in CloudKMS and AmazonKMS.
 	CredentialsFile string `json:"credentialsFile"`
 
-	// Path to the module used with PKCS11 KMS.
-	Module string `json:"module"`
+	// URI is based on the PKCS #11 URI Scheme defined in
+	// https://tools.ietf.org/html/rfc7512 and represents the configuration used
+	// to connect to the KMS.
+	//
+	// Used by: pkcs11
+	URI string `json:"uri"`
 
-	// Pin used to access the PKCS11 module.
+	// Pin used to access the PKCS11 module. It can be defined in the URI using
+	// the pin-value or pin-source properties.
 	Pin string `json:"pin"`
 
 	// ManagementKey used in YubiKeys. Default management key is the hexadecimal
@@ -93,10 +111,9 @@ func (o *Options) Validate() error {
 	}
 
 	switch Type(strings.ToLower(o.Type)) {
-	case DefaultKMS, SoftKMS, CloudKMS, AmazonKMS, SSHAgentKMS:
-	case YubiKey:
-	case PKCS11:
-		return ErrNotImplemented{"support for PKCS11 is not yet implemented"}
+	case DefaultKMS, SoftKMS: // Go crypto based kms.
+	case CloudKMS, AmazonKMS, SSHAgentKMS: // Cloud based kms.
+	case YubiKey, PKCS11: // Hardware based kms.
 	default:
 		return errors.Errorf("unsupported kms type %s", o.Type)
 	}

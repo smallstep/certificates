@@ -234,7 +234,7 @@ func createSSH(c *cloudkms.CloudKMS, project, location, keyRing string, protecti
 	resp, err = c.CreateKey(&apiv1.CreateKeyRequest{
 		Name:               parent + "/ssh-host-key",
 		SignatureAlgorithm: apiv1.ECDSAWithSHA256,
-		ProtectionLevel:    apiv1.Software,
+		ProtectionLevel:    protectionLevel,
 	})
 	if err != nil {
 		return err
