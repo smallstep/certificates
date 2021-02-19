@@ -24,7 +24,7 @@ jobs:
         run: sudo apt-get -y install libpcsclite-dev
       - name: Lint, Test, Build
         id: lintTestBuild
-        run: V=1 make -j1 bootstrap travis
+        run: V=1 make -j1 bootstrap ci
       - name: Codecov
         uses: codecov/codecov-action@v1.2.1
         with:
