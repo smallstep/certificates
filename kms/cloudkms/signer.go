@@ -13,33 +13,41 @@ import (
 type Signer struct {
 	client     KeyManagementClient
 	signingKey string
+	publicKey  crypto.PublicKey
 }
 
-func NewSigner(c KeyManagementClient, signingKey string) *Signer {
-	return &Signer{
+// NewSigner creates a new crypto.Signer the given CloudKMS signing key.
+func NewSigner(c KeyManagementClient, signingKey string) (*Signer, error) {
+	// Make sure that the key exists.
+	signer := &Signer{
 		client:     c,
 		signingKey: signingKey,
 	}
+	if err := signer.preloadKey(signingKey); err != nil {
+		return nil, err
+	}
+
+	return signer, nil
 }
 
-// Public returns the public key of this signer or an error.
-func (s *Signer) Public() crypto.PublicKey {
+func (s *Signer) preloadKey(signingKey string) error {
 	ctx, cancel := defaultContext()
 	defer cancel()
 
 	response, err := s.client.GetPublicKey(ctx, &kmspb.GetPublicKeyRequest{
-		Name: s.signingKey,
+		Name: signingKey,
 	})
 	if err != nil {
 		return errors.Wrap(err, "cloudKMS GetPublicKey failed")
 	}
 
-	pk, err := pemutil.ParseKey([]byte(response.Pem))
-	if err != nil {
-		return err
-	}
+	s.publicKey, err = pemutil.ParseKey([]byte(response.Pem))
+	return err
+}
 
-	return pk
+// Public returns the public key of this signer or an error.
+func (s *Signer) Public() crypto.PublicKey {
+	return s.publicKey
 }
 
 // Sign signs digest with the private key stored in Google's Cloud KMS.

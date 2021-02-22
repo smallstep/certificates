@@ -165,6 +165,15 @@ func TestCloudKMS_Close(t *testing.T) {
 
 func TestCloudKMS_CreateSigner(t *testing.T) {
 	keyName := "projects/p/locations/l/keyRings/k/cryptoKeys/c/cryptoKeyVersions/1"
+	pemBytes, err := ioutil.ReadFile("testdata/pub.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pk, err := pemutil.ParseKey(pemBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type fields struct {
 		client KeyManagementClient
 	}
@@ -178,8 +187,16 @@ func TestCloudKMS_CreateSigner(t *testing.T) {
 		want    crypto.Signer
 		wantErr bool
 	}{
-		{"ok", fields{&MockClient{}}, args{&apiv1.CreateSignerRequest{SigningKey: keyName}}, &Signer{client: &MockClient{}, signingKey: keyName}, false},
-		{"fail", fields{&MockClient{}}, args{&apiv1.CreateSignerRequest{SigningKey: ""}}, nil, true},
+		{"ok", fields{&MockClient{
+			getPublicKey: func(_ context.Context, _ *kmspb.GetPublicKeyRequest, _ ...gax.CallOption) (*kmspb.PublicKey, error) {
+				return &kmspb.PublicKey{Pem: string(pemBytes)}, nil
+			},
+		}}, args{&apiv1.CreateSignerRequest{SigningKey: keyName}}, &Signer{client: &MockClient{}, signingKey: keyName, publicKey: pk}, false},
+		{"fail", fields{&MockClient{
+			getPublicKey: func(_ context.Context, _ *kmspb.GetPublicKeyRequest, _ ...gax.CallOption) (*kmspb.PublicKey, error) {
+				return nil, fmt.Errorf("test error")
+			},
+		}}, args{&apiv1.CreateSignerRequest{SigningKey: ""}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -190,6 +207,9 @@ func TestCloudKMS_CreateSigner(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CloudKMS.CreateSigner() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if signer, ok := got.(*Signer); ok {
+				signer.client = &MockClient{}
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("CloudKMS.CreateSigner() = %v, want %v", got, tt.want)
