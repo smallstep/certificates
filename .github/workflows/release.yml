@@ -68,7 +68,7 @@ jobs:
           prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
 
   goreleaser:
-    name: Create Release & Upload Assets
+    name: Upload Assets To Github w/ goreleaser
     runs-on: ubuntu-20.04
     needs: create_release
     steps:
@@ -92,7 +92,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PAT }}
 
   release_deb:
-    name: Build & Release Debian package
+    name: Build & Upload Debian Package To Github
     runs-on: ubuntu-20.04
     needs: create_release
     steps:

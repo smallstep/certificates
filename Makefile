@@ -20,7 +20,7 @@ all: lint test build
 
 ci: lintcgo testcgo build
 
-.PHONY: all travis
+.PHONY: all ci
 
 #########################################
 # Bootstrapping
@@ -45,6 +45,15 @@ PUSHTYPE := release-candidate
 	else
 PUSHTYPE := release
 	endif
+# GITHUB Actions
+else ifdef GITHUB_REF
+VERSION := $(shell echo $(GITHUB_REF) | sed 's/^refs\/tags\///')
+NOT_RC  := $(shell echo $(VERSION) | grep -v -e -rc)
+	ifeq ($(NOT_RC),)
+PUSHTYPE := release-candidate
+	else
+PUSHTYPE := release
+	endif
 else
 VERSION ?= $(shell [ -d .git ] && git describe --tags --always --dirty="-dev")
 # If we are not in an active git dir then try reading the version from .VERSION.
@@ -62,6 +71,7 @@ DEB_VERSION := $(shell echo $(VERSION) | sed 's/-/~/g')
 
 ifdef V
 $(info    TRAVIS_TAG is $(TRAVIS_TAG))
+$(info    GITHUB_REF is $(GITHUB_REF))
 $(info    VERSION is $(VERSION))
 $(info    DEB_VERSION is $(DEB_VERSION))
 $(info    PUSHTYPE is $(PUSHTYPE))
@@ -270,7 +280,6 @@ bundle-darwin: binary-darwin
 # Targets for creating step artifacts
 #################################################
 
-# This command is called by travis directly *after* a successful build
 docker-artifacts: docker-$(PUSHTYPE)
 
 .PHONY: docker-artifacts
