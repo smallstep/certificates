@@ -156,7 +156,7 @@ func TestBootstrap(t *testing.T) {
 					}
 					gotTR := got.client.GetTransport().(*http.Transport)
 					wantTR := tt.want.client.GetTransport().(*http.Transport)
-					if !reflect.DeepEqual(gotTR.TLSClientConfig.RootCAs, wantTR.TLSClientConfig.RootCAs) {
+					if !equalPools(gotTR.TLSClientConfig.RootCAs, wantTR.TLSClientConfig.RootCAs) {
 						t.Errorf("Bootstrap() certPool = %v, want %v", gotTR.TLSClientConfig.RootCAs, wantTR.TLSClientConfig.RootCAs)
 					}
 				}
