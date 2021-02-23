@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/dsa"
+	"crypto/dsa" //nolint
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"

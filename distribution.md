@@ -16,7 +16,6 @@ e.g. `v1.0.2`
 `-rc*` suffix. e.g. `v1.0.2-rc` or `v1.0.2-rc.4`
 
 ---
-
 1. **Tag it!**
 
     1. Find the most recent tag.
