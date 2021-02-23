@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     name: Lint, Test, Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     outputs:
       is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
     steps:
@@ -20,7 +20,7 @@ jobs:
         name: Setup Go
         uses: actions/setup-go@v2
         with:
-          go-version: '^1.15.6'
+          go-version: '^1.15.8'
       -
         name: Install Deps
         id: install-deps
@@ -39,10 +39,38 @@ jobs:
           if [ $OUT -eq 0 ]; then IS_PRERELEASE=true; else IS_PRERELEASE=false; fi
           echo "::set-output name=IS_PRERELEASE::${IS_PRERELEASE}"
 
-  release:
-    name: Create Release & Upload Assets
-    runs-on: ubuntu-latest
+  create_release:
+    name: Create Release
     needs: test
+    runs-on: ubuntu-20.04
+    outputs:
+      is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
+    steps:
+      -
+        name: Is Pre-release
+        id: is_prerelease
+        run: |
+          set +e
+          echo ${{ github.ref }} | grep "\-rc.*"
+          OUT=$?
+          if [ $OUT -eq 0 ]; then IS_PRERELEASE=true; else IS_PRERELEASE=false; fi
+          echo "::set-output name=IS_PRERELEASE::${IS_PRERELEASE}"
+      -
+        name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
+
+  goreleaser:
+    name: Create Release & Upload Assets
+    runs-on: ubuntu-20.04
+    needs: create_release
     steps:
       -
         name: Checkout
@@ -63,9 +91,43 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }}
 
+  release_deb:
+    name: Build & Release Debian package
+    runs-on: ubuntu-20.04
+    needs: create_release
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      -
+        name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '^1.15.8'
+      -
+        name: APT Install
+        id: aptInstall
+        run: sudo apt-get -y install build-essential debhelper fakeroot
+      -
+        name: Build Debian package
+        id: build
+        run: |
+          PATH=$PATH:/usr/local/go/bin:/home/admin/go/bin
+          make debian
+      -
+        name: Upload Debian Package
+        id: upload_deb
+        run: |
+          tag_name="${GITHUB_REF##*/}"
+          hub release edit $(find ./.releases -type f -printf "-a %p ") -m "" "$tag_name"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build_upload_docker:
     name: Build & Upload Docker Images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: test
     steps:
       - name: Checkout
@@ -73,7 +135,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v2
         with:
-          go-version: '^1.15.6'
+          go-version: '^1.15.8'
       - name: Build
         id: build
         run: |
