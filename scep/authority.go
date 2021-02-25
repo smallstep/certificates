@@ -1,17 +1,26 @@
 package scep
 
 import (
-	"crypto/rsa"
+	"bytes"
 	"crypto/x509"
-	"encoding/pem"
 	"errors"
-	"io/ioutil"
+	"fmt"
+	"math/big"
+	"math/rand"
 
 	"github.com/smallstep/certificates/authority/provisioner"
 	database "github.com/smallstep/certificates/db"
+
 	"go.step.sm/crypto/pemutil"
 
 	"github.com/smallstep/nosql"
+
+	microx509util "github.com/micromdm/scep/crypto/x509util"
+	microscep "github.com/micromdm/scep/scep"
+
+	"github.com/smallstep/certificates/scep/pkcs7"
+
+	"go.step.sm/crypto/x509util"
 )
 
 // Interface is the SCEP authority interface.
@@ -41,7 +50,10 @@ type Interface interface {
 	// GetLinkExplicit(linkType Link, provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
 
 	GetCACertificates() ([]*x509.Certificate, error)
-	GetSigningKey() (*rsa.PrivateKey, error)
+	//GetSigningKey() (*rsa.PrivateKey, error)
+
+	DecryptPKIEnvelope(*PKIMessage) error
+	SignCSR(msg *PKIMessage, template *x509.Certificate) (*PKIMessage, error)
 }
 
 // Authority is the layer that handles all SCEP interactions.
@@ -54,17 +66,16 @@ type Authority struct {
 	// dir      *directory
 
 	intermediateCertificate *x509.Certificate
-	intermediateKey         *rsa.PrivateKey
 
-	//signer crypto.Signer
-
+	service  Service
 	signAuth SignAuthority
 }
 
 // AuthorityOptions required to create a new SCEP Authority.
 type AuthorityOptions struct {
 	IntermediateCertificatePath string
-	IntermediateKeyPath         string
+
+	Service Service
 
 	// Backdate
 	Backdate provisioner.Duration
@@ -79,7 +90,7 @@ type AuthorityOptions struct {
 	Prefix string
 }
 
-// SignAuthority is the interface implemented by a CA authority.
+// SignAuthority is the interface for a signing authority
 type SignAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	LoadProvisionerByID(string) (provisioner.Interface, error)
@@ -87,6 +98,7 @@ type SignAuthority interface {
 
 // New returns a new Authority that implements the SCEP interface.
 func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
+
 	if _, ok := ops.DB.(*database.SimpleDB); !ok {
 		// TODO: see ACME implementation
 	}
@@ -100,40 +112,15 @@ func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 		return nil, err
 	}
 
-	intermediateKey, err := readPrivateKey(ops.IntermediateKeyPath)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Authority{
 		backdate:                ops.Backdate,
 		db:                      ops.DB,
 		prefix:                  ops.Prefix,
 		dns:                     ops.DNS,
 		intermediateCertificate: certificateChain[0],
-		intermediateKey:         intermediateKey,
+		service:                 ops.Service,
 		signAuth:                signAuth,
 	}, nil
-}
-
-func readPrivateKey(path string) (*rsa.PrivateKey, error) {
-
-	keyBytes, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	block, _ := pem.Decode([]byte(keyBytes))
-	if block == nil {
-		return nil, nil
-	}
-
-	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return key, nil
 }
 
 // LoadProvisionerByID calls out to the SignAuthority interface to load a
@@ -145,6 +132,20 @@ func (a *Authority) LoadProvisionerByID(id string) (provisioner.Interface, error
 // GetCACertificates returns the certificate (chain) for the CA
 func (a *Authority) GetCACertificates() ([]*x509.Certificate, error) {
 
+	// TODO: this should return: the "SCEP Server (RA)" certificate, the issuing CA up to and excl. the root
+	// Some clients do need the root certificate however; also see: https://github.com/openxpki/openxpki/issues/73
+	//
+	// This means we might need to think about if we should use the current intermediate CA
+	// certificate as the "SCEP Server (RA)" certificate. It might be better to have a distinct
+	// RA certificate, with a corresponding rsa.PrivateKey, just for SCEP usage, which is signed by
+	// the intermediate CA. Will need to look how we can provide this nicely within step-ca.
+	//
+	// This might also mean that we might want to use a distinct instance of KMS for doing the key operations,
+	// so that we can use RSA just for SCEP.
+	//
+	// Using an RA does not seem to exist in https://tools.ietf.org/html/rfc8894, but is mentioned in
+	// https://tools.ietf.org/id/draft-nourse-scep-21.html. Will continue using the CA directly for now.
+
 	if a.intermediateCertificate == nil {
 		return nil, errors.New("no intermediate certificate available in SCEP authority")
 	}
@@ -152,16 +153,210 @@ func (a *Authority) GetCACertificates() ([]*x509.Certificate, error) {
 	return []*x509.Certificate{a.intermediateCertificate}, nil
 }
 
-// GetSigningKey returns the RSA private key for the CA
-// TODO: we likely should provide utility functions for decrypting and
-// signing instead of providing the signing key directly
-func (a *Authority) GetSigningKey() (*rsa.PrivateKey, error) {
+// DecryptPKIEnvelope decrypts an enveloped message
+func (a *Authority) DecryptPKIEnvelope(msg *PKIMessage) error {
 
-	if a.intermediateKey == nil {
-		return nil, errors.New("no intermediate key available in SCEP authority")
+	data := msg.Raw
+
+	p7, err := pkcs7.Parse(data)
+	if err != nil {
+		return err
 	}
 
-	return a.intermediateKey, nil
+	var tID microscep.TransactionID
+	if err := p7.UnmarshalSignedAttribute(oidSCEPtransactionID, &tID); err != nil {
+		return err
+	}
+
+	var msgType microscep.MessageType
+	if err := p7.UnmarshalSignedAttribute(oidSCEPmessageType, &msgType); err != nil {
+		return err
+	}
+
+	msg.p7 = p7
+
+	p7c, err := pkcs7.Parse(p7.Content)
+	if err != nil {
+		return err
+	}
+
+	envelope, err := p7c.Decrypt(a.intermediateCertificate, a.service.Decrypter)
+	if err != nil {
+		return err
+	}
+
+	msg.pkiEnvelope = envelope
+
+	switch msg.MessageType {
+	case microscep.CertRep:
+		certs, err := microscep.CACerts(msg.pkiEnvelope)
+		if err != nil {
+			return err
+		}
+		msg.CertRepMessage.Certificate = certs[0] // TODO: check correctness of this
+		return nil
+	case microscep.PKCSReq, microscep.UpdateReq, microscep.RenewalReq:
+		csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
+		if err != nil {
+			return fmt.Errorf("parse CSR from pkiEnvelope")
+		}
+		// check for challengePassword
+		cp, err := microx509util.ParseChallengePassword(msg.pkiEnvelope)
+		if err != nil {
+			return fmt.Errorf("scep: parse challenge password in pkiEnvelope")
+		}
+		msg.CSRReqMessage = &microscep.CSRReqMessage{
+			RawDecrypted:      msg.pkiEnvelope,
+			CSR:               csr,
+			ChallengePassword: cp,
+		}
+		//msg.Certificate = p7.Certificates[0] // TODO: check if this is necessary to add (again)
+		return nil
+	case microscep.GetCRL, microscep.GetCert, microscep.CertPoll:
+		return fmt.Errorf("not implemented") //errNotImplemented
+	}
+
+	return nil
+}
+
+// SignCSR creates an x509.Certificate based on a template and Cert Authority credentials
+// returns a new PKIMessage with CertRep data
+//func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, template *x509.Certificate) (*PKIMessage, error) {
+func (a *Authority) SignCSR(msg *PKIMessage, template *x509.Certificate) (*PKIMessage, error) {
+
+	// check if CSRReqMessage has already been decrypted
+	if msg.CSRReqMessage.CSR == nil {
+		if err := a.DecryptPKIEnvelope(msg); err != nil {
+			return nil, err
+		}
+	}
+
+	csr := msg.CSRReqMessage.CSR
+
+	// Template data
+	data := x509util.NewTemplateData()
+	data.SetCommonName(csr.Subject.CommonName)
+	//data.Set(x509util.SANsKey, sans)
+
+	// templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
+	// if err != nil {
+	// 	return nil, ServerInternalErr(errors.Wrapf(err, "error creating template options from ACME provisioner"))
+	// }
+	// signOps = append(signOps, templateOptions)
+
+	// // Create and store a new certificate.
+	// certChain, err := auth.Sign(csr, provisioner.SignOptions{
+	// 	NotBefore: provisioner.NewTimeDuration(o.NotBefore),
+	// 	NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
+	// }, signOps...)
+	// if err != nil {
+	// 	return nil, ServerInternalErr(errors.Wrapf(err, "error generating certificate for order %s", o.ID))
+	// }
+
+	// TODO: proper options
+	signOps := provisioner.SignOptions{}
+	signOps2 := []provisioner.SignOption{}
+
+	certs, err := a.signAuth.Sign(csr, signOps, signOps2...)
+	if err != nil {
+		return nil, err
+	}
+
+	cert := certs[0]
+
+	// fmt.Println("CERT")
+	// fmt.Println(cert)
+	// fmt.Println(fmt.Sprintf("%T", cert))
+	// fmt.Println(cert.Issuer)
+	// fmt.Println(cert.Subject)
+
+	serial := big.NewInt(int64(rand.Int63())) // TODO: serial logic?
+	cert.SerialNumber = serial
+
+	// create a degenerate cert structure
+	deg, err := DegenerateCertificates([]*x509.Certificate{cert})
+	if err != nil {
+		return nil, err
+	}
+
+	e7, err := pkcs7.Encrypt(deg, msg.p7.Certificates)
+	if err != nil {
+		return nil, err
+	}
+
+	// PKIMessageAttributes to be signed
+	config := pkcs7.SignerInfoConfig{
+		ExtraSignedAttributes: []pkcs7.Attribute{
+			{
+				Type:  oidSCEPtransactionID,
+				Value: msg.TransactionID,
+			},
+			{
+				Type:  oidSCEPpkiStatus,
+				Value: microscep.SUCCESS,
+			},
+			{
+				Type:  oidSCEPmessageType,
+				Value: microscep.CertRep,
+			},
+			{
+				Type:  oidSCEPrecipientNonce,
+				Value: msg.SenderNonce,
+			},
+		},
+	}
+
+	signedData, err := pkcs7.NewSignedData(e7)
+	if err != nil {
+		return nil, err
+	}
+
+	// add the certificate into the signed data type
+	// this cert must be added before the signedData because the recipient will expect it
+	// as the first certificate in the array
+	signedData.AddCertificate(cert)
+
+	authCert := a.intermediateCertificate
+
+	// sign the attributes
+	if err := signedData.AddSigner(authCert, a.service.Signer, config); err != nil {
+		return nil, err
+	}
+
+	certRepBytes, err := signedData.Finish()
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &CertRepMessage{
+		PKIStatus:      microscep.SUCCESS,
+		RecipientNonce: microscep.RecipientNonce(msg.SenderNonce),
+		Certificate:    cert,
+		degenerate:     deg,
+	}
+
+	// create a CertRep message from the original
+	crepMsg := &PKIMessage{
+		Raw:            certRepBytes,
+		TransactionID:  msg.TransactionID,
+		MessageType:    microscep.CertRep,
+		CertRepMessage: cr,
+	}
+
+	return crepMsg, nil
+}
+
+// DegenerateCertificates creates degenerate certificates pkcs#7 type
+func DegenerateCertificates(certs []*x509.Certificate) ([]byte, error) {
+	var buf bytes.Buffer
+	for _, cert := range certs {
+		buf.Write(cert.Raw)
+	}
+	degenerate, err := pkcs7.DegenerateCertificate(buf.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	return degenerate, nil
 }
 
 // Interface guards

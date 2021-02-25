@@ -13,6 +13,7 @@ type KeyManager interface {
 	GetPublicKey(req *GetPublicKeyRequest) (crypto.PublicKey, error)
 	CreateKey(req *CreateKeyRequest) (*CreateKeyResponse, error)
 	CreateSigner(req *CreateSignerRequest) (crypto.Signer, error)
+	CreateDecrypter(req *CreateDecrypterRequest) (crypto.Decrypter, error) // TODO: split into separate interface?
 	Close() error
 }
 

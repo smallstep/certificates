@@ -28,6 +28,8 @@ const (
 	opnGetCACert    = "GetCACert"
 	opnGetCACaps    = "GetCACaps"
 	opnPKIOperation = "PKIOperation"
+
+	// TODO: add other (more optional) operations and handling
 )
 
 // SCEPRequest is a SCEP server request.
@@ -98,6 +100,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
+
 	scepRequest, err := decodeSCEPRequest(r)
 	if err != nil {
 		fmt.Println(err)
@@ -252,27 +255,22 @@ func (h *Handler) PKIOperation(w http.ResponseWriter, r *http.Request, scepReque
 		return err
 	}
 
-	certs, err := h.Auth.GetCACertificates()
-	if err != nil {
+	pkimsg := &scep.PKIMessage{
+		TransactionID: msg.TransactionID,
+		MessageType:   msg.MessageType,
+		SenderNonce:   msg.SenderNonce,
+		Raw:           msg.Raw,
+	}
+
+	if err := h.Auth.DecryptPKIEnvelope(pkimsg); err != nil {
 		return err
 	}
 
-	// TODO: instead of getting the key to decrypt, add a decrypt function to the auth; less leaky
-	key, err := h.Auth.GetSigningKey()
-	if err != nil {
-		return err
-	}
-
-	ca := certs[0]
-	if err := msg.DecryptPKIEnvelope(ca, key); err != nil {
-		return err
-	}
-
-	if msg.MessageType == microscep.PKCSReq {
+	if pkimsg.MessageType == microscep.PKCSReq {
 		// TODO: CSR validation, like challenge password
 	}
 
-	csr := msg.CSRReqMessage.CSR
+	csr := pkimsg.CSRReqMessage.CSR
 	id, err := createKeyIdentifier(csr.PublicKey)
 	if err != nil {
 		return err
@@ -282,6 +280,7 @@ func (h *Handler) PKIOperation(w http.ResponseWriter, r *http.Request, scepReque
 
 	days := 40
 
+	// TODO: use information from provisioner, like claims
 	template := &x509.Certificate{
 		SerialNumber: serial,
 		Subject:      csr.Subject,
@@ -296,16 +295,16 @@ func (h *Handler) PKIOperation(w http.ResponseWriter, r *http.Request, scepReque
 		EmailAddresses:     csr.EmailAddresses,
 	}
 
-	certRep, err := msg.SignCSR(ca, key, template)
+	certRep, err := h.Auth.SignCSR(pkimsg, template)
 	if err != nil {
 		return err
 	}
 
-	//cert := certRep.CertRepMessage.Certificate
-	//name := certName(cert)
+	// //cert := certRep.CertRepMessage.Certificate
+	// //name := certName(cert)
 
-	// TODO: check if CN already exists, if renewal is allowed and if existing should be revoked; fail if not
-	// TODO: store the new cert for CN locally; should go into the DB
+	// // TODO: check if CN already exists, if renewal is allowed and if existing should be revoked; fail if not
+	// // TODO: store the new cert for CN locally; should go into the DB
 
 	scepResponse.Data = certRep.Raw
 
@@ -321,7 +320,7 @@ func certName(cert *x509.Certificate) string {
 	return string(cert.Signature)
 }
 
-// createKeyIdentifier create an identifier for public keys
+// createKeyIdentifier creates an identifier for public keys
 // according to the first method in RFC5280 section 4.2.1.2.
 func createKeyIdentifier(pub crypto.PublicKey) ([]byte, error) {
 
@@ -390,9 +389,9 @@ func ProvisionerFromContext(ctx context.Context) (scep.Provisioner, error) {
 	if val == nil {
 		return nil, errors.New("provisioner expected in request context")
 	}
-	pval, ok := val.(scep.Provisioner)
-	if !ok || pval == nil {
+	p, ok := val.(scep.Provisioner)
+	if !ok || p == nil {
 		return nil, errors.New("provisioner in context is not a SCEP provisioner")
 	}
-	return pval, nil
+	return p, nil
 }

@@ -55,7 +55,7 @@ func (s *SCEP) DefaultTLSCertDuration() time.Duration {
 	return s.claimer.DefaultTLSCertDuration()
 }
 
-// Init initializes and validates the fields of a JWK type.
+// Init initializes and validates the fields of a SCEP type.
 func (s *SCEP) Init(config Config) (err error) {
 
 	switch {
@@ -69,6 +69,8 @@ func (s *SCEP) Init(config Config) (err error) {
 	if s.claimer, err = NewClaimer(s.Claims, config.Claims); err != nil {
 		return err
 	}
+
+	// TODO: add other, SCEP specific, options?
 
 	return err
 }
