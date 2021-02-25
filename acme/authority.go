@@ -92,7 +92,7 @@ func NewAuthority(db nosql.DB, dns, prefix string, signAuth SignAuthority) (*Aut
 	})
 }
 
-// New returns a new Autohrity that implements the ACME interface.
+// New returns a new Authority that implements the ACME interface.
 func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 	if _, ok := ops.DB.(*database.SimpleDB); !ok {
 		// If it's not a SimpleDB then go ahead and bootstrap the DB with the
@@ -140,59 +140,41 @@ func (a *Authority) LoadProvisionerByID(id string) (provisioner.Interface, error
 }
 
 // NewNonce generates, stores, and returns a new ACME nonce.
-func (a *Authority) NewNonce() (string, error) {
-	n, err := newNonce(a.db)
-	if err != nil {
-		return "", err
-	}
-	return n.ID, nil
+func (a *Authority) NewNonce(ctx context.Context) (string, error) {
+	return a.db.CreateNonce(ctx)
 }
 
 // UseNonce consumes the given nonce if it is valid, returns error otherwise.
-func (a *Authority) UseNonce(nonce string) error {
-	return useNonce(a.db, nonce)
+func (a *Authority) UseNonce(ctx context.Context, nonce string) error {
+	return a.db.DeleteNonce(ctx, nonce)
 }
 
 // NewAccount creates, stores, and returns a new ACME account.
 func (a *Authority) NewAccount(ctx context.Context, ao AccountOptions) (*Account, error) {
-	acc, err := newAccount(a.db, ao)
-	if err != nil {
-		return nil, err
+	a := NewAccount(ao)
+	if err := a.db.CreateAccount(ctx, a); err != nil {
+		return ServerInternalErr(err)
 	}
-	return acc.toACME(ctx, a.db, a.dir)
+	return a, nil
 }
 
 // UpdateAccount updates an ACME account.
-func (a *Authority) UpdateAccount(ctx context.Context, id string, contact []string) (*Account, error) {
-	acc, err := getAccountByID(a.db, id)
+func (a *Authority) UpdateAccount(ctx context.Context, auo AccountUpdateOptions) (*Account, error) {
+	acc, err := a.db.GetAccount(ctx, auo.ID)
 	if err != nil {
-		return nil, ServerInternalErr(err)
+		return ServerInternalErr(err)
 	}
-	if acc, err = acc.update(a.db, contact); err != nil {
-		return nil, err
+	acc.Contact = auo.Contact
+	acc.Status = auo.Status
+	if err = a.db.UpdateAccount(ctx, acc); err != nil {
+		return ServerInternalErr(err)
 	}
-	return acc.toACME(ctx, a.db, a.dir)
+	return acc, nil
 }
 
 // GetAccount returns an ACME account.
 func (a *Authority) GetAccount(ctx context.Context, id string) (*Account, error) {
-	acc, err := getAccountByID(a.db, id)
-	if err != nil {
-		return nil, err
-	}
-	return acc.toACME(ctx, a.db, a.dir)
-}
-
-// DeactivateAccount deactivates an ACME account.
-func (a *Authority) DeactivateAccount(ctx context.Context, id string) (*Account, error) {
-	acc, err := getAccountByID(a.db, id)
-	if err != nil {
-		return nil, err
-	}
-	if acc, err = acc.deactivate(a.db); err != nil {
-		return nil, err
-	}
-	return acc.toACME(ctx, a.db, a.dir)
+	return a.db.GetAccount(ctx, id)
 }
 
 func keyToID(jwk *jose.JSONWebKey) (string, error) {
@@ -209,11 +191,8 @@ func (a *Authority) GetAccountByKey(ctx context.Context, jwk *jose.JSONWebKey) (
 	if err != nil {
 		return nil, err
 	}
-	acc, err := getAccountByKeyID(a.db, kid)
-	if err != nil {
-		return nil, err
-	}
-	return acc.toACME(ctx, a.db, a.dir)
+	acc, err := a.db.GetAccountByKeyID(ctx, kid)
+	return acc, err
 }
 
 // GetOrder returns an ACME order.
