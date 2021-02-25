@@ -18,9 +18,9 @@ OUTPUT_ROOT=output/
 
 all: lint test build
 
-travis: lintcgo testcgo build
+ci: lintcgo testcgo build
 
-.PHONY: all travis
+.PHONY: all ci
 
 #########################################
 # Bootstrapping
@@ -45,6 +45,15 @@ PUSHTYPE := release-candidate
 	else
 PUSHTYPE := release
 	endif
+# GITHUB Actions
+else ifdef GITHUB_REF
+VERSION := $(shell echo $(GITHUB_REF) | sed 's/^refs\/tags\///')
+NOT_RC  := $(shell echo $(VERSION) | grep -v -e -rc)
+	ifeq ($(NOT_RC),)
+PUSHTYPE := release-candidate
+	else
+PUSHTYPE := release
+	endif
 else
 VERSION ?= $(shell [ -d .git ] && git describe --tags --always --dirty="-dev")
 # If we are not in an active git dir then try reading the version from .VERSION.
@@ -62,6 +71,7 @@ DEB_VERSION := $(shell echo $(VERSION) | sed 's/-/~/g')
 
 ifdef V
 $(info    TRAVIS_TAG is $(TRAVIS_TAG))
+$(info    GITHUB_REF is $(GITHUB_REF))
 $(info    VERSION is $(VERSION))
 $(info    DEB_VERSION is $(DEB_VERSION))
 $(info    PUSHTYPE is $(PUSHTYPE))
@@ -267,38 +277,9 @@ bundle-darwin: binary-darwin
 .PHONY: binary-linux binary-darwin bundle-linux bundle-darwin
 
 #################################################
-# Targets for creating OS specific artifacts and archives
-#################################################
-
-artifacts-linux-tag: bundle-linux debian
-
-artifacts-darwin-tag: bundle-darwin
-
-artifacts-archive-tag:
-	$Q mkdir -p $(RELEASE)
-	$Q git archive v$(VERSION) | gzip > $(RELEASE)/step-certificates_$(VERSION).tar.gz
-
-artifacts-tag: artifacts-linux-tag artifacts-darwin-tag artifacts-archive-tag
-
-.PHONY: artifacts-linux-tag artifacts-darwin-tag artifacts-archive-tag artifacts-tag
-
-#################################################
 # Targets for creating step artifacts
 #################################################
 
-# For all builds that are not tagged and not on the master branch
-artifacts-branch:
+docker-artifacts: docker-$(PUSHTYPE)
 
-# For all builds that are not tagged
-artifacts-master:
-
-# For all builds with a release-candidate (-rc) tag
-artifacts-release-candidate: artifacts-tag
-
-# For all builds with a release tag
-artifacts-release: artifacts-tag
-
-# This command is called by travis directly *after* a successful build
-artifacts: artifacts-$(PUSHTYPE) docker-$(PUSHTYPE)
-
-.PHONY: artifacts-master artifacts-release-candidate artifacts-release artifacts
+.PHONY: docker-artifacts
