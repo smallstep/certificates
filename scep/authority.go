@@ -18,7 +18,9 @@ import (
 	microx509util "github.com/micromdm/scep/crypto/x509util"
 	microscep "github.com/micromdm/scep/scep"
 
-	"github.com/smallstep/certificates/scep/pkcs7"
+	//"github.com/smallstep/certificates/scep/pkcs7"
+
+	"go.mozilla.org/pkcs7"
 
 	"go.step.sm/crypto/x509util"
 )

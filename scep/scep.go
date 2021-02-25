@@ -6,7 +6,9 @@ import (
 
 	microscep "github.com/micromdm/scep/scep"
 
-	"github.com/smallstep/certificates/scep/pkcs7"
+	//"github.com/smallstep/certificates/scep/pkcs7"
+
+	"go.mozilla.org/pkcs7"
 )
 
 // SCEP OIDs
