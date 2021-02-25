@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/cas"
+	"github.com/smallstep/certificates/scep"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -41,6 +42,9 @@ type Authority struct {
 	rootX509Certs      []*x509.Certificate
 	federatedX509Certs []*x509.Certificate
 	certificates       *sync.Map
+
+	// SCEP CA
+	scepService *scep.Service
 
 	// SSH CA
 	sshCAUserCertSignKey    ssh.Signer
@@ -193,6 +197,38 @@ func (a *Authority) init() error {
 			a.rootX509Certs = append(a.rootX509Certs, resp.RootCertificate)
 			sum := sha256.Sum256(resp.RootCertificate.Raw)
 			log.Printf("Using root fingerprint '%s'", hex.EncodeToString(sum[:]))
+		}
+	}
+
+	// TODO: decide if this is a good approach for providing the SCEP functionality
+	if a.scepService == nil {
+		var options casapi.Options
+		if a.config.AuthorityConfig.Options != nil {
+			options = *a.config.AuthorityConfig.Options
+		}
+
+		// Read intermediate and create X509 signer for default CAS.
+		if options.Is(casapi.SoftCAS) {
+			options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
+			if err != nil {
+				return err
+			}
+			options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.IntermediateKey,
+				Password:   []byte(a.config.Password),
+			})
+			if err != nil {
+				return err
+			}
+			options.Decrypter, err = a.keyManager.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+				DecryptionKey: a.config.IntermediateKey,
+				Password:      []byte(a.config.Password),
+			})
+		}
+
+		a.scepService = &scep.Service{
+			Signer:    options.Signer,
+			Decrypter: options.Decrypter,
 		}
 	}
 
@@ -393,4 +429,13 @@ func (a *Authority) CloseForReload() {
 	if err := a.keyManager.Close(); err != nil {
 		log.Printf("error closing the key manager: %v", err)
 	}
+}
+
+// GetSCEPService returns the configured SCEP Service
+// TODO: this function is intended to exist temporarily
+// in order to make SCEP work more easily. It can be
+// made more correct by using the right interfaces/abstractions
+// after it works as expected.
+func (a *Authority) GetSCEPService() scep.Service {
+	return *a.scepService
 }

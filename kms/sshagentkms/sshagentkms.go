@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -203,4 +204,9 @@ func (k *SSHAgentKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.Publi
 	default:
 		return nil, errors.Errorf("unsupported public key type %T", v)
 	}
+}
+
+// CreateDecrypter creates a crypto.Decrypter backed by ssh-agent
+func (k *SSHAgentKMS) CreateDecrypter(req *apiv1.CreateDecrypterRequest) (crypto.Decrypter, error) {
+	return nil, fmt.Errorf("not implemented yet")
 }

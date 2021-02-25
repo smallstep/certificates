@@ -3,6 +3,7 @@ package awskms
 import (
 	"context"
 	"crypto"
+	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -219,6 +220,11 @@ func (k *KMS) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, error
 		return nil, errors.New("createSigner 'signingKey' cannot be empty")
 	}
 	return NewSigner(k.service, req.SigningKey)
+}
+
+// CreateDecrypter creates a new crypto.decrypter backed by AWS KMS
+func (k *KMS) CreateDecrypter(req *apiv1.CreateDecrypterRequest) (crypto.Decrypter, error) {
+	return nil, fmt.Errorf("not implemented yet")
 }
 
 // Close closes the connection of the KMS client.

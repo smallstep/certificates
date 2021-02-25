@@ -3,6 +3,7 @@ package cloudkms
 import (
 	"context"
 	"crypto"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -283,6 +284,11 @@ func (k *CloudKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKe
 	}
 
 	return pk, nil
+}
+
+// CreateDecrypter creates a new crypto.Decrypter backed by Google Cloud KMS
+func (k *CloudKMS) CreateDecrypter(req *apiv1.CreateDecrypterRequest) (crypto.Decrypter, error) {
+	return nil, fmt.Errorf("not implemented yet")
 }
 
 // getPublicKeyWithRetries retries the request if the error is

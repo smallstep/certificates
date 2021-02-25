@@ -145,3 +145,39 @@ func (k *SoftKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey
 		return nil, errors.Errorf("unsupported public key type %T", v)
 	}
 }
+
+// CreateDecrypter creates a new crypto.Decrypter backed by disk/software
+func (k *SoftKMS) CreateDecrypter(req *apiv1.CreateDecrypterRequest) (crypto.Decrypter, error) {
+
+	var opts []pemutil.Options
+	if req.Password != nil {
+		opts = append(opts, pemutil.WithPassword(req.Password))
+	}
+
+	switch {
+	case req.Decrypter != nil:
+		return req.Decrypter, nil
+	case len(req.DecryptionKeyPEM) != 0:
+		v, err := pemutil.ParseKey(req.DecryptionKeyPEM, opts...)
+		if err != nil {
+			return nil, err
+		}
+		decrypter, ok := v.(crypto.Decrypter)
+		if !ok {
+			return nil, errors.New("decryptorKeyPEM is not a crypto.Decrypter")
+		}
+		return decrypter, nil
+	case req.DecryptionKey != "":
+		v, err := pemutil.Read(req.DecryptionKey, opts...)
+		if err != nil {
+			return nil, err
+		}
+		decrypter, ok := v.(crypto.Decrypter)
+		if !ok {
+			return nil, errors.New("decryptionKey is not a crypto.Decrypter")
+		}
+		return decrypter, nil
+	default:
+		return nil, errors.New("failed to load softKMS: please define decryptionKeyPEM or decryptionKey")
+	}
+}

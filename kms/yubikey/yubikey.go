@@ -7,6 +7,7 @@ import (
 	"crypto"
 	"crypto/x509"
 	"encoding/hex"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -187,6 +188,11 @@ func (k *YubiKey) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, e
 		return nil, errors.New("private key is not a crypto.Signer")
 	}
 	return signer, nil
+}
+
+// CreateDecrypter creates a new crypto.Decrypter backed by a YubiKey
+func (k *YubiKey) CreateDecrypter(req *apiv1.CreateDecrypterRequest) (crypto.Decrypter, error) {
+	return nil, fmt.Errorf("not implemented yet")
 }
 
 // Close releases the connection to the YubiKey.
