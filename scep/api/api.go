@@ -2,19 +2,14 @@ package api
 
 import (
 	"context"
-	"crypto"
-	"crypto/sha1"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/big"
-	"math/rand"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
@@ -252,53 +247,29 @@ func (h *Handler) PKIOperation(w http.ResponseWriter, r *http.Request, scepReque
 
 	ctx := r.Context()
 
-	msg, err := microscep.ParsePKIMessage(scepRequest.Message)
+	microMsg, err := microscep.ParsePKIMessage(scepRequest.Message)
 	if err != nil {
 		return err
 	}
 
-	pkimsg := &scep.PKIMessage{
-		TransactionID: msg.TransactionID,
-		MessageType:   msg.MessageType,
-		SenderNonce:   msg.SenderNonce,
-		Raw:           msg.Raw,
+	msg := &scep.PKIMessage{
+		TransactionID: microMsg.TransactionID,
+		MessageType:   microMsg.MessageType,
+		SenderNonce:   microMsg.SenderNonce,
+		Raw:           microMsg.Raw,
 	}
 
-	if err := h.Auth.DecryptPKIEnvelope(ctx, pkimsg); err != nil {
+	if err := h.Auth.DecryptPKIEnvelope(ctx, msg); err != nil {
 		return err
 	}
 
-	if pkimsg.MessageType == microscep.PKCSReq {
+	if msg.MessageType == microscep.PKCSReq {
 		// TODO: CSR validation, like challenge password
 	}
 
-	csr := pkimsg.CSRReqMessage.CSR
-	subjectKeyID, err := createKeyIdentifier(csr.PublicKey)
-	if err != nil {
-		return err
-	}
+	csr := msg.CSRReqMessage.CSR
 
-	serial := big.NewInt(int64(rand.Int63())) // TODO: serial logic?
-
-	days := 40
-
-	// TODO: use information from provisioner, like claims
-	template := &x509.Certificate{
-		SerialNumber: serial,
-		Subject:      csr.Subject,
-		NotBefore:    time.Now().Add(-600).UTC(),
-		NotAfter:     time.Now().AddDate(0, 0, days).UTC(),
-		SubjectKeyId: subjectKeyID,
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageClientAuth,
-		},
-		SignatureAlgorithm: csr.SignatureAlgorithm,
-		EmailAddresses:     csr.EmailAddresses,
-		DNSNames:           csr.DNSNames,
-	}
-
-	certRep, err := h.Auth.SignCSR(ctx, pkimsg, template)
+	certRep, err := h.Auth.SignCSR(ctx, csr, msg)
 	if err != nil {
 		return err
 	}
@@ -323,20 +294,6 @@ func certName(cert *x509.Certificate) string {
 	return string(cert.Signature)
 }
 
-// createKeyIdentifier creates an identifier for public keys
-// according to the first method in RFC5280 section 4.2.1.2.
-func createKeyIdentifier(pub crypto.PublicKey) ([]byte, error) {
-
-	keyBytes, err := x509.MarshalPKIXPublicKey(pub)
-	if err != nil {
-		return nil, err
-	}
-
-	id := sha1.Sum(keyBytes)
-
-	return id[:], nil
-}
-
 func formatCapabilities(caps []string) []byte {
 	return []byte(strings.Join(caps, "\r\n"))
 }
@@ -354,6 +311,7 @@ func writeSCEPResponse(w http.ResponseWriter, response SCEPResponse) error {
 
 var (
 	// TODO: check the default capabilities; https://tools.ietf.org/html/rfc8894#section-3.5.2
+	// TODO: move capabilities to Authority or Provisioner, so that they can be configured?
 	defaultCapabilities = []string{
 		"Renewal",
 		"SHA-1",

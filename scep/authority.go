@@ -3,6 +3,8 @@ package scep
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/sha1"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -52,7 +54,7 @@ type Interface interface {
 
 	GetCACertificates() ([]*x509.Certificate, error)
 	DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error
-	SignCSR(ctx context.Context, msg *PKIMessage, template *x509.Certificate) (*PKIMessage, error)
+	SignCSR(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage) (*PKIMessage, error)
 }
 
 // Authority is the layer that handles all SCEP interactions.
@@ -221,7 +223,8 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 // SignCSR creates an x509.Certificate based on a CSR template and Cert Authority credentials
 // returns a new PKIMessage with CertRep data
 //func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, template *x509.Certificate) (*PKIMessage, error) {
-func (a *Authority) SignCSR(ctx context.Context, msg *PKIMessage, template *x509.Certificate) (*PKIMessage, error) {
+//func (a *Authority) SignCSR(ctx context.Context, msg *PKIMessage, template *x509.Certificate) (*PKIMessage, error) {
+func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage) (*PKIMessage, error) {
 
 	// TODO: intermediate storage of the request? In SCEP it's possible to request a csr/certificate
 	// to be signed, which can be performed asynchronously / out-of-band. In that case a client can
@@ -238,9 +241,32 @@ func (a *Authority) SignCSR(ctx context.Context, msg *PKIMessage, template *x509
 		if err := a.DecryptPKIEnvelope(ctx, msg); err != nil {
 			return nil, err
 		}
+		csr = msg.CSRReqMessage.CSR
 	}
 
-	csr := msg.CSRReqMessage.CSR
+	// subjectKeyID, err := createKeyIdentifier(csr.PublicKey)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// serial := big.NewInt(int64(rand.Int63())) // TODO: serial logic?
+	// days := 40                                // TODO: days
+
+	// // TODO: use information from provisioner, like claims
+	// template := &x509.Certificate{
+	// 	SerialNumber: serial,
+	// 	Subject:      csr.Subject,
+	// 	NotBefore:    time.Now().Add(-600).UTC(),
+	// 	NotAfter:     time.Now().AddDate(0, 0, days).UTC(),
+	// 	SubjectKeyId: subjectKeyID,
+	// 	KeyUsage:     x509.KeyUsageDigitalSignature,
+	// 	ExtKeyUsage: []x509.ExtKeyUsage{
+	// 		x509.ExtKeyUsageClientAuth,
+	// 	},
+	// 	SignatureAlgorithm: csr.SignatureAlgorithm,
+	// 	EmailAddresses:     csr.EmailAddresses,
+	// 	DNSNames:           csr.DNSNames,
+	// }
 
 	// Template data
 	data := x509util.NewTemplateData()
@@ -278,6 +304,8 @@ func (a *Authority) SignCSR(ctx context.Context, msg *PKIMessage, template *x509
 	// fmt.Println(fmt.Sprintf("%T", cert))
 	// fmt.Println(cert.Issuer)
 	// fmt.Println(cert.Subject)
+	// fmt.Println(cert.SerialNumber)
+	// fmt.Println(string(cert.SubjectKeyId))
 
 	// create a degenerate cert structure
 	deg, err := DegenerateCertificates([]*x509.Certificate{cert})
@@ -363,6 +391,20 @@ func DegenerateCertificates(certs []*x509.Certificate) ([]byte, error) {
 		return nil, err
 	}
 	return degenerate, nil
+}
+
+// createKeyIdentifier creates an identifier for public keys
+// according to the first method in RFC5280 section 4.2.1.2.
+func createKeyIdentifier(pub crypto.PublicKey) ([]byte, error) {
+
+	keyBytes, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return nil, err
+	}
+
+	id := sha1.Sum(keyBytes)
+
+	return id[:], nil
 }
 
 // Interface guards
