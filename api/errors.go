@@ -11,6 +11,7 @@ import (
 	"github.com/smallstep/certificates/authority/mgmt"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
+	"github.com/smallstep/certificates/scep"
 )
 
 // WriteError writes to w a JSON representation of the given error.
@@ -22,6 +23,8 @@ func WriteError(w http.ResponseWriter, err error) {
 	case *mgmt.Error:
 		mgmt.WriteError(w, k)
 		return
+	case *scep.Error:
+		w.Header().Set("Content-Type", "text/plain")
 	default:
 		w.Header().Set("Content-Type", "application/json")
 	}
