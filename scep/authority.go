@@ -6,8 +6,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"math/big"
-	"math/rand"
 
 	"github.com/smallstep/certificates/authority/provisioner"
 	database "github.com/smallstep/certificates/db"
@@ -53,8 +51,6 @@ type Interface interface {
 	// GetLinkExplicit(linkType Link, provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
 
 	GetCACertificates() ([]*x509.Certificate, error)
-	//GetSigningKey() (*rsa.PrivateKey, error)
-
 	DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error
 	SignCSR(ctx context.Context, msg *PKIMessage, template *x509.Certificate) (*PKIMessage, error)
 }
@@ -201,12 +197,12 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 	case microscep.PKCSReq, microscep.UpdateReq, microscep.RenewalReq:
 		csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
 		if err != nil {
-			return fmt.Errorf("parse CSR from pkiEnvelope")
+			return fmt.Errorf("parse CSR from pkiEnvelope: %w", err)
 		}
 		// check for challengePassword
 		cp, err := microx509util.ParseChallengePassword(msg.pkiEnvelope)
 		if err != nil {
-			return fmt.Errorf("scep: parse challenge password in pkiEnvelope")
+			return fmt.Errorf("scep: parse challenge password in pkiEnvelope: %w", err)
 		}
 		msg.CSRReqMessage = &microscep.CSRReqMessage{
 			RawDecrypted:      msg.pkiEnvelope,
@@ -227,6 +223,11 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 //func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, template *x509.Certificate) (*PKIMessage, error) {
 func (a *Authority) SignCSR(ctx context.Context, msg *PKIMessage, template *x509.Certificate) (*PKIMessage, error) {
 
+	// TODO: intermediate storage of the request? In SCEP it's possible to request a csr/certificate
+	// to be signed, which can be performed asynchronously / out-of-band. In that case a client can
+	// poll for the status. It seems to be similar as what can happen in ACME, so might want to model
+	// the implementation after the one in the ACME authority. Requires storage, etc.
+
 	p, err := ProvisionerFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -245,41 +246,38 @@ func (a *Authority) SignCSR(ctx context.Context, msg *PKIMessage, template *x509
 	data := x509util.NewTemplateData()
 	data.SetCommonName(csr.Subject.CommonName)
 	data.SetSANs(csr.DNSNames)
+	data.SetCertificateRequest(csr)
 
-	// TODO: proper options
-	opts := provisioner.SignOptions{}
-	signOps := []provisioner.SignOption{}
+	// Get authorizations from the SCEP provisioner.
+	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
+	signOps, err := p.AuthorizeSign(ctx, "")
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving authorization options from SCEP provisioner: %w", err)
+	}
+
+	opts := provisioner.SignOptions{
+		// NotBefore: provisioner.NewTimeDuration(o.NotBefore),
+		// NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
+	}
 
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
 	if err != nil {
-		return nil, fmt.Errorf("error creating template options from SCEP provisioner")
+		return nil, fmt.Errorf("error creating template options from SCEP provisioner: %w", err)
 	}
 	signOps = append(signOps, templateOptions)
 
-	// // Create and store a new certificate.
-	// certChain, err := auth.Sign(csr, provisioner.SignOptions{
-	// 	NotBefore: provisioner.NewTimeDuration(o.NotBefore),
-	// 	NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
-	// }, signOps...)
-	// if err != nil {
-	// 	return nil, ServerInternalErr(errors.Wrapf(err, "error generating certificate for order %s", o.ID))
-	// }
-
-	certs, err := a.signAuth.Sign(csr, opts, signOps...)
+	certChain, err := a.signAuth.Sign(csr, opts, signOps...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error generating certificate for order %w", err)
 	}
 
-	cert := certs[0]
+	cert := certChain[0]
 
 	// fmt.Println("CERT")
 	// fmt.Println(cert)
 	// fmt.Println(fmt.Sprintf("%T", cert))
 	// fmt.Println(cert.Issuer)
 	// fmt.Println(cert.Subject)
-
-	serial := big.NewInt(int64(rand.Int63())) // TODO: serial logic?
-	cert.SerialNumber = serial
 
 	// create a degenerate cert structure
 	deg, err := DegenerateCertificates([]*x509.Certificate{cert})
