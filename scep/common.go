@@ -3,14 +3,21 @@ package scep
 import (
 	"context"
 	"errors"
+)
 
-	"github.com/smallstep/certificates/acme"
+// ContextKey is the key type for storing and searching for SCEP request
+// essentials in the context of a request.
+type ContextKey string
+
+const (
+	// ProvisionerContextKey provisioner key
+	ProvisionerContextKey = ContextKey("provisioner")
 )
 
 // ProvisionerFromContext searches the context for a SCEP provisioner.
 // Returns the provisioner or an error.
 func ProvisionerFromContext(ctx context.Context) (Provisioner, error) {
-	val := ctx.Value(acme.ProvisionerContextKey)
+	val := ctx.Value(ProvisionerContextKey)
 	if val == nil {
 		return nil, errors.New("provisioner expected in request context")
 	}
