@@ -235,12 +235,12 @@ func (h *Handler) GetCACert(w http.ResponseWriter, r *http.Request, scepResponse
 
 func (h *Handler) GetCACaps(w http.ResponseWriter, r *http.Request, scepResponse SCEPResponse) error {
 
-	ctx := r.Context()
+	//ctx := r.Context()
 
-	_, err := ProvisionerFromContext(ctx)
-	if err != nil {
-		return err
-	}
+	// _, err := ProvisionerFromContext(ctx)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// TODO: get the actual capabilities from provisioner config
 	scepResponse.Data = formatCapabilities(defaultCapabilities)
@@ -249,6 +249,8 @@ func (h *Handler) GetCACaps(w http.ResponseWriter, r *http.Request, scepResponse
 }
 
 func (h *Handler) PKIOperation(w http.ResponseWriter, r *http.Request, scepRequest SCEPRequest, scepResponse SCEPResponse) error {
+
+	ctx := r.Context()
 
 	msg, err := microscep.ParsePKIMessage(scepRequest.Message)
 	if err != nil {
@@ -262,7 +264,7 @@ func (h *Handler) PKIOperation(w http.ResponseWriter, r *http.Request, scepReque
 		Raw:           msg.Raw,
 	}
 
-	if err := h.Auth.DecryptPKIEnvelope(pkimsg); err != nil {
+	if err := h.Auth.DecryptPKIEnvelope(ctx, pkimsg); err != nil {
 		return err
 	}
 
@@ -271,7 +273,7 @@ func (h *Handler) PKIOperation(w http.ResponseWriter, r *http.Request, scepReque
 	}
 
 	csr := pkimsg.CSRReqMessage.CSR
-	id, err := createKeyIdentifier(csr.PublicKey)
+	subjectKeyID, err := createKeyIdentifier(csr.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -286,16 +288,17 @@ func (h *Handler) PKIOperation(w http.ResponseWriter, r *http.Request, scepReque
 		Subject:      csr.Subject,
 		NotBefore:    time.Now().Add(-600).UTC(),
 		NotAfter:     time.Now().AddDate(0, 0, days).UTC(),
-		SubjectKeyId: id,
+		SubjectKeyId: subjectKeyID,
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{
 			x509.ExtKeyUsageClientAuth,
 		},
 		SignatureAlgorithm: csr.SignatureAlgorithm,
 		EmailAddresses:     csr.EmailAddresses,
+		DNSNames:           csr.DNSNames,
 	}
 
-	certRep, err := h.Auth.SignCSR(pkimsg, template)
+	certRep, err := h.Auth.SignCSR(ctx, pkimsg, template)
 	if err != nil {
 		return err
 	}
@@ -380,18 +383,4 @@ func contentHeader(operation string, certNum int) string {
 	default:
 		return "text/plain"
 	}
-}
-
-// ProvisionerFromContext searches the context for a provisioner. Returns the
-// provisioner or an error.
-func ProvisionerFromContext(ctx context.Context) (scep.Provisioner, error) {
-	val := ctx.Value(acme.ProvisionerContextKey)
-	if val == nil {
-		return nil, errors.New("provisioner expected in request context")
-	}
-	p, ok := val.(scep.Provisioner)
-	if !ok || p == nil {
-		return nil, errors.New("provisioner in context is not a SCEP provisioner")
-	}
-	return p, nil
 }
