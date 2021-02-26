@@ -18,6 +18,7 @@ type Order struct {
 	Finalize       string       `json:"finalize"`
 	Certificate    string       `json:"certificate,omitempty"`
 	ID             string       `json:"-"`
+	ProvisionerID  string       `json:"-"`
 }
 
 // ToLog enables response logging.
