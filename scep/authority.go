@@ -2,6 +2,7 @@ package scep
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -54,8 +55,8 @@ type Interface interface {
 	GetCACertificates() ([]*x509.Certificate, error)
 	//GetSigningKey() (*rsa.PrivateKey, error)
 
-	DecryptPKIEnvelope(*PKIMessage) error
-	SignCSR(msg *PKIMessage, template *x509.Certificate) (*PKIMessage, error)
+	DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error
+	SignCSR(ctx context.Context, msg *PKIMessage, template *x509.Certificate) (*PKIMessage, error)
 }
 
 // Authority is the layer that handles all SCEP interactions.
@@ -156,7 +157,7 @@ func (a *Authority) GetCACertificates() ([]*x509.Certificate, error) {
 }
 
 // DecryptPKIEnvelope decrypts an enveloped message
-func (a *Authority) DecryptPKIEnvelope(msg *PKIMessage) error {
+func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error {
 
 	data := msg.Raw
 
@@ -221,14 +222,19 @@ func (a *Authority) DecryptPKIEnvelope(msg *PKIMessage) error {
 	return nil
 }
 
-// SignCSR creates an x509.Certificate based on a template and Cert Authority credentials
+// SignCSR creates an x509.Certificate based on a CSR template and Cert Authority credentials
 // returns a new PKIMessage with CertRep data
 //func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, template *x509.Certificate) (*PKIMessage, error) {
-func (a *Authority) SignCSR(msg *PKIMessage, template *x509.Certificate) (*PKIMessage, error) {
+func (a *Authority) SignCSR(ctx context.Context, msg *PKIMessage, template *x509.Certificate) (*PKIMessage, error) {
+
+	p, err := ProvisionerFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	// check if CSRReqMessage has already been decrypted
 	if msg.CSRReqMessage.CSR == nil {
-		if err := a.DecryptPKIEnvelope(msg); err != nil {
+		if err := a.DecryptPKIEnvelope(ctx, msg); err != nil {
 			return nil, err
 		}
 	}
@@ -238,13 +244,17 @@ func (a *Authority) SignCSR(msg *PKIMessage, template *x509.Certificate) (*PKIMe
 	// Template data
 	data := x509util.NewTemplateData()
 	data.SetCommonName(csr.Subject.CommonName)
-	//data.Set(x509util.SANsKey, sans)
+	data.SetSANs(csr.DNSNames)
 
-	// templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
-	// if err != nil {
-	// 	return nil, ServerInternalErr(errors.Wrapf(err, "error creating template options from ACME provisioner"))
-	// }
-	// signOps = append(signOps, templateOptions)
+	// TODO: proper options
+	opts := provisioner.SignOptions{}
+	signOps := []provisioner.SignOption{}
+
+	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
+	if err != nil {
+		return nil, fmt.Errorf("error creating template options from SCEP provisioner")
+	}
+	signOps = append(signOps, templateOptions)
 
 	// // Create and store a new certificate.
 	// certChain, err := auth.Sign(csr, provisioner.SignOptions{
@@ -255,11 +265,7 @@ func (a *Authority) SignCSR(msg *PKIMessage, template *x509.Certificate) (*PKIMe
 	// 	return nil, ServerInternalErr(errors.Wrapf(err, "error generating certificate for order %s", o.ID))
 	// }
 
-	// TODO: proper options
-	signOps := provisioner.SignOptions{}
-	signOps2 := []provisioner.SignOption{}
-
-	certs, err := a.signAuth.Sign(csr, signOps, signOps2...)
+	certs, err := a.signAuth.Sign(csr, opts, signOps...)
 	if err != nil {
 		return nil, err
 	}
