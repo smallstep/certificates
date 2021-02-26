@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"time"
 
 	"github.com/pkg/errors"
@@ -13,7 +14,7 @@ type SCEP struct {
 	Type string `json:"type"`
 	Name string `json:"name"`
 
-	// ForceCN bool     `json:"forceCN,omitempty"`
+	ForceCN bool     `json:"forceCN,omitempty"`
 	Options *Options `json:"options,omitempty"`
 	Claims  *Claims  `json:"claims,omitempty"`
 	claimer *Claimer
@@ -73,6 +74,21 @@ func (s *SCEP) Init(config Config) (err error) {
 	// TODO: add other, SCEP specific, options?
 
 	return err
+}
+
+// AuthorizeSign does not do any validation, because all validation is handled
+// in the SCEP protocol. This method returns a list of modifiers / constraints
+// on the resulting certificate.
+func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+	return []SignOption{
+		// modifiers / withOptions
+		newProvisionerExtensionOption(TypeSCEP, s.Name, ""),
+		newForceCNOption(s.ForceCN),
+		profileDefaultDuration(s.claimer.DefaultTLSCertDuration()),
+		// validators
+		defaultPublicKeyValidator{},
+		newValidityValidator(s.claimer.MinTLSCertDuration(), s.claimer.MaxTLSCertDuration()),
+	}, nil
 }
 
 // Interface guards
