@@ -319,3 +319,13 @@ func (a *Authority) GetCertificate(accID, certID string) ([]byte, error) {
 	}
 	return cert.toACME(a.db, a.dir)
 }
+
+type httpGetter func(string) (*http.Response, error)
+type lookupTxt func(string) ([]string, error)
+type tlsDialer func(network, addr string, config *tls.Config) (*tls.Conn, error)
+
+type validateOptions struct {
+	httpGet   httpGetter
+	lookupTxt lookupTxt
+	tlsDial   tlsDialer
+}
