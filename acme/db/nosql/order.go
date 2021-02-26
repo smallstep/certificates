@@ -84,9 +84,8 @@ func (db *DB) GetOrder(id string) (*types.Order, error) {
 	return o, nil
 }
 
-// newOrder returns a new Order type.
-func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
-	id, err := randID()
+func (db *DB) CreateOrder(ctx context.Context, o *types.Order) error {
+	o.ID, err := randID()
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +111,7 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 		naf = nbf.Add(ops.defaultDuration)
 	}
 
-	o := &order{
+	dbo := &dbOrder{
 		ID:             id,
 		AccountID:      ops.AccountID,
 		Created:        now,
@@ -123,7 +122,7 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 		NotAfter:       naf,
 		Authorizations: authzs,
 	}
-	if err := o.save(db, nil); err != nil {
+	if err := db.saveDBOrder(dbo, nil); err != nil {
 		return nil, err
 	}
 
@@ -133,6 +132,10 @@ func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 		return nil, err
 	}
 	return o, nil
+}
+
+// newOrder returns a new Order type.
+func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 }
 
 type orderIDsByAccount struct{}
