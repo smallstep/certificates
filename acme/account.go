@@ -38,29 +38,5 @@ func (a *Account) GetKey() *jose.JSONWebKey {
 
 // IsValid returns true if the Account is valid.
 func (a *Account) IsValid() bool {
-	return a.Status == StatusValid
+	return Status(a.Status) == StatusValid
 }
-
-// AccountOptions are the options needed to create a new ACME account.
-type AccountOptions struct {
-	Key     *jose.JSONWebKey
-	Contact []string
-}
-
-// AccountUpdateOptions are the options needed to update an existing ACME account.
-type AccountUpdateOptions struct {
-	Contact []string
-	Status  types.Status
-}
-
-// toACME converts the internal Account type into the public acmeAccount
-// type for presentation in the ACME protocol.
-//func (a *account) toACME(ctx context.Context, db nosql.DB, dir *directory) (*Account, error) {
-//	return &Account{
-//		Status:  a.Status,
-//		Contact: a.Contact,
-//		Orders:  dir.getLink(ctx, OrdersByAccountLink, true, a.ID),
-//		Key:     a.Key,
-//		ID:      a.ID,
-//	}, nil
-//}

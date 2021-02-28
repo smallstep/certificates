@@ -26,7 +26,7 @@ func (dba *dbAccount) clone() *dbAccount {
 }
 
 // CreateAccount imlements the AcmeDB.CreateAccount interface.
-func (db *DB) CreateAccount(ctx context.Context, acc *types.Account) error {
+func (db *DB) CreateAccount(ctx context.Context, acc *Account) error {
 	acc.ID, err = randID()
 	if err != nil {
 		return nil, err
@@ -63,9 +63,13 @@ func (db *DB) CreateAccount(ctx context.Context, acc *types.Account) error {
 }
 
 // GetAccount retrieves an ACME account by ID.
-func (db *DB) GetAccount(ctx context.Context, id string) (*types.Account, error) {
+func (db *DB) GetAccount(ctx context.Context, id string) (*Account, error) {
+	acc, err := db.getDBAccount(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 
-	return &types.Account{
+	return &Account{
 		Status:  dbacc.Status,
 		Contact: dbacc.Contact,
 		Orders:  dir.getLink(ctx, OrdersByAccountLink, true, a.ID),
@@ -75,7 +79,7 @@ func (db *DB) GetAccount(ctx context.Context, id string) (*types.Account, error)
 }
 
 // GetAccountByKeyID retrieves an ACME account by KeyID (thumbprint of the Account Key -- JWK).
-func (db *DB) GetAccountByKeyID(ctx context.Context, kid string) (*types.Account, error) {
+func (db *DB) GetAccountByKeyID(ctx context.Context, kid string) (*Account, error) {
 	id, err := db.getAccountIDByKeyID(kid)
 	if err != nil {
 		return nil, err
@@ -84,7 +88,7 @@ func (db *DB) GetAccountByKeyID(ctx context.Context, kid string) (*types.Account
 }
 
 // UpdateAccount imlements the AcmeDB.UpdateAccount interface.
-func (db *DB) UpdateAccount(ctx context.Context, acc *types.Account) error {
+func (db *DB) UpdateAccount(ctx context.Context, acc *Account) error {
 	if len(acc.ID) == 0 {
 		return ServerInternalErr(errors.New("id cannot be empty"))
 	}
@@ -99,7 +103,7 @@ func (db *DB) UpdateAccount(ctx context.Context, acc *types.Account) error {
 	nu.Status = acc.Status
 
 	// If the status has changed to 'deactivated', then set deactivatedAt timestamp.
-	if acc.Status == types.StatusDeactivated && old.Status != types.Status.Deactivated {
+	if acc.Status == StatusDeactivated && old.Status != Status.Deactivated {
 		nu.Deactivated = clock.Now()
 	}
 

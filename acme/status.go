@@ -1,4 +1,4 @@
-package types
+package acme
 
 // Status represents an ACME status.
 type Status string
