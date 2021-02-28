@@ -33,16 +33,10 @@ func (db *DB) CreateNonce() (Nonce, error) {
 	if err != nil {
 		return nil, ServerInternalErr(errors.Wrap(err, "error marshaling nonce"))
 	}
-	_, swapped, err := db.CmpAndSwap(nonceTable, []byte(id), nil, b)
-	switch {
-	case err != nil:
-		return nil, ServerInternalErr(errors.Wrap(err, "error storing nonce"))
-	case !swapped:
-		return nil, ServerInternalErr(errors.New("error storing nonce; " +
-			"value has changed since last read"))
-	default:
-		return Nonce(id), nil
+	if err = db.save(ctx, id, b, nil, "nonce", nonceTable); err != nil {
+		return "", err
 	}
+	return Nonce(id), nil
 }
 
 // DeleteNonce verifies that the nonce is valid (by checking if it exists),

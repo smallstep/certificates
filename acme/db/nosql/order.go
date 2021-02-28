@@ -2,17 +2,13 @@ package nosql
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/json"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/nosql"
-	"go.step.sm/crypto/x509util"
 )
 
 var defaultOrderExpiry = time.Hour * 24
@@ -20,19 +16,10 @@ var defaultOrderExpiry = time.Hour * 24
 // Mutex for locking ordersByAccount index operations.
 var ordersByAccountMux sync.Mutex
 
-// OrderOptions options with which to create a new Order.
-type OrderOptions struct {
-	AccountID       string       `json:"accID"`
-	Identifiers     []Identifier `json:"identifiers"`
-	NotBefore       time.Time    `json:"notBefore"`
-	NotAfter        time.Time    `json:"notAfter"`
-	backdate        time.Duration
-	defaultDuration time.Duration
-}
-
 type dbOrder struct {
 	ID             string       `json:"id"`
 	AccountID      string       `json:"accountID"`
+	ProvisionerID  string       `json:"provisionerID"`
 	Created        time.Time    `json:"created"`
 	Expires        time.Time    `json:"expires,omitempty"`
 	Status         string       `json:"status"`
@@ -60,7 +47,7 @@ func (db *DB) getDBOrder(id string) (*dbOrder, error) {
 }
 
 // GetOrder retrieves an ACME Order from the database.
-func (db *DB) GetOrder(id string) (*types.Order, error) {
+func (db *DB) GetOrder(id string) (*acme.Order, error) {
 	dbo, err := db.getDBOrder(id)
 
 	azs := make([]string, len(dbo.Authorizations))
@@ -76,6 +63,7 @@ func (db *DB) GetOrder(id string) (*types.Order, error) {
 		Authorizations: azs,
 		Finalize:       dir.getLink(ctx, FinalizeLink, true, o.ID),
 		ID:             dbo.ID,
+		ProvisionerID:  dbo.ProvisionerID,
 	}
 
 	if dbo.Certificate != "" {
@@ -84,58 +72,72 @@ func (db *DB) GetOrder(id string) (*types.Order, error) {
 	return o, nil
 }
 
-func (db *DB) CreateOrder(ctx context.Context, o *types.Order) error {
-	o.ID, err := randID()
+// CreateOrder creates ACME Order resources and saves them to the DB.
+func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
+	if len(o.AccountID) == 0 {
+		return ServerInternalErr(errors.New("account-id cannot be empty"))
+	}
+	if len(o.ProvisionerID) == 0 {
+		return ServerInternalErr(errors.New("provisioner-id cannot be empty"))
+	}
+	if len(o.Identifiers) == 0 {
+		return ServerInternalErr(errors.New("identifiers cannot be empty"))
+	}
+	if o.DefaultDuration == 0 {
+		return ServerInternalErr(errors.New("default-duration cannot be empty"))
+	}
+
+	o.ID, err = randID()
 	if err != nil {
 		return nil, err
 	}
 
-	authzs := make([]string, len(ops.Identifiers))
+	azIDs := make([]string, len(ops.Identifiers))
 	for i, identifier := range ops.Identifiers {
-		az, err := newAuthz(db, ops.AccountID, identifier)
+		az, err = db.CreateAuthorzation(&types.Authorization{
+			AccountID:  o.AccountID,
+			Identifier: o.Identifier,
+		})
 		if err != nil {
-			return nil, err
+			return err
 		}
-		authzs[i] = az.getID()
+		azIDs[i] = az.ID
 	}
 
 	now := clock.Now()
 	var backdate time.Duration
-	nbf := ops.NotBefore
+	nbf := o.NotBefore
 	if nbf.IsZero() {
 		nbf = now
-		backdate = -1 * ops.backdate
+		backdate = -1 * o.Backdate
 	}
-	naf := ops.NotAfter
+	naf := o.NotAfter
 	if naf.IsZero() {
-		naf = nbf.Add(ops.defaultDuration)
+		naf = nbf.Add(o.DefaultDuration)
 	}
 
 	dbo := &dbOrder{
-		ID:             id,
-		AccountID:      ops.AccountID,
+		ID:             o.ID,
+		AccountID:      o.AccountID,
+		ProvisionerID:  o.ProvisionerID,
 		Created:        now,
 		Status:         StatusPending,
 		Expires:        now.Add(defaultOrderExpiry),
 		Identifiers:    ops.Identifiers,
 		NotBefore:      nbf.Add(backdate),
 		NotAfter:       naf,
-		Authorizations: authzs,
+		Authorizations: azIDs,
 	}
-	if err := db.saveDBOrder(dbo, nil); err != nil {
+	if err := db.save(ctx, o.ID, dbo, nil, orderTable); err != nil {
 		return nil, err
 	}
 
 	var oidHelper = orderIDsByAccount{}
-	_, err = oidHelper.addOrderID(db, ops.AccountID, o.ID)
+	_, err = oidHelper.addOrderID(db, o.AccountID, o.ID)
 	if err != nil {
 		return nil, err
 	}
 	return o, nil
-}
-
-// newOrder returns a new Order type.
-func newOrder(db nosql.DB, ops OrderOptions) (*order, error) {
 }
 
 type orderIDsByAccount struct{}
@@ -188,7 +190,7 @@ func (oiba orderIDsByAccount) unsafeGetOrderIDsByAccount(db nosql.DB, accID stri
 		if err != nil {
 			return nil, ServerInternalErr(errors.Wrapf(err, "error loading order %s for account %s", oid, accID))
 		}
-		if o, err = o.updateStatus(db); err != nil {
+		if o, err = o.UpdateStatus(db); err != nil {
 			return nil, ServerInternalErr(errors.Wrapf(err, "error updating order %s for account %s", oid, accID))
 		}
 		if o.Status == StatusPending {
@@ -198,7 +200,7 @@ func (oiba orderIDsByAccount) unsafeGetOrderIDsByAccount(db nosql.DB, accID stri
 	// If the number of pending orders is less than the number of orders in the
 	// list, then update the pending order list.
 	if len(pendOids) != len(oids) {
-		if err = orderIDs(pendOids).save(db, oids, accID); err != nil {
+		if err = orderIDs(pendOiUs).save(db, oids, accID); err != nil {
 			return nil, ServerInternalErr(errors.Wrapf(err, "error storing orderIDs as part of getOrderIDsByAccount logic: "+
 				"len(orderIDs) = %d", len(pendOids)))
 		}
@@ -247,226 +249,4 @@ func (oids orderIDs) save(db nosql.DB, old orderIDs, accID string) error {
 	default:
 		return nil
 	}
-}
-
-func (o *order) save(db nosql.DB, old *order) error {
-	var (
-		err  error
-		oldB []byte
-	)
-	if old == nil {
-		oldB = nil
-	} else {
-		if oldB, err = json.Marshal(old); err != nil {
-			return ServerInternalErr(errors.Wrap(err, "error marshaling old acme order"))
-		}
-	}
-
-	newB, err := json.Marshal(o)
-	if err != nil {
-		return ServerInternalErr(errors.Wrap(err, "error marshaling new acme order"))
-	}
-
-	_, swapped, err := db.CmpAndSwap(orderTable, []byte(o.ID), oldB, newB)
-	switch {
-	case err != nil:
-		return ServerInternalErr(errors.Wrap(err, "error storing order"))
-	case !swapped:
-		return ServerInternalErr(errors.New("error storing order; " +
-			"value has changed since last read"))
-	default:
-		return nil
-	}
-}
-
-// updateStatus updates order status if necessary.
-func (o *order) updateStatus(db nosql.DB) (*order, error) {
-	_newOrder := *o
-	newOrder := &_newOrder
-
-	now := time.Now().UTC()
-	switch o.Status {
-	case StatusInvalid:
-		return o, nil
-	case StatusValid:
-		return o, nil
-	case StatusReady:
-		// check expiry
-		if now.After(o.Expires) {
-			newOrder.Status = StatusInvalid
-			newOrder.Error = MalformedErr(errors.New("order has expired"))
-			break
-		}
-		return o, nil
-	case StatusPending:
-		// check expiry
-		if now.After(o.Expires) {
-			newOrder.Status = StatusInvalid
-			newOrder.Error = MalformedErr(errors.New("order has expired"))
-			break
-		}
-
-		var count = map[string]int{
-			StatusValid:   0,
-			StatusInvalid: 0,
-			StatusPending: 0,
-		}
-		for _, azID := range o.Authorizations {
-			az, err := getAuthz(db, azID)
-			if err != nil {
-				return nil, err
-			}
-			if az, err = az.updateStatus(db); err != nil {
-				return nil, err
-			}
-			st := az.getStatus()
-			count[st]++
-		}
-		switch {
-		case count[StatusInvalid] > 0:
-			newOrder.Status = StatusInvalid
-
-		// No change in the order status, so just return the order as is -
-		// without writing any changes.
-		case count[StatusPending] > 0:
-			return newOrder, nil
-
-		case count[StatusValid] == len(o.Authorizations):
-			newOrder.Status = StatusReady
-
-		default:
-			return nil, ServerInternalErr(errors.New("unexpected authz status"))
-		}
-	default:
-		return nil, ServerInternalErr(errors.Errorf("unrecognized order status: %s", o.Status))
-	}
-
-	if err := newOrder.save(db, o); err != nil {
-		return nil, err
-	}
-	return newOrder, nil
-}
-
-// finalize signs a certificate if the necessary conditions for Order completion
-// have been met.
-func (o *order) finalize(db nosql.DB, csr *x509.CertificateRequest, auth SignAuthority, p Provisioner) (*order, error) {
-	var err error
-	if o, err = o.updateStatus(db); err != nil {
-		return nil, err
-	}
-
-	switch o.Status {
-	case StatusInvalid:
-		return nil, OrderNotReadyErr(errors.Errorf("order %s has been abandoned", o.ID))
-	case StatusValid:
-		return o, nil
-	case StatusPending:
-		return nil, OrderNotReadyErr(errors.Errorf("order %s is not ready", o.ID))
-	case StatusReady:
-		break
-	default:
-		return nil, ServerInternalErr(errors.Errorf("unexpected status %s for order %s", o.Status, o.ID))
-	}
-
-	// RFC8555: The CSR MUST indicate the exact same set of requested
-	// identifiers as the initial newOrder request. Identifiers of type "dns"
-	// MUST appear either in the commonName portion of the requested subject
-	// name or in an extensionRequest attribute [RFC2985] requesting a
-	// subjectAltName extension, or both.
-	if csr.Subject.CommonName != "" {
-		csr.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
-	}
-	csr.DNSNames = uniqueLowerNames(csr.DNSNames)
-	orderNames := make([]string, len(o.Identifiers))
-	for i, n := range o.Identifiers {
-		orderNames[i] = n.Value
-	}
-	orderNames = uniqueLowerNames(orderNames)
-
-	// Validate identifier names against CSR alternative names.
-	//
-	// Note that with certificate templates we are not going to check for the
-	// absence of other SANs as they will only be set if the templates allows
-	// them.
-	if len(csr.DNSNames) != len(orderNames) {
-		return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
-	}
-
-	sans := make([]x509util.SubjectAlternativeName, len(csr.DNSNames))
-	for i := range csr.DNSNames {
-		if csr.DNSNames[i] != orderNames[i] {
-			return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
-		}
-		sans[i] = x509util.SubjectAlternativeName{
-			Type:  x509util.DNSType,
-			Value: csr.DNSNames[i],
-		}
-	}
-
-	// Get authorizations from the ACME provisioner.
-	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod)
-	signOps, err := p.AuthorizeSign(ctx, "")
-	if err != nil {
-		return nil, ServerInternalErr(errors.Wrapf(err, "error retrieving authorization options from ACME provisioner"))
-	}
-
-	// Template data
-	data := x509util.NewTemplateData()
-	data.SetCommonName(csr.Subject.CommonName)
-	data.Set(x509util.SANsKey, sans)
-
-	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
-	if err != nil {
-		return nil, ServerInternalErr(errors.Wrapf(err, "error creating template options from ACME provisioner"))
-	}
-	signOps = append(signOps, templateOptions)
-
-	// Create and store a new certificate.
-	certChain, err := auth.Sign(csr, provisioner.SignOptions{
-		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
-		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
-	}, signOps...)
-	if err != nil {
-		return nil, ServerInternalErr(errors.Wrapf(err, "error generating certificate for order %s", o.ID))
-	}
-
-	cert, err := newCert(db, CertOptions{
-		AccountID:     o.AccountID,
-		OrderID:       o.ID,
-		Leaf:          certChain[0],
-		Intermediates: certChain[1:],
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	_newOrder := *o
-	newOrder := &_newOrder
-	newOrder.Certificate = cert.ID
-	newOrder.Status = StatusValid
-	if err := newOrder.save(db, o); err != nil {
-		return nil, err
-	}
-	return newOrder, nil
-}
-
-// toACME converts the internal Order type into the public acmeOrder type for
-// presentation in the ACME protocol.
-func (o *order) toACME(ctx context.Context, db nosql.DB, dir *directory) (*Order, error) {
-}
-
-// uniqueLowerNames returns the set of all unique names in the input after all
-// of them are lowercased. The returned names will be in their lowercased form
-// and sorted alphabetically.
-func uniqueLowerNames(names []string) (unique []string) {
-	nameMap := make(map[string]int, len(names))
-	for _, name := range names {
-		nameMap[strings.ToLower(name)] = 1
-	}
-	unique = make([]string, 0, len(nameMap))
-	for name := range nameMap {
-		unique = append(unique, name)
-	}
-	sort.Strings(unique)
-	return
 }

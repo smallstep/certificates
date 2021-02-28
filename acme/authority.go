@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -68,17 +69,6 @@ type AuthorityOptions struct {
 	// "acme" is the prefix from which the ACME api is accessed.
 	Prefix string
 }
-
-var (
-	accountTable           = []byte("acme_accounts")
-	accountByKeyIDTable    = []byte("acme_keyID_accountID_index")
-	authzTable             = []byte("acme_authzs")
-	challengeTable         = []byte("acme_challenges")
-	nonceTable             = []byte("nonces")
-	orderTable             = []byte("acme_orders")
-	ordersByAccountIDTable = []byte("acme_account_orders_index")
-	certTable              = []byte("acme_certs")
-)
 
 // NewAuthority returns a new Authority that implements the ACME interface.
 //
@@ -197,14 +187,23 @@ func (a *Authority) GetAccountByKey(ctx context.Context, jwk *jose.JSONWebKey) (
 
 // GetOrder returns an ACME order.
 func (a *Authority) GetOrder(ctx context.Context, accID, orderID string) (*Order, error) {
-	o, err := getOrder(a.db, orderID)
+	prov, err := ProvisionerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
+	o, err := a.db.GetOrder(ctx, orderID)
+	if err != nil {
+		return nil, ServerInternalErr(err)
+	}
 	if accID != o.AccountID {
+		log.Printf("account-id from request ('%s') does not match order account-id ('%s')", accID, o.AccountID)
 		return nil, UnauthorizedErr(errors.New("account does not own order"))
 	}
-	if o, err = o.updateStatus(a.db); err != nil {
+	if prov.GetID() != o.ProvisionerID {
+		log.Printf("provisioner-id from request ('%s') does not match order provisioner-id ('%s')", prov.GetID(), o.ProvisionerID)
+		return nil, UnauthorizedErr(errors.New("provisioner does not own order"))
+	}
+	if err = a.updateOrderStatus(ctx, o); err != nil {
 		return nil, err
 	}
 	return o.toACME(ctx, a.db, a.dir)
@@ -234,13 +233,15 @@ func (a *Authority) NewOrder(ctx context.Context, ops OrderOptions) (*Order, err
 	if err != nil {
 		return nil, err
 	}
-	ops.backdate = a.backdate.Duration
-	ops.defaultDuration = prov.DefaultTLSCertDuration()
-	order, err := newOrder(a.db, ops)
-	if err != nil {
-		return nil, Wrap(err, "error creating order")
-	}
-	return order.toACME(ctx, a.db, a.dir)
+	return db.CreateOrder(ctx, &Order{
+		AccountID:       ops.AccountID,
+		ProvisionerID:   prov.GetID(),
+		Backdate:        a.backdate.Duration,
+		DefaultDuration: prov.DefaultTLSCertDuration(),
+		Identifiers:     ops.Identifiers,
+		NotBefore:       ops.NotBefore,
+		NotAfter:        ops.NotAfter,
+	})
 }
 
 // FinalizeOrder attempts to finalize an order and generate a new certificate.
@@ -249,44 +250,51 @@ func (a *Authority) FinalizeOrder(ctx context.Context, accID, orderID string, cs
 	if err != nil {
 		return nil, err
 	}
-	o, err := getOrder(a.db, orderID)
+	o, err := a.db.GetOrder(ctx, orderID)
 	if err != nil {
 		return nil, err
 	}
 	if accID != o.AccountID {
+		log.Printf("account-id from request ('%s') does not match order account-id ('%s')", accID, o.AccountID)
 		return nil, UnauthorizedErr(errors.New("account does not own order"))
 	}
-	o, err = o.finalize(a.db, csr, a.signAuth, prov)
+	if prov.GetID() != o.ProvisionerID {
+		log.Printf("provisioner-id from request ('%s') does not match order provisioner-id ('%s')", prov.GetID(), o.ProvisionerID)
+		return nil, UnauthorizedErr(errors.New("provisioner does not own order"))
+	}
+	o, err = o.Finalize(ctx, a.db, csr, a.signAuth, prov)
 	if err != nil {
 		return nil, Wrap(err, "error finalizing order")
 	}
-	return o.toACME(ctx, a.db, a.dir)
+	return o, nil
 }
 
 // GetAuthz retrieves and attempts to update the status on an ACME authz
 // before returning.
 func (a *Authority) GetAuthz(ctx context.Context, accID, authzID string) (*Authz, error) {
-	az, err := getAuthz(a.db, authzID)
+	az, err := a.db.GetAuthorization(ctx, authzID)
 	if err != nil {
 		return nil, err
 	}
-	if accID != az.getAccountID() {
+	if accID != az.AccountID {
+		log.Printf("account-id from request ('%s') does not match authz account-id ('%s')", accID, az.AccountID)
 		return nil, UnauthorizedErr(errors.New("account does not own authz"))
 	}
-	az, err = az.updateStatus(a.db)
+	az, err = az.UpdateStatus(ctx, a.db)
 	if err != nil {
 		return nil, Wrap(err, "error updating authz status")
 	}
-	return az.toACME(ctx, a.db, a.dir)
+	return az, nil
 }
 
 // ValidateChallenge attempts to validate the challenge.
 func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, jwk *jose.JSONWebKey) (*Challenge, error) {
-	ch, err := getChallenge(a.db, chID)
+	ch, err := a.db.GetChallenge(ctx, chID, "todo")
 	if err != nil {
 		return nil, err
 	}
-	if accID != ch.getAccountID() {
+	if accID != ch.AccountID {
+		log.Printf("account-id from request ('%s') does not match challenge account-id ('%s')", accID, ch.AccountID)
 		return nil, UnauthorizedErr(errors.New("account does not own challenge"))
 	}
 	client := http.Client{
@@ -295,17 +303,16 @@ func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, j
 	dialer := &net.Dialer{
 		Timeout: 30 * time.Second,
 	}
-	ch, err = ch.validate(a.db, jwk, validateOptions{
+	if err = ch.Validate(ctx, a.db, jwk, validateOptions{
 		httpGet:   client.Get,
 		lookupTxt: net.LookupTXT,
 		tlsDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
 			return tls.DialWithDialer(dialer, network, addr, config)
 		},
-	})
-	if err != nil {
+	}); err != nil {
 		return nil, Wrap(err, "error attempting challenge validation")
 	}
-	return ch.toACME(ctx, a.db, a.dir)
+	return ch, nil
 }
 
 // GetCertificate retrieves the Certificate by ID.
@@ -318,14 +325,4 @@ func (a *Authority) GetCertificate(accID, certID string) ([]byte, error) {
 		return nil, UnauthorizedErr(errors.New("account does not own certificate"))
 	}
 	return cert.toACME(a.db, a.dir)
-}
-
-type httpGetter func(string) (*http.Response, error)
-type lookupTxt func(string) ([]string, error)
-type tlsDialer func(network, addr string, config *tls.Config) (*tls.Conn, error)
-
-type validateOptions struct {
-	httpGet   httpGetter
-	lookupTxt lookupTxt
-	tlsDial   tlsDialer
 }

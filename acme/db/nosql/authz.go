@@ -14,48 +14,20 @@ var defaultExpiryDuration = time.Hour * 24
 
 // dbAuthz is the base authz type that others build from.
 type dbAuthz struct {
-	ID         string     `json:"id"`
-	AccountID  string     `json:"accountID"`
-	Identifier Identifier `json:"identifier"`
-	Status     string     `json:"status"`
-	Expires    time.Time  `json:"expires"`
-	Challenges []string   `json:"challenges"`
-	Wildcard   bool       `json:"wildcard"`
-	Created    time.Time  `json:"created"`
-	Error      *Error     `json:"error"`
+	ID         string      `json:"id"`
+	AccountID  string      `json:"accountID"`
+	Identifier *Identifier `json:"identifier"`
+	Status     string      `json:"status"`
+	Expires    time.Time   `json:"expires"`
+	Challenges []string    `json:"challenges"`
+	Wildcard   bool        `json:"wildcard"`
+	Created    time.Time   `json:"created"`
+	Error      *Error      `json:"error"`
 }
 
 func (ba *dbAuthz) clone() *dbAuthz {
 	u := *ba
 	return &u
-}
-
-func (db *DB) saveDBAuthz(ctx context.Context, nu *authz, old *dbAuthz) error {
-	var (
-		err        error
-		oldB, newB []byte
-	)
-
-	if old == nil {
-		oldB = nil
-	} else {
-		if oldB, err = json.Marshal(old); err != nil {
-			return ServerInternalErr(errors.Wrap(err, "error marshaling old authz"))
-		}
-	}
-	if newB, err = json.Marshal(nu); err != nil {
-		return ServerInternalErr(errors.Wrap(err, "error marshaling new authz"))
-	}
-	_, swapped, err := db.CmpAndSwap(authzTable, []byte(ba.ID), oldB, newB)
-	switch {
-	case err != nil:
-		return ServerInternalErr(errors.Wrapf(err, "error storing authz"))
-	case !swapped:
-		return ServerInternalErr(errors.Errorf("error storing authz; " +
-			"value has changed since last read"))
-	default:
-		return nil
-	}
 }
 
 // getDBAuthz retrieves and unmarshals a database representation of the
@@ -102,8 +74,11 @@ func (db *DB) GetAuthorization(ctx context.Context, id string) (*types.Authoriza
 // CreateAuthorization creates an entry in the database for the Authorization.
 // Implements the acme.DB.CreateAuthorization interface.
 func (db *DB) CreateAuthorization(ctx context.Context, az *types.Authorization) error {
-	if len(authz.AccountID) == 0 {
-		return ServerInternalErr(errors.New("AccountID cannot be empty"))
+	if len(az.AccountID) == 0 {
+		return ServerInternalErr(errors.New("account-id cannot be empty"))
+	}
+	if az.Identifier == nil {
+		return ServerInternalErr(errors.New("identifier cannot be nil"))
 	}
 	az.ID, err = randID()
 	if err != nil {
@@ -113,7 +88,7 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *types.Authorization) 
 	now := clock.Now()
 	dbaz := &dbAuthz{
 		ID:         az.ID,
-		AccountID:  az.AccountId,
+		AccountID:  az.AccountID,
 		Status:     types.StatusPending,
 		Created:    now,
 		Expires:    now.Add(defaultExpiryDuration),
@@ -150,11 +125,14 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *types.Authorization) 
 	}
 	dbaz.Challenges = chIDs
 
-	return db.saveDBAuthz(ctx, dbaz, nil)
+	return db.save(ctx, az.ID, dbaz, nil, "authz", authzTable)
 }
 
 // UpdateAuthorization saves an updated ACME Authorization to the database.
 func (db *DB) UpdateAuthorization(ctx context.Context, az *types.Authorization) error {
+	if len(az.ID) == 0 {
+		return ServerInternalErr(errors.New("id cannot be empty"))
+	}
 	old, err := db.getDBAuthz(ctx, az.ID)
 	if err != nil {
 		return err
@@ -164,53 +142,5 @@ func (db *DB) UpdateAuthorization(ctx context.Context, az *types.Authorization) 
 
 	nu.Status = az.Status
 	nu.Error = az.Error
-	return db.saveDBAuthz(ctx, nu, old)
+	return db.save(ctx, old.ID, nu, old, "authz", authzTable)
 }
-
-/*
-// updateStatus attempts to update the status on a dbAuthz and stores the
-// updating object if necessary.
-func (ba *dbAuthz) updateStatus(db nosql.DB) (authz, error) {
-	newAuthz := ba.clone()
-
-	now := time.Now().UTC()
-	switch ba.Status {
-	case StatusInvalid:
-		return ba.parent(), nil
-	case StatusValid:
-		return ba.parent(), nil
-	case StatusPending:
-		// check expiry
-		if now.After(ba.Expires) {
-			newAuthz.Status = StatusInvalid
-			newAuthz.Error = MalformedErr(errors.New("authz has expired"))
-			break
-		}
-
-		var isValid = false
-		for _, chID := range ba.Challenges {
-			ch, err := getChallenge(db, chID)
-			if err != nil {
-				return ba, err
-			}
-			if ch.getStatus() == StatusValid {
-				isValid = true
-				break
-			}
-		}
-
-		if !isValid {
-			return ba.parent(), nil
-		}
-		newAuthz.Status = StatusValid
-		newAuthz.Error = nil
-	default:
-		return nil, ServerInternalErr(errors.Errorf("unrecognized authz status: %s", ba.Status))
-	}
-
-	if err := newAuthz.save(db, ba); err != nil {
-		return ba, err
-	}
-	return newAuthz.parent(), nil
-}
-*/

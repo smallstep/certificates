@@ -16,6 +16,7 @@ import (
 // only those methods required by the ACME api/authority.
 type Provisioner interface {
 	AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error)
+	GetID() string
 	GetName() string
 	DefaultTLSCertDuration() time.Duration
 	GetOptions() *provisioner.Options
@@ -25,6 +26,7 @@ type Provisioner interface {
 type MockProvisioner struct {
 	Mret1                   interface{}
 	Merr                    error
+	MgetID                  func() string
 	MgetName                func() string
 	MauthorizeSign          func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	MdefaultTLSCertDuration func() time.Duration
@@ -55,11 +57,20 @@ func (m *MockProvisioner) DefaultTLSCertDuration() time.Duration {
 	return m.Mret1.(time.Duration)
 }
 
+// GetOptions mock
 func (m *MockProvisioner) GetOptions() *provisioner.Options {
 	if m.MgetOptions != nil {
 		return m.MgetOptions()
 	}
 	return m.Mret1.(*provisioner.Options)
+}
+
+// GetID mock
+func (m *MockProvisioner) GetID() string {
+	if m.MgetID != nil {
+		return m.MgetID()
+	}
+	return m.Mret1.(string)
 }
 
 // ContextKey is the key type for storing and searching for ACME request

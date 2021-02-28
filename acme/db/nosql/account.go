@@ -25,45 +25,15 @@ func (dba *dbAccount) clone() *dbAccount {
 	return &nu
 }
 
-func (db *DB) saveDBAccount(nu *dbAccount, old *dbAccount) error {
-	var (
-		err  error
-		oldB []byte
-	)
-	if old == nil {
-		oldB = nil
-	} else {
-		if oldB, err = json.Marshal(old); err != nil {
-			return ServerInternalErr(errors.Wrap(err, "error marshaling old acme order"))
-		}
-	}
-
-	b, err := json.Marshal(*nu)
-	if err != nil {
-		return errors.Wrap(err, "error marshaling new account object")
-	}
-	// Set the Account
-	_, swapped, err := db.CmpAndSwap(accountTable, []byte(nu.ID), oldB, b)
-	switch {
-	case err != nil:
-		return ServerInternalErr(errors.Wrap(err, "error storing account"))
-	case !swapped:
-		return ServerInternalErr(errors.New("error storing account; " +
-			"value has changed since last read"))
-	default:
-		return nil
-	}
-}
-
 // CreateAccount imlements the AcmeDB.CreateAccount interface.
 func (db *DB) CreateAccount(ctx context.Context, acc *types.Account) error {
-	id, err := randID()
+	acc.ID, err = randID()
 	if err != nil {
 		return nil, err
 	}
 
 	dba := &dbAccount{
-		ID:      id,
+		ID:      acc.ID,
 		Key:     acc.Key,
 		Contact: acc.Contact,
 		Status:  acc.Valid,
@@ -84,7 +54,7 @@ func (db *DB) CreateAccount(ctx context.Context, acc *types.Account) error {
 	case !swapped:
 		return ServerInternalErr(errors.Errorf("key-id to account-id index already exists"))
 	default:
-		if err = db.saveDBAccount(dba, nil); err != nil {
+		if err = db.save(ctx, acc.ID, dba, nil, "account", accountTable); err != nil {
 			db.db.Del(accountByKeyIDTable, kidB)
 			return err
 		}
@@ -115,9 +85,11 @@ func (db *DB) GetAccountByKeyID(ctx context.Context, kid string) (*types.Account
 
 // UpdateAccount imlements the AcmeDB.UpdateAccount interface.
 func (db *DB) UpdateAccount(ctx context.Context, acc *types.Account) error {
-	kid := "from-context"
+	if len(acc.ID) == 0 {
+		return ServerInternalErr(errors.New("id cannot be empty"))
+	}
 
-	old, err := db.getDBAccountByKeyID(ctx, kid)
+	old, err := db.getDBAccount(ctx, acc.ID)
 	if err != nil {
 		return err
 	}
@@ -131,7 +103,7 @@ func (db *DB) UpdateAccount(ctx context.Context, acc *types.Account) error {
 		nu.Deactivated = clock.Now()
 	}
 
-	return db.saveDBAccount(newdba, dba)
+	return db.save(ctx, old.ID, newdba, dba, "account", accountTable)
 }
 
 func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, error) {
@@ -145,12 +117,8 @@ func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, erro
 	return string(id), nil
 }
 
-// getDBAccountByKeyID retrieves Id associated with the given Kid.
-func (db *DB) getDBAccountByKeyID(ctx context.Context, kid string) (*dbAccount, error) {
-	id, err := db.getAccountIDByKeyID(ctx, kid)
-	if err != nil {
-		return err
-	}
+// getDBAccount retrieves and unmarshals dbAccount.
+func (db *DB) getDBAccount(ctx context.Context, id string) (*dbAccount, error) {
 	data, err := db.db.Get(accountTable, []byte(id))
 	if err != nil {
 		if nosqlDB.IsErrNotFound(err) {
