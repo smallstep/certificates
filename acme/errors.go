@@ -186,6 +186,9 @@ func RejectedIdentifierErr(err error) *Error {
 
 // ServerInternalErr returns a new acme error.
 func ServerInternalErr(err error) *Error {
+	if err == nil {
+		return nil
+	}
 	return &Error{
 		Type:   serverInternalErr,
 		Detail: "The server experienced an internal error",
