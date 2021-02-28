@@ -28,16 +28,16 @@ type Interface interface {
 	DeactivateAccount(ctx context.Context, accID string) (*Account, error)
 	GetAccount(ctx context.Context, accID string) (*Account, error)
 	GetAccountByKey(ctx context.Context, key *jose.JSONWebKey) (*Account, error)
-	NewAccount(ctx context.Context, ao AccountOptions) (*Account, error)
-	UpdateAccount(context.Context, string, []string) (*Account, error)
+	NewAccount(ctx context.Context, acc *Account) (*Account, error)
+	UpdateAccount(ctx context.Context, acc *Account) (*Account, error)
 
-	GetAuthz(ctx context.Context, accID string, authzID string) (*Authz, error)
+	GetAuthz(ctx context.Context, accID string, authzID string) (*Authorization, error)
 	ValidateChallenge(ctx context.Context, accID string, chID string, key *jose.JSONWebKey) (*Challenge, error)
 
 	FinalizeOrder(ctx context.Context, accID string, orderID string, csr *x509.CertificateRequest) (*Order, error)
 	GetOrder(ctx context.Context, accID string, orderID string) (*Order, error)
 	GetOrdersByAccount(ctx context.Context, accID string) ([]string, error)
-	NewOrder(ctx context.Context, oo OrderOptions) (*Order, error)
+	NewOrder(ctx context.Context, o *Order) (*Order, error)
 
 	GetCertificate(string, string) ([]byte, error)
 
@@ -140,22 +140,19 @@ func (a *Authority) UseNonce(ctx context.Context, nonce string) error {
 }
 
 // NewAccount creates, stores, and returns a new ACME account.
-func (a *Authority) NewAccount(ctx context.Context, ao AccountOptions) (*Account, error) {
-	a := NewAccount(ao)
-	if err := a.db.CreateAccount(ctx, a); err != nil {
+func (a *Authority) NewAccount(ctx context.Context, acc *Account) (*Account, error) {
+	if err := a.db.CreateAccount(ctx, acc); err != nil {
 		return ServerInternalErr(err)
 	}
 	return a, nil
 }
 
 // UpdateAccount updates an ACME account.
-func (a *Authority) UpdateAccount(ctx context.Context, auo AccountUpdateOptions) (*Account, error) {
-	acc, err := a.db.GetAccount(ctx, auo.ID)
-	if err != nil {
-		return ServerInternalErr(err)
-	}
-	acc.Contact = auo.Contact
-	acc.Status = auo.Status
+func (a *Authority) UpdateAccount(ctx context.Context, acc *Account) (*Account, error) {
+	/*
+		acc.Contact = auo.Contact
+		acc.Status = auo.Status
+	*/
 	if err = a.db.UpdateAccount(ctx, acc); err != nil {
 		return ServerInternalErr(err)
 	}
@@ -228,20 +225,19 @@ func (a *Authority) GetOrdersByAccount(ctx context.Context, id string) ([]string
 }
 
 // NewOrder generates, stores, and returns a new ACME order.
-func (a *Authority) NewOrder(ctx context.Context, ops OrderOptions) (*Order, error) {
+func (a *Authority) NewOrder(ctx context.Context, o *Order) (*Order, error) {
 	prov, err := ProvisionerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return db.CreateOrder(ctx, &Order{
-		AccountID:       ops.AccountID,
-		ProvisionerID:   prov.GetID(),
-		Backdate:        a.backdate.Duration,
-		DefaultDuration: prov.DefaultTLSCertDuration(),
-		Identifiers:     ops.Identifiers,
-		NotBefore:       ops.NotBefore,
-		NotAfter:        ops.NotAfter,
-	})
+	o.DefaultDuration = prov.DefaultTLSCertDuration()
+	o.Backdate = a.backdate.Duration
+	o.ProvisionerID = prov.GetID()
+
+	if err = db.CreateOrder(ctx, o); err != nil {
+		return nil, ServerInternalErr(err)
+	}
+	return o, nil
 }
 
 // FinalizeOrder attempts to finalize an order and generate a new certificate.
@@ -271,7 +267,7 @@ func (a *Authority) FinalizeOrder(ctx context.Context, accID, orderID string, cs
 
 // GetAuthz retrieves and attempts to update the status on an ACME authz
 // before returning.
-func (a *Authority) GetAuthz(ctx context.Context, accID, authzID string) (*Authz, error) {
+func (a *Authority) GetAuthz(ctx context.Context, accID, authzID string) (*Authorization, error) {
 	az, err := a.db.GetAuthorization(ctx, authzID)
 	if err != nil {
 		return nil, err
@@ -316,13 +312,14 @@ func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, j
 }
 
 // GetCertificate retrieves the Certificate by ID.
-func (a *Authority) GetCertificate(accID, certID string) ([]byte, error) {
-	cert, err := getCert(a.db, certID)
+func (a *Authority) GetCertificate(ctx context.Context, accID, certID string) ([]byte, error) {
+	cert, err := a.db.GetCertificate(a.db, certID)
 	if err != nil {
 		return nil, err
 	}
-	if accID != cert.AccountID {
-		return nil, UnauthorizedErr(errors.New("account does not own certificate"))
+	if cert.AccountID != accID {
+		log.Printf("account-id from request ('%s') does not match challenge account-id ('%s')", accID, cert.AccountID)
+		return nil, UnauthorizedErr(errors.New("account does not own challenge"))
 	}
 	return cert.toACME(a.db, a.dir)
 }

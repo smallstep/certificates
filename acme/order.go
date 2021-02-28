@@ -1,3 +1,4 @@
+package acme
 
 import (
 	"context"
@@ -188,7 +189,7 @@ func (o *order) Finalize(ctx, db DB, csr *x509.CertificateRequest, auth SignAuth
 		return nil, ServerInternalErr(errors.Wrapf(err, "error generating certificate for order %s", o.ID))
 	}
 
-	cert, err := newCert(db, CertOptions{
+	cert, err := db.CreateCertificate(ctx, &Certificate{
 		AccountID:     o.AccountID,
 		OrderID:       o.ID,
 		Leaf:          certChain[0],
