@@ -32,6 +32,8 @@ NoNewPrivileges=yes
 ; Sandboxing
 ; This sandboxing works with YubiKey PIV (via pcscd HTTP API), but it is likely
 ; too restrictive for PKCS#11 HSMs.
+;
+; NOTE: Comment out the rest of this section for troubleshooting.
 ProtectSystem=full
 ProtectHome=true
 RestrictNamespaces=true
