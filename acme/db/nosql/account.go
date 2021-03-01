@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/acme"
 	nosqlDB "github.com/smallstep/nosql"
 	"go.step.sm/crypto/jose"
 )
@@ -17,7 +18,7 @@ type dbAccount struct {
 	Deactivated time.Time        `json:"deactivated"`
 	Key         *jose.JSONWebKey `json:"key"`
 	Contact     []string         `json:"contact,omitempty"`
-	Status      string           `json:"status"`
+	Status      acme.Status      `json:"status"`
 }
 
 func (dba *dbAccount) clone() *dbAccount {
@@ -26,33 +27,34 @@ func (dba *dbAccount) clone() *dbAccount {
 }
 
 // CreateAccount imlements the AcmeDB.CreateAccount interface.
-func (db *DB) CreateAccount(ctx context.Context, acc *Account) error {
+func (db *DB) CreateAccount(ctx context.Context, acc *acme.Account) error {
+	var err error
 	acc.ID, err = randID()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	dba := &dbAccount{
 		ID:      acc.ID,
 		Key:     acc.Key,
 		Contact: acc.Contact,
-		Status:  acc.Valid,
+		Status:  acc.Status,
 		Created: clock.Now(),
 	}
 
-	kid, err := keyToID(dba.Key)
+	kid, err := acme.KeyToID(dba.Key)
 	if err != nil {
 		return err
 	}
 	kidB := []byte(kid)
 
 	// Set the jwkID -> acme account ID index
-	_, swapped, err := db.db.CmpAndSwap(accountByKeyIDTable, kidB, nil, []byte(a.ID))
+	_, swapped, err := db.db.CmpAndSwap(accountByKeyIDTable, kidB, nil, []byte(acc.ID))
 	switch {
 	case err != nil:
-		return ServerInternalErr(errors.Wrap(err, "error setting key-id to account-id index"))
+		return errors.Wrap(err, "error storing keyID to accountID index")
 	case !swapped:
-		return ServerInternalErr(errors.Errorf("key-id to account-id index already exists"))
+		return errors.Errorf("key-id to account-id index already exists")
 	default:
 		if err = db.save(ctx, acc.ID, dba, nil, "account", accountTable); err != nil {
 			db.db.Del(accountByKeyIDTable, kidB)
@@ -63,24 +65,24 @@ func (db *DB) CreateAccount(ctx context.Context, acc *Account) error {
 }
 
 // GetAccount retrieves an ACME account by ID.
-func (db *DB) GetAccount(ctx context.Context, id string) (*Account, error) {
-	acc, err := db.getDBAccount(ctx, id)
+func (db *DB) GetAccount(ctx context.Context, id string) (*acme.Account, error) {
+	dbacc, err := db.getDBAccount(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Account{
+	return &acme.Account{
 		Status:  dbacc.Status,
 		Contact: dbacc.Contact,
-		Orders:  dir.getLink(ctx, OrdersByAccountLink, true, a.ID),
+		Orders:  dir.getLink(ctx, OrdersByAccountLink, true, dbacc.ID),
 		Key:     dbacc.Key,
 		ID:      dbacc.ID,
 	}, nil
 }
 
 // GetAccountByKeyID retrieves an ACME account by KeyID (thumbprint of the Account Key -- JWK).
-func (db *DB) GetAccountByKeyID(ctx context.Context, kid string) (*Account, error) {
-	id, err := db.getAccountIDByKeyID(kid)
+func (db *DB) GetAccountByKeyID(ctx context.Context, kid string) (*acme.Account, error) {
+	id, err := db.getAccountIDByKeyID(ctx, kid)
 	if err != nil {
 		return nil, err
 	}
@@ -88,9 +90,9 @@ func (db *DB) GetAccountByKeyID(ctx context.Context, kid string) (*Account, erro
 }
 
 // UpdateAccount imlements the AcmeDB.UpdateAccount interface.
-func (db *DB) UpdateAccount(ctx context.Context, acc *Account) error {
+func (db *DB) UpdateAccount(ctx context.Context, acc *acme.Account) error {
 	if len(acc.ID) == 0 {
-		return ServerInternalErr(errors.New("id cannot be empty"))
+		return errors.New("id cannot be empty")
 	}
 
 	old, err := db.getDBAccount(ctx, acc.ID)
@@ -99,24 +101,24 @@ func (db *DB) UpdateAccount(ctx context.Context, acc *Account) error {
 	}
 
 	nu := old.clone()
-	nu.Contact = acc.contact
+	nu.Contact = acc.Contact
 	nu.Status = acc.Status
 
 	// If the status has changed to 'deactivated', then set deactivatedAt timestamp.
-	if acc.Status == StatusDeactivated && old.Status != Status.Deactivated {
+	if acc.Status == acme.StatusDeactivated && old.Status != acme.StatusDeactivated {
 		nu.Deactivated = clock.Now()
 	}
 
-	return db.save(ctx, old.ID, newdba, dba, "account", accountTable)
+	return db.save(ctx, old.ID, nu, old, "account", accountTable)
 }
 
 func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, error) {
 	id, err := db.db.Get(accountByKeyIDTable, []byte(kid))
 	if err != nil {
 		if nosqlDB.IsErrNotFound(err) {
-			return nil, MalformedErr(errors.Wrapf(err, "account with key id %s not found", kid))
+			return "", errors.Wrapf(err, "account with key id %s not found", kid)
 		}
-		return nil, ServerInternalErr(errors.Wrapf(err, "error loading key-account index"))
+		return "", errors.Wrapf(err, "error loading key-account index")
 	}
 	return string(id), nil
 }
@@ -126,14 +128,14 @@ func (db *DB) getDBAccount(ctx context.Context, id string) (*dbAccount, error) {
 	data, err := db.db.Get(accountTable, []byte(id))
 	if err != nil {
 		if nosqlDB.IsErrNotFound(err) {
-			return nil, MalformedErr(errors.Wrapf(err, "account %s not found", id))
+			return nil, errors.Wrapf(err, "account %s not found", id)
 		}
-		return nil, ServerInternalErr(errors.Wrapf(err, "error loading account %s", id))
+		return nil, errors.Wrapf(err, "error loading account %s", id)
 	}
 
-	dbacc := new(account)
+	dbacc := new(dbAccount)
 	if err = json.Unmarshal(data, dbacc); err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error unmarshaling account"))
+		return nil, errors.Wrap(err, "error unmarshaling account")
 	}
 	return dbacc, nil
 }

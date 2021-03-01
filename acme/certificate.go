@@ -1,10 +1,9 @@
 package acme
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/pem"
-
-	"github.com/smallstep/nosql"
 )
 
 // Certificate options with which to create and store a cert object.
@@ -17,7 +16,7 @@ type Certificate struct {
 }
 
 // ToACME encodes the entire X509 chain into a PEM list.
-func (cert *Certificate) ToACME(db nosql.DB, dir *directory) ([]byte, error) {
+func (cert *Certificate) ToACME(ctx context.Context) ([]byte, error) {
 	var ret []byte
 	for _, c := range append([]*x509.Certificate{cert.Leaf}, cert.Intermediates...) {
 		ret = append(ret, pem.EncodeToMemory(&pem.Block{
