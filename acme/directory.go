@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-
-	"github.com/pkg/errors"
 )
 
 // Directory represents an ACME directory for configuring clients.
@@ -23,7 +21,7 @@ type Directory struct {
 func (d *Directory) ToLog() (interface{}, error) {
 	b, err := json.Marshal(d)
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error marshaling directory for logging"))
+		return nil, ErrorInternalServerWrap(err, "error marshaling directory for logging")
 	}
 	return string(b), nil
 }

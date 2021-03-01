@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/jose"
 )
@@ -125,7 +124,7 @@ func (a *Authority) UseNonce(ctx context.Context, nonce string) error {
 // NewAccount creates, stores, and returns a new ACME account.
 func (a *Authority) NewAccount(ctx context.Context, acc *Account) error {
 	if err := a.db.CreateAccount(ctx, acc); err != nil {
-		return ErrorWrap(ErrorServerInternalType, err, "newAccount: error creating account")
+		return ErrorWrap(ErrorServerInternalType, err, "error creating account")
 	}
 	return nil
 }
@@ -137,14 +136,18 @@ func (a *Authority) UpdateAccount(ctx context.Context, acc *Account) (*Account, 
 		acc.Status = auo.Status
 	*/
 	if err := a.db.UpdateAccount(ctx, acc); err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "authority.UpdateAccount - database update failed"
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error updating account")
 	}
 	return acc, nil
 }
 
 // GetAccount returns an ACME account.
 func (a *Authority) GetAccount(ctx context.Context, id string) (*Account, error) {
-	return a.db.GetAccount(ctx, id)
+	acc, err := a.db.GetAccount(ctx, id)
+	if err != nil {
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving account")
+	}
+	return acc, nil
 }
 
 // GetAccountByKey returns the ACME associated with the jwk id.
@@ -165,18 +168,18 @@ func (a *Authority) GetOrder(ctx context.Context, accID, orderID string) (*Order
 	}
 	o, err := a.db.GetOrder(ctx, orderID)
 	if err != nil {
-		return nil, ServerInternalErr(err)
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving order")
 	}
 	if accID != o.AccountID {
 		log.Printf("account-id from request ('%s') does not match order account-id ('%s')", accID, o.AccountID)
-		return nil, UnauthorizedErr(errors.New("account does not own order"))
+		return nil, NewError(ErrorUnauthorizedType, "account does not own order")
 	}
 	if prov.GetID() != o.ProvisionerID {
 		log.Printf("provisioner-id from request ('%s') does not match order provisioner-id ('%s')", prov.GetID(), o.ProvisionerID)
-		return nil, UnauthorizedErr(errors.New("provisioner does not own order"))
+		return nil, NewError(ErrorUnauthorizedType, "provisioner does not own order")
 	}
 	if err = o.UpdateStatus(ctx, a.db); err != nil {
-		return nil, err
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error updating order")
 	}
 	return o, nil
 }
@@ -212,7 +215,7 @@ func (a *Authority) NewOrder(ctx context.Context, o *Order) (*Order, error) {
 	o.ProvisionerID = prov.GetID()
 
 	if err = a.db.CreateOrder(ctx, o); err != nil {
-		return nil, ServerInternalErr(err)
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error creating order")
 	}
 	return o, nil
 }
@@ -225,18 +228,18 @@ func (a *Authority) FinalizeOrder(ctx context.Context, accID, orderID string, cs
 	}
 	o, err := a.db.GetOrder(ctx, orderID)
 	if err != nil {
-		return nil, err
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving order")
 	}
 	if accID != o.AccountID {
 		log.Printf("account-id from request ('%s') does not match order account-id ('%s')", accID, o.AccountID)
-		return nil, UnauthorizedErr(errors.New("account does not own order"))
+		return nil, NewError(ErrorUnauthorizedType, "account does not own order")
 	}
 	if prov.GetID() != o.ProvisionerID {
 		log.Printf("provisioner-id from request ('%s') does not match order provisioner-id ('%s')", prov.GetID(), o.ProvisionerID)
-		return nil, UnauthorizedErr(errors.New("provisioner does not own order"))
+		return nil, NewError(ErrorUnauthorizedType, "provisioner does not own order")
 	}
 	if err = o.Finalize(ctx, a.db, csr, a.signAuth, prov); err != nil {
-		return nil, Wrap(err, "error finalizing order")
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error finalizing order")
 	}
 	return o, nil
 }
@@ -246,14 +249,14 @@ func (a *Authority) FinalizeOrder(ctx context.Context, accID, orderID string, cs
 func (a *Authority) GetAuthz(ctx context.Context, accID, authzID string) (*Authorization, error) {
 	az, err := a.db.GetAuthorization(ctx, authzID)
 	if err != nil {
-		return nil, err
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving authorization")
 	}
 	if accID != az.AccountID {
 		log.Printf("account-id from request ('%s') does not match authz account-id ('%s')", accID, az.AccountID)
-		return nil, UnauthorizedErr(errors.New("account does not own authz"))
+		return nil, NewError(ErrorUnauthorizedType, "account does not own order")
 	}
 	if err = az.UpdateStatus(ctx, a.db); err != nil {
-		return nil, Wrap(err, "error updating authz status")
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error updating authorization status")
 	}
 	return az, nil
 }
@@ -262,11 +265,11 @@ func (a *Authority) GetAuthz(ctx context.Context, accID, authzID string) (*Autho
 func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, jwk *jose.JSONWebKey) (*Challenge, error) {
 	ch, err := a.db.GetChallenge(ctx, chID, "todo")
 	if err != nil {
-		return nil, err
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving challenge")
 	}
 	if accID != ch.AccountID {
 		log.Printf("account-id from request ('%s') does not match challenge account-id ('%s')", accID, ch.AccountID)
-		return nil, UnauthorizedErr(errors.New("account does not own challenge"))
+		return nil, NewError(ErrorUnauthorizedType, "account does not own order")
 	}
 	client := http.Client{
 		Timeout: time.Duration(30 * time.Second),
@@ -281,7 +284,7 @@ func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, j
 			return tls.DialWithDialer(dialer, network, addr, config)
 		},
 	}); err != nil {
-		return nil, Wrap(err, "error attempting challenge validation")
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error validating challenge")
 	}
 	return ch, nil
 }
@@ -290,11 +293,11 @@ func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, j
 func (a *Authority) GetCertificate(ctx context.Context, accID, certID string) ([]byte, error) {
 	cert, err := a.db.GetCertificate(ctx, certID)
 	if err != nil {
-		return nil, err
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving certificate")
 	}
 	if cert.AccountID != accID {
 		log.Printf("account-id from request ('%s') does not match challenge account-id ('%s')", accID, cert.AccountID)
-		return nil, UnauthorizedErr(errors.New("account does not own challenge"))
+		return nil, NewError(ErrorUnauthorizedType, "account does not own order")
 	}
 	return cert.ToACME(ctx)
 }

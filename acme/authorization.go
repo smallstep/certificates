@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // Authorization representst an ACME Authorization.
@@ -23,7 +21,7 @@ type Authorization struct {
 func (az *Authorization) ToLog() (interface{}, error) {
 	b, err := json.Marshal(az)
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error marshaling authz for logging"))
+		return nil, ErrorInternalServerWrap(err, "error marshaling authz for logging")
 	}
 	return string(b), nil
 }
@@ -34,7 +32,7 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 	now := time.Now().UTC()
 	expiry, err := time.Parse(time.RFC3339, az.Expires)
 	if err != nil {
-		return ServerInternalErr(errors.Wrap(err, "error converting expiry string to time"))
+		return ErrorInternalServerWrap(err, "error converting expiry string to time")
 	}
 
 	switch az.Status {
@@ -62,11 +60,11 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 		}
 		az.Status = StatusValid
 	default:
-		return ServerInternalErr(errors.Errorf("unrecognized authorization status: %s", az.Status))
+		return NewError(ErrorServerInternalType, "unrecognized authorization status: %s", az.Status)
 	}
 
 	if err = db.UpdateAuthorization(ctx, az); err != nil {
-		return ServerInternalErr(err)
+		return ErrorInternalServerWrap(err, "error updating authorization")
 	}
 	return nil
 }

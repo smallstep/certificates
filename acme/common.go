@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/jose"
 )
@@ -96,7 +95,7 @@ const (
 func AccountFromContext(ctx context.Context) (*Account, error) {
 	val, ok := ctx.Value(AccContextKey).(*Account)
 	if !ok || val == nil {
-		return nil, AccountDoesNotExistErr(nil)
+		return nil, NewError(ErrorServerInternalType, "account not in context")
 	}
 	return val, nil
 }
@@ -114,7 +113,7 @@ func BaseURLFromContext(ctx context.Context) *url.URL {
 func JwkFromContext(ctx context.Context) (*jose.JSONWebKey, error) {
 	val, ok := ctx.Value(JwkContextKey).(*jose.JSONWebKey)
 	if !ok || val == nil {
-		return nil, ServerInternalErr(errors.Errorf("jwk expected in request context"))
+		return nil, NewError(ErrorServerInternalType, "jwk expected in request context")
 	}
 	return val, nil
 }
@@ -123,7 +122,7 @@ func JwkFromContext(ctx context.Context) (*jose.JSONWebKey, error) {
 func JwsFromContext(ctx context.Context) (*jose.JSONWebSignature, error) {
 	val, ok := ctx.Value(JwsContextKey).(*jose.JSONWebSignature)
 	if !ok || val == nil {
-		return nil, ServerInternalErr(errors.Errorf("jws expected in request context"))
+		return nil, NewError(ErrorServerInternalType, "jws expected in request context")
 	}
 	return val, nil
 }
@@ -133,11 +132,11 @@ func JwsFromContext(ctx context.Context) (*jose.JSONWebSignature, error) {
 func ProvisionerFromContext(ctx context.Context) (Provisioner, error) {
 	val := ctx.Value(ProvisionerContextKey)
 	if val == nil {
-		return nil, ServerInternalErr(errors.Errorf("provisioner expected in request context"))
+		return nil, NewError(ErrorServerInternalType, "provisioner expected in request context")
 	}
 	pval, ok := val.(Provisioner)
 	if !ok || pval == nil {
-		return nil, ServerInternalErr(errors.Errorf("provisioner in context is not an ACME provisioner"))
+		return nil, NewError(ErrorServerInternalType, "provisioner in context is not an ACME provisioner")
 	}
 	return pval, nil
 }
