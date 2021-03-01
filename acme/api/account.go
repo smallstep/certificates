@@ -44,7 +44,7 @@ type UpdateAccountRequest struct {
 // IsDeactivateRequest returns true if the update request is a deactivation
 // request, false otherwise.
 func (u *UpdateAccountRequest) IsDeactivateRequest() bool {
-	return u.Status == acme.StatusDeactivated
+	return u.Status == string(acme.StatusDeactivated)
 }
 
 // Validate validates a update-account request body.
@@ -59,7 +59,7 @@ func (u *UpdateAccountRequest) Validate() error {
 		}
 		return nil
 	case len(u.Status) > 0:
-		if u.Status != acme.StatusDeactivated {
+		if u.Status != string(acme.StatusDeactivated) {
 			return acme.MalformedErr(errors.Errorf("cannot update account "+
 				"status to %s, only deactivated", u.Status))
 		}
@@ -110,9 +110,10 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if acc, err = h.Auth.NewAccount(r.Context(), acme.AccountOptions{
+		if acc, err = h.Auth.NewAccount(r.Context(), &acme.Account{
 			Key:     jwk,
 			Contact: nar.Contact,
+			Status:  acme.StatusValid,
 		}); err != nil {
 			api.WriteError(w, err)
 			return

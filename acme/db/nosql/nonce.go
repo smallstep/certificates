@@ -1,11 +1,13 @@
 package nosql
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/acme"
 	nosqlDB "github.com/smallstep/nosql"
 	"github.com/smallstep/nosql/database"
 )
@@ -18,10 +20,10 @@ type dbNonce struct {
 
 // CreateNonce creates, stores, and returns an ACME replay-nonce.
 // Implements the acme.DB interface.
-func (db *DB) CreateNonce() (Nonce, error) {
+func (db *DB) CreateNonce(ctx context.Context) (acme.Nonce, error) {
 	_id, err := randID()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	id := base64.RawURLEncoding.EncodeToString([]byte(_id))
@@ -31,12 +33,12 @@ func (db *DB) CreateNonce() (Nonce, error) {
 	}
 	b, err := json.Marshal(n)
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error marshaling nonce"))
+		return "", errors.Wrap(err, "error marshaling nonce")
 	}
 	if err = db.save(ctx, id, b, nil, "nonce", nonceTable); err != nil {
 		return "", err
 	}
-	return Nonce(id), nil
+	return acme.Nonce(id), nil
 }
 
 // DeleteNonce verifies that the nonce is valid (by checking if it exists),
@@ -59,9 +61,9 @@ func (db *DB) DeleteNonce(nonce string) error {
 
 	switch {
 	case nosqlDB.IsErrNotFound(err):
-		return BadNonceErr(nil)
+		return errors.New("not found")
 	case err != nil:
-		return ServerInternalErr(errors.Wrapf(err, "error deleting nonce %s", nonce))
+		return errors.Wrapf(err, "error deleting nonce %s", nonce)
 	default:
 		return nil
 	}

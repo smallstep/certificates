@@ -4,7 +4,7 @@ import "context"
 
 // DB is the DB interface expected by the step-ca ACME API.
 type DB interface {
-	CreateAccount(ctx context.Context, acc *Account) (*Account, error)
+	CreateAccount(ctx context.Context, acc *Account) error
 	GetAccount(ctx context.Context, id string) (*Account, error)
 	GetAccountByKeyID(ctx context.Context, kid string) (*Account, error)
 	UpdateAccount(ctx context.Context, acc *Account) error

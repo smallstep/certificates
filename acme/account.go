@@ -1,9 +1,10 @@
 package acme
 
 import (
+	"crypto"
+	"encoding/base64"
 	"encoding/json"
 
-	"github.com/pkg/errors"
 	"go.step.sm/crypto/jose"
 )
 
@@ -11,7 +12,7 @@ import (
 // attributes required for responses in the ACME protocol.
 type Account struct {
 	Contact []string         `json:"contact,omitempty"`
-	Status  string           `json:"status"`
+	Status  Status           `json:"status"`
 	Orders  string           `json:"orders"`
 	ID      string           `json:"-"`
 	Key     *jose.JSONWebKey `json:"-"`
@@ -21,7 +22,7 @@ type Account struct {
 func (a *Account) ToLog() (interface{}, error) {
 	b, err := json.Marshal(a)
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error marshaling account for logging"))
+		return nil, ErrorWrap(ErrorServerInternalType, err, "error marshaling account for logging")
 	}
 	return string(b), nil
 }
@@ -39,4 +40,13 @@ func (a *Account) GetKey() *jose.JSONWebKey {
 // IsValid returns true if the Account is valid.
 func (a *Account) IsValid() bool {
 	return Status(a.Status) == StatusValid
+}
+
+// KeyToID converts a JWK to a thumbprint.
+func KeyToID(jwk *jose.JSONWebKey) (string, error) {
+	kid, err := jwk.Thumbprint(crypto.SHA256)
+	if err != nil {
+		return "", ErrorWrap(ErrorServerInternalType, err, "error generating jwk thumbprint")
+	}
+	return base64.RawURLEncoding.EncodeToString(kid), nil
 }

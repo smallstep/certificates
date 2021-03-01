@@ -13,18 +13,25 @@ import (
 	"go.step.sm/crypto/x509util"
 )
 
+// Identifier encodes the type that an order pertains to.
+type Identifier struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
 // Order contains order metadata for the ACME protocol order type.
 type Order struct {
-	Status          string        `json:"status"`
+	Status          Status        `json:"status"`
 	Expires         string        `json:"expires,omitempty"`
 	Identifiers     []Identifier  `json:"identifiers"`
 	NotBefore       string        `json:"notBefore,omitempty"`
 	NotAfter        string        `json:"notAfter,omitempty"`
 	Error           interface{}   `json:"error,omitempty"`
 	Authorizations  []string      `json:"authorizations"`
-	Finalize        string        `json:"finalize"`
+	FinalizeURL     string        `json:"finalize"`
 	Certificate     string        `json:"certificate,omitempty"`
 	ID              string        `json:"-"`
+	AccountID       string        `json:"-"`
 	ProvisionerID   string        `json:"-"`
 	DefaultDuration time.Duration `json:"-"`
 	Backdate        time.Duration `json:"-"`
@@ -45,7 +52,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 	now := time.Now().UTC()
 	expiry, err := time.Parse(time.RFC3339, o.Expires)
 	if err != nil {
-		return ServerInternalErr(errors.Wrap("error converting expiry string to time"))
+		return ServerInternalErr(errors.Wrap(err, "order.UpdateStatus - error converting expiry string to time"))
 	}
 
 	switch o.Status {
@@ -69,7 +76,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 			break
 		}
 
-		var count = map[string]int{
+		var count = map[Status]int{
 			StatusValid:   0,
 			StatusInvalid: 0,
 			StatusPending: 0,
@@ -77,10 +84,10 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 		for _, azID := range o.Authorizations {
 			az, err := db.GetAuthorization(ctx, azID)
 			if err != nil {
-				return false, err
+				return err
 			}
-			if az, err = az.UpdateStatus(db); err != nil {
-				return false, err
+			if err = az.UpdateStatus(ctx, db); err != nil {
+				return err
 			}
 			st := az.Status
 			count[st]++
@@ -98,20 +105,19 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 			o.Status = StatusReady
 
 		default:
-			return nil, ServerInternalErr(errors.New("unexpected authz status"))
+			return ServerInternalErr(errors.New("unexpected authz status"))
 		}
 	default:
-		return nil, ServerInternalErr(errors.Errorf("unrecognized order status: %s", o.Status))
+		return ServerInternalErr(errors.Errorf("unrecognized order status: %s", o.Status))
 	}
 	return db.UpdateOrder(ctx, o)
 }
 
-// finalize signs a certificate if the necessary conditions for Order completion
+// Finalize signs a certificate if the necessary conditions for Order completion
 // have been met.
-func (o *order) Finalize(ctx, db DB, csr *x509.CertificateRequest, auth SignAuthority, p Provisioner) error {
-	var err error
-	if o, err = o.UpdateStatus(db); err != nil {
-		return nil, err
+func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateRequest, auth SignAuthority, p Provisioner) error {
+	if err := o.UpdateStatus(ctx, db); err != nil {
+		return err
 	}
 
 	switch o.Status {
@@ -124,7 +130,7 @@ func (o *order) Finalize(ctx, db DB, csr *x509.CertificateRequest, auth SignAuth
 	case StatusReady:
 		break
 	default:
-		return nil, ServerInternalErr(errors.Errorf("unexpected status %s for order %s", o.Status, o.ID))
+		return ServerInternalErr(errors.Errorf("unexpected status %s for order %s", o.Status, o.ID))
 	}
 
 	// RFC8555: The CSR MUST indicate the exact same set of requested
@@ -135,7 +141,7 @@ func (o *order) Finalize(ctx, db DB, csr *x509.CertificateRequest, auth SignAuth
 	if csr.Subject.CommonName != "" {
 		csr.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
 	}
-	csr.DNSNames = uniqueLowerNames(csr.DNSNames)
+	csr.DNSNames = uniqueSortedLowerNames(csr.DNSNames)
 	orderNames := make([]string, len(o.Identifiers))
 	for i, n := range o.Identifiers {
 		orderNames[i] = n.Value
@@ -148,13 +154,13 @@ func (o *order) Finalize(ctx, db DB, csr *x509.CertificateRequest, auth SignAuth
 	// absence of other SANs as they will only be set if the templates allows
 	// them.
 	if len(csr.DNSNames) != len(orderNames) {
-		return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
+		return BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
 	}
 
 	sans := make([]x509util.SubjectAlternativeName, len(csr.DNSNames))
 	for i := range csr.DNSNames {
 		if csr.DNSNames[i] != orderNames[i] {
-			return nil, BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
+			return BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
 		}
 		sans[i] = x509util.SubjectAlternativeName{
 			Type:  x509util.DNSType,
@@ -163,10 +169,10 @@ func (o *order) Finalize(ctx, db DB, csr *x509.CertificateRequest, auth SignAuth
 	}
 
 	// Get authorizations from the ACME provisioner.
-	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod)
+	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 	signOps, err := p.AuthorizeSign(ctx, "")
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrapf(err, "error retrieving authorization options from ACME provisioner"))
+		return ServerInternalErr(errors.Wrapf(err, "error retrieving authorization options from ACME provisioner"))
 	}
 
 	// Template data
@@ -176,27 +182,36 @@ func (o *order) Finalize(ctx, db DB, csr *x509.CertificateRequest, auth SignAuth
 
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrapf(err, "error creating template options from ACME provisioner"))
+		return ServerInternalErr(errors.Wrapf(err, "error creating template options from ACME provisioner"))
 	}
 	signOps = append(signOps, templateOptions)
 
-	// Create and store a new certificate.
-	certChain, err := auth.Sign(csr, provisioner.SignOptions{
-		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
-		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
-	}, signOps...)
+	nbf, err := time.Parse(time.RFC3339, o.NotBefore)
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrapf(err, "error generating certificate for order %s", o.ID))
+		return ServerInternalErr(errors.Wrap(err, "error parsing order NotBefore"))
+	}
+	naf, err := time.Parse(time.RFC3339, o.NotAfter)
+	if err != nil {
+		return ServerInternalErr(errors.Wrap(err, "error parsing order NotAfter"))
 	}
 
-	cert, err := db.CreateCertificate(ctx, &Certificate{
+	// Sign a new certificate.
+	certChain, err := auth.Sign(csr, provisioner.SignOptions{
+		NotBefore: provisioner.NewTimeDuration(nbf),
+		NotAfter:  provisioner.NewTimeDuration(naf),
+	}, signOps...)
+	if err != nil {
+		return ServerInternalErr(errors.Wrapf(err, "error signing certificate for order %s", o.ID))
+	}
+
+	cert := &Certificate{
 		AccountID:     o.AccountID,
 		OrderID:       o.ID,
 		Leaf:          certChain[0],
 		Intermediates: certChain[1:],
-	})
-	if err != nil {
-		return nil, err
+	}
+	if err := db.CreateCertificate(ctx, cert); err != nil {
+		return err
 	}
 
 	o.Certificate = cert.ID

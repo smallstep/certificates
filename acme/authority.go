@@ -2,10 +2,8 @@ package acme
 
 import (
 	"context"
-	"crypto"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"log"
 	"net"
 	"net/http"
@@ -14,8 +12,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
-	database "github.com/smallstep/certificates/db"
-	"github.com/smallstep/nosql"
 	"go.step.sm/crypto/jose"
 )
 
@@ -49,7 +45,7 @@ type Interface interface {
 // Authority is the layer that handles all ACME interactions.
 type Authority struct {
 	backdate provisioner.Duration
-	db       nosql.DB
+	db       DB
 	dir      *directory
 	signAuth SignAuthority
 }
@@ -57,8 +53,8 @@ type Authority struct {
 // AuthorityOptions required to create a new ACME Authority.
 type AuthorityOptions struct {
 	Backdate provisioner.Duration
-	// DB is the database used by nosql.
-	DB nosql.DB
+	// DB storage backend that impements the acme.DB interface.
+	DB DB
 	// DNS the host used to generate accurate ACME links. By default the authority
 	// will use the Host from the request, so this value will only be used if
 	// request.Host is empty.
@@ -74,7 +70,7 @@ type AuthorityOptions struct {
 //
 // Deprecated: NewAuthority exists for hitorical compatibility and should not
 // be used. Use acme.New() instead.
-func NewAuthority(db nosql.DB, dns, prefix string, signAuth SignAuthority) (*Authority, error) {
+func NewAuthority(db DB, dns, prefix string, signAuth SignAuthority) (*Authority, error) {
 	return New(signAuth, AuthorityOptions{
 		DB:     db,
 		DNS:    dns,
@@ -84,19 +80,6 @@ func NewAuthority(db nosql.DB, dns, prefix string, signAuth SignAuthority) (*Aut
 
 // New returns a new Authority that implements the ACME interface.
 func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
-	if _, ok := ops.DB.(*database.SimpleDB); !ok {
-		// If it's not a SimpleDB then go ahead and bootstrap the DB with the
-		// necessary ACME tables. SimpleDB should ONLY be used for testing.
-		tables := [][]byte{accountTable, accountByKeyIDTable, authzTable,
-			challengeTable, nonceTable, orderTable, ordersByAccountIDTable,
-			certTable}
-		for _, b := range tables {
-			if err := ops.DB.CreateTable(b); err != nil {
-				return nil, errors.Wrapf(err, "error creating table %s",
-					string(b))
-			}
-		}
-	}
 	return &Authority{
 		backdate: ops.Backdate, db: ops.DB, dir: newDirectory(ops.DNS, ops.Prefix), signAuth: signAuth,
 	}, nil
@@ -130,21 +113,21 @@ func (a *Authority) LoadProvisionerByID(id string) (provisioner.Interface, error
 }
 
 // NewNonce generates, stores, and returns a new ACME nonce.
-func (a *Authority) NewNonce(ctx context.Context) (string, error) {
+func (a *Authority) NewNonce(ctx context.Context) (Nonce, error) {
 	return a.db.CreateNonce(ctx)
 }
 
 // UseNonce consumes the given nonce if it is valid, returns error otherwise.
 func (a *Authority) UseNonce(ctx context.Context, nonce string) error {
-	return a.db.DeleteNonce(ctx, nonce)
+	return a.db.DeleteNonce(ctx, Nonce(nonce))
 }
 
 // NewAccount creates, stores, and returns a new ACME account.
-func (a *Authority) NewAccount(ctx context.Context, acc *Account) (*Account, error) {
+func (a *Authority) NewAccount(ctx context.Context, acc *Account) error {
 	if err := a.db.CreateAccount(ctx, acc); err != nil {
-		return ServerInternalErr(err)
+		return ErrorWrap(ErrorServerInternalType, err, "newAccount: error creating account")
 	}
-	return a, nil
+	return nil
 }
 
 // UpdateAccount updates an ACME account.
@@ -153,8 +136,8 @@ func (a *Authority) UpdateAccount(ctx context.Context, acc *Account) (*Account, 
 		acc.Contact = auo.Contact
 		acc.Status = auo.Status
 	*/
-	if err = a.db.UpdateAccount(ctx, acc); err != nil {
-		return ServerInternalErr(err)
+	if err := a.db.UpdateAccount(ctx, acc); err != nil {
+		return nil, ErrorWrap(ErrorServerInternalType, err, "authority.UpdateAccount - database update failed"
 	}
 	return acc, nil
 }
@@ -164,17 +147,9 @@ func (a *Authority) GetAccount(ctx context.Context, id string) (*Account, error)
 	return a.db.GetAccount(ctx, id)
 }
 
-func keyToID(jwk *jose.JSONWebKey) (string, error) {
-	kid, err := jwk.Thumbprint(crypto.SHA256)
-	if err != nil {
-		return "", ServerInternalErr(errors.Wrap(err, "error generating jwk thumbprint"))
-	}
-	return base64.RawURLEncoding.EncodeToString(kid), nil
-}
-
 // GetAccountByKey returns the ACME associated with the jwk id.
 func (a *Authority) GetAccountByKey(ctx context.Context, jwk *jose.JSONWebKey) (*Account, error) {
-	kid, err := keyToID(jwk)
+	kid, err := KeyToID(jwk)
 	if err != nil {
 		return nil, err
 	}
@@ -200,12 +175,13 @@ func (a *Authority) GetOrder(ctx context.Context, accID, orderID string) (*Order
 		log.Printf("provisioner-id from request ('%s') does not match order provisioner-id ('%s')", prov.GetID(), o.ProvisionerID)
 		return nil, UnauthorizedErr(errors.New("provisioner does not own order"))
 	}
-	if err = a.updateOrderStatus(ctx, o); err != nil {
+	if err = o.UpdateStatus(ctx, a.db); err != nil {
 		return nil, err
 	}
-	return o.toACME(ctx, a.db, a.dir)
+	return o, nil
 }
 
+/*
 // GetOrdersByAccount returns the list of order urls owned by the account.
 func (a *Authority) GetOrdersByAccount(ctx context.Context, id string) ([]string, error) {
 	ordersByAccountMux.Lock()
@@ -223,6 +199,7 @@ func (a *Authority) GetOrdersByAccount(ctx context.Context, id string) ([]string
 	}
 	return ret, nil
 }
+*/
 
 // NewOrder generates, stores, and returns a new ACME order.
 func (a *Authority) NewOrder(ctx context.Context, o *Order) (*Order, error) {
@@ -234,7 +211,7 @@ func (a *Authority) NewOrder(ctx context.Context, o *Order) (*Order, error) {
 	o.Backdate = a.backdate.Duration
 	o.ProvisionerID = prov.GetID()
 
-	if err = db.CreateOrder(ctx, o); err != nil {
+	if err = a.db.CreateOrder(ctx, o); err != nil {
 		return nil, ServerInternalErr(err)
 	}
 	return o, nil
@@ -258,8 +235,7 @@ func (a *Authority) FinalizeOrder(ctx context.Context, accID, orderID string, cs
 		log.Printf("provisioner-id from request ('%s') does not match order provisioner-id ('%s')", prov.GetID(), o.ProvisionerID)
 		return nil, UnauthorizedErr(errors.New("provisioner does not own order"))
 	}
-	o, err = o.Finalize(ctx, a.db, csr, a.signAuth, prov)
-	if err != nil {
+	if err = o.Finalize(ctx, a.db, csr, a.signAuth, prov); err != nil {
 		return nil, Wrap(err, "error finalizing order")
 	}
 	return o, nil
@@ -276,8 +252,7 @@ func (a *Authority) GetAuthz(ctx context.Context, accID, authzID string) (*Autho
 		log.Printf("account-id from request ('%s') does not match authz account-id ('%s')", accID, az.AccountID)
 		return nil, UnauthorizedErr(errors.New("account does not own authz"))
 	}
-	az, err = az.UpdateStatus(ctx, a.db)
-	if err != nil {
+	if err = az.UpdateStatus(ctx, a.db); err != nil {
 		return nil, Wrap(err, "error updating authz status")
 	}
 	return az, nil
@@ -313,7 +288,7 @@ func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, j
 
 // GetCertificate retrieves the Certificate by ID.
 func (a *Authority) GetCertificate(ctx context.Context, accID, certID string) ([]byte, error) {
-	cert, err := a.db.GetCertificate(a.db, certID)
+	cert, err := a.db.GetCertificate(ctx, certID)
 	if err != nil {
 		return nil, err
 	}
@@ -321,5 +296,5 @@ func (a *Authority) GetCertificate(ctx context.Context, accID, certID string) ([
 		log.Printf("account-id from request ('%s') does not match challenge account-id ('%s')", accID, cert.AccountID)
 		return nil, UnauthorizedErr(errors.New("account does not own challenge"))
 	}
-	return cert.toACME(a.db, a.dir)
+	return cert.ToACME(ctx)
 }

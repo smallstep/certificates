@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/nosql"
 )
 
@@ -14,15 +15,15 @@ var defaultExpiryDuration = time.Hour * 24
 
 // dbAuthz is the base authz type that others build from.
 type dbAuthz struct {
-	ID         string      `json:"id"`
-	AccountID  string      `json:"accountID"`
-	Identifier *Identifier `json:"identifier"`
-	Status     string      `json:"status"`
-	Expires    time.Time   `json:"expires"`
-	Challenges []string    `json:"challenges"`
-	Wildcard   bool        `json:"wildcard"`
-	Created    time.Time   `json:"created"`
-	Error      *Error      `json:"error"`
+	ID         string           `json:"id"`
+	AccountID  string           `json:"accountID"`
+	Identifier *acme.Identifier `json:"identifier"`
+	Status     acme.Status      `json:"status"`
+	Expires    time.Time        `json:"expires"`
+	Challenges []string         `json:"challenges"`
+	Wildcard   bool             `json:"wildcard"`
+	Created    time.Time        `json:"created"`
+	Error      *acme.Error      `json:"error"`
 }
 
 func (ba *dbAuthz) clone() *dbAuthz {
@@ -35,33 +36,33 @@ func (ba *dbAuthz) clone() *dbAuthz {
 func (db *DB) getDBAuthz(ctx context.Context, id string) (*dbAuthz, error) {
 	data, err := db.db.Get(authzTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
-		return nil, MalformedErr(errors.Wrapf(err, "authz %s not found", id))
+		return nil, errors.Wrapf(err, "authz %s not found", id)
 	} else if err != nil {
-		return nil, ServerInternalErr(errors.Wrapf(err, "error loading authz %s", id))
+		return nil, errors.Wrapf(err, "error loading authz %s", id)
 	}
 
 	var dbaz dbAuthz
 	if err = json.Unmarshal(data, &dbaz); err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error unmarshaling authz type into dbAuthz"))
+		return nil, errors.Wrap(err, "error unmarshaling authz type into dbAuthz")
 	}
-	return &dbaz
+	return &dbaz, nil
 }
 
 // GetAuthorization retrieves and unmarshals an ACME authz type from the database.
 // Implements acme.DB GetAuthorization interface.
-func (db *DB) GetAuthorization(ctx context.Context, id string) (*types.Authorization, error) {
-	dbaz, err := getDBAuthz(id)
+func (db *DB) GetAuthorization(ctx context.Context, id string) (*acme.Authorization, error) {
+	dbaz, err := db.getDBAuthz(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	var chs = make([]*Challenge, len(ba.Challenges))
+	var chs = make([]*acme.Challenge, len(dbaz.Challenges))
 	for i, chID := range dbaz.Challenges {
-		chs[i], err = db.GetChallenge(ctx, chID)
+		chs[i], err = db.GetChallenge(ctx, chID, id)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return &types.Authorization{
+	return &acme.Authorization{
 		Identifier: dbaz.Identifier,
 		Status:     dbaz.Status,
 		Challenges: chs,
@@ -73,23 +74,24 @@ func (db *DB) GetAuthorization(ctx context.Context, id string) (*types.Authoriza
 
 // CreateAuthorization creates an entry in the database for the Authorization.
 // Implements the acme.DB.CreateAuthorization interface.
-func (db *DB) CreateAuthorization(ctx context.Context, az *types.Authorization) error {
+func (db *DB) CreateAuthorization(ctx context.Context, az *acme.Authorization) error {
 	if len(az.AccountID) == 0 {
-		return ServerInternalErr(errors.New("account-id cannot be empty"))
+		return errors.New("account-id cannot be empty")
 	}
 	if az.Identifier == nil {
-		return ServerInternalErr(errors.New("identifier cannot be nil"))
+		return errors.New("identifier cannot be nil")
 	}
+	var err error
 	az.ID, err = randID()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	now := clock.Now()
 	dbaz := &dbAuthz{
 		ID:         az.ID,
 		AccountID:  az.AccountID,
-		Status:     types.StatusPending,
+		Status:     acme.StatusPending,
 		Created:    now,
 		Expires:    now.Add(defaultExpiryDuration),
 		Identifier: az.Identifier,
@@ -97,9 +99,9 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *types.Authorization) 
 
 	if strings.HasPrefix(az.Identifier.Value, "*.") {
 		dbaz.Wildcard = true
-		dbaz.Identifier = Identifier{
-			Value: strings.TrimPrefix(identifier.Value, "*."),
-			Type:  identifier.Type,
+		dbaz.Identifier = &acme.Identifier{
+			Value: strings.TrimPrefix(az.Identifier.Value, "*."),
+			Type:  az.Identifier.Type,
 		}
 	}
 
@@ -111,14 +113,14 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *types.Authorization) 
 	}
 
 	for _, typ := range chTypes {
-		ch, err := db.CreateChallenge(ctx, &types.Challenge{
+		ch := &acme.Challenge{
 			AccountID: az.AccountID,
 			AuthzID:   az.ID,
 			Value:     az.Identifier.Value,
 			Type:      typ,
-		})
-		if err != nil {
-			return nil, Wrapf(err, "error creating '%s' challenge", typ)
+		}
+		if err = db.CreateChallenge(ctx, ch); err != nil {
+			return errors.Wrapf(err, "error creating challenge")
 		}
 
 		chIDs = append(chIDs, ch.ID)
@@ -129,9 +131,9 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *types.Authorization) 
 }
 
 // UpdateAuthorization saves an updated ACME Authorization to the database.
-func (db *DB) UpdateAuthorization(ctx context.Context, az *types.Authorization) error {
+func (db *DB) UpdateAuthorization(ctx context.Context, az *acme.Authorization) error {
 	if len(az.ID) == 0 {
-		return ServerInternalErr(errors.New("id cannot be empty"))
+		return errors.New("id cannot be empty")
 	}
 	old, err := db.getDBAuthz(ctx, az.ID)
 	if err != nil {
@@ -141,6 +143,5 @@ func (db *DB) UpdateAuthorization(ctx context.Context, az *types.Authorization) 
 	nu := old.clone()
 
 	nu.Status = az.Status
-	nu.Error = az.Error
 	return db.save(ctx, old.ID, nu, old, "authz", authzTable)
 }

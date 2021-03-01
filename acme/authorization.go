@@ -11,7 +11,7 @@ import (
 // Authorization representst an ACME Authorization.
 type Authorization struct {
 	Identifier *Identifier  `json:"identifier"`
-	Status     string       `json:"status"`
+	Status     Status       `json:"status"`
 	Expires    string       `json:"expires"`
 	Challenges []*Challenge `json:"challenges"`
 	Wildcard   bool         `json:"wildcard"`
@@ -34,7 +34,7 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 	now := time.Now().UTC()
 	expiry, err := time.Parse(time.RFC3339, az.Expires)
 	if err != nil {
-		return ServerInternalErr(errors.Wrap("error converting expiry string to time"))
+		return ServerInternalErr(errors.Wrap(err, "error converting expiry string to time"))
 	}
 
 	switch az.Status {
@@ -46,16 +46,11 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 		// check expiry
 		if now.After(expiry) {
 			az.Status = StatusInvalid
-			az.Error = MalformedErr(errors.New("authz has expired"))
 			break
 		}
 
 		var isValid = false
-		for _, chID := range ba.Challenges {
-			ch, err := db.GetChallenge(ctx, chID, az.ID)
-			if err != nil {
-				return ServerInternalErr(err)
-			}
+		for _, ch := range az.Challenges {
 			if ch.Status == StatusValid {
 				isValid = true
 				break
@@ -66,10 +61,12 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 			return nil
 		}
 		az.Status = StatusValid
-		az.Error = nil
 	default:
-		return nil, ServerInternalErr(errors.Errorf("unrecognized authz status: %s", ba.Status))
+		return ServerInternalErr(errors.Errorf("unrecognized authorization status: %s", az.Status))
 	}
 
-	return ServerInternalErr(db.UpdateAuthorization(ctx, az))
+	if err = db.UpdateAuthorization(ctx, az); err != nil {
+		return ServerInternalErr(err)
+	}
+	return nil
 }

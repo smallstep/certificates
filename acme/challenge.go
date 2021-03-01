@@ -18,14 +18,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/nosql"
 	"go.step.sm/crypto/jose"
 )
 
 // Challenge represents an ACME response Challenge type.
 type Challenge struct {
 	Type      string  `json:"type"`
-	Status    string  `json:"status"`
+	Status    Status  `json:"status"`
 	Token     string  `json:"token"`
 	Validated string  `json:"validated,omitempty"`
 	URL       string  `json:"url"`
@@ -99,7 +98,7 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	// Update and store the challenge.
 	ch.Status = StatusValid
 	ch.Error = nil
-	ch.Validated = clock.Now()
+	ch.Validated = clock.Now().Format(time.RFC3339)
 
 	return ServerInternalErr(db.UpdateChallenge(ctx, ch))
 }
@@ -107,11 +106,11 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo validateOptions) error {
 	config := &tls.Config{
 		NextProtos:         []string{"acme-tls/1"},
-		ServerName:         tc.Value,
+		ServerName:         ch.Value,
 		InsecureSkipVerify: true, // we expect a self-signed challenge certificate
 	}
 
-	hostPort := net.JoinHostPort(tc.Value, "443")
+	hostPort := net.JoinHostPort(ch.Value, "443")
 
 	conn, err := vo.tlsDial("tcp", hostPort, config)
 	if err != nil {
@@ -125,7 +124,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	if len(certs) == 0 {
 		return storeError(ctx, ch, db, RejectedIdentifierErr(errors.Errorf("%s "+
-			"challenge for %s resulted in no certificates", tc.Type, tc.Value)))
+			"challenge for %s resulted in no certificates", ch.Type, ch.Value)))
 	}
 
 	if !cs.NegotiatedProtocolIsMutual || cs.NegotiatedProtocol != "acme-tls/1" {
@@ -135,18 +134,18 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	leafCert := certs[0]
 
-	if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], tc.Value) {
+	if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], ch.Value) {
 		return storeError(ctx, ch, db, RejectedIdentifierErr(errors.Errorf("incorrect certificate for tls-alpn-01 challenge: "+
-			"leaf certificate must contain a single DNS name, %v", tc.Value)))
+			"leaf certificate must contain a single DNS name, %v", ch.Value)))
 	}
 
 	idPeAcmeIdentifier := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 31}
 	idPeAcmeIdentifierV1Obsolete := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 30, 1}
 	foundIDPeAcmeIdentifierV1Obsolete := false
 
-	keyAuth, err := KeyAuthorization(tc.Token, jwk)
+	keyAuth, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	hashedKeyAuth := sha256.Sum256([]byte(keyAuth))
 
@@ -173,9 +172,12 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 			ch.Status = StatusValid
 			ch.Error = nil
-			ch.Validated = clock.Now()
+			ch.Validated = clock.Now().Format(time.RFC3339)
 
-			return ServerInternalErr(db.UpdateChallenge(ctx, ch))
+			if err = db.UpdateChallenge(ctx, ch); err != nil {
+				return ServerInternalErr(errors.Wrap(err, "tlsalpn01ValidateChallenge - error updating challenge"))
+			}
+			return nil
 		}
 
 		if idPeAcmeIdentifierV1Obsolete.Equal(ext.Id) {
@@ -192,12 +194,12 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 		"certificate for tls-alpn-01 challenge: missing acmeValidationV1 extension")))
 }
 
-func dns01Validate(ctx context.Context, ch *Challenge, db nosql.DB, jwk *jose.JSONWebKey, vo validateOptions) error {
+func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo validateOptions) error {
 	// Normalize domain for wildcard DNS names
 	// This is done to avoid making TXT lookups for domains like
 	// _acme-challenge.*.example.com
 	// Instead perform txt lookup for _acme-challenge.example.com
-	domain := strings.TrimPrefix(dc.Value, "*.")
+	domain := strings.TrimPrefix(ch.Value, "*.")
 
 	txtRecords, err := vo.lookupTxt("_acme-challenge." + domain)
 	if err != nil {
@@ -205,9 +207,9 @@ func dns01Validate(ctx context.Context, ch *Challenge, db nosql.DB, jwk *jose.JS
 			"records for domain %s", domain)))
 	}
 
-	expectedKeyAuth, err := KeyAuthorization(dc.Token, jwk)
+	expectedKeyAuth, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	h := sha256.Sum256([]byte(expectedKeyAuth))
 	expected := base64.RawURLEncoding.EncodeToString(h[:])
@@ -226,7 +228,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db nosql.DB, jwk *jose.JS
 	// Update and store the challenge.
 	ch.Status = StatusValid
 	ch.Error = nil
-	ch.Validated = time.Now().UTC()
+	ch.Validated = clock.Now().UTC().Format(time.RFC3339)
 
 	return ServerInternalErr(db.UpdateChallenge(ctx, ch))
 }
@@ -243,7 +245,7 @@ func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
 }
 
 // storeError the given error to an ACME error and saves using the DB interface.
-func (bc *baseChallenge) storeError(ctx context.Context, ch Challenge, db nosql.DB, err *Error) error {
+func storeError(ctx context.Context, ch *Challenge, db DB, err *Error) error {
 	ch.Error = err.ToACME()
 	if err := db.UpdateChallenge(ctx, ch); err != nil {
 		return ServerInternalErr(errors.Wrap(err, "failure saving error to acme challenge"))

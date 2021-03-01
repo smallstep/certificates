@@ -17,51 +17,51 @@ var defaultOrderExpiry = time.Hour * 24
 var ordersByAccountMux sync.Mutex
 
 type dbOrder struct {
-	ID             string       `json:"id"`
-	AccountID      string       `json:"accountID"`
-	ProvisionerID  string       `json:"provisionerID"`
-	Created        time.Time    `json:"created"`
-	Expires        time.Time    `json:"expires,omitempty"`
-	Status         string       `json:"status"`
-	Identifiers    []Identifier `json:"identifiers"`
-	NotBefore      time.Time    `json:"notBefore,omitempty"`
-	NotAfter       time.Time    `json:"notAfter,omitempty"`
-	Error          *Error       `json:"error,omitempty"`
-	Authorizations []string     `json:"authorizations"`
-	Certificate    string       `json:"certificate,omitempty"`
+	ID             string            `json:"id"`
+	AccountID      string            `json:"accountID"`
+	ProvisionerID  string            `json:"provisionerID"`
+	Created        time.Time         `json:"created"`
+	Expires        time.Time         `json:"expires,omitempty"`
+	Status         acme.Status       `json:"status"`
+	Identifiers    []acme.Identifier `json:"identifiers"`
+	NotBefore      time.Time         `json:"notBefore,omitempty"`
+	NotAfter       time.Time         `json:"notAfter,omitempty"`
+	Error          *Error            `json:"error,omitempty"`
+	Authorizations []string          `json:"authorizations"`
+	Certificate    string            `json:"certificate,omitempty"`
 }
 
 // getDBOrder retrieves and unmarshals an ACME Order type from the database.
 func (db *DB) getDBOrder(id string) (*dbOrder, error) {
 	b, err := db.db.Get(orderTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
-		return nil, MalformedErr(errors.Wrapf(err, "order %s not found", id))
+		return nil, errors.Wrapf(err, "order %s not found", id)
 	} else if err != nil {
-		return nil, ServerInternalErr(errors.Wrapf(err, "error loading order %s", id))
+		return nil, errors.Wrapf(err, "error loading order %s", id)
 	}
 	o := new(dbOrder)
 	if err := json.Unmarshal(b, &o); err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error unmarshaling order"))
+		return nil, errors.Wrap(err, "error unmarshaling order")
 	}
 	return o, nil
 }
 
 // GetOrder retrieves an ACME Order from the database.
-func (db *DB) GetOrder(id string) (*acme.Order, error) {
+func (db *DB) GetOrder(ctx context.Context, id string) (*acme.Order, error) {
 	dbo, err := db.getDBOrder(id)
 
 	azs := make([]string, len(dbo.Authorizations))
 	for i, aid := range dbo.Authorizations {
 		azs[i] = dir.getLink(ctx, AuthzLink, true, aid)
 	}
-	o := &Order{
+	o := &acme.Order{
 		Status:         dbo.Status,
 		Expires:        dbo.Expires.Format(time.RFC3339),
 		Identifiers:    dbo.Identifiers,
 		NotBefore:      dbo.NotBefore.Format(time.RFC3339),
 		NotAfter:       dbo.NotAfter.Format(time.RFC3339),
 		Authorizations: azs,
-		Finalize:       dir.getLink(ctx, FinalizeLink, true, o.ID),
+		FinalizeURL:    dir.getLink(ctx, FinalizeLink, true, o.ID),
 		ID:             dbo.ID,
 		ProvisionerID:  dbo.ProvisionerID,
 	}
