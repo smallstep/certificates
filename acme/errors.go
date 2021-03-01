@@ -93,8 +93,6 @@ func (ap ProblemType) String() string {
 		return "externalAccountRequired"
 	case ErrorInvalidContactType:
 		return "incorrectResponse"
-	case ErrorInvalidContactType:
-		return "invalidContact"
 	case ErrorMalformedType:
 		return "malformed"
 	case ErrorOrderNotReadyType:
@@ -133,13 +131,11 @@ var (
 	officialACMEPrefix          = "urn:ietf:params:acme:error:"
 	stepACMEPrefix              = "urn:step:acme:error:"
 	errorServerInternalMetadata = errorMetadata{
-		ErrorAccountDoesNotExistType: {
-			typ:     officialACMEPrefix + ErrorServerInternalType.String(),
-			details: "The server experienced an internal error",
-			status:  500,
-		},
+		typ:     officialACMEPrefix + ErrorServerInternalType.String(),
+		details: "The server experienced an internal error",
+		status:  500,
 	}
-	errorMap = [ProblemType]errorMetadata{
+	errorMap = map[ProblemType]errorMetadata{
 		ErrorAccountDoesNotExistType: {
 			typ:     officialACMEPrefix + ErrorAccountDoesNotExistType.String(),
 			details: "Account does not exist",
@@ -267,7 +263,7 @@ var (
 // Error represents an ACME
 type Error struct {
 	Type        string        `json:"type"`
-	Detail      string        `json:"detail"`
+	Details     string        `json:"detail"`
 	Subproblems []interface{} `json:"subproblems,omitempty"`
 	Identifier  interface{}   `json:"identifier,omitempty"`
 	Err         error         `json:"-"`
@@ -275,13 +271,13 @@ type Error struct {
 }
 
 func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
-	meta, ok := errorMetadata[typ]
+	meta, ok := errorMap[pt]
 	if !ok {
 		meta = errorServerInternalMetadata
 		return &Error{
 			Type:    meta.typ,
 			Details: meta.details,
-			Status:  meta.Status,
+			Status:  meta.status,
 			Err:     errors.Errorf("unrecognized problemType %v", pt),
 		}
 	}
@@ -301,7 +297,7 @@ func ErrorWrap(typ ProblemType, err error, msg string, args ...interface{}) *Err
 		return nil
 	case *Error:
 		if e.Err == nil {
-			e.Err = errors.Errorf(msg+"; "+e.Detail, args...)
+			e.Err = errors.Errorf(msg+"; "+e.Details, args...)
 		} else {
 			e.Err = errors.Wrapf(e.Err, msg, args...)
 		}
@@ -311,6 +307,11 @@ func ErrorWrap(typ ProblemType, err error, msg string, args ...interface{}) *Err
 	}
 }
 
+// ErrorInternalServerWrap shortcut to wrap an internal server error type.
+func ErrorInternalServerWrap(err error, msg string, args ...interface{}) *Error {
+	return ErrorWrap(ErrorServerInternalType, err, msg, args...)
+}
+
 // StatusCode returns the status code and implements the StatusCoder interface.
 func (e *Error) StatusCode() int {
 	return e.Status
@@ -318,13 +319,13 @@ func (e *Error) StatusCode() int {
 
 // Error allows AError to implement the error interface.
 func (e *Error) Error() string {
-	return e.Detail
+	return e.Details
 }
 
 // Cause returns the internal error and implements the Causer interface.
 func (e *Error) Cause() error {
 	if e.Err == nil {
-		return errors.New(e.Detail)
+		return errors.New(e.Details)
 	}
 	return e.Err
 }

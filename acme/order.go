@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/x509util"
 )
@@ -41,7 +40,7 @@ type Order struct {
 func (o *Order) ToLog() (interface{}, error) {
 	b, err := json.Marshal(o)
 	if err != nil {
-		return nil, ServerInternalErr(errors.Wrap(err, "error marshaling order for logging"))
+		return nil, ErrorInternalServerWrap(err, "error marshaling order for logging")
 	}
 	return string(b), nil
 }
@@ -52,7 +51,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 	now := time.Now().UTC()
 	expiry, err := time.Parse(time.RFC3339, o.Expires)
 	if err != nil {
-		return ServerInternalErr(errors.Wrap(err, "order.UpdateStatus - error converting expiry string to time"))
+		return ErrorInternalServerWrap(err, "order.UpdateStatus - error converting expiry string to time")
 	}
 
 	switch o.Status {
@@ -64,7 +63,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 		// Check expiry
 		if now.After(expiry) {
 			o.Status = StatusInvalid
-			o.Error = MalformedErr(errors.New("order has expired"))
+			o.Error = NewError(ErrorMalformedType, "order has expired")
 			break
 		}
 		return nil
@@ -72,7 +71,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 		// Check expiry
 		if now.After(expiry) {
 			o.Status = StatusInvalid
-			o.Error = MalformedErr(errors.New("order has expired"))
+			o.Error = NewError(ErrorMalformedType, "order has expired")
 			break
 		}
 
@@ -105,10 +104,10 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 			o.Status = StatusReady
 
 		default:
-			return ServerInternalErr(errors.New("unexpected authz status"))
+			return NewError(ErrorServerInternalType, "unexpected authz status")
 		}
 	default:
-		return ServerInternalErr(errors.Errorf("unrecognized order status: %s", o.Status))
+		return NewError(ErrorServerInternalType, "unrecognized order status: %s", o.Status)
 	}
 	return db.UpdateOrder(ctx, o)
 }
@@ -122,15 +121,15 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 
 	switch o.Status {
 	case StatusInvalid:
-		return OrderNotReadyErr(errors.Errorf("order %s has been abandoned", o.ID))
+		return NewError(ErrorOrderNotReadyType, "order %s has been abandoned", o.ID)
 	case StatusValid:
 		return nil
 	case StatusPending:
-		return OrderNotReadyErr(errors.Errorf("order %s is not ready", o.ID))
+		return NewError(ErrorOrderNotReadyType, "order %s is not ready", o.ID)
 	case StatusReady:
 		break
 	default:
-		return ServerInternalErr(errors.Errorf("unexpected status %s for order %s", o.Status, o.ID))
+		return NewError(ErrorServerInternalType, "unexpected status %s for order %s", o.Status, o.ID)
 	}
 
 	// RFC8555: The CSR MUST indicate the exact same set of requested
@@ -154,13 +153,15 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	// absence of other SANs as they will only be set if the templates allows
 	// them.
 	if len(csr.DNSNames) != len(orderNames) {
-		return BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
+		return NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
+			"CSR names = %v, Order names = %v", csr.DNSNames, orderNames)
 	}
 
 	sans := make([]x509util.SubjectAlternativeName, len(csr.DNSNames))
 	for i := range csr.DNSNames {
 		if csr.DNSNames[i] != orderNames[i] {
-			return BadCSRErr(errors.Errorf("CSR names do not match identifiers exactly: CSR names = %v, Order names = %v", csr.DNSNames, orderNames))
+			return NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
+				"CSR names = %v, Order names = %v", csr.DNSNames, orderNames)
 		}
 		sans[i] = x509util.SubjectAlternativeName{
 			Type:  x509util.DNSType,
@@ -172,7 +173,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 	signOps, err := p.AuthorizeSign(ctx, "")
 	if err != nil {
-		return ServerInternalErr(errors.Wrapf(err, "error retrieving authorization options from ACME provisioner"))
+		return ErrorInternalServerWrap(err, "error retrieving authorization options from ACME provisioner")
 	}
 
 	// Template data
@@ -182,17 +183,17 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
 	if err != nil {
-		return ServerInternalErr(errors.Wrapf(err, "error creating template options from ACME provisioner"))
+		return ErrorInternalServerWrap(err, "error creating template options from ACME provisioner")
 	}
 	signOps = append(signOps, templateOptions)
 
 	nbf, err := time.Parse(time.RFC3339, o.NotBefore)
 	if err != nil {
-		return ServerInternalErr(errors.Wrap(err, "error parsing order NotBefore"))
+		return ErrorInternalServerWrap(err, "error parsing order NotBefore")
 	}
 	naf, err := time.Parse(time.RFC3339, o.NotAfter)
 	if err != nil {
-		return ServerInternalErr(errors.Wrap(err, "error parsing order NotAfter"))
+		return ErrorInternalServerWrap(err, "error parsing order NotAfter")
 	}
 
 	// Sign a new certificate.
@@ -201,7 +202,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		NotAfter:  provisioner.NewTimeDuration(naf),
 	}, signOps...)
 	if err != nil {
-		return ServerInternalErr(errors.Wrapf(err, "error signing certificate for order %s", o.ID))
+		return ErrorInternalServerWrap(err, "error signing certificate for order %s", o.ID)
 	}
 
 	cert := &Certificate{
