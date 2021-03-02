@@ -5,8 +5,8 @@ private keys and sign certificates.
 
 Support for multiple KMS are planned, but currently the only Google's Cloud KMS,
 and Amazon's AWS KMS are supported. A still experimental version for YubiKeys is
-also available if you compile
-[step-certificates](https://github.com/smallstep/certificates) yourself.
+also available if you compile [step-ca](https://github.com/smallstep/certificates) 
+yourself.
 
 ## Google's Cloud KMS
 

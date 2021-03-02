@@ -142,13 +142,13 @@ $ brew install step
     Download the Debian package from the [latest `step-ca` release](https://github.com/smallstep/certificates/releases/latest):
 
     ```
-    $ wget https://github.com/smallstep/certificates/releases/download/vX.Y.Z/step-certificates_X.Y.Z_amd64.deb
+    $ wget https://github.com/smallstep/certificates/releases/download/vX.Y.Z/step-ca_X.Y.Z_amd64.deb
     ```
 
     Install the Debian package:
 
     ```
-    $ sudo dpkg -i step-certificates_X.Y.Z_amd64.deb
+    $ sudo dpkg -i step-ca_X.Y.Z_amd64.deb
     ```
 
 #### Arch Linux
@@ -184,14 +184,14 @@ You can use [pacman](https://www.archlinux.org/pacman/) to install the packages.
     Download the Linux package from the [latest `step-ca` release](https://github.com/smallstep/certificates/releases/latest):
 
     ```
-    $ wget -O step-ca.tar.gz https://github.com/smallstep/certificates/releases/download/vX.Y.Z/step-certificates_linux_X.Y.Z_amd64.tar.gz
+    $ wget -O step-ca.tar.gz https://github.com/smallstep/certificates/releases/download/vX.Y.Z/step-ca_linux_X.Y.Z_amd64.tar.gz
     ```
 
     Install `step-ca` by unzipping and copying the executable over to `/usr/bin`:
 
     ```
     $ tar -xf step-ca.tar.gz
-    $ sudo cp step-certificates_X.Y.Z/bin/step-ca /usr/bin
+    $ sudo cp step-ca_X.Y.Z/bin/step-ca /usr/bin
     ```
 
 See the [`systemctl` setup section](https://smallstep.com/docs/step-ca/certificate-authority-server-production#running-step-ca-as-a-daemon) for a
