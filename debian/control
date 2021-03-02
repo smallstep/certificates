@@ -1,4 +1,4 @@
-Source: step-certificates
+Source: step-ca
 Section: utils
 Priority: optional
 Maintainer: Smallstep Labs, Inc. <techadmin@smallstep.com>
@@ -8,8 +8,8 @@ Homepage: https://github.com/smallstep/certificates
 Vcs-Browser: https://github.com/smallstep/certificates.git
 Vcs-Git: https://github.com/smallstep/certificates.git
 
-Package: step-certificates
+Package: step-ca
 Architecture: any
 Depends: ${misc:Depends}
 Description: Smallstep Certificate Authority
-   step-certificates is the Smallstep Certificate Authority.
+   step-ca is the Smallstep Certificate Authority.
