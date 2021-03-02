@@ -16,18 +16,28 @@ to manage issues, etc.
 
 ## Building From Source
 
+Clone this repository to get a bleeding-edge build, 
+or download the source archive for [the latest stable release](https://github.com/smallstep/certificates/releases/latest).
+
+### Building step-ca
+
 The only prerequisites are [`go`](https://golang.org/) and make.
 
 To build from source:
 
     make bootstrap && make
 
+### Building CGO step-ca (with PKCS#11 and YubiKey PIV support)
+
+To build the CGO version of `step-ca` you will need [`go`](https://golang.org/), make, gcc, pkg-config, and the [`libpcsclite-dev`](https://pcsclite.apdu.fr/) package. On Ubuntu:
+
+    sudo apt update
+    sudo apt install -y make gcc libpcsclite-dev pkg-config
+    make bootstrap && make build GOFLAGS=""
 
 ## Asking Support Questions
 
-Users and developers can ask questions over email (info@smallstep.com) or
-[twitter](https://twitter.com/smallsteplabs). Please don't use the GitHub
-issue tracker to ask questions.
+Feel free to post a question on our [GitHub Discussions](https://github.com/smallstep/certificates/discussions) page, or find us on [Gitter](https://gitter.im/smallstep/community).
 
 ## Reporting Issues
 
