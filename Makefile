@@ -223,7 +223,7 @@ changelog:
 
 debian: changelog
 	$Q mkdir -p $(RELEASE); \
-	OUTPUT=../step-certificates_*.deb; \
+	OUTPUT=../step-ca*.deb; \
 	rm $$OUTPUT; \
 	dpkg-buildpackage -b -rfakeroot -us -uc && cp $$OUTPUT $(RELEASE)/
 
