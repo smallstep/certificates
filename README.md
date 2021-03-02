@@ -108,7 +108,7 @@ ACME is the protocol used by Let's Encrypt to automate the issuance of HTTPS cer
 These instructions will install an OS specific version of the `step-ca` binary on
 your local machine.
 
-Want to build from source? See [our contributor's guide](docs/contributing.md)
+Want to build from source? See [our contributor's guide](./docs/CONTRIBUTING.md)
 
 ### Mac OS
 
