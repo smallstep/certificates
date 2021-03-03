@@ -20,27 +20,28 @@ type Identifier struct {
 
 // Order contains order metadata for the ACME protocol order type.
 type Order struct {
-	Status          Status        `json:"status"`
-	Expires         string        `json:"expires,omitempty"`
-	Identifiers     []Identifier  `json:"identifiers"`
-	NotBefore       string        `json:"notBefore,omitempty"`
-	NotAfter        string        `json:"notAfter,omitempty"`
-	Error           interface{}   `json:"error,omitempty"`
-	Authorizations  []string      `json:"authorizations"`
-	FinalizeURL     string        `json:"finalize"`
-	Certificate     string        `json:"certificate,omitempty"`
-	ID              string        `json:"-"`
-	AccountID       string        `json:"-"`
-	ProvisionerID   string        `json:"-"`
-	DefaultDuration time.Duration `json:"-"`
-	Backdate        time.Duration `json:"-"`
+	Status            Status        `json:"status"`
+	Expires           time.Time     `json:"expires,omitempty"`
+	Identifiers       []Identifier  `json:"identifiers"`
+	NotBefore         time.Time     `json:"notBefore,omitempty"`
+	NotAfter          time.Time     `json:"notAfter,omitempty"`
+	Error             interface{}   `json:"error,omitempty"`
+	AuthorizationURLs []string      `json:"authorizations"`
+	AuthorizationIDs  []string      `json:"-"`
+	FinalizeURL       string        `json:"finalize"`
+	Certificate       string        `json:"certificate,omitempty"`
+	ID                string        `json:"-"`
+	AccountID         string        `json:"-"`
+	ProvisionerID     string        `json:"-"`
+	DefaultDuration   time.Duration `json:"-"`
+	Backdate          time.Duration `json:"-"`
 }
 
 // ToLog enables response logging.
 func (o *Order) ToLog() (interface{}, error) {
 	b, err := json.Marshal(o)
 	if err != nil {
-		return nil, ErrorInternalServerWrap(err, "error marshaling order for logging")
+		return nil, ErrorISEWrap(err, "error marshaling order for logging")
 	}
 	return string(b), nil
 }
@@ -49,10 +50,6 @@ func (o *Order) ToLog() (interface{}, error) {
 // Changes to the order are saved using the database interface.
 func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 	now := time.Now().UTC()
-	expiry, err := time.Parse(time.RFC3339, o.Expires)
-	if err != nil {
-		return ErrorInternalServerWrap(err, "order.UpdateStatus - error converting expiry string to time")
-	}
 
 	switch o.Status {
 	case StatusInvalid:
@@ -61,7 +58,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 		return nil
 	case StatusReady:
 		// Check expiry
-		if now.After(expiry) {
+		if now.After(o.Expires) {
 			o.Status = StatusInvalid
 			o.Error = NewError(ErrorMalformedType, "order has expired")
 			break
@@ -69,7 +66,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 		return nil
 	case StatusPending:
 		// Check expiry
-		if now.After(expiry) {
+		if now.After(o.Expires) {
 			o.Status = StatusInvalid
 			o.Error = NewError(ErrorMalformedType, "order has expired")
 			break
@@ -80,7 +77,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 			StatusInvalid: 0,
 			StatusPending: 0,
 		}
-		for _, azID := range o.Authorizations {
+		for _, azID := range o.AuthorizationIDs {
 			az, err := db.GetAuthorization(ctx, azID)
 			if err != nil {
 				return err
@@ -100,14 +97,14 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 		case count[StatusPending] > 0:
 			return nil
 
-		case count[StatusValid] == len(o.Authorizations):
+		case count[StatusValid] == len(o.AuthorizationIDs):
 			o.Status = StatusReady
 
 		default:
-			return NewError(ErrorServerInternalType, "unexpected authz status")
+			return NewErrorISE("unexpected authz status")
 		}
 	default:
-		return NewError(ErrorServerInternalType, "unrecognized order status: %s", o.Status)
+		return NewErrorISE("unrecognized order status: %s", o.Status)
 	}
 	return db.UpdateOrder(ctx, o)
 }
@@ -129,7 +126,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	case StatusReady:
 		break
 	default:
-		return NewError(ErrorServerInternalType, "unexpected status %s for order %s", o.Status, o.ID)
+		return NewErrorISE("unexpected status %s for order %s", o.Status, o.ID)
 	}
 
 	// RFC8555: The CSR MUST indicate the exact same set of requested
@@ -173,7 +170,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 	signOps, err := p.AuthorizeSign(ctx, "")
 	if err != nil {
-		return ErrorInternalServerWrap(err, "error retrieving authorization options from ACME provisioner")
+		return ErrorISEWrap(err, "error retrieving authorization options from ACME provisioner")
 	}
 
 	// Template data
@@ -183,26 +180,17 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
 	if err != nil {
-		return ErrorInternalServerWrap(err, "error creating template options from ACME provisioner")
+		return ErrorISEWrap(err, "error creating template options from ACME provisioner")
 	}
 	signOps = append(signOps, templateOptions)
 
-	nbf, err := time.Parse(time.RFC3339, o.NotBefore)
-	if err != nil {
-		return ErrorInternalServerWrap(err, "error parsing order NotBefore")
-	}
-	naf, err := time.Parse(time.RFC3339, o.NotAfter)
-	if err != nil {
-		return ErrorInternalServerWrap(err, "error parsing order NotAfter")
-	}
-
 	// Sign a new certificate.
 	certChain, err := auth.Sign(csr, provisioner.SignOptions{
-		NotBefore: provisioner.NewTimeDuration(nbf),
-		NotAfter:  provisioner.NewTimeDuration(naf),
+		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
+		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
 	}, signOps...)
 	if err != nil {
-		return ErrorInternalServerWrap(err, "error signing certificate for order %s", o.ID)
+		return ErrorISEWrap(err, "error signing certificate for order %s", o.ID)
 	}
 
 	cert := &Certificate{

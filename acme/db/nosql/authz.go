@@ -3,7 +3,6 @@ package nosql
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -75,16 +74,15 @@ func (db *DB) GetAuthorization(ctx context.Context, id string) (*acme.Authorizat
 // CreateAuthorization creates an entry in the database for the Authorization.
 // Implements the acme.DB.CreateAuthorization interface.
 func (db *DB) CreateAuthorization(ctx context.Context, az *acme.Authorization) error {
-	if len(az.AccountID) == 0 {
-		return errors.New("account-id cannot be empty")
-	}
-	if az.Identifier == nil {
-		return errors.New("identifier cannot be nil")
-	}
 	var err error
 	az.ID, err = randID()
 	if err != nil {
 		return err
+	}
+
+	chIDs := make([]string, len(az.Challenges))
+	for i, ch := range az.Challenges {
+		chIDs[i] = ch.ID
 	}
 
 	now := clock.Now()
@@ -95,37 +93,9 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *acme.Authorization) e
 		Created:    now,
 		Expires:    now.Add(defaultExpiryDuration),
 		Identifier: az.Identifier,
+		Challenges: chIDs,
+		Wildcard:   az.Wildcard,
 	}
-
-	if strings.HasPrefix(az.Identifier.Value, "*.") {
-		dbaz.Wildcard = true
-		dbaz.Identifier = &acme.Identifier{
-			Value: strings.TrimPrefix(az.Identifier.Value, "*."),
-			Type:  az.Identifier.Type,
-		}
-	}
-
-	chIDs := []string{}
-	chTypes := []string{"dns-01"}
-	// HTTP and TLS challenges can only be used for identifiers without wildcards.
-	if !dbaz.Wildcard {
-		chTypes = append(chTypes, []string{"http-01", "tls-alpn-01"}...)
-	}
-
-	for _, typ := range chTypes {
-		ch := &acme.Challenge{
-			AccountID: az.AccountID,
-			AuthzID:   az.ID,
-			Value:     az.Identifier.Value,
-			Type:      typ,
-		}
-		if err = db.CreateChallenge(ctx, ch); err != nil {
-			return errors.Wrapf(err, "error creating challenge")
-		}
-
-		chIDs = append(chIDs, ch.ID)
-	}
-	dbaz.Challenges = chIDs
 
 	return db.save(ctx, az.ID, dbaz, nil, "authz", authzTable)
 }

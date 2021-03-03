@@ -8,20 +8,22 @@ import (
 
 // Authorization representst an ACME Authorization.
 type Authorization struct {
-	Identifier *Identifier  `json:"identifier"`
-	Status     Status       `json:"status"`
-	Expires    string       `json:"expires"`
-	Challenges []*Challenge `json:"challenges"`
-	Wildcard   bool         `json:"wildcard"`
-	ID         string       `json:"-"`
-	AccountID  string       `json:"-"`
+	Identifier   Identifier   `json:"identifier"`
+	Status       Status       `json:"status"`
+	Expires      string       `json:"expires"`
+	Challenges   []*Challenge `json:"challenges"`
+	ChallengeIDs string       `json::"-"`
+	Wildcard     bool         `json:"wildcard"`
+	ID           string       `json:"-"`
+	AccountID    string       `json:"-"`
+	Token        string       `json:"-"`
 }
 
 // ToLog enables response logging.
 func (az *Authorization) ToLog() (interface{}, error) {
 	b, err := json.Marshal(az)
 	if err != nil {
-		return nil, ErrorInternalServerWrap(err, "error marshaling authz for logging")
+		return nil, ErrorISEWrap(err, "error marshaling authz for logging")
 	}
 	return string(b), nil
 }
@@ -32,7 +34,7 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 	now := time.Now().UTC()
 	expiry, err := time.Parse(time.RFC3339, az.Expires)
 	if err != nil {
-		return ErrorInternalServerWrap(err, "error converting expiry string to time")
+		return ErrorISEWrap(err, "error converting expiry string to time")
 	}
 
 	switch az.Status {
@@ -64,7 +66,7 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 	}
 
 	if err = db.UpdateAuthorization(ctx, az); err != nil {
-		return ErrorInternalServerWrap(err, "error updating authorization")
+		return ErrorISEWrap(err, "error updating authorization")
 	}
 	return nil
 }

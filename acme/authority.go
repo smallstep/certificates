@@ -8,10 +8,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/randutil"
 )
 
 // Interface is the acme authority interface.
@@ -124,7 +126,7 @@ func (a *Authority) UseNonce(ctx context.Context, nonce string) error {
 // NewAccount creates, stores, and returns a new ACME account.
 func (a *Authority) NewAccount(ctx context.Context, acc *Account) error {
 	if err := a.db.CreateAccount(ctx, acc); err != nil {
-		return ErrorWrap(ErrorServerInternalType, err, "error creating account")
+		return ErrorISEWrap(err, "error creating account")
 	}
 	return nil
 }
@@ -136,7 +138,7 @@ func (a *Authority) UpdateAccount(ctx context.Context, acc *Account) (*Account, 
 		acc.Status = auo.Status
 	*/
 	if err := a.db.UpdateAccount(ctx, acc); err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error updating account")
+		return nil, ErrorISEWrap(err, "error updating account")
 	}
 	return acc, nil
 }
@@ -145,7 +147,7 @@ func (a *Authority) UpdateAccount(ctx context.Context, acc *Account) (*Account, 
 func (a *Authority) GetAccount(ctx context.Context, id string) (*Account, error) {
 	acc, err := a.db.GetAccount(ctx, id)
 	if err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving account")
+		return nil, ErrorISEWrap(err, "error retrieving account")
 	}
 	return acc, nil
 }
@@ -168,7 +170,7 @@ func (a *Authority) GetOrder(ctx context.Context, accID, orderID string) (*Order
 	}
 	o, err := a.db.GetOrder(ctx, orderID)
 	if err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving order")
+		return nil, ErrorISEWrap(err, "error retrieving order")
 	}
 	if accID != o.AccountID {
 		log.Printf("account-id from request ('%s') does not match order account-id ('%s')", accID, o.AccountID)
@@ -179,7 +181,7 @@ func (a *Authority) GetOrder(ctx context.Context, accID, orderID string) (*Order
 		return nil, NewError(ErrorUnauthorizedType, "provisioner does not own order")
 	}
 	if err = o.UpdateStatus(ctx, a.db); err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error updating order")
+		return nil, ErrorISEWrap(err, "error updating order")
 	}
 	return o, nil
 }
@@ -205,19 +207,54 @@ func (a *Authority) GetOrdersByAccount(ctx context.Context, id string) ([]string
 */
 
 // NewOrder generates, stores, and returns a new ACME order.
-func (a *Authority) NewOrder(ctx context.Context, o *Order) (*Order, error) {
-	prov, err := ProvisionerFromContext(ctx)
-	if err != nil {
-		return nil, err
+func (a *Authority) NewOrder(ctx context.Context, o *Order) error {
+	if len(o.AccountID) == 0 {
+		return NewErrorISE("account-id cannot be empty")
 	}
-	o.DefaultDuration = prov.DefaultTLSCertDuration()
-	o.Backdate = a.backdate.Duration
-	o.ProvisionerID = prov.GetID()
+	if len(o.ProvisionerID) == 0 {
+		return NewErrorISE("provisioner-id cannot be empty")
+	}
+	if len(o.Identifiers) == 0 {
+		return NewErrorISE("identifiers cannot be empty")
+	}
+	if o.DefaultDuration == 0 {
+		return NewErrorISE("default-duration cannot be empty")
+	}
 
-	if err = a.db.CreateOrder(ctx, o); err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error creating order")
+	o.AuthorizationIDs = make([]string, len(o.Identifiers))
+	for i, identifier := range o.Identifiers {
+		az := &Authorization{
+			AccountID:  o.AccountID,
+			Identifier: identifier,
+		}
+		if err := a.NewAuthorization(ctx, az); err != nil {
+			return err
+		}
+		o.AuthorizationIDs[i] = az.ID
 	}
-	return o, nil
+
+	now := clock.Now()
+	if o.NotBefore.IsZero() {
+		o.NotBefore = now
+	}
+	if o.NotAfter.IsZero() {
+		o.NotAfter = o.NotBefore.Add(o.DefaultDuration)
+	}
+
+	if err := a.db.CreateOrder(ctx, o); err != nil {
+		return ErrorISEWrap(err, "error creating order")
+	}
+	return nil
+	/*
+		o.DefaultDuration = prov.DefaultTLSCertDuration()
+		o.Backdate = a.backdate.Duration
+		o.ProvisionerID = prov.GetID()
+
+		if err = a.db.CreateOrder(ctx, o); err != nil {
+			return nil, ErrorWrap(ErrorServerInternalType, err, "error creating order")
+		}
+		return o, nil
+	*/
 }
 
 // FinalizeOrder attempts to finalize an order and generate a new certificate.
@@ -228,7 +265,7 @@ func (a *Authority) FinalizeOrder(ctx context.Context, accID, orderID string, cs
 	}
 	o, err := a.db.GetOrder(ctx, orderID)
 	if err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving order")
+		return nil, ErrorISEWrap(err, "error retrieving order")
 	}
 	if accID != o.AccountID {
 		log.Printf("account-id from request ('%s') does not match order account-id ('%s')", accID, o.AccountID)
@@ -239,33 +276,113 @@ func (a *Authority) FinalizeOrder(ctx context.Context, accID, orderID string, cs
 		return nil, NewError(ErrorUnauthorizedType, "provisioner does not own order")
 	}
 	if err = o.Finalize(ctx, a.db, csr, a.signAuth, prov); err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error finalizing order")
+		return nil, ErrorISEWrap(err, "error finalizing order")
 	}
 	return o, nil
 }
 
-// GetAuthz retrieves and attempts to update the status on an ACME authz
+// NewAuthorization generates and stores an ACME Authorization type along with
+// any associated resources.
+func (a *Authority) NewAuthorization(ctx context.Context, az *Authorization) error {
+	if len(az.AccountID) == 0 {
+		return NewErrorISE("account-id cannot be empty")
+	}
+	if len(az.Identifier.Value) == 0 {
+		return NewErrorISE("identifier cannot be empty")
+	}
+
+	if strings.HasPrefix(az.Identifier.Value, "*.") {
+		az.Wildcard = true
+		az.Identifier = Identifier{
+			Value: strings.TrimPrefix(az.Identifier.Value, "*."),
+			Type:  az.Identifier.Type,
+		}
+	}
+
+	var (
+		err     error
+		chTypes = []string{"dns-01"}
+	)
+	// HTTP and TLS challenges can only be used for identifiers without wildcards.
+	if !az.Wildcard {
+		chTypes = append(chTypes, []string{"http-01", "tls-alpn-01"}...)
+	}
+
+	az.Token, err = randutil.Alphanumeric(32)
+	if err != nil {
+		return ErrorISEWrap(err, "error generating random alphanumeric ID")
+	}
+
+	az.Challenges = make([]*Challenge, len(chTypes))
+	for i, typ := range chTypes {
+		ch := &Challenge{
+			AccountID: az.AccountID,
+			AuthzID:   az.ID,
+			Value:     az.Identifier.Value,
+			Type:      typ,
+			Token:     az.Token,
+		}
+		if err := a.NewChallenge(ctx, ch); err != nil {
+			return err
+		}
+		az.Challenges[i] = ch
+	}
+	if err = a.db.CreateAuthorization(ctx, az); err != nil {
+		return ErrorISEWrap(err, "error creating authorization")
+	}
+	return nil
+}
+
+// GetAuthorization retrieves and attempts to update the status on an ACME authz
 // before returning.
-func (a *Authority) GetAuthz(ctx context.Context, accID, authzID string) (*Authorization, error) {
+func (a *Authority) GetAuthorization(ctx context.Context, accID, authzID string) (*Authorization, error) {
 	az, err := a.db.GetAuthorization(ctx, authzID)
 	if err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving authorization")
+		return nil, ErrorISEWrap(err, "error retrieving authorization")
 	}
 	if accID != az.AccountID {
 		log.Printf("account-id from request ('%s') does not match authz account-id ('%s')", accID, az.AccountID)
 		return nil, NewError(ErrorUnauthorizedType, "account does not own order")
 	}
 	if err = az.UpdateStatus(ctx, a.db); err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error updating authorization status")
+		return nil, ErrorISEWrap(err, "error updating authorization status")
 	}
 	return az, nil
 }
 
-// ValidateChallenge attempts to validate the challenge.
-func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, jwk *jose.JSONWebKey) (*Challenge, error) {
+// NewChallenge generates and stores an ACME challenge and associated resources.
+func (a *Authority) NewChallenge(ctx context.Context, ch *Challenge) error {
+	if len(ch.AccountID) == 0 {
+		return NewErrorISE("account-id cannot be empty")
+	}
+	if len(ch.AuthzID) == 0 {
+		return NewErrorISE("authz-id cannot be empty")
+	}
+	if len(ch.Token) == 0 {
+		return NewErrorISE("token cannot be empty")
+	}
+	if len(ch.Value) == 0 {
+		return NewErrorISE("value cannot be empty")
+	}
+
+	switch ch.Type {
+	case "dns-01", "http-01", "tls-alpn-01":
+		break
+	default:
+		return NewErrorISE("unexpected error type '%s'", ch.Type)
+	}
+
+	if err := a.db.CreateChallenge(ctx, ch); err != nil {
+		return ErrorISEWrap(err, "error creating challenge")
+	}
+	return nil
+}
+
+// GetValidateChallenge attempts to validate the challenge.
+func (a *Authority) GetValidateChallenge(ctx context.Context, accID, chID, azID string, jwk *jose.JSONWebKey) (*Challenge, error) {
 	ch, err := a.db.GetChallenge(ctx, chID, "todo")
 	if err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving challenge")
+		return nil, ErrorISEWrap(err, "error retrieving challenge")
 	}
 	if accID != ch.AccountID {
 		log.Printf("account-id from request ('%s') does not match challenge account-id ('%s')", accID, ch.AccountID)
@@ -284,7 +401,7 @@ func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, j
 			return tls.DialWithDialer(dialer, network, addr, config)
 		},
 	}); err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error validating challenge")
+		return nil, ErrorISEWrap(err, "error validating challenge")
 	}
 	return ch, nil
 }
@@ -293,7 +410,7 @@ func (a *Authority) ValidateChallenge(ctx context.Context, accID, chID string, j
 func (a *Authority) GetCertificate(ctx context.Context, accID, certID string) ([]byte, error) {
 	cert, err := a.db.GetCertificate(ctx, certID)
 	if err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error retrieving certificate")
+		return nil, ErrorISEWrap(err, "error retrieving certificate")
 	}
 	if cert.AccountID != accID {
 		log.Printf("account-id from request ('%s') does not match challenge account-id ('%s')", accID, cert.AccountID)

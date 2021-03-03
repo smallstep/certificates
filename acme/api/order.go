@@ -23,11 +23,11 @@ type NewOrderRequest struct {
 // Validate validates a new-order request body.
 func (n *NewOrderRequest) Validate() error {
 	if len(n.Identifiers) == 0 {
-		return acme.MalformedErr(errors.Errorf("identifiers list cannot be empty"))
+		return acme.NewError(ErrorMalformedType, "identifiers list cannot be empty")
 	}
 	for _, id := range n.Identifiers {
 		if id.Type != "dns" {
-			return acme.MalformedErr(errors.Errorf("identifier type unsupported: %s", id.Type))
+			return acme.NewError(ErrorMalformedType, "identifier type unsupported: %s", id.Type)
 		}
 	}
 	return nil

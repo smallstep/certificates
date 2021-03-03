@@ -38,7 +38,7 @@ type Challenge struct {
 func (ch *Challenge) ToLog() (interface{}, error) {
 	b, err := json.Marshal(ch)
 	if err != nil {
-		return nil, ErrorInternalServerWrap(err, "error marshaling challenge for logging")
+		return nil, ErrorISEWrap(err, "error marshaling challenge for logging")
 	}
 	return string(b), nil
 }
@@ -80,7 +80,7 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return ErrorInternalServerWrap(err, "error reading "+
+		return ErrorISEWrap(err, "error reading "+
 			"response body for url %s", url)
 	}
 	keyAuth := strings.Trim(string(body), "\r\n")
@@ -100,7 +100,7 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	ch.Validated = clock.Now().Format(time.RFC3339)
 
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
-		return ErrorInternalServerWrap(err, "error updating challenge")
+		return ErrorISEWrap(err, "error updating challenge")
 	}
 	return nil
 }
@@ -178,7 +178,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 			ch.Validated = clock.Now().Format(time.RFC3339)
 
 			if err = db.UpdateChallenge(ctx, ch); err != nil {
-				return ErrorInternalServerWrap(err, "tlsalpn01ValidateChallenge - error updating challenge")
+				return ErrorISEWrap(err, "tlsalpn01ValidateChallenge - error updating challenge")
 			}
 			return nil
 		}
@@ -234,7 +234,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	ch.Validated = clock.Now().UTC().Format(time.RFC3339)
 
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
-		return ErrorInternalServerWrap(err, "error updating challenge")
+		return ErrorISEWrap(err, "error updating challenge")
 	}
 	return nil
 }
@@ -244,7 +244,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
 	thumbprint, err := jwk.Thumbprint(crypto.SHA256)
 	if err != nil {
-		return "", ErrorInternalServerWrap(err, "error generating JWK thumbprint")
+		return "", ErrorISEWrap(err, "error generating JWK thumbprint")
 	}
 	encPrint := base64.RawURLEncoding.EncodeToString(thumbprint)
 	return fmt.Sprintf("%s.%s", token, encPrint), nil
@@ -254,7 +254,7 @@ func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
 func storeError(ctx context.Context, ch *Challenge, db DB, err *Error) error {
 	ch.Error = err
 	if err := db.UpdateChallenge(ctx, ch); err != nil {
-		return ErrorInternalServerWrap(err, "failure saving error to acme challenge")
+		return ErrorISEWrap(err, "failure saving error to acme challenge")
 	}
 	return nil
 }
