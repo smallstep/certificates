@@ -47,28 +47,10 @@ func (db *DB) getDBChallenge(ctx context.Context, id string) (*dbChallenge, erro
 // CreateChallenge creates a new ACME challenge data structure in the database.
 // Implements acme.DB.CreateChallenge interface.
 func (db *DB) CreateChallenge(ctx context.Context, ch *acme.Challenge) error {
-	if len(ch.AuthzID) == 0 {
-		return errors.New("AuthzID cannot be empty")
-	}
-	if len(ch.AccountID) == 0 {
-		return errors.New("AccountID cannot be empty")
-	}
-	if len(ch.Value) == 0 {
-		return errors.New("AccountID cannot be empty")
-	}
-	// TODO: verify that challenge type is set and is one of expected types.
-	if len(ch.Type) == 0 {
-		return errors.New("Type cannot be empty")
-	}
-
 	var err error
 	ch.ID, err = randID()
 	if err != nil {
 		return errors.Wrap(err, "error generating random id for ACME challenge")
-	}
-	ch.Token, err = randID()
-	if err != nil {
-		return errors.Wrap(err, "error generating token for ACME challenge")
 	}
 
 	dbch := &dbChallenge{

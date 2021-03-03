@@ -21,7 +21,7 @@ type Directory struct {
 func (d *Directory) ToLog() (interface{}, error) {
 	b, err := json.Marshal(d)
 	if err != nil {
-		return nil, ErrorInternalServerWrap(err, "error marshaling directory for logging")
+		return nil, ErrorISEWrap(err, "error marshaling directory for logging")
 	}
 	return string(b), nil
 }

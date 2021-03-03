@@ -21,7 +21,7 @@ type NewAccountRequest struct {
 func validateContacts(cs []string) error {
 	for _, c := range cs {
 		if len(c) == 0 {
-			return acme.MalformedErr(errors.New("contact cannot be empty string"))
+			return acme.NewError(acme.ErrorMalformedType, "contact cannot be empty string")
 		}
 	}
 	return nil
@@ -30,7 +30,7 @@ func validateContacts(cs []string) error {
 // Validate validates a new-account request body.
 func (n *NewAccountRequest) Validate() error {
 	if n.OnlyReturnExisting && len(n.Contact) > 0 {
-		return acme.MalformedErr(errors.New("incompatible input; onlyReturnExisting must be alone"))
+		return acme.NewError(acme.ErrorMalformedType, "incompatible input; onlyReturnExisting must be alone")
 	}
 	return validateContacts(n.Contact)
 }
@@ -51,8 +51,8 @@ func (u *UpdateAccountRequest) IsDeactivateRequest() bool {
 func (u *UpdateAccountRequest) Validate() error {
 	switch {
 	case len(u.Status) > 0 && len(u.Contact) > 0:
-		return acme.MalformedErr(errors.New("incompatible input; contact and " +
-			"status updates are mutually exclusive"))
+		return acme.NewError(acme.ErrorMalformedType, "incompatible input; contact and "+
+			"status updates are mutually exclusive")
 	case len(u.Contact) > 0:
 		if err := validateContacts(u.Contact); err != nil {
 			return err
@@ -60,8 +60,8 @@ func (u *UpdateAccountRequest) Validate() error {
 		return nil
 	case len(u.Status) > 0:
 		if u.Status != string(acme.StatusDeactivated) {
-			return acme.MalformedErr(errors.Errorf("cannot update account "+
-				"status to %s, only deactivated", u.Status))
+			return acme.NewError(acme.ErrorMalformedType, "cannot update account "+
+				"status to %s, only deactivated", u.Status)
 		}
 		return nil
 	default:
@@ -80,8 +80,8 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	var nar NewAccountRequest
 	if err := json.Unmarshal(payload.value, &nar); err != nil {
-		api.WriteError(w, acme.MalformedErr(errors.Wrap(err,
-			"failed to unmarshal new-account request payload")))
+		api.WriteError(w, acme.ErrorWrap(acme.ErrorMalformedType, err,
+			"failed to unmarshal new-account request payload"))
 		return
 	}
 	if err := nar.Validate(); err != nil {
@@ -101,7 +101,8 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 
 		// Account does not exist //
 		if nar.OnlyReturnExisting {
-			api.WriteError(w, acme.AccountDoesNotExistErr(nil))
+			api.WriteError(w, acme.NewError(acme.ErrorAccountDoesNotExistType,
+				"account does not exist"))
 			return
 		}
 		jwk, err := acme.JwkFromContext(r.Context())
@@ -146,7 +147,8 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	if !payload.isPostAsGet {
 		var uar UpdateAccountRequest
 		if err := json.Unmarshal(payload.value, &uar); err != nil {
-			api.WriteError(w, acme.MalformedErr(errors.Wrap(err, "failed to unmarshal new-account request payload")))
+			api.WriteError(w, acme.ErrorWrap(acme.ErrorMalformedType, err,
+				"failed to unmarshal new-account request payload"))
 			return
 		}
 		if err := uar.Validate(); err != nil {

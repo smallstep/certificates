@@ -74,48 +74,12 @@ func (db *DB) GetOrder(ctx context.Context, id string) (*acme.Order, error) {
 
 // CreateOrder creates ACME Order resources and saves them to the DB.
 func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
-	if len(o.AccountID) == 0 {
-		return ServerInternalErr(errors.New("account-id cannot be empty"))
-	}
-	if len(o.ProvisionerID) == 0 {
-		return ServerInternalErr(errors.New("provisioner-id cannot be empty"))
-	}
-	if len(o.Identifiers) == 0 {
-		return ServerInternalErr(errors.New("identifiers cannot be empty"))
-	}
-	if o.DefaultDuration == 0 {
-		return ServerInternalErr(errors.New("default-duration cannot be empty"))
-	}
-
 	o.ID, err = randID()
 	if err != nil {
 		return nil, err
 	}
 
-	azIDs := make([]string, len(ops.Identifiers))
-	for i, identifier := range ops.Identifiers {
-		az, err = db.CreateAuthorzation(&types.Authorization{
-			AccountID:  o.AccountID,
-			Identifier: o.Identifier,
-		})
-		if err != nil {
-			return err
-		}
-		azIDs[i] = az.ID
-	}
-
 	now := clock.Now()
-	var backdate time.Duration
-	nbf := o.NotBefore
-	if nbf.IsZero() {
-		nbf = now
-		backdate = -1 * o.Backdate
-	}
-	naf := o.NotAfter
-	if naf.IsZero() {
-		naf = nbf.Add(o.DefaultDuration)
-	}
-
 	dbo := &dbOrder{
 		ID:             o.ID,
 		AccountID:      o.AccountID,
@@ -123,10 +87,10 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 		Created:        now,
 		Status:         StatusPending,
 		Expires:        now.Add(defaultOrderExpiry),
-		Identifiers:    ops.Identifiers,
-		NotBefore:      nbf.Add(backdate),
-		NotAfter:       naf,
-		Authorizations: azIDs,
+		Identifiers:    o.Identifiers,
+		NotBefore:      o.NotBefore,
+		NotAfter:       o.NotBefore,
+		Authorizations: o.AuthorizationIDs,
 	}
 	if err := db.save(ctx, o.ID, dbo, nil, orderTable); err != nil {
 		return nil, err

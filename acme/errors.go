@@ -1,4 +1,3 @@
-// Error represents an ACME
 package acme
 
 import (
@@ -11,55 +10,55 @@ import (
 type ProblemType int
 
 const (
-	// The request specified an account that does not exist
+	// ErrorAccountDoesNotExistType request specified an account that does not exist
 	ErrorAccountDoesNotExistType ProblemType = iota
-	// The request specified a certificate to be revoked that has already been revoked
+	// ErrorAlreadyRevokedType request specified a certificate to be revoked that has already been revoked
 	ErrorAlreadyRevokedType
-	// The CSR is unacceptable (e.g., due to a short key)
+	// ErrorBadCSRType CSR is unacceptable (e.g., due to a short key)
 	ErrorBadCSRType
-	// The client sent an unacceptable anti-replay nonce
+	// ErrorBadNonceType client sent an unacceptable anti-replay nonce
 	ErrorBadNonceType
-	// The JWS was signed by a public key the server does not support
+	// ErrorBadPublicKeyType JWS was signed by a public key the server does not support
 	ErrorBadPublicKeyType
-	// The revocation reason provided is not allowed by the server
+	// ErrorBadRevocationReasonType revocation reason provided is not allowed by the server
 	ErrorBadRevocationReasonType
-	// The JWS was signed with an algorithm the server does not support
+	// ErrorBadSignatureAlgorithmType JWS was signed with an algorithm the server does not support
 	ErrorBadSignatureAlgorithmType
-	// Certification Authority Authorization (CAA) records forbid the CA from issuing a certificate
+	// ErrorCaaType Authority Authorization (CAA) records forbid the CA from issuing a certificate
 	ErrorCaaType
-	// Specific error conditions are indicated in the “subproblems” array.
+	// ErrorCompoundType error conditions are indicated in the “subproblems” array.
 	ErrorCompoundType
-	// The server could not connect to validation target
+	// ErrorConnectionType server could not connect to validation target
 	ErrorConnectionType
-	// There was a problem with a DNS query during identifier validation
+	// ErrorDNSType was a problem with a DNS query during identifier validation
 	ErrorDNSType
-	// The request must include a value for the “externalAccountBinding” field
+	// ErrorExternalAccountRequiredType request must include a value for the “externalAccountBinding” field
 	ErrorExternalAccountRequiredType
-	// Response received didn’t match the challenge’s requirements
+	// ErrorIncorrectResponseType received didn’t match the challenge’s requirements
 	ErrorIncorrectResponseType
-	// A contact URL for an account was invalid
+	// ErrorInvalidContactType URL for an account was invalid
 	ErrorInvalidContactType
-	// The request message was malformed
+	// ErrorMalformedType request message was malformed
 	ErrorMalformedType
-	// The request attempted to finalize an order that is not ready to be finalized
+	// ErrorOrderNotReadyType request attempted to finalize an order that is not ready to be finalized
 	ErrorOrderNotReadyType
-	// The request exceeds a rate limit
+	// ErrorRateLimitedType request exceeds a rate limit
 	ErrorRateLimitedType
-	// The server will not issue certificates for the identifier
+	// ErrorRejectedIdentifierType server will not issue certificates for the identifier
 	ErrorRejectedIdentifierType
-	// The server experienced an internal error
+	// ErrorServerInternalType server experienced an internal error
 	ErrorServerInternalType
-	// The server received a TLS error during validation
+	// ErrorTLSType server received a TLS error during validation
 	ErrorTLSType
-	// The client lacks sufficient authorization
+	// ErrorUnauthorizedType client lacks sufficient authorization
 	ErrorUnauthorizedType
-	// A contact URL for an account used an unsupported protocol scheme
+	// ErrorUnsupportedContactType URL for an account used an unsupported protocol scheme
 	ErrorUnsupportedContactType
-	// An identifier is of an unsupported type
+	// ErrorUnsupportedIdentifierType identifier is of an unsupported type
 	ErrorUnsupportedIdentifierType
-	// Visit the “instance” URL and take actions specified there
+	// ErrorUserActionRequiredType the “instance” URL and take actions specified there
 	ErrorUserActionRequiredType
-	// The operation is not implemented
+	// ErrorNotImplementedType operation is not implemented
 	ErrorNotImplementedType
 )
 
@@ -116,7 +115,7 @@ func (ap ProblemType) String() string {
 	case ErrorNotImplementedType:
 		return "notImplemented"
 	default:
-		return fmt.Sprintf("unsupported type ACME error type %v", ap)
+		return fmt.Sprintf("unsupported type ACME error type '%d'", int(ap))
 	}
 }
 
@@ -270,6 +269,7 @@ type Error struct {
 	Status      int           `json:"-"`
 }
 
+// NewError creates a new Error type.
 func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
 	meta, ok := errorMap[pt]
 	if !ok {
@@ -290,6 +290,11 @@ func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
 	}
 }
 
+// NewErrorISE creates a new ErrorServerInternalType Error.
+func NewErrorISE(msg string, args ...interface{}) *Error {
+	return NewError(ErrorServerInternalType, msg, args...)
+}
+
 // ErrorWrap attempts to wrap the internal error.
 func ErrorWrap(typ ProblemType, err error, msg string, args ...interface{}) *Error {
 	switch e := err.(type) {
@@ -307,8 +312,8 @@ func ErrorWrap(typ ProblemType, err error, msg string, args ...interface{}) *Err
 	}
 }
 
-// ErrorInternalServerWrap shortcut to wrap an internal server error type.
-func ErrorInternalServerWrap(err error, msg string, args ...interface{}) *Error {
+// ErrorISEWrap shortcut to wrap an internal server error type.
+func ErrorISEWrap(err error, msg string, args ...interface{}) *Error {
 	return ErrorWrap(ErrorServerInternalType, err, msg, args...)
 }
 
