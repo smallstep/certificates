@@ -8,15 +8,14 @@ import (
 
 // Authorization representst an ACME Authorization.
 type Authorization struct {
-	Identifier   Identifier   `json:"identifier"`
-	Status       Status       `json:"status"`
-	Expires      string       `json:"expires"`
-	Challenges   []*Challenge `json:"challenges"`
-	ChallengeIDs string       `json::"-"`
-	Wildcard     bool         `json:"wildcard"`
-	ID           string       `json:"-"`
-	AccountID    string       `json:"-"`
-	Token        string       `json:"-"`
+	Identifier Identifier   `json:"identifier"`
+	Status     Status       `json:"status"`
+	Expires    time.Time    `json:"expires"`
+	Challenges []*Challenge `json:"challenges"`
+	Wildcard   bool         `json:"wildcard"`
+	ID         string       `json:"-"`
+	AccountID  string       `json:"-"`
+	Token      string       `json:"-"`
 }
 
 // ToLog enables response logging.
