@@ -38,7 +38,7 @@ type Challenge struct {
 func (ch *Challenge) ToLog() (interface{}, error) {
 	b, err := json.Marshal(ch)
 	if err != nil {
-		return nil, ErrorISEWrap(err, "error marshaling challenge for logging")
+		return nil, WrapErrorISE(err, "error marshaling challenge for logging")
 	}
 	return string(b), nil
 }
@@ -47,7 +47,7 @@ func (ch *Challenge) ToLog() (interface{}, error) {
 // type using the DB interface.
 // satisfactorily validated, the 'status' and 'validated' attributes are
 // updated.
-func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, vo validateOptions) error {
+func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, vo ValidateOptions) error {
 	// If already valid or invalid then return without performing validation.
 	if ch.Status == StatusValid || ch.Status == StatusInvalid {
 		return nil
@@ -60,16 +60,16 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 	case "tls-alpn-01":
 		return tlsalpn01Validate(ctx, ch, db, jwk, vo)
 	default:
-		return NewError(ErrorServerInternalType, "unexpected challenge type '%s'", ch.Type)
+		return NewErrorISE("unexpected challenge type '%s'", ch.Type)
 	}
 }
 
-func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo validateOptions) error {
+func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo ValidateOptions) error {
 	url := fmt.Sprintf("http://%s/.well-known/acme-challenge/%s", ch.Value, ch.Token)
 
-	resp, err := vo.httpGet(url)
+	resp, err := vo.HTTPGet(url)
 	if err != nil {
-		return storeError(ctx, ch, db, ErrorWrap(ErrorConnectionType, err,
+		return storeError(ctx, ch, db, WrapError(ErrorConnectionType, err,
 			"error doing http GET for url %s", url))
 	}
 	if resp.StatusCode >= 400 {
@@ -80,7 +80,7 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return ErrorISEWrap(err, "error reading "+
+		return WrapErrorISE(err, "error reading "+
 			"response body for url %s", url)
 	}
 	keyAuth := strings.Trim(string(body), "\r\n")
@@ -100,12 +100,12 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	ch.Validated = clock.Now().Format(time.RFC3339)
 
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
-		return ErrorISEWrap(err, "error updating challenge")
+		return WrapErrorISE(err, "error updating challenge")
 	}
 	return nil
 }
 
-func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo validateOptions) error {
+func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo ValidateOptions) error {
 	config := &tls.Config{
 		NextProtos:         []string{"acme-tls/1"},
 		ServerName:         ch.Value,
@@ -114,9 +114,9 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	hostPort := net.JoinHostPort(ch.Value, "443")
 
-	conn, err := vo.tlsDial("tcp", hostPort, config)
+	conn, err := vo.TLSDial("tcp", hostPort, config)
 	if err != nil {
-		return storeError(ctx, ch, db, ErrorWrap(ErrorConnectionType, err,
+		return storeError(ctx, ch, db, WrapError(ErrorConnectionType, err,
 			"error doing TLS dial for %s", hostPort))
 	}
 	defer conn.Close()
@@ -178,7 +178,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 			ch.Validated = clock.Now().Format(time.RFC3339)
 
 			if err = db.UpdateChallenge(ctx, ch); err != nil {
-				return ErrorISEWrap(err, "tlsalpn01ValidateChallenge - error updating challenge")
+				return WrapErrorISE(err, "tlsalpn01ValidateChallenge - error updating challenge")
 			}
 			return nil
 		}
@@ -197,16 +197,16 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 		"incorrect certificate for tls-alpn-01 challenge: missing acmeValidationV1 extension"))
 }
 
-func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo validateOptions) error {
+func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo ValidateOptions) error {
 	// Normalize domain for wildcard DNS names
 	// This is done to avoid making TXT lookups for domains like
 	// _acme-challenge.*.example.com
 	// Instead perform txt lookup for _acme-challenge.example.com
 	domain := strings.TrimPrefix(ch.Value, "*.")
 
-	txtRecords, err := vo.lookupTxt("_acme-challenge." + domain)
+	txtRecords, err := vo.LookupTxt("_acme-challenge." + domain)
 	if err != nil {
-		return storeError(ctx, ch, db, ErrorWrap(ErrorDNSType, err,
+		return storeError(ctx, ch, db, WrapError(ErrorDNSType, err,
 			"error looking up TXT records for domain %s", domain))
 	}
 
@@ -234,7 +234,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	ch.Validated = clock.Now().UTC().Format(time.RFC3339)
 
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
-		return ErrorISEWrap(err, "error updating challenge")
+		return WrapErrorISE(err, "error updating challenge")
 	}
 	return nil
 }
@@ -244,7 +244,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
 	thumbprint, err := jwk.Thumbprint(crypto.SHA256)
 	if err != nil {
-		return "", ErrorISEWrap(err, "error generating JWK thumbprint")
+		return "", WrapErrorISE(err, "error generating JWK thumbprint")
 	}
 	encPrint := base64.RawURLEncoding.EncodeToString(thumbprint)
 	return fmt.Sprintf("%s.%s", token, encPrint), nil
@@ -254,7 +254,7 @@ func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
 func storeError(ctx context.Context, ch *Challenge, db DB, err *Error) error {
 	ch.Error = err
 	if err := db.UpdateChallenge(ctx, ch); err != nil {
-		return ErrorISEWrap(err, "failure saving error to acme challenge")
+		return WrapErrorISE(err, "failure saving error to acme challenge")
 	}
 	return nil
 }
@@ -263,8 +263,9 @@ type httpGetter func(string) (*http.Response, error)
 type lookupTxt func(string) ([]string, error)
 type tlsDialer func(network, addr string, config *tls.Config) (*tls.Conn, error)
 
-type validateOptions struct {
-	httpGet   httpGetter
-	lookupTxt lookupTxt
-	tlsDial   tlsDialer
+// ValidateOptions are ACME challenge validator functions.
+type ValidateOptions struct {
+	HTTPGet   httpGetter
+	LookupTxt lookupTxt
+	TLSDial   tlsDialer
 }

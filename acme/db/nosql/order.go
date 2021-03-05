@@ -11,8 +11,6 @@ import (
 	"github.com/smallstep/nosql"
 )
 
-var defaultOrderExpiry = time.Hour * 24
-
 // Mutex for locking ordersByAccount index operations.
 var ordersByAccountMux sync.Mutex
 
@@ -26,16 +24,16 @@ type dbOrder struct {
 	Identifiers    []acme.Identifier `json:"identifiers"`
 	NotBefore      time.Time         `json:"notBefore,omitempty"`
 	NotAfter       time.Time         `json:"notAfter,omitempty"`
-	Error          *Error            `json:"error,omitempty"`
+	Error          *acme.Error       `json:"error,omitempty"`
 	Authorizations []string          `json:"authorizations"`
-	Certificate    string            `json:"certificate,omitempty"`
+	CertificateID  string            `json:"certificate,omitempty"`
 }
 
 // getDBOrder retrieves and unmarshals an ACME Order type from the database.
 func (db *DB) getDBOrder(id string) (*dbOrder, error) {
 	b, err := db.db.Get(orderTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
-		return nil, errors.Wrapf(err, "order %s not found", id)
+		return nil, acme.WrapError(acme.ErrorMalformedType, err, "order %s not found", id)
 	} else if err != nil {
 		return nil, errors.Wrapf(err, "error loading order %s", id)
 	}
@@ -49,34 +47,31 @@ func (db *DB) getDBOrder(id string) (*dbOrder, error) {
 // GetOrder retrieves an ACME Order from the database.
 func (db *DB) GetOrder(ctx context.Context, id string) (*acme.Order, error) {
 	dbo, err := db.getDBOrder(id)
-
-	azs := make([]string, len(dbo.Authorizations))
-	for i, aid := range dbo.Authorizations {
-		azs[i] = dir.getLink(ctx, AuthzLink, true, aid)
+	if err != nil {
+		return nil, err
 	}
+
 	o := &acme.Order{
-		Status:         dbo.Status,
-		Expires:        dbo.Expires.Format(time.RFC3339),
-		Identifiers:    dbo.Identifiers,
-		NotBefore:      dbo.NotBefore.Format(time.RFC3339),
-		NotAfter:       dbo.NotAfter.Format(time.RFC3339),
-		Authorizations: azs,
-		FinalizeURL:    dir.getLink(ctx, FinalizeLink, true, o.ID),
-		ID:             dbo.ID,
-		ProvisionerID:  dbo.ProvisionerID,
+		Status:           dbo.Status,
+		Expires:          dbo.Expires,
+		Identifiers:      dbo.Identifiers,
+		NotBefore:        dbo.NotBefore,
+		NotAfter:         dbo.NotAfter,
+		AuthorizationIDs: dbo.Authorizations,
+		ID:               dbo.ID,
+		ProvisionerID:    dbo.ProvisionerID,
+		CertificateID:    dbo.CertificateID,
 	}
 
-	if dbo.Certificate != "" {
-		o.Certificate = dir.getLink(ctx, CertificateLink, true, o.Certificate)
-	}
 	return o, nil
 }
 
 // CreateOrder creates ACME Order resources and saves them to the DB.
 func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
+	var err error
 	o.ID, err = randID()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	now := clock.Now()
@@ -85,23 +80,23 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 		AccountID:      o.AccountID,
 		ProvisionerID:  o.ProvisionerID,
 		Created:        now,
-		Status:         StatusPending,
-		Expires:        now.Add(defaultOrderExpiry),
+		Status:         acme.StatusPending,
+		Expires:        o.Expires,
 		Identifiers:    o.Identifiers,
 		NotBefore:      o.NotBefore,
 		NotAfter:       o.NotBefore,
 		Authorizations: o.AuthorizationIDs,
 	}
-	if err := db.save(ctx, o.ID, dbo, nil, orderTable); err != nil {
-		return nil, err
+	if err := db.save(ctx, o.ID, dbo, nil, "order", orderTable); err != nil {
+		return err
 	}
 
 	var oidHelper = orderIDsByAccount{}
 	_, err = oidHelper.addOrderID(db, o.AccountID, o.ID)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return o, nil
+	return nil
 }
 
 type orderIDsByAccount struct{}
@@ -135,11 +130,11 @@ func (oiba orderIDsByAccount) unsafeGetOrderIDsByAccount(db nosql.DB, accID stri
 		if nosql.IsErrNotFound(err) {
 			return []string{}, nil
 		}
-		return nil, ServerInternalErr(errors.Wrapf(err, "error loading orderIDs for account %s", accID))
+		return nil, errors.Wrapf(err, "error loading orderIDs for account %s", accID)
 	}
 	var oids []string
 	if err := json.Unmarshal(b, &oids); err != nil {
-		return nil, ServerInternalErr(errors.Wrapf(err, "error unmarshaling orderIDs for account %s", accID))
+		return nil, errors.Wrapf(err, "error unmarshaling orderIDs for account %s", accID)
 	}
 
 	// Remove any order that is not in PENDING state and update the stored list
@@ -152,21 +147,21 @@ func (oiba orderIDsByAccount) unsafeGetOrderIDsByAccount(db nosql.DB, accID stri
 	for _, oid := range oids {
 		o, err := getOrder(db, oid)
 		if err != nil {
-			return nil, ServerInternalErr(errors.Wrapf(err, "error loading order %s for account %s", oid, accID))
+			return nil, errors.Wrapf(err, "error loading order %s for account %s", oid, accID)
 		}
 		if o, err = o.UpdateStatus(db); err != nil {
-			return nil, ServerInternalErr(errors.Wrapf(err, "error updating order %s for account %s", oid, accID))
+			return nil, errors.Wrapf(err, "error updating order %s for account %s", oid, accID)
 		}
-		if o.Status == StatusPending {
+		if o.Status == acme.StatusPending {
 			pendOids = append(pendOids, oid)
 		}
 	}
 	// If the number of pending orders is less than the number of orders in the
 	// list, then update the pending order list.
 	if len(pendOids) != len(oids) {
-		if err = orderIDs(pendOiUs).save(db, oids, accID); err != nil {
-			return nil, ServerInternalErr(errors.Wrapf(err, "error storing orderIDs as part of getOrderIDsByAccount logic: "+
-				"len(orderIDs) = %d", len(pendOids)))
+		if err = orderIDs(pendOids).save(db, oids, accID); err != nil {
+			return nil, errors.Wrapf(err, "error storing orderIDs as part of getOrderIDsByAccount logic: "+
+				"len(orderIDs) = %d", len(pendOids))
 		}
 	}
 
@@ -192,7 +187,7 @@ func (oids orderIDs) save(db nosql.DB, old orderIDs, accID string) error {
 	} else {
 		oldb, err = json.Marshal(old)
 		if err != nil {
-			return ServerInternalErr(errors.Wrap(err, "error marshaling old order IDs slice"))
+			return errors.Wrap(err, "error marshaling old order IDs slice")
 		}
 	}
 	if len(oids) == 0 {
@@ -200,13 +195,13 @@ func (oids orderIDs) save(db nosql.DB, old orderIDs, accID string) error {
 	} else {
 		newb, err = json.Marshal(oids)
 		if err != nil {
-			return ServerInternalErr(errors.Wrap(err, "error marshaling new order IDs slice"))
+			return errors.Wrap(err, "error marshaling new order IDs slice")
 		}
 	}
 	_, swapped, err := db.CmpAndSwap(ordersByAccountIDTable, []byte(accID), oldb, newb)
 	switch {
 	case err != nil:
-		return ServerInternalErr(errors.Wrapf(err, "error storing order IDs for account %s", accID))
+		return errors.Wrapf(err, "error storing order IDs for account %s", accID)
 	case !swapped:
 		return ServerInternalErr(errors.Errorf("error storing order IDs "+
 			"for account %s; order IDs changed since last read", accID))

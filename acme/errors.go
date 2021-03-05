@@ -262,7 +262,7 @@ var (
 // Error represents an ACME
 type Error struct {
 	Type        string        `json:"type"`
-	Details     string        `json:"detail"`
+	Detail      string        `json:"detail"`
 	Subproblems []interface{} `json:"subproblems,omitempty"`
 	Identifier  interface{}   `json:"identifier,omitempty"`
 	Err         error         `json:"-"`
@@ -275,18 +275,18 @@ func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
 	if !ok {
 		meta = errorServerInternalMetadata
 		return &Error{
-			Type:    meta.typ,
-			Details: meta.details,
-			Status:  meta.status,
-			Err:     errors.Errorf("unrecognized problemType %v", pt),
+			Type:   meta.typ,
+			Detail: meta.details,
+			Status: meta.status,
+			Err:    errors.Errorf("unrecognized problemType %v", pt),
 		}
 	}
 
 	return &Error{
-		Type:    meta.typ,
-		Details: meta.details,
-		Status:  meta.status,
-		Err:     errors.Errorf(msg, args...),
+		Type:   meta.typ,
+		Detail: meta.details,
+		Status: meta.status,
+		Err:    errors.Errorf(msg, args...),
 	}
 }
 
@@ -295,14 +295,14 @@ func NewErrorISE(msg string, args ...interface{}) *Error {
 	return NewError(ErrorServerInternalType, msg, args...)
 }
 
-// ErrorWrap attempts to wrap the internal error.
-func ErrorWrap(typ ProblemType, err error, msg string, args ...interface{}) *Error {
+// WrapError attempts to wrap the internal error.
+func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Error {
 	switch e := err.(type) {
 	case nil:
 		return nil
 	case *Error:
 		if e.Err == nil {
-			e.Err = errors.Errorf(msg+"; "+e.Details, args...)
+			e.Err = errors.Errorf(msg+"; "+e.Detail, args...)
 		} else {
 			e.Err = errors.Wrapf(e.Err, msg, args...)
 		}
@@ -312,9 +312,9 @@ func ErrorWrap(typ ProblemType, err error, msg string, args ...interface{}) *Err
 	}
 }
 
-// ErrorISEWrap shortcut to wrap an internal server error type.
-func ErrorISEWrap(err error, msg string, args ...interface{}) *Error {
-	return ErrorWrap(ErrorServerInternalType, err, msg, args...)
+// WrapErrorISE shortcut to wrap an internal server error type.
+func WrapErrorISE(err error, msg string, args ...interface{}) *Error {
+	return WrapError(ErrorServerInternalType, err, msg, args...)
 }
 
 // StatusCode returns the status code and implements the StatusCoder interface.
@@ -324,13 +324,13 @@ func (e *Error) StatusCode() int {
 
 // Error allows AError to implement the error interface.
 func (e *Error) Error() string {
-	return e.Details
+	return e.Detail
 }
 
 // Cause returns the internal error and implements the Causer interface.
 func (e *Error) Cause() error {
 	if e.Err == nil {
-		return errors.New(e.Details)
+		return errors.New(e.Detail)
 	}
 	return e.Err
 }

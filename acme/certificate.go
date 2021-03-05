@@ -1,7 +1,6 @@
 package acme
 
 import (
-	"context"
 	"crypto/x509"
 	"encoding/pem"
 )
@@ -16,7 +15,7 @@ type Certificate struct {
 }
 
 // ToACME encodes the entire X509 chain into a PEM list.
-func (cert *Certificate) ToACME(ctx context.Context) ([]byte, error) {
+func (cert *Certificate) ToACME() ([]byte, error) {
 	var ret []byte
 	for _, c := range append([]*x509.Certificate{cert.Leaf}, cert.Intermediates...) {
 		ret = append(ret, pem.EncodeToMemory(&pem.Block{

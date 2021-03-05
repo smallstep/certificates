@@ -14,15 +14,15 @@ var defaultExpiryDuration = time.Hour * 24
 
 // dbAuthz is the base authz type that others build from.
 type dbAuthz struct {
-	ID         string           `json:"id"`
-	AccountID  string           `json:"accountID"`
-	Identifier *acme.Identifier `json:"identifier"`
-	Status     acme.Status      `json:"status"`
-	Expires    time.Time        `json:"expires"`
-	Challenges []string         `json:"challenges"`
-	Wildcard   bool             `json:"wildcard"`
-	Created    time.Time        `json:"created"`
-	Error      *acme.Error      `json:"error"`
+	ID         string          `json:"id"`
+	AccountID  string          `json:"accountID"`
+	Identifier acme.Identifier `json:"identifier"`
+	Status     acme.Status     `json:"status"`
+	Expires    time.Time       `json:"expires"`
+	Challenges []string        `json:"challenges"`
+	Wildcard   bool            `json:"wildcard"`
+	Created    time.Time       `json:"created"`
+	Error      *acme.Error     `json:"error"`
 }
 
 func (ba *dbAuthz) clone() *dbAuthz {
@@ -66,7 +66,7 @@ func (db *DB) GetAuthorization(ctx context.Context, id string) (*acme.Authorizat
 		Status:     dbaz.Status,
 		Challenges: chs,
 		Wildcard:   dbaz.Wildcard,
-		Expires:    dbaz.Expires.Format(time.RFC3339),
+		Expires:    dbaz.Expires,
 		ID:         dbaz.ID,
 	}, nil
 }

@@ -21,7 +21,7 @@ import (
 type ACMEClient struct {
 	client *http.Client
 	dirLoc string
-	dir    *acme.Directory
+	dir    *acmeAPI.Directory
 	acc    *acme.Account
 	Key    *jose.JSONWebKey
 	kid    string
@@ -53,7 +53,7 @@ func NewACMEClient(endpoint string, contact []string, opts ...ClientOption) (*AC
 	if resp.StatusCode >= 400 {
 		return nil, readACMEError(resp.Body)
 	}
-	var dir acme.Directory
+	var dir acmeAPI.Directory
 	if err := readJSON(resp.Body, &dir); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", endpoint)
 	}
@@ -93,7 +93,7 @@ func NewACMEClient(endpoint string, contact []string, opts ...ClientOption) (*AC
 
 // GetDirectory makes a directory request to the ACME api and returns an
 // ACME directory object.
-func (c *ACMEClient) GetDirectory() (*acme.Directory, error) {
+func (c *ACMEClient) GetDirectory() (*acmeAPI.Directory, error) {
 	return c.dir, nil
 }
 
@@ -231,7 +231,7 @@ func (c *ACMEClient) ValidateChallenge(url string) error {
 }
 
 // GetAuthz returns the Authz at the given path.
-func (c *ACMEClient) GetAuthz(url string) (*acme.Authz, error) {
+func (c *ACMEClient) GetAuthz(url string) (*acme.Authorization, error) {
 	resp, err := c.post(nil, url, withKid(c))
 	if err != nil {
 		return nil, err
@@ -240,7 +240,7 @@ func (c *ACMEClient) GetAuthz(url string) (*acme.Authz, error) {
 		return nil, readACMEError(resp.Body)
 	}
 
-	var az acme.Authz
+	var az acme.Authorization
 	if err := readJSON(resp.Body, &az); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", url)
 	}
@@ -342,7 +342,7 @@ func readACMEError(r io.ReadCloser) error {
 	if err != nil {
 		return errors.Wrap(err, "error reading from body")
 	}
-	ae := new(acme.AError)
+	ae := new(acme.Error)
 	err = json.Unmarshal(b, &ae)
 	// If we successfully marshaled to an ACMEError then return the ACMEError.
 	if err != nil || len(ae.Error()) == 0 {

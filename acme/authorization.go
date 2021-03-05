@@ -22,7 +22,7 @@ type Authorization struct {
 func (az *Authorization) ToLog() (interface{}, error) {
 	b, err := json.Marshal(az)
 	if err != nil {
-		return nil, ErrorISEWrap(err, "error marshaling authz for logging")
+		return nil, WrapErrorISE(err, "error marshaling authz for logging")
 	}
 	return string(b), nil
 }
@@ -30,11 +30,7 @@ func (az *Authorization) ToLog() (interface{}, error) {
 // UpdateStatus updates the ACME Authorization Status if necessary.
 // Changes to the Authorization are saved using the database interface.
 func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
-	now := time.Now().UTC()
-	expiry, err := time.Parse(time.RFC3339, az.Expires)
-	if err != nil {
-		return ErrorISEWrap(err, "error converting expiry string to time")
-	}
+	now := clock.Now()
 
 	switch az.Status {
 	case StatusInvalid:
@@ -43,7 +39,7 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 		return nil
 	case StatusPending:
 		// check expiry
-		if now.After(expiry) {
+		if now.After(az.Expires) {
 			az.Status = StatusInvalid
 			break
 		}
@@ -61,11 +57,11 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 		}
 		az.Status = StatusValid
 	default:
-		return NewError(ErrorServerInternalType, "unrecognized authorization status: %s", az.Status)
+		return NewErrorISE("unrecognized authorization status: %s", az.Status)
 	}
 
-	if err = db.UpdateAuthorization(ctx, az); err != nil {
-		return ErrorISEWrap(err, "error updating authorization")
+	if err := db.UpdateAuthorization(ctx, az); err != nil {
+		return WrapErrorISE(err, "error updating authorization")
 	}
 	return nil
 }
