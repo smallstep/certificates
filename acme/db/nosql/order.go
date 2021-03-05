@@ -203,8 +203,8 @@ func (oids orderIDs) save(db nosql.DB, old orderIDs, accID string) error {
 	case err != nil:
 		return errors.Wrapf(err, "error storing order IDs for account %s", accID)
 	case !swapped:
-		return ServerInternalErr(errors.Errorf("error storing order IDs "+
-			"for account %s; order IDs changed since last read", accID))
+		return errors.Errorf("error storing order IDs "+
+			"for account %s; order IDs changed since last read", accID)
 	default:
 		return nil
 	}

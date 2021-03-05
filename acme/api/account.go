@@ -65,7 +65,8 @@ func (u *UpdateAccountRequest) Validate() error {
 
 // NewAccount is the handler resource for creating new ACME accounts.
 func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
-	payload, err := payloadFromContext(r.Context())
+	ctx := r.Context()
+	payload, err := payloadFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
@@ -97,7 +98,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 				"account does not exist"))
 			return
 		}
-		jwk, err := jwkFromContext(r.Context())
+		jwk, err := jwkFromContext(ctx)
 		if err != nil {
 			api.WriteError(w, err)
 			return
@@ -108,7 +109,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			Contact: nar.Contact,
 			Status:  acme.StatusValid,
 		}
-		if err := h.db.CreateAccount(r.Context(), acc); err != nil {
+		if err := h.db.CreateAccount(ctx, acc); err != nil {
 			api.WriteError(w, acme.WrapErrorISE(err, "error creating account"))
 			return
 		}
@@ -126,12 +127,13 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 
 // GetUpdateAccount is the api for updating an ACME account.
 func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
-	acc, err := accountFromContext(r.Context())
+	ctx := r.Context()
+	acc, err := accountFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
-	payload, err := payloadFromContext(r.Context())
+	payload, err := payloadFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
@@ -156,7 +158,7 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 		// in the ACME spec (https://tools.ietf.org/html/rfc8555#section-7.3.2).
 		acc.Status = uar.Status
 		acc.Contact = uar.Contact
-		if err = h.db.UpdateAccount(r.Context(), acc); err != nil {
+		if err = h.db.UpdateAccount(ctx, acc); err != nil {
 			api.WriteError(w, acme.WrapErrorISE(err, "error updating account"))
 			return
 		}
@@ -164,8 +166,7 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 
 	h.linker.LinkAccount(ctx, acc)
 
-	w.Header().Set("Location", h.linker.GetLink(r.Context(), AccountLinkType,
-		true, acc.ID))
+	w.Header().Set("Location", h.linker.GetLink(ctx, AccountLinkType, true, acc.ID))
 	api.JSON(w, acc)
 }
 

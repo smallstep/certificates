@@ -136,9 +136,9 @@ func (l LinkType) String() string {
 
 // LinkOrder sets the ACME links required by an ACME order.
 func (l *Linker) LinkOrder(ctx context.Context, o *acme.Order) {
-	o.azURLs = make([]string, len(o.AuthorizationIDs))
-	for i, azID := range o.AutohrizationIDs {
-		o.azURLs[i] = l.GetLink(ctx, AuthzLinkType, true, azID)
+	o.AuthorizationURLs = make([]string, len(o.AuthorizationIDs))
+	for i, azID := range o.AuthorizationIDs {
+		o.AuthorizationURLs[i] = l.GetLink(ctx, AuthzLinkType, true, azID)
 	}
 	o.FinalizeURL = l.GetLink(ctx, FinalizeLinkType, true, o.ID)
 	if o.CertificateID != "" {
@@ -148,12 +148,12 @@ func (l *Linker) LinkOrder(ctx context.Context, o *acme.Order) {
 
 // LinkAccount sets the ACME links required by an ACME account.
 func (l *Linker) LinkAccount(ctx context.Context, acc *acme.Account) {
-	a.Orders = l.GetLink(ctx, OrdersByAccountLinkType, true, acc.ID)
+	acc.Orders = l.GetLink(ctx, OrdersByAccountLinkType, true, acc.ID)
 }
 
 // LinkChallenge sets the ACME links required by an ACME account.
 func (l *Linker) LinkChallenge(ctx context.Context, ch *acme.Challenge) {
-	a.URL = l.GetLink(ctx, ChallengeLinkType, true, ch.AuthzID, ch.ID)
+	ch.URL = l.GetLink(ctx, ChallengeLinkType, true, ch.AuthzID, ch.ID)
 }
 
 // LinkAuthorization sets the ACME links required by an ACME account.
