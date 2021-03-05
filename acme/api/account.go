@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/go-chi/chi"
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/logging"
@@ -37,14 +35,8 @@ func (n *NewAccountRequest) Validate() error {
 
 // UpdateAccountRequest represents an update-account request.
 type UpdateAccountRequest struct {
-	Contact []string `json:"contact"`
-	Status  string   `json:"status"`
-}
-
-// IsDeactivateRequest returns true if the update request is a deactivation
-// request, false otherwise.
-func (u *UpdateAccountRequest) IsDeactivateRequest() bool {
-	return u.Status == string(acme.StatusDeactivated)
+	Contact []string    `json:"contact"`
+	Status  acme.Status `json:"status"`
 }
 
 // Validate validates a update-account request body.
@@ -59,7 +51,7 @@ func (u *UpdateAccountRequest) Validate() error {
 		}
 		return nil
 	case len(u.Status) > 0:
-		if u.Status != string(acme.StatusDeactivated) {
+		if u.Status != acme.StatusDeactivated {
 			return acme.NewError(acme.ErrorMalformedType, "cannot update account "+
 				"status to %s, only deactivated", u.Status)
 		}
@@ -80,7 +72,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	var nar NewAccountRequest
 	if err := json.Unmarshal(payload.value, &nar); err != nil {
-		api.WriteError(w, acme.ErrorWrap(acme.ErrorMalformedType, err,
+		api.WriteError(w, acme.WrapError(acme.ErrorMalformedType, err,
 			"failed to unmarshal new-account request payload"))
 		return
 	}
@@ -90,7 +82,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpStatus := http.StatusCreated
-	acc, err := acme.AccountFromContext(r.Context())
+	acc, err := accountFromContext(r.Context())
 	if err != nil {
 		acmeErr, ok := err.(*acme.Error)
 		if !ok || acmeErr.Status != http.StatusBadRequest {
@@ -105,18 +97,19 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 				"account does not exist"))
 			return
 		}
-		jwk, err := acme.JwkFromContext(r.Context())
+		jwk, err := jwkFromContext(r.Context())
 		if err != nil {
 			api.WriteError(w, err)
 			return
 		}
 
-		if acc, err = h.Auth.NewAccount(r.Context(), &acme.Account{
+		acc := &acme.Account{
 			Key:     jwk,
 			Contact: nar.Contact,
 			Status:  acme.StatusValid,
-		}); err != nil {
-			api.WriteError(w, err)
+		}
+		if err := h.db.CreateAccount(r.Context(), acc); err != nil {
+			api.WriteError(w, acme.WrapErrorISE(err, "error creating account"))
 			return
 		}
 	} else {
@@ -124,14 +117,16 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 		httpStatus = http.StatusOK
 	}
 
-	w.Header().Set("Location", h.Auth.GetLink(r.Context(), acme.AccountLink,
-		true, acc.GetID()))
+	h.linker.LinkAccount(ctx, acc)
+
+	w.Header().Set("Location", h.linker.GetLink(r.Context(), AccountLinkType,
+		true, acc.ID))
 	api.JSONStatus(w, acc, httpStatus)
 }
 
 // GetUpdateAccount is the api for updating an ACME account.
 func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
-	acc, err := acme.AccountFromContext(r.Context())
+	acc, err := accountFromContext(r.Context())
 	if err != nil {
 		api.WriteError(w, err)
 		return
@@ -147,7 +142,7 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	if !payload.isPostAsGet {
 		var uar UpdateAccountRequest
 		if err := json.Unmarshal(payload.value, &uar); err != nil {
-			api.WriteError(w, acme.ErrorWrap(acme.ErrorMalformedType, err,
+			api.WriteError(w, acme.WrapError(acme.ErrorMalformedType, err,
 				"failed to unmarshal new-account request payload"))
 			return
 		}
@@ -159,18 +154,18 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 		// If neither the status nor the contacts are being updated then ignore
 		// the updates and return 200. This conforms with the behavior detailed
 		// in the ACME spec (https://tools.ietf.org/html/rfc8555#section-7.3.2).
-		if uar.IsDeactivateRequest() {
-			acc, err = h.Auth.DeactivateAccount(r.Context(), acc.GetID())
-		} else if len(uar.Contact) > 0 {
-			acc, err = h.Auth.UpdateAccount(r.Context(), acc.GetID(), uar.Contact)
-		}
-		if err != nil {
-			api.WriteError(w, err)
+		acc.Status = uar.Status
+		acc.Contact = uar.Contact
+		if err = h.db.UpdateAccount(r.Context(), acc); err != nil {
+			api.WriteError(w, acme.WrapErrorISE(err, "error updating account"))
 			return
 		}
 	}
-	w.Header().Set("Location", h.Auth.GetLink(r.Context(), acme.AccountLink,
-		true, acc.GetID()))
+
+	h.linker.LinkAccount(ctx, acc)
+
+	w.Header().Set("Location", h.linker.GetLink(r.Context(), AccountLinkType,
+		true, acc.ID))
 	api.JSON(w, acc)
 }
 
@@ -185,21 +180,24 @@ func logOrdersByAccount(w http.ResponseWriter, oids []string) {
 
 // GetOrdersByAccount ACME api for retrieving the list of order urls belonging to an account.
 func (h *Handler) GetOrdersByAccount(w http.ResponseWriter, r *http.Request) {
-	acc, err := acme.AccountFromContext(r.Context())
-	if err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	accID := chi.URLParam(r, "accID")
-	if acc.ID != accID {
-		api.WriteError(w, acme.UnauthorizedErr(errors.New("account ID does not match url param")))
-		return
-	}
-	orders, err := h.Auth.GetOrdersByAccount(r.Context(), acc.GetID())
-	if err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	api.JSON(w, orders)
-	logOrdersByAccount(w, orders)
+	/*
+		acc, err := acme.AccountFromContext(r.Context())
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		accID := chi.URLParam(r, "accID")
+		if acc.ID != accID {
+			api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType, "account ID does not match url param"))
+			return
+		}
+		orders, err := h.Auth.GetOrdersByAccount(r.Context(), acc.GetID())
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		api.JSON(w, orders)
+		logOrdersByAccount(w, orders)
+	*/
+	return
 }

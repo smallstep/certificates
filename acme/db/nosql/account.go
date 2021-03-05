@@ -74,7 +74,6 @@ func (db *DB) GetAccount(ctx context.Context, id string) (*acme.Account, error) 
 	return &acme.Account{
 		Status:  dbacc.Status,
 		Contact: dbacc.Contact,
-		Orders:  dir.getLink(ctx, OrdersByAccountLink, true, dbacc.ID),
 		Key:     dbacc.Key,
 		ID:      dbacc.ID,
 	}, nil

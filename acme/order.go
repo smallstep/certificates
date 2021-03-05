@@ -26,10 +26,11 @@ type Order struct {
 	NotBefore         time.Time     `json:"notBefore,omitempty"`
 	NotAfter          time.Time     `json:"notAfter,omitempty"`
 	Error             interface{}   `json:"error,omitempty"`
-	AuthorizationURLs []string      `json:"authorizations"`
 	AuthorizationIDs  []string      `json:"-"`
+	AuthorizationURLs []string      `json:"authorizations"`
 	FinalizeURL       string        `json:"finalize"`
-	Certificate       string        `json:"certificate,omitempty"`
+	CertificateID     string        `json:"-"`
+	CertificateURL    string        `json:"certificate,omitempty"`
 	ID                string        `json:"-"`
 	AccountID         string        `json:"-"`
 	ProvisionerID     string        `json:"-"`
@@ -41,7 +42,7 @@ type Order struct {
 func (o *Order) ToLog() (interface{}, error) {
 	b, err := json.Marshal(o)
 	if err != nil {
-		return nil, ErrorISEWrap(err, "error marshaling order for logging")
+		return nil, WrapErrorISE(err, "error marshaling order for logging")
 	}
 	return string(b), nil
 }
@@ -111,7 +112,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 
 // Finalize signs a certificate if the necessary conditions for Order completion
 // have been met.
-func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateRequest, auth SignAuthority, p Provisioner) error {
+func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateRequest, auth CertificateAuthority, p Provisioner) error {
 	if err := o.UpdateStatus(ctx, db); err != nil {
 		return err
 	}
@@ -170,7 +171,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 	signOps, err := p.AuthorizeSign(ctx, "")
 	if err != nil {
-		return ErrorISEWrap(err, "error retrieving authorization options from ACME provisioner")
+		return WrapErrorISE(err, "error retrieving authorization options from ACME provisioner")
 	}
 
 	// Template data
@@ -180,7 +181,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
 	if err != nil {
-		return ErrorISEWrap(err, "error creating template options from ACME provisioner")
+		return WrapErrorISE(err, "error creating template options from ACME provisioner")
 	}
 	signOps = append(signOps, templateOptions)
 
@@ -190,7 +191,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
 	}, signOps...)
 	if err != nil {
-		return ErrorISEWrap(err, "error signing certificate for order %s", o.ID)
+		return WrapErrorISE(err, "error signing certificate for order %s", o.ID)
 	}
 
 	cert := &Certificate{
@@ -203,7 +204,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		return err
 	}
 
-	o.Certificate = cert.ID
+	o.CertificateID = cert.ID
 	o.Status = StatusValid
 	return db.UpdateOrder(ctx, o)
 }

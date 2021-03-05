@@ -11,8 +11,8 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
+	acmeNoSQL "github.com/smallstep/certificates/acme/db/nosql"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/db"
@@ -124,11 +124,12 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	}
 
 	prefix := "acme"
-	acmeAuth, err := acme.New(auth, acme.AuthorityOptions{
+	acmeAuth, err := acmeAPI.NewHandler(acmeAPI.HandlerOptions{
 		Backdate: *config.AuthorityConfig.Backdate,
-		DB:       auth.GetDatabase().(nosql.DB),
+		DB:       acmeNoSQL.New(auth.GetDatabase().(nosql.DB)),
 		DNS:      dns,
 		Prefix:   prefix,
+		CA:       auth,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating ACME authority")

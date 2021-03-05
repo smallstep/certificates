@@ -21,7 +21,7 @@ type dbChallenge struct {
 	Value     string      `json:"value"`
 	Validated string      `json:"validated"`
 	Created   time.Time   `json:"created"`
-	Error     *AError     `json:"error"`
+	Error     *acme.Error `json:"error"`
 }
 
 func (dbc *dbChallenge) clone() *dbChallenge {
@@ -79,7 +79,6 @@ func (db *DB) GetChallenge(ctx context.Context, id, authzID string) (*acme.Chall
 		Type:      dbch.Type,
 		Status:    dbch.Status,
 		Token:     dbch.Token,
-		URL:       dir.getLink(ctx, ChallengeLink, true, dbch.ID),
 		ID:        dbch.ID,
 		AuthzID:   dbch.AuthzID,
 		Error:     dbch.Error,

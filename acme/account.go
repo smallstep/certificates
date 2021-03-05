@@ -22,7 +22,7 @@ type Account struct {
 func (a *Account) ToLog() (interface{}, error) {
 	b, err := json.Marshal(a)
 	if err != nil {
-		return nil, ErrorWrap(ErrorServerInternalType, err, "error marshaling account for logging")
+		return nil, WrapErrorISE(err, "error marshaling account for logging")
 	}
 	return string(b), nil
 }
@@ -46,7 +46,7 @@ func (a *Account) IsValid() bool {
 func KeyToID(jwk *jose.JSONWebKey) (string, error) {
 	kid, err := jwk.Thumbprint(crypto.SHA256)
 	if err != nil {
-		return "", ErrorWrap(ErrorServerInternalType, err, "error generating jwk thumbprint")
+		return "", WrapErrorISE(err, "error generating jwk thumbprint")
 	}
 	return base64.RawURLEncoding.EncodeToString(kid), nil
 }
