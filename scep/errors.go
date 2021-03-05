@@ -4,8 +4,8 @@ package scep
 type Error struct {
 	// Type       ProbType
 	// Detail string
-	Err    error
-	Status int
+	Message string `json:"message"`
+	Status  int    `json:"-"`
 	// Sub    []*Error
 	// Identifier *Identifier
 }
@@ -15,5 +15,5 @@ func (e *Error) Error() string {
 	// if e.Err == nil {
 	// 	return e.Detail
 	// }
-	return e.Err.Error()
+	return e.Message
 }

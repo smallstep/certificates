@@ -174,7 +174,7 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		scepRouterHandler.Route(r)
 	})
 
-	// helpful routine for logging all routes //
+	// helpful routine for logging all routes
 	//dumpRoutes(mux)
 
 	// Add monitoring if configured

@@ -9,8 +9,10 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 
+	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/scep"
@@ -76,14 +78,10 @@ func New(scepAuth scep.Interface) api.RouterHandler {
 
 // Route traffic and implement the Router interface.
 func (h *Handler) Route(r api.Router) {
-	//getLink := h.Auth.GetLinkExplicit
-	//fmt.Println(getLink)
+	getLink := h.Auth.GetLinkExplicit
 
-	//r.MethodFunc("GET", "/bla", h.baseURLFromRequest(h.lookupProvisioner(nil)))
-	//r.MethodFunc("GET", getLink(acme.NewNonceLink, "{provisionerID}", false, nil), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.GetNonce))))
-
-	r.MethodFunc(http.MethodGet, "/", h.lookupProvisioner(h.Get))
-	r.MethodFunc(http.MethodPost, "/", h.lookupProvisioner(h.Post))
+	r.MethodFunc(http.MethodGet, getLink("{provisionerID}", false, nil), h.lookupProvisioner(h.Get))
+	r.MethodFunc(http.MethodPost, getLink("{provisionerID}", false, nil), h.lookupProvisioner(h.Post))
 
 }
 
@@ -202,16 +200,12 @@ func decodeSCEPRequest(r *http.Request) (SCEPRequest, error) {
 func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		// name := chi.URLParam(r, "provisionerID")
-		// provisionerID, err := url.PathUnescape(name)
-		// if err != nil {
-		// 	api.WriteError(w, fmt.Errorf("error url unescaping provisioner id '%s'", name))
-		// 	return
-		// }
-
-		// TODO: make this configurable; and we might want to look at being able to provide multiple,
-		// like the ACME one? The below assumes a SCEP provider (scep/) called "scep1" exists.
-		provisionerID := "scep1"
+		name := chi.URLParam(r, "provisionerID")
+		provisionerID, err := url.PathUnescape(name)
+		if err != nil {
+			api.WriteError(w, fmt.Errorf("error url unescaping provisioner id '%s'", name))
+			return
+		}
 
 		p, err := h.Auth.LoadProvisionerByID("scep/" + provisionerID)
 		if err != nil {
@@ -275,6 +269,8 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 
 	response := SCEPResponse{Operation: opnPKIOperation}
 
+	fmt.Println("BEFORE PARSING")
+
 	microMsg, err := microscep.ParsePKIMessage(request.Message)
 	if err != nil {
 		return SCEPResponse{}, err
@@ -287,7 +283,12 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 		Raw:           microMsg.Raw,
 	}
 
+	fmt.Println("len raw:", len(microMsg.Raw))
+
+	fmt.Println("AFTER PARSING")
+
 	if err := h.Auth.DecryptPKIEnvelope(ctx, msg); err != nil {
+		fmt.Println("ERROR IN DECRYPTPKIENVELOPE")
 		return SCEPResponse{}, err
 	}
 
@@ -310,6 +311,8 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 
 	response.Data = certRep.Raw
 	response.Certificate = certRep.Certificate
+
+	fmt.Println("HERE!!!")
 
 	return response, nil
 }
@@ -336,8 +339,8 @@ func writeSCEPResponse(w http.ResponseWriter, response SCEPResponse) {
 
 func writeError(w http.ResponseWriter, err error) {
 	scepError := &scep.Error{
-		Err:    fmt.Errorf("post request failed: %w", err),
-		Status: http.StatusInternalServerError, // TODO: make this a param?
+		Message: err.Error(),
+		Status:  http.StatusInternalServerError, // TODO: make this a param?
 	}
 	api.WriteError(w, scepError)
 }

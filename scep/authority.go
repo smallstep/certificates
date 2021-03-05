@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net/url"
 
 	"github.com/smallstep/certificates/authority/provisioner"
 	database "github.com/smallstep/certificates/db"
@@ -55,6 +56,8 @@ type Interface interface {
 	GetCACertificates() ([]*x509.Certificate, error)
 	DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error
 	SignCSR(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage) (*PKIMessage, error)
+
+	GetLinkExplicit(provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
 }
 
 // Authority is the layer that handles all SCEP interactions.
@@ -130,6 +133,44 @@ func (a *Authority) LoadProvisionerByID(id string) (provisioner.Interface, error
 	return a.signAuth.LoadProvisionerByID(id)
 }
 
+// GetLinkExplicit returns the requested link from the directory.
+func (a *Authority) GetLinkExplicit(provName string, abs bool, baseURL *url.URL, inputs ...string) string {
+	// TODO: taken from ACME; move it to directory (if we need a directory in SCEP)?
+	return a.getLinkExplicit(provName, abs, baseURL, inputs...)
+}
+
+// getLinkExplicit returns an absolute or partial path to the given resource and a base
+// URL dynamically obtained from the request for which the link is being calculated.
+func (a *Authority) getLinkExplicit(provisionerName string, abs bool, baseURL *url.URL, inputs ...string) string {
+
+	// TODO: do we need to provide a way to provide a different suffix/base?
+	// Like "/cgi-bin/pkiclient.exe"? Or would it be enough to have that as the name?
+	link := fmt.Sprintf("/%s", provisionerName)
+
+	if abs {
+		// Copy the baseURL value from the pointer. https://github.com/golang/go/issues/38351
+		u := url.URL{}
+		if baseURL != nil {
+			u = *baseURL
+		}
+
+		// If no Scheme is set, then default to https.
+		if u.Scheme == "" {
+			u.Scheme = "https"
+		}
+
+		// If no Host is set, then use the default (first DNS attr in the ca.json).
+		if u.Host == "" {
+			u.Host = a.dns
+		}
+
+		u.Path = a.prefix + link
+		return u.String()
+	}
+
+	return link
+}
+
 // GetCACertificates returns the certificate (chain) for the CA
 func (a *Authority) GetCACertificates() ([]*x509.Certificate, error) {
 
@@ -164,6 +205,8 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 		return err
 	}
 
+	fmt.Println("len content:", len(p7.Content))
+
 	var tID microscep.TransactionID
 	if err := p7.UnmarshalSignedAttribute(oidSCEPtransactionID, &tID); err != nil {
 		return err
@@ -176,10 +219,16 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 
 	msg.p7 = p7
 
+	//p7c, err := pkcs7.Parse(p7.Content)
 	p7c, err := pkcs7.Parse(p7.Content)
 	if err != nil {
 		return err
 	}
+
+	fmt.Println(tID)
+	fmt.Println(msgType)
+
+	fmt.Println("len p7c content:", len(p7c.Content))
 
 	envelope, err := p7c.Decrypt(a.intermediateCertificate, a.service.Decrypter)
 	if err != nil {
@@ -308,7 +357,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	// fmt.Println(string(cert.SubjectKeyId))
 
 	// create a degenerate cert structure
-	deg, err := DegenerateCertificates([]*x509.Certificate{cert})
+	deg, err := degenerateCertificates([]*x509.Certificate{cert})
 	if err != nil {
 		return nil, err
 	}
@@ -380,8 +429,8 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	return crepMsg, nil
 }
 
-// DegenerateCertificates creates degenerate certificates pkcs#7 type
-func DegenerateCertificates(certs []*x509.Certificate) ([]byte, error) {
+// degenerateCertificates creates degenerate certificates pkcs#7 type
+func degenerateCertificates(certs []*x509.Certificate) ([]byte, error) {
 	var buf bytes.Buffer
 	for _, cert := range certs {
 		buf.Write(cert.Raw)
