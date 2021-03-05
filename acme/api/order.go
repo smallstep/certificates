@@ -119,7 +119,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.linker.Link(ctx, o)
+	h.linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, true, o.ID))
 	api.JSONStatus(w, o, http.StatusCreated)
