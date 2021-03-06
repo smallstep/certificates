@@ -24,8 +24,7 @@ type DB interface {
 	UpdateChallenge(ctx context.Context, ch *Challenge) error
 
 	CreateOrder(ctx context.Context, o *Order) error
-	DeleteOrder(ctx context.Context, id string) error
 	GetOrder(ctx context.Context, id string) (*Order, error)
-	GetOrdersByAccountID(ctx context.Context, accountID string) error
+	GetOrdersByAccountID(ctx context.Context, accountID string) ([]string, error)
 	UpdateOrder(ctx context.Context, o *Order) error
 }

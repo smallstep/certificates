@@ -124,24 +124,24 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	}
 
 	prefix := "acme"
-	acmeAuth, err := acmeAPI.NewHandler(acmeAPI.HandlerOptions{
+	acmeDB, err := acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
+	if err != nil {
+		return nil, errors.Wrap(err, "error configuring ACME DB interface")
+	}
+	acmeHandler := acmeAPI.NewHandler(acmeAPI.HandlerOptions{
 		Backdate: *config.AuthorityConfig.Backdate,
-		DB:       acmeNoSQL.New(auth.GetDatabase().(nosql.DB)),
+		DB:       acmeDB,
 		DNS:      dns,
 		Prefix:   prefix,
 		CA:       auth,
 	})
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating ACME authority")
-	}
-	acmeRouterHandler := acmeAPI.New(acmeAuth)
 	mux.Route("/"+prefix, func(r chi.Router) {
-		acmeRouterHandler.Route(r)
+		acmeHandler.Route(r)
 	})
 	// Use 2.0 because, at the moment, our ACME api is only compatible with v2.0
 	// of the ACME spec.
 	mux.Route("/2.0/"+prefix, func(r chi.Router) {
-		acmeRouterHandler.Route(r)
+		acmeHandler.Route(r)
 	})
 
 	/*

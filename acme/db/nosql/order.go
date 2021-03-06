@@ -29,8 +29,13 @@ type dbOrder struct {
 	CertificateID  string            `json:"certificate,omitempty"`
 }
 
+func (a *dbOrder) clone() *dbOrder {
+	b := *a
+	return &b
+}
+
 // getDBOrder retrieves and unmarshals an ACME Order type from the database.
-func (db *DB) getDBOrder(id string) (*dbOrder, error) {
+func (db *DB) getDBOrder(ctx context.Context, id string) (*dbOrder, error) {
 	b, err := db.db.Get(orderTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
 		return nil, acme.WrapError(acme.ErrorMalformedType, err, "order %s not found", id)
@@ -46,7 +51,7 @@ func (db *DB) getDBOrder(id string) (*dbOrder, error) {
 
 // GetOrder retrieves an ACME Order from the database.
 func (db *DB) GetOrder(ctx context.Context, id string) (*acme.Order, error) {
-	dbo, err := db.getDBOrder(id)
+	dbo, err := db.getDBOrder(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +96,7 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 		return err
 	}
 
-	var oidHelper = orderIDsByAccount{}
-	_, err = oidHelper.addOrderID(db, o.AccountID, o.ID)
+	_, err = db.updateAddOrderIDs(ctx, o.AccountID, o.ID)
 	if err != nil {
 		return err
 	}
@@ -104,28 +108,11 @@ type orderIDsByAccount struct{}
 // addOrderID adds an order ID to a users index of in progress order IDs.
 // This method will also cull any orders that are no longer in the `pending`
 // state from the index before returning it.
-func (oiba orderIDsByAccount) addOrderID(db nosql.DB, accID string, oid string) ([]string, error) {
+func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...string) ([]string, error) {
 	ordersByAccountMux.Lock()
 	defer ordersByAccountMux.Unlock()
 
-	// Update the "order IDs by account ID" index
-	oids, err := oiba.unsafeGetOrderIDsByAccount(db, accID)
-	if err != nil {
-		return nil, err
-	}
-	newOids := append(oids, oid)
-	if err = orderIDs(newOids).save(db, oids, accID); err != nil {
-		// Delete the entire order if storing the index fails.
-		db.Del(orderTable, []byte(oid))
-		return nil, err
-	}
-	return newOids, nil
-}
-
-// unsafeGetOrderIDsByAccount retrieves a list of Order IDs that were created by the
-// account.
-func (oiba orderIDsByAccount) unsafeGetOrderIDsByAccount(db nosql.DB, accID string) ([]string, error) {
-	b, err := db.Get(ordersByAccountIDTable, []byte(accID))
+	b, err := db.db.Get(ordersByAccountIDTable, []byte(accID))
 	if err != nil {
 		if nosql.IsErrNotFound(err) {
 			return []string{}, nil
@@ -145,67 +132,46 @@ func (oiba orderIDsByAccount) unsafeGetOrderIDsByAccount(db nosql.DB, accID stri
 	// that are invalid in the array of URLs.
 	pendOids := []string{}
 	for _, oid := range oids {
-		o, err := getOrder(db, oid)
+		o, err := db.GetOrder(ctx, oid)
 		if err != nil {
-			return nil, errors.Wrapf(err, "error loading order %s for account %s", oid, accID)
+			return nil, acme.WrapErrorISE(err, "error loading order %s for account %s", oid, accID)
 		}
-		if o, err = o.UpdateStatus(db); err != nil {
-			return nil, errors.Wrapf(err, "error updating order %s for account %s", oid, accID)
+		if err = o.UpdateStatus(ctx, db); err != nil {
+			return nil, acme.WrapErrorISE(err, "error updating order %s for account %s", oid, accID)
 		}
 		if o.Status == acme.StatusPending {
 			pendOids = append(pendOids, oid)
 		}
 	}
-	// If the number of pending orders is less than the number of orders in the
-	// list, then update the pending order list.
-	if len(pendOids) != len(oids) {
-		if err = orderIDs(pendOids).save(db, oids, accID); err != nil {
-			return nil, errors.Wrapf(err, "error storing orderIDs as part of getOrderIDsByAccount logic: "+
-				"len(orderIDs) = %d", len(pendOids))
-		}
+	pendOids = append(pendOids, addOids...)
+	if len(oids) == 0 {
+		oids = nil
 	}
-
+	if err = db.save(ctx, accID, pendOids, oids, "orderIDsByAccountID", ordersByAccountIDTable); err != nil {
+		// Delete all orders that may have been previously stored if orderIDsByAccountID update fails.
+		for _, oid := range addOids {
+			db.db.Del(orderTable, []byte(oid))
+		}
+		return nil, errors.Wrap(err, "error saving OrderIDsByAccountID index")
+	}
 	return pendOids, nil
 }
 
-type orderIDs []string
+func (db *DB) GetOrdersByAccountID(ctx context.Context, accID string) ([]string, error) {
+	return db.updateAddOrderIDs(ctx, accID)
+}
 
-// save is used to update the list of orderIDs keyed by ACME account ID
-// stored in the database.
-//
-// This method always converts empty lists to 'nil' when storing to the DB. We
-// do this to avoid any confusion between an empty list and a nil value in the
-// db.
-func (oids orderIDs) save(db nosql.DB, old orderIDs, accID string) error {
-	var (
-		err  error
-		oldb []byte
-		newb []byte
-	)
-	if len(old) == 0 {
-		oldb = nil
-	} else {
-		oldb, err = json.Marshal(old)
-		if err != nil {
-			return errors.Wrap(err, "error marshaling old order IDs slice")
-		}
+// UpdateOrder saves an updated ACME Order to the database.
+func (db *DB) UpdateOrder(ctx context.Context, o *acme.Order) error {
+	old, err := db.getDBOrder(ctx, o.ID)
+	if err != nil {
+		return err
 	}
-	if len(oids) == 0 {
-		newb = nil
-	} else {
-		newb, err = json.Marshal(oids)
-		if err != nil {
-			return errors.Wrap(err, "error marshaling new order IDs slice")
-		}
-	}
-	_, swapped, err := db.CmpAndSwap(ordersByAccountIDTable, []byte(accID), oldb, newb)
-	switch {
-	case err != nil:
-		return errors.Wrapf(err, "error storing order IDs for account %s", accID)
-	case !swapped:
-		return errors.Errorf("error storing order IDs "+
-			"for account %s; order IDs changed since last read", accID)
-	default:
-		return nil
-	}
+
+	nu := old.clone()
+
+	nu.Status = o.Status
+	nu.Error = o.Error
+	nu.CertificateID = o.CertificateID
+	return db.save(ctx, old.ID, nu, old, "order", orderTable)
 }

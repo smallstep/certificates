@@ -151,14 +151,21 @@ func (l *Linker) LinkAccount(ctx context.Context, acc *acme.Account) {
 	acc.Orders = l.GetLink(ctx, OrdersByAccountLinkType, true, acc.ID)
 }
 
-// LinkChallenge sets the ACME links required by an ACME account.
+// LinkChallenge sets the ACME links required by an ACME challenge.
 func (l *Linker) LinkChallenge(ctx context.Context, ch *acme.Challenge) {
 	ch.URL = l.GetLink(ctx, ChallengeLinkType, true, ch.AuthzID, ch.ID)
 }
 
-// LinkAuthorization sets the ACME links required by an ACME account.
+// LinkAuthorization sets the ACME links required by an ACME authorization.
 func (l *Linker) LinkAuthorization(ctx context.Context, az *acme.Authorization) {
 	for _, ch := range az.Challenges {
 		l.LinkChallenge(ctx, ch)
+	}
+}
+
+// LinkOrdersByAccountID converts each order ID to an ACME link.
+func (l *Linker) LinkOrdersByAccountID(ctx context.Context, orders []string) {
+	for i, id := range orders {
+		orders[i] = l.GetLink(ctx, OrderLinkType, true, id)
 	}
 }

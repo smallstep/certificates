@@ -25,7 +25,7 @@ type Order struct {
 	Identifiers       []Identifier  `json:"identifiers"`
 	NotBefore         time.Time     `json:"notBefore,omitempty"`
 	NotAfter          time.Time     `json:"notAfter,omitempty"`
-	Error             interface{}   `json:"error,omitempty"`
+	Error             *Error        `json:"error,omitempty"`
 	AuthorizationIDs  []string      `json:"-"`
 	AuthorizationURLs []string      `json:"authorizations"`
 	FinalizeURL       string        `json:"finalize"`
