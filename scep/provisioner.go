@@ -15,4 +15,5 @@ type Provisioner interface {
 	DefaultTLSCertDuration() time.Duration
 	GetOptions() *provisioner.Options
 	GetChallengePassword() string
+	GetCapabilities() []string
 }

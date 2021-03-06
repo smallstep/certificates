@@ -16,6 +16,7 @@ type SCEP struct {
 
 	ForceCN           bool     `json:"forceCN,omitempty"`
 	ChallengePassword string   `json:"challenge,omitempty"`
+	Capabilities      []string `json:"capabilities,omitempty"`
 	Options           *Options `json:"options,omitempty"`
 	Claims            *Claims  `json:"claims,omitempty"`
 	claimer           *Claimer
@@ -95,6 +96,11 @@ func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 // GetChallengePassword returns the challenge password
 func (s *SCEP) GetChallengePassword() string {
 	return s.ChallengePassword
+}
+
+// GetCapabilities returns the CA capabilities
+func (s *SCEP) GetCapabilities() []string {
+	return s.Capabilities
 }
 
 // Interface guards

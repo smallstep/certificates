@@ -57,6 +57,7 @@ type Interface interface {
 	DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error
 	SignCSR(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage) (*PKIMessage, error)
 	MatchChallengePassword(ctx context.Context, password string) (bool, error)
+	GetCACaps(ctx context.Context) []string
 
 	GetLinkExplicit(provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
 }
@@ -128,6 +129,19 @@ func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 	}, nil
 }
 
+var (
+	// TODO: check the default capabilities; https://tools.ietf.org/html/rfc8894#section-3.5.2
+	defaultCapabilities = []string{
+		"Renewal",
+		"SHA-1",
+		"SHA-256",
+		"AES",
+		"DES3",
+		"SCEPStandard",
+		"POSTPKIOperation",
+	}
+)
+
 // LoadProvisionerByID calls out to the SignAuthority interface to load a
 // provisioner by ID.
 func (a *Authority) LoadProvisionerByID(id string) (provisioner.Interface, error) {
@@ -155,9 +169,9 @@ func (a *Authority) getLinkExplicit(provisionerName string, abs bool, baseURL *u
 			u = *baseURL
 		}
 
-		// If no Scheme is set, then default to https.
+		// If no Scheme is set, then default to http (in case of SCEP)
 		if u.Scheme == "" {
-			u.Scheme = "https"
+			u.Scheme = "http"
 		}
 
 		// If no Host is set, then use the default (first DNS attr in the ca.json).
@@ -188,6 +202,9 @@ func (a *Authority) GetCACertificates() ([]*x509.Certificate, error) {
 	//
 	// Using an RA does not seem to exist in https://tools.ietf.org/html/rfc8894, but is mentioned in
 	// https://tools.ietf.org/id/draft-nourse-scep-21.html. Will continue using the CA directly for now.
+	//
+	// The certificate to use should probably depend on the (configured) Provisioner and may
+	// use a distinct certificate, apart from the intermediate.
 
 	if a.intermediateCertificate == nil {
 		return nil, errors.New("no intermediate certificate available in SCEP authority")
@@ -419,6 +436,28 @@ func (a *Authority) MatchChallengePassword(ctx context.Context, password string)
 	// that can be interacted with more easily, via some internal API, for example.
 
 	return false, nil
+}
+
+// GetCACaps returns the CA capabilities
+func (a *Authority) GetCACaps(ctx context.Context) []string {
+
+	p, err := ProvisionerFromContext(ctx)
+	if err != nil {
+		return defaultCapabilities
+	}
+
+	caps := p.GetCapabilities()
+	if len(caps) == 0 {
+		return defaultCapabilities
+	}
+
+	// TODO: validate the caps? Ensure they are the right format according to RFC?
+	// TODO: ensure that the capabilities are actually "enforced"/"verified" in code too:
+	// check that only parts of the spec are used in the implementation belonging to the capabilities.
+	// For example for renewals, which we could disable in the provisioner, should then also
+	// not be reported in cacaps operation.
+
+	return caps
 }
 
 // degenerateCertificates creates degenerate certificates pkcs#7 type
