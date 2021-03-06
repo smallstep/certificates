@@ -1,4 +1,4 @@
-step-certificates (0.8.4-14-ge72f087-dev) unstable; urgency=medium
+step-ca (0.8.4-14-ge72f087-dev) unstable; urgency=medium
 
   * See https://github.com/smallstep/certificates/releases
 

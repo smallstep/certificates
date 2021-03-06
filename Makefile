@@ -215,7 +215,7 @@ run:
 #########################################
 
 changelog:
-	$Q echo "step-certificates ($(DEB_VERSION)) unstable; urgency=medium" > debian/changelog
+	$Q echo "step-ca ($(DEB_VERSION)) unstable; urgency=medium" > debian/changelog
 	$Q echo >> debian/changelog
 	$Q echo "  * See https://github.com/smallstep/certificates/releases" >> debian/changelog
 	$Q echo >> debian/changelog
@@ -223,7 +223,7 @@ changelog:
 
 debian: changelog
 	$Q mkdir -p $(RELEASE); \
-	OUTPUT=../step-certificates_*.deb; \
+	OUTPUT=../step-ca*.deb; \
 	rm $$OUTPUT; \
 	dpkg-buildpackage -b -rfakeroot -us -uc && cp $$OUTPUT $(RELEASE)/
 
@@ -236,7 +236,7 @@ distclean: clean
 #################################################
 
 BINARY_OUTPUT=$(OUTPUT_ROOT)binary/
-RELEASE=./.travis-releases
+RELEASE=./.releases
 
 define BUNDLE_MAKE
 	# $(1) -- Go Operating System (e.g. linux, darwin, windows, etc.)
@@ -258,23 +258,7 @@ binary-linux-armv7:
 binary-darwin:
 	$(call BUNDLE_MAKE,darwin,amd64,,$(BINARY_OUTPUT)darwin/)
 
-define BUNDLE
-    # $(1) -- Binary Output Dir Name
-	# $(2) -- Step Platform Name
-	# $(3) -- Step Binary Architecture
-	# $(4) -- Step Binary Name (For Windows Comaptibility)
-	$(q) ./make/bundle.sh "$(BINARY_OUTPUT)$(1)" "$(RELEASE)" "$(VERSION)" "$(2)" "$(3)" "$(4)" "$(5)" "$(6)"
-endef
-
-bundle-linux: binary-linux binary-linux-arm64 binary-linux-armv7
-	$(call BUNDLE,linux,linux,amd64,$(BINNAME),$(CLOUDKMS_BINNAME),$(AWSKMS_BINNAME))
-	$(call BUNDLE,linux.arm64,linux,arm64,$(BINNAME),$(CLOUDKMS_BINNAME),$(AWSKMS_BINNAME))
-	$(call BUNDLE,linux.armv7,linux,armv7,$(BINNAME),$(CLOUDKMS_BINNAME),$(AWSKMS_BINNAME))
-
-bundle-darwin: binary-darwin
-	$(call BUNDLE,darwin,darwin,amd64,$(BINNAME),$(CLOUDKMS_BINNAME),$(AWSKMS_BINNAME))
-
-.PHONY: binary-linux binary-darwin bundle-linux bundle-darwin
+.PHONY: binary-linux binary-linux-arm64 binary-linux-armv7 binary-darwin
 
 #################################################
 # Targets for creating step artifacts
