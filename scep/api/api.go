@@ -82,7 +82,6 @@ func (h *Handler) Route(r api.Router) {
 
 	r.MethodFunc(http.MethodGet, getLink("{provisionerID}", false, nil), h.lookupProvisioner(h.Get))
 	r.MethodFunc(http.MethodPost, getLink("{provisionerID}", false, nil), h.lookupProvisioner(h.Post))
-
 }
 
 // Get handles all SCEP GET requests
@@ -103,7 +102,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	case opnGetCACaps:
 		response, err = h.GetCACaps(ctx)
 	case opnPKIOperation:
-		// TODO: implement the GET for PKI operation
+		// TODO: implement the GET for PKI operation? Default CACAPS doesn't specify this is in use, though
 	default:
 		err = fmt.Errorf("unknown operation: %s", request.Operation)
 	}
@@ -170,6 +169,7 @@ func decodeSCEPRequest(r *http.Request) (SCEPRequest, error) {
 			if _, ok := query["message"]; ok {
 				message = query.Get("message")
 			}
+			// TODO: verify this; it seems like it should be StdEncoding instead of URLEncoding
 			decodedMessage, err := base64.URLEncoding.DecodeString(message)
 			if err != nil {
 				return SCEPRequest{}, err
@@ -269,8 +269,6 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 
 	response := SCEPResponse{Operation: opnPKIOperation}
 
-	fmt.Println("BEFORE PARSING")
-
 	microMsg, err := microscep.ParsePKIMessage(request.Message)
 	if err != nil {
 		return SCEPResponse{}, err
@@ -283,12 +281,7 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 		Raw:           microMsg.Raw,
 	}
 
-	fmt.Println("len raw:", len(microMsg.Raw))
-
-	fmt.Println("AFTER PARSING")
-
 	if err := h.Auth.DecryptPKIEnvelope(ctx, msg); err != nil {
-		fmt.Println("ERROR IN DECRYPTPKIENVELOPE")
 		return SCEPResponse{}, err
 	}
 
@@ -311,8 +304,6 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 
 	response.Data = certRep.Raw
 	response.Certificate = certRep.Certificate
-
-	fmt.Println("HERE!!!")
 
 	return response, nil
 }

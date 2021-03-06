@@ -205,8 +205,6 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 		return err
 	}
 
-	fmt.Println("len content:", len(p7.Content))
-
 	var tID microscep.TransactionID
 	if err := p7.UnmarshalSignedAttribute(oidSCEPtransactionID, &tID); err != nil {
 		return err
@@ -224,11 +222,6 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 	if err != nil {
 		return err
 	}
-
-	fmt.Println(tID)
-	fmt.Println(msgType)
-
-	fmt.Println("len p7c content:", len(p7c.Content))
 
 	envelope, err := p7c.Decrypt(a.intermediateCertificate, a.service.Decrypter)
 	if err != nil {
