@@ -80,7 +80,6 @@ func New(scepAuth scep.Interface) api.RouterHandler {
 // Route traffic and implement the Router interface.
 func (h *Handler) Route(r api.Router) {
 	getLink := h.Auth.GetLinkExplicit
-
 	r.MethodFunc(http.MethodGet, getLink("{provisionerID}", false, nil), h.lookupProvisioner(h.Get))
 	r.MethodFunc(http.MethodPost, getLink("{provisionerID}", false, nil), h.lookupProvisioner(h.Post))
 }
@@ -140,6 +139,8 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: fix cases in which we get here and there's no certificate (i.e. wrong password, waiting for cert, etc)
+	// We should generate an appropriate response and it should be signed
 	api.LogCertificate(w, response.Certificate)
 
 	writeSCEPResponse(w, response)
@@ -238,8 +239,10 @@ func (h *Handler) GetCACert(ctx context.Context) (SCEPResponse, error) {
 		return SCEPResponse{}, errors.New("missing CA cert")
 	}
 
-	response := SCEPResponse{Operation: opnGetCACert}
-	response.CACertNum = len(certs)
+	response := SCEPResponse{
+		Operation: opnGetCACert,
+		CACertNum: len(certs),
+	}
 
 	if len(certs) == 1 {
 		response.Data = certs[0].Raw
@@ -268,8 +271,6 @@ func (h *Handler) GetCACaps(ctx context.Context) (SCEPResponse, error) {
 // PKIOperation performs PKI operations and returns a SCEP response
 func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPResponse, error) {
 
-	response := SCEPResponse{Operation: opnPKIOperation}
-
 	// parse the message using microscep implementation
 	microMsg, err := microscep.ParsePKIMessage(request.Message)
 	if err != nil {
@@ -295,7 +296,15 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 	}
 
 	if msg.MessageType == microscep.PKCSReq {
-		// TODO: CSR validation, like challenge password
+
+		challengeMatches, err := h.Auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
+		if err != nil {
+			return SCEPResponse{}, err
+		}
+
+		if !challengeMatches {
+			return SCEPResponse{}, errors.New("wrong password provided")
+		}
 	}
 
 	csr := msg.CSRReqMessage.CSR
@@ -311,8 +320,11 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 	// // TODO: check if CN already exists, if renewal is allowed and if existing should be revoked; fail if not
 	// // TODO: store the new cert for CN locally; should go into the DB
 
-	response.Data = certRep.Raw
-	response.Certificate = certRep.Certificate
+	response := SCEPResponse{
+		Operation:   opnPKIOperation,
+		Data:        certRep.Raw,
+		Certificate: certRep.Certificate,
+	}
 
 	return response, nil
 }
@@ -338,6 +350,7 @@ func writeSCEPResponse(w http.ResponseWriter, response SCEPResponse) {
 }
 
 func writeError(w http.ResponseWriter, err error) {
+	// TODO: this probably needs to use SCEP specific errors (i.e. failInfo)
 	scepError := &scep.Error{
 		Message: err.Error(),
 		Status:  http.StatusInternalServerError, // TODO: make this a param?

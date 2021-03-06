@@ -14,10 +14,11 @@ type SCEP struct {
 	Type string `json:"type"`
 	Name string `json:"name"`
 
-	ForceCN bool     `json:"forceCN,omitempty"`
-	Options *Options `json:"options,omitempty"`
-	Claims  *Claims  `json:"claims,omitempty"`
-	claimer *Claimer
+	ForceCN           bool     `json:"forceCN,omitempty"`
+	ChallengePassword string   `json:"challenge,omitempty"`
+	Options           *Options `json:"options,omitempty"`
+	Claims            *Claims  `json:"claims,omitempty"`
+	claimer           *Claimer
 }
 
 // GetID returns the provisioner unique identifier.
@@ -76,7 +77,7 @@ func (s *SCEP) Init(config Config) (err error) {
 	return err
 }
 
-// AuthorizeSign does not do any validation, because all validation is handled
+// AuthorizeSign does not do any verification, because all verification is handled
 // in the SCEP protocol. This method returns a list of modifiers / constraints
 // on the resulting certificate.
 func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
@@ -89,6 +90,11 @@ func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		defaultPublicKeyValidator{},
 		newValidityValidator(s.claimer.MinTLSCertDuration(), s.claimer.MaxTLSCertDuration()),
 	}, nil
+}
+
+// GetChallengePassword returns the challenge password
+func (s *SCEP) GetChallengePassword() string {
+	return s.ChallengePassword
 }
 
 // Interface guards

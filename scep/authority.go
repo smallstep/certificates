@@ -56,6 +56,7 @@ type Interface interface {
 	GetCACertificates() ([]*x509.Certificate, error)
 	DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error
 	SignCSR(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage) (*PKIMessage, error)
+	MatchChallengePassword(ctx context.Context, password string) (bool, error)
 
 	GetLinkExplicit(provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
 }
@@ -399,6 +400,25 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	}
 
 	return crepMsg, nil
+}
+
+// MatchChallengePassword verifies a SCEP challenge password
+func (a *Authority) MatchChallengePassword(ctx context.Context, password string) (bool, error) {
+
+	p, err := ProvisionerFromContext(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	if p.GetChallengePassword() == password {
+		return true, nil
+	}
+
+	// TODO: support dynamic challenges, i.e. a list of challenges instead of one?
+	// That's probably a bit harder to configure, though; likely requires some data store
+	// that can be interacted with more easily, via some internal API, for example.
+
+	return false, nil
 }
 
 // degenerateCertificates creates degenerate certificates pkcs#7 type
