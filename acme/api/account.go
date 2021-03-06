@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/logging"
@@ -181,24 +182,26 @@ func logOrdersByAccount(w http.ResponseWriter, oids []string) {
 
 // GetOrdersByAccount ACME api for retrieving the list of order urls belonging to an account.
 func (h *Handler) GetOrdersByAccount(w http.ResponseWriter, r *http.Request) {
-	/*
-		acc, err := acme.AccountFromContext(r.Context())
-		if err != nil {
-			api.WriteError(w, err)
-			return
-		}
-		accID := chi.URLParam(r, "accID")
-		if acc.ID != accID {
-			api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType, "account ID does not match url param"))
-			return
-		}
-		orders, err := h.Auth.GetOrdersByAccount(r.Context(), acc.GetID())
-		if err != nil {
-			api.WriteError(w, err)
-			return
-		}
-		api.JSON(w, orders)
-		logOrdersByAccount(w, orders)
-	*/
+	ctx := r.Context()
+	acc, err := accountFromContext(ctx)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+	accID := chi.URLParam(r, "accID")
+	if acc.ID != accID {
+		api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType, "account ID '%s' does not match url param '%s'", acc.ID, accID))
+		return
+	}
+	orders, err := h.db.GetOrdersByAccountID(ctx, acc.ID)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	h.linker.LinkOrdersByAccountID(ctx, orders)
+
+	api.JSON(w, orders)
+	logOrdersByAccount(w, orders)
 	return
 }

@@ -44,8 +44,7 @@ func New(db nosqlDB.DB) (*DB, error) {
 func (db *DB) save(ctx context.Context, id string, nu interface{}, old interface{}, typ string, table []byte) error {
 	newB, err := json.Marshal(nu)
 	if err != nil {
-		return errors.Wrapf(err,
-			"error marshaling new acme %s", typ)
+		return errors.Wrapf(err, "error marshaling acme type: %s, value: %v", typ, nu)
 	}
 	var oldB []byte
 	if old == nil {
@@ -53,8 +52,7 @@ func (db *DB) save(ctx context.Context, id string, nu interface{}, old interface
 	} else {
 		oldB, err = json.Marshal(old)
 		if err != nil {
-			return errors.Wrapf(err,
-				"error marshaling old acme %s", typ)
+			return errors.Wrapf(err, "error marshaling acme type: %s, value: %v", typ, old)
 		}
 	}
 
@@ -63,8 +61,7 @@ func (db *DB) save(ctx context.Context, id string, nu interface{}, old interface
 	case err != nil:
 		return errors.Wrapf(err, "error saving acme %s", typ)
 	case !swapped:
-		return errors.Errorf("error saving acme %s; "+
-			"changed since last read", typ)
+		return errors.Errorf("error saving acme %s; changed since last read", typ)
 	default:
 		return nil
 	}
