@@ -198,27 +198,7 @@ func (a *Authority) GetCACertificates() ([]*x509.Certificate, error) {
 // DecryptPKIEnvelope decrypts an enveloped message
 func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error {
 
-	data := msg.Raw
-
-	p7, err := pkcs7.Parse(data)
-	if err != nil {
-		return err
-	}
-
-	var tID microscep.TransactionID
-	if err := p7.UnmarshalSignedAttribute(oidSCEPtransactionID, &tID); err != nil {
-		return err
-	}
-
-	var msgType microscep.MessageType
-	if err := p7.UnmarshalSignedAttribute(oidSCEPmessageType, &msgType); err != nil {
-		return err
-	}
-
-	msg.p7 = p7
-
-	//p7c, err := pkcs7.Parse(p7.Content)
-	p7c, err := pkcs7.Parse(p7.Content)
+	p7c, err := pkcs7.Parse(msg.P7.Content)
 	if err != nil {
 		return err
 	}
@@ -253,7 +233,6 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 			CSR:               csr,
 			ChallengePassword: cp,
 		}
-		//msg.Certificate = p7.Certificates[0] // TODO: check if this is necessary to add (again)
 		return nil
 	case microscep.GetCRL, microscep.GetCert, microscep.CertPoll:
 		return fmt.Errorf("not implemented") //errNotImplemented
@@ -355,7 +334,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 		return nil, err
 	}
 
-	e7, err := pkcs7.Encrypt(deg, msg.p7.Certificates)
+	e7, err := pkcs7.Encrypt(deg, msg.P7.Certificates)
 	if err != nil {
 		return nil, err
 	}

@@ -35,7 +35,7 @@ type PKIMessage struct {
 	Raw []byte
 
 	// parsed
-	p7 *pkcs7.PKCS7
+	P7 *pkcs7.PKCS7
 
 	// decrypted enveloped content
 	pkiEnvelope []byte

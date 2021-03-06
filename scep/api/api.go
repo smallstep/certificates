@@ -16,6 +16,7 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/scep"
+	"go.mozilla.org/pkcs7"
 
 	microscep "github.com/micromdm/scep/scep"
 )
@@ -269,16 +270,24 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 
 	response := SCEPResponse{Operation: opnPKIOperation}
 
+	// parse the message using microscep implementation
 	microMsg, err := microscep.ParsePKIMessage(request.Message)
 	if err != nil {
 		return SCEPResponse{}, err
 	}
 
+	p7, err := pkcs7.Parse(microMsg.Raw)
+	if err != nil {
+		return SCEPResponse{}, err
+	}
+
+	// copy over properties to our internal PKIMessage
 	msg := &scep.PKIMessage{
 		TransactionID: microMsg.TransactionID,
 		MessageType:   microMsg.MessageType,
 		SenderNonce:   microMsg.SenderNonce,
 		Raw:           microMsg.Raw,
+		P7:            p7,
 	}
 
 	if err := h.Auth.DecryptPKIEnvelope(ctx, msg); err != nil {

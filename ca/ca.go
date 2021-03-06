@@ -156,7 +156,6 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	// well as certificates via SCEP.
 	tlsConfig = nil
 
-	// TODO: get the SCEP service
 	scepPrefix := "scep"
 	scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
 		IntermediateCertificatePath: config.IntermediateCert,
