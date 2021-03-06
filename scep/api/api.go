@@ -33,20 +33,6 @@ const maxPayloadSize = 2 << 20
 
 type nextHTTP = func(http.ResponseWriter, *http.Request)
 
-var (
-	// TODO: check the default capabilities; https://tools.ietf.org/html/rfc8894#section-3.5.2
-	// TODO: move capabilities to Authority or Provisioner, so that they can be configured?
-	defaultCapabilities = []string{
-		"Renewal",
-		"SHA-1",
-		"SHA-256",
-		"AES",
-		"DES3",
-		"SCEPStandard",
-		"POSTPKIOperation",
-	}
-)
-
 const (
 	certChainHeader = "application/x-x509-ca-ra-cert"
 	leafHeader      = "application/x-x509-ca-cert"
@@ -260,10 +246,12 @@ func (h *Handler) GetCACert(ctx context.Context) (SCEPResponse, error) {
 // GetCACaps returns the CA capabilities in a SCEP response
 func (h *Handler) GetCACaps(ctx context.Context) (SCEPResponse, error) {
 
-	response := SCEPResponse{Operation: opnGetCACaps}
+	caps := h.Auth.GetCACaps(ctx)
 
-	// TODO: get the actual capabilities from provisioner config
-	response.Data = formatCapabilities(defaultCapabilities)
+	response := SCEPResponse{
+		Operation: opnGetCACaps,
+		Data:      formatCapabilities(caps),
+	}
 
 	return response, nil
 }
