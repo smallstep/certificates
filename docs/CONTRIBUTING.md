@@ -29,15 +29,47 @@ To build from source:
 
 Find your binaries in `bin/`.
 
-### Alternative: Build a CGO `step-ca` (with PKCS#11 and YubiKey PIV support)
+### Build `step-ca` using CGO
 
-To build the CGO version of `step-ca` you will need [`go`](https://golang.org/), make, gcc, pkg-config, and the [`libpcsclite-dev`](https://pcsclite.apdu.fr/) package. On Ubuntu:
+#### The CGO build enables PKCS #11 and YubiKey PIV support
 
-    sudo apt update
-    sudo apt install -y make gcc libpcsclite-dev pkg-config
-    make bootstrap && make build GOFLAGS=""
+To build the CGO version of `step-ca`, you will need [`go`](https://golang.org/), make, and a C compiler.
 
-Find your binaries in `bin/`.
+You'll also need PCSC support on your operating system, as required by the `go-piv` module.
+On Linux, the [`libpcsclite-dev`](https://pcsclite.apdu.fr/) package provides PCSC support.
+On macOS and Windows, PCSC support is built into the OS.
+
+#### 1. Install PCSC support
+
+On Debian-based distributions, run:
+
+```shell
+sudo apt-get install libpcsclite-dev
+```
+
+On Fedora:
+
+```shell
+sudo yum install pcsc-lite-devel
+```
+
+On CentOS:
+
+```
+sudo yum install 'dnf-command(config-manager)'
+sudo yum config-manager --set-enabled PowerTools
+sudo yum install pcsc-lite-devel
+```
+
+#### 2. Build `step-ca`
+
+To build `step-ca`, clone this repository and run the following:
+
+```shell
+make bootstrap && make build GOFLAGS=""
+```
+
+When the build is complete, you will find binaries in `bin/`.
 
 ## Asking Support Questions
 
