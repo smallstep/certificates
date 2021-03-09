@@ -180,8 +180,8 @@ func logOrdersByAccount(w http.ResponseWriter, oids []string) {
 	}
 }
 
-// GetOrdersByAccount ACME api for retrieving the list of order urls belonging to an account.
-func (h *Handler) GetOrdersByAccount(w http.ResponseWriter, r *http.Request) {
+// GetOrdersByAccountID ACME api for retrieving the list of order urls belonging to an account.
+func (h *Handler) GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acc, err := accountFromContext(ctx)
 	if err != nil {

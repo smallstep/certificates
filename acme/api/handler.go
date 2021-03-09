@@ -90,9 +90,9 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("POST", getLink(KeyChangeLinkType, "{provisionerID}", false, nil, "{accID}"), extractPayloadByKid(h.NotImplemented))
 	r.MethodFunc("POST", getLink(NewOrderLinkType, "{provisionerID}", false, nil), extractPayloadByKid(h.NewOrder))
 	r.MethodFunc("POST", getLink(OrderLinkType, "{provisionerID}", false, nil, "{ordID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrder)))
-	r.MethodFunc("POST", getLink(OrdersByAccountLinkType, "{provisionerID}", false, nil, "{accID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrdersByAccount)))
+	r.MethodFunc("POST", getLink(OrdersByAccountLinkType, "{provisionerID}", false, nil, "{accID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrdersByAccountID)))
 	r.MethodFunc("POST", getLink(FinalizeLinkType, "{provisionerID}", false, nil, "{ordID}"), extractPayloadByKid(h.FinalizeOrder))
-	r.MethodFunc("POST", getLink(AuthzLinkType, "{provisionerID}", false, nil, "{authzID}"), extractPayloadByKid(h.isPostAsGet(h.GetAuthz)))
+	r.MethodFunc("POST", getLink(AuthzLinkType, "{provisionerID}", false, nil, "{authzID}"), extractPayloadByKid(h.isPostAsGet(h.GetAuthorization)))
 	r.MethodFunc("POST", getLink(ChallengeLinkType, "{provisionerID}", false, nil, "{authzID}", "{chID}"), extractPayloadByKid(h.GetChallenge))
 	r.MethodFunc("POST", getLink(CertificateLinkType, "{provisionerID}", false, nil, "{certID}"), extractPayloadByKid(h.isPostAsGet(h.GetCertificate)))
 }
@@ -149,8 +149,8 @@ func (h *Handler) NotImplemented(w http.ResponseWriter, r *http.Request) {
 	api.WriteError(w, acme.NewError(acme.ErrorNotImplementedType, "this API is not implemented"))
 }
 
-// GetAuthz ACME api for retrieving an Authz.
-func (h *Handler) GetAuthz(w http.ResponseWriter, r *http.Request) {
+// GetAuthorization ACME api for retrieving an Authz.
+func (h *Handler) GetAuthorization(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acc, err := accountFromContext(ctx)
 	if err != nil {
