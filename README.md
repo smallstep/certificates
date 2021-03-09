@@ -48,6 +48,10 @@ Setting up a *public key infrastructure* (PKI) is out of reach for many small te
 - Capable of high availability (HA) deployment using [root federation](https://smallstep.com/blog/step-v0.8.3-federation-root-rotation.html) and/or multiple intermediaries
 - Can operate as [an online intermediate CA for an existing root CA](https://smallstep.com/docs/tutorials/intermediate-ca-new-ca)
 - [Badger, BoltDB, and MySQL database backends](https://smallstep.com/docs/step-ca/configuration#databases)
+- Supports advanced [cryptographic protection](https://smallstep.com/docs/step-ca/configuration#cryptographic-protection) of signing keys, eg:
+  - Using PKCS #11 hardware security modules (HSMs)
+  - Using cloud key management services
+  - Using YubiKeys
 
 ### ⚙️ Many ways to automate
 
@@ -56,7 +60,7 @@ There are several ways to authorize a request with the CA and establish a chain 
 You can issue certificates in exchange for:
 - [ACME challenge responses](#your-own-private-acme-server) from any ACMEv2 client
 - [OAuth OIDC single sign-on tokens](https://smallstep.com/blog/easily-curl-services-secured-by-https-tls.html), eg:
-  - ID tokens from Okta, GSuite, Azure AD, Auth0.
+  - ID tokens from Okta, GSuite, Azure AD, Auth0
   - ID tokens from an OAuth OIDC service that you host, like [Keycloak](https://www.keycloak.org/) or [Dex](https://github.com/dexidp/dex)
 - [Cloud instance identity documents](https://smallstep.com/blog/embarrassingly-easy-certificates-on-aws-azure-gcp/), for VMs on AWS, GCP, and Azure
 - [Single-use, short-lived JWK tokens]() issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
