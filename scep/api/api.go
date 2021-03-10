@@ -315,13 +315,6 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 	return response, nil
 }
 
-func certName(cert *x509.Certificate) string {
-	if cert.Subject.CommonName != "" {
-		return cert.Subject.CommonName
-	}
-	return string(cert.Signature)
-}
-
 func formatCapabilities(caps []string) []byte {
 	return []byte(strings.Join(caps, "\r\n"))
 }

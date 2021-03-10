@@ -224,6 +224,9 @@ func (a *Authority) init() error {
 				DecryptionKey: a.config.IntermediateKey,
 				Password:      []byte(a.config.Password),
 			})
+			if err != nil {
+				return err
+			}
 		}
 
 		a.scepService = &scep.Service{
