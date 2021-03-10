@@ -299,16 +299,12 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 		}
 	}
 
+	// TODO: check if CN already exists, if renewal is allowed and if existing should be revoked; fail if not
+
 	certRep, err := h.Auth.SignCSR(ctx, csr, msg)
 	if err != nil {
 		return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, "error when signing new certificate")
 	}
-
-	// //cert := certRep.CertRepMessage.Certificate
-	// //name := certName(cert)
-
-	// // TODO: check if CN already exists, if renewal is allowed and if existing should be revoked; fail if not
-	// // TODO: store the new cert for CN locally; should go into the DB
 
 	response := SCEPResponse{
 		Operation:   opnPKIOperation,

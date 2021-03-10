@@ -27,31 +27,14 @@ import (
 	"go.step.sm/crypto/x509util"
 )
 
+var (
+	certTable = []byte("scep_certs")
+)
+
 // Interface is the SCEP authority interface.
 type Interface interface {
-	// GetDirectory(ctx context.Context) (*Directory, error)
-	// NewNonce() (string, error)
-	// UseNonce(string) error
-
-	// DeactivateAccount(ctx context.Context, accID string) (*Account, error)
-	// GetAccount(ctx context.Context, accID string) (*Account, error)
-	// GetAccountByKey(ctx context.Context, key *jose.JSONWebKey) (*Account, error)
-	// NewAccount(ctx context.Context, ao AccountOptions) (*Account, error)
-	// UpdateAccount(context.Context, string, []string) (*Account, error)
-
-	// GetAuthz(ctx context.Context, accID string, authzID string) (*Authz, error)
-	// ValidateChallenge(ctx context.Context, accID string, chID string, key *jose.JSONWebKey) (*Challenge, error)
-
-	// FinalizeOrder(ctx context.Context, accID string, orderID string, csr *x509.CertificateRequest) (*Order, error)
-	// GetOrder(ctx context.Context, accID string, orderID string) (*Order, error)
-	// GetOrdersByAccount(ctx context.Context, accID string) ([]string, error)
-	// NewOrder(ctx context.Context, oo OrderOptions) (*Order, error)
-
-	// GetCertificate(string, string) ([]byte, error)
-
 	LoadProvisionerByID(string) (provisioner.Interface, error)
-	// GetLink(ctx context.Context, linkType Link, absoluteLink bool, inputs ...string) string
-	// GetLinkExplicit(linkType Link, provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
+	GetLinkExplicit(provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
 
 	GetCACertificates() ([]*x509.Certificate, error)
 	DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error
@@ -59,8 +42,6 @@ type Interface interface {
 	CreateFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage, info FailInfoName, infoText string) (*PKIMessage, error)
 	MatchChallengePassword(ctx context.Context, password string) (bool, error)
 	GetCACaps(ctx context.Context) []string
-
-	GetLinkExplicit(provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
 }
 
 // Authority is the layer that handles all SCEP interactions.
@@ -107,7 +88,14 @@ type SignAuthority interface {
 func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 
 	if _, ok := ops.DB.(*database.SimpleDB); !ok {
-		// TODO: see ACME implementation
+		// If it's not a SimpleDB then go ahead and bootstrap the DB with the
+		// necessary SCEP tables. SimpleDB should ONLY be used for testing.
+		tables := [][]byte{certTable}
+		for _, b := range tables {
+			if err := ops.DB.CreateTable(b); err != nil {
+				return nil, fmt.Errorf("%w: error creating table %s", err, string(b))
+			}
+		}
 	}
 
 	// TODO: the below is a bit similar as what happens in the core Authority class, which
@@ -284,30 +272,6 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 		csr = msg.CSRReqMessage.CSR
 	}
 
-	// subjectKeyID, err := createKeyIdentifier(csr.PublicKey)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// serial := big.NewInt(int64(rand.Int63())) // TODO: serial logic?
-	// days := 40                                // TODO: days
-
-	// // TODO: use information from provisioner, like claims
-	// template := &x509.Certificate{
-	// 	SerialNumber: serial,
-	// 	Subject:      csr.Subject,
-	// 	NotBefore:    time.Now().Add(-600).UTC(),
-	// 	NotAfter:     time.Now().AddDate(0, 0, days).UTC(),
-	// 	SubjectKeyId: subjectKeyID,
-	// 	KeyUsage:     x509.KeyUsageDigitalSignature,
-	// 	ExtKeyUsage: []x509.ExtKeyUsage{
-	// 		x509.ExtKeyUsageClientAuth,
-	// 	},
-	// 	SignatureAlgorithm: csr.SignatureAlgorithm,
-	// 	EmailAddresses:     csr.EmailAddresses,
-	// 	DNSNames:           csr.DNSNames,
-	// }
-
 	// Template data
 	data := x509util.NewTemplateData()
 	data.SetCommonName(csr.Subject.CommonName)
@@ -339,14 +303,6 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 
 	cert := certChain[0]
 
-	// fmt.Println("CERT")
-	// fmt.Println(cert)
-	// fmt.Println(fmt.Sprintf("%T", cert))
-	// fmt.Println(cert.Issuer)
-	// fmt.Println(cert.Subject)
-	// fmt.Println(cert.SerialNumber)
-	// fmt.Println(string(cert.SubjectKeyId))
-
 	// create a degenerate cert structure
 	deg, err := degenerateCertificates([]*x509.Certificate{cert})
 	if err != nil {
@@ -377,7 +333,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 				Type:  oidSCEPrecipientNonce,
 				Value: msg.SenderNonce,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPsenderNonce,
 				Value: msg.SenderNonce,
 			},
@@ -421,6 +377,16 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 		CertRepMessage: cr,
 	}
 
+	// TODO: save more data?
+	_, err = newCert(a.db, CertOptions{
+		Leaf:          certChain[0],
+		Intermediates: certChain[1:],
+	})
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
 	return crepMsg, nil
 }
 
@@ -429,31 +395,31 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, csr *x509.Certifi
 
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPtransactionID,
 				Value: msg.TransactionID,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPpkiStatus,
 				Value: microscep.FAILURE,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPfailInfo,
 				Value: info,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPfailInfoText,
 				Value: infoText,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPmessageType,
 				Value: microscep.CertRep,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPsenderNonce,
 				Value: msg.SenderNonce,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPrecipientNonce,
 				Value: msg.SenderNonce,
 			},
