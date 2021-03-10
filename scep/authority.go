@@ -3,8 +3,6 @@ package scep
 import (
 	"bytes"
 	"context"
-	"crypto"
-	"crypto/sha1"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -510,20 +508,6 @@ func degenerateCertificates(certs []*x509.Certificate) ([]byte, error) {
 		return nil, err
 	}
 	return degenerate, nil
-}
-
-// createKeyIdentifier creates an identifier for public keys
-// according to the first method in RFC5280 section 4.2.1.2.
-func createKeyIdentifier(pub crypto.PublicKey) ([]byte, error) {
-
-	keyBytes, err := x509.MarshalPKIXPublicKey(pub)
-	if err != nil {
-		return nil, err
-	}
-
-	id := sha1.Sum(keyBytes)
-
-	return id[:], nil
 }
 
 // Interface guards

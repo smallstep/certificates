@@ -65,16 +65,16 @@ func newCert(db nosql.DB, ops CertOptions) (*certificate, error) {
 	}
 }
 
-func getCert(db nosql.DB, id string) (*certificate, error) {
-	b, err := db.Get(certTable, []byte(id))
-	if nosql.IsErrNotFound(err) {
-		return nil, fmt.Errorf("certificate %s not found", id)
-	} else if err != nil {
-		return nil, fmt.Errorf("error loading certificate")
-	}
-	var cert certificate
-	if err := json.Unmarshal(b, &cert); err != nil {
-		return nil, fmt.Errorf("%w: error unmarshaling certificate", err)
-	}
-	return &cert, nil
-}
+// func getCert(db nosql.DB, id string) (*certificate, error) {
+// 	b, err := db.Get(certTable, []byte(id))
+// 	if nosql.IsErrNotFound(err) {
+// 		return nil, fmt.Errorf("certificate %s not found", id)
+// 	} else if err != nil {
+// 		return nil, fmt.Errorf("error loading certificate")
+// 	}
+// 	var cert certificate
+// 	if err := json.Unmarshal(b, &cert); err != nil {
+// 		return nil, fmt.Errorf("%w: error unmarshaling certificate", err)
+// 	}
+// 	return &cert, nil
+// }
