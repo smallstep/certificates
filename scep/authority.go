@@ -56,6 +56,7 @@ type Interface interface {
 	GetCACertificates() ([]*x509.Certificate, error)
 	DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error
 	SignCSR(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage) (*PKIMessage, error)
+	CreateFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage, info FailInfoName, infoText string) (*PKIMessage, error)
 	MatchChallengePassword(ctx context.Context, password string) (bool, error)
 	GetCACaps(ctx context.Context) []string
 
@@ -376,6 +377,10 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 				Type:  oidSCEPrecipientNonce,
 				Value: msg.SenderNonce,
 			},
+			pkcs7.Attribute{
+				Type:  oidSCEPsenderNonce,
+				Value: msg.SenderNonce,
+			},
 		},
 	}
 
@@ -406,6 +411,74 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 		RecipientNonce: microscep.RecipientNonce(msg.SenderNonce),
 		Certificate:    cert,
 		degenerate:     deg,
+	}
+
+	// create a CertRep message from the original
+	crepMsg := &PKIMessage{
+		Raw:            certRepBytes,
+		TransactionID:  msg.TransactionID,
+		MessageType:    microscep.CertRep,
+		CertRepMessage: cr,
+	}
+
+	return crepMsg, nil
+}
+
+// CreateFailureResponse creates an appropriately signed reply for PKI operations
+func (a *Authority) CreateFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage, info FailInfoName, infoText string) (*PKIMessage, error) {
+
+	config := pkcs7.SignerInfoConfig{
+		ExtraSignedAttributes: []pkcs7.Attribute{
+			pkcs7.Attribute{
+				Type:  oidSCEPtransactionID,
+				Value: msg.TransactionID,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPpkiStatus,
+				Value: microscep.FAILURE,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPfailInfo,
+				Value: info,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPfailInfoText,
+				Value: infoText,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPmessageType,
+				Value: microscep.CertRep,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPsenderNonce,
+				Value: msg.SenderNonce,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPrecipientNonce,
+				Value: msg.SenderNonce,
+			},
+		},
+	}
+
+	signedData, err := pkcs7.NewSignedData(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// sign the attributes
+	if err := signedData.AddSigner(a.intermediateCertificate, a.service.Signer, config); err != nil {
+		return nil, err
+	}
+
+	certRepBytes, err := signedData.Finish()
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &CertRepMessage{
+		PKIStatus:      microscep.FAILURE,
+		FailInfo:       microscep.BadRequest,
+		RecipientNonce: microscep.RecipientNonce(msg.SenderNonce),
 	}
 
 	// create a CertRep message from the original

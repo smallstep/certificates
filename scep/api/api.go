@@ -34,9 +34,9 @@ const maxPayloadSize = 2 << 20
 type nextHTTP = func(http.ResponseWriter, *http.Request)
 
 const (
-	certChainHeader = "application/x-x509-ca-ra-cert"
-	leafHeader      = "application/x-x509-ca-cert"
-	pkiOpHeader     = "application/x-pki-message"
+	certChainHeader    = "application/x-x509-ca-ra-cert"
+	leafHeader         = "application/x-x509-ca-cert"
+	pkiOperationHeader = "application/x-pki-message"
 )
 
 // SCEPRequest is a SCEP server request.
@@ -124,10 +124,6 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 		writeError(w, fmt.Errorf("post request failed: %w", err))
 		return
 	}
-
-	// TODO: fix cases in which we get here and there's no certificate (i.e. wrong password, waiting for cert, etc)
-	// We should generate an appropriate response and it should be signed
-	api.LogCertificate(w, response.Certificate)
 
 	writeSCEPResponse(w, response)
 }
@@ -262,9 +258,13 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 	// parse the message using microscep implementation
 	microMsg, err := microscep.ParsePKIMessage(request.Message)
 	if err != nil {
+		// return the error, because we can't use the msg for creating a CertRep
 		return SCEPResponse{}, err
 	}
 
+	// this is essentially doing the same as microscep.ParsePKIMessage, but
+	// gives us access to the p7 itself in scep.PKIMessage. Essentially a small
+	// wrapper for the microscep implementation.
 	p7, err := pkcs7.Parse(microMsg.Raw)
 	if err != nil {
 		return SCEPResponse{}, err
@@ -283,23 +283,25 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 		return SCEPResponse{}, err
 	}
 
+	// NOTE: at this point we have sufficient information for returning nicely signed CertReps
+	csr := msg.CSRReqMessage.CSR
+
 	if msg.MessageType == microscep.PKCSReq {
 
 		challengeMatches, err := h.Auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
 		if err != nil {
-			return SCEPResponse{}, err
+			return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, "error when checking password")
 		}
 
 		if !challengeMatches {
-			return SCEPResponse{}, errors.New("wrong password provided")
+			// TODO: can this be returned safely to the client? In the end, if the password was correct, that gains a bit of info too.
+			return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, "wrong password provided")
 		}
 	}
 
-	csr := msg.CSRReqMessage.CSR
-
 	certRep, err := h.Auth.SignCSR(ctx, csr, msg)
 	if err != nil {
-		return SCEPResponse{}, err
+		return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, "error when signing new certificate")
 	}
 
 	// //cert := certRep.CertRepMessage.Certificate
@@ -330,6 +332,11 @@ func formatCapabilities(caps []string) []byte {
 
 // writeSCEPResponse writes a SCEP response back to the SCEP client.
 func writeSCEPResponse(w http.ResponseWriter, response SCEPResponse) {
+
+	if response.Certificate != nil {
+		api.LogCertificate(w, response.Certificate)
+	}
+
 	w.Header().Set("Content-Type", contentHeader(response))
 	_, err := w.Write(response.Data)
 	if err != nil {
@@ -346,6 +353,17 @@ func writeError(w http.ResponseWriter, err error) {
 	api.WriteError(w, scepError)
 }
 
+func (h *Handler) createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, infoText string) (SCEPResponse, error) {
+	certRepMsg, err := h.Auth.CreateFailureResponse(ctx, csr, msg, scep.FailInfoName(info), infoText)
+	if err != nil {
+		return SCEPResponse{}, err
+	}
+	return SCEPResponse{
+		Operation: opnPKIOperation,
+		Data:      certRepMsg.Raw,
+	}, nil
+}
+
 func contentHeader(r SCEPResponse) string {
 	switch r.Operation {
 	case opnGetCACert:
@@ -354,7 +372,7 @@ func contentHeader(r SCEPResponse) string {
 		}
 		return leafHeader
 	case opnPKIOperation:
-		return pkiOpHeader
+		return pkiOperationHeader
 	default:
 		return "text/plain"
 	}

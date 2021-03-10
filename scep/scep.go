@@ -11,6 +11,18 @@ import (
 	"go.mozilla.org/pkcs7"
 )
 
+// FailInfoName models the name/value of failInfo
+type FailInfoName microscep.FailInfo
+
+// FailInfo models a failInfo object consisting of a
+// name/identifier and a failInfoText, the latter of
+// which can be more descriptive and is intended to be
+// read by humans.
+type FailInfo struct {
+	Name FailInfoName
+	Text string
+}
+
 // SCEP OIDs
 var (
 	oidSCEPmessageType    = asn1.ObjectIdentifier{2, 16, 840, 1, 113733, 1, 9, 2}
@@ -20,6 +32,7 @@ var (
 	oidSCEPrecipientNonce = asn1.ObjectIdentifier{2, 16, 840, 1, 113733, 1, 9, 6}
 	oidSCEPtransactionID  = asn1.ObjectIdentifier{2, 16, 840, 1, 113733, 1, 9, 7}
 	oidChallengePassword  = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 7}
+	oidSCEPfailInfoText   = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 24}
 )
 
 // PKIMessage defines the possible SCEP message types
