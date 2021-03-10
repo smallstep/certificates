@@ -1,16 +1,6 @@
 package acme
 
-import (
-	"testing"
-	"time"
-
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/nosql"
-	"github.com/smallstep/nosql/database"
-)
-
+/*
 func TestNewNonce(t *testing.T) {
 	type test struct {
 		db  nosql.DB
@@ -161,3 +151,4 @@ func TestUseNonce(t *testing.T) {
 		})
 	}
 }
+*/

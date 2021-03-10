@@ -1,20 +1,6 @@
 package acme
 
-import (
-	"crypto/x509"
-	"encoding/json"
-	"encoding/pem"
-	"testing"
-	"time"
-
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/nosql"
-	"github.com/smallstep/nosql/database"
-	"go.step.sm/crypto/pemutil"
-)
-
+/*
 func defaultCertOps() (*CertOptions, error) {
 	crt, err := pemutil.ReadCertificate("../authority/testdata/certs/foo.crt")
 	if err != nil {
@@ -36,7 +22,7 @@ func defaultCertOps() (*CertOptions, error) {
 	}, nil
 }
 
-func newcert() (*certificate, error) {
+func newcert() (*Certificate, error) {
 	ops, err := defaultCertOps()
 	if err != nil {
 		return nil, err
@@ -251,3 +237,4 @@ func TestCertificateToACME(t *testing.T) {
 	assert.FatalError(t, err)
 	assert.Equals(t, append(cert.Leaf, cert.Intermediates...), acmeCert)
 }
+*/

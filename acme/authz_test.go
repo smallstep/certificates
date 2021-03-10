@@ -1,20 +1,7 @@
 package acme
 
-import (
-	"context"
-	"encoding/json"
-	"strings"
-	"testing"
-	"time"
-
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/nosql"
-	"github.com/smallstep/nosql/database"
-)
-
-func newAz() (authz, error) {
+/*
+func newAz() (*Authorization, error) {
 	mockdb := &db.MockNoSQLDB{
 		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 			return []byte("foo"), true, nil
@@ -834,3 +821,4 @@ func TestAuthzUpdateStatus(t *testing.T) {
 		})
 	}
 }
+*/

@@ -1,24 +1,6 @@
 package acme
 
-import (
-	"context"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/json"
-	"fmt"
-	"net"
-	"net/url"
-	"testing"
-	"time"
-
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/nosql"
-	"github.com/smallstep/nosql/database"
-)
-
+/*
 var certDuration = 6 * time.Hour
 
 func defaultOrderOps() OrderOptions {
@@ -1735,3 +1717,4 @@ func Test_getOrderIDsByAccount(t *testing.T) {
 		})
 	}
 }
+*/

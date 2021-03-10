@@ -503,7 +503,6 @@ func TestHandlerGetChallenge(t *testing.T) {
 			ch := ch()
 			ch.Status = "valid"
 			ch.Validated = time.Now().UTC().Format(time.RFC3339)
-			count := 0
 			return test{
 				db: &acme.MockDB{
 					MockGetChallenge: func(ctx context.Context, chID, azID string) (*acme.Challenge, error) {

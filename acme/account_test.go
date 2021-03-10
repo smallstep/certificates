@@ -1,20 +1,10 @@
 package acme
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"net/url"
-	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/nosql"
-	"github.com/smallstep/nosql/database"
-	"go.step.sm/crypto/jose"
 )
 
 var (
@@ -39,7 +29,8 @@ func newProv() Provisioner {
 	return p
 }
 
-func newAcc() (*account, error) {
+/*
+func newAcc() (*Account, error) {
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	if err != nil {
 		return nil, err
@@ -53,12 +44,14 @@ func newAcc() (*account, error) {
 		Key: jwk, Contact: []string{"foo", "bar"},
 	})
 }
+*/
 
+/*
 func TestGetAccountByID(t *testing.T) {
 	type test struct {
 		id  string
 		db  nosql.DB
-		acc *account
+		acc *Account
 		err *Error
 	}
 	tests := map[string]func(t *testing.T) test{
@@ -73,7 +66,7 @@ func TestGetAccountByID(t *testing.T) {
 						return nil, database.ErrNotFound
 					},
 				},
-				err: MalformedErr(errors.Errorf("account %s not found: not found", acc.ID)),
+				err: NewError(ErrorMalformedType, "account %s not found: not found", acc.ID),
 			}
 		},
 		"fail/db-error": func(t *testing.T) test {
@@ -87,7 +80,7 @@ func TestGetAccountByID(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				err: ServerInternalErr(errors.Errorf("error loading account %s: force", acc.ID)),
+				err: NewErrorISE("error loading account %s: force", acc.ID),
 			}
 		},
 		"fail/unmarshal-error": func(t *testing.T) test {
@@ -768,3 +761,4 @@ func TestNewAccount(t *testing.T) {
 		})
 	}
 }
+*/

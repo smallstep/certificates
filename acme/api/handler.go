@@ -39,7 +39,7 @@ type Handler struct {
 	db       acme.DB
 	backdate provisioner.Duration
 	ca       acme.CertificateAuthority
-	linker   *Linker
+	linker   Linker
 }
 
 // HandlerOptions required to create a new ACME API request handler.

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
-	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	"go.step.sm/crypto/pemutil"
@@ -30,7 +29,7 @@ func TestNewOrderRequestValidate(t *testing.T) {
 		"fail/no-identifiers": func(t *testing.T) test {
 			return test{
 				nor: &NewOrderRequest{},
-				err: acme.MalformedErr(errors.Errorf("identifiers list cannot be empty")),
+				err: acme.NewError(acme.ErrorMalformedType, "identifiers list cannot be empty"),
 			}
 		},
 		"fail/bad-identifier": func(t *testing.T) test {
@@ -41,7 +40,7 @@ func TestNewOrderRequestValidate(t *testing.T) {
 						{Type: "foo", Value: "bar.com"},
 					},
 				},
-				err: acme.MalformedErr(errors.Errorf("identifier type unsupported: foo")),
+				err: acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: foo"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -105,7 +104,7 @@ func TestFinalizeRequestValidate(t *testing.T) {
 		"fail/parse-csr-error": func(t *testing.T) test {
 			return test{
 				fr:  &FinalizeRequest{},
-				err: acme.MalformedErr(errors.Errorf("unable to parse csr: asn1: syntax error: sequence truncated")),
+				err: acme.NewError(acme.ErrorMalformedType, "unable to parse csr: asn1: syntax error: sequence truncated"),
 			}
 		},
 		"fail/invalid-csr-signature": func(t *testing.T) test {
@@ -117,7 +116,7 @@ func TestFinalizeRequestValidate(t *testing.T) {
 				fr: &FinalizeRequest{
 					CSR: base64.RawURLEncoding.EncodeToString(c.Raw),
 				},
-				err: acme.MalformedErr(errors.Errorf("csr failed signature check: x509: ECDSA verification failure")),
+				err: acme.NewError(acme.ErrorMalformedType, "csr failed signature check: x509: ECDSA verification failure"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -148,15 +147,15 @@ func TestFinalizeRequestValidate(t *testing.T) {
 	}
 }
 
-func TestHandlerGetOrder(t *testing.T) {
+func TestHandler_GetOrder(t *testing.T) {
 	expiry := time.Now().UTC().Add(6 * time.Hour)
 	nbf := time.Now().UTC()
 	naf := time.Now().UTC().Add(24 * time.Hour)
 	o := acme.Order{
 		ID:        "orderID",
-		Expires:   expiry.Format(time.RFC3339),
-		NotBefore: nbf.Format(time.RFC3339),
-		NotAfter:  naf.Format(time.RFC3339),
+		Expires:   expiry,
+		NotBefore: nbf,
+		NotAfter:  naf,
 		Identifiers: []acme.Identifier{
 			{
 				Type:  "dns",
@@ -167,8 +166,8 @@ func TestHandlerGetOrder(t *testing.T) {
 				Value: "*.smallstep.com",
 			},
 		},
-		Status:         "pending",
-		Authorizations: []string{"foo", "bar"},
+		Status:            "pending",
+		AuthorizationURLs: []string{"foo", "bar"},
 	}
 
 	// Request with chi context
@@ -181,67 +180,57 @@ func TestHandlerGetOrder(t *testing.T) {
 		baseURL.String(), provName, o.ID)
 
 	type test struct {
-		auth       acme.Interface
+		db         acme.DB
+		linker     Linker
 		ctx        context.Context
 		statusCode int
-		problem    *acme.Error
+		err        *acme.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-account": func(t *testing.T) test {
 			return test{
-				auth:       &mockAcmeAuthority{},
-				ctx:        context.WithValue(context.Background(), acme.ProvisionerContextKey, prov),
+				ctx:        context.WithValue(context.Background(), provisionerContextKey, prov),
 				statusCode: 400,
-				problem:    acme.AccountDoesNotExistErr(nil),
+				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
 		},
 		"fail/nil-account": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, nil)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, nil)
 			return test{
-				auth:       &mockAcmeAuthority{},
 				ctx:        ctx,
 				statusCode: 400,
-				problem:    acme.AccountDoesNotExistErr(nil),
+				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
 		},
 		"fail/getOrder-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				auth: &mockAcmeAuthority{
-					err: acme.ServerInternalErr(errors.New("force")),
+				db: &acme.MockDB{
+					MockError: acme.NewErrorISE("force"),
 				},
 				ctx:        ctx,
 				statusCode: 500,
-				problem:    acme.ServerInternalErr(errors.New("force")),
+				err:        acme.NewErrorISE("force"),
 			}
 		},
 		"ok": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
-			ctx = context.WithValue(ctx, acme.BaseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				auth: &mockAcmeAuthority{
-					getOrder: func(ctx context.Context, accID, id string) (*acme.Order, error) {
-						p, err := acme.ProvisionerFromContext(ctx)
-						assert.FatalError(t, err)
-						assert.Equals(t, p, prov)
-						assert.Equals(t, accID, acc.ID)
+				db: &acme.MockDB{
+					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						assert.Equals(t, id, o.ID)
 						return &o, nil
 					},
-					getLink: func(ctx context.Context, typ acme.Link, abs bool, in ...string) string {
-						assert.Equals(t, typ, acme.OrderLink)
-						assert.True(t, abs)
-						assert.Equals(t, in, []string{o.ID})
-						return url
-					},
 				},
+				linker:     NewLinker("dns", "acme"),
 				ctx:        ctx,
 				statusCode: 200,
 			}
@@ -250,7 +239,7 @@ func TestHandlerGetOrder(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := New(tc.auth).(*Handler)
+			h := &Handler{linker: tc.linker, db: tc.db}
 			req := httptest.NewRequest("GET", url, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
@@ -263,15 +252,14 @@ func TestHandlerGetOrder(t *testing.T) {
 			res.Body.Close()
 			assert.FatalError(t, err)
 
-			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				var ae acme.AError
+			if res.StatusCode >= 400 && assert.NotNil(t, tc.err) {
+				var ae acme.Error
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
-				prob := tc.problem.ToACME()
 
-				assert.Equals(t, ae.Type, prob.Type)
-				assert.Equals(t, ae.Detail, prob.Detail)
-				assert.Equals(t, ae.Identifier, prob.Identifier)
-				assert.Equals(t, ae.Subproblems, prob.Subproblems)
+				assert.Equals(t, ae.Type, tc.err.Type)
+				assert.Equals(t, ae.Detail, tc.err.Detail)
+				assert.Equals(t, ae.Identifier, tc.err.Identifier)
+				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
 				expB, err := json.Marshal(o)
@@ -290,15 +278,15 @@ func TestHandlerNewOrder(t *testing.T) {
 	naf := nbf.Add(17 * time.Hour)
 	o := acme.Order{
 		ID:        "orderID",
-		Expires:   expiry.Format(time.RFC3339),
-		NotBefore: nbf.Format(time.RFC3339),
-		NotAfter:  naf.Format(time.RFC3339),
+		Expires:   expiry,
+		NotBefore: nbf,
+		NotAfter:  naf,
 		Identifiers: []acme.Identifier{
 			{Type: "dns", Value: "example.com"},
 			{Type: "dns", Value: "bar.com"},
 		},
-		Status:         "pending",
-		Authorizations: []string{"foo", "bar"},
+		Status:            "pending",
+		AuthorizationURLs: []string{"foo", "bar"},
 	}
 
 	prov := newProv()
@@ -308,58 +296,59 @@ func TestHandlerNewOrder(t *testing.T) {
 		baseURL.String(), provName)
 
 	type test struct {
-		auth       acme.Interface
+		db         acme.DB
+		linker     Linker
 		ctx        context.Context
 		statusCode int
-		problem    *acme.Error
+		err        *acme.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-account": func(t *testing.T) test {
 			return test{
-				ctx:        context.WithValue(context.Background(), acme.ProvisionerContextKey, prov),
+				ctx:        context.WithValue(context.Background(), provisionerContextKey, prov),
 				statusCode: 400,
-				problem:    acme.AccountDoesNotExistErr(nil),
+				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
 		},
 		"fail/nil-account": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, nil)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, nil)
 			return test{
 				ctx:        ctx,
 				statusCode: 400,
-				problem:    acme.AccountDoesNotExistErr(nil),
+				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
 		},
 		"fail/no-payload": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
 			return test{
 				ctx:        ctx,
 				statusCode: 500,
-				problem:    acme.ServerInternalErr(errors.New("payload expected in request context")),
+				err:        acme.NewErrorISE("payload expected in request context"),
 			}
 		},
 		"fail/nil-payload": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
-			ctx = context.WithValue(ctx, acme.PayloadContextKey, nil)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, nil)
 			return test{
 				ctx:        ctx,
 				statusCode: 500,
-				problem:    acme.ServerInternalErr(errors.New("payload expected in request context")),
+				err:        acme.NewErrorISE("payload expected in request context"),
 			}
 		},
 		"fail/unmarshal-payload-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
-			ctx = context.WithValue(ctx, acme.PayloadContextKey, &payloadInfo{})
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{})
 			return test{
 				ctx:        ctx,
 				statusCode: 400,
-				problem:    acme.MalformedErr(errors.New("failed to unmarshal new-order request payload: unexpected end of JSON input")),
+				err:        acme.NewError(acme.ErrorMalformedType, "failed to unmarshal new-order request payload: unexpected end of JSON input"),
 			}
 		},
 		"fail/malformed-payload-error": func(t *testing.T) test {
@@ -367,13 +356,13 @@ func TestHandlerNewOrder(t *testing.T) {
 			nor := &NewOrderRequest{}
 			b, err := json.Marshal(nor)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
-			ctx = context.WithValue(ctx, acme.PayloadContextKey, &payloadInfo{value: b})
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			return test{
 				ctx:        ctx,
 				statusCode: 400,
-				problem:    acme.MalformedErr(errors.New("identifiers list cannot be empty")),
+				err:        acme.NewError(acme.ErrorMalformedType, "identifiers list cannot be empty"),
 			}
 		},
 		"fail/NewOrder-error": func(t *testing.T) test {
@@ -386,23 +375,18 @@ func TestHandlerNewOrder(t *testing.T) {
 			}
 			b, err := json.Marshal(nor)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
-			ctx = context.WithValue(ctx, acme.PayloadContextKey, &payloadInfo{value: b})
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			return test{
-				auth: &mockAcmeAuthority{
-					newOrder: func(ctx context.Context, ops acme.OrderOptions) (*acme.Order, error) {
-						p, err := acme.ProvisionerFromContext(ctx)
-						assert.FatalError(t, err)
-						assert.Equals(t, p, prov)
-						assert.Equals(t, ops.AccountID, acc.ID)
-						assert.Equals(t, ops.Identifiers, nor.Identifiers)
-						return nil, acme.MalformedErr(errors.New("force"))
+				db: &acme.MockDB{
+					MockCreateOrder: func(ctx context.Context, o *acme.Order) error {
+						return acme.NewError(acme.ErrorMalformedType, "force")
 					},
 				},
 				ctx:        ctx,
 				statusCode: 400,
-				problem:    acme.MalformedErr(errors.New("force")),
+				err:        acme.NewError(acme.ErrorMalformedType, "force"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -417,29 +401,17 @@ func TestHandlerNewOrder(t *testing.T) {
 			}
 			b, err := json.Marshal(nor)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
-			ctx = context.WithValue(ctx, acme.PayloadContextKey, &payloadInfo{value: b})
-			ctx = context.WithValue(ctx, acme.BaseURLContextKey, baseURL)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				auth: &mockAcmeAuthority{
-					newOrder: func(ctx context.Context, ops acme.OrderOptions) (*acme.Order, error) {
-						p, err := acme.ProvisionerFromContext(ctx)
-						assert.FatalError(t, err)
-						assert.Equals(t, p, prov)
-						assert.Equals(t, ops.AccountID, acc.ID)
-						assert.Equals(t, ops.Identifiers, nor.Identifiers)
-						assert.Equals(t, ops.NotBefore, nbf)
-						assert.Equals(t, ops.NotAfter, naf)
-						return &o, nil
-					},
-					getLink: func(ctx context.Context, typ acme.Link, abs bool, in ...string) string {
-						assert.Equals(t, typ, acme.OrderLink)
-						assert.True(t, abs)
-						assert.Equals(t, in, []string{o.ID})
-						return fmt.Sprintf("%s/acme/%s/order/%s", baseURL.String(), provName, o.ID)
+				db: &acme.MockDB{
+					MockCreateOrder: func(ctx context.Context, o *acme.Order) error {
+						return nil
 					},
 				},
+				linker:     NewLinker("dns", "acme"),
 				ctx:        ctx,
 				statusCode: 201,
 			}
@@ -454,30 +426,17 @@ func TestHandlerNewOrder(t *testing.T) {
 			}
 			b, err := json.Marshal(nor)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
-			ctx = context.WithValue(ctx, acme.PayloadContextKey, &payloadInfo{value: b})
-			ctx = context.WithValue(ctx, acme.BaseURLContextKey, baseURL)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				auth: &mockAcmeAuthority{
-					newOrder: func(ctx context.Context, ops acme.OrderOptions) (*acme.Order, error) {
-						p, err := acme.ProvisionerFromContext(ctx)
-						assert.FatalError(t, err)
-						assert.Equals(t, p, prov)
-						assert.Equals(t, ops.AccountID, acc.ID)
-						assert.Equals(t, ops.Identifiers, nor.Identifiers)
-
-						assert.True(t, ops.NotBefore.IsZero())
-						assert.True(t, ops.NotAfter.IsZero())
-						return &o, nil
-					},
-					getLink: func(ctx context.Context, typ acme.Link, abs bool, in ...string) string {
-						assert.Equals(t, typ, acme.OrderLink)
-						assert.True(t, abs)
-						assert.Equals(t, in, []string{o.ID})
-						return fmt.Sprintf("%s/acme/%s/order/%s", baseURL.String(), provName, o.ID)
+				db: &acme.MockDB{
+					MockCreateOrder: func(ctx context.Context, o *acme.Order) error {
+						return nil
 					},
 				},
+				linker:     NewLinker("dns", "acme"),
 				ctx:        ctx,
 				statusCode: 201,
 			}
@@ -486,7 +445,7 @@ func TestHandlerNewOrder(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := New(tc.auth).(*Handler)
+			h := &Handler{linker: tc.linker, db: tc.db}
 			req := httptest.NewRequest("GET", url, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
@@ -499,15 +458,14 @@ func TestHandlerNewOrder(t *testing.T) {
 			res.Body.Close()
 			assert.FatalError(t, err)
 
-			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				var ae acme.AError
+			if res.StatusCode >= 400 && assert.NotNil(t, tc.err) {
+				var ae acme.Error
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
-				prob := tc.problem.ToACME()
 
-				assert.Equals(t, ae.Type, prob.Type)
-				assert.Equals(t, ae.Detail, prob.Detail)
-				assert.Equals(t, ae.Identifier, prob.Identifier)
-				assert.Equals(t, ae.Subproblems, prob.Subproblems)
+				assert.Equals(t, ae.Type, tc.err.Type)
+				assert.Equals(t, ae.Detail, tc.err.Detail)
+				assert.Equals(t, ae.Identifier, tc.err.Identifier)
+				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
 				expB, err := json.Marshal(o)
@@ -522,22 +480,22 @@ func TestHandlerNewOrder(t *testing.T) {
 	}
 }
 
-func TestHandlerFinalizeOrder(t *testing.T) {
+func TestHandler_FinalizeOrder(t *testing.T) {
 	expiry := time.Now().UTC().Add(6 * time.Hour)
 	nbf := time.Now().UTC().Add(5 * time.Hour)
 	naf := nbf.Add(17 * time.Hour)
 	o := acme.Order{
 		ID:        "orderID",
-		Expires:   expiry.Format(time.RFC3339),
-		NotBefore: nbf.Format(time.RFC3339),
-		NotAfter:  naf.Format(time.RFC3339),
+		Expires:   expiry,
+		NotBefore: nbf,
+		NotAfter:  naf,
 		Identifiers: []acme.Identifier{
 			{Type: "dns", Value: "example.com"},
 			{Type: "dns", Value: "bar.com"},
 		},
-		Status:         "valid",
-		Authorizations: []string{"foo", "bar"},
-		Certificate:    "https://ca.smallstep.com/acme/certificate/certID",
+		Status:            "valid",
+		AuthorizationURLs: []string{"foo", "bar"},
+		CertificateURL:    "https://ca.smallstep.com/acme/certificate/certID",
 	}
 	_csr, err := pemutil.Read("../../authority/testdata/certs/foo.csr")
 	assert.FatalError(t, err)
@@ -554,60 +512,61 @@ func TestHandlerFinalizeOrder(t *testing.T) {
 		baseURL.String(), provName, o.ID)
 
 	type test struct {
-		auth       acme.Interface
+		db         acme.DB
+		linker     Linker
 		ctx        context.Context
 		statusCode int
-		problem    *acme.Error
+		err        *acme.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-account": func(t *testing.T) test {
 			return test{
-				auth:       &mockAcmeAuthority{},
-				ctx:        context.WithValue(context.Background(), acme.ProvisionerContextKey, prov),
+				db:         &acme.MockDB{},
+				ctx:        context.WithValue(context.Background(), provisionerContextKey, prov),
 				statusCode: 400,
-				problem:    acme.AccountDoesNotExistErr(nil),
+				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
 		},
 		"fail/nil-account": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, nil)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, nil)
 			return test{
-				auth:       &mockAcmeAuthority{},
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 400,
-				problem:    acme.AccountDoesNotExistErr(nil),
+				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
 		},
 		"fail/no-payload": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
 			return test{
 				ctx:        ctx,
 				statusCode: 500,
-				problem:    acme.ServerInternalErr(errors.New("payload expected in request context")),
+				err:        acme.NewErrorISE("payload expected in request context"),
 			}
 		},
 		"fail/nil-payload": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
-			ctx = context.WithValue(ctx, acme.PayloadContextKey, nil)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, nil)
 			return test{
 				ctx:        ctx,
 				statusCode: 500,
-				problem:    acme.ServerInternalErr(errors.New("payload expected in request context")),
+				err:        acme.NewErrorISE("payload expected in request context"),
 			}
 		},
 		"fail/unmarshal-payload-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
-			ctx = context.WithValue(ctx, acme.PayloadContextKey, &payloadInfo{})
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{})
 			return test{
 				ctx:        ctx,
 				statusCode: 400,
-				problem:    acme.MalformedErr(errors.New("failed to unmarshal finalize-order request payload: unexpected end of JSON input")),
+				err:        acme.NewError(acme.ErrorMalformedType, "failed to unmarshal finalize-order request payload: unexpected end of JSON input"),
 			}
 		},
 		"fail/malformed-payload-error": func(t *testing.T) test {
@@ -615,13 +574,13 @@ func TestHandlerFinalizeOrder(t *testing.T) {
 			fr := &FinalizeRequest{}
 			b, err := json.Marshal(fr)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
-			ctx = context.WithValue(ctx, acme.PayloadContextKey, &payloadInfo{value: b})
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			return test{
 				ctx:        ctx,
 				statusCode: 400,
-				problem:    acme.MalformedErr(errors.New("unable to parse csr: asn1: syntax error: sequence truncated")),
+				err:        acme.NewError(acme.ErrorMalformedType, "unable to parse csr: asn1: syntax error: sequence truncated"),
 			}
 		},
 		"fail/FinalizeOrder-error": func(t *testing.T) test {
@@ -631,25 +590,27 @@ func TestHandlerFinalizeOrder(t *testing.T) {
 			}
 			b, err := json.Marshal(nor)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
-			ctx = context.WithValue(ctx, acme.PayloadContextKey, &payloadInfo{value: b})
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				auth: &mockAcmeAuthority{
-					finalizeOrder: func(ctx context.Context, accID, id string, incsr *x509.CertificateRequest) (*acme.Order, error) {
-						p, err := acme.ProvisionerFromContext(ctx)
-						assert.FatalError(t, err)
-						assert.Equals(t, p, prov)
-						assert.Equals(t, accID, acc.ID)
-						assert.Equals(t, id, o.ID)
-						assert.Equals(t, incsr.Raw, csr.Raw)
-						return nil, acme.MalformedErr(errors.New("force"))
+				db: &acme.MockDB{
+					MockUpdateOrder: func(ctx context.Context, o *acme.Order) error {
+						/*
+							p, err := acme.ProvisionerFromContext(ctx)
+							assert.FatalError(t, err)
+							assert.Equals(t, p, prov)
+							assert.Equals(t, accID, acc.ID)
+							assert.Equals(t, id, o.ID)
+							assert.Equals(t, incsr.Raw, csr.Raw)
+						*/
+						return acme.NewError(acme.ErrorMalformedType, "force")
 					},
 				},
 				ctx:        ctx,
 				statusCode: 400,
-				problem:    acme.MalformedErr(errors.New("force")),
+				err:        acme.NewError(acme.ErrorMalformedType, "force"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -659,28 +620,25 @@ func TestHandlerFinalizeOrder(t *testing.T) {
 			}
 			b, err := json.Marshal(nor)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), acme.ProvisionerContextKey, prov)
-			ctx = context.WithValue(ctx, acme.AccContextKey, acc)
-			ctx = context.WithValue(ctx, acme.PayloadContextKey, &payloadInfo{value: b})
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
-			ctx = context.WithValue(ctx, acme.BaseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				auth: &mockAcmeAuthority{
-					finalizeOrder: func(ctx context.Context, accID, id string, incsr *x509.CertificateRequest) (*acme.Order, error) {
-						p, err := acme.ProvisionerFromContext(ctx)
-						assert.FatalError(t, err)
-						assert.Equals(t, p, prov)
-						assert.Equals(t, accID, acc.ID)
-						assert.Equals(t, id, o.ID)
-						assert.Equals(t, incsr.Raw, csr.Raw)
-						return &o, nil
-					},
-					getLink: func(ctx context.Context, typ acme.Link, abs bool, in ...string) string {
-						assert.Equals(t, typ, acme.OrderLink)
-						assert.True(t, abs)
-						assert.Equals(t, in, []string{o.ID})
-						return fmt.Sprintf("%s/acme/%s/order/%s",
-							baseURL.String(), provName, o.ID)
+				linker: NewLinker("dns", "acme"),
+				db: &acme.MockDB{
+					MockUpdateOrder: func(ctx context.Context, o *acme.Order) error {
+						/*
+							p, err := acme.ProvisionerFromContext(ctx)
+							assert.FatalError(t, err)
+							assert.Equals(t, p, prov)
+							assert.Equals(t, accID, acc.ID)
+							assert.Equals(t, id, o.ID)
+							assert.Equals(t, incsr.Raw, csr.Raw)
+							return &o, nil
+						*/
+						return nil
 					},
 				},
 				ctx:        ctx,
@@ -691,7 +649,7 @@ func TestHandlerFinalizeOrder(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := New(tc.auth).(*Handler)
+			h := &Handler{linker: tc.linker, db: tc.db}
 			req := httptest.NewRequest("GET", url, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
@@ -704,15 +662,14 @@ func TestHandlerFinalizeOrder(t *testing.T) {
 			res.Body.Close()
 			assert.FatalError(t, err)
 
-			if res.StatusCode >= 400 && assert.NotNil(t, tc.problem) {
-				var ae acme.AError
+			if res.StatusCode >= 400 && assert.NotNil(t, tc.err) {
+				var ae acme.Error
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
-				prob := tc.problem.ToACME()
 
-				assert.Equals(t, ae.Type, prob.Type)
-				assert.Equals(t, ae.Detail, prob.Detail)
-				assert.Equals(t, ae.Identifier, prob.Identifier)
-				assert.Equals(t, ae.Subproblems, prob.Subproblems)
+				assert.Equals(t, ae.Type, tc.err.Type)
+				assert.Equals(t, ae.Detail, tc.err.Detail)
+				assert.Equals(t, ae.Identifier, tc.err.Identifier)
+				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
 				expB, err := json.Marshal(o)

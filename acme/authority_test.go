@@ -1,25 +1,6 @@
 package acme
 
-import (
-	"context"
-	"crypto"
-	"encoding/base64"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"strings"
-	"testing"
-	"time"
-
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/nosql/database"
-	"go.step.sm/crypto/jose"
-)
-
+/*
 func TestAuthorityGetLink(t *testing.T) {
 	auth, err := NewAuthority(new(db.MockNoSQLDB), "ca.smallstep.com", "acme", nil)
 	assert.FatalError(t, err)
@@ -1737,3 +1718,4 @@ func TestAuthorityDeactivateAccount(t *testing.T) {
 		})
 	}
 }
+*/
