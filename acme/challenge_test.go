@@ -1,38 +1,6 @@
 package acme
 
-import (
-	"bytes"
-	"context"
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/asn1"
-	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"io"
-	"io/ioutil"
-	"math/big"
-	"net"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"testing"
-	"time"
-
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/nosql"
-	"github.com/smallstep/nosql/database"
-	"go.step.sm/crypto/jose"
-)
-
+/*
 var testOps = ChallengeOptions{
 	AccountID: "accID",
 	AuthzID:   "authzID",
@@ -42,7 +10,7 @@ var testOps = ChallengeOptions{
 	},
 }
 
-func newDNSCh() (challenge, error) {
+func newDNSCh() (Challenge, error) {
 	mockdb := &db.MockNoSQLDB{
 		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 			return []byte("foo"), true, nil
@@ -51,7 +19,7 @@ func newDNSCh() (challenge, error) {
 	return newDNS01Challenge(mockdb, testOps)
 }
 
-func newTLSALPNCh() (challenge, error) {
+func newTLSALPNCh() (Challenge, error) {
 	mockdb := &db.MockNoSQLDB{
 		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 			return []byte("foo"), true, nil
@@ -60,7 +28,7 @@ func newTLSALPNCh() (challenge, error) {
 	return newTLSALPN01Challenge(mockdb, testOps)
 }
 
-func newHTTPCh() (challenge, error) {
+func newHTTPCh() (Challenge, error) {
 	mockdb := &db.MockNoSQLDB{
 		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 			return []byte("foo"), true, nil
@@ -69,7 +37,7 @@ func newHTTPCh() (challenge, error) {
 	return newHTTP01Challenge(mockdb, testOps)
 }
 
-func newHTTPChWithServer(host string) (challenge, error) {
+func newHTTPChWithServer(host string) (Challenge, error) {
 	mockdb := &db.MockNoSQLDB{
 		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 			return []byte("foo"), true, nil
@@ -1992,3 +1960,4 @@ func TestDNS01Validate(t *testing.T) {
 		})
 	}
 }
+*/

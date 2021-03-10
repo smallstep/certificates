@@ -9,18 +9,30 @@ import (
 )
 
 // NewLinker returns a new Directory type.
-func NewLinker(dns, prefix string) *Linker {
-	return &Linker{Prefix: prefix, DNS: dns}
+func NewLinker(dns, prefix string) Linker {
+	return &linker{prefix: prefix, dns: dns}
 }
 
-// Linker generates ACME links.
-type Linker struct {
-	Prefix string
-	DNS    string
+// Linker interface for generating links for ACME resources.
+type Linker interface {
+	GetLink(ctx context.Context, typ LinkType, abs bool, inputs ...string) string
+	GetLinkExplicit(typ LinkType, provName string, abs bool, baseURL *url.URL, inputs ...string) string
+
+	LinkOrder(ctx context.Context, o *acme.Order)
+	LinkAccount(ctx context.Context, o *acme.Account)
+	LinkChallenge(ctx context.Context, o *acme.Challenge)
+	LinkAuthorization(ctx context.Context, o *acme.Authorization)
+	LinkOrdersByAccountID(ctx context.Context, orders []string)
+}
+
+// linker generates ACME links.
+type linker struct {
+	prefix string
+	dns    string
 }
 
 // GetLink is a helper for GetLinkExplicit
-func (l *Linker) GetLink(ctx context.Context, typ LinkType, abs bool, inputs ...string) string {
+func (l *linker) GetLink(ctx context.Context, typ LinkType, abs bool, inputs ...string) string {
 	var provName string
 	if p, err := provisionerFromContext(ctx); err == nil && p != nil {
 		provName = p.GetName()
@@ -31,7 +43,7 @@ func (l *Linker) GetLink(ctx context.Context, typ LinkType, abs bool, inputs ...
 // GetLinkExplicit returns an absolute or partial path to the given resource and a base
 // URL dynamically obtained from the request for which the link is being
 // calculated.
-func (l *Linker) GetLinkExplicit(typ LinkType, provisionerName string, abs bool, baseURL *url.URL, inputs ...string) string {
+func (l *linker) GetLinkExplicit(typ LinkType, provisionerName string, abs bool, baseURL *url.URL, inputs ...string) string {
 	var link string
 	switch typ {
 	case NewNonceLinkType, NewAccountLinkType, NewOrderLinkType, NewAuthzLinkType, DirectoryLinkType, KeyChangeLinkType, RevokeCertLinkType:
@@ -60,10 +72,10 @@ func (l *Linker) GetLinkExplicit(typ LinkType, provisionerName string, abs bool,
 
 		// If no Host is set, then use the default (first DNS attr in the ca.json).
 		if u.Host == "" {
-			u.Host = l.DNS
+			u.Host = l.dns
 		}
 
-		u.Path = l.Prefix + link
+		u.Path = l.prefix + link
 		return u.String()
 	}
 	return link
@@ -135,7 +147,7 @@ func (l LinkType) String() string {
 }
 
 // LinkOrder sets the ACME links required by an ACME order.
-func (l *Linker) LinkOrder(ctx context.Context, o *acme.Order) {
+func (l *linker) LinkOrder(ctx context.Context, o *acme.Order) {
 	o.AuthorizationURLs = make([]string, len(o.AuthorizationIDs))
 	for i, azID := range o.AuthorizationIDs {
 		o.AuthorizationURLs[i] = l.GetLink(ctx, AuthzLinkType, true, azID)
@@ -147,25 +159,103 @@ func (l *Linker) LinkOrder(ctx context.Context, o *acme.Order) {
 }
 
 // LinkAccount sets the ACME links required by an ACME account.
-func (l *Linker) LinkAccount(ctx context.Context, acc *acme.Account) {
+func (l *linker) LinkAccount(ctx context.Context, acc *acme.Account) {
 	acc.Orders = l.GetLink(ctx, OrdersByAccountLinkType, true, acc.ID)
 }
 
 // LinkChallenge sets the ACME links required by an ACME challenge.
-func (l *Linker) LinkChallenge(ctx context.Context, ch *acme.Challenge) {
+func (l *linker) LinkChallenge(ctx context.Context, ch *acme.Challenge) {
 	ch.URL = l.GetLink(ctx, ChallengeLinkType, true, ch.AuthzID, ch.ID)
 }
 
 // LinkAuthorization sets the ACME links required by an ACME authorization.
-func (l *Linker) LinkAuthorization(ctx context.Context, az *acme.Authorization) {
+func (l *linker) LinkAuthorization(ctx context.Context, az *acme.Authorization) {
 	for _, ch := range az.Challenges {
 		l.LinkChallenge(ctx, ch)
 	}
 }
 
 // LinkOrdersByAccountID converts each order ID to an ACME link.
-func (l *Linker) LinkOrdersByAccountID(ctx context.Context, orders []string) {
+func (l *linker) LinkOrdersByAccountID(ctx context.Context, orders []string) {
 	for i, id := range orders {
 		orders[i] = l.GetLink(ctx, OrderLinkType, true, id)
 	}
+}
+
+// MockLinker implements the Linker interface. Only used for testing.
+type MockLinker struct {
+	MockGetLink         func(ctx context.Context, typ LinkType, abs bool, inputs ...string) string
+	MockGetLinkExplicit func(typ LinkType, provName string, abs bool, baseURL *url.URL, inputs ...string) string
+
+	MockLinkOrder             func(ctx context.Context, o *acme.Order)
+	MockLinkAccount           func(ctx context.Context, o *acme.Account)
+	MockLinkChallenge         func(ctx context.Context, o *acme.Challenge)
+	MockLinkAuthorization     func(ctx context.Context, o *acme.Authorization)
+	MockLinkOrdersByAccountID func(ctx context.Context, orders []string)
+
+	MockError error
+	MockRet1  interface{}
+}
+
+// GetLink mock.
+func (m *MockLinker) GetLink(ctx context.Context, typ LinkType, abs bool, inputs ...string) string {
+	if m.MockGetLink != nil {
+		return m.MockGetLink(ctx, typ, abs, inputs...)
+	}
+
+	return m.MockRet1.(string)
+}
+
+// GetLinkExplicit mock.
+func (m *MockLinker) GetLinkExplicit(typ LinkType, provName string, abs bool, baseURL *url.URL, inputs ...string) string {
+	if m.MockGetLinkExplicit != nil {
+		return m.MockGetLinkExplicit(typ, provName, abs, baseURL, inputs...)
+	}
+
+	return m.MockRet1.(string)
+}
+
+// LinkOrder mock.
+func (m *MockLinker) LinkOrder(ctx context.Context, o *acme.Order) {
+	if m.MockLinkOrder != nil {
+		m.MockLinkOrder(ctx, o)
+		return
+	}
+	return
+}
+
+// LinkAccount mock.
+func (m *MockLinker) LinkAccount(ctx context.Context, o *acme.Account) {
+	if m.MockLinkAccount != nil {
+		m.MockLinkAccount(ctx, o)
+		return
+	}
+	return
+}
+
+// LinkChallenge mock.
+func (m *MockLinker) LinkChallenge(ctx context.Context, o *acme.Challenge) {
+	if m.MockLinkChallenge != nil {
+		m.MockLinkChallenge(ctx, o)
+		return
+	}
+	return
+}
+
+// LinkAuthorization mock.
+func (m *MockLinker) LinkAuthorization(ctx context.Context, o *acme.Authorization) {
+	if m.MockLinkAuthorization != nil {
+		m.MockLinkAuthorization(ctx, o)
+		return
+	}
+	return
+}
+
+// LinkOrderAccountsByID mock.
+func (m *MockLinker) LinkOrderAccountsByID(ctx context.Context, orders []string) {
+	if m.MockLinkOrdersByAccountID != nil {
+		m.MockLinkOrdersByAccountID(ctx, orders)
+		return
+	}
+	return
 }
