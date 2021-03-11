@@ -47,7 +47,7 @@ func (ch *Challenge) ToLog() (interface{}, error) {
 // type using the DB interface.
 // satisfactorily validated, the 'status' and 'validated' attributes are
 // updated.
-func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, vo ValidateOptions) error {
+func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
 	// If already valid or invalid then return without performing validation.
 	if ch.Status == StatusValid || ch.Status == StatusInvalid {
 		return nil
@@ -64,7 +64,7 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 	}
 }
 
-func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo ValidateOptions) error {
+func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
 	url := fmt.Sprintf("http://%s/.well-known/acme-challenge/%s", ch.Value, ch.Token)
 
 	resp, err := vo.HTTPGet(url)
@@ -105,7 +105,7 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	return nil
 }
 
-func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo ValidateOptions) error {
+func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
 	config := &tls.Config{
 		NextProtos:         []string{"acme-tls/1"},
 		ServerName:         ch.Value,
@@ -197,7 +197,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 		"incorrect certificate for tls-alpn-01 challenge: missing acmeValidationV1 extension"))
 }
 
-func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo ValidateOptions) error {
+func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
 	// Normalize domain for wildcard DNS names
 	// This is done to avoid making TXT lookups for domains like
 	// _acme-challenge.*.example.com
@@ -263,8 +263,8 @@ type httpGetter func(string) (*http.Response, error)
 type lookupTxt func(string) ([]string, error)
 type tlsDialer func(network, addr string, config *tls.Config) (*tls.Conn, error)
 
-// ValidateOptions are ACME challenge validator functions.
-type ValidateOptions struct {
+// ValidateChallengeOptions are ACME challenge validator functions.
+type ValidateChallengeOptions struct {
 	HTTPGet   httpGetter
 	LookupTxt lookupTxt
 	TLSDial   tlsDialer
