@@ -81,7 +81,7 @@ func Test_baseURLFromRequest(t *testing.T) {
 	}
 }
 
-func TestHandlerBaseURLFromRequest(t *testing.T) {
+func TestHandler_baseURLFromRequest(t *testing.T) {
 	h := &Handler{}
 	req := httptest.NewRequest("GET", "/foo", nil)
 	req.Host = "test.ca.smallstep.com:8080"
@@ -107,7 +107,7 @@ func TestHandlerBaseURLFromRequest(t *testing.T) {
 	h.baseURLFromRequest(next)(w, req)
 }
 
-func TestHandler_AddNonce(t *testing.T) {
+func TestHandler_addNonce(t *testing.T) {
 	url := "https://ca.smallstep.com/acme/new-nonce"
 	type test struct {
 		db         acme.DB
@@ -226,7 +226,7 @@ func TestHandler_addDirLink(t *testing.T) {
 	}
 }
 
-func TestHandler_VerifyContentType(t *testing.T) {
+func TestHandler_verifyContentType(t *testing.T) {
 	prov := newProv()
 	provName := prov.GetName()
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
@@ -340,7 +340,7 @@ func TestHandler_VerifyContentType(t *testing.T) {
 	}
 }
 
-func TestHandlerIsPostAsGet(t *testing.T) {
+func TestHandler_isPostAsGet(t *testing.T) {
 	url := "https://ca.smallstep.com/acme/new-account"
 	type test struct {
 		ctx        context.Context
@@ -417,7 +417,7 @@ func (errReader) Close() error {
 	return nil
 }
 
-func TestHandlerParseJWS(t *testing.T) {
+func TestHandler_parseJWS(t *testing.T) {
 	url := "https://ca.smallstep.com/acme/new-account"
 	type test struct {
 		next       nextHTTP
@@ -498,7 +498,7 @@ func TestHandlerParseJWS(t *testing.T) {
 	}
 }
 
-func TestHandlerVerifyAndExtractJWSPayload(t *testing.T) {
+func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	assert.FatalError(t, err)
 	_pub := jwk.Public()
@@ -558,7 +558,7 @@ func TestHandlerVerifyAndExtractJWSPayload(t *testing.T) {
 			assert.FatalError(t, err)
 			_pub := _jwk.Public()
 			ctx := context.WithValue(context.Background(), jwsContextKey, parsedJWS)
-			ctx = context.WithValue(ctx, jwsContextKey, &_pub)
+			ctx = context.WithValue(ctx, jwkContextKey, &_pub)
 			return test{
 				ctx:        ctx,
 				statusCode: 400,
@@ -570,7 +570,7 @@ func TestHandlerVerifyAndExtractJWSPayload(t *testing.T) {
 			clone := &_pub
 			clone.Algorithm = jose.HS256
 			ctx := context.WithValue(context.Background(), jwsContextKey, parsedJWS)
-			ctx = context.WithValue(ctx, jwsContextKey, clone)
+			ctx = context.WithValue(ctx, jwkContextKey, clone)
 			return test{
 				ctx:        ctx,
 				statusCode: 400,
@@ -579,7 +579,7 @@ func TestHandlerVerifyAndExtractJWSPayload(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			ctx := context.WithValue(context.Background(), jwsContextKey, parsedJWS)
-			ctx = context.WithValue(ctx, jwsContextKey, pub)
+			ctx = context.WithValue(ctx, jwkContextKey, pub)
 			return test{
 				ctx:        ctx,
 				statusCode: 200,
@@ -600,7 +600,7 @@ func TestHandlerVerifyAndExtractJWSPayload(t *testing.T) {
 			clone := &_pub
 			clone.Algorithm = ""
 			ctx := context.WithValue(context.Background(), jwsContextKey, parsedJWS)
-			ctx = context.WithValue(ctx, jwsContextKey, pub)
+			ctx = context.WithValue(ctx, jwkContextKey, pub)
 			return test{
 				ctx:        ctx,
 				statusCode: 200,
@@ -624,7 +624,7 @@ func TestHandlerVerifyAndExtractJWSPayload(t *testing.T) {
 			_parsed, err := jose.ParseJWS(_raw)
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.Background(), jwsContextKey, _parsed)
-			ctx = context.WithValue(ctx, jwsContextKey, pub)
+			ctx = context.WithValue(ctx, jwkContextKey, pub)
 			return test{
 				ctx:        ctx,
 				statusCode: 200,
@@ -648,7 +648,7 @@ func TestHandlerVerifyAndExtractJWSPayload(t *testing.T) {
 			_parsed, err := jose.ParseJWS(_raw)
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.Background(), jwsContextKey, _parsed)
-			ctx = context.WithValue(ctx, jwsContextKey, pub)
+			ctx = context.WithValue(ctx, jwkContextKey, pub)
 			return test{
 				ctx:        ctx,
 				statusCode: 200,
@@ -697,7 +697,7 @@ func TestHandlerVerifyAndExtractJWSPayload(t *testing.T) {
 	}
 }
 
-func TestHandlerLookupJWK(t *testing.T) {
+func TestHandler_lookupJWK(t *testing.T) {
 	prov := newProv()
 	provName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
@@ -899,7 +899,7 @@ func TestHandlerLookupJWK(t *testing.T) {
 	}
 }
 
-func TestHandlerExtractJWK(t *testing.T) {
+func TestHandler_extractJWK(t *testing.T) {
 	prov := newProv()
 	provName := url.PathEscape(prov.GetName())
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -1095,7 +1095,7 @@ func TestHandlerExtractJWK(t *testing.T) {
 	}
 }
 
-func TestHandlerValidateJWS(t *testing.T) {
+func TestHandler_validateJWS(t *testing.T) {
 	url := "https://ca.smallstep.com/acme/account/1234"
 	type test struct {
 		db         acme.DB

@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -47,7 +48,7 @@ func TestHandler_GetNonce(t *testing.T) {
 }
 
 func TestHandler_GetDirectory(t *testing.T) {
-	linker := NewLinker("acme", "ca.smallstep.com")
+	linker := NewLinker("ca.smallstep.com", "acme")
 
 	prov := newProv()
 	provName := url.PathEscape(prov.GetName())
@@ -306,7 +307,7 @@ func TestHandler_GetCertificate(t *testing.T) {
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
 		},
-		"fail/getCertificate-error": func(t *testing.T) test {
+		"fail/db.GetCertificate-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
@@ -319,7 +320,7 @@ func TestHandler_GetCertificate(t *testing.T) {
 				err:        acme.NewErrorISE("force"),
 			}
 		},
-		"fail/decode-leaf-for-loggger": func(t *testing.T) test {
+		"fail/account-id-mismatch": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
@@ -327,28 +328,12 @@ func TestHandler_GetCertificate(t *testing.T) {
 				db: &acme.MockDB{
 					MockGetCertificate: func(ctx context.Context, id string) (*acme.Certificate, error) {
 						assert.Equals(t, id, certID)
-						return &acme.Certificate{}, nil
+						return &acme.Certificate{AccountID: "foo"}, nil
 					},
 				},
 				ctx:        ctx,
-				statusCode: 500,
-				err:        acme.NewErrorISE("failed to decode any certificates from generated certBytes"),
-			}
-		},
-		"fail/parse-x509-leaf-for-logger": func(t *testing.T) test {
-			acc := &acme.Account{ID: "accID"}
-			ctx := context.WithValue(context.Background(), accContextKey, acc)
-			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
-			return test{
-				db: &acme.MockDB{
-					MockGetCertificate: func(ctx context.Context, id string) (*acme.Certificate, error) {
-						assert.Equals(t, id, certID)
-						return &acme.Certificate{}, nil
-					},
-				},
-				ctx:        ctx,
-				statusCode: 500,
-				err:        acme.NewErrorISE("failed to parse generated leaf certificate"),
+				statusCode: 401,
+				err:        acme.NewError(acme.ErrorUnauthorizedType, "account id mismatch"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -359,7 +344,13 @@ func TestHandler_GetCertificate(t *testing.T) {
 				db: &acme.MockDB{
 					MockGetCertificate: func(ctx context.Context, id string) (*acme.Certificate, error) {
 						assert.Equals(t, id, certID)
-						return &acme.Certificate{}, nil
+						return &acme.Certificate{
+							AccountID:     "accID",
+							OrderID:       "ordID",
+							Leaf:          leaf,
+							Intermediates: []*x509.Certificate{inter, root},
+							ID:            id,
+						}, nil
 					},
 				},
 				ctx:        ctx,

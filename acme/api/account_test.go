@@ -40,7 +40,7 @@ func newProv() provisioner.Interface {
 	return p
 }
 
-func TestNewAccountRequestValidate(t *testing.T) {
+func TestNewAccountRequest_Validate(t *testing.T) {
 	type test struct {
 		nar *NewAccountRequest
 		err *acme.Error
@@ -96,7 +96,7 @@ func TestNewAccountRequestValidate(t *testing.T) {
 	}
 }
 
-func TestUpdateAccountRequestValidate(t *testing.T) {
+func TestUpdateAccountRequest_Validate(t *testing.T) {
 	type test struct {
 		uar *UpdateAccountRequest
 		err *acme.Error
