@@ -278,18 +278,13 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 }
 
 func TestHandler_NewAccount(t *testing.T) {
-	accID := "accountID"
-	acc := acme.Account{
-		ID:     accID,
-		Status: "valid",
-		Orders: fmt.Sprintf("https://ca.smallstep.com/acme/account/%s/orders", accID),
-	}
 	prov := newProv()
 	provName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
 
 	type test struct {
 		db         acme.DB
+		acc        *acme.Account
 		ctx        context.Context
 		statusCode int
 		err        *acme.Error
@@ -372,7 +367,7 @@ func TestHandler_NewAccount(t *testing.T) {
 				err:        acme.NewErrorISE("jwk expected in request context"),
 			}
 		},
-		"fail/NewAccount-error": func(t *testing.T) test {
+		"fail/db.CreateAccount-error": func(t *testing.T) test {
 			nar := &NewAccountRequest{
 				Contact: []string{"foo", "bar"},
 			}
@@ -410,20 +405,18 @@ func TestHandler_NewAccount(t *testing.T) {
 			return test{
 				db: &acme.MockDB{
 					MockCreateAccount: func(ctx context.Context, acc *acme.Account) error {
+						acc.ID = "accountID"
 						assert.Equals(t, acc.Contact, nar.Contact)
 						assert.Equals(t, acc.Key, jwk)
 						return nil
 					},
-					/*
-						getLink: func(ctx context.Context, typ acme.Link, abs bool, in ...string) string {
-							assert.Equals(t, typ, acme.AccountLink)
-							assert.True(t, abs)
-							assert.True(t, abs)
-							assert.Equals(t, baseURL, acme.BaseURLFromContext(ctx))
-							return fmt.Sprintf("%s/acme/%s/account/%s",
-								baseURL.String(), provName, accID)
-						},
-					*/
+				},
+				acc: &acme.Account{
+					ID:      "accountID",
+					Key:     jwk,
+					Status:  acme.StatusValid,
+					Contact: []string{"foo", "bar"},
+					Orders:  "https://test.ca.smallstep.com/acme/test@acme-provisioner.com/account/accountID/orders",
 				},
 				ctx:        ctx,
 				statusCode: 201,
@@ -435,12 +428,21 @@ func TestHandler_NewAccount(t *testing.T) {
 			}
 			b, err := json.Marshal(nar)
 			assert.FatalError(t, err)
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			acc := &acme.Account{
+				ID:      "accountID",
+				Key:     jwk,
+				Status:  acme.StatusValid,
+				Contact: []string{"foo", "bar"},
+			}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
-			ctx = context.WithValue(ctx, accContextKey, &acc)
+			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
 				ctx:        ctx,
+				acc:        acc,
 				statusCode: 200,
 			}
 		},
@@ -448,7 +450,7 @@ func TestHandler_NewAccount(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{db: tc.db}
+			h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
 			req := httptest.NewRequest("GET", "/foo/bar", nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
@@ -471,19 +473,19 @@ func TestHandler_NewAccount(t *testing.T) {
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
-				expB, err := json.Marshal(acc)
+				expB, err := json.Marshal(tc.acc)
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"],
 					[]string{fmt.Sprintf("%s/acme/%s/account/%s", baseURL.String(),
-						provName, accID)})
+						provName, "accountID")})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
 	}
 }
 
-func TestHandlerGetUpdateAccount(t *testing.T) {
+func TestHandler_GetUpdateAccount(t *testing.T) {
 	accID := "accountID"
 	acc := acme.Account{
 		ID:     accID,
@@ -594,16 +596,6 @@ func TestHandlerGetUpdateAccount(t *testing.T) {
 						assert.Equals(t, upd.ID, acc.ID)
 						return nil
 					},
-					/*
-						getLink: func(ctx context.Context, typ acme.Link, abs bool, ins ...string) string {
-							assert.Equals(t, typ, acme.AccountLink)
-							assert.True(t, abs)
-							assert.Equals(t, acme.BaseURLFromContext(ctx), baseURL)
-							assert.Equals(t, ins, []string{accID})
-							return fmt.Sprintf("%s/acme/%s/account/%s",
-								baseURL.String(), provName, accID)
-						},
-					*/
 				},
 				ctx:        ctx,
 				statusCode: 200,
@@ -639,16 +631,6 @@ func TestHandlerGetUpdateAccount(t *testing.T) {
 						assert.Equals(t, upd.ID, acc.ID)
 						return nil
 					},
-					/*
-						getLink: func(ctx context.Context, typ acme.Link, abs bool, ins ...string) string {
-							assert.Equals(t, typ, acme.AccountLink)
-							assert.True(t, abs)
-							assert.Equals(t, acme.BaseURLFromContext(ctx), baseURL)
-							assert.Equals(t, ins, []string{accID})
-							return fmt.Sprintf("%s/acme/%s/account/%s",
-								baseURL.String(), provName, accID)
-						},
-					*/
 				},
 				ctx:        ctx,
 				statusCode: 200,
@@ -660,18 +642,6 @@ func TestHandlerGetUpdateAccount(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{isPostAsGet: true})
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				/*
-					auth: &mockAcmeAuthority{
-						getLink: func(ctx context.Context, typ acme.Link, abs bool, ins ...string) string {
-							assert.Equals(t, typ, acme.AccountLink)
-							assert.True(t, abs)
-							assert.Equals(t, acme.BaseURLFromContext(ctx), baseURL)
-							assert.Equals(t, ins, []string{accID})
-							return fmt.Sprintf("%s/acme/%s/account/%s",
-								baseURL, provName, accID)
-						},
-					},
-				*/
 				ctx:        ctx,
 				statusCode: 200,
 			}
@@ -680,7 +650,7 @@ func TestHandlerGetUpdateAccount(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{db: tc.db}
+			h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
 			req := httptest.NewRequest("GET", "/foo/bar", nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()

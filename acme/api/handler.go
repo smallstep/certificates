@@ -38,10 +38,11 @@ type payloadInfo struct {
 
 // Handler is the ACME API request handler.
 type Handler struct {
-	db       acme.DB
-	backdate provisioner.Duration
-	ca       acme.CertificateAuthority
-	linker   Linker
+	db                       acme.DB
+	backdate                 provisioner.Duration
+	ca                       acme.CertificateAuthority
+	linker                   Linker
+	validateChallengeOptions *acme.ValidateChallengeOptions
 }
 
 // HandlerOptions required to create a new ACME API request handler.
@@ -63,11 +64,24 @@ type HandlerOptions struct {
 
 // NewHandler returns a new ACME API handler.
 func NewHandler(ops HandlerOptions) api.RouterHandler {
+	client := http.Client{
+		Timeout: time.Duration(30 * time.Second),
+	}
+	dialer := &net.Dialer{
+		Timeout: 30 * time.Second,
+	}
 	return &Handler{
 		ca:       ops.CA,
 		db:       ops.DB,
 		backdate: ops.Backdate,
 		linker:   NewLinker(ops.DNS, ops.Prefix),
+		validateChallengeOptions: &acme.ValidateChallengeOptions{
+			HTTPGet:   client.Get,
+			LookupTxt: net.LookupTXT,
+			TLSDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
+				return tls.DialWithDialer(dialer, network, addr, config)
+			},
+		},
 	}
 }
 
@@ -212,24 +226,12 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 			"account '%s' does not own challenge '%s'", acc.ID, ch.ID))
 		return
 	}
-	client := http.Client{
-		Timeout: time.Duration(30 * time.Second),
-	}
-	dialer := &net.Dialer{
-		Timeout: 30 * time.Second,
-	}
 	jwk, err := jwkFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
-	if err = ch.Validate(ctx, h.db, jwk, acme.ValidateOptions{
-		HTTPGet:   client.Get,
-		LookupTxt: net.LookupTXT,
-		TLSDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
-			return tls.DialWithDialer(dialer, network, addr, config)
-		},
-	}); err != nil {
+	if err = ch.Validate(ctx, h.db, jwk, h.validateChallengeOptions); err != nil {
 		api.WriteError(w, acme.WrapErrorISE(err, "error validating challenge"))
 		return
 	}

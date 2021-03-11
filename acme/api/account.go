@@ -105,7 +105,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		acc := &acme.Account{
+		acc = &acme.Account{
 			Key:     jwk,
 			Contact: nar.Contact,
 			Status:  acme.StatusValid,
