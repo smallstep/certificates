@@ -2,7 +2,9 @@ package api
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"net/http"
@@ -259,10 +261,12 @@ func (h *Handler) GetCertificate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	certBytes, err := cert.ToACME()
-	if err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error converting cert to ACME representation"))
-		return
+	var certBytes []byte
+	for _, c := range append([]*x509.Certificate{cert.Leaf}, cert.Intermediates...) {
+		certBytes = append(certBytes, pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: c.Raw,
+		})...)
 	}
 
 	api.LogCertificate(w, cert.Leaf)

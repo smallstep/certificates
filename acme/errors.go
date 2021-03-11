@@ -271,6 +271,10 @@ type Error struct {
 
 // NewError creates a new Error type.
 func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
+	return newError(pt, errors.Errorf(msg, args...))
+}
+
+func newError(pt ProblemType, err error) *Error {
 	meta, ok := errorMap[pt]
 	if !ok {
 		meta = errorServerInternalMetadata
@@ -278,7 +282,7 @@ func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
 			Type:   meta.typ,
 			Detail: meta.details,
 			Status: meta.status,
-			Err:    errors.Errorf("unrecognized problemType %v", pt),
+			Err:    err,
 		}
 	}
 
@@ -286,7 +290,7 @@ func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
 		Type:   meta.typ,
 		Detail: meta.details,
 		Status: meta.status,
-		Err:    errors.Errorf(msg, args...),
+		Err:    err,
 	}
 }
 
@@ -308,7 +312,7 @@ func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Err
 		}
 		return e
 	default:
-		return NewError(ErrorServerInternalType, msg, args...)
+		return newError(typ, errors.Wrapf(err, msg, args...))
 	}
 }
 

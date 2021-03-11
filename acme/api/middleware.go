@@ -411,7 +411,7 @@ const (
 func accountFromContext(ctx context.Context) (*acme.Account, error) {
 	val, ok := ctx.Value(accContextKey).(*acme.Account)
 	if !ok || val == nil {
-		return nil, acme.NewErrorISE("account not in context")
+		return nil, acme.NewError(acme.ErrorAccountDoesNotExistType, "account not in context")
 	}
 	return val, nil
 }
