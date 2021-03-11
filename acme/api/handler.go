@@ -171,6 +171,7 @@ func (h *Handler) GetAuthorization(w http.ResponseWriter, r *http.Request) {
 	}
 	if err = az.UpdateStatus(ctx, h.db); err != nil {
 		api.WriteError(w, acme.WrapErrorISE(err, "error updating authorization status"))
+		return
 	}
 
 	h.linker.LinkAuthorization(ctx, az)
