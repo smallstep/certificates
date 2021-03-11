@@ -462,7 +462,7 @@ func provisionerFromContext(ctx context.Context) (acme.Provisioner, error) {
 func payloadFromContext(ctx context.Context) (*payloadInfo, error) {
 	val, ok := ctx.Value(payloadContextKey).(*payloadInfo)
 	if !ok || val == nil {
-		return nil, acme.NewErrorISE("payload expected in request context")
+		return nil, acme.NewError(acme.ErrorMalformedType, "payload expected in request context")
 	}
 	return val, nil
 }
