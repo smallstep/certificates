@@ -23,6 +23,7 @@ import (
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/kms"
+	"github.com/smallstep/certificates/kms/apiv1"
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/sshagentkms"
 	"github.com/smallstep/certificates/templates"
@@ -446,11 +447,6 @@ func (a *Authority) init() error {
 	audiences := a.config.GetAudiences()
 	a.provisioners = provisioner.NewCollection(audiences)
 	config := provisioner.Config{
-		// TODO: I'm not sure if extending this configuration is a good way to integrate
-		// It's powerful, but leaks quite some seemingly internal stuff to the provisioner.
-		// IntermediateCert: a.config.IntermediateCert,
-		// SigningKey:       a.config.IntermediateKey,
-		// CACertificates:   a.rootX509Certs,
 		Claims:    claimer.Claims(),
 		Audiences: audiences,
 		DB:        a.db,
@@ -463,7 +459,7 @@ func (a *Authority) init() error {
 
 	// Check if a KMS with decryption capability is required and available
 	if a.requiresDecrypter() {
-		if _, ok := a.keyManager.(kmsapi.Decrypter); !ok {
+		if _, ok := a.keyManager.(apiv1.Decrypter); !ok {
 			return errors.New("keymanager doesn't provide crypto.Decrypter")
 		}
 	}
