@@ -90,13 +90,28 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// New order.
-	o := &acme.Order{Identifiers: nor.Identifiers}
+	now := clock.Now()
+	o := &acme.Order{
+		AccountID:        acc.ID,
+		ProvisionerID:    prov.GetID(),
+		Status:           acme.StatusPending,
+		Identifiers:      nor.Identifiers,
+		Expires:          now.Add(defaultOrderExpiry),
+		AuthorizationIDs: make([]string, len(nor.Identifiers)),
+	}
+	if o.NotBefore.IsZero() {
+		o.NotBefore = now
+	}
+	if o.NotAfter.IsZero() {
+		o.NotAfter = o.NotBefore.Add(prov.DefaultTLSCertDuration())
+	}
 
-	o.AuthorizationIDs = make([]string, len(o.Identifiers))
 	for i, identifier := range o.Identifiers {
 		az := &acme.Authorization{
 			AccountID:  acc.ID,
 			Identifier: identifier,
+			Expires:    o.Expires,
+			Status:     o.Status,
 		}
 		if err := h.newAuthorization(ctx, az); err != nil {
 			api.WriteError(w, err)
@@ -104,15 +119,6 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		}
 		o.AuthorizationIDs[i] = az.ID
 	}
-
-	now := clock.Now()
-	if o.NotBefore.IsZero() {
-		o.NotBefore = now
-	}
-	if o.NotAfter.IsZero() {
-		o.NotAfter = o.NotBefore.Add(prov.DefaultTLSCertDuration())
-	}
-	o.Expires = now.Add(defaultOrderExpiry)
 
 	if err := h.db.CreateOrder(ctx, o); err != nil {
 		api.WriteError(w, acme.WrapErrorISE(err, "error creating order"))
