@@ -27,6 +27,9 @@ func NewService(ctx context.Context, opts apiv1.Options) (*Service, error) {
 		t = apiv1.SoftCAS
 	}
 
+	// TODO: silence the linter (temporarily)
+	_ = t
+
 	// TODO: should this become similar to the New CertificateAuthorityService as in x509CAService?
 	return &Service{
 		certificateChain: opts.CertificateChain,
