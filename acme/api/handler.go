@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -70,14 +71,28 @@ func NewHandler(ops HandlerOptions) api.RouterHandler {
 	dialer := &net.Dialer{
 		Timeout: 30 * time.Second,
 	}
+	resolver := &net.Resolver{
+		// The DNS resolver can be configured for testing purposes with something
+		// like this:
+		//
+		// PreferGo: true,
+		// Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+		// 	var d net.Dialer
+		// 	return d.DialContext(ctx, "udp", "127.0.0.1:5333")
+		// },
+	}
 	return &Handler{
 		ca:       ops.CA,
 		db:       ops.DB,
 		backdate: ops.Backdate,
 		linker:   NewLinker(ops.DNS, ops.Prefix),
 		validateChallengeOptions: &acme.ValidateChallengeOptions{
-			HTTPGet:   client.Get,
-			LookupTxt: net.LookupTXT,
+			HTTPGet: client.Get,
+			LookupTxt: func(name string) ([]string, error) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				return resolver.LookupTXT(ctx, name)
+			},
 			TLSDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
 				return tls.DialWithDialer(dialer, network, addr, config)
 			},
