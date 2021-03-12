@@ -7,8 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"log"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -315,53 +313,6 @@ func (a *Authority) init() error {
 		}
 	}
 
-	// TODO: decide if this is a good approach for providing the SCEP functionality
-	// It currently mirrors the logic for the x509CAServer
-	if a.scepService == nil {
-		var options casapi.Options
-		if a.config.AuthorityConfig.Options != nil {
-			options = *a.config.AuthorityConfig.Options
-		}
-
-		// Read intermediate and create X509 signer and decrypter for default CAS.
-		if options.Is(casapi.SoftCAS) {
-			options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
-			if err != nil {
-				return err
-			}
-			options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-				SigningKey: a.config.IntermediateKey,
-				Password:   []byte(a.config.Password),
-			})
-			if err != nil {
-				return err
-			}
-
-			// TODO: this is not exactly nice to do, but ensures that tests will still run while
-			// ECDSA keys are in the testdata. ECDSA keys are no crypto.Decrypters, resulting
-			// in many errors in the test suite. Needs a better solution, I think.
-			underTest := strings.HasSuffix(os.Args[0], ".test")
-			if !underTest {
-				if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
-					options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-						DecryptionKey: a.config.IntermediateKey,
-						Password:      []byte(a.config.Password),
-					})
-					if err != nil {
-						return err
-					}
-				}
-			}
-		}
-
-		a.scepService, err = scep.NewService(context.Background(), options)
-		if err != nil {
-			return err
-		}
-
-		// TODO: mimick the x509CAService GetCertificateAuthority here too?
-	}
-
 	// Read root certificates and store them in the certificates map.
 	if len(a.rootX509Certs) == 0 {
 		a.rootX509Certs = make([]*x509.Certificate, len(a.config.Root))
@@ -512,6 +463,47 @@ func (a *Authority) init() error {
 		}
 	}
 
+	// TODO: decide if this is a good approach for providing the SCEP functionality
+	// It currently mirrors the logic for the x509CAService
+	if a.requiresSCEPService() && a.scepService == nil {
+		var options casapi.Options
+		if a.config.AuthorityConfig.Options != nil {
+			options = *a.config.AuthorityConfig.Options
+		}
+
+		// Read intermediate and create X509 signer and decrypter for default CAS.
+		if options.Is(casapi.SoftCAS) {
+			options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
+			if err != nil {
+				return err
+			}
+			options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.IntermediateKey,
+				Password:   []byte(a.config.Password),
+			})
+			if err != nil {
+				return err
+			}
+
+			if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
+				options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+					DecryptionKey: a.config.IntermediateKey,
+					Password:      []byte(a.config.Password),
+				})
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		a.scepService, err = scep.NewService(context.Background(), options)
+		if err != nil {
+			return err
+		}
+
+		// TODO: mimick the x509CAService GetCertificateAuthority here too?
+	}
+
 	// Store all the provisioners
 	for _, p := range a.config.AuthorityConfig.Provisioners {
 		if err := p.Init(config); err != nil {
@@ -586,12 +578,15 @@ func (a *Authority) CloseForReload() {
 	}
 }
 
-// requiresDecrypter iterates over the configured provisioners
-// and determines if the Authority requires a KMS that provides
-// a crypto.Decrypter by implementing the apiv1.Decrypter
-// interface. Currently only the SCEP provider requires this,
-// but others may be added in the future.
+// requiresDecrypter returns whether the Authority
+// requires a KMS that provides a crypto.Decrypter
 func (a *Authority) requiresDecrypter() bool {
+	return a.requiresSCEPService()
+}
+
+// requiresSCEPService iterates over the configured provisioners
+// and determines if one of them is a SCEP provisioner.
+func (a *Authority) requiresSCEPService() bool {
 	for _, p := range a.config.AuthorityConfig.Provisioners {
 		if p.GetType() == provisioner.TypeSCEP {
 			return true
@@ -605,6 +600,6 @@ func (a *Authority) requiresDecrypter() bool {
 // in order to make SCEP work more easily. It can be
 // made more correct by using the right interfaces/abstractions
 // after it works as expected.
-func (a *Authority) GetSCEPService() scep.Service {
-	return *a.scepService
+func (a *Authority) GetSCEPService() *scep.Service {
+	return a.scepService
 }

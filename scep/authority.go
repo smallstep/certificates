@@ -51,14 +51,14 @@ type Authority struct {
 
 	intermediateCertificate *x509.Certificate
 
-	service  Service
+	service  *Service
 	signAuth SignAuthority
 }
 
 // AuthorityOptions required to create a new SCEP Authority.
 type AuthorityOptions struct {
 	// Service provides the SCEP functions to Authority
-	Service Service
+	Service *Service
 	// Backdate
 	Backdate provisioner.Duration
 	// DB is the database used by nosql.
@@ -92,15 +92,23 @@ func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 		}
 	}
 
-	return &Authority{
-		backdate:                ops.Backdate,
-		db:                      ops.DB,
-		prefix:                  ops.Prefix,
-		dns:                     ops.DNS,
-		intermediateCertificate: ops.Service.certificateChain[0],
-		service:                 ops.Service,
-		signAuth:                signAuth,
-	}, nil
+	authority := &Authority{
+		backdate: ops.Backdate,
+		db:       ops.DB,
+		prefix:   ops.Prefix,
+		dns:      ops.DNS,
+		signAuth: signAuth,
+	}
+
+	// TODO: this is not really nice to do; the Service should be removed
+	// in its entirety to make this more interoperable with the rest of
+	// step-ca.
+	if ops.Service != nil {
+		authority.intermediateCertificate = ops.Service.certificateChain[0]
+		authority.service = ops.Service
+	}
+
+	return authority, nil
 }
 
 var (
