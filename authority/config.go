@@ -53,6 +53,7 @@ type Config struct {
 	IntermediateCert string               `json:"crt"`
 	IntermediateKey  string               `json:"key"`
 	Address          string               `json:"address"`
+	InsecureAddress  string               `json:"insecureAddress"`
 	DNSNames         []string             `json:"dnsNames"`
 	KMS              *kms.Options         `json:"kms,omitempty"`
 	SSH              *SSHConfig           `json:"ssh,omitempty"`
@@ -205,6 +206,13 @@ func (c *Config) Validate() error {
 	// Validate address (a port is required)
 	if _, _, err := net.SplitHostPort(c.Address); err != nil {
 		return errors.Errorf("invalid address %s", c.Address)
+	}
+
+	// Validate insecure address if it is configured
+	if c.InsecureAddress != "" {
+		if _, _, err := net.SplitHostPort(c.InsecureAddress); err != nil {
+			return errors.Errorf("invalid address %s", c.InsecureAddress)
+		}
 	}
 
 	if c.TLS == nil {

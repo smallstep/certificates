@@ -18,6 +18,7 @@ import (
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/kms"
+	"github.com/smallstep/certificates/kms/apiv1"
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/sshagentkms"
 	"github.com/smallstep/certificates/templates"
@@ -201,13 +202,14 @@ func (a *Authority) init() error {
 	}
 
 	// TODO: decide if this is a good approach for providing the SCEP functionality
+	// It currently mirrors the logic for the x509CAServer
 	if a.scepService == nil {
 		var options casapi.Options
 		if a.config.AuthorityConfig.Options != nil {
 			options = *a.config.AuthorityConfig.Options
 		}
 
-		// Read intermediate and create X509 signer for default CAS.
+		// Read intermediate and create X509 signer and decrypter for default CAS.
 		if options.Is(casapi.SoftCAS) {
 			options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
 			if err != nil {
@@ -220,12 +222,15 @@ func (a *Authority) init() error {
 			if err != nil {
 				return err
 			}
-			options.Decrypter, err = a.keyManager.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-				DecryptionKey: a.config.IntermediateKey,
-				Password:      []byte(a.config.Password),
-			})
-			if err != nil {
-				return err
+
+			if km, ok := a.keyManager.(apiv1.Decrypter); ok {
+				options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+					DecryptionKey: a.config.IntermediateKey,
+					Password:      []byte(a.config.Password),
+				})
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -368,11 +373,6 @@ func (a *Authority) init() error {
 	audiences := a.config.getAudiences()
 	a.provisioners = provisioner.NewCollection(audiences)
 	config := provisioner.Config{
-		// TODO: I'm not sure if extending this configuration is a good way to integrate
-		// It's powerful, but leaks quite some seemingly internal stuff to the provisioner.
-		// IntermediateCert: a.config.IntermediateCert,
-		// SigningKey:       a.config.IntermediateKey,
-		// CACertificates:   a.rootX509Certs,
 		Claims:    claimer.Claims(),
 		Audiences: audiences,
 		DB:        a.db,
@@ -382,6 +382,14 @@ func (a *Authority) init() error {
 		},
 		GetIdentityFunc: a.getIdentityFunc,
 	}
+
+	// Check if a KMS with decryption capability is required and available
+	if a.requiresDecrypter() {
+		if _, ok := a.keyManager.(apiv1.Decrypter); !ok {
+			return errors.New("keymanager doesn't provide crypto.Decrypter")
+		}
+	}
+
 	// Store all the provisioners
 	for _, p := range a.config.AuthorityConfig.Provisioners {
 		if err := p.Init(config); err != nil {
@@ -432,6 +440,20 @@ func (a *Authority) CloseForReload() {
 	if err := a.keyManager.Close(); err != nil {
 		log.Printf("error closing the key manager: %v", err)
 	}
+}
+
+// requiresDecrypter iterates over the configured provisioners
+// and determines if the Authority requires a KMS that provides
+// a crypto.Decrypter by implementing the apiv1.Decrypter
+// interface. Currently only the SCEP provider requires this,
+// but others may be added in the future.
+func (a *Authority) requiresDecrypter() bool {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeSCEP {
+			return true
+		}
+	}
+	return false
 }
 
 // GetSCEPService returns the configured SCEP Service

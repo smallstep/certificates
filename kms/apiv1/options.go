@@ -13,8 +13,11 @@ type KeyManager interface {
 	GetPublicKey(req *GetPublicKeyRequest) (crypto.PublicKey, error)
 	CreateKey(req *CreateKeyRequest) (*CreateKeyResponse, error)
 	CreateSigner(req *CreateSignerRequest) (crypto.Signer, error)
-	CreateDecrypter(req *CreateDecrypterRequest) (crypto.Decrypter, error) // TODO: split into separate interface?
 	Close() error
+}
+
+type Decrypter interface {
+	CreateDecrypter(req *CreateDecrypterRequest) (crypto.Decrypter, error)
 }
 
 // CertificateManager is the interface implemented by the KMS that can load and

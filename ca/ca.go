@@ -65,11 +65,12 @@ func WithDatabase(db db.AuthDB) Option {
 // CA is the type used to build the complete certificate authority. It builds
 // the HTTP server, set ups the middlewares and the HTTP handlers.
 type CA struct {
-	auth    *authority.Authority
-	config  *authority.Config
-	srv     *server.Server
-	opts    *options
-	renewer *TLSRenewer
+	auth        *authority.Authority
+	config      *authority.Config
+	srv         *server.Server
+	insecureSrv *server.Server
+	opts        *options
+	renewer     *TLSRenewer
 }
 
 // New creates and initializes the CA with the given configuration and options.
@@ -106,6 +107,9 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	// Using chi as the main router
 	mux := chi.NewRouter()
 	handler := http.Handler(mux)
+
+	insecureMux := chi.NewRouter()
+	insecureHandler := http.Handler(insecureMux)
 
 	// Add regular CA api endpoints in / and /1.0
 	routerHandler := api.New(auth)
@@ -145,17 +149,6 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		acmeRouterHandler.Route(r)
 	})
 
-	// TODO: THIS SHOULDN'T HAPPEN (or should become configurable)
-	// Current SCEP client I'm testing with doesn't seem to easily trust untrusted certs.
-	// Idea: provide a second mux/handler that runs without TLS. It probably should only
-	// have routes that are intended to be ran without TLS, like the SCEP ones. Look into
-	// option to not enable it in case no SCEP providers are configured. It might
-	// be nice to still include the SCEP routes in the secure handler too, for
-	// client that do understand HTTPS. The RFC does not seem to explicitly exclude HTTPS
-	// usage, but it mentions some caveats related to managing web PKI certificates as
-	// well as certificates via SCEP.
-	tlsConfig = nil
-
 	scepPrefix := "scep"
 	scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
 		IntermediateCertificatePath: config.IntermediateCert,
@@ -173,6 +166,16 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		scepRouterHandler.Route(r)
 	})
 
+	// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
+	// SCEP operations are performed using HTTP, so that's why the API is mounted
+	// to the insecure mux. To my current understanding there's no strong reason
+	// to not use HTTPS also, so that's why I've kept the API endpoints in both
+	// muxes and both HTTP as well as HTTPS can be used to request certificates
+	// using SCEP.
+	insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
+		scepRouterHandler.Route(r)
+	})
+
 	// helpful routine for logging all routes
 	//dumpRoutes(mux)
 
@@ -183,6 +186,7 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 			return nil, err
 		}
 		handler = m.Middleware(handler)
+		insecureHandler = m.Middleware(insecureHandler)
 	}
 
 	// Add logger if configured
@@ -192,16 +196,37 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 			return nil, err
 		}
 		handler = logger.Middleware(handler)
+		insecureHandler = logger.Middleware(insecureHandler)
 	}
 
 	ca.auth = auth
 	ca.srv = server.New(config.Address, handler, tlsConfig)
+
+	// TODO: instead opt for having a single server.Server but two http.Servers
+	// handling the HTTP vs. HTTPS handler?
+	if config.InsecureAddress != "" {
+		ca.insecureSrv = server.New(config.InsecureAddress, insecureHandler, nil)
+	}
+
 	return ca, nil
 }
 
 // Run starts the CA calling to the server ListenAndServe method.
 func (ca *CA) Run() error {
-	return ca.srv.ListenAndServe()
+
+	errors := make(chan error, 1)
+	go func() {
+		if ca.insecureSrv != nil {
+			errors <- ca.insecureSrv.ListenAndServe()
+		}
+	}()
+	go func() {
+		errors <- ca.srv.ListenAndServe()
+	}()
+
+	// wait till error occurs; ensures the servers keep listening
+	err := <-errors
+	return err
 }
 
 // Stop stops the CA calling to the server Shutdown method.
@@ -210,7 +235,17 @@ func (ca *CA) Stop() error {
 	if err := ca.auth.Shutdown(); err != nil {
 		log.Printf("error stopping ca.Authority: %+v\n", err)
 	}
-	return ca.srv.Shutdown()
+	var insecureShutdownErr error
+	if ca.insecureSrv != nil {
+		insecureShutdownErr = ca.insecureSrv.Shutdown()
+	}
+
+	secureErr := ca.srv.Shutdown()
+
+	if insecureShutdownErr != nil {
+		return insecureShutdownErr
+	}
+	return secureErr
 }
 
 // Reload reloads the configuration of the CA and calls to the server Reload
@@ -241,6 +276,13 @@ func (ca *CA) Reload() error {
 	if err != nil {
 		logContinue("Reload failed because the CA with new configuration could not be initialized.")
 		return errors.Wrap(err, "error reloading ca")
+	}
+
+	if ca.insecureSrv != nil {
+		if err = ca.insecureSrv.Reload(newCA.insecureSrv); err != nil {
+			logContinue("Reload failed because insecure server could not be replaced.")
+			return errors.Wrap(err, "error reloading insecure server")
+		}
 	}
 
 	if err = ca.srv.Reload(newCA.srv); err != nil {
