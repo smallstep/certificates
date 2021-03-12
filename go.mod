@@ -22,7 +22,7 @@ require (
 	github.com/smallstep/nosql v0.3.6
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
-	go.step.sm/cli-utils v0.1.0
+	go.step.sm/cli-utils v0.2.0
 	go.step.sm/crypto v0.7.3
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
 	golang.org/x/net v0.0.0-20210119194325-5f4716e94777
