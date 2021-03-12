@@ -153,15 +153,17 @@ func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, err)
 			return
 		}
-		var err error
-		// If neither the status nor the contacts are being updated then ignore
-		// the updates and return 200. This conforms with the behavior detailed
-		// in the ACME spec (https://tools.ietf.org/html/rfc8555#section-7.3.2).
-		acc.Status = uar.Status
-		acc.Contact = uar.Contact
-		if err = h.db.UpdateAccount(ctx, acc); err != nil {
-			api.WriteError(w, acme.WrapErrorISE(err, "error updating account"))
-			return
+		if len(uar.Status) > 0 || len(uar.Contact) > 0 {
+			if len(uar.Status) > 0 {
+				acc.Status = uar.Status
+			} else if len(uar.Contact) > 0 {
+				acc.Contact = uar.Contact
+			}
+
+			if err := h.db.UpdateAccount(ctx, acc); err != nil {
+				api.WriteError(w, acme.WrapErrorISE(err, "error updating account"))
+				return
+			}
 		}
 	}
 

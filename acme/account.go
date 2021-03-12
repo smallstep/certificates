@@ -27,16 +27,6 @@ func (a *Account) ToLog() (interface{}, error) {
 	return string(b), nil
 }
 
-// GetID returns the account ID.
-func (a *Account) GetID() string {
-	return a.ID
-}
-
-// GetKey returns the JWK associated with the account.
-func (a *Account) GetKey() *jose.JSONWebKey {
-	return a.Key
-}
-
 // IsValid returns true if the Account is valid.
 func (a *Account) IsValid() bool {
 	return Status(a.Status) == StatusValid

@@ -168,16 +168,22 @@ func TestUpdateAccountRequest_Validate(t *testing.T) {
 }
 
 func TestHandler_GetOrdersByAccountID(t *testing.T) {
-	oids := []string{
-		"https://ca.smallstep.com/acme/order/foo",
-		"https://ca.smallstep.com/acme/order/bar",
+	oids := []string{"foo", "bar"}
+	oidURLs := []string{
+		"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/order/foo",
+		"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/order/bar",
 	}
 	accID := "account-id"
 
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("accID", accID)
-	url := fmt.Sprintf("http://ca.smallstep.com/acme/account/%s/orders", accID)
+
+	prov := newProv()
+	provName := url.PathEscape(prov.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+
+	url := fmt.Sprintf("http://ca.smallstep.com/acme/%s/account/%s/orders", provName, accID)
 
 	type test struct {
 		db         acme.DB
@@ -189,15 +195,15 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 		"fail/no-account": func(t *testing.T) test {
 			return test{
 				db:         &acme.MockDB{},
+				ctx:        context.Background(),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
 		},
 		"fail/nil-account": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), accContextKey, nil)
 			return test{
 				db:         &acme.MockDB{},
-				ctx:        ctx,
+				ctx:        context.WithValue(context.Background(), accContextKey, nil),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
@@ -213,7 +219,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 				err:        acme.NewError(acme.ErrorUnauthorizedType, "account ID does not match url param"),
 			}
 		},
-		"fail/getOrdersByAccount-error": func(t *testing.T) test {
+		"fail/db.GetOrdersByAccountID-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: accID}
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
@@ -230,6 +236,8 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 			acc := &acme.Account{ID: accID}
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			return test{
 				db: &acme.MockDB{
 					MockGetOrdersByAccountID: func(ctx context.Context, id string) ([]string, error) {
@@ -245,7 +253,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{db: tc.db}
+			h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
 			req := httptest.NewRequest("GET", url, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
@@ -268,7 +276,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
-				expB, err := json.Marshal(oids)
+				expB, err := json.Marshal(oidURLs)
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
@@ -558,7 +566,7 @@ func TestHandler_GetUpdateAccount(t *testing.T) {
 				err:        acme.NewError(acme.ErrorMalformedType, "contact cannot be empty string"),
 			}
 		},
-		"fail/update-error": func(t *testing.T) test {
+		"fail/db.UpdateAccount-error": func(t *testing.T) test {
 			uar := &UpdateAccountRequest{
 				Status: "deactivated",
 			}

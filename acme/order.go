@@ -20,6 +20,7 @@ type Identifier struct {
 
 // Order contains order metadata for the ACME protocol order type.
 type Order struct {
+	ID                string        `json:"id"`
 	Status            Status        `json:"status"`
 	Expires           time.Time     `json:"expires,omitempty"`
 	Identifiers       []Identifier  `json:"identifiers"`
@@ -31,7 +32,6 @@ type Order struct {
 	FinalizeURL       string        `json:"finalize"`
 	CertificateID     string        `json:"-"`
 	CertificateURL    string        `json:"certificate,omitempty"`
-	ID                string        `json:"-"`
 	AccountID         string        `json:"-"`
 	ProvisionerID     string        `json:"-"`
 	DefaultDuration   time.Duration `json:"-"`
@@ -50,7 +50,7 @@ func (o *Order) ToLog() (interface{}, error) {
 // UpdateStatus updates the ACME Order Status if necessary.
 // Changes to the order are saved using the database interface.
 func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
-	now := time.Now().UTC()
+	now := clock.Now()
 
 	switch o.Status {
 	case StatusInvalid:
