@@ -352,8 +352,3 @@ func findCertificate(ctx P11, rawuri string) (*x509.Certificate, error) {
 	}
 	return cert, nil
 }
-
-// CreateDecrypter creates a new crypto.Decrypter backed by PKCS11
-func (k *PKCS11) CreateDecrypter(req *apiv1.CreateDecrypterRequest) (crypto.Decrypter, error) {
-	return nil, fmt.Errorf("not implemented yet")
-}
