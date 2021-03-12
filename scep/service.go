@@ -29,8 +29,8 @@ func NewService(ctx context.Context, opts apiv1.Options) (*Service, error) {
 
 	// TODO: should this become similar to the New CertificateAuthorityService as in x509CAService?
 	return &Service{
-		chain:     opts.CertificateChain,
-		signer:    opts.Signer,
-		decrypter: opts.Decrypter,
+		certificateChain: opts.CertificateChain,
+		signer:           opts.Signer,
+		decrypter:        opts.Decrypter,
 	}, nil
 }
