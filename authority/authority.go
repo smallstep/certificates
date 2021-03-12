@@ -234,10 +234,12 @@ func (a *Authority) init() error {
 			}
 		}
 
-		a.scepService = &scep.Service{
-			Signer:    options.Signer,
-			Decrypter: options.Decrypter,
+		a.scepService, err = scep.NewService(context.Background(), options)
+		if err != nil {
+			return err
 		}
+
+		// TODO: mimick the x509CAService GetCertificateAuthority here too?
 	}
 
 	// Read root certificates and store them in the certificates map.

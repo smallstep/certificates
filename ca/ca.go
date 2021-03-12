@@ -151,12 +151,11 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 
 	scepPrefix := "scep"
 	scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
-		IntermediateCertificatePath: config.IntermediateCert,
-		Service:                     auth.GetSCEPService(),
-		Backdate:                    *config.AuthorityConfig.Backdate,
-		DB:                          auth.GetDatabase().(nosql.DB),
-		DNS:                         dns,
-		Prefix:                      scepPrefix,
+		Service:  auth.GetSCEPService(),
+		Backdate: *config.AuthorityConfig.Backdate,
+		DB:       auth.GetDatabase().(nosql.DB),
+		DNS:      dns,
+		Prefix:   scepPrefix,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating SCEP authority")
@@ -358,13 +357,13 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func dumpRoutes(mux chi.Routes) {
-	// helpful routine for logging all routes //
-	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
-		fmt.Printf("%s %s\n", method, route)
-		return nil
-	}
-	if err := chi.Walk(mux, walkFunc); err != nil {
-		fmt.Printf("Logging err: %s\n", err.Error())
-	}
-}
+// func dumpRoutes(mux chi.Routes) {
+// 	// helpful routine for logging all routes //
+// 	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+// 		fmt.Printf("%s %s\n", method, route)
+// 		return nil
+// 	}
+// 	if err := chi.Walk(mux, walkFunc); err != nil {
+// 		fmt.Printf("Logging err: %s\n", err.Error())
+// 	}
+// }
