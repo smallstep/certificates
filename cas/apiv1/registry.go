@@ -18,7 +18,7 @@ func Register(t Type, fn CertificateAuthorityServiceNewFunc) {
 	registry.Store(t.String(), fn)
 }
 
-// LoadCertificateAuthorityServiceNewFunc returns the function initialize a KayManager.
+// LoadCertificateAuthorityServiceNewFunc returns the function to initialize a KeyManager.
 func LoadCertificateAuthorityServiceNewFunc(t Type) (CertificateAuthorityServiceNewFunc, bool) {
 	v, ok := registry.Load(t.String())
 	if !ok {

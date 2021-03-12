@@ -11,8 +11,6 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	database "github.com/smallstep/certificates/db"
 
-	"go.step.sm/crypto/pemutil"
-
 	"github.com/smallstep/nosql"
 
 	microx509util "github.com/micromdm/scep/crypto/x509util"
@@ -59,10 +57,8 @@ type Authority struct {
 
 // AuthorityOptions required to create a new SCEP Authority.
 type AuthorityOptions struct {
-	IntermediateCertificatePath string
-
+	// Service provides the SCEP functions to Authority
 	Service Service
-
 	// Backdate
 	Backdate provisioner.Duration
 	// DB is the database used by nosql.
@@ -96,21 +92,12 @@ func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 		}
 	}
 
-	// TODO: the below is a bit similar as what happens in the core Authority class, which
-	// creates the full x509 service. However, those aren't accessible directly, which is
-	// why I reimplemented this (for now). There might be an alternative that I haven't
-	// found yet.
-	certificateChain, err := pemutil.ReadCertificateBundle(ops.IntermediateCertificatePath)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Authority{
 		backdate:                ops.Backdate,
 		db:                      ops.DB,
 		prefix:                  ops.Prefix,
 		dns:                     ops.DNS,
-		intermediateCertificate: certificateChain[0],
+		intermediateCertificate: ops.Service.certificateChain[0],
 		service:                 ops.Service,
 		signAuth:                signAuth,
 	}, nil
@@ -208,7 +195,7 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 		return err
 	}
 
-	envelope, err := p7c.Decrypt(a.intermediateCertificate, a.service.Decrypter)
+	envelope, err := p7c.Decrypt(a.intermediateCertificate, a.service.decrypter)
 	if err != nil {
 		return err
 	}
@@ -351,7 +338,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	authCert := a.intermediateCertificate
 
 	// sign the attributes
-	if err := signedData.AddSigner(authCert, a.service.Signer, config); err != nil {
+	if err := signedData.AddSigner(authCert, a.service.signer, config); err != nil {
 		return nil, err
 	}
 
@@ -430,7 +417,7 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, csr *x509.Certifi
 	}
 
 	// sign the attributes
-	if err := signedData.AddSigner(a.intermediateCertificate, a.service.Signer, config); err != nil {
+	if err := signedData.AddSigner(a.intermediateCertificate, a.service.signer, config); err != nil {
 		return nil, err
 	}
 
