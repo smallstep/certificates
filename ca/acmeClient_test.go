@@ -40,9 +40,9 @@ func TestNewACMEClient(t *testing.T) {
 		KeyChange:  srv.URL + "/blorp",
 	}
 	acc := acme.Account{
-		Contact: []string{"max", "mariano"},
-		Status:  "valid",
-		Orders:  "orders-url",
+		Contact:   []string{"max", "mariano"},
+		Status:    "valid",
+		OrdersURL: "orders-url",
 	}
 	tests := map[string]func(t *testing.T) test{
 		"fail/client-option-error": func(t *testing.T) test {
@@ -248,9 +248,9 @@ func TestACMEClient_post(t *testing.T) {
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	assert.FatalError(t, err)
 	acc := acme.Account{
-		Contact: []string{"max", "mariano"},
-		Status:  "valid",
-		Orders:  "orders-url",
+		Contact:   []string{"max", "mariano"},
+		Status:    "valid",
+		OrdersURL: "orders-url",
 	}
 	ac := &ACMEClient{
 		client: &http.Client{
@@ -1121,9 +1121,9 @@ func TestACMEClient_GetAccountOrders(t *testing.T) {
 		Key:    jwk,
 		kid:    "foobar",
 		acc: &acme.Account{
-			Contact: []string{"max", "mariano"},
-			Status:  "valid",
-			Orders:  srv.URL + "/orders-url",
+			Contact:   []string{"max", "mariano"},
+			Status:    "valid",
+			OrdersURL: srv.URL + "/orders-url",
 		},
 	}
 
@@ -1198,7 +1198,7 @@ func TestACMEClient_GetAccountOrders(t *testing.T) {
 				assert.Equals(t, hdr.Nonce, expectedNonce)
 				jwsURL, ok := hdr.ExtraHeaders["url"].(string)
 				assert.Fatal(t, ok)
-				assert.Equals(t, jwsURL, ac.acc.Orders)
+				assert.Equals(t, jwsURL, ac.acc.OrdersURL)
 				assert.Equals(t, hdr.KeyID, ac.kid)
 
 				payload, err := jws.Verify(ac.Key.Public())
@@ -1259,9 +1259,9 @@ func TestACMEClient_GetCertificate(t *testing.T) {
 		Key:    jwk,
 		kid:    "foobar",
 		acc: &acme.Account{
-			Contact: []string{"max", "mariano"},
-			Status:  "valid",
-			Orders:  srv.URL + "/orders-url",
+			Contact:   []string{"max", "mariano"},
+			Status:    "valid",
+			OrdersURL: srv.URL + "/orders-url",
 		},
 	}
 

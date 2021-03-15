@@ -320,7 +320,7 @@ func (c *ACMEClient) GetAccountOrders() ([]string, error) {
 	if c.acc == nil {
 		return nil, errors.New("acme client not configured with account")
 	}
-	resp, err := c.post(nil, c.acc.Orders, withKid(c))
+	resp, err := c.post(nil, c.acc.OrdersURL, withKid(c))
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +330,7 @@ func (c *ACMEClient) GetAccountOrders() ([]string, error) {
 
 	var orders []string
 	if err := readJSON(resp.Body, &orders); err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", c.acc.Orders)
+		return nil, errors.Wrapf(err, "error reading %s", c.acc.OrdersURL)
 	}
 
 	return orders, nil

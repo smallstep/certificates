@@ -160,7 +160,7 @@ func (l *linker) LinkOrder(ctx context.Context, o *acme.Order) {
 
 // LinkAccount sets the ACME links required by an ACME account.
 func (l *linker) LinkAccount(ctx context.Context, acc *acme.Account) {
-	acc.Orders = l.GetLink(ctx, OrdersByAccountLinkType, true, acc.ID)
+	acc.OrdersURL = l.GetLink(ctx, OrdersByAccountLinkType, true, acc.ID)
 }
 
 // LinkChallenge sets the ACME links required by an ACME challenge.

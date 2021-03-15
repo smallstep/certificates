@@ -420,11 +420,11 @@ func TestHandler_NewAccount(t *testing.T) {
 					},
 				},
 				acc: &acme.Account{
-					ID:      "accountID",
-					Key:     jwk,
-					Status:  acme.StatusValid,
-					Contact: []string{"foo", "bar"},
-					Orders:  "https://test.ca.smallstep.com/acme/test@acme-provisioner.com/account/accountID/orders",
+					ID:        "accountID",
+					Key:       jwk,
+					Status:    acme.StatusValid,
+					Contact:   []string{"foo", "bar"},
+					OrdersURL: "https://test.ca.smallstep.com/acme/test@acme-provisioner.com/account/accountID/orders",
 				},
 				ctx:        ctx,
 				statusCode: 201,
@@ -496,9 +496,9 @@ func TestHandler_NewAccount(t *testing.T) {
 func TestHandler_GetUpdateAccount(t *testing.T) {
 	accID := "accountID"
 	acc := acme.Account{
-		ID:     accID,
-		Status: "valid",
-		Orders: fmt.Sprintf("https://ca.smallstep.com/acme/account/%s/orders", accID),
+		ID:        accID,
+		Status:    "valid",
+		OrdersURL: fmt.Sprintf("https://ca.smallstep.com/acme/account/%s/orders", accID),
 	}
 	prov := newProv()
 	provName := url.PathEscape(prov.GetName())
