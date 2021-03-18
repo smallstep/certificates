@@ -148,6 +148,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
 		Template: leaf,
+		CSR:      csr,
 		Lifetime: lifetime,
 		Backdate: signOpts.Backdate,
 	})
@@ -367,9 +368,10 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		// CAS operation, note that SoftCAS (default) is a noop.
 		// The revoke happens when this is stored in the db.
 		_, err = a.x509CAService.RevokeCertificate(&casapi.RevokeCertificateRequest{
-			Certificate: revokedCert,
-			Reason:      rci.Reason,
-			ReasonCode:  rci.ReasonCode,
+			Certificate:  revokedCert,
+			SerialNumber: rci.Serial,
+			Reason:       rci.Reason,
+			ReasonCode:   rci.ReasonCode,
 		})
 		if err != nil {
 			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
@@ -427,6 +429,7 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
 		Template: certTpl,
+		CSR:      cr,
 		Lifetime: 24 * time.Hour,
 		Backdate: 1 * time.Minute,
 	})

@@ -14,17 +14,29 @@ type Options struct {
 	// The type of the CAS to use.
 	Type string `json:"type"`
 
-	// Path to the credentials file used in CloudCAS
-	CredentialsFile string `json:"credentialsFile"`
+	// CertificateAuthority reference:
+	// In StepCAS the values is the CA url, e.g. "https://ca.smallstep.com:9000".
+	// In CloudCAS the format is "projects/*/locations/*/certificateAuthorities/*".
+	CertificateAuthority string `json:"certificateAuthority,omitempty"`
 
-	// CertificateAuthority reference. In CloudCAS the format is
-	// `projects/*/locations/*/certificateAuthorities/*`.
-	CertificateAuthority string `json:"certificateAuthority"`
+	// CertificateAuthorityFingerprint is the root fingerprint used to
+	// authenticate the connection to the CA when using StepCAS.
+	CertificateAuthorityFingerprint string `json:"certificateAuthorityFingerprint,omitempty"`
 
-	// Certificate and signer are the issuer certificate,along with any other bundled certificates to be returned in the chain for consumers, and signer used in SoftCAS.
-	// They are configured in ca.json crt and key properties.
-	CertificateChain []*x509.Certificate
-	Signer           crypto.Signer `json:"-"`
+	// CertificateIssuer contains the configuration used in StepCAS.
+	CertificateIssuer *CertificateIssuer `json:"certificateIssuer,omitempty"`
+
+	// Path to the credentials file used in CloudCAS. If not defined the default
+	// authentication mechanism provided by Google SDK will be used. See
+	// https://cloud.google.com/docs/authentication.
+	CredentialsFile string `json:"credentialsFile,omitempty"`
+
+	// Certificate and signer are the issuer certificate, along with any other
+	// bundled certificates to be returned in the chain for consumers, and
+	// signer used in SoftCAS. They are configured in ca.json crt and key
+	// properties.
+	CertificateChain []*x509.Certificate `json:"-"`
+	Signer           crypto.Signer       `json:"-"`
 
 	// IsCreator is set to true when we're creating a certificate authority. Is
 	// used to skip some validations when initializing a CertificateAuthority.
@@ -37,6 +49,15 @@ type Options struct {
 	// certificate authority.
 	Project  string `json:"-"`
 	Location string `json:"-"`
+}
+
+// CertificateIssuer contains the properties used to use the StepCAS certificate
+// authority service.
+type CertificateIssuer struct {
+	Type        string `json:"type"`
+	Provisioner string `json:"provisioner,omitempty"`
+	Certificate string `json:"crt,omitempty"`
+	Key         string `json:"key,omitempty"`
 }
 
 // Validate checks the fields in Options.

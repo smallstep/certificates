@@ -35,6 +35,8 @@ const (
 	SoftCAS = "softcas"
 	// CloudCAS is a CertificateAuthorityService using Google Cloud CAS.
 	CloudCAS = "cloudcas"
+	// StepCAS is a CertificateAuthorityService using another step-ca instance.
+	StepCAS = "stepcas"
 )
 
 // String returns a string from the type. It will always return the lower case
