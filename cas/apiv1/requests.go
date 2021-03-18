@@ -86,6 +86,7 @@ type RevokeCertificateRequest struct {
 	SerialNumber string
 	Reason       string
 	ReasonCode   int
+	PassiveOnly  bool
 	RequestID    string
 }
 

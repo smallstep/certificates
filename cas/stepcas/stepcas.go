@@ -149,6 +149,7 @@ func (s *StepCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1
 		ReasonCode: req.ReasonCode,
 		Reason:     req.Reason,
 		OTT:        token,
+		Passive:    req.PassiveOnly,
 	}, nil)
 	if err != nil {
 		return nil, err

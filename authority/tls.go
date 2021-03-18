@@ -372,6 +372,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 			SerialNumber: rci.Serial,
 			Reason:       rci.Reason,
 			ReasonCode:   rci.ReasonCode,
+			PassiveOnly:  revokeOpts.PassiveOnly,
 		})
 		if err != nil {
 			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
