@@ -59,45 +59,25 @@ func (db *DB) GetCertificate(ctx context.Context, id string) (*acme.Certificate,
 	if nosql.IsErrNotFound(err) {
 		return nil, errors.Wrapf(err, "certificate %s not found", id)
 	} else if err != nil {
-		return nil, errors.Wrap(err, "error loading certificate")
+		return nil, errors.Wrapf(err, "error loading certificate %s", id)
 	}
 	dbC := new(dbCert)
 	if err := json.Unmarshal(b, dbC); err != nil {
-		return nil, errors.Wrap(err, "error unmarshaling certificate")
+		return nil, errors.Wrapf(err, "error unmarshaling certificate %s", id)
 	}
 
-	leaf, err := parseCert(dbC.Leaf)
+	certs, err := parseBundle(append(dbC.Leaf, dbC.Intermediates...))
 	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing leaf of ACME Certificate with ID '%s'", id)
-	}
-
-	intermediates, err := parseBundle(dbC.Intermediates)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing intermediate bundle of ACME Certificate with ID '%s'", id)
+		return nil, errors.Wrapf(err, "error parsing certificate chain for ACME certificate with ID %s", id)
 	}
 
 	return &acme.Certificate{
 		ID:            dbC.ID,
 		AccountID:     dbC.AccountID,
 		OrderID:       dbC.OrderID,
-		Leaf:          leaf,
-		Intermediates: intermediates,
+		Leaf:          certs[0],
+		Intermediates: certs[1:],
 	}, nil
-}
-
-func parseCert(b []byte) (*x509.Certificate, error) {
-	block, rest := pem.Decode(b)
-	if block == nil || len(rest) > 0 {
-		return nil, errors.New("error decoding PEM block: contains unexpected data")
-	}
-	if block.Type != "CERTIFICATE" {
-		return nil, errors.New("error decoding PEM: block is not a certificate bundle")
-	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "error parsing x509 certificate")
-	}
-	return cert, nil
 }
 
 func parseBundle(b []byte) ([]*x509.Certificate, error) {
