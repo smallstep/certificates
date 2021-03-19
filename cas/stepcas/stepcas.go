@@ -211,6 +211,5 @@ func (s *StepCAS) lifetime(d time.Duration) api.TimeDuration {
 	}
 	var td api.TimeDuration
 	td.SetDuration(d)
-	println(td.String(), d.String())
 	return td
 }
