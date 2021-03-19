@@ -105,9 +105,6 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 
 type orderIDsByAccount struct{}
 
-// addOrderID adds an order ID to a users index of in progress order IDs.
-// This method will also cull any orders that are no longer in the `pending`
-// state from the index before returning it.
 func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...string) ([]string, error) {
 	ordersByAccountMux.Lock()
 	defer ordersByAccountMux.Unlock()
@@ -157,6 +154,7 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...st
 	return pendOids, nil
 }
 
+// GetOrdersByAccountID returns a list of order IDs owned by the account.
 func (db *DB) GetOrdersByAccountID(ctx context.Context, accID string) ([]string, error) {
 	return db.updateAddOrderIDs(ctx, accID)
 }

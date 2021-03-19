@@ -13,12 +13,12 @@ import (
 
 // dbAccount represents an ACME account.
 type dbAccount struct {
-	ID          string           `json:"id"`
-	Created     time.Time        `json:"created"`
-	Deactivated time.Time        `json:"deactivated"`
-	Key         *jose.JSONWebKey `json:"key"`
-	Contact     []string         `json:"contact,omitempty"`
-	Status      acme.Status      `json:"status"`
+	ID            string           `json:"id"`
+	CreatedAt     time.Time        `json:"createdAt"`
+	DeactivatedAt time.Time        `json:"deactivatedAt"`
+	Key           *jose.JSONWebKey `json:"key"`
+	Contact       []string         `json:"contact,omitempty"`
+	Status        acme.Status      `json:"status"`
 }
 
 func (dba *dbAccount) clone() *dbAccount {
@@ -35,11 +35,11 @@ func (db *DB) CreateAccount(ctx context.Context, acc *acme.Account) error {
 	}
 
 	dba := &dbAccount{
-		ID:      acc.ID,
-		Key:     acc.Key,
-		Contact: acc.Contact,
-		Status:  acc.Status,
-		Created: clock.Now(),
+		ID:        acc.ID,
+		Key:       acc.Key,
+		Contact:   acc.Contact,
+		Status:    acc.Status,
+		CreatedAt: clock.Now(),
 	}
 
 	kid, err := acme.KeyToID(dba.Key)
@@ -105,7 +105,7 @@ func (db *DB) UpdateAccount(ctx context.Context, acc *acme.Account) error {
 
 	// If the status has changed to 'deactivated', then set deactivatedAt timestamp.
 	if acc.Status == acme.StatusDeactivated && old.Status != acme.StatusDeactivated {
-		nu.Deactivated = clock.Now()
+		nu.DeactivatedAt = clock.Now()
 	}
 
 	return db.save(ctx, old.ID, nu, old, "account", accountTable)
