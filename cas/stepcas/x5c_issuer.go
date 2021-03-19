@@ -125,8 +125,8 @@ func newX5CSigner(certFile, keyFile string) (jose.Signer, error) {
 
 func newJoseSigner(key crypto.Signer, so *jose.SignerOptions) (jose.Signer, error) {
 	var alg jose.SignatureAlgorithm
-	switch k := key.(type) {
-	case *ecdsa.PrivateKey:
+	switch k := key.Public().(type) {
+	case *ecdsa.PublicKey:
 		switch k.Curve.Params().Name {
 		case "P-256":
 			alg = jose.ES256
@@ -137,9 +137,9 @@ func newJoseSigner(key crypto.Signer, so *jose.SignerOptions) (jose.Signer, erro
 		default:
 			return nil, errors.Errorf("unsupported elliptic curve %s", k.Curve.Params().Name)
 		}
-	case ed25519.PrivateKey:
+	case ed25519.PublicKey:
 		alg = jose.EdDSA
-	case *rsa.PrivateKey:
+	case *rsa.PublicKey:
 		alg = jose.DefaultRSASigAlgorithm
 	default:
 		return nil, errors.Errorf("unsupported key type %T", k)
