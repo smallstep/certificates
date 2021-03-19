@@ -174,14 +174,15 @@ func TestMain(m *testing.M) {
 
 	// Final certificate.
 	var err error
-	testCrt, testKey = mustSignCertificate("Test Certificate", []string{"doe.org"}, x509util.DefaultLeafTemplate, testIssCrt, testIssKey)
-	testCR, err = x509util.CreateCertificateRequest("Test Certificate", []string{"doe.org"}, testKey)
+	sans := []string{"doe.org", "jane@doe.org", "127.0.0.1", "::1", "localhost", "uuid:f81d4fae-7dec-11d0-a765-00a0c91e6bf6;name=value"}
+	testCrt, testKey = mustSignCertificate("Test Certificate", sans, x509util.DefaultLeafTemplate, testIssCrt, testIssKey)
+	testCR, err = x509util.CreateCertificateRequest("Test Certificate", sans, testKey)
 	if err != nil {
 		panic(err)
 	}
 
 	// CR used in errors.
-	testFailCR, err = x509util.CreateCertificateRequest("Test Certificate", []string{"fail.doe.org"}, testKey)
+	testFailCR, err = x509util.CreateCertificateRequest("", []string{"fail.doe.org"}, testKey)
 	if err != nil {
 		panic(err)
 	}

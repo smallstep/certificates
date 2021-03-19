@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"net/url"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
@@ -70,23 +71,9 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 		return nil, errors.New("createCertificateRequest `lifetime` cannot be 0")
 	}
 
-	token, err := s.signToken(req.CSR.Subject.CommonName, req.CSR.DNSNames)
+	cert, chain, err := s.createCertificate(req.CSR, req.Lifetime)
 	if err != nil {
 		return nil, err
-	}
-
-	resp, err := s.client.Sign(&api.SignRequest{
-		CsrPEM: api.CertificateRequest{CertificateRequest: req.CSR},
-		OTT:    token,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var chain []*x509.Certificate
-	cert := resp.CertChainPEM[0].Certificate
-	for _, c := range resp.CertChainPEM[1:] {
-		chain = append(chain, c.Certificate)
 	}
 
 	return &apiv1.CreateCertificateResponse{
@@ -98,28 +85,14 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 func (s *StepCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
 	switch {
 	case req.CSR == nil:
-		return nil, errors.New("createCertificateRequest `template` cannot be nil")
+		return nil, errors.New("renewCertificateRequest `template` cannot be nil")
 	case req.Lifetime == 0:
-		return nil, errors.New("createCertificateRequest `lifetime` cannot be 0")
+		return nil, errors.New("renewCertificateRequest `lifetime` cannot be 0")
 	}
 
-	token, err := s.signToken(req.CSR.Subject.CommonName, req.CSR.DNSNames)
+	cert, chain, err := s.createCertificate(req.CSR, req.Lifetime)
 	if err != nil {
 		return nil, err
-	}
-
-	resp, err := s.client.Sign(&api.SignRequest{
-		CsrPEM: api.CertificateRequest{CertificateRequest: req.CSR},
-		OTT:    token,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var chain []*x509.Certificate
-	cert := resp.CertChainPEM[0].Certificate
-	for _, c := range resp.CertChainPEM[1:] {
-		chain = append(chain, c.Certificate)
 	}
 
 	return &apiv1.RenewCertificateResponse{
@@ -171,6 +144,48 @@ func (s *StepCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequ
 	return &apiv1.GetCertificateAuthorityResponse{
 		RootCertificate: resp.RootPEM.Certificate,
 	}, nil
+}
+
+func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.Duration) (*x509.Certificate, []*x509.Certificate, error) {
+	sans := make([]string, 0, len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses)+len(cr.URIs))
+	for _, s := range cr.DNSNames {
+		sans = append(sans, s)
+	}
+	for _, s := range cr.EmailAddresses {
+		sans = append(sans, s)
+	}
+	for _, ip := range cr.IPAddresses {
+		sans = append(sans, ip.String())
+	}
+	for _, u := range cr.URIs {
+		sans = append(sans, u.String())
+	}
+
+	commonName := cr.Subject.CommonName
+	if commonName == "" && len(sans) > 0 {
+		commonName = sans[0]
+	}
+
+	token, err := s.signToken(commonName, sans)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resp, err := s.client.Sign(&api.SignRequest{
+		CsrPEM: api.CertificateRequest{CertificateRequest: cr},
+		OTT:    token,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var chain []*x509.Certificate
+	cert := resp.CertChainPEM[0].Certificate
+	for _, c := range resp.CertChainPEM[1:] {
+		chain = append(chain, c.Certificate)
+	}
+
+	return cert, chain, nil
 }
 
 func (s *StepCAS) signToken(subject string, sans []string) (string, error) {
