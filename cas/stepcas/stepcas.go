@@ -148,12 +148,8 @@ func (s *StepCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequ
 
 func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.Duration) (*x509.Certificate, []*x509.Certificate, error) {
 	sans := make([]string, 0, len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses)+len(cr.URIs))
-	for _, s := range cr.DNSNames {
-		sans = append(sans, s)
-	}
-	for _, s := range cr.EmailAddresses {
-		sans = append(sans, s)
-	}
+	sans = append(sans, cr.DNSNames...)
+	sans = append(sans, cr.EmailAddresses...)
 	for _, ip := range cr.IPAddresses {
 		sans = append(sans, ip.String())
 	}
