@@ -13,6 +13,7 @@ type Authorization struct {
 	ExpiresAt  time.Time    `json:"expires"`
 	Challenges []*Challenge `json:"challenges"`
 	Wildcard   bool         `json:"wildcard"`
+	Error      *Error       `json:"error,omitempty"`
 	ID         string       `json:"-"`
 	AccountID  string       `json:"-"`
 	Token      string       `json:"-"`

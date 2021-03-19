@@ -121,9 +121,9 @@ func TestHandler_GetAuthorization(t *testing.T) {
 			Type:  "dns",
 			Value: "example.com",
 		},
-		Status:   "pending",
-		Expires:  expiry,
-		Wildcard: false,
+		Status:    "pending",
+		ExpiresAt: expiry,
+		Wildcard:  false,
 		Challenges: []*acme.Challenge{
 			{
 				Type:    "http-01",
@@ -220,7 +220,7 @@ func TestHandler_GetAuthorization(t *testing.T) {
 						return &acme.Authorization{
 							AccountID: "accID",
 							Status:    acme.StatusPending,
-							Expires:   time.Now().Add(-1 * time.Hour),
+							ExpiresAt: time.Now().Add(-1 * time.Hour),
 						}, nil
 					},
 					MockUpdateAuthorization: func(ctx context.Context, az *acme.Authorization) error {

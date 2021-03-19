@@ -388,7 +388,7 @@ func TestACMEClient_NewOrder(t *testing.T) {
 	assert.FatalError(t, err)
 	ord := acme.Order{
 		Status:      "valid",
-		Expires:     time.Now(), // "soon"
+		ExpiresAt:   time.Now(), // "soon"
 		FinalizeURL: "finalize-url",
 	}
 	ac := &ACMEClient{
@@ -510,7 +510,7 @@ func TestACMEClient_GetOrder(t *testing.T) {
 	assert.FatalError(t, err)
 	ord := acme.Order{
 		Status:      "valid",
-		Expires:     time.Now(), // "soon"
+		ExpiresAt:   time.Now(), // "soon"
 		FinalizeURL: "finalize-url",
 	}
 	ac := &ACMEClient{
@@ -630,7 +630,7 @@ func TestACMEClient_GetAuthz(t *testing.T) {
 	assert.FatalError(t, err)
 	az := acme.Authorization{
 		Status:     "valid",
-		Expires:    time.Now(),
+		ExpiresAt:  time.Now(),
 		Identifier: acme.Identifier{Type: "dns", Value: "example.com"},
 	}
 	ac := &ACMEClient{
@@ -988,7 +988,7 @@ func TestACMEClient_FinalizeOrder(t *testing.T) {
 	assert.FatalError(t, err)
 	ord := acme.Order{
 		Status:         "valid",
-		Expires:        time.Now(), // "soon"
+		ExpiresAt:      time.Now(), // "soon"
 		FinalizeURL:    "finalize-url",
 		CertificateURL: "cert-url",
 	}

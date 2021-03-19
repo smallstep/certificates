@@ -58,7 +58,7 @@ func (db *DB) GetOrder(ctx context.Context, id string) (*acme.Order, error) {
 
 	o := &acme.Order{
 		Status:           dbo.Status,
-		Expires:          dbo.Expires,
+		ExpiresAt:        dbo.Expires,
 		Identifiers:      dbo.Identifiers,
 		NotBefore:        dbo.NotBefore,
 		NotAfter:         dbo.NotAfter,
@@ -86,7 +86,7 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 		ProvisionerID:  o.ProvisionerID,
 		Created:        now,
 		Status:         acme.StatusPending,
-		Expires:        o.Expires,
+		Expires:        o.ExpiresAt,
 		Identifiers:    o.Identifiers,
 		NotBefore:      o.NotBefore,
 		NotAfter:       o.NotBefore,

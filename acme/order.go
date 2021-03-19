@@ -22,7 +22,7 @@ type Identifier struct {
 type Order struct {
 	ID                string        `json:"id"`
 	Status            Status        `json:"status"`
-	Expires           time.Time     `json:"expires,omitempty"`
+	ExpiresAt         time.Time     `json:"expires,omitempty"`
 	Identifiers       []Identifier  `json:"identifiers"`
 	NotBefore         time.Time     `json:"notBefore,omitempty"`
 	NotAfter          time.Time     `json:"notAfter,omitempty"`
@@ -59,7 +59,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 		return nil
 	case StatusReady:
 		// Check expiry
-		if now.After(o.Expires) {
+		if now.After(o.ExpiresAt) {
 			o.Status = StatusInvalid
 			o.Error = NewError(ErrorMalformedType, "order has expired")
 			break
@@ -67,7 +67,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 		return nil
 	case StatusPending:
 		// Check expiry
-		if now.After(o.Expires) {
+		if now.After(o.ExpiresAt) {
 			o.Status = StatusInvalid
 			o.Error = NewError(ErrorMalformedType, "order has expired")
 			break

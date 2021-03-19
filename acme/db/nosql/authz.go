@@ -23,6 +23,7 @@ type dbAuthz struct {
 	Wildcard   bool            `json:"wildcard"`
 	CreatedAt  time.Time       `json:"createdAt"`
 	Error      *acme.Error     `json:"error"`
+	Token      string          `json:"token"`
 }
 
 func (ba *dbAuthz) clone() *dbAuthz {
@@ -35,14 +36,14 @@ func (ba *dbAuthz) clone() *dbAuthz {
 func (db *DB) getDBAuthz(ctx context.Context, id string) (*dbAuthz, error) {
 	data, err := db.db.Get(authzTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
-		return nil, errors.Wrapf(err, "authz %s not found", id)
+		return nil, acme.NewError(acme.ErrorMalformedType, "authz %s not found", id)
 	} else if err != nil {
 		return nil, errors.Wrapf(err, "error loading authz %s", id)
 	}
 
 	var dbaz dbAuthz
 	if err = json.Unmarshal(data, &dbaz); err != nil {
-		return nil, errors.Wrap(err, "error unmarshaling authz type into dbAuthz")
+		return nil, errors.Wrapf(err, "error unmarshaling authz %s into dbAuthz", id)
 	}
 	return &dbaz, nil
 }
@@ -62,12 +63,15 @@ func (db *DB) GetAuthorization(ctx context.Context, id string) (*acme.Authorizat
 		}
 	}
 	return &acme.Authorization{
+		ID:         dbaz.ID,
+		AccountID:  dbaz.AccountID,
 		Identifier: dbaz.Identifier,
 		Status:     dbaz.Status,
 		Challenges: chs,
 		Wildcard:   dbaz.Wildcard,
 		ExpiresAt:  dbaz.ExpiresAt,
-		ID:         dbaz.ID,
+		Token:      dbaz.Token,
+		Error:      dbaz.Error,
 	}, nil
 }
 
@@ -89,11 +93,12 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *acme.Authorization) e
 	dbaz := &dbAuthz{
 		ID:         az.ID,
 		AccountID:  az.AccountID,
-		Status:     acme.StatusPending,
+		Status:     az.Status,
 		CreatedAt:  now,
-		ExpiresAt:  now.Add(defaultExpiryDuration),
+		ExpiresAt:  az.ExpiresAt,
 		Identifier: az.Identifier,
 		Challenges: chIDs,
+		Token:      az.Token,
 		Wildcard:   az.Wildcard,
 	}
 
@@ -102,9 +107,6 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *acme.Authorization) e
 
 // UpdateAuthorization saves an updated ACME Authorization to the database.
 func (db *DB) UpdateAuthorization(ctx context.Context, az *acme.Authorization) error {
-	if len(az.ID) == 0 {
-		return errors.New("id cannot be empty")
-	}
 	old, err := db.getDBAuthz(ctx, az.ID)
 	if err != nil {
 		return err
@@ -113,5 +115,6 @@ func (db *DB) UpdateAuthorization(ctx context.Context, az *acme.Authorization) e
 	nu := old.clone()
 
 	nu.Status = az.Status
+	nu.Error = az.Error
 	return db.save(ctx, old.ID, nu, old, "authz", authzTable)
 }

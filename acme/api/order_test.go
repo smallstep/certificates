@@ -166,9 +166,9 @@ func TestHandler_GetOrder(t *testing.T) {
 				Value: "*.smallstep.com",
 			},
 		},
-		Expires: expiry,
-		Status:  acme.StatusInvalid,
-		Error:   acme.NewError(acme.ErrorMalformedType, "order has expired"),
+		ExpiresAt: expiry,
+		Status:    acme.StatusInvalid,
+		Error:     acme.NewError(acme.ErrorMalformedType, "order has expired"),
 		AuthorizationURLs: []string{
 			"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/foo",
 			"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/bar",
@@ -285,7 +285,7 @@ func TestHandler_GetOrder(t *testing.T) {
 						return &acme.Order{
 							AccountID:     "accountID",
 							ProvisionerID: "acme/test@acme-provisioner.com",
-							Expires:       clock.Now().Add(-time.Hour),
+							ExpiresAt:     clock.Now().Add(-time.Hour),
 							Status:        acme.StatusReady,
 						}, nil
 					},
@@ -311,7 +311,7 @@ func TestHandler_GetOrder(t *testing.T) {
 							ID:               "orderID",
 							AccountID:        "accountID",
 							ProvisionerID:    "acme/test@acme-provisioner.com",
-							Expires:          expiry,
+							ExpiresAt:        expiry,
 							Status:           acme.StatusReady,
 							AuthorizationIDs: []string{"foo", "bar", "baz"},
 							NotBefore:        nbf,
@@ -380,7 +380,7 @@ func TestHandler_NewOrder(t *testing.T) {
 	naf := nbf.Add(17 * time.Hour)
 	o := acme.Order{
 		ID:        "orderID",
-		Expires:   expiry,
+		ExpiresAt: expiry,
 		NotBefore: nbf,
 		NotAfter:  naf,
 		Identifiers: []acme.Identifier{
@@ -607,8 +607,8 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 				Value: "*.smallstep.com",
 			},
 		},
-		Expires: naf,
-		Status:  acme.StatusValid,
+		ExpiresAt: naf,
+		Status:    acme.StatusValid,
 		AuthorizationURLs: []string{
 			"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/foo",
 			"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/bar",
@@ -788,7 +788,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 						return &acme.Order{
 							AccountID:     "accountID",
 							ProvisionerID: "acme/test@acme-provisioner.com",
-							Expires:       clock.Now().Add(-time.Hour),
+							ExpiresAt:     clock.Now().Add(-time.Hour),
 							Status:        acme.StatusReady,
 						}, nil
 					},
@@ -815,7 +815,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 							ID:               "orderID",
 							AccountID:        "accountID",
 							ProvisionerID:    "acme/test@acme-provisioner.com",
-							Expires:          naf,
+							ExpiresAt:        naf,
 							Status:           acme.StatusValid,
 							AuthorizationIDs: []string{"foo", "bar", "baz"},
 							NotBefore:        nbf,
