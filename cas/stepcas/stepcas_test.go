@@ -189,7 +189,7 @@ func TestMain(m *testing.M) {
 
 	testRootFingerprint = x509util.Fingerprint(testRootCrt)
 
-	path, err := os.MkdirTemp(os.TempDir(), "stepcas")
+	path, err := ioutil.TempDir(os.TempDir(), "stepcas")
 	if err != nil {
 		panic(err)
 	}
