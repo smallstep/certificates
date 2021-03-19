@@ -17,6 +17,12 @@ import (
 
 const defaultValidity = 5 * time.Minute
 
+// timeNow returns the current time.
+// This method is used for unit testing purposes.
+var timeNow = func() time.Time {
+	return time.Now()
+}
+
 type x5cIssuer struct {
 	caURL    *url.URL
 	certFile string
@@ -58,6 +64,18 @@ func (i *x5cIssuer) RevokeToken(subject string) (string, error) {
 	return i.createToken(aud, subject, nil)
 }
 
+func (i *x5cIssuer) Lifetime(d time.Duration) time.Duration {
+	cert, err := pemutil.ReadCertificate(i.certFile, pemutil.WithFirstBlock())
+	if err != nil {
+		return d
+	}
+	now := timeNow()
+	if now.Add(d + time.Minute).After(cert.NotAfter) {
+		return cert.NotAfter.Sub(now) - time.Minute
+	}
+	return d
+}
+
 func (i *x5cIssuer) createToken(aud, sub string, sans []string) (string, error) {
 	signer, err := newX5CSigner(i.certFile, i.keyFile)
 	if err != nil {
@@ -86,7 +104,7 @@ func (i *x5cIssuer) createToken(aud, sub string, sans []string) (string, error) 
 }
 
 func defaultClaims(iss, sub, aud, id string) jose.Claims {
-	now := time.Now()
+	now := timeNow()
 	return jose.Claims{
 		ID:        id,
 		Issuer:    iss,

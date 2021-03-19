@@ -172,8 +172,9 @@ func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.D
 	}
 
 	resp, err := s.client.Sign(&api.SignRequest{
-		CsrPEM: api.CertificateRequest{CertificateRequest: cr},
-		OTT:    token,
+		CsrPEM:   api.CertificateRequest{CertificateRequest: cr},
+		OTT:      token,
+		NotAfter: s.lifetime(lifetime),
 	})
 	if err != nil {
 		return nil, nil, err
@@ -202,4 +203,14 @@ func (s *StepCAS) revokeToken(subject string) (string, error) {
 	}
 
 	return "", errors.New("stepCAS does not have any provisioner configured")
+}
+
+func (s *StepCAS) lifetime(d time.Duration) api.TimeDuration {
+	if s.x5c != nil {
+		d = s.x5c.Lifetime(d)
+	}
+	var td api.TimeDuration
+	td.SetDuration(d)
+	println(td.String(), d.String())
+	return td
 }

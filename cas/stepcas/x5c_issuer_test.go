@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"go.step.sm/crypto/jose"
 )
@@ -23,6 +24,17 @@ func (b noneSigner) Public() crypto.PublicKey {
 
 func (b noneSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
 	return digest, nil
+}
+
+func fakeTime(t *testing.T) {
+	t.Helper()
+	tmp := timeNow
+	t.Cleanup(func() {
+		timeNow = tmp
+	})
+	timeNow = func() time.Time {
+		return testX5CCrt.NotBefore
+	}
 }
 
 func Test_x5cIssuer_SignToken(t *testing.T) {
@@ -149,6 +161,53 @@ func Test_x5cIssuer_RevokeToken(t *testing.T) {
 				if !reflect.DeepEqual(c, want) {
 					t.Errorf("jwt.Claims() claims = %#v, want %#v", c, want)
 				}
+			}
+		})
+	}
+}
+
+func Test_x5cIssuer_Lifetime(t *testing.T) {
+	fakeTime(t)
+	caURL, err := url.Parse("https://ca.smallstep.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// With a leeway of 1m the max duration will be 59m.
+	maxDuration := testX5CCrt.NotAfter.Sub(timeNow()) - time.Minute
+
+	type fields struct {
+		caURL    *url.URL
+		certFile string
+		keyFile  string
+		issuer   string
+	}
+	type args struct {
+		d time.Duration
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   time.Duration
+	}{
+		{"ok 0s", fields{caURL, testX5CPath, testX5CKeyPath, "X5C"}, args{0}, 0},
+		{"ok 1m", fields{caURL, testX5CPath, testX5CKeyPath, "X5C"}, args{time.Minute}, time.Minute},
+		{"ok max-1m", fields{caURL, testX5CPath, testX5CKeyPath, "X5C"}, args{maxDuration - time.Minute}, maxDuration - time.Minute},
+		{"ok max", fields{caURL, testX5CPath, testX5CKeyPath, "X5C"}, args{maxDuration}, maxDuration},
+		{"ok max+1m", fields{caURL, testX5CPath, testX5CKeyPath, "X5C"}, args{maxDuration + time.Minute}, maxDuration},
+		{"ok fail", fields{caURL, testX5CPath + ".missing", testX5CKeyPath, "X5C"}, args{maxDuration + time.Minute}, maxDuration + time.Minute},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			i := &x5cIssuer{
+				caURL:    tt.fields.caURL,
+				certFile: tt.fields.certFile,
+				keyFile:  tt.fields.keyFile,
+				issuer:   tt.fields.issuer,
+			}
+			if got := i.Lifetime(tt.args.d); got != tt.want {
+				t.Errorf("x5cIssuer.Lifetime() = %v, want %v", got, tt.want)
 			}
 		})
 	}
