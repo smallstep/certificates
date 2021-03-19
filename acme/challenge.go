@@ -22,16 +22,16 @@ import (
 
 // Challenge represents an ACME response Challenge type.
 type Challenge struct {
-	Type      string `json:"type"`
-	Status    Status `json:"status"`
-	Token     string `json:"token"`
-	Validated string `json:"validated,omitempty"`
-	URL       string `json:"url"`
-	Error     *Error `json:"error,omitempty"`
-	ID        string `json:"-"`
-	AuthzID   string `json:"-"`
-	AccountID string `json:"-"`
-	Value     string `json:"-"`
+	Type        string `json:"type"`
+	Status      Status `json:"status"`
+	Token       string `json:"token"`
+	ValidatedAt string `json:"validated,omitempty"`
+	URL         string `json:"url"`
+	Error       *Error `json:"error,omitempty"`
+	ID          string `json:"-"`
+	AuthzID     string `json:"-"`
+	AccountID   string `json:"-"`
+	Value       string `json:"-"`
 }
 
 // ToLog enables response logging.
@@ -97,7 +97,7 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	// Update and store the challenge.
 	ch.Status = StatusValid
 	ch.Error = nil
-	ch.Validated = clock.Now().Format(time.RFC3339)
+	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
 
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
 		return WrapErrorISE(err, "error updating challenge")
@@ -175,7 +175,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 			ch.Status = StatusValid
 			ch.Error = nil
-			ch.Validated = clock.Now().Format(time.RFC3339)
+			ch.ValidatedAt = clock.Now().Format(time.RFC3339)
 
 			if err = db.UpdateChallenge(ctx, ch); err != nil {
 				return WrapErrorISE(err, "tlsalpn01ValidateChallenge - error updating challenge")
@@ -231,7 +231,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	// Update and store the challenge.
 	ch.Status = StatusValid
 	ch.Error = nil
-	ch.Validated = clock.Now().UTC().Format(time.RFC3339)
+	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
 
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
 		return WrapErrorISE(err, "error updating challenge")

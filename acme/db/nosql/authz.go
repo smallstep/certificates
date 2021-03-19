@@ -18,10 +18,10 @@ type dbAuthz struct {
 	AccountID  string          `json:"accountID"`
 	Identifier acme.Identifier `json:"identifier"`
 	Status     acme.Status     `json:"status"`
-	Expires    time.Time       `json:"expires"`
+	ExpiresAt  time.Time       `json:"expiresAt"`
 	Challenges []string        `json:"challenges"`
 	Wildcard   bool            `json:"wildcard"`
-	Created    time.Time       `json:"created"`
+	CreatedAt  time.Time       `json:"createdAt"`
 	Error      *acme.Error     `json:"error"`
 }
 
@@ -66,7 +66,7 @@ func (db *DB) GetAuthorization(ctx context.Context, id string) (*acme.Authorizat
 		Status:     dbaz.Status,
 		Challenges: chs,
 		Wildcard:   dbaz.Wildcard,
-		Expires:    dbaz.Expires,
+		ExpiresAt:  dbaz.ExpiresAt,
 		ID:         dbaz.ID,
 	}, nil
 }
@@ -90,8 +90,8 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *acme.Authorization) e
 		ID:         az.ID,
 		AccountID:  az.AccountID,
 		Status:     acme.StatusPending,
-		Created:    now,
-		Expires:    now.Add(defaultExpiryDuration),
+		CreatedAt:  now,
+		ExpiresAt:  now.Add(defaultExpiryDuration),
 		Identifier: az.Identifier,
 		Challenges: chIDs,
 		Wildcard:   az.Wildcard,

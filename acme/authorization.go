@@ -10,7 +10,7 @@ import (
 type Authorization struct {
 	Identifier Identifier   `json:"identifier"`
 	Status     Status       `json:"status"`
-	Expires    time.Time    `json:"expires"`
+	ExpiresAt  time.Time    `json:"expires"`
 	Challenges []*Challenge `json:"challenges"`
 	Wildcard   bool         `json:"wildcard"`
 	ID         string       `json:"-"`
@@ -39,7 +39,7 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 		return nil
 	case StatusPending:
 		// check expiry
-		if now.After(az.Expires) {
+		if now.After(az.ExpiresAt) {
 			az.Status = StatusInvalid
 			break
 		}

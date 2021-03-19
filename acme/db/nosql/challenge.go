@@ -10,18 +10,17 @@ import (
 	"github.com/smallstep/nosql"
 )
 
-// dbChallenge is the base Challenge type that others build from.
 type dbChallenge struct {
-	ID        string      `json:"id"`
-	AccountID string      `json:"accountID"`
-	AuthzID   string      `json:"authzID"`
-	Type      string      `json:"type"`
-	Status    acme.Status `json:"status"`
-	Token     string      `json:"token"`
-	Value     string      `json:"value"`
-	Validated string      `json:"validated"`
-	Created   time.Time   `json:"created"`
-	Error     *acme.Error `json:"error"`
+	ID          string      `json:"id"`
+	AccountID   string      `json:"accountID"`
+	AuthzID     string      `json:"authzID"`
+	Type        string      `json:"type"`
+	Status      acme.Status `json:"status"`
+	Token       string      `json:"token"`
+	Value       string      `json:"value"`
+	ValidatedAt string      `json:"validatedAt"`
+	CreatedAt   time.Time   `json:"createdAt"`
+	Error       *acme.Error `json:"error"`
 }
 
 func (dbc *dbChallenge) clone() *dbChallenge {
@@ -32,9 +31,9 @@ func (dbc *dbChallenge) clone() *dbChallenge {
 func (db *DB) getDBChallenge(ctx context.Context, id string) (*dbChallenge, error) {
 	data, err := db.db.Get(challengeTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
-		return nil, errors.Wrapf(err, "challenge %s not found", id)
+		return nil, acme.NewError(acme.ErrorMalformedType, "challenge %s not found", id)
 	} else if err != nil {
-		return nil, errors.Wrapf(err, "error loading challenge %s", id)
+		return nil, errors.Wrapf(err, "error loading acme challenge %s", id)
 	}
 
 	dbch := new(dbChallenge)
@@ -60,7 +59,7 @@ func (db *DB) CreateChallenge(ctx context.Context, ch *acme.Challenge) error {
 		Value:     ch.Value,
 		Status:    acme.StatusPending,
 		Token:     ch.Token,
-		Created:   clock.Now(),
+		CreatedAt: clock.Now(),
 		Type:      ch.Type,
 	}
 
@@ -76,22 +75,21 @@ func (db *DB) GetChallenge(ctx context.Context, id, authzID string) (*acme.Chall
 	}
 
 	ch := &acme.Challenge{
-		Type:      dbch.Type,
-		Status:    dbch.Status,
-		Token:     dbch.Token,
-		ID:        dbch.ID,
-		AuthzID:   dbch.AuthzID,
-		Error:     dbch.Error,
-		Validated: dbch.Validated,
+		ID:          dbch.ID,
+		AccountID:   dbch.AccountID,
+		AuthzID:     dbch.AuthzID,
+		Type:        dbch.Type,
+		Value:       dbch.Value,
+		Status:      dbch.Status,
+		Token:       dbch.Token,
+		Error:       dbch.Error,
+		ValidatedAt: dbch.ValidatedAt,
 	}
 	return ch, nil
 }
 
 // UpdateChallenge updates an ACME challenge type in the database.
 func (db *DB) UpdateChallenge(ctx context.Context, ch *acme.Challenge) error {
-	if len(ch.ID) == 0 {
-		return errors.New("id cannot be empty")
-	}
 	old, err := db.getDBChallenge(ctx, ch.ID)
 	if err != nil {
 		return err
@@ -99,10 +97,10 @@ func (db *DB) UpdateChallenge(ctx context.Context, ch *acme.Challenge) error {
 
 	nu := old.clone()
 
-	// These should be the only values chaning in an Update request.
+	// These should be the only values changing in an Update request.
 	nu.Status = ch.Status
 	nu.Error = ch.Error
-	nu.Validated = ch.Validated
+	nu.ValidatedAt = ch.ValidatedAt
 
 	return db.save(ctx, old.ID, nu, old, "challenge", challengeTable)
 }

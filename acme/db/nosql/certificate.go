@@ -14,7 +14,7 @@ import (
 
 type dbCert struct {
 	ID            string    `json:"id"`
-	Created       time.Time `json:"created"`
+	CreatedAt     time.Time `json:"createdAt"`
 	AccountID     string    `json:"accountID"`
 	OrderID       string    `json:"orderID"`
 	Leaf          []byte    `json:"leaf"`
@@ -47,7 +47,7 @@ func (db *DB) CreateCertificate(ctx context.Context, cert *acme.Certificate) err
 		OrderID:       cert.OrderID,
 		Leaf:          leaf,
 		Intermediates: intermediates,
-		Created:       time.Now().UTC(),
+		CreatedAt:     time.Now().UTC(),
 	}
 	return db.save(ctx, cert.ID, dbch, nil, "certificate", certTable)
 }
@@ -57,7 +57,7 @@ func (db *DB) CreateCertificate(ctx context.Context, cert *acme.Certificate) err
 func (db *DB) GetCertificate(ctx context.Context, id string) (*acme.Certificate, error) {
 	b, err := db.db.Get(certTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
-		return nil, errors.Wrapf(err, "certificate %s not found", id)
+		return nil, acme.NewError(acme.ErrorMalformedType, "certificate %s not found", id)
 	} else if err != nil {
 		return nil, errors.Wrapf(err, "error loading certificate %s", id)
 	}

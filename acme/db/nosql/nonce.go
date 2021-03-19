@@ -8,14 +8,19 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
-	nosqlDB "github.com/smallstep/nosql"
-	"github.com/smallstep/nosql/database"
+	"github.com/smallstep/nosql"
 )
 
 // dbNonce contains nonce metadata used in the ACME protocol.
 type dbNonce struct {
-	ID      string
-	Created time.Time
+	ID        string
+	CreatedAt time.Time
+	DeletedAt time.Time
+}
+
+func (dbn *dbNonce) clone() *dbNonce {
+	u := *dbn
+	return &u
 }
 
 // CreateNonce creates, stores, and returns an ACME replay-nonce.
@@ -28,14 +33,10 @@ func (db *DB) CreateNonce(ctx context.Context) (acme.Nonce, error) {
 
 	id := base64.RawURLEncoding.EncodeToString([]byte(_id))
 	n := &dbNonce{
-		ID:      id,
-		Created: clock.Now(),
+		ID:        id,
+		CreatedAt: clock.Now(),
 	}
-	b, err := json.Marshal(n)
-	if err != nil {
-		return "", errors.Wrap(err, "error marshaling nonce")
-	}
-	if err = db.save(ctx, id, b, nil, "nonce", nonceTable); err != nil {
+	if err = db.save(ctx, id, n, nil, "nonce", nonceTable); err != nil {
 		return "", err
 	}
 	return acme.Nonce(id), nil
@@ -44,27 +45,24 @@ func (db *DB) CreateNonce(ctx context.Context) (acme.Nonce, error) {
 // DeleteNonce verifies that the nonce is valid (by checking if it exists),
 // and if so, consumes the nonce resource by deleting it from the database.
 func (db *DB) DeleteNonce(ctx context.Context, nonce acme.Nonce) error {
-	err := db.db.Update(&database.Tx{
-		Operations: []*database.TxEntry{
-			{
-				Bucket: nonceTable,
-				Key:    []byte(nonce),
-				Cmd:    database.Get,
-			},
-			{
-				Bucket: nonceTable,
-				Key:    []byte(nonce),
-				Cmd:    database.Delete,
-			},
-		},
-	})
-
-	switch {
-	case nosqlDB.IsErrNotFound(err):
-		return errors.New("not found")
-	case err != nil:
-		return errors.Wrapf(err, "error deleting nonce %s", nonce)
-	default:
-		return nil
+	id := string(nonce)
+	b, err := db.db.Get(nonceTable, []byte(nonce))
+	if nosql.IsErrNotFound(err) {
+		return errors.Wrapf(err, "nonce %s not found", id)
+	} else if err != nil {
+		return errors.Wrapf(err, "error loading nonce %s", id)
 	}
+
+	dbn := new(dbNonce)
+	if err := json.Unmarshal(b, dbn); err != nil {
+		return errors.Wrapf(err, "error unmarshaling nonce %s", string(nonce))
+	}
+	if !dbn.DeletedAt.IsZero() {
+		return acme.NewError(acme.ErrorBadNonceType, "nonce %s already deleted", id)
+	}
+
+	nu := dbn.clone()
+	nu.DeletedAt = clock.Now()
+
+	return db.save(ctx, id, nu, dbn, "nonce", nonceTable)
 }

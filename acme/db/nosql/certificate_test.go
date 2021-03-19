@@ -34,7 +34,7 @@ func TestDB_CreateCertificate(t *testing.T) {
 	var tests = map[string]func(t *testing.T) test{
 		"fail/cmpAndSwap-error": func(t *testing.T) test {
 			cert := &acme.Certificate{
-				AccountID:     "accounttID",
+				AccountID:     "accountID",
 				OrderID:       "orderID",
 				Leaf:          leaf,
 				Intermediates: []*x509.Certificate{inter, root},
@@ -48,12 +48,11 @@ func TestDB_CreateCertificate(t *testing.T) {
 
 						dbc := new(dbCert)
 						assert.FatalError(t, json.Unmarshal(nu, dbc))
-						assert.FatalError(t, err)
 						assert.Equals(t, dbc.ID, string(key))
 						assert.Equals(t, dbc.ID, cert.ID)
 						assert.Equals(t, dbc.AccountID, cert.AccountID)
-						assert.True(t, clock.Now().Add(-time.Minute).Before(dbc.Created))
-						assert.True(t, clock.Now().Add(time.Minute).After(dbc.Created))
+						assert.True(t, clock.Now().Add(-time.Minute).Before(dbc.CreatedAt))
+						assert.True(t, clock.Now().Add(time.Minute).After(dbc.CreatedAt))
 						return nil, false, errors.New("force")
 					},
 				},
@@ -63,7 +62,7 @@ func TestDB_CreateCertificate(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			cert := &acme.Certificate{
-				AccountID:     "accounttID",
+				AccountID:     "accountID",
 				OrderID:       "orderID",
 				Leaf:          leaf,
 				Intermediates: []*x509.Certificate{inter, root},
@@ -83,12 +82,11 @@ func TestDB_CreateCertificate(t *testing.T) {
 
 						dbc := new(dbCert)
 						assert.FatalError(t, json.Unmarshal(nu, dbc))
-						assert.FatalError(t, err)
 						assert.Equals(t, dbc.ID, string(key))
 						assert.Equals(t, dbc.ID, cert.ID)
 						assert.Equals(t, dbc.AccountID, cert.AccountID)
-						assert.True(t, clock.Now().Add(-time.Minute).Before(dbc.Created))
-						assert.True(t, clock.Now().Add(time.Minute).After(dbc.Created))
+						assert.True(t, clock.Now().Add(-time.Minute).Before(dbc.CreatedAt))
+						assert.True(t, clock.Now().Add(time.Minute).After(dbc.CreatedAt))
 						return nil, true, nil
 					},
 				},
@@ -124,8 +122,9 @@ func TestDB_GetCertificate(t *testing.T) {
 
 	certID := "certID"
 	type test struct {
-		db  nosql.DB
-		err error
+		db      nosql.DB
+		err     error
+		acmeErr *acme.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/not-found": func(t *testing.T) test {
@@ -138,7 +137,7 @@ func TestDB_GetCertificate(t *testing.T) {
 						return nil, nosqldb.ErrNotFound
 					},
 				},
-				err: errors.New("certificate certID not found"),
+				acmeErr: acme.NewError(acme.ErrorMalformedType, "certificate certID not found"),
 			}
 		},
 		"fail/db.Get-error": func(t *testing.T) test {
@@ -182,7 +181,7 @@ func TestDB_GetCertificate(t *testing.T) {
 								Type:  "Public Key",
 								Bytes: leaf.Raw,
 							}),
-							Created: clock.Now(),
+							CreatedAt: clock.Now(),
 						}
 						b, err := json.Marshal(cert)
 						assert.FatalError(t, err)
@@ -215,7 +214,7 @@ func TestDB_GetCertificate(t *testing.T) {
 								Type:  "CERTIFICATE",
 								Bytes: root.Raw,
 							})...),
-							Created: clock.Now(),
+							CreatedAt: clock.Now(),
 						}
 						b, err := json.Marshal(cert)
 						assert.FatalError(t, err)
@@ -232,8 +231,19 @@ func TestDB_GetCertificate(t *testing.T) {
 			db := DB{db: tc.db}
 			cert, err := db.GetCertificate(context.Background(), certID)
 			if err != nil {
-				if assert.NotNil(t, tc.err) {
-					assert.HasPrefix(t, err.Error(), tc.err.Error())
+				switch k := err.(type) {
+				case *acme.Error:
+					if assert.NotNil(t, tc.acmeErr) {
+						assert.Equals(t, k.Type, tc.acmeErr.Type)
+						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, k.Status, tc.acmeErr.Status)
+						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+					}
+				default:
+					if assert.NotNil(t, tc.err) {
+						assert.HasPrefix(t, err.Error(), tc.err.Error())
+					}
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
