@@ -353,33 +353,28 @@ func (a *Authority) init() error {
 	// TODO: decide if this is a good approach for providing the SCEP functionality
 	// It currently mirrors the logic for the x509CAService
 	if a.requiresSCEPService() && a.scepService == nil {
-		var options casapi.Options
-		if a.config.AuthorityConfig.Options != nil {
-			options = *a.config.AuthorityConfig.Options
-		}
+		var options scep.Options
 
 		// Read intermediate and create X509 signer and decrypter for default CAS.
-		if options.Is(casapi.SoftCAS) {
-			options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
-			if err != nil {
-				return err
-			}
-			options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-				SigningKey: a.config.IntermediateKey,
-				Password:   []byte(a.config.Password),
+		options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
+		if err != nil {
+			return err
+		}
+		options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+			SigningKey: a.config.IntermediateKey,
+			Password:   []byte(a.config.Password),
+		})
+		if err != nil {
+			return err
+		}
+
+		if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
+			options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+				DecryptionKey: a.config.IntermediateKey,
+				Password:      []byte(a.config.Password),
 			})
 			if err != nil {
 				return err
-			}
-
-			if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
-				options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-					DecryptionKey: a.config.IntermediateKey,
-					Password:      []byte(a.config.Password),
-				})
-				if err != nil {
-					return err
-				}
 			}
 		}
 

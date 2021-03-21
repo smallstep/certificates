@@ -1,30 +1,22 @@
 package scep
 
 import (
-	"bytes"
 	"context"
+	"crypto/subtle"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"net/url"
 
 	"github.com/smallstep/certificates/authority/provisioner"
-	database "github.com/smallstep/certificates/db"
-
-	"github.com/smallstep/nosql"
 
 	microx509util "github.com/micromdm/scep/crypto/x509util"
 	microscep "github.com/micromdm/scep/scep"
 
-	//"github.com/smallstep/certificates/scep/pkcs7"
+	"github.com/pkg/errors"
 
 	"go.mozilla.org/pkcs7"
 
 	"go.step.sm/crypto/x509util"
-)
-
-var (
-	certTable = []byte("scep_certs")
 )
 
 // Interface is the SCEP authority interface.
@@ -42,28 +34,21 @@ type Interface interface {
 
 // Authority is the layer that handles all SCEP interactions.
 type Authority struct {
-	backdate provisioner.Duration
-	db       nosql.DB
-	prefix   string
-	dns      string
-
-	// dir      *directory
-
+	db                      DB
+	prefix                  string
+	dns                     string
 	intermediateCertificate *x509.Certificate
-
-	service  *Service
-	signAuth SignAuthority
+	service                 *Service
+	signAuth                SignAuthority
 }
 
 // AuthorityOptions required to create a new SCEP Authority.
 type AuthorityOptions struct {
-	// Service provides the SCEP functions to Authority
+	// Service provides the certificate chain, the signer and the decrypter to the Authority
 	Service *Service
-	// Backdate
-	Backdate provisioner.Duration
-	// DB is the database used by nosql.
-	DB nosql.DB
-	// DNS the host used to generate accurate SCEP links. By default the authority
+	// DB is the database used by SCEP
+	DB DB
+	// DNS is the host used to generate accurate SCEP links. By default the authority
 	// will use the Host from the request, so this value will only be used if
 	// request.Host is empty.
 	DNS string
@@ -81,19 +66,7 @@ type SignAuthority interface {
 // New returns a new Authority that implements the SCEP interface.
 func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 
-	if _, ok := ops.DB.(*database.SimpleDB); !ok {
-		// If it's not a SimpleDB then go ahead and bootstrap the DB with the
-		// necessary SCEP tables. SimpleDB should ONLY be used for testing.
-		tables := [][]byte{certTable}
-		for _, b := range tables {
-			if err := ops.DB.CreateTable(b); err != nil {
-				return nil, fmt.Errorf("%w: error creating table %s", err, string(b))
-			}
-		}
-	}
-
 	authority := &Authority{
-		backdate: ops.Backdate,
 		db:       ops.DB,
 		prefix:   ops.Prefix,
 		dns:      ops.DNS,
@@ -102,7 +75,7 @@ func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 
 	// TODO: this is not really nice to do; the Service should be removed
 	// in its entirety to make this more interoperable with the rest of
-	// step-ca.
+	// step-ca, I think.
 	if ops.Service != nil {
 		authority.intermediateCertificate = ops.Service.certificateChain[0]
 		authority.service = ops.Service
@@ -200,12 +173,12 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 
 	p7c, err := pkcs7.Parse(msg.P7.Content)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error parsing pkcs7 content")
 	}
 
 	envelope, err := p7c.Decrypt(a.intermediateCertificate, a.service.decrypter)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error decrypting encrypted pkcs7 content")
 	}
 
 	msg.pkiEnvelope = envelope
@@ -214,19 +187,19 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 	case microscep.CertRep:
 		certs, err := microscep.CACerts(msg.pkiEnvelope)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "error extracting CA certs from pkcs7 degenerate data")
 		}
-		msg.CertRepMessage.Certificate = certs[0] // TODO: check correctness of this
+		msg.CertRepMessage.Certificate = certs[0]
 		return nil
 	case microscep.PKCSReq, microscep.UpdateReq, microscep.RenewalReq:
 		csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
 		if err != nil {
-			return fmt.Errorf("parse CSR from pkiEnvelope: %w", err)
+			return errors.Wrap(err, "parse CSR from pkiEnvelope")
 		}
 		// check for challengePassword
 		cp, err := microx509util.ParseChallengePassword(msg.pkiEnvelope)
 		if err != nil {
-			return fmt.Errorf("scep: parse challenge password in pkiEnvelope: %w", err)
+			return errors.Wrap(err, "parse challenge password in pkiEnvelope")
 		}
 		msg.CSRReqMessage = &microscep.CSRReqMessage{
 			RawDecrypted:      msg.pkiEnvelope,
@@ -235,7 +208,7 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 		}
 		return nil
 	case microscep.GetCRL, microscep.GetCert, microscep.CertPoll:
-		return fmt.Errorf("not implemented") //errNotImplemented
+		return errors.Errorf("not implemented")
 	}
 
 	return nil
@@ -266,16 +239,13 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	}
 
 	// Template data
-	data := x509util.NewTemplateData()
-	data.SetCommonName(csr.Subject.CommonName)
-	data.SetSANs(csr.DNSNames)
-	data.SetCertificateRequest(csr)
+	data := x509util.CreateTemplateData(csr.Subject.CommonName, csr.DNSNames)
 
 	// Get authorizations from the SCEP provisioner.
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 	signOps, err := p.AuthorizeSign(ctx, "")
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving authorization options from SCEP provisioner: %w", err)
+		return nil, errors.Wrap(err, "error retrieving authorization options from SCEP provisioner")
 	}
 
 	opts := provisioner.SignOptions{
@@ -285,19 +255,20 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
 	if err != nil {
-		return nil, fmt.Errorf("error creating template options from SCEP provisioner: %w", err)
+		return nil, errors.Wrap(err, "error creating template options from SCEP provisioner")
 	}
 	signOps = append(signOps, templateOptions)
 
 	certChain, err := a.signAuth.Sign(csr, opts, signOps...)
 	if err != nil {
-		return nil, fmt.Errorf("error generating certificate for order %w", err)
+		return nil, errors.Wrap(err, "error generating certificate for order")
 	}
 
+	// take the issued certificate (only); https://tools.ietf.org/html/rfc8894#section-3.3.2
 	cert := certChain[0]
 
-	// create a degenerate cert structure
-	deg, err := degenerateCertificates([]*x509.Certificate{cert})
+	// and create a degenerate cert structure
+	deg, err := microscep.DegenerateCertificates([]*x509.Certificate{cert})
 	if err != nil {
 		return nil, err
 	}
@@ -370,13 +341,12 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 		CertRepMessage: cr,
 	}
 
-	// TODO: save more data?
-	_, err = newCert(a.db, CertOptions{
+	// store the newly created certificate
+	err = newCert(a.db, CertOptions{
 		Leaf:          certChain[0],
 		Intermediates: certChain[1:],
 	})
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
@@ -459,7 +429,7 @@ func (a *Authority) MatchChallengePassword(ctx context.Context, password string)
 		return false, err
 	}
 
-	if p.GetChallengePassword() == password {
+	if subtle.ConstantTimeCompare([]byte(p.GetChallengePassword()), []byte(password)) == 1 {
 		return true, nil
 	}
 
@@ -491,21 +461,3 @@ func (a *Authority) GetCACaps(ctx context.Context) []string {
 
 	return caps
 }
-
-// degenerateCertificates creates degenerate certificates pkcs#7 type
-func degenerateCertificates(certs []*x509.Certificate) ([]byte, error) {
-	var buf bytes.Buffer
-	for _, cert := range certs {
-		buf.Write(cert.Raw)
-	}
-	degenerate, err := pkcs7.DegenerateCertificate(buf.Bytes())
-	if err != nil {
-		return nil, err
-	}
-	return degenerate, nil
-}
-
-// Interface guards
-var (
-	_ Interface = (*Authority)(nil)
-)

@@ -151,11 +151,10 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 
 	scepPrefix := "scep"
 	scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
-		Service:  auth.GetSCEPService(),
-		Backdate: *config.AuthorityConfig.Backdate,
-		DB:       auth.GetDatabase().(nosql.DB),
-		DNS:      dns,
-		Prefix:   scepPrefix,
+		Service: auth.GetSCEPService(),
+		DB:      auth.GetDatabase().(scep.DB),
+		DNS:     dns,
+		Prefix:  scepPrefix,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating SCEP authority")
@@ -201,8 +200,10 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	ca.auth = auth
 	ca.srv = server.New(config.Address, handler, tlsConfig)
 
-	// TODO: instead opt for having a single server.Server but two http.Servers
-	// handling the HTTP vs. HTTPS handler?
+	// TODO: instead opt for having a single server.Server but two
+	// http.Servers handling the HTTP and HTTPS handler? The latter
+	// will probably introduce more complexity in terms of graceful
+	// reload.
 	if config.InsecureAddress != "" {
 		ca.insecureSrv = server.New(config.InsecureAddress, insecureHandler, nil)
 	}
@@ -357,13 +358,14 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-// func dumpRoutes(mux chi.Routes) {
-// 	// helpful routine for logging all routes //
-// 	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
-// 		fmt.Printf("%s %s\n", method, route)
-// 		return nil
-// 	}
-// 	if err := chi.Walk(mux, walkFunc); err != nil {
-// 		fmt.Printf("Logging err: %s\n", err.Error())
-// 	}
-// }
+//nolint // ignore linters to allow keeping this function around for debugging
+func dumpRoutes(mux chi.Routes) {
+	// helpful routine for logging all routes //
+	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		fmt.Printf("%s %s\n", method, route)
+		return nil
+	}
+	if err := chi.Walk(mux, walkFunc); err != nil {
+		fmt.Printf("Logging err: %s\n", err.Error())
+	}
+}
