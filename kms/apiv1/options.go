@@ -16,6 +16,8 @@ type KeyManager interface {
 	Close() error
 }
 
+// Decrypter is an interface implemented by KMSes that are used
+// in operations that require decryption
 type Decrypter interface {
 	CreateDecrypter(req *CreateDecrypterRequest) (crypto.Decrypter, error)
 }

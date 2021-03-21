@@ -138,9 +138,6 @@ type CreateDecrypterRequest struct {
 	Decrypter        crypto.Decrypter
 	DecryptionKey    string
 	DecryptionKeyPEM []byte
-	TokenLabel       string
-	PublicKey        string
-	PublicKeyPEM     []byte
 	Password         []byte
 }
 

@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/base64"
-	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -17,6 +15,8 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/scep"
 	"go.mozilla.org/pkcs7"
+
+	"github.com/pkg/errors"
 
 	microscep "github.com/micromdm/scep/scep"
 )
@@ -75,7 +75,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	request, err := decodeSCEPRequest(r)
 	if err != nil {
-		writeError(w, fmt.Errorf("not a scep get request: %w", err))
+		writeError(w, errors.Wrap(err, "not a scep get request"))
 		return
 	}
 
@@ -90,11 +90,11 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	case opnPKIOperation:
 		// TODO: implement the GET for PKI operation? Default CACAPS doesn't specify this is in use, though
 	default:
-		err = fmt.Errorf("unknown operation: %s", request.Operation)
+		err = errors.Errorf("unknown operation: %s", request.Operation)
 	}
 
 	if err != nil {
-		writeError(w, fmt.Errorf("get request failed: %w", err))
+		writeError(w, errors.Wrap(err, "get request failed"))
 		return
 	}
 
@@ -106,7 +106,7 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 
 	request, err := decodeSCEPRequest(r)
 	if err != nil {
-		writeError(w, fmt.Errorf("not a scep post request: %w", err))
+		writeError(w, errors.Wrap(err, "not a scep post request"))
 		return
 	}
 
@@ -117,11 +117,11 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	case opnPKIOperation:
 		response, err = h.PKIOperation(ctx, request)
 	default:
-		err = fmt.Errorf("unknown operation: %s", request.Operation)
+		err = errors.Errorf("unknown operation: %s", request.Operation)
 	}
 
 	if err != nil {
-		writeError(w, fmt.Errorf("post request failed: %w", err))
+		writeError(w, errors.Wrap(err, "post request failed"))
 		return
 	}
 
@@ -163,7 +163,7 @@ func decodeSCEPRequest(r *http.Request) (SCEPRequest, error) {
 				Message:   decodedMessage,
 			}, nil
 		default:
-			return SCEPRequest{}, fmt.Errorf("unsupported operation: %s", operation)
+			return SCEPRequest{}, errors.Errorf("unsupported operation: %s", operation)
 		}
 	case http.MethodPost:
 		body, err := ioutil.ReadAll(io.LimitReader(r.Body, maxPayloadSize))
@@ -175,7 +175,7 @@ func decodeSCEPRequest(r *http.Request) (SCEPRequest, error) {
 			Message:   body,
 		}, nil
 	default:
-		return SCEPRequest{}, fmt.Errorf("unsupported method: %s", method)
+		return SCEPRequest{}, errors.Errorf("unsupported method: %s", method)
 	}
 }
 
@@ -187,7 +187,7 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 		name := chi.URLParam(r, "provisionerID")
 		provisionerID, err := url.PathUnescape(name)
 		if err != nil {
-			api.WriteError(w, fmt.Errorf("error url unescaping provisioner id '%s'", name))
+			api.WriteError(w, errors.Errorf("error url unescaping provisioner id '%s'", name))
 			return
 		}
 
@@ -229,6 +229,9 @@ func (h *Handler) GetCACert(ctx context.Context) (SCEPResponse, error) {
 	if len(certs) == 1 {
 		response.Data = certs[0].Raw
 	} else {
+		// create degenerate pkcs7 certificate structure, according to
+		// https://tools.ietf.org/html/rfc8894#section-4.2.1.2, because
+		// not signed or encrypted data has to be returned.
 		data, err := microscep.DegenerateCertificates(certs)
 		if err != nil {
 			return SCEPResponse{}, err
@@ -329,12 +332,11 @@ func writeSCEPResponse(w http.ResponseWriter, response SCEPResponse) {
 	w.Header().Set("Content-Type", contentHeader(response))
 	_, err := w.Write(response.Data)
 	if err != nil {
-		writeError(w, fmt.Errorf("error when writing scep response: %w", err)) // This could end up as an error again
+		writeError(w, errors.Wrap(err, "error when writing scep response")) // This could end up as an error again
 	}
 }
 
 func writeError(w http.ResponseWriter, err error) {
-	// TODO: this probably needs to use SCEP specific errors (i.e. failInfo)
 	scepError := &scep.Error{
 		Message: err.Error(),
 		Status:  http.StatusInternalServerError, // TODO: make this a param?

@@ -235,6 +235,15 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 
 	ca.auth = auth
 	ca.srv = server.New(config.Address, handler, tlsConfig)
+
+	// TODO: instead opt for having a single server.Server but two
+	// http.Servers handling the HTTP and HTTPS handler? The latter
+	// will probably introduce more complexity in terms of graceful
+	// reload.
+	if config.InsecureAddress != "" {
+		ca.insecureSrv = server.New(config.InsecureAddress, insecureHandler, nil)
+	}
+
 	return ca, nil
 }
 

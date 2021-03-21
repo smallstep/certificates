@@ -102,9 +102,3 @@ func (s *SCEP) GetChallengePassword() string {
 func (s *SCEP) GetCapabilities() []string {
 	return s.Capabilities
 }
-
-// Interface guards
-var (
-	_ Interface = (*SCEP)(nil)
-	//_ scep.Provisioner = (*SCEP)(nil)
-)
