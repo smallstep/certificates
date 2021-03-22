@@ -66,7 +66,7 @@ func New(ctx context.Context, opts apiv1.Options) (*StepCAS, error) {
 func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1.CreateCertificateResponse, error) {
 	switch {
 	case req.CSR == nil:
-		return nil, errors.New("createCertificateRequest `template` cannot be nil")
+		return nil, errors.New("createCertificateRequest `csr` cannot be nil")
 	case req.Lifetime == 0:
 		return nil, errors.New("createCertificateRequest `lifetime` cannot be 0")
 	}
