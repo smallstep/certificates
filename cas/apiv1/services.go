@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"net/http"
 	"strings"
 )
 
@@ -47,4 +48,23 @@ func (t Type) String() string {
 		return SoftCAS
 	}
 	return strings.ToLower(string(t))
+}
+
+// ErrNotImplemented is the type of error returned if an operation is not
+// implemented.
+type ErrNotImplemented struct {
+	Message string
+}
+
+func (e ErrNotImplemented) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return "not implemented"
+}
+
+// StatusCode implements the StatusCoder interface and returns the HTTP 501
+// error.
+func (s ErrNotImplemented) StatusCode() int {
+	return http.StatusNotImplemented
 }

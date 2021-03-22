@@ -63,6 +63,8 @@ func New(ctx context.Context, opts apiv1.Options) (*StepCAS, error) {
 	}, nil
 }
 
+// CreateCertificate uses the step-ca sign request with the configured
+// provisioner to get a new certificate from the certificate authority.
 func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1.CreateCertificateResponse, error) {
 	switch {
 	case req.CSR == nil:
@@ -82,23 +84,10 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 	}, nil
 }
 
+// RenewCertificate will always return a non-implemented error as mTLS renewals
+// are not supported yet.
 func (s *StepCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
-	switch {
-	case req.CSR == nil:
-		return nil, errors.New("renewCertificateRequest `template` cannot be nil")
-	case req.Lifetime == 0:
-		return nil, errors.New("renewCertificateRequest `lifetime` cannot be 0")
-	}
-
-	cert, chain, err := s.createCertificate(req.CSR, req.Lifetime)
-	if err != nil {
-		return nil, err
-	}
-
-	return &apiv1.RenewCertificateResponse{
-		Certificate:      cert,
-		CertificateChain: chain,
-	}, nil
+	return nil, apiv1.ErrNotImplemented{Message: "stepCAS does not support mTLS renewals"}
 }
 
 func (s *StepCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {

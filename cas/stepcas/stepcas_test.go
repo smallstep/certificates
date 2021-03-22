@@ -497,27 +497,8 @@ func TestStepCAS_RenewCertificate(t *testing.T) {
 		want    *apiv1.RenewCertificateResponse
 		wantErr bool
 	}{
-		{"ok", fields{x5c, client, testRootFingerprint}, args{&apiv1.RenewCertificateRequest{
+		{"not implemented", fields{x5c, client, testRootFingerprint}, args{&apiv1.RenewCertificateRequest{
 			CSR:      testCR,
-			Lifetime: time.Hour,
-		}}, &apiv1.RenewCertificateResponse{
-			Certificate:      testCrt,
-			CertificateChain: []*x509.Certificate{testIssCrt},
-		}, false},
-		{"fail CSR", fields{x5c, client, testRootFingerprint}, args{&apiv1.RenewCertificateRequest{
-			CSR:      nil,
-			Lifetime: time.Hour,
-		}}, nil, true},
-		{"fail lifetime", fields{x5c, client, testRootFingerprint}, args{&apiv1.RenewCertificateRequest{
-			CSR:      testCR,
-			Lifetime: 0,
-		}}, nil, true},
-		{"fail sign token", fields{nil, client, testRootFingerprint}, args{&apiv1.RenewCertificateRequest{
-			CSR:      testCR,
-			Lifetime: time.Hour,
-		}}, nil, true},
-		{"fail client sign", fields{x5c, client, testRootFingerprint}, args{&apiv1.RenewCertificateRequest{
-			CSR:      testFailCR,
 			Lifetime: time.Hour,
 		}}, nil, true},
 	}
