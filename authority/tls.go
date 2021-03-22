@@ -334,22 +334,21 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		if !ok {
 			return errs.InternalServer("authority.Revoke; provisioner not found", opts...)
 		}
+		rci.ProvisionerID = p.GetID()
 		rci.TokenID, err = p.GetTokenID(revokeOpts.OTT)
 		if err != nil {
 			return errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Revoke; could not get ID for token")
 		}
+		opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
 		opts = append(opts, errs.WithKeyVal("tokenID", rci.TokenID))
 	} else {
 		// Load the Certificate provisioner if one exists.
-		p, err = a.LoadProvisionerByCertificate(revokeOpts.Crt)
-		if err != nil {
-			return errs.Wrap(http.StatusUnauthorized, err,
-				"authority.Revoke: unable to load certificate provisioner", opts...)
+		if p, err = a.LoadProvisionerByCertificate(revokeOpts.Crt); err == nil {
+			rci.ProvisionerID = p.GetID()
+			opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
 		}
 	}
-	rci.ProvisionerID = p.GetID()
-	opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
 
 	if provisioner.MethodFromContext(ctx) == provisioner.SSHRevokeMethod {
 		err = a.db.RevokeSSH(rci)

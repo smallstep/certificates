@@ -1242,6 +1242,30 @@ func TestAuthority_Revoke(t *testing.T) {
 				},
 			}
 		},
+		"ok/mTLS-no-provisioner": func() test {
+			_a := testAuthority(t, WithDatabase(&db.MockAuthDB{}))
+
+			crt, err := pemutil.ReadCertificate("./testdata/certs/foo.crt")
+			assert.FatalError(t, err)
+			// Filter out provisioner extension.
+			for i, ext := range crt.Extensions {
+				if ext.Id.Equal(asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1}) {
+					crt.Extensions = append(crt.Extensions[:i], crt.Extensions[i+1:]...)
+					break
+				}
+			}
+
+			return test{
+				auth: _a,
+				opts: &RevokeOptions{
+					Crt:        crt,
+					Serial:     "102012593071130646873265215610956555026",
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					MTLS:       true,
+				},
+			}
+		},
 	}
 	for name, f := range tests {
 		tc := f()
