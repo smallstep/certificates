@@ -56,6 +56,7 @@ type ErrNotImplemented struct {
 	Message string
 }
 
+// ErrNotImplemented implements the error interface.
 func (e ErrNotImplemented) Error() string {
 	if e.Message != "" {
 		return e.Message
@@ -65,6 +66,6 @@ func (e ErrNotImplemented) Error() string {
 
 // StatusCode implements the StatusCoder interface and returns the HTTP 501
 // error.
-func (s ErrNotImplemented) StatusCode() int {
+func (e ErrNotImplemented) StatusCode() int {
 	return http.StatusNotImplemented
 }
