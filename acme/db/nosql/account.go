@@ -26,6 +26,58 @@ func (dba *dbAccount) clone() *dbAccount {
 	return &nu
 }
 
+func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, error) {
+	id, err := db.db.Get(accountByKeyIDTable, []byte(kid))
+	if err != nil {
+		if nosqlDB.IsErrNotFound(err) {
+			return "", acme.NewError(acme.ErrorMalformedType, "account with key-id %s not found", kid)
+		}
+		return "", errors.Wrapf(err, "error loading key-account index for key %s", kid)
+	}
+	return string(id), nil
+}
+
+// getDBAccount retrieves and unmarshals dbAccount.
+func (db *DB) getDBAccount(ctx context.Context, id string) (*dbAccount, error) {
+	data, err := db.db.Get(accountTable, []byte(id))
+	if err != nil {
+		if nosqlDB.IsErrNotFound(err) {
+			return nil, acme.NewError(acme.ErrorMalformedType, "account %s not found", id)
+		}
+		return nil, errors.Wrapf(err, "error loading account %s", id)
+	}
+
+	dbacc := new(dbAccount)
+	if err = json.Unmarshal(data, dbacc); err != nil {
+		return nil, errors.Wrapf(err, "error unmarshaling account %s into dbAccount", id)
+	}
+	return dbacc, nil
+}
+
+// GetAccount retrieves an ACME account by ID.
+func (db *DB) GetAccount(ctx context.Context, id string) (*acme.Account, error) {
+	dbacc, err := db.getDBAccount(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &acme.Account{
+		Status:  dbacc.Status,
+		Contact: dbacc.Contact,
+		Key:     dbacc.Key,
+		ID:      dbacc.ID,
+	}, nil
+}
+
+// GetAccountByKeyID retrieves an ACME account by KeyID (thumbprint of the Account Key -- JWK).
+func (db *DB) GetAccountByKeyID(ctx context.Context, kid string) (*acme.Account, error) {
+	id, err := db.getAccountIDByKeyID(ctx, kid)
+	if err != nil {
+		return nil, err
+	}
+	return db.GetAccount(ctx, id)
+}
+
 // CreateAccount imlements the AcmeDB.CreateAccount interface.
 func (db *DB) CreateAccount(ctx context.Context, acc *acme.Account) error {
 	var err error
@@ -64,36 +116,8 @@ func (db *DB) CreateAccount(ctx context.Context, acc *acme.Account) error {
 	}
 }
 
-// GetAccount retrieves an ACME account by ID.
-func (db *DB) GetAccount(ctx context.Context, id string) (*acme.Account, error) {
-	dbacc, err := db.getDBAccount(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return &acme.Account{
-		Status:  dbacc.Status,
-		Contact: dbacc.Contact,
-		Key:     dbacc.Key,
-		ID:      dbacc.ID,
-	}, nil
-}
-
-// GetAccountByKeyID retrieves an ACME account by KeyID (thumbprint of the Account Key -- JWK).
-func (db *DB) GetAccountByKeyID(ctx context.Context, kid string) (*acme.Account, error) {
-	id, err := db.getAccountIDByKeyID(ctx, kid)
-	if err != nil {
-		return nil, err
-	}
-	return db.GetAccount(ctx, id)
-}
-
 // UpdateAccount imlements the AcmeDB.UpdateAccount interface.
 func (db *DB) UpdateAccount(ctx context.Context, acc *acme.Account) error {
-	if len(acc.ID) == 0 {
-		return errors.New("id cannot be empty")
-	}
-
 	old, err := db.getDBAccount(ctx, acc.ID)
 	if err != nil {
 		return err
@@ -109,32 +133,4 @@ func (db *DB) UpdateAccount(ctx context.Context, acc *acme.Account) error {
 	}
 
 	return db.save(ctx, old.ID, nu, old, "account", accountTable)
-}
-
-func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, error) {
-	id, err := db.db.Get(accountByKeyIDTable, []byte(kid))
-	if err != nil {
-		if nosqlDB.IsErrNotFound(err) {
-			return "", errors.Wrapf(err, "account with key id %s not found", kid)
-		}
-		return "", errors.Wrapf(err, "error loading key-account index")
-	}
-	return string(id), nil
-}
-
-// getDBAccount retrieves and unmarshals dbAccount.
-func (db *DB) getDBAccount(ctx context.Context, id string) (*dbAccount, error) {
-	data, err := db.db.Get(accountTable, []byte(id))
-	if err != nil {
-		if nosqlDB.IsErrNotFound(err) {
-			return nil, errors.Wrapf(err, "account %s not found", id)
-		}
-		return nil, errors.Wrapf(err, "error loading account %s", id)
-	}
-
-	dbacc := new(dbAccount)
-	if err = json.Unmarshal(data, dbacc); err != nil {
-		return nil, errors.Wrap(err, "error unmarshaling account")
-	}
-	return dbacc, nil
 }
