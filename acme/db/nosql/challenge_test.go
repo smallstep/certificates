@@ -101,7 +101,7 @@ func TestDB_getDBChallenge(t *testing.T) {
 						assert.Equals(t, k.Type, tc.acmeErr.Type)
 						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
 						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err, tc.acmeErr.Err)
+						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
 						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
 					}
 				default:

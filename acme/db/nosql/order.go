@@ -15,18 +15,18 @@ import (
 var ordersByAccountMux sync.Mutex
 
 type dbOrder struct {
-	ID             string            `json:"id"`
-	AccountID      string            `json:"accountID"`
-	ProvisionerID  string            `json:"provisionerID"`
-	Created        time.Time         `json:"created"`
-	Expires        time.Time         `json:"expires,omitempty"`
-	Status         acme.Status       `json:"status"`
-	Identifiers    []acme.Identifier `json:"identifiers"`
-	NotBefore      time.Time         `json:"notBefore,omitempty"`
-	NotAfter       time.Time         `json:"notAfter,omitempty"`
-	Error          *acme.Error       `json:"error,omitempty"`
-	Authorizations []string          `json:"authorizations"`
-	CertificateID  string            `json:"certificate,omitempty"`
+	ID               string            `json:"id"`
+	AccountID        string            `json:"accountID"`
+	ProvisionerID    string            `json:"provisionerID"`
+	CreatedAt        time.Time         `json:"createdAt"`
+	ExpiresAt        time.Time         `json:"expiresAt,omitempty"`
+	Status           acme.Status       `json:"status"`
+	Identifiers      []acme.Identifier `json:"identifiers"`
+	NotBefore        time.Time         `json:"notBefore,omitempty"`
+	NotAfter         time.Time         `json:"notAfter,omitempty"`
+	Error            *acme.Error       `json:"error,omitempty"`
+	AuthorizationIDs []string          `json:"authorizationIDs"`
+	CertificateID    string            `json:"certificate,omitempty"`
 }
 
 func (a *dbOrder) clone() *dbOrder {
@@ -38,13 +38,13 @@ func (a *dbOrder) clone() *dbOrder {
 func (db *DB) getDBOrder(ctx context.Context, id string) (*dbOrder, error) {
 	b, err := db.db.Get(orderTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
-		return nil, acme.WrapError(acme.ErrorMalformedType, err, "order %s not found", id)
+		return nil, acme.NewError(acme.ErrorMalformedType, "order %s not found", id)
 	} else if err != nil {
 		return nil, errors.Wrapf(err, "error loading order %s", id)
 	}
 	o := new(dbOrder)
 	if err := json.Unmarshal(b, &o); err != nil {
-		return nil, errors.Wrap(err, "error unmarshaling order")
+		return nil, errors.Wrapf(err, "error unmarshaling order %s into dbOrder", id)
 	}
 	return o, nil
 }
@@ -57,15 +57,17 @@ func (db *DB) GetOrder(ctx context.Context, id string) (*acme.Order, error) {
 	}
 
 	o := &acme.Order{
+		ID:               dbo.ID,
+		AccountID:        dbo.AccountID,
+		ProvisionerID:    dbo.ProvisionerID,
+		CertificateID:    dbo.CertificateID,
 		Status:           dbo.Status,
-		ExpiresAt:        dbo.Expires,
+		ExpiresAt:        dbo.ExpiresAt,
 		Identifiers:      dbo.Identifiers,
 		NotBefore:        dbo.NotBefore,
 		NotAfter:         dbo.NotAfter,
-		AuthorizationIDs: dbo.Authorizations,
-		ID:               dbo.ID,
-		ProvisionerID:    dbo.ProvisionerID,
-		CertificateID:    dbo.CertificateID,
+		AuthorizationIDs: dbo.AuthorizationIDs,
+		Error:            dbo.Error,
 	}
 
 	return o, nil
@@ -81,16 +83,16 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 
 	now := clock.Now()
 	dbo := &dbOrder{
-		ID:             o.ID,
-		AccountID:      o.AccountID,
-		ProvisionerID:  o.ProvisionerID,
-		Created:        now,
-		Status:         acme.StatusPending,
-		Expires:        o.ExpiresAt,
-		Identifiers:    o.Identifiers,
-		NotBefore:      o.NotBefore,
-		NotAfter:       o.NotBefore,
-		Authorizations: o.AuthorizationIDs,
+		ID:               o.ID,
+		AccountID:        o.AccountID,
+		ProvisionerID:    o.ProvisionerID,
+		Status:           o.Status,
+		CreatedAt:        now,
+		ExpiresAt:        o.ExpiresAt,
+		Identifiers:      o.Identifiers,
+		NotBefore:        o.NotBefore,
+		NotAfter:         o.NotBefore,
+		AuthorizationIDs: o.AuthorizationIDs,
 	}
 	if err := db.save(ctx, o.ID, dbo, nil, "order", orderTable); err != nil {
 		return err
@@ -101,6 +103,21 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 		return err
 	}
 	return nil
+}
+
+// UpdateOrder saves an updated ACME Order to the database.
+func (db *DB) UpdateOrder(ctx context.Context, o *acme.Order) error {
+	old, err := db.getDBOrder(ctx, o.ID)
+	if err != nil {
+		return err
+	}
+
+	nu := old.clone()
+
+	nu.Status = o.Status
+	nu.Error = o.Error
+	nu.CertificateID = o.CertificateID
+	return db.save(ctx, old.ID, nu, old, "order", orderTable)
 }
 
 type orderIDsByAccount struct{}
@@ -157,19 +174,4 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...st
 // GetOrdersByAccountID returns a list of order IDs owned by the account.
 func (db *DB) GetOrdersByAccountID(ctx context.Context, accID string) ([]string, error) {
 	return db.updateAddOrderIDs(ctx, accID)
-}
-
-// UpdateOrder saves an updated ACME Order to the database.
-func (db *DB) UpdateOrder(ctx context.Context, o *acme.Order) error {
-	old, err := db.getDBOrder(ctx, o.ID)
-	if err != nil {
-		return err
-	}
-
-	nu := old.clone()
-
-	nu.Status = o.Status
-	nu.Error = o.Error
-	nu.CertificateID = o.CertificateID
-	return db.save(ctx, old.ID, nu, old, "order", orderTable)
 }
