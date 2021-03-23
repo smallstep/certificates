@@ -21,7 +21,7 @@ func init() {
 // StepCAS implements the cas.CertificateAuthorityService interface using
 // another step-ca instance.
 type StepCAS struct {
-	x5c         *x5cIssuer
+	iss         stepIssuer
 	client      *ca.Client
 	fingerprint string
 }
@@ -40,7 +40,10 @@ func New(ctx context.Context, opts apiv1.Options) (*StepCAS, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "stepCAS `certificateAuthority` is not valid")
 	}
-	if err := validateCertificateIssuer(opts.CertificateIssuer); err != nil {
+
+	// Create configured issuer
+	iss, err := newStepIssuer(caURL, opts.CertificateIssuer)
+	if err != nil {
 		return nil, err
 	}
 
@@ -50,14 +53,8 @@ func New(ctx context.Context, opts apiv1.Options) (*StepCAS, error) {
 		return nil, err
 	}
 
-	// X5C is the only one supported at the moment.
-	x5c, err := newX5CIssuer(caURL, opts.CertificateIssuer)
-	if err != nil {
-		return nil, err
-	}
-
 	return &StepCAS{
-		x5c:         x5c,
+		iss:         iss,
 		client:      client,
 		fingerprint: opts.CertificateAuthorityFingerprint,
 	}, nil
@@ -101,7 +98,7 @@ func (s *StepCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1
 		serialNumber = req.Certificate.SerialNumber.String()
 	}
 
-	token, err := s.revokeToken(serialNumber)
+	token, err := s.iss.RevokeToken(serialNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +148,7 @@ func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.D
 		commonName = sans[0]
 	}
 
-	token, err := s.signToken(commonName, sans)
+	token, err := s.iss.SignToken(commonName, sans)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -174,27 +171,8 @@ func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.D
 	return cert, chain, nil
 }
 
-func (s *StepCAS) signToken(subject string, sans []string) (string, error) {
-	if s.x5c != nil {
-		return s.x5c.SignToken(subject, sans)
-	}
-
-	return "", errors.New("stepCAS does not have any provisioner configured")
-}
-
-func (s *StepCAS) revokeToken(subject string) (string, error) {
-	if s.x5c != nil {
-		return s.x5c.RevokeToken(subject)
-	}
-
-	return "", errors.New("stepCAS does not have any provisioner configured")
-}
-
 func (s *StepCAS) lifetime(d time.Duration) api.TimeDuration {
-	if s.x5c != nil {
-		d = s.x5c.Lifetime(d)
-	}
 	var td api.TimeDuration
-	td.SetDuration(d)
+	td.SetDuration(s.iss.Lifetime(d))
 	return td
 }
