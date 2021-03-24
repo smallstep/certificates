@@ -3,6 +3,7 @@ package nosql
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -511,27 +512,39 @@ func TestDB_CreateOrder(t *testing.T) {
 						return nil, nosqldb.ErrNotFound
 					},
 					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
-						*idptr = string(key)
-						assert.Equals(t, string(bucket), string(orderTable))
-						assert.Equals(t, string(key), o.ID)
-						assert.Equals(t, old, nil)
+						switch string(bucket) {
+						case string(ordersByAccountIDTable):
+							b, err := json.Marshal([]string{o.ID})
+							assert.FatalError(t, err)
+							assert.Equals(t, string(key), "accID")
+							assert.Equals(t, old, nil)
+							assert.Equals(t, nu, b)
+							return nu, true, nil
+						case string(orderTable):
+							*idptr = string(key)
+							assert.Equals(t, string(key), o.ID)
+							assert.Equals(t, old, nil)
 
-						dbo := new(dbOrder)
-						assert.FatalError(t, json.Unmarshal(nu, dbo))
-						assert.Equals(t, dbo.ID, o.ID)
-						assert.Equals(t, dbo.AccountID, o.AccountID)
-						assert.Equals(t, dbo.ProvisionerID, o.ProvisionerID)
-						assert.Equals(t, dbo.CertificateID, "")
-						assert.Equals(t, dbo.Status, o.Status)
-						assert.True(t, dbo.CreatedAt.Add(-time.Minute).Before(now))
-						assert.True(t, dbo.CreatedAt.Add(time.Minute).After(now))
-						assert.Equals(t, dbo.ExpiresAt, o.ExpiresAt)
-						assert.Equals(t, dbo.NotBefore, o.NotBefore)
-						assert.Equals(t, dbo.NotAfter, o.NotAfter)
-						assert.Equals(t, dbo.AuthorizationIDs, o.AuthorizationIDs)
-						assert.Equals(t, dbo.Identifiers, o.Identifiers)
-						assert.Equals(t, dbo.Error, nil)
-						return nu, true, nil
+							dbo := new(dbOrder)
+							assert.FatalError(t, json.Unmarshal(nu, dbo))
+							assert.Equals(t, dbo.ID, o.ID)
+							assert.Equals(t, dbo.AccountID, o.AccountID)
+							assert.Equals(t, dbo.ProvisionerID, o.ProvisionerID)
+							assert.Equals(t, dbo.CertificateID, "")
+							assert.Equals(t, dbo.Status, o.Status)
+							assert.True(t, dbo.CreatedAt.Add(-time.Minute).Before(now))
+							assert.True(t, dbo.CreatedAt.Add(time.Minute).After(now))
+							assert.Equals(t, dbo.ExpiresAt, o.ExpiresAt)
+							assert.Equals(t, dbo.NotBefore, o.NotBefore)
+							assert.Equals(t, dbo.NotAfter, o.NotAfter)
+							assert.Equals(t, dbo.AuthorizationIDs, o.AuthorizationIDs)
+							assert.Equals(t, dbo.Identifiers, o.Identifiers)
+							assert.Equals(t, dbo.Error, nil)
+							return nu, true, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, false, errors.New("force")
+						}
 					},
 				},
 				o:   o,
@@ -550,6 +563,437 @@ func TestDB_CreateOrder(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, tc.o.ID, *tc._id)
+				}
+			}
+		})
+	}
+}
+
+func TestDB_updateAddOrderIDs(t *testing.T) {
+	accID := "accID"
+	type test struct {
+		db      nosql.DB
+		err     error
+		acmeErr *acme.Error
+		addOids []string
+		res     []string
+	}
+	var tests = map[string]func(t *testing.T) test{
+		"fail/db.Get-error": func(t *testing.T) test {
+			return test{
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						assert.Equals(t, bucket, ordersByAccountIDTable)
+						assert.Equals(t, key, []byte(accID))
+						return nil, errors.New("force")
+					},
+				},
+				err: errors.Errorf("error loading orderIDs for account %s", accID),
+			}
+		},
+		"fail/unmarshal-error": func(t *testing.T) test {
+			return test{
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						assert.Equals(t, bucket, ordersByAccountIDTable)
+						assert.Equals(t, key, []byte(accID))
+						return []byte("foo"), nil
+					},
+				},
+				err: errors.Errorf("error unmarshaling orderIDs for account %s", accID),
+			}
+		},
+		"fail/db.Get-order-error": func(t *testing.T) test {
+			return test{
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(ordersByAccountIDTable):
+							assert.Equals(t, key, []byte(accID))
+							b, err := json.Marshal([]string{"foo", "bar"})
+							assert.FatalError(t, err)
+							return b, nil
+						case string(orderTable):
+							assert.Equals(t, key, []byte("foo"))
+							return nil, errors.New("force")
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, errors.New("force")
+						}
+					},
+				},
+				acmeErr: acme.NewErrorISE("error loading order foo for account accID: error loading order foo: force"),
+			}
+		},
+		"fail/update-order-status-error": func(t *testing.T) test {
+			expiry := clock.Now().Add(-5 * time.Minute)
+			ofoo := &dbOrder{
+				ID:        "foo",
+				Status:    acme.StatusPending,
+				ExpiresAt: expiry,
+			}
+			bfoo, err := json.Marshal(ofoo)
+			assert.FatalError(t, err)
+			return test{
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(ordersByAccountIDTable):
+							assert.Equals(t, key, []byte(accID))
+							b, err := json.Marshal([]string{"foo", "bar"})
+							assert.FatalError(t, err)
+							return b, nil
+						case string(orderTable):
+							assert.Equals(t, key, []byte("foo"))
+							return bfoo, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, errors.New("force")
+						}
+					},
+					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, orderTable)
+						assert.Equals(t, key, []byte("foo"))
+						assert.Equals(t, old, bfoo)
+
+						newdbo := new(dbOrder)
+						assert.FatalError(t, json.Unmarshal(nu, newdbo))
+						assert.Equals(t, newdbo.ID, "foo")
+						assert.Equals(t, newdbo.Status, acme.StatusInvalid)
+						assert.Equals(t, newdbo.ExpiresAt, expiry)
+						assert.Equals(t, newdbo.Error.Error(), acme.NewError(acme.ErrorMalformedType, "order has expired").Error())
+						return nil, false, errors.New("force")
+					},
+				},
+				acmeErr: acme.NewErrorISE("error updating order foo for account accID: error saving acme order: force"),
+			}
+		},
+		"fail/db.save-order-error": func(t *testing.T) test {
+			addOids := []string{"foo", "bar"}
+			b, err := json.Marshal(addOids)
+			assert.FatalError(t, err)
+			delCount := 0
+			return test{
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						assert.Equals(t, bucket, ordersByAccountIDTable)
+						assert.Equals(t, key, []byte(accID))
+						return nil, nosqldb.ErrNotFound
+					},
+					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, ordersByAccountIDTable)
+						assert.Equals(t, key, []byte(accID))
+						assert.Equals(t, old, nil)
+						assert.Equals(t, nu, b)
+						return nil, false, errors.New("force")
+					},
+					MDel: func(bucket, key []byte) error {
+						delCount++
+						switch delCount {
+						case 1:
+							assert.Equals(t, bucket, orderTable)
+							assert.Equals(t, key, []byte("foo"))
+							return nil
+						case 2:
+							assert.Equals(t, bucket, orderTable)
+							assert.Equals(t, key, []byte("bar"))
+							return nil
+						default:
+							assert.FatalError(t, errors.New("delete should only be called twice"))
+							return errors.New("force")
+						}
+					},
+				},
+				addOids: addOids,
+				err:     errors.Errorf("error saving orderIDs index for account %s", accID),
+			}
+		},
+		"ok/all-old-not-pending": func(t *testing.T) test {
+			oldOids := []string{"foo", "bar"}
+			bOldOids, err := json.Marshal(oldOids)
+			assert.FatalError(t, err)
+			expiry := clock.Now().Add(-5 * time.Minute)
+			ofoo := &dbOrder{
+				ID:        "foo",
+				Status:    acme.StatusPending,
+				ExpiresAt: expiry,
+			}
+			bfoo, err := json.Marshal(ofoo)
+			assert.FatalError(t, err)
+			obar := &dbOrder{
+				ID:        "bar",
+				Status:    acme.StatusPending,
+				ExpiresAt: expiry,
+			}
+			bbar, err := json.Marshal(obar)
+			assert.FatalError(t, err)
+			return test{
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(ordersByAccountIDTable):
+							return bOldOids, nil
+						case string(orderTable):
+							switch string(key) {
+							case "foo":
+								assert.Equals(t, key, []byte("foo"))
+								return bfoo, nil
+							case "bar":
+								assert.Equals(t, key, []byte("bar"))
+								return bbar, nil
+							default:
+								assert.FatalError(t, errors.Errorf("unexpected key %s", string(key)))
+								return nil, errors.New("force")
+							}
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, errors.New("force")
+						}
+					},
+					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
+						switch string(bucket) {
+						case string(orderTable):
+							return nil, true, nil
+						case string(ordersByAccountIDTable):
+							assert.Equals(t, key, []byte(accID))
+							assert.Equals(t, old, bOldOids)
+							assert.Equals(t, nu, nil)
+							return nil, true, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, false, errors.New("force")
+						}
+					},
+				},
+				res: []string{},
+			}
+		},
+		"ok/old-and-new": func(t *testing.T) test {
+			oldOids := []string{"foo", "bar"}
+			bOldOids, err := json.Marshal(oldOids)
+			assert.FatalError(t, err)
+			addOids := []string{"zap", "zar"}
+			bAddOids, err := json.Marshal(addOids)
+			assert.FatalError(t, err)
+			expiry := clock.Now().Add(-5 * time.Minute)
+			ofoo := &dbOrder{
+				ID:        "foo",
+				Status:    acme.StatusPending,
+				ExpiresAt: expiry,
+			}
+			bfoo, err := json.Marshal(ofoo)
+			assert.FatalError(t, err)
+			obar := &dbOrder{
+				ID:        "bar",
+				Status:    acme.StatusPending,
+				ExpiresAt: expiry,
+			}
+			bbar, err := json.Marshal(obar)
+			assert.FatalError(t, err)
+			return test{
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(ordersByAccountIDTable):
+							return bOldOids, nil
+						case string(orderTable):
+							switch string(key) {
+							case "foo":
+								assert.Equals(t, key, []byte("foo"))
+								return bfoo, nil
+							case "bar":
+								assert.Equals(t, key, []byte("bar"))
+								return bbar, nil
+							default:
+								assert.FatalError(t, errors.Errorf("unexpected key %s", string(key)))
+								return nil, errors.New("force")
+							}
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, errors.New("force")
+						}
+					},
+					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
+						switch string(bucket) {
+						case string(orderTable):
+							return nil, true, nil
+						case string(ordersByAccountIDTable):
+							assert.Equals(t, key, []byte(accID))
+							assert.Equals(t, old, bOldOids)
+							assert.Equals(t, nu, bAddOids)
+							return nil, true, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, false, errors.New("force")
+						}
+					},
+				},
+				addOids: addOids,
+				res:     addOids,
+			}
+		},
+		"ok/old-and-new-2": func(t *testing.T) test {
+			oldOids := []string{"foo", "bar", "baz"}
+			bOldOids, err := json.Marshal(oldOids)
+			assert.FatalError(t, err)
+			addOids := []string{"zap", "zar"}
+			now := clock.Now()
+			min5 := now.Add(5 * time.Minute)
+			expiry := now.Add(-5 * time.Minute)
+
+			o1 := &dbOrder{
+				ID:               "foo",
+				Status:           acme.StatusPending,
+				ExpiresAt:        min5,
+				AuthorizationIDs: []string{"a"},
+			}
+			bo1, err := json.Marshal(o1)
+			assert.FatalError(t, err)
+			o2 := &dbOrder{
+				ID:        "bar",
+				Status:    acme.StatusPending,
+				ExpiresAt: expiry,
+			}
+			bo2, err := json.Marshal(o2)
+			assert.FatalError(t, err)
+			o3 := &dbOrder{
+				ID:               "baz",
+				Status:           acme.StatusPending,
+				ExpiresAt:        min5,
+				AuthorizationIDs: []string{"b"},
+			}
+			bo3, err := json.Marshal(o3)
+			assert.FatalError(t, err)
+
+			az1 := &dbAuthz{
+				ID:           "a",
+				Status:       acme.StatusPending,
+				ExpiresAt:    min5,
+				ChallengeIDs: []string{"aa"},
+			}
+			baz1, err := json.Marshal(az1)
+			assert.FatalError(t, err)
+			az2 := &dbAuthz{
+				ID:           "b",
+				Status:       acme.StatusPending,
+				ExpiresAt:    min5,
+				ChallengeIDs: []string{"bb"},
+			}
+			baz2, err := json.Marshal(az2)
+			assert.FatalError(t, err)
+
+			ch1 := &dbChallenge{
+				ID:     "aa",
+				Status: acme.StatusPending,
+			}
+			bch1, err := json.Marshal(ch1)
+			assert.FatalError(t, err)
+			ch2 := &dbChallenge{
+				ID:     "bb",
+				Status: acme.StatusPending,
+			}
+			bch2, err := json.Marshal(ch2)
+			assert.FatalError(t, err)
+
+			newOids := append([]string{"foo", "baz"}, addOids...)
+			bNewOids, err := json.Marshal(newOids)
+			assert.FatalError(t, err)
+
+			return test{
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(authzTable):
+							switch string(key) {
+							case "a":
+								return baz1, nil
+							case "b":
+								return baz2, nil
+							default:
+								assert.FatalError(t, errors.Errorf("unexpected authz key %s", string(key)))
+								return nil, errors.New("force")
+							}
+						case string(challengeTable):
+							switch string(key) {
+							case "aa":
+								return bch1, nil
+							case "bb":
+								return bch2, nil
+							default:
+								assert.FatalError(t, errors.Errorf("unexpected challenge key %s", string(key)))
+								return nil, errors.New("force")
+							}
+						case string(ordersByAccountIDTable):
+							return bOldOids, nil
+						case string(orderTable):
+							switch string(key) {
+							case "foo":
+								return bo1, nil
+							case "bar":
+								return bo2, nil
+							case "baz":
+								return bo3, nil
+							default:
+								assert.FatalError(t, errors.Errorf("unexpected key %s", string(key)))
+								return nil, errors.New("force")
+							}
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, errors.New("force")
+						}
+					},
+					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
+						switch string(bucket) {
+						case string(orderTable):
+							return nil, true, nil
+						case string(ordersByAccountIDTable):
+							assert.Equals(t, key, []byte(accID))
+							assert.Equals(t, old, bOldOids)
+							assert.Equals(t, nu, bNewOids)
+							return nil, true, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, false, errors.New("force")
+						}
+					},
+				},
+				addOids: addOids,
+				res:     newOids,
+			}
+		},
+	}
+	for name, run := range tests {
+		tc := run(t)
+		t.Run(name, func(t *testing.T) {
+			db := DB{db: tc.db}
+			var (
+				res []string
+				err error
+			)
+			if tc.addOids == nil {
+				res, err = db.updateAddOrderIDs(context.Background(), accID)
+			} else {
+				res, err = db.updateAddOrderIDs(context.Background(), accID, tc.addOids...)
+			}
+
+			if err != nil {
+				switch k := err.(type) {
+				case *acme.Error:
+					if assert.NotNil(t, tc.acmeErr) {
+						assert.Equals(t, k.Type, tc.acmeErr.Type)
+						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, k.Status, tc.acmeErr.Status)
+						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+					}
+				default:
+					if assert.NotNil(t, tc.err) {
+						assert.HasPrefix(t, err.Error(), tc.err.Error())
+					}
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					assert.True(t, reflect.DeepEqual(res, tc.res))
 				}
 			}
 		})

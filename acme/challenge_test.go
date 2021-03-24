@@ -1,643 +1,27 @@
 package acme
 
-/*
-var testOps = ChallengeOptions{
-	AccountID: "accID",
-	AuthzID:   "authzID",
-	Identifier: Identifier{
-		Type:  "", // will get set correctly depending on the "new.." method.
-		Value: "zap.internal",
-	},
-}
+import (
+	"bytes"
+	"context"
+	"crypto"
+	"encoding/base64"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"testing"
+	"time"
 
-func newDNSCh() (Challenge, error) {
-	mockdb := &db.MockNoSQLDB{
-		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-			return []byte("foo"), true, nil
-		},
-	}
-	return newDNS01Challenge(mockdb, testOps)
-}
-
-func newTLSALPNCh() (Challenge, error) {
-	mockdb := &db.MockNoSQLDB{
-		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-			return []byte("foo"), true, nil
-		},
-	}
-	return newTLSALPN01Challenge(mockdb, testOps)
-}
-
-func newHTTPCh() (Challenge, error) {
-	mockdb := &db.MockNoSQLDB{
-		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-			return []byte("foo"), true, nil
-		},
-	}
-	return newHTTP01Challenge(mockdb, testOps)
-}
-
-func newHTTPChWithServer(host string) (Challenge, error) {
-	mockdb := &db.MockNoSQLDB{
-		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-			return []byte("foo"), true, nil
-		},
-	}
-	return newHTTP01Challenge(mockdb, ChallengeOptions{
-		AccountID: "accID",
-		AuthzID:   "authzID",
-		Identifier: Identifier{
-			Type:  "", // will get set correctly depending on the "new.." method.
-			Value: host,
-		},
-	})
-}
-
-func TestNewHTTP01Challenge(t *testing.T) {
-	ops := ChallengeOptions{
-		AccountID: "accID",
-		AuthzID:   "authzID",
-		Identifier: Identifier{
-			Type:  "http",
-			Value: "zap.internal",
-		},
-	}
-	type test struct {
-		ops ChallengeOptions
-		db  nosql.DB
-		err *Error
-	}
-	tests := map[string]test{
-		"fail/store-error": {
-			ops: ops,
-			db: &db.MockNoSQLDB{
-				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-					return nil, false, errors.New("force")
-				},
-			},
-			err: ServerInternalErr(errors.New("error saving acme challenge: force")),
-		},
-		"ok": {
-			ops: ops,
-			db: &db.MockNoSQLDB{
-				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-					return []byte("foo"), true, nil
-				},
-			},
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			ch, err := newHTTP01Challenge(tc.db, tc.ops)
-			if err != nil {
-				if assert.NotNil(t, tc.err) {
-					ae, ok := err.(*Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
-				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, ch.getAccountID(), ops.AccountID)
-					assert.Equals(t, ch.getAuthzID(), ops.AuthzID)
-					assert.Equals(t, ch.getType(), "http-01")
-					assert.Equals(t, ch.getValue(), "zap.internal")
-					assert.Equals(t, ch.getStatus(), StatusPending)
-
-					assert.True(t, ch.getValidated().IsZero())
-					assert.True(t, ch.getCreated().Before(time.Now().UTC().Add(time.Minute)))
-					assert.True(t, ch.getCreated().After(time.Now().UTC().Add(-1*time.Minute)))
-
-					assert.True(t, ch.getID() != "")
-					assert.True(t, ch.getToken() != "")
-				}
-			}
-		})
-	}
-}
-
-func TestNewTLSALPN01Challenge(t *testing.T) {
-	ops := ChallengeOptions{
-		AccountID: "accID",
-		AuthzID:   "authzID",
-		Identifier: Identifier{
-			Type:  "http",
-			Value: "zap.internal",
-		},
-	}
-	type test struct {
-		ops ChallengeOptions
-		db  nosql.DB
-		err *Error
-	}
-	tests := map[string]test{
-		"fail/store-error": {
-			ops: ops,
-			db: &db.MockNoSQLDB{
-				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-					return nil, false, errors.New("force")
-				},
-			},
-			err: ServerInternalErr(errors.New("error saving acme challenge: force")),
-		},
-		"ok": {
-			ops: ops,
-			db: &db.MockNoSQLDB{
-				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-					return []byte("foo"), true, nil
-				},
-			},
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			ch, err := newTLSALPN01Challenge(tc.db, tc.ops)
-			if err != nil {
-				if assert.NotNil(t, tc.err) {
-					ae, ok := err.(*Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
-				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, ch.getAccountID(), ops.AccountID)
-					assert.Equals(t, ch.getAuthzID(), ops.AuthzID)
-					assert.Equals(t, ch.getType(), "tls-alpn-01")
-					assert.Equals(t, ch.getValue(), "zap.internal")
-					assert.Equals(t, ch.getStatus(), StatusPending)
-
-					assert.True(t, ch.getValidated().IsZero())
-					assert.True(t, ch.getCreated().Before(time.Now().UTC().Add(time.Minute)))
-					assert.True(t, ch.getCreated().After(time.Now().UTC().Add(-1*time.Minute)))
-
-					assert.True(t, ch.getID() != "")
-					assert.True(t, ch.getToken() != "")
-				}
-			}
-		})
-	}
-}
-
-func TestNewDNS01Challenge(t *testing.T) {
-	ops := ChallengeOptions{
-		AccountID: "accID",
-		AuthzID:   "authzID",
-		Identifier: Identifier{
-			Type:  "dns",
-			Value: "zap.internal",
-		},
-	}
-	type test struct {
-		ops ChallengeOptions
-		db  nosql.DB
-		err *Error
-	}
-	tests := map[string]test{
-		"fail/store-error": {
-			ops: ops,
-			db: &db.MockNoSQLDB{
-				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-					return nil, false, errors.New("force")
-				},
-			},
-			err: ServerInternalErr(errors.New("error saving acme challenge: force")),
-		},
-		"ok": {
-			ops: ops,
-			db: &db.MockNoSQLDB{
-				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-					return []byte("foo"), true, nil
-				},
-			},
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			ch, err := newDNS01Challenge(tc.db, tc.ops)
-			if err != nil {
-				if assert.NotNil(t, tc.err) {
-					ae, ok := err.(*Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
-				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, ch.getAccountID(), ops.AccountID)
-					assert.Equals(t, ch.getAuthzID(), ops.AuthzID)
-					assert.Equals(t, ch.getType(), "dns-01")
-					assert.Equals(t, ch.getValue(), "zap.internal")
-					assert.Equals(t, ch.getStatus(), StatusPending)
-
-					assert.True(t, ch.getValidated().IsZero())
-					assert.True(t, ch.getCreated().Before(time.Now().UTC().Add(time.Minute)))
-					assert.True(t, ch.getCreated().After(time.Now().UTC().Add(-1*time.Minute)))
-
-					assert.True(t, ch.getID() != "")
-					assert.True(t, ch.getToken() != "")
-				}
-			}
-		})
-	}
-}
-
-func TestChallengeToACME(t *testing.T) {
-	dir := newDirectory("ca.smallstep.com", "acme")
-
-	httpCh, err := newHTTPCh()
-	assert.FatalError(t, err)
-	_httpCh, ok := httpCh.(*http01Challenge)
-	assert.Fatal(t, ok)
-	_httpCh.baseChallenge.Validated = clock.Now()
-	dnsCh, err := newDNSCh()
-	assert.FatalError(t, err)
-	tlsALPNCh, err := newTLSALPNCh()
-	assert.FatalError(t, err)
-
-	prov := newProv()
-	provName := url.PathEscape(prov.GetName())
-	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
-	ctx = context.WithValue(ctx, BaseURLContextKey, baseURL)
-	tests := map[string]challenge{
-		"dns":      dnsCh,
-		"http":     httpCh,
-		"tls-alpn": tlsALPNCh,
-	}
-	for name, ch := range tests {
-		t.Run(name, func(t *testing.T) {
-			ach, err := ch.toACME(ctx, nil, dir)
-			assert.FatalError(t, err)
-
-			assert.Equals(t, ach.Type, ch.getType())
-			assert.Equals(t, ach.Status, ch.getStatus())
-			assert.Equals(t, ach.Token, ch.getToken())
-			assert.Equals(t, ach.URL,
-				fmt.Sprintf("%s/acme/%s/challenge/%s",
-					baseURL.String(), provName, ch.getID()))
-			assert.Equals(t, ach.ID, ch.getID())
-			assert.Equals(t, ach.AuthzID, ch.getAuthzID())
-
-			if ach.Type == "http-01" {
-				v, err := time.Parse(time.RFC3339, ach.Validated)
-				assert.FatalError(t, err)
-				assert.Equals(t, v.String(), _httpCh.baseChallenge.Validated.String())
-			} else {
-				assert.Equals(t, ach.Validated, "")
-			}
-		})
-	}
-}
-
-func TestChallengeSave(t *testing.T) {
-	type test struct {
-		ch  challenge
-		old challenge
-		db  nosql.DB
-		err *Error
-	}
-	tests := map[string]func(t *testing.T) test{
-		"fail/old-nil/swap-error": func(t *testing.T) test {
-			httpCh, err := newHTTPCh()
-			assert.FatalError(t, err)
-			return test{
-				ch:  httpCh,
-				old: nil,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						return nil, false, errors.New("force")
-					},
-				},
-				err: ServerInternalErr(errors.New("error saving acme challenge: force")),
-			}
-		},
-		"fail/old-nil/swap-false": func(t *testing.T) test {
-			httpCh, err := newHTTPCh()
-			assert.FatalError(t, err)
-			return test{
-				ch:  httpCh,
-				old: nil,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						return []byte("foo"), false, nil
-					},
-				},
-				err: ServerInternalErr(errors.New("error saving acme challenge; acme challenge has changed since last read")),
-			}
-		},
-		"ok/old-nil": func(t *testing.T) test {
-			httpCh, err := newHTTPCh()
-			assert.FatalError(t, err)
-			b, err := json.Marshal(httpCh)
-			assert.FatalError(t, err)
-			return test{
-				ch:  httpCh,
-				old: nil,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						assert.Equals(t, old, nil)
-						assert.Equals(t, b, newval)
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, []byte(httpCh.getID()), key)
-						return []byte("foo"), true, nil
-					},
-				},
-			}
-		},
-		"ok/old-not-nil": func(t *testing.T) test {
-			oldHTTPCh, err := newHTTPCh()
-			assert.FatalError(t, err)
-			httpCh, err := newHTTPCh()
-			assert.FatalError(t, err)
-
-			oldb, err := json.Marshal(oldHTTPCh)
-			assert.FatalError(t, err)
-			b, err := json.Marshal(httpCh)
-			assert.FatalError(t, err)
-			return test{
-				ch:  httpCh,
-				old: oldHTTPCh,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						assert.Equals(t, old, oldb)
-						assert.Equals(t, b, newval)
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, []byte(httpCh.getID()), key)
-						return []byte("foo"), true, nil
-					},
-				},
-			}
-		},
-	}
-	for name, run := range tests {
-		t.Run(name, func(t *testing.T) {
-			tc := run(t)
-			if err := tc.ch.save(tc.db, tc.old); err != nil {
-				if assert.NotNil(t, tc.err) {
-					ae, ok := err.(*Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
-				}
-			} else {
-				assert.Nil(t, tc.err)
-			}
-		})
-	}
-}
-
-func TestChallengeClone(t *testing.T) {
-	ch, err := newHTTPCh()
-	assert.FatalError(t, err)
-
-	clone := ch.clone()
-
-	assert.Equals(t, clone.getID(), ch.getID())
-	assert.Equals(t, clone.getAccountID(), ch.getAccountID())
-	assert.Equals(t, clone.getAuthzID(), ch.getAuthzID())
-	assert.Equals(t, clone.getStatus(), ch.getStatus())
-	assert.Equals(t, clone.getToken(), ch.getToken())
-	assert.Equals(t, clone.getCreated(), ch.getCreated())
-	assert.Equals(t, clone.getValidated(), ch.getValidated())
-
-	clone.Status = StatusValid
-
-	assert.NotEquals(t, clone.getStatus(), ch.getStatus())
-}
-
-func TestChallengeUnmarshal(t *testing.T) {
-	type test struct {
-		ch  challenge
-		chb []byte
-		err *Error
-	}
-	tests := map[string]func(t *testing.T) test{
-		"fail/nil": func(t *testing.T) test {
-			return test{
-				chb: nil,
-				err: ServerInternalErr(errors.New("error unmarshaling challenge type: unexpected end of JSON input")),
-			}
-		},
-		"fail/unexpected-type-http": func(t *testing.T) test {
-			httpCh, err := newHTTPCh()
-			assert.FatalError(t, err)
-			_httpCh, ok := httpCh.(*http01Challenge)
-			assert.Fatal(t, ok)
-			_httpCh.baseChallenge.Type = "foo"
-			b, err := json.Marshal(httpCh)
-			assert.FatalError(t, err)
-			return test{
-				chb: b,
-				err: ServerInternalErr(errors.New("unexpected challenge type foo")),
-			}
-		},
-		"fail/unexpected-type-alpn": func(t *testing.T) test {
-			tlsALPNCh, err := newTLSALPNCh()
-			assert.FatalError(t, err)
-			_tlsALPNCh, ok := tlsALPNCh.(*tlsALPN01Challenge)
-			assert.Fatal(t, ok)
-			_tlsALPNCh.baseChallenge.Type = "foo"
-			b, err := json.Marshal(tlsALPNCh)
-			assert.FatalError(t, err)
-			return test{
-				chb: b,
-				err: ServerInternalErr(errors.New("unexpected challenge type foo")),
-			}
-		},
-		"fail/unexpected-type-dns": func(t *testing.T) test {
-			dnsCh, err := newDNSCh()
-			assert.FatalError(t, err)
-			_dnsCh, ok := dnsCh.(*dns01Challenge)
-			assert.Fatal(t, ok)
-			_dnsCh.baseChallenge.Type = "foo"
-			b, err := json.Marshal(dnsCh)
-			assert.FatalError(t, err)
-			return test{
-				chb: b,
-				err: ServerInternalErr(errors.New("unexpected challenge type foo")),
-			}
-		},
-		"ok/dns": func(t *testing.T) test {
-			dnsCh, err := newDNSCh()
-			assert.FatalError(t, err)
-			b, err := json.Marshal(dnsCh)
-			assert.FatalError(t, err)
-			return test{
-				ch:  dnsCh,
-				chb: b,
-			}
-		},
-		"ok/http": func(t *testing.T) test {
-			httpCh, err := newHTTPCh()
-			assert.FatalError(t, err)
-			b, err := json.Marshal(httpCh)
-			assert.FatalError(t, err)
-			return test{
-				ch:  httpCh,
-				chb: b,
-			}
-		},
-		"ok/alpn": func(t *testing.T) test {
-			tlsALPNCh, err := newTLSALPNCh()
-			assert.FatalError(t, err)
-			b, err := json.Marshal(tlsALPNCh)
-			assert.FatalError(t, err)
-			return test{
-				ch:  tlsALPNCh,
-				chb: b,
-			}
-		},
-		"ok/err": func(t *testing.T) test {
-			httpCh, err := newHTTPCh()
-			assert.FatalError(t, err)
-			_httpCh, ok := httpCh.(*http01Challenge)
-			assert.Fatal(t, ok)
-			_httpCh.baseChallenge.Error = ServerInternalErr(errors.New("force")).ToACME()
-			b, err := json.Marshal(httpCh)
-			assert.FatalError(t, err)
-			return test{
-				ch:  httpCh,
-				chb: b,
-			}
-		},
-	}
-	for name, run := range tests {
-		t.Run(name, func(t *testing.T) {
-			tc := run(t)
-			if ch, err := unmarshalChallenge(tc.chb); err != nil {
-				if assert.NotNil(t, tc.err) {
-					ae, ok := err.(*Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
-				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, tc.ch.getID(), ch.getID())
-					assert.Equals(t, tc.ch.getAccountID(), ch.getAccountID())
-					assert.Equals(t, tc.ch.getAuthzID(), ch.getAuthzID())
-					assert.Equals(t, tc.ch.getStatus(), ch.getStatus())
-					assert.Equals(t, tc.ch.getToken(), ch.getToken())
-					assert.Equals(t, tc.ch.getCreated(), ch.getCreated())
-					assert.Equals(t, tc.ch.getValidated(), ch.getValidated())
-				}
-			}
-		})
-	}
-}
-func TestGetChallenge(t *testing.T) {
-	type test struct {
-		id  string
-		db  nosql.DB
-		ch  challenge
-		err *Error
-	}
-	tests := map[string]func(t *testing.T) test{
-		"fail/not-found": func(t *testing.T) test {
-			dnsCh, err := newDNSCh()
-			assert.FatalError(t, err)
-			return test{
-				ch: dnsCh,
-				id: dnsCh.getID(),
-				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						return nil, database.ErrNotFound
-					},
-				},
-				err: MalformedErr(errors.Errorf("challenge %s not found: not found", dnsCh.getID())),
-			}
-		},
-		"fail/db-error": func(t *testing.T) test {
-			dnsCh, err := newDNSCh()
-			assert.FatalError(t, err)
-			return test{
-				ch: dnsCh,
-				id: dnsCh.getID(),
-				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						return nil, errors.New("force")
-					},
-				},
-				err: ServerInternalErr(errors.Errorf("error loading challenge %s: force", dnsCh.getID())),
-			}
-		},
-		"fail/unmarshal-error": func(t *testing.T) test {
-			dnsCh, err := newDNSCh()
-			assert.FatalError(t, err)
-			_dnsCh, ok := dnsCh.(*dns01Challenge)
-			assert.Fatal(t, ok)
-			_dnsCh.baseChallenge.Type = "foo"
-			b, err := json.Marshal(dnsCh)
-			assert.FatalError(t, err)
-			return test{
-				ch: dnsCh,
-				id: dnsCh.getID(),
-				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, key, []byte(dnsCh.getID()))
-						return b, nil
-					},
-				},
-				err: ServerInternalErr(errors.New("unexpected challenge type foo")),
-			}
-		},
-		"ok": func(t *testing.T) test {
-			dnsCh, err := newDNSCh()
-			assert.FatalError(t, err)
-			b, err := json.Marshal(dnsCh)
-			assert.FatalError(t, err)
-			return test{
-				ch: dnsCh,
-				id: dnsCh.getID(),
-				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, key, []byte(dnsCh.getID()))
-						return b, nil
-					},
-				},
-			}
-		},
-	}
-	for name, run := range tests {
-		t.Run(name, func(t *testing.T) {
-			tc := run(t)
-			if ch, err := getChallenge(tc.db, tc.id); err != nil {
-				if assert.NotNil(t, tc.err) {
-					ae, ok := err.(*Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
-				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, tc.ch.getID(), ch.getID())
-					assert.Equals(t, tc.ch.getAccountID(), ch.getAccountID())
-					assert.Equals(t, tc.ch.getAuthzID(), ch.getAuthzID())
-					assert.Equals(t, tc.ch.getStatus(), ch.getStatus())
-					assert.Equals(t, tc.ch.getToken(), ch.getToken())
-					assert.Equals(t, tc.ch.getCreated(), ch.getCreated())
-					assert.Equals(t, tc.ch.getValidated(), ch.getValidated())
-				}
-			}
-		})
-	}
-}
+	"github.com/pkg/errors"
+	"github.com/smallstep/assert"
+	"go.step.sm/crypto/jose"
+)
 
 func TestKeyAuthorization(t *testing.T) {
 	type test struct {
 		token string
 		jwk   *jose.JSONWebKey
 		exp   string
-		err   *Error
+		err   error
 	}
 	tests := map[string]func(t *testing.T) test{
 		"fail/jwk-thumbprint-error": func(t *testing.T) test {
@@ -647,7 +31,7 @@ func TestKeyAuthorization(t *testing.T) {
 			return test{
 				token: "1234",
 				jwk:   jwk,
-				err:   ServerInternalErr(errors.Errorf("error generating JWK thumbprint: square/go-jose: unknown key type 'string'")),
+				err:   errors.New("error generating JWK thumbprint: square/go-jose: unknown key type 'string'"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -669,11 +53,7 @@ func TestKeyAuthorization(t *testing.T) {
 			tc := run(t)
 			if ka, err := KeyAuthorization(tc.token, tc.jwk); err != nil {
 				if assert.NotNil(t, tc.err) {
-					ae, ok := err.(*Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
+					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
@@ -695,258 +75,357 @@ func (errReader) Close() error {
 
 func TestHTTP01Validate(t *testing.T) {
 	type test struct {
-		vo  validateOptions
-		ch  challenge
-		res challenge
+		vo  *ValidateChallengeOptions
+		ch  *Challenge
 		jwk *jose.JSONWebKey
-		db  nosql.DB
+		db  DB
 		err *Error
 	}
 	tests := map[string]func(t *testing.T) test{
-		"ok/status-already-valid": func(t *testing.T) test {
-			ch, err := newHTTPCh()
-			assert.FatalError(t, err)
-			_ch, ok := ch.(*http01Challenge)
-			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = StatusValid
-			return test{
-				ch:  ch,
-				res: ch,
+		"fail/http-get-error-store-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
 			}
-		},
-		"ok/status-already-invalid": func(t *testing.T) test {
-			ch, err := newHTTPCh()
-			assert.FatalError(t, err)
-			_ch, ok := ch.(*http01Challenge)
-			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = StatusInvalid
-			return test{
-				ch:  ch,
-				res: ch,
-			}
-		},
-		"ok/http-get-error": func(t *testing.T) test {
-			ch, err := newHTTPCh()
-			assert.FatalError(t, err)
-			oldb, err := json.Marshal(ch)
-			assert.FatalError(t, err)
 
-			expErr := ConnectionErr(errors.Errorf("error doing http GET for url "+
-				"http://zap.internal/.well-known/acme-challenge/%s: force", ch.getToken()))
-			baseClone := ch.clone()
-			baseClone.Error = expErr.ToACME()
-			newCh := &http01Challenge{baseClone}
-			newb, err := json.Marshal(newCh)
-			assert.FatalError(t, err)
 			return test{
 				ch: ch,
-				vo: validateOptions{
-					httpGet: func(url string) (*http.Response, error) {
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, key, []byte(ch.getID()))
-						assert.Equals(t, old, oldb)
-						assert.Equals(t, newval, newb)
-						return nil, true, nil
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return errors.New("force")
 					},
 				},
-				res: ch,
+				err: NewErrorISE("failure saving error to acme challenge: force"),
 			}
 		},
-		"ok/http-get->=400": func(t *testing.T) test {
-			ch, err := newHTTPCh()
-			assert.FatalError(t, err)
-			oldb, err := json.Marshal(ch)
-			assert.FatalError(t, err)
+		"ok/http-get-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
 
-			expErr := ConnectionErr(errors.Errorf("error doing http GET for url "+
-				"http://zap.internal/.well-known/acme-challenge/%s with status code 400", ch.getToken()))
-			baseClone := ch.clone()
-			baseClone.Error = expErr.ToACME()
-			newCh := &http01Challenge{baseClone}
-			newb, err := json.Marshal(newCh)
-			assert.FatalError(t, err)
 			return test{
 				ch: ch,
-				vo: validateOptions{
-					httpGet: func(url string) (*http.Response, error) {
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
+						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return nil
+					},
+				},
+			}
+		},
+		"fail/http-get->=400-store-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
 							StatusCode: http.StatusBadRequest,
 						}, nil
 					},
 				},
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, key, []byte(ch.getID()))
-						assert.Equals(t, old, oldb)
-						assert.Equals(t, newval, newb)
-						return nil, true, nil
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s with status code 400", ch.Token)
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return errors.New("force")
 					},
 				},
-				res: ch,
+				err: NewErrorISE("failure saving error to acme challenge: force"),
 			}
 		},
-		"fail/read-body": func(t *testing.T) test {
-			ch, err := newHTTPCh()
-			assert.FatalError(t, err)
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
-			jwk.Key = "foo"
+		"ok/http-get->=400": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
 
 			return test{
 				ch: ch,
-				vo: validateOptions{
-					httpGet: func(url string) (*http.Response, error) {
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusBadRequest,
+						}, nil
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s with status code 400", ch.Token)
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return nil
+					},
+				},
+			}
+		},
+		"fail/read-body": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
 							Body: errReader(0),
 						}, nil
 					},
 				},
-				jwk: jwk,
-				err: ServerInternalErr(errors.Errorf("error reading response "+
-					"body for url http://zap.internal/.well-known/acme-challenge/%s: force",
-					ch.getToken())),
+				err: NewErrorISE("error reading response body for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token),
 			}
 		},
-		"fail/key-authorization-gen-error": func(t *testing.T) test {
-			ch, err := newHTTPCh()
-			assert.FatalError(t, err)
+		"fail/key-auth-gen-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
+
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			jwk.Key = "foo"
 			return test{
 				ch: ch,
-				vo: validateOptions{
-					httpGet: func(url string) (*http.Response, error) {
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
 							Body: ioutil.NopCloser(bytes.NewBufferString("foo")),
 						}, nil
 					},
 				},
 				jwk: jwk,
-				err: ServerInternalErr(errors.New("error generating JWK thumbprint: square/go-jose: unknown key type 'string'")),
+				err: NewErrorISE("error generating JWK thumbprint: square/go-jose: unknown key type 'string'"),
 			}
 		},
 		"ok/key-auth-mismatch": func(t *testing.T) test {
-			ch, err := newHTTPCh()
-			assert.FatalError(t, err)
-			oldb, err := json.Marshal(ch)
-			assert.FatalError(t, err)
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 
-			expKeyAuth, err := KeyAuthorization(ch.getToken(), jwk)
+			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
 			assert.FatalError(t, err)
-
-			expErr := RejectedIdentifierErr(errors.Errorf("keyAuthorization does not match; "+
-				"expected %s, but got foo", expKeyAuth))
-			baseClone := ch.clone()
-			baseClone.Error = expErr.ToACME()
-			newCh := &http01Challenge{baseClone}
-			newb, err := json.Marshal(newCh)
-			assert.FatalError(t, err)
-
 			return test{
 				ch: ch,
-				vo: validateOptions{
-					httpGet: func(url string) (*http.Response, error) {
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
 							Body: ioutil.NopCloser(bytes.NewBufferString("foo")),
 						}, nil
 					},
 				},
 				jwk: jwk,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, key, []byte(ch.getID()))
-						assert.Equals(t, old, oldb)
-						assert.Equals(t, newval, newb)
-						return nil, true, nil
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						err := NewError(ErrorRejectedIdentifierType,
+							"keyAuthorization does not match; expected %s, but got foo", expKeyAuth)
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return nil
 					},
 				},
-				res: ch,
 			}
 		},
-		"fail/save-error": func(t *testing.T) test {
-			ch, err := newHTTPCh()
-			assert.FatalError(t, err)
+		"fail/key-auth-mismatch-store-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 
-			expKeyAuth, err := KeyAuthorization(ch.getToken(), jwk)
+			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
 			assert.FatalError(t, err)
 			return test{
 				ch: ch,
-				vo: validateOptions{
-					httpGet: func(url string) (*http.Response, error) {
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
-							Body: ioutil.NopCloser(bytes.NewBufferString(expKeyAuth)),
+							Body: ioutil.NopCloser(bytes.NewBufferString("foo")),
 						}, nil
 					},
 				},
 				jwk: jwk,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						return nil, false, errors.New("force")
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						err := NewError(ErrorRejectedIdentifierType,
+							"keyAuthorization does not match; expected %s, but got foo", expKeyAuth)
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return errors.New("force")
 					},
 				},
-				err: ServerInternalErr(errors.New("error saving acme challenge: force")),
+				err: NewErrorISE("failure saving error to acme challenge: force"),
 			}
 		},
-		"ok": func(t *testing.T) test {
-			ch, err := newHTTPCh()
-			assert.FatalError(t, err)
-			_ch, ok := ch.(*http01Challenge)
-			assert.Fatal(t, ok)
-			_ch.baseChallenge.Error = MalformedErr(nil).ToACME()
-			oldb, err := json.Marshal(ch)
-			assert.FatalError(t, err)
+		"fail/update-challenge-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 
-			expKeyAuth, err := KeyAuthorization(ch.getToken(), jwk)
+			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
 			assert.FatalError(t, err)
-
-			baseClone := ch.clone()
-			baseClone.Status = StatusValid
-			baseClone.Error = nil
-			newCh := &http01Challenge{baseClone}
-
 			return test{
-				ch:  ch,
-				res: newCh,
-				vo: validateOptions{
-					httpGet: func(url string) (*http.Response, error) {
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
 							Body: ioutil.NopCloser(bytes.NewBufferString(expKeyAuth)),
 						}, nil
 					},
 				},
 				jwk: jwk,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, key, []byte(ch.getID()))
-						assert.Equals(t, old, oldb)
-
-						httpCh, err := unmarshalChallenge(newval)
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusValid)
+						assert.Equals(t, updch.Error, nil)
+						va, err := time.Parse(time.RFC3339, updch.ValidatedAt)
 						assert.FatalError(t, err)
-						assert.Equals(t, httpCh.getStatus(), StatusValid)
-						assert.True(t, httpCh.getValidated().Before(time.Now().UTC().Add(time.Minute)))
-						assert.True(t, httpCh.getValidated().After(time.Now().UTC().Add(-1*time.Second)))
+						now := clock.Now()
+						assert.True(t, va.Add(-time.Minute).Before(now))
+						assert.True(t, va.Add(time.Minute).After(now))
 
-						baseClone.Validated = httpCh.getValidated()
+						return errors.New("force")
+					},
+				},
+				err: NewErrorISE("error updating challenge: force"),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
 
-						return nil, true, nil
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+
+			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+			assert.FatalError(t, err)
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
+						return &http.Response{
+							Body: ioutil.NopCloser(bytes.NewBufferString(expKeyAuth)),
+						}, nil
+					},
+				},
+				jwk: jwk,
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						assert.Equals(t, updch.Status, StatusValid)
+						assert.Equals(t, updch.Error, nil)
+						va, err := time.Parse(time.RFC3339, updch.ValidatedAt)
+						assert.FatalError(t, err)
+						now := clock.Now()
+						assert.True(t, va.Add(-time.Minute).Before(now))
+						assert.True(t, va.Add(time.Minute).After(now))
+						return nil
 					},
 				},
 			}
@@ -955,30 +434,27 @@ func TestHTTP01Validate(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if ch, err := tc.ch.validate(tc.db, tc.jwk, tc.vo); err != nil {
+			if err := http01Validate(context.Background(), tc.ch, tc.db, tc.jwk, tc.vo); err != nil {
 				if assert.NotNil(t, tc.err) {
-					ae, ok := err.(*Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
+					switch k := err.(type) {
+					case *Error:
+						assert.Equals(t, k.Type, tc.err.Type)
+						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equals(t, k.Status, tc.err.Status)
+						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
+						assert.Equals(t, k.Detail, tc.err.Detail)
+					default:
+						assert.FatalError(t, errors.New("unexpected error type"))
+					}
 				}
 			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, tc.res.getID(), ch.getID())
-					assert.Equals(t, tc.res.getAccountID(), ch.getAccountID())
-					assert.Equals(t, tc.res.getAuthzID(), ch.getAuthzID())
-					assert.Equals(t, tc.res.getStatus(), ch.getStatus())
-					assert.Equals(t, tc.res.getToken(), ch.getToken())
-					assert.Equals(t, tc.res.getCreated(), ch.getCreated())
-					assert.Equals(t, tc.res.getValidated(), ch.getValidated())
-					assert.Equals(t, tc.res.getError(), ch.getError())
-				}
+				assert.Nil(t, tc.err)
 			}
 		})
 	}
 }
 
+/*
 func TestTLSALPN01Validate(t *testing.T) {
 	type test struct {
 		srv *httptest.Server
@@ -1955,6 +1431,638 @@ func TestDNS01Validate(t *testing.T) {
 					assert.Equals(t, tc.res.getCreated(), ch.getCreated())
 					assert.Equals(t, tc.res.getValidated(), ch.getValidated())
 					assert.Equals(t, tc.res.getError(), ch.getError())
+				}
+			}
+		})
+	}
+}
+
+/*
+var testOps = ChallengeOptions{
+	AccountID: "accID",
+	AuthzID:   "authzID",
+	Identifier: Identifier{
+		Type:  "", // will get set correctly depending on the "new.." method.
+		Value: "zap.internal",
+	},
+}
+
+func newDNSCh() (Challenge, error) {
+	mockdb := &db.MockNoSQLDB{
+		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+			return []byte("foo"), true, nil
+		},
+	}
+	return newDNS01Challenge(mockdb, testOps)
+}
+
+func newTLSALPNCh() (Challenge, error) {
+	mockdb := &db.MockNoSQLDB{
+		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+			return []byte("foo"), true, nil
+		},
+	}
+	return newTLSALPN01Challenge(mockdb, testOps)
+}
+
+func newHTTPCh() (Challenge, error) {
+	mockdb := &db.MockNoSQLDB{
+		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+			return []byte("foo"), true, nil
+		},
+	}
+	return newHTTP01Challenge(mockdb, testOps)
+}
+
+func newHTTPChWithServer(host string) (Challenge, error) {
+	mockdb := &db.MockNoSQLDB{
+		MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+			return []byte("foo"), true, nil
+		},
+	}
+	return newHTTP01Challenge(mockdb, ChallengeOptions{
+		AccountID: "accID",
+		AuthzID:   "authzID",
+		Identifier: Identifier{
+			Type:  "", // will get set correctly depending on the "new.." method.
+			Value: host,
+		},
+	})
+}
+
+func TestNewHTTP01Challenge(t *testing.T) {
+	ops := ChallengeOptions{
+		AccountID: "accID",
+		AuthzID:   "authzID",
+		Identifier: Identifier{
+			Type:  "http",
+			Value: "zap.internal",
+		},
+	}
+	type test struct {
+		ops ChallengeOptions
+		db  nosql.DB
+		err *Error
+	}
+	tests := map[string]test{
+		"fail/store-error": {
+			ops: ops,
+			db: &db.MockNoSQLDB{
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					return nil, false, errors.New("force")
+				},
+			},
+			err: ServerInternalErr(errors.New("error saving acme challenge: force")),
+		},
+		"ok": {
+			ops: ops,
+			db: &db.MockNoSQLDB{
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					return []byte("foo"), true, nil
+				},
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ch, err := newHTTP01Challenge(tc.db, tc.ops)
+			if err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					assert.Equals(t, ch.getAccountID(), ops.AccountID)
+					assert.Equals(t, ch.getAuthzID(), ops.AuthzID)
+					assert.Equals(t, ch.getType(), "http-01")
+					assert.Equals(t, ch.getValue(), "zap.internal")
+					assert.Equals(t, ch.getStatus(), StatusPending)
+
+					assert.True(t, ch.getValidated().IsZero())
+					assert.True(t, ch.getCreated().Before(time.Now().UTC().Add(time.Minute)))
+					assert.True(t, ch.getCreated().After(time.Now().UTC().Add(-1*time.Minute)))
+
+					assert.True(t, ch.getID() != "")
+					assert.True(t, ch.getToken() != "")
+				}
+			}
+		})
+	}
+}
+
+func TestNewTLSALPN01Challenge(t *testing.T) {
+	ops := ChallengeOptions{
+		AccountID: "accID",
+		AuthzID:   "authzID",
+		Identifier: Identifier{
+			Type:  "http",
+			Value: "zap.internal",
+		},
+	}
+	type test struct {
+		ops ChallengeOptions
+		db  nosql.DB
+		err *Error
+	}
+	tests := map[string]test{
+		"fail/store-error": {
+			ops: ops,
+			db: &db.MockNoSQLDB{
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					return nil, false, errors.New("force")
+				},
+			},
+			err: ServerInternalErr(errors.New("error saving acme challenge: force")),
+		},
+		"ok": {
+			ops: ops,
+			db: &db.MockNoSQLDB{
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					return []byte("foo"), true, nil
+				},
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ch, err := newTLSALPN01Challenge(tc.db, tc.ops)
+			if err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					assert.Equals(t, ch.getAccountID(), ops.AccountID)
+					assert.Equals(t, ch.getAuthzID(), ops.AuthzID)
+					assert.Equals(t, ch.getType(), "tls-alpn-01")
+					assert.Equals(t, ch.getValue(), "zap.internal")
+					assert.Equals(t, ch.getStatus(), StatusPending)
+
+					assert.True(t, ch.getValidated().IsZero())
+					assert.True(t, ch.getCreated().Before(time.Now().UTC().Add(time.Minute)))
+					assert.True(t, ch.getCreated().After(time.Now().UTC().Add(-1*time.Minute)))
+
+					assert.True(t, ch.getID() != "")
+					assert.True(t, ch.getToken() != "")
+				}
+			}
+		})
+	}
+}
+
+func TestNewDNS01Challenge(t *testing.T) {
+	ops := ChallengeOptions{
+		AccountID: "accID",
+		AuthzID:   "authzID",
+		Identifier: Identifier{
+			Type:  "dns",
+			Value: "zap.internal",
+		},
+	}
+	type test struct {
+		ops ChallengeOptions
+		db  nosql.DB
+		err *Error
+	}
+	tests := map[string]test{
+		"fail/store-error": {
+			ops: ops,
+			db: &db.MockNoSQLDB{
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					return nil, false, errors.New("force")
+				},
+			},
+			err: ServerInternalErr(errors.New("error saving acme challenge: force")),
+		},
+		"ok": {
+			ops: ops,
+			db: &db.MockNoSQLDB{
+				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+					return []byte("foo"), true, nil
+				},
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ch, err := newDNS01Challenge(tc.db, tc.ops)
+			if err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					assert.Equals(t, ch.getAccountID(), ops.AccountID)
+					assert.Equals(t, ch.getAuthzID(), ops.AuthzID)
+					assert.Equals(t, ch.getType(), "dns-01")
+					assert.Equals(t, ch.getValue(), "zap.internal")
+					assert.Equals(t, ch.getStatus(), StatusPending)
+
+					assert.True(t, ch.getValidated().IsZero())
+					assert.True(t, ch.getCreated().Before(time.Now().UTC().Add(time.Minute)))
+					assert.True(t, ch.getCreated().After(time.Now().UTC().Add(-1*time.Minute)))
+
+					assert.True(t, ch.getID() != "")
+					assert.True(t, ch.getToken() != "")
+				}
+			}
+		})
+	}
+}
+
+func TestChallengeToACME(t *testing.T) {
+	dir := newDirectory("ca.smallstep.com", "acme")
+
+	httpCh, err := newHTTPCh()
+	assert.FatalError(t, err)
+	_httpCh, ok := httpCh.(*http01Challenge)
+	assert.Fatal(t, ok)
+	_httpCh.baseChallenge.Validated = clock.Now()
+	dnsCh, err := newDNSCh()
+	assert.FatalError(t, err)
+	tlsALPNCh, err := newTLSALPNCh()
+	assert.FatalError(t, err)
+
+	prov := newProv()
+	provName := url.PathEscape(prov.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+	ctx := context.WithValue(context.Background(), ProvisionerContextKey, prov)
+	ctx = context.WithValue(ctx, BaseURLContextKey, baseURL)
+	tests := map[string]challenge{
+		"dns":      dnsCh,
+		"http":     httpCh,
+		"tls-alpn": tlsALPNCh,
+	}
+	for name, ch := range tests {
+		t.Run(name, func(t *testing.T) {
+			ach, err := ch.toACME(ctx, nil, dir)
+			assert.FatalError(t, err)
+
+			assert.Equals(t, ach.Type, ch.getType())
+			assert.Equals(t, ach.Status, ch.getStatus())
+			assert.Equals(t, ach.Token, ch.getToken())
+			assert.Equals(t, ach.URL,
+				fmt.Sprintf("%s/acme/%s/challenge/%s",
+					baseURL.String(), provName, ch.getID()))
+			assert.Equals(t, ach.ID, ch.getID())
+			assert.Equals(t, ach.AuthzID, ch.getAuthzID())
+
+			if ach.Type == "http-01" {
+				v, err := time.Parse(time.RFC3339, ach.Validated)
+				assert.FatalError(t, err)
+				assert.Equals(t, v.String(), _httpCh.baseChallenge.Validated.String())
+			} else {
+				assert.Equals(t, ach.Validated, "")
+			}
+		})
+	}
+}
+
+func TestChallengeSave(t *testing.T) {
+	type test struct {
+		ch  challenge
+		old challenge
+		db  nosql.DB
+		err *Error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"fail/old-nil/swap-error": func(t *testing.T) test {
+			httpCh, err := newHTTPCh()
+			assert.FatalError(t, err)
+			return test{
+				ch:  httpCh,
+				old: nil,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						return nil, false, errors.New("force")
+					},
+				},
+				err: ServerInternalErr(errors.New("error saving acme challenge: force")),
+			}
+		},
+		"fail/old-nil/swap-false": func(t *testing.T) test {
+			httpCh, err := newHTTPCh()
+			assert.FatalError(t, err)
+			return test{
+				ch:  httpCh,
+				old: nil,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						return []byte("foo"), false, nil
+					},
+				},
+				err: ServerInternalErr(errors.New("error saving acme challenge; acme challenge has changed since last read")),
+			}
+		},
+		"ok/old-nil": func(t *testing.T) test {
+			httpCh, err := newHTTPCh()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(httpCh)
+			assert.FatalError(t, err)
+			return test{
+				ch:  httpCh,
+				old: nil,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, old, nil)
+						assert.Equals(t, b, newval)
+						assert.Equals(t, bucket, challengeTable)
+						assert.Equals(t, []byte(httpCh.getID()), key)
+						return []byte("foo"), true, nil
+					},
+				},
+			}
+		},
+		"ok/old-not-nil": func(t *testing.T) test {
+			oldHTTPCh, err := newHTTPCh()
+			assert.FatalError(t, err)
+			httpCh, err := newHTTPCh()
+			assert.FatalError(t, err)
+
+			oldb, err := json.Marshal(oldHTTPCh)
+			assert.FatalError(t, err)
+			b, err := json.Marshal(httpCh)
+			assert.FatalError(t, err)
+			return test{
+				ch:  httpCh,
+				old: oldHTTPCh,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
+						assert.Equals(t, old, oldb)
+						assert.Equals(t, b, newval)
+						assert.Equals(t, bucket, challengeTable)
+						assert.Equals(t, []byte(httpCh.getID()), key)
+						return []byte("foo"), true, nil
+					},
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if err := tc.ch.save(tc.db, tc.old); err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
+func TestChallengeClone(t *testing.T) {
+	ch, err := newHTTPCh()
+	assert.FatalError(t, err)
+
+	clone := ch.clone()
+
+	assert.Equals(t, clone.getID(), ch.getID())
+	assert.Equals(t, clone.getAccountID(), ch.getAccountID())
+	assert.Equals(t, clone.getAuthzID(), ch.getAuthzID())
+	assert.Equals(t, clone.getStatus(), ch.getStatus())
+	assert.Equals(t, clone.getToken(), ch.getToken())
+	assert.Equals(t, clone.getCreated(), ch.getCreated())
+	assert.Equals(t, clone.getValidated(), ch.getValidated())
+
+	clone.Status = StatusValid
+
+	assert.NotEquals(t, clone.getStatus(), ch.getStatus())
+}
+
+func TestChallengeUnmarshal(t *testing.T) {
+	type test struct {
+		ch  challenge
+		chb []byte
+		err *Error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"fail/nil": func(t *testing.T) test {
+			return test{
+				chb: nil,
+				err: ServerInternalErr(errors.New("error unmarshaling challenge type: unexpected end of JSON input")),
+			}
+		},
+		"fail/unexpected-type-http": func(t *testing.T) test {
+			httpCh, err := newHTTPCh()
+			assert.FatalError(t, err)
+			_httpCh, ok := httpCh.(*http01Challenge)
+			assert.Fatal(t, ok)
+			_httpCh.baseChallenge.Type = "foo"
+			b, err := json.Marshal(httpCh)
+			assert.FatalError(t, err)
+			return test{
+				chb: b,
+				err: ServerInternalErr(errors.New("unexpected challenge type foo")),
+			}
+		},
+		"fail/unexpected-type-alpn": func(t *testing.T) test {
+			tlsALPNCh, err := newTLSALPNCh()
+			assert.FatalError(t, err)
+			_tlsALPNCh, ok := tlsALPNCh.(*tlsALPN01Challenge)
+			assert.Fatal(t, ok)
+			_tlsALPNCh.baseChallenge.Type = "foo"
+			b, err := json.Marshal(tlsALPNCh)
+			assert.FatalError(t, err)
+			return test{
+				chb: b,
+				err: ServerInternalErr(errors.New("unexpected challenge type foo")),
+			}
+		},
+		"fail/unexpected-type-dns": func(t *testing.T) test {
+			dnsCh, err := newDNSCh()
+			assert.FatalError(t, err)
+			_dnsCh, ok := dnsCh.(*dns01Challenge)
+			assert.Fatal(t, ok)
+			_dnsCh.baseChallenge.Type = "foo"
+			b, err := json.Marshal(dnsCh)
+			assert.FatalError(t, err)
+			return test{
+				chb: b,
+				err: ServerInternalErr(errors.New("unexpected challenge type foo")),
+			}
+		},
+		"ok/dns": func(t *testing.T) test {
+			dnsCh, err := newDNSCh()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(dnsCh)
+			assert.FatalError(t, err)
+			return test{
+				ch:  dnsCh,
+				chb: b,
+			}
+		},
+		"ok/http": func(t *testing.T) test {
+			httpCh, err := newHTTPCh()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(httpCh)
+			assert.FatalError(t, err)
+			return test{
+				ch:  httpCh,
+				chb: b,
+			}
+		},
+		"ok/alpn": func(t *testing.T) test {
+			tlsALPNCh, err := newTLSALPNCh()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(tlsALPNCh)
+			assert.FatalError(t, err)
+			return test{
+				ch:  tlsALPNCh,
+				chb: b,
+			}
+		},
+		"ok/err": func(t *testing.T) test {
+			httpCh, err := newHTTPCh()
+			assert.FatalError(t, err)
+			_httpCh, ok := httpCh.(*http01Challenge)
+			assert.Fatal(t, ok)
+			_httpCh.baseChallenge.Error = ServerInternalErr(errors.New("force")).ToACME()
+			b, err := json.Marshal(httpCh)
+			assert.FatalError(t, err)
+			return test{
+				ch:  httpCh,
+				chb: b,
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if ch, err := unmarshalChallenge(tc.chb); err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					assert.Equals(t, tc.ch.getID(), ch.getID())
+					assert.Equals(t, tc.ch.getAccountID(), ch.getAccountID())
+					assert.Equals(t, tc.ch.getAuthzID(), ch.getAuthzID())
+					assert.Equals(t, tc.ch.getStatus(), ch.getStatus())
+					assert.Equals(t, tc.ch.getToken(), ch.getToken())
+					assert.Equals(t, tc.ch.getCreated(), ch.getCreated())
+					assert.Equals(t, tc.ch.getValidated(), ch.getValidated())
+				}
+			}
+		})
+	}
+}
+func TestGetChallenge(t *testing.T) {
+	type test struct {
+		id  string
+		db  nosql.DB
+		ch  challenge
+		err *Error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"fail/not-found": func(t *testing.T) test {
+			dnsCh, err := newDNSCh()
+			assert.FatalError(t, err)
+			return test{
+				ch: dnsCh,
+				id: dnsCh.getID(),
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						return nil, database.ErrNotFound
+					},
+				},
+				err: MalformedErr(errors.Errorf("challenge %s not found: not found", dnsCh.getID())),
+			}
+		},
+		"fail/db-error": func(t *testing.T) test {
+			dnsCh, err := newDNSCh()
+			assert.FatalError(t, err)
+			return test{
+				ch: dnsCh,
+				id: dnsCh.getID(),
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						return nil, errors.New("force")
+					},
+				},
+				err: ServerInternalErr(errors.Errorf("error loading challenge %s: force", dnsCh.getID())),
+			}
+		},
+		"fail/unmarshal-error": func(t *testing.T) test {
+			dnsCh, err := newDNSCh()
+			assert.FatalError(t, err)
+			_dnsCh, ok := dnsCh.(*dns01Challenge)
+			assert.Fatal(t, ok)
+			_dnsCh.baseChallenge.Type = "foo"
+			b, err := json.Marshal(dnsCh)
+			assert.FatalError(t, err)
+			return test{
+				ch: dnsCh,
+				id: dnsCh.getID(),
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						assert.Equals(t, bucket, challengeTable)
+						assert.Equals(t, key, []byte(dnsCh.getID()))
+						return b, nil
+					},
+				},
+				err: ServerInternalErr(errors.New("unexpected challenge type foo")),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			dnsCh, err := newDNSCh()
+			assert.FatalError(t, err)
+			b, err := json.Marshal(dnsCh)
+			assert.FatalError(t, err)
+			return test{
+				ch: dnsCh,
+				id: dnsCh.getID(),
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						assert.Equals(t, bucket, challengeTable)
+						assert.Equals(t, key, []byte(dnsCh.getID()))
+						return b, nil
+					},
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if ch, err := getChallenge(tc.db, tc.id); err != nil {
+				if assert.NotNil(t, tc.err) {
+					ae, ok := err.(*Error)
+					assert.True(t, ok)
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
+				}
+			} else {
+				if assert.Nil(t, tc.err) {
+					assert.Equals(t, tc.ch.getID(), ch.getID())
+					assert.Equals(t, tc.ch.getAccountID(), ch.getAccountID())
+					assert.Equals(t, tc.ch.getAuthzID(), ch.getAuthzID())
+					assert.Equals(t, tc.ch.getStatus(), ch.getStatus())
+					assert.Equals(t, tc.ch.getToken(), ch.getToken())
+					assert.Equals(t, tc.ch.getCreated(), ch.getCreated())
+					assert.Equals(t, tc.ch.getValidated(), ch.getValidated())
 				}
 			}
 		})

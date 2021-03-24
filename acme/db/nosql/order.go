@@ -127,15 +127,17 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...st
 	defer ordersByAccountMux.Unlock()
 
 	b, err := db.db.Get(ordersByAccountIDTable, []byte(accID))
+	var (
+		oldOids []string
+	)
 	if err != nil {
-		if nosql.IsErrNotFound(err) {
-			return []string{}, nil
+		if !nosql.IsErrNotFound(err) {
+			return nil, errors.Wrapf(err, "error loading orderIDs for account %s", accID)
 		}
-		return nil, errors.Wrapf(err, "error loading orderIDs for account %s", accID)
-	}
-	var oids []string
-	if err := json.Unmarshal(b, &oids); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling orderIDs for account %s", accID)
+	} else {
+		if err := json.Unmarshal(b, &oldOids); err != nil {
+			return nil, errors.Wrapf(err, "error unmarshaling orderIDs for account %s", accID)
+		}
 	}
 
 	// Remove any order that is not in PENDING state and update the stored list
@@ -145,7 +147,7 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...st
 	// The server SHOULD include pending orders and SHOULD NOT include orders
 	// that are invalid in the array of URLs.
 	pendOids := []string{}
-	for _, oid := range oids {
+	for _, oid := range oldOids {
 		o, err := db.GetOrder(ctx, oid)
 		if err != nil {
 			return nil, acme.WrapErrorISE(err, "error loading order %s for account %s", oid, accID)
@@ -158,15 +160,27 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...st
 		}
 	}
 	pendOids = append(pendOids, addOids...)
-	if len(oids) == 0 {
-		oids = nil
+	var (
+		_old interface{} = oldOids
+		_new interface{} = pendOids
+	)
+	switch {
+	case len(oldOids) == 0 && len(pendOids) == 0:
+		// If list has not changed from empty, then no need to write the DB.
+		return []string{}, nil
+	case len(oldOids) == 0:
+		_old = nil
+	case len(pendOids) == 0:
+		_new = nil
 	}
-	if err = db.save(ctx, accID, pendOids, oids, "orderIDsByAccountID", ordersByAccountIDTable); err != nil {
+	if err = db.save(ctx, accID, _new, _old, "orderIDsByAccountID", ordersByAccountIDTable); err != nil {
 		// Delete all orders that may have been previously stored if orderIDsByAccountID update fails.
 		for _, oid := range addOids {
+			// Ignore error from delete -- we tried our best.
+			// TODO when we have logging w/ request ID tracking, logging this error.
 			db.db.Del(orderTable, []byte(oid))
 		}
-		return nil, errors.Wrap(err, "error saving OrderIDsByAccountID index")
+		return nil, errors.Wrapf(err, "error saving orderIDs index for account %s", accID)
 	}
 	return pendOids, nil
 }

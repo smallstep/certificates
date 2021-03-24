@@ -14,16 +14,16 @@ var defaultExpiryDuration = time.Hour * 24
 
 // dbAuthz is the base authz type that others build from.
 type dbAuthz struct {
-	ID         string          `json:"id"`
-	AccountID  string          `json:"accountID"`
-	Identifier acme.Identifier `json:"identifier"`
-	Status     acme.Status     `json:"status"`
-	ExpiresAt  time.Time       `json:"expiresAt"`
-	Challenges []string        `json:"challenges"`
-	Wildcard   bool            `json:"wildcard"`
-	CreatedAt  time.Time       `json:"createdAt"`
-	Error      *acme.Error     `json:"error"`
-	Token      string          `json:"token"`
+	ID           string          `json:"id"`
+	AccountID    string          `json:"accountID"`
+	Identifier   acme.Identifier `json:"identifier"`
+	Status       acme.Status     `json:"status"`
+	ExpiresAt    time.Time       `json:"expiresAt"`
+	ChallengeIDs []string        `json:"challengeIDs"`
+	Wildcard     bool            `json:"wildcard"`
+	CreatedAt    time.Time       `json:"createdAt"`
+	Error        *acme.Error     `json:"error"`
+	Token        string          `json:"token"`
 }
 
 func (ba *dbAuthz) clone() *dbAuthz {
@@ -55,8 +55,8 @@ func (db *DB) GetAuthorization(ctx context.Context, id string) (*acme.Authorizat
 	if err != nil {
 		return nil, err
 	}
-	var chs = make([]*acme.Challenge, len(dbaz.Challenges))
-	for i, chID := range dbaz.Challenges {
+	var chs = make([]*acme.Challenge, len(dbaz.ChallengeIDs))
+	for i, chID := range dbaz.ChallengeIDs {
 		chs[i], err = db.GetChallenge(ctx, chID, id)
 		if err != nil {
 			return nil, err
@@ -91,15 +91,15 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *acme.Authorization) e
 
 	now := clock.Now()
 	dbaz := &dbAuthz{
-		ID:         az.ID,
-		AccountID:  az.AccountID,
-		Status:     az.Status,
-		CreatedAt:  now,
-		ExpiresAt:  az.ExpiresAt,
-		Identifier: az.Identifier,
-		Challenges: chIDs,
-		Token:      az.Token,
-		Wildcard:   az.Wildcard,
+		ID:           az.ID,
+		AccountID:    az.AccountID,
+		Status:       az.Status,
+		CreatedAt:    now,
+		ExpiresAt:    az.ExpiresAt,
+		Identifier:   az.Identifier,
+		ChallengeIDs: chIDs,
+		Token:        az.Token,
+		Wildcard:     az.Wildcard,
 	}
 
 	return db.save(ctx, az.ID, dbaz, nil, "authz", authzTable)

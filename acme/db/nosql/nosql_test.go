@@ -110,6 +110,19 @@ func TestDB_save(t *testing.T) {
 				},
 			},
 		},
+		"ok/nils": test{
+			nu:  nil,
+			old: nil,
+			db: &db.MockNoSQLDB{
+				MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
+					assert.Equals(t, bucket, challengeTable)
+					assert.Equals(t, string(key), "id")
+					assert.Equals(t, old, nil)
+					assert.Equals(t, nu, nil)
+					return nu, true, nil
+				},
+			},
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {

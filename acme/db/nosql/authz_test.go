@@ -71,13 +71,13 @@ func TestDB_getDBAuthz(t *testing.T) {
 					Type:  "dns",
 					Value: "test.ca.smallstep.com",
 				},
-				Status:     acme.StatusPending,
-				Token:      "token",
-				CreatedAt:  now,
-				ExpiresAt:  now.Add(5 * time.Minute),
-				Error:      acme.NewErrorISE("force"),
-				Challenges: []string{"foo", "bar"},
-				Wildcard:   true,
+				Status:       acme.StatusPending,
+				Token:        "token",
+				CreatedAt:    now,
+				ExpiresAt:    now.Add(5 * time.Minute),
+				Error:        acme.NewErrorISE("force"),
+				ChallengeIDs: []string{"foo", "bar"},
+				Wildcard:     true,
 			}
 			b, err := json.Marshal(dbaz)
 			assert.FatalError(t, err)
@@ -174,13 +174,13 @@ func TestDB_GetAuthorization(t *testing.T) {
 					Type:  "dns",
 					Value: "test.ca.smallstep.com",
 				},
-				Status:     acme.StatusPending,
-				Token:      "token",
-				CreatedAt:  now,
-				ExpiresAt:  now.Add(5 * time.Minute),
-				Error:      acme.NewErrorISE("force"),
-				Challenges: []string{"foo", "bar"},
-				Wildcard:   true,
+				Status:       acme.StatusPending,
+				Token:        "token",
+				CreatedAt:    now,
+				ExpiresAt:    now.Add(5 * time.Minute),
+				Error:        acme.NewErrorISE("force"),
+				ChallengeIDs: []string{"foo", "bar"},
+				Wildcard:     true,
 			}
 			b, err := json.Marshal(dbaz)
 			assert.FatalError(t, err)
@@ -212,13 +212,13 @@ func TestDB_GetAuthorization(t *testing.T) {
 					Type:  "dns",
 					Value: "test.ca.smallstep.com",
 				},
-				Status:     acme.StatusPending,
-				Token:      "token",
-				CreatedAt:  now,
-				ExpiresAt:  now.Add(5 * time.Minute),
-				Error:      acme.NewErrorISE("force"),
-				Challenges: []string{"foo", "bar"},
-				Wildcard:   true,
+				Status:       acme.StatusPending,
+				Token:        "token",
+				CreatedAt:    now,
+				ExpiresAt:    now.Add(5 * time.Minute),
+				Error:        acme.NewErrorISE("force"),
+				ChallengeIDs: []string{"foo", "bar"},
+				Wildcard:     true,
 			}
 			b, err := json.Marshal(dbaz)
 			assert.FatalError(t, err)
@@ -250,13 +250,13 @@ func TestDB_GetAuthorization(t *testing.T) {
 					Type:  "dns",
 					Value: "test.ca.smallstep.com",
 				},
-				Status:     acme.StatusPending,
-				Token:      "token",
-				CreatedAt:  now,
-				ExpiresAt:  now.Add(5 * time.Minute),
-				Error:      acme.NewErrorISE("force"),
-				Challenges: []string{"foo", "bar"},
-				Wildcard:   true,
+				Status:       acme.StatusPending,
+				Token:        "token",
+				CreatedAt:    now,
+				ExpiresAt:    now.Add(5 * time.Minute),
+				Error:        acme.NewErrorISE("force"),
+				ChallengeIDs: []string{"foo", "bar"},
+				Wildcard:     true,
 			}
 			b, err := json.Marshal(dbaz)
 			assert.FatalError(t, err)
@@ -374,7 +374,7 @@ func TestDB_CreateAuthorization(t *testing.T) {
 						})
 						assert.Equals(t, dbaz.Status, az.Status)
 						assert.Equals(t, dbaz.Token, az.Token)
-						assert.Equals(t, dbaz.Challenges, []string{"foo", "bar"})
+						assert.Equals(t, dbaz.ChallengeIDs, []string{"foo", "bar"})
 						assert.Equals(t, dbaz.Wildcard, az.Wildcard)
 						assert.Equals(t, dbaz.ExpiresAt, az.ExpiresAt)
 						assert.Nil(t, dbaz.Error)
@@ -428,7 +428,7 @@ func TestDB_CreateAuthorization(t *testing.T) {
 						})
 						assert.Equals(t, dbaz.Status, az.Status)
 						assert.Equals(t, dbaz.Token, az.Token)
-						assert.Equals(t, dbaz.Challenges, []string{"foo", "bar"})
+						assert.Equals(t, dbaz.ChallengeIDs, []string{"foo", "bar"})
 						assert.Equals(t, dbaz.Wildcard, az.Wildcard)
 						assert.Equals(t, dbaz.ExpiresAt, az.ExpiresAt)
 						assert.Nil(t, dbaz.Error)
@@ -469,12 +469,12 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 			Type:  "dns",
 			Value: "test.ca.smallstep.com",
 		},
-		Status:     acme.StatusPending,
-		Token:      "token",
-		CreatedAt:  now,
-		ExpiresAt:  now.Add(5 * time.Minute),
-		Challenges: []string{"foo", "bar"},
-		Wildcard:   true,
+		Status:       acme.StatusPending,
+		Token:        "token",
+		CreatedAt:    now,
+		ExpiresAt:    now.Add(5 * time.Minute),
+		ChallengeIDs: []string{"foo", "bar"},
+		Wildcard:     true,
 	}
 	b, err := json.Marshal(dbaz)
 	assert.FatalError(t, err)
@@ -530,7 +530,7 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 						assert.Equals(t, dbNew.Identifier, dbaz.Identifier)
 						assert.Equals(t, dbNew.Status, acme.StatusValid)
 						assert.Equals(t, dbNew.Token, dbaz.Token)
-						assert.Equals(t, dbNew.Challenges, dbaz.Challenges)
+						assert.Equals(t, dbNew.ChallengeIDs, dbaz.ChallengeIDs)
 						assert.Equals(t, dbNew.Wildcard, dbaz.Wildcard)
 						assert.Equals(t, dbNew.CreatedAt, dbaz.CreatedAt)
 						assert.Equals(t, dbNew.ExpiresAt, dbaz.ExpiresAt)
@@ -580,7 +580,7 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 						assert.Equals(t, dbNew.Identifier, dbaz.Identifier)
 						assert.Equals(t, dbNew.Status, acme.StatusValid)
 						assert.Equals(t, dbNew.Token, dbaz.Token)
-						assert.Equals(t, dbNew.Challenges, dbaz.Challenges)
+						assert.Equals(t, dbNew.ChallengeIDs, dbaz.ChallengeIDs)
 						assert.Equals(t, dbNew.Wildcard, dbaz.Wildcard)
 						assert.Equals(t, dbNew.CreatedAt, dbaz.CreatedAt)
 						assert.Equals(t, dbNew.ExpiresAt, dbaz.ExpiresAt)
