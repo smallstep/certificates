@@ -15,7 +15,7 @@ type Options struct {
 	Type string `json:"type"`
 
 	// CertificateAuthority reference:
-	// In StepCAS the values is the CA url, e.g. "https://ca.smallstep.com:9000".
+	// In StepCAS the value is the CA url, e.g. "https://ca.smallstep.com:9000".
 	// In CloudCAS the format is "projects/*/locations/*/certificateAuthorities/*".
 	CertificateAuthority string `json:"certificateAuthority,omitempty"`
 
