@@ -57,6 +57,7 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 			return nil
 		}
 		az.Status = StatusValid
+		az.Error = nil
 	default:
 		return NewErrorISE("unrecognized authorization status: %s", az.Status)
 	}

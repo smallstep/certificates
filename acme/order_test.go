@@ -1,5 +1,261 @@
 package acme
 
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/pkg/errors"
+	"github.com/smallstep/assert"
+)
+
+func TestOrder_UpdateStatus(t *testing.T) {
+	type test struct {
+		o   *Order
+		err *Error
+		db  DB
+	}
+	tests := map[string]func(t *testing.T) test{
+		"ok/already-invalid": func(t *testing.T) test {
+			o := &Order{
+				Status: StatusInvalid,
+			}
+			return test{
+				o: o,
+			}
+		},
+		"ok/already-valid": func(t *testing.T) test {
+			o := &Order{
+				Status: StatusInvalid,
+			}
+			return test{
+				o: o,
+			}
+		},
+		"fail/error-unexpected-status": func(t *testing.T) test {
+			o := &Order{
+				Status: "foo",
+			}
+			return test{
+				o:   o,
+				err: NewErrorISE("unrecognized order status: %s", o.Status),
+			}
+		},
+		"ok/ready-expired": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:        "oID",
+				AccountID: "accID",
+				Status:    StatusReady,
+				ExpiresAt: now.Add(-5 * time.Minute),
+			}
+			return test{
+				o: o,
+				db: &MockDB{
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.Status, StatusInvalid)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						return nil
+					},
+				},
+			}
+		},
+		"fail/ready-expired-db.UpdateOrder-error": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:        "oID",
+				AccountID: "accID",
+				Status:    StatusReady,
+				ExpiresAt: now.Add(-5 * time.Minute),
+			}
+			return test{
+				o: o,
+				db: &MockDB{
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.Status, StatusInvalid)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						return errors.New("force")
+					},
+				},
+				err: NewErrorISE("error updating order: force"),
+			}
+		},
+		"ok/pending-expired": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:        "oID",
+				AccountID: "accID",
+				Status:    StatusPending,
+				ExpiresAt: now.Add(-5 * time.Minute),
+			}
+			return test{
+				o: o,
+				db: &MockDB{
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.Status, StatusInvalid)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+
+						err := NewError(ErrorMalformedType, "order has expired")
+						assert.HasPrefix(t, updo.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updo.Error.Type, err.Type)
+						assert.Equals(t, updo.Error.Detail, err.Detail)
+						assert.Equals(t, updo.Error.Status, err.Status)
+						assert.Equals(t, updo.Error.Detail, err.Detail)
+						return nil
+					},
+				},
+			}
+		},
+		"ok/invalid": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusPending,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+			}
+			az1 := &Authorization{
+				ID:     "a",
+				Status: StatusValid,
+			}
+			az2 := &Authorization{
+				ID:     "b",
+				Status: StatusInvalid,
+			}
+
+			return test{
+				o: o,
+				db: &MockDB{
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.Status, StatusInvalid)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						return nil
+					},
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						switch id {
+						case az1.ID:
+							return az1, nil
+						case az2.ID:
+							return az2, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected authz key %s", id))
+							return nil, errors.New("force")
+						}
+					},
+				},
+			}
+		},
+		"ok/still-pending": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusPending,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+			}
+			az1 := &Authorization{
+				ID:     "a",
+				Status: StatusValid,
+			}
+			az2 := &Authorization{
+				ID:     "b",
+				Status: StatusPending,
+			}
+
+			return test{
+				o: o,
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						switch id {
+						case az1.ID:
+							return az1, nil
+						case az2.ID:
+							return az2, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected authz key %s", id))
+							return nil, errors.New("force")
+						}
+					},
+				},
+			}
+		},
+		"ok/valid": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusPending,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+			}
+			az1 := &Authorization{
+				ID:     "a",
+				Status: StatusValid,
+			}
+			az2 := &Authorization{
+				ID:     "b",
+				Status: StatusValid,
+			}
+
+			return test{
+				o: o,
+				db: &MockDB{
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.Status, StatusReady)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						return nil
+					},
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						switch id {
+						case az1.ID:
+							return az1, nil
+						case az2.ID:
+							return az2, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected authz key %s", id))
+							return nil, errors.New("force")
+						}
+					},
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if err := tc.o.UpdateStatus(context.Background(), tc.db); err != nil {
+				if assert.NotNil(t, tc.err) {
+					switch k := err.(type) {
+					case *Error:
+						assert.Equals(t, k.Type, tc.err.Type)
+						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equals(t, k.Status, tc.err.Status)
+						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
+						assert.Equals(t, k.Detail, tc.err.Detail)
+					default:
+						assert.FatalError(t, errors.New("unexpected error type"))
+					}
+				}
+			} else {
+				assert.Nil(t, tc.err)
+			}
+		})
+
+	}
+}
+
 /*
 var certDuration = 6 * time.Hour
 

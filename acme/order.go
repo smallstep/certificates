@@ -81,10 +81,10 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 		for _, azID := range o.AuthorizationIDs {
 			az, err := db.GetAuthorization(ctx, azID)
 			if err != nil {
-				return err
+				return WrapErrorISE(err, "error getting authorization ID %s", azID)
 			}
 			if err = az.UpdateStatus(ctx, db); err != nil {
-				return err
+				return WrapErrorISE(err, "error updating authorization ID %s", azID)
 			}
 			st := az.Status
 			count[st]++
@@ -107,7 +107,10 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 	default:
 		return NewErrorISE("unrecognized order status: %s", o.Status)
 	}
-	return db.UpdateOrder(ctx, o)
+	if err := db.UpdateOrder(ctx, o); err != nil {
+		return WrapErrorISE(err, "error updating order")
+	}
+	return nil
 }
 
 // Finalize signs a certificate if the necessary conditions for Order completion
