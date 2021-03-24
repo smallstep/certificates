@@ -187,6 +187,217 @@ func TestKeyAuthorization(t *testing.T) {
 	}
 }
 
+func TestChallenge_Validate(t *testing.T) {
+	type test struct {
+		ch  *Challenge
+		vo  *ValidateChallengeOptions
+		jwk *jose.JSONWebKey
+		db  DB
+		err *Error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"ok/already-valid": func(t *testing.T) test {
+			ch := &Challenge{
+				Status: StatusValid,
+			}
+			return test{
+				ch: ch,
+			}
+		},
+		"fail/already-invalid": func(t *testing.T) test {
+			ch := &Challenge{
+				Status: StatusInvalid,
+			}
+			return test{
+				ch: ch,
+			}
+		},
+		"fail/unexpected-type": func(t *testing.T) test {
+			ch := &Challenge{
+				Status: StatusPending,
+				Type:   "foo",
+			}
+			return test{
+				ch:  ch,
+				err: NewErrorISE("unexpected challenge type 'foo'"),
+			}
+		},
+		"fail/http-01": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				Status:  StatusPending,
+				AuthzID: "azID",
+				Type:    "http-01",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
+						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Type, ch.Type)
+						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return errors.New("force")
+					},
+				},
+				err: NewErrorISE("failure saving error to acme challenge: force"),
+			}
+		},
+		"ok/http-01": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				Status:  StatusPending,
+				AuthzID: "azID",
+				Type:    "http-01",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					HTTPGet: func(url string) (*http.Response, error) {
+						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Type, ch.Type)
+						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return nil
+					},
+				},
+			}
+		},
+		"fail/dns-01": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				Type:    "dns-01",
+				Status:  StatusPending,
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					LookupTxt: func(url string) ([]string, error) {
+						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Type, ch.Type)
+						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						err := NewError(ErrorDNSType, "error looking up TXT records for domain %s: force", ch.Value)
+
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return errors.New("force")
+					},
+				},
+				err: NewErrorISE("failure saving error to acme challenge: force"),
+			}
+		},
+		"ok/dns-01": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				Type:    "dns-01",
+				Status:  StatusPending,
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					LookupTxt: func(url string) ([]string, error) {
+						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Type, ch.Type)
+						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						err := NewError(ErrorDNSType, "error looking up TXT records for domain %s: force", ch.Value)
+
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return nil
+					},
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if err := tc.ch.Validate(context.Background(), tc.db, tc.jwk, tc.vo); err != nil {
+				if assert.NotNil(t, tc.err) {
+					switch k := err.(type) {
+					case *Error:
+						assert.Equals(t, k.Type, tc.err.Type)
+						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equals(t, k.Status, tc.err.Status)
+						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
+						assert.Equals(t, k.Detail, tc.err.Detail)
+					default:
+						assert.FatalError(t, errors.New("unexpected error type"))
+					}
+				}
+			} else {
+				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
 type errReader int
 
 func (errReader) Read(p []byte) (n int, err error) {
