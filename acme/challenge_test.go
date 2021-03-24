@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,7 +23,7 @@ func TestKeyAuthorization(t *testing.T) {
 		token string
 		jwk   *jose.JSONWebKey
 		exp   string
-		err   error
+		err   *Error
 	}
 	tests := map[string]func(t *testing.T) test{
 		"fail/jwk-thumbprint-error": func(t *testing.T) test {
@@ -31,7 +33,7 @@ func TestKeyAuthorization(t *testing.T) {
 			return test{
 				token: "1234",
 				jwk:   jwk,
-				err:   errors.New("error generating JWK thumbprint: square/go-jose: unknown key type 'string'"),
+				err:   NewErrorISE("error generating JWK thumbprint: square/go-jose: unknown key type 'string'"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -53,7 +55,16 @@ func TestKeyAuthorization(t *testing.T) {
 			tc := run(t)
 			if ka, err := KeyAuthorization(tc.token, tc.jwk); err != nil {
 				if assert.NotNil(t, tc.err) {
-					assert.HasPrefix(t, err.Error(), tc.err.Error())
+					switch k := err.(type) {
+					case *Error:
+						assert.Equals(t, k.Type, tc.err.Type)
+						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equals(t, k.Status, tc.err.Status)
+						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
+						assert.Equals(t, k.Detail, tc.err.Detail)
+					default:
+						assert.FatalError(t, errors.New("unexpected error type"))
+					}
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
@@ -435,6 +446,301 @@ func TestHTTP01Validate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
 			if err := http01Validate(context.Background(), tc.ch, tc.db, tc.jwk, tc.vo); err != nil {
+				if assert.NotNil(t, tc.err) {
+					switch k := err.(type) {
+					case *Error:
+						assert.Equals(t, k.Type, tc.err.Type)
+						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equals(t, k.Status, tc.err.Status)
+						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
+						assert.Equals(t, k.Detail, tc.err.Detail)
+					default:
+						assert.FatalError(t, errors.New("unexpected error type"))
+					}
+				}
+			} else {
+				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
+func TestDNS01Validate(t *testing.T) {
+	fulldomain := "*.zap.internal"
+	domain := strings.TrimPrefix(fulldomain, "*.")
+	type test struct {
+		vo  *ValidateChallengeOptions
+		ch  *Challenge
+		jwk *jose.JSONWebKey
+		db  DB
+		err *Error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"fail/lookupTXT-store-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   fulldomain,
+			}
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					LookupTxt: func(url string) ([]string, error) {
+						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+
+						err := NewError(ErrorDNSType, "error looking up TXT records for domain %s: force", domain)
+
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return errors.New("force")
+					},
+				},
+				err: NewErrorISE("failure saving error to acme challenge: force"),
+			}
+		},
+		"ok/lookupTXT-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   fulldomain,
+			}
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					LookupTxt: func(url string) ([]string, error) {
+						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+
+						err := NewError(ErrorDNSType, "error looking up TXT records for domain %s: force", domain)
+
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return nil
+					},
+				},
+			}
+		},
+		"fail/key-auth-gen-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   fulldomain,
+			}
+
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			jwk.Key = "foo"
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					LookupTxt: func(url string) ([]string, error) {
+						return []string{"foo"}, nil
+					},
+				},
+				jwk: jwk,
+				err: NewErrorISE("error generating JWK thumbprint: square/go-jose: unknown key type 'string'"),
+			}
+		},
+		"fail/key-auth-mismatch-store-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   fulldomain,
+			}
+
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+
+			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+			assert.FatalError(t, err)
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					LookupTxt: func(url string) ([]string, error) {
+						return []string{"foo", "bar"}, nil
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+
+						err := NewError(ErrorRejectedIdentifierType, "keyAuthorization does not match; expected %s, but got %s", expKeyAuth, []string{"foo", "bar"})
+
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return errors.New("force")
+					},
+				},
+				jwk: jwk,
+				err: NewErrorISE("failure saving error to acme challenge: force"),
+			}
+		},
+		"ok/key-auth-mismatch-store-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   fulldomain,
+			}
+
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+
+			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+			assert.FatalError(t, err)
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					LookupTxt: func(url string) ([]string, error) {
+						return []string{"foo", "bar"}, nil
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+
+						err := NewError(ErrorRejectedIdentifierType, "keyAuthorization does not match; expected %s, but got %s", expKeyAuth, []string{"foo", "bar"})
+
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return nil
+					},
+				},
+				jwk: jwk,
+			}
+		},
+		"fail/update-challenge-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   fulldomain,
+			}
+
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+
+			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+			assert.FatalError(t, err)
+			h := sha256.Sum256([]byte(expKeyAuth))
+			expected := base64.RawURLEncoding.EncodeToString(h[:])
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					LookupTxt: func(url string) ([]string, error) {
+						return []string{"foo", expected}, nil
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						assert.Equals(t, updch.Status, StatusValid)
+						assert.Equals(t, updch.Error, nil)
+						va, err := time.Parse(time.RFC3339, updch.ValidatedAt)
+						assert.FatalError(t, err)
+						now := clock.Now()
+						assert.True(t, va.Add(-time.Minute).Before(now))
+						assert.True(t, va.Add(time.Minute).After(now))
+
+						return errors.New("force")
+					},
+				},
+				jwk: jwk,
+				err: NewErrorISE("error updating challenge: force"),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   fulldomain,
+			}
+
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+
+			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+			assert.FatalError(t, err)
+			h := sha256.Sum256([]byte(expKeyAuth))
+			expected := base64.RawURLEncoding.EncodeToString(h[:])
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					LookupTxt: func(url string) ([]string, error) {
+						return []string{"foo", expected}, nil
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						assert.Equals(t, updch.Status, StatusValid)
+						assert.Equals(t, updch.Error, nil)
+						va, err := time.Parse(time.RFC3339, updch.ValidatedAt)
+						assert.FatalError(t, err)
+						now := clock.Now()
+						assert.True(t, va.Add(-time.Minute).Before(now))
+						assert.True(t, va.Add(time.Minute).After(now))
+
+						return nil
+					},
+				},
+				jwk: jwk,
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if err := dns01Validate(context.Background(), tc.ch, tc.db, tc.jwk, tc.vo); err != nil {
 				if assert.NotNil(t, tc.err) {
 					switch k := err.(type) {
 					case *Error:
@@ -1168,273 +1474,6 @@ func newTLSALPNValidationCert(keyAuthHash []byte, obsoleteOID, critical bool, na
 		PrivateKey:  privateKey,
 		Certificate: [][]byte{cert},
 	}, nil
-}
-
-func TestDNS01Validate(t *testing.T) {
-	type test struct {
-		vo  validateOptions
-		ch  challenge
-		res challenge
-		jwk *jose.JSONWebKey
-		db  nosql.DB
-		err *Error
-	}
-	tests := map[string]func(t *testing.T) test{
-		"ok/status-already-valid": func(t *testing.T) test {
-			ch, err := newDNSCh()
-			assert.FatalError(t, err)
-			_ch, ok := ch.(*dns01Challenge)
-			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = StatusValid
-			return test{
-				ch:  ch,
-				res: ch,
-			}
-		},
-		"ok/status-already-invalid": func(t *testing.T) test {
-			ch, err := newDNSCh()
-			assert.FatalError(t, err)
-			_ch, ok := ch.(*dns01Challenge)
-			assert.Fatal(t, ok)
-			_ch.baseChallenge.Status = StatusInvalid
-			return test{
-				ch:  ch,
-				res: ch,
-			}
-		},
-		"ok/lookup-txt-error": func(t *testing.T) test {
-			ch, err := newDNSCh()
-			assert.FatalError(t, err)
-			oldb, err := json.Marshal(ch)
-			assert.FatalError(t, err)
-
-			expErr := DNSErr(errors.Errorf("error looking up TXT records for "+
-				"domain %s: force", ch.getValue()))
-			baseClone := ch.clone()
-			baseClone.Error = expErr.ToACME()
-			newCh := &dns01Challenge{baseClone}
-			newb, err := json.Marshal(newCh)
-			assert.FatalError(t, err)
-			return test{
-				ch: ch,
-				vo: validateOptions{
-					lookupTxt: func(url string) ([]string, error) {
-						return nil, errors.New("force")
-					},
-				},
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, key, []byte(ch.getID()))
-						assert.Equals(t, old, oldb)
-						assert.Equals(t, newval, newb)
-						return nil, true, nil
-					},
-				},
-				res: ch,
-			}
-		},
-		"ok/lookup-txt-wildcard": func(t *testing.T) test {
-			ch, err := newDNSCh()
-			assert.FatalError(t, err)
-			_ch, ok := ch.(*dns01Challenge)
-			assert.Fatal(t, ok)
-			_ch.baseChallenge.Value = "*.zap.internal"
-
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
-
-			expKeyAuth, err := KeyAuthorization(ch.getToken(), jwk)
-			assert.FatalError(t, err)
-			h := sha256.Sum256([]byte(expKeyAuth))
-			expected := base64.RawURLEncoding.EncodeToString(h[:])
-
-			baseClone := ch.clone()
-			baseClone.Status = StatusValid
-			baseClone.Error = nil
-			newCh := &dns01Challenge{baseClone}
-
-			return test{
-				ch:  ch,
-				res: newCh,
-				vo: validateOptions{
-					lookupTxt: func(url string) ([]string, error) {
-						assert.Equals(t, url, "_acme-challenge.zap.internal")
-						return []string{"foo", expected}, nil
-					},
-				},
-				jwk: jwk,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						dnsCh, err := unmarshalChallenge(newval)
-						assert.FatalError(t, err)
-						assert.Equals(t, dnsCh.getStatus(), StatusValid)
-						baseClone.Validated = dnsCh.getValidated()
-						return nil, true, nil
-					},
-				},
-			}
-		},
-		"fail/key-authorization-gen-error": func(t *testing.T) test {
-			ch, err := newDNSCh()
-			assert.FatalError(t, err)
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
-			jwk.Key = "foo"
-			return test{
-				ch: ch,
-				vo: validateOptions{
-					lookupTxt: func(url string) ([]string, error) {
-						return []string{"foo", "bar"}, nil
-					},
-				},
-				jwk: jwk,
-				err: ServerInternalErr(errors.New("error generating JWK thumbprint: square/go-jose: unknown key type 'string'")),
-			}
-		},
-		"ok/key-auth-mismatch": func(t *testing.T) test {
-			ch, err := newDNSCh()
-			assert.FatalError(t, err)
-			oldb, err := json.Marshal(ch)
-			assert.FatalError(t, err)
-
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
-
-			expKeyAuth, err := KeyAuthorization(ch.getToken(), jwk)
-			assert.FatalError(t, err)
-
-			expErr := RejectedIdentifierErr(errors.Errorf("keyAuthorization does not match; "+
-				"expected %s, but got %s", expKeyAuth, []string{"foo", "bar"}))
-			baseClone := ch.clone()
-			baseClone.Error = expErr.ToACME()
-			newCh := &http01Challenge{baseClone}
-			newb, err := json.Marshal(newCh)
-			assert.FatalError(t, err)
-
-			return test{
-				ch: ch,
-				vo: validateOptions{
-					lookupTxt: func(url string) ([]string, error) {
-						return []string{"foo", "bar"}, nil
-					},
-				},
-				jwk: jwk,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, key, []byte(ch.getID()))
-						assert.Equals(t, old, oldb)
-						assert.Equals(t, newval, newb)
-						return nil, true, nil
-					},
-				},
-				res: ch,
-			}
-		},
-		"fail/save-error": func(t *testing.T) test {
-			ch, err := newDNSCh()
-			assert.FatalError(t, err)
-
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
-
-			expKeyAuth, err := KeyAuthorization(ch.getToken(), jwk)
-			assert.FatalError(t, err)
-			h := sha256.Sum256([]byte(expKeyAuth))
-			expected := base64.RawURLEncoding.EncodeToString(h[:])
-			return test{
-				ch: ch,
-				vo: validateOptions{
-					lookupTxt: func(url string) ([]string, error) {
-						return []string{"foo", expected}, nil
-					},
-				},
-				jwk: jwk,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						return nil, false, errors.New("force")
-					},
-				},
-				err: ServerInternalErr(errors.New("error saving acme challenge: force")),
-			}
-		},
-		"ok": func(t *testing.T) test {
-			ch, err := newDNSCh()
-			assert.FatalError(t, err)
-			_ch, ok := ch.(*dns01Challenge)
-			assert.Fatal(t, ok)
-			_ch.baseChallenge.Error = MalformedErr(nil).ToACME()
-			oldb, err := json.Marshal(ch)
-			assert.FatalError(t, err)
-
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
-
-			expKeyAuth, err := KeyAuthorization(ch.getToken(), jwk)
-			assert.FatalError(t, err)
-			h := sha256.Sum256([]byte(expKeyAuth))
-			expected := base64.RawURLEncoding.EncodeToString(h[:])
-
-			baseClone := ch.clone()
-			baseClone.Status = StatusValid
-			baseClone.Error = nil
-			newCh := &dns01Challenge{baseClone}
-
-			return test{
-				ch:  ch,
-				res: newCh,
-				vo: validateOptions{
-					lookupTxt: func(url string) ([]string, error) {
-						return []string{"foo", expected}, nil
-					},
-				},
-				jwk: jwk,
-				db: &db.MockNoSQLDB{
-					MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
-						assert.Equals(t, bucket, challengeTable)
-						assert.Equals(t, key, []byte(ch.getID()))
-						assert.Equals(t, old, oldb)
-
-						dnsCh, err := unmarshalChallenge(newval)
-						assert.FatalError(t, err)
-						assert.Equals(t, dnsCh.getStatus(), StatusValid)
-						assert.True(t, dnsCh.getValidated().Before(time.Now().UTC()))
-						assert.True(t, dnsCh.getValidated().After(time.Now().UTC().Add(-1*time.Second)))
-
-						baseClone.Validated = dnsCh.getValidated()
-
-						return nil, true, nil
-					},
-				},
-			}
-		},
-	}
-	for name, run := range tests {
-		t.Run(name, func(t *testing.T) {
-			tc := run(t)
-			if ch, err := tc.ch.validate(tc.db, tc.jwk, tc.vo); err != nil {
-				if assert.NotNil(t, tc.err) {
-					ae, ok := err.(*Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
-				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, tc.res.getID(), ch.getID())
-					assert.Equals(t, tc.res.getAccountID(), ch.getAccountID())
-					assert.Equals(t, tc.res.getAuthzID(), ch.getAuthzID())
-					assert.Equals(t, tc.res.getStatus(), ch.getStatus())
-					assert.Equals(t, tc.res.getToken(), ch.getToken())
-					assert.Equals(t, tc.res.getCreated(), ch.getCreated())
-					assert.Equals(t, tc.res.getValidated(), ch.getValidated())
-					assert.Equals(t, tc.res.getError(), ch.getError())
-				}
-			}
-		})
-	}
 }
 
 /*
