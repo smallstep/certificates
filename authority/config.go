@@ -189,7 +189,6 @@ func (c *Config) Validate() error {
 
 	// Options holds the RA/CAS configuration.
 	ra := c.AuthorityConfig.Options
-
 	// The default RA/CAS requires root, crt and key.
 	if ra.Is(cas.SoftCAS) {
 		switch {

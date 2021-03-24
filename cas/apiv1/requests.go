@@ -53,6 +53,7 @@ const (
 // CreateCertificateRequest is the request used to sign a new certificate.
 type CreateCertificateRequest struct {
 	Template  *x509.Certificate
+	CSR       *x509.CertificateRequest
 	Lifetime  time.Duration
 	Backdate  time.Duration
 	RequestID string
@@ -67,6 +68,7 @@ type CreateCertificateResponse struct {
 // RenewCertificateRequest is the request used to re-sign a certificate.
 type RenewCertificateRequest struct {
 	Template  *x509.Certificate
+	CSR       *x509.CertificateRequest
 	Lifetime  time.Duration
 	Backdate  time.Duration
 	RequestID string
@@ -80,10 +82,12 @@ type RenewCertificateResponse struct {
 
 // RevokeCertificateRequest is the request used to revoke a certificate.
 type RevokeCertificateRequest struct {
-	Certificate *x509.Certificate
-	Reason      string
-	ReasonCode  int
-	RequestID   string
+	Certificate  *x509.Certificate
+	SerialNumber string
+	Reason       string
+	ReasonCode   int
+	PassiveOnly  bool
+	RequestID    string
 }
 
 // RevokeCertificateResponse is the response to a revoke certificate request.

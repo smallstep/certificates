@@ -148,6 +148,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
 		Template: leaf,
+		CSR:      csr,
 		Lifetime: lifetime,
 		Backdate: signOpts.Backdate,
 	})
@@ -333,22 +334,21 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		if !ok {
 			return errs.InternalServer("authority.Revoke; provisioner not found", opts...)
 		}
+		rci.ProvisionerID = p.GetID()
 		rci.TokenID, err = p.GetTokenID(revokeOpts.OTT)
 		if err != nil {
 			return errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Revoke; could not get ID for token")
 		}
+		opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
 		opts = append(opts, errs.WithKeyVal("tokenID", rci.TokenID))
 	} else {
 		// Load the Certificate provisioner if one exists.
-		p, err = a.LoadProvisionerByCertificate(revokeOpts.Crt)
-		if err != nil {
-			return errs.Wrap(http.StatusUnauthorized, err,
-				"authority.Revoke: unable to load certificate provisioner", opts...)
+		if p, err = a.LoadProvisionerByCertificate(revokeOpts.Crt); err == nil {
+			rci.ProvisionerID = p.GetID()
+			opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
 		}
 	}
-	rci.ProvisionerID = p.GetID()
-	opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
 
 	if provisioner.MethodFromContext(ctx) == provisioner.SSHRevokeMethod {
 		err = a.db.RevokeSSH(rci)
@@ -367,9 +367,11 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		// CAS operation, note that SoftCAS (default) is a noop.
 		// The revoke happens when this is stored in the db.
 		_, err = a.x509CAService.RevokeCertificate(&casapi.RevokeCertificateRequest{
-			Certificate: revokedCert,
-			Reason:      rci.Reason,
-			ReasonCode:  rci.ReasonCode,
+			Certificate:  revokedCert,
+			SerialNumber: rci.Serial,
+			Reason:       rci.Reason,
+			ReasonCode:   rci.ReasonCode,
+			PassiveOnly:  revokeOpts.PassiveOnly,
 		})
 		if err != nil {
 			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
@@ -427,6 +429,7 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
 		Template: certTpl,
+		CSR:      cr,
 		Lifetime: 24 * time.Hour,
 		Backdate: 1 * time.Minute,
 	})

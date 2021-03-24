@@ -37,6 +37,7 @@ import (
 	// Enabled cas interfaces.
 	_ "github.com/smallstep/certificates/cas/cloudcas"
 	_ "github.com/smallstep/certificates/cas/softcas"
+	_ "github.com/smallstep/certificates/cas/stepcas"
 )
 
 // commit and buildTime are filled in during build by the Makefile
