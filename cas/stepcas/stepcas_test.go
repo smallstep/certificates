@@ -23,6 +23,8 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas/apiv1"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -36,9 +38,10 @@ var (
 	testIssKey                  crypto.Signer
 	testIssPath, testIssKeyPath string
 
-	testX5CCrt                  *x509.Certificate
-	testX5CKey                  crypto.Signer
-	testX5CPath, testX5CKeyPath string
+	testX5CCrt                         *x509.Certificate
+	testX5CKey                         crypto.Signer
+	testX5CPath, testX5CKeyPath        string
+	testPassword, testEncryptedKeyPath string
 
 	testCR     *x509.CertificateRequest
 	testCrt    *x509.Certificate
@@ -100,6 +103,16 @@ func mustSerializeKey(filename string, key crypto.Signer) {
 		Bytes: b,
 	})
 	if err := ioutil.WriteFile(filename, b, 0600); err != nil {
+		panic(err)
+	}
+}
+
+func mustEncryptKey(filename string, key crypto.Signer) {
+	_, err := pemutil.Serialize(key,
+		pemutil.ToFile(filename, 0600),
+		pemutil.WithPKCS8(true),
+		pemutil.WithPassword([]byte(testPassword)))
+	if err != nil {
 		panic(err)
 	}
 }
@@ -167,31 +180,45 @@ func testCAHelper(t *testing.T) (*url.URL, *ca.Client) {
 	return u, client
 }
 
-func testX5CIssuer(t *testing.T, caURL *url.URL) *x5cIssuer {
+func testX5CIssuer(t *testing.T, caURL *url.URL, password string) *x5cIssuer {
 	t.Helper()
+	key, givenPassword := testX5CKeyPath, password
+	if password != "" {
+		key = testEncryptedKeyPath
+		password = testPassword
+	}
 	x5c, err := newX5CIssuer(caURL, &apiv1.CertificateIssuer{
 		Type:        "x5c",
 		Provisioner: "X5C",
 		Certificate: testX5CPath,
-		Key:         testX5CKeyPath,
+		Key:         key,
+		Password:    password,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	x5c.password = givenPassword
 	return x5c
 }
 
-func testJWKIssuer(t *testing.T, caURL *url.URL) *jwkIssuer {
+func testJWKIssuer(t *testing.T, caURL *url.URL, password string) *jwkIssuer {
 	t.Helper()
-	x5c, err := newJWKIssuer(caURL, &apiv1.CertificateIssuer{
+	key, givenPassword := testX5CKeyPath, password
+	if password != "" {
+		key = testEncryptedKeyPath
+		password = testPassword
+	}
+	jwk, err := newJWKIssuer(caURL, &apiv1.CertificateIssuer{
 		Type:        "jwk",
 		Provisioner: "ra@doe.org",
-		Key:         testX5CKeyPath,
+		Key:         key,
+		Password:    password,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return x5c
+	jwk.password = givenPassword
+	return jwk
 }
 
 func TestMain(m *testing.M) {
@@ -210,6 +237,12 @@ func TestMain(m *testing.M) {
 
 	// CR used in errors.
 	testFailCR, err = x509util.CreateCertificateRequest("", []string{"fail.doe.org"}, testKey)
+	if err != nil {
+		panic(err)
+	}
+
+	// Password used to encrypto the key
+	testPassword, err = randutil.Hex(32)
 	if err != nil {
 		panic(err)
 	}
@@ -235,6 +268,9 @@ func TestMain(m *testing.M) {
 	testX5CKeyPath = filepath.Join(path, "x5c.key")
 	mustSerializeCrt(testX5CPath, testX5CCrt, testIssCrt)
 	mustSerializeKey(testX5CKeyPath, testX5CKey)
+
+	testEncryptedKeyPath = filepath.Join(path, "x5c.enc.key")
+	mustEncryptKey(testEncryptedKeyPath, testX5CKey)
 
 	code := m.Run()
 	if err := os.RemoveAll(path); err != nil {
@@ -473,8 +509,12 @@ func TestNew(t *testing.T) {
 
 func TestStepCAS_CreateCertificate(t *testing.T) {
 	caURL, client := testCAHelper(t)
-	x5c := testX5CIssuer(t, caURL)
-	jwk := testJWKIssuer(t, caURL)
+	x5c := testX5CIssuer(t, caURL, "")
+	jwk := testJWKIssuer(t, caURL, "")
+	x5cEnc := testX5CIssuer(t, caURL, testPassword)
+	jwkEnc := testJWKIssuer(t, caURL, testPassword)
+	x5cBad := testX5CIssuer(t, caURL, "bad-password")
+	jwkBad := testJWKIssuer(t, caURL, "bad-password")
 
 	type fields struct {
 		iss         stepIssuer
@@ -498,7 +538,21 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 			Certificate:      testCrt,
 			CertificateChain: []*x509.Certificate{testIssCrt},
 		}, false},
+		{"ok with password", fields{x5cEnc, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
+			CSR:      testCR,
+			Lifetime: time.Hour,
+		}}, &apiv1.CreateCertificateResponse{
+			Certificate:      testCrt,
+			CertificateChain: []*x509.Certificate{testIssCrt},
+		}, false},
 		{"ok jwk", fields{jwk, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
+			CSR:      testCR,
+			Lifetime: time.Hour,
+		}}, &apiv1.CreateCertificateResponse{
+			Certificate:      testCrt,
+			CertificateChain: []*x509.Certificate{testIssCrt},
+		}, false},
+		{"ok jwk with password", fields{jwkEnc, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:      testCR,
 			Lifetime: time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
@@ -519,6 +573,14 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 		}}, nil, true},
 		{"fail client sign", fields{x5c, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:      testFailCR,
+			Lifetime: time.Hour,
+		}}, nil, true},
+		{"fail password", fields{x5cBad, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
+			CSR:      testCR,
+			Lifetime: time.Hour,
+		}}, nil, true},
+		{"fail jwk password", fields{jwkBad, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
+			CSR:      testCR,
 			Lifetime: time.Hour,
 		}}, nil, true},
 	}
@@ -543,8 +605,8 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 
 func TestStepCAS_RenewCertificate(t *testing.T) {
 	caURL, client := testCAHelper(t)
-	x5c := testX5CIssuer(t, caURL)
-	jwk := testJWKIssuer(t, caURL)
+	x5c := testX5CIssuer(t, caURL, "")
+	jwk := testJWKIssuer(t, caURL, "")
 
 	type fields struct {
 		iss         stepIssuer
@@ -591,8 +653,12 @@ func TestStepCAS_RenewCertificate(t *testing.T) {
 
 func TestStepCAS_RevokeCertificate(t *testing.T) {
 	caURL, client := testCAHelper(t)
-	x5c := testX5CIssuer(t, caURL)
-	jwk := testJWKIssuer(t, caURL)
+	x5c := testX5CIssuer(t, caURL, "")
+	jwk := testJWKIssuer(t, caURL, "")
+	x5cEnc := testX5CIssuer(t, caURL, testPassword)
+	jwkEnc := testJWKIssuer(t, caURL, testPassword)
+	x5cBad := testX5CIssuer(t, caURL, "bad-password")
+	jwkBad := testJWKIssuer(t, caURL, "bad-password")
 
 	type fields struct {
 		iss         stepIssuer
@@ -625,6 +691,10 @@ func TestStepCAS_RevokeCertificate(t *testing.T) {
 		}}, &apiv1.RevokeCertificateResponse{
 			Certificate: testCrt,
 		}, false},
+		{"ok with password", fields{x5cEnc, client, testRootFingerprint}, args{&apiv1.RevokeCertificateRequest{
+			SerialNumber: "ok",
+			Certificate:  nil,
+		}}, &apiv1.RevokeCertificateResponse{}, false},
 		{"ok serial number jwk", fields{jwk, client, testRootFingerprint}, args{&apiv1.RevokeCertificateRequest{
 			SerialNumber: "ok",
 			Certificate:  nil,
@@ -641,6 +711,10 @@ func TestStepCAS_RevokeCertificate(t *testing.T) {
 		}}, &apiv1.RevokeCertificateResponse{
 			Certificate: testCrt,
 		}, false},
+		{"ok jwk with password", fields{jwkEnc, client, testRootFingerprint}, args{&apiv1.RevokeCertificateRequest{
+			SerialNumber: "ok",
+			Certificate:  nil,
+		}}, &apiv1.RevokeCertificateResponse{}, false},
 		{"fail request", fields{x5c, client, testRootFingerprint}, args{&apiv1.RevokeCertificateRequest{
 			SerialNumber: "",
 			Certificate:  nil,
@@ -650,6 +724,14 @@ func TestStepCAS_RevokeCertificate(t *testing.T) {
 		}}, nil, true},
 		{"fail client revoke", fields{x5c, client, testRootFingerprint}, args{&apiv1.RevokeCertificateRequest{
 			SerialNumber: "fail",
+		}}, nil, true},
+		{"fail password", fields{x5cBad, client, testRootFingerprint}, args{&apiv1.RevokeCertificateRequest{
+			SerialNumber: "ok",
+			Certificate:  nil,
+		}}, nil, true},
+		{"fail jwk password", fields{jwkBad, client, testRootFingerprint}, args{&apiv1.RevokeCertificateRequest{
+			SerialNumber: "ok",
+			Certificate:  nil,
 		}}, nil, true},
 	}
 	for _, tt := range tests {
@@ -673,8 +755,8 @@ func TestStepCAS_RevokeCertificate(t *testing.T) {
 
 func TestStepCAS_GetCertificateAuthority(t *testing.T) {
 	caURL, client := testCAHelper(t)
-	x5c := testX5CIssuer(t, caURL)
-	jwk := testJWKIssuer(t, caURL)
+	x5c := testX5CIssuer(t, caURL, "")
+	jwk := testJWKIssuer(t, caURL, "")
 
 	type fields struct {
 		iss         stepIssuer

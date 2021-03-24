@@ -25,24 +25,26 @@ var timeNow = func() time.Time {
 
 type x5cIssuer struct {
 	caURL    *url.URL
+	issuer   string
 	certFile string
 	keyFile  string
-	issuer   string
+	password string
 }
 
 // newX5CIssuer create a new x5c token issuer. The given configuration should be
 // already validate.
 func newX5CIssuer(caURL *url.URL, cfg *apiv1.CertificateIssuer) (*x5cIssuer, error) {
-	_, err := newX5CSigner(cfg.Certificate, cfg.Key)
+	_, err := newX5CSigner(cfg.Certificate, cfg.Key, cfg.Password)
 	if err != nil {
 		return nil, err
 	}
 
 	return &x5cIssuer{
 		caURL:    caURL,
+		issuer:   cfg.Provisioner,
 		certFile: cfg.Certificate,
 		keyFile:  cfg.Key,
-		issuer:   cfg.Provisioner,
+		password: cfg.Password,
 	}, nil
 }
 
@@ -77,7 +79,7 @@ func (i *x5cIssuer) Lifetime(d time.Duration) time.Duration {
 }
 
 func (i *x5cIssuer) createToken(aud, sub string, sans []string) (string, error) {
-	signer, err := newX5CSigner(i.certFile, i.keyFile)
+	signer, err := newX5CSigner(i.certFile, i.keyFile, i.password)
 	if err != nil {
 		return "", err
 	}
@@ -116,8 +118,12 @@ func defaultClaims(iss, sub, aud, id string) jose.Claims {
 	}
 }
 
-func newX5CSigner(certFile, keyFile string) (jose.Signer, error) {
-	key, err := pemutil.Read(keyFile)
+func readKey(keyFile, password string) (crypto.Signer, error) {
+	var opts []pemutil.Options
+	if password != "" {
+		opts = append(opts, pemutil.WithPassword([]byte(password)))
+	}
+	key, err := pemutil.Read(keyFile, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -125,11 +131,19 @@ func newX5CSigner(certFile, keyFile string) (jose.Signer, error) {
 	if !ok {
 		return nil, errors.New("key is not a crypto.Signer")
 	}
+	return signer, nil
+}
+
+func newX5CSigner(certFile, keyFile, password string) (jose.Signer, error) {
+	signer, err := readKey(keyFile, password)
+	if err != nil {
+		return nil, err
+	}
 	kid, err := jose.Thumbprint(&jose.JSONWebKey{Key: signer.Public()})
 	if err != nil {
 		return nil, err
 	}
-	certs, err := jose.ValidateX5C(certFile, key)
+	certs, err := jose.ValidateX5C(certFile, signer)
 	if err != nil {
 		return nil, errors.Wrap(err, "error validating x5c certificate chain and key")
 	}

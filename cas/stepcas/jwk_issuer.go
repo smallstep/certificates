@@ -1,33 +1,33 @@
 package stepcas
 
 import (
-	"crypto"
 	"net/url"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/randutil"
 )
 
 type jwkIssuer struct {
-	caURL   *url.URL
-	keyFile string
-	issuer  string
+	caURL    *url.URL
+	issuer   string
+	keyFile  string
+	password string
 }
 
 func newJWKIssuer(caURL *url.URL, cfg *apiv1.CertificateIssuer) (*jwkIssuer, error) {
-	_, err := newJWKSigner(cfg.Key)
+	_, err := newJWKSigner(cfg.Key, cfg.Password)
 	if err != nil {
 		return nil, err
 	}
 
 	return &jwkIssuer{
-		caURL:   caURL,
-		keyFile: cfg.Key,
-		issuer:  cfg.Provisioner,
+		caURL:    caURL,
+		issuer:   cfg.Provisioner,
+		keyFile:  cfg.Key,
+		password: cfg.Password,
 	}, nil
 }
 
@@ -50,7 +50,7 @@ func (i *jwkIssuer) Lifetime(d time.Duration) time.Duration {
 }
 
 func (i *jwkIssuer) createToken(aud, sub string, sans []string) (string, error) {
-	signer, err := newJWKSigner(i.keyFile)
+	signer, err := newJWKSigner(i.keyFile, i.password)
 	if err != nil {
 		return "", err
 	}
@@ -76,14 +76,10 @@ func (i *jwkIssuer) createToken(aud, sub string, sans []string) (string, error) 
 	return tok, nil
 }
 
-func newJWKSigner(keyFile string) (jose.Signer, error) {
-	key, err := pemutil.Read(keyFile)
+func newJWKSigner(keyFile, password string) (jose.Signer, error) {
+	signer, err := readKey(keyFile, password)
 	if err != nil {
 		return nil, err
-	}
-	signer, ok := key.(crypto.Signer)
-	if !ok {
-		return nil, errors.New("key is not a crypto.Signer")
 	}
 	kid, err := jose.Thumbprint(&jose.JSONWebKey{Key: signer.Public()})
 	if err != nil {
