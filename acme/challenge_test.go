@@ -18,6 +18,118 @@ import (
 	"go.step.sm/crypto/jose"
 )
 
+func Test_storeError(t *testing.T) {
+	type test struct {
+		ch  *Challenge
+		db  DB
+		err *Error
+	}
+	err := NewError(ErrorMalformedType, "foo")
+	tests := map[string]func(t *testing.T) test{
+		"fail/db.UpdateChallenge-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
+			return test{
+				ch: ch,
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return errors.New("force")
+					},
+				},
+				err: NewErrorISE("failure saving error to acme challenge: force"),
+			}
+		},
+		"fail/db.UpdateChallenge-acme-error": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
+			return test{
+				ch: ch,
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return NewError(ErrorMalformedType, "bar")
+					},
+				},
+				err: NewError(ErrorMalformedType, "failure saving error to acme challenge: bar"),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:      "chID",
+				AuthzID: "azID",
+				Token:   "token",
+				Value:   "zap.internal",
+			}
+			return test{
+				ch: ch,
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.AuthzID, ch.AuthzID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return nil
+					},
+				},
+			}
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			tc := run(t)
+			if err := storeError(context.Background(), tc.ch, tc.db, err); err != nil {
+				if assert.NotNil(t, tc.err) {
+					switch k := err.(type) {
+					case *Error:
+						assert.Equals(t, k.Type, tc.err.Type)
+						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equals(t, k.Status, tc.err.Status)
+						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
+						assert.Equals(t, k.Detail, tc.err.Detail)
+					default:
+						assert.FatalError(t, errors.New("unexpected error type"))
+					}
+				}
+			} else {
+				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
 func TestKeyAuthorization(t *testing.T) {
 	type test struct {
 		token string
