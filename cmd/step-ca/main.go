@@ -66,6 +66,7 @@ var appHelpTemplate = `## NAME
 | **{{join .Names ", "}}** | {{.Usage}} |{{end}}
 {{end}}{{if .VisibleFlags}}{{end}}
 ## OPTIONS
+
 {{range $index, $option := .VisibleFlags}}{{if $index}}
 {{end}}{{$option}}
 {{end}}{{end}}{{if .Copyright}}{{if len .Authors}}
