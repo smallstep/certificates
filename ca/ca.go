@@ -23,9 +23,10 @@ import (
 )
 
 type options struct {
-	configFile string
-	password   []byte
-	database   db.AuthDB
+	configFile     string
+	password       []byte
+	issuerPassword []byte
+	database       db.AuthDB
 }
 
 func (o *options) apply(opts []Option) {
@@ -50,6 +51,14 @@ func WithConfigFile(name string) Option {
 func WithPassword(password []byte) Option {
 	return func(o *options) {
 		o.password = password
+	}
+}
+
+// WithIssuer sets the given password as the configured certificate issuer
+// password in the CA options.
+func WithIssuerPassword(password []byte) Option {
+	return func(o *options) {
+		o.issuerPassword = password
 	}
 }
 
@@ -82,8 +91,16 @@ func New(config *authority.Config, opts ...Option) (*CA, error) {
 
 // Init initializes the CA with the given configuration.
 func (ca *CA) Init(config *authority.Config) (*CA, error) {
-	if l := len(ca.opts.password); l > 0 {
+	// Intermediate Password.
+	if len(ca.opts.password) > 0 {
 		ca.config.Password = string(ca.opts.password)
+	}
+
+	// Certificate issuer password for RA mode.
+	if len(ca.opts.issuerPassword) > 0 {
+		if ca.config.AuthorityConfig != nil && ca.config.AuthorityConfig.CertificateIssuer != nil {
+			ca.config.AuthorityConfig.CertificateIssuer.Password = string(ca.opts.issuerPassword)
+		}
 	}
 
 	var opts []authority.Option
@@ -213,6 +230,7 @@ func (ca *CA) Reload() error {
 
 	newCA, err := New(config,
 		WithPassword(ca.opts.password),
+		WithIssuerPassword(ca.opts.issuerPassword),
 		WithConfigFile(ca.opts.configFile),
 		WithDatabase(ca.auth.GetDatabase()),
 	)
