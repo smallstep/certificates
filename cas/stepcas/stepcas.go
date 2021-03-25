@@ -41,14 +41,14 @@ func New(ctx context.Context, opts apiv1.Options) (*StepCAS, error) {
 		return nil, errors.Wrap(err, "stepCAS `certificateAuthority` is not valid")
 	}
 
-	// Create configured issuer
-	iss, err := newStepIssuer(caURL, opts.CertificateIssuer)
+	// Create client.
+	client, err := ca.NewClient(opts.CertificateAuthority, ca.WithRootSHA256(opts.CertificateAuthorityFingerprint))
 	if err != nil {
 		return nil, err
 	}
 
-	// Create client.
-	client, err := ca.NewClient(opts.CertificateAuthority, ca.WithRootSHA256(opts.CertificateAuthorityFingerprint))
+	// Create configured issuer
+	iss, err := newStepIssuer(caURL, client, opts.CertificateIssuer)
 	if err != nil {
 		return nil, err
 	}

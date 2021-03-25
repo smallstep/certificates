@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas/apiv1"
 )
 
@@ -16,7 +17,7 @@ type stepIssuer interface {
 }
 
 // newStepIssuer returns the configured step issuer.
-func newStepIssuer(caURL *url.URL, iss *apiv1.CertificateIssuer) (stepIssuer, error) {
+func newStepIssuer(caURL *url.URL, client *ca.Client, iss *apiv1.CertificateIssuer) (stepIssuer, error) {
 	if err := validateCertificateIssuer(iss); err != nil {
 		return nil, err
 	}
@@ -25,7 +26,7 @@ func newStepIssuer(caURL *url.URL, iss *apiv1.CertificateIssuer) (stepIssuer, er
 	case "x5c":
 		return newX5CIssuer(caURL, iss)
 	case "jwk":
-		return newJWKIssuer(caURL, iss)
+		return newJWKIssuer(caURL, client, iss)
 	default:
 		return nil, errors.Errorf("stepCAS `certificateIssuer.type` %s is not supported", iss.Type)
 	}
@@ -65,11 +66,11 @@ func validateX5CIssuer(iss *apiv1.CertificateIssuer) error {
 	}
 }
 
-// validateJWKIssuer validates the configuration of jwk issuer.
+// validateJWKIssuer validates the configuration of jwk issuer. If the key is
+// not given, then it will download it from the CA. If the password is not set
+// it will be prompted.
 func validateJWKIssuer(iss *apiv1.CertificateIssuer) error {
 	switch {
-	case iss.Key == "":
-		return errors.New("stepCAS `certificateIssuer.key` cannot be empty")
 	case iss.Provisioner == "":
 		return errors.New("stepCAS `certificateIssuer.provisioner` cannot be empty")
 	default:
