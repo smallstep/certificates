@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/rsa"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -243,15 +244,21 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "invalid jwk in protected header"))
 			return
 		}
-		ctx = context.WithValue(ctx, jwkContextKey, jwk)
-		kid, err := acme.KeyToID(jwk)
+
+		// Overwrite KeyID with the JWK thumbprint.
+		jwk.KeyID, err = acme.KeyToID(jwk)
 		if err != nil {
 			api.WriteError(w, acme.WrapErrorISE(err, "error getting KeyID from JWK"))
 			return
 		}
-		acc, err := h.db.GetAccountByKeyID(ctx, kid)
+
+		// Store the JWK in the context.
+		ctx = context.WithValue(ctx, jwkContextKey, jwk)
+
+		// Get Account or continue to generate a new one.
+		acc, err := h.db.GetAccountByKeyID(ctx, jwk.KeyID)
 		switch {
-		case nosql.IsErrNotFound(err):
+		case errors.Is(err, acme.ErrNotFound):
 			// For NewAccount requests ...
 			break
 		case err != nil:

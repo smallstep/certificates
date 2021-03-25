@@ -34,7 +34,7 @@ func TestDB_getDBAccount(t *testing.T) {
 						return nil, nosqldb.ErrNotFound
 					},
 				},
-				acmeErr: acme.NewError(acme.ErrorMalformedType, "account accID not found"),
+				err: acme.ErrNotFound,
 			}
 		},
 		"fail/db.Get-error": func(t *testing.T) test {
@@ -142,7 +142,7 @@ func TestDB_getAccountIDByKeyID(t *testing.T) {
 						return nil, nosqldb.ErrNotFound
 					},
 				},
-				acmeErr: acme.NewError(acme.ErrorMalformedType, "account with key-id kid not found"),
+				err: acme.ErrNotFound,
 			}
 		},
 		"fail/db.Get-error": func(t *testing.T) test {
@@ -219,19 +219,6 @@ func TestDB_GetAccount(t *testing.T) {
 					},
 				},
 				err: errors.New("error loading account accID: force"),
-			}
-		},
-		"fail/forward-acme-error": func(t *testing.T) test {
-			return test{
-				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						assert.Equals(t, bucket, accountTable)
-						assert.Equals(t, string(key), accID)
-
-						return nil, nosqldb.ErrNotFound
-					},
-				},
-				acmeErr: acme.NewError(acme.ErrorMalformedType, "account accID not found"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -314,19 +301,6 @@ func TestDB_GetAccountByKeyID(t *testing.T) {
 				err: errors.New("error loading key-account index for key kid: force"),
 			}
 		},
-		"fail/db.getAccountIDByKeyID-forward-acme-error": func(t *testing.T) test {
-			return test{
-				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						assert.Equals(t, string(bucket), string(accountByKeyIDTable))
-						assert.Equals(t, string(key), kid)
-
-						return nil, nosqldb.ErrNotFound
-					},
-				},
-				acmeErr: acme.NewError(acme.ErrorMalformedType, "account with key-id kid not found"),
-			}
-		},
 		"fail/db.GetAccount-error": func(t *testing.T) test {
 			return test{
 				db: &db.MockNoSQLDB{
@@ -345,26 +319,6 @@ func TestDB_GetAccountByKeyID(t *testing.T) {
 					},
 				},
 				err: errors.New("error loading account accID: force"),
-			}
-		},
-		"fail/db.GetAccount-forward-acme-error": func(t *testing.T) test {
-			return test{
-				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						switch string(bucket) {
-						case string(accountByKeyIDTable):
-							assert.Equals(t, string(key), kid)
-							return []byte(accID), nil
-						case string(accountTable):
-							assert.Equals(t, string(key), accID)
-							return nil, nosqldb.ErrNotFound
-						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
-							return nil, errors.New("force")
-						}
-					},
-				},
-				acmeErr: acme.NewError(acme.ErrorMalformedType, "account accID not found"),
 			}
 		},
 		"ok": func(t *testing.T) test {

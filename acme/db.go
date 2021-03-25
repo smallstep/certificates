@@ -2,7 +2,15 @@ package acme
 
 import (
 	"context"
+
+	"github.com/pkg/errors"
 )
+
+// ErrNotFound is an error that should be used by the acme.DB interface to
+// indicate that an entity does not exist. For example, in the new-account
+// endpoint, if GetAccountByKeyID returns ErrNotFound we will create the new
+// account.
+var ErrNotFound = errors.New("not found")
 
 // DB is the DB interface expected by the step-ca ACME API.
 type DB interface {

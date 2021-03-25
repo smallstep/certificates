@@ -1047,7 +1047,7 @@ func TestHandler_extractJWK(t *testing.T) {
 				db: &acme.MockDB{
 					MockGetAccountByKeyID: func(ctx context.Context, kid string) (*acme.Account, error) {
 						assert.Equals(t, kid, pub.KeyID)
-						return nil, database.ErrNotFound
+						return nil, acme.ErrNotFound
 					},
 				},
 				next: func(w http.ResponseWriter, r *http.Request) {

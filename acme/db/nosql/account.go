@@ -30,7 +30,7 @@ func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, erro
 	id, err := db.db.Get(accountByKeyIDTable, []byte(kid))
 	if err != nil {
 		if nosqlDB.IsErrNotFound(err) {
-			return "", acme.NewError(acme.ErrorMalformedType, "account with key-id %s not found", kid)
+			return "", acme.ErrNotFound
 		}
 		return "", errors.Wrapf(err, "error loading key-account index for key %s", kid)
 	}
@@ -42,7 +42,7 @@ func (db *DB) getDBAccount(ctx context.Context, id string) (*dbAccount, error) {
 	data, err := db.db.Get(accountTable, []byte(id))
 	if err != nil {
 		if nosqlDB.IsErrNotFound(err) {
-			return nil, acme.NewError(acme.ErrorMalformedType, "account %s not found", id)
+			return nil, acme.ErrNotFound
 		}
 		return nil, errors.Wrapf(err, "error loading account %s", id)
 	}
