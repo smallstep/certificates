@@ -67,8 +67,8 @@ func validateX5CIssuer(iss *apiv1.CertificateIssuer) error {
 }
 
 // validateJWKIssuer validates the configuration of jwk issuer. If the key is
-// not given, then it will download it from the CA. If the password is not given
-// it will be asked.
+// not given, then it will download it from the CA. If the password is not set
+// it will be prompted.
 func validateJWKIssuer(iss *apiv1.CertificateIssuer) error {
 	switch {
 	case iss.Provisioner == "":
