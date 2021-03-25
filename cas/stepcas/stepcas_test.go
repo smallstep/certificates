@@ -21,8 +21,10 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas/apiv1"
+	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"
@@ -42,6 +44,7 @@ var (
 	testX5CKey                         crypto.Signer
 	testX5CPath, testX5CKeyPath        string
 	testPassword, testEncryptedKeyPath string
+	testKeyID, testEncryptedJWKKey     string
 
 	testCR     *x509.CertificateRequest
 	testCrt    *x509.Certificate
@@ -157,6 +160,27 @@ func testCAHelper(t *testing.T) (*url.URL, *ca.Client) {
 			writeJSON(w, api.RevokeResponse{
 				Status: "ok",
 			})
+		case r.RequestURI == "/provisioners":
+			w.WriteHeader(http.StatusOK)
+			writeJSON(w, api.ProvisionersResponse{
+				NextCursor: "cursor",
+				Provisioners: []provisioner.Interface{
+					&provisioner.JWK{
+						Type:         "JWK",
+						Name:         "ra@doe.org",
+						Key:          &jose.JSONWebKey{KeyID: testKeyID, Key: testX5CKey.Public()},
+						EncryptedKey: testEncryptedJWKKey,
+					},
+					&provisioner.JWK{
+						Type: "JWK",
+						Name: "empty@doe.org",
+						Key:  &jose.JSONWebKey{KeyID: testKeyID, Key: testX5CKey.Public()},
+					},
+				},
+			})
+		case r.RequestURI == "/provisioners?cursor=cursor":
+			w.WriteHeader(http.StatusOK)
+			writeJSON(w, api.ProvisionersResponse{})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			fmt.Fprintf(w, `{"error":"not found"}`)
@@ -203,12 +227,16 @@ func testX5CIssuer(t *testing.T, caURL *url.URL, password string) *x5cIssuer {
 
 func testJWKIssuer(t *testing.T, caURL *url.URL, password string) *jwkIssuer {
 	t.Helper()
-	key, givenPassword := testX5CKeyPath, password
+	client, err := ca.NewClient(caURL.String(), ca.WithTransport(http.DefaultTransport))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := testX5CKeyPath
 	if password != "" {
 		key = testEncryptedKeyPath
 		password = testPassword
 	}
-	jwk, err := newJWKIssuer(caURL, &apiv1.CertificateIssuer{
+	jwk, err := newJWKIssuer(caURL, client, &apiv1.CertificateIssuer{
 		Type:        "jwk",
 		Provisioner: "ra@doe.org",
 		Key:         key,
@@ -217,7 +245,7 @@ func testJWKIssuer(t *testing.T, caURL *url.URL, password string) *jwkIssuer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jwk.password = givenPassword
+
 	return jwk
 }
 
@@ -225,6 +253,7 @@ func TestMain(m *testing.M) {
 	testRootCrt, testRootKey = mustSignCertificate("Test Root Certificate", nil, x509util.DefaultRootTemplate, nil, nil)
 	testIssCrt, testIssKey = mustSignCertificate("Test Intermediate Certificate", nil, x509util.DefaultIntermediateTemplate, testRootCrt, testRootKey)
 	testX5CCrt, testX5CKey = mustSignCertificate("Test X5C Certificate", nil, x509util.DefaultLeafTemplate, testIssCrt, testIssKey)
+	testRootFingerprint = x509util.Fingerprint(testRootCrt)
 
 	// Final certificate.
 	var err error
@@ -241,14 +270,27 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	// Password used to encrypto the key
+	// Password used to encrypt the key.
 	testPassword, err = randutil.Hex(32)
 	if err != nil {
 		panic(err)
 	}
 
-	testRootFingerprint = x509util.Fingerprint(testRootCrt)
+	// Encrypted JWK key used when the key is downloaded from the CA.
+	jwe, err := jose.EncryptJWK(&jose.JSONWebKey{Key: testX5CKey}, []byte(testPassword))
+	if err != nil {
+		panic(err)
+	}
+	testEncryptedJWKKey, err = jwe.CompactSerialize()
+	if err != nil {
+		panic(err)
+	}
+	testKeyID, err = jose.Thumbprint(&jose.JSONWebKey{Key: testX5CKey})
+	if err != nil {
+		panic(err)
+	}
 
+	// Create test files.
 	path, err := ioutil.TempDir(os.TempDir(), "stepcas")
 	if err != nil {
 		panic(err)
@@ -301,6 +343,11 @@ func Test_init(t *testing.T) {
 
 func TestNew(t *testing.T) {
 	caURL, client := testCAHelper(t)
+	signer, err := newJWKSignerFromEncryptedKey(testKeyID, testEncryptedJWKKey, testPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type args struct {
 		ctx  context.Context
 		opts apiv1.Options
@@ -340,9 +387,26 @@ func TestNew(t *testing.T) {
 			},
 		}}, &StepCAS{
 			iss: &jwkIssuer{
-				caURL:   caURL,
-				keyFile: testX5CKeyPath,
-				issuer:  "ra@doe.org",
+				caURL:  caURL,
+				issuer: "ra@doe.org",
+				signer: signer,
+			},
+			client:      client,
+			fingerprint: testRootFingerprint,
+		}, false},
+		{"ok jwk provisioners", args{context.TODO(), apiv1.Options{
+			CertificateAuthority:            caURL.String(),
+			CertificateAuthorityFingerprint: testRootFingerprint,
+			CertificateIssuer: &apiv1.CertificateIssuer{
+				Type:        "jwk",
+				Provisioner: "ra@doe.org",
+				Password:    testPassword,
+			},
+		}}, &StepCAS{
+			iss: &jwkIssuer{
+				caURL:  caURL,
+				issuer: "ra@doe.org",
+				signer: signer,
 			},
 			client:      client,
 			fingerprint: testRootFingerprint,
@@ -394,6 +458,33 @@ func TestNew(t *testing.T) {
 				Type:        "jwk",
 				Provisioner: "",
 				Key:         testX5CKeyPath,
+			},
+		}}, nil, true},
+		{"fail provisioner not found", args{context.TODO(), apiv1.Options{
+			CertificateAuthority:            caURL.String(),
+			CertificateAuthorityFingerprint: testRootFingerprint,
+			CertificateIssuer: &apiv1.CertificateIssuer{
+				Type:        "jwk",
+				Provisioner: "notfound@doe.org",
+				Password:    testPassword,
+			},
+		}}, nil, true},
+		{"fail invalid password", args{context.TODO(), apiv1.Options{
+			CertificateAuthority:            caURL.String(),
+			CertificateAuthorityFingerprint: testRootFingerprint,
+			CertificateIssuer: &apiv1.CertificateIssuer{
+				Type:        "jwk",
+				Provisioner: "ra@doe.org",
+				Password:    "bad-password",
+			},
+		}}, nil, true},
+		{"fail no key", args{context.TODO(), apiv1.Options{
+			CertificateAuthority:            caURL.String(),
+			CertificateAuthorityFingerprint: testRootFingerprint,
+			CertificateIssuer: &apiv1.CertificateIssuer{
+				Type:        "jwk",
+				Provisioner: "empty@doe.org",
+				Password:    testPassword,
 			},
 		}}, nil, true},
 		{"fail certificate", args{context.TODO(), apiv1.Options{
@@ -496,9 +587,12 @@ func TestNew(t *testing.T) {
 				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			// We cannot compare client
+			// We cannot compare neither the client nor the signer.
 			if got != nil && tt.want != nil {
 				got.client = tt.want.client
+				if jwk, ok := got.iss.(*jwkIssuer); ok {
+					jwk.signer = signer
+				}
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("New() = %v, want %v", got, tt.want)
@@ -514,7 +608,6 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 	x5cEnc := testX5CIssuer(t, caURL, testPassword)
 	jwkEnc := testJWKIssuer(t, caURL, testPassword)
 	x5cBad := testX5CIssuer(t, caURL, "bad-password")
-	jwkBad := testJWKIssuer(t, caURL, "bad-password")
 
 	type fields struct {
 		iss         stepIssuer
@@ -576,10 +669,6 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 			Lifetime: time.Hour,
 		}}, nil, true},
 		{"fail password", fields{x5cBad, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
-			CSR:      testCR,
-			Lifetime: time.Hour,
-		}}, nil, true},
-		{"fail jwk password", fields{jwkBad, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:      testCR,
 			Lifetime: time.Hour,
 		}}, nil, true},
@@ -658,7 +747,6 @@ func TestStepCAS_RevokeCertificate(t *testing.T) {
 	x5cEnc := testX5CIssuer(t, caURL, testPassword)
 	jwkEnc := testJWKIssuer(t, caURL, testPassword)
 	x5cBad := testX5CIssuer(t, caURL, "bad-password")
-	jwkBad := testJWKIssuer(t, caURL, "bad-password")
 
 	type fields struct {
 		iss         stepIssuer
@@ -726,10 +814,6 @@ func TestStepCAS_RevokeCertificate(t *testing.T) {
 			SerialNumber: "fail",
 		}}, nil, true},
 		{"fail password", fields{x5cBad, client, testRootFingerprint}, args{&apiv1.RevokeCertificateRequest{
-			SerialNumber: "ok",
-			Certificate:  nil,
-		}}, nil, true},
-		{"fail jwk password", fields{jwkBad, client, testRootFingerprint}, args{&apiv1.RevokeCertificateRequest{
 			SerialNumber: "ok",
 			Certificate:  nil,
 		}}, nil, true},
