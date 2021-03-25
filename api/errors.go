@@ -33,11 +33,15 @@ func WriteError(w http.ResponseWriter, err error) {
 
 	// Write errors in the response writer
 	if rl, ok := w.(logging.ResponseLogger); ok {
+		logErr := err
+		if u, ok := err.(*acme.Error); ok {
+			logErr = u.Err
+		}
 		rl.WithFields(map[string]interface{}{
-			"error": err,
+			"error": logErr,
 		})
 		if os.Getenv("STEPDEBUG") == "1" {
-			if e, ok := err.(errs.StackTracer); ok {
+			if e, ok := logErr.(errs.StackTracer); ok {
 				rl.WithFields(map[string]interface{}{
 					"stack-trace": fmt.Sprintf("%+v", e),
 				})

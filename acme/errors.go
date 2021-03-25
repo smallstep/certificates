@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -336,4 +337,13 @@ func (e *Error) Cause() error {
 		return errors.New(e.Detail)
 	}
 	return e.Err
+}
+
+// ToLog implements the EnableLogger interface.
+func (e *Error) ToLog() (interface{}, error) {
+	b, err := json.Marshal(e)
+	if err != nil {
+		return nil, WrapErrorISE(err, "error marshaling acme.Error for logging")
+	}
+	return string(b), nil
 }
