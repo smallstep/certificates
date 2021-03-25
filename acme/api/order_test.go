@@ -1570,7 +1570,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 				assert.FatalError(t, err)
 
 				ro := new(acme.Order)
-				err = json.Unmarshal(body, ro)
+				assert.FatalError(t, json.Unmarshal(body, ro))
 
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"], []string{url})

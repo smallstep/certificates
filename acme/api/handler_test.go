@@ -425,16 +425,6 @@ func TestHandler_GetCertificate(t *testing.T) {
 	}
 }
 
-func ch() acme.Challenge {
-	return acme.Challenge{
-		Type:   "http-01",
-		Status: "pending",
-		Token:  "tok2",
-		URL:    "https://ca.smallstep.com/acme/challenge/chID",
-		ID:     "chID",
-	}
-}
-
 func TestHandler_GetChallenge(t *testing.T) {
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("chID", "chID")

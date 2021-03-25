@@ -120,8 +120,6 @@ func (db *DB) UpdateOrder(ctx context.Context, o *acme.Order) error {
 	return db.save(ctx, old.ID, nu, old, "order", orderTable)
 }
 
-type orderIDsByAccount struct{}
-
 func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...string) ([]string, error) {
 	ordersByAccountMux.Lock()
 	defer ordersByAccountMux.Unlock()

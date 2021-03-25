@@ -16,10 +16,9 @@ import (
 
 func TestDB_CreateNonce(t *testing.T) {
 	type test struct {
-		db    nosql.DB
-		nonce *acme.Nonce
-		err   error
-		_id   *string
+		db  nosql.DB
+		err error
+		_id *string
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/cmpAndSwap-error": func(t *testing.T) test {

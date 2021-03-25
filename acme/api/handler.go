@@ -142,10 +142,6 @@ func (d *Directory) ToLog() (interface{}, error) {
 	return string(b), nil
 }
 
-type directory struct {
-	prefix, dns string
-}
-
 // GetDirectory is the ACME resource for returning a directory configuration
 // for client configuration.
 func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {

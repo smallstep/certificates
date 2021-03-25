@@ -128,7 +128,6 @@ type errorMetadata struct {
 
 var (
 	officialACMEPrefix          = "urn:ietf:params:acme:error:"
-	stepACMEPrefix              = "urn:step:acme:error:"
 	errorServerInternalMetadata = errorMetadata{
 		typ:     officialACMEPrefix + ErrorServerInternalType.String(),
 		details: "The server experienced an internal error",

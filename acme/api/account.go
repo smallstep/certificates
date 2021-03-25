@@ -205,5 +205,4 @@ func (h *Handler) GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 
 	api.JSON(w, orders)
 	logOrdersByAccount(w, orders)
-	return
 }

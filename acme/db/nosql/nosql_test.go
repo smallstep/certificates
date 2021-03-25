@@ -16,7 +16,7 @@ func TestNew(t *testing.T) {
 		err error
 	}
 	var tests = map[string]test{
-		"fail/db.CreateTable-error": test{
+		"fail/db.CreateTable-error": {
 			db: &db.MockNoSQLDB{
 				MCreateTable: func(bucket []byte) error {
 					assert.Equals(t, string(bucket), string(accountTable))
@@ -25,7 +25,7 @@ func TestNew(t *testing.T) {
 			},
 			err: errors.Errorf("error creating table %s: force", string(accountTable)),
 		},
-		"ok": test{
+		"ok": {
 			db: &db.MockNoSQLDB{
 				MCreateTable: func(bucket []byte) error {
 					return nil
@@ -60,16 +60,16 @@ func TestDB_save(t *testing.T) {
 		err error
 	}
 	var tests = map[string]test{
-		"fail/error-marshaling-new": test{
+		"fail/error-marshaling-new": {
 			nu:  errorThrower("foo"),
 			err: errors.New("error marshaling acme type: challenge"),
 		},
-		"fail/error-marshaling-old": test{
+		"fail/error-marshaling-old": {
 			nu:  "new",
 			old: errorThrower("foo"),
 			err: errors.New("error marshaling acme type: challenge"),
 		},
-		"fail/db.CmpAndSwap-error": test{
+		"fail/db.CmpAndSwap-error": {
 			nu:  "new",
 			old: "old",
 			db: &db.MockNoSQLDB{
@@ -83,7 +83,7 @@ func TestDB_save(t *testing.T) {
 			},
 			err: errors.New("error saving acme challenge: force"),
 		},
-		"fail/db.CmpAndSwap-false-marshaling-old": test{
+		"fail/db.CmpAndSwap-false-marshaling-old": {
 			nu:  "new",
 			old: "old",
 			db: &db.MockNoSQLDB{
@@ -97,7 +97,7 @@ func TestDB_save(t *testing.T) {
 			},
 			err: errors.New("error saving acme challenge; changed since last read"),
 		},
-		"ok": test{
+		"ok": {
 			nu:  "new",
 			old: "old",
 			db: &db.MockNoSQLDB{
@@ -110,7 +110,7 @@ func TestDB_save(t *testing.T) {
 				},
 			},
 		},
-		"ok/nils": test{
+		"ok/nils": {
 			nu:  nil,
 			old: nil,
 			db: &db.MockNoSQLDB{

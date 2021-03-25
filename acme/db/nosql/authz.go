@@ -10,8 +10,6 @@ import (
 	"github.com/smallstep/nosql"
 )
 
-var defaultExpiryDuration = time.Hour * 24
-
 // dbAuthz is the base authz type that others build from.
 type dbAuthz struct {
 	ID           string          `json:"id"`
