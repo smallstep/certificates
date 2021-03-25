@@ -29,7 +29,6 @@ type Challenge struct {
 	URL         string `json:"url"`
 	Error       *Error `json:"error,omitempty"`
 	ID          string `json:"-"`
-	AuthzID     string `json:"-"`
 	AccountID   string `json:"-"`
 	Value       string `json:"-"`
 }

@@ -214,17 +214,16 @@ func TestLinker_LinkChallenge(t *testing.T) {
 	var tests = map[string]test{
 		"ok": {
 			ch: &acme.Challenge{
-				ID:      chID,
-				AuthzID: azID,
+				ID: chID,
 			},
 			validate: func(ch *acme.Challenge) {
-				assert.Equals(t, ch.URL, fmt.Sprintf("%s/%s/%s/challenge/%s/%s", baseURL, linkerPrefix, provName, ch.AuthzID, ch.ID))
+				assert.Equals(t, ch.URL, fmt.Sprintf("%s/%s/%s/challenge/%s/%s", baseURL, linkerPrefix, provName, azID, ch.ID))
 			},
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			l.LinkChallenge(ctx, tc.ch)
+			l.LinkChallenge(ctx, tc.ch, azID)
 			tc.validate(tc.ch)
 		})
 	}
@@ -252,9 +251,9 @@ func TestLinker_LinkAuthorization(t *testing.T) {
 			az: &acme.Authorization{
 				ID: azID,
 				Challenges: []*acme.Challenge{
-					{ID: chID0, AuthzID: azID},
-					{ID: chID1, AuthzID: azID},
-					{ID: chID2, AuthzID: azID},
+					{ID: chID0},
+					{ID: chID1},
+					{ID: chID2},
 				},
 			},
 			validate: func(az *acme.Authorization) {

@@ -66,7 +66,6 @@ func TestDB_getDBChallenge(t *testing.T) {
 			dbc := &dbChallenge{
 				ID:          chID,
 				AccountID:   "accountID",
-				AuthzID:     "authzID",
 				Type:        "dns-01",
 				Status:      acme.StatusPending,
 				Token:       "token",
@@ -113,7 +112,6 @@ func TestDB_getDBChallenge(t *testing.T) {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, ch.ID, tc.dbc.ID)
 					assert.Equals(t, ch.AccountID, tc.dbc.AccountID)
-					assert.Equals(t, ch.AuthzID, tc.dbc.AuthzID)
 					assert.Equals(t, ch.Type, tc.dbc.Type)
 					assert.Equals(t, ch.Status, tc.dbc.Status)
 					assert.Equals(t, ch.Token, tc.dbc.Token)
@@ -137,7 +135,6 @@ func TestDB_CreateChallenge(t *testing.T) {
 		"fail/cmpAndSwap-error": func(t *testing.T) test {
 			ch := &acme.Challenge{
 				AccountID: "accountID",
-				AuthzID:   "authzID",
 				Type:      "dns-01",
 				Status:    acme.StatusPending,
 				Token:     "token",
@@ -154,7 +151,6 @@ func TestDB_CreateChallenge(t *testing.T) {
 						assert.FatalError(t, json.Unmarshal(nu, dbc))
 						assert.Equals(t, dbc.ID, string(key))
 						assert.Equals(t, dbc.AccountID, ch.AccountID)
-						assert.Equals(t, dbc.AuthzID, ch.AuthzID)
 						assert.Equals(t, dbc.Type, ch.Type)
 						assert.Equals(t, dbc.Status, ch.Status)
 						assert.Equals(t, dbc.Token, ch.Token)
@@ -174,7 +170,6 @@ func TestDB_CreateChallenge(t *testing.T) {
 				idPtr = &id
 				ch    = &acme.Challenge{
 					AccountID: "accountID",
-					AuthzID:   "authzID",
 					Type:      "dns-01",
 					Status:    acme.StatusPending,
 					Token:     "token",
@@ -195,7 +190,6 @@ func TestDB_CreateChallenge(t *testing.T) {
 						assert.FatalError(t, json.Unmarshal(nu, dbc))
 						assert.Equals(t, dbc.ID, string(key))
 						assert.Equals(t, dbc.AccountID, ch.AccountID)
-						assert.Equals(t, dbc.AuthzID, ch.AuthzID)
 						assert.Equals(t, dbc.Type, ch.Type)
 						assert.Equals(t, dbc.Status, ch.Status)
 						assert.Equals(t, dbc.Token, ch.Token)
@@ -266,7 +260,6 @@ func TestDB_GetChallenge(t *testing.T) {
 			dbc := &dbChallenge{
 				ID:          chID,
 				AccountID:   "accountID",
-				AuthzID:     azID,
 				Type:        "dns-01",
 				Status:      acme.StatusPending,
 				Token:       "token",
@@ -313,7 +306,6 @@ func TestDB_GetChallenge(t *testing.T) {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, ch.ID, tc.dbc.ID)
 					assert.Equals(t, ch.AccountID, tc.dbc.AccountID)
-					assert.Equals(t, ch.AuthzID, tc.dbc.AuthzID)
 					assert.Equals(t, ch.Type, tc.dbc.Type)
 					assert.Equals(t, ch.Status, tc.dbc.Status)
 					assert.Equals(t, ch.Token, tc.dbc.Token)
@@ -331,7 +323,6 @@ func TestDB_UpdateChallenge(t *testing.T) {
 	dbc := &dbChallenge{
 		ID:        chID,
 		AccountID: "accountID",
-		AuthzID:   "azID",
 		Type:      "dns-01",
 		Status:    acme.StatusPending,
 		Token:     "token",
@@ -390,7 +381,6 @@ func TestDB_UpdateChallenge(t *testing.T) {
 						assert.FatalError(t, json.Unmarshal(nu, dbNew))
 						assert.Equals(t, dbNew.ID, dbc.ID)
 						assert.Equals(t, dbNew.AccountID, dbc.AccountID)
-						assert.Equals(t, dbNew.AuthzID, dbc.AuthzID)
 						assert.Equals(t, dbNew.Type, dbc.Type)
 						assert.Equals(t, dbNew.Status, updCh.Status)
 						assert.Equals(t, dbNew.Token, dbc.Token)
@@ -408,7 +398,6 @@ func TestDB_UpdateChallenge(t *testing.T) {
 			updCh := &acme.Challenge{
 				ID:          dbc.ID,
 				AccountID:   dbc.AccountID,
-				AuthzID:     dbc.AuthzID,
 				Type:        dbc.Type,
 				Token:       dbc.Token,
 				Value:       dbc.Value,
@@ -437,7 +426,6 @@ func TestDB_UpdateChallenge(t *testing.T) {
 						assert.FatalError(t, json.Unmarshal(nu, dbNew))
 						assert.Equals(t, dbNew.ID, dbc.ID)
 						assert.Equals(t, dbNew.AccountID, dbc.AccountID)
-						assert.Equals(t, dbNew.AuthzID, dbc.AuthzID)
 						assert.Equals(t, dbNew.Type, dbc.Type)
 						assert.Equals(t, dbNew.Token, dbc.Token)
 						assert.Equals(t, dbNew.Value, dbc.Value)
@@ -463,7 +451,6 @@ func TestDB_UpdateChallenge(t *testing.T) {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, tc.ch.ID, dbc.ID)
 					assert.Equals(t, tc.ch.AccountID, dbc.AccountID)
-					assert.Equals(t, tc.ch.AuthzID, dbc.AuthzID)
 					assert.Equals(t, tc.ch.Type, dbc.Type)
 					assert.Equals(t, tc.ch.Token, dbc.Token)
 					assert.Equals(t, tc.ch.Value, dbc.Value)

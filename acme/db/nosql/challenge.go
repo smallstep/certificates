@@ -13,7 +13,6 @@ import (
 type dbChallenge struct {
 	ID          string      `json:"id"`
 	AccountID   string      `json:"accountID"`
-	AuthzID     string      `json:"authzID"`
 	Type        string      `json:"type"`
 	Status      acme.Status `json:"status"`
 	Token       string      `json:"token"`
@@ -54,7 +53,6 @@ func (db *DB) CreateChallenge(ctx context.Context, ch *acme.Challenge) error {
 
 	dbch := &dbChallenge{
 		ID:        ch.ID,
-		AuthzID:   ch.AuthzID,
 		AccountID: ch.AccountID,
 		Value:     ch.Value,
 		Status:    acme.StatusPending,
@@ -77,7 +75,6 @@ func (db *DB) GetChallenge(ctx context.Context, id, authzID string) (*acme.Chall
 	ch := &acme.Challenge{
 		ID:          dbch.ID,
 		AccountID:   dbch.AccountID,
-		AuthzID:     dbch.AuthzID,
 		Type:        dbch.Type,
 		Value:       dbch.Value,
 		Status:      dbch.Status,

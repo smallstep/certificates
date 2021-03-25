@@ -20,7 +20,7 @@ type Linker interface {
 
 	LinkOrder(ctx context.Context, o *acme.Order)
 	LinkAccount(ctx context.Context, o *acme.Account)
-	LinkChallenge(ctx context.Context, o *acme.Challenge)
+	LinkChallenge(ctx context.Context, o *acme.Challenge, azID string)
 	LinkAuthorization(ctx context.Context, o *acme.Authorization)
 	LinkOrdersByAccountID(ctx context.Context, orders []string)
 }
@@ -164,14 +164,14 @@ func (l *linker) LinkAccount(ctx context.Context, acc *acme.Account) {
 }
 
 // LinkChallenge sets the ACME links required by an ACME challenge.
-func (l *linker) LinkChallenge(ctx context.Context, ch *acme.Challenge) {
-	ch.URL = l.GetLink(ctx, ChallengeLinkType, true, ch.AuthzID, ch.ID)
+func (l *linker) LinkChallenge(ctx context.Context, ch *acme.Challenge, azID string) {
+	ch.URL = l.GetLink(ctx, ChallengeLinkType, true, azID, ch.ID)
 }
 
 // LinkAuthorization sets the ACME links required by an ACME authorization.
 func (l *linker) LinkAuthorization(ctx context.Context, az *acme.Authorization) {
 	for _, ch := range az.Challenges {
-		l.LinkChallenge(ctx, ch)
+		l.LinkChallenge(ctx, ch, az.ID)
 	}
 }
 

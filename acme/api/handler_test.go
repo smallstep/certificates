@@ -126,20 +126,18 @@ func TestHandler_GetAuthorization(t *testing.T) {
 		Wildcard:  false,
 		Challenges: []*acme.Challenge{
 			{
-				Type:    "http-01",
-				Status:  "pending",
-				Token:   "tok2",
-				URL:     "https://ca.smallstep.com/acme/challenge/chHTTPID",
-				ID:      "chHTTP01ID",
-				AuthzID: "authzID",
+				Type:   "http-01",
+				Status: "pending",
+				Token:  "tok2",
+				URL:    "https://ca.smallstep.com/acme/challenge/chHTTPID",
+				ID:     "chHTTP01ID",
 			},
 			{
-				Type:    "dns-01",
-				Status:  "pending",
-				Token:   "tok2",
-				URL:     "https://ca.smallstep.com/acme/challenge/chDNSID",
-				ID:      "chDNSID",
-				AuthzID: "authzID",
+				Type:   "dns-01",
+				Status: "pending",
+				Token:  "tok2",
+				URL:    "https://ca.smallstep.com/acme/challenge/chDNSID",
+				ID:     "chDNSID",
 			},
 		},
 	}
@@ -429,12 +427,11 @@ func TestHandler_GetCertificate(t *testing.T) {
 
 func ch() acme.Challenge {
 	return acme.Challenge{
-		Type:    "http-01",
-		Status:  "pending",
-		Token:   "tok2",
-		URL:     "https://ca.smallstep.com/acme/challenge/chID",
-		ID:      "chID",
-		AuthzID: "authzID",
+		Type:   "http-01",
+		Status: "pending",
+		Token:  "tok2",
+		URL:    "https://ca.smallstep.com/acme/challenge/chID",
+		ID:     "chID",
 	}
 }
 
@@ -627,7 +624,6 @@ func TestHandler_GetChallenge(t *testing.T) {
 						assert.Equals(t, azID, "authzID")
 						return &acme.Challenge{
 							ID:        "chID",
-							AuthzID:   "authzID",
 							Status:    acme.StatusPending,
 							Type:      "http-01",
 							AccountID: "accID",
@@ -643,7 +639,6 @@ func TestHandler_GetChallenge(t *testing.T) {
 				},
 				ch: &acme.Challenge{
 					ID:        "chID",
-					AuthzID:   "authzID",
 					Status:    acme.StatusPending,
 					Type:      "http-01",
 					AccountID: "accID",
@@ -689,7 +684,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 				expB, err := json.Marshal(tc.ch)
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
-				assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<%s/acme/%s/authz/%s>;rel=\"up\"", baseURL, provName, tc.ch.AuthzID)})
+				assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<%s/acme/%s/authz/%s>;rel=\"up\"", baseURL, provName, "authzID")})
 				assert.Equals(t, res.Header["Location"], []string{url})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}

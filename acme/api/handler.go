@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -70,14 +71,28 @@ func NewHandler(ops HandlerOptions) api.RouterHandler {
 	dialer := &net.Dialer{
 		Timeout: 30 * time.Second,
 	}
+	resolver := &net.Resolver{
+		// The DNS resolver can be configured for testing purposes with something
+		// like this:
+		//
+		// PreferGo: true,
+		// Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+		// 	var d net.Dialer
+		// 	return d.DialContext(ctx, "udp", "127.0.0.1:5333")
+		// },
+	}
 	return &Handler{
 		ca:       ops.CA,
 		db:       ops.DB,
 		backdate: ops.Backdate,
 		linker:   NewLinker(ops.DNS, ops.Prefix),
 		validateChallengeOptions: &acme.ValidateChallengeOptions{
-			HTTPGet:   client.Get,
-			LookupTxt: net.LookupTXT,
+			HTTPGet: client.Get,
+			LookupTxt: func(name string) ([]string, error) {
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				return resolver.LookupTXT(ctx, name)
+			},
 			TLSDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
 				return tls.DialWithDialer(dialer, network, addr, config)
 			},
@@ -216,7 +231,8 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	// strict enforcement would render these clients broken. For the time being
 	// we'll just ignore the body.
 
-	ch, err := h.db.GetChallenge(ctx, chi.URLParam(r, "chID"), chi.URLParam(r, "authzID"))
+	azID := chi.URLParam(r, "authzID")
+	ch, err := h.db.GetChallenge(ctx, chi.URLParam(r, "chID"), azID)
 	if err != nil {
 		api.WriteError(w, acme.WrapErrorISE(err, "error retrieving challenge"))
 		return
@@ -236,10 +252,10 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.linker.LinkChallenge(ctx, ch)
+	h.linker.LinkChallenge(ctx, ch, azID)
 
-	w.Header().Add("Link", link(h.linker.GetLink(ctx, AuthzLinkType, true, ch.AuthzID), "up"))
-	w.Header().Set("Location", h.linker.GetLink(ctx, ChallengeLinkType, true, ch.AuthzID, ch.ID))
+	w.Header().Add("Link", link(h.linker.GetLink(ctx, AuthzLinkType, true, azID), "up"))
+	w.Header().Set("Location", h.linker.GetLink(ctx, ChallengeLinkType, true, azID, ch.ID))
 	api.JSON(w, ch)
 }
 

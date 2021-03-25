@@ -59,6 +59,7 @@ func (f *FinalizeRequest) Validate() error {
 }
 
 var defaultOrderExpiry = time.Hour * 24
+var defaultOrderBackdate = time.Minute
 
 // NewOrder ACME api for creating a new order.
 func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
@@ -90,22 +91,23 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := clock.Now()
-	expiry := now.Add(defaultOrderExpiry)
 	// New order.
 	o := &acme.Order{
-		AccountID:     acc.ID,
-		ProvisionerID: prov.GetID(),
-		Status:        acme.StatusPending,
-		ExpiresAt:     expiry,
-		Identifiers:   nor.Identifiers,
+		AccountID:        acc.ID,
+		ProvisionerID:    prov.GetID(),
+		Status:           acme.StatusPending,
+		Identifiers:      nor.Identifiers,
+		ExpiresAt:        now.Add(defaultOrderExpiry),
+		AuthorizationIDs: make([]string, len(nor.Identifiers)),
+		NotBefore:        nor.NotBefore,
+		NotAfter:         nor.NotAfter,
 	}
 
-	o.AuthorizationIDs = make([]string, len(o.Identifiers))
 	for i, identifier := range o.Identifiers {
 		az := &acme.Authorization{
 			AccountID:  acc.ID,
 			Identifier: identifier,
-			ExpiresAt:  expiry,
+			ExpiresAt:  o.ExpiresAt,
 			Status:     acme.StatusPending,
 		}
 		if err := h.newAuthorization(ctx, az); err != nil {
@@ -120,6 +122,9 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	if o.NotAfter.IsZero() {
 		o.NotAfter = o.NotBefore.Add(prov.DefaultTLSCertDuration())
+	}
+	if nor.NotBefore.IsZero() {
+		o.NotBefore.Add(-defaultOrderBackdate)
 	}
 
 	if err := h.db.CreateOrder(ctx, o); err != nil {
@@ -155,19 +160,17 @@ func (h *Handler) newAuthorization(ctx context.Context, az *acme.Authorization) 
 	if err != nil {
 		return acme.WrapErrorISE(err, "error generating random alphanumeric ID")
 	}
-
 	az.Challenges = make([]*acme.Challenge, len(chTypes))
 	for i, typ := range chTypes {
 		ch := &acme.Challenge{
 			AccountID: az.AccountID,
-			AuthzID:   az.ID,
 			Value:     az.Identifier.Value,
 			Type:      typ,
 			Token:     az.Token,
 			Status:    acme.StatusPending,
 		}
 		if err := h.db.CreateChallenge(ctx, ch); err != nil {
-			return err
+			return acme.WrapErrorISE(err, "error creating challenge")
 		}
 		az.Challenges[i] = ch
 	}
