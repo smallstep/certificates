@@ -204,12 +204,15 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		Intermediates: certChain[1:],
 	}
 	if err := db.CreateCertificate(ctx, cert); err != nil {
-		return err
+		return WrapErrorISE(err, "error creating certificate for order %s", o.ID)
 	}
 
 	o.CertificateID = cert.ID
 	o.Status = StatusValid
-	return db.UpdateOrder(ctx, o)
+	if err = db.UpdateOrder(ctx, o); err != nil {
+		return WrapErrorISE(err, "error updating order %s", o.ID)
+	}
+	return nil
 }
 
 // uniqueSortedLowerNames returns the set of all unique names in the input after all
