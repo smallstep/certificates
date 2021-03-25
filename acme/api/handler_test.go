@@ -478,8 +478,8 @@ func TestHandler_GetChallenge(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			return test{
 				ctx:        ctx,
-				statusCode: 400,
-				err:        acme.NewError(acme.ErrorMalformedType, "payload expected in request context"),
+				statusCode: 500,
+				err:        acme.NewErrorISE("payload expected in request context"),
 			}
 		},
 		"fail/nil-payload": func(t *testing.T) test {
@@ -489,8 +489,8 @@ func TestHandler_GetChallenge(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, nil)
 			return test{
 				ctx:        ctx,
-				statusCode: 400,
-				err:        acme.NewError(acme.ErrorMalformedType, "payload expected in request context"),
+				statusCode: 500,
+				err:        acme.NewErrorISE("payload expected in request context"),
 			}
 		},
 		"fail/db.GetChallenge-error": func(t *testing.T) test {

@@ -665,7 +665,7 @@ func TestDB_updateAddOrderIDs(t *testing.T) {
 						return nil, false, errors.New("force")
 					},
 				},
-				acmeErr: acme.NewErrorISE("error updating order foo for account accID: error saving acme order: force"),
+				acmeErr: acme.NewErrorISE("error updating order foo for account accID: error updating order: error saving acme order: force"),
 			}
 		},
 		"fail/db.save-order-error": func(t *testing.T) test {

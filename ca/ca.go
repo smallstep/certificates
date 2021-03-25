@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
 	acmeNoSQL "github.com/smallstep/certificates/acme/db/nosql"
 	"github.com/smallstep/certificates/api"
@@ -124,9 +125,14 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	}
 
 	prefix := "acme"
-	acmeDB, err := acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
-	if err != nil {
-		return nil, errors.Wrap(err, "error configuring ACME DB interface")
+	var acmeDB acme.DB
+	if config.DB == nil {
+		acmeDB = nil
+	} else {
+		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
+		if err != nil {
+			return nil, errors.Wrap(err, "error configuring ACME DB interface")
+		}
 	}
 	acmeHandler := acmeAPI.NewHandler(acmeAPI.HandlerOptions{
 		Backdate: *config.AuthorityConfig.Backdate,

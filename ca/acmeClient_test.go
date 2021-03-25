@@ -376,19 +376,20 @@ func TestACMEClient_NewOrder(t *testing.T) {
 	assert.FatalError(t, err)
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	assert.FatalError(t, err)
+	now := time.Now().UTC().Round(time.Second)
 	nor := acmeAPI.NewOrderRequest{
 		Identifiers: []acme.Identifier{
 			{Type: "dns", Value: "example.com"},
 			{Type: "dns", Value: "acme.example.com"},
 		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Minute),
+		NotBefore: now,
+		NotAfter:  now.Add(time.Minute),
 	}
 	norb, err := json.Marshal(nor)
 	assert.FatalError(t, err)
 	ord := acme.Order{
 		Status:      "valid",
-		ExpiresAt:   time.Now(), // "soon"
+		ExpiresAt:   now, // "soon"
 		FinalizeURL: "finalize-url",
 	}
 	ac := &ACMEClient{
@@ -510,7 +511,7 @@ func TestACMEClient_GetOrder(t *testing.T) {
 	assert.FatalError(t, err)
 	ord := acme.Order{
 		Status:      "valid",
-		ExpiresAt:   time.Now(), // "soon"
+		ExpiresAt:   time.Now().UTC().Round(time.Second), // "soon"
 		FinalizeURL: "finalize-url",
 	}
 	ac := &ACMEClient{
@@ -630,7 +631,7 @@ func TestACMEClient_GetAuthz(t *testing.T) {
 	assert.FatalError(t, err)
 	az := acme.Authorization{
 		Status:     "valid",
-		ExpiresAt:  time.Now(),
+		ExpiresAt:  time.Now().UTC().Round(time.Second),
 		Identifier: acme.Identifier{Type: "dns", Value: "example.com"},
 	}
 	ac := &ACMEClient{
