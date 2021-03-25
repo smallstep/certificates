@@ -123,8 +123,10 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	if o.NotAfter.IsZero() {
 		o.NotAfter = o.NotBefore.Add(prov.DefaultTLSCertDuration())
 	}
+	// If request NotBefore was empty then backdate the order.NotBefore (now)
+	// to avoid timing issues.
 	if nor.NotBefore.IsZero() {
-		o.NotBefore.Add(-defaultOrderBackdate)
+		o.NotBefore = o.NotBefore.Add(-defaultOrderBackdate)
 	}
 
 	if err := h.db.CreateOrder(ctx, o); err != nil {
