@@ -54,8 +54,8 @@ func WithPassword(password []byte) Option {
 	}
 }
 
-// WithIssuer sets the given password as the configured certificate issuer
-// password in the CA options.
+// WithIssuerPassword sets the given password as the configured certificate
+// issuer password in the CA options.
 func WithIssuerPassword(password []byte) Option {
 	return func(o *options) {
 		o.issuerPassword = password
