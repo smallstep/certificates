@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/subtle"
 	"crypto/x509"
-	"fmt"
 	"net/url"
 
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -109,9 +108,9 @@ func (a *Authority) GetLinkExplicit(provName string, abs bool, baseURL *url.URL,
 // URL dynamically obtained from the request for which the link is being calculated.
 func (a *Authority) getLinkExplicit(provisionerName string, abs bool, baseURL *url.URL, inputs ...string) string {
 
-	// TODO: do we need to provide a way to provide a different suffix/base?
+	// TODO: do we need to provide a way to provide a different suffix?
 	// Like "/cgi-bin/pkiclient.exe"? Or would it be enough to have that as the name?
-	link := fmt.Sprintf("/%s", provisionerName)
+	link := "/" + provisionerName
 
 	if abs {
 		// Copy the baseURL value from the pointer. https://github.com/golang/go/issues/38351
@@ -235,7 +234,31 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	}
 
 	// Template data
-	data := x509util.CreateTemplateData(csr.Subject.CommonName, csr.DNSNames)
+	sans := []string{}
+	sans = append(sans, csr.DNSNames...)
+	sans = append(sans, csr.EmailAddresses...)
+	for _, v := range csr.IPAddresses {
+		sans = append(sans, v.String())
+	}
+	for _, v := range csr.URIs {
+		sans = append(sans, v.String())
+	}
+	if len(sans) == 0 {
+		sans = append(sans, csr.Subject.CommonName)
+	}
+	data := x509util.CreateTemplateData(csr.Subject.CommonName, sans)
+	data.SetCertificateRequest(csr)
+	data.SetSubject(x509util.Subject{
+		Country:            csr.Subject.Country,
+		Organization:       csr.Subject.Organization,
+		OrganizationalUnit: csr.Subject.OrganizationalUnit,
+		Locality:           csr.Subject.Locality,
+		Province:           csr.Subject.Province,
+		StreetAddress:      csr.Subject.StreetAddress,
+		PostalCode:         csr.Subject.PostalCode,
+		SerialNumber:       csr.Subject.SerialNumber,
+		CommonName:         csr.Subject.CommonName,
+	})
 
 	// Get authorizations from the SCEP provisioner.
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
