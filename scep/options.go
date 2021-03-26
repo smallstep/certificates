@@ -60,7 +60,7 @@ func (o *Options) Validate() error {
 		return errors.New("only RSA public keys are (currently) supported as decrypters")
 	}
 
-	// check if intermedate public key is the same as the decrypter public key.
+	// check if intermediate public key is the same as the decrypter public key.
 	// In certnanny/sscep it's mentioned that the signing key can be different
 	// from the decrypting (and encrypting) key. Currently that's not supported.
 	if !decrypterPublicKey.Equal(intermediate.PublicKey) {
