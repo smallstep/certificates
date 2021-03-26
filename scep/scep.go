@@ -4,7 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 
-	microscep "github.com/micromdm/scep/scep"
+	microscep "github.com/micromdm/scep/v2/scep"
 
 	//"github.com/smallstep/certificates/scep/pkcs7"
 
