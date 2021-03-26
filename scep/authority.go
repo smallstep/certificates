@@ -34,7 +34,6 @@ type Interface interface {
 
 // Authority is the layer that handles all SCEP interactions.
 type Authority struct {
-	db                      DB
 	prefix                  string
 	dns                     string
 	intermediateCertificate *x509.Certificate
@@ -46,8 +45,6 @@ type Authority struct {
 type AuthorityOptions struct {
 	// Service provides the certificate chain, the signer and the decrypter to the Authority
 	Service *Service
-	// DB is the database used by SCEP
-	DB DB
 	// DNS is the host used to generate accurate SCEP links. By default the authority
 	// will use the Host from the request, so this value will only be used if
 	// request.Host is empty.
@@ -67,7 +64,6 @@ type SignAuthority interface {
 func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 
 	authority := &Authority{
-		db:       ops.DB,
 		prefix:   ops.Prefix,
 		dns:      ops.DNS,
 		signAuth: signAuth,
@@ -339,15 +335,6 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 		TransactionID:  msg.TransactionID,
 		MessageType:    microscep.CertRep,
 		CertRepMessage: cr,
-	}
-
-	// store the newly created certificate
-	err = newCert(a.db, CertOptions{
-		Leaf:          certChain[0],
-		Intermediates: certChain[1:],
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	return crepMsg, nil
