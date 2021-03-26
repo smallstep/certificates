@@ -115,6 +115,7 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	if err != nil {
 		return nil, err
 	}
+	ca.auth = auth
 
 	tlsConfig, err := ca.getTLSConfig(auth)
 	if err != nil {
@@ -166,29 +167,35 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		acmeRouterHandler.Route(r)
 	})
 
-	scepPrefix := "scep"
-	scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
-		Service: auth.GetSCEPService(),
-		DNS:     dns,
-		Prefix:  scepPrefix,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating SCEP authority")
-	}
-	scepRouterHandler := scepAPI.New(scepAuthority)
-	mux.Route("/"+scepPrefix, func(r chi.Router) {
-		scepRouterHandler.Route(r)
-	})
+	if ca.shouldServeSCEPEndpoints() {
+		scepPrefix := "scep"
+		scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
+			Service: auth.GetSCEPService(),
+			DNS:     dns,
+			Prefix:  scepPrefix,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "error creating SCEP authority")
+		}
+		scepRouterHandler := scepAPI.New(scepAuthority)
 
-	// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
-	// SCEP operations are performed using HTTP, so that's why the API is mounted
-	// to the insecure mux. To my current understanding there's no strong reason
-	// to not use HTTPS also, so that's why I've kept the API endpoints in both
-	// muxes and both HTTP as well as HTTPS can be used to request certificates
-	// using SCEP.
-	insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
-		scepRouterHandler.Route(r)
-	})
+		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
+		// SCEP operations are performed using HTTP, so that's why the API is mounted
+		// to the insecure mux.
+		insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
+			scepRouterHandler.Route(r)
+		})
+
+		// The RFC also mentions usage of HTTPS, but seems to advise
+		// against it, because of potential interoperability issues.
+		// Currently I think it's not bad to use HTTPS also, so that's
+		// why I've kept the API endpoints in both muxes and both HTTP
+		// as well as HTTPS can be used to request certificates
+		// using SCEP.
+		mux.Route("/"+scepPrefix, func(r chi.Router) {
+			scepRouterHandler.Route(r)
+		})
+	}
 
 	// helpful routine for logging all routes
 	//dumpRoutes(mux)
@@ -213,14 +220,15 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		insecureHandler = logger.Middleware(insecureHandler)
 	}
 
-	ca.auth = auth
 	ca.srv = server.New(config.Address, handler, tlsConfig)
 
-	// TODO: instead opt for having a single server.Server but two
-	// http.Servers handling the HTTP and HTTPS handler? The latter
-	// will probably introduce more complexity in terms of graceful
-	// reload.
-	if config.InsecureAddress != "" {
+	// only start the insecure server if the insecure address is configured
+	// and, currently, also only when it should serve SCEP endpoints.
+	if ca.shouldServeSCEPEndpoints() && config.InsecureAddress != "" {
+		// TODO: instead opt for having a single server.Server but two
+		// http.Servers handling the HTTP and HTTPS handler? The latter
+		// will probably introduce more complexity in terms of graceful
+		// reload.
 		ca.insecureSrv = server.New(config.InsecureAddress, insecureHandler, nil)
 	}
 
@@ -373,6 +381,14 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	tlsConfig.PreferServerCipherSuites = true
 
 	return tlsConfig, nil
+}
+
+// shouldMountSCEPEndpoints returns if the CA should be
+// configured with endpoints for SCEP. This is assumed to be
+// true if a SCEPService exists, which is true in case a
+// SCEP provisioner was configured.
+func (ca *CA) shouldServeSCEPEndpoints() bool {
+	return ca.auth.GetSCEPService() != nil
 }
 
 //nolint // ignore linters to allow keeping this function around for debugging
