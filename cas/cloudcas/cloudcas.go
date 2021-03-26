@@ -141,7 +141,6 @@ func (c *CloudCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityReq
 		Name: name,
 	})
 	if err != nil {
-		println(name)
 		return nil, errors.Wrap(err, "cloudCAS GetCertificateAuthority failed")
 	}
 	if len(resp.PemCaCertificates) == 0 {

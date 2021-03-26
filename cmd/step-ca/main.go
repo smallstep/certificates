@@ -37,6 +37,7 @@ import (
 	// Enabled cas interfaces.
 	_ "github.com/smallstep/certificates/cas/cloudcas"
 	_ "github.com/smallstep/certificates/cas/softcas"
+	_ "github.com/smallstep/certificates/cas/stepcas"
 )
 
 // commit and buildTime are filled in during build by the Makefile
@@ -65,6 +66,7 @@ var appHelpTemplate = `## NAME
 | **{{join .Names ", "}}** | {{.Usage}} |{{end}}
 {{end}}{{if .VisibleFlags}}{{end}}
 ## OPTIONS
+
 {{range $index, $option := .VisibleFlags}}{{if $index}}
 {{end}}{{$option}}
 {{end}}{{end}}{{if .Copyright}}{{if len .Authors}}
@@ -105,7 +107,7 @@ func main() {
 	app.HelpName = "step-ca"
 	app.Version = config.Version()
 	app.Usage = "an online certificate authority for secure automated certificate management"
-	app.UsageText = `**step-ca** <config> [**--password-file**=<file>] [**--resolver**=<addr>] [**--help**] [**--version**]`
+	app.UsageText = `**step-ca** <config> [**--password-file**=<file>] [**--issuer-password-file**=<file>] [**--resolver**=<addr>] [**--help**] [**--version**]`
 	app.Description = `**step-ca** runs the Step Online Certificate Authority
 (Step CA) using the given configuration.
 See the README.md for more detailed configuration documentation.
