@@ -118,6 +118,7 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	if err != nil {
 		return nil, err
 	}
+	ca.auth = auth
 
 	tlsConfig, err := ca.getTLSConfig(auth)
 	if err != nil {
@@ -233,14 +234,15 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 		handler = logger.Middleware(handler)
 	}
 
-	ca.auth = auth
 	ca.srv = server.New(config.Address, handler, tlsConfig)
 
-	// TODO: instead opt for having a single server.Server but two
-	// http.Servers handling the HTTP and HTTPS handler? The latter
-	// will probably introduce more complexity in terms of graceful
-	// reload.
-	if config.InsecureAddress != "" {
+	// only start the insecure server if the insecure address is configured
+	// and, currently, also only when it should serve SCEP endpoints.
+	if ca.shouldServeSCEPEndpoints() && config.InsecureAddress != "" {
+		// TODO: instead opt for having a single server.Server but two
+		// http.Servers handling the HTTP and HTTPS handler? The latter
+		// will probably introduce more complexity in terms of graceful
+		// reload.
 		ca.insecureSrv = server.New(config.InsecureAddress, insecureHandler, nil)
 	}
 

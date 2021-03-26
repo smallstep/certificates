@@ -575,6 +575,8 @@ func (a *Authority) CloseForReload() {
 
 // requiresDecrypter returns whether the Authority
 // requires a KMS that provides a crypto.Decrypter
+// Currently this is only required when SCEP is
+// enabled.
 func (a *Authority) requiresDecrypter() bool {
 	return a.requiresSCEPService()
 }

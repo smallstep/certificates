@@ -33,7 +33,6 @@ var (
 	oidSCEPtransactionID  = asn1.ObjectIdentifier{2, 16, 840, 1, 113733, 1, 9, 7}
 	oidSCEPfailInfoText   = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 24}
 	//oidChallengePassword  = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 7}
-
 )
 
 // PKIMessage defines the possible SCEP message types
