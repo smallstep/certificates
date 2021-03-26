@@ -3,7 +3,6 @@ package nosql
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -95,7 +94,6 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 		NotAfter:         o.NotAfter,
 		AuthorizationIDs: o.AuthorizationIDs,
 	}
-	fmt.Printf("dbo = %+v\n", dbo)
 	if err := db.save(ctx, o.ID, dbo, nil, "order", orderTable); err != nil {
 		return err
 	}

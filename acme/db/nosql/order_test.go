@@ -385,6 +385,8 @@ func TestDB_UpdateOrder(t *testing.T) {
 
 func TestDB_CreateOrder(t *testing.T) {
 	now := clock.Now()
+	nbf := now.Add(5 * time.Minute)
+	naf := now.Add(15 * time.Minute)
 	type test struct {
 		db  nosql.DB
 		o   *acme.Order
@@ -399,8 +401,8 @@ func TestDB_CreateOrder(t *testing.T) {
 				CertificateID: "certID",
 				Status:        acme.StatusValid,
 				ExpiresAt:     now,
-				NotBefore:     now,
-				NotAfter:      now,
+				NotBefore:     nbf,
+				NotAfter:      naf,
 				Identifiers: []acme.Identifier{
 					{Type: "dns", Value: "test.ca.smallstep.com"},
 					{Type: "dns", Value: "example.foo.com"},
@@ -443,8 +445,8 @@ func TestDB_CreateOrder(t *testing.T) {
 				CertificateID: "certID",
 				Status:        acme.StatusValid,
 				ExpiresAt:     now,
-				NotBefore:     now,
-				NotAfter:      now,
+				NotBefore:     nbf,
+				NotAfter:      naf,
 				Identifiers: []acme.Identifier{
 					{Type: "dns", Value: "test.ca.smallstep.com"},
 					{Type: "dns", Value: "example.foo.com"},
@@ -496,8 +498,8 @@ func TestDB_CreateOrder(t *testing.T) {
 				ProvisionerID: "provID",
 				Status:        acme.StatusValid,
 				ExpiresAt:     now,
-				NotBefore:     now,
-				NotAfter:      now,
+				NotBefore:     nbf,
+				NotAfter:      naf,
 				Identifiers: []acme.Identifier{
 					{Type: "dns", Value: "test.ca.smallstep.com"},
 					{Type: "dns", Value: "example.foo.com"},
