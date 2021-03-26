@@ -18,7 +18,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	microscep "github.com/micromdm/scep/scep"
+	microscep "github.com/micromdm/scep/v2/scep"
 )
 
 const (

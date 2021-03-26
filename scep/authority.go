@@ -8,8 +8,8 @@ import (
 
 	"github.com/smallstep/certificates/authority/provisioner"
 
-	microx509util "github.com/micromdm/scep/crypto/x509util"
-	microscep "github.com/micromdm/scep/scep"
+	microx509util "github.com/micromdm/scep/v2/cryptoutil/x509util"
+	microscep "github.com/micromdm/scep/v2/scep"
 
 	"github.com/pkg/errors"
 
