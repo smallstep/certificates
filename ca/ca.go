@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"sync"
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
@@ -251,7 +252,29 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 
 // Run starts the CA calling to the server ListenAndServe method.
 func (ca *CA) Run() error {
-	return ca.srv.ListenAndServe()
+	var wg sync.WaitGroup
+	errors := make(chan error, 1)
+
+	if ca.insecureSrv != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errors <- ca.insecureSrv.ListenAndServe()
+		}()
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		errors <- ca.srv.ListenAndServe()
+	}()
+
+	// wait till error occurs; ensures the servers keep listening
+	err := <-errors
+
+	wg.Wait()
+
+	return err
 }
 
 // Stop stops the CA calling to the server Shutdown method.
