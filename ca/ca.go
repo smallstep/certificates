@@ -152,7 +152,6 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	scepPrefix := "scep"
 	scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
 		Service: auth.GetSCEPService(),
-		DB:      auth.GetDatabase().(scep.DB),
 		DNS:     dns,
 		Prefix:  scepPrefix,
 	})
