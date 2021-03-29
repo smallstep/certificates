@@ -14,11 +14,11 @@ import (
 // dbAccount represents an ACME account.
 type dbAccount struct {
 	ID            string           `json:"id"`
-	CreatedAt     time.Time        `json:"createdAt"`
-	DeactivatedAt time.Time        `json:"deactivatedAt"`
 	Key           *jose.JSONWebKey `json:"key"`
 	Contact       []string         `json:"contact,omitempty"`
 	Status        acme.Status      `json:"status"`
+	CreatedAt     time.Time        `json:"createdAt"`
+	DeactivatedAt time.Time        `json:"deactivatedAt"`
 }
 
 func (dba *dbAccount) clone() *dbAccount {

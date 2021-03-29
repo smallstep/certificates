@@ -18,15 +18,15 @@ type dbOrder struct {
 	ID               string            `json:"id"`
 	AccountID        string            `json:"accountID"`
 	ProvisionerID    string            `json:"provisionerID"`
-	CreatedAt        time.Time         `json:"createdAt"`
-	ExpiresAt        time.Time         `json:"expiresAt,omitempty"`
-	Status           acme.Status       `json:"status"`
 	Identifiers      []acme.Identifier `json:"identifiers"`
+	AuthorizationIDs []string          `json:"authorizationIDs"`
+	Status           acme.Status       `json:"status"`
 	NotBefore        time.Time         `json:"notBefore,omitempty"`
 	NotAfter         time.Time         `json:"notAfter,omitempty"`
-	Error            *acme.Error       `json:"error,omitempty"`
-	AuthorizationIDs []string          `json:"authorizationIDs"`
+	CreatedAt        time.Time         `json:"createdAt"`
+	ExpiresAt        time.Time         `json:"expiresAt,omitempty"`
 	CertificateID    string            `json:"certificate,omitempty"`
+	Error            *acme.Error       `json:"error,omitempty"`
 }
 
 func (a *dbOrder) clone() *dbOrder {

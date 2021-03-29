@@ -15,14 +15,14 @@ type CertificateAuthority interface {
 }
 
 // Clock that returns time in UTC rounded to seconds.
-type Clock int
+type Clock struct{}
 
 // Now returns the UTC time rounded to seconds.
 func (c *Clock) Now() time.Time {
 	return time.Now().UTC().Round(time.Second)
 }
 
-var clock = new(Clock)
+var clock Clock
 
 // Provisioner is an interface that implements a subset of the provisioner.Interface --
 // only those methods required by the ACME api/authority.

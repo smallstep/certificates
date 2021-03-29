@@ -16,12 +16,12 @@ type dbAuthz struct {
 	AccountID    string          `json:"accountID"`
 	Identifier   acme.Identifier `json:"identifier"`
 	Status       acme.Status     `json:"status"`
-	ExpiresAt    time.Time       `json:"expiresAt"`
+	Token        string          `json:"token"`
 	ChallengeIDs []string        `json:"challengeIDs"`
 	Wildcard     bool            `json:"wildcard"`
 	CreatedAt    time.Time       `json:"createdAt"`
+	ExpiresAt    time.Time       `json:"expiresAt"`
 	Error        *acme.Error     `json:"error"`
-	Token        string          `json:"token"`
 }
 
 func (ba *dbAuthz) clone() *dbAuthz {

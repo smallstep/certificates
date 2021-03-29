@@ -11,7 +11,7 @@ import (
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/nosql"
-	nosqldb "github.com/smallstep/nosql/database"
+	"github.com/smallstep/nosql/database"
 )
 
 func TestDB_CreateNonce(t *testing.T) {
@@ -85,108 +85,57 @@ func TestDB_DeleteNonce(t *testing.T) {
 
 	nonceID := "nonceID"
 	type test struct {
-		db  nosql.DB
-		err error
+		db      nosql.DB
+		err     error
+		acmeErr *acme.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/not-found": func(t *testing.T) test {
 			return test{
 				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						assert.Equals(t, bucket, nonceTable)
-						assert.Equals(t, string(key), nonceID)
+					MUpdate: func(tx *database.Tx) error {
+						assert.Equals(t, tx.Operations[0].Bucket, nonceTable)
+						assert.Equals(t, tx.Operations[0].Key, []byte(nonceID))
+						assert.Equals(t, tx.Operations[0].Cmd, database.Get)
 
-						return nil, nosqldb.ErrNotFound
+						assert.Equals(t, tx.Operations[1].Bucket, nonceTable)
+						assert.Equals(t, tx.Operations[1].Key, []byte(nonceID))
+						assert.Equals(t, tx.Operations[1].Cmd, database.Delete)
+						return database.ErrNotFound
 					},
 				},
-				err: errors.New("nonce nonceID not found"),
+				acmeErr: acme.NewError(acme.ErrorBadNonceType, "nonce %s not found", nonceID),
 			}
 		},
-		"fail/db.Get-error": func(t *testing.T) test {
+		"fail/db.Update-error": func(t *testing.T) test {
 			return test{
 				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						assert.Equals(t, bucket, nonceTable)
-						assert.Equals(t, string(key), nonceID)
+					MUpdate: func(tx *database.Tx) error {
+						assert.Equals(t, tx.Operations[0].Bucket, nonceTable)
+						assert.Equals(t, tx.Operations[0].Key, []byte(nonceID))
+						assert.Equals(t, tx.Operations[0].Cmd, database.Get)
 
-						return nil, errors.Errorf("force")
+						assert.Equals(t, tx.Operations[1].Bucket, nonceTable)
+						assert.Equals(t, tx.Operations[1].Key, []byte(nonceID))
+						assert.Equals(t, tx.Operations[1].Cmd, database.Delete)
+						return errors.New("force")
 					},
 				},
-				err: errors.New("error loading nonce nonceID: force"),
-			}
-		},
-		"fail/unmarshal-error": func(t *testing.T) test {
-			return test{
-				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						assert.Equals(t, bucket, nonceTable)
-						assert.Equals(t, string(key), nonceID)
-
-						a := []string{"foo", "bar", "baz"}
-						b, err := json.Marshal(a)
-						assert.FatalError(t, err)
-
-						return b, nil
-					},
-				},
-				err: errors.New("error unmarshaling nonce nonceID"),
-			}
-		},
-		"fail/already-used": func(t *testing.T) test {
-			return test{
-				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						assert.Equals(t, bucket, nonceTable)
-						assert.Equals(t, string(key), nonceID)
-
-						nonce := dbNonce{
-							ID:        nonceID,
-							CreatedAt: clock.Now().Add(-5 * time.Minute),
-							DeletedAt: clock.Now(),
-						}
-						b, err := json.Marshal(nonce)
-						assert.FatalError(t, err)
-
-						return b, nil
-					},
-				},
-				err: acme.NewError(acme.ErrorBadNonceType, "nonce already deleted"),
+				err: errors.New("error deleting nonce nonceID: force"),
 			}
 		},
 		"ok": func(t *testing.T) test {
-			nonce := dbNonce{
-				ID:        nonceID,
-				CreatedAt: clock.Now().Add(-5 * time.Minute),
-			}
-			b, err := json.Marshal(nonce)
-			assert.FatalError(t, err)
 			return test{
 				db: &db.MockNoSQLDB{
-					MGet: func(bucket, key []byte) ([]byte, error) {
-						assert.Equals(t, bucket, nonceTable)
-						assert.Equals(t, string(key), nonceID)
+					MUpdate: func(tx *database.Tx) error {
+						assert.Equals(t, tx.Operations[0].Bucket, nonceTable)
+						assert.Equals(t, tx.Operations[0].Key, []byte(nonceID))
+						assert.Equals(t, tx.Operations[0].Cmd, database.Get)
 
-						return b, nil
-					},
-					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
-						assert.Equals(t, bucket, nonceTable)
-						assert.Equals(t, old, b)
-
-						dbo := new(dbNonce)
-						assert.FatalError(t, json.Unmarshal(old, dbo))
-						assert.Equals(t, dbo.ID, string(key))
-						assert.True(t, clock.Now().Add(-6*time.Minute).Before(dbo.CreatedAt))
-						assert.True(t, clock.Now().Add(-4*time.Minute).After(dbo.CreatedAt))
-						assert.True(t, dbo.DeletedAt.IsZero())
-
-						dbn := new(dbNonce)
-						assert.FatalError(t, json.Unmarshal(nu, dbn))
-						assert.Equals(t, dbn.ID, string(key))
-						assert.True(t, clock.Now().Add(-6*time.Minute).Before(dbn.CreatedAt))
-						assert.True(t, clock.Now().Add(-4*time.Minute).After(dbn.CreatedAt))
-						assert.True(t, clock.Now().Add(-time.Minute).Before(dbn.DeletedAt))
-						assert.True(t, clock.Now().Add(time.Minute).After(dbn.DeletedAt))
-						return nil, true, nil
+						assert.Equals(t, tx.Operations[1].Bucket, nonceTable)
+						assert.Equals(t, tx.Operations[1].Key, []byte(nonceID))
+						assert.Equals(t, tx.Operations[1].Cmd, database.Delete)
+						return nil
 					},
 				},
 			}
@@ -197,8 +146,19 @@ func TestDB_DeleteNonce(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			db := DB{db: tc.db}
 			if err := db.DeleteNonce(context.Background(), acme.Nonce(nonceID)); err != nil {
-				if assert.NotNil(t, tc.err) {
-					assert.HasPrefix(t, err.Error(), tc.err.Error())
+				switch k := err.(type) {
+				case *acme.Error:
+					if assert.NotNil(t, tc.acmeErr) {
+						assert.Equals(t, k.Type, tc.acmeErr.Type)
+						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, k.Status, tc.acmeErr.Status)
+						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+					}
+				default:
+					if assert.NotNil(t, tc.err) {
+						assert.HasPrefix(t, err.Error(), tc.err.Error())
+					}
 				}
 			} else {
 				assert.Nil(t, tc.err)

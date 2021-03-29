@@ -21,14 +21,14 @@ func link(url, typ string) string {
 }
 
 // Clock that returns time in UTC rounded to seconds.
-type Clock int
+type Clock struct{}
 
 // Now returns the UTC time rounded to seconds.
 func (c *Clock) Now() time.Time {
 	return time.Now().UTC().Round(time.Second)
 }
 
-var clock = new(Clock)
+var clock Clock
 
 type payloadInfo struct {
 	value       []byte
@@ -65,7 +65,7 @@ type HandlerOptions struct {
 // NewHandler returns a new ACME API handler.
 func NewHandler(ops HandlerOptions) api.RouterHandler {
 	client := http.Client{
-		Timeout: time.Duration(30 * time.Second),
+		Timeout: 30 * time.Second,
 	}
 	dialer := &net.Dialer{
 		Timeout: 30 * time.Second,
@@ -89,8 +89,8 @@ func NewHandler(ops HandlerOptions) api.RouterHandler {
 func (h *Handler) Route(r api.Router) {
 	getLink := h.linker.GetLinkExplicit
 	// Standard ACME API
-	r.MethodFunc("GET", getLink(NewNonceLinkType, "{provisionerID}", false, nil), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.GetNonce))))
-	r.MethodFunc("HEAD", getLink(NewNonceLinkType, "{provisionerID}", false, nil), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.GetNonce))))
+	r.MethodFunc("GET", getLink(NewNonceLinkType, "{provisionerID}", false, nil), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.GetNonce)))))
+	r.MethodFunc("HEAD", getLink(NewNonceLinkType, "{provisionerID}", false, nil), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.GetNonce)))))
 	r.MethodFunc("GET", getLink(DirectoryLinkType, "{provisionerID}", false, nil), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.GetDirectory))))
 	r.MethodFunc("HEAD", getLink(DirectoryLinkType, "{provisionerID}", false, nil), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.GetDirectory))))
 
@@ -218,6 +218,7 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, acme.WrapErrorISE(err, "error retrieving challenge"))
 		return
 	}
+	ch.AuthorizationID = azID
 	if acc.ID != ch.AccountID {
 		api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own challenge '%s'", acc.ID, ch.ID))

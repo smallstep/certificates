@@ -21,6 +21,8 @@ type Identifier struct {
 // Order contains order metadata for the ACME protocol order type.
 type Order struct {
 	ID                string       `json:"id"`
+	AccountID         string       `json:"-"`
+	ProvisionerID     string       `json:"-"`
 	Status            Status       `json:"status"`
 	ExpiresAt         time.Time    `json:"expires,omitempty"`
 	Identifiers       []Identifier `json:"identifiers"`
@@ -32,8 +34,6 @@ type Order struct {
 	FinalizeURL       string       `json:"finalize"`
 	CertificateID     string       `json:"-"`
 	CertificateURL    string       `json:"certificate,omitempty"`
-	AccountID         string       `json:"-"`
-	ProvisionerID     string       `json:"-"`
 }
 
 // ToLog enables response logging.

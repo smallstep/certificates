@@ -582,6 +582,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 						assert.Equals(t, ch.Status, acme.StatusPending)
 						assert.Equals(t, ch.Type, "http-01")
 						assert.Equals(t, ch.AccountID, "accID")
+						assert.Equals(t, ch.AuthorizationID, "authzID")
 						assert.HasSuffix(t, ch.Error.Type, acme.ErrorConnectionType.String())
 						return acme.NewErrorISE("force")
 					},
@@ -623,17 +624,19 @@ func TestHandler_GetChallenge(t *testing.T) {
 						assert.Equals(t, ch.Status, acme.StatusPending)
 						assert.Equals(t, ch.Type, "http-01")
 						assert.Equals(t, ch.AccountID, "accID")
+						assert.Equals(t, ch.AuthorizationID, "authzID")
 						assert.HasSuffix(t, ch.Error.Type, acme.ErrorConnectionType.String())
 						return nil
 					},
 				},
 				ch: &acme.Challenge{
-					ID:        "chID",
-					Status:    acme.StatusPending,
-					Type:      "http-01",
-					AccountID: "accID",
-					URL:       url,
-					Error:     acme.NewError(acme.ErrorConnectionType, "force"),
+					ID:              "chID",
+					Status:          acme.StatusPending,
+					AuthorizationID: "authzID",
+					Type:            "http-01",
+					AccountID:       "accID",
+					URL:             url,
+					Error:           acme.NewError(acme.ErrorConnectionType, "force"),
 				},
 				vco: &acme.ValidateChallengeOptions{
 					HTTPGet: func(string) (*http.Response, error) {

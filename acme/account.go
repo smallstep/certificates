@@ -11,11 +11,11 @@ import (
 // Account is a subset of the internal account type containing only those
 // attributes required for responses in the ACME protocol.
 type Account struct {
+	ID        string           `json:"-"`
+	Key       *jose.JSONWebKey `json:"-"`
 	Contact   []string         `json:"contact,omitempty"`
 	Status    Status           `json:"status"`
 	OrdersURL string           `json:"orders"`
-	ID        string           `json:"-"`
-	Key       *jose.JSONWebKey `json:"-"`
 }
 
 // ToLog enables response logging.

@@ -22,15 +22,16 @@ import (
 
 // Challenge represents an ACME response Challenge type.
 type Challenge struct {
-	Type        string `json:"type"`
-	Status      Status `json:"status"`
-	Token       string `json:"token"`
-	ValidatedAt string `json:"validated,omitempty"`
-	URL         string `json:"url"`
-	Error       *Error `json:"error,omitempty"`
-	ID          string `json:"-"`
-	AccountID   string `json:"-"`
-	Value       string `json:"-"`
+	ID              string `json:"-"`
+	AccountID       string `json:"-"`
+	AuthorizationID string `json:"-"`
+	Value           string `json:"-"`
+	Type            string `json:"type"`
+	Status          Status `json:"status"`
+	Token           string `json:"token"`
+	ValidatedAt     string `json:"validated,omitempty"`
+	URL             string `json:"url"`
+	Error           *Error `json:"error,omitempty"`
 }
 
 // ToLog enables response logging.
