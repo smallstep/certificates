@@ -24,10 +24,10 @@ type Order struct {
 	AccountID         string       `json:"-"`
 	ProvisionerID     string       `json:"-"`
 	Status            Status       `json:"status"`
-	ExpiresAt         time.Time    `json:"expires,omitempty"`
+	ExpiresAt         time.Time    `json:"expires"`
 	Identifiers       []Identifier `json:"identifiers"`
-	NotBefore         time.Time    `json:"notBefore,omitempty"`
-	NotAfter          time.Time    `json:"notAfter,omitempty"`
+	NotBefore         time.Time    `json:"notBefore"`
+	NotAfter          time.Time    `json:"notAfter"`
 	Error             *Error       `json:"error,omitempty"`
 	AuthorizationIDs  []string     `json:"-"`
 	AuthorizationURLs []string     `json:"authorizations"`

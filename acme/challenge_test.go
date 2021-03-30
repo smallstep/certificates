@@ -31,17 +31,19 @@ import (
 
 func Test_storeError(t *testing.T) {
 	type test struct {
-		ch  *Challenge
-		db  DB
-		err *Error
+		ch          *Challenge
+		db          DB
+		markInvalid bool
+		err         *Error
 	}
 	err := NewError(ErrorMalformedType, "foo")
 	tests := map[string]func(t *testing.T) test{
 		"fail/db.UpdateChallenge-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusValid,
 			}
 			return test{
 				ch: ch,
@@ -50,6 +52,7 @@ func Test_storeError(t *testing.T) {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
 						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusValid)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
@@ -64,9 +67,10 @@ func Test_storeError(t *testing.T) {
 		},
 		"fail/db.UpdateChallenge-acme-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusValid,
 			}
 			return test{
 				ch: ch,
@@ -75,6 +79,7 @@ func Test_storeError(t *testing.T) {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
 						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusValid)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
@@ -89,9 +94,10 @@ func Test_storeError(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusValid,
 			}
 			return test{
 				ch: ch,
@@ -100,6 +106,7 @@ func Test_storeError(t *testing.T) {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
 						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusValid)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
@@ -111,11 +118,38 @@ func Test_storeError(t *testing.T) {
 				},
 			}
 		},
+		"ok/mark-invalid": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusValid,
+			}
+			return test{
+				ch: ch,
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusInvalid)
+
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return nil
+					},
+				},
+				markInvalid: true,
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			if err := storeError(context.Background(), tc.ch, tc.db, err); err != nil {
+			if err := storeError(context.Background(), tc.db, tc.ch, tc.markInvalid, err); err != nil {
 				if assert.NotNil(t, tc.err) {
 					switch k := err.(type) {
 					case *Error:
@@ -499,9 +533,10 @@ func TestHTTP01Validate(t *testing.T) {
 	tests := map[string]func(t *testing.T) test{
 		"fail/http-get-error-store-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusPending,
 			}
 
 			return test{
@@ -515,6 +550,8 @@ func TestHTTP01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusPending)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
@@ -530,9 +567,10 @@ func TestHTTP01Validate(t *testing.T) {
 		},
 		"ok/http-get-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusPending,
 			}
 
 			return test{
@@ -546,6 +584,8 @@ func TestHTTP01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusPending)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
@@ -560,9 +600,10 @@ func TestHTTP01Validate(t *testing.T) {
 		},
 		"fail/http-get->=400-store-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusPending,
 			}
 
 			return test{
@@ -571,6 +612,7 @@ func TestHTTP01Validate(t *testing.T) {
 					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
 							StatusCode: http.StatusBadRequest,
+							Body:       errReader(0),
 						}, nil
 					},
 				},
@@ -578,6 +620,8 @@ func TestHTTP01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusPending)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s with status code 400", ch.Token)
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
@@ -593,9 +637,10 @@ func TestHTTP01Validate(t *testing.T) {
 		},
 		"ok/http-get->=400": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusPending,
 			}
 
 			return test{
@@ -604,6 +649,7 @@ func TestHTTP01Validate(t *testing.T) {
 					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
 							StatusCode: http.StatusBadRequest,
+							Body:       errReader(0),
 						}, nil
 					},
 				},
@@ -611,6 +657,8 @@ func TestHTTP01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusPending)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s with status code 400", ch.Token)
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
@@ -625,9 +673,10 @@ func TestHTTP01Validate(t *testing.T) {
 		},
 		"fail/read-body": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusPending,
 			}
 
 			return test{
@@ -644,9 +693,10 @@ func TestHTTP01Validate(t *testing.T) {
 		},
 		"fail/key-auth-gen-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusPending,
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -667,9 +717,10 @@ func TestHTTP01Validate(t *testing.T) {
 		},
 		"ok/key-auth-mismatch": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusPending,
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -692,6 +743,7 @@ func TestHTTP01Validate(t *testing.T) {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
 						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusInvalid)
 
 						err := NewError(ErrorRejectedIdentifierType,
 							"keyAuthorization does not match; expected %s, but got foo", expKeyAuth)
@@ -707,9 +759,10 @@ func TestHTTP01Validate(t *testing.T) {
 		},
 		"fail/key-auth-mismatch-store-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusPending,
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -732,6 +785,7 @@ func TestHTTP01Validate(t *testing.T) {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
 						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusInvalid)
 
 						err := NewError(ErrorRejectedIdentifierType,
 							"keyAuthorization does not match; expected %s, but got foo", expKeyAuth)
@@ -748,9 +802,10 @@ func TestHTTP01Validate(t *testing.T) {
 		},
 		"fail/update-challenge-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusPending,
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -789,9 +844,10 @@ func TestHTTP01Validate(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: "zap.internal",
+				ID:     "chID",
+				Token:  "token",
+				Value:  "zap.internal",
+				Status: StatusPending,
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -864,9 +920,10 @@ func TestDNS01Validate(t *testing.T) {
 	tests := map[string]func(t *testing.T) test{
 		"fail/lookupTXT-store-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: fulldomain,
+				ID:     "chID",
+				Token:  "token",
+				Value:  fulldomain,
+				Status: StatusPending,
 			}
 
 			return test{
@@ -880,6 +937,8 @@ func TestDNS01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusPending)
 
 						err := NewError(ErrorDNSType, "error looking up TXT records for domain %s: force", domain)
 
@@ -896,9 +955,10 @@ func TestDNS01Validate(t *testing.T) {
 		},
 		"ok/lookupTXT-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: fulldomain,
+				ID:     "chID",
+				Token:  "token",
+				Value:  fulldomain,
+				Status: StatusPending,
 			}
 
 			return test{
@@ -912,6 +972,8 @@ func TestDNS01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusPending)
 
 						err := NewError(ErrorDNSType, "error looking up TXT records for domain %s: force", domain)
 
@@ -927,9 +989,10 @@ func TestDNS01Validate(t *testing.T) {
 		},
 		"fail/key-auth-gen-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: fulldomain,
+				ID:     "chID",
+				Token:  "token",
+				Value:  fulldomain,
+				Status: StatusPending,
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -949,9 +1012,10 @@ func TestDNS01Validate(t *testing.T) {
 		},
 		"fail/key-auth-mismatch-store-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: fulldomain,
+				ID:     "chID",
+				Token:  "token",
+				Value:  fulldomain,
+				Status: StatusPending,
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -971,6 +1035,8 @@ func TestDNS01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusPending)
 
 						err := NewError(ErrorRejectedIdentifierType, "keyAuthorization does not match; expected %s, but got %s", expKeyAuth, []string{"foo", "bar"})
 
@@ -988,9 +1054,10 @@ func TestDNS01Validate(t *testing.T) {
 		},
 		"ok/key-auth-mismatch-store-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: fulldomain,
+				ID:     "chID",
+				Token:  "token",
+				Value:  fulldomain,
+				Status: StatusPending,
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -1010,6 +1077,8 @@ func TestDNS01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusPending)
 
 						err := NewError(ErrorRejectedIdentifierType, "keyAuthorization does not match; expected %s, but got %s", expKeyAuth, []string{"foo", "bar"})
 
@@ -1026,9 +1095,10 @@ func TestDNS01Validate(t *testing.T) {
 		},
 		"fail/update-challenge-error": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: fulldomain,
+				ID:     "chID",
+				Token:  "token",
+				Value:  fulldomain,
+				Status: StatusPending,
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -1051,6 +1121,7 @@ func TestDNS01Validate(t *testing.T) {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
 						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusValid)
 
 						assert.Equals(t, updch.Status, StatusValid)
 						assert.Equals(t, updch.Error, nil)
@@ -1069,9 +1140,10 @@ func TestDNS01Validate(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			ch := &Challenge{
-				ID:    "chID",
-				Token: "token",
-				Value: fulldomain,
+				ID:     "chID",
+				Token:  "token",
+				Value:  fulldomain,
+				Status: StatusPending,
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -1094,6 +1166,7 @@ func TestDNS01Validate(t *testing.T) {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
 						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Status, StatusValid)
 
 						assert.Equals(t, updch.Status, StatusValid)
 						assert.Equals(t, updch.Error, nil)
@@ -1349,7 +1422,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1379,7 +1452,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1415,7 +1488,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1452,7 +1525,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1496,7 +1569,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1539,7 +1612,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1583,7 +1656,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1626,7 +1699,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1692,7 +1765,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1731,7 +1804,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1775,7 +1848,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1818,7 +1891,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1858,7 +1931,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1897,7 +1970,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1942,7 +2015,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -1988,7 +2061,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -2034,7 +2107,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -2078,7 +2151,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusInvalid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
@@ -2123,7 +2196,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Status, StatusValid)
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 						assert.Equals(t, updch.Error, nil)

@@ -19,7 +19,7 @@ type Clock struct{}
 
 // Now returns the UTC time rounded to seconds.
 func (c *Clock) Now() time.Time {
-	return time.Now().UTC().Round(time.Second)
+	return time.Now().UTC().Truncate(time.Second)
 }
 
 var clock Clock

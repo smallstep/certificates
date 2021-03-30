@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -49,7 +50,7 @@ func (ch *Challenge) ToLog() (interface{}, error) {
 // updated.
 func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
 	// If already valid or invalid then return without performing validation.
-	if ch.Status == StatusValid || ch.Status == StatusInvalid {
+	if ch.Status != StatusPending {
 		return nil
 	}
 	switch ch.Type {
@@ -65,32 +66,32 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 }
 
 func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
-	url := fmt.Sprintf("http://%s/.well-known/acme-challenge/%s", ch.Value, ch.Token)
+	url := &url.URL{Scheme: "http", Host: ch.Value, Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
 
-	resp, err := vo.HTTPGet(url)
+	resp, err := vo.HTTPGet(url.String())
 	if err != nil {
-		return storeError(ctx, ch, db, WrapError(ErrorConnectionType, err,
+		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
 			"error doing http GET for url %s", url))
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return storeError(ctx, ch, db, NewError(ErrorConnectionType,
+		return storeError(ctx, db, ch, false, NewError(ErrorConnectionType,
 			"error doing http GET for url %s with status code %d", url, resp.StatusCode))
 	}
-	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return WrapErrorISE(err, "error reading "+
 			"response body for url %s", url)
 	}
-	keyAuth := strings.Trim(string(body), "\r\n")
+	keyAuth := strings.TrimSpace(string(body))
 
 	expected, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
 		return err
 	}
 	if keyAuth != expected {
-		return storeError(ctx, ch, db, NewError(ErrorRejectedIdentifierType,
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"keyAuthorization does not match; expected %s, but got %s", expected, keyAuth))
 	}
 
@@ -107,7 +108,11 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 
 func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
 	config := &tls.Config{
-		NextProtos:         []string{"acme-tls/1"},
+		NextProtos: []string{"acme-tls/1"},
+		// https://tools.ietf.org/html/rfc8737#section-4
+		// ACME servers that implement "acme-tls/1" MUST only negotiate TLS 1.2
+		// [RFC5246] or higher when connecting to clients for validation.
+		MinVersion:         tls.VersionTLS12,
 		ServerName:         ch.Value,
 		InsecureSkipVerify: true, // we expect a self-signed challenge certificate
 	}
@@ -116,7 +121,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	conn, err := vo.TLSDial("tcp", hostPort, config)
 	if err != nil {
-		return storeError(ctx, ch, db, WrapError(ErrorConnectionType, err,
+		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
 			"error doing TLS dial for %s", hostPort))
 	}
 	defer conn.Close()
@@ -125,19 +130,19 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 	certs := cs.PeerCertificates
 
 	if len(certs) == 0 {
-		return storeError(ctx, ch, db, NewError(ErrorRejectedIdentifierType,
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"%s challenge for %s resulted in no certificates", ch.Type, ch.Value))
 	}
 
 	if !cs.NegotiatedProtocolIsMutual || cs.NegotiatedProtocol != "acme-tls/1" {
-		return storeError(ctx, ch, db, NewError(ErrorRejectedIdentifierType,
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge"))
 	}
 
 	leafCert := certs[0]
 
 	if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], ch.Value) {
-		return storeError(ctx, ch, db, NewError(ErrorRejectedIdentifierType,
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value))
 	}
 
@@ -154,7 +159,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 	for _, ext := range leafCert.Extensions {
 		if idPeAcmeIdentifier.Equal(ext.Id) {
 			if !ext.Critical {
-				return storeError(ctx, ch, db, NewError(ErrorRejectedIdentifierType,
+				return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 					"incorrect certificate for tls-alpn-01 challenge: acmeValidationV1 extension not critical"))
 			}
 
@@ -162,12 +167,12 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 			rest, err := asn1.Unmarshal(ext.Value, &extValue)
 
 			if err != nil || len(rest) > 0 || len(hashedKeyAuth) != len(extValue) {
-				return storeError(ctx, ch, db, NewError(ErrorRejectedIdentifierType,
+				return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 					"incorrect certificate for tls-alpn-01 challenge: malformed acmeValidationV1 extension value"))
 			}
 
 			if subtle.ConstantTimeCompare(hashedKeyAuth[:], extValue) != 1 {
-				return storeError(ctx, ch, db, NewError(ErrorRejectedIdentifierType,
+				return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 					"incorrect certificate for tls-alpn-01 challenge: "+
 						"expected acmeValidationV1 extension value %s for this challenge but got %s",
 					hex.EncodeToString(hashedKeyAuth[:]), hex.EncodeToString(extValue)))
@@ -189,11 +194,11 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 	}
 
 	if foundIDPeAcmeIdentifierV1Obsolete {
-		return storeError(ctx, ch, db, NewError(ErrorRejectedIdentifierType,
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"incorrect certificate for tls-alpn-01 challenge: obsolete id-pe-acmeIdentifier in acmeValidationV1 extension"))
 	}
 
-	return storeError(ctx, ch, db, NewError(ErrorRejectedIdentifierType,
+	return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 		"incorrect certificate for tls-alpn-01 challenge: missing acmeValidationV1 extension"))
 }
 
@@ -206,7 +211,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 
 	txtRecords, err := vo.LookupTxt("_acme-challenge." + domain)
 	if err != nil {
-		return storeError(ctx, ch, db, WrapError(ErrorDNSType, err,
+		return storeError(ctx, db, ch, false, WrapError(ErrorDNSType, err,
 			"error looking up TXT records for domain %s", domain))
 	}
 
@@ -224,7 +229,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 		}
 	}
 	if !found {
-		return storeError(ctx, ch, db, NewError(ErrorRejectedIdentifierType,
+		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType,
 			"keyAuthorization does not match; expected %s, but got %s", expectedKeyAuth, txtRecords))
 	}
 
@@ -251,8 +256,11 @@ func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
 }
 
 // storeError the given error to an ACME error and saves using the DB interface.
-func storeError(ctx context.Context, ch *Challenge, db DB, err *Error) error {
+func storeError(ctx context.Context, db DB, ch *Challenge, markInvalid bool, err *Error) error {
 	ch.Error = err
+	if markInvalid {
+		ch.Status = StatusInvalid
+	}
 	if err := db.UpdateChallenge(ctx, ch); err != nil {
 		return WrapErrorISE(err, "failure saving error to acme challenge")
 	}
