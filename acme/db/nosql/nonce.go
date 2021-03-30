@@ -18,11 +18,6 @@ type dbNonce struct {
 	DeletedAt time.Time
 }
 
-func (dbn *dbNonce) clone() *dbNonce {
-	u := *dbn
-	return &u
-}
-
 // CreateNonce creates, stores, and returns an ACME replay-nonce.
 // Implements the acme.DB interface.
 func (db *DB) CreateNonce(ctx context.Context) (acme.Nonce, error) {
