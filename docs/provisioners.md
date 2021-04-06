@@ -80,7 +80,7 @@ Example `claims`:
   use this value.
 
   * `enableSSHCA`: enable all provisioners to generate SSH Certificates.
-  The deault value is `false`. You can enable this option per provisioner
+  The default value is `false`. You can enable this option per provisioner
   by setting it to `true` in the provisioner claims.
 
 ## Provisioner Types
