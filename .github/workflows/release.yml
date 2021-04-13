@@ -50,7 +50,7 @@ jobs:
           # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
           # skip-build-cache: true
       -
-        name: Lint, Test, Build
+        name: Test, Build
         id: lint_test_build
         run: V=1 make ci
 
