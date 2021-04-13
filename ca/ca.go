@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
+	acmeNoSQL "github.com/smallstep/certificates/acme/db/nosql"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/db"
@@ -141,23 +142,29 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	}
 
 	prefix := "acme"
-	acmeAuth, err := acme.New(auth, acme.AuthorityOptions{
+	var acmeDB acme.DB
+	if config.DB == nil {
+		acmeDB = nil
+	} else {
+		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
+		if err != nil {
+			return nil, errors.Wrap(err, "error configuring ACME DB interface")
+		}
+	}
+	acmeHandler := acmeAPI.NewHandler(acmeAPI.HandlerOptions{
 		Backdate: *config.AuthorityConfig.Backdate,
-		DB:       auth.GetDatabase().(nosql.DB),
+		DB:       acmeDB,
 		DNS:      dns,
 		Prefix:   prefix,
+		CA:       auth,
 	})
-	if err != nil {
-		return nil, errors.Wrap(err, "error creating ACME authority")
-	}
-	acmeRouterHandler := acmeAPI.New(acmeAuth)
 	mux.Route("/"+prefix, func(r chi.Router) {
-		acmeRouterHandler.Route(r)
+		acmeHandler.Route(r)
 	})
 	// Use 2.0 because, at the moment, our ACME api is only compatible with v2.0
 	// of the ACME spec.
 	mux.Route("/2.0/"+prefix, func(r chi.Router) {
-		acmeRouterHandler.Route(r)
+		acmeHandler.Route(r)
 	})
 
 	/*
