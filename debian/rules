@@ -6,5 +6,8 @@ override_dh_install-arch:
 build:
 	dh build
 
+override_dh_auto_build:
+	dh_auto build ci
+
 %:
 	dh $@
