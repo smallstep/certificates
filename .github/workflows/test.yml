@@ -36,7 +36,7 @@ jobs:
           # working-directory: somedir
 
           # Optional: golangci-lint command line arguments.
-          # args: --issues-exit-code=0
+          args: --timeout=30m
 
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           # only-new-issues: true
