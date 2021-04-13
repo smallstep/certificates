@@ -7,7 +7,7 @@ build:
 	dh build
 
 override_dh_auto_build:
-	dh_auto build ci
+	dh_auto_build ci
 
 %:
 	dh $@
