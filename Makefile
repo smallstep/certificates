@@ -28,7 +28,7 @@ ci: lintcgo testcgo build
 
 bootstra%:
 	# Using a released version of golangci-lint to take into account custom replacements in their go.mod
-	$Q GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.24.0
+	$Q go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.24.0
 
 .PHONY: bootstra%
 
