@@ -134,7 +134,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 			"%s challenge for %s resulted in no certificates", ch.Type, ch.Value))
 	}
 
-	if !cs.NegotiatedProtocolIsMutual || cs.NegotiatedProtocol != "acme-tls/1" {
+	if cs.NegotiatedProtocol != "acme-tls/1" {
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge"))
 	}
