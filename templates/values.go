@@ -99,9 +99,10 @@ var DefaultSSHTemplateData = map[string]string{
 `,
 
 	// sshd_config.tpl adds the configuration to support certificates
-	"sshd_config.tpl": `TrustedUserCAKeys /etc/ssh/ca.pub
-HostCertificate /etc/ssh/{{.User.Certificate}}
-HostKey /etc/ssh/{{.User.Key}}`,
+	"sshd_config.tpl": `Match all
+	TrustedUserCAKeys /etc/ssh/ca.pub
+	HostCertificate /etc/ssh/{{.User.Certificate}}
+	HostKey /etc/ssh/{{.User.Key}}`,
 
 	// ca.tpl contains the public key used to authorized clients
 	"ca.tpl": `{{.Step.SSH.UserKey.Type}} {{.Step.SSH.UserKey.Marshal | toString | b64enc}}
