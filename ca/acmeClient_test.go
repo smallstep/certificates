@@ -35,7 +35,6 @@ func TestNewACMEClient(t *testing.T) {
 		NewNonce:   srv.URL + "/foo",
 		NewAccount: srv.URL + "/bar",
 		NewOrder:   srv.URL + "/baz",
-		NewAuthz:   srv.URL + "/zap",
 		RevokeCert: srv.URL + "/zip",
 		KeyChange:  srv.URL + "/blorp",
 	}
@@ -146,7 +145,6 @@ func TestACMEClient_GetDirectory(t *testing.T) {
 			NewNonce:   "/foo",
 			NewAccount: "/bar",
 			NewOrder:   "/baz",
-			NewAuthz:   "/zap",
 			RevokeCert: "/zip",
 			KeyChange:  "/blorp",
 		},

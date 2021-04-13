@@ -44,27 +44,26 @@ func (l *linker) GetLink(ctx context.Context, typ LinkType, abs bool, inputs ...
 // URL dynamically obtained from the request for which the link is being
 // calculated.
 func (l *linker) GetLinkExplicit(typ LinkType, provisionerName string, abs bool, baseURL *url.URL, inputs ...string) string {
-	var link string
+	var u = url.URL{}
+	// Copy the baseURL value from the pointer. https://github.com/golang/go/issues/38351
+	if baseURL != nil {
+		u = *baseURL
+	}
+
 	switch typ {
 	case NewNonceLinkType, NewAccountLinkType, NewOrderLinkType, NewAuthzLinkType, DirectoryLinkType, KeyChangeLinkType, RevokeCertLinkType:
-		link = fmt.Sprintf("/%s/%s", provisionerName, typ)
+		u.Path = fmt.Sprintf("/%s/%s", provisionerName, typ)
 	case AccountLinkType, OrderLinkType, AuthzLinkType, CertificateLinkType:
-		link = fmt.Sprintf("/%s/%s/%s", provisionerName, typ, inputs[0])
+		u.Path = fmt.Sprintf("/%s/%s/%s", provisionerName, typ, inputs[0])
 	case ChallengeLinkType:
-		link = fmt.Sprintf("/%s/%s/%s/%s", provisionerName, typ, inputs[0], inputs[1])
+		u.Path = fmt.Sprintf("/%s/%s/%s/%s", provisionerName, typ, inputs[0], inputs[1])
 	case OrdersByAccountLinkType:
-		link = fmt.Sprintf("/%s/%s/%s/orders", provisionerName, AccountLinkType, inputs[0])
+		u.Path = fmt.Sprintf("/%s/%s/%s/orders", provisionerName, AccountLinkType, inputs[0])
 	case FinalizeLinkType:
-		link = fmt.Sprintf("/%s/%s/%s/finalize", provisionerName, OrderLinkType, inputs[0])
+		u.Path = fmt.Sprintf("/%s/%s/%s/finalize", provisionerName, OrderLinkType, inputs[0])
 	}
 
 	if abs {
-		// Copy the baseURL value from the pointer. https://github.com/golang/go/issues/38351
-		u := url.URL{}
-		if baseURL != nil {
-			u = *baseURL
-		}
-
 		// If no Scheme is set, then default to https.
 		if u.Scheme == "" {
 			u.Scheme = "https"
@@ -75,10 +74,10 @@ func (l *linker) GetLinkExplicit(typ LinkType, provisionerName string, abs bool,
 			u.Host = l.dns
 		}
 
-		u.Path = l.prefix + link
+		u.Path = l.prefix + u.Path
 		return u.String()
 	}
-	return link
+	return u.EscapedPath()
 }
 
 // LinkType captures the link type.

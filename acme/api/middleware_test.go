@@ -228,9 +228,9 @@ func TestHandler_addDirLink(t *testing.T) {
 
 func TestHandler_verifyContentType(t *testing.T) {
 	prov := newProv()
-	provName := prov.GetName()
+	escProvName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	url := fmt.Sprintf("%s/acme/%s/certificate/abc123", baseURL.String(), provName)
+	url := fmt.Sprintf("%s/acme/%s/certificate/abc123", baseURL.String(), escProvName)
 	type test struct {
 		h           Handler
 		ctx         context.Context
@@ -245,7 +245,7 @@ func TestHandler_verifyContentType(t *testing.T) {
 				h: Handler{
 					linker: NewLinker("dns", "acme"),
 				},
-				url:         fmt.Sprintf("%s/acme/%s/new-account", baseURL.String(), provName),
+				url:         url,
 				ctx:         context.WithValue(context.Background(), provisionerContextKey, prov),
 				contentType: "foo",
 				statusCode:  400,
@@ -1160,7 +1160,7 @@ func TestHandler_validateJWS(t *testing.T) {
 			return test{
 				ctx:        context.WithValue(context.Background(), jwsContextKey, jws),
 				statusCode: 400,
-				err:        acme.NewError(acme.ErrorMalformedType, "unsuitable algorithm: none"),
+				err:        acme.NewError(acme.ErrorBadSignatureAlgorithmType, "unsuitable algorithm: none"),
 			}
 		},
 		"fail/unsuitable-algorithm-mac": func(t *testing.T) test {
@@ -1172,7 +1172,7 @@ func TestHandler_validateJWS(t *testing.T) {
 			return test{
 				ctx:        context.WithValue(context.Background(), jwsContextKey, jws),
 				statusCode: 400,
-				err:        acme.NewError(acme.ErrorMalformedType, "unsuitable algorithm: %s", jose.HS256),
+				err:        acme.NewError(acme.ErrorBadSignatureAlgorithmType, "unsuitable algorithm: %s", jose.HS256),
 			}
 		},
 		"fail/rsa-key-&-alg-mismatch": func(t *testing.T) test {

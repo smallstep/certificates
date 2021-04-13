@@ -102,7 +102,7 @@ func (h *Handler) Route(r api.Router) {
 	}
 
 	r.MethodFunc("POST", getLink(NewAccountLinkType, "{provisionerID}", false, nil), extractPayloadByJWK(h.NewAccount))
-	r.MethodFunc("POST", getLink(AccountLinkType, "{provisionerID}", false, nil, "{accID}"), extractPayloadByKid(h.GetUpdateAccount))
+	r.MethodFunc("POST", getLink(AccountLinkType, "{provisionerID}", false, nil, "{accID}"), extractPayloadByKid(h.GetOrUpdateAccount))
 	r.MethodFunc("POST", getLink(KeyChangeLinkType, "{provisionerID}", false, nil, "{accID}"), extractPayloadByKid(h.NotImplemented))
 	r.MethodFunc("POST", getLink(NewOrderLinkType, "{provisionerID}", false, nil), extractPayloadByKid(h.NewOrder))
 	r.MethodFunc("POST", getLink(OrderLinkType, "{provisionerID}", false, nil, "{ordID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrder)))
@@ -125,12 +125,11 @@ func (h *Handler) GetNonce(w http.ResponseWriter, r *http.Request) {
 
 // Directory represents an ACME directory for configuring clients.
 type Directory struct {
-	NewNonce   string `json:"newNonce,omitempty"`
-	NewAccount string `json:"newAccount,omitempty"`
-	NewOrder   string `json:"newOrder,omitempty"`
-	NewAuthz   string `json:"newAuthz,omitempty"`
-	RevokeCert string `json:"revokeCert,omitempty"`
-	KeyChange  string `json:"keyChange,omitempty"`
+	NewNonce   string `json:"newNonce"`
+	NewAccount string `json:"newAccount"`
+	NewOrder   string `json:"newOrder"`
+	RevokeCert string `json:"revokeCert"`
+	KeyChange  string `json:"keyChange"`
 }
 
 // ToLog enables response logging for the Directory type.

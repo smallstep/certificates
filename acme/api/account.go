@@ -126,8 +126,8 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	api.JSONStatus(w, acc, httpStatus)
 }
 
-// GetUpdateAccount is the api for updating an ACME account.
-func (h *Handler) GetUpdateAccount(w http.ResponseWriter, r *http.Request) {
+// GetOrUpdateAccount is the api for updating an ACME account.
+func (h *Handler) GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acc, err := accountFromContext(ctx)
 	if err != nil {

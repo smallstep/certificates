@@ -90,7 +90,7 @@ func (h *Handler) verifyContentType(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ct := r.Header.Get("Content-Type")
 		var expected []string
-		if strings.Contains(r.URL.Path, h.linker.GetLink(r.Context(), CertificateLinkType, false, "")) {
+		if strings.Contains(r.URL.String(), h.linker.GetLink(r.Context(), CertificateLinkType, false, "")) {
 			// GET /certificate requests allow a greater range of content types.
 			expected = []string{"application/jose+json", "application/pkix-cert", "application/pkcs7-mime"}
 		} else {
@@ -170,7 +170,7 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 		}
 		hdr := sig.Protected
 		switch hdr.Algorithm {
-		case jose.RS256, jose.RS384, jose.RS512:
+		case jose.RS256, jose.RS384, jose.RS512, jose.PS256, jose.PS384, jose.PS512:
 			if hdr.JSONWebKey != nil {
 				switch k := hdr.JSONWebKey.Key.(type) {
 				case *rsa.PublicKey:
@@ -189,7 +189,7 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 		case jose.ES256, jose.ES384, jose.ES512, jose.EdDSA:
 			// we good
 		default:
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "unsuitable algorithm: %s", hdr.Algorithm))
+			api.WriteError(w, acme.NewError(acme.ErrorBadSignatureAlgorithmType, "unsuitable algorithm: %s", hdr.Algorithm))
 			return
 		}
 

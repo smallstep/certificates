@@ -32,7 +32,7 @@ func newProv() acme.Provisioner {
 	// Initialize provisioners
 	p := &provisioner.ACME{
 		Type: "ACME",
-		Name: "test@acme-provisioner.com",
+		Name: "test@acme-<test>provisioner.com",
 	}
 	if err := p.Init(provisioner.Config{Claims: globalProvisionerClaims}); err != nil {
 		fmt.Printf("%v", err)
@@ -168,11 +168,6 @@ func TestUpdateAccountRequest_Validate(t *testing.T) {
 }
 
 func TestHandler_GetOrdersByAccountID(t *testing.T) {
-	oids := []string{"foo", "bar"}
-	oidURLs := []string{
-		"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/order/foo",
-		"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/order/bar",
-	}
 	accID := "account-id"
 
 	// Request with chi context
@@ -184,6 +179,12 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
 
 	url := fmt.Sprintf("http://ca.smallstep.com/acme/%s/account/%s/orders", provName, accID)
+
+	oids := []string{"foo", "bar"}
+	oidURLs := []string{
+		fmt.Sprintf("%s/acme/%s/order/foo", baseURL.String(), provName),
+		fmt.Sprintf("%s/acme/%s/order/bar", baseURL.String(), provName),
+	}
 
 	type test struct {
 		db         acme.DB
@@ -287,7 +288,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 
 func TestHandler_NewAccount(t *testing.T) {
 	prov := newProv()
-	provName := url.PathEscape(prov.GetName())
+	escProvName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
 
 	type test struct {
@@ -424,7 +425,7 @@ func TestHandler_NewAccount(t *testing.T) {
 					Key:       jwk,
 					Status:    acme.StatusValid,
 					Contact:   []string{"foo", "bar"},
-					OrdersURL: "https://test.ca.smallstep.com/acme/test@acme-provisioner.com/account/accountID/orders",
+					OrdersURL: fmt.Sprintf("%s/acme/%s/account/accountID/orders", baseURL.String(), escProvName),
 				},
 				ctx:        ctx,
 				statusCode: 201,
@@ -486,14 +487,14 @@ func TestHandler_NewAccount(t *testing.T) {
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"],
 					[]string{fmt.Sprintf("%s/acme/%s/account/%s", baseURL.String(),
-						provName, "accountID")})
+						escProvName, "accountID")})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
 	}
 }
 
-func TestHandler_GetUpdateAccount(t *testing.T) {
+func TestHandler_GetOrUpdateAccount(t *testing.T) {
 	accID := "accountID"
 	acc := acme.Account{
 		ID:        accID,
@@ -501,7 +502,7 @@ func TestHandler_GetUpdateAccount(t *testing.T) {
 		OrdersURL: fmt.Sprintf("https://ca.smallstep.com/acme/account/%s/orders", accID),
 	}
 	prov := newProv()
-	provName := url.PathEscape(prov.GetName())
+	escProvName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
 
 	type test struct {
@@ -662,7 +663,7 @@ func TestHandler_GetUpdateAccount(t *testing.T) {
 			req := httptest.NewRequest("GET", "/foo/bar", nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetUpdateAccount(w, req)
+			h.GetOrUpdateAccount(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
@@ -686,7 +687,7 @@ func TestHandler_GetUpdateAccount(t *testing.T) {
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"],
 					[]string{fmt.Sprintf("%s/acme/%s/account/%s", baseURL.String(),
-						provName, accID)})
+						escProvName, accID)})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})

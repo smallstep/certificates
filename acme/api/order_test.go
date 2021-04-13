@@ -149,6 +149,10 @@ func TestFinalizeRequestValidate(t *testing.T) {
 }
 
 func TestHandler_GetOrder(t *testing.T) {
+	prov := newProv()
+	escProvName := url.PathEscape(prov.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+
 	now := clock.Now()
 	nbf := now
 	naf := now.Add(24 * time.Hour)
@@ -171,21 +175,18 @@ func TestHandler_GetOrder(t *testing.T) {
 		Status:    acme.StatusInvalid,
 		Error:     acme.NewError(acme.ErrorMalformedType, "order has expired"),
 		AuthorizationURLs: []string{
-			"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/foo",
-			"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/bar",
-			"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/baz",
+			fmt.Sprintf("%s/acme/%s/authz/foo", baseURL.String(), escProvName),
+			fmt.Sprintf("%s/acme/%s/authz/bar", baseURL.String(), escProvName),
+			fmt.Sprintf("%s/acme/%s/authz/baz", baseURL.String(), escProvName),
 		},
-		FinalizeURL: "https://test.ca.smallstep.com/acme/test@acme-provisioner.com/order/orderID/finalize",
+		FinalizeURL: fmt.Sprintf("%s/acme/%s/order/orderID/finalize", baseURL.String(), escProvName),
 	}
 
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("ordID", o.ID)
-	prov := newProv()
-	provName := url.PathEscape(prov.GetName())
-	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
 	url := fmt.Sprintf("%s/acme/%s/order/%s",
-		baseURL.String(), provName, o.ID)
+		baseURL.String(), escProvName, o.ID)
 
 	type test struct {
 		db         acme.DB
@@ -285,7 +286,7 @@ func TestHandler_GetOrder(t *testing.T) {
 					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						return &acme.Order{
 							AccountID:     "accountID",
-							ProvisionerID: "acme/test@acme-provisioner.com",
+							ProvisionerID: fmt.Sprintf("acme/%s", prov.GetName()),
 							ExpiresAt:     clock.Now().Add(-time.Hour),
 							Status:        acme.StatusReady,
 						}, nil
@@ -311,7 +312,7 @@ func TestHandler_GetOrder(t *testing.T) {
 						return &acme.Order{
 							ID:               "orderID",
 							AccountID:        "accountID",
-							ProvisionerID:    "acme/test@acme-provisioner.com",
+							ProvisionerID:    fmt.Sprintf("acme/%s", prov.GetName()),
 							ExpiresAt:        expiry,
 							Status:           acme.StatusReady,
 							AuthorizationIDs: []string{"foo", "bar", "baz"},
@@ -581,10 +582,10 @@ func TestHandler_newAuthorization(t *testing.T) {
 func TestHandler_NewOrder(t *testing.T) {
 	// Request with chi context
 	prov := newProv()
-	provName := url.PathEscape(prov.GetName())
+	escProvName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
 	url := fmt.Sprintf("%s/acme/%s/order/ordID",
-		baseURL.String(), provName)
+		baseURL.String(), escProvName)
 
 	type test struct {
 		db         acme.DB
@@ -877,8 +878,8 @@ func TestHandler_NewOrder(t *testing.T) {
 					assert.Equals(t, o.Status, acme.StatusPending)
 					assert.Equals(t, o.Identifiers, nor.Identifiers)
 					assert.Equals(t, o.AuthorizationURLs, []string{
-						"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/az1ID",
-						"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/az2ID",
+						fmt.Sprintf("%s/acme/%s/authz/az1ID", baseURL.String(), escProvName),
+						fmt.Sprintf("%s/acme/%s/authz/az2ID", baseURL.String(), escProvName),
 					})
 					assert.True(t, o.NotBefore.Add(-testBufferDur).Before(expNbf))
 					assert.True(t, o.NotBefore.Add(testBufferDur).After(expNbf))
@@ -968,7 +969,7 @@ func TestHandler_NewOrder(t *testing.T) {
 					assert.Equals(t, o.ID, "ordID")
 					assert.Equals(t, o.Status, acme.StatusPending)
 					assert.Equals(t, o.Identifiers, nor.Identifiers)
-					assert.Equals(t, o.AuthorizationURLs, []string{"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/az1ID"})
+					assert.Equals(t, o.AuthorizationURLs, []string{fmt.Sprintf("%s/acme/%s/authz/az1ID", baseURL.String(), escProvName)})
 					assert.True(t, o.NotBefore.Add(-testBufferDur).Before(expNbf))
 					assert.True(t, o.NotBefore.Add(testBufferDur).After(expNbf))
 					assert.True(t, o.NotAfter.Add(-testBufferDur).Before(expNaf))
@@ -1059,7 +1060,7 @@ func TestHandler_NewOrder(t *testing.T) {
 					assert.Equals(t, o.ID, "ordID")
 					assert.Equals(t, o.Status, acme.StatusPending)
 					assert.Equals(t, o.Identifiers, nor.Identifiers)
-					assert.Equals(t, o.AuthorizationURLs, []string{"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/az1ID"})
+					assert.Equals(t, o.AuthorizationURLs, []string{fmt.Sprintf("%s/acme/%s/authz/az1ID", baseURL.String(), escProvName)})
 					assert.True(t, o.NotBefore.Add(-testBufferDur).Before(expNbf))
 					assert.True(t, o.NotBefore.Add(testBufferDur).After(expNbf))
 					assert.True(t, o.NotAfter.Add(-testBufferDur).Before(expNaf))
@@ -1149,7 +1150,7 @@ func TestHandler_NewOrder(t *testing.T) {
 					assert.Equals(t, o.ID, "ordID")
 					assert.Equals(t, o.Status, acme.StatusPending)
 					assert.Equals(t, o.Identifiers, nor.Identifiers)
-					assert.Equals(t, o.AuthorizationURLs, []string{"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/az1ID"})
+					assert.Equals(t, o.AuthorizationURLs, []string{fmt.Sprintf("%s/acme/%s/authz/az1ID", baseURL.String(), escProvName)})
 					assert.True(t, o.NotBefore.Add(-testBufferDur).Before(expNbf))
 					assert.True(t, o.NotBefore.Add(testBufferDur).After(expNbf))
 					assert.True(t, o.NotAfter.Add(-testBufferDur).Before(expNaf))
@@ -1240,7 +1241,7 @@ func TestHandler_NewOrder(t *testing.T) {
 					assert.Equals(t, o.ID, "ordID")
 					assert.Equals(t, o.Status, acme.StatusPending)
 					assert.Equals(t, o.Identifiers, nor.Identifiers)
-					assert.Equals(t, o.AuthorizationURLs, []string{"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/az1ID"})
+					assert.Equals(t, o.AuthorizationURLs, []string{fmt.Sprintf("%s/acme/%s/authz/az1ID", baseURL.String(), escProvName)})
 					assert.True(t, o.NotBefore.Add(-testBufferDur).Before(expNbf))
 					assert.True(t, o.NotBefore.Add(testBufferDur).After(expNbf))
 					assert.True(t, o.NotAfter.Add(-testBufferDur).Before(expNaf))
@@ -1291,6 +1292,10 @@ func TestHandler_NewOrder(t *testing.T) {
 }
 
 func TestHandler_FinalizeOrder(t *testing.T) {
+	prov := newProv()
+	escProvName := url.PathEscape(prov.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+
 	now := clock.Now()
 	nbf := now
 	naf := now.Add(24 * time.Hour)
@@ -1311,22 +1316,19 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 		ExpiresAt: naf,
 		Status:    acme.StatusValid,
 		AuthorizationURLs: []string{
-			"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/foo",
-			"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/bar",
-			"https://test.ca.smallstep.com/acme/test@acme-provisioner.com/authz/baz",
+			fmt.Sprintf("%s/acme/%s/authz/foo", baseURL.String(), escProvName),
+			fmt.Sprintf("%s/acme/%s/authz/bar", baseURL.String(), escProvName),
+			fmt.Sprintf("%s/acme/%s/authz/baz", baseURL.String(), escProvName),
 		},
-		FinalizeURL:    "https://test.ca.smallstep.com/acme/test@acme-provisioner.com/order/orderID/finalize",
-		CertificateURL: "https://test.ca.smallstep.com/acme/test@acme-provisioner.com/certificate/certID",
+		FinalizeURL:    fmt.Sprintf("%s/acme/%s/order/orderID/finalize", baseURL.String(), escProvName),
+		CertificateURL: fmt.Sprintf("%s/acme/%s/certificate/certID", baseURL.String(), escProvName),
 	}
 
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("ordID", o.ID)
-	prov := newProv()
-	provName := url.PathEscape(prov.GetName())
-	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
 	url := fmt.Sprintf("%s/acme/%s/order/%s",
-		baseURL.String(), provName, o.ID)
+		baseURL.String(), escProvName, o.ID)
 
 	_csr, err := pemutil.Read("../../authority/testdata/certs/foo.csr")
 	assert.FatalError(t, err)
@@ -1488,7 +1490,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						return &acme.Order{
 							AccountID:     "accountID",
-							ProvisionerID: "acme/test@acme-provisioner.com",
+							ProvisionerID: fmt.Sprintf("acme/%s", prov.GetName()),
 							ExpiresAt:     clock.Now().Add(-time.Hour),
 							Status:        acme.StatusReady,
 						}, nil
@@ -1515,7 +1517,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 						return &acme.Order{
 							ID:               "orderID",
 							AccountID:        "accountID",
-							ProvisionerID:    "acme/test@acme-provisioner.com",
+							ProvisionerID:    fmt.Sprintf("acme/%s", prov.GetName()),
 							ExpiresAt:        naf,
 							Status:           acme.StatusValid,
 							AuthorizationIDs: []string{"foo", "bar", "baz"},
