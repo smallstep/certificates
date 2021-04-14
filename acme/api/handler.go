@@ -87,12 +87,12 @@ func NewHandler(ops HandlerOptions) api.RouterHandler {
 
 // Route traffic and implement the Router interface.
 func (h *Handler) Route(r api.Router) {
-	getLink := h.linker.GetLinkExplicit
+	getPath := h.linker.GetUnescapedPathSuffix
 	// Standard ACME API
-	r.MethodFunc("GET", getLink(NewNonceLinkType, "{provisionerID}", false, nil), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.GetNonce)))))
-	r.MethodFunc("HEAD", getLink(NewNonceLinkType, "{provisionerID}", false, nil), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.GetNonce)))))
-	r.MethodFunc("GET", getLink(DirectoryLinkType, "{provisionerID}", false, nil), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.GetDirectory))))
-	r.MethodFunc("HEAD", getLink(DirectoryLinkType, "{provisionerID}", false, nil), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.GetDirectory))))
+	r.MethodFunc("GET", getPath(NewNonceLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.GetNonce)))))
+	r.MethodFunc("HEAD", getPath(NewNonceLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.GetNonce)))))
+	r.MethodFunc("GET", getPath(DirectoryLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.GetDirectory))))
+	r.MethodFunc("HEAD", getPath(DirectoryLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.GetDirectory))))
 
 	extractPayloadByJWK := func(next nextHTTP) nextHTTP {
 		return h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(h.validateJWS(h.extractJWK(h.verifyAndExtractJWSPayload(next)))))))))
@@ -101,16 +101,16 @@ func (h *Handler) Route(r api.Router) {
 		return h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(h.validateJWS(h.lookupJWK(h.verifyAndExtractJWSPayload(next)))))))))
 	}
 
-	r.MethodFunc("POST", getLink(NewAccountLinkType, "{provisionerID}", false, nil), extractPayloadByJWK(h.NewAccount))
-	r.MethodFunc("POST", getLink(AccountLinkType, "{provisionerID}", false, nil, "{accID}"), extractPayloadByKid(h.GetOrUpdateAccount))
-	r.MethodFunc("POST", getLink(KeyChangeLinkType, "{provisionerID}", false, nil, "{accID}"), extractPayloadByKid(h.NotImplemented))
-	r.MethodFunc("POST", getLink(NewOrderLinkType, "{provisionerID}", false, nil), extractPayloadByKid(h.NewOrder))
-	r.MethodFunc("POST", getLink(OrderLinkType, "{provisionerID}", false, nil, "{ordID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrder)))
-	r.MethodFunc("POST", getLink(OrdersByAccountLinkType, "{provisionerID}", false, nil, "{accID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrdersByAccountID)))
-	r.MethodFunc("POST", getLink(FinalizeLinkType, "{provisionerID}", false, nil, "{ordID}"), extractPayloadByKid(h.FinalizeOrder))
-	r.MethodFunc("POST", getLink(AuthzLinkType, "{provisionerID}", false, nil, "{authzID}"), extractPayloadByKid(h.isPostAsGet(h.GetAuthorization)))
-	r.MethodFunc("POST", getLink(ChallengeLinkType, "{provisionerID}", false, nil, "{authzID}", "{chID}"), extractPayloadByKid(h.GetChallenge))
-	r.MethodFunc("POST", getLink(CertificateLinkType, "{provisionerID}", false, nil, "{certID}"), extractPayloadByKid(h.isPostAsGet(h.GetCertificate)))
+	r.MethodFunc("POST", getPath(NewAccountLinkType, "{provisionerID}"), extractPayloadByJWK(h.NewAccount))
+	r.MethodFunc("POST", getPath(AccountLinkType, "{provisionerID}", "{accID}"), extractPayloadByKid(h.GetOrUpdateAccount))
+	r.MethodFunc("POST", getPath(KeyChangeLinkType, "{provisionerID}", "{accID}"), extractPayloadByKid(h.NotImplemented))
+	r.MethodFunc("POST", getPath(NewOrderLinkType, "{provisionerID}"), extractPayloadByKid(h.NewOrder))
+	r.MethodFunc("POST", getPath(OrderLinkType, "{provisionerID}", "{ordID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrder)))
+	r.MethodFunc("POST", getPath(OrdersByAccountLinkType, "{provisionerID}", "{accID}"), extractPayloadByKid(h.isPostAsGet(h.GetOrdersByAccountID)))
+	r.MethodFunc("POST", getPath(FinalizeLinkType, "{provisionerID}", "{ordID}"), extractPayloadByKid(h.FinalizeOrder))
+	r.MethodFunc("POST", getPath(AuthzLinkType, "{provisionerID}", "{authzID}"), extractPayloadByKid(h.isPostAsGet(h.GetAuthorization)))
+	r.MethodFunc("POST", getPath(ChallengeLinkType, "{provisionerID}", "{authzID}", "{chID}"), extractPayloadByKid(h.GetChallenge))
+	r.MethodFunc("POST", getPath(CertificateLinkType, "{provisionerID}", "{certID}"), extractPayloadByKid(h.isPostAsGet(h.GetCertificate)))
 }
 
 // GetNonce just sets the right header since a Nonce is added to each response
@@ -146,11 +146,11 @@ func (d *Directory) ToLog() (interface{}, error) {
 func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	api.JSON(w, &Directory{
-		NewNonce:   h.linker.GetLink(ctx, NewNonceLinkType, true),
-		NewAccount: h.linker.GetLink(ctx, NewAccountLinkType, true),
-		NewOrder:   h.linker.GetLink(ctx, NewOrderLinkType, true),
-		RevokeCert: h.linker.GetLink(ctx, RevokeCertLinkType, true),
-		KeyChange:  h.linker.GetLink(ctx, KeyChangeLinkType, true),
+		NewNonce:   h.linker.GetLink(ctx, NewNonceLinkType),
+		NewAccount: h.linker.GetLink(ctx, NewAccountLinkType),
+		NewOrder:   h.linker.GetLink(ctx, NewOrderLinkType),
+		RevokeCert: h.linker.GetLink(ctx, RevokeCertLinkType),
+		KeyChange:  h.linker.GetLink(ctx, KeyChangeLinkType),
 	})
 }
 
@@ -185,7 +185,7 @@ func (h *Handler) GetAuthorization(w http.ResponseWriter, r *http.Request) {
 
 	h.linker.LinkAuthorization(ctx, az)
 
-	w.Header().Set("Location", h.linker.GetLink(ctx, AuthzLinkType, true, az.ID))
+	w.Header().Set("Location", h.linker.GetLink(ctx, AuthzLinkType, az.ID))
 	api.JSON(w, az)
 }
 
@@ -235,8 +235,8 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 
 	h.linker.LinkChallenge(ctx, ch, azID)
 
-	w.Header().Add("Link", link(h.linker.GetLink(ctx, AuthzLinkType, true, azID), "up"))
-	w.Header().Set("Location", h.linker.GetLink(ctx, ChallengeLinkType, true, azID, ch.ID))
+	w.Header().Add("Link", link(h.linker.GetLink(ctx, AuthzLinkType, azID), "up"))
+	w.Header().Set("Location", h.linker.GetLink(ctx, ChallengeLinkType, azID, ch.ID))
 	api.JSON(w, ch)
 }
 

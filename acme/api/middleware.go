@@ -78,8 +78,7 @@ func (h *Handler) addNonce(next nextHTTP) nextHTTP {
 // directory index url.
 func (h *Handler) addDirLink(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Link", link(h.linker.GetLink(r.Context(),
-			DirectoryLinkType, true), "index"))
+		w.Header().Add("Link", link(h.linker.GetLink(r.Context(), DirectoryLinkType), "index"))
 		next(w, r)
 	}
 }
@@ -88,15 +87,23 @@ func (h *Handler) addDirLink(next nextHTTP) nextHTTP {
 // application/jose+json.
 func (h *Handler) verifyContentType(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ct := r.Header.Get("Content-Type")
-		var expected []string
-		if strings.Contains(r.URL.String(), h.linker.GetLink(r.Context(), CertificateLinkType, false, "")) {
+		var (
+			expected []string
+			provName string
+		)
+		if p, err := provisionerFromContext(r.Context()); err == nil && p != nil {
+			provName = p.GetName()
+		}
+		u := url.URL{Path: h.linker.GetUnescapedPathSuffix(CertificateLinkType, provName, "")}
+		if strings.Contains(r.URL.String(), u.EscapedPath()) {
 			// GET /certificate requests allow a greater range of content types.
 			expected = []string{"application/jose+json", "application/pkix-cert", "application/pkcs7-mime"}
 		} else {
 			// By default every request should have content-type applictaion/jose+json.
 			expected = []string{"application/jose+json"}
 		}
+
+		ct := r.Header.Get("Content-Type")
 		for _, e := range expected {
 			if ct == e {
 				next(w, r)
@@ -314,7 +321,7 @@ func (h *Handler) lookupJWK(next nextHTTP) nextHTTP {
 			return
 		}
 
-		kidPrefix := h.linker.GetLink(ctx, AccountLinkType, true, "")
+		kidPrefix := h.linker.GetLink(ctx, AccountLinkType, "")
 		kid := jws.Signatures[0].Protected.KeyID
 		if !strings.HasPrefix(kid, kidPrefix) {
 			api.WriteError(w, acme.NewError(acme.ErrorMalformedType,
