@@ -240,6 +240,18 @@ func TestHandler_verifyContentType(t *testing.T) {
 		url         string
 	}
 	var tests = map[string]func(t *testing.T) test{
+		"fail/provisioner-not-set": func(t *testing.T) test {
+			return test{
+				h: Handler{
+					linker: NewLinker("dns", "acme"),
+				},
+				url:         url,
+				ctx:         context.Background(),
+				contentType: "foo",
+				statusCode:  500,
+				err:         acme.NewErrorISE("provisioner expected in request context"),
+			}
+		},
 		"fail/general-bad-content-type": func(t *testing.T) test {
 			return test{
 				h: Handler{

@@ -87,14 +87,14 @@ func (h *Handler) addDirLink(next nextHTTP) nextHTTP {
 // application/jose+json.
 func (h *Handler) verifyContentType(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var (
-			expected []string
-			provName string
-		)
-		if p, err := provisionerFromContext(r.Context()); err == nil && p != nil {
-			provName = p.GetName()
+		var expected []string
+		p, err := provisionerFromContext(r.Context())
+		if err != nil {
+			api.WriteError(w, err)
+			return
 		}
-		u := url.URL{Path: h.linker.GetUnescapedPathSuffix(CertificateLinkType, provName, "")}
+
+		u := url.URL{Path: h.linker.GetUnescapedPathSuffix(CertificateLinkType, p.GetName(), "")}
 		if strings.Contains(r.URL.String(), u.EscapedPath()) {
 			// GET /certificate requests allow a greater range of content types.
 			expected = []string{"application/jose+json", "application/pkix-cert", "application/pkcs7-mime"}
