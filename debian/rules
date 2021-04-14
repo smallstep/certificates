@@ -4,8 +4,10 @@ override_dh_install-arch:
 	dh_install --arch
 
 build:
-	make bootstrap
 	dh build
+
+override_dh_auto_build:
+	dh_auto_build -- build
 
 %:
 	dh $@
