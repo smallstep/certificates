@@ -15,8 +15,8 @@ func NewLinker(dns, prefix string) Linker {
 
 // Linker interface for generating links for ACME resources.
 type Linker interface {
-	GetLink(ctx context.Context, typ LinkType, abs bool, inputs ...string) string
-	GetLinkExplicit(typ LinkType, provName string, abs bool, baseURL *url.URL, inputs ...string) string
+	GetLink(ctx context.Context, typ LinkType, inputs ...string) string
+	GetUnescapedPathSuffix(typ LinkType, provName string, inputs ...string) string
 
 	LinkOrder(ctx context.Context, o *acme.Order)
 	LinkAccount(ctx context.Context, o *acme.Account)
@@ -31,53 +31,52 @@ type linker struct {
 	dns    string
 }
 
+func (l *linker) GetUnescapedPathSuffix(typ LinkType, provisionerName string, inputs ...string) string {
+	switch typ {
+	case NewNonceLinkType, NewAccountLinkType, NewOrderLinkType, NewAuthzLinkType, DirectoryLinkType, KeyChangeLinkType, RevokeCertLinkType:
+		return fmt.Sprintf("/%s/%s", provisionerName, typ)
+	case AccountLinkType, OrderLinkType, AuthzLinkType, CertificateLinkType:
+		return fmt.Sprintf("/%s/%s/%s", provisionerName, typ, inputs[0])
+	case ChallengeLinkType:
+		return fmt.Sprintf("/%s/%s/%s/%s", provisionerName, typ, inputs[0], inputs[1])
+	case OrdersByAccountLinkType:
+		return fmt.Sprintf("/%s/%s/%s/orders", provisionerName, AccountLinkType, inputs[0])
+	case FinalizeLinkType:
+		return fmt.Sprintf("/%s/%s/%s/finalize", provisionerName, OrderLinkType, inputs[0])
+	default:
+		return ""
+	}
+}
+
 // GetLink is a helper for GetLinkExplicit
-func (l *linker) GetLink(ctx context.Context, typ LinkType, abs bool, inputs ...string) string {
-	var provName string
+func (l *linker) GetLink(ctx context.Context, typ LinkType, inputs ...string) string {
+	var (
+		provName string
+		baseURL  = baseURLFromContext(ctx)
+		u        = url.URL{}
+	)
 	if p, err := provisionerFromContext(ctx); err == nil && p != nil {
 		provName = p.GetName()
 	}
-	return l.GetLinkExplicit(typ, provName, abs, baseURLFromContext(ctx), inputs...)
-}
-
-// GetLinkExplicit returns an absolute or partial path to the given resource and a base
-// URL dynamically obtained from the request for which the link is being
-// calculated.
-func (l *linker) GetLinkExplicit(typ LinkType, provisionerName string, abs bool, baseURL *url.URL, inputs ...string) string {
-	var u = url.URL{}
 	// Copy the baseURL value from the pointer. https://github.com/golang/go/issues/38351
 	if baseURL != nil {
 		u = *baseURL
 	}
 
-	switch typ {
-	case NewNonceLinkType, NewAccountLinkType, NewOrderLinkType, NewAuthzLinkType, DirectoryLinkType, KeyChangeLinkType, RevokeCertLinkType:
-		u.Path = fmt.Sprintf("/%s/%s", provisionerName, typ)
-	case AccountLinkType, OrderLinkType, AuthzLinkType, CertificateLinkType:
-		u.Path = fmt.Sprintf("/%s/%s/%s", provisionerName, typ, inputs[0])
-	case ChallengeLinkType:
-		u.Path = fmt.Sprintf("/%s/%s/%s/%s", provisionerName, typ, inputs[0], inputs[1])
-	case OrdersByAccountLinkType:
-		u.Path = fmt.Sprintf("/%s/%s/%s/orders", provisionerName, AccountLinkType, inputs[0])
-	case FinalizeLinkType:
-		u.Path = fmt.Sprintf("/%s/%s/%s/finalize", provisionerName, OrderLinkType, inputs[0])
+	u.Path = l.GetUnescapedPathSuffix(typ, provName, inputs...)
+
+	// If no Scheme is set, then default to https.
+	if u.Scheme == "" {
+		u.Scheme = "https"
 	}
 
-	if abs {
-		// If no Scheme is set, then default to https.
-		if u.Scheme == "" {
-			u.Scheme = "https"
-		}
-
-		// If no Host is set, then use the default (first DNS attr in the ca.json).
-		if u.Host == "" {
-			u.Host = l.dns
-		}
-
-		u.Path = l.prefix + u.Path
-		return u.String()
+	// If no Host is set, then use the default (first DNS attr in the ca.json).
+	if u.Host == "" {
+		u.Host = l.dns
 	}
-	return u.EscapedPath()
+
+	u.Path = l.prefix + u.Path
+	return u.String()
 }
 
 // LinkType captures the link type.
@@ -149,22 +148,22 @@ func (l LinkType) String() string {
 func (l *linker) LinkOrder(ctx context.Context, o *acme.Order) {
 	o.AuthorizationURLs = make([]string, len(o.AuthorizationIDs))
 	for i, azID := range o.AuthorizationIDs {
-		o.AuthorizationURLs[i] = l.GetLink(ctx, AuthzLinkType, true, azID)
+		o.AuthorizationURLs[i] = l.GetLink(ctx, AuthzLinkType, azID)
 	}
-	o.FinalizeURL = l.GetLink(ctx, FinalizeLinkType, true, o.ID)
+	o.FinalizeURL = l.GetLink(ctx, FinalizeLinkType, o.ID)
 	if o.CertificateID != "" {
-		o.CertificateURL = l.GetLink(ctx, CertificateLinkType, true, o.CertificateID)
+		o.CertificateURL = l.GetLink(ctx, CertificateLinkType, o.CertificateID)
 	}
 }
 
 // LinkAccount sets the ACME links required by an ACME account.
 func (l *linker) LinkAccount(ctx context.Context, acc *acme.Account) {
-	acc.OrdersURL = l.GetLink(ctx, OrdersByAccountLinkType, true, acc.ID)
+	acc.OrdersURL = l.GetLink(ctx, OrdersByAccountLinkType, acc.ID)
 }
 
 // LinkChallenge sets the ACME links required by an ACME challenge.
 func (l *linker) LinkChallenge(ctx context.Context, ch *acme.Challenge, azID string) {
-	ch.URL = l.GetLink(ctx, ChallengeLinkType, true, azID, ch.ID)
+	ch.URL = l.GetLink(ctx, ChallengeLinkType, azID, ch.ID)
 }
 
 // LinkAuthorization sets the ACME links required by an ACME authorization.
@@ -177,6 +176,6 @@ func (l *linker) LinkAuthorization(ctx context.Context, az *acme.Authorization) 
 // LinkOrdersByAccountID converts each order ID to an ACME link.
 func (l *linker) LinkOrdersByAccountID(ctx context.Context, orders []string) {
 	for i, id := range orders {
-		orders[i] = l.GetLink(ctx, OrderLinkType, true, id)
+		orders[i] = l.GetLink(ctx, OrderLinkType, id)
 	}
 }

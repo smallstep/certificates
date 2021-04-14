@@ -167,8 +167,8 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		acmeHandler.Route(r)
 	})
 
+	// helpful routine for logging all routes //
 	/*
-		// helpful routine for logging all routes //
 		walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
 			fmt.Printf("%s %s\n", method, route)
 			return nil

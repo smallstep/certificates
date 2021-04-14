@@ -121,8 +121,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 
 	h.linker.LinkAccount(ctx, acc)
 
-	w.Header().Set("Location", h.linker.GetLink(r.Context(), AccountLinkType,
-		true, acc.ID))
+	w.Header().Set("Location", h.linker.GetLink(r.Context(), AccountLinkType, acc.ID))
 	api.JSONStatus(w, acc, httpStatus)
 }
 
@@ -169,7 +168,7 @@ func (h *Handler) GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 
 	h.linker.LinkAccount(ctx, acc)
 
-	w.Header().Set("Location", h.linker.GetLink(ctx, AccountLinkType, true, acc.ID))
+	w.Header().Set("Location", h.linker.GetLink(ctx, AccountLinkType, acc.ID))
 	api.JSON(w, acc)
 }
 
