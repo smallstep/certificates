@@ -17,18 +17,18 @@ func TestLinker_GetUnescapedPathSuffix(t *testing.T) {
 
 	getPath := linker.GetUnescapedPathSuffix
 
-	assert.Equals(t, getPath(NewNonceLinkType, "{provisionerID}"), fmt.Sprintf("/{provisionerID}/new-nonce"))
-	assert.Equals(t, getPath(DirectoryLinkType, "{provisionerID}"), fmt.Sprintf("/{provisionerID}/directory"))
-	assert.Equals(t, getPath(NewAccountLinkType, "{provisionerID}"), fmt.Sprintf("/{provisionerID}/new-account"))
-	assert.Equals(t, getPath(AccountLinkType, "{provisionerID}", "{accID}"), fmt.Sprintf("/{provisionerID}/account/{accID}"))
-	assert.Equals(t, getPath(KeyChangeLinkType, "{provisionerID}"), fmt.Sprintf("/{provisionerID}/key-change"))
-	assert.Equals(t, getPath(NewOrderLinkType, "{provisionerID}"), fmt.Sprintf("/{provisionerID}/new-order"))
-	assert.Equals(t, getPath(OrderLinkType, "{provisionerID}", "{ordID}"), fmt.Sprintf("/{provisionerID}/order/{ordID}"))
-	assert.Equals(t, getPath(OrdersByAccountLinkType, "{provisionerID}", "{accID}"), fmt.Sprintf("/{provisionerID}/account/{accID}/orders"))
-	assert.Equals(t, getPath(FinalizeLinkType, "{provisionerID}", "{ordID}"), fmt.Sprintf("/{provisionerID}/order/{ordID}/finalize"))
-	assert.Equals(t, getPath(AuthzLinkType, "{provisionerID}", "{authzID}"), fmt.Sprintf("/{provisionerID}/authz/{authzID}"))
-	assert.Equals(t, getPath(ChallengeLinkType, "{provisionerID}", "{authzID}", "{chID}"), fmt.Sprintf("/{provisionerID}/challenge/{authzID}/{chID}"))
-	assert.Equals(t, getPath(CertificateLinkType, "{provisionerID}", "{certID}"), fmt.Sprintf("/{provisionerID}/certificate/{certID}"))
+	assert.Equals(t, getPath(NewNonceLinkType, "{provisionerID}"), "/{provisionerID}/new-nonce")
+	assert.Equals(t, getPath(DirectoryLinkType, "{provisionerID}"), "/{provisionerID}/directory")
+	assert.Equals(t, getPath(NewAccountLinkType, "{provisionerID}"), "/{provisionerID}/new-account")
+	assert.Equals(t, getPath(AccountLinkType, "{provisionerID}", "{accID}"), "/{provisionerID}/account/{accID}")
+	assert.Equals(t, getPath(KeyChangeLinkType, "{provisionerID}"), "/{provisionerID}/key-change")
+	assert.Equals(t, getPath(NewOrderLinkType, "{provisionerID}"), "/{provisionerID}/new-order")
+	assert.Equals(t, getPath(OrderLinkType, "{provisionerID}", "{ordID}"), "/{provisionerID}/order/{ordID}")
+	assert.Equals(t, getPath(OrdersByAccountLinkType, "{provisionerID}", "{accID}"), "/{provisionerID}/account/{accID}/orders")
+	assert.Equals(t, getPath(FinalizeLinkType, "{provisionerID}", "{ordID}"), "/{provisionerID}/order/{ordID}/finalize")
+	assert.Equals(t, getPath(AuthzLinkType, "{provisionerID}", "{authzID}"), "/{provisionerID}/authz/{authzID}")
+	assert.Equals(t, getPath(ChallengeLinkType, "{provisionerID}", "{authzID}", "{chID}"), "/{provisionerID}/challenge/{authzID}/{chID}")
+	assert.Equals(t, getPath(CertificateLinkType, "{provisionerID}", "{certID}"), "/{provisionerID}/certificate/{certID}")
 }
 
 func TestLinker_GetLink(t *testing.T) {
