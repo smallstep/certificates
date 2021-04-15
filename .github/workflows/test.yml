@@ -60,7 +60,6 @@ jobs:
         name: Codecov
         uses: codecov/codecov-action@v1.2.1
         with:
-          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
           file: ./coverage.out # optional
           name: codecov-umbrella # optional
           fail_ci_if_error: true # optional (default = false)
