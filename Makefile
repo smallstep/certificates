@@ -38,7 +38,7 @@ bootstra%:
 
 # If TRAVIS_TAG is set then we know this ref has been tagged.
 ifdef TRAVIS_TAG
-VERSION := $(TRAVIS_TAG)
+VERSION ?= $(TRAVIS_TAG)
 NOT_RC  := $(shell echo $(VERSION) | grep -v -e -rc)
 	ifeq ($(NOT_RC),)
 PUSHTYPE := release-candidate
@@ -47,7 +47,7 @@ PUSHTYPE := release
 	endif
 # GITHUB Actions
 else ifdef GITHUB_REF
-VERSION := $(shell echo $(GITHUB_REF) | sed 's/^refs\/tags\///')
+VERSION ?= $(shell echo $(GITHUB_REF) | sed 's/^refs\/tags\///')
 NOT_RC  := $(shell echo $(VERSION) | grep -v -e -rc)
 	ifeq ($(NOT_RC),)
 PUSHTYPE := release-candidate
