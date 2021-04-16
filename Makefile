@@ -18,7 +18,7 @@ OUTPUT_ROOT=output/
 
 all: lint test build
 
-ci: lintcgo testcgo build
+ci: testcgo build
 
 .PHONY: all ci
 
@@ -28,7 +28,7 @@ ci: lintcgo testcgo build
 
 bootstra%:
 	# Using a released version of golangci-lint to take into account custom replacements in their go.mod
-	$Q GO111MODULE=on go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.24.0
+	$Q curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.39.0
 
 .PHONY: bootstra%
 
@@ -38,7 +38,7 @@ bootstra%:
 
 # If TRAVIS_TAG is set then we know this ref has been tagged.
 ifdef TRAVIS_TAG
-VERSION := $(TRAVIS_TAG)
+VERSION ?= $(TRAVIS_TAG)
 NOT_RC  := $(shell echo $(VERSION) | grep -v -e -rc)
 	ifeq ($(NOT_RC),)
 PUSHTYPE := release-candidate
@@ -47,7 +47,7 @@ PUSHTYPE := release
 	endif
 # GITHUB Actions
 else ifdef GITHUB_REF
-VERSION := $(shell echo $(GITHUB_REF) | sed 's/^refs\/tags\///')
+VERSION ?= $(shell echo $(GITHUB_REF) | sed 's/^refs\/tags\///')
 NOT_RC  := $(shell echo $(VERSION) | grep -v -e -rc)
 	ifeq ($(NOT_RC),)
 PUSHTYPE := release-candidate

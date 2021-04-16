@@ -56,8 +56,7 @@ func NewContextWithMethod(ctx context.Context, method Method) context.Context {
 	return context.WithValue(ctx, methodKey{}, method)
 }
 
-// MethodFromContext returns the Method saved in ctx. Returns Sign if the given
-// context has no Method associated with it.
+// MethodFromContext returns the Method saved in ctx.
 func MethodFromContext(ctx context.Context) Method {
 	m, _ := ctx.Value(methodKey{}).(Method)
 	return m

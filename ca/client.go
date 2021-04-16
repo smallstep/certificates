@@ -57,6 +57,7 @@ func newInsecureClient() *uaClient {
 	return &uaClient{
 		Client: &http.Client{
 			Transport: &http.Transport{
+				Proxy:           http.ProxyFromEnvironment,
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
 		},

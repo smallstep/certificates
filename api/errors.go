@@ -17,14 +17,14 @@ import (
 func WriteError(w http.ResponseWriter, err error) {
 	switch k := err.(type) {
 	case *acme.Error:
-		w.Header().Set("Content-Type", "application/problem+json")
-		err = k.ToACME()
+		acme.WriteError(w, k)
+		return
 	case *scep.Error:
-		// TODO: check if this is correct; and should we do some more processing?
 		w.Header().Set("Content-Type", "text/plain")
 	default:
 		w.Header().Set("Content-Type", "application/json")
 	}
+
 	cause := errors.Cause(err)
 	if sc, ok := err.(errs.StatusCoder); ok {
 		w.WriteHeader(sc.StatusCode())

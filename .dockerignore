@@ -1,5 +1,3 @@
-README.md
-.gitignore
 bin
 coverage.txt
 *.test
