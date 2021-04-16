@@ -191,7 +191,7 @@ In the ca.json configuration file, a complete JWK provisioner example looks like
 ### OIDC
 
 An OIDC provisioner allows a user to get a certificate after authenticating
-himself with an OAuth OpenID Connect identity provider. The ID token provided
+themself with an OAuth OpenID Connect identity provider. The ID token provided
 will be used on the CA authentication, and by default, the certificate will only
 have the user's email as a Subject Alternative Name (SAN) Extension.
 
