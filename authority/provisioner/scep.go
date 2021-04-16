@@ -75,7 +75,7 @@ func (s *SCEP) Init(config Config) (err error) {
 		return err
 	}
 
-	// Mask the actual challenge value, so it won't be marshalled
+	// Mask the actual challenge value, so it won't be marshaled
 	s.secretChallengePassword = s.ChallengePassword
 	s.ChallengePassword = "*** redacted ***"
 
