@@ -20,6 +20,8 @@ type SCEP struct {
 	Options           *Options `json:"options,omitempty"`
 	Claims            *Claims  `json:"claims,omitempty"`
 	claimer           *Claimer
+
+	secretChallengePassword string
 }
 
 // GetID returns the provisioner unique identifier.
@@ -73,6 +75,10 @@ func (s *SCEP) Init(config Config) (err error) {
 		return err
 	}
 
+	// Mask the actual challenge value, so it won't be marshalled
+	s.secretChallengePassword = s.ChallengePassword
+	s.ChallengePassword = "*** redacted ***"
+
 	// TODO: add other, SCEP specific, options?
 
 	return err
@@ -95,7 +101,7 @@ func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 
 // GetChallengePassword returns the challenge password
 func (s *SCEP) GetChallengePassword() string {
-	return s.ChallengePassword
+	return s.secretChallengePassword
 }
 
 // GetCapabilities returns the CA capabilities
