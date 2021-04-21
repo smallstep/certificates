@@ -56,10 +56,7 @@ func newClient(transport http.RoundTripper) *uaClient {
 func newInsecureClient() *uaClient {
 	return &uaClient{
 		Client: &http.Client{
-			Transport: &http.Transport{
-				Proxy:           http.ProxyFromEnvironment,
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
+			Transport: getDefaultTransport(&tls.Config{InsecureSkipVerify: true}),
 		},
 	}
 }
@@ -292,7 +289,7 @@ func getTransportFromFile(filename string) (http.RoundTripper, error) {
 		MinVersion:               tls.VersionTLS12,
 		PreferServerCipherSuites: true,
 		RootCAs:                  pool,
-	})
+	}), nil
 }
 
 func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
@@ -311,7 +308,7 @@ func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
 		MinVersion:               tls.VersionTLS12,
 		PreferServerCipherSuites: true,
 		RootCAs:                  pool,
-	})
+	}), nil
 }
 
 func getTransportFromCABundle(bundle []byte) (http.RoundTripper, error) {
@@ -323,7 +320,7 @@ func getTransportFromCABundle(bundle []byte) (http.RoundTripper, error) {
 		MinVersion:               tls.VersionTLS12,
 		PreferServerCipherSuites: true,
 		RootCAs:                  pool,
-	})
+	}), nil
 }
 
 // parseEndpoint parses and validates the given endpoint. It supports general
