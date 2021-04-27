@@ -23,10 +23,10 @@ import (
 var mTLSDialContext func() func(ctx context.Context, network, address string) (net.Conn, error)
 
 func init() {
-	// STEP_TLS_TUNNEL is an environment that can be set to do an TLS over
-	// (m)TLS tunnel to step-ca using identity-like credentials. The value is a
-	// path to a json file with the tunnel host, certificate, key and root used
-	// to create the (m)TLS tunnel.
+	// STEP_TLS_TUNNEL is an environment variable that can be set to do an TLS
+	// over (m)TLS tunnel to step-ca using identity-like credentials. The value
+	// is a path to a json file with the tunnel host, certificate, key and root
+	// used to create the (m)TLS tunnel.
 	//
 	// The configuration should look like:
 	//  {

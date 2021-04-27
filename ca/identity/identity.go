@@ -186,7 +186,7 @@ func (i *Identity) Validate() error {
 		return fileExists(i.Key)
 	case TunnelTLS:
 		if i.Host == "" {
-			return errors.New("tunnel.crt cannot be empty")
+			return errors.New("tunnel.host cannot be empty")
 		}
 		if i.Certificate != "" {
 			if err := fileExists(i.Certificate); err != nil {
