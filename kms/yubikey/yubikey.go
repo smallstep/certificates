@@ -313,7 +313,7 @@ func getSlotAndName(name string) (piv.Slot, string, error) {
 
 	s, ok := slotMapping[slotID]
 	if !ok {
-		return piv.Slot{}, "", errors.Errorf("usupported slot-id '%s'", name)
+		return piv.Slot{}, "", errors.Errorf("unsupported slot-id '%s'", name)
 	}
 
 	name = "yubikey:slot-id=" + url.QueryEscape(slotID)
