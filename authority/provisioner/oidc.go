@@ -44,6 +44,7 @@ type openIDPayload struct {
 	AuthorizedParty string   `json:"azp"`
 	Email           string   `json:"email"`
 	EmailVerified   bool     `json:"email_verified"`
+	Username        string   `json:"preferred_username"`
 	Hd              string   `json:"hd"`
 	Nonce           string   `json:"nonce"`
 	Groups          []string `json:"groups"`
@@ -79,6 +80,21 @@ func (o *OIDC) IsAdmin(email string) bool {
 		email = sanitizeEmail(email)
 		for _, e := range o.Admins {
 			if email == sanitizeEmail(e) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// IsAdmin returns true if the given groups is in the Admins allowlist, false
+// otherwise.
+func (o *OIDC) IsAdminGroup(groups []string) bool {
+	for _,g := range groups {
+		// The groups and emails can be in the same array for now, but consider
+		// making a specialized option later.
+		for _,gadmin := range o.Admins {
+			if g == gadmin {
 				return true
 			}
 		}
@@ -377,6 +393,11 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSSHSign")
 	}
+	// Reuse the contains function provided for simplicity
+	if !containsAllMembers(iden.Usernames, []string{claims.Username}){
+		// Add preferred_username to the identity's Username
+		iden.Usernames = append(iden.Usernames, claims.Username)
+	}
 
 	// Certificate templates.
 	data := sshutil.CreateTemplateData(sshutil.UserCert, claims.Email, iden.Usernames)
@@ -395,6 +416,9 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	// Use the default template unless no-templates are configured and email is
 	// an admin, in that case we will use the parameters in the request.
 	isAdmin := o.IsAdmin(claims.Email)
+	if !isAdmin && len(claims.Groups)>0 {
+		isAdmin = o.IsAdminGroup(claims.Groups)
+	}
 	defaultTemplate := sshutil.DefaultTemplate
 	if isAdmin && !o.Options.GetSSHOptions().HasTemplate() {
 		defaultTemplate = sshutil.DefaultAdminTemplate
