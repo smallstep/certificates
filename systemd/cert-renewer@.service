@@ -26,7 +26,7 @@ ExecStart=/usr/bin/step ca renew --force $CERT_LOCATION $KEY_LOCATION
 
 ; Try to reload or restart the systemd service that relies on this cert-renewer
 ; If the relying service doesn't exist, forge ahead.
-ExecStartPost=/usr/bin/env bash -c "if ! systemctl --quiet is-enabled %i.service ; then exit 0; fi; systemctl try-reload-or-restart %i"
+ExecStartPost=-systemctl try-reload-or-restart %i
 
 [Install]
 WantedBy=multi-user.target
