@@ -87,8 +87,8 @@ func (o *OIDC) IsAdmin(email string) bool {
 	return false
 }
 
-// IsAdmin returns true if the given groups is in the Admins allowlist, false
-// otherwise.
+// IsAdminGroup returns true if the one group in the given list is in the Admins
+// allowlist, false otherwise.
 func (o *OIDC) IsAdminGroup(groups []string) bool {
 	for _, g := range groups {
 		// The groups and emails can be in the same array for now, but consider
