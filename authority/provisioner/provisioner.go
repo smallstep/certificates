@@ -337,10 +337,10 @@ type Permissions struct {
 }
 
 // GetIdentityFunc is a function that returns an identity.
-type GetIdentityFunc func(ctx context.Context, p Interface, email string) (*Identity, error)
+type GetIdentityFunc func(ctx context.Context, p Interface, email string, usernames ...string) (*Identity, error)
 
 // DefaultIdentityFunc return a default identity depending on the provisioner type.
-func DefaultIdentityFunc(ctx context.Context, p Interface, email string) (*Identity, error) {
+func DefaultIdentityFunc(ctx context.Context, p Interface, email string, usernames ...string) (*Identity, error) {
 	switch k := p.(type) {
 	case *OIDC:
 		// OIDC principals would be:
@@ -351,13 +351,14 @@ func DefaultIdentityFunc(ctx context.Context, p Interface, email string) (*Ident
 		if !sshUserRegex.MatchString(name) {
 			return nil, errors.Errorf("invalid principal '%s' from email '%s'", name, email)
 		}
-		usernames := []string{name}
+		usernames := append(usernames, name)
 		if i := strings.LastIndex(email, "@"); i >= 0 {
 			if local := email[:i]; !strings.EqualFold(local, name) {
 				usernames = append(usernames, local)
 			}
 		}
 		usernames = append(usernames, email)
+		// Some remove duplicate function should be added
 		return &Identity{
 			Usernames: usernames,
 		}, nil

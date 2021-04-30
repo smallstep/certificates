@@ -47,7 +47,7 @@ func WithDatabase(db db.AuthDB) Option {
 
 // WithGetIdentityFunc sets a custom function to retrieve the identity from
 // an external resource.
-func WithGetIdentityFunc(fn func(ctx context.Context, p provisioner.Interface, email string) (*provisioner.Identity, error)) Option {
+func WithGetIdentityFunc(fn func(ctx context.Context, p provisioner.Interface, email string, usernames ...string) (*provisioner.Identity, error)) Option {
 	return func(a *Authority) error {
 		a.getIdentityFunc = fn
 		return nil
