@@ -62,10 +62,11 @@ func TestSanitizeSSHUserPrincipal(t *testing.T) {
 
 func TestDefaultIdentityFunc(t *testing.T) {
 	type test struct {
-		p        Interface
-		email    string
-		err      error
-		identity *Identity
+		p         Interface
+		email     string
+		usernames []string
+		err       error
+		identity  *Identity
 	}
 	tests := map[string]func(*testing.T) test{
 		"fail/unsupported-provisioner": func(t *testing.T) test {
@@ -106,7 +107,7 @@ func TestDefaultIdentityFunc(t *testing.T) {
 			return test{
 				p:        &OIDC{},
 				email:    "John@smallstep.com",
-				identity: &Identity{Usernames: []string{"john", "John@smallstep.com"}},
+				identity: &Identity{Usernames: []string{"john", "John", "John@smallstep.com"}},
 			}
 		},
 		"ok symbol": func(t *testing.T) test {
@@ -116,11 +117,35 @@ func TestDefaultIdentityFunc(t *testing.T) {
 				identity: &Identity{Usernames: []string{"john_doe", "John+Doe", "John+Doe@smallstep.com"}},
 			}
 		},
+		"ok username": func(t *testing.T) test {
+			return test{
+				p:         &OIDC{},
+				email:     "john@smallstep.com",
+				usernames: []string{"johnny"},
+				identity:  &Identity{Usernames: []string{"johnny", "john", "john@smallstep.com"}},
+			}
+		},
+		"ok usernames": func(t *testing.T) test {
+			return test{
+				p:         &OIDC{},
+				email:     "john@smallstep.com",
+				usernames: []string{"johnny", "js", ""},
+				identity:  &Identity{Usernames: []string{"johnny", "js", "john", "john@smallstep.com"}},
+			}
+		},
+		"ok empty username": func(t *testing.T) test {
+			return test{
+				p:         &OIDC{},
+				email:     "john@smallstep.com",
+				usernames: []string{""},
+				identity:  &Identity{Usernames: []string{"john", "john@smallstep.com"}},
+			}
+		},
 	}
 	for name, get := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := get(t)
-			identity, err := DefaultIdentityFunc(context.Background(), tc.p, tc.email)
+			identity, err := DefaultIdentityFunc(context.Background(), tc.p, tc.email, tc.usernames...)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.Equals(t, tc.err.Error(), err.Error())
