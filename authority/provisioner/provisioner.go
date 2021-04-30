@@ -358,13 +358,28 @@ func DefaultIdentityFunc(ctx context.Context, p Interface, email string, usernam
 			}
 		}
 		usernames = append(usernames, email)
-		// Some remove duplicate function should be added
+		usernames = SanitizeStringSlices(usernames)
 		return &Identity{
 			Usernames: usernames,
 		}, nil
 	default:
 		return nil, errors.Errorf("provisioner type '%T' not supported by identity function", k)
 	}
+}
+
+func SanitizeStringSlices(original []string) []string {
+	output := []string{}
+	seen := make(map[string]bool)
+	for _, entry := range original {
+		if entry == "" {
+			continue
+		}
+		if _, value := seen[entry]; !value {
+			seen[entry] = true
+			output = append(output, entry)
+		}
+	}
+	return output
 }
 
 // MockProvisioner for testing
