@@ -129,7 +129,7 @@ func TestDefaultIdentityFunc(t *testing.T) {
 			return test{
 				p:         &OIDC{},
 				email:     "john@smallstep.com",
-				usernames: []string{"johnny", "js", ""},
+				usernames: []string{"johnny", "js", "", "johnny", ""},
 				identity:  &Identity{Usernames: []string{"johnny", "js", "john", "john@smallstep.com"}},
 			}
 		},

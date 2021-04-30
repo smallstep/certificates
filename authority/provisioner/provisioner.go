@@ -370,13 +370,13 @@ func DefaultIdentityFunc(ctx context.Context, p Interface, email string, usernam
 // SanitizeStringSlices removes duplicated an empty strings.
 func SanitizeStringSlices(original []string) []string {
 	output := []string{}
-	seen := make(map[string]bool)
+	seen := make(map[string]struct{})
 	for _, entry := range original {
 		if entry == "" {
 			continue
 		}
 		if _, value := seen[entry]; !value {
-			seen[entry] = true
+			seen[entry] = struct{}{}
 			output = append(output, entry)
 		}
 	}
