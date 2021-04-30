@@ -389,14 +389,9 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 
 	// Get the identity using either the default identityFunc or one injected
 	// externally.
-	iden, err := o.getIdentityFunc(ctx, o, claims.Email)
+	iden, err := o.getIdentityFunc(ctx, o, claims.Email, claims.PreferredUsername)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSSHSign")
-	}
-	// Reuse the contains function provided for simplicity
-	if !containsAllMembers(iden.Usernames, []string{claims.PreferredUsername}) {
-		// Add preferred_username to the identity's Username
-		iden.Usernames = append(iden.Usernames, claims.PreferredUsername)
 	}
 
 	// Certificate templates.
