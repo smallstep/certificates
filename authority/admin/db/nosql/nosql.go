@@ -11,10 +11,8 @@ import (
 )
 
 var (
-	authorityAdminsTable                  = []byte("authority_admins")
-	authorityConfigsTable                 = []byte("authority_configs")
-	authorityProvisionersTable            = []byte("authority_provisioners")
-	authorityProvisionersNameIDIndexTable = []byte("authority_provisioners_name_id_index")
+	adminsTable       = []byte("admins")
+	provisionersTable = []byte("provisioners")
 )
 
 // DB is a struct that implements the AcmeDB interface.
@@ -25,7 +23,7 @@ type DB struct {
 
 // New configures and returns a new Authority DB backend implemented using a nosql DB.
 func New(db nosqlDB.DB, authorityID string) (*DB, error) {
-	tables := [][]byte{authorityAdminsTable, authorityConfigsTable, authorityProvisionersTable, authorityProvisionersNameIDIndexTable}
+	tables := [][]byte{adminsTable, provisionersTable}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
 			return nil, errors.Wrapf(err, "error creating table %s",
@@ -70,8 +68,6 @@ func (db *DB) save(ctx context.Context, id string, nu interface{}, old interface
 		return nil
 	}
 }
-
-var idLen = 32
 
 func randID() (val string, err error) {
 	val, err = randutil.UUIDv4()

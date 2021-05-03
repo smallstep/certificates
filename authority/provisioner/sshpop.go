@@ -101,7 +101,7 @@ func (p *SSHPOP) Init(config Config) error {
 		return err
 	}
 
-	p.audiences = config.Audiences.WithFragment(p.GetID())
+	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
 	p.db = config.DB
 	p.sshPubKeys = config.SSHKeys
 	return nil

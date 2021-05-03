@@ -116,7 +116,7 @@ func (p *X5C) Init(config Config) error {
 
 	// Verify that at least one root was found.
 	if len(p.rootPool.Subjects()) == 0 {
-		return errors.Errorf("no x509 certificates found in roots attribute for provisioner %s", p.GetName())
+		return errors.Errorf("no x509 certificates found in roots attribute for provisioner '%s'", p.GetName())
 	}
 
 	// Update claims with global ones
@@ -125,7 +125,7 @@ func (p *X5C) Init(config Config) error {
 		return err
 	}
 
-	p.audiences = config.Audiences.WithFragment(p.GetID())
+	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
 	return nil
 }
 
@@ -139,7 +139,8 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, err
 	}
 
 	verifiedChains, err := jwt.Headers[0].Certificates(x509.VerifyOptions{
-		Roots: p.rootPool,
+		Roots:     p.rootPool,
+		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	})
 	if err != nil {
 		return nil, errs.Wrap(http.StatusUnauthorized, err,
@@ -234,7 +235,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // AuthorizeRenew returns an error if the renewal is disabled.
 func (p *X5C) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("x5c.AuthorizeRenew; renew is disabled for x5c provisioner %s", p.GetID())
+		return errs.Unauthorized("x5c.AuthorizeRenew; renew is disabled for x5c provisioner '%s'", p.GetName())
 	}
 	return nil
 }
@@ -242,7 +243,7 @@ func (p *X5C) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized("x5c.AuthorizeSSHSign; sshCA is disabled for x5c provisioner %s", p.GetID())
+		return nil, errs.Unauthorized("x5c.AuthorizeSSHSign; sshCA is disabled for x5c provisioner '%s'", p.GetName())
 	}
 
 	claims, err := p.authorizeToken(token, p.audiences.SSHSign)

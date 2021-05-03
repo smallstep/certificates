@@ -1,15 +1,58 @@
-package mgmt
+package admin
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/linkedca"
+	"go.step.sm/linkedca"
+)
+
+const (
+	// DefaultAuthorityID is the default AuthorityID. This will be the ID
+	// of the first Authority created, as well as the default AuthorityID
+	// if one is not specified in the configuration.
+	DefaultAuthorityID = "00000000-0000-0000-0000-000000000000"
 )
 
 // ErrNotFound is an error that should be used by the authority.DB interface to
 // indicate that an entity does not exist.
 var ErrNotFound = errors.New("not found")
+
+// UnmarshalProvisionerDetails unmarshals details type to the specific provisioner details.
+func UnmarshalProvisionerDetails(typ linkedca.Provisioner_Type, data []byte) (*linkedca.ProvisionerDetails, error) {
+	var v linkedca.ProvisionerDetails
+	switch typ {
+	case linkedca.Provisioner_JWK:
+		v.Data = new(linkedca.ProvisionerDetails_JWK)
+	case linkedca.Provisioner_OIDC:
+		v.Data = new(linkedca.ProvisionerDetails_OIDC)
+	case linkedca.Provisioner_GCP:
+		v.Data = new(linkedca.ProvisionerDetails_GCP)
+	case linkedca.Provisioner_AWS:
+		v.Data = new(linkedca.ProvisionerDetails_AWS)
+	case linkedca.Provisioner_AZURE:
+		v.Data = new(linkedca.ProvisionerDetails_Azure)
+	case linkedca.Provisioner_ACME:
+		v.Data = new(linkedca.ProvisionerDetails_ACME)
+	case linkedca.Provisioner_X5C:
+		v.Data = new(linkedca.ProvisionerDetails_X5C)
+	case linkedca.Provisioner_K8SSA:
+		v.Data = new(linkedca.ProvisionerDetails_K8SSA)
+	case linkedca.Provisioner_SSHPOP:
+		v.Data = new(linkedca.ProvisionerDetails_SSHPOP)
+	case linkedca.Provisioner_SCEP:
+		v.Data = new(linkedca.ProvisionerDetails_SCEP)
+	default:
+		return nil, fmt.Errorf("unsupported provisioner type %s", typ)
+	}
+
+	if err := json.Unmarshal(data, v.Data); err != nil {
+		return nil, err
+	}
+	return &linkedca.ProvisionerDetails{Data: v.Data}, nil
+}
 
 // DB is the DB interface expected by the step-ca ACME API.
 type DB interface {

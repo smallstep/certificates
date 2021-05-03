@@ -288,13 +288,13 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		name := chi.URLParam(r, "provisionerID")
-		provID, err := url.PathUnescape(name)
+		nameEscaped := chi.URLParam(r, "provisionerID")
+		name, err := url.PathUnescape(nameEscaped)
 		if err != nil {
-			api.WriteError(w, acme.WrapErrorISE(err, "error url unescaping provisioner id '%s'", name))
+			api.WriteError(w, acme.WrapErrorISE(err, "error url unescaping provisioner name '%s'", nameEscaped))
 			return
 		}
-		p, err := h.ca.LoadProvisionerByID("acme/" + provID)
+		p, err := h.ca.LoadProvisionerByName(name)
 		if err != nil {
 			api.WriteError(w, err)
 			return

@@ -11,6 +11,7 @@ import (
 // SCEP provisioning flow
 type SCEP struct {
 	*base
+	ID   string `json:"-"`
 	Type string `json:"type"`
 	Name string `json:"name"`
 
@@ -26,8 +27,17 @@ type SCEP struct {
 	secretChallengePassword string
 }
 
-// GetID returns the provisioner unique identifier.
-func (s SCEP) GetID() string {
+// GetID returns the provisioner unique identifier. The name and credential id
+// should uniquely identify any JWK provisioner.
+func (s *SCEP) GetID() string {
+	if s.ID != "" {
+		return s.ID
+	}
+	return s.GetIDForToken()
+}
+
+// GetIDForToken returns the provisioner unique identifier.
+func (s SCEP) GetIDForToken() string {
 	return "scep/" + s.Name
 }
 

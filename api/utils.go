@@ -3,11 +3,14 @@ package api
 import (
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 // EnableLogger is an interface that enables response logging for an object.
@@ -64,6 +67,29 @@ func JSONStatus(w http.ResponseWriter, v interface{}, status int) {
 	LogEnabledResponse(w, v)
 }
 
+// ProtoJSON writes the passed value into the http.ResponseWriter.
+func ProtoJSON(w http.ResponseWriter, m proto.Message) {
+	ProtoJSONStatus(w, m, http.StatusOK)
+}
+
+// ProtoJSONStatus writes the given value into the http.ResponseWriter and the
+// given status is written as the status code of the response.
+func ProtoJSONStatus(w http.ResponseWriter, m proto.Message, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	b, err := protojson.Marshal(m)
+	if err != nil {
+		LogError(w, err)
+		return
+	}
+	if _, err := w.Write(b); err != nil {
+		LogError(w, err)
+		return
+	}
+	//LogEnabledResponse(w, v)
+}
+
 // ReadJSON reads JSON from the request body and stores it in the value
 // pointed by v.
 func ReadJSON(r io.Reader, v interface{}) error {
@@ -71,4 +97,14 @@ func ReadJSON(r io.Reader, v interface{}) error {
 		return errs.Wrap(http.StatusBadRequest, err, "error decoding json")
 	}
 	return nil
+}
+
+// ReadProtoJSON reads JSON from the request body and stores it in the value
+// pointed by v.
+func ReadProtoJSON(r io.Reader, m proto.Message) error {
+	data, err := ioutil.ReadAll(r)
+	if err != nil {
+		return errs.Wrap(http.StatusBadRequest, err, "error reading request body")
+	}
+	return protojson.Unmarshal(data, m)
 }

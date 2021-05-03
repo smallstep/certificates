@@ -20,7 +20,7 @@ import (
 
 // Interface is the SCEP authority interface.
 type Interface interface {
-	LoadProvisionerByID(string) (provisioner.Interface, error)
+	LoadProvisionerByName(string) (provisioner.Interface, error)
 	GetLinkExplicit(provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
 
 	GetCACertificates() ([]*x509.Certificate, error)
@@ -56,7 +56,7 @@ type AuthorityOptions struct {
 // SignAuthority is the interface for a signing authority
 type SignAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
-	LoadProvisionerByID(string) (provisioner.Interface, error)
+	LoadProvisionerByName(string) (provisioner.Interface, error)
 }
 
 // New returns a new Authority that implements the SCEP interface.
@@ -92,10 +92,10 @@ var (
 	}
 )
 
-// LoadProvisionerByID calls out to the SignAuthority interface to load a
-// provisioner by ID.
-func (a *Authority) LoadProvisionerByID(id string) (provisioner.Interface, error) {
-	return a.signAuth.LoadProvisionerByID(id)
+// LoadProvisionerByName calls out to the SignAuthority interface to load a
+// provisioner by name.
+func (a *Authority) LoadProvisionerByName(name string) (provisioner.Interface, error) {
+	return a.signAuth.LoadProvisionerByName(name)
 }
 
 // GetLinkExplicit returns the requested link from the directory.

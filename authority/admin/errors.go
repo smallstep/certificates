@@ -1,4 +1,4 @@
-package mgmt
+package admin
 
 import (
 	"encoding/json"
@@ -25,6 +25,10 @@ const (
 	ErrorDeletedType
 	// ErrorBadRequestType bad request.
 	ErrorBadRequestType
+	// ErrorNotImplementedType not implemented.
+	ErrorNotImplementedType
+	// ErrorUnauthorizedType internal server error.
+	ErrorUnauthorizedType
 	// ErrorServerInternalType internal server error.
 	ErrorServerInternalType
 )
@@ -41,6 +45,10 @@ func (ap ProblemType) String() string {
 		return "deleted"
 	case ErrorBadRequestType:
 		return "badRequest"
+	case ErrorNotImplementedType:
+		return "notImplemented"
+	case ErrorUnauthorizedType:
+		return "unauthorized"
 	case ErrorServerInternalType:
 		return "internalServerError"
 	default:
@@ -75,12 +83,22 @@ var (
 		ErrorDeletedType: {
 			typ:     ErrorDeletedType.String(),
 			details: "resource is deleted",
-			status:  403,
+			status:  http.StatusUnauthorized,
+		},
+		ErrorNotImplementedType: {
+			typ:     ErrorNotImplementedType.String(),
+			details: "not implemented",
+			status:  http.StatusNotImplemented,
 		},
 		ErrorBadRequestType: {
 			typ:     ErrorBadRequestType.String(),
 			details: "bad request",
-			status:  400,
+			status:  http.StatusBadRequest,
+		},
+		ErrorUnauthorizedType: {
+			typ:     ErrorUnauthorizedType.String(),
+			details: "unauthorized",
+			status:  http.StatusUnauthorized,
 		},
 		ErrorServerInternalType: errorServerInternalMetadata,
 	}
@@ -199,7 +217,6 @@ func WriteError(w http.ResponseWriter, err *Error) {
 		}
 	}
 
-	fmt.Printf("err = %+v\n", err)
 	if err := json.NewEncoder(w).Encode(err); err != nil {
 		log.Println(err)
 	}

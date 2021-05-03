@@ -296,7 +296,7 @@ func (p *AWS) GetTokenID(token string) (string, error) {
 	}
 
 	// Use provisioner + instance-id as the identifier.
-	unique := fmt.Sprintf("%s.%s", p.GetID(), payload.document.InstanceID)
+	unique := fmt.Sprintf("%s.%s", p.GetIDForToken(), payload.document.InstanceID)
 	sum := sha256.Sum256([]byte(unique))
 	return strings.ToLower(hex.EncodeToString(sum[:])), nil
 }
@@ -344,7 +344,7 @@ func (p *AWS) GetIdentityToken(subject, caURL string) (string, error) {
 		return "", err
 	}
 
-	audience, err := generateSignAudience(caURL, p.GetID())
+	audience, err := generateSignAudience(caURL, p.GetIDForToken())
 	if err != nil {
 		return "", err
 	}
@@ -352,7 +352,7 @@ func (p *AWS) GetIdentityToken(subject, caURL string) (string, error) {
 	// Create unique ID for Trust On First Use (TOFU). Only the first instance
 	// per provisioner is allowed as we don't have a way to trust the given
 	// sans.
-	unique := fmt.Sprintf("%s.%s", p.GetID(), idoc.InstanceID)
+	unique := fmt.Sprintf("%s.%s", p.GetIDForToken(), idoc.InstanceID)
 	sum := sha256.Sum256([]byte(unique))
 
 	// Create a JWT from the identity document
@@ -407,7 +407,7 @@ func (p *AWS) Init(config Config) (err error) {
 	if p.config, err = newAWSConfig(p.IIDRoots); err != nil {
 		return err
 	}
-	p.audiences = config.Audiences.WithFragment(p.GetID())
+	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
 
 	// validate IMDS versions
 	if len(p.IMDSVersions) == 0 {
@@ -484,7 +484,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // certificate was configured to allow renewals.
 func (p *AWS) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("aws.AuthorizeRenew; renew is disabled for aws provisioner %s", p.GetID())
+		return errs.Unauthorized("aws.AuthorizeRenew; renew is disabled for aws provisioner '%s'", p.GetName())
 	}
 	return nil
 }
@@ -697,7 +697,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized("aws.AuthorizeSSHSign; ssh ca is disabled for aws provisioner %s", p.GetID())
+		return nil, errs.Unauthorized("aws.AuthorizeSSHSign; ssh ca is disabled for aws provisioner '%s'", p.GetName())
 	}
 	claims, err := p.authorizeToken(token)
 	if err != nil {

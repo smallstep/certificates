@@ -430,6 +430,7 @@ type mockProvisioner struct {
 	ret1, ret2, ret3   interface{}
 	err                error
 	getID              func() string
+	getIDForToken      func() string
 	getTokenID         func(string) (string, error)
 	getName            func() string
 	getType            func() provisioner.Type
@@ -448,6 +449,13 @@ type mockProvisioner struct {
 func (m *mockProvisioner) GetID() string {
 	if m.getID != nil {
 		return m.getID()
+	}
+	return m.ret1.(string)
+}
+
+func (m *mockProvisioner) GetIDForToken() string {
+	if m.getIDForToken != nil {
+		return m.getIDForToken()
 	}
 	return m.ret1.(string)
 }
@@ -553,7 +561,7 @@ type mockAuthority struct {
 	renew                        func(cert *x509.Certificate) ([]*x509.Certificate, error)
 	rekey                        func(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
 	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
-	loadProvisionerByID          func(provID string) (provisioner.Interface, error)
+	loadProvisionerByName        func(name string) (provisioner.Interface, error)
 	getProvisioners              func(nextCursor string, limit int) (provisioner.List, string, error)
 	revoke                       func(context.Context, *authority.RevokeOptions) error
 	getEncryptedKey              func(kid string) (string, error)
@@ -633,9 +641,9 @@ func (m *mockAuthority) LoadProvisionerByCertificate(cert *x509.Certificate) (pr
 	return m.ret1.(provisioner.Interface), m.err
 }
 
-func (m *mockAuthority) LoadProvisionerByID(provID string) (provisioner.Interface, error) {
-	if m.loadProvisionerByID != nil {
-		return m.loadProvisionerByID(provID)
+func (m *mockAuthority) LoadProvisionerByName(name string) (provisioner.Interface, error) {
+	if m.loadProvisionerByName != nil {
+		return m.loadProvisionerByName(name)
 	}
 	return m.ret1.(provisioner.Interface), m.err
 }

@@ -134,7 +134,7 @@ func (p *GCP) GetTokenID(token string) (string, error) {
 	// Create unique ID for Trust On First Use (TOFU). Only the first instance
 	// per provisioner is allowed as we don't have a way to trust the given
 	// sans.
-	unique := fmt.Sprintf("%s.%s", p.GetID(), claims.Google.ComputeEngine.InstanceID)
+	unique := fmt.Sprintf("%s.%s", p.GetIDForToken(), claims.Google.ComputeEngine.InstanceID)
 	sum := sha256.Sum256([]byte(unique))
 	return strings.ToLower(hex.EncodeToString(sum[:])), nil
 }
@@ -168,7 +168,7 @@ func (p *GCP) GetIdentityURL(audience string) string {
 
 // GetIdentityToken does an HTTP request to the identity url.
 func (p *GCP) GetIdentityToken(subject, caURL string) (string, error) {
-	audience, err := generateSignAudience(caURL, p.GetID())
+	audience, err := generateSignAudience(caURL, p.GetIDForToken())
 	if err != nil {
 		return "", err
 	}
@@ -216,7 +216,7 @@ func (p *GCP) Init(config Config) error {
 		return err
 	}
 
-	p.audiences = config.Audiences.WithFragment(p.GetID())
+	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
 	return nil
 }
 
@@ -277,7 +277,7 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // AuthorizeRenew returns an error if the renewal is disabled.
 func (p *GCP) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("gcp.AuthorizeRenew; renew is disabled for gcp provisioner %s", p.GetID())
+		return errs.Unauthorized("gcp.AuthorizeRenew; renew is disabled for gcp provisioner '%s'", p.GetName())
 	}
 	return nil
 }
@@ -382,7 +382,7 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized("gcp.AuthorizeSSHSign; sshCA is disabled for gcp provisioner %s", p.GetID())
+		return nil, errs.Unauthorized("gcp.AuthorizeSSHSign; sshCA is disabled for gcp provisioner '%s'", p.GetName())
 	}
 	claims, err := p.authorizeToken(token)
 	if err != nil {

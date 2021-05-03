@@ -7,8 +7,8 @@ import (
 	"encoding/pem"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
-	"github.com/smallstep/certificates/authority/mgmt"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
@@ -189,7 +189,7 @@ func WithX509FederatedBundle(pemCerts []byte) Option {
 }
 
 // WithAdminDB is an option to set the database backing the admin APIs.
-func WithAdminDB(db mgmt.DB) Option {
+func WithAdminDB(db admin.DB) Option {
 	return func(a *Authority) error {
 		a.adminDB = db
 		return nil

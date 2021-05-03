@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/admin"
 	"go.step.sm/crypto/jose"
 )
 
@@ -148,24 +148,7 @@ func (c *Collection) LoadByCertificate(cert *x509.Certificate) (Interface, bool)
 			if _, err := asn1.Unmarshal(e.Value, &provisioner); err != nil {
 				return nil, false
 			}
-			switch Type(provisioner.Type) {
-			case TypeJWK:
-				return c.Load(string(provisioner.Name) + ":" + string(provisioner.CredentialID))
-			case TypeAWS:
-				return c.Load("aws/" + string(provisioner.Name))
-			case TypeGCP:
-				return c.Load("gcp/" + string(provisioner.Name))
-			case TypeACME:
-				return c.Load("acme/" + string(provisioner.Name))
-			case TypeSCEP:
-				return c.Load("scep/" + string(provisioner.Name))
-			case TypeX5C:
-				return c.Load("x5c/" + string(provisioner.Name))
-			case TypeK8sSA:
-				return c.Load(K8sSAID)
-			default:
-				return c.Load(string(provisioner.CredentialID))
-			}
+			return c.LoadByName(string(provisioner.Name))
 		}
 	}
 
@@ -190,18 +173,21 @@ func (c *Collection) LoadEncryptedKey(keyID string) (string, bool) {
 func (c *Collection) Store(p Interface) error {
 	// Store provisioner always in byID. ID must be unique.
 	if _, loaded := c.byID.LoadOrStore(p.GetID(), p); loaded {
-		return errors.New("cannot add multiple provisioners with the same id")
+		return admin.NewError(admin.ErrorBadRequestType,
+			"cannot add multiple provisioners with the same id")
 	}
 	// Store provisioner always by name.
 	if _, loaded := c.byName.LoadOrStore(p.GetName(), p); loaded {
 		c.byID.Delete(p.GetID())
-		return errors.New("cannot add multiple provisioners with the same name")
+		return admin.NewError(admin.ErrorBadRequestType,
+			"cannot add multiple provisioners with the same name")
 	}
 	// Store provisioner always by ID presented in token.
 	if _, loaded := c.byTokenID.LoadOrStore(p.GetIDForToken(), p); loaded {
 		c.byID.Delete(p.GetID())
 		c.byName.Delete(p.GetName())
-		return errors.New("cannot add multiple provisioners with the same token identifier")
+		return admin.NewError(admin.ErrorBadRequestType,
+			"cannot add multiple provisioners with the same token identifier")
 	}
 
 	// Store provisioner in byKey if EncryptedKey is defined.
@@ -223,6 +209,65 @@ func (c *Collection) Store(p Interface) error {
 	})
 	sort.Sort(c.sorted)
 	return nil
+}
+
+// Remove deletes an provisioner from all associated collections and lists.
+func (c *Collection) Remove(id string) error {
+	prov, ok := c.Load(id)
+	if !ok {
+		return admin.NewError(admin.ErrorNotFoundType, "provisioner %s not found", id)
+	}
+
+	var found bool
+	for i, elem := range c.sorted {
+		if elem.provisioner.GetID() == id {
+			// Remove index in sorted list
+			copy(c.sorted[i:], c.sorted[i+1:])           // Shift a[i+1:] left one index.
+			c.sorted[len(c.sorted)-1] = uidProvisioner{} // Erase last element (write zero value).
+			c.sorted = c.sorted[:len(c.sorted)-1]        // Truncate slice.
+			found = true
+			break
+		}
+	}
+	if !found {
+		return admin.NewError(admin.ErrorNotFoundType, "provisioner %s not found in sorted list", prov.GetName())
+	}
+
+	c.byID.Delete(id)
+	c.byName.Delete(prov.GetName())
+	c.byTokenID.Delete(prov.GetIDForToken())
+	if kid, _, ok := prov.GetEncryptedKey(); ok {
+		c.byKey.Delete(kid)
+	}
+
+	return nil
+}
+
+// Update updates the given provisioner in all related lists and collections.
+func (c *Collection) Update(nu Interface) error {
+	old, ok := c.Load(nu.GetID())
+	if !ok {
+		return admin.NewError(admin.ErrorNotFoundType, "provisioner %s not found", nu.GetID())
+	}
+
+	if old.GetName() != nu.GetName() {
+		if _, ok := c.LoadByName(nu.GetName()); ok {
+			return admin.NewError(admin.ErrorBadRequestType,
+				"provisioner with name %s already exists", nu.GetName())
+		}
+	}
+	if old.GetIDForToken() != nu.GetIDForToken() {
+		if _, ok := c.LoadByTokenID(nu.GetIDForToken()); ok {
+			return admin.NewError(admin.ErrorBadRequestType,
+				"provisioner with Token ID %s already exists", nu.GetIDForToken())
+		}
+	}
+
+	if err := c.Remove(old.GetID()); err != nil {
+		return err
+	}
+
+	return c.Store(nu)
 }
 
 // Find implements pagination on a list of sorted provisioners.

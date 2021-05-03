@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/mgmt"
-	"github.com/smallstep/certificates/linkedca"
+	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/nosql"
+	"go.step.sm/linkedca"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // dbAdmin is the database representation of the Admin type.
@@ -22,19 +23,46 @@ type dbAdmin struct {
 	DeletedAt     time.Time           `json:"deletedAt"`
 }
 
-func (dbp *dbAdmin) clone() *dbAdmin {
-	u := *dbp
+func (dba *dbAdmin) convert() *linkedca.Admin {
+	return &linkedca.Admin{
+		Id:            dba.ID,
+		AuthorityId:   dba.AuthorityID,
+		ProvisionerId: dba.ProvisionerID,
+		Subject:       dba.Subject,
+		Type:          dba.Type,
+		CreatedAt:     timestamppb.New(dba.CreatedAt),
+		DeletedAt:     timestamppb.New(dba.DeletedAt),
+	}
+}
+
+func (dba *dbAdmin) clone() *dbAdmin {
+	u := *dba
 	return &u
 }
 
 func (db *DB) getDBAdminBytes(ctx context.Context, id string) ([]byte, error) {
-	data, err := db.db.Get(authorityAdminsTable, []byte(id))
+	data, err := db.db.Get(adminsTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
-		return nil, mgmt.NewError(mgmt.ErrorNotFoundType, "admin %s not found", id)
+		return nil, admin.NewError(admin.ErrorNotFoundType, "admin %s not found", id)
 	} else if err != nil {
 		return nil, errors.Wrapf(err, "error loading admin %s", id)
 	}
 	return data, nil
+}
+
+func (db *DB) unmarshalDBAdmin(data []byte, id string) (*dbAdmin, error) {
+	var dba = new(dbAdmin)
+	if err := json.Unmarshal(data, dba); err != nil {
+		return nil, errors.Wrapf(err, "error unmarshaling admin %s into dbAdmin", id)
+	}
+	if !dba.DeletedAt.IsZero() {
+		return nil, admin.NewError(admin.ErrorDeletedType, "admin %s is deleted", id)
+	}
+	if dba.AuthorityID != db.authorityID {
+		return nil, admin.NewError(admin.ErrorAuthorityMismatchType,
+			"admin %s is not owned by authority %s", dba.ID, db.authorityID)
+	}
+	return dba, nil
 }
 
 func (db *DB) getDBAdmin(ctx context.Context, id string) (*dbAdmin, error) {
@@ -42,40 +70,19 @@ func (db *DB) getDBAdmin(ctx context.Context, id string) (*dbAdmin, error) {
 	if err != nil {
 		return nil, err
 	}
-	dba, err := unmarshalDBAdmin(data, id)
+	dba, err := db.unmarshalDBAdmin(data, id)
 	if err != nil {
 		return nil, err
-	}
-	if dba.AuthorityID != db.authorityID {
-		return nil, mgmt.NewError(mgmt.ErrorAuthorityMismatchType,
-			"admin %s is not owned by authority %s", dba.ID, db.authorityID)
 	}
 	return dba, nil
 }
 
-func unmarshalDBAdmin(data []byte, id string) (*dbAdmin, error) {
-	var dba = new(dbAdmin)
-	if err := json.Unmarshal(data, dba); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling admin %s into dbAdmin", id)
-	}
-	if !dba.DeletedAt.IsZero() {
-		return nil, mgmt.NewError(mgmt.ErrorDeletedType, "admin %s is deleted", id)
-	}
-	return dba, nil
-}
-
-func unmarshalAdmin(data []byte, id string) (*linkedca.Admin, error) {
-	dba, err := unmarshalDBAdmin(data, id)
+func (db *DB) unmarshalAdmin(data []byte, id string) (*linkedca.Admin, error) {
+	dba, err := db.unmarshalDBAdmin(data, id)
 	if err != nil {
 		return nil, err
 	}
-	return &linkedca.Admin{
-		Id:            dba.ID,
-		AuthorityId:   dba.AuthorityID,
-		ProvisionerId: dba.ProvisionerID,
-		Subject:       dba.Subject,
-		Type:          dba.Type,
-	}, nil
+	return dba.convert(), nil
 }
 
 // GetAdmin retrieves and unmarshals a admin from the database.
@@ -84,13 +91,9 @@ func (db *DB) GetAdmin(ctx context.Context, id string) (*linkedca.Admin, error) 
 	if err != nil {
 		return nil, err
 	}
-	adm, err := unmarshalAdmin(data, id)
+	adm, err := db.unmarshalAdmin(data, id)
 	if err != nil {
 		return nil, err
-	}
-	if adm.AuthorityId != db.authorityID {
-		return nil, mgmt.NewError(mgmt.ErrorAuthorityMismatchType,
-			"admin %s is not owned by authority %s", adm.Id, db.authorityID)
 	}
 
 	return adm, nil
@@ -100,15 +103,24 @@ func (db *DB) GetAdmin(ctx context.Context, id string) (*linkedca.Admin, error) 
 // from the database.
 // TODO should we be paginating?
 func (db *DB) GetAdmins(ctx context.Context) ([]*linkedca.Admin, error) {
-	dbEntries, err := db.db.List(authorityAdminsTable)
+	dbEntries, err := db.db.List(adminsTable)
 	if err != nil {
 		return nil, errors.Wrap(err, "error loading admins")
 	}
 	var admins = []*linkedca.Admin{}
 	for _, entry := range dbEntries {
-		adm, err := unmarshalAdmin(entry.Value, string(entry.Key))
+		adm, err := db.unmarshalAdmin(entry.Value, string(entry.Key))
 		if err != nil {
-			return nil, err
+			switch k := err.(type) {
+			case *admin.Error:
+				if k.IsType(admin.ErrorDeletedType) || k.IsType(admin.ErrorAuthorityMismatchType) {
+					continue
+				} else {
+					return nil, err
+				}
+			default:
+				return nil, err
+			}
 		}
 		if adm.AuthorityId != db.authorityID {
 			continue
@@ -123,7 +135,7 @@ func (db *DB) CreateAdmin(ctx context.Context, adm *linkedca.Admin) error {
 	var err error
 	adm.Id, err = randID()
 	if err != nil {
-		return mgmt.WrapErrorISE(err, "error generating random id for admin")
+		return admin.WrapErrorISE(err, "error generating random id for admin")
 	}
 	adm.AuthorityId = db.authorityID
 
@@ -136,7 +148,7 @@ func (db *DB) CreateAdmin(ctx context.Context, adm *linkedca.Admin) error {
 		CreatedAt:     clock.Now(),
 	}
 
-	return db.save(ctx, dba.ID, dba, nil, "admin", authorityAdminsTable)
+	return db.save(ctx, dba.ID, dba, nil, "admin", adminsTable)
 }
 
 // UpdateAdmin saves an updated admin to the database.
@@ -149,7 +161,7 @@ func (db *DB) UpdateAdmin(ctx context.Context, adm *linkedca.Admin) error {
 	nu := old.clone()
 	nu.Type = adm.Type
 
-	return db.save(ctx, old.ID, nu, old, "admin", authorityAdminsTable)
+	return db.save(ctx, old.ID, nu, old, "admin", adminsTable)
 }
 
 // DeleteAdmin saves an updated admin to the database.
@@ -162,5 +174,5 @@ func (db *DB) DeleteAdmin(ctx context.Context, id string) error {
 	nu := old.clone()
 	nu.DeletedAt = clock.Now()
 
-	return db.save(ctx, old.ID, nu, old, "admin", authorityAdminsTable)
+	return db.save(ctx, old.ID, nu, old, "admin", adminsTable)
 }

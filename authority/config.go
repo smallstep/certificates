@@ -5,16 +5,25 @@ import "github.com/smallstep/certificates/authority/config"
 // Config is an alias to support older APIs.
 type Config = config.Config
 
+// LoadConfiguration is an alias to support older APIs.
+var LoadConfiguration = config.LoadConfiguration
+
 // AuthConfig is an alias to support older APIs.
 type AuthConfig = config.AuthConfig
+
+// TLS
 
 // ASN1DN is an alias to support older APIs.
 type ASN1DN = config.ASN1DN
 
-// TLS
+// DefaultTLSOptions is an alias to support older APIs.
+var DefaultTLSOptions = config.DefaultTLSOptions
 
 // TLSOptions is an alias to support older APIs.
 type TLSOptions = config.TLSOptions
+
+// CipherSuites is an alias to support older APIs.
+type CipherSuites = config.CipherSuites
 
 // SSH
 

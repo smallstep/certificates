@@ -12,8 +12,8 @@ import (
 	cas "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	kms "github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/certificates/linkedca"
 	"github.com/smallstep/certificates/templates"
+	"go.step.sm/linkedca"
 )
 
 const (
@@ -21,18 +21,6 @@ const (
 )
 
 var (
-	// DefaultTLSOptions represents the default TLS version as well as the cipher
-	// suites used in the TLS certificates.
-	DefaultTLSOptions = TLSOptions{
-		CipherSuites: CipherSuites{
-			"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
-			"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-			"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
-		},
-		MinVersion:    1.2,
-		MaxVersion:    1.2,
-		Renegotiation: false,
-	}
 	// DefaultBackdate length of time to backdate certificates to avoid
 	// clock skew validation issues.
 	DefaultBackdate = time.Minute
@@ -41,7 +29,7 @@ var (
 	// DefaultEnableSSHCA enable SSH CA features per provisioner or globally
 	// for all provisioners.
 	DefaultEnableSSHCA = false
-	// GlobalProvisionerClaims default claims for the Authority. Can be overriden
+	// GlobalProvisionerClaims default claims for the Authority. Can be overridden
 	// by provisioner specific claims.
 	GlobalProvisionerClaims = provisioner.Claims{
 		MinTLSDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
@@ -65,6 +53,7 @@ type Config struct {
 	IntermediateCert string               `json:"crt"`
 	IntermediateKey  string               `json:"key"`
 	Address          string               `json:"address"`
+	InsecureAddress  string               `json:"insecureAddress"`
 	DNSNames         []string             `json:"dnsNames"`
 	KMS              *kms.Options         `json:"kms,omitempty"`
 	SSH              *SSHConfig           `json:"ssh,omitempty"`
@@ -80,13 +69,13 @@ type Config struct {
 // ASN1DN contains ASN1.DN attributes that are used in Subject and Issuer
 // x509 Certificate blocks.
 type ASN1DN struct {
-	Country            string `json:"country,omitempty" step:"country"`
-	Organization       string `json:"organization,omitempty" step:"organization"`
-	OrganizationalUnit string `json:"organizationalUnit,omitempty" step:"organizationalUnit"`
-	Locality           string `json:"locality,omitempty" step:"locality"`
-	Province           string `json:"province,omitempty" step:"province"`
-	StreetAddress      string `json:"streetAddress,omitempty" step:"streetAddress"`
-	CommonName         string `json:"commonName,omitempty" step:"commonName"`
+	Country            string `json:"country,omitempty"`
+	Organization       string `json:"organization,omitempty"`
+	OrganizationalUnit string `json:"organizationalUnit,omitempty"`
+	Locality           string `json:"locality,omitempty"`
+	Province           string `json:"province,omitempty"`
+	StreetAddress      string `json:"streetAddress,omitempty"`
+	CommonName         string `json:"commonName,omitempty"`
 }
 
 // AuthConfig represents the configuration options for the authority. An
@@ -101,6 +90,7 @@ type AuthConfig struct {
 	Claims               *provisioner.Claims   `json:"claims,omitempty"`
 	DisableIssuedAtCheck bool                  `json:"disableIssuedAtCheck,omitempty"`
 	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
+	EnableAdmin          bool                  `json:"enableAdmin,omitempty"`
 }
 
 // init initializes the required fields in the AuthConfig if they are not

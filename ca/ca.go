@@ -17,9 +17,8 @@ import (
 	acmeNoSQL "github.com/smallstep/certificates/acme/db/nosql"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/config"
-	"github.com/smallstep/certificates/authority/mgmt"
-	mgmtAPI "github.com/smallstep/certificates/authority/mgmt/api"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
@@ -79,11 +78,12 @@ func WithDatabase(db db.AuthDB) Option {
 // CA is the type used to build the complete certificate authority. It builds
 // the HTTP server, set ups the middlewares and the HTTP handlers.
 type CA struct {
-	auth    *authority.Authority
-	config  *config.Config
-	srv     *server.Server
-	opts    *options
-	renewer *TLSRenewer
+	auth        *authority.Authority
+	config      *config.Config
+	srv         *server.Server
+	insecureSrv *server.Server
+	opts        *options
+	renewer     *TLSRenewer
 }
 
 // New creates and initializes the CA with the given configuration and options.
@@ -130,6 +130,9 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	mux := chi.NewRouter()
 	handler := http.Handler(mux)
 
+	insecureMux := chi.NewRouter()
+	insecureHandler := http.Handler(insecureMux)
+
 	// Add regular CA api endpoints in / and /1.0
 	routerHandler := api.New(auth)
 	routerHandler.Route(mux)
@@ -154,7 +157,7 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	if config.DB == nil {
 		acmeDB = nil
 	} else {
-		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB), mgmt.DefaultAuthorityID)
+		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
 		if err != nil {
 			return nil, errors.Wrap(err, "error configuring ACME DB interface")
 		}
@@ -176,12 +179,14 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	})
 
 	// Admin API Router
-	adminDB := auth.GetAdminDatabase()
-	if adminDB != nil {
-		mgmtHandler := mgmtAPI.NewHandler(auth)
-		mux.Route("/admin", func(r chi.Router) {
-			mgmtHandler.Route(r)
-		})
+	if config.AuthorityConfig.EnableAdmin {
+		adminDB := auth.GetAdminDatabase()
+		if adminDB != nil {
+			adminHandler := adminAPI.NewHandler(auth)
+			mux.Route("/admin", func(r chi.Router) {
+				adminHandler.Route(r)
+			})
+		}
 	}
 
 	if ca.shouldServeSCEPEndpoints() {

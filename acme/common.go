@@ -11,7 +11,7 @@ import (
 // CertificateAuthority is the interface implemented by a CA authority.
 type CertificateAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
-	LoadProvisionerByID(string) (provisioner.Interface, error)
+	LoadProvisionerByName(string) (provisioner.Interface, error)
 }
 
 // Clock that returns time in UTC rounded to seconds.

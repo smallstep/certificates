@@ -7,27 +7,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type _Claims struct {
-	*X509Claims    `json:"x509Claims"`
-	*SSHClaims     `json:"sshClaims"`
-	DisableRenewal *bool `json:"disableRenewal"`
-}
-
-type X509Claims struct {
-	Durations *Durations `json:"durations"`
-}
-
-type SSHClaims struct {
-	UserDuration *Durations `json:"userDurations"`
-	HostDuration *Durations `json:"hostDuration"`
-}
-
-type Durations struct {
-	Min     string `json:"min"`
-	Max     string `json:"max"`
-	Default string `json:"default"`
-}
-
 // Claims so that individual provisioners can override global claims.
 type Claims struct {
 	// TLS CA properties
@@ -92,6 +71,9 @@ func (c *Claimer) DefaultTLSCertDuration() time.Duration {
 // minimum from the authority configuration will be used.
 func (c *Claimer) MinTLSCertDuration() time.Duration {
 	if c.claims == nil || c.claims.MinTLSDur == nil {
+		if c.claims != nil && c.claims.DefaultTLSDur != nil && c.claims.DefaultTLSDur.Duration < c.global.MinTLSDur.Duration {
+			return c.claims.DefaultTLSDur.Duration
+		}
 		return c.global.MinTLSDur.Duration
 	}
 	return c.claims.MinTLSDur.Duration
@@ -102,6 +84,9 @@ func (c *Claimer) MinTLSCertDuration() time.Duration {
 // maximum from the authority configuration will be used.
 func (c *Claimer) MaxTLSCertDuration() time.Duration {
 	if c.claims == nil || c.claims.MaxTLSDur == nil {
+		if c.claims != nil && c.claims.DefaultTLSDur != nil && c.claims.DefaultTLSDur.Duration > c.global.MaxTLSDur.Duration {
+			return c.claims.DefaultTLSDur.Duration
+		}
 		return c.global.MaxTLSDur.Duration
 	}
 	return c.claims.MaxTLSDur.Duration
@@ -147,6 +132,9 @@ func (c *Claimer) DefaultUserSSHCertDuration() time.Duration {
 // global minimum from the authority configuration will be used.
 func (c *Claimer) MinUserSSHCertDuration() time.Duration {
 	if c.claims == nil || c.claims.MinUserSSHDur == nil {
+		if c.claims != nil && c.claims.DefaultUserSSHDur != nil && c.claims.DefaultUserSSHDur.Duration < c.global.MinUserSSHDur.Duration {
+			return c.claims.DefaultUserSSHDur.Duration
+		}
 		return c.global.MinUserSSHDur.Duration
 	}
 	return c.claims.MinUserSSHDur.Duration
@@ -157,6 +145,9 @@ func (c *Claimer) MinUserSSHCertDuration() time.Duration {
 // global maximum from the authority configuration will be used.
 func (c *Claimer) MaxUserSSHCertDuration() time.Duration {
 	if c.claims == nil || c.claims.MaxUserSSHDur == nil {
+		if c.claims != nil && c.claims.DefaultUserSSHDur != nil && c.claims.DefaultUserSSHDur.Duration > c.global.MaxUserSSHDur.Duration {
+			return c.claims.DefaultUserSSHDur.Duration
+		}
 		return c.global.MaxUserSSHDur.Duration
 	}
 	return c.claims.MaxUserSSHDur.Duration
@@ -177,6 +168,9 @@ func (c *Claimer) DefaultHostSSHCertDuration() time.Duration {
 // global minimum from the authority configuration will be used.
 func (c *Claimer) MinHostSSHCertDuration() time.Duration {
 	if c.claims == nil || c.claims.MinHostSSHDur == nil {
+		if c.claims != nil && c.claims.DefaultHostSSHDur != nil && c.claims.DefaultHostSSHDur.Duration < c.global.MinHostSSHDur.Duration {
+			return c.claims.DefaultHostSSHDur.Duration
+		}
 		return c.global.MinHostSSHDur.Duration
 	}
 	return c.claims.MinHostSSHDur.Duration
@@ -187,6 +181,9 @@ func (c *Claimer) MinHostSSHCertDuration() time.Duration {
 // global maximum from the authority configuration will be used.
 func (c *Claimer) MaxHostSSHCertDuration() time.Duration {
 	if c.claims == nil || c.claims.MaxHostSSHDur == nil {
+		if c.claims != nil && c.claims.DefaultHostSSHDur != nil && c.claims.DefaultHostSSHDur.Duration > c.global.MaxHostSSHDur.Duration {
+			return c.claims.DefaultHostSSHDur.Duration
+		}
 		return c.global.MaxHostSSHDur.Duration
 	}
 	return c.claims.MaxHostSSHDur.Duration

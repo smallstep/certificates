@@ -10,8 +10,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -28,10 +30,13 @@ import (
 	"github.com/smallstep/certificates/ca/identity"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/cli-utils/config"
+	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/net/http2"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -108,6 +113,12 @@ type clientOptions struct {
 	certificate          tls.Certificate
 	getClientCertificate func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
 	retryFunc            RetryFunc
+	x5cJWK               *jose.JSONWebKey
+	x5cCertFile          string
+	x5cCertStrs          []string
+	x5cCert              *x509.Certificate
+	x5cIssuer            string
+	x5cSubject           string
 }
 
 func (o *clientOptions) apply(opts []ClientOption) (err error) {
@@ -266,9 +277,66 @@ func WithCABundle(bundle []byte) ClientOption {
 
 // WithCertificate will set the given certificate as the TLS client certificate
 // in the client.
-func WithCertificate(crt tls.Certificate) ClientOption {
+func WithCertificate(cert tls.Certificate) ClientOption {
 	return func(o *clientOptions) error {
-		o.certificate = crt
+		o.certificate = cert
+		return nil
+	}
+}
+
+var (
+	stepOIDRoot        = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
+	stepOIDProvisioner = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
+)
+
+type stepProvisionerASN1 struct {
+	Type          int
+	Name          []byte
+	CredentialID  []byte
+	KeyValuePairs []string `asn1:"optional,omitempty"`
+}
+
+// WithAdminX5C will set the given file as the X5C certificate for use
+// by the client.
+func WithAdminX5C(certs []*x509.Certificate, key interface{}, passwordFile string) ClientOption {
+	return func(o *clientOptions) error {
+		// Get private key from given key file
+		var (
+			err  error
+			opts []jose.Option
+		)
+		if len(passwordFile) != 0 {
+			opts = append(opts, jose.WithPasswordFile(passwordFile))
+		}
+		blk, err := pemutil.Serialize(key)
+		if err != nil {
+			return errors.Wrap(err, "error serializing private key")
+		}
+		o.x5cJWK, err = jose.ParseKey(pem.EncodeToMemory(blk), opts...)
+		if err != nil {
+			return err
+		}
+		o.x5cCertStrs, err = jose.ValidateX5C(certs, o.x5cJWK.Key)
+		if err != nil {
+			return errors.Wrap(err, "error validating x5c certificate chain and key for use in x5c header")
+		}
+
+		o.x5cCert = certs[0]
+		o.x5cSubject = o.x5cCert.Subject.CommonName
+
+		for _, e := range o.x5cCert.Extensions {
+			if e.Id.Equal(stepOIDProvisioner) {
+				var provisioner stepProvisionerASN1
+				if _, err := asn1.Unmarshal(e.Value, &provisioner); err != nil {
+					return errors.Wrap(err, "error unmarshaling provisioner OID from certificate")
+				}
+				o.x5cIssuer = string(provisioner.Name)
+			}
+		}
+		if len(o.x5cIssuer) == 0 {
+			return errors.New("provisioner extension not found in certificate")
+		}
+
 		return nil
 	}
 }
@@ -372,6 +440,8 @@ type ProvisionerOption func(o *provisionerOptions) error
 type provisionerOptions struct {
 	cursor string
 	limit  int
+	id     string
+	name   string
 }
 
 func (o *provisionerOptions) apply(opts []ProvisionerOption) (err error) {
@@ -391,6 +461,12 @@ func (o *provisionerOptions) rawQuery() string {
 	if o.limit > 0 {
 		v.Set("limit", strconv.Itoa(o.limit))
 	}
+	if len(o.id) > 0 {
+		v.Set("id", o.id)
+	}
+	if len(o.name) > 0 {
+		v.Set("name", o.name)
+	}
 	return v.Encode()
 }
 
@@ -406,6 +482,22 @@ func WithProvisionerCursor(cursor string) ProvisionerOption {
 func WithProvisionerLimit(limit int) ProvisionerOption {
 	return func(o *provisionerOptions) error {
 		o.limit = limit
+		return nil
+	}
+}
+
+// WithProvisionerID will request the given provisioner.
+func WithProvisionerID(id string) ProvisionerOption {
+	return func(o *provisionerOptions) error {
+		o.id = id
+		return nil
+	}
+}
+
+// WithProvisionerName will request the given provisioner.
+func WithProvisionerName(name string) ProvisionerOption {
+	return func(o *provisionerOptions) error {
+		o.name = name
 		return nil
 	}
 }
@@ -1209,6 +1301,15 @@ func getRootCAPath() string {
 func readJSON(r io.ReadCloser, v interface{}) error {
 	defer r.Close()
 	return json.NewDecoder(r).Decode(v)
+}
+
+func readProtoJSON(r io.ReadCloser, m proto.Message) error {
+	defer r.Close()
+	data, err := ioutil.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	return protojson.Unmarshal(data, m)
 }
 
 func readError(r io.ReadCloser) error {

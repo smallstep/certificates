@@ -377,7 +377,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 // certificate was configured to allow renewals.
 func (o *OIDC) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if o.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("oidc.AuthorizeRenew; renew is disabled for oidc provisioner %s", o.GetID())
+		return errs.Unauthorized("oidc.AuthorizeRenew; renew is disabled for oidc provisioner '%s'", o.GetName())
 	}
 	return nil
 }
@@ -385,7 +385,7 @@ func (o *OIDC) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !o.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized("oidc.AuthorizeSSHSign; sshCA is disabled for oidc provisioner %s", o.GetID())
+		return nil, errs.Unauthorized("oidc.AuthorizeSSHSign; sshCA is disabled for oidc provisioner '%s'", o.GetName())
 	}
 	claims, err := o.authorizeToken(token)
 	if err != nil {

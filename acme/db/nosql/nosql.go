@@ -23,12 +23,11 @@ var (
 
 // DB is a struct that implements the AcmeDB interface.
 type DB struct {
-	db          nosqlDB.DB
-	authorityID string
+	db nosqlDB.DB
 }
 
 // New configures and returns a new ACME DB backend implemented using a nosql DB.
-func New(db nosqlDB.DB, authorityID string) (*DB, error) {
+func New(db nosqlDB.DB) (*DB, error) {
 	tables := [][]byte{accountTable, accountByKeyIDTable, authzTable,
 		challengeTable, nonceTable, orderTable, ordersByAccountIDTable, certTable}
 	for _, b := range tables {
@@ -37,7 +36,7 @@ func New(db nosqlDB.DB, authorityID string) (*DB, error) {
 				string(b))
 		}
 	}
-	return &DB{db, authorityID}, nil
+	return &DB{db}, nil
 }
 
 // save writes the new data to the database, overwriting the old data if it
