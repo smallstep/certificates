@@ -1,0 +1,7 @@
+{
+    "type": "mTLS",
+    "crt": "testdata/identity/identity.crt",
+    "key": "testdata/identity/identity_key",
+    "host": "tunnel:443",
+    "root": "testdata/certs/root_ca.crt"
+}

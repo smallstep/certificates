@@ -529,6 +529,75 @@ func TestClient_Renew(t *testing.T) {
 	}
 }
 
+func TestClient_Rekey(t *testing.T) {
+	ok := &api.SignResponse{
+		ServerPEM: api.Certificate{Certificate: parseCertificate(certPEM)},
+		CaPEM:     api.Certificate{Certificate: parseCertificate(rootPEM)},
+		CertChainPEM: []api.Certificate{
+			{Certificate: parseCertificate(certPEM)},
+			{Certificate: parseCertificate(rootPEM)},
+		},
+	}
+
+	request := &api.RekeyRequest{
+		CsrPEM: api.CertificateRequest{CertificateRequest: parseCertificateRequest(csrPEM)},
+	}
+
+	tests := []struct {
+		name         string
+		request      *api.RekeyRequest
+		response     interface{}
+		responseCode int
+		wantErr      bool
+		err          error
+	}{
+		{"ok", request, ok, 200, false, nil},
+		{"unauthorized", request, errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
+		{"empty request", &api.RekeyRequest{}, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"nil request", nil, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+	}
+
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				api.JSONStatus(w, tt.response, tt.responseCode)
+			})
+
+			got, err := c.Rekey(tt.request, nil)
+			if (err != nil) != tt.wantErr {
+				fmt.Printf("%+v", err)
+				t.Errorf("Client.Renew() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			switch {
+			case err != nil:
+				if got != nil {
+					t.Errorf("Client.Renew() = %v, want nil", got)
+				}
+
+				sc, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				assert.HasPrefix(t, tt.err.Error(), err.Error())
+			default:
+				if !reflect.DeepEqual(got, tt.response) {
+					t.Errorf("Client.Renew() = %v, want %v", got, tt.response)
+				}
+			}
+		})
+	}
+}
+
 func TestClient_Provisioners(t *testing.T) {
 	ok := &api.ProvisionersResponse{
 		Provisioners: provisioner.List{},

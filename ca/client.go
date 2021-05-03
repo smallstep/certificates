@@ -56,10 +56,7 @@ func newClient(transport http.RoundTripper) *uaClient {
 func newInsecureClient() *uaClient {
 	return &uaClient{
 		Client: &http.Client{
-			Transport: &http.Transport{
-				Proxy:           http.ProxyFromEnvironment,
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
+			Transport: getDefaultTransport(&tls.Config{InsecureSkipVerify: true}),
 		},
 	}
 }
@@ -99,12 +96,13 @@ type RetryFunc func(code int) bool
 type ClientOption func(o *clientOptions) error
 
 type clientOptions struct {
-	transport    http.RoundTripper
-	rootSHA256   string
-	rootFilename string
-	rootBundle   []byte
-	certificate  tls.Certificate
-	retryFunc    RetryFunc
+	transport            http.RoundTripper
+	rootSHA256           string
+	rootFilename         string
+	rootBundle           []byte
+	certificate          tls.Certificate
+	getClientCertificate func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
+	retryFunc            RetryFunc
 }
 
 func (o *clientOptions) apply(opts []ClientOption) (err error) {
@@ -139,6 +137,7 @@ func (o *clientOptions) applyDefaultIdentity() error {
 		return nil
 	}
 	o.certificate = crt
+	o.getClientCertificate = i.GetClientCertificateFunc()
 	return nil
 }
 
@@ -193,6 +192,7 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 			}
 			if len(tr.TLSClientConfig.Certificates) == 0 && tr.TLSClientConfig.GetClientCertificate == nil {
 				tr.TLSClientConfig.Certificates = []tls.Certificate{o.certificate}
+				tr.TLSClientConfig.GetClientCertificate = o.getClientCertificate
 			}
 		case *http2.Transport:
 			if tr.TLSClientConfig == nil {
@@ -200,6 +200,7 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 			}
 			if len(tr.TLSClientConfig.Certificates) == 0 && tr.TLSClientConfig.GetClientCertificate == nil {
 				tr.TLSClientConfig.Certificates = []tls.Certificate{o.certificate}
+				tr.TLSClientConfig.GetClientCertificate = o.getClientCertificate
 			}
 		default:
 			return nil, errors.Errorf("unsupported transport type %T", tr)
@@ -288,7 +289,7 @@ func getTransportFromFile(filename string) (http.RoundTripper, error) {
 		MinVersion:               tls.VersionTLS12,
 		PreferServerCipherSuites: true,
 		RootCAs:                  pool,
-	})
+	}), nil
 }
 
 func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
@@ -307,7 +308,7 @@ func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
 		MinVersion:               tls.VersionTLS12,
 		PreferServerCipherSuites: true,
 		RootCAs:                  pool,
-	})
+	}), nil
 }
 
 func getTransportFromCABundle(bundle []byte) (http.RoundTripper, error) {
@@ -319,7 +320,7 @@ func getTransportFromCABundle(bundle []byte) (http.RoundTripper, error) {
 		MinVersion:               tls.VersionTLS12,
 		PreferServerCipherSuites: true,
 		RootCAs:                  pool,
-	})
+	}), nil
 }
 
 // parseEndpoint parses and validates the given endpoint. It supports general
@@ -611,6 +612,36 @@ retry:
 	var sign api.SignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
 		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Renew; error reading %s", u)
+	}
+	return &sign, nil
+}
+
+// Rekey performs the rekey request to the CA and returns the api.SignResponse
+// struct.
+func (c *Client) Rekey(req *api.RekeyRequest, tr http.RoundTripper) (*api.SignResponse, error) {
+	var retried bool
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/rekey"})
+	client := &http.Client{Transport: tr}
+retry:
+	resp, err := client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Rekey; client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readError(resp.Body)
+	}
+	var sign api.SignResponse
+	if err := readJSON(resp.Body, &sign); err != nil {
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Rekey; error reading %s", u)
 	}
 	return &sign, nil
 }
