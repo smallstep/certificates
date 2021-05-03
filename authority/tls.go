@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
@@ -23,14 +24,14 @@ import (
 )
 
 // GetTLSOptions returns the tls options configured.
-func (a *Authority) GetTLSOptions() *TLSOptions {
+func (a *Authority) GetTLSOptions() *config.TLSOptions {
 	return a.config.TLS
 }
 
 var oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
 var oidSubjectKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 14}
 
-func withDefaultASN1DN(def *ASN1DN) provisioner.CertificateModifierFunc {
+func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 	return func(crt *x509.Certificate, opts provisioner.SignOptions) error {
 		if def == nil {
 			return errors.New("default ASN1DN template cannot be nil")

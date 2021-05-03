@@ -17,6 +17,8 @@ import (
 	acmeNoSQL "github.com/smallstep/certificates/acme/db/nosql"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/mgmt"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
@@ -85,7 +87,7 @@ type CA struct {
 }
 
 // New creates and initializes the CA with the given configuration and options.
-func New(config *authority.Config, opts ...Option) (*CA, error) {
+func New(config *config.Config, opts ...Option) (*CA, error) {
 	ca := &CA{
 		config: config,
 		opts:   new(options),
@@ -95,7 +97,7 @@ func New(config *authority.Config, opts ...Option) (*CA, error) {
 }
 
 // Init initializes the CA with the given configuration.
-func (ca *CA) Init(config *authority.Config) (*CA, error) {
+func (ca *CA) Init(config *config.Config) (*CA, error) {
 	// Intermediate Password.
 	if len(ca.opts.password) > 0 {
 		ca.config.Password = string(ca.opts.password)
@@ -154,7 +156,7 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	if config.DB == nil {
 		acmeDB = nil
 	} else {
-		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
+		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB), mgmt.DefaultAuthorityID)
 		if err != nil {
 			return nil, errors.Wrap(err, "error configuring ACME DB interface")
 		}
@@ -293,7 +295,7 @@ func (ca *CA) Stop() error {
 // Reload reloads the configuration of the CA and calls to the server Reload
 // method.
 func (ca *CA) Reload() error {
-	config, err := authority.LoadConfiguration(ca.opts.configFile)
+	config, err := config.LoadConfiguration(ca.opts.configFile)
 	if err != nil {
 		return errors.Wrap(err, "error reloading ca configuration")
 	}
