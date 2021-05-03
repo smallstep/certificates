@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/pki"
@@ -162,7 +162,7 @@ func onboardAction(ctx *cli.Context) error {
 	return nil
 }
 
-func onboardPKI(config onboardingConfiguration) (*authority.Config, string, error) {
+func onboardPKI(config onboardingConfiguration) (*config.Config, string, error) {
 	p, err := pki.New(apiv1.Options{
 		Type:      apiv1.SoftCAS,
 		IsCreator: true,

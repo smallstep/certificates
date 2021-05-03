@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority"
+	authconfig "github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas"
@@ -481,12 +481,12 @@ type caDefaults struct {
 }
 
 // Option is the type for modifiers over the auth config object.
-type Option func(c *authority.Config) error
+type Option func(c *authconfig.Config) error
 
 // WithDefaultDB is a configuration modifier that adds a default DB stanza to
 // the authority config.
 func WithDefaultDB() Option {
-	return func(c *authority.Config) error {
+	return func(c *authconfig.Config) error {
 		c.DB = &db.Config{
 			Type:       "badger",
 			DataSource: GetDBPath(),
@@ -498,14 +498,14 @@ func WithDefaultDB() Option {
 // WithoutDB is a configuration modifier that adds a default DB stanza to
 // the authority config.
 func WithoutDB() Option {
-	return func(c *authority.Config) error {
+	return func(c *authconfig.Config) error {
 		c.DB = nil
 		return nil
 	}
 }
 
 // GenerateConfig returns the step certificates configuration.
-func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
+func (p *PKI) GenerateConfig(opt ...Option) (*authconfig.Config, error) {
 	key, err := p.ottPrivateKey.CompactSerialize()
 	if err != nil {
 		return nil, errors.Wrap(err, "error serializing private key")
@@ -523,7 +523,7 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 		authorityOptions = &p.casOptions
 	}
 
-	config := &authority.Config{
+	config := &authconfig.Config{
 		Root:             []string{p.root},
 		FederatedRoots:   []string{},
 		IntermediateCert: p.intermediate,
@@ -535,22 +535,22 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authority.Config, error) {
 			Type:       "badger",
 			DataSource: GetDBPath(),
 		},
-		AuthorityConfig: &authority.AuthConfig{
+		AuthorityConfig: &authconfig.AuthConfig{
 			Options:              authorityOptions,
 			DisableIssuedAtCheck: false,
 			Provisioners:         provisioner.List{prov},
 		},
-		TLS: &authority.TLSOptions{
-			MinVersion:    authority.DefaultTLSMinVersion,
-			MaxVersion:    authority.DefaultTLSMaxVersion,
-			Renegotiation: authority.DefaultTLSRenegotiation,
-			CipherSuites:  authority.DefaultTLSCipherSuites,
+		TLS: &authconfig.TLSOptions{
+			MinVersion:    authconfig.DefaultTLSMinVersion,
+			MaxVersion:    authconfig.DefaultTLSMaxVersion,
+			Renegotiation: authconfig.DefaultTLSRenegotiation,
+			CipherSuites:  authconfig.DefaultTLSCipherSuites,
 		},
 		Templates: p.getTemplates(),
 	}
 	if p.enableSSH {
 		enableSSHCA := true
-		config.SSH = &authority.SSHConfig{
+		config.SSH = &authconfig.SSHConfig{
 			HostKey: p.sshHostKey,
 			UserKey: p.sshUserKey,
 		}

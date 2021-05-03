@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 )
@@ -37,11 +37,11 @@ func (s *SignRequest) Validate() error {
 
 // SignResponse is the response object of the certificate signature request.
 type SignResponse struct {
-	ServerPEM    Certificate           `json:"crt"`
-	CaPEM        Certificate           `json:"ca"`
-	CertChainPEM []Certificate         `json:"certChain"`
-	TLSOptions   *authority.TLSOptions `json:"tlsOptions,omitempty"`
-	TLS          *tls.ConnectionState  `json:"-"`
+	ServerPEM    Certificate          `json:"crt"`
+	CaPEM        Certificate          `json:"ca"`
+	CertChainPEM []Certificate        `json:"certChain"`
+	TLSOptions   *config.TLSOptions   `json:"tlsOptions,omitempty"`
+	TLS          *tls.ConnectionState `json:"-"`
 }
 
 // Sign is an HTTP handler that reads a certificate request and an

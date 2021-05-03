@@ -21,6 +21,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
@@ -32,7 +33,7 @@ type Authority interface {
 	// context specifies the Authorize[Sign|Revoke|etc.] method.
 	Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	AuthorizeSign(ott string) ([]provisioner.SignOption, error)
-	GetTLSOptions() *authority.TLSOptions
+	GetTLSOptions() *config.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	Renew(peer *x509.Certificate) ([]*x509.Certificate, error)

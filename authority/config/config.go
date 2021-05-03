@@ -1,4 +1,4 @@
-package authority
+package config
 
 import (
 	"encoding/json"
@@ -15,6 +15,10 @@ import (
 	"github.com/smallstep/certificates/templates"
 )
 
+const (
+	legacyAuthority = "step-certificate-authority"
+)
+
 var (
 	// DefaultTLSOptions represents the default TLS version as well as the cipher
 	// suites used in the TLS certificates.
@@ -28,10 +32,12 @@ var (
 		MaxVersion:    1.2,
 		Renegotiation: false,
 	}
-	defaultBackdate         = time.Minute
-	defaultDisableRenewal   = false
-	defaultEnableSSHCA      = false
-	globalProvisionerClaims = provisioner.Claims{
+	defaultBackdate       = time.Minute
+	defaultDisableRenewal = false
+	defaultEnableSSHCA    = false
+	// GlobalProvisionerClaims default claims for the Authority. Can be overriden
+	// by provisioner specific claims.
+	GlobalProvisionerClaims = provisioner.Claims{
 		MinTLSDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
 		MaxTLSDur:         &provisioner.Duration{Duration: 24 * time.Hour},
 		DefaultTLSDur:     &provisioner.Duration{Duration: 24 * time.Hour},
@@ -151,9 +157,9 @@ func LoadConfiguration(filename string) (*Config, error) {
 	return &c, nil
 }
 
-// initializes the minimal configuration required to create an authority. This
+// Init initializes the minimal configuration required to create an authority. This
 // is mainly used on embedded authorities.
-func (c *Config) init() {
+func (c *Config) Init() {
 	if c.DNSNames == nil {
 		c.DNSNames = []string{"localhost", "127.0.0.1", "::1"}
 	}
@@ -246,13 +252,13 @@ func (c *Config) Validate() error {
 		return err
 	}
 
-	return c.AuthorityConfig.Validate(c.getAudiences())
+	return c.AuthorityConfig.Validate(c.GetAudiences())
 }
 
-// getAudiences returns the legacy and possible urls without the ports that will
+// GetAudiences returns the legacy and possible urls without the ports that will
 // be used as the default provisioner audiences. The CA might have proxies in
 // front so we cannot rely on the port.
-func (c *Config) getAudiences() provisioner.Audiences {
+func (c *Config) GetAudiences() provisioner.Audiences {
 	audiences := provisioner.Audiences{
 		Sign:      []string{legacyAuthority},
 		Revoke:    []string{legacyAuthority},

@@ -13,6 +13,9 @@ import (
 	"github.com/smallstep/certificates/cas"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/mgmt"
+	authMgmtNosql "github.com/smallstep/certificates/authority/mgmt/db/nosql"
 	"github.com/smallstep/certificates/authority/provisioner"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
@@ -20,17 +23,15 @@ import (
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/sshagentkms"
 	"github.com/smallstep/certificates/templates"
+	"github.com/smallstep/nosql"
 	"go.step.sm/crypto/pemutil"
 	"golang.org/x/crypto/ssh"
 )
 
-const (
-	legacyAuthority = "step-certificate-authority"
-)
-
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
-	config       *Config
+	config       *config.Config
+	mgmtDB       *mgmt.DB
 	keyManager   kms.KeyManager
 	provisioners *provisioner.Collection
 	db           db.AuthDB
@@ -55,14 +56,14 @@ type Authority struct {
 	startTime time.Time
 
 	// Custom functions
-	sshBastionFunc   func(ctx context.Context, user, hostname string) (*Bastion, error)
+	sshBastionFunc   func(ctx context.Context, user, hostname string) (*config.Bastion, error)
 	sshCheckHostFunc func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
-	sshGetHostsFunc  func(ctx context.Context, cert *x509.Certificate) ([]Host, error)
+	sshGetHostsFunc  func(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)
 	getIdentityFunc  provisioner.GetIdentityFunc
 }
 
 // New creates and initiates a new Authority type.
-func New(config *Config, opts ...Option) (*Authority, error) {
+func New(config *config.Config, opts ...Option) (*Authority, error) {
 	err := config.Validate()
 	if err != nil {
 		return nil, err
@@ -92,7 +93,7 @@ func New(config *Config, opts ...Option) (*Authority, error) {
 // project without the limitations of the config.
 func NewEmbedded(opts ...Option) (*Authority, error) {
 	a := &Authority{
-		config:       &Config{},
+		config:       &config.Config{},
 		certificates: new(sync.Map),
 	}
 
@@ -116,7 +117,7 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	}
 
 	// Initialize config required fields.
-	a.config.init()
+	a.config.Init()
 
 	// Initialize authority from options or configuration.
 	if err := a.init(); err != nil {
@@ -139,6 +140,22 @@ func (a *Authority) init() error {
 	// If a.config.DB is nil then a simple, barebones in memory DB will be used.
 	if a.db == nil {
 		if a.db, err = db.New(a.config.DB); err != nil {
+			return err
+		}
+	}
+
+	// Pull AuthConfig from DB.
+	if true {
+		mgmtDB, err := authMgmtNosql.New(a.db.(nosql.DB), mgmt.DefaultAuthorityID)
+		if err != nil {
+			return err
+		}
+		_ac, err := mgmtDB.GetAuthConfig(context.Background(), mgmt.DefaultAuthorityID)
+		if err != nil {
+			return err
+		}
+		a.config.AuthorityConfig, err = _ac.ToCertificates()
+		if err != nil {
 			return err
 		}
 	}
@@ -314,7 +331,7 @@ func (a *Authority) init() error {
 	}
 
 	// Merge global and configuration claims
-	claimer, err := provisioner.NewClaimer(a.config.AuthorityConfig.Claims, globalProvisionerClaims)
+	claimer, err := provisioner.NewClaimer(a.config.AuthorityConfig.Claims, config.GlobalProvisionerClaims)
 	if err != nil {
 		return err
 	}
@@ -326,7 +343,7 @@ func (a *Authority) init() error {
 		return err
 	}
 	// Initialize provisioners
-	audiences := a.config.getAudiences()
+	audiences := a.config.GetAudiences()
 	a.provisioners = provisioner.NewCollection(audiences)
 	config := provisioner.Config{
 		Claims:    claimer.Claims(),

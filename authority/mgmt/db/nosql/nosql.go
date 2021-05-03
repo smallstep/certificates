@@ -6,19 +6,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	nosqlDB "github.com/smallstep/nosql"
+	nosqlDB "github.com/smallstep/nosql/database"
 	"go.step.sm/crypto/randutil"
 )
 
 var (
-	accountTable           = []byte("acme_accounts")
-	accountByKeyIDTable    = []byte("acme_keyID_accountID_index")
-	authzTable             = []byte("acme_authzs")
-	challengeTable         = []byte("acme_challenges")
-	nonceTable             = []byte("nonces")
-	orderTable             = []byte("acme_orders")
-	ordersByAccountIDTable = []byte("acme_account_orders_index")
-	certTable              = []byte("acme_certs")
+	authorityAdminsTable       = []byte("authority_admins")
+	authorityConfigsTable      = []byte("authority_configs")
+	authorityProvisionersTable = []byte("authority_provisioners")
 )
 
 // DB is a struct that implements the AcmeDB interface.
@@ -27,10 +22,9 @@ type DB struct {
 	authorityID string
 }
 
-// New configures and returns a new ACME DB backend implemented using a nosql DB.
+// New configures and returns a new Authority DB backend implemented using a nosql DB.
 func New(db nosqlDB.DB, authorityID string) (*DB, error) {
-	tables := [][]byte{accountTable, accountByKeyIDTable, authzTable,
-		challengeTable, nonceTable, orderTable, ordersByAccountIDTable, certTable}
+	tables := [][]byte{authorityAdminsTable, authorityConfigsTable, authorityProvisionersTable}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
 			return nil, errors.Wrapf(err, "error creating table %s",
@@ -52,7 +46,7 @@ func (db *DB) save(ctx context.Context, id string, nu interface{}, old interface
 	} else {
 		newB, err = json.Marshal(nu)
 		if err != nil {
-			return errors.Wrapf(err, "error marshaling acme type: %s, value: %v", typ, nu)
+			return errors.Wrapf(err, "error marshaling authority type: %s, value: %v", typ, nu)
 		}
 	}
 	var oldB []byte
@@ -68,9 +62,9 @@ func (db *DB) save(ctx context.Context, id string, nu interface{}, old interface
 	_, swapped, err := db.db.CmpAndSwap(table, []byte(id), oldB, newB)
 	switch {
 	case err != nil:
-		return errors.Wrapf(err, "error saving acme %s", typ)
+		return errors.Wrapf(err, "error saving authority %s", typ)
 	case !swapped:
-		return errors.Errorf("error saving acme %s; changed since last read", typ)
+		return errors.Errorf("error saving authority %s; changed since last read", typ)
 	default:
 		return nil
 	}
