@@ -514,8 +514,6 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	assert.FatalError(t, err)
 	failGetIdentityToken, err := generateSimpleToken("the-issuer", p5.ClientID, &keys.Keys[0])
 	assert.FatalError(t, err)
-	okPreferredUsername, err := generateOIDCToken("subject", "the-issuer", p1.ClientID, "name@smallstep.com", "lecris", time.Now(), &keys.Keys[0])
-	assert.FatalError(t, err)
 	// Admin email not in domains
 	okAdmin, err := generateOIDCToken("subject", "the-issuer", p3.ClientID, "root@example.com", "", time.Now(), &keys.Keys[0])
 	assert.FatalError(t, err)
@@ -575,9 +573,6 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
 		{"ok-emptyPrincipals-getIdentity", p4, args{okGetIdentityToken, SignSSHOptions{}, pub},
 			&SignSSHOptions{CertType: "user", Principals: []string{"max", "mariano"},
-				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
-		{"ok-preferred-username", p1, args{okPreferredUsername, SignSSHOptions{CertType: "user", KeyID: "name@smallstep.com", Principals: []string{"lecris"}}, pub},
-			&SignSSHOptions{CertType: "user", Principals: []string{"lecris", "name", "name@smallstep.com"},
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
 		{"ok-options", p1, args{t1, SignSSHOptions{CertType: "user", Principals: []string{"name"}}, pub},
 			&SignSSHOptions{CertType: "user", Principals: []string{"name", "name@smallstep.com"},

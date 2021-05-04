@@ -346,7 +346,7 @@ func DefaultIdentityFunc(ctx context.Context, p Interface, email string, usernam
 	switch k := p.(type) {
 	case *OIDC:
 		// OIDC principals would be:
-		// 1. Preferred usernames.
+		// ~~1. Preferred usernames.~~ Note: Under discussion, currently disabled
 		// 2. Sanitized local.
 		// 3. Raw local (if different).
 		// 4. Email address.
