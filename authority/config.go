@@ -146,6 +146,8 @@ func LoadConfiguration(filename string) (*Config, error) {
 		return nil, errors.Wrapf(err, "error parsing %s", filename)
 	}
 
+	c.init()
+
 	return &c, nil
 }
 
