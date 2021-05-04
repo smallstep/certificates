@@ -354,7 +354,7 @@ func DefaultIdentityFunc(ctx context.Context, p Interface, email string, usernam
 		if !sshUserRegex.MatchString(name) {
 			return nil, errors.Errorf("invalid principal '%s' from email '%s'", name, email)
 		}
-		usernames := append(usernames, name)
+		usernames = append(usernames, name)
 		if i := strings.LastIndex(email, "@"); i >= 0 {
 			usernames = append(usernames, email[:i])
 		}
