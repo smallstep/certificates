@@ -40,13 +40,13 @@ func (c openIDConfiguration) Validate() error {
 // openIDPayload represents the fields on the id_token JWT payload.
 type openIDPayload struct {
 	jose.Claims
-	AtHash            string   `json:"at_hash"`
-	AuthorizedParty   string   `json:"azp"`
-	Email             string   `json:"email"`
-	EmailVerified     bool     `json:"email_verified"`
-	Hd                string   `json:"hd"`
-	Nonce             string   `json:"nonce"`
-	Groups            []string `json:"groups"`
+	AtHash          string   `json:"at_hash"`
+	AuthorizedParty string   `json:"azp"`
+	Email           string   `json:"email"`
+	EmailVerified   bool     `json:"email_verified"`
+	Hd              string   `json:"hd"`
+	Nonce           string   `json:"nonce"`
+	Groups          []string `json:"groups"`
 }
 
 // OIDC represents an OAuth 2.0 OpenID Connect provider.
