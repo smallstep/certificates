@@ -500,10 +500,10 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	assert.FatalError(t, p4.Init(config))
 	assert.FatalError(t, p5.Init(config))
 
-	p4.getIdentityFunc = func(ctx context.Context, p Interface, email string, usernames ...string) (*Identity, error) {
+	p4.getIdentityFunc = func(ctx context.Context, p Interface, email string) (*Identity, error) {
 		return &Identity{Usernames: []string{"max", "mariano"}}, nil
 	}
-	p5.getIdentityFunc = func(ctx context.Context, p Interface, email string, usernames ...string) (*Identity, error) {
+	p5.getIdentityFunc = func(ctx context.Context, p Interface, email string) (*Identity, error) {
 		return nil, errors.New("force")
 	}
 	// Additional test needed for empty usernames and duplicate email and usernames

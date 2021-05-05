@@ -44,7 +44,6 @@ type openIDPayload struct {
 	AuthorizedParty   string   `json:"azp"`
 	Email             string   `json:"email"`
 	EmailVerified     bool     `json:"email_verified"`
-	PreferredUsername string   `json:"preferred_username"`
 	Hd                string   `json:"hd"`
 	Nonce             string   `json:"nonce"`
 	Groups            []string `json:"groups"`
