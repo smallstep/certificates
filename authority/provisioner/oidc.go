@@ -86,6 +86,21 @@ func (o *OIDC) IsAdmin(email string) bool {
 	return false
 }
 
+// IsAdminGroup returns true if the one group in the given list is in the Admins
+// allowlist, false otherwise.
+func (o *OIDC) IsAdminGroup(groups []string) bool {
+	for _, g := range groups {
+		// The groups and emails can be in the same array for now, but consider
+		// making a specialized option later.
+		for _, gadmin := range o.Admins {
+			if g == gadmin {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func sanitizeEmail(email string) string {
 	if i := strings.LastIndex(email, "@"); i >= 0 {
 		email = email[:i] + strings.ToLower(email[i:])
@@ -372,7 +387,8 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	}
 
 	// Get the identity using either the default identityFunc or one injected
-	// externally.
+	// externally. Note that the PreferredUsername might be empty.
+	// TBD: Would preferred_username present a safety issue here?
 	iden, err := o.getIdentityFunc(ctx, o, claims.Email)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSSHSign")
@@ -395,6 +411,9 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	// Use the default template unless no-templates are configured and email is
 	// an admin, in that case we will use the parameters in the request.
 	isAdmin := o.IsAdmin(claims.Email)
+	if !isAdmin && len(claims.Groups) > 0 {
+		isAdmin = o.IsAdminGroup(claims.Groups)
+	}
 	defaultTemplate := sshutil.DefaultTemplate
 	if isAdmin && !o.Options.GetSSHOptions().HasTemplate() {
 		defaultTemplate = sshutil.DefaultAdminTemplate

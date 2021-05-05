@@ -773,6 +773,47 @@ func generateToken(sub, iss, aud string, email string, sans []string, iat time.T
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }
 
+func generateOIDCToken(sub, iss, aud string, email string, preferredUsername string, iat time.Time, jwk *jose.JSONWebKey, tokOpts ...tokOption) (string, error) {
+	so := new(jose.SignerOptions)
+	so.WithType("JWT")
+	so.WithHeader("kid", jwk.KeyID)
+
+	for _, o := range tokOpts {
+		if err := o(so); err != nil {
+			return "", err
+		}
+	}
+
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key}, so)
+	if err != nil {
+		return "", err
+	}
+
+	id, err := randutil.ASCII(64)
+	if err != nil {
+		return "", err
+	}
+
+	claims := struct {
+		jose.Claims
+		Email             string `json:"email"`
+		PreferredUsername string `json:"preferred_username,omitempty"`
+	}{
+		Claims: jose.Claims{
+			ID:        id,
+			Subject:   sub,
+			Issuer:    iss,
+			IssuedAt:  jose.NewNumericDate(iat),
+			NotBefore: jose.NewNumericDate(iat),
+			Expiry:    jose.NewNumericDate(iat.Add(5 * time.Minute)),
+			Audience:  []string{aud},
+		},
+		Email:             email,
+		PreferredUsername: preferredUsername,
+	}
+	return jose.Signed(sig).Claims(claims).CompactSerialize()
+}
+
 func generateX5CSSHToken(jwk *jose.JSONWebKey, claims *x5cPayload, tokOpts ...tokOption) (string, error) {
 	so := new(jose.SignerOptions)
 	so.WithType("JWT")

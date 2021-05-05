@@ -506,6 +506,7 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	p5.getIdentityFunc = func(ctx context.Context, p Interface, email string) (*Identity, error) {
 		return nil, errors.New("force")
 	}
+	// Additional test needed for empty usernames and duplicate email and usernames
 
 	t1, err := generateSimpleToken("the-issuer", p1.ClientID, &keys.Keys[0])
 	assert.FatalError(t, err)
@@ -514,7 +515,7 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	failGetIdentityToken, err := generateSimpleToken("the-issuer", p5.ClientID, &keys.Keys[0])
 	assert.FatalError(t, err)
 	// Admin email not in domains
-	okAdmin, err := generateToken("subject", "the-issuer", p3.ClientID, "root@example.com", []string{}, time.Now(), &keys.Keys[0])
+	okAdmin, err := generateOIDCToken("subject", "the-issuer", p3.ClientID, "root@example.com", "", time.Now(), &keys.Keys[0])
 	assert.FatalError(t, err)
 	// Empty email
 	failEmail, err := generateToken("subject", "the-issuer", p3.ClientID, "", []string{}, time.Now(), &keys.Keys[0])
@@ -576,11 +577,11 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 		{"ok-options", p1, args{t1, SignSSHOptions{CertType: "user", Principals: []string{"name"}}, pub},
 			&SignSSHOptions{CertType: "user", Principals: []string{"name", "name@smallstep.com"},
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
-		{"admin-user", p3, args{okAdmin, SignSSHOptions{CertType: "user", KeyID: "root@example.com", Principals: []string{"root", "root@example.com"}}, pub},
+		{"ok-admin-user", p3, args{okAdmin, SignSSHOptions{CertType: "user", KeyID: "root@example.com", Principals: []string{"root", "root@example.com"}}, pub},
 			expectedAdminOptions, http.StatusOK, false, false},
-		{"admin-host", p3, args{okAdmin, SignSSHOptions{CertType: "host", KeyID: "smallstep.com", Principals: []string{"smallstep.com"}}, pub},
+		{"ok-admin-host", p3, args{okAdmin, SignSSHOptions{CertType: "host", KeyID: "smallstep.com", Principals: []string{"smallstep.com"}}, pub},
 			expectedHostOptions, http.StatusOK, false, false},
-		{"admin-options", p3, args{okAdmin, SignSSHOptions{CertType: "user", KeyID: "name", Principals: []string{"name"}}, pub},
+		{"ok-admin-options", p3, args{okAdmin, SignSSHOptions{CertType: "user", KeyID: "name", Principals: []string{"name"}}, pub},
 			&SignSSHOptions{CertType: "user", Principals: []string{"name"},
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
 		{"fail-rsa1024", p1, args{t1, SignSSHOptions{}, rsa1024.Public()}, expectedUserOptions, http.StatusOK, false, true},
