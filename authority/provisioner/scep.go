@@ -2,7 +2,6 @@ package provisioner
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -88,7 +87,7 @@ func (s *SCEP) Init(config Config) (err error) {
 	}
 
 	if s.MinimumPublicKeyLength%8 != 0 {
-		return fmt.Errorf("only minimum public keys exactly divisible by 8 are supported; %d is not exactly divisibly by 8", s.MinimumPublicKeyLength)
+		return errors.Errorf("only minimum public keys exactly divisible by 8 are supported; %d is not exactly divisibly by 8", s.MinimumPublicKeyLength)
 	}
 
 	// TODO: add other, SCEP specific, options?
