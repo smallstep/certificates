@@ -8,7 +8,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/json"
-	"fmt"
 	"net"
 	"net/url"
 	"reflect"
@@ -139,7 +138,7 @@ func (v publicKeyMinimumLengthValidator) Valid(req *x509.CertificateRequest) err
 	case *rsa.PublicKey:
 		minimumLengthInBytes := v.length / 8
 		if k.Size() < minimumLengthInBytes {
-			return fmt.Errorf("rsa key in CSR must be at least %d bits (%d bytes)", v.length, minimumLengthInBytes)
+			return errors.Errorf("rsa key in CSR must be at least %d bits (%d bytes)", v.length, minimumLengthInBytes)
 		}
 	case *ecdsa.PublicKey, ed25519.PublicKey:
 	default:
