@@ -416,7 +416,7 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, csr *x509.Certifi
 
 	cr := &CertRepMessage{
 		PKIStatus:      microscep.FAILURE,
-		FailInfo:       microscep.BadRequest,
+		FailInfo:       microscep.FailInfo(info),
 		RecipientNonce: microscep.RecipientNonce(msg.SenderNonce),
 	}
 
