@@ -32,23 +32,23 @@ var (
 		MaxVersion:    1.2,
 		Renegotiation: false,
 	}
-	defaultBackdate       = time.Minute
-	defaultDisableRenewal = false
-	defaultEnableSSHCA    = false
+	DefaultBackdate       = time.Minute
+	DefaultDisableRenewal = false
+	DefaultEnableSSHCA    = false
 	// GlobalProvisionerClaims default claims for the Authority. Can be overriden
 	// by provisioner specific claims.
 	GlobalProvisionerClaims = provisioner.Claims{
 		MinTLSDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
 		MaxTLSDur:         &provisioner.Duration{Duration: 24 * time.Hour},
 		DefaultTLSDur:     &provisioner.Duration{Duration: 24 * time.Hour},
-		DisableRenewal:    &defaultDisableRenewal,
+		DisableRenewal:    &DefaultDisableRenewal,
 		MinUserSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
 		MaxUserSSHDur:     &provisioner.Duration{Duration: 24 * time.Hour},
 		DefaultUserSSHDur: &provisioner.Duration{Duration: 16 * time.Hour},
 		MinHostSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
 		MaxHostSSHDur:     &provisioner.Duration{Duration: 30 * 24 * time.Hour},
 		DefaultHostSSHDur: &provisioner.Duration{Duration: 30 * 24 * time.Hour},
-		EnableSSHCA:       &defaultEnableSSHCA,
+		EnableSSHCA:       &DefaultEnableSSHCA,
 	}
 )
 
@@ -89,6 +89,7 @@ type ASN1DN struct {
 // cas.Options.
 type AuthConfig struct {
 	*cas.Options
+	AuthorityID          string                `json:"authorityID,omitempty"`
 	Provisioners         provisioner.List      `json:"provisioners"`
 	Template             *ASN1DN               `json:"template,omitempty"`
 	Claims               *provisioner.Claims   `json:"claims,omitempty"`
@@ -107,7 +108,7 @@ func (c *AuthConfig) init() {
 	}
 	if c.Backdate == nil {
 		c.Backdate = &provisioner.Duration{
-			Duration: defaultBackdate,
+			Duration: DefaultBackdate,
 		}
 	}
 }

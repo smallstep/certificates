@@ -150,17 +150,19 @@ func (a *Authority) init() error {
 
 	// Pull AuthConfig from DB.
 	if true {
-		mgmtDB, err := authMgmtNosql.New(a.db.(nosql.DB), mgmt.DefaultAuthorityID)
-		if err != nil {
-			return err
-		}
-		_ac, err := mgmtDB.GetAuthConfig(context.Background(), mgmt.DefaultAuthorityID)
-		if err != nil {
-			return err
-		}
-		a.config.AuthorityConfig, err = _ac.ToCertificates()
-		if err != nil {
-			return err
+		if len(a.config.AuthConfig.AuthorityID)_== 0 {
+			mgmtDB, err := authMgmtNosql.New(a.db.(nosql.DB), mgmt.DefaultAuthorityID)
+			if err != nil {
+				return err
+			}
+			mgmtAuthConfig, err := mgmt.CreateAuthority(context.Background, mgmtDB, WithDefaultAuthorityID)
+			if err != nil {
+				return err
+			}
+			a.config.AuthConfig, err := mgmtAuthConfig.ToCertificates()
+			if err != nil {
+				return err
+			}
 		}
 	}
 

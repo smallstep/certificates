@@ -13,13 +13,13 @@ import (
 
 // dbAdmin is the database representation of the Admin type.
 type dbAdmin struct {
-	ID           string    `json:"id"`
-	AuthorityID  string    `json:"authorityID"`
-	Name         string    `json:"name"`
-	Provisioner  string    `json:"provisioner"`
-	IsSuperAdmin bool      `json:"isSuperAdmin"`
-	CreatedAt    time.Time `json:"createdAt"`
-	DeletedAt    time.Time `json:"deletedAt"`
+	ID            string    `json:"id"`
+	AuthorityID   string    `json:"authorityID"`
+	ProvisionerID string    `json:"provisionerID"`
+	Name          string    `json:"name"`
+	IsSuperAdmin  bool      `json:"isSuperAdmin"`
+	CreatedAt     time.Time `json:"createdAt"`
+	DeletedAt     time.Time `json:"deletedAt"`
 }
 
 func (dbp *dbAdmin) clone() *dbAdmin {
@@ -70,6 +70,13 @@ func (db *DB) GetAdmin(ctx context.Context, id string) (*mgmt.Admin, error) {
 		return nil, mgmt.NewError(mgmt.ErrorAuthorityMismatchType,
 			"admin %s is not owned by authority %s", adm.ID, db.authorityID)
 	}
+
+	prov, err := db.GetProvisioner(ctx, adm.ProvisionerID)
+	if err != nil {
+		return nil, err
+	}
+	adm.ProvisionerName = prov.Name
+	adm.ProvisionerType = prov.Type
 	return adm, nil
 }
 
@@ -87,10 +94,11 @@ func unmarshalAdmin(data []byte, id string) (*mgmt.Admin, error) {
 		return nil, errors.Wrapf(err, "error unmarshaling admin %s into dbAdmin", id)
 	}
 	adm := &mgmt.Admin{
-		ID:           dba.ID,
-		Name:         dba.Name,
-		Provisioner:  dba.Provisioner,
-		IsSuperAdmin: dba.IsSuperAdmin,
+		ID:            dba.ID,
+		AuthorityID:   dba.AuthorityID,
+		ProvisionerID: dba.ProvisionerID,
+		Name:          dba.Name,
+		IsSuperAdmin:  dba.IsSuperAdmin,
 	}
 	if !dba.DeletedAt.IsZero() {
 		adm.Status = mgmt.StatusDeleted
@@ -132,12 +140,12 @@ func (db *DB) CreateAdmin(ctx context.Context, adm *mgmt.Admin) error {
 	}
 
 	dba := &dbAdmin{
-		ID:           adm.ID,
-		AuthorityID:  db.authorityID,
-		Name:         adm.Name,
-		Provisioner:  adm.Provisioner,
-		IsSuperAdmin: adm.IsSuperAdmin,
-		CreatedAt:    clock.Now(),
+		ID:            adm.ID,
+		AuthorityID:   db.authorityID,
+		ProvisionerID: adm.ProvisionerID,
+		Name:          adm.Name,
+		IsSuperAdmin:  adm.IsSuperAdmin,
+		CreatedAt:     clock.Now(),
 	}
 
 	return db.save(ctx, dba.ID, dba, nil, "admin", authorityAdminsTable)
@@ -156,7 +164,7 @@ func (db *DB) UpdateAdmin(ctx context.Context, adm *mgmt.Admin) error {
 	if old.DeletedAt.IsZero() && adm.Status == mgmt.StatusDeleted {
 		nu.DeletedAt = clock.Now()
 	}
-	nu.Provisioner = adm.Provisioner
+	nu.ProvisionerID = adm.ProvisionerID
 	nu.IsSuperAdmin = adm.IsSuperAdmin
 
 	return db.save(ctx, old.ID, nu, old, "admin", authorityAdminsTable)
