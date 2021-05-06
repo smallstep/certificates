@@ -51,6 +51,7 @@ type SCEPResponse struct {
 	CACertNum   int
 	Data        []byte
 	Certificate *x509.Certificate
+	Error       error
 }
 
 // Handler is the SCEP request handler.
@@ -75,7 +76,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	request, err := decodeSCEPRequest(r)
 	if err != nil {
-		writeError(w, errors.Wrap(err, "not a scep get request"))
+		writeError(w, errors.Wrap(err, "invalid scep get request"))
 		return
 	}
 
@@ -94,7 +95,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		writeError(w, errors.Wrap(err, "get request failed"))
+		writeError(w, errors.Wrap(err, "scep get request failed"))
 		return
 	}
 
@@ -106,7 +107,7 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 
 	request, err := decodeSCEPRequest(r)
 	if err != nil {
-		writeError(w, errors.Wrap(err, "not a scep post request"))
+		writeError(w, errors.Wrap(err, "invalid scep post request"))
 		return
 	}
 
@@ -121,7 +122,7 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		writeError(w, errors.Wrap(err, "post request failed"))
+		writeError(w, errors.Wrap(err, "scep post request failed"))
 		return
 	}
 
@@ -193,13 +194,13 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 
 		p, err := h.Auth.LoadProvisionerByID("scep/" + provisionerID)
 		if err != nil {
-			writeError(w, err)
+			api.WriteError(w, err)
 			return
 		}
 
 		provisioner, ok := p.(*provisioner.SCEP)
 		if !ok {
-			writeError(w, errors.New("provisioner must be of type SCEP"))
+			api.WriteError(w, errors.New("provisioner must be of type SCEP"))
 			return
 		}
 
@@ -293,12 +294,12 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 
 		challengeMatches, err := h.Auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
 		if err != nil {
-			return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, "error when checking password")
+			return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("error when checking password"))
 		}
 
 		if !challengeMatches {
 			// TODO: can this be returned safely to the client? In the end, if the password was correct, that gains a bit of info too.
-			return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, "wrong password provided")
+			return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("wrong password provided"))
 		}
 	}
 
@@ -306,7 +307,7 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 
 	certRep, err := h.Auth.SignCSR(ctx, csr, msg)
 	if err != nil {
-		return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, "error when signing new certificate")
+		return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.Wrap(err, "error when signing new certificate"))
 	}
 
 	response := SCEPResponse{
@@ -324,6 +325,10 @@ func formatCapabilities(caps []string) []byte {
 
 // writeSCEPResponse writes a SCEP response back to the SCEP client.
 func writeSCEPResponse(w http.ResponseWriter, response SCEPResponse) {
+
+	if response.Error != nil {
+		api.LogError(w, response.Error)
+	}
 
 	if response.Certificate != nil {
 		api.LogCertificate(w, response.Certificate)
@@ -344,14 +349,15 @@ func writeError(w http.ResponseWriter, err error) {
 	api.WriteError(w, scepError)
 }
 
-func (h *Handler) createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, infoText string) (SCEPResponse, error) {
-	certRepMsg, err := h.Auth.CreateFailureResponse(ctx, csr, msg, scep.FailInfoName(info), infoText)
+func (h *Handler) createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (SCEPResponse, error) {
+	certRepMsg, err := h.Auth.CreateFailureResponse(ctx, csr, msg, scep.FailInfoName(info), failError.Error())
 	if err != nil {
 		return SCEPResponse{}, err
 	}
 	return SCEPResponse{
 		Operation: opnPKIOperation,
 		Data:      certRepMsg.Raw,
+		Error:     failError,
 	}, nil
 }
 
