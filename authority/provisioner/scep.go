@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -17,9 +18,11 @@ type SCEP struct {
 	ForceCN           bool     `json:"forceCN,omitempty"`
 	ChallengePassword string   `json:"challenge,omitempty"`
 	Capabilities      []string `json:"capabilities,omitempty"`
-	Options           *Options `json:"options,omitempty"`
-	Claims            *Claims  `json:"claims,omitempty"`
-	claimer           *Claimer
+	// MinimumPublicKeyLength is the minimum length for public keys in CSRs
+	MinimumPublicKeyLength int      `json:"minimumPublicKeyLength,omitempty"`
+	Options                *Options `json:"options,omitempty"`
+	Claims                 *Claims  `json:"claims,omitempty"`
+	claimer                *Claimer
 
 	secretChallengePassword string
 }
@@ -79,6 +82,15 @@ func (s *SCEP) Init(config Config) (err error) {
 	s.secretChallengePassword = s.ChallengePassword
 	s.ChallengePassword = "*** redacted ***"
 
+	// Default to 2048 bits minimum public key length (for CSRs) if not set
+	if s.MinimumPublicKeyLength == 0 {
+		s.MinimumPublicKeyLength = 2048
+	}
+
+	if s.MinimumPublicKeyLength%8 != 0 {
+		return fmt.Errorf("only minimum public keys exactly divisible by 8 are supported; %d is not exactly divisibly by 8", s.MinimumPublicKeyLength)
+	}
+
 	// TODO: add other, SCEP specific, options?
 
 	return err
@@ -94,7 +106,7 @@ func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		newForceCNOption(s.ForceCN),
 		profileDefaultDuration(s.claimer.DefaultTLSCertDuration()),
 		// validators
-		defaultPublicKeyValidator{},
+		newPublicKeyMinimumLengthValidator(s.MinimumPublicKeyLength),
 		newValidityValidator(s.claimer.MinTLSCertDuration(), s.claimer.MaxTLSCertDuration()),
 	}, nil
 }
