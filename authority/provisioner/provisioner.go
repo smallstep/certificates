@@ -345,31 +345,48 @@ type Permissions struct {
 // GetIdentityFunc is a function that returns an identity.
 type GetIdentityFunc func(ctx context.Context, p Interface, email string) (*Identity, error)
 
-// DefaultIdentityFunc return a default identity depending on the provisioner type.
+// DefaultIdentityFunc return a default identity depending on the provisioner
+// type. For OIDC email is always present and the usernames might
+// contain empty strings.
 func DefaultIdentityFunc(ctx context.Context, p Interface, email string) (*Identity, error) {
 	switch k := p.(type) {
 	case *OIDC:
 		// OIDC principals would be:
-		// 1. Sanitized local.
-		// 2. Raw local (if different).
-		// 3. Email address.
+		// ~~1. Preferred usernames.~~ Note: Under discussion, currently disabled
+		// 2. Sanitized local.
+		// 3. Raw local (if different).
+		// 4. Email address.
 		name := SanitizeSSHUserPrincipal(email)
 		if !sshUserRegex.MatchString(name) {
 			return nil, errors.Errorf("invalid principal '%s' from email '%s'", name, email)
 		}
 		usernames := []string{name}
 		if i := strings.LastIndex(email, "@"); i >= 0 {
-			if local := email[:i]; !strings.EqualFold(local, name) {
-				usernames = append(usernames, local)
-			}
+			usernames = append(usernames, email[:i])
 		}
 		usernames = append(usernames, email)
 		return &Identity{
-			Usernames: usernames,
+			Usernames: SanitizeStringSlices(usernames),
 		}, nil
 	default:
 		return nil, errors.Errorf("provisioner type '%T' not supported by identity function", k)
 	}
+}
+
+// SanitizeStringSlices removes duplicated an empty strings.
+func SanitizeStringSlices(original []string) []string {
+	output := []string{}
+	seen := make(map[string]struct{})
+	for _, entry := range original {
+		if entry == "" {
+			continue
+		}
+		if _, value := seen[entry]; !value {
+			seen[entry] = struct{}{}
+			output = append(output, entry)
+		}
+	}
+	return output
 }
 
 // MockProvisioner for testing

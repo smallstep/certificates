@@ -263,7 +263,7 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 	}
 
 	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
-	if err = a.storeCertificate(fullchain); err != nil {
+	if err = a.storeRenewedCertificate(oldCert, fullchain); err != nil {
 		if err != db.ErrNotImplemented {
 			return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey; error storing certificate in db", opts...)
 		}
@@ -283,6 +283,19 @@ func (a *Authority) storeCertificate(fullchain []*x509.Certificate) error {
 		StoreCertificateChain(...*x509.Certificate) error
 	}); ok {
 		return s.StoreCertificateChain(fullchain...)
+	}
+	return a.db.StoreCertificate(fullchain[0])
+}
+
+// storeRenewedCertificate allows to use an extension of the db.AuthDB interface
+// that can log if a certificate has been renewed or rekeyed.
+//
+// TODO: at some point we should implement this in the standard implementation.
+func (a *Authority) storeRenewedCertificate(oldCert *x509.Certificate, fullchain []*x509.Certificate) error {
+	if s, ok := a.db.(interface {
+		StoreRenewedCertificate(*x509.Certificate, ...*x509.Certificate) error
+	}); ok {
+		return s.StoreRenewedCertificate(oldCert, fullchain...)
 	}
 	return a.db.StoreCertificate(fullchain[0])
 }

@@ -616,6 +616,36 @@ retry:
 	return &sign, nil
 }
 
+// Rekey performs the rekey request to the CA and returns the api.SignResponse
+// struct.
+func (c *Client) Rekey(req *api.RekeyRequest, tr http.RoundTripper) (*api.SignResponse, error) {
+	var retried bool
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling request")
+	}
+
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/rekey"})
+	client := &http.Client{Transport: tr}
+retry:
+	resp, err := client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Rekey; client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readError(resp.Body)
+	}
+	var sign api.SignResponse
+	if err := readJSON(resp.Body, &sign); err != nil {
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Rekey; error reading %s", u)
+	}
+	return &sign, nil
+}
+
 // Revoke performs the revoke request to the CA and returns the api.RevokeResponse
 // struct.
 func (c *Client) Revoke(req *api.RevokeRequest, tr http.RoundTripper) (*api.RevokeResponse, error) {

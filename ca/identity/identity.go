@@ -134,6 +134,12 @@ func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) er
 	return nil
 }
 
+// WriteIdentityCertificate writes the identity certificate to disk.
+func WriteIdentityCertificate(certChain []api.Certificate) error {
+	filename := filepath.Join(identityDir, "identity.crt")
+	return writeCertificate(filename, certChain)
+}
+
 // writeCertificate writes the given certificate on disk.
 func writeCertificate(filename string, certChain []api.Certificate) error {
 	buf := new(bytes.Buffer)
