@@ -18,7 +18,7 @@ type DB interface {
 	UpdateProvisioner(ctx context.Context, prov *Provisioner) error
 
 	CreateAdmin(ctx context.Context, admin *Admin) error
-	GetAdmin(ctx context.Context, id string) error
+	GetAdmin(ctx context.Context, id string) (*Admin, error)
 	GetAdmins(ctx context.Context) ([]*Admin, error)
 	UpdateAdmin(ctx context.Context, admin *Admin) error
 
@@ -116,7 +116,7 @@ func (m *MockDB) GetAdmins(ctx context.Context) ([]*Admin, error) {
 
 // UpdateAdmin mock
 func (m *MockDB) UpdateAdmin(ctx context.Context, adm *Admin) error {
-	if m.UpdateAdmin != nil {
+	if m.MockUpdateAdmin != nil {
 		return m.MockUpdateAdmin(ctx, adm)
 	}
 	return m.MockError
@@ -142,7 +142,7 @@ func (m *MockDB) GetAuthConfig(ctx context.Context, id string) (*AuthConfig, err
 
 // UpdateAuthConfig mock
 func (m *MockDB) UpdateAuthConfig(ctx context.Context, adm *AuthConfig) error {
-	if m.UpdateAuthConfig != nil {
+	if m.MockUpdateAuthConfig != nil {
 		return m.MockUpdateAuthConfig(ctx, adm)
 	}
 	return m.MockError

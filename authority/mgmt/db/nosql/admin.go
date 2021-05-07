@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/mgmt"
 	"github.com/smallstep/nosql"
 )
@@ -109,7 +108,7 @@ func unmarshalAdmin(data []byte, id string) (*mgmt.Admin, error) {
 // GetAdmins retrieves and unmarshals all active (not deleted) admins
 // from the database.
 // TODO should we be paginating?
-func (db *DB) GetAdmins(ctx context.Context, az *acme.Authorization) ([]*mgmt.Admin, error) {
+func (db *DB) GetAdmins(ctx context.Context) ([]*mgmt.Admin, error) {
 	dbEntries, err := db.db.List(authorityAdminsTable)
 	if err != nil {
 		return nil, errors.Wrap(err, "error loading admins")

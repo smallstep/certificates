@@ -32,9 +32,14 @@ var (
 		MaxVersion:    1.2,
 		Renegotiation: false,
 	}
-	DefaultBackdate       = time.Minute
+	// DefaultBackdate length of time to backdate certificates to avoid
+	// clock skew validation issues.
+	DefaultBackdate = time.Minute
+	// DefaultDisableRenewal disables renewals per provisioner.
 	DefaultDisableRenewal = false
-	DefaultEnableSSHCA    = false
+	// DefaultEnableSSHCA enable SSH CA features per provisioner or globally
+	// for all provisioners.
+	DefaultEnableSSHCA = false
 	// GlobalProvisionerClaims default claims for the Authority. Can be overriden
 	// by provisioner specific claims.
 	GlobalProvisionerClaims = provisioner.Claims{
@@ -153,7 +158,7 @@ func LoadConfiguration(filename string) (*Config, error) {
 		return nil, errors.Wrapf(err, "error parsing %s", filename)
 	}
 
-	c.init()
+	c.Init()
 
 	return &c, nil
 }

@@ -58,55 +58,59 @@ func (h *Handler) GetAdmins(w http.ResponseWriter, r *http.Request) {
 
 // CreateAdmin creates a new admin.
 func (h *Handler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	/*
+		ctx := r.Context()
 
-	var body CreateAdminRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	if err := body.Validate(); err != nil {
-		api.WriteError(w, err)
-	}
+		var body CreateAdminRequest
+		if err := ReadJSON(r.Body, &body); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		if err := body.Validate(); err != nil {
+			api.WriteError(w, err)
+		}
 
-	adm := &config.Admin{
-		Name:         body.Name,
-		Provisioner:  body.Provisioner,
-		IsSuperAdmin: body.IsSuperAdmin,
-	}
-	if err := h.db.CreateAdmin(ctx, adm); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	api.JSONStatus(w, adm, http.StatusCreated)
+		adm := &config.Admin{
+			Name:         body.Name,
+			Provisioner:  body.Provisioner,
+			IsSuperAdmin: body.IsSuperAdmin,
+		}
+		if err := h.db.CreateAdmin(ctx, adm); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		api.JSONStatus(w, adm, http.StatusCreated)
+	*/
 }
 
 // UpdateAdmin updates an existing admin.
 func (h *Handler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := chi.URLParam(r, "id")
+	/*
+		ctx := r.Context()
+		id := chi.URLParam(r, "id")
 
-	var body UpdateAdminRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	if err := body.Validate(); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	if adm, err := h.db.GetAdmin(ctx, id); err != nil {
-		api.WriteError(w, err)
-		return
-	}
+		var body UpdateAdminRequest
+		if err := ReadJSON(r.Body, &body); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		if err := body.Validate(); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		if adm, err := h.db.GetAdmin(ctx, id); err != nil {
+			api.WriteError(w, err)
+			return
+		}
 
-	adm.Name = body.Name
-	adm.Provisioner = body.Provisioner
-	adm.IsSuperAdmin = body.IsSuperAdmin
+		adm.Name = body.Name
+		adm.Provisioner = body.Provisioner
+		adm.IsSuperAdmin = body.IsSuperAdmin
 
-	if err := h.db.UpdateAdmin(ctx, adm); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	api.JSON(w, adm)
+		if err := h.db.UpdateAdmin(ctx, adm); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		api.JSON(w, adm)
+	*/
 }

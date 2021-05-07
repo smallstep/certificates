@@ -20,6 +20,16 @@ type ProvisionerCtx struct {
 	Password                          string
 }
 
+func NewProvisionerCtx(opts ...ProvisionerOption) *ProvisionerCtx {
+	pc := &ProvisionerCtx{
+		Claims: NewDefaultClaims(),
+	}
+	for _, o := range opts {
+		o(pc)
+	}
+	return pc
+}
+
 func WithJWK(jwk *jose.JSONWebKey, jwe *jose.JSONWebEncryption) func(*ProvisionerCtx) {
 	return func(ctx *ProvisionerCtx) {
 		ctx.JWK = jwk
@@ -62,10 +72,7 @@ func (p *Provisioner) GetOptions() *provisioner.Options {
 }
 
 func CreateProvisioner(ctx context.Context, db DB, typ, name string, opts ...ProvisionerOption) (*Provisioner, error) {
-	pc := new(ProvisionerCtx)
-	for _, o := range opts {
-		o(pc)
-	}
+	pc := NewProvisionerCtx(opts...)
 
 	details, err := createJWKDetails(pc)
 	if err != nil {

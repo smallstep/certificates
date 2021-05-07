@@ -5,16 +5,15 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/mgmt"
 )
 
 // CreateAuthConfigRequest represents the body for a CreateAuthConfig request.
 type CreateAuthConfigRequest struct {
-	ASN1DN               *authority.ASN1DN `json:"asn1dn,omitempty"`
-	Claims               *config.Claims    `json:"claims,omitempty"`
-	DisableIssuedAtCheck bool              `json:"disableIssuedAtCheck,omitempty"`
-	Backdate             string            `json:"backdate,omitempty"`
+	ASN1DN   *config.ASN1DN `json:"asn1dn,omitempty"`
+	Claims   *mgmt.Claims   `json:"claims,omitempty"`
+	Backdate string         `json:"backdate,omitempty"`
 }
 
 // Validate validates a CreateAuthConfig request body.
@@ -24,10 +23,9 @@ func (car *CreateAuthConfigRequest) Validate() error {
 
 // UpdateAuthConfigRequest represents the body for a UpdateAuthConfig request.
 type UpdateAuthConfigRequest struct {
-	ASN1DN               *authority.ASN1DN `json:"asn1dn"`
-	Claims               *config.Claims    `json:"claims"`
-	DisableIssuedAtCheck bool              `json:"disableIssuedAtCheck,omitempty"`
-	Backdate             string            `json:"backdate,omitempty"`
+	ASN1DN   *config.ASN1DN `json:"asn1dn"`
+	Claims   *mgmt.Claims   `json:"claims"`
+	Backdate string         `json:"backdate,omitempty"`
 }
 
 // Validate validates a new-admin request body.
@@ -53,7 +51,7 @@ func (h *Handler) CreateAuthConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var body CreateAuthConfigRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
+	if err := api.ReadJSON(r.Body, &body); err != nil {
 		api.WriteError(w, err)
 		return
 	}
@@ -61,10 +59,9 @@ func (h *Handler) CreateAuthConfig(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, err)
 	}
 
-	ac := config.AuthConfig{
-		Status:               config.StatusActive,
-		DisableIssuedAtCheck: body.DisableIssuedAtCheck,
-		Backdate:             "1m",
+	ac := &mgmt.AuthConfig{
+		Status:   mgmt.StatusActive,
+		Backdate: "1m",
 	}
 	if body.ASN1DN != nil {
 		ac.ASN1DN = body.ASN1DN
@@ -84,38 +81,40 @@ func (h *Handler) CreateAuthConfig(w http.ResponseWriter, r *http.Request) {
 
 // UpdateAuthConfig updates an existing AuthConfig.
 func (h *Handler) UpdateAuthConfig(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := chi.URLParam(r, "id")
+	/*
+		ctx := r.Context()
+		id := chi.URLParam(r, "id")
 
-	var body UpdateAuthConfigRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	if err := body.Validate(); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	if ac, err := h.db.GetAuthConfig(ctx, id); err != nil {
-		api.WriteError(w, err)
-		return
-	}
+		var body UpdateAuthConfigRequest
+		if err := api.ReadJSON(r.Body, &body); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		if err := body.Validate(); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		ac, err := h.db.GetAuthConfig(ctx, id)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
 
-	ac.DisableIssuedAtCheck = body.DisableIssuedAtCheck
-	ac.Status = body.Status
-	if body.ASN1DN != nil {
-		ac.ASN1DN = body.ASN1DN
-	}
-	if body.Claims != nil {
-		ac.Claims = body.Claims
-	}
-	if body.Backdate != "" {
-		ac.Backdate = body.Backdate
-	}
+		ac.Status = body.Status
+		if body.ASN1DN != nil {
+			ac.ASN1DN = body.ASN1DN
+		}
+		if body.Claims != nil {
+			ac.Claims = body.Claims
+		}
+		if body.Backdate != "" {
+			ac.Backdate = body.Backdate
+		}
 
-	if err := h.db.UpdateAuthConfig(ctx, ac); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	api.JSON(w, ac)
+		if err := h.db.UpdateAuthConfig(ctx, ac); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		api.JSON(w, ac)
+	*/
 }

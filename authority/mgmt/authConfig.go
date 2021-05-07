@@ -19,28 +19,8 @@ type AuthConfig struct {
 
 func NewDefaultAuthConfig() *AuthConfig {
 	return &AuthConfig{
-		Claims: &Claims{
-			X509: &X509Claims{
-				Durations: &Durations{
-					Min:     config.GlobalProvisionerClaims.MinTLSDur.String(),
-					Max:     config.GlobalProvisionerClaims.MaxTLSDur.String(),
-					Default: config.GlobalProvisionerClaims.DefaultTLSDur.String(),
-				},
-			},
-			SSH: &SSHClaims{
-				UserDurations: &Durations{
-					Min:     config.GlobalProvisionerClaims.MinUserSSHDur.String(),
-					Max:     config.GlobalProvisionerClaims.MaxUserSSHDur.String(),
-					Default: config.GlobalProvisionerClaims.DefaultUserSSHDur.String(),
-				},
-				HostDurations: &Durations{
-					Min:     config.GlobalProvisionerClaims.MinHostSSHDur.String(),
-					Max:     config.GlobalProvisionerClaims.MaxHostSSHDur.String(),
-					Default: config.GlobalProvisionerClaims.DefaultHostSSHDur.String(),
-				},
-			},
-			DisableRenewal: config.DefaultDisableRenewal,
-		},
+		Claims:   NewDefaultClaims(),
+		ASN1DN:   &config.ASN1DN{},
 		Backdate: config.DefaultBackdate.String(),
 		Status:   StatusActive,
 	}

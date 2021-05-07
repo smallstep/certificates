@@ -87,6 +87,11 @@ type Error struct {
 	Status      int           `json:"-"`
 }
 
+// IsType returns true if the error type matches the input type.
+func (e *Error) IsType(pt ProblemType) bool {
+	return pt.String() == e.Type
+}
+
 // NewError creates a new Error type.
 func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
 	return newError(pt, errors.Errorf(msg, args...))

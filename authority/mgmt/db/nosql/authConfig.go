@@ -12,13 +12,12 @@ import (
 )
 
 type dbAuthConfig struct {
-	ID                   string         `json:"id"`
-	ASN1DN               *config.ASN1DN `json:"asn1dn"`
-	Claims               *mgmt.Claims   `json:"claims"`
-	DisableIssuedAtCheck bool           `json:"disableIssuedAtCheck,omitempty"`
-	Backdate             string         `json:"backdate,omitempty"`
-	CreatedAt            time.Time      `json:"createdAt"`
-	DeletedAt            time.Time      `json:"deletedAt"`
+	ID        string         `json:"id"`
+	ASN1DN    *config.ASN1DN `json:"asn1dn"`
+	Claims    *mgmt.Claims   `json:"claims"`
+	Backdate  string         `json:"backdate,omitempty"`
+	CreatedAt time.Time      `json:"createdAt"`
+	DeletedAt time.Time      `json:"deletedAt"`
 }
 
 func (dbp *dbAuthConfig) clone() *dbAuthConfig {
@@ -63,30 +62,30 @@ func (db *DB) GetAuthConfig(ctx context.Context, id string) (*mgmt.AuthConfig, e
 	}
 
 	return &mgmt.AuthConfig{
-		ID:                   dba.ID,
-		Provisioners:         provs,
-		ASN1DN:               dba.ASN1DN,
-		Backdate:             dba.Backdate,
-		Claims:               dba.Claims,
-		DisableIssuedAtCheck: dba.DisableIssuedAtCheck,
+		ID:           dba.ID,
+		Provisioners: provs,
+		ASN1DN:       dba.ASN1DN,
+		Backdate:     dba.Backdate,
+		Claims:       dba.Claims,
 	}, nil
 }
 
 // CreateAuthConfig stores a new provisioner to the database.
 func (db *DB) CreateAuthConfig(ctx context.Context, ac *mgmt.AuthConfig) error {
 	var err error
-	ac.ID, err = randID()
-	if err != nil {
-		return errors.Wrap(err, "error generating random id for provisioner")
+	if ac.ID == "" {
+		ac.ID, err = randID()
+		if err != nil {
+			return errors.Wrap(err, "error generating random id for provisioner")
+		}
 	}
 
 	dba := &dbAuthConfig{
-		ID:                   ac.ID,
-		ASN1DN:               ac.ASN1DN,
-		Claims:               ac.Claims,
-		DisableIssuedAtCheck: ac.DisableIssuedAtCheck,
-		Backdate:             ac.Backdate,
-		CreatedAt:            clock.Now(),
+		ID:        ac.ID,
+		ASN1DN:    ac.ASN1DN,
+		Claims:    ac.Claims,
+		Backdate:  ac.Backdate,
+		CreatedAt: clock.Now(),
 	}
 
 	return db.save(ctx, dba.ID, dba, nil, "authConfig", authorityConfigsTable)
@@ -106,7 +105,6 @@ func (db *DB) UpdateAuthConfig(ctx context.Context, ac *mgmt.AuthConfig) error {
 		nu.DeletedAt = clock.Now()
 	}
 	nu.Claims = ac.Claims
-	nu.DisableIssuedAtCheck = ac.DisableIssuedAtCheck
 	nu.Backdate = ac.Backdate
 
 	return db.save(ctx, old.ID, nu, old, "authConfig", authorityProvisionersTable)

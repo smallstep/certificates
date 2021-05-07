@@ -18,6 +18,7 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/mgmt"
+	mgmtAPI "github.com/smallstep/certificates/authority/mgmt/api"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
@@ -143,6 +144,7 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 		dns = fmt.Sprintf("%s:%s", dns, port)
 	}
 
+	// ACME Router
 	prefix := "acme"
 	var acmeDB acme.DB
 	if config.DB == nil {
@@ -168,6 +170,16 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	mux.Route("/2.0/"+prefix, func(r chi.Router) {
 		acmeHandler.Route(r)
 	})
+
+	// MGMT Router
+
+	mgmtDB := auth.GetMgmtDatabase()
+	if mgmtDB != nil {
+		mgmtHandler := mgmtAPI.NewHandler(mgmtDB)
+		mux.Route("/mgmt", func(r chi.Router) {
+			mgmtHandler.Route(r)
+		})
+	}
 
 	// helpful routine for logging all routes //
 	/*
