@@ -310,3 +310,72 @@ func Test_generateKey(t *testing.T) {
 		})
 	}
 }
+
+func TestSoftKMS_CreateDecrypter(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemBlock, err := pemutil.Serialize(privateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemBlockPassword, err := pemutil.Serialize(privateKey, pemutil.WithPassword([]byte("pass")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ecdsaPK, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ecdsaPemBlock, err := pemutil.Serialize(ecdsaPK)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := ioutil.ReadFile("testdata/rsa.priv.pem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, _ := pem.Decode(b)
+	block.Bytes, err = x509.DecryptPEMBlock(block, []byte("pass")) //nolint
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyFromFile, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type args struct {
+		req *apiv1.CreateDecrypterRequest
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    crypto.Decrypter
+		wantErr bool
+	}{
+		{"decrypter", args{&apiv1.CreateDecrypterRequest{Decrypter: privateKey}}, privateKey, false},
+		{"file", args{&apiv1.CreateDecrypterRequest{DecryptionKey: "testdata/rsa.priv.pem", Password: []byte("pass")}}, keyFromFile, false},
+		{"pem", args{&apiv1.CreateDecrypterRequest{DecryptionKeyPEM: pem.EncodeToMemory(pemBlock)}}, privateKey, false},
+		{"pem password", args{&apiv1.CreateDecrypterRequest{DecryptionKeyPEM: pem.EncodeToMemory(pemBlockPassword), Password: []byte("pass")}}, privateKey, false},
+		{"fail none", args{&apiv1.CreateDecrypterRequest{}}, nil, true},
+		{"fail missing", args{&apiv1.CreateDecrypterRequest{DecryptionKey: "testdata/missing"}}, nil, true},
+		{"fail bad pem", args{&apiv1.CreateDecrypterRequest{DecryptionKeyPEM: []byte("bad pem")}}, nil, true},
+		{"fail bad password", args{&apiv1.CreateDecrypterRequest{DecryptionKeyPEM: pem.EncodeToMemory(pemBlockPassword), Password: []byte("bad-pass")}}, nil, true},
+		{"fail not a decrypter (ecdsa key)", args{&apiv1.CreateDecrypterRequest{DecryptionKeyPEM: pem.EncodeToMemory(ecdsaPemBlock)}}, nil, true},
+		{"fail not a decrypter from file", args{&apiv1.CreateDecrypterRequest{DecryptionKey: "testdata/rsa.pub.pem"}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			k := &SoftKMS{}
+			got, err := k.CreateDecrypter(tt.args.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SoftKMS.CreateDecrypter(), error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("SoftKMS.CreateDecrypter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
