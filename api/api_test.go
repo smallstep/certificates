@@ -6,6 +6,7 @@ import (
 	"crypto"
 	"crypto/dsa" //nolint
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -1285,6 +1286,10 @@ func Test_fmtPublicKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	edPub, edPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var dsa2048 dsa.PrivateKey
 	if err := dsa.GenerateParameters(&dsa2048.Parameters, rand.Reader, dsa.L2048N256); err != nil {
 		t.Fatal(err)
@@ -1304,6 +1309,7 @@ func Test_fmtPublicKey(t *testing.T) {
 	}{
 		{"p256", args{p256.Public(), p256, nil}, "ECDSA P-256"},
 		{"rsa1024", args{rsa1024.Public(), rsa1024, nil}, "RSA 1024"},
+		{"ed25519", args{edPub, edPriv, nil}, "Ed25519"},
 		{"dsa2048", args{cert: &x509.Certificate{PublicKeyAlgorithm: x509.DSA, PublicKey: &dsa2048.PublicKey}}, "DSA 2048"},
 		{"unknown", args{cert: &x509.Certificate{PublicKeyAlgorithm: x509.ECDSA, PublicKey: []byte("12345678")}}, "ECDSA unknown"},
 	}
