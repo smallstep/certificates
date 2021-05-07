@@ -60,10 +60,10 @@ func (c *MgmtClient) retryOnError(r *http.Response) bool {
 	return false
 }
 
-// GetAdmin performs the GET /config/admin/{id} request to the CA.
+// GetAdmin performs the GET /mgmt/admin/{id} request to the CA.
 func (c *MgmtClient) GetAdmin(id string) (*mgmt.Admin, error) {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/config/admin", id)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/mgmt/admin", id)})
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
@@ -83,10 +83,10 @@ retry:
 	return adm, nil
 }
 
-// GetAdmins performs the GET /config/admins request to the CA.
+// GetAdmins performs the GET /mgmt/admins request to the CA.
 func (c *MgmtClient) GetAdmins() ([]*mgmt.Admin, error) {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/config/admins"})
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/mgmt/admins"})
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {

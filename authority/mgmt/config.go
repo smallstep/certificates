@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/config"
 )
 
 const (
@@ -48,6 +49,31 @@ type Durations struct {
 	Min     string `json:"min"`
 	Max     string `json:"max"`
 	Default string `json:"default"`
+}
+
+func NewDefaultClaims() *Claims {
+	return &Claims{
+		X509: &X509Claims{
+			Durations: &Durations{
+				Min:     config.GlobalProvisionerClaims.MinTLSDur.String(),
+				Max:     config.GlobalProvisionerClaims.MaxTLSDur.String(),
+				Default: config.GlobalProvisionerClaims.DefaultTLSDur.String(),
+			},
+		},
+		SSH: &SSHClaims{
+			UserDurations: &Durations{
+				Min:     config.GlobalProvisionerClaims.MinUserSSHDur.String(),
+				Max:     config.GlobalProvisionerClaims.MaxUserSSHDur.String(),
+				Default: config.GlobalProvisionerClaims.DefaultUserSSHDur.String(),
+			},
+			HostDurations: &Durations{
+				Min:     config.GlobalProvisionerClaims.MinHostSSHDur.String(),
+				Max:     config.GlobalProvisionerClaims.MaxHostSSHDur.String(),
+				Default: config.GlobalProvisionerClaims.DefaultHostSSHDur.String(),
+			},
+		},
+		DisableRenewal: config.DefaultDisableRenewal,
+	}
 }
 
 type AuthorityOption func(*AuthConfig) error

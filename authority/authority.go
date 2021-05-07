@@ -32,7 +32,7 @@ import (
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
 	config       *config.Config
-	mgmtDB       *mgmt.DB
+	mgmtDB       mgmt.DB
 	keyManager   kms.KeyManager
 	provisioners *provisioner.Collection
 	db           db.AuthDB
@@ -150,19 +150,25 @@ func (a *Authority) init() error {
 
 	// Pull AuthConfig from DB.
 	if true {
-		if len(a.config.AuthConfig.AuthorityID)_== 0 {
-			mgmtDB, err := authMgmtNosql.New(a.db.(nosql.DB), mgmt.DefaultAuthorityID)
-			if err != nil {
-				return err
+		// Check if AuthConfig already exists
+		a.mgmtDB, err = authMgmtNosql.New(a.db.(nosql.DB), mgmt.DefaultAuthorityID)
+		if err != nil {
+			return err
+		}
+		mgmtAuthConfig, err := a.mgmtDB.GetAuthConfig(context.Background(), mgmt.DefaultAuthorityID)
+		if err != nil {
+			if k, ok := err.(*mgmt.Error); ok && k.IsType(mgmt.ErrorNotFoundType) {
+				mgmtAuthConfig, err = mgmt.CreateAuthority(context.Background(), a.mgmtDB, mgmt.WithDefaultAuthorityID)
+				if err != nil {
+					return mgmt.WrapErrorISE(err, "error creating authConfig")
+				}
+			} else {
+				return mgmt.WrapErrorISE(err, "error getting authConfig from db")
 			}
-			mgmtAuthConfig, err := mgmt.CreateAuthority(context.Background, mgmtDB, WithDefaultAuthorityID)
-			if err != nil {
-				return err
-			}
-			a.config.AuthConfig, err := mgmtAuthConfig.ToCertificates()
-			if err != nil {
-				return err
-			}
+		}
+		a.config.AuthorityConfig, err = mgmtAuthConfig.ToCertificates()
+		if err != nil {
+			return err
 		}
 	}
 
@@ -440,6 +446,11 @@ func (a *Authority) init() error {
 // define a database, GetDatabase will return a db.SimpleDB instance.
 func (a *Authority) GetDatabase() db.AuthDB {
 	return a.db
+}
+
+// GetMgmtDatabase returns the mgmt database, if one exists.
+func (a *Authority) GetMgmtDatabase() mgmt.DB {
+	return a.mgmtDB
 }
 
 // Shutdown safely shuts down any clients, databases, etc. held by the Authority.

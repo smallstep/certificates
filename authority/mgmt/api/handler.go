@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/mgmt"
 )
 
 // Clock that returns time in UTC rounded to seconds.
@@ -19,14 +19,12 @@ var clock Clock
 
 // Handler is the ACME API request handler.
 type Handler struct {
-	db config.DB
+	db mgmt.DB
 }
 
 // NewHandler returns a new Authority Config Handler.
-func NewHandler(db config.DB) api.RouterHandler {
-	return &Handler{
-		db: ops.DB,
-	}
+func NewHandler(db mgmt.DB) api.RouterHandler {
+	return &Handler{db}
 }
 
 // Route traffic and implement the Router interface.

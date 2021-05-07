@@ -5,17 +5,17 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/mgmt"
 )
 
 // CreateProvisionerRequest represents the body for a CreateProvisioner request.
 type CreateProvisionerRequest struct {
-	Type         string         `json:"type"`
-	Name         string         `json:"name"`
-	Claims       *config.Claims `json:"claims"`
-	Details      interface{}    `json:"details"`
-	X509Template string         `json:"x509Template"`
-	SSHTemplate  string         `json:"sshTemplate"`
+	Type         string       `json:"type"`
+	Name         string       `json:"name"`
+	Claims       *mgmt.Claims `json:"claims"`
+	Details      interface{}  `json:"details"`
+	X509Template string       `json:"x509Template"`
+	SSHTemplate  string       `json:"sshTemplate"`
 }
 
 // Validate validates a new-provisioner request body.
@@ -25,10 +25,10 @@ func (car *CreateProvisionerRequest) Validate() error {
 
 // UpdateProvisionerRequest represents the body for a UpdateProvisioner request.
 type UpdateProvisionerRequest struct {
-	Claims       *config.Claims `json:"claims"`
-	Details      interface{}    `json:"details"`
-	X509Template string         `json:"x509Template"`
-	SSHTemplate  string         `json:"sshTemplate"`
+	Claims       *mgmt.Claims `json:"claims"`
+	Details      interface{}  `json:"details"`
+	X509Template string       `json:"x509Template"`
+	SSHTemplate  string       `json:"sshTemplate"`
 }
 
 // Validate validates a new-provisioner request body.
@@ -66,7 +66,7 @@ func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var body CreateProvisionerRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
+	if err := api.ReadJSON(r.Body, &body); err != nil {
 		api.WriteError(w, err)
 		return
 	}
@@ -74,7 +74,7 @@ func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, err)
 	}
 
-	prov := &config.Provisioner{
+	prov := &mgmt.Provisioner{
 		Type:         body.Type,
 		Name:         body.Name,
 		Claims:       body.Claims,
@@ -91,32 +91,34 @@ func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 
 // UpdateProvisioner updates an existing prov.
 func (h *Handler) UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := chi.URLParam(r, "id")
+	/*
+		ctx := r.Context()
+		id := chi.URLParam(r, "id")
 
-	var body UpdateProvisionerRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	if err := body.Validate(); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	if prov, err := h.db.GetProvisioner(ctx, id); err != nil {
-		api.WriteError(w, err)
-		return
-	}
+		var body UpdateProvisionerRequest
+		if err := ReadJSON(r.Body, &body); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		if err := body.Validate(); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		if prov, err := h.db.GetProvisioner(ctx, id); err != nil {
+			api.WriteError(w, err)
+			return
+		}
 
-	prov.Claims = body.Claims
-	prov.Details = body.Provisioner
-	prov.X509Template = body.X509Template
-	prov.SSHTemplate = body.SSHTemplate
-	prov.Status = body.Status
+		prov.Claims = body.Claims
+		prov.Details = body.Provisioner
+		prov.X509Template = body.X509Template
+		prov.SSHTemplate = body.SSHTemplate
+		prov.Status = body.Status
 
-	if err := h.db.UpdateProvisioner(ctx, prov); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	api.JSON(w, prov)
+		if err := h.db.UpdateProvisioner(ctx, prov); err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		api.JSON(w, prov)
+	*/
 }
