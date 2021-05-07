@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -322,6 +323,13 @@ func getPEM(i interface{}) ([]byte, error) {
 		var err error
 		block.Type = "EC PRIVATE KEY"
 		block.Bytes, err = x509.MarshalECPrivateKey(i)
+		if err != nil {
+			return nil, errors.Wrap(err, "error marshaling private key")
+		}
+	case ed25519.PrivateKey:
+		var err error
+		block.Type = "PRIVATE KEY"
+		block.Bytes, err = x509.MarshalPKCS8PrivateKey(i)
 		if err != nil {
 			return nil, errors.Wrap(err, "error marshaling private key")
 		}
