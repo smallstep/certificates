@@ -25,6 +25,10 @@ builds:
     ignore:
      - goos: windows
        goarch: 386
+     - goos: windows
+       goarm: 6
+     - goos: windows
+       goarm: 7
     flags:
       - -trimpath
     main: ./cmd/step-ca/main.go
@@ -45,10 +49,15 @@ builds:
       - arm64
       - 386
     goarm:
+      - 6
       - 7
     ignore:
      - goos: windows
        goarch: 386
+     - goos: windows
+       goarm: 6
+     - goos: windows
+       goarm: 7
     flags:
       - -trimpath
     main: ./cmd/step-cloudkms-init/main.go
@@ -69,10 +78,15 @@ builds:
       - arm64
       - 386
     goarm:
+      - 6
       - 7
     ignore:
      - goos: windows
        goarch: 386
+     - goos: windows
+       goarm: 6
+     - goos: windows
+       goarm: 7
     flags:
       - -trimpath
     main: ./cmd/step-awskms-init/main.go
