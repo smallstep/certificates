@@ -1,4 +1,7 @@
-# Getting started with docker
+# Getting started with Docker
+
+## NOTE: This guide is deprecated.
+## Please see [smallstep/step-ca](https://hub.docker.com/r/smallstep/step-ca) on Docker Hub for instructions.
 
 This guide shows how to set up [step certificates](https://github.com/smallstep/certificates) using docker.
 
@@ -103,16 +106,16 @@ accepted certificate authority.
 
 ### Notes for running on a Raspberry Pi
 
-When you run step-ca on a Raspberry Pi, you might get the following error in the
-logs of your docker container:
+When you run step-ca on a Raspberry Pi, you might get the following error in
+your continaer logs:
 
 ```sh
 step-ca  | badger 2021/05/08 20:13:12 INFO: All 0 tables opened in 0s
 step-ca  | Error opening database of Type badger with source /home/step/db: error opening Badger database: Mmap value log file. Path=/home/step/db/000000.vlog. Error=cannot allocate memory
 ```
 
-In that case you need to adjust the `db` configuration in the file `/home/step/config/ca.json`,
-you need to adjust `badgerFileLoadingMode` from being `""` to the value `FileIO`.
+To fix it, adjust the `db` configuration in the file `config/ca.json`.
+Change the value of `badgerFileLoadingMode` from `""` to `"FileIO"`.
 
 ```sh
 docker run -it -v step:/home/step smallstep/step-ca sh
@@ -120,15 +123,15 @@ docker run -it -v step:/home/step smallstep/step-ca sh
 ~ $ vi config/ca.json
 ```
 
-You will end up with something similar like this:
+You will end up with this:
+
 ```json
     "db": {
           "type": "badger",
           "dataSource": "/root/.step/db",
-          "badgerFileLoadingMode": "FileIO",
+          "badgerFileLoadingMode": "FileIO"
     },
 ```
-
 
 ## Dev environment bootstrap
 
