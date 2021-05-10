@@ -1,7 +1,6 @@
 # Getting started with Docker
 
-## NOTE: This guide is deprecated.
-## Please see [smallstep/step-ca](https://hub.docker.com/r/smallstep/step-ca) on Docker Hub for instructions.
+## NOTE: This guide is deprecated. Please see [smallstep/step-ca](https://hub.docker.com/r/smallstep/step-ca) on Docker Hub for instructions.
 
 This guide shows how to set up [step certificates](https://github.com/smallstep/certificates) using docker.
 
