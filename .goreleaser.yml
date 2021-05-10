@@ -20,6 +20,7 @@ builds:
       - arm64
       - 386
     goarm:
+      - 6
       - 7
     ignore:
      - goos: windows
