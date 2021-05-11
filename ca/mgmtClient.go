@@ -105,3 +105,26 @@ retry:
 	}
 	return *admins, nil
 }
+
+// GetProvisioners performs the GET /mgmt/provisioners request to the CA.
+func (c *MgmtClient) GetProvisioners() ([]*mgmt.Provisioner, error) {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/mgmt/provisioners"})
+retry:
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readError(resp.Body)
+	}
+	var provs = new([]*mgmt.Provisioner)
+	if err := readJSON(resp.Body, provs); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return *provs, nil
+}

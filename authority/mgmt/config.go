@@ -2,6 +2,7 @@ package mgmt
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/config"
@@ -23,6 +24,17 @@ const (
 	// StatusDeleted deleted
 	StatusDeleted
 )
+
+func (st StatusType) String() string {
+	switch st {
+	case StatusActive:
+		return "active"
+	case StatusDeleted:
+		return "deleted"
+	default:
+		return fmt.Sprintf("status %d not found", st)
+	}
+}
 
 // Claims encapsulates all x509 and ssh claims applied to the authority
 // configuration. E.g. maxTLSCertDuration, defaultSSHCertDuration, etc.
@@ -111,7 +123,7 @@ func CreateAuthority(ctx context.Context, db DB, options ...AuthorityOption) (*A
 		return nil, WrapErrorISE(err, "error creating first provisioner")
 	}
 
-	admin, err := CreateAdmin(ctx, db, "Change Me", prov, true)
+	admin, err := CreateAdmin(ctx, db, "Change Me", prov.ID, true)
 	if err != nil {
 		// TODO should we try to clean up?
 		return nil, WrapErrorISE(err, "error creating first provisioner")
