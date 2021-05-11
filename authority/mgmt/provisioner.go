@@ -20,6 +20,17 @@ type ProvisionerCtx struct {
 	Password                          string
 }
 
+type ProvisionerType string
+
+var (
+	ProvisionerTypeJWK    = ProvisionerType("JWK")
+	ProvisionerTypeOIDC   = ProvisionerType("OIDC")
+	ProvisionerTypeACME   = ProvisionerType("ACME")
+	ProvisionerTypeX5C    = ProvisionerType("X5C")
+	ProvisionerTypeK8S    = ProvisionerType("K8S")
+	ProvisionerTypeSSHPOP = ProvisionerType("SSHPOP")
+)
+
 func NewProvisionerCtx(opts ...ProvisionerOption) *ProvisionerCtx {
 	pc := &ProvisionerCtx{
 		Claims: NewDefaultClaims(),
@@ -97,12 +108,14 @@ func CreateProvisioner(ctx context.Context, db DB, typ, name string, opts ...Pro
 	return p, nil
 }
 
-type ProvisionerDetails_JWK struct {
-	PubKey  []byte `json:"pubKey"`
-	PrivKey string `json:"privKey"`
+// ProvisionerDetailsJWK represents the values required by a JWK provisioner.
+type ProvisionerDetailsJWK struct {
+	Type       ProvisionerType `json:"type"`
+	PubKey     []byte          `json:"pubKey"`
+	EncPrivKey string          `json:"privKey"`
 }
 
-func createJWKDetails(pc *ProvisionerCtx) (*ProvisionerDetails_JWK, error) {
+func createJWKDetails(pc *ProvisionerCtx) (*ProvisionerDetailsJWK, error) {
 	var err error
 
 	if pc.JWK != nil && pc.JWE == nil {
@@ -131,9 +144,10 @@ func createJWKDetails(pc *ProvisionerCtx) (*ProvisionerDetails_JWK, error) {
 		return nil, WrapErrorISE(err, "error serializing JWE")
 	}
 
-	return &ProvisionerDetails_JWK{
-		PubKey:  jwkPubBytes,
-		PrivKey: jwePrivStr,
+	return &ProvisionerDetailsJWK{
+		Type:       ProvisionerTypeJWK,
+		PubKey:     jwkPubBytes,
+		EncPrivKey: jwePrivStr,
 	}, nil
 }
 
@@ -150,7 +164,7 @@ func (p *Provisioner) ToCertificates() (provisioner.Interface, error) {
 	}
 
 	switch details := p.Details.(type) {
-	case *ProvisionerDetails_JWK:
+	case *ProvisionerDetailsJWK:
 		jwk := new(jose.JSONWebKey)
 		if err := json.Unmarshal(details.PubKey, &jwk); err != nil {
 			return nil, err
@@ -159,7 +173,7 @@ func (p *Provisioner) ToCertificates() (provisioner.Interface, error) {
 			Type:         p.Type,
 			Name:         p.Name,
 			Key:          jwk,
-			EncryptedKey: details.PrivKey,
+			EncryptedKey: details.EncPrivKey,
 			Claims:       claims,
 			Options:      p.GetOptions(),
 		}, nil
@@ -324,68 +338,6 @@ func marshalDetails(d *ProvisionerDetails) (sql.NullString, error) {
 	}, nil
 }
 
-func unmarshalDetails(ctx context.Context, db database.DB, typ ProvisionerType, s sql.NullString) (*ProvisionerDetails, error) {
-	if !s.Valid {
-		return nil, nil
-	}
-	var v isProvisionerDetails_Data
-	switch typ {
-	case ProvisionerType_JWK:
-		p := new(ProvisionerDetails_JWK)
-		if err := json.Unmarshal([]byte(s.String), p); err != nil {
-			return nil, err
-		}
-		if p.JWK.Key.Key == nil {
-			key, err := LoadKey(ctx, db, p.JWK.Key.Id.Id)
-			if err != nil {
-				return nil, err
-			}
-			p.JWK.Key = key
-		}
-		return &ProvisionerDetails{Data: p}, nil
-	case ProvisionerType_OIDC:
-		v = new(ProvisionerDetails_OIDC)
-	case ProvisionerType_GCP:
-		v = new(ProvisionerDetails_GCP)
-	case ProvisionerType_AWS:
-		v = new(ProvisionerDetails_AWS)
-	case ProvisionerType_AZURE:
-		v = new(ProvisionerDetails_Azure)
-	case ProvisionerType_ACME:
-		v = new(ProvisionerDetails_ACME)
-	case ProvisionerType_X5C:
-		p := new(ProvisionerDetails_X5C)
-		if err := json.Unmarshal([]byte(s.String), p); err != nil {
-			return nil, err
-		}
-		for _, k := range p.X5C.GetRoots() {
-			if err := k.Select(ctx, db, k.Id.Id); err != nil {
-				return nil, err
-			}
-		}
-		return &ProvisionerDetails{Data: p}, nil
-	case ProvisionerType_K8SSA:
-		p := new(ProvisionerDetails_K8SSA)
-		if err := json.Unmarshal([]byte(s.String), p); err != nil {
-			return nil, err
-		}
-		for _, k := range p.K8SSA.GetPublicKeys() {
-			if err := k.Select(ctx, db, k.Id.Id); err != nil {
-				return nil, err
-			}
-		}
-		return &ProvisionerDetails{Data: p}, nil
-	case ProvisionerType_SSHPOP:
-		v = new(ProvisionerDetails_SSHPOP)
-	default:
-		return nil, fmt.Errorf("unsupported provisioner type %s", typ)
-	}
-
-	if err := json.Unmarshal([]byte(s.String), v); err != nil {
-		return nil, err
-	}
-	return &ProvisionerDetails{Data: v}, nil
-}
 
 func marshalClaims(c *Claims) (sql.NullString, error) {
 	b, err := json.Marshal(c)

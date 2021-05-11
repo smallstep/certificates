@@ -63,19 +63,13 @@ func (db *DB) GetAdmin(ctx context.Context, id string) (*mgmt.Admin, error) {
 		return nil, err
 	}
 	if adm.Status == mgmt.StatusDeleted {
-		return nil, mgmt.NewError(mgmt.ErrorDeletedType, "admin %s is deleted")
+		return nil, mgmt.NewError(mgmt.ErrorDeletedType, "admin %s is deleted", adm.ID)
 	}
 	if adm.AuthorityID != db.authorityID {
 		return nil, mgmt.NewError(mgmt.ErrorAuthorityMismatchType,
 			"admin %s is not owned by authority %s", adm.ID, db.authorityID)
 	}
 
-	prov, err := db.GetProvisioner(ctx, adm.ProvisionerID)
-	if err != nil {
-		return nil, err
-	}
-	adm.ProvisionerName = prov.Name
-	adm.ProvisionerType = prov.Type
 	return adm, nil
 }
 

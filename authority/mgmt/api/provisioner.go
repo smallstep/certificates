@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -10,12 +11,14 @@ import (
 
 // CreateProvisionerRequest represents the body for a CreateProvisioner request.
 type CreateProvisionerRequest struct {
-	Type         string       `json:"type"`
-	Name         string       `json:"name"`
-	Claims       *mgmt.Claims `json:"claims"`
-	Details      interface{}  `json:"details"`
-	X509Template string       `json:"x509Template"`
-	SSHTemplate  string       `json:"sshTemplate"`
+	Type             string       `json:"type"`
+	Name             string       `json:"name"`
+	Claims           *mgmt.Claims `json:"claims"`
+	Details          interface{}  `json:"details"`
+	X509Template     string       `json:"x509Template"`
+	X509TemplateData []byte       `json:"x509TemplateData"`
+	SSHTemplate      string       `json:"sshTemplate"`
+	SSHTemplateData  []byte       `json:"sshTemplateData"`
 }
 
 // Validate validates a new-provisioner request body.
@@ -25,10 +28,12 @@ func (car *CreateProvisionerRequest) Validate() error {
 
 // UpdateProvisionerRequest represents the body for a UpdateProvisioner request.
 type UpdateProvisionerRequest struct {
-	Claims       *mgmt.Claims `json:"claims"`
-	Details      interface{}  `json:"details"`
-	X509Template string       `json:"x509Template"`
-	SSHTemplate  string       `json:"sshTemplate"`
+	Claims           *mgmt.Claims `json:"claims"`
+	Details          interface{}  `json:"details"`
+	X509Template     string       `json:"x509Template"`
+	X509TemplateData []byte       `json:"x509TemplateData"`
+	SSHTemplate      string       `json:"sshTemplate"`
+	SSHTemplateData  []byte       `json:"sshTemplateData"`
 }
 
 // Validate validates a new-provisioner request body.
@@ -58,6 +63,7 @@ func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, err)
 		return
 	}
+	fmt.Printf("provs = %+v\n", provs)
 	api.JSON(w, provs)
 }
 
@@ -75,12 +81,14 @@ func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prov := &mgmt.Provisioner{
-		Type:         body.Type,
-		Name:         body.Name,
-		Claims:       body.Claims,
-		Details:      body.Details,
-		X509Template: body.X509Template,
-		SSHTemplate:  body.SSHTemplate,
+		Type:             body.Type,
+		Name:             body.Name,
+		Claims:           body.Claims,
+		Details:          body.Details,
+		X509Template:     body.X509Template,
+		X509TemplateData: body.X509TemplateData,
+		SSHTemplate:      body.SSHTemplate,
+		SSHTemplateData:  body.SSHTemplateData,
 	}
 	if err := h.db.CreateProvisioner(ctx, prov); err != nil {
 		api.WriteError(w, err)
