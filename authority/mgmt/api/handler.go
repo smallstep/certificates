@@ -33,13 +33,15 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("GET", "/provisioner/{id}", h.GetProvisioner)
 	r.MethodFunc("GET", "/provisioners", h.GetProvisioners)
 	r.MethodFunc("POST", "/provisioner", h.CreateProvisioner)
-	r.MethodFunc("PUT", "/provsiioner/{id}", h.UpdateProvisioner)
+	r.MethodFunc("PUT", "/provisioner/{id}", h.UpdateProvisioner)
+	//r.MethodFunc("DELETE", "/provisioner/{id}", h.UpdateAdmin)
 
 	// Admins
 	r.MethodFunc("GET", "/admin/{id}", h.GetAdmin)
 	r.MethodFunc("GET", "/admins", h.GetAdmins)
 	r.MethodFunc("POST", "/admin", h.CreateAdmin)
 	r.MethodFunc("PUT", "/admin/{id}", h.UpdateAdmin)
+	r.MethodFunc("DELETE", "/admin/{id}", h.DeleteAdmin)
 
 	// AuthConfig
 	r.MethodFunc("GET", "/authconfig/{id}", h.GetAuthConfig)

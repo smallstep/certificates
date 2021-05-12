@@ -23,12 +23,15 @@ type ProvisionerCtx struct {
 type ProvisionerType string
 
 var (
-	ProvisionerTypeJWK    = ProvisionerType("JWK")
-	ProvisionerTypeOIDC   = ProvisionerType("OIDC")
 	ProvisionerTypeACME   = ProvisionerType("ACME")
-	ProvisionerTypeX5C    = ProvisionerType("X5C")
-	ProvisionerTypeK8S    = ProvisionerType("K8S")
+	ProvisionerTypeAWS    = ProvisionerType("AWS")
+	ProvisionerTypeAZURE  = ProvisionerType("AZURE")
+	ProvisionerTypeGCP    = ProvisionerType("GCP")
+	ProvisionerTypeJWK    = ProvisionerType("JWK")
+	ProvisionerTypeK8SSA  = ProvisionerType("K8SSA")
+	ProvisionerTypeOIDC   = ProvisionerType("OIDC")
 	ProvisionerTypeSSHPOP = ProvisionerType("SSHPOP")
+	ProvisionerTypeX5C    = ProvisionerType("X5C")
 )
 
 func NewProvisionerCtx(opts ...ProvisionerOption) *ProvisionerCtx {
@@ -56,8 +59,8 @@ func WithPassword(pass string) func(*ProvisionerCtx) {
 
 // Provisioner type.
 type Provisioner struct {
-	ID               string      `json:"-"`
-	AuthorityID      string      `json:"-"`
+	ID               string      `json:"id"`
+	AuthorityID      string      `json:"authorityID"`
 	Type             string      `json:"type"`
 	Name             string      `json:"name"`
 	Claims           *Claims     `json:"claims"`
@@ -108,12 +111,74 @@ func CreateProvisioner(ctx context.Context, db DB, typ, name string, opts ...Pro
 	return p, nil
 }
 
+type ProvisionerDetails interface {
+	isProvisionerDetails()
+}
+
 // ProvisionerDetailsJWK represents the values required by a JWK provisioner.
 type ProvisionerDetailsJWK struct {
 	Type       ProvisionerType `json:"type"`
 	PubKey     []byte          `json:"pubKey"`
 	EncPrivKey string          `json:"privKey"`
 }
+
+// ProvisionerDetailsOIDC represents the values required by a OIDC provisioner.
+type ProvisionerDetailsOIDC struct {
+	Type ProvisionerType `json:"type"`
+}
+
+// ProvisionerDetailsGCP represents the values required by a GCP provisioner.
+type ProvisionerDetailsGCP struct {
+	Type ProvisionerType `json:"type"`
+}
+
+// ProvisionerDetailsAWS represents the values required by a AWS provisioner.
+type ProvisionerDetailsAWS struct {
+	Type ProvisionerType `json:"type"`
+}
+
+// ProvisionerDetailsAzure represents the values required by a Azure provisioner.
+type ProvisionerDetailsAzure struct {
+	Type ProvisionerType `json:"type"`
+}
+
+// ProvisionerDetailsACME represents the values required by a ACME provisioner.
+type ProvisionerDetailsACME struct {
+	Type ProvisionerType `json:"type"`
+}
+
+// ProvisionerDetailsX5C represents the values required by a X5C provisioner.
+type ProvisionerDetailsX5C struct {
+	Type ProvisionerType `json:"type"`
+}
+
+// ProvisionerDetailsK8SSA represents the values required by a K8SSA provisioner.
+type ProvisionerDetailsK8SSA struct {
+	Type ProvisionerType `json:"type"`
+}
+
+// ProvisionerDetailsSSHPOP represents the values required by a SSHPOP provisioner.
+type ProvisionerDetailsSSHPOP struct {
+	Type ProvisionerType `json:"type"`
+}
+
+func (*ProvisionerDetailsJWK) isProvisionerDetails() {}
+
+func (*ProvisionerDetailsOIDC) isProvisionerDetails() {}
+
+func (*ProvisionerDetailsGCP) isProvisionerDetails() {}
+
+func (*ProvisionerDetailsAWS) isProvisionerDetails() {}
+
+func (*ProvisionerDetailsAzure) isProvisionerDetails() {}
+
+func (*ProvisionerDetailsACME) isProvisionerDetails() {}
+
+func (*ProvisionerDetailsX5C) isProvisionerDetails() {}
+
+func (*ProvisionerDetailsK8SSA) isProvisionerDetails() {}
+
+func (*ProvisionerDetailsSSHPOP) isProvisionerDetails() {}
 
 func createJWKDetails(pc *ProvisionerCtx) (*ProvisionerDetailsJWK, error) {
 	var err error
@@ -155,10 +220,6 @@ func createJWKDetails(pc *ProvisionerCtx) (*ProvisionerDetailsJWK, error) {
 // provisioner type.
 func (p *Provisioner) ToCertificates() (provisioner.Interface, error) {
 	claims, err := p.Claims.ToCertificates()
-	if err != nil {
-		return nil, err
-	}
-
 	if err != nil {
 		return nil, err
 	}
@@ -325,36 +386,3 @@ func (c *Claims) ToCertificates() (*provisioner.Claims, error) {
 		EnableSSHCA:       &c.SSH.Enabled,
 	}, nil
 }
-
-/*
-func marshalDetails(d *ProvisionerDetails) (sql.NullString, error) {
-	b, err := json.Marshal(d.GetData())
-	if err != nil {
-		return sql.NullString{}, nil
-	}
-	return sql.NullString{
-		String: string(b),
-		Valid:  len(b) > 0,
-	}, nil
-}
-
-
-func marshalClaims(c *Claims) (sql.NullString, error) {
-	b, err := json.Marshal(c)
-	if err != nil {
-		return sql.NullString{}, nil
-	}
-	return sql.NullString{
-		String: string(b),
-		Valid:  len(b) > 0,
-	}, nil
-}
-
-func unmarshalClaims(s sql.NullString) (*Claims, error) {
-	if !s.Valid {
-		return nil, nil
-	}
-	v := new(Claims)
-	return v, json.Unmarshal([]byte(s.String), v)
-}
-*/

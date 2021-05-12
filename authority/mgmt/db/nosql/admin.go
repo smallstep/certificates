@@ -131,6 +131,7 @@ func (db *DB) CreateAdmin(ctx context.Context, adm *mgmt.Admin) error {
 	if err != nil {
 		return errors.Wrap(err, "error generating random id for admin")
 	}
+	adm.AuthorityID = db.authorityID
 
 	dba := &dbAdmin{
 		ID:            adm.ID,

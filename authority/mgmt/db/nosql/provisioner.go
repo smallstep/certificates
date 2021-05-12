@@ -126,7 +126,6 @@ func unmarshalProvisioner(data []byte, id string) (*mgmt.Provisioner, error) {
 
 // GetProvisioners retrieves and unmarshals all active (not deleted) provisioners
 // from the database.
-// TODO should we be paginating?
 func (db *DB) GetProvisioners(ctx context.Context) ([]*mgmt.Provisioner, error) {
 	dbEntries, err := db.db.List(authorityProvisionersTable)
 	if err != nil {
@@ -157,13 +156,18 @@ func (db *DB) CreateProvisioner(ctx context.Context, prov *mgmt.Provisioner) err
 		return errors.Wrap(err, "error generating random id for provisioner")
 	}
 
+	details, err := json.Marshal(prov.Details)
+	if err != nil {
+		return mgmt.WrapErrorISE(err, "error marshaling details when creating provisioner")
+	}
+
 	dbp := &dbProvisioner{
 		ID:           prov.ID,
 		AuthorityID:  db.authorityID,
 		Type:         prov.Type,
 		Name:         prov.Name,
 		Claims:       prov.Claims,
-		Details:      prov.Details,
+		Details:      details,
 		X509Template: prov.X509Template,
 		SSHTemplate:  prov.SSHTemplate,
 		CreatedAt:    clock.Now(),
@@ -186,72 +190,44 @@ func (db *DB) UpdateProvisioner(ctx context.Context, prov *mgmt.Provisioner) err
 		nu.DeletedAt = clock.Now()
 	}
 	nu.Claims = prov.Claims
-	nu.Details = prov.Details
 	nu.X509Template = prov.X509Template
 	nu.SSHTemplate = prov.SSHTemplate
+
+	nu.Details, err = json.Marshal(prov.Details)
+	if err != nil {
+		return mgmt.WrapErrorISE(err, "error marshaling details when creating provisioner")
+	}
 
 	return db.save(ctx, old.ID, nu, old, "provisioner", authorityProvisionersTable)
 }
 
-func unmarshalDetails(typ ProvisionerType, details []byte) (interface{}, error) {
-	if !s.Valid {
-		return nil, nil
-	}
-	var v isProvisionerDetails_Data
+func unmarshalDetails(typ mgmt.ProvisionerType, data []byte) (mgmt.ProvisionerDetails, error) {
+	var v mgmt.ProvisionerDetails
 	switch typ {
-	case ProvisionerTypeJWK:
-		p := new(ProvisionerDetailsJWK)
-		if err := json.Unmarshal([]byte(s.String), p); err != nil {
-			return nil, err
-		}
-		if p.JWK.Key.Key == nil {
-			key, err := LoadKey(ctx, db, p.JWK.Key.Id.Id)
-			if err != nil {
-				return nil, err
-			}
-			p.JWK.Key = key
-		}
-		return &ProvisionerDetails{Data: p}, nil
-	case ProvisionerType_OIDC:
-		v = new(ProvisionerDetails_OIDC)
-	case ProvisionerType_GCP:
-		v = new(ProvisionerDetails_GCP)
-	case ProvisionerType_AWS:
-		v = new(ProvisionerDetails_AWS)
-	case ProvisionerType_AZURE:
-		v = new(ProvisionerDetails_Azure)
-	case ProvisionerType_ACME:
-		v = new(ProvisionerDetails_ACME)
-	case ProvisionerType_X5C:
-		p := new(ProvisionerDetails_X5C)
-		if err := json.Unmarshal([]byte(s.String), p); err != nil {
-			return nil, err
-		}
-		for _, k := range p.X5C.GetRoots() {
-			if err := k.Select(ctx, db, k.Id.Id); err != nil {
-				return nil, err
-			}
-		}
-		return &ProvisionerDetails{Data: p}, nil
-	case ProvisionerType_K8SSA:
-		p := new(ProvisionerDetails_K8SSA)
-		if err := json.Unmarshal([]byte(s.String), p); err != nil {
-			return nil, err
-		}
-		for _, k := range p.K8SSA.GetPublicKeys() {
-			if err := k.Select(ctx, db, k.Id.Id); err != nil {
-				return nil, err
-			}
-		}
-		return &ProvisionerDetails{Data: p}, nil
-	case ProvisionerType_SSHPOP:
-		v = new(ProvisionerDetails_SSHPOP)
+	case mgmt.ProvisionerTypeJWK:
+		v = new(mgmt.ProvisionerDetailsJWK)
+	case mgmt.ProvisionerTypeOIDC:
+		v = new(mgmt.ProvisionerDetailsOIDC)
+	case mgmt.ProvisionerTypeGCP:
+		v = new(mgmt.ProvisionerDetailsGCP)
+	case mgmt.ProvisionerTypeAWS:
+		v = new(mgmt.ProvisionerDetailsAWS)
+	case mgmt.ProvisionerTypeAZURE:
+		v = new(mgmt.ProvisionerDetailsAzure)
+	case mgmt.ProvisionerTypeACME:
+		v = new(mgmt.ProvisionerDetailsACME)
+	case mgmt.ProvisionerTypeX5C:
+		v = new(mgmt.ProvisionerDetailsX5C)
+	case mgmt.ProvisionerTypeK8SSA:
+		v = new(mgmt.ProvisionerDetailsK8SSA)
+	case mgmt.ProvisionerTypeSSHPOP:
+		v = new(mgmt.ProvisionerDetailsSSHPOP)
 	default:
 		return nil, fmt.Errorf("unsupported provisioner type %s", typ)
 	}
 
-	if err := json.Unmarshal([]byte(s.String), v); err != nil {
+	if err := json.Unmarshal(data, v); err != nil {
 		return nil, err
 	}
-	return &ProvisionerDetails{Data: v}, nil
+	return v, nil
 }
