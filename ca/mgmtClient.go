@@ -1,12 +1,16 @@
 package ca
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"path"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/mgmt"
+	mgmtAPI "github.com/smallstep/certificates/authority/mgmt/api"
+	"github.com/smallstep/certificates/errs"
 )
 
 // MgmtClient implements an HTTP client for the CA server.
@@ -68,6 +72,87 @@ retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readError(resp.Body)
+	}
+	var adm = new(mgmt.Admin)
+	if err := readJSON(resp.Body, adm); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return adm, nil
+}
+
+// CreateAdmin performs the POST /mgmt/admin request to the CA.
+func (c *MgmtClient) CreateAdmin(req *mgmtAPI.CreateAdminRequest) (*mgmt.Admin, error) {
+	var retried bool
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/mgmt/admin"})
+retry:
+	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readError(resp.Body)
+	}
+	var adm = new(mgmt.Admin)
+	if err := readJSON(resp.Body, adm); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return adm, nil
+}
+
+// RemoveAdmin performs the DELETE /mgmt/admin/{id} request to the CA.
+func (c *MgmtClient) RemoveAdmin(id string) error {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/mgmt/admin", id)})
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return errors.Wrapf(err, "create DELETE %s request failed", u)
+	}
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return errors.Wrapf(err, "client DELETE %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return readError(resp.Body)
+	}
+	return nil
+}
+
+// UpdateAdmin performs the PUT /mgmt/admin/{id} request to the CA.
+func (c *MgmtClient) UpdateAdmin(id string, uar *mgmtAPI.UpdateAdminRequest) (*mgmt.Admin, error) {
+	var retried bool
+	body, err := json.Marshal(uar)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/mgmt/admin", id)})
+	req, err := http.NewRequest("PUT", u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "create PUT %s request failed", u)
+	}
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "client PUT %s failed", u)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {

@@ -23,6 +23,8 @@ const (
 	ErrorAuthorityMismatchType
 	// ErrorDeletedType resource has been deleted.
 	ErrorDeletedType
+	// ErrorBadRequestType bad request.
+	ErrorBadRequestType
 	// ErrorServerInternalType internal server error.
 	ErrorServerInternalType
 )
@@ -37,6 +39,8 @@ func (ap ProblemType) String() string {
 		return "authorityMismatch"
 	case ErrorDeletedType:
 		return "deleted"
+	case ErrorBadRequestType:
+		return "badRequest"
 	case ErrorServerInternalType:
 		return "internalServerError"
 	default:
@@ -69,9 +73,14 @@ var (
 			status:  401,
 		},
 		ErrorDeletedType: {
-			typ:     ErrorNotFoundType.String(),
+			typ:     ErrorDeletedType.String(),
 			details: "resource is deleted",
 			status:  403,
+		},
+		ErrorBadRequestType: {
+			typ:     ErrorBadRequestType.String(),
+			details: "bad request",
+			status:  400,
 		},
 		ErrorServerInternalType: errorServerInternalMetadata,
 	}

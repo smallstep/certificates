@@ -166,6 +166,7 @@ func (a *Authority) init() error {
 				return mgmt.WrapErrorISE(err, "error getting authConfig from db")
 			}
 		}
+
 		a.config.AuthorityConfig, err = mgmtAuthConfig.ToCertificates()
 		if err != nil {
 			return err

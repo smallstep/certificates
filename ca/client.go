@@ -88,6 +88,11 @@ func (c *uaClient) Post(url, contentType string, body io.Reader) (*http.Response
 	return c.Client.Do(req)
 }
 
+func (c *uaClient) Do(req *http.Request) (*http.Response, error) {
+	req.Header.Set("User-Agent", UserAgent)
+	return c.Client.Do(req)
+}
+
 // RetryFunc defines the method used to retry a request. If it returns true, the
 // request will be retried once.
 type RetryFunc func(code int) bool
