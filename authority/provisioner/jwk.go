@@ -28,6 +28,7 @@ type stepPayload struct {
 // signature requests.
 type JWK struct {
 	*base
+	ID           string           `json:"-"`
 	Type         string           `json:"type"`
 	Name         string           `json:"name"`
 	Key          *jose.JSONWebKey `json:"key"`
@@ -41,6 +42,9 @@ type JWK struct {
 // GetID returns the provisioner unique identifier. The name and credential id
 // should uniquely identify any JWK provisioner.
 func (p *JWK) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
 	return p.Name + ":" + p.Key.KeyID
 }
 

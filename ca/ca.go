@@ -172,10 +172,9 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	})
 
 	// MGMT Router
-
 	mgmtDB := auth.GetMgmtDatabase()
 	if mgmtDB != nil {
-		mgmtHandler := mgmtAPI.NewHandler(mgmtDB)
+		mgmtHandler := mgmtAPI.NewHandler(mgmtDB, auth)
 		mux.Route("/mgmt", func(r chi.Router) {
 			mgmtHandler.Route(r)
 		})

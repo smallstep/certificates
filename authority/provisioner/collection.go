@@ -45,6 +45,7 @@ type loadByTokenPayload struct {
 type Collection struct {
 	byID      *sync.Map
 	byKey     *sync.Map
+	byName    *sync.Map
 	sorted    provisionerSlice
 	audiences Audiences
 }
@@ -55,6 +56,7 @@ func NewCollection(audiences Audiences) *Collection {
 	return &Collection{
 		byID:      new(sync.Map),
 		byKey:     new(sync.Map),
+		byName:    new(sync.Map),
 		audiences: audiences,
 	}
 }
@@ -62,6 +64,11 @@ func NewCollection(audiences Audiences) *Collection {
 // Load a provisioner by the ID.
 func (c *Collection) Load(id string) (Interface, bool) {
 	return loadProvisioner(c.byID, id)
+}
+
+// LoadByName a provisioner by name.
+func (c *Collection) LoadByName(name string) (Interface, bool) {
+	return loadProvisioner(c.byName, name)
 }
 
 // LoadByToken parses the token claims and loads the provisioner associated.
@@ -171,6 +178,11 @@ func (c *Collection) LoadEncryptedKey(keyID string) (string, bool) {
 func (c *Collection) Store(p Interface) error {
 	// Store provisioner always in byID. ID must be unique.
 	if _, loaded := c.byID.LoadOrStore(p.GetID(), p); loaded {
+		return errors.New("cannot add multiple provisioners with the same id")
+	}
+	// Store provisioner always by name.
+	if _, loaded := c.byName.LoadOrStore(p.GetName(), p); loaded {
+		c.byID.Delete(p.GetID())
 		return errors.New("cannot add multiple provisioners with the same id")
 	}
 

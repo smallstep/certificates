@@ -2,7 +2,6 @@ package mgmt
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/config"
@@ -16,25 +15,14 @@ const (
 )
 
 // StatusType is the type for status.
-type StatusType int
+type StatusType string
 
-const (
+var (
 	// StatusActive active
-	StatusActive StatusType = iota
+	StatusActive = StatusType("active")
 	// StatusDeleted deleted
-	StatusDeleted
+	StatusDeleted = StatusType("deleted")
 )
-
-func (st StatusType) String() string {
-	switch st {
-	case StatusActive:
-		return "active"
-	case StatusDeleted:
-		return "deleted"
-	default:
-		return fmt.Sprintf("status %d not found", st)
-	}
-}
 
 // Claims encapsulates all x509 and ssh claims applied to the authority
 // configuration. E.g. maxTLSCertDuration, defaultSSHCertDuration, etc.
@@ -123,14 +111,18 @@ func CreateAuthority(ctx context.Context, db DB, options ...AuthorityOption) (*A
 		return nil, WrapErrorISE(err, "error creating first provisioner")
 	}
 
-	admin, err := CreateAdmin(ctx, db, "Change Me", prov.ID, true)
-	if err != nil {
+	adm := &Admin{
+		ProvisionerID: prov.ID,
+		Subject:       "Change Me",
+		Type:          AdminTypeSuper,
+	}
+	if err := db.CreateAdmin(ctx, adm); err != nil {
 		// TODO should we try to clean up?
-		return nil, WrapErrorISE(err, "error creating first provisioner")
+		return nil, WrapErrorISE(err, "error creating first admin")
 	}
 
 	ac.Provisioners = []*Provisioner{prov}
-	ac.Admins = []*Admin{admin}
+	ac.Admins = []*Admin{adm}
 
 	return ac, nil
 }

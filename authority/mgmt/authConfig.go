@@ -1,6 +1,7 @@
 package mgmt
 
 import (
+	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
@@ -9,7 +10,7 @@ import (
 type AuthConfig struct {
 	//*cas.Options         `json:"cas"`
 	ID           string         `json:"id"`
-	ASN1DN       *config.ASN1DN `json:"template,omitempty"`
+	ASN1DN       *config.ASN1DN `json:"asn1dn,omitempty"`
 	Provisioners []*Provisioner `json:"-"`
 	Admins       []*Admin       `json:"-"`
 	Claims       *Claims        `json:"claims,omitempty"`
@@ -46,9 +47,18 @@ func (ac *AuthConfig) ToCertificates() (*config.AuthConfig, error) {
 		}
 		provs = append(provs, authProv)
 	}
+	var admins []*admin.Admin
+	for _, adm := range ac.Admins {
+		authAdmin, err := adm.ToCertificates()
+		if err != nil {
+			return nil, err
+		}
+		admins = append(admins, authAdmin)
+	}
 	return &config.AuthConfig{
 		AuthorityID:          ac.ID,
 		Provisioners:         provs,
+		Admins:               admins,
 		Template:             ac.ASN1DN,
 		Claims:               claims,
 		DisableIssuedAtCheck: false,

@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/authority/mgmt"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
 )
@@ -17,6 +18,9 @@ func WriteError(w http.ResponseWriter, err error) {
 	switch k := err.(type) {
 	case *acme.Error:
 		acme.WriteError(w, k)
+		return
+	case *mgmt.Error:
+		mgmt.WriteError(w, k)
 		return
 	default:
 		w.Header().Set("Content-Type", "application/json")

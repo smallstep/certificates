@@ -13,6 +13,7 @@ import (
 	"github.com/smallstep/certificates/cas"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/mgmt"
 	authMgmtNosql "github.com/smallstep/certificates/authority/mgmt/db/nosql"
@@ -34,6 +35,7 @@ type Authority struct {
 	mgmtDB       mgmt.DB
 	keyManager   kms.KeyManager
 	provisioners *provisioner.Collection
+	admins       *admin.Collection
 	db           db.AuthDB
 	templates    *templates.Templates
 
@@ -125,6 +127,61 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	}
 
 	return a, nil
+}
+
+func (a *Authority) ReloadAuthConfig() error {
+	mgmtAuthConfig, err := a.mgmtDB.GetAuthConfig(context.Background(), mgmt.DefaultAuthorityID)
+	if err != nil {
+		return mgmt.WrapErrorISE(err, "error getting authConfig from db")
+	}
+
+	a.config.AuthorityConfig, err = mgmtAuthConfig.ToCertificates()
+	if err != nil {
+		return mgmt.WrapErrorISE(err, "error converting mgmt authConfig to certificates authConfig")
+	}
+
+	// Merge global and configuration claims
+	claimer, err := provisioner.NewClaimer(a.config.AuthorityConfig.Claims, config.GlobalProvisionerClaims)
+	if err != nil {
+		return err
+	}
+	// TODO: should we also be combining the ssh federated roots here?
+	// If we rotate ssh roots keys, sshpop provisioner will lose ability to
+	// validate old SSH certificates, unless they are added as federated certs.
+	sshKeys, err := a.GetSSHRoots(context.Background())
+	if err != nil {
+		return err
+	}
+	// Initialize provisioners
+	audiences := a.config.GetAudiences()
+	a.provisioners = provisioner.NewCollection(audiences)
+	config := provisioner.Config{
+		Claims:    claimer.Claims(),
+		Audiences: audiences,
+		DB:        a.db,
+		SSHKeys: &provisioner.SSHKeys{
+			UserKeys: sshKeys.UserKeys,
+			HostKeys: sshKeys.HostKeys,
+		},
+		GetIdentityFunc: a.getIdentityFunc,
+	}
+	// Store all the provisioners
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if err := p.Init(config); err != nil {
+			return err
+		}
+		if err := a.provisioners.Store(p); err != nil {
+			return err
+		}
+	}
+	// Store all the admins
+	a.admins = admin.NewCollection()
+	for _, adm := range a.config.AuthorityConfig.Admins {
+		if err := a.admins.Store(adm); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // init performs validation and initializes the fields of an Authority struct.
@@ -373,6 +430,13 @@ func (a *Authority) init() error {
 			return err
 		}
 	}
+	// Store all the admins
+	a.admins = admin.NewCollection()
+	for _, adm := range a.config.AuthorityConfig.Admins {
+		if err := a.admins.Store(adm); err != nil {
+			return err
+		}
+	}
 
 	// Configure templates, currently only ssh templates are supported.
 	if a.sshCAHostCertSignKey != nil || a.sshCAUserCertSignKey != nil {
@@ -404,6 +468,16 @@ func (a *Authority) GetDatabase() db.AuthDB {
 // GetMgmtDatabase returns the mgmt database, if one exists.
 func (a *Authority) GetMgmtDatabase() mgmt.DB {
 	return a.mgmtDB
+}
+
+// GetAdminCollection returns the admin collection.
+func (a *Authority) GetAdminCollection() *admin.Collection {
+	return a.admins
+}
+
+// GetProvisionerCollection returns the admin collection.
+func (a *Authority) GetProvisionerCollection() *provisioner.Collection {
+	return a.provisioners
 }
 
 // Shutdown safely shuts down any clients, databases, etc. held by the Authority.
