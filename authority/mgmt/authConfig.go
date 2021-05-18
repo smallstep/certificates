@@ -4,6 +4,7 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/authority/status"
 )
 
 // AuthConfig represents the Authority Configuration.
@@ -15,7 +16,7 @@ type AuthConfig struct {
 	Admins       []*Admin       `json:"-"`
 	Claims       *Claims        `json:"claims,omitempty"`
 	Backdate     string         `json:"backdate,omitempty"`
-	Status       StatusType     `json:"status,omitempty"`
+	Status       status.Type    `json:"status,omitempty"`
 }
 
 func NewDefaultAuthConfig() *AuthConfig {
@@ -23,7 +24,7 @@ func NewDefaultAuthConfig() *AuthConfig {
 		Claims:   NewDefaultClaims(),
 		ASN1DN:   &config.ASN1DN{},
 		Backdate: config.DefaultBackdate.String(),
-		Status:   StatusActive,
+		Status:   status.Active,
 	}
 }
 

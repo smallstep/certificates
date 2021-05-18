@@ -179,7 +179,7 @@ func (a *Authority) ReloadAuthConfig() error {
 		}
 	}
 	// Store all the admins
-	a.admins = admin.NewCollection()
+	a.admins = admin.NewCollection(a.provisioners)
 	for _, adm := range a.config.AuthorityConfig.Admins {
 		if err := a.admins.Store(adm); err != nil {
 			return err
@@ -479,7 +479,7 @@ func (a *Authority) init() error {
 		}
 	}
 	// Store all the admins
-	a.admins = admin.NewCollection()
+	a.admins = admin.NewCollection(a.provisioners)
 	for _, adm := range a.config.AuthorityConfig.Admins {
 		if err := a.admins.Store(adm); err != nil {
 			return err

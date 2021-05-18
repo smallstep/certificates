@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/mgmt"
+	"github.com/smallstep/certificates/authority/status"
 	"github.com/smallstep/nosql"
 )
 
@@ -106,7 +107,7 @@ func (db *DB) UpdateAuthConfig(ctx context.Context, ac *mgmt.AuthConfig) error {
 	nu := old.clone()
 
 	// If the authority was active but is now deleted ...
-	if old.DeletedAt.IsZero() && ac.Status == mgmt.StatusDeleted {
+	if old.DeletedAt.IsZero() && ac.Status == status.Deleted {
 		nu.DeletedAt = clock.Now()
 	}
 	nu.Claims = ac.Claims

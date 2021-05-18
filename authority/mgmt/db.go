@@ -14,9 +14,8 @@ var ErrNotFound = errors.New("not found")
 type DB interface {
 	CreateProvisioner(ctx context.Context, prov *Provisioner) error
 	GetProvisioner(ctx context.Context, id string) (*Provisioner, error)
-	GetProvisionerByName(ctx context.Context, name string) (*Provisioner, error)
 	GetProvisioners(ctx context.Context) ([]*Provisioner, error)
-	UpdateProvisioner(ctx context.Context, name string, prov *Provisioner) error
+	UpdateProvisioner(ctx context.Context, prov *Provisioner) error
 
 	CreateAdmin(ctx context.Context, admin *Admin) error
 	GetAdmin(ctx context.Context, id string) (*Admin, error)
@@ -31,11 +30,10 @@ type DB interface {
 // MockDB is an implementation of the DB interface that should only be used as
 // a mock in tests.
 type MockDB struct {
-	MockCreateProvisioner    func(ctx context.Context, prov *Provisioner) error
-	MockGetProvisioner       func(ctx context.Context, id string) (*Provisioner, error)
-	MockGetProvisionerByName func(ctx context.Context, name string) (*Provisioner, error)
-	MockGetProvisioners      func(ctx context.Context) ([]*Provisioner, error)
-	MockUpdateProvisioner    func(ctx context.Context, name string, prov *Provisioner) error
+	MockCreateProvisioner func(ctx context.Context, prov *Provisioner) error
+	MockGetProvisioner    func(ctx context.Context, id string) (*Provisioner, error)
+	MockGetProvisioners   func(ctx context.Context) ([]*Provisioner, error)
+	MockUpdateProvisioner func(ctx context.Context, prov *Provisioner) error
 
 	MockCreateAdmin func(ctx context.Context, adm *Admin) error
 	MockGetAdmin    func(ctx context.Context, id string) (*Admin, error)
@@ -70,16 +68,6 @@ func (m *MockDB) GetProvisioner(ctx context.Context, id string) (*Provisioner, e
 	return m.MockRet1.(*Provisioner), m.MockError
 }
 
-// GetProvisionerByName mock.
-func (m *MockDB) GetProvisionerByName(ctx context.Context, id string) (*Provisioner, error) {
-	if m.MockGetProvisionerByName != nil {
-		return m.MockGetProvisionerByName(ctx, id)
-	} else if m.MockError != nil {
-		return nil, m.MockError
-	}
-	return m.MockRet1.(*Provisioner), m.MockError
-}
-
 // GetProvisioners mock
 func (m *MockDB) GetProvisioners(ctx context.Context) ([]*Provisioner, error) {
 	if m.MockGetProvisioners != nil {
@@ -91,9 +79,9 @@ func (m *MockDB) GetProvisioners(ctx context.Context) ([]*Provisioner, error) {
 }
 
 // UpdateProvisioner mock
-func (m *MockDB) UpdateProvisioner(ctx context.Context, name string, prov *Provisioner) error {
+func (m *MockDB) UpdateProvisioner(ctx context.Context, prov *Provisioner) error {
 	if m.MockUpdateProvisioner != nil {
-		return m.MockUpdateProvisioner(ctx, name, prov)
+		return m.MockUpdateProvisioner(ctx, prov)
 	}
 	return m.MockError
 }

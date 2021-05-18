@@ -8,6 +8,7 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/mgmt"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/authority/status"
 )
 
 // CreateProvisionerRequest represents the body for a CreateProvisioner request.
@@ -55,7 +56,13 @@ func (h *Handler) GetProvisioner(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	name := chi.URLParam(r, "name")
 
-	prov, err := h.db.GetProvisionerByName(ctx, name)
+	p, ok := h.auth.GetProvisionerCollection().LoadByName(name)
+	if !ok {
+		api.WriteError(w, mgmt.NewError(mgmt.ErrorNotFoundType, "provisioner %s not found", name))
+		return
+	}
+
+	prov, err := h.db.GetProvisioner(ctx, p.GetID())
 	if err != nil {
 		api.WriteError(w, err)
 		return
@@ -123,6 +130,8 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 
 	c := h.auth.GetAdminCollection()
+	fmt.Printf("c.Count() = %+v\n", c.Count())
+	fmt.Printf("c.CountByProvisioner() = %+v\n", c.CountByProvisioner(name))
 	if c.Count() == c.CountByProvisioner(name) {
 		api.WriteError(w, mgmt.NewError(mgmt.ErrorBadRequestType,
 			"cannot remove provisioner %s because no admins will remain", name))
@@ -130,14 +139,18 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	prov, err := h.db.GetProvisionerByName(ctx, name)
-	if err != nil {
-		api.WriteError(w, mgmt.WrapErrorISE(err, "error retrieiving provisioner %s", name))
+	p, ok := h.auth.GetProvisionerCollection().LoadByName(name)
+	if !ok {
+		api.WriteError(w, mgmt.NewError(mgmt.ErrorNotFoundType, "provisioner %s not found", name))
 		return
 	}
-	fmt.Printf("prov = %+v\n", prov)
-	prov.Status = mgmt.StatusDeleted
-	if err := h.db.UpdateProvisioner(ctx, name, prov); err != nil {
+	prov, err := h.db.GetProvisioner(ctx, p.GetID())
+	if err != nil {
+		api.WriteError(w, mgmt.WrapErrorISE(err, "error loading provisioner %s from db", name))
+		return
+	}
+	prov.Status = status.Deleted
+	if err := h.db.UpdateProvisioner(ctx, prov); err != nil {
 		api.WriteError(w, mgmt.WrapErrorISE(err, "error updating provisioner %s", name))
 		return
 	}
@@ -150,8 +163,8 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 				ID:            adm.ID,
 				ProvisionerID: adm.ProvisionerID,
 				Subject:       adm.Subject,
-				Type:          mgmt.AdminType(adm.Type),
-				Status:        mgmt.StatusDeleted,
+				Type:          adm.Type,
+				Status:        status.Deleted,
 			}); err != nil {
 				api.WriteError(w, mgmt.WrapErrorISE(err, "error deleting admin %s, as part of provisioner %s deletion", adm.Subject, name))
 				return

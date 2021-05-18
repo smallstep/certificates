@@ -316,7 +316,7 @@ func certChainToPEM(certChain []*x509.Certificate) []Certificate {
 
 // Provisioners returns the list of provisioners configured in the authority.
 func (h *caHandler) Provisioners(w http.ResponseWriter, r *http.Request) {
-	cursor, limit, err := parseCursor(r)
+	cursor, limit, err := ParseCursor(r)
 	if err != nil {
 		WriteError(w, errs.BadRequestErr(err))
 		return
@@ -427,7 +427,8 @@ func LogCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 	}
 }
 
-func parseCursor(r *http.Request) (cursor string, limit int, err error) {
+// ParseCursor parses the cursor and limit from the request query params.
+func ParseCursor(r *http.Request) (cursor string, limit int, err error) {
 	q := r.URL.Query()
 	cursor = q.Get("cursor")
 	if v := q.Get("limit"); len(v) > 0 {
