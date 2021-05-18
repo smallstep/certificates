@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/authority/status"
 	"go.step.sm/crypto/jose"
 )
 
@@ -69,7 +70,7 @@ type Provisioner struct {
 	X509TemplateData []byte      `json:"x509TemplateData"`
 	SSHTemplate      string      `json:"sshTemplate"`
 	SSHTemplateData  []byte      `json:"sshTemplateData"`
-	Status           StatusType  `json:"status"`
+	Status           status.Type `json:"status"`
 }
 
 func (p *Provisioner) GetOptions() *provisioner.Options {
@@ -101,7 +102,7 @@ func CreateProvisioner(ctx context.Context, db DB, typ, name string, opts ...Pro
 		X509TemplateData: pc.X509TemplateData,
 		SSHTemplate:      pc.SSHTemplate,
 		SSHTemplateData:  pc.SSHTemplateData,
-		Status:           StatusActive,
+		Status:           status.Active,
 	}
 
 	if err := db.CreateProvisioner(ctx, p); err != nil {

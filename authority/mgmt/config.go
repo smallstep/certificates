@@ -14,16 +14,6 @@ const (
 	DefaultAuthorityID = "00000000-0000-0000-0000-000000000000"
 )
 
-// StatusType is the type for status.
-type StatusType string
-
-var (
-	// StatusActive active
-	StatusActive = StatusType("active")
-	// StatusDeleted deleted
-	StatusDeleted = StatusType("deleted")
-)
-
 // Claims encapsulates all x509 and ssh claims applied to the authority
 // configuration. E.g. maxTLSCertDuration, defaultSSHCertDuration, etc.
 type Claims struct {

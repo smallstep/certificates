@@ -2,56 +2,54 @@ package admin
 
 import (
 	"crypto/sha1"
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
-	"go.step.sm/crypto/jose"
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
-// DefaultProvisionersLimit is the default limit for listing provisioners.
-const DefaultProvisionersLimit = 20
+// DefaultAdminLimit is the default limit for listing provisioners.
+const DefaultAdminLimit = 20
 
-// DefaultProvisionersMax is the maximum limit for listing provisioners.
-const DefaultProvisionersMax = 100
+// DefaultAdminMax is the maximum limit for listing provisioners.
+const DefaultAdminMax = 100
 
-/*
-type uidProvisioner struct {
-	provisioner Interface
-	uid         string
+type uidAdmin struct {
+	admin *Admin
+	uid   string
 }
 
-type provisionerSlice []uidProvisioner
+type adminSlice []uidAdmin
 
-func (p provisionerSlice) Len() int           { return len(p) }
-func (p provisionerSlice) Less(i, j int) bool { return p[i].uid < p[j].uid }
-func (p provisionerSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-*/
-
-// loadByTokenPayload is a payload used to extract the id used to load the
-// provisioner.
-type loadByTokenPayload struct {
-	jose.Claims
-	AuthorizedParty string `json:"azp"` // OIDC client id
-	TenantID        string `json:"tid"` // Microsoft Azure tenant id
-}
+func (p adminSlice) Len() int           { return len(p) }
+func (p adminSlice) Less(i, j int) bool { return p[i].uid < p[j].uid }
+func (p adminSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // Collection is a memory map of admins.
 type Collection struct {
 	byID               *sync.Map
 	bySubProv          *sync.Map
 	byProv             *sync.Map
+	sorted             adminSlice
+	provisioners       *provisioner.Collection
 	count              int
 	countByProvisioner map[string]int
 }
 
 // NewCollection initializes a collection of provisioners. The given list of
 // audiences are the audiences used by the JWT provisioner.
-func NewCollection() *Collection {
+func NewCollection(provisioners *provisioner.Collection) *Collection {
 	return &Collection{
 		byID:               new(sync.Map),
 		byProv:             new(sync.Map),
 		bySubProv:          new(sync.Map),
 		countByProvisioner: map[string]int{},
+		provisioners:       provisioners,
 	}
 }
 
@@ -88,12 +86,18 @@ func (c *Collection) LoadByProvisioner(provName string) ([]*Admin, bool) {
 // Store adds an admin to the collection and enforces the uniqueness of
 // admin IDs and amdin subject <-> provisioner name combos.
 func (c *Collection) Store(adm *Admin) error {
-	provName := adm.ProvisionerName
+	p, ok := c.provisioners.Load(adm.ProvisionerID)
+	if !ok {
+		return fmt.Errorf("provisioner %s not found", adm.ProvisionerID)
+	}
+	adm.ProvisionerName = p.GetName()
+	adm.ProvisionerType = p.GetType().String()
 	// Store admin always in byID. ID must be unique.
 	if _, loaded := c.byID.LoadOrStore(adm.ID, adm); loaded {
 		return errors.New("cannot add multiple admins with the same id")
 	}
 
+	provName := adm.ProvisionerName
 	// Store admin alwasy in bySubProv. Subject <-> ProvisionerName must be unique.
 	if _, loaded := c.bySubProv.LoadOrStore(subProvNameHash(adm.Subject, provName), adm); loaded {
 		c.byID.Delete(adm.ID)
@@ -108,6 +112,21 @@ func (c *Collection) Store(adm *Admin) error {
 		c.countByProvisioner[provName] = 1
 	}
 	c.count++
+
+	// Store sorted admins.
+	// Use the first 4 bytes (32bit) of the sum to insert the order
+	// Using big endian format to get the strings sorted:
+	// 0x00000000, 0x00000001, 0x00000002, ...
+	bi := make([]byte, 4)
+	_sum := sha1.Sum([]byte(adm.ID))
+	sum := _sum[:]
+	binary.BigEndian.PutUint32(bi, uint32(c.sorted.Len()))
+	sum[0], sum[1], sum[2], sum[3] = bi[0], bi[1], bi[2], bi[3]
+	c.sorted = append(c.sorted, uidAdmin{
+		admin: adm,
+		uid:   hex.EncodeToString(sum),
+	})
+	sort.Sort(c.sorted)
 
 	return nil
 }
@@ -125,23 +144,22 @@ func (c *Collection) CountByProvisioner(provName string) int {
 	return 0
 }
 
-/*
 // Find implements pagination on a list of sorted provisioners.
-func (c *Collection) Find(cursor string, limit int) (List, string) {
+func (c *Collection) Find(cursor string, limit int) ([]*Admin, string) {
 	switch {
 	case limit <= 0:
-		limit = DefaultProvisionersLimit
-	case limit > DefaultProvisionersMax:
-		limit = DefaultProvisionersMax
+		limit = DefaultAdminLimit
+	case limit > DefaultAdminMax:
+		limit = DefaultAdminMax
 	}
 
 	n := c.sorted.Len()
 	cursor = fmt.Sprintf("%040s", cursor)
 	i := sort.Search(n, func(i int) bool { return c.sorted[i].uid >= cursor })
 
-	slice := List{}
+	slice := []*Admin{}
 	for ; i < n && len(slice) < limit; i++ {
-		slice = append(slice, c.sorted[i].provisioner)
+		slice = append(slice, c.sorted[i].admin)
 	}
 
 	if i < n {
@@ -149,7 +167,6 @@ func (c *Collection) Find(cursor string, limit int) (List, string) {
 	}
 	return slice, ""
 }
-*/
 
 func loadAdmin(m *sync.Map, key string) (*Admin, bool) {
 	a, ok := m.Load(key)

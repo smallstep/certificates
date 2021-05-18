@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/mgmt"
 	mgmtAPI "github.com/smallstep/certificates/authority/mgmt/api"
 	"github.com/smallstep/certificates/errs"
@@ -88,6 +90,80 @@ retry:
 	return adm, nil
 }
 
+// AdminOption is the type of options passed to the Provisioner method.
+type AdminOption func(o *adminOptions) error
+
+type adminOptions struct {
+	cursor string
+	limit  int
+}
+
+func (o *adminOptions) apply(opts []AdminOption) (err error) {
+	for _, fn := range opts {
+		if err = fn(o); err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (o *adminOptions) rawQuery() string {
+	v := url.Values{}
+	if len(o.cursor) > 0 {
+		v.Set("cursor", o.cursor)
+	}
+	if o.limit > 0 {
+		v.Set("limit", strconv.Itoa(o.limit))
+	}
+	return v.Encode()
+}
+
+// WithAdminCursor will request the admins starting with the given cursor.
+func WithAdminCursor(cursor string) AdminOption {
+	return func(o *adminOptions) error {
+		o.cursor = cursor
+		return nil
+	}
+}
+
+// WithAdminLimit will request the given number of admins.
+func WithAdminLimit(limit int) AdminOption {
+	return func(o *adminOptions) error {
+		o.limit = limit
+		return nil
+	}
+}
+
+// GetAdmins performs the GET /mgmt/admins request to the CA.
+func (c *MgmtClient) GetAdmins(opts ...AdminOption) (*mgmtAPI.GetAdminsResponse, error) {
+	var retried bool
+	o := new(adminOptions)
+	if err := o.apply(opts); err != nil {
+		return nil, err
+	}
+	u := c.endpoint.ResolveReference(&url.URL{
+		Path:     "/mgmt/admins",
+		RawQuery: o.rawQuery(),
+	})
+retry:
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readMgmtError(resp.Body)
+	}
+	var body = new(mgmtAPI.GetAdminsResponse)
+	if err := readJSON(resp.Body, body); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return body, nil
+}
+
 // CreateAdmin performs the POST /mgmt/admin request to the CA.
 func (c *MgmtClient) CreateAdmin(req *mgmtAPI.CreateAdminRequest) (*mgmt.Admin, error) {
 	var retried bool
@@ -139,7 +215,7 @@ retry:
 }
 
 // UpdateAdmin performs the PUT /mgmt/admin/{id} request to the CA.
-func (c *MgmtClient) UpdateAdmin(id string, uar *mgmtAPI.UpdateAdminRequest) (*mgmt.Admin, error) {
+func (c *MgmtClient) UpdateAdmin(id string, uar *mgmtAPI.UpdateAdminRequest) (*admin.Admin, error) {
 	var retried bool
 	body, err := json.Marshal(uar)
 	if err != nil {
@@ -162,34 +238,11 @@ retry:
 		}
 		return nil, readMgmtError(resp.Body)
 	}
-	var adm = new(mgmt.Admin)
+	var adm = new(admin.Admin)
 	if err := readJSON(resp.Body, adm); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
 	return adm, nil
-}
-
-// GetAdmins performs the GET /mgmt/admins request to the CA.
-func (c *MgmtClient) GetAdmins() ([]*mgmt.Admin, error) {
-	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/mgmt/admins"})
-retry:
-	resp, err := c.client.Get(u.String())
-	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
-	}
-	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
-			retried = true
-			goto retry
-		}
-		return nil, readMgmtError(resp.Body)
-	}
-	var admins = new([]*mgmt.Admin)
-	if err := readJSON(resp.Body, admins); err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", u)
-	}
-	return *admins, nil
 }
 
 // GetProvisioner performs the GET /mgmt/provisioner/{id} request to the CA.

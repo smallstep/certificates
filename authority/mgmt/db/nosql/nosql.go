@@ -3,7 +3,6 @@ package nosql
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -60,7 +59,6 @@ func (db *DB) save(ctx context.Context, id string, nu interface{}, old interface
 			return errors.Wrapf(err, "error marshaling acme type: %s, value: %v", typ, old)
 		}
 	}
-	fmt.Printf("oldB = %+v\n", oldB)
 
 	_, swapped, err := db.db.CmpAndSwap(table, []byte(id), oldB, newB)
 	switch {

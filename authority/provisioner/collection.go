@@ -183,7 +183,7 @@ func (c *Collection) Store(p Interface) error {
 	// Store provisioner always by name.
 	if _, loaded := c.byName.LoadOrStore(p.GetName(), p); loaded {
 		c.byID.Delete(p.GetID())
-		return errors.New("cannot add multiple provisioners with the same id")
+		return errors.New("cannot add multiple provisioners with the same name")
 	}
 
 	// Store provisioner in byKey if EncryptedKey is defined.

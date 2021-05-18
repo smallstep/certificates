@@ -6,19 +6,21 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/mgmt"
+	"github.com/smallstep/certificates/authority/status"
 	"github.com/smallstep/nosql"
 )
 
 // dbAdmin is the database representation of the Admin type.
 type dbAdmin struct {
-	ID            string         `json:"id"`
-	AuthorityID   string         `json:"authorityID"`
-	ProvisionerID string         `json:"provisionerID"`
-	Subject       string         `json:"subject"`
-	Type          mgmt.AdminType `json:"type"`
-	CreatedAt     time.Time      `json:"createdAt"`
-	DeletedAt     time.Time      `json:"deletedAt"`
+	ID            string     `json:"id"`
+	AuthorityID   string     `json:"authorityID"`
+	ProvisionerID string     `json:"provisionerID"`
+	Subject       string     `json:"subject"`
+	Type          admin.Type `json:"type"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	DeletedAt     time.Time  `json:"deletedAt"`
 }
 
 func (dbp *dbAdmin) clone() *dbAdmin {
@@ -71,10 +73,10 @@ func unmarshalAdmin(data []byte, id string) (*mgmt.Admin, error) {
 		ProvisionerID: dba.ProvisionerID,
 		Subject:       dba.Subject,
 		Type:          dba.Type,
-		Status:        mgmt.StatusActive,
+		Status:        status.Active,
 	}
 	if !dba.DeletedAt.IsZero() {
-		adm.Status = mgmt.StatusDeleted
+		adm.Status = status.Deleted
 	}
 	return adm, nil
 }
@@ -89,19 +91,13 @@ func (db *DB) GetAdmin(ctx context.Context, id string) (*mgmt.Admin, error) {
 	if err != nil {
 		return nil, err
 	}
-	if adm.Status == mgmt.StatusDeleted {
+	if adm.Status == status.Deleted {
 		return nil, mgmt.NewError(mgmt.ErrorDeletedType, "admin %s is deleted", adm.ID)
 	}
 	if adm.AuthorityID != db.authorityID {
 		return nil, mgmt.NewError(mgmt.ErrorAuthorityMismatchType,
 			"admin %s is not owned by authority %s", adm.ID, db.authorityID)
 	}
-	prov, err := db.GetProvisioner(ctx, adm.ProvisionerID)
-	if err != nil {
-		return nil, err
-	}
-	adm.ProvisionerName = prov.Name
-	adm.ProvisionerType = prov.Type
 
 	return adm, nil
 }
@@ -114,34 +110,18 @@ func (db *DB) GetAdmins(ctx context.Context) ([]*mgmt.Admin, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "error loading admins")
 	}
-	var (
-		provCache = map[string]*mgmt.Provisioner{}
-		admins    []*mgmt.Admin
-	)
+	var admins = []*mgmt.Admin{}
 	for _, entry := range dbEntries {
 		adm, err := unmarshalAdmin(entry.Value, string(entry.Key))
 		if err != nil {
 			return nil, err
 		}
-		if adm.Status == mgmt.StatusDeleted {
+		if adm.Status == status.Deleted {
 			continue
 		}
 		if adm.AuthorityID != db.authorityID {
 			continue
 		}
-		var (
-			prov *mgmt.Provisioner
-			ok   bool
-		)
-		if prov, ok = provCache[adm.ProvisionerID]; !ok {
-			prov, err = db.GetProvisioner(ctx, adm.ProvisionerID)
-			if err != nil {
-				return nil, err
-			}
-			provCache[adm.ProvisionerID] = prov
-		}
-		adm.ProvisionerName = prov.Name
-		adm.ProvisionerType = prov.Type
 		admins = append(admins, adm)
 	}
 	return admins, nil
@@ -155,24 +135,6 @@ func (db *DB) CreateAdmin(ctx context.Context, adm *mgmt.Admin) error {
 		return mgmt.WrapErrorISE(err, "error generating random id for admin")
 	}
 	adm.AuthorityID = db.authorityID
-
-	// If provisionerID is set, then use it, otherwise load the provisioner
-	// to get the name.
-	if adm.ProvisionerID == "" {
-		prov, err := db.GetProvisionerByName(ctx, adm.ProvisionerName)
-		if err != nil {
-			return err
-		}
-		adm.ProvisionerID = prov.ID
-		adm.ProvisionerType = prov.Type
-	} else {
-		prov, err := db.GetProvisioner(ctx, adm.ProvisionerID)
-		if err != nil {
-			return err
-		}
-		adm.ProvisionerName = prov.Name
-		adm.ProvisionerType = prov.Type
-	}
 
 	dba := &dbAdmin{
 		ID:            adm.ID,
@@ -196,7 +158,7 @@ func (db *DB) UpdateAdmin(ctx context.Context, adm *mgmt.Admin) error {
 	nu := old.clone()
 
 	// If the admin was active but is now deleted ...
-	if old.DeletedAt.IsZero() && adm.Status == mgmt.StatusDeleted {
+	if old.DeletedAt.IsZero() && adm.Status == status.Deleted {
 		nu.DeletedAt = clock.Now()
 	}
 	nu.Type = adm.Type
