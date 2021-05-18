@@ -1,31 +1,34 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/mgmt"
 )
 
 // CreateAdminRequest represents the body for a CreateAdmin request.
 type CreateAdminRequest struct {
-	Name          string `json:"name"`
-	ProvisionerID string `json:"provisionerID"`
-	IsSuperAdmin  bool   `json:"isSuperAdmin"`
+	Subject     string         `json:"subject"`
+	Provisioner string         `json:"provisioner"`
+	Type        mgmt.AdminType `json:"type"`
 }
 
 // Validate validates a new-admin request body.
-func (car *CreateAdminRequest) Validate() error {
+func (car *CreateAdminRequest) Validate(c *admin.Collection) error {
+	if _, ok := c.LoadBySubProv(car.Subject, car.Provisioner); ok {
+		return mgmt.NewError(mgmt.ErrorBadRequestType,
+			"admin with subject %s and provisioner name %s already exists", car.Subject, car.Provisioner)
+	}
 	return nil
 }
 
 // UpdateAdminRequest represents the body for a UpdateAdmin request.
 type UpdateAdminRequest struct {
-	Name          string `json:"name"`
-	ProvisionerID string `json:"provisionerID"`
-	IsSuperAdmin  string `json:"isSuperAdmin"`
-	Status        string `json:"status"`
+	Type mgmt.AdminType `json:"type"`
 }
 
 // Validate validates a new-admin request body.
@@ -73,27 +76,37 @@ func (h *Handler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO validate
+	if err := body.Validate(h.auth.GetAdminCollection()); err != nil {
+		api.WriteError(w, err)
+		return
+	}
 
 	adm := &mgmt.Admin{
-		ProvisionerID: body.ProvisionerID,
-		Name:          body.Name,
-		IsSuperAdmin:  body.IsSuperAdmin,
-		Status:        mgmt.StatusActive,
+		ProvisionerName: body.Provisioner,
+		Subject:         body.Subject,
+		Type:            body.Type,
+		Status:          mgmt.StatusActive,
 	}
 	if err := h.db.CreateAdmin(ctx, adm); err != nil {
 		api.WriteError(w, mgmt.WrapErrorISE(err, "error creating admin"))
 		return
 	}
 	api.JSON(w, adm)
+	if err := h.auth.ReloadAuthConfig(); err != nil {
+		fmt.Printf("err = %+v\n", err)
+	}
 }
 
 // DeleteAdmin deletes admin.
 func (h *Handler) DeleteAdmin(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
 	id := chi.URLParam(r, "id")
 
+	if h.auth.GetAdminCollection().Count() == 1 {
+		api.WriteError(w, mgmt.NewError(mgmt.ErrorBadRequestType, "cannot remove last admin"))
+		return
+	}
+
+	ctx := r.Context()
 	adm, err := h.db.GetAdmin(ctx, id)
 	if err != nil {
 		api.WriteError(w, mgmt.WrapErrorISE(err, "error retrieiving admin %s", id))
@@ -105,6 +118,9 @@ func (h *Handler) DeleteAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	api.JSON(w, &DeleteResponse{Status: "ok"})
+	if err := h.auth.ReloadAuthConfig(); err != nil {
+		fmt.Printf("err = %+v\n", err)
+	}
 }
 
 // UpdateAdmin updates an existing admin.
@@ -127,22 +143,14 @@ func (h *Handler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
 
 	// TODO validate
 
-	if len(body.Name) > 0 {
-		adm.Name = body.Name
-	}
-	if len(body.Status) > 0 {
-		adm.Status = mgmt.StatusActive // FIXME
-	}
-	// Set IsSuperAdmin iff the string was set in the update request.
-	if len(body.IsSuperAdmin) > 0 {
-		adm.IsSuperAdmin = (body.IsSuperAdmin == "true")
-	}
-	if len(body.ProvisionerID) > 0 {
-		adm.ProvisionerID = body.ProvisionerID
-	}
+	adm.Type = body.Type
+
 	if err := h.db.UpdateAdmin(ctx, adm); err != nil {
 		api.WriteError(w, mgmt.WrapErrorISE(err, "error updating admin %s", id))
 		return
 	}
 	api.JSON(w, adm)
+	if err := h.auth.ReloadAuthConfig(); err != nil {
+		fmt.Printf("err = %+v\n", err)
+	}
 }

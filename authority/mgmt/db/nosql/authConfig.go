@@ -60,9 +60,14 @@ func (db *DB) GetAuthConfig(ctx context.Context, id string) (*mgmt.AuthConfig, e
 	if err != nil {
 		return nil, err
 	}
+	admins, err := db.GetAdmins(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	return &mgmt.AuthConfig{
 		ID:           dba.ID,
+		Admins:       admins,
 		Provisioners: provs,
 		ASN1DN:       dba.ASN1DN,
 		Backdate:     dba.Backdate,

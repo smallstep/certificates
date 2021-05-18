@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/authority/mgmt"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/scep"
@@ -21,6 +22,9 @@ func WriteError(w http.ResponseWriter, err error) {
 		return
 	case *scep.Error:
 		w.Header().Set("Content-Type", "text/plain")
+	case *mgmt.Error:
+		mgmt.WriteError(w, k)
+		return
 	default:
 		w.Header().Set("Content-Type", "application/json")
 	}

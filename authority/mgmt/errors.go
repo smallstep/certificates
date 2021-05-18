@@ -88,12 +88,11 @@ var (
 
 // Error represents an ACME
 type Error struct {
-	Type        string        `json:"type"`
-	Detail      string        `json:"detail"`
-	Subproblems []interface{} `json:"subproblems,omitempty"`
-	Identifier  interface{}   `json:"identifier,omitempty"`
-	Err         error         `json:"-"`
-	Status      int           `json:"-"`
+	Type    string `json:"type"`
+	Detail  string `json:"detail"`
+	Message string `json:"message"`
+	Err     error  `json:"-"`
+	Status  int    `json:"-"`
 }
 
 // IsType returns true if the error type matches the input type.
@@ -160,7 +159,7 @@ func (e *Error) StatusCode() int {
 
 // Error allows AError to implement the error interface.
 func (e *Error) Error() string {
-	return e.Detail
+	return e.Err.Error()
 }
 
 // Cause returns the internal error and implements the Causer interface.
@@ -182,9 +181,10 @@ func (e *Error) ToLog() (interface{}, error) {
 
 // WriteError writes to w a JSON representation of the given error.
 func WriteError(w http.ResponseWriter, err *Error) {
-	w.Header().Set("Content-Type", "application/problem+json")
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(err.StatusCode())
 
+	err.Message = err.Err.Error()
 	// Write errors in the response writer
 	if rl, ok := w.(logging.ResponseLogger); ok {
 		rl.WithFields(map[string]interface{}{
@@ -199,6 +199,7 @@ func WriteError(w http.ResponseWriter, err *Error) {
 		}
 	}
 
+	fmt.Printf("err = %+v\n", err)
 	if err := json.NewEncoder(w).Encode(err); err != nil {
 		log.Println(err)
 	}

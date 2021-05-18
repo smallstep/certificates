@@ -46,39 +46,6 @@ func (h *Handler) GetAuthConfig(w http.ResponseWriter, r *http.Request) {
 	api.JSON(w, ac)
 }
 
-// CreateAuthConfig creates a new admin.
-func (h *Handler) CreateAuthConfig(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var body CreateAuthConfigRequest
-	if err := api.ReadJSON(r.Body, &body); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	if err := body.Validate(); err != nil {
-		api.WriteError(w, err)
-	}
-
-	ac := &mgmt.AuthConfig{
-		Status:   mgmt.StatusActive,
-		Backdate: "1m",
-	}
-	if body.ASN1DN != nil {
-		ac.ASN1DN = body.ASN1DN
-	}
-	if body.Claims != nil {
-		ac.Claims = body.Claims
-	}
-	if body.Backdate != "" {
-		ac.Backdate = body.Backdate
-	}
-	if err := h.db.CreateAuthConfig(ctx, ac); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	api.JSONStatus(w, ac, http.StatusCreated)
-}
-
 // UpdateAuthConfig updates an existing AuthConfig.
 func (h *Handler) UpdateAuthConfig(w http.ResponseWriter, r *http.Request) {
 	/*

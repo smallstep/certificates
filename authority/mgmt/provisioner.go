@@ -59,8 +59,8 @@ func WithPassword(pass string) func(*ProvisionerCtx) {
 
 // Provisioner type.
 type Provisioner struct {
-	ID               string      `json:"id"`
-	AuthorityID      string      `json:"authorityID"`
+	ID               string      `json:"-"`
+	AuthorityID      string      `json:"-"`
 	Type             string      `json:"type"`
 	Name             string      `json:"name"`
 	Claims           *Claims     `json:"claims"`
@@ -87,8 +87,7 @@ func (p *Provisioner) GetOptions() *provisioner.Options {
 
 func CreateProvisioner(ctx context.Context, db DB, typ, name string, opts ...ProvisionerOption) (*Provisioner, error) {
 	pc := NewProvisionerCtx(opts...)
-
-	details, err := createJWKDetails(pc)
+	details, err := NewProvisionerDetails(ProvisionerType(typ), pc)
 	if err != nil {
 		return nil, err
 	}
@@ -180,6 +179,27 @@ func (*ProvisionerDetailsK8SSA) isProvisionerDetails() {}
 
 func (*ProvisionerDetailsSSHPOP) isProvisionerDetails() {}
 
+func NewProvisionerDetails(typ ProvisionerType, pc *ProvisionerCtx) (ProvisionerDetails, error) {
+	switch typ {
+	case ProvisionerTypeJWK:
+		return createJWKDetails(pc)
+		/*
+			case ProvisionerTypeOIDC:
+				return createOIDCDetails(pc)
+			case ProvisionerTypeACME:
+				return createACMEDetails(pc)
+			case ProvisionerTypeK8SSA:
+				return createK8SSADetails(pc)
+			case ProvisionerTypeSSHPOP:
+				return createSSHPOPDetails(pc)
+			case ProvisionerTypeX5C:
+				return createSSHPOPDetails(pc)
+		*/
+	default:
+		return nil, NewErrorISE("unsupported provisioner type %s", typ)
+	}
+}
+
 func createJWKDetails(pc *ProvisionerCtx) (*ProvisionerDetailsJWK, error) {
 	var err error
 
@@ -231,6 +251,7 @@ func (p *Provisioner) ToCertificates() (provisioner.Interface, error) {
 			return nil, err
 		}
 		return &provisioner.JWK{
+			ID:           p.ID,
 			Type:         p.Type,
 			Name:         p.Name,
 			Key:          jwk,
@@ -385,4 +406,44 @@ func (c *Claims) ToCertificates() (*provisioner.Claims, error) {
 		DefaultHostSSHDur: durs["defaultSSHHostDur"].dur,
 		EnableSSHCA:       &c.SSH.Enabled,
 	}, nil
+}
+
+type detailsType struct {
+	Type ProvisionerType
+}
+
+func UnmarshalProvisionerDetails(data []byte) (ProvisionerDetails, error) {
+	dt := new(detailsType)
+	if err := json.Unmarshal(data, dt); err != nil {
+		return nil, WrapErrorISE(err, "error unmarshaling provisioner details")
+	}
+
+	var v ProvisionerDetails
+	switch dt.Type {
+	case ProvisionerTypeJWK:
+		v = new(ProvisionerDetailsJWK)
+	case ProvisionerTypeOIDC:
+		v = new(ProvisionerDetailsOIDC)
+	case ProvisionerTypeGCP:
+		v = new(ProvisionerDetailsGCP)
+	case ProvisionerTypeAWS:
+		v = new(ProvisionerDetailsAWS)
+	case ProvisionerTypeAZURE:
+		v = new(ProvisionerDetailsAzure)
+	case ProvisionerTypeACME:
+		v = new(ProvisionerDetailsACME)
+	case ProvisionerTypeX5C:
+		v = new(ProvisionerDetailsX5C)
+	case ProvisionerTypeK8SSA:
+		v = new(ProvisionerDetailsK8SSA)
+	case ProvisionerTypeSSHPOP:
+		v = new(ProvisionerDetailsSSHPOP)
+	default:
+		return nil, fmt.Errorf("unsupported provisioner type %s", dt.Type)
+	}
+
+	if err := json.Unmarshal(data, v); err != nil {
+		return nil, err
+	}
+	return v, nil
 }

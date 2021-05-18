@@ -3,6 +3,7 @@ package nosql
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -11,9 +12,10 @@ import (
 )
 
 var (
-	authorityAdminsTable       = []byte("authority_admins")
-	authorityConfigsTable      = []byte("authority_configs")
-	authorityProvisionersTable = []byte("authority_provisioners")
+	authorityAdminsTable                  = []byte("authority_admins")
+	authorityConfigsTable                 = []byte("authority_configs")
+	authorityProvisionersTable            = []byte("authority_provisioners")
+	authorityProvisionersNameIDIndexTable = []byte("authority_provisioners_name_id_index")
 )
 
 // DB is a struct that implements the AcmeDB interface.
@@ -24,7 +26,7 @@ type DB struct {
 
 // New configures and returns a new Authority DB backend implemented using a nosql DB.
 func New(db nosqlDB.DB, authorityID string) (*DB, error) {
-	tables := [][]byte{authorityAdminsTable, authorityConfigsTable, authorityProvisionersTable}
+	tables := [][]byte{authorityAdminsTable, authorityConfigsTable, authorityProvisionersTable, authorityProvisionersNameIDIndexTable}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
 			return nil, errors.Wrapf(err, "error creating table %s",
@@ -58,6 +60,7 @@ func (db *DB) save(ctx context.Context, id string, nu interface{}, old interface
 			return errors.Wrapf(err, "error marshaling acme type: %s, value: %v", typ, old)
 		}
 	}
+	fmt.Printf("oldB = %+v\n", oldB)
 
 	_, swapped, err := db.db.CmpAndSwap(table, []byte(id), oldB, newB)
 	switch {
@@ -73,7 +76,7 @@ func (db *DB) save(ctx context.Context, id string, nu interface{}, old interface
 var idLen = 32
 
 func randID() (val string, err error) {
-	val, err = randutil.Alphanumeric(idLen)
+	val, err = randutil.UUIDv4()
 	if err != nil {
 		return "", errors.Wrap(err, "error generating random alphanumeric ID")
 	}
