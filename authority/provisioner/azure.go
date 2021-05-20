@@ -84,6 +84,7 @@ type azurePayload struct {
 // and https://docs.microsoft.com/en-us/azure/virtual-machines/windows/instance-metadata-service
 type Azure struct {
 	*base
+	ID                     string   `json:"-"`
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
 	TenantID               string   `json:"tenantID"`
@@ -101,6 +102,15 @@ type Azure struct {
 
 // GetID returns the provisioner unique identifier.
 func (p *Azure) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (p *Azure) GetIDForToken() string {
 	return p.TenantID
 }
 

@@ -26,6 +26,7 @@ type x5cPayload struct {
 // signature requests.
 type X5C struct {
 	*base
+	ID        string   `json:"-"`
 	Type      string   `json:"type"`
 	Name      string   `json:"name"`
 	Roots     []byte   `json:"roots"`
@@ -39,6 +40,15 @@ type X5C struct {
 // GetID returns the provisioner unique identifier. The name and credential id
 // should uniquely identify any X5C provisioner.
 func (p *X5C) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (p *X5C) GetIDForToken() string {
 	return "x5c/" + p.Name
 }
 

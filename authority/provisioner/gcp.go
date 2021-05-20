@@ -78,6 +78,7 @@ func newGCPConfig() *gcpConfig {
 // https://cloud.google.com/compute/docs/instances/verifying-instance-identity
 type GCP struct {
 	*base
+	ID                     string   `json:"-"`
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
 	ServiceAccounts        []string `json:"serviceAccounts"`
@@ -96,6 +97,16 @@ type GCP struct {
 // GetID returns the provisioner unique identifier. The name should uniquely
 // identify any GCP provisioner.
 func (p *GCP) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.GetIDForToken()
+
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (p *GCP) GetIDForToken() string {
 	return "gcp/" + p.Name
 }
 

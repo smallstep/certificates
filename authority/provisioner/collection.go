@@ -46,6 +46,7 @@ type Collection struct {
 	byID      *sync.Map
 	byKey     *sync.Map
 	byName    *sync.Map
+	byTokenID *sync.Map
 	sorted    provisionerSlice
 	audiences Audiences
 }
@@ -57,6 +58,7 @@ func NewCollection(audiences Audiences) *Collection {
 		byID:      new(sync.Map),
 		byKey:     new(sync.Map),
 		byName:    new(sync.Map),
+		byTokenID: new(sync.Map),
 		audiences: audiences,
 	}
 }
@@ -69,6 +71,13 @@ func (c *Collection) Load(id string) (Interface, bool) {
 // LoadByName a provisioner by name.
 func (c *Collection) LoadByName(name string) (Interface, bool) {
 	return loadProvisioner(c.byName, name)
+}
+
+// LoadByTokenID a provisioner by identifier found in token.
+// For different provisioner types this identifier may be found in in different
+// attributes of the token.
+func (c *Collection) LoadByTokenID(tokenProvisionerID string) (Interface, bool) {
+	return loadProvisioner(c.byTokenID, tokenProvisionerID)
 }
 
 // LoadByToken parses the token claims and loads the provisioner associated.
@@ -86,11 +95,12 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 	if matchesAudience(claims.Audience, audiences) {
 		// Use fragment to get provisioner name (GCP, AWS, SSHPOP)
 		if fragment != "" {
-			return c.Load(fragment)
+			return c.LoadByTokenID(fragment)
 		}
 		// If matches with stored audiences it will be a JWT token (default), and
 		// the id would be <issuer>:<kid>.
-		return c.Load(claims.Issuer + ":" + token.Headers[0].KeyID)
+		// TODO: is this ok?
+		return c.LoadByTokenID(claims.Issuer + ":" + token.Headers[0].KeyID)
 	}
 
 	// The ID will be just the clientID stored in azp, aud or tid.
@@ -101,7 +111,7 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 
 	// Kubernetes Service Account tokens.
 	if payload.Issuer == k8sSAIssuer {
-		if p, ok := c.Load(K8sSAID); ok {
+		if p, ok := c.LoadByTokenID(K8sSAID); ok {
 			return p, ok
 		}
 		// Kubernetes service account provisioner not found
@@ -115,18 +125,18 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 
 	// Try with azp (OIDC)
 	if len(payload.AuthorizedParty) > 0 {
-		if p, ok := c.Load(payload.AuthorizedParty); ok {
+		if p, ok := c.LoadByTokenID(payload.AuthorizedParty); ok {
 			return p, ok
 		}
 	}
 	// Try with tid (Azure)
 	if payload.TenantID != "" {
-		if p, ok := c.Load(payload.TenantID); ok {
+		if p, ok := c.LoadByTokenID(payload.TenantID); ok {
 			return p, ok
 		}
 	}
 	// Fallback to aud
-	return c.Load(payload.Audience[0])
+	return c.LoadByTokenID(payload.Audience[0])
 }
 
 // LoadByCertificate looks for the provisioner extension and extracts the
@@ -186,6 +196,12 @@ func (c *Collection) Store(p Interface) error {
 	if _, loaded := c.byName.LoadOrStore(p.GetName(), p); loaded {
 		c.byID.Delete(p.GetID())
 		return errors.New("cannot add multiple provisioners with the same name")
+	}
+	// Store provisioner always by ID presented in token.
+	if _, loaded := c.byTokenID.LoadOrStore(p.GetIDForToken(), p); loaded {
+		c.byID.Delete(p.GetID())
+		c.byName.Delete(p.GetName())
+		return errors.New("cannot add multiple provisioners with the same token identifier")
 	}
 
 	// Store provisioner in byKey if EncryptedKey is defined.
