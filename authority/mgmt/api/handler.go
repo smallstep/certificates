@@ -32,20 +32,20 @@ func NewHandler(auth *authority.Authority) api.RouterHandler {
 // Route traffic and implement the Router interface.
 func (h *Handler) Route(r api.Router) {
 	// Provisioners
-	r.MethodFunc("GET", "/provisioner/{name}", h.GetProvisioner)
+	r.MethodFunc("GET", "/provisioners/{name}", h.GetProvisioner)
 	r.MethodFunc("GET", "/provisioners", h.GetProvisioners)
-	r.MethodFunc("POST", "/provisioner", h.CreateProvisioner)
-	r.MethodFunc("PUT", "/provisioner/{name}", h.UpdateProvisioner)
-	r.MethodFunc("DELETE", "/provisioner/{name}", h.DeleteProvisioner)
+	r.MethodFunc("POST", "/provisioners", h.CreateProvisioner)
+	r.MethodFunc("PUT", "/provisioners/{name}", h.UpdateProvisioner)
+	r.MethodFunc("DELETE", "/provisioners/{name}", h.DeleteProvisioner)
 
 	// Admins
-	r.MethodFunc("GET", "/admin/{id}", h.GetAdmin)
+	r.MethodFunc("GET", "/admins/{id}", h.GetAdmin)
 	r.MethodFunc("GET", "/admins", h.GetAdmins)
-	r.MethodFunc("POST", "/admin", h.CreateAdmin)
-	r.MethodFunc("PATCH", "/admin/{id}", h.UpdateAdmin)
-	r.MethodFunc("DELETE", "/admin/{id}", h.DeleteAdmin)
+	r.MethodFunc("POST", "/admins", h.CreateAdmin)
+	r.MethodFunc("PATCH", "/admins/{id}", h.UpdateAdmin)
+	r.MethodFunc("DELETE", "/admins/{id}", h.DeleteAdmin)
 
 	// AuthConfig
-	r.MethodFunc("GET", "/authconfig/{id}", h.GetAuthConfig)
-	r.MethodFunc("PUT", "/authconfig/{id}", h.UpdateAuthConfig)
+	r.MethodFunc("GET", "/authconfigs/{id}", h.GetAuthConfig)
+	r.MethodFunc("PUT", "/authconfigs/{id}", h.UpdateAuthConfig)
 }

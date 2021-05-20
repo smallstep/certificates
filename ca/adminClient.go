@@ -16,16 +16,16 @@ import (
 	"github.com/smallstep/certificates/errs"
 )
 
-// MgmtClient implements an HTTP client for the CA server.
-type MgmtClient struct {
+// AdminClient implements an HTTP client for the CA server.
+type AdminClient struct {
 	client    *uaClient
 	endpoint  *url.URL
 	retryFunc RetryFunc
 	opts      []ClientOption
 }
 
-// NewMgmtClient creates a new MgmtClient with the given endpoint and options.
-func NewMgmtClient(endpoint string, opts ...ClientOption) (*MgmtClient, error) {
+// NewAdminClient creates a new AdminClient with the given endpoint and options.
+func NewAdminClient(endpoint string, opts ...ClientOption) (*AdminClient, error) {
 	u, err := parseEndpoint(endpoint)
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func NewMgmtClient(endpoint string, opts ...ClientOption) (*MgmtClient, error) {
 		return nil, err
 	}
 
-	return &MgmtClient{
+	return &AdminClient{
 		client:    newClient(tr),
 		endpoint:  u,
 		retryFunc: o.retryFunc,
@@ -48,7 +48,7 @@ func NewMgmtClient(endpoint string, opts ...ClientOption) (*MgmtClient, error) {
 	}, nil
 }
 
-func (c *MgmtClient) retryOnError(r *http.Response) bool {
+func (c *AdminClient) retryOnError(r *http.Response) bool {
 	if c.retryFunc != nil {
 		if c.retryFunc(r.StatusCode) {
 			o := new(clientOptions)
@@ -67,10 +67,10 @@ func (c *MgmtClient) retryOnError(r *http.Response) bool {
 	return false
 }
 
-// GetAdmin performs the GET /mgmt/admin/{id} request to the CA.
-func (c *MgmtClient) GetAdmin(id string) (*mgmt.Admin, error) {
+// GetAdmin performs the GET /admin/admin/{id} request to the CA.
+func (c *AdminClient) GetAdmin(id string) (*mgmt.Admin, error) {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/mgmt/admin", id)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/admin", id)})
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
@@ -81,7 +81,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readMgmtError(resp.Body)
+		return nil, readAdminError(resp.Body)
 	}
 	var adm = new(mgmt.Admin)
 	if err := readJSON(resp.Body, adm); err != nil {
@@ -135,7 +135,7 @@ func WithAdminLimit(limit int) AdminOption {
 }
 
 // GetAdmins performs the GET /admin/admins request to the CA.
-func (c *MgmtClient) GetAdmins(opts ...AdminOption) (*mgmtAPI.GetAdminsResponse, error) {
+func (c *AdminClient) GetAdmins(opts ...AdminOption) (*mgmtAPI.GetAdminsResponse, error) {
 	var retried bool
 	o := new(adminOptions)
 	if err := o.apply(opts); err != nil {
@@ -155,7 +155,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readMgmtError(resp.Body)
+		return nil, readAdminError(resp.Body)
 	}
 	var body = new(mgmtAPI.GetAdminsResponse)
 	if err := readJSON(resp.Body, body); err != nil {
@@ -164,14 +164,14 @@ retry:
 	return body, nil
 }
 
-// CreateAdmin performs the POST /admin/admin request to the CA.
-func (c *MgmtClient) CreateAdmin(req *mgmtAPI.CreateAdminRequest) (*mgmt.Admin, error) {
+// CreateAdmin performs the POST /admin/admins request to the CA.
+func (c *AdminClient) CreateAdmin(req *mgmtAPI.CreateAdminRequest) (*mgmt.Admin, error) {
 	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/admin/admin"})
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/admin/admins"})
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
@@ -182,7 +182,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readMgmtError(resp.Body)
+		return nil, readAdminError(resp.Body)
 	}
 	var adm = new(mgmt.Admin)
 	if err := readJSON(resp.Body, adm); err != nil {
@@ -191,10 +191,10 @@ retry:
 	return adm, nil
 }
 
-// RemoveAdmin performs the DELETE /admin/admin/{id} request to the CA.
-func (c *MgmtClient) RemoveAdmin(id string) error {
+// RemoveAdmin performs the DELETE /admin/admins/{id} request to the CA.
+func (c *AdminClient) RemoveAdmin(id string) error {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/admin", id)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/admins", id)})
 	req, err := http.NewRequest("DELETE", u.String(), nil)
 	if err != nil {
 		return errors.Wrapf(err, "create DELETE %s request failed", u)
@@ -209,19 +209,19 @@ retry:
 			retried = true
 			goto retry
 		}
-		return readMgmtError(resp.Body)
+		return readAdminError(resp.Body)
 	}
 	return nil
 }
 
-// UpdateAdmin performs the PUT /admin/admin/{id} request to the CA.
-func (c *MgmtClient) UpdateAdmin(id string, uar *mgmtAPI.UpdateAdminRequest) (*admin.Admin, error) {
+// UpdateAdmin performs the PUT /admin/admins/{id} request to the CA.
+func (c *AdminClient) UpdateAdmin(id string, uar *mgmtAPI.UpdateAdminRequest) (*admin.Admin, error) {
 	var retried bool
 	body, err := json.Marshal(uar)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/admin", id)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/admins", id)})
 	req, err := http.NewRequest("PATCH", u.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "create PUT %s request failed", u)
@@ -236,7 +236,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readMgmtError(resp.Body)
+		return nil, readAdminError(resp.Body)
 	}
 	var adm = new(admin.Admin)
 	if err := readJSON(resp.Body, adm); err != nil {
@@ -245,10 +245,10 @@ retry:
 	return adm, nil
 }
 
-// GetProvisioner performs the GET /admin/provisioner/{name} request to the CA.
-func (c *MgmtClient) GetProvisioner(name string) (*mgmt.Provisioner, error) {
+// GetProvisioner performs the GET /admin/provisioners/{name} request to the CA.
+func (c *AdminClient) GetProvisioner(name string) (*mgmt.Provisioner, error) {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/provisioner", name)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/provisioners", name)})
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
@@ -259,7 +259,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readMgmtError(resp.Body)
+		return nil, readAdminError(resp.Body)
 	}
 	var prov = new(mgmt.Provisioner)
 	if err := readJSON(resp.Body, prov); err != nil {
@@ -269,7 +269,7 @@ retry:
 }
 
 // GetProvisioners performs the GET /admin/provisioners request to the CA.
-func (c *MgmtClient) GetProvisioners() ([]*mgmt.Provisioner, error) {
+func (c *AdminClient) GetProvisioners() ([]*mgmt.Provisioner, error) {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/admin/provisioners"})
 retry:
@@ -282,7 +282,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readMgmtError(resp.Body)
+		return nil, readAdminError(resp.Body)
 	}
 	var provs = new([]*mgmt.Provisioner)
 	if err := readJSON(resp.Body, provs); err != nil {
@@ -291,10 +291,10 @@ retry:
 	return *provs, nil
 }
 
-// RemoveProvisioner performs the DELETE /admin/provisioner/{name} request to the CA.
-func (c *MgmtClient) RemoveProvisioner(name string) error {
+// RemoveProvisioner performs the DELETE /admin/provisioners/{name} request to the CA.
+func (c *AdminClient) RemoveProvisioner(name string) error {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/provisioner", name)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/provisioners", name)})
 	req, err := http.NewRequest("DELETE", u.String(), nil)
 	if err != nil {
 		return errors.Wrapf(err, "create DELETE %s request failed", u)
@@ -309,19 +309,19 @@ retry:
 			retried = true
 			goto retry
 		}
-		return readMgmtError(resp.Body)
+		return readAdminError(resp.Body)
 	}
 	return nil
 }
 
-// CreateProvisioner performs the POST /admin/provisioner request to the CA.
-func (c *MgmtClient) CreateProvisioner(req *mgmtAPI.CreateProvisionerRequest) (*mgmt.Provisioner, error) {
+// CreateProvisioner performs the POST /admin/provisioners request to the CA.
+func (c *AdminClient) CreateProvisioner(req *mgmtAPI.CreateProvisionerRequest) (*mgmt.Provisioner, error) {
 	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/admin/provisioner"})
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/admin/provisioners"})
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
@@ -332,7 +332,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readMgmtError(resp.Body)
+		return nil, readAdminError(resp.Body)
 	}
 	var prov = new(mgmt.Provisioner)
 	if err := readJSON(resp.Body, prov); err != nil {
@@ -341,14 +341,14 @@ retry:
 	return prov, nil
 }
 
-// UpdateProvisioner performs the PUT /admin/provisioner/{id} request to the CA.
-func (c *MgmtClient) UpdateProvisioner(id string, upr *mgmtAPI.UpdateProvisionerRequest) (*mgmt.Provisioner, error) {
+// UpdateProvisioner performs the PUT /admin/provisioners/{id} request to the CA.
+func (c *AdminClient) UpdateProvisioner(id string, upr *mgmtAPI.UpdateProvisionerRequest) (*mgmt.Provisioner, error) {
 	var retried bool
 	body, err := json.Marshal(upr)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/provisioner", id)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/provisioners", id)})
 	req, err := http.NewRequest("PUT", u.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "create PUT %s request failed", u)
@@ -363,7 +363,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readMgmtError(resp.Body)
+		return nil, readAdminError(resp.Body)
 	}
 	var prov = new(mgmt.Provisioner)
 	if err := readJSON(resp.Body, prov); err != nil {
@@ -373,7 +373,7 @@ retry:
 }
 
 // GetAuthConfig performs the GET /admin/authconfig/{id} request to the CA.
-func (c *MgmtClient) GetAuthConfig(id string) (*mgmt.AuthConfig, error) {
+func (c *AdminClient) GetAuthConfig(id string) (*mgmt.AuthConfig, error) {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/authconfig", id)})
 retry:
@@ -386,7 +386,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readMgmtError(resp.Body)
+		return nil, readAdminError(resp.Body)
 	}
 	var ac = new(mgmt.AuthConfig)
 	if err := readJSON(resp.Body, ac); err != nil {
@@ -395,7 +395,7 @@ retry:
 	return ac, nil
 }
 
-func readMgmtError(r io.ReadCloser) error {
+func readAdminError(r io.ReadCloser) error {
 	defer r.Close()
 	mgmtErr := new(mgmt.Error)
 	if err := json.NewDecoder(r).Decode(mgmtErr); err != nil {
