@@ -14,6 +14,10 @@ func (p *noop) GetID() string {
 	return "noop"
 }
 
+func (p *noop) GetIDForToken() string {
+	return "noop"
+}
+
 func (p *noop) GetTokenID(token string) (string, error) {
 	return "", nil
 }

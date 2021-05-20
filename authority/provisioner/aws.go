@@ -252,6 +252,7 @@ type awsInstanceIdentityDocument struct {
 // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-identity-documents.html
 type AWS struct {
 	*base
+	ID                     string   `json:"-"`
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
 	Accounts               []string `json:"accounts"`
@@ -269,6 +270,15 @@ type AWS struct {
 
 // GetID returns the provisioner unique identifier.
 func (p *AWS) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (p *AWS) GetIDForToken() string {
 	return "aws/" + p.Name
 }
 

@@ -13,6 +13,7 @@ import (
 // provisioning flow.
 type ACME struct {
 	*base
+	ID      string   `json:"-"`
 	Type    string   `json:"type"`
 	Name    string   `json:"name"`
 	ForceCN bool     `json:"forceCN,omitempty"`
@@ -23,6 +24,15 @@ type ACME struct {
 
 // GetID returns the provisioner unique identifier.
 func (p ACME) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (p *ACME) GetIDForToken() string {
 	return "acme/" + p.Name
 }
 

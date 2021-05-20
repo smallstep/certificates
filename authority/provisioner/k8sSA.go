@@ -42,6 +42,7 @@ type k8sSAPayload struct {
 // entity trusted to make signature requests.
 type K8sSA struct {
 	*base
+	ID        string   `json:"-"`
 	Type      string   `json:"type"`
 	Name      string   `json:"name"`
 	PubKeys   []byte   `json:"publicKeys,omitempty"`
@@ -56,6 +57,15 @@ type K8sSA struct {
 // GetID returns the provisioner unique identifier. The name and credential id
 // should uniquely identify any K8sSA provisioner.
 func (p *K8sSA) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (p *K8sSA) GetIDForToken() string {
 	return K8sSAID
 }
 

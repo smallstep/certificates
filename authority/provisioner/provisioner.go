@@ -17,6 +17,7 @@ import (
 // Interface is the interface that all provisioner types must implement.
 type Interface interface {
 	GetID() string
+	GetIDForToken() string
 	GetTokenID(token string) (string, error)
 	GetName() string
 	GetType() Type
@@ -388,6 +389,7 @@ type MockProvisioner struct {
 	Mret1, Mret2, Mret3 interface{}
 	Merr                error
 	MgetID              func() string
+	MgetIDForToken      func() string
 	MgetTokenID         func(string) (string, error)
 	MgetName            func() string
 	MgetType            func() Type
@@ -406,6 +408,14 @@ type MockProvisioner struct {
 func (m *MockProvisioner) GetID() string {
 	if m.MgetID != nil {
 		return m.MgetID()
+	}
+	return m.Mret1.(string)
+}
+
+// GetIDForToken mock
+func (m *MockProvisioner) GetIDForToken() string {
+	if m.MgetIDForToken != nil {
+		return m.MgetIDForToken()
 	}
 	return m.Mret1.(string)
 }
