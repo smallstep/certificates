@@ -32,7 +32,7 @@ import (
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
 	config       *config.Config
-	mgmtDB       mgmt.DB
+	adminDB      mgmt.DB
 	keyManager   kms.KeyManager
 	provisioners *provisioner.Collection
 	admins       *admin.Collection
@@ -130,7 +130,7 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 }
 
 func (a *Authority) ReloadAuthConfig() error {
-	mgmtAuthConfig, err := a.mgmtDB.GetAuthConfig(context.Background(), mgmt.DefaultAuthorityID)
+	mgmtAuthConfig, err := a.adminDB.GetAuthConfig(context.Background(), mgmt.DefaultAuthorityID)
 	if err != nil {
 		return mgmt.WrapErrorISE(err, "error getting authConfig from db")
 	}
@@ -204,14 +204,14 @@ func (a *Authority) init() error {
 	// Pull AuthConfig from DB.
 	if true {
 		// Check if AuthConfig already exists
-		a.mgmtDB, err = authMgmtNosql.New(a.db.(nosql.DB), mgmt.DefaultAuthorityID)
+		a.adminDB, err = authMgmtNosql.New(a.db.(nosql.DB), mgmt.DefaultAuthorityID)
 		if err != nil {
 			return err
 		}
-		mgmtAuthConfig, err := a.mgmtDB.GetAuthConfig(context.Background(), mgmt.DefaultAuthorityID)
+		mgmtAuthConfig, err := a.adminDB.GetAuthConfig(context.Background(), mgmt.DefaultAuthorityID)
 		if err != nil {
 			if k, ok := err.(*mgmt.Error); ok && k.IsType(mgmt.ErrorNotFoundType) {
-				mgmtAuthConfig, err = mgmt.CreateAuthority(context.Background(), a.mgmtDB, mgmt.WithDefaultAuthorityID)
+				mgmtAuthConfig, err = mgmt.CreateAuthority(context.Background(), a.adminDB, mgmt.WithDefaultAuthorityID)
 				if err != nil {
 					return mgmt.WrapErrorISE(err, "error creating authConfig")
 				}
@@ -465,9 +465,9 @@ func (a *Authority) GetDatabase() db.AuthDB {
 	return a.db
 }
 
-// GetMgmtDatabase returns the mgmt database, if one exists.
-func (a *Authority) GetMgmtDatabase() mgmt.DB {
-	return a.mgmtDB
+// GetAdminDatabase returns the mgmt database, if one exists.
+func (a *Authority) GetAdminDatabase() mgmt.DB {
+	return a.adminDB
 }
 
 // GetAdminCollection returns the admin collection.

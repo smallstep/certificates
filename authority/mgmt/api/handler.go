@@ -25,8 +25,8 @@ type Handler struct {
 }
 
 // NewHandler returns a new Authority Config Handler.
-func NewHandler(db mgmt.DB, auth *authority.Authority) api.RouterHandler {
-	return &Handler{db, auth}
+func NewHandler(auth *authority.Authority) api.RouterHandler {
+	return &Handler{auth.GetAdminDatabase(), auth}
 }
 
 // Route traffic and implement the Router interface.

@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/mgmt"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
@@ -183,6 +184,14 @@ func WithX509FederatedBundle(pemCerts []byte) Option {
 			return err
 		}
 		a.federatedX509Certs = certs
+		return nil
+	}
+}
+
+// WithAdminDB is an option to set the database backing the admin APIs.
+func WithAdminDB(db mgmt.DB) Option {
+	return func(a *Authority) error {
+		a.adminDB = db
 		return nil
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/smallstep/certificates/authority/mgmt"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/authority/status"
+	"github.com/smallstep/certificates/errs"
 )
 
 // CreateProvisionerRequest represents the body for a CreateProvisioner request.
@@ -29,6 +30,12 @@ func (cpr *CreateProvisionerRequest) Validate(c *provisioner.Collection) error {
 		return mgmt.NewError(mgmt.ErrorBadRequestType, "provisioner with name %s already exists", cpr.Name)
 	}
 	return nil
+}
+
+// GetProvisionersResponse is the type for GET /admin/provisioners responses.
+type GetProvisionersResponse struct {
+	Provisioners provisioner.List `json:"provisioners"`
+	NextCursor   string           `json:"nextCursor"`
 }
 
 // UpdateProvisionerRequest represents the body for a UpdateProvisioner request.
@@ -72,14 +79,22 @@ func (h *Handler) GetProvisioner(w http.ResponseWriter, r *http.Request) {
 
 // GetProvisioners returns all provisioners associated with the authority.
 func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	provs, err := h.db.GetProvisioners(ctx)
+	cursor, limit, err := api.ParseCursor(r)
 	if err != nil {
-		api.WriteError(w, err)
+		api.WriteError(w, mgmt.WrapError(mgmt.ErrorBadRequestType, err,
+			"error parsing cursor / limt query params"))
 		return
 	}
-	api.JSON(w, provs)
+
+	p, next, err := h.auth.GetProvisioners(cursor, limit)
+	if err != nil {
+		api.WriteError(w, errs.InternalServerErr(err))
+		return
+	}
+	api.JSON(w, &GetProvisionersResponse{
+		Provisioners: p,
+		NextCursor:   next,
+	})
 }
 
 // CreateProvisioner creates a new prov.
