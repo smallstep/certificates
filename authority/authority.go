@@ -205,8 +205,9 @@ func (a *Authority) init() error {
 		}
 	}
 
-	// Pull AuthConfig from DB.
-	if true {
+	// Initialize step-ca Admin Database if it's not already initialized using
+	// WithAdminDB.
+	if a.adminDB == nil {
 		// Check if AuthConfig already exists
 		a.adminDB, err = authMgmtNosql.New(a.db.(nosql.DB), mgmt.DefaultAuthorityID)
 		if err != nil {
