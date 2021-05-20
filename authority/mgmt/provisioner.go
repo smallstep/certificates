@@ -60,17 +60,17 @@ func WithPassword(pass string) func(*ProvisionerCtx) {
 
 // Provisioner type.
 type Provisioner struct {
-	ID               string      `json:"-"`
-	AuthorityID      string      `json:"-"`
-	Type             string      `json:"type"`
-	Name             string      `json:"name"`
-	Claims           *Claims     `json:"claims"`
-	Details          interface{} `json:"details"`
-	X509Template     string      `json:"x509Template"`
-	X509TemplateData []byte      `json:"x509TemplateData"`
-	SSHTemplate      string      `json:"sshTemplate"`
-	SSHTemplateData  []byte      `json:"sshTemplateData"`
-	Status           status.Type `json:"status"`
+	ID               string             `json:"-"`
+	AuthorityID      string             `json:"-"`
+	Type             string             `json:"type"`
+	Name             string             `json:"name"`
+	Claims           *Claims            `json:"claims"`
+	Details          ProvisionerDetails `json:"details"`
+	X509Template     string             `json:"x509Template"`
+	X509TemplateData []byte             `json:"x509TemplateData"`
+	SSHTemplate      string             `json:"sshTemplate"`
+	SSHTemplateData  []byte             `json:"sshTemplateData"`
+	Status           status.Type        `json:"status"`
 }
 
 func (p *Provisioner) GetOptions() *provisioner.Options {
@@ -111,6 +111,8 @@ func CreateProvisioner(ctx context.Context, db DB, typ, name string, opts ...Pro
 	return p, nil
 }
 
+// ProvisionerDetails is the interface implemented by all provisioner details
+// attributes.
 type ProvisionerDetails interface {
 	isProvisionerDetails()
 }
@@ -118,8 +120,8 @@ type ProvisionerDetails interface {
 // ProvisionerDetailsJWK represents the values required by a JWK provisioner.
 type ProvisionerDetailsJWK struct {
 	Type       ProvisionerType `json:"type"`
-	PubKey     []byte          `json:"pubKey"`
-	EncPrivKey string          `json:"privKey"`
+	PublicKey  []byte          `json:"publicKey"`
+	PrivateKey string          `json:"PrivateKey"`
 }
 
 // ProvisionerDetailsOIDC represents the values required by a OIDC provisioner.
@@ -232,8 +234,8 @@ func createJWKDetails(pc *ProvisionerCtx) (*ProvisionerDetailsJWK, error) {
 
 	return &ProvisionerDetailsJWK{
 		Type:       ProvisionerTypeJWK,
-		PubKey:     jwkPubBytes,
-		EncPrivKey: jwePrivStr,
+		PublicKey:  jwkPubBytes,
+		PrivateKey: jwePrivStr,
 	}, nil
 }
 
@@ -248,7 +250,7 @@ func (p *Provisioner) ToCertificates() (provisioner.Interface, error) {
 	switch details := p.Details.(type) {
 	case *ProvisionerDetailsJWK:
 		jwk := new(jose.JSONWebKey)
-		if err := json.Unmarshal(details.PubKey, &jwk); err != nil {
+		if err := json.Unmarshal(details.PublicKey, &jwk); err != nil {
 			return nil, err
 		}
 		return &provisioner.JWK{
@@ -256,7 +258,7 @@ func (p *Provisioner) ToCertificates() (provisioner.Interface, error) {
 			Type:         p.Type,
 			Name:         p.Name,
 			Key:          jwk,
-			EncryptedKey: details.EncPrivKey,
+			EncryptedKey: details.PrivateKey,
 			Claims:       claims,
 			Options:      p.GetOptions(),
 		}, nil

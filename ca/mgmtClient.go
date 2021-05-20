@@ -134,7 +134,7 @@ func WithAdminLimit(limit int) AdminOption {
 	}
 }
 
-// GetAdmins performs the GET /mgmt/admins request to the CA.
+// GetAdmins performs the GET /admin/admins request to the CA.
 func (c *MgmtClient) GetAdmins(opts ...AdminOption) (*mgmtAPI.GetAdminsResponse, error) {
 	var retried bool
 	o := new(adminOptions)
@@ -142,7 +142,7 @@ func (c *MgmtClient) GetAdmins(opts ...AdminOption) (*mgmtAPI.GetAdminsResponse,
 		return nil, err
 	}
 	u := c.endpoint.ResolveReference(&url.URL{
-		Path:     "/mgmt/admins",
+		Path:     "/admin/admins",
 		RawQuery: o.rawQuery(),
 	})
 retry:
@@ -164,14 +164,14 @@ retry:
 	return body, nil
 }
 
-// CreateAdmin performs the POST /mgmt/admin request to the CA.
+// CreateAdmin performs the POST /admin/admin request to the CA.
 func (c *MgmtClient) CreateAdmin(req *mgmtAPI.CreateAdminRequest) (*mgmt.Admin, error) {
 	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/mgmt/admin"})
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/admin/admin"})
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
@@ -191,10 +191,10 @@ retry:
 	return adm, nil
 }
 
-// RemoveAdmin performs the DELETE /mgmt/admin/{id} request to the CA.
+// RemoveAdmin performs the DELETE /admin/admin/{id} request to the CA.
 func (c *MgmtClient) RemoveAdmin(id string) error {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/mgmt/admin", id)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/admin", id)})
 	req, err := http.NewRequest("DELETE", u.String(), nil)
 	if err != nil {
 		return errors.Wrapf(err, "create DELETE %s request failed", u)
@@ -214,14 +214,14 @@ retry:
 	return nil
 }
 
-// UpdateAdmin performs the PUT /mgmt/admin/{id} request to the CA.
+// UpdateAdmin performs the PUT /admin/admin/{id} request to the CA.
 func (c *MgmtClient) UpdateAdmin(id string, uar *mgmtAPI.UpdateAdminRequest) (*admin.Admin, error) {
 	var retried bool
 	body, err := json.Marshal(uar)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/mgmt/admin", id)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/admin", id)})
 	req, err := http.NewRequest("PATCH", u.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "create PUT %s request failed", u)
@@ -245,10 +245,10 @@ retry:
 	return adm, nil
 }
 
-// GetProvisioner performs the GET /mgmt/provisioner/{id} request to the CA.
-func (c *MgmtClient) GetProvisioner(id string) (*mgmt.Provisioner, error) {
+// GetProvisioner performs the GET /admin/provisioner/{name} request to the CA.
+func (c *MgmtClient) GetProvisioner(name string) (*mgmt.Provisioner, error) {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/mgmt/provisioner", id)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/provisioner", name)})
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
@@ -268,10 +268,10 @@ retry:
 	return prov, nil
 }
 
-// GetProvisioners performs the GET /mgmt/provisioners request to the CA.
+// GetProvisioners performs the GET /admin/provisioners request to the CA.
 func (c *MgmtClient) GetProvisioners() ([]*mgmt.Provisioner, error) {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/mgmt/provisioners"})
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/admin/provisioners"})
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
@@ -291,10 +291,10 @@ retry:
 	return *provs, nil
 }
 
-// RemoveProvisioner performs the DELETE /mgmt/provisioner/{name} request to the CA.
+// RemoveProvisioner performs the DELETE /admin/provisioner/{name} request to the CA.
 func (c *MgmtClient) RemoveProvisioner(name string) error {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/mgmt/provisioner", name)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/provisioner", name)})
 	req, err := http.NewRequest("DELETE", u.String(), nil)
 	if err != nil {
 		return errors.Wrapf(err, "create DELETE %s request failed", u)
@@ -314,14 +314,14 @@ retry:
 	return nil
 }
 
-// CreateProvisioner performs the POST /mgmt/provisioner request to the CA.
+// CreateProvisioner performs the POST /admin/provisioner request to the CA.
 func (c *MgmtClient) CreateProvisioner(req *mgmtAPI.CreateProvisionerRequest) (*mgmt.Provisioner, error) {
 	var retried bool
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/mgmt/provisioner"})
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/admin/provisioner"})
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
@@ -341,14 +341,14 @@ retry:
 	return prov, nil
 }
 
-// UpdateProvisioner performs the PUT /mgmt/provisioner/{id} request to the CA.
+// UpdateProvisioner performs the PUT /admin/provisioner/{id} request to the CA.
 func (c *MgmtClient) UpdateProvisioner(id string, upr *mgmtAPI.UpdateProvisionerRequest) (*mgmt.Provisioner, error) {
 	var retried bool
 	body, err := json.Marshal(upr)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/mgmt/provisioner", id)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/provisioner", id)})
 	req, err := http.NewRequest("PUT", u.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrapf(err, "create PUT %s request failed", u)
@@ -372,10 +372,10 @@ retry:
 	return prov, nil
 }
 
-// GetAuthConfig performs the GET /mgmt/authconfig/{id} request to the CA.
+// GetAuthConfig performs the GET /admin/authconfig/{id} request to the CA.
 func (c *MgmtClient) GetAuthConfig(id string) (*mgmt.AuthConfig, error) {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/mgmt/authconfig", id)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join("/admin/authconfig", id)})
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {

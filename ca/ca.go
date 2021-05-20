@@ -209,11 +209,11 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 		})
 	}
 
-	// MGMT Router
-	mgmtDB := auth.GetMgmtDatabase()
-	if mgmtDB != nil {
-		mgmtHandler := mgmtAPI.NewHandler(mgmtDB, auth)
-		mux.Route("/mgmt", func(r chi.Router) {
+	// Admin API Router
+	adminDB := auth.GetAdminDatabase()
+	if adminDB != nil {
+		mgmtHandler := mgmtAPI.NewHandler(auth)
+		mux.Route("/admin", func(r chi.Router) {
 			mgmtHandler.Route(r)
 		})
 	}
