@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/dsa" //nolint
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/asn1"
@@ -437,7 +438,6 @@ func parseCursor(r *http.Request) (cursor string, limit int, err error) {
 	return
 }
 
-// TODO: add support for Ed25519 once it's supported
 func fmtPublicKey(cert *x509.Certificate) string {
 	var params string
 	switch pk := cert.PublicKey.(type) {
@@ -445,6 +445,8 @@ func fmtPublicKey(cert *x509.Certificate) string {
 		params = pk.Curve.Params().Name
 	case *rsa.PublicKey:
 		params = strconv.Itoa(pk.Size() * 8)
+	case ed25519.PublicKey:
+		return cert.PublicKeyAlgorithm.String()
 	case *dsa.PublicKey:
 		params = strconv.Itoa(pk.Q.BitLen() * 8)
 	default:
