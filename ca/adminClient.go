@@ -315,9 +315,9 @@ retry:
 }
 
 // CreateProvisioner performs the POST /admin/provisioners request to the CA.
-func (c *AdminClient) CreateProvisioner(req *mgmtAPI.CreateProvisionerRequest) (*mgmt.Provisioner, error) {
+func (c *AdminClient) CreateProvisioner(prov *mgmt.Provisioner) (*mgmt.Provisioner, error) {
 	var retried bool
-	body, err := json.Marshal(req)
+	body, err := json.Marshal(prov)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
@@ -334,11 +334,11 @@ retry:
 		}
 		return nil, readAdminError(resp.Body)
 	}
-	var prov = new(mgmt.Provisioner)
-	if err := readJSON(resp.Body, prov); err != nil {
+	var nuProv = new(mgmt.Provisioner)
+	if err := readJSON(resp.Body, nuProv); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
-	return prov, nil
+	return nuProv, nil
 }
 
 // UpdateProvisioner performs the PUT /admin/provisioners/{id} request to the CA.

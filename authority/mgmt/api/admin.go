@@ -120,8 +120,8 @@ func (h *Handler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteAdmin(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	if h.auth.GetAdminCollection().Count() == 1 {
-		api.WriteError(w, mgmt.NewError(mgmt.ErrorBadRequestType, "cannot remove last admin"))
+	if h.auth.GetAdminCollection().SuperCount() == 1 {
+		api.WriteError(w, mgmt.NewError(mgmt.ErrorBadRequestType, "cannot remove the last super admin"))
 		return
 	}
 

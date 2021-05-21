@@ -12,15 +12,6 @@ import (
 
 type ProvisionerOption func(*ProvisionerCtx)
 
-type ProvisionerCtx struct {
-	JWK                               *jose.JSONWebKey
-	JWE                               *jose.JSONWebEncryption
-	X509Template, SSHTemplate         string
-	X509TemplateData, SSHTemplateData []byte
-	Claims                            *Claims
-	Password                          string
-}
-
 type ProvisionerType string
 
 var (
@@ -34,29 +25,6 @@ var (
 	ProvisionerTypeSSHPOP = ProvisionerType("SSHPOP")
 	ProvisionerTypeX5C    = ProvisionerType("X5C")
 )
-
-func NewProvisionerCtx(opts ...ProvisionerOption) *ProvisionerCtx {
-	pc := &ProvisionerCtx{
-		Claims: NewDefaultClaims(),
-	}
-	for _, o := range opts {
-		o(pc)
-	}
-	return pc
-}
-
-func WithJWK(jwk *jose.JSONWebKey, jwe *jose.JSONWebEncryption) func(*ProvisionerCtx) {
-	return func(ctx *ProvisionerCtx) {
-		ctx.JWK = jwk
-		ctx.JWE = jwe
-	}
-}
-
-func WithPassword(pass string) func(*ProvisionerCtx) {
-	return func(ctx *ProvisionerCtx) {
-		ctx.Password = pass
-	}
-}
 
 type unmarshalProvisioner struct {
 	ID               string          `json:"-"`
@@ -157,6 +125,38 @@ func CreateProvisioner(ctx context.Context, db DB, typ, name string, opts ...Pro
 	return p, nil
 }
 
+type ProvisionerCtx struct {
+	JWK                               *jose.JSONWebKey
+	JWE                               *jose.JSONWebEncryption
+	X509Template, SSHTemplate         string
+	X509TemplateData, SSHTemplateData []byte
+	Claims                            *Claims
+	Password                          string
+}
+
+func NewProvisionerCtx(opts ...ProvisionerOption) *ProvisionerCtx {
+	pc := &ProvisionerCtx{
+		Claims: NewDefaultClaims(),
+	}
+	for _, o := range opts {
+		o(pc)
+	}
+	return pc
+}
+
+func WithJWK(jwk *jose.JSONWebKey, jwe *jose.JSONWebEncryption) func(*ProvisionerCtx) {
+	return func(ctx *ProvisionerCtx) {
+		ctx.JWK = jwk
+		ctx.JWE = jwe
+	}
+}
+
+func WithPassword(pass string) func(*ProvisionerCtx) {
+	return func(ctx *ProvisionerCtx) {
+		ctx.Password = pass
+	}
+}
+
 // ProvisionerDetails is the interface implemented by all provisioner details
 // attributes.
 type ProvisionerDetails interface {
@@ -172,37 +172,61 @@ type ProvisionerDetailsJWK struct {
 
 // ProvisionerDetailsOIDC represents the values required by a OIDC provisioner.
 type ProvisionerDetailsOIDC struct {
-	Type ProvisionerType `json:"type"`
+	Type                  ProvisionerType `json:"type"`
+	ClientID              string          `json:"clientID"`
+	ClientSecret          string          `json:"clientSecret"`
+	ConfigurationEndpoint string          `json:"configurationEndpoint"`
+	Admins                []string        `json:"admins"`
+	Domains               []string        `json:"domains"`
+	Groups                []string        `json:"groups"`
+	ListenAddress         string          `json:"listenAddress"`
+	TenantID              string          `json:"tenantID"`
 }
 
 // ProvisionerDetailsGCP represents the values required by a GCP provisioner.
 type ProvisionerDetailsGCP struct {
-	Type ProvisionerType `json:"type"`
+	Type                   ProvisionerType `json:"type"`
+	ServiceAccounts        []string        `json:"serviceAccounts"`
+	ProjectIDs             []string        `json:"projectIDs"`
+	DisableCustomSANs      bool            `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool            `json:"disableTrustOnFirstUse"`
+	InstanceAge            string          `json:"instanceAge"`
 }
 
 // ProvisionerDetailsAWS represents the values required by a AWS provisioner.
 type ProvisionerDetailsAWS struct {
-	Type ProvisionerType `json:"type"`
+	Type                   ProvisionerType `json:"type"`
+	Accounts               []string        `json:"accounts"`
+	DisableCustomSANs      bool            `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool            `json:"disableTrustOnFirstUse"`
+	InstanceAge            string          `json:"instanceAge"`
 }
 
 // ProvisionerDetailsAzure represents the values required by a Azure provisioner.
 type ProvisionerDetailsAzure struct {
-	Type ProvisionerType `json:"type"`
+	Type                   ProvisionerType `json:"type"`
+	ResourceGroups         []string        `json:"resourceGroups"`
+	Audience               string          `json:"audience"`
+	DisableCustomSANs      bool            `json:"disableCustomSANs"`
+	DisableTrustOnFirstUse bool            `json:"disableTrustOnFirstUse"`
 }
 
 // ProvisionerDetailsACME represents the values required by a ACME provisioner.
 type ProvisionerDetailsACME struct {
-	Type ProvisionerType `json:"type"`
+	Type    ProvisionerType `json:"type"`
+	ForceCN bool            `json:"forceCN"`
 }
 
 // ProvisionerDetailsX5C represents the values required by a X5C provisioner.
 type ProvisionerDetailsX5C struct {
-	Type ProvisionerType `json:"type"`
+	Type  ProvisionerType `json:"type"`
+	Roots []byte          `json:"roots"`
 }
 
 // ProvisionerDetailsK8SSA represents the values required by a K8SSA provisioner.
 type ProvisionerDetailsK8SSA struct {
-	Type ProvisionerType `json:"type"`
+	Type       ProvisionerType `json:"type"`
+	PublicKeys []byte          `json:"publicKeys"`
 }
 
 // ProvisionerDetailsSSHPOP represents the values required by a SSHPOP provisioner.
@@ -250,6 +274,42 @@ func NewProvisionerDetails(typ ProvisionerType, pc *ProvisionerCtx) (Provisioner
 }
 
 func createJWKDetails(pc *ProvisionerCtx) (*ProvisionerDetailsJWK, error) {
+	var err error
+
+	if pc.JWK != nil && pc.JWE == nil {
+		return nil, NewErrorISE("JWE is required with JWK for createJWKProvisioner")
+	}
+	if pc.JWE != nil && pc.JWK == nil {
+		return nil, NewErrorISE("JWK is required with JWE for createJWKProvisioner")
+	}
+	if pc.JWK == nil && pc.JWE == nil {
+		// Create a new JWK w/ encrypted private key.
+		if pc.Password == "" {
+			return nil, NewErrorISE("password is required to provisioner with new keys")
+		}
+		pc.JWK, pc.JWE, err = jose.GenerateDefaultKeyPair([]byte(pc.Password))
+		if err != nil {
+			return nil, WrapErrorISE(err, "error generating JWK key pair")
+		}
+	}
+
+	jwkPubBytes, err := pc.JWK.MarshalJSON()
+	if err != nil {
+		return nil, WrapErrorISE(err, "error marshaling JWK")
+	}
+	jwePrivStr, err := pc.JWE.CompactSerialize()
+	if err != nil {
+		return nil, WrapErrorISE(err, "error serializing JWE")
+	}
+
+	return &ProvisionerDetailsJWK{
+		Type:       ProvisionerTypeJWK,
+		PublicKey:  jwkPubBytes,
+		PrivateKey: jwePrivStr,
+	}, nil
+}
+
+func createACMEDetails(pc *ProvisionerCtx) (*ProvisionerDetailsJWK, error) {
 	var err error
 
 	if pc.JWK != nil && pc.JWE == nil {
@@ -461,6 +521,7 @@ type detailsType struct {
 	Type ProvisionerType
 }
 
+// UnmarshalProvisionerDetails unmarshals bytes into the proper details type.
 func UnmarshalProvisionerDetails(data json.RawMessage) (ProvisionerDetails, error) {
 	dt := new(detailsType)
 	if err := json.Unmarshal(data, dt); err != nil {

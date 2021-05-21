@@ -101,34 +101,17 @@ func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var body CreateProvisionerRequest
-	if err := api.ReadJSON(r.Body, &body); err != nil {
-		api.WriteError(w, err)
-		return
-	}
-	if err := body.Validate(h.auth.GetProvisionerCollection()); err != nil {
+	var prov = new(mgmt.Provisioner)
+	if err := api.ReadJSON(r.Body, prov); err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
-	details, err := mgmt.UnmarshalProvisionerDetails(body.Details)
-	if err != nil {
-		api.WriteError(w, mgmt.WrapErrorISE(err, "error unmarshaling provisioner details"))
-		return
-	}
+	// TODO: validate
 
-	claims := mgmt.NewDefaultClaims()
+	// TODO: fix this
+	prov.Claims = mgmt.NewDefaultClaims()
 
-	prov := &mgmt.Provisioner{
-		Type:             body.Type,
-		Name:             body.Name,
-		Claims:           claims,
-		Details:          details,
-		X509Template:     body.X509Template,
-		X509TemplateData: body.X509TemplateData,
-		SSHTemplate:      body.SSHTemplate,
-		SSHTemplateData:  body.SSHTemplateData,
-	}
 	if err := h.db.CreateProvisioner(ctx, prov); err != nil {
 		api.WriteError(w, err)
 		return
@@ -144,21 +127,20 @@ func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 
-	c := h.auth.GetAdminCollection()
-	fmt.Printf("c.Count() = %+v\n", c.Count())
-	fmt.Printf("c.CountByProvisioner() = %+v\n", c.CountByProvisioner(name))
-	if c.Count() == c.CountByProvisioner(name) {
-		api.WriteError(w, mgmt.NewError(mgmt.ErrorBadRequestType,
-			"cannot remove provisioner %s because no admins will remain", name))
-		return
-	}
-
-	ctx := r.Context()
 	p, ok := h.auth.GetProvisionerCollection().LoadByName(name)
 	if !ok {
 		api.WriteError(w, mgmt.NewError(mgmt.ErrorNotFoundType, "provisioner %s not found", name))
 		return
 	}
+
+	c := h.auth.GetAdminCollection()
+	if c.SuperCount() == c.SuperCountByProvisioner(name) {
+		api.WriteError(w, mgmt.NewError(mgmt.ErrorBadRequestType,
+			"cannot remove provisioner %s because no super admins will remain", name))
+		return
+	}
+
+	ctx := r.Context()
 	prov, err := h.db.GetProvisioner(ctx, p.GetID())
 	if err != nil {
 		api.WriteError(w, mgmt.WrapErrorISE(err, "error loading provisioner %s from db", name))
