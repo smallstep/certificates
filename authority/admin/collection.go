@@ -32,24 +32,24 @@ func (p adminSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // Collection is a memory map of admins.
 type Collection struct {
-	byID               *sync.Map
-	bySubProv          *sync.Map
-	byProv             *sync.Map
-	sorted             adminSlice
-	provisioners       *provisioner.Collection
-	count              int
-	countByProvisioner map[string]int
+	byID                    *sync.Map
+	bySubProv               *sync.Map
+	byProv                  *sync.Map
+	sorted                  adminSlice
+	provisioners            *provisioner.Collection
+	superCount              int
+	superCountByProvisioner map[string]int
 }
 
 // NewCollection initializes a collection of provisioners. The given list of
 // audiences are the audiences used by the JWT provisioner.
 func NewCollection(provisioners *provisioner.Collection) *Collection {
 	return &Collection{
-		byID:               new(sync.Map),
-		byProv:             new(sync.Map),
-		bySubProv:          new(sync.Map),
-		countByProvisioner: map[string]int{},
-		provisioners:       provisioners,
+		byID:                    new(sync.Map),
+		byProv:                  new(sync.Map),
+		bySubProv:               new(sync.Map),
+		superCountByProvisioner: map[string]int{},
+		provisioners:            provisioners,
 	}
 }
 
@@ -106,12 +106,12 @@ func (c *Collection) Store(adm *Admin) error {
 
 	if admins, ok := c.LoadByProvisioner(provName); ok {
 		c.byProv.Store(provName, append(admins, adm))
-		c.countByProvisioner[provName]++
+		c.superCountByProvisioner[provName]++
 	} else {
 		c.byProv.Store(provName, []*Admin{adm})
-		c.countByProvisioner[provName] = 1
+		c.superCountByProvisioner[provName] = 1
 	}
-	c.count++
+	c.superCount++
 
 	// Store sorted admins.
 	// Use the first 4 bytes (32bit) of the sum to insert the order
@@ -131,14 +131,14 @@ func (c *Collection) Store(adm *Admin) error {
 	return nil
 }
 
-// Count returns the total number of admins.
-func (c *Collection) Count() int {
-	return c.count
+// SuperCount returns the total number of admins.
+func (c *Collection) SuperCount() int {
+	return c.superCount
 }
 
-// CountByProvisioner returns the total number of admins.
-func (c *Collection) CountByProvisioner(provName string) int {
-	if cnt, ok := c.countByProvisioner[provName]; ok {
+// SuperCountByProvisioner returns the total number of admins.
+func (c *Collection) SuperCountByProvisioner(provName string) int {
+	if cnt, ok := c.superCountByProvisioner[provName]; ok {
 		return cnt
 	}
 	return 0
