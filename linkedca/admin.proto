@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package linkedca;
+
+option go_package = "github.com/smallstep/certificates/linkedca";
+
+message Admin {
+    enum Type {
+        UNKNOWN = 0;
+        ADMIN = 1;
+        SUPER_ADMIN = 2;
+    }
+    string id = 1;
+    string authority_id = 2;
+    string subject = 3;
+    string provisioner_id = 4;
+    Type type = 5;
+}
