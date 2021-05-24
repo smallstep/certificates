@@ -1,21 +1,8 @@
 syntax = "proto3";
 
-package majordomo;
+package linkedca;
 
-option go_package = "github.com/smallstep/certificates/majordomo";
-
-message Administrator {
-    enum Type {
-        UNKNOWN = 0;
-        ADMIN = 1;
-        SUPER_ADMIN = 2;
-    }
-    string id = 1;
-    string authority_id = 2;
-    string subject = 3;
-    string provisioner_id = 4;
-    Type type = 5;
-}
+option go_package = "github.com/smallstep/certificates/linkedca";
 
 message Provisioner {
     enum Type {
