@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/linkedca"
 )
 
 // DefaultAdminLimit is the default limit for listing provisioners.
@@ -20,7 +21,7 @@ const DefaultAdminLimit = 20
 const DefaultAdminMax = 100
 
 type uidAdmin struct {
-	admin *Admin
+	admin *linkedca.Admin
 	uid   string
 }
 
@@ -54,7 +55,7 @@ func NewCollection(provisioners *provisioner.Collection) *Collection {
 }
 
 // LoadByID a admin by the ID.
-func (c *Collection) LoadByID(id string) (*Admin, bool) {
+func (c *Collection) LoadByID(id string) (*linkedca.Admin, bool) {
 	return loadAdmin(c.byID, id)
 }
 
@@ -66,17 +67,17 @@ func subProvNameHash(sub, provName string) string {
 }
 
 // LoadBySubProv a admin by the subject and provisioner name.
-func (c *Collection) LoadBySubProv(sub, provName string) (*Admin, bool) {
+func (c *Collection) LoadBySubProv(sub, provName string) (*linkedca.Admin, bool) {
 	return loadAdmin(c.bySubProv, subProvNameHash(sub, provName))
 }
 
 // LoadByProvisioner a admin by the subject and provisioner name.
-func (c *Collection) LoadByProvisioner(provName string) ([]*Admin, bool) {
+func (c *Collection) LoadByProvisioner(provName string) ([]*linkedca.Admin, bool) {
 	a, ok := c.byProv.Load(provName)
 	if !ok {
 		return nil, false
 	}
-	admins, ok := a.([]*Admin)
+	admins, ok := a.([]*linkedca.Admin)
 	if !ok {
 		return nil, false
 	}
@@ -85,22 +86,20 @@ func (c *Collection) LoadByProvisioner(provName string) ([]*Admin, bool) {
 
 // Store adds an admin to the collection and enforces the uniqueness of
 // admin IDs and amdin subject <-> provisioner name combos.
-func (c *Collection) Store(adm *Admin) error {
-	p, ok := c.provisioners.Load(adm.ProvisionerID)
+func (c *Collection) Store(adm *linkedca.Admin) error {
+	p, ok := c.provisioners.Load(adm.ProvisionerId)
 	if !ok {
-		return fmt.Errorf("provisioner %s not found", adm.ProvisionerID)
+		return fmt.Errorf("provisioner %s not found", adm.ProvisionerId)
 	}
-	adm.ProvisionerName = p.GetName()
-	adm.ProvisionerType = p.GetType().String()
 	// Store admin always in byID. ID must be unique.
-	if _, loaded := c.byID.LoadOrStore(adm.ID, adm); loaded {
+	if _, loaded := c.byID.LoadOrStore(adm.Id, adm); loaded {
 		return errors.New("cannot add multiple admins with the same id")
 	}
 
-	provName := adm.ProvisionerName
-	// Store admin alwasy in bySubProv. Subject <-> ProvisionerName must be unique.
+	provName := p.GetName()
+	// Store admin always in bySubProv. Subject <-> ProvisionerName must be unique.
 	if _, loaded := c.bySubProv.LoadOrStore(subProvNameHash(adm.Subject, provName), adm); loaded {
-		c.byID.Delete(adm.ID)
+		c.byID.Delete(adm.Id)
 		return errors.New("cannot add multiple admins with the same subject and provisioner")
 	}
 
@@ -108,7 +107,7 @@ func (c *Collection) Store(adm *Admin) error {
 		c.byProv.Store(provName, append(admins, adm))
 		c.superCountByProvisioner[provName]++
 	} else {
-		c.byProv.Store(provName, []*Admin{adm})
+		c.byProv.Store(provName, []*linkedca.Admin{adm})
 		c.superCountByProvisioner[provName] = 1
 	}
 	c.superCount++
@@ -118,7 +117,7 @@ func (c *Collection) Store(adm *Admin) error {
 	// Using big endian format to get the strings sorted:
 	// 0x00000000, 0x00000001, 0x00000002, ...
 	bi := make([]byte, 4)
-	_sum := sha1.Sum([]byte(adm.ID))
+	_sum := sha1.Sum([]byte(adm.Id))
 	sum := _sum[:]
 	binary.BigEndian.PutUint32(bi, uint32(c.sorted.Len()))
 	sum[0], sum[1], sum[2], sum[3] = bi[0], bi[1], bi[2], bi[3]
@@ -145,7 +144,7 @@ func (c *Collection) SuperCountByProvisioner(provName string) int {
 }
 
 // Find implements pagination on a list of sorted provisioners.
-func (c *Collection) Find(cursor string, limit int) ([]*Admin, string) {
+func (c *Collection) Find(cursor string, limit int) ([]*linkedca.Admin, string) {
 	switch {
 	case limit <= 0:
 		limit = DefaultAdminLimit
@@ -157,7 +156,7 @@ func (c *Collection) Find(cursor string, limit int) ([]*Admin, string) {
 	cursor = fmt.Sprintf("%040s", cursor)
 	i := sort.Search(n, func(i int) bool { return c.sorted[i].uid >= cursor })
 
-	slice := []*Admin{}
+	slice := []*linkedca.Admin{}
 	for ; i < n && len(slice) < limit; i++ {
 		slice = append(slice, c.sorted[i].admin)
 	}
@@ -168,12 +167,12 @@ func (c *Collection) Find(cursor string, limit int) ([]*Admin, string) {
 	return slice, ""
 }
 
-func loadAdmin(m *sync.Map, key string) (*Admin, bool) {
+func loadAdmin(m *sync.Map, key string) (*linkedca.Admin, bool) {
 	a, ok := m.Load(key)
 	if !ok {
 		return nil, false
 	}
-	adm, ok := a.(*Admin)
+	adm, ok := a.(*linkedca.Admin)
 	if !ok {
 		return nil, false
 	}

@@ -1,9 +1,6 @@
 package mgmt
 
 import (
-	"context"
-
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/config"
 )
 
@@ -66,19 +63,7 @@ func NewDefaultClaims() *Claims {
 	}
 }
 
-type AuthorityOption func(*AuthConfig) error
-
-func WithDefaultAuthorityID(ac *AuthConfig) error {
-	ac.ID = DefaultAuthorityID
-	return nil
-}
-
-func CreateDefaultAuthority(ctx context.Context, db DB) (*AuthConfig, error) {
-	options := []AuthorityOption{WithDefaultAuthorityID}
-
-	return CreateAuthority(ctx, db, options...)
-}
-
+/*
 func CreateAuthority(ctx context.Context, db DB, options ...AuthorityOption) (*AuthConfig, error) {
 	ac := NewDefaultAuthConfig()
 
@@ -116,3 +101,4 @@ func CreateAuthority(ctx context.Context, db DB, options ...AuthorityOption) (*A
 
 	return ac, nil
 }
+*/
