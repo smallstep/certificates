@@ -1,31 +1,15 @@
 package mgmt
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/authority/status"
+	"github.com/smallstep/certificates/linkedca"
 	"go.step.sm/crypto/jose"
 )
 
-type ProvisionerOption func(*ProvisionerCtx)
-
-type ProvisionerType string
-
-var (
-	ProvisionerTypeACME   = ProvisionerType("ACME")
-	ProvisionerTypeAWS    = ProvisionerType("AWS")
-	ProvisionerTypeAZURE  = ProvisionerType("AZURE")
-	ProvisionerTypeGCP    = ProvisionerType("GCP")
-	ProvisionerTypeJWK    = ProvisionerType("JWK")
-	ProvisionerTypeK8SSA  = ProvisionerType("K8SSA")
-	ProvisionerTypeOIDC   = ProvisionerType("OIDC")
-	ProvisionerTypeSSHPOP = ProvisionerType("SSHPOP")
-	ProvisionerTypeX5C    = ProvisionerType("X5C")
-)
-
+/*
 type unmarshalProvisioner struct {
 	ID               string          `json:"-"`
 	AuthorityID      string          `json:"-"`
@@ -40,23 +24,8 @@ type unmarshalProvisioner struct {
 	Status           status.Type     `json:"status"`
 }
 
-// Provisioner type.
-type Provisioner struct {
-	ID               string             `json:"-"`
-	AuthorityID      string             `json:"-"`
-	Type             string             `json:"type"`
-	Name             string             `json:"name"`
-	Claims           *Claims            `json:"claims"`
-	Details          ProvisionerDetails `json:"details"`
-	X509Template     string             `json:"x509Template"`
-	X509TemplateData []byte             `json:"x509TemplateData"`
-	SSHTemplate      string             `json:"sshTemplate"`
-	SSHTemplateData  []byte             `json:"sshTemplateData"`
-	Status           status.Type        `json:"status"`
-}
-
 type typ struct {
-	Type ProvisionerType `json:"type"`
+	Type linkedca.Provisioner_Type `json:"type"`
 }
 
 // UnmarshalJSON implements the Unmarshal interface.
@@ -86,287 +55,48 @@ func (p *Provisioner) UnmarshalJSON(b []byte) error {
 
 	return nil
 }
+*/
 
-func (p *Provisioner) GetOptions() *provisioner.Options {
+func provisionerGetOptions(p *linkedca.Provisioner) *provisioner.Options {
 	return &provisioner.Options{
 		X509: &provisioner.X509Options{
-			Template:     p.X509Template,
+			Template:     string(p.X509Template),
 			TemplateData: p.X509TemplateData,
 		},
 		SSH: &provisioner.SSHOptions{
-			Template:     p.SSHTemplate,
-			TemplateData: p.SSHTemplateData,
+			Template:     string(p.SshTemplate),
+			TemplateData: p.SshTemplateData,
 		},
 	}
 }
 
-func CreateProvisioner(ctx context.Context, db DB, typ, name string, opts ...ProvisionerOption) (*Provisioner, error) {
-	pc := NewProvisionerCtx(opts...)
-	details, err := NewProvisionerDetails(ProvisionerType(typ), pc)
-	if err != nil {
-		return nil, err
-	}
-
-	p := &Provisioner{
-		Type:             typ,
-		Name:             name,
-		Claims:           pc.Claims,
-		Details:          details,
-		X509Template:     pc.X509Template,
-		X509TemplateData: pc.X509TemplateData,
-		SSHTemplate:      pc.SSHTemplate,
-		SSHTemplateData:  pc.SSHTemplateData,
-		Status:           status.Active,
-	}
-
-	if err := db.CreateProvisioner(ctx, p); err != nil {
-		return nil, WrapErrorISE(err, "error creating provisioner")
-	}
-	return p, nil
-}
-
-type ProvisionerCtx struct {
-	JWK                               *jose.JSONWebKey
-	JWE                               *jose.JSONWebEncryption
-	X509Template, SSHTemplate         string
-	X509TemplateData, SSHTemplateData []byte
-	Claims                            *Claims
-	Password                          string
-}
-
-func NewProvisionerCtx(opts ...ProvisionerOption) *ProvisionerCtx {
-	pc := &ProvisionerCtx{
-		Claims: NewDefaultClaims(),
-	}
-	for _, o := range opts {
-		o(pc)
-	}
-	return pc
-}
-
-func WithJWK(jwk *jose.JSONWebKey, jwe *jose.JSONWebEncryption) func(*ProvisionerCtx) {
-	return func(ctx *ProvisionerCtx) {
-		ctx.JWK = jwk
-		ctx.JWE = jwe
-	}
-}
-
-func WithPassword(pass string) func(*ProvisionerCtx) {
-	return func(ctx *ProvisionerCtx) {
-		ctx.Password = pass
-	}
-}
-
-// ProvisionerDetails is the interface implemented by all provisioner details
-// attributes.
-type ProvisionerDetails interface {
-	isProvisionerDetails()
-}
-
-// ProvisionerDetailsJWK represents the values required by a JWK provisioner.
-type ProvisionerDetailsJWK struct {
-	Type       ProvisionerType `json:"type"`
-	PublicKey  []byte          `json:"publicKey"`
-	PrivateKey string          `json:"PrivateKey"`
-}
-
-// ProvisionerDetailsOIDC represents the values required by a OIDC provisioner.
-type ProvisionerDetailsOIDC struct {
-	Type                  ProvisionerType `json:"type"`
-	ClientID              string          `json:"clientID"`
-	ClientSecret          string          `json:"clientSecret"`
-	ConfigurationEndpoint string          `json:"configurationEndpoint"`
-	Admins                []string        `json:"admins"`
-	Domains               []string        `json:"domains"`
-	Groups                []string        `json:"groups"`
-	ListenAddress         string          `json:"listenAddress"`
-	TenantID              string          `json:"tenantID"`
-}
-
-// ProvisionerDetailsGCP represents the values required by a GCP provisioner.
-type ProvisionerDetailsGCP struct {
-	Type                   ProvisionerType `json:"type"`
-	ServiceAccounts        []string        `json:"serviceAccounts"`
-	ProjectIDs             []string        `json:"projectIDs"`
-	DisableCustomSANs      bool            `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool            `json:"disableTrustOnFirstUse"`
-	InstanceAge            string          `json:"instanceAge"`
-}
-
-// ProvisionerDetailsAWS represents the values required by a AWS provisioner.
-type ProvisionerDetailsAWS struct {
-	Type                   ProvisionerType `json:"type"`
-	Accounts               []string        `json:"accounts"`
-	DisableCustomSANs      bool            `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool            `json:"disableTrustOnFirstUse"`
-	InstanceAge            string          `json:"instanceAge"`
-}
-
-// ProvisionerDetailsAzure represents the values required by a Azure provisioner.
-type ProvisionerDetailsAzure struct {
-	Type                   ProvisionerType `json:"type"`
-	ResourceGroups         []string        `json:"resourceGroups"`
-	Audience               string          `json:"audience"`
-	DisableCustomSANs      bool            `json:"disableCustomSANs"`
-	DisableTrustOnFirstUse bool            `json:"disableTrustOnFirstUse"`
-}
-
-// ProvisionerDetailsACME represents the values required by a ACME provisioner.
-type ProvisionerDetailsACME struct {
-	Type    ProvisionerType `json:"type"`
-	ForceCN bool            `json:"forceCN"`
-}
-
-// ProvisionerDetailsX5C represents the values required by a X5C provisioner.
-type ProvisionerDetailsX5C struct {
-	Type  ProvisionerType `json:"type"`
-	Roots []byte          `json:"roots"`
-}
-
-// ProvisionerDetailsK8SSA represents the values required by a K8SSA provisioner.
-type ProvisionerDetailsK8SSA struct {
-	Type       ProvisionerType `json:"type"`
-	PublicKeys []byte          `json:"publicKeys"`
-}
-
-// ProvisionerDetailsSSHPOP represents the values required by a SSHPOP provisioner.
-type ProvisionerDetailsSSHPOP struct {
-	Type ProvisionerType `json:"type"`
-}
-
-func (*ProvisionerDetailsJWK) isProvisionerDetails() {}
-
-func (*ProvisionerDetailsOIDC) isProvisionerDetails() {}
-
-func (*ProvisionerDetailsGCP) isProvisionerDetails() {}
-
-func (*ProvisionerDetailsAWS) isProvisionerDetails() {}
-
-func (*ProvisionerDetailsAzure) isProvisionerDetails() {}
-
-func (*ProvisionerDetailsACME) isProvisionerDetails() {}
-
-func (*ProvisionerDetailsX5C) isProvisionerDetails() {}
-
-func (*ProvisionerDetailsK8SSA) isProvisionerDetails() {}
-
-func (*ProvisionerDetailsSSHPOP) isProvisionerDetails() {}
-
-func NewProvisionerDetails(typ ProvisionerType, pc *ProvisionerCtx) (ProvisionerDetails, error) {
-	switch typ {
-	case ProvisionerTypeJWK:
-		return createJWKDetails(pc)
-		/*
-			case ProvisionerTypeOIDC:
-				return createOIDCDetails(pc)
-			case ProvisionerTypeACME:
-				return createACMEDetails(pc)
-			case ProvisionerTypeK8SSA:
-				return createK8SSADetails(pc)
-			case ProvisionerTypeSSHPOP:
-				return createSSHPOPDetails(pc)
-			case ProvisionerTypeX5C:
-				return createSSHPOPDetails(pc)
-		*/
-	default:
-		return nil, NewErrorISE("unsupported provisioner type %s", typ)
-	}
-}
-
-func createJWKDetails(pc *ProvisionerCtx) (*ProvisionerDetailsJWK, error) {
-	var err error
-
-	if pc.JWK != nil && pc.JWE == nil {
-		return nil, NewErrorISE("JWE is required with JWK for createJWKProvisioner")
-	}
-	if pc.JWE != nil && pc.JWK == nil {
-		return nil, NewErrorISE("JWK is required with JWE for createJWKProvisioner")
-	}
-	if pc.JWK == nil && pc.JWE == nil {
-		// Create a new JWK w/ encrypted private key.
-		if pc.Password == "" {
-			return nil, NewErrorISE("password is required to provisioner with new keys")
-		}
-		pc.JWK, pc.JWE, err = jose.GenerateDefaultKeyPair([]byte(pc.Password))
-		if err != nil {
-			return nil, WrapErrorISE(err, "error generating JWK key pair")
-		}
-	}
-
-	jwkPubBytes, err := pc.JWK.MarshalJSON()
-	if err != nil {
-		return nil, WrapErrorISE(err, "error marshaling JWK")
-	}
-	jwePrivStr, err := pc.JWE.CompactSerialize()
-	if err != nil {
-		return nil, WrapErrorISE(err, "error serializing JWE")
-	}
-
-	return &ProvisionerDetailsJWK{
-		Type:       ProvisionerTypeJWK,
-		PublicKey:  jwkPubBytes,
-		PrivateKey: jwePrivStr,
-	}, nil
-}
-
-func createACMEDetails(pc *ProvisionerCtx) (*ProvisionerDetailsJWK, error) {
-	var err error
-
-	if pc.JWK != nil && pc.JWE == nil {
-		return nil, NewErrorISE("JWE is required with JWK for createJWKProvisioner")
-	}
-	if pc.JWE != nil && pc.JWK == nil {
-		return nil, NewErrorISE("JWK is required with JWE for createJWKProvisioner")
-	}
-	if pc.JWK == nil && pc.JWE == nil {
-		// Create a new JWK w/ encrypted private key.
-		if pc.Password == "" {
-			return nil, NewErrorISE("password is required to provisioner with new keys")
-		}
-		pc.JWK, pc.JWE, err = jose.GenerateDefaultKeyPair([]byte(pc.Password))
-		if err != nil {
-			return nil, WrapErrorISE(err, "error generating JWK key pair")
-		}
-	}
-
-	jwkPubBytes, err := pc.JWK.MarshalJSON()
-	if err != nil {
-		return nil, WrapErrorISE(err, "error marshaling JWK")
-	}
-	jwePrivStr, err := pc.JWE.CompactSerialize()
-	if err != nil {
-		return nil, WrapErrorISE(err, "error serializing JWE")
-	}
-
-	return &ProvisionerDetailsJWK{
-		Type:       ProvisionerTypeJWK,
-		PublicKey:  jwkPubBytes,
-		PrivateKey: jwePrivStr,
-	}, nil
-}
-
-// ToCertificates converts the landlord provisioner type to the open source
+// provisionerToCertificates converts the landlord provisioner type to the open source
 // provisioner type.
-func (p *Provisioner) ToCertificates() (provisioner.Interface, error) {
-	claims, err := p.Claims.ToCertificates()
+func provisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, error) {
+	claims, err := claimsToCertificates(p.Claims)
 	if err != nil {
 		return nil, err
 	}
 
-	switch details := p.Details.(type) {
-	case *ProvisionerDetailsJWK:
+	details := p.Details.GetData()
+	if details == nil {
+		return nil, fmt.Errorf("provisioner does not have any details")
+	}
+
+	switch d := details.(type) {
+	case *linkedca.ProvisionerDetails_JWK:
 		jwk := new(jose.JSONWebKey)
-		if err := json.Unmarshal(details.PublicKey, &jwk); err != nil {
+		if err := json.Unmarshal(d.JWK.PublicKey, &jwk); err != nil {
 			return nil, err
 		}
 		return &provisioner.JWK{
-			ID:           p.ID,
-			Type:         p.Type,
+			ID:           p.Id,
+			Type:         p.Type.String(),
 			Name:         p.Name,
 			Key:          jwk,
-			EncryptedKey: details.PrivateKey,
+			EncryptedKey: string(d.JWK.EncryptedPrivateKey),
 			Claims:       claims,
-			Options:      p.GetOptions(),
+			Options:      provisionerGetOptions(p),
 		}, nil
 		/*
 			case *ProvisionerDetails_OIDC:
@@ -478,9 +208,9 @@ func (p *Provisioner) ToCertificates() (provisioner.Interface, error) {
 	}
 }
 
-// ToCertificates converts the landlord provisioner claims type to the open source
+// claimsToCertificates converts the landlord provisioner claims type to the open source
 // (step-ca) claims type.
-func (c *Claims) ToCertificates() (*provisioner.Claims, error) {
+func claimsToCertificates(c *linkedca.Claims) (*provisioner.Claims, error) {
 	var durs = map[string]struct {
 		durStr string
 		dur    *provisioner.Duration
@@ -488,12 +218,12 @@ func (c *Claims) ToCertificates() (*provisioner.Claims, error) {
 		"minTLSDur":         {durStr: c.X509.Durations.Min},
 		"maxTLSDur":         {durStr: c.X509.Durations.Max},
 		"defaultTLSDur":     {durStr: c.X509.Durations.Default},
-		"minSSHUserDur":     {durStr: c.SSH.UserDurations.Min},
-		"maxSSHUserDur":     {durStr: c.SSH.UserDurations.Max},
-		"defaultSSHUserDur": {durStr: c.SSH.UserDurations.Default},
-		"minSSHHostDur":     {durStr: c.SSH.HostDurations.Min},
-		"maxSSHHostDur":     {durStr: c.SSH.HostDurations.Max},
-		"defaultSSHHostDur": {durStr: c.SSH.HostDurations.Default},
+		"minSSHUserDur":     {durStr: c.Ssh.UserDurations.Min},
+		"maxSSHUserDur":     {durStr: c.Ssh.UserDurations.Max},
+		"defaultSSHUserDur": {durStr: c.Ssh.UserDurations.Default},
+		"minSSHHostDur":     {durStr: c.Ssh.HostDurations.Min},
+		"maxSSHHostDur":     {durStr: c.Ssh.HostDurations.Max},
+		"defaultSSHHostDur": {durStr: c.Ssh.HostDurations.Default},
 	}
 	var err error
 	for k, v := range durs {
@@ -513,10 +243,11 @@ func (c *Claims) ToCertificates() (*provisioner.Claims, error) {
 		MinHostSSHDur:     durs["minSSHHostDur"].dur,
 		MaxHostSSHDur:     durs["maxSSHHostDur"].dur,
 		DefaultHostSSHDur: durs["defaultSSHHostDur"].dur,
-		EnableSSHCA:       &c.SSH.Enabled,
+		EnableSSHCA:       &c.Ssh.Enabled,
 	}, nil
 }
 
+/*
 type detailsType struct {
 	Type ProvisionerType
 }
@@ -557,3 +288,4 @@ func UnmarshalProvisionerDetails(data json.RawMessage) (ProvisionerDetails, erro
 	}
 	return v, nil
 }
+*/
