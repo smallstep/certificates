@@ -6,21 +6,20 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/mgmt"
-	"github.com/smallstep/certificates/authority/status"
+	"github.com/smallstep/certificates/linkedca"
 	"github.com/smallstep/nosql"
 )
 
 // dbAdmin is the database representation of the Admin type.
 type dbAdmin struct {
-	ID            string     `json:"id"`
-	AuthorityID   string     `json:"authorityID"`
-	ProvisionerID string     `json:"provisionerID"`
-	Subject       string     `json:"subject"`
-	Type          admin.Type `json:"type"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	DeletedAt     time.Time  `json:"deletedAt"`
+	ID            string              `json:"id"`
+	AuthorityID   string              `json:"authorityID"`
+	ProvisionerID string              `json:"provisionerID"`
+	Subject       string              `json:"subject"`
+	Type          linkedca.Admin_Type `json:"type"`
+	CreatedAt     time.Time           `json:"createdAt"`
+	DeletedAt     time.Time           `json:"deletedAt"`
 }
 
 func (dbp *dbAdmin) clone() *dbAdmin {
@@ -59,30 +58,28 @@ func unmarshalDBAdmin(data []byte, id string) (*dbAdmin, error) {
 	if err := json.Unmarshal(data, dba); err != nil {
 		return nil, errors.Wrapf(err, "error unmarshaling admin %s into dbAdmin", id)
 	}
+	if !dba.DeletedAt.IsZero() {
+		return nil, mgmt.NewError(mgmt.ErrorDeletedType, "admin %s is deleted", id)
+	}
 	return dba, nil
 }
 
-func unmarshalAdmin(data []byte, id string) (*mgmt.Admin, error) {
-	var dba = new(dbAdmin)
-	if err := json.Unmarshal(data, dba); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling admin %s into dbAdmin", id)
+func unmarshalAdmin(data []byte, id string) (*linkedca.Admin, error) {
+	dba, err := unmarshalDBAdmin(data, id)
+	if err != nil {
+		return nil, err
 	}
-	adm := &mgmt.Admin{
-		ID:            dba.ID,
-		AuthorityID:   dba.AuthorityID,
-		ProvisionerID: dba.ProvisionerID,
+	return &linkedca.Admin{
+		Id:            dba.ID,
+		AuthorityId:   dba.AuthorityID,
+		ProvisionerId: dba.ProvisionerID,
 		Subject:       dba.Subject,
 		Type:          dba.Type,
-		Status:        status.Active,
-	}
-	if !dba.DeletedAt.IsZero() {
-		adm.Status = status.Deleted
-	}
-	return adm, nil
+	}, nil
 }
 
 // GetAdmin retrieves and unmarshals a admin from the database.
-func (db *DB) GetAdmin(ctx context.Context, id string) (*mgmt.Admin, error) {
+func (db *DB) GetAdmin(ctx context.Context, id string) (*linkedca.Admin, error) {
 	data, err := db.getDBAdminBytes(ctx, id)
 	if err != nil {
 		return nil, err
@@ -91,12 +88,9 @@ func (db *DB) GetAdmin(ctx context.Context, id string) (*mgmt.Admin, error) {
 	if err != nil {
 		return nil, err
 	}
-	if adm.Status == status.Deleted {
-		return nil, mgmt.NewError(mgmt.ErrorDeletedType, "admin %s is deleted", adm.ID)
-	}
-	if adm.AuthorityID != db.authorityID {
+	if adm.AuthorityId != db.authorityID {
 		return nil, mgmt.NewError(mgmt.ErrorAuthorityMismatchType,
-			"admin %s is not owned by authority %s", adm.ID, db.authorityID)
+			"admin %s is not owned by authority %s", adm.Id, db.authorityID)
 	}
 
 	return adm, nil
@@ -105,21 +99,18 @@ func (db *DB) GetAdmin(ctx context.Context, id string) (*mgmt.Admin, error) {
 // GetAdmins retrieves and unmarshals all active (not deleted) admins
 // from the database.
 // TODO should we be paginating?
-func (db *DB) GetAdmins(ctx context.Context) ([]*mgmt.Admin, error) {
+func (db *DB) GetAdmins(ctx context.Context) ([]*linkedca.Admin, error) {
 	dbEntries, err := db.db.List(authorityAdminsTable)
 	if err != nil {
 		return nil, errors.Wrap(err, "error loading admins")
 	}
-	var admins = []*mgmt.Admin{}
+	var admins = []*linkedca.Admin{}
 	for _, entry := range dbEntries {
 		adm, err := unmarshalAdmin(entry.Value, string(entry.Key))
 		if err != nil {
 			return nil, err
 		}
-		if adm.Status == status.Deleted {
-			continue
-		}
-		if adm.AuthorityID != db.authorityID {
+		if adm.AuthorityId != db.authorityID {
 			continue
 		}
 		admins = append(admins, adm)
@@ -128,18 +119,18 @@ func (db *DB) GetAdmins(ctx context.Context) ([]*mgmt.Admin, error) {
 }
 
 // CreateAdmin stores a new admin to the database.
-func (db *DB) CreateAdmin(ctx context.Context, adm *mgmt.Admin) error {
+func (db *DB) CreateAdmin(ctx context.Context, adm *linkedca.Admin) error {
 	var err error
-	adm.ID, err = randID()
+	adm.Id, err = randID()
 	if err != nil {
 		return mgmt.WrapErrorISE(err, "error generating random id for admin")
 	}
-	adm.AuthorityID = db.authorityID
+	adm.AuthorityId = db.authorityID
 
 	dba := &dbAdmin{
-		ID:            adm.ID,
+		ID:            adm.Id,
 		AuthorityID:   db.authorityID,
-		ProvisionerID: adm.ProvisionerID,
+		ProvisionerID: adm.ProvisionerId,
 		Subject:       adm.Subject,
 		Type:          adm.Type,
 		CreatedAt:     clock.Now(),
@@ -149,19 +140,27 @@ func (db *DB) CreateAdmin(ctx context.Context, adm *mgmt.Admin) error {
 }
 
 // UpdateAdmin saves an updated admin to the database.
-func (db *DB) UpdateAdmin(ctx context.Context, adm *mgmt.Admin) error {
-	old, err := db.getDBAdmin(ctx, adm.ID)
+func (db *DB) UpdateAdmin(ctx context.Context, adm *linkedca.Admin) error {
+	old, err := db.getDBAdmin(ctx, adm.Id)
 	if err != nil {
 		return err
 	}
 
 	nu := old.clone()
-
-	// If the admin was active but is now deleted ...
-	if old.DeletedAt.IsZero() && adm.Status == status.Deleted {
-		nu.DeletedAt = clock.Now()
-	}
 	nu.Type = adm.Type
+
+	return db.save(ctx, old.ID, nu, old, "admin", authorityAdminsTable)
+}
+
+// DeleteAdmin saves an updated admin to the database.
+func (db *DB) DeleteAdmin(ctx context.Context, id string) error {
+	old, err := db.getDBAdmin(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	nu := old.clone()
+	nu.DeletedAt = clock.Now()
 
 	return db.save(ctx, old.ID, nu, old, "admin", authorityAdminsTable)
 }
