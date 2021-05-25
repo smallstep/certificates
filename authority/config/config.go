@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 	cas "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	kms "github.com/smallstep/certificates/kms/apiv1"
+	"github.com/smallstep/certificates/linkedca"
 	"github.com/smallstep/certificates/templates"
 )
 
@@ -97,7 +97,7 @@ type AuthConfig struct {
 	*cas.Options
 	AuthorityID          string                `json:"authorityID,omitempty"`
 	Provisioners         provisioner.List      `json:"provisioners"`
-	Admins               []*admin.Admin        `json:"-"`
+	Admins               []*linkedca.Admin     `json:"-"`
 	Template             *ASN1DN               `json:"template,omitempty"`
 	Claims               *provisioner.Claims   `json:"claims,omitempty"`
 	DisableIssuedAtCheck bool                  `json:"disableIssuedAtCheck,omitempty"`

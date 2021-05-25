@@ -2,6 +2,7 @@ package mgmt
 
 import (
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/linkedca"
 )
 
 const (
@@ -11,49 +12,22 @@ const (
 	DefaultAuthorityID = "00000000-0000-0000-0000-000000000000"
 )
 
-// Claims encapsulates all x509 and ssh claims applied to the authority
-// configuration. E.g. maxTLSCertDuration, defaultSSHCertDuration, etc.
-type Claims struct {
-	X509           *X509Claims `json:"x509Claims"`
-	SSH            *SSHClaims  `json:"sshClaims"`
-	DisableRenewal bool        `json:"disableRenewal"`
-}
-
-// X509Claims are the x509 claims applied to the authority.
-type X509Claims struct {
-	Durations *Durations `json:"durations"`
-}
-
-// SSHClaims are the ssh claims applied to the authority.
-type SSHClaims struct {
-	Enabled       bool       `json:"enabled"`
-	UserDurations *Durations `json:"userDurations"`
-	HostDurations *Durations `json:"hostDurations"`
-}
-
-// Durations represents min, max, default, duration.
-type Durations struct {
-	Min     string `json:"min"`
-	Max     string `json:"max"`
-	Default string `json:"default"`
-}
-
-func NewDefaultClaims() *Claims {
-	return &Claims{
-		X509: &X509Claims{
-			Durations: &Durations{
+func NewDefaultClaims() *linkedca.Claims {
+	return &linkedca.Claims{
+		X509: &linkedca.X509Claims{
+			Durations: &linkedca.Durations{
 				Min:     config.GlobalProvisionerClaims.MinTLSDur.String(),
 				Max:     config.GlobalProvisionerClaims.MaxTLSDur.String(),
 				Default: config.GlobalProvisionerClaims.DefaultTLSDur.String(),
 			},
 		},
-		SSH: &SSHClaims{
-			UserDurations: &Durations{
+		Ssh: &linkedca.SSHClaims{
+			UserDurations: &linkedca.Durations{
 				Min:     config.GlobalProvisionerClaims.MinUserSSHDur.String(),
 				Max:     config.GlobalProvisionerClaims.MaxUserSSHDur.String(),
 				Default: config.GlobalProvisionerClaims.DefaultUserSSHDur.String(),
 			},
-			HostDurations: &Durations{
+			HostDurations: &linkedca.Durations{
 				Min:     config.GlobalProvisionerClaims.MinHostSSHDur.String(),
 				Max:     config.GlobalProvisionerClaims.MaxHostSSHDur.String(),
 				Default: config.GlobalProvisionerClaims.DefaultHostSSHDur.String(),

@@ -17,11 +17,13 @@ type DB interface {
 	GetProvisioner(ctx context.Context, id string) (*linkedca.Provisioner, error)
 	GetProvisioners(ctx context.Context) ([]*linkedca.Provisioner, error)
 	UpdateProvisioner(ctx context.Context, prov *linkedca.Provisioner) error
+	DeleteProvisioner(ctx context.Context, id string) error
 
 	CreateAdmin(ctx context.Context, admin *linkedca.Admin) error
 	GetAdmin(ctx context.Context, id string) (*linkedca.Admin, error)
 	GetAdmins(ctx context.Context) ([]*linkedca.Admin, error)
 	UpdateAdmin(ctx context.Context, admin *linkedca.Admin) error
+	DeleteAdmin(ctx context.Context, id string) error
 }
 
 // MockDB is an implementation of the DB interface that should only be used as
@@ -31,11 +33,13 @@ type MockDB struct {
 	MockGetProvisioner    func(ctx context.Context, id string) (*linkedca.Provisioner, error)
 	MockGetProvisioners   func(ctx context.Context) ([]*linkedca.Provisioner, error)
 	MockUpdateProvisioner func(ctx context.Context, prov *linkedca.Provisioner) error
+	MockDeleteProvisioner func(ctx context.Context, id string) error
 
 	MockCreateAdmin func(ctx context.Context, adm *linkedca.Admin) error
 	MockGetAdmin    func(ctx context.Context, id string) (*linkedca.Admin, error)
 	MockGetAdmins   func(ctx context.Context) ([]*linkedca.Admin, error)
 	MockUpdateAdmin func(ctx context.Context, adm *linkedca.Admin) error
+	MockDeleteAdmin func(ctx context.Context, id string) error
 
 	MockError error
 	MockRet1  interface{}
@@ -79,6 +83,14 @@ func (m *MockDB) UpdateProvisioner(ctx context.Context, prov *linkedca.Provision
 	return m.MockError
 }
 
+// DeleteProvisioner mock
+func (m *MockDB) DeleteProvisioner(ctx context.Context, id string) error {
+	if m.MockDeleteProvisioner != nil {
+		return m.MockDeleteProvisioner(ctx, id)
+	}
+	return m.MockError
+}
+
 // CreateAdmin mock
 func (m *MockDB) CreateAdmin(ctx context.Context, admin *linkedca.Admin) error {
 	if m.MockCreateAdmin != nil {
@@ -111,6 +123,14 @@ func (m *MockDB) GetAdmins(ctx context.Context) ([]*linkedca.Admin, error) {
 func (m *MockDB) UpdateAdmin(ctx context.Context, adm *linkedca.Admin) error {
 	if m.MockUpdateAdmin != nil {
 		return m.MockUpdateAdmin(ctx, adm)
+	}
+	return m.MockError
+}
+
+// DeleteAdmin mock
+func (m *MockDB) DeleteAdmin(ctx context.Context, id string) error {
+	if m.MockDeleteAdmin != nil {
+		return m.MockDeleteAdmin(ctx, id)
 	}
 	return m.MockError
 }

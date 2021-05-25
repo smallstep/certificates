@@ -178,12 +178,3 @@ func loadAdmin(m *sync.Map, key string) (*linkedca.Admin, bool) {
 	}
 	return adm, true
 }
-
-/*
-// provisionerSum returns the SHA1 of the provisioners ID. From this we will
-// create the unique and sorted id.
-func provisionerSum(p Interface) []byte {
-	sum := sha1.Sum([]byte(p.GetID()))
-	return sum[:]
-}
-*/
