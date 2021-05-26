@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/mgmt"
 	mgmtAPI "github.com/smallstep/certificates/authority/mgmt/api"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/linkedca"
 )
@@ -92,7 +93,7 @@ retry:
 	return adm, nil
 }
 
-// AdminOption is the type of options passed to the Provisioner method.
+// AdminOption is the type of options passed to the Admin method.
 type AdminOption func(o *adminOptions) error
 
 type adminOptions struct {
@@ -136,8 +137,8 @@ func WithAdminLimit(limit int) AdminOption {
 	}
 }
 
-// GetAdmins performs the GET /admin/admins request to the CA.
-func (c *AdminClient) GetAdmins(opts ...AdminOption) (*mgmtAPI.GetAdminsResponse, error) {
+// GetAdminsPaginate returns a page from the the GET /admin/admins request to the CA.
+func (c *AdminClient) GetAdminsPaginate(opts ...AdminOption) (*mgmtAPI.GetAdminsResponse, error) {
 	var retried bool
 	o := new(adminOptions)
 	if err := o.apply(opts); err != nil {
@@ -164,6 +165,26 @@ retry:
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
 	return body, nil
+}
+
+// GetAdmins returns all admins from the GET /admin/admins request to the CA.
+func (c *AdminClient) GetAdmins(opts ...AdminOption) ([]*linkedca.Admin, error) {
+	var (
+		cursor = ""
+		admins = []*linkedca.Admin{}
+	)
+	for {
+		resp, err := c.GetAdminsPaginate(WithAdminCursor(cursor), WithAdminLimit(100))
+		if err != nil {
+			return nil, err
+		}
+		admins = append(admins, resp.Admins...)
+		if resp.NextCursor == "" {
+			return admins, nil
+		}
+		cursor = resp.NextCursor
+	}
+	return admins, nil
 }
 
 // CreateAdmin performs the POST /admin/admins request to the CA.
@@ -247,8 +268,8 @@ retry:
 	return adm, nil
 }
 
-// GetProvisioner performs the GET /admin/provisioners/{name} request to the CA.
-func (c *AdminClient) GetProvisioner(name string) (*linkedca.Provisioner, error) {
+// GetProvisionerByName performs the GET /admin/provisioners/{name} request to the CA.
+func (c *AdminClient) GetProvisionerByName(name string) (*linkedca.Provisioner, error) {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", name)})
 retry:
@@ -270,10 +291,17 @@ retry:
 	return prov, nil
 }
 
-// GetProvisioners performs the GET /admin/provisioners request to the CA.
-func (c *AdminClient) GetProvisioners() ([]*linkedca.Provisioner, error) {
+// GetProvisionersPaginate performs the GET /admin/provisioners request to the CA.
+func (c *AdminClient) GetProvisionersPaginate(opts ...ProvisionerOption) (*mgmtAPI.GetProvisionersResponse, error) {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: "/admin/provisioners"})
+	o := new(provisionerOptions)
+	if err := o.apply(opts); err != nil {
+		return nil, err
+	}
+	u := c.endpoint.ResolveReference(&url.URL{
+		Path:     "/admin/provisioners",
+		RawQuery: o.rawQuery(),
+	})
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
@@ -286,11 +314,31 @@ retry:
 		}
 		return nil, readAdminError(resp.Body)
 	}
-	var provs = new([]*linkedca.Provisioner)
-	if err := readJSON(resp.Body, provs); err != nil {
+	var body = new(mgmtAPI.GetProvisionersResponse)
+	if err := readJSON(resp.Body, body); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
-	return *provs, nil
+	return body, nil
+}
+
+// GetProvisioners returns all admins from the GET /admin/admins request to the CA.
+func (c *AdminClient) GetProvisioners(opts ...AdminOption) (provisioner.List, error) {
+	var (
+		cursor = ""
+		provs  = provisioner.List{}
+	)
+	for {
+		resp, err := c.GetProvisionersPaginate(WithProvisionerCursor(cursor), WithProvisionerLimit(100))
+		if err != nil {
+			return nil, err
+		}
+		provs = append(provs, resp.Provisioners...)
+		if resp.NextCursor == "" {
+			return provs, nil
+		}
+		cursor = resp.NextCursor
+	}
+	return provs, nil
 }
 
 // RemoveProvisioner performs the DELETE /admin/provisioners/{name} request to the CA.
