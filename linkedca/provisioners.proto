@@ -5,28 +5,29 @@ package linkedca;
 option go_package = "github.com/smallstep/certificates/linkedca";
 
 message Provisioner {
-    enum Type {
-        NOOP = 0;
-        JWK = 1;
-        OIDC = 2;
-        GCP = 3;
-        AWS = 4;
-        AZURE = 5;
-        ACME = 6;
-        X5C = 7;
-        K8SSA = 8;
-        SSHPOP = 9;
-    }
-    string id = 1;
-    string authority_id = 2;
-    Type type = 3;
-    string name = 4;
-    ProvisionerDetails details = 5;
-    Claims claims = 6;
-    bytes x509_template = 7;
-    bytes x509_template_data = 8;
-    bytes ssh_template = 9;
-    bytes ssh_template_data = 10;
+	enum Type {
+		NOOP = 0;
+		JWK = 1;
+		OIDC = 2;
+		GCP = 3;
+		AWS = 4;
+		AZURE = 5;
+		ACME = 6;
+		X5C = 7;
+		K8SSA = 8;
+		SSHPOP = 9;
+		SCEP = 10;
+	}
+	string id = 1;
+	string authority_id = 2;
+	Type type = 3;
+	string name = 4;
+	ProvisionerDetails details = 5;
+	Claims claims = 6;
+	bytes x509_template = 7;
+	bytes x509_template_data = 8;
+	bytes ssh_template = 9;
+	bytes ssh_template_data = 10;
 }
 
 message ProvisionerDetails {
@@ -40,85 +41,93 @@ message ProvisionerDetails {
 		X5CProvisioner X5C = 26;
 		K8sSAProvisioner K8sSA = 27;
 		SSHPOPProvisioner SSHPOP = 28;
+		SCEPProvisioner SCEP = 29;
 	}
 }
 
 message ProvisionerList {
-    repeated Provisioner provisioners = 1;
+	repeated Provisioner provisioners = 1;
 }
 
 message Claims {
-    X509Claims x509 = 1;
-    SSHClaims ssh = 2;
-    bool disable_renewal = 3;
+	X509Claims x509 = 1;
+	SSHClaims ssh = 2;
+	bool disable_renewal = 3;
 }
 
 message X509Claims {
-    bool enabled = 1;
-    Durations durations = 2;
+	bool enabled = 1;
+	Durations durations = 2;
 }
 
 message SSHClaims {
-    bool enabled = 1;
-    Durations user_durations = 2;
-    Durations host_durations = 3;
+	bool enabled = 1;
+	Durations user_durations = 2;
+	Durations host_durations = 3;
 }
 
 message Durations {
-    string default = 1;
-    string min = 2;
-    string max = 3;
+	string default = 1;
+	string min = 2;
+	string max = 3;
 }
 
 message JWKProvisioner {
-    bytes public_key = 1;
-    bytes encrypted_private_key = 2;
+	bytes public_key = 1;
+	bytes encrypted_private_key = 2;
 }
 
 message OIDCProvisioner {
-    string client_id = 1;
-    string client_secret = 2;
-    string configuration_endpoint = 3;
-    repeated string admins = 4;
-    repeated string domains = 5;
-    repeated string groups = 6;
-    string listen_address = 7;
-    string tenant_id = 8;
+	string client_id = 1;
+	string client_secret = 2;
+	string configuration_endpoint = 3;
+	repeated string admins = 4;
+	repeated string domains = 5;
+	repeated string groups = 6;
+	string listen_address = 7;
+	string tenant_id = 8;
 }
 
 message GCPProvisioner {
-    repeated string service_accounts = 1;
-    repeated string project_ids = 2;
-    bool disable_custom_sans = 3;
-    bool disable_trust_on_first_use = 4;
-    string instance_age = 5;
+	repeated string service_accounts = 1;
+	repeated string project_ids = 2;
+	bool disable_custom_sans = 3;
+	bool disable_trust_on_first_use = 4;
+	string instance_age = 5;
 }
 
 message AWSProvisioner {
-    repeated string accounts = 1;
-    bool disable_custom_sans = 2;
-    bool disable_trust_on_first_use = 3;
-    string instance_age = 4;
+	repeated string accounts = 1;
+	bool disable_custom_sans = 2;
+	bool disable_trust_on_first_use = 3;
+	string instance_age = 4;
 }
 
 message AzureProvisioner {
-    string tenant_id = 1;
-    repeated string resource_groups = 2;
-    string audience = 3;
-    bool disable_custom_sans = 4;
-    bool disable_trust_on_first_use = 5;
+	string tenant_id = 1;
+	repeated string resource_groups = 2;
+	string audience = 3;
+	bool disable_custom_sans = 4;
+	bool disable_trust_on_first_use = 5;
 }
 
 message ACMEProvisioner {
-    bool force_cn = 1;
+	bool force_cn = 1;
 }
 
 message X5CProvisioner {
-    repeated bytes roots = 1;
+	repeated bytes roots = 1;
 }
 
 message K8sSAProvisioner {
-    repeated bytes public_keys = 1;
+	repeated bytes public_keys = 1;
 }
 
 message SSHPOPProvisioner {}
+
+message SCEPProvisioner {
+	bool force_cn = 1;
+	string challenge = 2;
+	repeated string capabilities = 3;
+	int32 minimum_public_key_length = 4;
+}
