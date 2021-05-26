@@ -204,3 +204,16 @@ func (db *DB) UpdateProvisioner(ctx context.Context, prov *linkedca.Provisioner)
 
 	return nil
 }
+
+// DeleteProvisioner saves an updated admin to the database.
+func (db *DB) DeleteProvisioner(ctx context.Context, id string) error {
+	old, err := db.getDBProvisioner(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	nu := old.clone()
+	nu.DeletedAt = clock.Now()
+
+	return db.save(ctx, old.ID, nu, old, "provisioner", authorityProvisionersTable)
+}

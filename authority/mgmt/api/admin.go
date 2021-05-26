@@ -8,14 +8,14 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/mgmt"
-	"github.com/smallstep/certificates/authority/status"
+	"github.com/smallstep/certificates/linkedca"
 )
 
 // CreateAdminRequest represents the body for a CreateAdmin request.
 type CreateAdminRequest struct {
-	Subject     string     `json:"subject"`
-	Provisioner string     `json:"provisioner"`
-	Type        admin.Type `json:"type"`
+	Subject     string              `json:"subject"`
+	Provisioner string              `json:"provisioner"`
+	Type        linkedca.Admin_Type `json:"type"`
 }
 
 // Validate validates a new-admin request body.
@@ -29,13 +29,13 @@ func (car *CreateAdminRequest) Validate(c *admin.Collection) error {
 
 // GetAdminsResponse for returning a list of admins.
 type GetAdminsResponse struct {
-	Admins     []*admin.Admin `json:"admins"`
-	NextCursor string         `json:"nextCursor"`
+	Admins     []*linkedca.Admin `json:"admins"`
+	NextCursor string            `json:"nextCursor"`
 }
 
 // UpdateAdminRequest represents the body for a UpdateAdmin request.
 type UpdateAdminRequest struct {
-	Type admin.Type `json:"type"`
+	Type linkedca.Admin_Type `json:"type"`
 }
 
 // Validate validates a new-admin request body.
@@ -98,20 +98,17 @@ func (h *Handler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	adm := &mgmt.Admin{
-		ProvisionerID: p.GetID(),
+	adm := &linkedca.Admin{
+		ProvisionerId: p.GetID(),
 		Subject:       body.Subject,
 		Type:          body.Type,
-		Status:        status.Active,
 	}
 	if err := h.db.CreateAdmin(ctx, adm); err != nil {
 		api.WriteError(w, mgmt.WrapErrorISE(err, "error creating admin"))
 		return
 	}
-	adm.ProvisionerName = p.GetName()
-	adm.ProvisionerType = p.GetType().String()
 	api.JSON(w, adm)
-	if err := h.auth.ReloadAuthConfig(); err != nil {
+	if err := h.auth.ReloadAuthConfig(ctx); err != nil {
 		fmt.Printf("err = %+v\n", err)
 	}
 }
@@ -126,18 +123,13 @@ func (h *Handler) DeleteAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	adm, err := h.db.GetAdmin(ctx, id)
-	if err != nil {
-		api.WriteError(w, mgmt.WrapErrorISE(err, "error retrieiving admin %s", id))
-		return
-	}
-	adm.Status = status.Deleted
-	if err := h.db.UpdateAdmin(ctx, adm); err != nil {
-		api.WriteError(w, mgmt.WrapErrorISE(err, "error updating admin %s", id))
+	if err := h.db.DeleteAdmin(ctx, id); err != nil {
+		api.WriteError(w, mgmt.WrapErrorISE(err, "error deleting admin %s", id))
 		return
 	}
 	api.JSON(w, &DeleteResponse{Status: "ok"})
-	if err := h.auth.ReloadAuthConfig(); err != nil {
+
+	if err := h.auth.ReloadAuthConfig(ctx); err != nil {
 		fmt.Printf("err = %+v\n", err)
 	}
 }
@@ -166,12 +158,12 @@ func (h *Handler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
 
 	adm.Type = body.Type
 
-	if err := h.db.UpdateAdmin(ctx, (*mgmt.Admin)(adm)); err != nil {
+	if err := h.db.UpdateAdmin(ctx, (*linkedca.Admin)(adm)); err != nil {
 		api.WriteError(w, mgmt.WrapErrorISE(err, "error updating admin %s", id))
 		return
 	}
 	api.JSON(w, adm)
-	if err := h.auth.ReloadAuthConfig(); err != nil {
+	if err := h.auth.ReloadAuthConfig(ctx); err != nil {
 		fmt.Printf("err = %+v\n", err)
 	}
 }

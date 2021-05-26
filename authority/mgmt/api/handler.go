@@ -44,8 +44,4 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("POST", "/admins", h.CreateAdmin)
 	r.MethodFunc("PATCH", "/admins/{id}", h.UpdateAdmin)
 	r.MethodFunc("DELETE", "/admins/{id}", h.DeleteAdmin)
-
-	// AuthConfig
-	r.MethodFunc("GET", "/authconfigs/{id}", h.GetAuthConfig)
-	r.MethodFunc("PUT", "/authconfigs/{id}", h.UpdateAuthConfig)
 }
