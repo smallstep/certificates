@@ -151,7 +151,7 @@ func (db *DB) CreateProvisioner(ctx context.Context, prov *linkedca.Provisioner)
 		return errors.Wrap(err, "error generating random id for provisioner")
 	}
 
-	details, err := json.Marshal(prov.Details)
+	details, err := json.Marshal(prov.Details.GetData())
 	if err != nil {
 		return mgmt.WrapErrorISE(err, "error marshaling details when creating provisioner %s", prov.Name)
 	}

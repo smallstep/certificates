@@ -134,6 +134,7 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	return a, nil
 }
 
+// ReloadAuthConfig reloads dynamic fields of the AuthConfig.
 func (a *Authority) ReloadAuthConfig(ctx context.Context) error {
 	provs, err := a.adminDB.GetProvisioners(ctx)
 	if err != nil {
@@ -222,14 +223,20 @@ func (a *Authority) init() error {
 
 		provs, err := a.adminDB.GetProvisioners(context.Background())
 		if err != nil {
-			return err
+			return mgmt.WrapErrorISE(err, "error getting provisioners to initialize authority")
 		}
 		if len(provs) == 0 {
 			// Create First Provisioner
 			prov, err := mgmt.CreateFirstProvisioner(context.Background(), a.adminDB, a.config.Password)
 			if err != nil {
-				return err
+				return mgmt.WrapErrorISE(err, "error creating first provisioner")
 			}
+			certProv, err := provisionerToCertificates(prov)
+			if err != nil {
+				return mgmt.WrapErrorISE(err, "error converting provisioner to certificates type")
+			}
+			a.config.AuthorityConfig.Provisioners = []provisioner.Interface{certProv}
+
 			// Create First Admin
 			adm := &linkedca.Admin{
 				ProvisionerId: prov.Id,
@@ -242,13 +249,9 @@ func (a *Authority) init() error {
 			}
 			a.config.AuthorityConfig.Admins = []*linkedca.Admin{adm}
 		} else {
-			provs, err := a.adminDB.GetProvisioners(context.Background())
-			if err != nil {
-				return mgmt.WrapErrorISE(err, "error getting provisioners to initialize authority")
-			}
 			a.config.AuthorityConfig.Provisioners, err = provisionerListToCertificates(provs)
 			if err != nil {
-				return mgmt.WrapErrorISE(err, "error converting provisioner list to certificates")
+				return mgmt.WrapErrorISE(err, "error converting provisioner list to certificates type")
 			}
 			a.config.AuthorityConfig.Admins, err = a.adminDB.GetAdmins(context.Background())
 			if err != nil {

@@ -96,7 +96,7 @@ func CreateFirstProvisioner(ctx context.Context, db DB, password string) (*linke
 		return nil, WrapErrorISE(err, "error serializing JWE")
 	}
 
-	return &linkedca.Provisioner{
+	p := &linkedca.Provisioner{
 		Name:   "Admin JWK",
 		Type:   linkedca.Provisioner_JWK,
 		Claims: NewDefaultClaims(),
@@ -108,5 +108,9 @@ func CreateFirstProvisioner(ctx context.Context, db DB, password string) (*linke
 				},
 			},
 		},
-	}, nil
+	}
+	if err := db.CreateProvisioner(ctx, p); err != nil {
+		return nil, WrapErrorISE(err, "error creating provisioner")
+	}
+	return p, nil
 }

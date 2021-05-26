@@ -87,6 +87,7 @@ func provisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 
 	switch d := details.(type) {
 	case *linkedca.ProvisionerDetails_JWK:
+		fmt.Printf("d = %+v\n", d)
 		jwk := new(jose.JSONWebKey)
 		if err := json.Unmarshal(d.JWK.PublicKey, &jwk); err != nil {
 			return nil, err
