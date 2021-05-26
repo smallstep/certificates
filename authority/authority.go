@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/cas"
+	"github.com/smallstep/certificates/linkedca"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/admin"
@@ -129,15 +130,18 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	return a, nil
 }
 
-func (a *Authority) ReloadAuthConfig() error {
-	mgmtAuthConfig, err := a.adminDB.GetAuthConfig(context.Background(), mgmt.DefaultAuthorityID)
+func (a *Authority) ReloadAuthConfig(ctx context.Context) error {
+	provs, err := a.adminDB.GetProvisioners(ctx)
 	if err != nil {
-		return mgmt.WrapErrorISE(err, "error getting authConfig from db")
+		return mgmt.WrapErrorISE(err, "error getting provisioners to initialize authority")
 	}
-
-	a.config.AuthorityConfig, err = mgmtAuthConfig.ToCertificates()
+	a.config.AuthorityConfig.Provisioners, err = provisionerListToCertificates(provs)
 	if err != nil {
-		return mgmt.WrapErrorISE(err, "error converting mgmt authConfig to certificates authConfig")
+		return mgmt.WrapErrorISE(err, "error converting provisioner list to certificates")
+	}
+	a.config.AuthorityConfig.Admins, err = a.adminDB.GetAdmins(ctx)
+	if err != nil {
+		return mgmt.WrapErrorISE(err, "error getting provisioners to initialize authority")
 	}
 
 	// Merge global and configuration claims
@@ -148,7 +152,7 @@ func (a *Authority) ReloadAuthConfig() error {
 	// TODO: should we also be combining the ssh federated roots here?
 	// If we rotate ssh roots keys, sshpop provisioner will lose ability to
 	// validate old SSH certificates, unless they are added as federated certs.
-	sshKeys, err := a.GetSSHRoots(context.Background())
+	sshKeys, err := a.GetSSHRoots(ctx)
 	if err != nil {
 		return err
 	}
@@ -201,29 +205,51 @@ func (a *Authority) init() error {
 		}
 	}
 
-	// Initialize step-ca Admin Database if it's not already initialized using
-	// WithAdminDB.
-	if a.adminDB == nil {
-		// Check if AuthConfig already exists
-		a.adminDB, err = authMgmtNosql.New(a.db.(nosql.DB), mgmt.DefaultAuthorityID)
-		if err != nil {
-			return err
-		}
-		mgmtAuthConfig, err := a.adminDB.GetAuthConfig(context.Background(), mgmt.DefaultAuthorityID)
-		if err != nil {
-			if k, ok := err.(*mgmt.Error); ok && k.IsType(mgmt.ErrorNotFoundType) {
-				mgmtAuthConfig, err = mgmt.CreateAuthority(context.Background(), a.adminDB, mgmt.WithDefaultAuthorityID)
-				if err != nil {
-					return mgmt.WrapErrorISE(err, "error creating authConfig")
-				}
-			} else {
-				return mgmt.WrapErrorISE(err, "error getting authConfig from db")
+	if len(a.config.AuthorityConfig.Provisioners) == 0 {
+		// Initialize step-ca Admin Database if it's not already initialized using
+		// WithAdminDB.
+		if a.adminDB == nil {
+			// Check if AuthConfig already exists
+			a.adminDB, err = authMgmtNosql.New(a.db.(nosql.DB), mgmt.DefaultAuthorityID)
+			if err != nil {
+				return err
 			}
 		}
 
-		a.config.AuthorityConfig, err = mgmtAuthConfig.ToCertificates()
+		provs, err := a.adminDB.GetProvisioners(context.Background())
 		if err != nil {
 			return err
+		}
+		if len(provs) == 0 {
+			// Create First Provisioner
+			prov, err := mgmt.CreateFirstProvisioner(context.Background(), a.adminDB, a.config.Password)
+			if err != nil {
+				return err
+			}
+			// Create First Admin
+			adm := &linkedca.Admin{
+				ProvisionerId: prov.Id,
+				Subject:       "step",
+				Type:          linkedca.Admin_SUPER_ADMIN,
+			}
+			if err := a.adminDB.CreateAdmin(context.Background(), adm); err != nil {
+				// TODO should we try to clean up?
+				return mgmt.WrapErrorISE(err, "error creating first admin")
+			}
+			a.config.AuthorityConfig.Admins = []*linkedca.Admin{adm}
+		} else {
+			provs, err := a.adminDB.GetProvisioners(context.Background())
+			if err != nil {
+				return mgmt.WrapErrorISE(err, "error getting provisioners to initialize authority")
+			}
+			a.config.AuthorityConfig.Provisioners, err = provisionerListToCertificates(provs)
+			if err != nil {
+				return mgmt.WrapErrorISE(err, "error converting provisioner list to certificates")
+			}
+			a.config.AuthorityConfig.Admins, err = a.adminDB.GetAdmins(context.Background())
+			if err != nil {
+				return mgmt.WrapErrorISE(err, "error getting provisioners to initialize authority")
+			}
 		}
 	}
 

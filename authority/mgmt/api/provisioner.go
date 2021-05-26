@@ -8,20 +8,20 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/mgmt"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/authority/status"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/linkedca"
 )
 
 // CreateProvisionerRequest represents the body for a CreateProvisioner request.
 type CreateProvisionerRequest struct {
-	Type             string       `json:"type"`
-	Name             string       `json:"name"`
-	Claims           *mgmt.Claims `json:"claims"`
-	Details          []byte       `json:"details"`
-	X509Template     string       `json:"x509Template"`
-	X509TemplateData []byte       `json:"x509TemplateData"`
-	SSHTemplate      string       `json:"sshTemplate"`
-	SSHTemplateData  []byte       `json:"sshTemplateData"`
+	Type             string           `json:"type"`
+	Name             string           `json:"name"`
+	Claims           *linkedca.Claims `json:"claims"`
+	Details          []byte           `json:"details"`
+	X509Template     string           `json:"x509Template"`
+	X509TemplateData []byte           `json:"x509TemplateData"`
+	SSHTemplate      string           `json:"sshTemplate"`
+	SSHTemplateData  []byte           `json:"sshTemplateData"`
 }
 
 // Validate validates a new-provisioner request body.
@@ -40,14 +40,14 @@ type GetProvisionersResponse struct {
 
 // UpdateProvisionerRequest represents the body for a UpdateProvisioner request.
 type UpdateProvisionerRequest struct {
-	Type             string       `json:"type"`
-	Name             string       `json:"name"`
-	Claims           *mgmt.Claims `json:"claims"`
-	Details          []byte       `json:"details"`
-	X509Template     string       `json:"x509Template"`
-	X509TemplateData []byte       `json:"x509TemplateData"`
-	SSHTemplate      string       `json:"sshTemplate"`
-	SSHTemplateData  []byte       `json:"sshTemplateData"`
+	Type             string           `json:"type"`
+	Name             string           `json:"name"`
+	Claims           *linkedca.Claims `json:"claims"`
+	Details          []byte           `json:"details"`
+	X509Template     string           `json:"x509Template"`
+	X509TemplateData []byte           `json:"x509TemplateData"`
+	SSHTemplate      string           `json:"sshTemplate"`
+	SSHTemplateData  []byte           `json:"sshTemplateData"`
 }
 
 // Validate validates a update-provisioner request body.
@@ -101,7 +101,7 @@ func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var prov = new(mgmt.Provisioner)
+	var prov = new(linkedca.Provisioner)
 	if err := api.ReadJSON(r.Body, prov); err != nil {
 		api.WriteError(w, err)
 		return
@@ -118,7 +118,7 @@ func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 	}
 	api.JSONStatus(w, prov, http.StatusCreated)
 
-	if err := h.auth.ReloadAuthConfig(); err != nil {
+	if err := h.auth.ReloadAuthConfig(ctx); err != nil {
 		fmt.Printf("err = %+v\n", err)
 	}
 }
@@ -141,14 +141,8 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	prov, err := h.db.GetProvisioner(ctx, p.GetID())
-	if err != nil {
-		api.WriteError(w, mgmt.WrapErrorISE(err, "error loading provisioner %s from db", name))
-		return
-	}
-	prov.Status = status.Deleted
-	if err := h.db.UpdateProvisioner(ctx, prov); err != nil {
-		api.WriteError(w, mgmt.WrapErrorISE(err, "error updating provisioner %s", name))
+	if err := h.db.DeleteProvisioner(ctx, p.GetID()); err != nil {
+		api.WriteError(w, mgmt.WrapErrorISE(err, "error deleting provisioner %s", name))
 		return
 	}
 
@@ -156,13 +150,7 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 	admins, ok := c.LoadByProvisioner(name)
 	if ok {
 		for _, adm := range admins {
-			if err := h.db.UpdateAdmin(ctx, &mgmt.Admin{
-				ID:            adm.ID,
-				ProvisionerID: adm.ProvisionerID,
-				Subject:       adm.Subject,
-				Type:          adm.Type,
-				Status:        status.Deleted,
-			}); err != nil {
+			if err := h.db.DeleteAdmin(ctx, adm.Id); err != nil {
 				api.WriteError(w, mgmt.WrapErrorISE(err, "error deleting admin %s, as part of provisioner %s deletion", adm.Subject, name))
 				return
 			}
@@ -171,7 +159,7 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 
 	api.JSON(w, &DeleteResponse{Status: "ok"})
 
-	if err := h.auth.ReloadAuthConfig(); err != nil {
+	if err := h.auth.ReloadAuthConfig(ctx); err != nil {
 		fmt.Printf("err = %+v\n", err)
 	}
 }
