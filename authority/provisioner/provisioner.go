@@ -141,6 +141,8 @@ const (
 	TypeK8sSA Type = 8
 	// TypeSSHPOP is used to indicate the SSHPOP provisioners.
 	TypeSSHPOP Type = 9
+	// TypeSCEP is used to indicate the SCEP provisioners
+	TypeSCEP Type = 10
 )
 
 // String returns the string representation of the type.
@@ -164,6 +166,8 @@ func (t Type) String() string {
 		return "K8sSA"
 	case TypeSSHPOP:
 		return "SSHPOP"
+	case TypeSCEP:
+		return "SCEP"
 	default:
 		return ""
 	}
@@ -232,6 +236,8 @@ func (l *List) UnmarshalJSON(data []byte) error {
 			p = &K8sSA{}
 		case "sshpop":
 			p = &SSHPOP{}
+		case "scep":
+			p = &SCEP{}
 		default:
 			// Skip unsupported provisioners. A client using this method may be
 			// compiled with a version of smallstep/certificates that does not

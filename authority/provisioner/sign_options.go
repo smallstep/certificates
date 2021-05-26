@@ -117,6 +117,36 @@ func (v defaultPublicKeyValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
+// publicKeyMinimumLengthValidator validates the length (in bits) of the public key
+// of a certificate request is at least a certain length
+type publicKeyMinimumLengthValidator struct {
+	length int
+}
+
+// newPublicKeyMinimumLengthValidator creates a new publicKeyMinimumLengthValidator
+// with the given length as its minimum value
+// TODO: change the defaultPublicKeyValidator to have a configurable length instead?
+func newPublicKeyMinimumLengthValidator(length int) publicKeyMinimumLengthValidator {
+	return publicKeyMinimumLengthValidator{
+		length: length,
+	}
+}
+
+// Valid checks that certificate request common name matches the one configured.
+func (v publicKeyMinimumLengthValidator) Valid(req *x509.CertificateRequest) error {
+	switch k := req.PublicKey.(type) {
+	case *rsa.PublicKey:
+		minimumLengthInBytes := v.length / 8
+		if k.Size() < minimumLengthInBytes {
+			return errors.Errorf("rsa key in CSR must be at least %d bits (%d bytes)", v.length, minimumLengthInBytes)
+		}
+	case *ecdsa.PublicKey, ed25519.PublicKey:
+	default:
+		return errors.Errorf("unrecognized public key of type '%T' in CSR", k)
+	}
+	return nil
+}
+
 // commonNameValidator validates the common name of a certificate request.
 type commonNameValidator string
 

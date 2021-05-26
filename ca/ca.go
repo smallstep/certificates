@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"sync"
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
@@ -19,6 +20,8 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
+	"github.com/smallstep/certificates/scep"
+	scepAPI "github.com/smallstep/certificates/scep/api"
 	"github.com/smallstep/certificates/server"
 	"github.com/smallstep/nosql"
 )
@@ -73,11 +76,12 @@ func WithDatabase(db db.AuthDB) Option {
 // CA is the type used to build the complete certificate authority. It builds
 // the HTTP server, set ups the middlewares and the HTTP handlers.
 type CA struct {
-	auth    *authority.Authority
-	config  *authority.Config
-	srv     *server.Server
-	opts    *options
-	renewer *TLSRenewer
+	auth        *authority.Authority
+	config      *authority.Config
+	srv         *server.Server
+	insecureSrv *server.Server
+	opts        *options
+	renewer     *TLSRenewer
 }
 
 // New creates and initializes the CA with the given configuration and options.
@@ -113,6 +117,7 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	if err != nil {
 		return nil, err
 	}
+	ca.auth = auth
 
 	tlsConfig, err := ca.getTLSConfig(auth)
 	if err != nil {
@@ -122,6 +127,9 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	// Using chi as the main router
 	mux := chi.NewRouter()
 	handler := http.Handler(mux)
+
+	insecureMux := chi.NewRouter()
+	insecureHandler := http.Handler(insecureMux)
 
 	// Add regular CA api endpoints in / and /1.0
 	routerHandler := api.New(auth)
@@ -167,16 +175,38 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		acmeHandler.Route(r)
 	})
 
-	// helpful routine for logging all routes //
-	/*
-		walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
-			fmt.Printf("%s %s\n", method, route)
-			return nil
+	if ca.shouldServeSCEPEndpoints() {
+		scepPrefix := "scep"
+		scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
+			Service: auth.GetSCEPService(),
+			DNS:     dns,
+			Prefix:  scepPrefix,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "error creating SCEP authority")
 		}
-		if err := chi.Walk(mux, walkFunc); err != nil {
-			fmt.Printf("Logging err: %s\n", err.Error())
-		}
-	*/
+		scepRouterHandler := scepAPI.New(scepAuthority)
+
+		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
+		// SCEP operations are performed using HTTP, so that's why the API is mounted
+		// to the insecure mux.
+		insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
+			scepRouterHandler.Route(r)
+		})
+
+		// The RFC also mentions usage of HTTPS, but seems to advise
+		// against it, because of potential interoperability issues.
+		// Currently I think it's not bad to use HTTPS also, so that's
+		// why I've kept the API endpoints in both muxes and both HTTP
+		// as well as HTTPS can be used to request certificates
+		// using SCEP.
+		mux.Route("/"+scepPrefix, func(r chi.Router) {
+			scepRouterHandler.Route(r)
+		})
+	}
+
+	// helpful routine for logging all routes
+	//dumpRoutes(mux)
 
 	// Add monitoring if configured
 	if len(config.Monitoring) > 0 {
@@ -185,6 +215,7 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 			return nil, err
 		}
 		handler = m.Middleware(handler)
+		insecureHandler = m.Middleware(insecureHandler)
 	}
 
 	// Add logger if configured
@@ -194,16 +225,50 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 			return nil, err
 		}
 		handler = logger.Middleware(handler)
+		insecureHandler = logger.Middleware(insecureHandler)
 	}
 
-	ca.auth = auth
 	ca.srv = server.New(config.Address, handler, tlsConfig)
+
+	// only start the insecure server if the insecure address is configured
+	// and, currently, also only when it should serve SCEP endpoints.
+	if ca.shouldServeSCEPEndpoints() && config.InsecureAddress != "" {
+		// TODO: instead opt for having a single server.Server but two
+		// http.Servers handling the HTTP and HTTPS handler? The latter
+		// will probably introduce more complexity in terms of graceful
+		// reload.
+		ca.insecureSrv = server.New(config.InsecureAddress, insecureHandler, nil)
+	}
+
 	return ca, nil
 }
 
 // Run starts the CA calling to the server ListenAndServe method.
 func (ca *CA) Run() error {
-	return ca.srv.ListenAndServe()
+
+	var wg sync.WaitGroup
+	errors := make(chan error, 1)
+
+	if ca.insecureSrv != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errors <- ca.insecureSrv.ListenAndServe()
+		}()
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		errors <- ca.srv.ListenAndServe()
+	}()
+
+	// wait till error occurs; ensures the servers keep listening
+	err := <-errors
+
+	wg.Wait()
+
+	return err
 }
 
 // Stop stops the CA calling to the server Shutdown method.
@@ -212,7 +277,17 @@ func (ca *CA) Stop() error {
 	if err := ca.auth.Shutdown(); err != nil {
 		log.Printf("error stopping ca.Authority: %+v\n", err)
 	}
-	return ca.srv.Shutdown()
+	var insecureShutdownErr error
+	if ca.insecureSrv != nil {
+		insecureShutdownErr = ca.insecureSrv.Shutdown()
+	}
+
+	secureErr := ca.srv.Shutdown()
+
+	if insecureShutdownErr != nil {
+		return insecureShutdownErr
+	}
+	return secureErr
 }
 
 // Reload reloads the configuration of the CA and calls to the server Reload
@@ -244,6 +319,13 @@ func (ca *CA) Reload() error {
 	if err != nil {
 		logContinue("Reload failed because the CA with new configuration could not be initialized.")
 		return errors.Wrap(err, "error reloading ca")
+	}
+
+	if ca.insecureSrv != nil {
+		if err = ca.insecureSrv.Reload(newCA.insecureSrv); err != nil {
+			logContinue("Reload failed because insecure server could not be replaced.")
+			return errors.Wrap(err, "error reloading insecure server")
+		}
 	}
 
 	if err = ca.srv.Reload(newCA.srv); err != nil {
@@ -317,4 +399,24 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	tlsConfig.PreferServerCipherSuites = true
 
 	return tlsConfig, nil
+}
+
+// shouldMountSCEPEndpoints returns if the CA should be
+// configured with endpoints for SCEP. This is assumed to be
+// true if a SCEPService exists, which is true in case a
+// SCEP provisioner was configured.
+func (ca *CA) shouldServeSCEPEndpoints() bool {
+	return ca.auth.GetSCEPService() != nil
+}
+
+//nolint // ignore linters to allow keeping this function around for debugging
+func dumpRoutes(mux chi.Routes) {
+	// helpful routine for logging all routes //
+	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		fmt.Printf("%s %s\n", method, route)
+		return nil
+	}
+	if err := chi.Walk(mux, walkFunc); err != nil {
+		fmt.Printf("Logging err: %s\n", err.Error())
+	}
 }

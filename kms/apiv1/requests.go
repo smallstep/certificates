@@ -133,6 +133,14 @@ type CreateSignerRequest struct {
 	Password      []byte
 }
 
+// CreateDecrypterRequest is the parameter used in the kms.Decrypt method.
+type CreateDecrypterRequest struct {
+	Decrypter        crypto.Decrypter
+	DecryptionKey    string
+	DecryptionKeyPEM []byte
+	Password         []byte
+}
+
 // LoadCertificateRequest is the parameter used in the LoadCertificate method of
 // a CertificateManager.
 type LoadCertificateRequest struct {
