@@ -273,16 +273,19 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 // challengeTypes determines the types of challenges that should be used
 // for the ACME authorization request.
 func challengeTypes(az *acme.Authorization) []string {
-	chTypes := []string{}
+	var chTypes []string
 
-	// DNS challenge can only be used for identifiers with type dns
-	if az.Identifier.Type == "dns" {
-		chTypes = append(chTypes, "dns-01") // TODO: make these types consts/enum?
-	}
-
-	// HTTP and TLS challenges can only be used for identifiers without wildcards.
-	if !az.Wildcard {
-		chTypes = append(chTypes, []string{"http-01", "tls-alpn-01"}...)
+	switch az.Identifier.Type {
+	case "ip": // TODO: make these types consts/enum?
+		chTypes = []string{"http-01", "tls-alpn-01"}
+	case "dns":
+		chTypes = []string{"dns-01"}
+		// HTTP and TLS challenges can only be used for identifiers without wildcards.
+		if !az.Wildcard {
+			chTypes = append(chTypes, []string{"http-01", "tls-alpn-01"}...)
+		}
+	default:
+		chTypes = []string{}
 	}
 
 	return chTypes
