@@ -207,17 +207,12 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	orderNames = uniqueSortedLowerNames(orderNames)
 	orderIPs = uniqueSortedIPs(orderIPs)
 
-	// TODO: check whether this order was requested with identifier-type IP,
-	// if so, handle it as an IP order; not as a DNSName order, so the logic
-	// for verifying the contents MAY not be necessary.
 	// TODO: limit what IP addresses can be used? Only private? Only certain ranges
 	// based on configuration? Public vs. private range? That logic should be configurable somewhere.
-	// TODO: how to handler orders that have DNSNames AND IPs? I guess it could
-	// happen in cases where there are multiple "identifiers" to order a cert for
-	// and http or tls-alpn-1 is used (NOT DNS, because that can't be used for IPs).
 	// TODO: ensure that DNSNames indeed MUST NEVER have an IP
 	// TODO: only allow IP based identifier based on configuration?
-	// TODO: validation of the input (if IP; should be valid IPv4/v6)
+	// TODO: validation of the input (if IP; should be valid IPv4/v6; Incoming request should have Host header set / ALPN IN-ADDR.ARPA)
+	// TODO: limit the IP address identifier to a single IP address? RFC _can_ be read like that, but there can be multiple identifiers, of course
 
 	// Determine if DNS names or IPs should be processed.
 	// At this time, orders in which DNS names and IPs are mixed are not supported. // TODO: ensure that's OK and/or should we support more, RFC-wise

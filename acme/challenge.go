@@ -119,8 +119,14 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	hostPort := net.JoinHostPort(ch.Value, "443")
 
+	fmt.Println(hostPort)
+	fmt.Println(fmt.Sprintf("%#+v", config))
+
+	time.Sleep(5 * time.Second) // TODO: remove this; client seems to take a while to start serving; the server does not seem to retry the conn
+
 	conn, err := vo.TLSDial("tcp", hostPort, config)
 	if err != nil {
+		fmt.Println(err)
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
 			"error doing TLS dial for %s", hostPort))
 	}
@@ -128,6 +134,9 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	cs := conn.ConnectionState()
 	certs := cs.PeerCertificates
+
+	fmt.Println(fmt.Sprintf("%#+v", cs))
+	fmt.Println(fmt.Sprintf("%#+v", certs))
 
 	if len(certs) == 0 {
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
@@ -140,10 +149,19 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 	}
 
 	leafCert := certs[0]
+	fmt.Println(fmt.Sprintf("%#+v", leafCert))
 
-	if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], ch.Value) {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value))
+	// if no DNS names present, look for IP address and verify that exactly one exists
+	if len(leafCert.DNSNames) == 0 {
+		if len(leafCert.IPAddresses) != 1 || !strings.EqualFold(leafCert.IPAddresses[0].String(), ch.Value) {
+			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+				"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address, %v", ch.Value))
+		}
+	} else {
+		if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], ch.Value) {
+			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+				"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value))
+		}
 	}
 
 	idPeAcmeIdentifier := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 31}

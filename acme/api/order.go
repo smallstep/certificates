@@ -275,15 +275,14 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 func challengeTypes(az *acme.Authorization) []string {
 	chTypes := []string{}
 
-	// DNS challenge can not be used for identifiers with type IP
-	if az.Identifier.Type != "ip" {
+	// DNS challenge can only be used for identifiers with type dns
+	if az.Identifier.Type == "dns" {
 		chTypes = append(chTypes, "dns-01") // TODO: make these types consts/enum?
 	}
 
 	// HTTP and TLS challenges can only be used for identifiers without wildcards.
 	if !az.Wildcard {
-		//chTypes = append(chTypes, []string{"http-01", "tls-alpn-01"}...)
-		chTypes = append(chTypes, []string{"http-01"}...) // TODO: fix tls-alpn-01
+		chTypes = append(chTypes, []string{"http-01", "tls-alpn-01"}...)
 	}
 
 	return chTypes
