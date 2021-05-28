@@ -110,6 +110,10 @@ func (m *mockKeyManager) CreateSigner(req *kmsapi.CreateSignerRequest) (crypto.S
 	return signer, m.errCreatesigner
 }
 
+func (m *mockKeyManager) CreateDecrypter(req *kmsapi.CreateDecrypterRequest) (crypto.Decrypter, error) {
+	return nil, nil
+}
+
 func (m *mockKeyManager) Close() error {
 	return m.errClose
 }

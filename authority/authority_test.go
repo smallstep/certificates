@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"reflect"
@@ -317,6 +318,153 @@ func TestAuthority_CloseForReload(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.auth.CloseForReload()
+		})
+	}
+}
+
+func testScepAuthority(t *testing.T, opts ...Option) *Authority {
+
+	p := provisioner.List{
+		&provisioner.SCEP{
+			Name: "scep1",
+			Type: "SCEP",
+		},
+	}
+	c := &Config{
+		Address:          "127.0.0.1:8443",
+		InsecureAddress:  "127.0.0.1:8080",
+		Root:             []string{"testdata/scep/root.crt"},
+		IntermediateCert: "testdata/scep/intermediate.crt",
+		IntermediateKey:  "testdata/scep/intermediate.key",
+		DNSNames:         []string{"example.com"},
+		Password:         "pass",
+		AuthorityConfig: &AuthConfig{
+			Provisioners: p,
+		},
+	}
+	a, err := New(c, opts...)
+	assert.FatalError(t, err)
+	return a
+}
+
+func TestAuthority_GetSCEPService(t *testing.T) {
+	auth := testScepAuthority(t)
+	fmt.Println(auth)
+
+	p := provisioner.List{
+		&provisioner.SCEP{
+			Name: "scep1",
+			Type: "SCEP",
+		},
+	}
+
+	type fields struct {
+		config *Config
+		// keyManager              kms.KeyManager
+		// provisioners            *provisioner.Collection
+		// db                      db.AuthDB
+		// templates               *templates.Templates
+		// x509CAService           cas.CertificateAuthorityService
+		// rootX509Certs           []*x509.Certificate
+		// federatedX509Certs      []*x509.Certificate
+		// certificates            *sync.Map
+		// scepService             *scep.Service
+		// sshCAUserCertSignKey    ssh.Signer
+		// sshCAHostCertSignKey    ssh.Signer
+		// sshCAUserCerts          []ssh.PublicKey
+		// sshCAHostCerts          []ssh.PublicKey
+		// sshCAUserFederatedCerts []ssh.PublicKey
+		// sshCAHostFederatedCerts []ssh.PublicKey
+		// initOnce                bool
+		// startTime               time.Time
+		// sshBastionFunc          func(ctx context.Context, user, hostname string) (*Bastion, error)
+		// sshCheckHostFunc        func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
+		// sshGetHostsFunc         func(ctx context.Context, cert *x509.Certificate) ([]Host, error)
+		// getIdentityFunc         provisioner.GetIdentityFunc
+	}
+	tests := []struct {
+		name        string
+		fields      fields
+		wantService bool
+		wantErr     bool
+	}{
+		{
+			name: "ok",
+			fields: fields{
+				config: &Config{
+					Address:          "127.0.0.1:8443",
+					InsecureAddress:  "127.0.0.1:8080",
+					Root:             []string{"testdata/scep/root.crt"},
+					IntermediateCert: "testdata/scep/intermediate.crt",
+					IntermediateKey:  "testdata/scep/intermediate.key",
+					DNSNames:         []string{"example.com"},
+					Password:         "pass",
+					AuthorityConfig: &AuthConfig{
+						Provisioners: p,
+					},
+				},
+			},
+			wantService: true,
+			wantErr:     false,
+		},
+		{
+			name: "wrong password",
+			fields: fields{
+				config: &Config{
+					Address:          "127.0.0.1:8443",
+					InsecureAddress:  "127.0.0.1:8080",
+					Root:             []string{"testdata/scep/root.crt"},
+					IntermediateCert: "testdata/scep/intermediate.crt",
+					IntermediateKey:  "testdata/scep/intermediate.key",
+					DNSNames:         []string{"example.com"},
+					Password:         "wrongpass",
+					AuthorityConfig: &AuthConfig{
+						Provisioners: p,
+					},
+				},
+			},
+			wantService: false,
+			wantErr:     true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// a := &Authority{
+			// 	config:                  tt.fields.config,
+			// 	keyManager:              tt.fields.keyManager,
+			// 	provisioners:            tt.fields.provisioners,
+			// 	db:                      tt.fields.db,
+			// 	templates:               tt.fields.templates,
+			// 	x509CAService:           tt.fields.x509CAService,
+			// 	rootX509Certs:           tt.fields.rootX509Certs,
+			// 	federatedX509Certs:      tt.fields.federatedX509Certs,
+			// 	certificates:            tt.fields.certificates,
+			// 	scepService:             tt.fields.scepService,
+			// 	sshCAUserCertSignKey:    tt.fields.sshCAUserCertSignKey,
+			// 	sshCAHostCertSignKey:    tt.fields.sshCAHostCertSignKey,
+			// 	sshCAUserCerts:          tt.fields.sshCAUserCerts,
+			// 	sshCAHostCerts:          tt.fields.sshCAHostCerts,
+			// 	sshCAUserFederatedCerts: tt.fields.sshCAUserFederatedCerts,
+			// 	sshCAHostFederatedCerts: tt.fields.sshCAHostFederatedCerts,
+			// 	initOnce:                tt.fields.initOnce,
+			// 	startTime:               tt.fields.startTime,
+			// 	sshBastionFunc:          tt.fields.sshBastionFunc,
+			// 	sshCheckHostFunc:        tt.fields.sshCheckHostFunc,
+			// 	sshGetHostsFunc:         tt.fields.sshGetHostsFunc,
+			// 	getIdentityFunc:         tt.fields.getIdentityFunc,
+			// }
+			a, err := New(tt.fields.config)
+			fmt.Println(err)
+			fmt.Println(a)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Authority.New(), error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantService {
+				if got := a.GetSCEPService(); (got != nil) != tt.wantService {
+					t.Errorf("Authority.GetSCEPService() = %v, wantService %v", got, tt.wantService)
+				}
+			}
 		})
 	}
 }

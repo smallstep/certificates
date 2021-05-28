@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/cas"
+	"github.com/smallstep/certificates/scep"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -41,6 +42,9 @@ type Authority struct {
 	rootX509Certs      []*x509.Certificate
 	federatedX509Certs []*x509.Certificate
 	certificates       *sync.Map
+
+	// SCEP CA
+	scepService *scep.Service
 
 	// SSH CA
 	sshCAUserCertSignKey    ssh.Signer
@@ -338,6 +342,50 @@ func (a *Authority) init() error {
 		},
 		GetIdentityFunc: a.getIdentityFunc,
 	}
+
+	// Check if a KMS with decryption capability is required and available
+	if a.requiresDecrypter() {
+		if _, ok := a.keyManager.(kmsapi.Decrypter); !ok {
+			return errors.New("keymanager doesn't provide crypto.Decrypter")
+		}
+	}
+
+	// TODO: decide if this is a good approach for providing the SCEP functionality
+	// It currently mirrors the logic for the x509CAService
+	if a.requiresSCEPService() && a.scepService == nil {
+		var options scep.Options
+
+		// Read intermediate and create X509 signer and decrypter for default CAS.
+		options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
+		if err != nil {
+			return err
+		}
+		options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+			SigningKey: a.config.IntermediateKey,
+			Password:   []byte(a.config.Password),
+		})
+		if err != nil {
+			return err
+		}
+
+		if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
+			options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+				DecryptionKey: a.config.IntermediateKey,
+				Password:      []byte(a.config.Password),
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		a.scepService, err = scep.NewService(context.Background(), options)
+		if err != nil {
+			return err
+		}
+
+		// TODO: mimick the x509CAService GetCertificateAuthority here too?
+	}
+
 	// Store all the provisioners
 	for _, p := range a.config.AuthorityConfig.Provisioners {
 		if err := p.Init(config); err != nil {
@@ -388,4 +436,32 @@ func (a *Authority) CloseForReload() {
 	if err := a.keyManager.Close(); err != nil {
 		log.Printf("error closing the key manager: %v", err)
 	}
+}
+
+// requiresDecrypter returns whether the Authority
+// requires a KMS that provides a crypto.Decrypter
+// Currently this is only required when SCEP is
+// enabled.
+func (a *Authority) requiresDecrypter() bool {
+	return a.requiresSCEPService()
+}
+
+// requiresSCEPService iterates over the configured provisioners
+// and determines if one of them is a SCEP provisioner.
+func (a *Authority) requiresSCEPService() bool {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeSCEP {
+			return true
+		}
+	}
+	return false
+}
+
+// GetSCEPService returns the configured SCEP Service
+// TODO: this function is intended to exist temporarily
+// in order to make SCEP work more easily. It can be
+// made more correct by using the right interfaces/abstractions
+// after it works as expected.
+func (a *Authority) GetSCEPService() *scep.Service {
+	return a.scepService
 }

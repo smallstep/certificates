@@ -16,6 +16,12 @@ type KeyManager interface {
 	Close() error
 }
 
+// Decrypter is an interface implemented by KMSes that are used
+// in operations that require decryption
+type Decrypter interface {
+	CreateDecrypter(req *CreateDecrypterRequest) (crypto.Decrypter, error)
+}
+
 // CertificateManager is the interface implemented by the KMS that can load and
 // store x509.Certificates.
 type CertificateManager interface {
