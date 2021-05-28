@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
+	"net"
+	"reflect"
 	"testing"
 	"time"
 
@@ -733,6 +735,81 @@ func TestOrder_Finalize(t *testing.T) {
 				}
 			} else {
 				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
+func Test_uniqueSortedIPs(t *testing.T) {
+	type args struct {
+		ips []net.IP
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantUnique []net.IP
+	}{
+		{
+			name: "ok/empty",
+			args: args{
+				ips: []net.IP{},
+			},
+			wantUnique: []net.IP{},
+		},
+		{
+			name: "ok/single-ipv4",
+			args: args{
+				ips: []net.IP{net.ParseIP("192.168.42.42")},
+			},
+			wantUnique: []net.IP{net.ParseIP("192.168.42.42")},
+		},
+		{
+			name: "ok/multiple-ipv4",
+			args: args{
+				ips: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.10"), net.ParseIP("192.168.42.1")},
+			},
+			wantUnique: []net.IP{net.ParseIP("192.168.42.1"), net.ParseIP("192.168.42.10"), net.ParseIP("192.168.42.42")},
+		},
+		{
+			name: "ok/unique-ipv4",
+			args: args{
+				ips: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.42")},
+			},
+			wantUnique: []net.IP{net.ParseIP("192.168.42.42")},
+		},
+		{
+			name: "ok/single-ipv6",
+			args: args{
+				ips: []net.IP{net.ParseIP("2001:db8::30")},
+			},
+			wantUnique: []net.IP{net.ParseIP("2001:db8::30")},
+		},
+		{
+			name: "ok/multiple-ipv6",
+			args: args{
+				ips: []net.IP{net.ParseIP("2001:db8::30"), net.ParseIP("2001:db8::20"), net.ParseIP("2001:db8::10")},
+			},
+			wantUnique: []net.IP{net.ParseIP("2001:db8::10"), net.ParseIP("2001:db8::20"), net.ParseIP("2001:db8::30")},
+		},
+		{
+			name: "ok/unique-ipv6",
+			args: args{
+				ips: []net.IP{net.ParseIP("2001:db8::1"), net.ParseIP("2001:db8::1")},
+			},
+			wantUnique: []net.IP{net.ParseIP("2001:db8::1")},
+		},
+		{
+			name: "ok/mixed-ipv4-and-ipv6",
+			args: args{
+				ips: []net.IP{net.ParseIP("2001:db8::1"), net.ParseIP("2001:db8::1"), net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.42")},
+			},
+			wantUnique: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("2001:db8::1")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotUnique := uniqueSortedIPs(tt.args.ips); !reflect.DeepEqual(gotUnique, tt.wantUnique) {
+				t.Errorf("uniqueSortedIPs() = %v, want %v", gotUnique, tt.wantUnique)
 			}
 		})
 	}

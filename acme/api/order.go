@@ -28,7 +28,7 @@ func (n *NewOrderRequest) Validate() error {
 		return acme.NewError(acme.ErrorMalformedType, "identifiers list cannot be empty")
 	}
 	for _, id := range n.Identifiers {
-		if id.Type != "dns" {
+		if !(id.Type == "dns" || id.Type == "ip") {
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
 		}
 	}
@@ -149,15 +149,9 @@ func (h *Handler) newAuthorization(ctx context.Context, az *acme.Authorization) 
 		}
 	}
 
-	var (
-		err     error
-		chTypes = []string{"dns-01"}
-	)
-	// HTTP and TLS challenges can only be used for identifiers without wildcards.
-	if !az.Wildcard {
-		chTypes = append(chTypes, []string{"http-01", "tls-alpn-01"}...)
-	}
+	chTypes := challengeTypes(az)
 
+	var err error
 	az.Token, err = randutil.Alphanumeric(32)
 	if err != nil {
 		return acme.WrapErrorISE(err, "error generating random alphanumeric ID")
@@ -274,4 +268,23 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
 	api.JSON(w, o)
+}
+
+// challengeTypes determines the types of challenges that should be used
+// for the ACME authorization request.
+func challengeTypes(az *acme.Authorization) []string {
+	chTypes := []string{}
+
+	// DNS challenge can not be used for identifiers with type IP
+	if az.Identifier.Type != "ip" {
+		chTypes = append(chTypes, "dns-01") // TODO: make these types consts/enum?
+	}
+
+	// HTTP and TLS challenges can only be used for identifiers without wildcards.
+	if !az.Wildcard {
+		//chTypes = append(chTypes, []string{"http-01", "tls-alpn-01"}...)
+		chTypes = append(chTypes, []string{"http-01"}...) // TODO: fix tls-alpn-01
+	}
+
+	return chTypes
 }

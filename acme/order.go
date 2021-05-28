@@ -1,9 +1,11 @@
 package acme
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"net"
 	"sort"
 	"strings"
 	"time"
@@ -131,41 +133,13 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		return NewErrorISE("unexpected status %s for order %s", o.Status, o.ID)
 	}
 
-	// RFC8555: The CSR MUST indicate the exact same set of requested
-	// identifiers as the initial newOrder request. Identifiers of type "dns"
-	// MUST appear either in the commonName portion of the requested subject
-	// name or in an extensionRequest attribute [RFC2985] requesting a
-	// subjectAltName extension, or both.
-	if csr.Subject.CommonName != "" {
-		csr.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
-	}
-	csr.DNSNames = uniqueSortedLowerNames(csr.DNSNames)
-	orderNames := make([]string, len(o.Identifiers))
-	for i, n := range o.Identifiers {
-		orderNames[i] = n.Value
-	}
-	orderNames = uniqueSortedLowerNames(orderNames)
+	// canonicalize the CSR to allow for comparison
+	csr = canonicalize(csr)
 
-	// Validate identifier names against CSR alternative names.
-	//
-	// Note that with certificate templates we are not going to check for the
-	// absence of other SANs as they will only be set if the templates allows
-	// them.
-	if len(csr.DNSNames) != len(orderNames) {
-		return NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
-			"CSR names = %v, Order names = %v", csr.DNSNames, orderNames)
-	}
-
-	sans := make([]x509util.SubjectAlternativeName, len(csr.DNSNames))
-	for i := range csr.DNSNames {
-		if csr.DNSNames[i] != orderNames[i] {
-			return NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
-				"CSR names = %v, Order names = %v", csr.DNSNames, orderNames)
-		}
-		sans[i] = x509util.SubjectAlternativeName{
-			Type:  x509util.DNSType,
-			Value: csr.DNSNames[i],
-		}
+	// retrieve the requested SANs for the Order
+	sans, err := o.sans(csr)
+	if err != nil {
+		return WrapErrorISE(err, "error determining SANs for the CSR")
 	}
 
 	// Get authorizations from the ACME provisioner.
@@ -213,6 +187,120 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	return nil
 }
 
+func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativeName, error) {
+
+	var sans []x509util.SubjectAlternativeName
+
+	// order the DNS names and IP addresses, so that they can be compared against the canonicalized CSR
+	orderNames := make([]string, len(o.Identifiers))
+	orderIPs := make([]net.IP, len(o.Identifiers))
+	for i, n := range o.Identifiers {
+		switch n.Type {
+		case "dns":
+			orderNames[i] = n.Value
+		case "ip":
+			orderIPs[i] = net.ParseIP(n.Value) // NOTE: this assumes are all valid IPs or will result in nil entries
+		default:
+			return sans, NewErrorISE("unsupported identifier type in order: %s", n.Type)
+		}
+	}
+	orderNames = uniqueSortedLowerNames(orderNames)
+	orderIPs = uniqueSortedIPs(orderIPs)
+
+	// TODO: check whether this order was requested with identifier-type IP,
+	// if so, handle it as an IP order; not as a DNSName order, so the logic
+	// for verifying the contents MAY not be necessary.
+	// TODO: limit what IP addresses can be used? Only private? Only certain ranges
+	// based on configuration? Public vs. private range? That logic should be configurable somewhere.
+	// TODO: how to handler orders that have DNSNames AND IPs? I guess it could
+	// happen in cases where there are multiple "identifiers" to order a cert for
+	// and http or tls-alpn-1 is used (NOT DNS, because that can't be used for IPs).
+	// TODO: ensure that DNSNames indeed MUST NEVER have an IP
+	// TODO: only allow IP based identifier based on configuration?
+	// TODO: validation of the input (if IP; should be valid IPv4/v6)
+
+	// Determine if DNS names or IPs should be processed.
+	// At this time, orders in which DNS names and IPs are mixed are not supported. // TODO: ensure that's OK and/or should we support more, RFC-wise
+	shouldProcessIPAddresses := len(csr.DNSNames) == 0 && len(orderIPs) != 0 // TODO: verify that this logic is OK and sufficient
+	if shouldProcessIPAddresses {
+		// Validate identifier IPs against CSR alternative names (IPs).
+		if len(csr.IPAddresses) != len(orderIPs) {
+			return sans, NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
+				"CSR IPs = %v, Order IPs = %v", csr.IPAddresses, orderIPs)
+		}
+
+		sans = make([]x509util.SubjectAlternativeName, len(csr.IPAddresses))
+		for i := range csr.IPAddresses {
+			if !ipsAreEqual(csr.IPAddresses[i], orderIPs[i]) {
+				return sans, NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
+					"CSR IPs = %v, Order IPs = %v", csr.IPAddresses, orderIPs)
+			}
+			sans[i] = x509util.SubjectAlternativeName{
+				Type:  x509util.IPType,
+				Value: csr.IPAddresses[i].String(),
+			}
+		}
+	} else {
+		// Validate identifier names against CSR alternative names.
+		//
+		// Note that with certificate templates we are not going to check for the
+		// absence of other SANs as they will only be set if the templates allows
+		// them.
+		if len(csr.DNSNames) != len(orderNames) {
+			return sans, NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
+				"CSR names = %v, Order names = %v", csr.DNSNames, orderNames)
+		}
+
+		sans = make([]x509util.SubjectAlternativeName, len(csr.DNSNames))
+		for i := range csr.DNSNames {
+			if csr.DNSNames[i] != orderNames[i] {
+				return sans, NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
+					"CSR names = %v, Order names = %v", csr.DNSNames, orderNames)
+			}
+			sans[i] = x509util.SubjectAlternativeName{
+				Type:  x509util.DNSType,
+				Value: csr.DNSNames[i],
+			}
+		}
+	}
+
+	return sans, nil
+}
+
+func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.CertificateRequest) {
+
+	// for clarity only; we're operating on the same object by pointer
+	canonicalized = csr
+
+	// RFC8555: The CSR MUST indicate the exact same set of requested
+	// identifiers as the initial newOrder request. Identifiers of type "dns"
+	// MUST appear either in the commonName portion of the requested subject
+	// name or in an extensionRequest attribute [RFC2985] requesting a
+	// subjectAltName extension, or both.
+	if csr.Subject.CommonName != "" {
+		canonicalized.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
+	}
+	canonicalized.DNSNames = uniqueSortedLowerNames(csr.DNSNames)
+	canonicalized.IPAddresses = uniqueSortedIPs(csr.IPAddresses) // TODO: sorting and setting this value MAY result in different values in CSR (and probably also ending up in cert); is that behavior wanted?
+
+	return canonicalized
+}
+
+// ipsAreEqual compares IPs to be equal. IPv6 representations of IPv4
+// adresses are NOT considered equal to the IPv4 address in this case.
+// Both IPs should be the same version AND equal to each other.
+func ipsAreEqual(x, y net.IP) bool {
+	if isIPv4(x) && isIPv4(y) {
+		return x.Equal(y)
+	}
+	return x.Equal(y)
+}
+
+// isIPv4 returns if an IP is IPv4 or not.
+func isIPv4(ip net.IP) bool {
+	return ip.To4() != nil
+}
+
 // uniqueSortedLowerNames returns the set of all unique names in the input after all
 // of them are lowercased. The returned names will be in their lowercased form
 // and sorted alphabetically.
@@ -226,5 +314,25 @@ func uniqueSortedLowerNames(names []string) (unique []string) {
 		unique = append(unique, name)
 	}
 	sort.Strings(unique)
+	return
+}
+
+// uniqueSortedIPs returns the set of all unique net.IPs in the input. They
+// are sorted by their bytes (octet) representation.
+func uniqueSortedIPs(ips []net.IP) (unique []net.IP) {
+	type entry struct {
+		ip net.IP
+	}
+	ipEntryMap := make(map[string]entry, len(ips))
+	for _, ip := range ips {
+		ipEntryMap[ip.String()] = entry{ip: ip}
+	}
+	unique = make([]net.IP, 0, len(ipEntryMap))
+	for _, entry := range ipEntryMap {
+		unique = append(unique, entry.ip)
+	}
+	sort.Slice(unique, func(i, j int) bool {
+		return bytes.Compare(unique[i], unique[j]) < 0
+	})
 	return
 }

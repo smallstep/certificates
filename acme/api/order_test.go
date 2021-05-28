@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
@@ -52,6 +53,68 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 					Identifiers: []acme.Identifier{
 						{Type: "dns", Value: "example.com"},
 						{Type: "dns", Value: "bar.com"},
+					},
+					NotAfter:  naf,
+					NotBefore: nbf,
+				},
+				nbf: nbf,
+				naf: naf,
+			}
+		},
+		"ok/ipv4": func(t *testing.T) test {
+			nbf := time.Now().UTC().Add(time.Minute)
+			naf := time.Now().UTC().Add(5 * time.Minute)
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "ip", Value: "192.168.42.42"},
+					},
+					NotAfter:  naf,
+					NotBefore: nbf,
+				},
+				nbf: nbf,
+				naf: naf,
+			}
+		},
+		"ok/ipv6": func(t *testing.T) test {
+			nbf := time.Now().UTC().Add(time.Minute)
+			naf := time.Now().UTC().Add(5 * time.Minute)
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "ip", Value: "2001:db8::1"},
+					},
+					NotAfter:  naf,
+					NotBefore: nbf,
+				},
+				nbf: nbf,
+				naf: naf,
+			}
+		},
+		"ok/mixed-dns-and-ipv4": func(t *testing.T) test { // TODO: verify that this is allowed and what we want to be possible (in Validate())
+			nbf := time.Now().UTC().Add(time.Minute)
+			naf := time.Now().UTC().Add(5 * time.Minute)
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "dns", Value: "example.com"},
+						{Type: "ip", Value: "192.168.42.42"},
+					},
+					NotAfter:  naf,
+					NotBefore: nbf,
+				},
+				nbf: nbf,
+				naf: naf,
+			}
+		},
+		"ok/mixed-ipv4-and-ipv6": func(t *testing.T) test {
+			nbf := time.Now().UTC().Add(time.Minute)
+			naf := time.Now().UTC().Add(5 * time.Minute)
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "ip", Value: "192.168.42.42"},
+						{Type: "ip", Value: "2001:db8::1"},
 					},
 					NotAfter:  naf,
 					NotBefore: nbf,
@@ -1577,6 +1640,56 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"], []string{url})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
+			}
+		})
+	}
+}
+
+func TestHandler_challengeTypes(t *testing.T) {
+	type args struct {
+		az *acme.Authorization
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{
+			name: "ok/dns",
+			args: args{
+				az: &acme.Authorization{
+					Identifier: acme.Identifier{Type: "dns", Value: "example.com"},
+					Wildcard:   false,
+				},
+			},
+			want: []string{"dns-01", "http-01", "tls-alpn-01"},
+		},
+		{
+			name: "ok/wildcard",
+			args: args{
+				az: &acme.Authorization{
+					Identifier: acme.Identifier{Type: "dns", Value: "*.example.com"},
+					Wildcard:   true,
+				},
+			},
+			want: []string{"dns-01"},
+		},
+		{
+			name: "ok/ip",
+			args: args{
+				az: &acme.Authorization{
+					Identifier: acme.Identifier{Type: "ip", Value: "192.168.42.42"},
+					Wildcard:   false,
+				},
+			},
+			want: []string{"http-01", "tls-alpn-01"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			if got := challengeTypes(tt.args.az); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Handler.challengeTypes() = %v, want %v", got, tt.want)
 			}
 		})
 	}
