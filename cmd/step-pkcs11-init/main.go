@@ -35,10 +35,12 @@ type Config struct {
 	RootOnly         bool
 	RootObject       string
 	RootKeyObject    string
+	RootSubject      string
 	RootPath         string
 	CrtObject        string
 	CrtPath          string
 	CrtKeyObject     string
+	CrtSubject       string
 	CrtKeyPath       string
 	SSHHostKeyObject string
 	SSHUserKeyObject string
@@ -101,9 +103,11 @@ func main() {
 	flag.StringVar(&c.RootObject, "root-cert", "pkcs11:id=7330;object=root-cert", "PKCS #11 URI with object id and label to store the root certificate.")
 	flag.StringVar(&c.RootPath, "root-cert-path", "root_ca.crt", "Location to write the root certificate.")
 	flag.StringVar(&c.RootKeyObject, "root-key", "pkcs11:id=7330;object=root-key", "PKCS #11 URI with object id and label to store the root key.")
+	flag.StringVar(&c.RootSubject, "root-name", "PKCS #11 Smallstep Root", "Subject and Issuer of the root certificate.")
 	flag.StringVar(&c.CrtObject, "crt-cert", "pkcs11:id=7331;object=intermediate-cert", "PKCS #11 URI with object id and label to store the intermediate certificate.")
 	flag.StringVar(&c.CrtPath, "crt-cert-path", "intermediate_ca.crt", "Location to write the intermediate certificate.")
 	flag.StringVar(&c.CrtKeyObject, "crt-key", "pkcs11:id=7331;object=intermediate-key", "PKCS #11 URI with object id and label to store the intermediate certificate.")
+	flag.StringVar(&c.CrtSubject, "crt-name", "PKCS #11 Smallstep Intermediate", "Subject of the intermediate certificate.")
 	flag.StringVar(&c.CrtKeyPath, "crt-key-path", "intermediate_ca_key", "Location to write the intermediate private key.")
 	flag.StringVar(&c.SSHHostKeyObject, "ssh-host-key", "pkcs11:id=7332;object=ssh-host-key", "PKCS #11 URI with object id and label to store the key used to sign SSH host certificates.")
 	flag.StringVar(&c.SSHUserKeyObject, "ssh-user-key", "pkcs11:id=7333;object=ssh-user-key", "PKCS #11 URI with object id and label to store the key used to sign SSH user certificates.")
@@ -300,8 +304,8 @@ func createPKI(k kms.KeyManager, c Config) error {
 			BasicConstraintsValid: true,
 			MaxPathLen:            1,
 			MaxPathLenZero:        false,
-			Issuer:                pkix.Name{CommonName: "PKCS #11 Smallstep Root"},
-			Subject:               pkix.Name{CommonName: "PKCS #11 Smallstep Root"},
+			Issuer:                pkix.Name{CommonName: c.RootSubject},
+			Subject:               pkix.Name{CommonName: c.RootSubject},
 			SerialNumber:          mustSerialNumber(),
 			SubjectKeyId:          mustSubjectKeyID(resp.PublicKey),
 			AuthorityKeyId:        mustSubjectKeyID(resp.PublicKey),
@@ -379,7 +383,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		MaxPathLen:            0,
 		MaxPathLenZero:        true,
 		Issuer:                root.Subject,
-		Subject:               pkix.Name{CommonName: "YubiKey Smallstep Intermediate"},
+		Subject:               pkix.Name{CommonName: c.CrtSubject},
 		SerialNumber:          mustSerialNumber(),
 		SubjectKeyId:          mustSubjectKeyID(publicKey),
 	}
