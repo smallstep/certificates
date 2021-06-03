@@ -192,14 +192,17 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	var sans []x509util.SubjectAlternativeName
 
 	// order the DNS names and IP addresses, so that they can be compared against the canonicalized CSR
-	orderNames := make([]string, len(o.Identifiers))
-	orderIPs := make([]net.IP, len(o.Identifiers))
-	for i, n := range o.Identifiers {
+	orderNames := make([]string, numberOfIdentifierType("dns", o.Identifiers))
+	orderIPs := make([]net.IP, numberOfIdentifierType("ip", o.Identifiers))
+	indexDNS, indexIP := 0, 0
+	for _, n := range o.Identifiers {
 		switch n.Type {
 		case "dns":
-			orderNames[i] = n.Value
+			orderNames[indexDNS] = n.Value
+			indexDNS++
 		case "ip":
-			orderIPs[i] = net.ParseIP(n.Value) // NOTE: this assumes are all valid IPs at this time; or will result in nil entries
+			orderIPs[indexIP] = net.ParseIP(n.Value) // NOTE: this assumes are all valid IPs at this time; or will result in nil entries
+			indexIP++
 		default:
 			return sans, NewErrorISE("unsupported identifier type in order: %s", n.Type)
 		}
@@ -209,6 +212,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 
 	totalNumberOfSANs := len(csr.DNSNames) + len(csr.IPAddresses)
 	sans = make([]x509util.SubjectAlternativeName, totalNumberOfSANs)
+	index := 0
 
 	// TODO: limit what IP addresses can be used? Only private? Only certain ranges (i.e. only allow the specific ranges by default, configuration for all?)
 	// TODO: can DNS already be limited to a certain domain? That would probably be nice to have too, but maybe not as part of this PR
@@ -221,22 +225,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	// Note that with certificate templates we are not going to check for the
 	// absence of other SANs as they will only be set if the templates allows
 	// them.
-	if len(csr.IPAddresses) != len(orderIPs) {
-		return sans, NewError(ErrorBadCSRType, "number of CSR IPs do not match identifiers exactly: "+
-			"CSR IPs = %v, Order IPs = %v", csr.IPAddresses, orderIPs)
-	}
-
-	for i := range csr.IPAddresses {
-		if !ipsAreEqual(csr.IPAddresses[i], orderIPs[i]) {
-			return sans, NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
-				"CSR IPs = %v, Order IPs = %v", csr.IPAddresses, orderIPs)
-		}
-		sans[i] = x509util.SubjectAlternativeName{
-			Type:  x509util.IPType,
-			Value: csr.IPAddresses[i].String(),
-		}
-	}
-
 	if len(csr.DNSNames) != len(orderNames) {
 		return sans, NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
 			"CSR names = %v, Order names = %v", csr.DNSNames, orderNames)
@@ -247,15 +235,48 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			return sans, NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
 				"CSR names = %v, Order names = %v", csr.DNSNames, orderNames)
 		}
-		sans[i] = x509util.SubjectAlternativeName{
+		sans[index] = x509util.SubjectAlternativeName{
 			Type:  x509util.DNSType,
 			Value: csr.DNSNames[i],
 		}
+		index++
+	}
+
+	if len(csr.IPAddresses) != len(orderIPs) {
+		return sans, NewError(ErrorBadCSRType, "number of CSR IPs do not match identifiers exactly: "+
+			"CSR IPs = %v, Order IPs = %v", csr.IPAddresses, orderIPs)
+	}
+
+	for i := range csr.IPAddresses {
+		if !ipsAreEqual(csr.IPAddresses[i], orderIPs[i]) {
+			return sans, NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
+				"CSR IPs = %v, Order IPs = %v", csr.IPAddresses, orderIPs)
+		}
+		sans[index] = x509util.SubjectAlternativeName{
+			Type:  x509util.IPType,
+			Value: csr.IPAddresses[i].String(),
+		}
+		index++
 	}
 
 	return sans, nil
 }
 
+// numberOfIdentifierType returns the number of Identifiers that
+// are of type typ.
+func numberOfIdentifierType(typ string, ids []Identifier) int {
+	c := 0
+	for _, id := range ids {
+		if id.Type == typ {
+			c++
+		}
+	}
+	return c
+}
+
+// canonicalize canonicalizes a CSR so that it can be compared against an Order
+// NOTE: this effectively changes the order of SANs in the CSR, which may be OK,
+// but may not be expected.
 func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.CertificateRequest) {
 
 	// for clarity only; we're operating on the same object by pointer

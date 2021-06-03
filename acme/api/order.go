@@ -33,7 +33,7 @@ func (n *NewOrderRequest) Validate() error {
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
 		}
 		if id.Type == "ip" && net.ParseIP(id.Value) == nil {
-			return acme.NewError(acme.ErrorMalformedType, "%s is not a valid IP address", id.Value)
+			return acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", id.Value)
 		}
 	}
 	return nil
