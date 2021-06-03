@@ -133,7 +133,6 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	conn, err := vo.TLSDial("tcp", hostPort, config)
 	if err != nil {
-		fmt.Println(err)
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
 			"error doing TLS dial for %s", hostPort))
 	}
