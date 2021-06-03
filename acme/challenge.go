@@ -108,12 +108,12 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 
 func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
 
-	var serverName string
-
 	// RFC8738 states that, if HostName is IP, it should be the ARPA
 	// address https://datatracker.ietf.org/doc/html/rfc8738#section-6.
 	// It also references TLS Extensions [RFC6066].
-	if ip := net.ParseIP(ch.Value); ip != nil {
+	var serverName string
+	ip := net.ParseIP(ch.Value)
+	if ip != nil {
 		serverName = reverseAddr(ip)
 	} else {
 		serverName = ch.Value
@@ -155,7 +155,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	// if no DNS names present, look for IP address and verify that exactly one exists
 	if len(leafCert.DNSNames) == 0 {
-		if len(leafCert.IPAddresses) != 1 || !strings.EqualFold(leafCert.IPAddresses[0].String(), ch.Value) {
+		if len(leafCert.IPAddresses) != 1 || !leafCert.IPAddresses[0].Equal(ip) {
 			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 				"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address, %v", ch.Value))
 		}
