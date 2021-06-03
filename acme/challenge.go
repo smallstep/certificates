@@ -107,22 +107,29 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 }
 
 func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
+
+	var serverName string
+
+	// RFC8738 states that, if HostName is IP, it should be the ARPA
+	// address https://datatracker.ietf.org/doc/html/rfc8738#section-6.
+	// It also references TLS Extensions [RFC6066].
+	if ip := net.ParseIP(ch.Value); ip != nil {
+		serverName = reverseAddr(ip)
+	} else {
+		serverName = ch.Value
+	}
+
 	config := &tls.Config{
 		NextProtos: []string{"acme-tls/1"},
 		// https://tools.ietf.org/html/rfc8737#section-4
 		// ACME servers that implement "acme-tls/1" MUST only negotiate TLS 1.2
 		// [RFC5246] or higher when connecting to clients for validation.
 		MinVersion:         tls.VersionTLS12,
-		ServerName:         ch.Value,
+		ServerName:         serverName,
 		InsecureSkipVerify: true, // we expect a self-signed challenge certificate
 	}
 
 	hostPort := net.JoinHostPort(ch.Value, "443")
-
-	fmt.Println(hostPort)
-	fmt.Println(fmt.Sprintf("%#+v", config))
-
-	time.Sleep(5 * time.Second) // TODO: remove this; client seems to take a while to start serving; the server does not seem to retry the conn
 
 	conn, err := vo.TLSDial("tcp", hostPort, config)
 	if err != nil {
@@ -135,9 +142,6 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 	cs := conn.ConnectionState()
 	certs := cs.PeerCertificates
 
-	fmt.Println(fmt.Sprintf("%#+v", cs))
-	fmt.Println(fmt.Sprintf("%#+v", certs))
-
 	if len(certs) == 0 {
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"%s challenge for %s resulted in no certificates", ch.Type, ch.Value))
@@ -149,7 +153,6 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 	}
 
 	leafCert := certs[0]
-	fmt.Println(fmt.Sprintf("%#+v", leafCert))
 
 	// if no DNS names present, look for IP address and verify that exactly one exists
 	if len(leafCert.DNSNames) == 0 {
@@ -261,6 +264,50 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	}
 	return nil
 }
+
+// reverseaddr returns the in-addr.arpa. or ip6.arpa. hostname of the IP
+// address addr suitable for rDNS (PTR) record lookup or an error if it fails
+// to parse the IP address.
+// Implementation taken and adapted from https://golang.org/src/net/dnsclient.go?s=780:834#L20
+func reverseAddr(ip net.IP) (arpa string) {
+	if ip.To4() != nil {
+		return uitoa(uint(ip[15])) + "." + uitoa(uint(ip[14])) + "." + uitoa(uint(ip[13])) + "." + uitoa(uint(ip[12])) + ".in-addr.arpa."
+	}
+	// Must be IPv6
+	buf := make([]byte, 0, len(ip)*4+len("ip6.arpa."))
+	// Add it, in reverse, to the buffer
+	for i := len(ip) - 1; i >= 0; i-- {
+		v := ip[i]
+		buf = append(buf, hexit[v&0xF],
+			'.',
+			hexit[v>>4],
+			'.')
+	}
+	// Append "ip6.arpa." and return (buf already has the final .)
+	buf = append(buf, "ip6.arpa."...)
+	return string(buf)
+}
+
+// Convert unsigned integer to decimal string.
+// Implementation taken from https://golang.org/src/net/parse.go
+func uitoa(val uint) string {
+	if val == 0 { // avoid string allocation
+		return "0"
+	}
+	var buf [20]byte // big enough for 64bit value base 10
+	i := len(buf) - 1
+	for val >= 10 {
+		q := val / 10
+		buf[i] = byte('0' + val - q*10)
+		i--
+		val = q
+	}
+	// val < 10
+	buf[i] = byte('0' + val)
+	return string(buf[i:])
+}
+
+const hexit = "0123456789abcdef"
 
 // KeyAuthorization creates the ACME key authorization value from a token
 // and a jwk.
