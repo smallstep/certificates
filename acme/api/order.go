@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -30,6 +31,9 @@ func (n *NewOrderRequest) Validate() error {
 	for _, id := range n.Identifiers {
 		if !(id.Type == "dns" || id.Type == "ip") {
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
+		}
+		if id.Type == "ip" && net.ParseIP(id.Value) == nil {
+			return acme.NewError(acme.ErrorMalformedType, "%s is not a valid IP address", id.Value)
 		}
 	}
 	return nil
@@ -85,6 +89,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 			"failed to unmarshal new-order request payload"))
 		return
 	}
+
 	if err := nor.Validate(); err != nil {
 		api.WriteError(w, err)
 		return
