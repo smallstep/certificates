@@ -199,7 +199,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 		case "dns":
 			orderNames[i] = n.Value
 		case "ip":
-			orderIPs[i] = net.ParseIP(n.Value) // NOTE: this assumes are all valid IPs or will result in nil entries
+			orderIPs[i] = net.ParseIP(n.Value) // NOTE: this assumes are all valid IPs at this time; or will result in nil entries
 		default:
 			return sans, NewErrorISE("unsupported identifier type in order: %s", n.Type)
 		}
@@ -207,55 +207,49 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	orderNames = uniqueSortedLowerNames(orderNames)
 	orderIPs = uniqueSortedIPs(orderIPs)
 
-	// TODO: limit what IP addresses can be used? Only private? Only certain ranges
-	// based on configuration? Public vs. private range? That logic should be configurable somewhere.
-	// TODO: ensure that DNSNames indeed MUST NEVER have an IP
-	// TODO: only allow IP based identifier based on configuration?
-	// TODO: validation of the input (if IP; should be valid IPv4/v6; Incoming request should have Host header set / ALPN IN-ADDR.ARPA)
-	// TODO: limit the IP address identifier to a single IP address? RFC _can_ be read like that, but there can be multiple identifiers, of course
+	totalNumberOfSANs := len(csr.DNSNames) + len(csr.IPAddresses)
+	sans = make([]x509util.SubjectAlternativeName, totalNumberOfSANs)
 
-	// Determine if DNS names or IPs should be processed.
-	// At this time, orders in which DNS names and IPs are mixed are not supported. // TODO: ensure that's OK and/or should we support more, RFC-wise
-	shouldProcessIPAddresses := len(csr.DNSNames) == 0 && len(orderIPs) != 0 // TODO: verify that this logic is OK and sufficient
-	if shouldProcessIPAddresses {
-		// Validate identifier IPs against CSR alternative names (IPs).
-		if len(csr.IPAddresses) != len(orderIPs) {
+	// TODO: limit what IP addresses can be used? Only private? Only certain ranges (i.e. only allow the specific ranges by default, configuration for all?)
+	// TODO: can DNS already be limited to a certain domain? That would probably be nice to have too, but maybe not as part of this PR
+	// TODO: if it seems not too big of a change, make consts/enums out of the stringly typed identifiers (challenge types, identifier types)
+	// based on configuration? Public vs. private range? That logic should be configurable somewhere.
+	// TODO: only allow IP based identifier based on configuration? Some additional configuration and validation on the provisioner for this case.
+
+	// Validate identifier names against CSR alternative names.
+	//
+	// Note that with certificate templates we are not going to check for the
+	// absence of other SANs as they will only be set if the templates allows
+	// them.
+	if len(csr.IPAddresses) != len(orderIPs) {
+		return sans, NewError(ErrorBadCSRType, "number of CSR IPs do not match identifiers exactly: "+
+			"CSR IPs = %v, Order IPs = %v", csr.IPAddresses, orderIPs)
+	}
+
+	for i := range csr.IPAddresses {
+		if !ipsAreEqual(csr.IPAddresses[i], orderIPs[i]) {
 			return sans, NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
 				"CSR IPs = %v, Order IPs = %v", csr.IPAddresses, orderIPs)
 		}
-
-		sans = make([]x509util.SubjectAlternativeName, len(csr.IPAddresses))
-		for i := range csr.IPAddresses {
-			if !ipsAreEqual(csr.IPAddresses[i], orderIPs[i]) {
-				return sans, NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
-					"CSR IPs = %v, Order IPs = %v", csr.IPAddresses, orderIPs)
-			}
-			sans[i] = x509util.SubjectAlternativeName{
-				Type:  x509util.IPType,
-				Value: csr.IPAddresses[i].String(),
-			}
+		sans[i] = x509util.SubjectAlternativeName{
+			Type:  x509util.IPType,
+			Value: csr.IPAddresses[i].String(),
 		}
-	} else {
-		// Validate identifier names against CSR alternative names.
-		//
-		// Note that with certificate templates we are not going to check for the
-		// absence of other SANs as they will only be set if the templates allows
-		// them.
-		if len(csr.DNSNames) != len(orderNames) {
+	}
+
+	if len(csr.DNSNames) != len(orderNames) {
+		return sans, NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
+			"CSR names = %v, Order names = %v", csr.DNSNames, orderNames)
+	}
+
+	for i := range csr.DNSNames {
+		if csr.DNSNames[i] != orderNames[i] {
 			return sans, NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
 				"CSR names = %v, Order names = %v", csr.DNSNames, orderNames)
 		}
-
-		sans = make([]x509util.SubjectAlternativeName, len(csr.DNSNames))
-		for i := range csr.DNSNames {
-			if csr.DNSNames[i] != orderNames[i] {
-				return sans, NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
-					"CSR names = %v, Order names = %v", csr.DNSNames, orderNames)
-			}
-			sans[i] = x509util.SubjectAlternativeName{
-				Type:  x509util.DNSType,
-				Value: csr.DNSNames[i],
-			}
+		sans[i] = x509util.SubjectAlternativeName{
+			Type:  x509util.DNSType,
+			Value: csr.DNSNames[i],
 		}
 	}
 
@@ -276,7 +270,7 @@ func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.Certificate
 		canonicalized.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
 	}
 	canonicalized.DNSNames = uniqueSortedLowerNames(csr.DNSNames)
-	canonicalized.IPAddresses = uniqueSortedIPs(csr.IPAddresses) // TODO: sorting and setting this value MAY result in different values in CSR (and probably also ending up in cert); is that behavior wanted?
+	canonicalized.IPAddresses = uniqueSortedIPs(csr.IPAddresses)
 
 	return canonicalized
 }
@@ -285,15 +279,16 @@ func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.Certificate
 // adresses are NOT considered equal to the IPv4 address in this case.
 // Both IPs should be the same version AND equal to each other.
 func ipsAreEqual(x, y net.IP) bool {
-	if isIPv4(x) && isIPv4(y) {
+	if matchAddrFamily(x, y) {
 		return x.Equal(y)
 	}
-	return x.Equal(y)
+	return false
 }
 
-// isIPv4 returns if an IP is IPv4 or not.
-func isIPv4(ip net.IP) bool {
-	return ip.To4() != nil
+// matchAddrFamily returns if two IPs are both IPv4 OR IPv6
+// Implementation taken and adapted from https://golang.org/src/net/ip.go
+func matchAddrFamily(x net.IP, y net.IP) bool {
+	return x.To4() != nil && y.To4() != nil || x.To16() != nil && x.To4() == nil && y.To16() != nil && y.To4() == nil
 }
 
 // uniqueSortedLowerNames returns the set of all unique names in the input after all
