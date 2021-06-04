@@ -139,7 +139,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	// retrieve the requested SANs for the Order
 	sans, err := o.sans(csr)
 	if err != nil {
-		return WrapErrorISE(err, "error determining SANs for the CSR")
+		return err
 	}
 
 	// Get authorizations from the ACME provisioner.
@@ -242,7 +242,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	}
 
 	if len(csr.IPAddresses) != len(orderIPs) {
-		return sans, NewError(ErrorBadCSRType, "number of CSR IPs do not match identifiers exactly: "+
+		return sans, NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
 			"CSR IPs = %v, Order IPs = %v", csr.IPAddresses, orderIPs)
 	}
 

@@ -157,12 +157,12 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 	if len(leafCert.DNSNames) == 0 {
 		if len(leafCert.IPAddresses) != 1 || !leafCert.IPAddresses[0].Equal(ip) {
 			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-				"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address, %v", ch.Value))
+				"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value))
 		}
 	} else {
 		if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], ch.Value) {
 			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-				"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value))
+				"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value))
 		}
 	}
 

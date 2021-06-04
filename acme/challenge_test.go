@@ -1544,7 +1544,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				err: NewErrorISE("failure saving error to acme challenge: force"),
 			}
 		},
-		"ok/no-names-error": func(t *testing.T) test {
+		"ok/no-names-nor-ips-error": func(t *testing.T) test {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -1573,7 +1573,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
-						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value)
+						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
@@ -1616,7 +1616,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
-						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value)
+						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
@@ -1660,7 +1660,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
-						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value)
+						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
@@ -1703,7 +1703,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
-						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value)
+						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
