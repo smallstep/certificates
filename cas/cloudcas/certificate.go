@@ -12,8 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
-	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1beta1"
-	wrapperspb "google.golang.org/protobuf/types/known/wrapperspb"
+	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1"
 )
 
 var (
@@ -67,11 +66,10 @@ func createCertificateConfig(tpl *x509.Certificate) (*pb.Certificate_Config, err
 	config := &pb.CertificateConfig{
 		SubjectConfig: &pb.CertificateConfig_SubjectConfig{
 			Subject:        createSubject(tpl),
-			CommonName:     tpl.Subject.CommonName,
 			SubjectAltName: createSubjectAlternativeNames(tpl),
 		},
-		ReusableConfig: createReusableConfig(tpl),
-		PublicKey:      pk,
+		X509Config: createX509Parameters(tpl),
+		PublicKey:  pk,
 	}
 	return &pb.Certificate_Config{
 		Config: config,
@@ -86,7 +84,7 @@ func createPublicKey(key crypto.PublicKey) (*pb.PublicKey, error) {
 			return nil, errors.Wrap(err, "error marshaling public key")
 		}
 		return &pb.PublicKey{
-			Type: pb.PublicKey_PEM_EC_KEY,
+			Format: pb.PublicKey_PEM,
 			Key: pem.EncodeToMemory(&pem.Block{
 				Type:  "PUBLIC KEY",
 				Bytes: asn1Bytes,
@@ -94,7 +92,7 @@ func createPublicKey(key crypto.PublicKey) (*pb.PublicKey, error) {
 		}, nil
 	case *rsa.PublicKey:
 		return &pb.PublicKey{
-			Type: pb.PublicKey_PEM_RSA_KEY,
+			Format: pb.PublicKey_PEM,
 			Key: pem.EncodeToMemory(&pem.Block{
 				Type:  "RSA PUBLIC KEY",
 				Bytes: x509.MarshalPKCS1PublicKey(key),
@@ -107,7 +105,9 @@ func createPublicKey(key crypto.PublicKey) (*pb.PublicKey, error) {
 
 func createSubject(cert *x509.Certificate) *pb.Subject {
 	sub := cert.Subject
-	ret := new(pb.Subject)
+	ret := &pb.Subject{
+		CommonName: sub.CommonName,
+	}
 	if len(sub.Country) > 0 {
 		ret.CountryCode = sub.Country[0]
 	}
@@ -196,7 +196,7 @@ func createSubjectAlternativeNames(cert *x509.Certificate) *pb.SubjectAltNames {
 	return ret
 }
 
-func createReusableConfig(cert *x509.Certificate) *pb.ReusableConfigWrapper {
+func createX509Parameters(cert *x509.Certificate) *pb.X509Parameters {
 	var unknownEKUs []*pb.ObjectId
 	var ekuOptions = &pb.KeyUsage_ExtendedKeyUsageOptions{}
 	for _, eku := range cert.ExtKeyUsage {
@@ -241,22 +241,19 @@ func createReusableConfig(cert *x509.Certificate) *pb.ReusableConfigWrapper {
 		policyIDs = append(policyIDs, createObjectID(oid))
 	}
 
-	var caOptions *pb.ReusableConfigValues_CaOptions
+	var caOptions *pb.X509Parameters_CaOptions
 	if cert.BasicConstraintsValid {
-		var maxPathLength *wrapperspb.Int32Value
+		caOptions = new(pb.X509Parameters_CaOptions)
+		var maxPathLength int32
 		switch {
 		case cert.MaxPathLenZero:
-			maxPathLength = wrapperspb.Int32(0)
+			maxPathLength = 0
+			caOptions.MaxIssuerPathLength = &maxPathLength
 		case cert.MaxPathLen > 0:
-			maxPathLength = wrapperspb.Int32(int32(cert.MaxPathLen))
-		default:
-			maxPathLength = nil
+			maxPathLength = int32(cert.MaxPathLen)
+			caOptions.MaxIssuerPathLength = &maxPathLength
 		}
-
-		caOptions = &pb.ReusableConfigValues_CaOptions{
-			IsCa:                wrapperspb.Bool(cert.IsCA),
-			MaxIssuerPathLength: maxPathLength,
-		}
+		caOptions.IsCa = &cert.IsCA
 	}
 
 	var extraExtensions []*pb.X509Extension
@@ -270,7 +267,7 @@ func createReusableConfig(cert *x509.Certificate) *pb.ReusableConfigWrapper {
 		}
 	}
 
-	values := &pb.ReusableConfigValues{
+	return &pb.X509Parameters{
 		KeyUsage: &pb.KeyUsage{
 			BaseKeyUsage: &pb.KeyUsage_KeyUsageOptions{
 				DigitalSignature:  cert.KeyUsage&x509.KeyUsageDigitalSignature > 0,
@@ -290,12 +287,6 @@ func createReusableConfig(cert *x509.Certificate) *pb.ReusableConfigWrapper {
 		PolicyIds:            policyIDs,
 		AiaOcspServers:       cert.OCSPServer,
 		AdditionalExtensions: extraExtensions,
-	}
-
-	return &pb.ReusableConfigWrapper{
-		ConfigValues: &pb.ReusableConfigWrapper_ReusableConfigValues{
-			ReusableConfigValues: values,
-		},
 	}
 }
 

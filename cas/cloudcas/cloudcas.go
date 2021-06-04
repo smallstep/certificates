@@ -10,14 +10,16 @@ import (
 	"strings"
 	"time"
 
-	privateca "cloud.google.com/go/security/privateca/apiv1beta1"
+	privateca "cloud.google.com/go/security/privateca/apiv1"
 	"github.com/google/uuid"
 	gax "github.com/googleapis/gax-go/v2"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"go.step.sm/crypto/x509util"
 	"google.golang.org/api/option"
-	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1beta1"
+	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -32,9 +34,9 @@ var now = func() time.Time {
 }
 
 // The actual regular expression that matches a certificate authority is:
-//   ^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z0-9-]+/certificateAuthorities/[a-zA-Z0-9-_]+$
+//   ^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z0-9-]+/caPools/[a-zA-Z0-9-_]+/certificateAuthorities/[a-zA-Z0-9-_]+$
 // But we will allow a more flexible one to fail if this changes.
-var caRegexp = regexp.MustCompile("^projects/[^/]+/locations/[^/]+/certificateAuthorities/[^/]+$")
+var caRegexp = regexp.MustCompile("^projects/[^/]+/locations/[^/]+/caPools/[^/]+/certificateAuthorities/[^/]+$")
 
 // CertificateAuthorityClient is the interface implemented by the Google CAS
 // client.
@@ -45,6 +47,9 @@ type CertificateAuthorityClient interface {
 	CreateCertificateAuthority(ctx context.Context, req *pb.CreateCertificateAuthorityRequest, opts ...gax.CallOption) (*privateca.CreateCertificateAuthorityOperation, error)
 	FetchCertificateAuthorityCsr(ctx context.Context, req *pb.FetchCertificateAuthorityCsrRequest, opts ...gax.CallOption) (*pb.FetchCertificateAuthorityCsrResponse, error)
 	ActivateCertificateAuthority(ctx context.Context, req *pb.ActivateCertificateAuthorityRequest, opts ...gax.CallOption) (*privateca.ActivateCertificateAuthorityOperation, error)
+	EnableCertificateAuthority(ctx context.Context, req *pb.EnableCertificateAuthorityRequest, opts ...gax.CallOption) (*privateca.EnableCertificateAuthorityOperation, error)
+	GetCaPool(ctx context.Context, req *pb.GetCaPoolRequest, opts ...gax.CallOption) (*pb.CaPool, error)
+	CreateCaPool(ctx context.Context, req *pb.CreateCaPoolRequest, opts ...gax.CallOption) (*privateca.CreateCaPoolOperation, error)
 }
 
 // recocationCodeMap maps revocation reason codes from RFC 5280, to Google CAS
@@ -68,6 +73,7 @@ type CloudCAS struct {
 	certificateAuthority string
 	project              string
 	location             string
+	caPool               string
 }
 
 // newCertificateAuthorityClient creates the certificate authority client. This
@@ -93,6 +99,8 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 			return nil, errors.New("cloudCAS 'project' cannot be empty")
 		case opts.Location == "":
 			return nil, errors.New("cloudCAS 'location' cannot be empty")
+		case opts.CAPool == "":
+			return nil, errors.New("cloudCAS 'caPool' cannot be empty")
 		}
 	} else {
 		if opts.CertificateAuthority == "" {
@@ -102,12 +110,15 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 			return nil, errors.New("cloudCAS 'certificateAuthority' is not valid certificate authority resource")
 		}
 		// Extract project and location from CertificateAuthority
-		if parts := strings.Split(opts.CertificateAuthority, "/"); len(parts) == 6 {
+		if parts := strings.Split(opts.CertificateAuthority, "/"); len(parts) == 8 {
 			if opts.Project == "" {
 				opts.Project = parts[1]
 			}
 			if opts.Location == "" {
 				opts.Location = parts[3]
+			}
+			if opts.CAPool == "" {
+				opts.CAPool = parts[5]
 			}
 		}
 	}
@@ -122,6 +133,7 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 		certificateAuthority: opts.CertificateAuthority,
 		project:              opts.Project,
 		location:             opts.Location,
+		caPool:               opts.CAPool,
 	}, nil
 }
 
@@ -301,28 +313,30 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 	}
 	req.Template.ExtraExtensions = append(req.Template.ExtraExtensions, casExtension)
 
+	// Create the caPool if necessary
+	parent, err := c.createCaPoolIfNecessary()
+	if err != nil {
+		return nil, err
+	}
+
 	// Prepare CreateCertificateAuthorityRequest
 	pbReq := &pb.CreateCertificateAuthorityRequest{
-		Parent:                 "projects/" + c.project + "/locations/" + c.location,
+		Parent:                 parent,
 		CertificateAuthorityId: caID,
 		RequestId:              req.RequestID,
 		CertificateAuthority: &pb.CertificateAuthority{
 			Type: caType,
-			Tier: pb.CertificateAuthority_ENTERPRISE,
 			Config: &pb.CertificateConfig{
 				SubjectConfig: &pb.CertificateConfig_SubjectConfig{
-					Subject:    createSubject(req.Template),
-					CommonName: req.Template.Subject.CommonName,
+					Subject:        createSubject(req.Template),
+					SubjectAltName: createSubjectAlternativeNames(req.Template),
 				},
-				ReusableConfig: createReusableConfig(req.Template),
+				X509Config: createX509Parameters(req.Template),
 			},
-			Lifetime: durationpb.New(req.Lifetime),
-			KeySpec:  keySpec,
-			IssuingOptions: &pb.CertificateAuthority_IssuingOptions{
-				IncludeCaCertUrl:    true,
-				IncludeCrlAccessUrl: true,
-			},
-			Labels: map[string]string{},
+			Lifetime:  durationpb.New(req.Lifetime),
+			KeySpec:   keySpec,
+			GcsBucket: "",
+			Labels:    map[string]string{},
 		},
 	}
 
@@ -344,9 +358,17 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 		return nil, errors.Wrap(err, "cloudCAS CreateCertificateAuthority failed")
 	}
 
+	// Enable root certificate
+	if req.Type == apiv1.RootCA {
+		ca, err = c.enableCertificateAuthority(ca)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Sign Intermediate CAs with the parent.
 	if req.Type == apiv1.IntermediateCA {
-		ca, err = c.signIntermediateCA(ca.Name, req)
+		ca, err = c.signIntermediateCA(parent, ca.Name, req)
 		if err != nil {
 			return nil, err
 		}
@@ -378,6 +400,77 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 	}, nil
 }
 
+func (c *CloudCAS) createCaPoolIfNecessary() (string, error) {
+	ctx, cancel := defaultContext()
+	defer cancel()
+
+	pool, err := c.client.GetCaPool(ctx, &pb.GetCaPoolRequest{
+		Name: "projects/" + c.project + "/locations/" + c.location + "/caPools/" + c.caPool,
+	})
+	if err == nil {
+		return pool.Name, nil
+	}
+
+	if status.Code(err) != codes.NotFound {
+		return "", errors.Wrap(err, "cloudCAS GetCaPool failed")
+	}
+
+	ctx, cancel = defaultContext()
+	defer cancel()
+
+	op, err := c.client.CreateCaPool(ctx, &pb.CreateCaPoolRequest{
+		Parent:   "projects/" + c.project + "/locations/" + c.location,
+		CaPoolId: c.caPool,
+		CaPool: &pb.CaPool{
+			Tier:           pb.CaPool_ENTERPRISE,
+			IssuancePolicy: nil,
+			PublishingOptions: &pb.CaPool_PublishingOptions{
+				PublishCaCert: true,
+				PublishCrl:    true,
+			},
+		},
+	})
+	if err != nil {
+		return "", errors.Wrap(err, "cloudCAS CreateCaPool failed")
+	}
+
+	ctx, cancel = defaultInitiatorContext()
+	defer cancel()
+
+	pool, err = op.Wait(ctx)
+	if err != nil {
+		return "", errors.Wrap(err, "cloudCAS CreateCaPool failed")
+	}
+
+	return pool.Name, nil
+}
+
+func (c *CloudCAS) enableCertificateAuthority(ca *pb.CertificateAuthority) (*pb.CertificateAuthority, error) {
+	if ca.State == pb.CertificateAuthority_ENABLED {
+		return ca, nil
+	}
+
+	ctx, cancel := defaultContext()
+	defer cancel()
+
+	resp, err := c.client.EnableCertificateAuthority(ctx, &pb.EnableCertificateAuthorityRequest{
+		Name: ca.Name,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "cloudCAS EnableCertificateAuthority failed")
+	}
+
+	ctx, cancel = defaultInitiatorContext()
+	defer cancel()
+
+	ca, err = resp.Wait(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "cloudCAS EnableCertificateAuthority failed")
+	}
+
+	return ca, nil
+}
+
 func (c *CloudCAS) createCertificate(tpl *x509.Certificate, lifetime time.Duration, requestID string) (*x509.Certificate, []*x509.Certificate, error) {
 	// Removes the CAS extension if it exists.
 	apiv1.RemoveCertificateAuthorityExtension(tpl)
@@ -403,7 +496,7 @@ func (c *CloudCAS) createCertificate(tpl *x509.Certificate, lifetime time.Durati
 	defer cancel()
 
 	cert, err := c.client.CreateCertificate(ctx, &pb.CreateCertificateRequest{
-		Parent:        c.certificateAuthority,
+		Parent:        "projects/" + c.project + "/locations/" + c.location + "/caPools/" + c.caPool,
 		CertificateId: id,
 		Certificate: &pb.Certificate{
 			CertificateConfig: certConfig,
@@ -420,7 +513,7 @@ func (c *CloudCAS) createCertificate(tpl *x509.Certificate, lifetime time.Durati
 	return getCertificateAndChain(cert)
 }
 
-func (c *CloudCAS) signIntermediateCA(name string, req *apiv1.CreateCertificateAuthorityRequest) (*pb.CertificateAuthority, error) {
+func (c *CloudCAS) signIntermediateCA(parent, name string, req *apiv1.CreateCertificateAuthorityRequest) (*pb.CertificateAuthority, error) {
 	id, err := createCertificateID()
 	if err != nil {
 		return nil, err
@@ -477,7 +570,7 @@ func (c *CloudCAS) signIntermediateCA(name string, req *apiv1.CreateCertificateA
 		defer cancel()
 
 		cert, err = c.client.CreateCertificate(ctx, &pb.CreateCertificateRequest{
-			Parent:        req.Parent.Name,
+			Parent:        parent,
 			CertificateId: id,
 			Certificate: &pb.Certificate{
 				CertificateConfig: &pb.Certificate_PemCsr{
@@ -519,6 +612,12 @@ func (c *CloudCAS) signIntermediateCA(name string, req *apiv1.CreateCertificateA
 	ca, err := resp.Wait(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "cloudCAS ActivateCertificateAuthority failed")
+	}
+
+	// Enable certificate authority
+	ca, err = c.enableCertificateAuthority(ca)
+	if err != nil {
+		return nil, err
 	}
 
 	return ca, nil

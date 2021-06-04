@@ -49,6 +49,7 @@ type Options struct {
 	// certificate authority.
 	Project  string `json:"-"`
 	Location string `json:"-"`
+	CAPool   string `json:"-"`
 }
 
 // CertificateIssuer contains the properties used to use the StepCAS certificate
