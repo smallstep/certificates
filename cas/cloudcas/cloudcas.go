@@ -74,6 +74,7 @@ type CloudCAS struct {
 	project              string
 	location             string
 	caPool               string
+	gcsBucket            string
 }
 
 // newCertificateAuthorityClient creates the certificate authority client. This
@@ -263,6 +264,8 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 		return nil, errors.New("cloudCAS `project` cannot be empty")
 	case c.location == "":
 		return nil, errors.New("cloudCAS `location` cannot be empty")
+	case c.caPool == "":
+		return nil, errors.New("cloudCAS `caPool` cannot be empty")
 	case req.Template == nil:
 		return nil, errors.New("createCertificateAuthorityRequest `template` cannot be nil")
 	case req.Lifetime == 0:
@@ -335,7 +338,7 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 			},
 			Lifetime:  durationpb.New(req.Lifetime),
 			KeySpec:   keySpec,
-			GcsBucket: "",
+			GcsBucket: c.gcsBucket,
 			Labels:    map[string]string{},
 		},
 	}
