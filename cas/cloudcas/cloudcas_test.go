@@ -893,6 +893,10 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
 		PemCsr: testIntermediateCsr,
 	}, nil)
+	m.EXPECT().CreateCertificate(any, any).Return(&pb.Certificate{
+		PemCertificate:      testIntermediateCertificate,
+		PemCertificateChain: []string{testRootCertificate},
+	}, nil)
 	m.EXPECT().ActivateCertificateAuthority(any, any).Return(fake.ActivateCertificateAuthorityOperation("ActivateCertificateAuthority"), nil)
 	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
 		Name: "ActivateCertificateAuthority",
@@ -930,10 +934,6 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 	}, nil)
 	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
 		PemCsr: testIntermediateCsr,
-	}, nil)
-	m.EXPECT().CreateCertificate(any, any).Return(&pb.Certificate{
-		PemCertificate:      testIntermediateCertificate,
-		PemCertificateChain: []string{testRootCertificate},
 	}, nil)
 	m.EXPECT().ActivateCertificateAuthority(any, any).Return(fake.ActivateCertificateAuthorityOperation("ActivateCertificateAuthority"), nil)
 	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
@@ -1002,6 +1002,102 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 	// fail CreateCertificateAuthority.Wait
 	m.EXPECT().GetCaPool(any, any).Return(&pb.CaPool{Name: testCaPoolName}, nil)
 	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(nil, errTest)
+
+	// fail EnableCertificateAuthority
+	m.EXPECT().GetCaPool(any, any).Return(&pb.CaPool{Name: testCaPoolName}, nil)
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name:              testAuthorityName,
+				PemCaCertificates: []string{testRootCertificate},
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().EnableCertificateAuthority(any, any).Return(nil, errTest)
+
+	// fail EnableCertificateAuthority.Wait
+	m.EXPECT().GetCaPool(any, any).Return(&pb.CaPool{Name: testCaPoolName}, nil)
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name:              testAuthorityName,
+				PemCaCertificates: []string{testRootCertificate},
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().EnableCertificateAuthority(any, any).Return(fake.EnableCertificateAuthorityOperation("EnableCertificateAuthorityOperation"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(nil, errTest)
+
+	// fail EnableCertificateAuthority intermediate
+	m.EXPECT().GetCaPool(any, any).Return(&pb.CaPool{Name: testCaPoolName}, nil)
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name: testAuthorityName,
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
+		PemCsr: testIntermediateCsr,
+	}, nil)
+	m.EXPECT().CreateCertificate(any, any).Return(&pb.Certificate{
+		PemCertificate:      testIntermediateCertificate,
+		PemCertificateChain: []string{testRootCertificate},
+	}, nil)
+	m.EXPECT().ActivateCertificateAuthority(any, any).Return(fake.ActivateCertificateAuthorityOperation("ActivateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "ActivateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name:              testAuthorityName,
+				PemCaCertificates: []string{testIntermediateCertificate, testRootCertificate},
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().EnableCertificateAuthority(any, any).Return(nil, errTest)
+
+	// fail EnableCertificateAuthority.Wait intermediate
+	m.EXPECT().GetCaPool(any, any).Return(&pb.CaPool{Name: testCaPoolName}, nil)
+	m.EXPECT().CreateCertificateAuthority(any, any).Return(fake.CreateCertificateAuthorityOperation("CreateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "CreateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name: testAuthorityName,
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().FetchCertificateAuthorityCsr(any, any).Return(&pb.FetchCertificateAuthorityCsrResponse{
+		PemCsr: testIntermediateCsr,
+	}, nil)
+	m.EXPECT().CreateCertificate(any, any).Return(&pb.Certificate{
+		PemCertificate:      testIntermediateCertificate,
+		PemCertificateChain: []string{testRootCertificate},
+	}, nil)
+	m.EXPECT().ActivateCertificateAuthority(any, any).Return(fake.ActivateCertificateAuthorityOperation("ActivateCertificateAuthority"), nil)
+	mos.EXPECT().GetOperation(any, any).Return(&longrunningpb.Operation{
+		Name: "ActivateCertificateAuthority",
+		Done: true,
+		Result: &longrunningpb.Operation_Response{
+			Response: must(anypb.New(&pb.CertificateAuthority{
+				Name:              testAuthorityName,
+				PemCaCertificates: []string{testIntermediateCertificate, testRootCertificate},
+			})).(*anypb.Any),
+		},
+	}, nil)
+	m.EXPECT().EnableCertificateAuthority(any, any).Return(fake.EnableCertificateAuthorityOperation("EnableCertificateAuthorityOperation"), nil)
 	mos.EXPECT().GetOperation(any, any).Return(nil, errTest)
 
 	// fail FetchCertificateAuthorityCsr
@@ -1247,6 +1343,36 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
+		{"fail EnableCertificateAuthority", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+		}}, nil, true},
+		{"fail EnableCertificateAuthority.Wait", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: mustParseCertificate(t, testRootCertificate),
+			Lifetime: 24 * time.Hour,
+		}}, nil, true},
+
+		{"fail EnableCertificateAuthority intermediate", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testIntermediateCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Name:        testAuthorityName,
+				Certificate: rootCrt,
+			},
+		}}, nil, true},
+		{"fail EnableCertificateAuthority.Wait intermediate", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: mustParseCertificate(t, testIntermediateCertificate),
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Name:        testAuthorityName,
+				Certificate: rootCrt,
+			},
+		}}, nil, true},
+
 		{"fail FetchCertificateAuthorityCsr", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testIntermediateCertificate),
