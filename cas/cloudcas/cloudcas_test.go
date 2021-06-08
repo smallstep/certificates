@@ -290,7 +290,7 @@ func TestNew(t *testing.T) {
 			caPool:               testCaPool,
 		}, false},
 		{"ok creator", args{context.Background(), apiv1.Options{
-			IsCreator: true, Project: testProject, Location: testLocation, CAPool: testCaPool,
+			IsCreator: true, Project: testProject, Location: testLocation, CaPool: testCaPool,
 		}}, &CloudCAS{
 			client:   &testClient{},
 			project:  testProject,
@@ -311,7 +311,7 @@ func TestNew(t *testing.T) {
 			IsCreator: true, Project: testProject, Location: "",
 		}}, nil, true},
 		{"fail caPool", args{context.Background(), apiv1.Options{
-			IsCreator: true, Project: testProject, Location: testLocation, CAPool: "",
+			IsCreator: true, Project: testProject, Location: testLocation, CaPool: "",
 		}}, nil, true},
 	}
 	for _, tt := range tests {

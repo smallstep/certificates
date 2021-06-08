@@ -100,9 +100,10 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 			return nil, errors.New("cloudCAS 'project' cannot be empty")
 		case opts.Location == "":
 			return nil, errors.New("cloudCAS 'location' cannot be empty")
-		case opts.CAPool == "":
+		case opts.CaPool == "":
 			return nil, errors.New("cloudCAS 'caPool' cannot be empty")
 		}
+
 	} else {
 		if opts.CertificateAuthority == "" {
 			return nil, errors.New("cloudCAS 'certificateAuthority' cannot be empty")
@@ -118,8 +119,8 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 			if opts.Location == "" {
 				opts.Location = parts[3]
 			}
-			if opts.CAPool == "" {
-				opts.CAPool = parts[5]
+			if opts.CaPool == "" {
+				opts.CaPool = parts[5]
 			}
 		}
 	}
@@ -134,7 +135,7 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 		certificateAuthority: opts.CertificateAuthority,
 		project:              opts.Project,
 		location:             opts.Location,
-		caPool:               opts.CAPool,
+		caPool:               opts.CaPool,
 	}, nil
 }
 
