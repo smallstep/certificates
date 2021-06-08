@@ -7,12 +7,20 @@ to manage issues, etc.
 
 ## Table of Contents
 
-* [Building From Source](#building-from-source)
-* [Asking Support Questions](#asking-support-questions)
-* [Reporting Issues](#reporting-issues)
-* [Submitting Patches](#submitting-patches)
-  * [Code Contribution Guidelines](#code-contribution-guidelines)
-  * [Git Commit Message Guidelines](#git-commit-message-guidelines)
+- [Contributing to `step certificates`](#contributing-to-step-certificates)
+  - [Table of Contents](#table-of-contents)
+  - [Building From Source](#building-from-source)
+    - [Build a standard `step-ca`](#build-a-standard-step-ca)
+    - [Build `step-ca` using CGO](#build-step-ca-using-cgo)
+      - [The CGO build enables PKCS #11 and YubiKey PIV support](#the-cgo-build-enables-pkcs-11-and-yubikey-piv-support)
+      - [1. Install PCSC support](#1-install-pcsc-support)
+      - [2. Build `step-ca`](#2-build-step-ca)
+  - [Asking Support Questions](#asking-support-questions)
+  - [Reporting Issues](#reporting-issues)
+  - [Code Contribution](#code-contribution)
+  - [Submitting Patches](#submitting-patches)
+    - [Code Contribution Guidelines](#code-contribution-guidelines)
+    - [Git Commit Message Guidelines](#git-commit-message-guidelines)
 
 ## Building From Source
 
@@ -73,7 +81,7 @@ When the build is complete, you will find binaries in `bin/`.
 
 ## Asking Support Questions
 
-Feel free to post a question on our [GitHub Discussions](https://github.com/smallstep/certificates/discussions) page, or find us on [Gitter](https://gitter.im/smallstep/community).
+Feel free to post a question on our [GitHub Discussions](https://github.com/smallstep/certificates/discussions) page, or find us on [Discord](https://bit.ly/stepdiscord).
 
 ## Reporting Issues
 
