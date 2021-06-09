@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/asn1"
-	"encoding/json"
 	"encoding/pem"
 	"regexp"
 	"strings"
@@ -412,9 +411,6 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 			}
 		}
 	}
-
-	b, _ := json.MarshalIndent(ca, "", "\t")
-	println(string(b))
 
 	return &apiv1.CreateCertificateAuthorityResponse{
 		Name:             ca.Name,
