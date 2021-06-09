@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/asn1"
+	"encoding/json"
 	"encoding/pem"
 	"regexp"
 	"strings"
@@ -67,6 +68,13 @@ var revocationCodeMap = map[int]pb.RevocationReason{
 	10: pb.RevocationReason_ATTRIBUTE_AUTHORITY_COMPROMISE,
 }
 
+// caPoolTierMap contains the map between apv1.Options.Tier and the pb type.
+var caPoolTierMap = map[string]pb.CaPool_Tier{
+	"":           pb.CaPool_DEVOPS,
+	"ENTERPRISE": pb.CaPool_ENTERPRISE,
+	"DEVOPS":     pb.CaPool_DEVOPS,
+}
+
 // CloudCAS implements a Certificate Authority Service using Google Cloud CAS.
 type CloudCAS struct {
 	client               CertificateAuthorityClient
@@ -74,6 +82,7 @@ type CloudCAS struct {
 	project              string
 	location             string
 	caPool               string
+	caPoolTier           pb.CaPool_Tier
 	gcsBucket            string
 }
 
@@ -94,7 +103,8 @@ var newCertificateAuthorityClient = func(ctx context.Context, credentialsFile st
 // New creates a new CertificateAuthorityService implementation using Google
 // Cloud CAS.
 func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
-	if opts.IsCreator {
+	var caPoolTier pb.CaPool_Tier
+	if opts.IsCreator && opts.CertificateAuthority == "" {
 		switch {
 		case opts.Project == "":
 			return nil, errors.New("cloudCAS 'project' cannot be empty")
@@ -103,7 +113,10 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 		case opts.CaPool == "":
 			return nil, errors.New("cloudCAS 'caPool' cannot be empty")
 		}
-
+		var ok bool
+		if caPoolTier, ok = caPoolTierMap[strings.ToUpper(opts.CaPoolTier)]; !ok {
+			return nil, errors.New("cloudCAS 'caPoolTier' is not a valid tier")
+		}
 	} else {
 		if opts.CertificateAuthority == "" {
 			return nil, errors.New("cloudCAS 'certificateAuthority' cannot be empty")
@@ -130,12 +143,15 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 		return nil, err
 	}
 
+	// GCSBucket is the the bucket name or empty for a managed bucket.
 	return &CloudCAS{
 		client:               client,
 		certificateAuthority: opts.CertificateAuthority,
 		project:              opts.Project,
 		location:             opts.Location,
 		caPool:               opts.CaPool,
+		gcsBucket:            opts.GCSBucket,
+		caPoolTier:           caPoolTier,
 	}, nil
 }
 
@@ -267,6 +283,8 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 		return nil, errors.New("cloudCAS `location` cannot be empty")
 	case c.caPool == "":
 		return nil, errors.New("cloudCAS `caPool` cannot be empty")
+	case c.caPoolTier == 0:
+		return nil, errors.New("cloudCAS `caPoolTier` cannot be empty")
 	case req.Template == nil:
 		return nil, errors.New("createCertificateAuthorityRequest `template` cannot be nil")
 	case req.Lifetime == 0:
@@ -362,20 +380,18 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 		return nil, errors.Wrap(err, "cloudCAS CreateCertificateAuthority failed")
 	}
 
-	// Enable root certificate
-	if req.Type == apiv1.RootCA {
-		ca, err = c.enableCertificateAuthority(ca)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// Sign Intermediate CAs with the parent.
 	if req.Type == apiv1.IntermediateCA {
 		ca, err = c.signIntermediateCA(parent, ca.Name, req)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Enable Certificate Authority.
+	ca, err = c.enableCertificateAuthority(ca)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(ca.PemCaCertificates) == 0 {
@@ -396,6 +412,9 @@ func (c *CloudCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthor
 			}
 		}
 	}
+
+	b, _ := json.MarshalIndent(ca, "", "\t")
+	println(string(b))
 
 	return &apiv1.CreateCertificateAuthorityResponse{
 		Name:             ca.Name,
@@ -419,6 +438,12 @@ func (c *CloudCAS) createCaPoolIfNecessary() (string, error) {
 		return "", errors.Wrap(err, "cloudCAS GetCaPool failed")
 	}
 
+	// PublishCrl is only supported by the enterprise tier
+	var publishCrl bool
+	if c.caPoolTier == pb.CaPool_ENTERPRISE {
+		publishCrl = true
+	}
+
 	ctx, cancel = defaultContext()
 	defer cancel()
 
@@ -426,11 +451,11 @@ func (c *CloudCAS) createCaPoolIfNecessary() (string, error) {
 		Parent:   "projects/" + c.project + "/locations/" + c.location,
 		CaPoolId: c.caPool,
 		CaPool: &pb.CaPool{
-			Tier:           pb.CaPool_ENTERPRISE,
+			Tier:           c.caPoolTier,
 			IssuancePolicy: nil,
 			PublishingOptions: &pb.CaPool_PublishingOptions{
 				PublishCaCert: true,
-				PublishCrl:    true,
+				PublishCrl:    publishCrl,
 			},
 		},
 	})
@@ -507,7 +532,8 @@ func (c *CloudCAS) createCertificate(tpl *x509.Certificate, lifetime time.Durati
 			Lifetime:          durationpb.New(lifetime),
 			Labels:            map[string]string{},
 		},
-		RequestId: requestID,
+		IssuingCertificateAuthorityId: getResourceName(c.certificateAuthority),
+		RequestId:                     requestID,
 	})
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "cloudCAS CreateCertificate failed")
@@ -583,7 +609,8 @@ func (c *CloudCAS) signIntermediateCA(parent, name string, req *apiv1.CreateCert
 				Lifetime: durationpb.New(req.Lifetime),
 				Labels:   map[string]string{},
 			},
-			RequestId: req.RequestID,
+			IssuingCertificateAuthorityId: getResourceName(req.Parent.Name),
+			RequestId:                     req.RequestID,
 		})
 		if err != nil {
 			return nil, errors.Wrap(err, "cloudCAS CreateCertificate failed")
@@ -616,12 +643,6 @@ func (c *CloudCAS) signIntermediateCA(parent, name string, req *apiv1.CreateCert
 	ca, err := resp.Wait(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "cloudCAS ActivateCertificateAuthority failed")
-	}
-
-	// Enable certificate authority
-	ca, err = c.enableCertificateAuthority(ca)
-	if err != nil {
-		return nil, err
 	}
 
 	return ca, nil
@@ -690,7 +711,12 @@ func getCertificateAndChain(certpb *pb.Certificate) (*x509.Certificate, []*x509.
 	}
 
 	return cert, chain, nil
+}
 
+// getResourceName returns the last part of a resource.
+func getResourceName(name string) string {
+	parts := strings.Split(name, "/")
+	return parts[len(parts)-1]
 }
 
 // Normalize a certificate authority name to comply with [a-zA-Z0-9-_].

@@ -279,6 +279,17 @@ func TestNew(t *testing.T) {
 			project:              testProject,
 			location:             testLocation,
 			caPool:               testCaPool,
+			caPoolTier:           0,
+		}, false},
+		{"ok authority and creator", args{context.Background(), apiv1.Options{
+			CertificateAuthority: testAuthorityName, IsCreator: true,
+		}}, &CloudCAS{
+			client:               &testClient{},
+			certificateAuthority: testAuthorityName,
+			project:              testProject,
+			location:             testLocation,
+			caPool:               testCaPool,
+			caPoolTier:           0,
 		}, false},
 		{"ok with credentials", args{context.Background(), apiv1.Options{
 			CertificateAuthority: testAuthorityName, CredentialsFile: "testdata/credentials.json",
@@ -288,14 +299,34 @@ func TestNew(t *testing.T) {
 			project:              testProject,
 			location:             testLocation,
 			caPool:               testCaPool,
+			caPoolTier:           0,
 		}, false},
 		{"ok creator", args{context.Background(), apiv1.Options{
 			IsCreator: true, Project: testProject, Location: testLocation, CaPool: testCaPool,
 		}}, &CloudCAS{
-			client:   &testClient{},
-			project:  testProject,
-			location: testLocation,
-			caPool:   testCaPool,
+			client:     &testClient{},
+			project:    testProject,
+			location:   testLocation,
+			caPool:     testCaPool,
+			caPoolTier: pb.CaPool_DEVOPS,
+		}, false},
+		{"ok creator devops", args{context.Background(), apiv1.Options{
+			IsCreator: true, Project: testProject, Location: testLocation, CaPool: testCaPool, CaPoolTier: "DevOps",
+		}}, &CloudCAS{
+			client:     &testClient{},
+			project:    testProject,
+			location:   testLocation,
+			caPool:     testCaPool,
+			caPoolTier: pb.CaPool_DEVOPS,
+		}, false},
+		{"ok creator enterprise", args{context.Background(), apiv1.Options{
+			IsCreator: true, Project: testProject, Location: testLocation, CaPool: testCaPool, CaPoolTier: "ENTERPRISE",
+		}}, &CloudCAS{
+			client:     &testClient{},
+			project:    testProject,
+			location:   testLocation,
+			caPool:     testCaPool,
+			caPoolTier: pb.CaPool_ENTERPRISE,
 		}, false},
 		{"fail certificate authority", args{context.Background(), apiv1.Options{
 			CertificateAuthority: "projects/ok1234/locations/ok1234/caPools/ok1234/certificateAuthorities/ok1234/bad",
@@ -1215,6 +1246,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 		project              string
 		location             string
 		caPool               string
+		caPoolTier           pb.CaPool_Tier
 	}
 	type args struct {
 		req *apiv1.CreateCertificateAuthorityRequest
@@ -1226,7 +1258,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 		want    *apiv1.CreateCertificateAuthorityResponse
 		wantErr bool
 	}{
-		{"ok root", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"ok root", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_ENTERPRISE}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1234,7 +1266,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 			Name:        testAuthorityName,
 			Certificate: rootCrt,
 		}, false},
-		{"ok intermediate", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"ok intermediate", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testIntermediateCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1247,7 +1279,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 			Certificate:      intCrt,
 			CertificateChain: []*x509.Certificate{rootCrt},
 		}, false},
-		{"ok intermediate local signer", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"ok intermediate local signer", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_ENTERPRISE}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testIntermediateCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1260,7 +1292,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 			Certificate:      intCrt,
 			CertificateChain: []*x509.Certificate{rootCrt},
 		}, false},
-		{"ok create key", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"ok create key", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1271,46 +1303,46 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 			Name:        testAuthorityName,
 			Certificate: rootCrt,
 		}, false},
-		{"fail project", fields{m, "", "", testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail project", fields{m, "", "", testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail location", fields{m, "", testProject, "", testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail location", fields{m, "", testProject, "", testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail caPool", fields{m, "", testProject, testLocation, ""}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail caPool", fields{m, "", testProject, testLocation, "", pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail template", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail template", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail lifetime", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail lifetime", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 		}}, nil, true},
-		{"fail parent", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail parent", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail parent name", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail parent name", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 			Parent:   &apiv1.CreateCertificateAuthorityResponse{},
 		}}, nil, true},
-		{"fail type", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail type", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     0,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail create key", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail create key", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1318,43 +1350,43 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 				SignatureAlgorithm: kmsapi.PureEd25519,
 			},
 		}}, nil, true},
-		{"fail GetCaPool", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail GetCaPool", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail CreateCaPool", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail CreateCaPool", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail CreateCaPool.Wait", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail CreateCaPool.Wait", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail CreateCertificateAuthority", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail CreateCertificateAuthority", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail CreateCertificateAuthority.Wait", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail CreateCertificateAuthority.Wait", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail EnableCertificateAuthority", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail EnableCertificateAuthority", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail EnableCertificateAuthority.Wait", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail EnableCertificateAuthority.Wait", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,
 			Template: mustParseCertificate(t, testRootCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
 
-		{"fail EnableCertificateAuthority intermediate", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail EnableCertificateAuthority intermediate", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testIntermediateCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1363,7 +1395,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 				Certificate: rootCrt,
 			},
 		}}, nil, true},
-		{"fail EnableCertificateAuthority.Wait intermediate", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail EnableCertificateAuthority.Wait intermediate", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testIntermediateCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1373,7 +1405,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 			},
 		}}, nil, true},
 
-		{"fail FetchCertificateAuthorityCsr", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail FetchCertificateAuthorityCsr", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testIntermediateCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1382,7 +1414,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 				Certificate: rootCrt,
 			},
 		}}, nil, true},
-		{"fail CreateCertificate", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail CreateCertificate", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testIntermediateCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1391,7 +1423,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 				Certificate: rootCrt,
 			},
 		}}, nil, true},
-		{"fail ActivateCertificateAuthority", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail ActivateCertificateAuthority", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testIntermediateCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1400,7 +1432,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 				Certificate: rootCrt,
 			},
 		}}, nil, true},
-		{"fail ActivateCertificateAuthority.Wait", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail ActivateCertificateAuthority.Wait", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testIntermediateCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1409,7 +1441,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 				Certificate: rootCrt,
 			},
 		}}, nil, true},
-		{"fail x509util.CreateCertificate", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail x509util.CreateCertificate", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testIntermediateCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1418,7 +1450,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 				Signer:      createBadSigner(t),
 			},
 		}}, nil, true},
-		{"fail parseCertificateRequest", fields{m, "", testProject, testLocation, testCaPool}, args{&apiv1.CreateCertificateAuthorityRequest{
+		{"fail parseCertificateRequest", fields{m, "", testProject, testLocation, testCaPool, pb.CaPool_DEVOPS}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.IntermediateCA,
 			Template: mustParseCertificate(t, testIntermediateCertificate),
 			Lifetime: 24 * time.Hour,
@@ -1436,6 +1468,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 				project:              tt.fields.project,
 				location:             tt.fields.location,
 				caPool:               tt.fields.caPool,
+				caPoolTier:           tt.fields.caPoolTier,
 			}
 			got, err := c.CreateCertificateAuthority(tt.args.req)
 			if (err != nil) != tt.wantErr {
