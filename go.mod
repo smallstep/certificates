@@ -26,10 +26,10 @@ require (
 	go.step.sm/cli-utils v0.2.0
 	go.step.sm/crypto v0.8.3
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
-	golang.org/x/net v0.0.0-20210503060351-7fd8e65b6420
-	golang.org/x/sys v0.0.0-20210603125802-9665404d3644 // indirect
+	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
+	golang.org/x/sys v0.0.0-20210608053332-aa57babbf139 // indirect
 	google.golang.org/api v0.47.0
-	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c
+	google.golang.org/genproto v0.0.0-20210608205507-b6d2f5bf0d7d
 	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.26.0
 	gopkg.in/square/go-jose.v2 v2.5.1
