@@ -119,7 +119,7 @@ func main() {
 		fatal(err)
 	}
 
-	if c.Pin == "" && u.Get("pin-value") == "" && u.Get("pin-source") == "" {
+	if u.Get("pin-value") == "" && u.Get("pin-source") == "" && c.Pin == "" {
 		pin, err := ui.PromptPassword("What is the PKCS#11 PIN?")
 		if err != nil {
 			fatal(err)
