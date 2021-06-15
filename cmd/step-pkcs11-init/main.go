@@ -119,6 +119,14 @@ func main() {
 		fatal(err)
 	}
 
+	if c.Pin == "" && u.Get("pin-value") == "" && u.Get("pin-source") == "" {
+		pin, err := ui.PromptPassword("What is the PKCS#11 PIN?")
+		if err != nil {
+			fatal(err)
+		}
+		c.Pin = string(pin)
+	}
+
 	k, err := kms.New(context.Background(), apiv1.Options{
 		Type: string(apiv1.PKCS11),
 		URI:  c.KMS,
