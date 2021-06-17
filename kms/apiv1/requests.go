@@ -156,4 +156,8 @@ type LoadCertificateRequest struct {
 type StoreCertificateRequest struct {
 	Name        string
 	Certificate *x509.Certificate
+
+	// Whether the key may be exported from the HSM under a wrap key.
+	// Sets the CKA_EXTRACTABLE bit.
+	Extractable bool
 }

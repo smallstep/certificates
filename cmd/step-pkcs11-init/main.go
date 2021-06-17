@@ -328,6 +328,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 				Name:        c.RootObject,
 				Certificate: root,
+				Extractable: c.Extractable,
 			}); err != nil {
 				return err
 			}
@@ -406,6 +407,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 			Name:        c.CrtObject,
 			Certificate: intermediate,
+			Extractable: c.Extractable,
 		}); err != nil {
 			return err
 		}
