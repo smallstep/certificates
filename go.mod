@@ -15,6 +15,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.0.5
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/micromdm/scep/v2 v2.0.0
+	github.com/miekg/pkcs11 v1.0.3-0.20190429190417-a667d056470f
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1

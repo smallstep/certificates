@@ -112,6 +112,10 @@ type CreateKeyRequest struct {
 	// ProtectionLevel specifies how cryptographic operations are performed.
 	// Used by: cloudkms
 	ProtectionLevel ProtectionLevel
+
+	// Whether the key may be exported from the HSM under a wrap key.
+	// Sets the CKA_EXTRACTABLE bit.
+	Extractable bool
 }
 
 // CreateKeyResponse is the response value of the kms.CreateKey method.
