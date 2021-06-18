@@ -21,18 +21,26 @@ import (
 	"go.step.sm/crypto/jose"
 )
 
+type ChallengeType string
+
+const (
+	HTTP01    ChallengeType = "http-01"
+	DNS01     ChallengeType = "dns-01"
+	TLSALPN01 ChallengeType = "tls-alpn-01"
+)
+
 // Challenge represents an ACME response Challenge type.
 type Challenge struct {
-	ID              string `json:"-"`
-	AccountID       string `json:"-"`
-	AuthorizationID string `json:"-"`
-	Value           string `json:"-"`
-	Type            string `json:"type"`
-	Status          Status `json:"status"`
-	Token           string `json:"token"`
-	ValidatedAt     string `json:"validated,omitempty"`
-	URL             string `json:"url"`
-	Error           *Error `json:"error,omitempty"`
+	ID              string        `json:"-"`
+	AccountID       string        `json:"-"`
+	AuthorizationID string        `json:"-"`
+	Value           string        `json:"-"`
+	Type            ChallengeType `json:"type"`
+	Status          Status        `json:"status"`
+	Token           string        `json:"token"`
+	ValidatedAt     string        `json:"validated,omitempty"`
+	URL             string        `json:"url"`
+	Error           *Error        `json:"error,omitempty"`
 }
 
 // ToLog enables response logging.
@@ -54,11 +62,11 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 		return nil
 	}
 	switch ch.Type {
-	case "http-01":
+	case HTTP01:
 		return http01Validate(ctx, ch, db, jwk, vo)
-	case "dns-01":
+	case DNS01:
 		return dns01Validate(ctx, ch, db, jwk, vo)
-	case "tls-alpn-01":
+	case TLSALPN01:
 		return tlsalpn01Validate(ctx, ch, db, jwk, vo)
 	default:
 		return NewErrorISE("unexpected challenge type '%s'", ch.Type)
