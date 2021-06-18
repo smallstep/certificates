@@ -393,6 +393,31 @@ func TestOrder_Finalize(t *testing.T) {
 					"CSR names = %v, Order names = %v", []string{"foo.internal"}, orderNames),
 			}
 		},
+		"fail/error-ips-length-mismatch": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "192.168.42.42"},
+					{Type: "ip", Value: "192.168.43.42"},
+				},
+			}
+			orderIPs := []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")}
+			csr := &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42")},
+			}
+
+			return test{
+				o:   o,
+				csr: csr,
+				err: NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
+					"CSR IPs = %v, Order IPs = %v", []net.IP{net.ParseIP("192.168.42.42")}, orderIPs),
+			}
+		},
 		"fail/error-names-mismatch": func(t *testing.T) test {
 			now := clock.Now()
 			o := &Order{
@@ -419,6 +444,31 @@ func TestOrder_Finalize(t *testing.T) {
 				csr: csr,
 				err: NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
 					"CSR names = %v, Order names = %v", []string{"foo.internal", "zap.internal"}, orderNames),
+			}
+		},
+		"fail/error-ips-mismatch": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "192.168.42.42"},
+					{Type: "ip", Value: "192.168.43.42"},
+				},
+			}
+			orderIPs := []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")}
+			csr := &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.32")},
+			}
+
+			return test{
+				o:   o,
+				csr: csr,
+				err: NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
+					"CSR IPs = %v, Order IPs = %v", []net.IP{net.ParseIP("192.168.42.32"), net.ParseIP("192.168.42.42")}, orderIPs),
 			}
 		},
 		"fail/error-provisioner-auth": func(t *testing.T) test {
@@ -652,7 +702,7 @@ func TestOrder_Finalize(t *testing.T) {
 				err: NewErrorISE("error updating order oID: force"),
 			}
 		},
-		"ok/new-cert": func(t *testing.T) test {
+		"ok/new-cert-dns": func(t *testing.T) test {
 			now := clock.Now()
 			o := &Order{
 				ID:               "oID",
@@ -670,6 +720,131 @@ func TestOrder_Finalize(t *testing.T) {
 					CommonName: "foo.internal",
 				},
 				DNSNames: []string{"bar.internal"},
+			}
+
+			foo := &x509.Certificate{Subject: pkix.Name{CommonName: "foo"}}
+			bar := &x509.Certificate{Subject: pkix.Name{CommonName: "bar"}}
+			baz := &x509.Certificate{Subject: pkix.Name{CommonName: "baz"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{foo, bar, baz}, nil
+					},
+				},
+				db: &MockDB{
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+						cert.ID = "certID"
+						assert.Equals(t, cert.AccountID, o.AccountID)
+						assert.Equals(t, cert.OrderID, o.ID)
+						assert.Equals(t, cert.Leaf, foo)
+						assert.Equals(t, cert.Intermediates, []*x509.Certificate{bar, baz})
+						return nil
+					},
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.CertificateID, "certID")
+						assert.Equals(t, updo.Status, StatusValid)
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						assert.Equals(t, updo.AuthorizationIDs, o.AuthorizationIDs)
+						assert.Equals(t, updo.Identifiers, o.Identifiers)
+						return nil
+					},
+				},
+			}
+		},
+		"ok/new-cert-ip": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "192.168.42.42"},
+					{Type: "ip", Value: "192.168.43.42"},
+				},
+			}
+			csr := &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")}, // in case of IPs, no Common Name
+			}
+
+			foo := &x509.Certificate{Subject: pkix.Name{CommonName: "foo"}}
+			bar := &x509.Certificate{Subject: pkix.Name{CommonName: "bar"}}
+			baz := &x509.Certificate{Subject: pkix.Name{CommonName: "baz"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{foo, bar, baz}, nil
+					},
+				},
+				db: &MockDB{
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+						cert.ID = "certID"
+						assert.Equals(t, cert.AccountID, o.AccountID)
+						assert.Equals(t, cert.OrderID, o.ID)
+						assert.Equals(t, cert.Leaf, foo)
+						assert.Equals(t, cert.Intermediates, []*x509.Certificate{bar, baz})
+						return nil
+					},
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.CertificateID, "certID")
+						assert.Equals(t, updo.Status, StatusValid)
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						assert.Equals(t, updo.AuthorizationIDs, o.AuthorizationIDs)
+						assert.Equals(t, updo.Identifiers, o.Identifiers)
+						return nil
+					},
+				},
+			}
+		},
+		"ok/new-cert-dns-and-ip": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+					{Type: "ip", Value: "192.168.42.42"},
+				},
+			}
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "foo.internal",
+				},
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42")},
 			}
 
 			foo := &x509.Certificate{Subject: pkix.Name{CommonName: "foo"}}
@@ -810,6 +985,204 @@ func Test_uniqueSortedIPs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if gotUnique := uniqueSortedIPs(tt.args.ips); !reflect.DeepEqual(gotUnique, tt.wantUnique) {
 				t.Errorf("uniqueSortedIPs() = %v, want %v", gotUnique, tt.wantUnique)
+			}
+		})
+	}
+}
+
+func Test_numberOfIdentifierType(t *testing.T) {
+	type args struct {
+		typ IdentifierType
+		ids []Identifier
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "ok/no-identifiers",
+			args: args{
+				typ: DNS,
+				ids: []Identifier{},
+			},
+			want: 0,
+		},
+		{
+			name: "ok/no-dns",
+			args: args{
+				typ: DNS,
+				ids: []Identifier{
+					{
+						Type:  IP,
+						Value: "192.168.42.42",
+					},
+				},
+			},
+			want: 0,
+		},
+		{
+			name: "ok/no-ips",
+			args: args{
+				typ: IP,
+				ids: []Identifier{
+					{
+						Type:  DNS,
+						Value: "example.com",
+					},
+				},
+			},
+			want: 0,
+		},
+		{
+			name: "ok/one-dns",
+			args: args{
+				typ: DNS,
+				ids: []Identifier{
+					{
+						Type:  DNS,
+						Value: "example.com",
+					},
+					{
+						Type:  IP,
+						Value: "192.168.42.42",
+					},
+				},
+			},
+			want: 1,
+		},
+		{
+			name: "ok/one-ip",
+			args: args{
+				typ: IP,
+				ids: []Identifier{
+					{
+						Type:  DNS,
+						Value: "example.com",
+					},
+					{
+						Type:  IP,
+						Value: "192.168.42.42",
+					},
+				},
+			},
+			want: 1,
+		},
+		{
+			name: "ok/more-dns",
+			args: args{
+				typ: DNS,
+				ids: []Identifier{
+					{
+						Type:  DNS,
+						Value: "example.com",
+					},
+					{
+						Type:  DNS,
+						Value: "*.example.com",
+					},
+					{
+						Type:  IP,
+						Value: "192.168.42.42",
+					},
+				},
+			},
+			want: 2,
+		},
+		{
+			name: "ok/more-ips",
+			args: args{
+				typ: IP,
+				ids: []Identifier{
+					{
+						Type:  DNS,
+						Value: "example.com",
+					},
+					{
+						Type:  IP,
+						Value: "192.168.42.42",
+					},
+					{
+						Type:  IP,
+						Value: "192.168.42.43",
+					},
+				},
+			},
+			want: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := numberOfIdentifierType(tt.args.typ, tt.args.ids); got != tt.want {
+				t.Errorf("numberOfIdentifierType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_ipsAreEqual(t *testing.T) {
+	type args struct {
+		x net.IP
+		y net.IP
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "ok/ipv4",
+			args: args{
+				x: net.ParseIP("192.168.42.42"),
+				y: net.ParseIP("192.168.42.42"),
+			},
+			want: true,
+		},
+		{
+			name: "ok/ipv6",
+			args: args{
+				x: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
+			want: true,
+		},
+		{
+			name: "ok/ipv4-and-ipv6",
+			args: args{
+				x: net.ParseIP("192.168.42.42"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
+			want: false,
+		},
+		{
+			name: "ok/ipv4-mapped-to-ipv6",
+			args: args{
+				x: net.ParseIP("192.168.42.42"),
+				y: net.ParseIP("::ffff:192.168.42.42"), // parsed to the same IPv4 by Go
+			},
+			want: true, // TODO: is this behavior OK?
+		},
+		{
+			name: "ok/invalid-ipv4-and-valid-ipv6",
+			args: args{
+				x: net.ParseIP("192.168.42.1000"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
+			want: false,
+		},
+		{
+			name: "ok/invalid-ipv4-and-invalid-ipv6",
+			args: args{
+				x: net.ParseIP("192.168.42.1000"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:1000000"),
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ipsAreEqual(tt.args.x, tt.args.y); got != tt.want {
+				t.Errorf("ipsAreEqual() = %v, want %v", got, tt.want)
 			}
 		})
 	}

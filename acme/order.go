@@ -199,15 +199,15 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	var sans []x509util.SubjectAlternativeName
 
 	// order the DNS names and IP addresses, so that they can be compared against the canonicalized CSR
-	orderNames := make([]string, numberOfIdentifierType("dns", o.Identifiers))
-	orderIPs := make([]net.IP, numberOfIdentifierType("ip", o.Identifiers))
+	orderNames := make([]string, numberOfIdentifierType(DNS, o.Identifiers))
+	orderIPs := make([]net.IP, numberOfIdentifierType(IP, o.Identifiers))
 	indexDNS, indexIP := 0, 0
 	for _, n := range o.Identifiers {
 		switch n.Type {
-		case "dns":
+		case DNS:
 			orderNames[indexDNS] = n.Value
 			indexDNS++
-		case "ip":
+		case IP:
 			orderIPs[indexIP] = net.ParseIP(n.Value) // NOTE: this assumes are all valid IPs at this time; or will result in nil entries
 			indexIP++
 		default:
@@ -303,8 +303,8 @@ func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.Certificate
 }
 
 // ipsAreEqual compares IPs to be equal. IPv6 representations of IPv4
-// adresses are NOT considered equal to the IPv4 address in this case.
-// Both IPs should be the same version AND equal to each other.
+// adresses are considered equal to the IPv4 address in this case.
+// TODO: is this behavior OK to keep?
 func ipsAreEqual(x, y net.IP) bool {
 	if matchAddrFamily(x, y) {
 		return x.Equal(y)
