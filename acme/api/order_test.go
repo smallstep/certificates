@@ -45,6 +45,22 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 				err: acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: foo"),
 			}
 		},
+		"fail/bad-ip": func(t *testing.T) test {
+			nbf := time.Now().UTC().Add(time.Minute)
+			naf := time.Now().UTC().Add(5 * time.Minute)
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "ip", Value: "192.168.42.1000"},
+					},
+					NotAfter:  naf,
+					NotBefore: nbf,
+				},
+				nbf: nbf,
+				naf: naf,
+				err: acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", "192.168.42.1000"),
+			}
+		},
 		"ok": func(t *testing.T) test {
 			nbf := time.Now().UTC().Add(time.Minute)
 			naf := time.Now().UTC().Add(5 * time.Minute)
@@ -91,7 +107,7 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 				naf: naf,
 			}
 		},
-		"ok/mixed-dns-and-ipv4": func(t *testing.T) test { // TODO: verify that this is allowed and what we want to be possible (in Validate())
+		"ok/mixed-dns-and-ipv4": func(t *testing.T) test {
 			nbf := time.Now().UTC().Add(time.Minute)
 			naf := time.Now().UTC().Add(5 * time.Minute)
 			return test{

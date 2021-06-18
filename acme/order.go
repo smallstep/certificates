@@ -14,10 +14,17 @@ import (
 	"go.step.sm/crypto/x509util"
 )
 
+type IdentifierType string
+
+const (
+	IP  IdentifierType = "ip"
+	DNS IdentifierType = "dns"
+)
+
 // Identifier encodes the type that an order pertains to.
 type Identifier struct {
-	Type  string `json:"type"`
-	Value string `json:"value"`
+	Type  IdentifierType `json:"type"`
+	Value string         `json:"value"`
 }
 
 // Order contains order metadata for the ACME protocol order type.
@@ -222,7 +229,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	// Validate identifier names against CSR alternative names.
 	//
 	// Note that with certificate templates we are not going to check for the
-	// absence of other SANs as they will only be set if the templates allows
+	// absence of other SANs as they will only be set if the template allows
 	// them.
 	if len(csr.DNSNames) != len(orderNames) {
 		return sans, NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
@@ -263,7 +270,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 
 // numberOfIdentifierType returns the number of Identifiers that
 // are of type typ.
-func numberOfIdentifierType(typ string, ids []Identifier) int {
+func numberOfIdentifierType(typ IdentifierType, ids []Identifier) int {
 	c := 0
 	for _, id := range ids {
 		if id.Type == typ {
@@ -305,7 +312,7 @@ func ipsAreEqual(x, y net.IP) bool {
 	return false
 }
 
-// matchAddrFamily returns if two IPs are both IPv4 OR IPv6
+// matchAddrFamily returns true if two IPs are both IPv4 OR IPv6
 // Implementation taken and adapted from https://golang.org/src/net/ip.go
 func matchAddrFamily(x net.IP, y net.IP) bool {
 	return x.To4() != nil && y.To4() != nil || x.To16() != nil && x.To4() == nil && y.To16() != nil && y.To4() == nil
