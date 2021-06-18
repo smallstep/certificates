@@ -115,25 +115,13 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 }
 
 func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
-
-	// RFC8738 states that, if HostName is IP, it should be the ARPA
-	// address https://datatracker.ietf.org/doc/html/rfc8738#section-6.
-	// It also references TLS Extensions [RFC6066].
-	var serverName string
-	ip := net.ParseIP(ch.Value)
-	if ip != nil {
-		serverName = reverseAddr(ip)
-	} else {
-		serverName = ch.Value
-	}
-
 	config := &tls.Config{
 		NextProtos: []string{"acme-tls/1"},
 		// https://tools.ietf.org/html/rfc8737#section-4
 		// ACME servers that implement "acme-tls/1" MUST only negotiate TLS 1.2
 		// [RFC5246] or higher when connecting to clients for validation.
 		MinVersion:         tls.VersionTLS12,
-		ServerName:         serverName,
+		ServerName:         serverName(ch),
 		InsecureSkipVerify: true, // we expect a self-signed challenge certificate
 	}
 
@@ -163,7 +151,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	// if no DNS names present, look for IP address and verify that exactly one exists
 	if len(leafCert.DNSNames) == 0 {
-		if len(leafCert.IPAddresses) != 1 || !leafCert.IPAddresses[0].Equal(ip) {
+		if len(leafCert.IPAddresses) != 1 || !leafCert.IPAddresses[0].Equal(net.ParseIP(ch.Value)) {
 			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 				"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value))
 		}
@@ -270,6 +258,21 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 		return WrapErrorISE(err, "error updating challenge")
 	}
 	return nil
+}
+
+// serverName determines the SNI HostName to set based on an acme.Challenge
+// for TLS-ALPN-01 challenges. RFC8738 states that, if HostName is an IP, it
+// should be the ARPA address https://datatracker.ietf.org/doc/html/rfc8738#section-6.
+// It also references TLS Extensions [RFC6066].
+func serverName(ch *Challenge) string {
+	var serverName string
+	ip := net.ParseIP(ch.Value)
+	if ip != nil {
+		serverName = reverseAddr(ip)
+	} else {
+		serverName = ch.Value
+	}
+	return serverName
 }
 
 // reverseaddr returns the in-addr.arpa. or ip6.arpa. hostname of the IP
