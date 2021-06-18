@@ -85,7 +85,7 @@ func New(ctx context.Context, opts apiv1.Options) (*KMS, error) {
 			*o.Config.Region = v
 		}
 		if f := u.Get("credentials-file"); f != "" {
-			o.SharedConfigFiles = []string{opts.CredentialsFile}
+			o.SharedConfigFiles = []string{f}
 		}
 	}
 

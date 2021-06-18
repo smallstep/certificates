@@ -35,8 +35,13 @@ type Config struct {
 	RootOnly         bool
 	RootObject       string
 	RootKeyObject    string
+	RootSubject      string
+	RootPath         string
 	CrtObject        string
+	CrtPath          string
 	CrtKeyObject     string
+	CrtSubject       string
+	CrtKeyPath       string
 	SSHHostKeyObject string
 	SSHUserKeyObject string
 	RootFile         string
@@ -96,9 +101,14 @@ func main() {
 	flag.StringVar(&c.KMS, "kms", kmsuri, "PKCS #11 URI with the module-path and token to connect to the module.")
 	flag.StringVar(&c.Pin, "pin", "", "PKCS #11 PIN")
 	flag.StringVar(&c.RootObject, "root-cert", "pkcs11:id=7330;object=root-cert", "PKCS #11 URI with object id and label to store the root certificate.")
+	flag.StringVar(&c.RootPath, "root-cert-path", "root_ca.crt", "Location to write the root certificate.")
 	flag.StringVar(&c.RootKeyObject, "root-key", "pkcs11:id=7330;object=root-key", "PKCS #11 URI with object id and label to store the root key.")
+	flag.StringVar(&c.RootSubject, "root-name", "PKCS #11 Smallstep Root", "Subject and Issuer of the root certificate.")
 	flag.StringVar(&c.CrtObject, "crt-cert", "pkcs11:id=7331;object=intermediate-cert", "PKCS #11 URI with object id and label to store the intermediate certificate.")
+	flag.StringVar(&c.CrtPath, "crt-cert-path", "intermediate_ca.crt", "Location to write the intermediate certificate.")
 	flag.StringVar(&c.CrtKeyObject, "crt-key", "pkcs11:id=7331;object=intermediate-key", "PKCS #11 URI with object id and label to store the intermediate certificate.")
+	flag.StringVar(&c.CrtSubject, "crt-name", "PKCS #11 Smallstep Intermediate", "Subject of the intermediate certificate.")
+	flag.StringVar(&c.CrtKeyPath, "crt-key-path", "intermediate_ca_key", "Location to write the intermediate private key.")
 	flag.StringVar(&c.SSHHostKeyObject, "ssh-host-key", "pkcs11:id=7332;object=ssh-host-key", "PKCS #11 URI with object id and label to store the key used to sign SSH host certificates.")
 	flag.StringVar(&c.SSHUserKeyObject, "ssh-user-key", "pkcs11:id=7333;object=ssh-user-key", "PKCS #11 URI with object id and label to store the key used to sign SSH user certificates.")
 	flag.BoolVar(&c.RootOnly, "root-only", false, "Store only only the root certificate and sign and intermediate.")
@@ -119,7 +129,7 @@ func main() {
 		fatal(err)
 	}
 
-	if u.Pin() == "" && c.Pin == "" {
+	if u.Get("pin-value") == "" && u.Get("pin-source") == "" && c.Pin == "" {
 		pin, err := ui.PromptPassword("What is the PKCS#11 PIN?")
 		if err != nil {
 			fatal(err)
@@ -294,8 +304,8 @@ func createPKI(k kms.KeyManager, c Config) error {
 			BasicConstraintsValid: true,
 			MaxPathLen:            1,
 			MaxPathLenZero:        false,
-			Issuer:                pkix.Name{CommonName: "PKCS #11 Smallstep Root"},
-			Subject:               pkix.Name{CommonName: "PKCS #11 Smallstep Root"},
+			Issuer:                pkix.Name{CommonName: c.RootSubject},
+			Subject:               pkix.Name{CommonName: c.RootSubject},
 			SerialNumber:          mustSerialNumber(),
 			SubjectKeyId:          mustSubjectKeyID(resp.PublicKey),
 			AuthorityKeyId:        mustSubjectKeyID(resp.PublicKey),
@@ -320,7 +330,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			}
 		}
 
-		if err = fileutil.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
+		if err = fileutil.WriteFile(c.RootPath, pem.EncodeToMemory(&pem.Block{
 			Type:  "CERTIFICATE",
 			Bytes: b,
 		}), 0600); err != nil {
@@ -328,7 +338,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 
 		ui.PrintSelected("Root Key", resp.Name)
-		ui.PrintSelected("Root Certificate", "root_ca.crt")
+		ui.PrintSelected("Root Certificate", c.RootPath)
 	}
 
 	// Intermediate Certificate
@@ -346,7 +356,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			return err
 		}
 
-		_, err = pemutil.Serialize(priv, pemutil.WithPassword(pass), pemutil.ToFile("intermediate_ca_key", 0600))
+		_, err = pemutil.Serialize(priv, pemutil.WithPassword(pass), pemutil.ToFile(c.CrtKeyPath, 0600))
 		if err != nil {
 			return err
 		}
@@ -373,7 +383,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		MaxPathLen:            0,
 		MaxPathLenZero:        true,
 		Issuer:                root.Subject,
-		Subject:               pkix.Name{CommonName: "YubiKey Smallstep Intermediate"},
+		Subject:               pkix.Name{CommonName: c.CrtSubject},
 		SerialNumber:          mustSerialNumber(),
 		SubjectKeyId:          mustSubjectKeyID(publicKey),
 	}
@@ -397,7 +407,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 	}
 
-	if err = fileutil.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
+	if err = fileutil.WriteFile(c.CrtPath, pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: b,
 	}), 0600); err != nil {
@@ -405,12 +415,12 @@ func createPKI(k kms.KeyManager, c Config) error {
 	}
 
 	if c.RootOnly {
-		ui.PrintSelected("Intermediate Key", "intermediate_ca_key")
+		ui.PrintSelected("Intermediate Key", c.CrtKeyPath)
 	} else {
 		ui.PrintSelected("Intermediate Key", keyName)
 	}
 
-	ui.PrintSelected("Intermediate Certificate", "intermediate_ca.crt")
+	ui.PrintSelected("Intermediate Certificate", c.CrtPath)
 
 	if c.SSHHostKeyObject != "" {
 		resp, err := k.CreateKey(&apiv1.CreateKeyRequest{
