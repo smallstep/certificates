@@ -2271,7 +2271,6 @@ func TestTLSALPN01Validate(t *testing.T) {
 			}
 		})
 	}
-	t.Fail()
 }
 
 func Test_reverseAddr(t *testing.T) {
