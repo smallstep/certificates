@@ -67,7 +67,7 @@ var revocationCodeMap = map[int]pb.RevocationReason{
 	10: pb.RevocationReason_ATTRIBUTE_AUTHORITY_COMPROMISE,
 }
 
-// caPoolTierMap contains the map between apv1.Options.Tier and the pb type.
+// caPoolTierMap contains the map between apiv1.Options.Tier and the pb type.
 var caPoolTierMap = map[string]pb.CaPool_Tier{
 	"":           pb.CaPool_DEVOPS,
 	"ENTERPRISE": pb.CaPool_ENTERPRISE,

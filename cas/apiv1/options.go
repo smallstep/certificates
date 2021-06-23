@@ -46,9 +46,9 @@ type Options struct {
 	KeyManager kms.KeyManager `json:"-"`
 
 	// Project, Location, CaPool and GCSBucket are parameters used in CloudCAS
-	// to create a new certificate authority. If a CaPool does not exists it
-	// will be created. GCSBucket is optional, if not provided GCloud will
-	// create a managed bucket.
+	// to create a new certificate authority. If a CaPool does not exist it will
+	// be created. GCSBucket is optional, if not provided GCloud will create a
+	// managed bucket.
 	Project    string `json:"-"`
 	Location   string `json:"-"`
 	CaPool     string `json:"-"`
