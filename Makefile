@@ -15,6 +15,7 @@ PREFIX?=
 SRC=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
 GOOS_OVERRIDE ?=
 OUTPUT_ROOT=output/
+RELEASE=./.releases
 
 all: lint test build
 
