@@ -417,7 +417,7 @@ func LogCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 				if len(val.CredentialID) > 0 {
 					m["provisioner"] = fmt.Sprintf("%s (%s)", val.Name, val.CredentialID)
 				} else {
-					m["provisioner"] = fmt.Sprintf("%s", val.Name)
+					m["provisioner"] = val.Name
 				}
 				break
 			}
