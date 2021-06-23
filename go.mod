@@ -14,6 +14,8 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gax-go/v2 v2.0.5
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
+	github.com/mattn/go-colorable v0.1.8 // indirect
+	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/micromdm/scep/v2 v2.0.0
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.9.1
@@ -21,13 +23,14 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/nosql v0.3.6
+	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
 	go.step.sm/cli-utils v0.2.0
 	go.step.sm/crypto v0.8.3
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
-	golang.org/x/sys v0.0.0-20210608053332-aa57babbf139 // indirect
+	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22 // indirect
 	google.golang.org/api v0.47.0
 	google.golang.org/genproto v0.0.0-20210608205507-b6d2f5bf0d7d
 	google.golang.org/grpc v1.38.0
