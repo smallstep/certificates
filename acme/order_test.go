@@ -1284,54 +1284,161 @@ func Test_canonicalize(t *testing.T) {
 
 func TestOrder_sans(t *testing.T) {
 	type fields struct {
-		ID                string
-		AccountID         string
-		ProvisionerID     string
-		Status            Status
-		ExpiresAt         time.Time
-		Identifiers       []Identifier
-		NotBefore         time.Time
-		NotAfter          time.Time
-		Error             *Error
-		AuthorizationIDs  []string
-		AuthorizationURLs []string
-		FinalizeURL       string
-		CertificateID     string
-		CertificateURL    string
-	}
-	type args struct {
-		csr *x509.CertificateRequest
+		Identifiers []Identifier
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    []x509util.SubjectAlternativeName
-		wantErr bool
+		name   string
+		fields fields
+		csr    *x509.CertificateRequest
+		want   []x509util.SubjectAlternativeName
+		err    error
 	}{
-		// TODO: Add test cases.
+		{
+			name: "ok/dns",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "example.com"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "example.com",
+				},
+			},
+			want: []x509util.SubjectAlternativeName{
+				{Type: "dns", Value: "example.com"},
+			},
+			err: nil,
+		},
+		{
+			name: "fail/error-names-length-mismatch",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+					{Type: "dns", Value: "bar.internal"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "foo.internal",
+				},
+			},
+			want: []x509util.SubjectAlternativeName{},
+			err:  NewError(ErrorBadCSRType, "..."),
+		},
+		{
+			name: "fail/error-names-mismatch",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+					{Type: "dns", Value: "bar.internal"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "foo.internal",
+				},
+				DNSNames: []string{"zap.internal"},
+			},
+			want: []x509util.SubjectAlternativeName{},
+			err:  NewError(ErrorBadCSRType, "..."),
+		},
+		{
+			name: "ok/ipv4",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "192.168.43.42"},
+					{Type: "ip", Value: "192.168.42.42"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
+			},
+			want: []x509util.SubjectAlternativeName{
+				{Type: "ip", Value: "192.168.42.42"},
+				{Type: "ip", Value: "192.168.43.42"},
+			},
+			err: nil,
+		},
+		{
+			name: "fail/error-ips-length-mismatch",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "192.168.42.42"},
+					{Type: "ip", Value: "192.168.43.42"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42")},
+			},
+			want: []x509util.SubjectAlternativeName{},
+			err:  NewError(ErrorBadCSRType, "..."),
+		},
+		{
+			name: "fail/error-ips-mismatch",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "192.168.42.42"},
+					{Type: "ip", Value: "192.168.43.42"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.32")},
+			},
+			want: []x509util.SubjectAlternativeName{},
+			err:  NewError(ErrorBadCSRType, "..."),
+		},
+		{
+			name: "ok/mixed",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+					{Type: "dns", Value: "bar.internal"},
+					{Type: "ip", Value: "192.168.43.42"},
+					{Type: "ip", Value: "192.168.42.42"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "bar.internal",
+				},
+				DNSNames:    []string{"foo.internal"},
+				IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
+			},
+			want: []x509util.SubjectAlternativeName{
+				{Type: "dns", Value: "bar.internal"},
+				{Type: "dns", Value: "foo.internal"},
+				{Type: "ip", Value: "192.168.42.42"},
+				{Type: "ip", Value: "192.168.43.42"},
+			},
+			err: nil,
+		},
+		{
+			name: "fail/unsupported-identifier-type",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "ipv4", Value: "192.168.42.42"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42")},
+			},
+			want: []x509util.SubjectAlternativeName{},
+			err:  NewError(ErrorServerInternalType, "..."),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			o := &Order{
-				ID:                tt.fields.ID,
-				AccountID:         tt.fields.AccountID,
-				ProvisionerID:     tt.fields.ProvisionerID,
-				Status:            tt.fields.Status,
-				ExpiresAt:         tt.fields.ExpiresAt,
-				Identifiers:       tt.fields.Identifiers,
-				NotBefore:         tt.fields.NotBefore,
-				NotAfter:          tt.fields.NotAfter,
-				Error:             tt.fields.Error,
-				AuthorizationIDs:  tt.fields.AuthorizationIDs,
-				AuthorizationURLs: tt.fields.AuthorizationURLs,
-				FinalizeURL:       tt.fields.FinalizeURL,
-				CertificateID:     tt.fields.CertificateID,
-				CertificateURL:    tt.fields.CertificateURL,
+				Identifiers: tt.fields.Identifiers,
 			}
-			got, err := o.sans(tt.args.csr)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Order.sans() error = %v, wantErr %v", err, tt.wantErr)
+			canonicalizedCSR := canonicalize(tt.csr)
+			got, err := o.sans(canonicalizedCSR)
+			if err != nil && tt.err != nil {
+				if tt.err.Error() != err.Error() {
+					t.Errorf("Order.sans() error = %v, wantErr %v", err, tt.err)
+					return
+				}
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
