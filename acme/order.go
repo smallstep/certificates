@@ -221,8 +221,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	sans = make([]x509util.SubjectAlternativeName, totalNumberOfSANs)
 	index := 0
 
-	// TODO: only allow IP based identifier based on configuration? Some additional configuration and validation on the provisioner for this case.
-
 	// Validate identifier names against CSR alternative names.
 	//
 	// Note that with certificate templates we are not going to check for the

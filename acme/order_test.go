@@ -367,111 +367,6 @@ func TestOrder_Finalize(t *testing.T) {
 				err: NewErrorISE("unrecognized order status: %s", o.Status),
 			}
 		},
-		"fail/error-names-length-mismatch": func(t *testing.T) test {
-			now := clock.Now()
-			o := &Order{
-				ID:               "oID",
-				AccountID:        "accID",
-				Status:           StatusReady,
-				ExpiresAt:        now.Add(5 * time.Minute),
-				AuthorizationIDs: []string{"a", "b"},
-				Identifiers: []Identifier{
-					{Type: "dns", Value: "foo.internal"},
-					{Type: "dns", Value: "bar.internal"},
-				},
-			}
-			orderNames := []string{"bar.internal", "foo.internal"}
-			csr := &x509.CertificateRequest{
-				Subject: pkix.Name{
-					CommonName: "foo.internal",
-				},
-			}
-
-			return test{
-				o:   o,
-				csr: csr,
-				err: NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
-					"CSR names = %v, Order names = %v", []string{"foo.internal"}, orderNames),
-			}
-		},
-		"fail/error-ips-length-mismatch": func(t *testing.T) test {
-			now := clock.Now()
-			o := &Order{
-				ID:               "oID",
-				AccountID:        "accID",
-				Status:           StatusReady,
-				ExpiresAt:        now.Add(5 * time.Minute),
-				AuthorizationIDs: []string{"a", "b"},
-				Identifiers: []Identifier{
-					{Type: "ip", Value: "192.168.42.42"},
-					{Type: "ip", Value: "192.168.43.42"},
-				},
-			}
-			orderIPs := []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")}
-			csr := &x509.CertificateRequest{
-				IPAddresses: []net.IP{net.ParseIP("192.168.42.42")},
-			}
-
-			return test{
-				o:   o,
-				csr: csr,
-				err: NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
-					"CSR IPs = %v, Order IPs = %v", []net.IP{net.ParseIP("192.168.42.42")}, orderIPs),
-			}
-		},
-		"fail/error-names-mismatch": func(t *testing.T) test {
-			now := clock.Now()
-			o := &Order{
-				ID:               "oID",
-				AccountID:        "accID",
-				Status:           StatusReady,
-				ExpiresAt:        now.Add(5 * time.Minute),
-				AuthorizationIDs: []string{"a", "b"},
-				Identifiers: []Identifier{
-					{Type: "dns", Value: "foo.internal"},
-					{Type: "dns", Value: "bar.internal"},
-				},
-			}
-			orderNames := []string{"bar.internal", "foo.internal"}
-			csr := &x509.CertificateRequest{
-				Subject: pkix.Name{
-					CommonName: "foo.internal",
-				},
-				DNSNames: []string{"zap.internal"},
-			}
-
-			return test{
-				o:   o,
-				csr: csr,
-				err: NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
-					"CSR names = %v, Order names = %v", []string{"foo.internal", "zap.internal"}, orderNames),
-			}
-		},
-		"fail/error-ips-mismatch": func(t *testing.T) test {
-			now := clock.Now()
-			o := &Order{
-				ID:               "oID",
-				AccountID:        "accID",
-				Status:           StatusReady,
-				ExpiresAt:        now.Add(5 * time.Minute),
-				AuthorizationIDs: []string{"a", "b"},
-				Identifiers: []Identifier{
-					{Type: "ip", Value: "192.168.42.42"},
-					{Type: "ip", Value: "192.168.43.42"},
-				},
-			}
-			orderIPs := []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")}
-			csr := &x509.CertificateRequest{
-				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.32")},
-			}
-
-			return test{
-				o:   o,
-				csr: csr,
-				err: NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
-					"CSR IPs = %v, Order IPs = %v", []net.IP{net.ParseIP("192.168.42.32"), net.ParseIP("192.168.42.42")}, orderIPs),
-			}
-		},
 		"fail/error-provisioner-auth": func(t *testing.T) test {
 			now := clock.Now()
 			o := &Order{
@@ -1315,7 +1210,7 @@ func TestOrder_sans(t *testing.T) {
 		fields fields
 		csr    *x509.CertificateRequest
 		want   []x509util.SubjectAlternativeName
-		err    error
+		err    *Error
 	}{
 		{
 			name: "ok/dns",
@@ -1348,7 +1243,8 @@ func TestOrder_sans(t *testing.T) {
 				},
 			},
 			want: []x509util.SubjectAlternativeName{},
-			err:  NewError(ErrorBadCSRType, "..."),
+			err: NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
+				"CSR names = %v, Order names = %v", []string{"foo.internal"}, []string{"bar.internal", "foo.internal"}),
 		},
 		{
 			name: "fail/error-names-mismatch",
@@ -1365,7 +1261,8 @@ func TestOrder_sans(t *testing.T) {
 				DNSNames: []string{"zap.internal"},
 			},
 			want: []x509util.SubjectAlternativeName{},
-			err:  NewError(ErrorBadCSRType, "..."),
+			err: NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
+				"CSR names = %v, Order names = %v", []string{"foo.internal", "zap.internal"}, []string{"bar.internal", "foo.internal"}),
 		},
 		{
 			name: "ok/ipv4",
@@ -1385,6 +1282,23 @@ func TestOrder_sans(t *testing.T) {
 			err: nil,
 		},
 		{
+			name: "ok/ipv6",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "2001:0db8:85a3::8a2e:0370:7335"},
+					{Type: "ip", Value: "2001:0db8:85a3::8a2e:0370:7334"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7335"), net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")},
+			},
+			want: []x509util.SubjectAlternativeName{
+				{Type: "ip", Value: "2001:db8:85a3::8a2e:370:7334"},
+				{Type: "ip", Value: "2001:db8:85a3::8a2e:370:7335"},
+			},
+			err: nil,
+		},
+		{
 			name: "fail/error-ips-length-mismatch",
 			fields: fields{
 				Identifiers: []Identifier{
@@ -1396,7 +1310,8 @@ func TestOrder_sans(t *testing.T) {
 				IPAddresses: []net.IP{net.ParseIP("192.168.42.42")},
 			},
 			want: []x509util.SubjectAlternativeName{},
-			err:  NewError(ErrorBadCSRType, "..."),
+			err: NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
+				"CSR IPs = %v, Order IPs = %v", []net.IP{net.ParseIP("192.168.42.42")}, []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")}),
 		},
 		{
 			name: "fail/error-ips-mismatch",
@@ -1410,7 +1325,8 @@ func TestOrder_sans(t *testing.T) {
 				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.32")},
 			},
 			want: []x509util.SubjectAlternativeName{},
-			err:  NewError(ErrorBadCSRType, "..."),
+			err: NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
+				"CSR IPs = %v, Order IPs = %v", []net.IP{net.ParseIP("192.168.42.32"), net.ParseIP("192.168.42.42")}, []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")}),
 		},
 		{
 			name: "ok/mixed",
@@ -1420,6 +1336,7 @@ func TestOrder_sans(t *testing.T) {
 					{Type: "dns", Value: "bar.internal"},
 					{Type: "ip", Value: "192.168.43.42"},
 					{Type: "ip", Value: "192.168.42.42"},
+					{Type: "ip", Value: "2001:0db8:85a3:0000:0000:8a2e:0370:7334"},
 				},
 			},
 			csr: &x509.CertificateRequest{
@@ -1427,13 +1344,14 @@ func TestOrder_sans(t *testing.T) {
 					CommonName: "bar.internal",
 				},
 				DNSNames:    []string{"foo.internal"},
-				IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
+				IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42"), net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")},
 			},
 			want: []x509util.SubjectAlternativeName{
 				{Type: "dns", Value: "bar.internal"},
 				{Type: "dns", Value: "foo.internal"},
 				{Type: "ip", Value: "192.168.42.42"},
 				{Type: "ip", Value: "192.168.43.42"},
+				{Type: "ip", Value: "2001:db8:85a3::8a2e:370:7334"},
 			},
 			err: nil,
 		},
@@ -1448,7 +1366,7 @@ func TestOrder_sans(t *testing.T) {
 				IPAddresses: []net.IP{net.ParseIP("192.168.42.42")},
 			},
 			want: []x509util.SubjectAlternativeName{},
-			err:  NewError(ErrorServerInternalType, "..."),
+			err:  NewError(ErrorServerInternalType, "unsupported identifier type in order: ipv4"),
 		},
 	}
 	for _, tt := range tests {
@@ -1458,10 +1376,20 @@ func TestOrder_sans(t *testing.T) {
 			}
 			canonicalizedCSR := canonicalize(tt.csr)
 			got, err := o.sans(canonicalizedCSR)
-			if err != nil && tt.err != nil {
-				if tt.err.Error() != err.Error() {
-					t.Errorf("Order.sans() error = %v, wantErr %v", err, tt.err)
+			if tt.err != nil {
+				if err == nil {
+					t.Errorf("Order.sans() = %v, want error; got none", got)
 					return
+				}
+				switch k := err.(type) {
+				case *Error:
+					assert.Equals(t, k.Type, tt.err.Type)
+					assert.Equals(t, k.Detail, tt.err.Detail)
+					assert.Equals(t, k.Status, tt.err.Status)
+					assert.Equals(t, k.Err.Error(), tt.err.Err.Error())
+					assert.Equals(t, k.Detail, tt.err.Detail)
+				default:
+					assert.FatalError(t, errors.New("unexpected error type"))
 				}
 				return
 			}
