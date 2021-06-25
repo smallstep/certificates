@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"go.step.sm/crypto/x509util"
 )
 
 func TestOrder_UpdateStatus(t *testing.T) {
@@ -1183,6 +1184,158 @@ func Test_ipsAreEqual(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := ipsAreEqual(tt.args.x, tt.args.y); got != tt.want {
 				t.Errorf("ipsAreEqual() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_canonicalize(t *testing.T) {
+	type args struct {
+		csr *x509.CertificateRequest
+	}
+	tests := []struct {
+		name              string
+		args              args
+		wantCanonicalized *x509.CertificateRequest
+	}{
+		{
+			name: "ok/dns",
+			args: args{
+				csr: &x509.CertificateRequest{
+					DNSNames: []string{"www.example.com", "example.com"},
+				},
+			},
+			wantCanonicalized: &x509.CertificateRequest{
+				DNSNames:    []string{"example.com", "www.example.com"},
+				IPAddresses: []net.IP{},
+			},
+		},
+		{
+			name: "ok/common-name",
+			args: args{
+				csr: &x509.CertificateRequest{
+					Subject: pkix.Name{
+						CommonName: "example.com",
+					},
+					DNSNames: []string{"www.example.com"},
+				},
+			},
+			wantCanonicalized: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "example.com",
+				},
+				DNSNames:    []string{"example.com", "www.example.com"},
+				IPAddresses: []net.IP{},
+			},
+		},
+		{
+			name: "ok/ipv4",
+			args: args{
+				csr: &x509.CertificateRequest{
+					IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
+				},
+			},
+			wantCanonicalized: &x509.CertificateRequest{
+				DNSNames:    []string{},
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
+			},
+		},
+		{
+			name: "ok/mixed",
+			args: args{
+				csr: &x509.CertificateRequest{
+					DNSNames:    []string{"www.example.com", "example.com"},
+					IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
+				},
+			},
+			wantCanonicalized: &x509.CertificateRequest{
+				DNSNames:    []string{"example.com", "www.example.com"},
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
+			},
+		},
+		{
+			name: "ok/mixed-common-name",
+			args: args{
+				csr: &x509.CertificateRequest{
+					Subject: pkix.Name{
+						CommonName: "example.com",
+					},
+					DNSNames:    []string{"www.example.com"},
+					IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
+				},
+			},
+			wantCanonicalized: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "example.com",
+				},
+				DNSNames:    []string{"example.com", "www.example.com"},
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotCanonicalized := canonicalize(tt.args.csr); !reflect.DeepEqual(gotCanonicalized, tt.wantCanonicalized) {
+				t.Errorf("canonicalize() = %v, want %v", gotCanonicalized, tt.wantCanonicalized)
+			}
+		})
+	}
+}
+
+func TestOrder_sans(t *testing.T) {
+	type fields struct {
+		ID                string
+		AccountID         string
+		ProvisionerID     string
+		Status            Status
+		ExpiresAt         time.Time
+		Identifiers       []Identifier
+		NotBefore         time.Time
+		NotAfter          time.Time
+		Error             *Error
+		AuthorizationIDs  []string
+		AuthorizationURLs []string
+		FinalizeURL       string
+		CertificateID     string
+		CertificateURL    string
+	}
+	type args struct {
+		csr *x509.CertificateRequest
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []x509util.SubjectAlternativeName
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &Order{
+				ID:                tt.fields.ID,
+				AccountID:         tt.fields.AccountID,
+				ProvisionerID:     tt.fields.ProvisionerID,
+				Status:            tt.fields.Status,
+				ExpiresAt:         tt.fields.ExpiresAt,
+				Identifiers:       tt.fields.Identifiers,
+				NotBefore:         tt.fields.NotBefore,
+				NotAfter:          tt.fields.NotAfter,
+				Error:             tt.fields.Error,
+				AuthorizationIDs:  tt.fields.AuthorizationIDs,
+				AuthorizationURLs: tt.fields.AuthorizationURLs,
+				FinalizeURL:       tt.fields.FinalizeURL,
+				CertificateID:     tt.fields.CertificateID,
+				CertificateURL:    tt.fields.CertificateURL,
+			}
+			got, err := o.sans(tt.args.csr)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Order.sans() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Order.sans() = %v, want %v", got, tt.want)
 			}
 		})
 	}

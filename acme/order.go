@@ -221,9 +221,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	sans = make([]x509util.SubjectAlternativeName, totalNumberOfSANs)
 	index := 0
 
-	// TODO: limit what IP addresses can be used? Only private? Only certain ranges (i.e. only allow the specific ranges by default, configuration for all?)
-	// TODO: can DNS already be limited to a certain domain? That would probably be nice to have too, but maybe not as part of this PR
-	// TODO: if it seems not too big of a change, make consts/enums out of the stringly typed identifiers (challenge types, identifier types)
 	// TODO: only allow IP based identifier based on configuration? Some additional configuration and validation on the provisioner for this case.
 
 	// Validate identifier names against CSR alternative names.

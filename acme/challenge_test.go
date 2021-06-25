@@ -2334,7 +2334,7 @@ func Test_serverName(t *testing.T) {
 			want: "1.0.0.127.in-addr.arpa.",
 		},
 		{
-			name: "ok/ipv4",
+			name: "ok/ipv6",
 			args: args{
 				ch: &Challenge{
 					Value: "2001:db8::567:89ab",

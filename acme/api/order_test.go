@@ -1678,7 +1678,7 @@ func TestHandler_challengeTypes(t *testing.T) {
 					Wildcard:   false,
 				},
 			},
-			want: []acme.ChallengeType{acme.DNS01, acme.HTTP01, acme.TLSALPN01}, //[]string{"dns-01", "http-01", "tls-alpn-01"},
+			want: []acme.ChallengeType{acme.DNS01, acme.HTTP01, acme.TLSALPN01},
 		},
 		{
 			name: "ok/wildcard",
@@ -1703,7 +1703,6 @@ func TestHandler_challengeTypes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			if got := challengeTypes(tt.args.az); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Handler.challengeTypes() = %v, want %v", got, tt.want)
 			}

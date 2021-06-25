@@ -261,7 +261,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 }
 
 // serverName determines the SNI HostName to set based on an acme.Challenge
-// for TLS-ALPN-01 challenges. RFC8738 states that, if HostName is an IP, it
+// for TLS-ALPN-01 challenges RFC8738 states that, if HostName is an IP, it
 // should be the ARPA address https://datatracker.ietf.org/doc/html/rfc8738#section-6.
 // It also references TLS Extensions [RFC6066].
 func serverName(ch *Challenge) string {
