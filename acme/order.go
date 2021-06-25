@@ -299,20 +299,17 @@ func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.Certificate
 	return canonicalized
 }
 
-// ipsAreEqual compares IPs to be equal. IPv6 representations of IPv4
-// adresses are considered equal to the IPv4 address in this case.
-// TODO: is this behavior OK to keep?
+// ipsAreEqual compares IPs to be equal. Nil values (i.e. invalid IPs) are
+// not considered equal. IPv6 representations of IPv4 addresses are
+// considered equal to the IPv4 address in this implementation, which is
+// standard Go behavior. An example is "::ffff:192.168.42.42", which
+// is equal to "192.168.42.42". This is considered a known issue within
+// step and is tracked here too: https://github.com/golang/go/issues/37921.
 func ipsAreEqual(x, y net.IP) bool {
-	if matchAddrFamily(x, y) {
-		return x.Equal(y)
+	if x == nil || y == nil {
+		return false
 	}
-	return false
-}
-
-// matchAddrFamily returns true if two IPs are both IPv4 OR IPv6
-// Implementation taken and adapted from https://golang.org/src/net/ip.go
-func matchAddrFamily(x net.IP, y net.IP) bool {
-	return x.To4() != nil && y.To4() != nil || x.To16() != nil && x.To4() == nil && y.To16() != nil && y.To4() == nil
+	return x.Equal(y)
 }
 
 // uniqueSortedLowerNames returns the set of all unique names in the input after all

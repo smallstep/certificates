@@ -1140,6 +1140,14 @@ func Test_ipsAreEqual(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "fail/ipv4",
+			args: args{
+				x: net.ParseIP("192.168.42.42"),
+				y: net.ParseIP("192.168.42.43"),
+			},
+			want: false,
+		},
+		{
 			name: "ok/ipv6",
 			args: args{
 				x: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
@@ -1148,7 +1156,15 @@ func Test_ipsAreEqual(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "ok/ipv4-and-ipv6",
+			name: "fail/ipv6",
+			args: args{
+				x: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7335"),
+			},
+			want: false,
+		},
+		{
+			name: "fail/ipv4-and-ipv6",
 			args: args{
 				x: net.ParseIP("192.168.42.42"),
 				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
@@ -1161,10 +1177,10 @@ func Test_ipsAreEqual(t *testing.T) {
 				x: net.ParseIP("192.168.42.42"),
 				y: net.ParseIP("::ffff:192.168.42.42"), // parsed to the same IPv4 by Go
 			},
-			want: true, // TODO: is this behavior OK?
+			want: true, // we expect this to happen; a known issue in which ipv4 mapped ipv6 addresses are considered the same as their ipv4 counterpart
 		},
 		{
-			name: "ok/invalid-ipv4-and-valid-ipv6",
+			name: "fail/invalid-ipv4-and-valid-ipv6",
 			args: args{
 				x: net.ParseIP("192.168.42.1000"),
 				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
@@ -1172,7 +1188,15 @@ func Test_ipsAreEqual(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "ok/invalid-ipv4-and-invalid-ipv6",
+			name: "fail/valid-ipv4-and-invalid-ipv6",
+			args: args{
+				x: net.ParseIP("192.168.42.42"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:733400"),
+			},
+			want: false,
+		},
+		{
+			name: "fail/invalid-ipv4-and-invalid-ipv6",
 			args: args{
 				x: net.ParseIP("192.168.42.1000"),
 				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:1000000"),
