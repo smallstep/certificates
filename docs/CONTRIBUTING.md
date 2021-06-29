@@ -81,7 +81,7 @@ When the build is complete, you will find binaries in `bin/`.
 
 ## Asking Support Questions
 
-Feel free to post a question on our [GitHub Discussions](https://github.com/smallstep/certificates/discussions) page, or find us on [Discord](https://bit.ly/stepdiscord).
+Feel free to post a question on our [GitHub Discussions](https://github.com/smallstep/certificates/discussions) page, or find us on [Discord](https://bit.ly/step-discord).
 
 ## Reporting Issues
 
