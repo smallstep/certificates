@@ -352,6 +352,37 @@ func (h *Handler) lookupJWK(next nextHTTP) nextHTTP {
 	}
 }
 
+// extractOrLookupJWK forwards handling to either extractJWK or
+// lookupJWK based on the presence of a JWK or a KID, respectively.
+func (h *Handler) extractOrLookupJWK(next nextHTTP) nextHTTP {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		jws, err := jwsFromContext(ctx)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+
+		// at this point the JWS has already been verified (if correctly configured in middleware),
+		// and it can be used to check if a jwk exists.
+		if canExtractJWKFrom(jws) {
+			h.extractJWK(next)(w, r)
+			return
+		}
+
+		// default to looking up the JWK based on KID
+		h.lookupJWK(next)(w, r)
+	}
+}
+
+// canExtractJWKFrom checks if the JWS has a JWK that can be extracted
+func canExtractJWKFrom(jws *jose.JSONWebSignature) bool {
+	if len(jws.Signatures) == 0 {
+		return false
+	}
+	return jws.Signatures[0].Protected.JSONWebKey != nil
+}
+
 // verifyAndExtractJWSPayload extracts the JWK from the JWS and saves it in the context.
 // Make sure to parse and validate the JWS before running this middleware.
 func (h *Handler) verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {

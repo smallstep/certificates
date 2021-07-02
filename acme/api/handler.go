@@ -94,11 +94,17 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("GET", getPath(DirectoryLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.GetDirectory)))
 	r.MethodFunc("HEAD", getPath(DirectoryLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.GetDirectory)))
 
+	validatingMiddleware := func(next nextHTTP) nextHTTP {
+		return h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(next))))))
+	}
 	extractPayloadByJWK := func(next nextHTTP) nextHTTP {
-		return h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(h.validateJWS(h.extractJWK(h.verifyAndExtractJWSPayload(next)))))))))
+		return validatingMiddleware(h.extractJWK(h.verifyAndExtractJWSPayload(next)))
 	}
 	extractPayloadByKid := func(next nextHTTP) nextHTTP {
-		return h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(h.validateJWS(h.lookupJWK(h.verifyAndExtractJWSPayload(next)))))))))
+		return validatingMiddleware(h.lookupJWK(h.verifyAndExtractJWSPayload(next)))
+	}
+	extractPayloadByKidOrJWK := func(next nextHTTP) nextHTTP {
+		return validatingMiddleware(h.extractOrLookupJWK(h.verifyAndExtractJWSPayload(next)))
 	}
 
 	r.MethodFunc("POST", getPath(NewAccountLinkType, "{provisionerID}"), extractPayloadByJWK(h.NewAccount))
@@ -111,7 +117,7 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("POST", getPath(AuthzLinkType, "{provisionerID}", "{authzID}"), extractPayloadByKid(h.isPostAsGet(h.GetAuthorization)))
 	r.MethodFunc("POST", getPath(ChallengeLinkType, "{provisionerID}", "{authzID}", "{chID}"), extractPayloadByKid(h.GetChallenge))
 	r.MethodFunc("POST", getPath(CertificateLinkType, "{provisionerID}", "{certID}"), extractPayloadByKid(h.isPostAsGet(h.GetCertificate)))
-	r.MethodFunc("POST", getPath(RevokeCertLinkType, "{provisionerID}"), extractPayloadByKid(h.RevokeCert)) // TODO: check kid vs. jws; revoke can do both
+	r.MethodFunc("POST", getPath(RevokeCertLinkType, "{provisionerID}"), extractPayloadByKidOrJWK(h.RevokeCert))
 }
 
 // GetNonce just sets the right header since a Nonce is added to each response

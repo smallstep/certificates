@@ -9,6 +9,7 @@ import (
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	"go.step.sm/crypto/jose"
 	"golang.org/x/crypto/ocsp"
 )
 
@@ -19,14 +20,19 @@ type revokePayload struct {
 
 func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 
-	// TODO: support the non-kid case, i.e. JWK with the public key of the cert
-	// base the account + certificate JWK instead of the kid (which is now the case)
-
 	ctx := r.Context()
-	_, err := accountFromContext(ctx)
+	jws, err := jwsFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
+	}
+
+	if shouldCheckAccount(jws) {
+		_, err := accountFromContext(ctx)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
 	}
 
 	// TODO: do checks on account, i.e. is it still valid? is it allowed to do revocations? Revocations on the to be revoked cert?
@@ -65,7 +71,7 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	certID := certToBeRevoked.SerialNumber.String()
-	// TODO: retrieving the certificate to verify the account does not seem to work? Results in certificate not found error.
+	// TODO: retrieving the certificate to verify the account does not seem to work, so far? Results in certificate not found error.
 	// When Revoke is called, the certificate IS in fact found? The (h *Handler) GetCertificate function is fairly similar, too.
 	// existingCert, err := h.db.GetCertificate(ctx, certID)
 	// if err != nil {
@@ -101,6 +107,7 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Add("Link", link(h.linker.GetLink(ctx, DirectoryLinkType), "index"))
 	w.Write(nil)
 }
 
@@ -129,4 +136,11 @@ func reason(reasonCode int) string {
 	default:
 		return "unspecified reason"
 	}
+}
+
+// shouldUseAccount indicates whether an account should be
+// retrieved from the context, so that it can be used for
+// additional checks
+func shouldCheckAccount(jws *jose.JSONWebSignature) bool {
+	return !canExtractJWKFrom(jws)
 }
