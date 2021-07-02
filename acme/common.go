@@ -5,12 +5,14 @@ import (
 	"crypto/x509"
 	"time"
 
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 // CertificateAuthority is the interface implemented by a CA authority.
 type CertificateAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	Revoke(context.Context, *authority.RevokeOptions) error
 	LoadProvisionerByID(string) (provisioner.Interface, error)
 }
 
