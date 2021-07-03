@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
 
@@ -281,6 +282,10 @@ func (m *mockSignAuth) LoadProvisionerByID(id string) (provisioner.Interface, er
 		return m.loadProvisionerByID(id)
 	}
 	return m.ret1.(provisioner.Interface), m.err
+}
+
+func (m *mockSignAuth) Revoke(context.Context, *authority.RevokeOptions) error {
+	return nil
 }
 
 func TestOrder_Finalize(t *testing.T) {
