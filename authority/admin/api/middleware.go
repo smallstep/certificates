@@ -52,15 +52,3 @@ const (
 	// adminContextKey account key
 	adminContextKey = ContextKey("admin")
 )
-
-/*
-// adminFromContext searches the context for the token. Returns the
-// token or an error.
-func adminFromContext(ctx context.Context) (*linkedca.Admin, error) {
-	val, ok := ctx.Value(adminContextKey).(*linkedca.Admin)
-	if !ok || val == nil {
-		return nil, admin.NewErrorISE("admin not in context")
-	}
-	return val, nil
-}
-*/

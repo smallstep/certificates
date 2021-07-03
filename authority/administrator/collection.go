@@ -184,7 +184,7 @@ func (c *Collection) Update(id string, nu *linkedca.Admin) (*linkedca.Admin, err
 		return nil, admin.NewError(admin.ErrorNotFoundType, "admin %s not found", adm.Id)
 	}
 	if adm.Type == nu.Type {
-		return nil, admin.NewError(admin.ErrorBadRequestType, "admin %s already has type %s", id, adm.Type)
+		return adm, nil
 	}
 	if adm.Type == linkedca.Admin_SUPER_ADMIN && c.SuperCount() == 1 {
 		return nil, admin.NewError(admin.ErrorBadRequestType, "cannot change role of last super admin")
