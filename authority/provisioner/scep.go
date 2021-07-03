@@ -27,8 +27,7 @@ type SCEP struct {
 	secretChallengePassword string
 }
 
-// GetID returns the provisioner unique identifier. The name and credential id
-// should uniquely identify any JWK provisioner.
+// GetID returns the provisioner unique identifier.
 func (s *SCEP) GetID() string {
 	if s.ID != "" {
 		return s.ID
@@ -36,8 +35,9 @@ func (s *SCEP) GetID() string {
 	return s.GetIDForToken()
 }
 
-// GetIDForToken returns the provisioner unique identifier.
-func (s SCEP) GetIDForToken() string {
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (s *SCEP) GetIDForToken() string {
 	return "scep/" + s.Name
 }
 

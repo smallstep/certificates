@@ -229,6 +229,7 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 			return nil, err
 		}
 		handler = m.Middleware(handler)
+		insecureHandler = m.Middleware(insecureHandler)
 	}
 
 	// Add logger if configured
@@ -238,6 +239,7 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 			return nil, err
 		}
 		handler = logger.Middleware(handler)
+		insecureHandler = logger.Middleware(insecureHandler)
 	}
 
 	ca.srv = server.New(config.Address, handler, tlsConfig)
@@ -288,7 +290,17 @@ func (ca *CA) Stop() error {
 	if err := ca.auth.Shutdown(); err != nil {
 		log.Printf("error stopping ca.Authority: %+v\n", err)
 	}
-	return ca.srv.Shutdown()
+	var insecureShutdownErr error
+	if ca.insecureSrv != nil {
+		insecureShutdownErr = ca.insecureSrv.Shutdown()
+	}
+
+	secureErr := ca.srv.Shutdown()
+
+	if insecureShutdownErr != nil {
+		return insecureShutdownErr
+	}
+	return secureErr
 }
 
 // Reload reloads the configuration of the CA and calls to the server Reload
@@ -320,6 +332,13 @@ func (ca *CA) Reload() error {
 	if err != nil {
 		logContinue("Reload failed because the CA with new configuration could not be initialized.")
 		return errors.Wrap(err, "error reloading ca")
+	}
+
+	if ca.insecureSrv != nil {
+		if err = ca.insecureSrv.Reload(newCA.insecureSrv); err != nil {
+			logContinue("Reload failed because insecure server could not be replaced.")
+			return errors.Wrap(err, "error reloading insecure server")
+		}
 	}
 
 	if err = ca.srv.Reload(newCA.srv); err != nil {

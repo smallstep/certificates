@@ -67,8 +67,8 @@ func New(scepAuth scep.Interface) api.RouterHandler {
 // Route traffic and implement the Router interface.
 func (h *Handler) Route(r api.Router) {
 	getLink := h.Auth.GetLinkExplicit
-	r.MethodFunc(http.MethodGet, getLink("{name}", false, nil), h.lookupProvisioner(h.Get))
-	r.MethodFunc(http.MethodPost, getLink("{name}", false, nil), h.lookupProvisioner(h.Post))
+	r.MethodFunc(http.MethodGet, getLink("{provisionerID}", false, nil), h.lookupProvisioner(h.Get))
+	r.MethodFunc(http.MethodPost, getLink("{provisionerID}", false, nil), h.lookupProvisioner(h.Post))
 }
 
 // Get handles all SCEP GET requests
@@ -185,14 +185,14 @@ func decodeSCEPRequest(r *http.Request) (SCEPRequest, error) {
 func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		nameEscaped := chi.URLParam(r, "name")
-		name, err := url.PathUnescape(nameEscaped)
+		name := chi.URLParam(r, "provisionerID")
+		provisionerID, err := url.PathUnescape(name)
 		if err != nil {
 			api.WriteError(w, errors.Errorf("error url unescaping provisioner id '%s'", name))
 			return
 		}
 
-		p, err := h.Auth.LoadProvisionerByName(name)
+		p, err := h.Auth.LoadProvisionerByID("scep/" + provisionerID)
 		if err != nil {
 			api.WriteError(w, err)
 			return
