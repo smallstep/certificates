@@ -132,7 +132,7 @@ retry:
 		return nil, readAdminError(resp.Body)
 	}
 	var adm = new(linkedca.Admin)
-	if err := readJSON(resp.Body, adm); err != nil {
+	if err := readProtoJSON(resp.Body, adm); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
 	return adm, nil
@@ -270,7 +270,7 @@ retry:
 		return nil, readAdminError(resp.Body)
 	}
 	var adm = new(linkedca.Admin)
-	if err := readJSON(resp.Body, adm); err != nil {
+	if err := readProtoJSON(resp.Body, adm); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
 	return adm, nil
@@ -334,7 +334,7 @@ retry:
 		return nil, readAdminError(resp.Body)
 	}
 	var adm = new(linkedca.Admin)
-	if err := readJSON(resp.Body, adm); err != nil {
+	if err := readProtoJSON(resp.Body, adm); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
 	return adm, nil

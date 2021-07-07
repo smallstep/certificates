@@ -14,7 +14,7 @@ type nextHTTP = func(http.ResponseWriter, *http.Request)
 // is enabled before servicing requests.
 func (h *Handler) requireAPIEnabled(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if h.db == nil {
+		if !h.auth.IsAdminAPIEnabled() {
 			api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType,
 				"administration API not enabled"))
 			return

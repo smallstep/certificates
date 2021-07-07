@@ -171,5 +171,5 @@ func (h *Handler) UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, err)
 		return
 	}
-	api.ProtoJSONStatus(w, nu, http.StatusOK)
+	api.ProtoJSON(w, nu)
 }

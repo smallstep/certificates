@@ -508,6 +508,12 @@ func (a *Authority) GetAdminDatabase() admin.DB {
 	return a.adminDB
 }
 
+// IsAdminAPIEnabled returns a boolean indicating whether the Admin API has
+// been enabled.
+func (a *Authority) IsAdminAPIEnabled() bool {
+	return a.config.AuthorityConfig.EnableAdmin
+}
+
 // Shutdown safely shuts down any clients, databases, etc. held by the Authority.
 func (a *Authority) Shutdown() error {
 	if err := a.keyManager.Close(); err != nil {

@@ -15,7 +15,7 @@ var (
 	provisionersTable = []byte("provisioners")
 )
 
-// DB is a struct that implements the AcmeDB interface.
+// DB is a struct that implements the AdminDB interface.
 type DB struct {
 	db          nosqlDB.DB
 	authorityID string
@@ -54,7 +54,7 @@ func (db *DB) save(ctx context.Context, id string, nu interface{}, old interface
 	} else {
 		oldB, err = json.Marshal(old)
 		if err != nil {
-			return errors.Wrapf(err, "error marshaling acme type: %s, value: %v", typ, old)
+			return errors.Wrapf(err, "error marshaling admin type: %s, value: %v", typ, old)
 		}
 	}
 

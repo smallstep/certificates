@@ -12,7 +12,7 @@ import (
 	"github.com/smallstep/certificates/logging"
 )
 
-// ProblemType is the type of the ACME problem.
+// ProblemType is the type of the Admin problem.
 type ProblemType int
 
 const (
@@ -33,7 +33,7 @@ const (
 	ErrorServerInternalType
 )
 
-// String returns the string representation of the acme problem type,
+// String returns the string representation of the admin problem type,
 // fulfilling the Stringer interface.
 func (ap ProblemType) String() string {
 	switch ap {
@@ -73,17 +73,17 @@ var (
 		ErrorNotFoundType: {
 			typ:     ErrorNotFoundType.String(),
 			details: "resource not found",
-			status:  400,
+			status:  http.StatusNotFound,
 		},
 		ErrorAuthorityMismatchType: {
 			typ:     ErrorAuthorityMismatchType.String(),
 			details: "resource not owned by authority",
-			status:  401,
+			status:  http.StatusUnauthorized,
 		},
 		ErrorDeletedType: {
 			typ:     ErrorDeletedType.String(),
 			details: "resource is deleted",
-			status:  http.StatusUnauthorized,
+			status:  http.StatusNotFound,
 		},
 		ErrorNotImplementedType: {
 			typ:     ErrorNotImplementedType.String(),
@@ -104,7 +104,7 @@ var (
 	}
 )
 
-// Error represents an ACME
+// Error represents an Admin
 type Error struct {
 	Type    string `json:"type"`
 	Detail  string `json:"detail"`

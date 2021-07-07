@@ -18,6 +18,17 @@ type CreateAdminRequest struct {
 
 // Validate validates a new-admin request body.
 func (car *CreateAdminRequest) Validate() error {
+	if car.Subject == "" {
+		return admin.NewError(admin.ErrorBadRequestType, "subject cannot be empty")
+	}
+	if car.Provisioner == "" {
+		return admin.NewError(admin.ErrorBadRequestType, "provisioner cannot be empty")
+	}
+	switch car.Type {
+	case linkedca.Admin_SUPER_ADMIN, linkedca.Admin_ADMIN:
+	default:
+		return admin.NewError(admin.ErrorBadRequestType, "invalid value for admin type")
+	}
 	return nil
 }
 
@@ -34,6 +45,11 @@ type UpdateAdminRequest struct {
 
 // Validate validates a new-admin request body.
 func (uar *UpdateAdminRequest) Validate() error {
+	switch uar.Type {
+	case linkedca.Admin_SUPER_ADMIN, linkedca.Admin_ADMIN:
+	default:
+		return admin.NewError(admin.ErrorBadRequestType, "invalid value for admin type")
+	}
 	return nil
 }
 
@@ -52,7 +68,7 @@ func (h *Handler) GetAdmin(w http.ResponseWriter, r *http.Request) {
 			"admin %s not found", id))
 		return
 	}
-	api.JSON(w, adm)
+	api.ProtoJSON(w, adm)
 }
 
 // GetAdmins returns a segment of admins associated with the authority.
@@ -104,7 +120,7 @@ func (h *Handler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.JSON(w, adm)
+	api.ProtoJSONStatus(w, adm, http.StatusCreated)
 }
 
 // DeleteAdmin deletes admin.
@@ -127,6 +143,11 @@ func (h *Handler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := body.Validate(); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
 	id := chi.URLParam(r, "id")
 
 	adm, err := h.auth.UpdateAdmin(r.Context(), id, &linkedca.Admin{Type: body.Type})
@@ -135,5 +156,5 @@ func (h *Handler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.JSON(w, adm)
+	api.ProtoJSON(w, adm)
 }
