@@ -11,15 +11,15 @@ import (
 )
 
 type dbChallenge struct {
-	ID          string      `json:"id"`
-	AccountID   string      `json:"accountID"`
-	Type        string      `json:"type"`
-	Status      acme.Status `json:"status"`
-	Token       string      `json:"token"`
-	Value       string      `json:"value"`
-	ValidatedAt string      `json:"validatedAt"`
-	CreatedAt   time.Time   `json:"createdAt"`
-	Error       *acme.Error `json:"error"`
+	ID          string             `json:"id"`
+	AccountID   string             `json:"accountID"`
+	Type        acme.ChallengeType `json:"type"`
+	Status      acme.Status        `json:"status"`
+	Token       string             `json:"token"`
+	Value       string             `json:"value"`
+	ValidatedAt string             `json:"validatedAt"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	Error       *acme.Error        `json:"error"`
 }
 
 func (dbc *dbChallenge) clone() *dbChallenge {

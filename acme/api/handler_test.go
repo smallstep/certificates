@@ -574,13 +574,13 @@ func TestHandler_GetChallenge(t *testing.T) {
 						assert.Equals(t, azID, "authzID")
 						return &acme.Challenge{
 							Status:    acme.StatusPending,
-							Type:      "http-01",
+							Type:      acme.HTTP01,
 							AccountID: "accID",
 						}, nil
 					},
 					MockUpdateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						assert.Equals(t, ch.Status, acme.StatusPending)
-						assert.Equals(t, ch.Type, "http-01")
+						assert.Equals(t, ch.Type, acme.HTTP01)
 						assert.Equals(t, ch.AccountID, "accID")
 						assert.Equals(t, ch.AuthorizationID, "authzID")
 						assert.HasSuffix(t, ch.Error.Type, acme.ErrorConnectionType.String())
@@ -616,13 +616,13 @@ func TestHandler_GetChallenge(t *testing.T) {
 						return &acme.Challenge{
 							ID:        "chID",
 							Status:    acme.StatusPending,
-							Type:      "http-01",
+							Type:      acme.HTTP01,
 							AccountID: "accID",
 						}, nil
 					},
 					MockUpdateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						assert.Equals(t, ch.Status, acme.StatusPending)
-						assert.Equals(t, ch.Type, "http-01")
+						assert.Equals(t, ch.Type, acme.HTTP01)
 						assert.Equals(t, ch.AccountID, "accID")
 						assert.Equals(t, ch.AuthorizationID, "authzID")
 						assert.HasSuffix(t, ch.Error.Type, acme.ErrorConnectionType.String())
@@ -633,7 +633,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 					ID:              "chID",
 					Status:          acme.StatusPending,
 					AuthorizationID: "authzID",
-					Type:            "http-01",
+					Type:            acme.HTTP01,
 					AccountID:       "accID",
 					URL:             url,
 					Error:           acme.NewError(acme.ErrorConnectionType, "force"),
