@@ -198,7 +198,7 @@ func TestK8sSA_AuthorizeRenew(t *testing.T) {
 				p:    p,
 				cert: &x509.Certificate{},
 				code: http.StatusUnauthorized,
-				err:  errors.Errorf("k8ssa.AuthorizeRenew; renew is disabled for k8sSA provisioner %s", p.GetID()),
+				err:  errors.Errorf("k8ssa.AuthorizeRenew; renew is disabled for k8sSA provisioner '%s'", p.GetName()),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -319,7 +319,7 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 				p:     p,
 				token: "foo",
 				code:  http.StatusUnauthorized,
-				err:   errors.Errorf("k8ssa.AuthorizeSSHSign; sshCA is disabled for k8sSA provisioner %s", p.GetID()),
+				err:   errors.Errorf("k8ssa.AuthorizeSSHSign; sshCA is disabled for k8sSA provisioner '%s'", p.GetName()),
 			}
 		},
 		"fail/invalid-token": func(t *testing.T) test {

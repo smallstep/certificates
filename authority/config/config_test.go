@@ -1,4 +1,4 @@
-package authority
+package config
 
 import (
 	"fmt"
@@ -8,12 +8,14 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/jose"
+
+	_ "github.com/smallstep/certificates/cas"
 )
 
 func TestConfigValidate(t *testing.T) {
-	maxjwk, err := jose.ReadKey("testdata/secrets/max_pub.jwk")
+	maxjwk, err := jose.ReadKey("../testdata/secrets/max_pub.jwk")
 	assert.FatalError(t, err)
-	clijwk, err := jose.ReadKey("testdata/secrets/step_cli_key_pub.jwk")
+	clijwk, err := jose.ReadKey("../testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	ac := &AuthConfig{
 		Provisioners: provisioner.List{
@@ -39,9 +41,9 @@ func TestConfigValidate(t *testing.T) {
 		"empty-address": func(t *testing.T) ConfigValidateTest {
 			return ConfigValidateTest{
 				config: &Config{
-					Root:             []string{"testdata/secrets/root_ca.crt"},
-					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
-					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+					Root:             []string{"../testdata/secrets/root_ca.crt"},
+					IntermediateCert: "../testdata/secrets/intermediate_ca.crt",
+					IntermediateKey:  "../testdata/secrets/intermediate_ca_key",
 					DNSNames:         []string{"test.smallstep.com"},
 					Password:         "pass",
 					AuthorityConfig:  ac,
@@ -53,9 +55,9 @@ func TestConfigValidate(t *testing.T) {
 			return ConfigValidateTest{
 				config: &Config{
 					Address:          "127.0.0.1",
-					Root:             []string{"testdata/secrets/root_ca.crt"},
-					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
-					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+					Root:             []string{"../testdata/secrets/root_ca.crt"},
+					IntermediateCert: "../testdata/secrets/intermediate_ca.crt",
+					IntermediateKey:  "../testdata/secrets/intermediate_ca_key",
 					DNSNames:         []string{"test.smallstep.com"},
 					Password:         "pass",
 					AuthorityConfig:  ac,
@@ -67,8 +69,8 @@ func TestConfigValidate(t *testing.T) {
 			return ConfigValidateTest{
 				config: &Config{
 					Address:          "127.0.0.1:443",
-					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
-					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+					IntermediateCert: "../testdata/secrets/intermediate_ca.crt",
+					IntermediateKey:  "../testdata/secrets/intermediate_ca_key",
 					DNSNames:         []string{"test.smallstep.com"},
 					Password:         "pass",
 					AuthorityConfig:  ac,
@@ -80,8 +82,8 @@ func TestConfigValidate(t *testing.T) {
 			return ConfigValidateTest{
 				config: &Config{
 					Address:         "127.0.0.1:443",
-					Root:            []string{"testdata/secrets/root_ca.crt"},
-					IntermediateKey: "testdata/secrets/intermediate_ca_key",
+					Root:            []string{"../testdata/secrets/root_ca.crt"},
+					IntermediateKey: "../testdata/secrets/intermediate_ca_key",
 					DNSNames:        []string{"test.smallstep.com"},
 					Password:        "pass",
 					AuthorityConfig: ac,
@@ -93,8 +95,8 @@ func TestConfigValidate(t *testing.T) {
 			return ConfigValidateTest{
 				config: &Config{
 					Address:          "127.0.0.1:443",
-					Root:             []string{"testdata/secrets/root_ca.crt"},
-					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
+					Root:             []string{"../testdata/secrets/root_ca.crt"},
+					IntermediateCert: "../testdata/secrets/intermediate_ca.crt",
 					DNSNames:         []string{"test.smallstep.com"},
 					Password:         "pass",
 					AuthorityConfig:  ac,
@@ -106,9 +108,9 @@ func TestConfigValidate(t *testing.T) {
 			return ConfigValidateTest{
 				config: &Config{
 					Address:          "127.0.0.1:443",
-					Root:             []string{"testdata/secrets/root_ca.crt"},
-					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
-					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+					Root:             []string{"../testdata/secrets/root_ca.crt"},
+					IntermediateCert: "../testdata/secrets/intermediate_ca.crt",
+					IntermediateKey:  "../testdata/secrets/intermediate_ca_key",
 					Password:         "pass",
 					AuthorityConfig:  ac,
 				},
@@ -119,9 +121,9 @@ func TestConfigValidate(t *testing.T) {
 			return ConfigValidateTest{
 				config: &Config{
 					Address:          "127.0.0.1:443",
-					Root:             []string{"testdata/secrets/root_ca.crt"},
-					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
-					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+					Root:             []string{"../testdata/secrets/root_ca.crt"},
+					IntermediateCert: "../testdata/secrets/intermediate_ca.crt",
+					IntermediateKey:  "../testdata/secrets/intermediate_ca_key",
 					DNSNames:         []string{"test.smallstep.com"},
 					Password:         "pass",
 					AuthorityConfig:  ac,
@@ -133,9 +135,9 @@ func TestConfigValidate(t *testing.T) {
 			return ConfigValidateTest{
 				config: &Config{
 					Address:          "127.0.0.1:443",
-					Root:             []string{"testdata/secrets/root_ca.crt"},
-					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
-					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+					Root:             []string{"../testdata/secrets/root_ca.crt"},
+					IntermediateCert: "../testdata/secrets/intermediate_ca.crt",
+					IntermediateKey:  "../testdata/secrets/intermediate_ca_key",
 					DNSNames:         []string{"test.smallstep.com"},
 					Password:         "pass",
 					AuthorityConfig:  ac,
@@ -148,9 +150,9 @@ func TestConfigValidate(t *testing.T) {
 			return ConfigValidateTest{
 				config: &Config{
 					Address:          "127.0.0.1:443",
-					Root:             []string{"testdata/secrets/root_ca.crt"},
-					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
-					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+					Root:             []string{"../testdata/secrets/root_ca.crt"},
+					IntermediateCert: "../testdata/secrets/intermediate_ca.crt",
+					IntermediateKey:  "../testdata/secrets/intermediate_ca_key",
 					DNSNames:         []string{"test.smallstep.com"},
 					Password:         "pass",
 					AuthorityConfig:  ac,
@@ -177,9 +179,9 @@ func TestConfigValidate(t *testing.T) {
 			return ConfigValidateTest{
 				config: &Config{
 					Address:          "127.0.0.1:443",
-					Root:             []string{"testdata/secrets/root_ca.crt"},
-					IntermediateCert: "testdata/secrets/intermediate_ca.crt",
-					IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+					Root:             []string{"../testdata/secrets/root_ca.crt"},
+					IntermediateCert: "../testdata/secrets/intermediate_ca.crt",
+					IntermediateKey:  "../testdata/secrets/intermediate_ca_key",
 					DNSNames:         []string{"test.smallstep.com"},
 					Password:         "pass",
 					AuthorityConfig:  ac,
@@ -207,6 +209,8 @@ func TestConfigValidate(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
+					fmt.Printf("tc.tls = %+v\n", tc.tls)
+					fmt.Printf("*tc.config.TLS = %+v\n", *tc.config.TLS)
 					assert.Equals(t, *tc.config.TLS, tc.tls)
 				}
 			}
@@ -224,9 +228,9 @@ func TestAuthConfigValidate(t *testing.T) {
 		CommonName:    "test",
 	}
 
-	maxjwk, err := jose.ReadKey("testdata/secrets/max_pub.jwk")
+	maxjwk, err := jose.ReadKey("../testdata/secrets/max_pub.jwk")
 	assert.FatalError(t, err)
-	clijwk, err := jose.ReadKey("testdata/secrets/step_cli_key_pub.jwk")
+	clijwk, err := jose.ReadKey("../testdata/secrets/step_cli_key_pub.jwk")
 	assert.FatalError(t, err)
 	p := provisioner.List{
 		&provisioner.JWK{

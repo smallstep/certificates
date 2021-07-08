@@ -61,7 +61,7 @@ func TestACME_Init(t *testing.T) {
 		"fail-bad-claims": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p:   &ACME{Name: "foo", Type: "bar", Claims: &Claims{DefaultTLSDur: &Duration{0}}},
-				err: errors.New("claims: DefaultTLSCertDuration must be greater than 0"),
+				err: errors.New("claims: MinTLSCertDuration must be greater than 0"),
 			}
 		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
@@ -110,7 +110,7 @@ func TestACME_AuthorizeRenew(t *testing.T) {
 				p:    p,
 				cert: &x509.Certificate{},
 				code: http.StatusUnauthorized,
-				err:  errors.Errorf("acme.AuthorizeRenew; renew is disabled for acme provisioner %s", p.GetID()),
+				err:  errors.Errorf("acme.AuthorizeRenew; renew is disabled for acme provisioner '%s'", p.GetName()),
 			}
 		},
 		"ok": func(t *testing.T) test {

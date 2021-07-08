@@ -656,7 +656,7 @@ func TestAuthority_Renew(t *testing.T) {
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner 'dev'"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -856,7 +856,7 @@ func TestAuthority_Rekey(t *testing.T) {
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner 'dev'"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},

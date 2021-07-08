@@ -103,7 +103,6 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 		return nil, nil, err
 	}
 
-	// Update renew function with transport
 	tr := getDefaultTransport(tlsConfig)
 	// Use mutable tls.Config on renew
 	tr.DialTLS = c.buildDialTLS(tlsCtx) // nolint:staticcheck
