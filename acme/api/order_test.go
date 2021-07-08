@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
@@ -44,6 +45,22 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 				err: acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: foo"),
 			}
 		},
+		"fail/bad-ip": func(t *testing.T) test {
+			nbf := time.Now().UTC().Add(time.Minute)
+			naf := time.Now().UTC().Add(5 * time.Minute)
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "ip", Value: "192.168.42.1000"},
+					},
+					NotAfter:  naf,
+					NotBefore: nbf,
+				},
+				nbf: nbf,
+				naf: naf,
+				err: acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", "192.168.42.1000"),
+			}
+		},
 		"ok": func(t *testing.T) test {
 			nbf := time.Now().UTC().Add(time.Minute)
 			naf := time.Now().UTC().Add(5 * time.Minute)
@@ -52,6 +69,68 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 					Identifiers: []acme.Identifier{
 						{Type: "dns", Value: "example.com"},
 						{Type: "dns", Value: "bar.com"},
+					},
+					NotAfter:  naf,
+					NotBefore: nbf,
+				},
+				nbf: nbf,
+				naf: naf,
+			}
+		},
+		"ok/ipv4": func(t *testing.T) test {
+			nbf := time.Now().UTC().Add(time.Minute)
+			naf := time.Now().UTC().Add(5 * time.Minute)
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "ip", Value: "192.168.42.42"},
+					},
+					NotAfter:  naf,
+					NotBefore: nbf,
+				},
+				nbf: nbf,
+				naf: naf,
+			}
+		},
+		"ok/ipv6": func(t *testing.T) test {
+			nbf := time.Now().UTC().Add(time.Minute)
+			naf := time.Now().UTC().Add(5 * time.Minute)
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "ip", Value: "2001:db8::1"},
+					},
+					NotAfter:  naf,
+					NotBefore: nbf,
+				},
+				nbf: nbf,
+				naf: naf,
+			}
+		},
+		"ok/mixed-dns-and-ipv4": func(t *testing.T) test {
+			nbf := time.Now().UTC().Add(time.Minute)
+			naf := time.Now().UTC().Add(5 * time.Minute)
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "dns", Value: "example.com"},
+						{Type: "ip", Value: "192.168.42.42"},
+					},
+					NotAfter:  naf,
+					NotBefore: nbf,
+				},
+				nbf: nbf,
+				naf: naf,
+			}
+		},
+		"ok/mixed-ipv4-and-ipv6": func(t *testing.T) test {
+			nbf := time.Now().UTC().Add(time.Minute)
+			naf := time.Now().UTC().Add(5 * time.Minute)
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "ip", Value: "192.168.42.42"},
+						{Type: "ip", Value: "2001:db8::1"},
 					},
 					NotAfter:  naf,
 					NotBefore: nbf,
@@ -395,7 +474,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						assert.Equals(t, ch.AccountID, az.AccountID)
-						assert.Equals(t, ch.Type, "dns-01")
+						assert.Equals(t, ch.Type, acme.DNS01)
 						assert.Equals(t, ch.Token, az.Token)
 						assert.Equals(t, ch.Status, acme.StatusPending)
 						assert.Equals(t, ch.Value, az.Identifier.Value)
@@ -424,15 +503,15 @@ func TestHandler_newAuthorization(t *testing.T) {
 						switch count {
 						case 0:
 							ch.ID = "dns"
-							assert.Equals(t, ch.Type, "dns-01")
+							assert.Equals(t, ch.Type, acme.DNS01)
 							ch1 = &ch
 						case 1:
 							ch.ID = "http"
-							assert.Equals(t, ch.Type, "http-01")
+							assert.Equals(t, ch.Type, acme.HTTP01)
 							ch2 = &ch
 						case 2:
 							ch.ID = "tls"
-							assert.Equals(t, ch.Type, "tls-alpn-01")
+							assert.Equals(t, ch.Type, acme.TLSALPN01)
 							ch3 = &ch
 						default:
 							assert.FatalError(t, errors.New("test logic error"))
@@ -478,15 +557,15 @@ func TestHandler_newAuthorization(t *testing.T) {
 						switch count {
 						case 0:
 							ch.ID = "dns"
-							assert.Equals(t, ch.Type, "dns-01")
+							assert.Equals(t, ch.Type, acme.DNS01)
 							ch1 = &ch
 						case 1:
 							ch.ID = "http"
-							assert.Equals(t, ch.Type, "http-01")
+							assert.Equals(t, ch.Type, acme.HTTP01)
 							ch2 = &ch
 						case 2:
 							ch.ID = "tls"
-							assert.Equals(t, ch.Type, "tls-alpn-01")
+							assert.Equals(t, ch.Type, acme.TLSALPN01)
 							ch3 = &ch
 						default:
 							assert.FatalError(t, errors.New("test logic error"))
@@ -528,7 +607,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						ch.ID = "dns"
-						assert.Equals(t, ch.Type, "dns-01")
+						assert.Equals(t, ch.Type, acme.DNS01)
 						assert.Equals(t, ch.AccountID, az.AccountID)
 						assert.Equals(t, ch.Token, az.Token)
 						assert.Equals(t, ch.Status, acme.StatusPending)
@@ -695,7 +774,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						assert.Equals(t, ch.AccountID, "accID")
-						assert.Equals(t, ch.Type, "dns-01")
+						assert.Equals(t, ch.Type, acme.DNS01)
 						assert.NotEquals(t, ch.Token, "")
 						assert.Equals(t, ch.Status, acme.StatusPending)
 						assert.Equals(t, ch.Value, "zap.internal")
@@ -730,15 +809,15 @@ func TestHandler_NewOrder(t *testing.T) {
 						switch count {
 						case 0:
 							ch.ID = "dns"
-							assert.Equals(t, ch.Type, "dns-01")
+							assert.Equals(t, ch.Type, acme.DNS01)
 							ch1 = &ch
 						case 1:
 							ch.ID = "http"
-							assert.Equals(t, ch.Type, "http-01")
+							assert.Equals(t, ch.Type, acme.HTTP01)
 							ch2 = &ch
 						case 2:
 							ch.ID = "tls"
-							assert.Equals(t, ch.Type, "tls-alpn-01")
+							assert.Equals(t, ch.Type, acme.TLSALPN01)
 							ch3 = &ch
 						default:
 							assert.FatalError(t, errors.New("test logic error"))
@@ -802,22 +881,22 @@ func TestHandler_NewOrder(t *testing.T) {
 						switch chCount {
 						case 0:
 							ch.ID = "dns"
-							assert.Equals(t, ch.Type, "dns-01")
+							assert.Equals(t, ch.Type, acme.DNS01)
 							assert.Equals(t, ch.Value, "zap.internal")
 							ch1 = &ch
 						case 1:
 							ch.ID = "http"
-							assert.Equals(t, ch.Type, "http-01")
+							assert.Equals(t, ch.Type, acme.HTTP01)
 							assert.Equals(t, ch.Value, "zap.internal")
 							ch2 = &ch
 						case 2:
 							ch.ID = "tls"
-							assert.Equals(t, ch.Type, "tls-alpn-01")
+							assert.Equals(t, ch.Type, acme.TLSALPN01)
 							assert.Equals(t, ch.Value, "zap.internal")
 							ch3 = &ch
 						case 3:
 							ch.ID = "dns"
-							assert.Equals(t, ch.Type, "dns-01")
+							assert.Equals(t, ch.Type, acme.DNS01)
 							assert.Equals(t, ch.Value, "zar.internal")
 							ch4 = &ch
 						default:
@@ -842,7 +921,7 @@ func TestHandler_NewOrder(t *testing.T) {
 							az.ID = "az2ID"
 							az2ID = &az.ID
 							assert.Equals(t, az.Identifier, acme.Identifier{
-								Type:  "dns",
+								Type:  acme.DNS,
 								Value: "zar.internal",
 							})
 							assert.Equals(t, az.Wildcard, true)
@@ -917,15 +996,15 @@ func TestHandler_NewOrder(t *testing.T) {
 						switch count {
 						case 0:
 							ch.ID = "dns"
-							assert.Equals(t, ch.Type, "dns-01")
+							assert.Equals(t, ch.Type, acme.DNS01)
 							ch1 = &ch
 						case 1:
 							ch.ID = "http"
-							assert.Equals(t, ch.Type, "http-01")
+							assert.Equals(t, ch.Type, acme.HTTP01)
 							ch2 = &ch
 						case 2:
 							ch.ID = "tls"
-							assert.Equals(t, ch.Type, "tls-alpn-01")
+							assert.Equals(t, ch.Type, acme.TLSALPN01)
 							ch3 = &ch
 						default:
 							assert.FatalError(t, errors.New("test logic error"))
@@ -1009,15 +1088,15 @@ func TestHandler_NewOrder(t *testing.T) {
 						switch count {
 						case 0:
 							ch.ID = "dns"
-							assert.Equals(t, ch.Type, "dns-01")
+							assert.Equals(t, ch.Type, acme.DNS01)
 							ch1 = &ch
 						case 1:
 							ch.ID = "http"
-							assert.Equals(t, ch.Type, "http-01")
+							assert.Equals(t, ch.Type, acme.HTTP01)
 							ch2 = &ch
 						case 2:
 							ch.ID = "tls"
-							assert.Equals(t, ch.Type, "tls-alpn-01")
+							assert.Equals(t, ch.Type, acme.TLSALPN01)
 							ch3 = &ch
 						default:
 							assert.FatalError(t, errors.New("test logic error"))
@@ -1100,15 +1179,15 @@ func TestHandler_NewOrder(t *testing.T) {
 						switch count {
 						case 0:
 							ch.ID = "dns"
-							assert.Equals(t, ch.Type, "dns-01")
+							assert.Equals(t, ch.Type, acme.DNS01)
 							ch1 = &ch
 						case 1:
 							ch.ID = "http"
-							assert.Equals(t, ch.Type, "http-01")
+							assert.Equals(t, ch.Type, acme.HTTP01)
 							ch2 = &ch
 						case 2:
 							ch.ID = "tls"
-							assert.Equals(t, ch.Type, "tls-alpn-01")
+							assert.Equals(t, ch.Type, acme.TLSALPN01)
 							ch3 = &ch
 						default:
 							assert.FatalError(t, errors.New("test logic error"))
@@ -1192,15 +1271,15 @@ func TestHandler_NewOrder(t *testing.T) {
 						switch count {
 						case 0:
 							ch.ID = "dns"
-							assert.Equals(t, ch.Type, "dns-01")
+							assert.Equals(t, ch.Type, acme.DNS01)
 							ch1 = &ch
 						case 1:
 							ch.ID = "http"
-							assert.Equals(t, ch.Type, "http-01")
+							assert.Equals(t, ch.Type, acme.HTTP01)
 							ch2 = &ch
 						case 2:
 							ch.ID = "tls"
-							assert.Equals(t, ch.Type, "tls-alpn-01")
+							assert.Equals(t, ch.Type, acme.TLSALPN01)
 							ch3 = &ch
 						default:
 							assert.FatalError(t, errors.New("test logic error"))
@@ -1577,6 +1656,55 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Location"], []string{url})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
+			}
+		})
+	}
+}
+
+func TestHandler_challengeTypes(t *testing.T) {
+	type args struct {
+		az *acme.Authorization
+	}
+	tests := []struct {
+		name string
+		args args
+		want []acme.ChallengeType
+	}{
+		{
+			name: "ok/dns",
+			args: args{
+				az: &acme.Authorization{
+					Identifier: acme.Identifier{Type: "dns", Value: "example.com"},
+					Wildcard:   false,
+				},
+			},
+			want: []acme.ChallengeType{acme.DNS01, acme.HTTP01, acme.TLSALPN01},
+		},
+		{
+			name: "ok/wildcard",
+			args: args{
+				az: &acme.Authorization{
+					Identifier: acme.Identifier{Type: "dns", Value: "*.example.com"},
+					Wildcard:   true,
+				},
+			},
+			want: []acme.ChallengeType{acme.DNS01},
+		},
+		{
+			name: "ok/ip",
+			args: args{
+				az: &acme.Authorization{
+					Identifier: acme.Identifier{Type: "ip", Value: "192.168.42.42"},
+					Wildcard:   false,
+				},
+			},
+			want: []acme.ChallengeType{acme.HTTP01, acme.TLSALPN01},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := challengeTypes(tt.args.az); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Handler.challengeTypes() = %v, want %v", got, tt.want)
 			}
 		})
 	}
