@@ -5,10 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
 	"go.step.sm/crypto/jose"
 	"golang.org/x/crypto/ocsp"
@@ -29,23 +31,11 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if shouldCheckAccount(jws) {
-		_, err := accountFromContext(ctx)
-		if err != nil {
-			api.WriteError(w, err)
-			return
-		}
-	}
-
-	// TODO: do checks on account, i.e. is it still valid? is it allowed to do revocations? Revocations on the to be revoked cert?
-
-	_, err = provisionerFromContext(ctx)
+	prov, err := provisionerFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
-
-	// TODO: let provisioner authorize the revocation? Necessary per provisioner? Or can it be done by the CA, like the Revoke itself.
 
 	p, err := payloadFromContext(ctx)
 	if err != nil {
@@ -73,19 +63,39 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serial := certToBeRevoked.SerialNumber.String()
-	_, err = h.db.GetCertificateBySerial(ctx, serial)
+	existingCert, err := h.db.GetCertificateBySerial(ctx, serial)
 	if err != nil {
 		api.WriteError(w, acme.WrapErrorISE(err, "error retrieving certificate by serial"))
 		return
 	}
 
-	// if existingCert.AccountID != acc.ID {
-	// 	api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
-	// 		"account '%s' does not own certificate '%s'", acc.ID, certID))
-	// 	return // TODO: this check should only be performed in case acc exists (i.e. KeyID revoke)
-	// }
-
-	// TODO: validate the certToBeRevoked against what we know about it?
+	if shouldCheckAccountFrom(jws) {
+		account, err := accountFromContext(ctx)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		if !account.IsValid() {
+			api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
+				"account '%s' has status '%s'", account.ID, account.Status))
+			return
+		}
+		if existingCert.AccountID != account.ID {
+			api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
+				"account '%s' does not own certificate '%s'", account.ID, existingCert.ID))
+			return
+		}
+		// TODO: check "an account that holds authorizations for all of the identifiers in the certificate."
+	} else {
+		// if account doesn't need to be checked, the JWS should be verified to be signed by the
+		// private key that belongs to the public key in the certificate to be revoked.
+		_, err := jws.Verify(certToBeRevoked.PublicKey)
+		if err != nil {
+			api.WriteError(w, acme.WrapError(acme.ErrorUnauthorizedType, err,
+				"verification of jws using certificate public key failed"))
+			return
+		}
+	}
 
 	reasonCode := payload.ReasonCode
 	acmeErr := validateReasonCode(reasonCode)
@@ -94,16 +104,34 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Authorize revocation by ACME provisioner
+	ctx = provisioner.NewContextWithMethod(ctx, provisioner.RevokeMethod)
+	err = prov.AuthorizeRevoke(ctx, "")
+	if err != nil {
+		api.WriteError(w, acme.WrapErrorISE(err, "error authorizing revocation on provisioner"))
+		return
+	}
+
 	options := revokeOptions(serial, certToBeRevoked, reasonCode)
 	err = h.ca.Revoke(ctx, options)
 	if err != nil {
-		api.WriteError(w, err) // TODO: send the right error; 400; alreadyRevoked (or something else went wrong, of course)
+		api.WriteError(w, wrapRevokeErr(err))
 		return
 	}
 
 	logRevoke(w, options)
 	w.Header().Add("Link", link(h.linker.GetLink(ctx, DirectoryLinkType), "index"))
 	w.Write(nil)
+}
+
+// wrapRevokeErr is a best effort implementation to transform an error during
+// revocation into an ACME error, so that clients can understand the error.
+func wrapRevokeErr(err error) *acme.Error {
+	t := err.Error()
+	if strings.Contains(t, "has already been revoked") {
+		return acme.NewError(acme.ErrorAlreadyRevokedType, t)
+	}
+	return acme.WrapErrorISE(err, "error when revoking certificate")
 }
 
 // logRevoke logs successful revocation of certificate
@@ -176,9 +204,13 @@ func reason(reasonCode int) string {
 	}
 }
 
-// shouldCheckAccount indicates whether an account should be
+// shouldCheckAccountFrom indicates whether an account should be
 // retrieved from the context, so that it can be used for
-// additional checks.
-func shouldCheckAccount(jws *jose.JSONWebSignature) bool {
+// additional checks. This should only be done when no JWK
+// can be extracted from the request, as that would indicate
+// that the revocation request was signed with a certificate
+// key pair (and not an account key pair). Looking up such
+// a JWK would result in no Account being found.
+func shouldCheckAccountFrom(jws *jose.JSONWebSignature) bool {
 	return !canExtractJWKFrom(jws)
 }

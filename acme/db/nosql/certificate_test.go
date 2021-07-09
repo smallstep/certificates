@@ -103,7 +103,7 @@ func TestDB_CreateCertificate(t *testing.T) {
 							*idPtr = cert.ID
 						}
 
-						countOfCmpAndSwapCalls += 1
+						countOfCmpAndSwapCalls++
 
 						return nil, true, nil
 					},

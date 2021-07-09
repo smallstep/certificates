@@ -30,6 +30,7 @@ var clock Clock
 // only those methods required by the ACME api/authority.
 type Provisioner interface {
 	AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error)
+	AuthorizeRevoke(ctx context.Context, token string) error
 	GetID() string
 	GetName() string
 	DefaultTLSCertDuration() time.Duration
@@ -43,6 +44,7 @@ type MockProvisioner struct {
 	MgetID                  func() string
 	MgetName                func() string
 	MauthorizeSign          func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
+	MauthorizeRevoke        func(ctx context.Context, token string) error
 	MdefaultTLSCertDuration func() time.Duration
 	MgetOptions             func() *provisioner.Options
 }
@@ -61,6 +63,14 @@ func (m *MockProvisioner) AuthorizeSign(ctx context.Context, ott string) ([]prov
 		return m.MauthorizeSign(ctx, ott)
 	}
 	return m.Mret1.([]provisioner.SignOption), m.Merr
+}
+
+// AuthorizeRevoke mock
+func (m *MockProvisioner) AuthorizeRevoke(ctx context.Context, token string) error {
+	if m.MauthorizeRevoke != nil {
+		return m.MauthorizeRevoke(ctx, token)
+	}
+	return m.Merr
 }
 
 // DefaultTLSCertDuration mock

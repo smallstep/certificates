@@ -371,6 +371,7 @@ func (h *Handler) extractOrLookupJWK(next nextHTTP) nextHTTP {
 		}
 
 		// default to looking up the JWK based on KeyID
+		// NOTE: this is a JWK signed with the certificate private key
 		h.lookupJWK(next)(w, r)
 	}
 }
