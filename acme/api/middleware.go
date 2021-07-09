@@ -364,13 +364,13 @@ func (h *Handler) extractOrLookupJWK(next nextHTTP) nextHTTP {
 		}
 
 		// at this point the JWS has already been verified (if correctly configured in middleware),
-		// and it can be used to check if a jwk exists.
+		// and it can be used to check if a JWK exists.
 		if canExtractJWKFrom(jws) {
 			h.extractJWK(next)(w, r)
 			return
 		}
 
-		// default to looking up the JWK based on KID
+		// default to looking up the JWK based on KeyID
 		h.lookupJWK(next)(w, r)
 	}
 }

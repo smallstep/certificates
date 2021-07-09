@@ -28,6 +28,7 @@ type DB interface {
 
 	CreateCertificate(ctx context.Context, cert *Certificate) error
 	GetCertificate(ctx context.Context, id string) (*Certificate, error)
+	GetCertificateBySerial(ctx context.Context, serial string) (*Certificate, error)
 
 	CreateChallenge(ctx context.Context, ch *Challenge) error
 	GetChallenge(ctx context.Context, id, authzID string) (*Challenge, error)
@@ -54,8 +55,9 @@ type MockDB struct {
 	MockGetAuthorization    func(ctx context.Context, id string) (*Authorization, error)
 	MockUpdateAuthorization func(ctx context.Context, az *Authorization) error
 
-	MockCreateCertificate func(ctx context.Context, cert *Certificate) error
-	MockGetCertificate    func(ctx context.Context, id string) (*Certificate, error)
+	MockCreateCertificate      func(ctx context.Context, cert *Certificate) error
+	MockGetCertificate         func(ctx context.Context, id string) (*Certificate, error)
+	MockGetCertificateBySerial func(ctx context.Context, serial string) (*Certificate, error)
 
 	MockCreateChallenge func(ctx context.Context, ch *Challenge) error
 	MockGetChallenge    func(ctx context.Context, id, authzID string) (*Challenge, error)
@@ -174,6 +176,15 @@ func (m *MockDB) CreateCertificate(ctx context.Context, cert *Certificate) error
 func (m *MockDB) GetCertificate(ctx context.Context, id string) (*Certificate, error) {
 	if m.MockGetCertificate != nil {
 		return m.MockGetCertificate(ctx, id)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(*Certificate), m.MockError
+}
+
+func (m *MockDB) GetCertificateBySerial(ctx context.Context, serial string) (*Certificate, error) {
+	if m.MockGetCertificateBySerial != nil {
+		return m.MockGetCertificateBySerial(ctx, serial)
 	} else if m.MockError != nil {
 		return nil, m.MockError
 	}
