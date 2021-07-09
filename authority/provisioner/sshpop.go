@@ -26,6 +26,7 @@ type sshPOPPayload struct {
 // signature requests.
 type SSHPOP struct {
 	*base
+	ID         string  `json:"-"`
 	Type       string  `json:"type"`
 	Name       string  `json:"name"`
 	Claims     *Claims `json:"claims,omitempty"`
@@ -38,6 +39,15 @@ type SSHPOP struct {
 // GetID returns the provisioner unique identifier. The name and credential id
 // should uniquely identify any SSH-POP provisioner.
 func (p *SSHPOP) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (p *SSHPOP) GetIDForToken() string {
 	return "sshpop/" + p.Name
 }
 
@@ -91,7 +101,7 @@ func (p *SSHPOP) Init(config Config) error {
 		return err
 	}
 
-	p.audiences = config.Audiences.WithFragment(p.GetID())
+	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
 	p.db = config.DB
 	p.sshPubKeys = config.SSHKeys
 	return nil

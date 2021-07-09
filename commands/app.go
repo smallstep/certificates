@@ -11,7 +11,7 @@ import (
 	"unicode"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/ca"
 	"github.com/urfave/cli"
 	"go.step.sm/cli-utils/errs"
@@ -56,7 +56,7 @@ func appAction(ctx *cli.Context) error {
 	}
 
 	configFile := ctx.Args().Get(0)
-	config, err := authority.LoadConfiguration(configFile)
+	config, err := config.LoadConfiguration(configFile)
 	if err != nil {
 		fatal(err)
 	}

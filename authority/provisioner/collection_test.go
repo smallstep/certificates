@@ -132,6 +132,7 @@ func TestCollection_LoadByToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Collection{
 				byID:      tt.fields.byID,
+				byTokenID: tt.fields.byID,
 				audiences: tt.fields.audiences,
 			}
 			got, got1 := c.LoadByToken(tt.args.token, tt.args.claims)
@@ -153,10 +154,10 @@ func TestCollection_LoadByCertificate(t *testing.T) {
 	p3, err := generateACME()
 	assert.FatalError(t, err)
 
-	byID := new(sync.Map)
-	byID.Store(p1.GetID(), p1)
-	byID.Store(p2.GetID(), p2)
-	byID.Store(p3.GetID(), p3)
+	byName := new(sync.Map)
+	byName.Store(p1.GetName(), p1)
+	byName.Store(p2.GetName(), p2)
+	byName.Store(p3.GetName(), p3)
 
 	ok1Ext, err := createProvisionerExtension(1, p1.Name, p1.Key.KeyID)
 	assert.FatalError(t, err)
@@ -186,7 +187,7 @@ func TestCollection_LoadByCertificate(t *testing.T) {
 	}
 
 	type fields struct {
-		byID      *sync.Map
+		byName    *sync.Map
 		audiences Audiences
 	}
 	type args struct {
@@ -199,17 +200,17 @@ func TestCollection_LoadByCertificate(t *testing.T) {
 		want   Interface
 		want1  bool
 	}{
-		{"ok1", fields{byID, testAudiences}, args{ok1Cert}, p1, true},
-		{"ok2", fields{byID, testAudiences}, args{ok2Cert}, p2, true},
-		{"ok3", fields{byID, testAudiences}, args{ok3Cert}, p3, true},
-		{"noExtension", fields{byID, testAudiences}, args{&x509.Certificate{}}, &noop{}, true},
-		{"notFound", fields{byID, testAudiences}, args{notFoundCert}, nil, false},
-		{"badCert", fields{byID, testAudiences}, args{badCert}, nil, false},
+		{"ok1", fields{byName, testAudiences}, args{ok1Cert}, p1, true},
+		{"ok2", fields{byName, testAudiences}, args{ok2Cert}, p2, true},
+		{"ok3", fields{byName, testAudiences}, args{ok3Cert}, p3, true},
+		{"noExtension", fields{byName, testAudiences}, args{&x509.Certificate{}}, &noop{}, true},
+		{"notFound", fields{byName, testAudiences}, args{notFoundCert}, nil, false},
+		{"badCert", fields{byName, testAudiences}, args{badCert}, nil, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Collection{
-				byID:      tt.fields.byID,
+				byName:    tt.fields.byName,
 				audiences: tt.fields.audiences,
 			}
 			got, got1 := c.LoadByCertificate(tt.args.cert)

@@ -12,8 +12,13 @@ import (
 
 	"github.com/smallstep/certificates/cas"
 	"github.com/smallstep/certificates/scep"
+	"go.step.sm/linkedca"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/admin"
+	adminDBNosql "github.com/smallstep/certificates/authority/admin/db/nosql"
+	"github.com/smallstep/certificates/authority/administrator"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
@@ -21,25 +26,25 @@ import (
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/sshagentkms"
 	"github.com/smallstep/certificates/templates"
+	"github.com/smallstep/nosql"
 	"go.step.sm/crypto/pemutil"
 	"golang.org/x/crypto/ssh"
 )
 
-const (
-	legacyAuthority = "step-certificate-authority"
-)
-
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
-	config       *Config
+	config       *config.Config
 	keyManager   kms.KeyManager
 	provisioners *provisioner.Collection
+	admins       *administrator.Collection
 	db           db.AuthDB
+	adminDB      admin.DB
 	templates    *templates.Templates
 
 	// X509 CA
 	x509CAService      cas.CertificateAuthorityService
 	rootX509Certs      []*x509.Certificate
+	rootX509CertPool   *x509.CertPool
 	federatedX509Certs []*x509.Certificate
 	certificates       *sync.Map
 
@@ -59,14 +64,16 @@ type Authority struct {
 	startTime time.Time
 
 	// Custom functions
-	sshBastionFunc   func(ctx context.Context, user, hostname string) (*Bastion, error)
+	sshBastionFunc   func(ctx context.Context, user, hostname string) (*config.Bastion, error)
 	sshCheckHostFunc func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
-	sshGetHostsFunc  func(ctx context.Context, cert *x509.Certificate) ([]Host, error)
+	sshGetHostsFunc  func(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)
 	getIdentityFunc  provisioner.GetIdentityFunc
+
+	adminMutex sync.RWMutex
 }
 
 // New creates and initiates a new Authority type.
-func New(config *Config, opts ...Option) (*Authority, error) {
+func New(config *config.Config, opts ...Option) (*Authority, error) {
 	err := config.Validate()
 	if err != nil {
 		return nil, err
@@ -96,7 +103,7 @@ func New(config *Config, opts ...Option) (*Authority, error) {
 // project without the limitations of the config.
 func NewEmbedded(opts ...Option) (*Authority, error) {
 	a := &Authority{
-		config:       &Config{},
+		config:       &config.Config{},
 		certificates: new(sync.Map),
 	}
 
@@ -120,7 +127,7 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	}
 
 	// Initialize config required fields.
-	a.config.init()
+	a.config.Init()
 
 	// Initialize authority from options or configuration.
 	if err := a.init(); err != nil {
@@ -128,6 +135,65 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	}
 
 	return a, nil
+}
+
+// reloadAdminResources reloads admins and provisioners from the DB.
+func (a *Authority) reloadAdminResources(ctx context.Context) error {
+	var (
+		provList  provisioner.List
+		adminList []*linkedca.Admin
+	)
+	if a.config.AuthorityConfig.EnableAdmin {
+		provs, err := a.adminDB.GetProvisioners(ctx)
+		if err != nil {
+			return admin.WrapErrorISE(err, "error getting provisioners to initialize authority")
+		}
+		provList, err = provisionerListToCertificates(provs)
+		if err != nil {
+			return admin.WrapErrorISE(err, "error converting provisioner list to certificates")
+		}
+		adminList, err = a.adminDB.GetAdmins(ctx)
+		if err != nil {
+			return admin.WrapErrorISE(err, "error getting admins to initialize authority")
+		}
+	} else {
+		provList = a.config.AuthorityConfig.Provisioners
+		adminList = a.config.AuthorityConfig.Admins
+	}
+
+	provisionerConfig, err := a.generateProvisionerConfig(ctx)
+	if err != nil {
+		return admin.WrapErrorISE(err, "error generating provisioner config")
+	}
+
+	// Create provisioner collection.
+	provClxn := provisioner.NewCollection(provisionerConfig.Audiences)
+	for _, p := range provList {
+		if err := p.Init(*provisionerConfig); err != nil {
+			return err
+		}
+		if err := provClxn.Store(p); err != nil {
+			return err
+		}
+	}
+	// Create admin collection.
+	adminClxn := administrator.NewCollection(provClxn)
+	for _, adm := range adminList {
+		p, ok := provClxn.Load(adm.ProvisionerId)
+		if !ok {
+			return admin.NewErrorISE("provisioner %s not found when loading admin %s",
+				adm.ProvisionerId, adm.Id)
+		}
+		if err := adminClxn.Store(adm, p); err != nil {
+			return err
+		}
+	}
+
+	a.config.AuthorityConfig.Provisioners = provList
+	a.provisioners = provClxn
+	a.config.AuthorityConfig.Admins = adminList
+	a.admins = adminClxn
+	return nil
 }
 
 // init performs validation and initializes the fields of an Authority struct.
@@ -214,6 +280,11 @@ func (a *Authority) init() error {
 	for _, crt := range a.rootX509Certs {
 		sum := sha256.Sum256(crt.Raw)
 		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
+	}
+
+	a.rootX509CertPool = x509.NewCertPool()
+	for _, cert := range a.rootX509Certs {
+		a.rootX509CertPool.AddCert(cert)
 	}
 
 	// Read federated certificates and store them in the certificates map.
@@ -317,30 +388,11 @@ func (a *Authority) init() error {
 		tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts[1:]...)
 	}
 
-	// Merge global and configuration claims
-	claimer, err := provisioner.NewClaimer(a.config.AuthorityConfig.Claims, globalProvisionerClaims)
-	if err != nil {
-		return err
-	}
-	// TODO: should we also be combining the ssh federated roots here?
-	// If we rotate ssh roots keys, sshpop provisioner will lose ability to
-	// validate old SSH certificates, unless they are added as federated certs.
-	sshKeys, err := a.GetSSHRoots(context.Background())
-	if err != nil {
-		return err
-	}
-	// Initialize provisioners
-	audiences := a.config.getAudiences()
-	a.provisioners = provisioner.NewCollection(audiences)
-	config := provisioner.Config{
-		Claims:    claimer.Claims(),
-		Audiences: audiences,
-		DB:        a.db,
-		SSHKeys: &provisioner.SSHKeys{
-			UserKeys: sshKeys.UserKeys,
-			HostKeys: sshKeys.HostKeys,
-		},
-		GetIdentityFunc: a.getIdentityFunc,
+	// Check if a KMS with decryption capability is required and available
+	if a.requiresDecrypter() {
+		if _, ok := a.keyManager.(kmsapi.Decrypter); !ok {
+			return errors.New("keymanager doesn't provide crypto.Decrypter")
+		}
 	}
 
 	// Check if a KMS with decryption capability is required and available
@@ -386,14 +438,42 @@ func (a *Authority) init() error {
 		// TODO: mimick the x509CAService GetCertificateAuthority here too?
 	}
 
-	// Store all the provisioners
-	for _, p := range a.config.AuthorityConfig.Provisioners {
-		if err := p.Init(config); err != nil {
-			return err
+	if a.config.AuthorityConfig.EnableAdmin {
+		// Initialize step-ca Admin Database if it's not already initialized using
+		// WithAdminDB.
+		if a.adminDB == nil {
+			// Check if AuthConfig already exists
+			a.adminDB, err = adminDBNosql.New(a.db.(nosql.DB), admin.DefaultAuthorityID)
+			if err != nil {
+				return err
+			}
 		}
-		if err := a.provisioners.Store(p); err != nil {
-			return err
+
+		provs, err := a.adminDB.GetProvisioners(context.Background())
+		if err != nil {
+			return admin.WrapErrorISE(err, "error loading provisioners to initialize authority")
 		}
+		if len(provs) == 0 {
+			// Create First Provisioner
+			prov, err := CreateFirstProvisioner(context.Background(), a.adminDB, a.config.Password)
+			if err != nil {
+				return admin.WrapErrorISE(err, "error creating first provisioner")
+			}
+
+			// Create first admin
+			if err := a.adminDB.CreateAdmin(context.Background(), &linkedca.Admin{
+				ProvisionerId: prov.Id,
+				Subject:       "step",
+				Type:          linkedca.Admin_SUPER_ADMIN,
+			}); err != nil {
+				return admin.WrapErrorISE(err, "error creating first admin")
+			}
+		}
+	}
+
+	// Load Provisioners and Admins
+	if err := a.reloadAdminResources(context.Background()); err != nil {
+		return err
 	}
 
 	// Configure templates, currently only ssh templates are supported.
@@ -421,6 +501,17 @@ func (a *Authority) init() error {
 // define a database, GetDatabase will return a db.SimpleDB instance.
 func (a *Authority) GetDatabase() db.AuthDB {
 	return a.db
+}
+
+// GetAdminDatabase returns the admin database, if one exists.
+func (a *Authority) GetAdminDatabase() admin.DB {
+	return a.adminDB
+}
+
+// IsAdminAPIEnabled returns a boolean indicating whether the Admin API has
+// been enabled.
+func (a *Authority) IsAdminAPIEnabled() bool {
+	return a.config.AuthorityConfig.EnableAdmin
 }
 
 // Shutdown safely shuts down any clients, databases, etc. held by the Authority.

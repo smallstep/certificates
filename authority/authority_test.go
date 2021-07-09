@@ -454,8 +454,6 @@ func TestAuthority_GetSCEPService(t *testing.T) {
 			// 	getIdentityFunc:         tt.fields.getIdentityFunc,
 			// }
 			a, err := New(tt.fields.config)
-			fmt.Println(err)
-			fmt.Println(a)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.New(), error = %v, wantErr %v", err, tt.wantErr)
 				return

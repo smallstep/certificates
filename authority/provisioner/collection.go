@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/admin"
 	"go.step.sm/crypto/jose"
 )
 
@@ -45,6 +45,8 @@ type loadByTokenPayload struct {
 type Collection struct {
 	byID      *sync.Map
 	byKey     *sync.Map
+	byName    *sync.Map
+	byTokenID *sync.Map
 	sorted    provisionerSlice
 	audiences Audiences
 }
@@ -55,6 +57,8 @@ func NewCollection(audiences Audiences) *Collection {
 	return &Collection{
 		byID:      new(sync.Map),
 		byKey:     new(sync.Map),
+		byName:    new(sync.Map),
+		byTokenID: new(sync.Map),
 		audiences: audiences,
 	}
 }
@@ -62,6 +66,18 @@ func NewCollection(audiences Audiences) *Collection {
 // Load a provisioner by the ID.
 func (c *Collection) Load(id string) (Interface, bool) {
 	return loadProvisioner(c.byID, id)
+}
+
+// LoadByName a provisioner by name.
+func (c *Collection) LoadByName(name string) (Interface, bool) {
+	return loadProvisioner(c.byName, name)
+}
+
+// LoadByTokenID a provisioner by identifier found in token.
+// For different provisioner types this identifier may be found in in different
+// attributes of the token.
+func (c *Collection) LoadByTokenID(tokenProvisionerID string) (Interface, bool) {
+	return loadProvisioner(c.byTokenID, tokenProvisionerID)
 }
 
 // LoadByToken parses the token claims and loads the provisioner associated.
@@ -79,11 +95,12 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 	if matchesAudience(claims.Audience, audiences) {
 		// Use fragment to get provisioner name (GCP, AWS, SSHPOP)
 		if fragment != "" {
-			return c.Load(fragment)
+			return c.LoadByTokenID(fragment)
 		}
 		// If matches with stored audiences it will be a JWT token (default), and
 		// the id would be <issuer>:<kid>.
-		return c.Load(claims.Issuer + ":" + token.Headers[0].KeyID)
+		// TODO: is this ok?
+		return c.LoadByTokenID(claims.Issuer + ":" + token.Headers[0].KeyID)
 	}
 
 	// The ID will be just the clientID stored in azp, aud or tid.
@@ -94,7 +111,7 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 
 	// Kubernetes Service Account tokens.
 	if payload.Issuer == k8sSAIssuer {
-		if p, ok := c.Load(K8sSAID); ok {
+		if p, ok := c.LoadByTokenID(K8sSAID); ok {
 			return p, ok
 		}
 		// Kubernetes service account provisioner not found
@@ -108,18 +125,18 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 
 	// Try with azp (OIDC)
 	if len(payload.AuthorizedParty) > 0 {
-		if p, ok := c.Load(payload.AuthorizedParty); ok {
+		if p, ok := c.LoadByTokenID(payload.AuthorizedParty); ok {
 			return p, ok
 		}
 	}
 	// Try with tid (Azure)
 	if payload.TenantID != "" {
-		if p, ok := c.Load(payload.TenantID); ok {
+		if p, ok := c.LoadByTokenID(payload.TenantID); ok {
 			return p, ok
 		}
 	}
 	// Fallback to aud
-	return c.Load(payload.Audience[0])
+	return c.LoadByTokenID(payload.Audience[0])
 }
 
 // LoadByCertificate looks for the provisioner extension and extracts the
@@ -131,24 +148,7 @@ func (c *Collection) LoadByCertificate(cert *x509.Certificate) (Interface, bool)
 			if _, err := asn1.Unmarshal(e.Value, &provisioner); err != nil {
 				return nil, false
 			}
-			switch Type(provisioner.Type) {
-			case TypeJWK:
-				return c.Load(string(provisioner.Name) + ":" + string(provisioner.CredentialID))
-			case TypeAWS:
-				return c.Load("aws/" + string(provisioner.Name))
-			case TypeGCP:
-				return c.Load("gcp/" + string(provisioner.Name))
-			case TypeACME:
-				return c.Load("acme/" + string(provisioner.Name))
-			case TypeSCEP:
-				return c.Load("scep/" + string(provisioner.Name))
-			case TypeX5C:
-				return c.Load("x5c/" + string(provisioner.Name))
-			case TypeK8sSA:
-				return c.Load(K8sSAID)
-			default:
-				return c.Load(string(provisioner.CredentialID))
-			}
+			return c.LoadByName(string(provisioner.Name))
 		}
 	}
 
@@ -173,7 +173,21 @@ func (c *Collection) LoadEncryptedKey(keyID string) (string, bool) {
 func (c *Collection) Store(p Interface) error {
 	// Store provisioner always in byID. ID must be unique.
 	if _, loaded := c.byID.LoadOrStore(p.GetID(), p); loaded {
-		return errors.New("cannot add multiple provisioners with the same id")
+		return admin.NewError(admin.ErrorBadRequestType,
+			"cannot add multiple provisioners with the same id")
+	}
+	// Store provisioner always by name.
+	if _, loaded := c.byName.LoadOrStore(p.GetName(), p); loaded {
+		c.byID.Delete(p.GetID())
+		return admin.NewError(admin.ErrorBadRequestType,
+			"cannot add multiple provisioners with the same name")
+	}
+	// Store provisioner always by ID presented in token.
+	if _, loaded := c.byTokenID.LoadOrStore(p.GetIDForToken(), p); loaded {
+		c.byID.Delete(p.GetID())
+		c.byName.Delete(p.GetName())
+		return admin.NewError(admin.ErrorBadRequestType,
+			"cannot add multiple provisioners with the same token identifier")
 	}
 
 	// Store provisioner in byKey if EncryptedKey is defined.
@@ -195,6 +209,65 @@ func (c *Collection) Store(p Interface) error {
 	})
 	sort.Sort(c.sorted)
 	return nil
+}
+
+// Remove deletes an provisioner from all associated collections and lists.
+func (c *Collection) Remove(id string) error {
+	prov, ok := c.Load(id)
+	if !ok {
+		return admin.NewError(admin.ErrorNotFoundType, "provisioner %s not found", id)
+	}
+
+	var found bool
+	for i, elem := range c.sorted {
+		if elem.provisioner.GetID() == id {
+			// Remove index in sorted list
+			copy(c.sorted[i:], c.sorted[i+1:])           // Shift a[i+1:] left one index.
+			c.sorted[len(c.sorted)-1] = uidProvisioner{} // Erase last element (write zero value).
+			c.sorted = c.sorted[:len(c.sorted)-1]        // Truncate slice.
+			found = true
+			break
+		}
+	}
+	if !found {
+		return admin.NewError(admin.ErrorNotFoundType, "provisioner %s not found in sorted list", prov.GetName())
+	}
+
+	c.byID.Delete(id)
+	c.byName.Delete(prov.GetName())
+	c.byTokenID.Delete(prov.GetIDForToken())
+	if kid, _, ok := prov.GetEncryptedKey(); ok {
+		c.byKey.Delete(kid)
+	}
+
+	return nil
+}
+
+// Update updates the given provisioner in all related lists and collections.
+func (c *Collection) Update(nu Interface) error {
+	old, ok := c.Load(nu.GetID())
+	if !ok {
+		return admin.NewError(admin.ErrorNotFoundType, "provisioner %s not found", nu.GetID())
+	}
+
+	if old.GetName() != nu.GetName() {
+		if _, ok := c.LoadByName(nu.GetName()); ok {
+			return admin.NewError(admin.ErrorBadRequestType,
+				"provisioner with name %s already exists", nu.GetName())
+		}
+	}
+	if old.GetIDForToken() != nu.GetIDForToken() {
+		if _, ok := c.LoadByTokenID(nu.GetIDForToken()); ok {
+			return admin.NewError(admin.ErrorBadRequestType,
+				"provisioner with Token ID %s already exists", nu.GetIDForToken())
+		}
+	}
+
+	if err := c.Remove(old.GetID()); err != nil {
+		return err
+	}
+
+	return c.Store(nu)
 }
 
 // Find implements pagination on a list of sorted provisioners.

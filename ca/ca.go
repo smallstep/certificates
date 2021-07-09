@@ -17,6 +17,8 @@ import (
 	acmeNoSQL "github.com/smallstep/certificates/acme/db/nosql"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	adminAPI "github.com/smallstep/certificates/authority/admin/api"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
@@ -77,7 +79,7 @@ func WithDatabase(db db.AuthDB) Option {
 // the HTTP server, set ups the middlewares and the HTTP handlers.
 type CA struct {
 	auth        *authority.Authority
-	config      *authority.Config
+	config      *config.Config
 	srv         *server.Server
 	insecureSrv *server.Server
 	opts        *options
@@ -85,7 +87,7 @@ type CA struct {
 }
 
 // New creates and initializes the CA with the given configuration and options.
-func New(config *authority.Config, opts ...Option) (*CA, error) {
+func New(config *config.Config, opts ...Option) (*CA, error) {
 	ca := &CA{
 		config: config,
 		opts:   new(options),
@@ -95,7 +97,7 @@ func New(config *authority.Config, opts ...Option) (*CA, error) {
 }
 
 // Init initializes the CA with the given configuration.
-func (ca *CA) Init(config *authority.Config) (*CA, error) {
+func (ca *CA) Init(config *config.Config) (*CA, error) {
 	// Intermediate Password.
 	if len(ca.opts.password) > 0 {
 		ca.config.Password = string(ca.opts.password)
@@ -149,6 +151,7 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 		dns = fmt.Sprintf("%s:%s", dns, port)
 	}
 
+	// ACME Router
 	prefix := "acme"
 	var acmeDB acme.DB
 	if config.DB == nil {
@@ -174,6 +177,17 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 	mux.Route("/2.0/"+prefix, func(r chi.Router) {
 		acmeHandler.Route(r)
 	})
+
+	// Admin API Router
+	if config.AuthorityConfig.EnableAdmin {
+		adminDB := auth.GetAdminDatabase()
+		if adminDB != nil {
+			adminHandler := adminAPI.NewHandler(auth)
+			mux.Route("/admin", func(r chi.Router) {
+				adminHandler.Route(r)
+			})
+		}
+	}
 
 	if ca.shouldServeSCEPEndpoints() {
 		scepPrefix := "scep"
@@ -245,7 +259,6 @@ func (ca *CA) Init(config *authority.Config) (*CA, error) {
 
 // Run starts the CA calling to the server ListenAndServe method.
 func (ca *CA) Run() error {
-
 	var wg sync.WaitGroup
 	errors := make(chan error, 1)
 
@@ -293,7 +306,7 @@ func (ca *CA) Stop() error {
 // Reload reloads the configuration of the CA and calls to the server Reload
 // method.
 func (ca *CA) Reload() error {
-	config, err := authority.LoadConfiguration(ca.opts.configFile)
+	config, err := config.LoadConfiguration(ca.opts.configFile)
 	if err != nil {
 		return errors.Wrap(err, "error reloading ca configuration")
 	}

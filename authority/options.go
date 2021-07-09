@@ -7,6 +7,8 @@ import (
 	"encoding/pem"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
@@ -20,7 +22,7 @@ type Option func(*Authority) error
 
 // WithConfig replaces the current config with the given one. No validation is
 // performed in the given value.
-func WithConfig(config *Config) Option {
+func WithConfig(config *config.Config) Option {
 	return func(a *Authority) error {
 		a.config = config
 		return nil
@@ -31,7 +33,7 @@ func WithConfig(config *Config) Option {
 // the current one. No validation is performed in the given configuration.
 func WithConfigFile(filename string) Option {
 	return func(a *Authority) (err error) {
-		a.config, err = LoadConfiguration(filename)
+		a.config, err = config.LoadConfiguration(filename)
 		return
 	}
 }
@@ -56,7 +58,7 @@ func WithGetIdentityFunc(fn func(ctx context.Context, p provisioner.Interface, e
 
 // WithSSHBastionFunc sets a custom function to get the bastion for a
 // given user-host pair.
-func WithSSHBastionFunc(fn func(ctx context.Context, user, host string) (*Bastion, error)) Option {
+func WithSSHBastionFunc(fn func(ctx context.Context, user, host string) (*config.Bastion, error)) Option {
 	return func(a *Authority) error {
 		a.sshBastionFunc = fn
 		return nil
@@ -65,7 +67,7 @@ func WithSSHBastionFunc(fn func(ctx context.Context, user, host string) (*Bastio
 
 // WithSSHGetHosts sets a custom function to get the bastion for a
 // given user-host pair.
-func WithSSHGetHosts(fn func(ctx context.Context, cert *x509.Certificate) ([]Host, error)) Option {
+func WithSSHGetHosts(fn func(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)) Option {
 	return func(a *Authority) error {
 		a.sshGetHostsFunc = fn
 		return nil
@@ -182,6 +184,14 @@ func WithX509FederatedBundle(pemCerts []byte) Option {
 			return err
 		}
 		a.federatedX509Certs = certs
+		return nil
+	}
+}
+
+// WithAdminDB is an option to set the database backing the admin APIs.
+func WithAdminDB(db admin.DB) Option {
+	return func(a *Authority) error {
+		a.adminDB = db
 		return nil
 	}
 }

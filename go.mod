@@ -26,19 +26,22 @@ require (
 	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
-	go.step.sm/cli-utils v0.2.0
-	go.step.sm/crypto v0.8.3
-	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
-	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
-	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22 // indirect
+	go.step.sm/cli-utils v0.4.1
+	go.step.sm/crypto v0.9.0
+	go.step.sm/linkedca v0.0.0-20210611183751-27424aae8d25
+	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
+	golang.org/x/net v0.0.0-20210503060351-7fd8e65b6420
 	google.golang.org/api v0.47.0
-	google.golang.org/genproto v0.0.0-20210608205507-b6d2f5bf0d7d
+	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c
 	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.26.0
 	gopkg.in/square/go-jose.v2 v2.5.1
 )
 
 // replace github.com/smallstep/nosql => ../nosql
-// replace go.step.sm/crypto => ../crypto
+
+//replace go.step.sm/crypto => ../crypto
+
+//replace go.step.sm/cli-utils => ../cli-utils
 
 replace go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 => github.com/omorsi/pkcs7 v0.0.0-20210217142924-a7b80a2a8568

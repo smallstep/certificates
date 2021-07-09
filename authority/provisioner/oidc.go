@@ -54,6 +54,7 @@ type openIDPayload struct {
 // ClientSecret is mandatory, but it can be an empty string.
 type OIDC struct {
 	*base
+	ID                    string   `json:"-"`
 	Type                  string   `json:"type"`
 	Name                  string   `json:"name"`
 	ClientID              string   `json:"clientID"`
@@ -111,6 +112,15 @@ func sanitizeEmail(email string) string {
 // GetID returns the provisioner unique identifier, the OIDC provisioner the
 // uses the clientID for this.
 func (o *OIDC) GetID() string {
+	if o.ID != "" {
+		return o.ID
+	}
+	return o.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (o *OIDC) GetIDForToken() string {
 	return o.ClientID
 }
 
@@ -367,7 +377,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 // certificate was configured to allow renewals.
 func (o *OIDC) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if o.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("oidc.AuthorizeRenew; renew is disabled for oidc provisioner %s", o.GetID())
+		return errs.Unauthorized("oidc.AuthorizeRenew; renew is disabled for oidc provisioner '%s'", o.GetName())
 	}
 	return nil
 }
@@ -375,7 +385,7 @@ func (o *OIDC) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !o.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized("oidc.AuthorizeSSHSign; sshCA is disabled for oidc provisioner %s", o.GetID())
+		return nil, errs.Unauthorized("oidc.AuthorizeSSHSign; sshCA is disabled for oidc provisioner '%s'", o.GetName())
 	}
 	claims, err := o.authorizeToken(token)
 	if err != nil {
