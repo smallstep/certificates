@@ -400,7 +400,7 @@ func logOtt(w http.ResponseWriter, token string) {
 func LogCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
 		m := map[string]interface{}{
-			"serial":      cert.SerialNumber,
+			"serial":      fmtBytes(cert.SerialNumber.Bytes()),
 			"subject":     cert.Subject.CommonName,
 			"issuer":      cert.Issuer.CommonName,
 			"valid-from":  cert.NotBefore.Format(time.RFC3339),
@@ -455,4 +455,15 @@ func fmtPublicKey(cert *x509.Certificate) string {
 		params = "unknown"
 	}
 	return fmt.Sprintf("%s %s", cert.PublicKeyAlgorithm, params)
+}
+
+func fmtBytes(bs []byte) string {
+	var s string
+	for n, b := range bs {
+		if n > 0 {
+			s = s + ":"
+		}
+		s = s + fmt.Sprintf("%02x", b)
+	}
+	return string(s)
 }
