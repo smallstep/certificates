@@ -182,6 +182,7 @@ func (m *MockDB) GetCertificate(ctx context.Context, id string) (*Certificate, e
 	return m.MockRet1.(*Certificate), m.MockError
 }
 
+// GetCertificateBySerial mock
 func (m *MockDB) GetCertificateBySerial(ctx context.Context, serial string) (*Certificate, error) {
 	if m.MockGetCertificateBySerial != nil {
 		return m.MockGetCertificateBySerial(ctx, serial)

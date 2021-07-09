@@ -31,6 +31,7 @@ func TestDB_CreateCertificate(t *testing.T) {
 		err  error
 		_id  *string
 	}
+	countOfCmpAndSwapCalls := 0
 	var tests = map[string]func(t *testing.T) test{
 		"fail/cmpAndSwap-error": func(t *testing.T) test {
 			cert := &acme.Certificate{
@@ -75,18 +76,35 @@ func TestDB_CreateCertificate(t *testing.T) {
 			return test{
 				db: &db.MockNoSQLDB{
 					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
-						*idPtr = string(key)
-						assert.Equals(t, bucket, certTable)
-						assert.Equals(t, key, []byte(cert.ID))
-						assert.Equals(t, old, nil)
+						if countOfCmpAndSwapCalls == 0 {
+							*idPtr = string(key)
+							assert.Equals(t, bucket, certTable)
+							assert.Equals(t, key, []byte(cert.ID))
+							assert.Equals(t, old, nil)
 
-						dbc := new(dbCert)
-						assert.FatalError(t, json.Unmarshal(nu, dbc))
-						assert.Equals(t, dbc.ID, string(key))
-						assert.Equals(t, dbc.ID, cert.ID)
-						assert.Equals(t, dbc.AccountID, cert.AccountID)
-						assert.True(t, clock.Now().Add(-time.Minute).Before(dbc.CreatedAt))
-						assert.True(t, clock.Now().Add(time.Minute).After(dbc.CreatedAt))
+							dbc := new(dbCert)
+							assert.FatalError(t, json.Unmarshal(nu, dbc))
+							assert.Equals(t, dbc.ID, string(key))
+							assert.Equals(t, dbc.ID, cert.ID)
+							assert.Equals(t, dbc.AccountID, cert.AccountID)
+							assert.True(t, clock.Now().Add(-time.Minute).Before(dbc.CreatedAt))
+							assert.True(t, clock.Now().Add(time.Minute).After(dbc.CreatedAt))
+						}
+						if countOfCmpAndSwapCalls == 1 {
+							assert.Equals(t, bucket, certBySerialTable)
+							assert.Equals(t, key, []byte(cert.Leaf.SerialNumber.String()))
+							assert.Equals(t, old, nil)
+
+							dbs := new(dbSerial)
+							assert.FatalError(t, json.Unmarshal(nu, dbs))
+							assert.Equals(t, dbs.Serial, string(key))
+							assert.Equals(t, dbs.CertificateID, cert.ID)
+
+							*idPtr = cert.ID
+						}
+
+						countOfCmpAndSwapCalls += 1
+
 						return nil, true, nil
 					},
 				},
