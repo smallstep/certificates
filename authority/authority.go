@@ -442,10 +442,17 @@ func (a *Authority) init() error {
 		// Initialize step-ca Admin Database if it's not already initialized using
 		// WithAdminDB.
 		if a.adminDB == nil {
-			// Check if AuthConfig already exists
-			a.adminDB, err = adminDBNosql.New(a.db.(nosql.DB), admin.DefaultAuthorityID)
-			if err != nil {
-				return err
+			if a.config.AuthorityConfig.AuthorityID == "" {
+				// Check if AuthConfig already exists
+				a.adminDB, err = adminDBNosql.New(a.db.(nosql.DB), admin.DefaultAuthorityID)
+				if err != nil {
+					return err
+				}
+			} else {
+				a.adminDB, err = createLinkedCAClient(a.config.AuthorityConfig.AuthorityID, "localhost:6040")
+				if err != nil {
+					return err
+				}
 			}
 		}
 
