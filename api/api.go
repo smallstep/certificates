@@ -400,7 +400,7 @@ func logOtt(w http.ResponseWriter, token string) {
 func LogCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
 		m := map[string]interface{}{
-			"serial":      cert.SerialNumber,
+			"serial":      cert.SerialNumber.String(),
 			"subject":     cert.Subject.CommonName,
 			"issuer":      cert.Issuer.CommonName,
 			"valid-from":  cert.NotBefore.Format(time.RFC3339),
