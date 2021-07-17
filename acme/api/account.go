@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -281,14 +280,27 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 		return nil, err
 	}
 
-	jwkJSONBytes, err := jwk.MarshalJSON()
+	var payloadJWK *squarejose.JSONWebKey
+	err = json.Unmarshal(payload, &payloadJWK)
 	if err != nil {
-		return nil, acme.WrapErrorISE(err, "error marshaling jwk")
+		return nil, acme.WrapError(acme.ErrorMalformedType, err, "error unmarshaling payload into jwk")
 	}
 
-	if bytes.Equal(payload, jwkJSONBytes) {
+	if !keysAreEqual(jwk, payloadJWK) {
 		return nil, acme.NewError(acme.ErrorMalformedType, "keys in jws and eab payload do not match") // TODO: decide ACME error type to use
 	}
 
 	return externalAccountKey, nil
+}
+
+func keysAreEqual(x, y *squarejose.JSONWebKey) bool {
+	if x == nil || y == nil {
+		return false
+	}
+	digestX, errX := acme.KeyToID(x)
+	digestY, errY := acme.KeyToID(y)
+	if errX != nil || errY != nil {
+		return false
+	}
+	return digestX == digestY
 }
