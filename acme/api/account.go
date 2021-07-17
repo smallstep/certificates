@@ -1,20 +1,26 @@
 package api
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
+
+	squarejose "gopkg.in/square/go-jose.v2"
 )
 
 // NewAccountRequest represents the payload for a new account request.
 type NewAccountRequest struct {
-	Contact              []string `json:"contact"`
-	OnlyReturnExisting   bool     `json:"onlyReturnExisting"`
-	TermsOfServiceAgreed bool     `json:"termsOfServiceAgreed"`
+	Contact                []string    `json:"contact"`
+	OnlyReturnExisting     bool        `json:"onlyReturnExisting"`
+	TermsOfServiceAgreed   bool        `json:"termsOfServiceAgreed"`
+	ExternalAccountBinding interface{} `json:"externalAccountBinding,omitempty"`
 }
 
 func validateContacts(cs []string) error {
@@ -82,6 +88,14 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, err)
 		return
 	}
+
+	if err := h.validateExternalAccountBinding(ctx, &nar); err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	// TODO: link account to the key when created; mark boundat timestamp
+	// TODO: return the externalAccountBinding field (should contain same info) if new account created
 
 	httpStatus := http.StatusCreated
 	acc, err := accountFromContext(r.Context())
@@ -204,4 +218,67 @@ func (h *Handler) GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 
 	api.JSON(w, orders)
 	logOrdersByAccount(w, orders)
+}
+
+// validateExternalAccountBinding validates the externalAccountBinding property in a call to new-account
+func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest) error {
+
+	prov, err := provisionerFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	acmeProv, ok := prov.(*provisioner.ACME) // TODO: rewrite into providing configuration via function on acme.Provisioner
+	if !ok || acmeProv == nil {
+		return acme.NewErrorISE("provisioner in context is not an ACME provisioner")
+	}
+
+	shouldSkipAccountBindingValidation := !acmeProv.RequireEAB
+	if shouldSkipAccountBindingValidation {
+		return nil
+	}
+
+	if nar.ExternalAccountBinding == nil {
+		return acme.NewError(acme.ErrorExternalAccountRequiredType, "no external account binding provided")
+	}
+
+	eabJSONBytes, err := json.Marshal(nar.ExternalAccountBinding)
+	if err != nil {
+		return acme.WrapErrorISE(err, "error marshalling externalAccountBinding")
+	}
+
+	eabJWS, err := squarejose.ParseSigned(string(eabJSONBytes))
+	if err != nil {
+		return acme.WrapErrorISE(err, "error parsing externalAccountBinding jws")
+	}
+
+	// TODO: verify supported algorithms against the incoming alg (and corresponding settings)?
+	// TODO: implement strategy pattern to allow for different ways of verification (i.e. webhook call) based on configuration
+
+	keyID := eabJWS.Signatures[0].Protected.KeyID
+	externalAccountKey, err := h.db.GetExternalAccountKey(ctx, keyID)
+	if err != nil {
+		return acme.WrapErrorISE(err, "error retrieving external account key")
+	}
+
+	payload, err := eabJWS.Verify(externalAccountKey.KeyBytes)
+	if err != nil {
+		return acme.WrapErrorISE(err, "error verifying externalAccountBinding signature")
+	}
+
+	jwk, err := jwkFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	jwkJSONBytes, err := jwk.MarshalJSON()
+	if err != nil {
+		return acme.WrapErrorISE(err, "error marshaling jwk")
+	}
+
+	if bytes.Equal(payload, jwkJSONBytes) {
+		acme.NewError(acme.ErrorMalformedType, "keys in jws and eab payload do not match") // TODO: decide ACME error type to use
+	}
+
+	return nil
 }

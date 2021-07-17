@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"encoding/base64"
 	"encoding/json"
+	"time"
 
 	"go.step.sm/crypto/jose"
 )
@@ -39,4 +40,13 @@ func KeyToID(jwk *jose.JSONWebKey) (string, error) {
 		return "", WrapErrorISE(err, "error generating jwk thumbprint")
 	}
 	return base64.RawURLEncoding.EncodeToString(kid), nil
+}
+
+type ExternalAccountKey struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	AccountID string    `json:"-"`
+	KeyBytes  []byte    `json:"-"`
+	CreatedAt time.Time `json:"createdAt"`
+	BoundAt   time.Time `json:"boundAt,omitempty"`
 }

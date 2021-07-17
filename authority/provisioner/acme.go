@@ -13,13 +13,14 @@ import (
 // provisioning flow.
 type ACME struct {
 	*base
-	ID      string   `json:"-"`
-	Type    string   `json:"type"`
-	Name    string   `json:"name"`
-	ForceCN bool     `json:"forceCN,omitempty"`
-	Claims  *Claims  `json:"claims,omitempty"`
-	Options *Options `json:"options,omitempty"`
-	claimer *Claimer
+	ID         string   `json:"-"`
+	Type       string   `json:"type"`
+	Name       string   `json:"name"`
+	ForceCN    bool     `json:"forceCN,omitempty"`
+	RequireEAB bool     `json:"requireEAB,omitempty"`
+	Claims     *Claims  `json:"claims,omitempty"`
+	Options    *Options `json:"options,omitempty"`
+	claimer    *Claimer
 }
 
 // GetID returns the provisioner unique identifier.
