@@ -12,11 +12,12 @@ import (
 // Account is a subset of the internal account type containing only those
 // attributes required for responses in the ACME protocol.
 type Account struct {
-	ID        string           `json:"-"`
-	Key       *jose.JSONWebKey `json:"-"`
-	Contact   []string         `json:"contact,omitempty"`
-	Status    Status           `json:"status"`
-	OrdersURL string           `json:"orders"`
+	ID                     string           `json:"-"`
+	Key                    *jose.JSONWebKey `json:"-"`
+	Contact                []string         `json:"contact,omitempty"`
+	Status                 Status           `json:"status"`
+	OrdersURL              string           `json:"orders"`
+	ExternalAccountBinding interface{}      `json:"externalAccountBinding,omitempty"`
 }
 
 // ToLog enables response logging.
@@ -49,4 +50,10 @@ type ExternalAccountKey struct {
 	KeyBytes  []byte    `json:"-"`
 	CreatedAt time.Time `json:"createdAt"`
 	BoundAt   time.Time `json:"boundAt,omitempty"`
+}
+
+func (eak *ExternalAccountKey) BindTo(account *Account) {
+	eak.AccountID = account.ID
+	eak.BoundAt = time.Now()
+	eak.KeyBytes = []byte{} // TODO: ensure that single use keys are OK
 }

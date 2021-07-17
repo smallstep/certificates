@@ -343,6 +343,7 @@ func TestHandler_NewAccount(t *testing.T) {
 			b, err := json.Marshal(nar)
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			return test{
 				ctx:        ctx,
 				statusCode: 400,

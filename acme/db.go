@@ -21,6 +21,7 @@ type DB interface {
 
 	CreateExternalAccountKey(ctx context.Context, name string) (*ExternalAccountKey, error)
 	GetExternalAccountKey(ctx context.Context, keyID string) (*ExternalAccountKey, error)
+	UpdateExternalAccountKey(ctx context.Context, eak *ExternalAccountKey) error
 
 	CreateNonce(ctx context.Context) (Nonce, error)
 	DeleteNonce(ctx context.Context, nonce Nonce) error
@@ -52,6 +53,7 @@ type MockDB struct {
 
 	MockCreateExternalAccountKey func(ctx context.Context, name string) (*ExternalAccountKey, error)
 	MockGetExternalAccountKey    func(ctx context.Context, keyID string) (*ExternalAccountKey, error)
+	MockUpdateExternalAccountKey func(ctx context.Context, eak *ExternalAccountKey) error
 
 	MockCreateNonce func(ctx context.Context) (Nonce, error)
 	MockDeleteNonce func(ctx context.Context, nonce Nonce) error
@@ -134,6 +136,15 @@ func (m *MockDB) GetExternalAccountKey(ctx context.Context, keyID string) (*Exte
 		return nil, m.MockError
 	}
 	return m.MockRet1.(*ExternalAccountKey), m.MockError
+}
+
+func (m *MockDB) UpdateExternalAccountKey(ctx context.Context, eak *ExternalAccountKey) error {
+	if m.MockUpdateExternalAccountKey != nil {
+		return m.MockUpdateExternalAccountKey(ctx, eak)
+	} else if m.MockError != nil {
+		return m.MockError
+	}
+	return m.MockError
 }
 
 // CreateNonce mock

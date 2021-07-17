@@ -89,13 +89,11 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.validateExternalAccountBinding(ctx, &nar); err != nil {
+	eak, err := h.validateExternalAccountBinding(ctx, &nar)
+	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
-
-	// TODO: link account to the key when created; mark boundat timestamp
-	// TODO: return the externalAccountBinding field (should contain same info) if new account created
 
 	httpStatus := http.StatusCreated
 	acc, err := accountFromContext(r.Context())
@@ -127,6 +125,14 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 		if err := h.db.CreateAccount(ctx, acc); err != nil {
 			api.WriteError(w, acme.WrapErrorISE(err, "error creating account"))
 			return
+		}
+		if eak != nil { // means that we have a (valid) External Account Binding key that should be used
+			eak.BindTo(acc)
+			if err := h.db.UpdateExternalAccountKey(ctx, eak); err != nil {
+				api.WriteError(w, acme.WrapErrorISE(err, "error updating external account binding key"))
+				return
+			}
+			acc.ExternalAccountBinding = nar.ExternalAccountBinding
 		}
 	} else {
 		// Account exists //
@@ -221,35 +227,35 @@ func (h *Handler) GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 }
 
 // validateExternalAccountBinding validates the externalAccountBinding property in a call to new-account
-func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest) error {
+func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest) (*acme.ExternalAccountKey, error) {
 
 	prov, err := provisionerFromContext(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	acmeProv, ok := prov.(*provisioner.ACME) // TODO: rewrite into providing configuration via function on acme.Provisioner
 	if !ok || acmeProv == nil {
-		return acme.NewErrorISE("provisioner in context is not an ACME provisioner")
+		return nil, acme.NewErrorISE("provisioner in context is not an ACME provisioner")
 	}
 
 	shouldSkipAccountBindingValidation := !acmeProv.RequireEAB
 	if shouldSkipAccountBindingValidation {
-		return nil
+		return nil, nil
 	}
 
 	if nar.ExternalAccountBinding == nil {
-		return acme.NewError(acme.ErrorExternalAccountRequiredType, "no external account binding provided")
+		return nil, acme.NewError(acme.ErrorExternalAccountRequiredType, "no external account binding provided")
 	}
 
 	eabJSONBytes, err := json.Marshal(nar.ExternalAccountBinding)
 	if err != nil {
-		return acme.WrapErrorISE(err, "error marshalling externalAccountBinding")
+		return nil, acme.WrapErrorISE(err, "error marshalling externalAccountBinding")
 	}
 
 	eabJWS, err := squarejose.ParseSigned(string(eabJSONBytes))
 	if err != nil {
-		return acme.WrapErrorISE(err, "error parsing externalAccountBinding jws")
+		return nil, acme.WrapErrorISE(err, "error parsing externalAccountBinding jws")
 	}
 
 	// TODO: verify supported algorithms against the incoming alg (and corresponding settings)?
@@ -258,27 +264,31 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 	keyID := eabJWS.Signatures[0].Protected.KeyID
 	externalAccountKey, err := h.db.GetExternalAccountKey(ctx, keyID)
 	if err != nil {
-		return acme.WrapErrorISE(err, "error retrieving external account key")
+		return nil, acme.WrapErrorISE(err, "error retrieving external account key")
+	}
+
+	if !externalAccountKey.BoundAt.IsZero() { // TODO: ensure that single use keys are OK
+		return nil, acme.NewError(acme.ErrorUnauthorizedType, "external account binding key with id '%s' was already used", keyID)
 	}
 
 	payload, err := eabJWS.Verify(externalAccountKey.KeyBytes)
 	if err != nil {
-		return acme.WrapErrorISE(err, "error verifying externalAccountBinding signature")
+		return nil, acme.WrapErrorISE(err, "error verifying externalAccountBinding signature")
 	}
 
 	jwk, err := jwkFromContext(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	jwkJSONBytes, err := jwk.MarshalJSON()
 	if err != nil {
-		return acme.WrapErrorISE(err, "error marshaling jwk")
+		return nil, acme.WrapErrorISE(err, "error marshaling jwk")
 	}
 
 	if bytes.Equal(payload, jwkJSONBytes) {
-		acme.NewError(acme.ErrorMalformedType, "keys in jws and eab payload do not match") // TODO: decide ACME error type to use
+		return nil, acme.NewError(acme.ErrorMalformedType, "keys in jws and eab payload do not match") // TODO: decide ACME error type to use
 	}
 
-	return nil
+	return externalAccountKey, nil
 }
