@@ -249,7 +249,7 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 
 	eabJSONBytes, err := json.Marshal(nar.ExternalAccountBinding)
 	if err != nil {
-		return nil, acme.WrapErrorISE(err, "error marshalling externalAccountBinding")
+		return nil, acme.WrapErrorISE(err, "error marshaling externalAccountBinding")
 	}
 
 	eabJWS, err := squarejose.ParseSigned(string(eabJSONBytes))
@@ -283,7 +283,7 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 	var payloadJWK *squarejose.JSONWebKey
 	err = json.Unmarshal(payload, &payloadJWK)
 	if err != nil {
-		return nil, acme.WrapError(acme.ErrorMalformedType, err, "error unmarshalling payload into jwk")
+		return nil, acme.WrapError(acme.ErrorMalformedType, err, "error unmarshaling payload into jwk")
 	}
 
 	if !keysAreEqual(jwk, payloadJWK) {
