@@ -58,10 +58,10 @@ You can issue certificates in exchange for:
   - ID tokens from Okta, GSuite, Azure AD, Auth0.
   - ID tokens from an OAuth OIDC service that you host, like [Keycloak](https://www.keycloak.org/) or [Dex](https://github.com/dexidp/dex)
 - [Cloud instance identity documents](https://smallstep.com/blog/embarrassingly-easy-certificates-on-aws-azure-gcp/), for VMs on AWS, GCP, and Azure
-- [Single-use, short-lived JWK tokens]() issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
+- [Single-use, short-lived JWK tokens](https://smallstep.com/docs/step-ca/provisioners#jwk) issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
 - A trusted X.509 certificate (X5C provisioner)
 - Expiring SSH host certificates needing rotation (the SSHPOP provisioner)
-- Learn more in our [provisioner documentation](https://smallstep.com/docs/step-ca/configuration#jwk)
+- Learn more in our [provisioner documentation](https://smallstep.com/docs/step-ca/provisioners)
 
 ### 🏔 Your own private ACME server
 
