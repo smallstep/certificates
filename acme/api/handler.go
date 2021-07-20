@@ -64,8 +64,14 @@ type HandlerOptions struct {
 
 // NewHandler returns a new ACME API handler.
 func NewHandler(ops HandlerOptions) api.RouterHandler {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
 	client := http.Client{
-		Timeout: 30 * time.Second,
+		Timeout:   30 * time.Second,
+		Transport: transport,
 	}
 	dialer := &net.Dialer{
 		Timeout: 30 * time.Second,
