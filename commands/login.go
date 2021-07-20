@@ -2,13 +2,18 @@ package commands
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/pem"
+	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -32,13 +37,14 @@ const uuidPattern = "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4
 type linkedCAClaims struct {
 	jose.Claims
 	SANs []string `json:"sans"`
+	SHA  string   `json:"sha"`
 }
 
 func init() {
 	command.Register(cli.Command{
 		Name:  "login",
 		Usage: "create the certificates to authorize your Linked CA instance",
-		UsageText: `**step-ca login** <authority> **--token*=<token>
+		UsageText: `**step-ca login** **--token*=<token>
 		[**--linkedca**=<endpoint>] [**--root**=<file>]`,
 		Action: loginAction,
 		Description: `**step-ca login** ...
@@ -50,16 +56,7 @@ func init() {
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "token",
-				Usage: "The one-time <token> used to authenticate with the Linked CA in order to create the initial credentials",
-			},
-			cli.StringFlag{
-				Name:  "linkedca",
-				Usage: "The linkedca <endpoint> to connect to.",
-				Value: loginEndpoint,
-			},
-			cli.StringFlag{
-				Name:  "root",
-				Usage: "The root certificate <file> used to authenticate with the linkedca endpoint.",
+				Usage: "The <token> used to authenticate with the Linked CA in order to create the initial credentials",
 			},
 		},
 	})
@@ -70,18 +67,9 @@ func loginAction(ctx *cli.Context) error {
 		return err
 	}
 
-	args := ctx.Args()
-	authority := args[0]
 	token := ctx.String("token")
-	endpoint := ctx.String("linkedca")
-	rx := regexp.MustCompile(uuidPattern)
-	switch {
-	case !rx.MatchString(authority):
-		return errors.Errorf("positional argument %s is not a valid uuid", authority)
-	case token == "":
+	if token == "" {
 		return errs.RequiredFlag(ctx, "token")
-	case endpoint == "":
-		return errs.RequiredFlag(ctx, "linkedca")
 	}
 
 	var claims linkedCAClaims
@@ -90,9 +78,43 @@ func loginAction(ctx *cli.Context) error {
 		return errors.Wrap(err, "error parsing token")
 	}
 	if err := tok.UnsafeClaimsWithoutVerification(&claims); err != nil {
-		return errors.Wrap(err, "error parsing payload")
+		return errors.Wrap(err, "error parsing token")
+	}
+	if len(claims.Audience) != 0 {
+		return errors.Wrap(err, "error parsing token: invalid aud claim")
+	}
+	u, err := url.Parse(claims.Audience[0])
+	if err != nil {
+		return errors.Wrap(err, "error parsing token: invalid aud claim")
+	}
+	if claims.SHA == "" {
+		return errors.Wrap(err, "error parsing token: invalid sha claim")
+	}
+	authority, err := getAuthority(claims.SANs)
+	if err != nil {
+		return err
 	}
 
+	// Get and verify root certificate
+	root, err := getRootCertificate(u.Host, claims.SHA)
+	if err != nil {
+		return err
+	}
+
+	pool := x509.NewCertPool()
+	pool.AddCert(root)
+
+	gctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	conn, err := grpc.DialContext(gctx, u.Host, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+		RootCAs: pool,
+	})))
+	if err != nil {
+		return errors.Wrapf(err, "error connecting %s", u.Host)
+	}
+
+	// Create csr
 	signer, err := keyutil.GenerateDefaultSigner()
 	if err != nil {
 		return err
@@ -107,33 +129,7 @@ func loginAction(ctx *cli.Context) error {
 		return err
 	}
 
-	var options []grpc.DialOption
-	if root := ctx.String("root"); root != "" {
-		b, err := ioutil.ReadFile(root)
-		if err != nil {
-			return errors.Wrap(err, "error reading file")
-		}
-
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(b) {
-			return errors.Errorf("error reading %s: no certificates were found", root)
-		}
-
-		options = append(options, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
-			RootCAs: pool,
-		})))
-	} else {
-		options = append(options, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))
-	}
-
-	gctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	conn, err := grpc.DialContext(gctx, endpoint, options...)
-	if err != nil {
-		return errors.Wrapf(err, "error connecting %s", endpoint)
-	}
-
+	// Perform login and get signed certificate
 	client := linkedca.NewMajordomoClient(conn)
 	gctx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -178,6 +174,67 @@ func loginAction(ctx *cli.Context) error {
 	ui.PrintSelected("Key", keyFile)
 	ui.PrintSelected("Root", rootFile)
 	return nil
+}
+
+func getAuthority(sans []string) (string, error) {
+	for _, s := range sans {
+		if strings.HasPrefix(s, "urn:smallstep:authority:") {
+			if regexp.MustCompile(uuidPattern).MatchString(s[24:]) {
+				return s[24:], nil
+			}
+		}
+	}
+	return "", fmt.Errorf("error parsing token: invalid sans claim")
+}
+
+func getRootCertificate(endpoint, fingerprint string) (*x509.Certificate, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+		InsecureSkipVerify: true,
+	})))
+	if err != nil {
+		return nil, errors.Wrapf(err, "error connecting %s", endpoint)
+	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	client := linkedca.NewMajordomoClient(conn)
+	resp, err := client.GetRootCertificate(ctx, &linkedca.GetRootCertificateRequest{
+		Fingerprint: fingerprint,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error getting root certificate: %w", err)
+	}
+
+	var block *pem.Block
+	b := []byte(resp.PemCertificate)
+	for len(b) > 0 {
+		block, b = pem.Decode(b)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+			continue
+		}
+
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing certificate: %w", err)
+		}
+
+		// verify the sha256
+		sum := sha256.Sum256(cert.Raw)
+		if !strings.EqualFold(fingerprint, hex.EncodeToString(sum[:])) {
+			return nil, fmt.Errorf("error verifying certificate: SHA256 fingerprint does not match")
+		}
+
+		return cert, nil
+	}
+
+	return nil, fmt.Errorf("error getting root certificate: certificate not found")
 }
 
 func parseLoginResponse(resp *linkedca.LoginResponse) ([]byte, []byte, error) {

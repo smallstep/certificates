@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,13 +34,14 @@ import (
 
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
-	config       *config.Config
-	keyManager   kms.KeyManager
-	provisioners *provisioner.Collection
-	admins       *administrator.Collection
-	db           db.AuthDB
-	adminDB      admin.DB
-	templates    *templates.Templates
+	config        *config.Config
+	keyManager    kms.KeyManager
+	provisioners  *provisioner.Collection
+	admins        *administrator.Collection
+	db            db.AuthDB
+	adminDB       admin.DB
+	templates     *templates.Templates
+	linkedCAToken string
 
 	// X509 CA
 	x509CAService      cas.CertificateAuthorityService
@@ -442,17 +444,24 @@ func (a *Authority) init() error {
 		// Initialize step-ca Admin Database if it's not already initialized using
 		// WithAdminDB.
 		if a.adminDB == nil {
-			if a.config.AuthorityConfig.AuthorityID == "" {
+			if a.linkedCAToken == "" {
 				// Check if AuthConfig already exists
 				a.adminDB, err = adminDBNosql.New(a.db.(nosql.DB), admin.DefaultAuthorityID)
 				if err != nil {
 					return err
 				}
 			} else {
-				a.adminDB, err = createLinkedCAClient(a.config.AuthorityConfig.AuthorityID, "localhost:6040")
+				// Use the linkedca client as the admindb.
+				client, err := newLinkedCAClient(a.linkedCAToken)
 				if err != nil {
 					return err
 				}
+				// If authorityId is configured make sure it matches the one in the token
+				if id := a.config.AuthorityConfig.AuthorityID; id != "" && !strings.EqualFold(id, client.authorityID) {
+					return errors.New("error initializing linkedca: token authority and configured authority do not match")
+				}
+				client.Run()
+				a.adminDB = client
 			}
 		}
 
@@ -533,6 +542,9 @@ func (a *Authority) Shutdown() error {
 func (a *Authority) CloseForReload() {
 	if err := a.keyManager.Close(); err != nil {
 		log.Printf("error closing the key manager: %v", err)
+	}
+	if client, ok := a.adminDB.(*linkedCaClient); ok {
+		client.Stop()
 	}
 }
 

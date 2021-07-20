@@ -196,6 +196,15 @@ func WithAdminDB(db admin.DB) Option {
 	}
 }
 
+// WithLinkedCAToken is an option to set the authentication token used to enable
+// linked ca.
+func WithLinkedCAToken(token string) Option {
+	return func(a *Authority) error {
+		a.linkedCAToken = token
+		return nil
+	}
+}
+
 func readCertificateBundle(pemCerts []byte) ([]*x509.Certificate, error) {
 	var block *pem.Block
 	var certs []*x509.Certificate

@@ -38,6 +38,10 @@ certificate issuer private key used in the RA mode.`,
 			Name:  "resolver",
 			Usage: "address of a DNS resolver to be used instead of the default.",
 		},
+		cli.StringFlag{
+			Name:  "token",
+			Usage: "token used to enable the linked ca.",
+		},
 	},
 }
 
@@ -46,6 +50,7 @@ func appAction(ctx *cli.Context) error {
 	passFile := ctx.String("password-file")
 	issuerPassFile := ctx.String("issuer-password-file")
 	resolver := ctx.String("resolver")
+	token := ctx.String("token")
 
 	// If zero cmd line args show help, if >1 cmd line args show error.
 	if ctx.NArg() == 0 {
@@ -88,7 +93,8 @@ func appAction(ctx *cli.Context) error {
 	srv, err := ca.New(config,
 		ca.WithConfigFile(configFile),
 		ca.WithPassword(password),
-		ca.WithIssuerPassword(issuerPassword))
+		ca.WithIssuerPassword(issuerPassword),
+		ca.WithLinkedCAToken(token))
 	if err != nil {
 		fatal(err)
 	}
