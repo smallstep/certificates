@@ -30,6 +30,7 @@ import (
 
 type options struct {
 	configFile     string
+	linkedCAToken  string
 	password       []byte
 	issuerPassword []byte
 	database       db.AuthDB
@@ -75,6 +76,13 @@ func WithDatabase(db db.AuthDB) Option {
 	}
 }
 
+// WithLinkedCAToken sets the token used to authenticate with the linkedca.
+func WithLinkedCAToken(token string) Option {
+	return func(o *options) {
+		o.linkedCAToken = token
+	}
+}
+
 // CA is the type used to build the complete certificate authority. It builds
 // the HTTP server, set ups the middlewares and the HTTP handlers.
 type CA struct {
@@ -111,6 +119,10 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	}
 
 	var opts []authority.Option
+	if ca.opts.linkedCAToken != "" {
+		opts = append(opts, authority.WithLinkedCAToken(ca.opts.linkedCAToken))
+	}
+
 	if ca.opts.database != nil {
 		opts = append(opts, authority.WithDatabase(ca.opts.database))
 	}
@@ -326,6 +338,7 @@ func (ca *CA) Reload() error {
 	newCA, err := New(config,
 		WithPassword(ca.opts.password),
 		WithIssuerPassword(ca.opts.issuerPassword),
+		WithLinkedCAToken(ca.opts.linkedCAToken),
 		WithConfigFile(ca.opts.configFile),
 		WithDatabase(ca.auth.GetDatabase()),
 	)
