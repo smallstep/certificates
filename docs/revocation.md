@@ -202,7 +202,8 @@ through an example.
 [Use TLS Everywhere](https://smallstep.com/blog/use-tls.html) and let us know
 what you think of our tools. Get in touch over
 [Twitter](twitter.com/smallsteplabs) or through our
-[GitHub Discussions](https://github.com/smallstep/certificates/discussions) to chat with us in real time.
+[GitHub Discussions](https://github.com/smallstep/certificates/discussions) to find answers to frequently asked questions.
+[Discord](https://bit.ly/step-discord) to chat with us in real time.
 
 ## Further Reading
 
