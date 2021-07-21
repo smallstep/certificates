@@ -750,6 +750,11 @@ func TestAuthority_RekeySSH(t *testing.T) {
 	now := time.Now().UTC()
 
 	a := testAuthority(t)
+	a.db = &db.MockAuthDB{
+		MIsSSHRevoked: func(sn string) (bool, error) {
+			return false, nil
+		},
+	}
 
 	type test struct {
 		auth       *Authority
@@ -763,6 +768,56 @@ func TestAuthority_RekeySSH(t *testing.T) {
 		code       int
 	}
 	tests := map[string]func(t *testing.T) *test{
+		"fail/is-revoked": func(t *testing.T) *test {
+			auth := testAuthority(t)
+			auth.db = &db.MockAuthDB{
+				MIsSSHRevoked: func(sn string) (bool, error) {
+					return true, nil
+				},
+			}
+			return &test{
+				auth:       auth,
+				userSigner: signer,
+				hostSigner: signer,
+				cert: &ssh.Certificate{
+					Serial:          1234567890,
+					ValidAfter:      uint64(now.Unix()),
+					ValidBefore:     uint64(now.Add(time.Hour).Unix()),
+					CertType:        ssh.UserCert,
+					ValidPrincipals: []string{"foo", "bar"},
+					KeyId:           "foo",
+				},
+				key:      pub,
+				signOpts: []provisioner.SignOption{},
+				err:      errors.New("authority.authorizeSSHCertificate: certificate has been revoked"),
+				code:     http.StatusUnauthorized,
+			}
+		},
+		"fail/is-revoked-error": func(t *testing.T) *test {
+			auth := testAuthority(t)
+			auth.db = &db.MockAuthDB{
+				MIsSSHRevoked: func(sn string) (bool, error) {
+					return false, errors.New("an error")
+				},
+			}
+			return &test{
+				auth:       auth,
+				userSigner: signer,
+				hostSigner: signer,
+				cert: &ssh.Certificate{
+					Serial:          1234567890,
+					ValidAfter:      uint64(now.Unix()),
+					ValidBefore:     uint64(now.Add(time.Hour).Unix()),
+					CertType:        ssh.UserCert,
+					ValidPrincipals: []string{"foo", "bar"},
+					KeyId:           "foo",
+				},
+				key:      pub,
+				signOpts: []provisioner.SignOption{},
+				err:      errors.New("authority.authorizeSSHCertificate: an error"),
+				code:     http.StatusInternalServerError,
+			}
+		},
 		"fail/opts-type": func(t *testing.T) *test {
 			return &test{
 				userSigner: signer,
@@ -831,6 +886,9 @@ func TestAuthority_RekeySSH(t *testing.T) {
 		"fail/db-store": func(t *testing.T) *test {
 			return &test{
 				auth: testAuthority(t, WithDatabase(&db.MockAuthDB{
+					MIsSSHRevoked: func(sn string) (bool, error) {
+						return false, nil
+					},
 					MStoreSSHCertificate: func(cert *ssh.Certificate) error {
 						return errors.New("force")
 					},

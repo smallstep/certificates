@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
 	"golang.org/x/crypto/ssh"
@@ -30,7 +29,6 @@ type SSHPOP struct {
 	Type       string  `json:"type"`
 	Name       string  `json:"name"`
 	Claims     *Claims `json:"claims,omitempty"`
-	db         db.AuthDB
 	claimer    *Claimer
 	audiences  Audiences
 	sshPubKeys *SSHKeys
@@ -102,7 +100,6 @@ func (p *SSHPOP) Init(config Config) error {
 	}
 
 	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
-	p.db = config.DB
 	p.sshPubKeys = config.SSHKeys
 	return nil
 }
@@ -110,19 +107,13 @@ func (p *SSHPOP) Init(config Config) error {
 // authorizeToken performs common jwt authorization actions and returns the
 // claims for case specific downstream parsing.
 // e.g. a Sign request will auth/validate different fields than a Revoke request.
+//
+// Checking for certificate revocation has been moved to the authority package.
 func (p *SSHPOP) authorizeToken(token string, audiences []string) (*sshPOPPayload, error) {
 	sshCert, jwt, err := ExtractSSHPOPCert(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusUnauthorized, err,
 			"sshpop.authorizeToken; error extracting sshpop header from token")
-	}
-
-	// Check for revocation.
-	if isRevoked, err := p.db.IsSSHRevoked(strconv.FormatUint(sshCert.Serial, 10)); err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err,
-			"sshpop.authorizeToken; error checking checking sshpop cert revocation")
-	} else if isRevoked {
-		return nil, errs.Unauthorized("sshpop.authorizeToken; sshpop certificate is revoked")
 	}
 
 	// Check validity period of the certificate.

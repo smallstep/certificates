@@ -249,7 +249,11 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 // RenewSSH creates a signed SSH certificate using the old SSH certificate as a template.
 func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ssh.Certificate, error) {
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
-		return nil, errs.BadRequest("rewnewSSH: cannot renew certificate without validity period")
+		return nil, errs.BadRequest("renewSSH: cannot renew certificate without validity period")
+	}
+
+	if err := a.authorizeSSHCertificate(ctx, oldCert); err != nil {
+		return nil, err
 	}
 
 	backdate := a.config.AuthorityConfig.Backdate.Duration
@@ -317,6 +321,10 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
 		return nil, errs.BadRequest("rekeySSH; cannot rekey certificate without validity period")
+	}
+
+	if err := a.authorizeSSHCertificate(ctx, oldCert); err != nil {
+		return nil, err
 	}
 
 	backdate := a.config.AuthorityConfig.Backdate.Duration

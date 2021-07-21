@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -287,6 +288,19 @@ func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 	}
 	if err := p.AuthorizeRenew(context.Background(), cert); err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
+	}
+	return nil
+}
+
+// authorizeSSHCertificate returns an error if the given certificate is revoked.
+func (a *Authority) authorizeSSHCertificate(ctx context.Context, cert *ssh.Certificate) error {
+	serial := strconv.FormatUint(cert.Serial, 10)
+	isRevoked, err := a.db.IsSSHRevoked(serial)
+	if err != nil {
+		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeSSHCertificate", errs.WithKeyVal("serialNumber", serial))
+	}
+	if isRevoked {
+		return errs.Unauthorized("authority.authorizeSSHCertificate: certificate has been revoked", errs.WithKeyVal("serialNumber", serial))
 	}
 	return nil
 }
