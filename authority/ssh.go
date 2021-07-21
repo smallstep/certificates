@@ -239,7 +239,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		}
 	}
 
-	if err = a.db.StoreSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error storing certificate in db")
 	}
 
@@ -294,7 +294,7 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 	}
 
-	if err = a.db.StoreSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error storing certificate in db")
 	}
 
@@ -369,11 +369,21 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 		}
 	}
 
-	if err = a.db.StoreSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "rekeySSH; error storing certificate in db")
 	}
 
 	return cert, nil
+}
+
+func (a *Authority) storeSSHCertificate(cert *ssh.Certificate) error {
+	type sshCertificateStorer interface {
+		StoreSSHCertificate(crt *ssh.Certificate) error
+	}
+	if s, ok := a.adminDB.(sshCertificateStorer); ok {
+		return s.StoreSSHCertificate(cert)
+	}
+	return a.db.StoreSSHCertificate(cert)
 }
 
 // IsValidForAddUser checks if a user provisioner certificate can be issued to
@@ -451,7 +461,7 @@ func (a *Authority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, subje
 	}
 	cert.Signature = sig
 
-	if err = a.db.StoreSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSHAddUser: error storing certificate in db")
 	}
 

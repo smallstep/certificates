@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 	"go.step.sm/crypto/tlsutil"
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
+	"golang.org/x/crypto/ssh"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -235,6 +237,47 @@ func (c *linkedCaClient) DeleteAdmin(ctx context.Context, id string) error {
 		Id: id,
 	})
 	return errors.Wrap(err, "error deleting admin")
+}
+
+func (c *linkedCaClient) StoreCertificateChain(fullchain ...*x509.Certificate) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_, err := c.client.PostCertificate(ctx, &linkedca.CertificateRequest{
+		PemCertificate:      serializeCertificateChain(fullchain[0]),
+		PemCertificateChain: serializeCertificateChain(fullchain[1:]...),
+	})
+	return errors.Wrap(err, "error posting certificate")
+}
+
+func (c *linkedCaClient) StoreRenewedCertificate(parent *x509.Certificate, fullchain ...*x509.Certificate) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_, err := c.client.PostCertificate(ctx, &linkedca.CertificateRequest{
+		PemCertificate:       serializeCertificateChain(fullchain[0]),
+		PemCertificateChain:  serializeCertificateChain(fullchain[1:]...),
+		PemParentCertificate: serializeCertificateChain(parent),
+	})
+	return errors.Wrap(err, "error posting certificate")
+}
+
+func (c *linkedCaClient) StoreSSHCertificate(crt *ssh.Certificate) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_, err := c.client.PostSSHCertificate(ctx, &linkedca.SSHCertificateRequest{
+		Certificate: base64.StdEncoding.EncodeToString(crt.Marshal()),
+	})
+	return errors.Wrap(err, "error posting ssh certificate")
+}
+
+func serializeCertificateChain(fullchain ...*x509.Certificate) string {
+	var chain string
+	for _, crt := range fullchain {
+		chain += string(pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: crt.Raw,
+		}))
+	}
+	return chain
 }
 
 func getAuthority(sans []string) (string, error) {

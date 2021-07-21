@@ -280,9 +280,15 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 // `StoreCertificate(...*x509.Certificate) error` instead of just
 // `StoreCertificate(*x509.Certificate) error`.
 func (a *Authority) storeCertificate(fullchain []*x509.Certificate) error {
-	if s, ok := a.db.(interface {
+	type certificateChainStorer interface {
 		StoreCertificateChain(...*x509.Certificate) error
-	}); ok {
+	}
+	// Store certificate in linkedca
+	if s, ok := a.adminDB.(certificateChainStorer); ok {
+		return s.StoreCertificateChain(fullchain...)
+	}
+	// Store certificate in local db
+	if s, ok := a.db.(certificateChainStorer); ok {
 		return s.StoreCertificateChain(fullchain...)
 	}
 	return a.db.StoreCertificate(fullchain[0])
@@ -293,9 +299,15 @@ func (a *Authority) storeCertificate(fullchain []*x509.Certificate) error {
 //
 // TODO: at some point we should implement this in the standard implementation.
 func (a *Authority) storeRenewedCertificate(oldCert *x509.Certificate, fullchain []*x509.Certificate) error {
-	if s, ok := a.db.(interface {
+	type renewedCertificateChainStorer interface {
 		StoreRenewedCertificate(*x509.Certificate, ...*x509.Certificate) error
-	}); ok {
+	}
+	// Store certificate in linkedca
+	if s, ok := a.adminDB.(renewedCertificateChainStorer); ok {
+		return s.StoreRenewedCertificate(oldCert, fullchain...)
+	}
+	// Store certificate in local db
+	if s, ok := a.db.(renewedCertificateChainStorer); ok {
 		return s.StoreRenewedCertificate(oldCert, fullchain...)
 	}
 	return a.db.StoreCertificate(fullchain[0])
