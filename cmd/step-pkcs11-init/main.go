@@ -50,6 +50,7 @@ type Config struct {
 	NoCerts          bool
 	EnableSSH        bool
 	Force            bool
+	Extractable      bool
 }
 
 // Validate checks the flags in the config.
@@ -117,6 +118,7 @@ func main() {
 	flag.BoolVar(&c.EnableSSH, "ssh", false, "Enable the creation of ssh keys.")
 	flag.BoolVar(&c.NoCerts, "no-certs", false, "Do not store certificates in the module.")
 	flag.BoolVar(&c.Force, "force", false, "Force the delete of previous keys.")
+	flag.BoolVar(&c.Extractable, "extractable", false, "Allow export of private keys under wrap.")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -286,6 +288,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		resp, err := k.CreateKey(&apiv1.CreateKeyRequest{
 			Name:               c.RootKeyObject,
 			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
+			Extractable:        c.Extractable,
 		})
 		if err != nil {
 			return err
@@ -325,6 +328,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 				Name:        c.RootObject,
 				Certificate: root,
+				Extractable: c.Extractable,
 			}); err != nil {
 				return err
 			}
@@ -366,6 +370,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		resp, err := k.CreateKey(&apiv1.CreateKeyRequest{
 			Name:               c.CrtKeyObject,
 			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
+			Extractable:        c.Extractable,
 		})
 		if err != nil {
 			return err
@@ -402,6 +407,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 			Name:        c.CrtObject,
 			Certificate: intermediate,
+			Extractable: c.Extractable,
 		}); err != nil {
 			return err
 		}

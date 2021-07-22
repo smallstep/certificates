@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/ThalesIgnite/crypto11"
+	"github.com/miekg/pkcs11"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/uri"
@@ -32,9 +33,11 @@ type P11 interface {
 	FindKeyPair(id, label []byte) (crypto11.Signer, error)
 	FindCertificate(id, label []byte, serial *big.Int) (*x509.Certificate, error)
 	ImportCertificateWithLabel(id, label []byte, cert *x509.Certificate) error
+	ImportCertificateWithAttributes(template crypto11.AttributeSet, certificate *x509.Certificate) error
 	DeleteCertificate(id, label []byte, serial *big.Int) error
 	GenerateRSAKeyPairWithLabel(id, label []byte, bits int) (crypto11.SignerDecrypter, error)
 	GenerateECDSAKeyPairWithLabel(id, label []byte, curve elliptic.Curve) (crypto11.Signer, error)
+	GenerateECDSAKeyPairWithAttributes(public, private crypto11.AttributeSet, curve elliptic.Curve) (crypto11.Signer, error)
 	Close() error
 }
 
@@ -195,11 +198,29 @@ func (k *PKCS11) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 		}, "storeCertificate failed")
 	}
 
-	if err := k.p11.ImportCertificateWithLabel(id, object, req.Certificate); err != nil {
+	if err := ImportCertificateWithLabel(k.p11, id, object, req.Certificate, req.Extractable); err != nil {
 		return errors.Wrap(err, "storeCertificate failed")
 	}
 
 	return nil
+}
+
+func ImportCertificateWithLabel(ctx P11, id []byte, label []byte, certificate *x509.Certificate, extractable bool) error {
+	if id == nil {
+		return errors.New("id cannot be nil")
+	}
+	if label == nil {
+		return errors.New("label cannot be nil")
+	}
+
+	template, err := crypto11.NewAttributeSetWithIDAndLabel(id, label)
+	if err != nil {
+		return err
+	}
+	template.AddIfNotPresent([]*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, extractable),
+	})
+	return ctx.ImportCertificateWithAttributes(template, certificate)
 }
 
 // DeleteKey is a utility function to delete a key given an uri.
@@ -291,22 +312,36 @@ func generateKey(ctx P11, req *apiv1.CreateKeyRequest) (crypto11.Signer, error) 
 
 	switch req.SignatureAlgorithm {
 	case apiv1.UnspecifiedSignAlgorithm:
-		return ctx.GenerateECDSAKeyPairWithLabel(id, object, elliptic.P256())
+		return GenerateECDSAKeyPairWithLabel(ctx, id, object, elliptic.P256(), req.Extractable)
 	case apiv1.SHA256WithRSA, apiv1.SHA384WithRSA, apiv1.SHA512WithRSA:
 		return ctx.GenerateRSAKeyPairWithLabel(id, object, bits)
 	case apiv1.SHA256WithRSAPSS, apiv1.SHA384WithRSAPSS, apiv1.SHA512WithRSAPSS:
 		return ctx.GenerateRSAKeyPairWithLabel(id, object, bits)
 	case apiv1.ECDSAWithSHA256:
-		return ctx.GenerateECDSAKeyPairWithLabel(id, object, elliptic.P256())
+		return GenerateECDSAKeyPairWithLabel(ctx, id, object, elliptic.P256(), req.Extractable)
 	case apiv1.ECDSAWithSHA384:
-		return ctx.GenerateECDSAKeyPairWithLabel(id, object, elliptic.P384())
+		return GenerateECDSAKeyPairWithLabel(ctx, id, object, elliptic.P384(), req.Extractable)
 	case apiv1.ECDSAWithSHA512:
-		return ctx.GenerateECDSAKeyPairWithLabel(id, object, elliptic.P521())
+		return GenerateECDSAKeyPairWithLabel(ctx, id, object, elliptic.P521(), req.Extractable)
 	case apiv1.PureEd25519:
 		return nil, fmt.Errorf("signature algorithm %s is not supported", req.SignatureAlgorithm)
 	default:
 		return nil, fmt.Errorf("signature algorithm %s is not supported", req.SignatureAlgorithm)
 	}
+}
+
+func GenerateECDSAKeyPairWithLabel(ctx P11, id, label []byte, curve elliptic.Curve, extractable bool) (crypto11.Signer, error) {
+	public, err := crypto11.NewAttributeSetWithIDAndLabel(id, label)
+	if err != nil {
+		return nil, err
+	}
+	// Copy the AttributeSet to allow modifications.
+	private := public.Copy()
+	private.AddIfNotPresent([]*pkcs11.Attribute{
+		pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, extractable),
+	})
+
+	return ctx.GenerateECDSAKeyPairWithAttributes(public, private, curve)
 }
 
 func findSigner(ctx P11, rawuri string) (crypto11.Signer, error) {
