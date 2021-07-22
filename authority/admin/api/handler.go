@@ -40,5 +40,5 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("DELETE", "/admins/{id}", authnz(h.DeleteAdmin))
 
 	// External Account Binding Keys
-	r.MethodFunc("POST", "/eak", h.CreateExternalAccountKey) // TODO: authnz
+	r.MethodFunc("POST", "/eak", authnz(h.CreateExternalAccountKey))
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -556,6 +557,43 @@ retry:
 		return readAdminError(resp.Body)
 	}
 	return nil
+}
+
+// CreateExternalAccountKey performs the POST /admin/eak request to the CA.
+func (c *AdminClient) CreateExternalAccountKey(eakRequest *adminAPI.CreateExternalAccountKeyRequest) (*adminAPI.CreateExternalAccountKeyResponse, error) {
+	var retried bool
+	//body, err := protojson.Marshal(req)
+	body, err := json.Marshal(eakRequest)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "eak")})
+	tok, err := c.generateAdminToken(u.Path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error generating admin token")
+	}
+	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "create POST %s request failed", u)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var eakResp = new(adminAPI.CreateExternalAccountKeyResponse)
+	if err := api.ReadJSON(resp.Body, &eakResp); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return eakResp, nil
 }
 
 func readAdminError(r io.ReadCloser) error {

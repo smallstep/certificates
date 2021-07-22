@@ -7,12 +7,12 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 )
 
-// CreateExternalAccountKeyRequest is the type for GET /admin/eak requests
+// CreateExternalAccountKeyRequest is the type for POST /admin/eak requests
 type CreateExternalAccountKeyRequest struct {
 	Name string `json:"name"`
 }
 
-// CreateExternalAccountKeyResponse is the type for GET /admin/eak responses
+// CreateExternalAccountKeyResponse is the type for POST /admin/eak responses
 type CreateExternalAccountKeyResponse struct {
 	KeyID string `json:"keyID"`
 	Name  string `json:"name"`
@@ -21,17 +21,17 @@ type CreateExternalAccountKeyResponse struct {
 
 // CreateExternalAccountKey creates a new External Account Binding key
 func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Request) {
-	var eakRequest = new(CreateExternalAccountKeyRequest)
-	if err := api.ReadJSON(r.Body, eakRequest); err != nil { // TODO: rewrite into protobuf json (likely)
+	var body CreateExternalAccountKeyRequest
+	if err := api.ReadJSON(r.Body, &body); err != nil { // TODO: rewrite into protobuf json (likely)
 		api.WriteError(w, err)
 		return
 	}
 
 	// TODO: Validate input
 
-	eak, err := h.db.CreateExternalAccountKey(r.Context(), eakRequest.Name)
+	eak, err := h.db.CreateExternalAccountKey(r.Context(), body.Name)
 	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error creating external account key %s", eakRequest.Name))
+		api.WriteError(w, admin.WrapErrorISE(err, "error creating external account key %s", body.Name))
 		return
 	}
 
