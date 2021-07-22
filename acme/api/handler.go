@@ -123,6 +123,13 @@ func (h *Handler) GetNonce(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type Meta struct {
+	TermsOfService          string   `json:"termsOfService,omitempty"`
+	Website                 string   `json:"website,omitempty"`
+	CaaIdentities           []string `json:"caaIdentities,omitempty"`
+	ExternalAccountRequired bool     `json:"externalAccountRequired,omitempty"`
+}
+
 // Directory represents an ACME directory for configuring clients.
 type Directory struct {
 	NewNonce   string `json:"newNonce"`
@@ -130,6 +137,7 @@ type Directory struct {
 	NewOrder   string `json:"newOrder"`
 	RevokeCert string `json:"revokeCert"`
 	KeyChange  string `json:"keyChange"`
+	Meta       Meta   `json:"meta"`
 }
 
 // ToLog enables response logging for the Directory type.
@@ -145,12 +153,27 @@ func (d *Directory) ToLog() (interface{}, error) {
 // for client configuration.
 func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	prov, err := provisionerFromContext(ctx)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	acmeProv, ok := prov.(*provisioner.ACME) // TODO: rewrite into providing configuration via function on acme.Provisioner
+	if !ok || acmeProv == nil {
+		api.WriteError(w, acme.NewErrorISE("provisioner in context is not an ACME provisioner"))
+		return
+	}
+
 	api.JSON(w, &Directory{
 		NewNonce:   h.linker.GetLink(ctx, NewNonceLinkType),
 		NewAccount: h.linker.GetLink(ctx, NewAccountLinkType),
 		NewOrder:   h.linker.GetLink(ctx, NewOrderLinkType),
 		RevokeCert: h.linker.GetLink(ctx, RevokeCertLinkType),
 		KeyChange:  h.linker.GetLink(ctx, KeyChangeLinkType),
+		Meta: Meta{
+			ExternalAccountRequired: acmeProv.RequireEAB,
+		},
 	})
 }
 

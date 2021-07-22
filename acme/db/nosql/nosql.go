@@ -11,14 +11,15 @@ import (
 )
 
 var (
-	accountTable           = []byte("acme_accounts")
-	accountByKeyIDTable    = []byte("acme_keyID_accountID_index")
-	authzTable             = []byte("acme_authzs")
-	challengeTable         = []byte("acme_challenges")
-	nonceTable             = []byte("nonces")
-	orderTable             = []byte("acme_orders")
-	ordersByAccountIDTable = []byte("acme_account_orders_index")
-	certTable              = []byte("acme_certs")
+	accountTable            = []byte("acme_accounts")
+	accountByKeyIDTable     = []byte("acme_keyID_accountID_index")
+	authzTable              = []byte("acme_authzs")
+	challengeTable          = []byte("acme_challenges")
+	nonceTable              = []byte("nonces")
+	orderTable              = []byte("acme_orders")
+	ordersByAccountIDTable  = []byte("acme_account_orders_index")
+	certTable               = []byte("acme_certs")
+	externalAccountKeyTable = []byte("acme_external_account_keys")
 )
 
 // DB is a struct that implements the AcmeDB interface.
@@ -29,7 +30,7 @@ type DB struct {
 // New configures and returns a new ACME DB backend implemented using a nosql DB.
 func New(db nosqlDB.DB) (*DB, error) {
 	tables := [][]byte{accountTable, accountByKeyIDTable, authzTable,
-		challengeTable, nonceTable, orderTable, ordersByAccountIDTable, certTable}
+		challengeTable, nonceTable, orderTable, ordersByAccountIDTable, certTable, externalAccountKeyTable}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
 			return nil, errors.Wrapf(err, "error creating table %s",

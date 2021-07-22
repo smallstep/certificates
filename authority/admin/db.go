@@ -7,6 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 	"go.step.sm/linkedca"
+
+	"github.com/smallstep/certificates/authority/admin/eak"
 )
 
 const (
@@ -67,6 +69,8 @@ type DB interface {
 	GetAdmins(ctx context.Context) ([]*linkedca.Admin, error)
 	UpdateAdmin(ctx context.Context, admin *linkedca.Admin) error
 	DeleteAdmin(ctx context.Context, id string) error
+
+	CreateExternalAccountKey(ctx context.Context, name string) (*eak.ExternalAccountKey, error)
 }
 
 // MockDB is an implementation of the DB interface that should only be used as
@@ -83,6 +87,8 @@ type MockDB struct {
 	MockGetAdmins   func(ctx context.Context) ([]*linkedca.Admin, error)
 	MockUpdateAdmin func(ctx context.Context, adm *linkedca.Admin) error
 	MockDeleteAdmin func(ctx context.Context, id string) error
+
+	MockCreateExternalAccountKey func(ctx context.Context, name string) (*eak.ExternalAccountKey, error)
 
 	MockError error
 	MockRet1  interface{}
@@ -176,4 +182,11 @@ func (m *MockDB) DeleteAdmin(ctx context.Context, id string) error {
 		return m.MockDeleteAdmin(ctx, id)
 	}
 	return m.MockError
+}
+
+func (m *MockDB) CreateExternalAccountKey(ctx context.Context, name string) (*eak.ExternalAccountKey, error) {
+	if m.MockCreateExternalAccountKey != nil {
+		return m.MockCreateExternalAccountKey(ctx, name)
+	}
+	return m.MockRet1.(*eak.ExternalAccountKey), m.MockError
 }

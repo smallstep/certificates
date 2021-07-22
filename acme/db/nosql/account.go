@@ -2,6 +2,7 @@ package nosql
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"time"
 
@@ -24,6 +25,15 @@ type dbAccount struct {
 func (dba *dbAccount) clone() *dbAccount {
 	nu := *dba
 	return &nu
+}
+
+type dbExternalAccountKey struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	AccountID string    `json:"accountID,omitempty"`
+	KeyBytes  []byte    `json:"key"`
+	CreatedAt time.Time `json:"createdAt"`
+	BoundAt   time.Time `json:"boundAt"`
 }
 
 func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, error) {
@@ -52,6 +62,24 @@ func (db *DB) getDBAccount(ctx context.Context, id string) (*dbAccount, error) {
 		return nil, errors.Wrapf(err, "error unmarshaling account %s into dbAccount", id)
 	}
 	return dbacc, nil
+}
+
+// getDBExternalAccountKey retrieves and unmarshals dbExternalAccountKey.
+func (db *DB) getDBExternalAccountKey(ctx context.Context, id string) (*dbExternalAccountKey, error) {
+	data, err := db.db.Get(externalAccountKeyTable, []byte(id))
+	if err != nil {
+		if nosqlDB.IsErrNotFound(err) {
+			return nil, acme.ErrNotFound
+		}
+		return nil, errors.Wrapf(err, "error loading external account key %s", id)
+	}
+
+	dbeak := new(dbExternalAccountKey)
+	if err = json.Unmarshal(data, dbeak); err != nil {
+		return nil, errors.Wrapf(err, "error unmarshaling external account key %s into dbExternalAccountKey", id)
+	}
+
+	return dbeak, nil
 }
 
 // GetAccount retrieves an ACME account by ID.
@@ -133,4 +161,72 @@ func (db *DB) UpdateAccount(ctx context.Context, acc *acme.Account) error {
 	}
 
 	return db.save(ctx, old.ID, nu, old, "account", accountTable)
+}
+
+// CreateExternalAccountKey creates a new External Account Binding key with a name
+func (db *DB) CreateExternalAccountKey(ctx context.Context, name string) (*acme.ExternalAccountKey, error) {
+	keyID, err := randID()
+	if err != nil {
+		return nil, err
+	}
+
+	random := make([]byte, 32)
+	_, err = rand.Read(random)
+	if err != nil {
+		return nil, err
+	}
+
+	dbeak := &dbExternalAccountKey{
+		ID:        keyID,
+		Name:      name,
+		KeyBytes:  random,
+		CreatedAt: clock.Now(),
+	}
+
+	if err = db.save(ctx, keyID, dbeak, nil, "external_account_key", externalAccountKeyTable); err != nil {
+		return nil, err
+	}
+	return &acme.ExternalAccountKey{
+		ID:        dbeak.ID,
+		Name:      dbeak.Name,
+		AccountID: dbeak.AccountID,
+		KeyBytes:  dbeak.KeyBytes,
+		CreatedAt: dbeak.CreatedAt,
+		BoundAt:   dbeak.BoundAt,
+	}, nil
+}
+
+// GetExternalAccountKey retrieves an External Account Binding key by KeyID
+func (db *DB) GetExternalAccountKey(ctx context.Context, keyID string) (*acme.ExternalAccountKey, error) {
+	dbeak, err := db.getDBExternalAccountKey(ctx, keyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &acme.ExternalAccountKey{
+		ID:        dbeak.ID,
+		Name:      dbeak.Name,
+		AccountID: dbeak.AccountID,
+		KeyBytes:  dbeak.KeyBytes,
+		CreatedAt: dbeak.CreatedAt,
+		BoundAt:   dbeak.BoundAt,
+	}, nil
+}
+
+func (db *DB) UpdateExternalAccountKey(ctx context.Context, eak *acme.ExternalAccountKey) error {
+	old, err := db.getDBExternalAccountKey(ctx, eak.ID)
+	if err != nil {
+		return err
+	}
+
+	nu := dbExternalAccountKey{
+		ID:        eak.ID,
+		Name:      eak.Name,
+		AccountID: eak.AccountID,
+		KeyBytes:  eak.KeyBytes,
+		CreatedAt: eak.CreatedAt,
+		BoundAt:   eak.BoundAt,
+	}
+
+	return db.save(ctx, nu.ID, nu, old, "external_account_key", externalAccountKeyTable)
 }
