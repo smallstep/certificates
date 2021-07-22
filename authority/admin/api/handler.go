@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"
@@ -8,15 +9,18 @@ import (
 
 // Handler is the ACME API request handler.
 type Handler struct {
-	db   admin.DB
-	auth *authority.Authority
+	db     admin.DB
+	auth   *authority.Authority
+	acmeDB acme.DB
 }
 
 // NewHandler returns a new Authority Config Handler.
-func NewHandler(auth *authority.Authority) api.RouterHandler {
-	h := &Handler{db: auth.GetAdminDatabase(), auth: auth}
-
-	return h
+func NewHandler(auth *authority.Authority, adminDB admin.DB, acmeDB acme.DB) api.RouterHandler {
+	return &Handler{
+		db:     adminDB,
+		auth:   auth,
+		acmeDB: acmeDB,
+	}
 }
 
 // Route traffic and implement the Router interface.

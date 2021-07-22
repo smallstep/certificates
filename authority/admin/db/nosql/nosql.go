@@ -11,9 +11,8 @@ import (
 )
 
 var (
-	adminsTable             = []byte("admins")
-	provisionersTable       = []byte("provisioners")
-	externalAccountKeyTable = []byte("acme_external_account_keys")
+	adminsTable       = []byte("admins")
+	provisionersTable = []byte("provisioners")
 )
 
 // DB is a struct that implements the AdminDB interface.
@@ -24,7 +23,7 @@ type DB struct {
 
 // New configures and returns a new Authority DB backend implemented using a nosql DB.
 func New(db nosqlDB.DB, authorityID string) (*DB, error) {
-	tables := [][]byte{adminsTable, provisionersTable, externalAccountKeyTable}
+	tables := [][]byte{adminsTable, provisionersTable}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
 			return nil, errors.Wrapf(err, "error creating table %s",

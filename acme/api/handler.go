@@ -153,15 +153,9 @@ func (d *Directory) ToLog() (interface{}, error) {
 // for client configuration.
 func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	prov, err := provisionerFromContext(ctx)
+	acmeProv, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
-		return
-	}
-
-	acmeProv, ok := prov.(*provisioner.ACME) // TODO: rewrite into providing configuration via function on acme.Provisioner
-	if !ok || acmeProv == nil {
-		api.WriteError(w, acme.NewErrorISE("provisioner in context is not an ACME provisioner"))
 		return
 	}
 

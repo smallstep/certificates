@@ -29,7 +29,7 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 
 	// TODO: Validate input
 
-	eak, err := h.db.CreateExternalAccountKey(r.Context(), body.Name)
+	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), body.Name)
 	if err != nil {
 		api.WriteError(w, admin.WrapErrorISE(err, "error creating external account key %s", body.Name))
 		return

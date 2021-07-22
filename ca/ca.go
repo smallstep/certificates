@@ -182,7 +182,7 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	if config.AuthorityConfig.EnableAdmin {
 		adminDB := auth.GetAdminDatabase()
 		if adminDB != nil {
-			adminHandler := adminAPI.NewHandler(auth)
+			adminHandler := adminAPI.NewHandler(auth, adminDB, acmeDB)
 			mux.Route("/admin", func(r chi.Router) {
 				adminHandler.Route(r)
 			})

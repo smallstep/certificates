@@ -52,8 +52,12 @@ type ExternalAccountKey struct {
 	BoundAt   time.Time `json:"boundAt,omitempty"`
 }
 
+func (eak *ExternalAccountKey) AlreadyBound() bool {
+	return !eak.BoundAt.IsZero()
+}
+
 func (eak *ExternalAccountKey) BindTo(account *Account) {
 	eak.AccountID = account.ID
 	eak.BoundAt = time.Now()
-	eak.KeyBytes = []byte{} // TODO: ensure that single use keys are OK
+	eak.KeyBytes = []byte{} // clearing the key bytes; can only be used once
 }

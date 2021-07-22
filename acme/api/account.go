@@ -8,7 +8,6 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
 
 	squarejose "gopkg.in/square/go-jose.v2"
@@ -125,7 +124,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, acme.WrapErrorISE(err, "error creating account"))
 			return
 		}
-		if eak != nil { // means that we have a (valid) External Account Binding key that should be used
+		if eak != nil { // means that we have a (valid) External Account Binding key that should be bound, updated and sent in the response
 			eak.BindTo(acc)
 			if err := h.db.UpdateExternalAccountKey(ctx, eak); err != nil {
 				api.WriteError(w, acme.WrapErrorISE(err, "error updating external account binding key"))
@@ -134,7 +133,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			acc.ExternalAccountBinding = nar.ExternalAccountBinding
 		}
 	} else {
-		// Account exists //
+		// Account exists
 		httpStatus = http.StatusOK
 	}
 
@@ -227,19 +226,12 @@ func (h *Handler) GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 
 // validateExternalAccountBinding validates the externalAccountBinding property in a call to new-account
 func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest) (*acme.ExternalAccountKey, error) {
-
-	prov, err := provisionerFromContext(ctx)
+	acmeProv, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
-		return nil, err
+		return nil, acme.WrapErrorISE(err, "could not load ACME provisioner from context")
 	}
 
-	acmeProv, ok := prov.(*provisioner.ACME) // TODO: rewrite into providing configuration via function on acme.Provisioner
-	if !ok || acmeProv == nil {
-		return nil, acme.NewErrorISE("provisioner in context is not an ACME provisioner")
-	}
-
-	shouldSkipAccountBindingValidation := !acmeProv.RequireEAB
-	if shouldSkipAccountBindingValidation {
+	if !acmeProv.RequireEAB {
 		return nil, nil
 	}
 
@@ -249,7 +241,7 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 
 	eabJSONBytes, err := json.Marshal(nar.ExternalAccountBinding)
 	if err != nil {
-		return nil, acme.WrapErrorISE(err, "error marshaling externalAccountBinding")
+		return nil, acme.WrapErrorISE(err, "error marshaling externalAccountBinding into JSON")
 	}
 
 	eabJWS, err := squarejose.ParseSigned(string(eabJSONBytes))
@@ -266,8 +258,8 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 		return nil, acme.WrapErrorISE(err, "error retrieving external account key")
 	}
 
-	if !externalAccountKey.BoundAt.IsZero() { // TODO: ensure that single use keys are OK
-		return nil, acme.NewError(acme.ErrorUnauthorizedType, "external account binding key with id '%s' was already used", keyID)
+	if externalAccountKey.AlreadyBound() {
+		return nil, acme.NewError(acme.ErrorUnauthorizedType, "external account binding key with id '%s' was already bound to account '%s' on %s", keyID, externalAccountKey.AccountID, externalAccountKey.BoundAt)
 	}
 
 	payload, err := eabJWS.Verify(externalAccountKey.KeyBytes)
