@@ -43,6 +43,7 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("PATCH", "/admins/{id}", authnz(h.UpdateAdmin))
 	r.MethodFunc("DELETE", "/admins/{id}", authnz(h.DeleteAdmin))
 
-	// External Account Binding Keys
-	r.MethodFunc("POST", "/eak", authnz(h.CreateExternalAccountKey))
+	// ACME External Account Binding Keys
+	r.MethodFunc("GET", "/acme/eab", authnz(h.GetExternalAccountKeys))
+	r.MethodFunc("POST", "/acme/eab", authnz(h.CreateExternalAccountKey))
 }

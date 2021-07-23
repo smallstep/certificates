@@ -559,15 +559,54 @@ retry:
 	return nil
 }
 
-// CreateExternalAccountKey performs the POST /admin/eak request to the CA.
+// GetExternalAccountKeysPaginate returns a page from the the GET /admin/acme/eab request to the CA.
+func (c *AdminClient) GetExternalAccountKeysPaginate(opts ...AdminOption) (*adminAPI.GetExternalAccountKeysResponse, error) {
+	var retried bool
+	o := new(adminOptions)
+	if err := o.apply(opts); err != nil {
+		return nil, err
+	}
+	u := c.endpoint.ResolveReference(&url.URL{
+		Path:     "/admin/acme/eab",
+		RawQuery: o.rawQuery(),
+	})
+	tok, err := c.generateAdminToken(u.Path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error generating admin token")
+	}
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "create GET %s request failed", u)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	// var body = new(GetExternalAccountKeysResponse)
+	// if err := readJSON(resp.Body, body); err != nil {
+	// 	return nil, errors.Wrapf(err, "error reading %s", u)
+	// }
+	// return body, nil
+	return nil, nil // TODO: fix correctly
+}
+
+// CreateExternalAccountKey performs the POST /admin/acme/eab request to the CA.
 func (c *AdminClient) CreateExternalAccountKey(eakRequest *adminAPI.CreateExternalAccountKeyRequest) (*adminAPI.CreateExternalAccountKeyResponse, error) {
 	var retried bool
-	//body, err := protojson.Marshal(req)
 	body, err := json.Marshal(eakRequest)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "eak")})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab")})
 	tok, err := c.generateAdminToken(u.Path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
@@ -596,7 +635,27 @@ retry:
 	return eakResp, nil
 }
 
+// GetExternalAccountKeys returns all ACME EAB Keys from the GET /admin/acme/eab request to the CA.
+func (c *AdminClient) GetExternalAccountKeys(opts ...AdminOption) ([]*adminAPI.CreateExternalAccountKeyResponse, error) {
+	var (
+		cursor = ""
+		eaks   = []*adminAPI.CreateExternalAccountKeyResponse{}
+	)
+	for {
+		resp, err := c.GetExternalAccountKeysPaginate(WithAdminCursor(cursor), WithAdminLimit(100))
+		if err != nil {
+			return nil, err
+		}
+		eaks = append(eaks, resp.EAKs...)
+		if resp.NextCursor == "" {
+			return eaks, nil
+		}
+		cursor = resp.NextCursor
+	}
+}
+
 func readAdminError(r io.ReadCloser) error {
+	// TODO: not all errors can be read (i.e. 404); seems to be a bigger issue
 	defer r.Close()
 	adminErr := new(admin.Error)
 	if err := json.NewDecoder(r).Decode(adminErr); err != nil {
