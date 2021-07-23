@@ -269,6 +269,30 @@ func (c *linkedCaClient) StoreSSHCertificate(crt *ssh.Certificate) error {
 	return errors.Wrap(err, "error posting ssh certificate")
 }
 
+func (c *linkedCaClient) IsRevoked(serial string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	resp, err := c.client.GetCertificateStatus(ctx, &linkedca.GetCertificateStatusRequest{
+		Serial: serial,
+	})
+	if err != nil {
+		return false, errors.Wrap(err, "error getting certificate status")
+	}
+	return resp.Status != linkedca.RevocationStatus_ACTIVE, nil
+}
+
+func (c *linkedCaClient) IsSSHRevoked(serial string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	resp, err := c.client.GetSSHCertificateStatus(ctx, &linkedca.GetSSHCertificateStatusRequest{
+		Serial: serial,
+	})
+	if err != nil {
+		return false, errors.Wrap(err, "error getting certificate status")
+	}
+	return resp.Status != linkedca.RevocationStatus_ACTIVE, nil
+}
+
 func serializeCertificateChain(fullchain ...*x509.Certificate) string {
 	var chain string
 	for _, crt := range fullchain {
