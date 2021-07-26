@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
@@ -264,7 +263,7 @@ func (c *linkedCaClient) StoreSSHCertificate(crt *ssh.Certificate) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err := c.client.PostSSHCertificate(ctx, &linkedca.SSHCertificateRequest{
-		Certificate: base64.StdEncoding.EncodeToString(crt.Marshal()),
+		Certificate: string(ssh.MarshalAuthorizedKey(crt)),
 	})
 	return errors.Wrap(err, "error posting ssh certificate")
 }
