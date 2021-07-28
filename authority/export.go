@@ -13,6 +13,11 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+// Export creates a linkedca configuration form the current ca.json and loaded
+// authorities.
+//
+// Note that export will not export neither the pki password nor the certificate
+// issuer password.
 func (a *Authority) Export() (c *config.Configuration, err error) {
 	// Recover from panics
 	defer func() {
@@ -22,6 +27,8 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 	}()
 
 	files := make(map[string][]byte)
+
+	// The exported configuration should not include the password in it.
 	c = &config.Configuration{
 		Version:         "1.0",
 		Root:            mustReadFilesOrUris(a.config.Root, files),
@@ -40,8 +47,7 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 			DisableIssuedAtCheck: a.config.AuthorityConfig.DisableIssuedAtCheck,
 			Backdate:             a.config.AuthorityConfig.Backdate.String(),
 		},
-		Password: mustPassword(a.config.Password),
-		Files:    files,
+		Files: files,
 	}
 
 	// SSH
@@ -109,12 +115,12 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 			if !ok {
 				return nil, errors.Errorf("unknown certificate issuer type %s", iss.Type)
 			}
+			// The exporte certificate issuer should not include the password.
 			c.Authority.CertificateIssuer = &config.CertificateIssuer{
 				Type:        config.CertificateIssuer_Type(typ),
 				Provisioner: iss.Provisioner,
 				Certificate: mustReadFileOrUri(iss.Certificate, files),
 				Key:         mustReadFileOrUri(iss.Key, files),
-				Password:    mustPassword(iss.Password),
 			}
 		}
 	}
