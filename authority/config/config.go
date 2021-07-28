@@ -75,6 +75,7 @@ type ASN1DN struct {
 	Locality           string `json:"locality,omitempty"`
 	Province           string `json:"province,omitempty"`
 	StreetAddress      string `json:"streetAddress,omitempty"`
+	SerialNumber       string `json:"serialNumber,omitempty"`
 	CommonName         string `json:"commonName,omitempty"`
 }
 

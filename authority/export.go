@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -20,26 +21,34 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 		}
 	}()
 
+	files := make(map[string][]byte)
 	c = &config.Configuration{
-		Root:            mustReadFilesOrUris(a.config.Root),
-		FederatedRoots:  mustReadFilesOrUris(a.config.FederatedRoots),
-		Intermediate:    mustReadFileOrUri(a.config.IntermediateCert),
-		IntermediateKey: mustReadFileOrUri(a.config.IntermediateKey),
+		Version:         "1.0",
+		Root:            mustReadFilesOrUris(a.config.Root, files),
+		FederatedRoots:  mustReadFilesOrUris(a.config.FederatedRoots, files),
+		Intermediate:    mustReadFileOrUri(a.config.IntermediateCert, files),
+		IntermediateKey: mustReadFileOrUri(a.config.IntermediateKey, files),
 		Address:         a.config.Address,
 		InsecureAddress: a.config.InsecureAddress,
 		DnsNames:        a.config.DNSNames,
 		Db:              mustMarshalToStruct(a.config.DB),
 		Logger:          mustMarshalToStruct(a.config.Logger),
 		Monitoring:      mustMarshalToStruct(a.config.Monitoring),
-		Authority:       &config.Authority{},
-		Password:        mustPassword(a.config.Password),
+		Authority: &config.Authority{
+			Id:                   a.config.AuthorityConfig.AuthorityID,
+			EnableAdmin:          a.config.AuthorityConfig.EnableAdmin,
+			DisableIssuedAtCheck: a.config.AuthorityConfig.DisableIssuedAtCheck,
+			Backdate:             a.config.AuthorityConfig.Backdate.String(),
+		},
+		Password: mustPassword(a.config.Password),
+		Files:    files,
 	}
 
 	// SSH
 	if v := a.config.SSH; v != nil {
 		c.Ssh = &config.SSH{
-			HostKey:          mustReadFileOrUri(v.HostKey),
-			UserKey:          mustReadFileOrUri(v.UserKey),
+			HostKey:          mustReadFileOrUri(v.HostKey, files),
+			UserKey:          mustReadFileOrUri(v.UserKey, files),
 			AddUserPrincipal: v.AddUserPrincipal,
 			AddUserCommand:   v.AddUserCommand,
 		}
@@ -80,8 +89,6 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 	}
 
 	// Authority
-	c.Authority.Id = a.config.AuthorityConfig.AuthorityID
-
 	// cas options
 	if v := a.config.AuthorityConfig.Options; v != nil {
 		c.Authority.Type = 0
@@ -96,13 +103,12 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 			c.Authority.CertificateIssuer = &config.CertificateIssuer{
 				Type:        config.CertificateIssuer_Type(typ),
 				Provisioner: iss.Provisioner,
-				Certificate: mustReadFileOrUri(iss.Certificate),
-				Key:         mustReadFileOrUri(iss.Key),
+				Certificate: mustReadFileOrUri(iss.Certificate, files),
+				Key:         mustReadFileOrUri(iss.Key, files),
 				Password:    mustPassword(iss.Password),
 			}
 		}
 	}
-
 	// admins
 	for {
 		list, cursor := a.admins.Find("", 100)
@@ -111,7 +117,6 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 			break
 		}
 	}
-
 	// provisioners
 	for {
 		list, cursor := a.provisioners.Find("", 100)
@@ -126,7 +131,21 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 			break
 		}
 	}
+	// global claims
 	c.Authority.Claims = claimsToLinkedca(a.config.AuthorityConfig.Claims)
+	// Distiguised names template
+	if v := a.config.AuthorityConfig.Template; v != nil {
+		c.Authority.Template = &config.DistinguishedName{
+			Country:            v.Country,
+			Organization:       v.Organization,
+			OrganizationalUnit: v.OrganizationalUnit,
+			Locality:           v.Locality,
+			Province:           v.Province,
+			StreetAddress:      v.StreetAddress,
+			SerialNumber:       v.SerialNumber,
+			CommonName:         v.CommonName,
+		}
+	}
 
 	// TLS
 	if v := a.config.TLS; v != nil {
@@ -155,18 +174,14 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 			if !ok {
 				return nil, errors.Errorf("unsupported template type %s", t.Type)
 			}
-			content := t.Content
-			if len(content) == 0 {
-				content = mustReadFileOrUri(t.TemplatePath)
-			}
 			c.Templates.Ssh.Hosts = append(c.Templates.Ssh.Hosts, &config.Template{
 				Type:     config.Template_Type(typ),
 				Name:     t.Name,
-				Template: t.TemplatePath,
+				Template: mustReadFileOrUri(t.TemplatePath, files),
 				Path:     t.Path,
 				Comment:  t.Comment,
 				Requires: t.RequiredData,
-				Content:  content,
+				Content:  t.Content,
 			})
 		}
 		for _, t := range v.SSH.User {
@@ -174,18 +189,14 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 			if !ok {
 				return nil, errors.Errorf("unsupported template type %s", t.Type)
 			}
-			content := t.Content
-			if len(content) == 0 {
-				content = mustReadFileOrUri(t.TemplatePath)
-			}
 			c.Templates.Ssh.Users = append(c.Templates.Ssh.Users, &config.Template{
 				Type:     config.Template_Type(typ),
 				Name:     t.Name,
-				Template: t.TemplatePath,
+				Template: mustReadFileOrUri(t.TemplatePath, files),
 				Path:     t.Path,
 				Comment:  t.Comment,
 				Requires: t.RequiredData,
-				Content:  content,
+				Content:  t.Content,
 			})
 		}
 	}
@@ -212,10 +223,17 @@ func mustMarshalToStruct(v interface{}) *structpb.Struct {
 	return r
 }
 
-func mustReadFileOrUri(fn string) []byte {
+func mustReadFileOrUri(fn string, m map[string][]byte) string {
 	if fn == "" {
-		return nil
+		return ""
 	}
+
+	stepPath := filepath.ToSlash(step.StepPath())
+	if !strings.HasSuffix(stepPath, "/") {
+		stepPath += "/"
+	}
+
+	fn = strings.TrimPrefix(filepath.ToSlash(fn), stepPath)
 
 	ok, err := isFilename(fn)
 	if err != nil {
@@ -226,15 +244,16 @@ func mustReadFileOrUri(fn string) []byte {
 		if err != nil {
 			panic(errors.Wrapf(err, "error reading %s", fn))
 		}
-		return b
+		m[fn] = b
+		return fn
 	}
-	return []byte(fn)
+	return fn
 }
 
-func mustReadFilesOrUris(fns []string) [][]byte {
-	var result [][]byte
+func mustReadFilesOrUris(fns []string, m map[string][]byte) []string {
+	var result []string
 	for _, fn := range fns {
-		result = append(result, mustReadFileOrUri(fn))
+		result = append(result, mustReadFileOrUri(fn, m))
 	}
 	return result
 }

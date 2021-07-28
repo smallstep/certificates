@@ -36,7 +36,6 @@ func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 		if def == nil {
 			return errors.New("default ASN1DN template cannot be nil")
 		}
-
 		if len(crt.Subject.Country) == 0 && def.Country != "" {
 			crt.Subject.Country = append(crt.Subject.Country, def.Country)
 		}
@@ -55,7 +54,12 @@ func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 		if len(crt.Subject.StreetAddress) == 0 && def.StreetAddress != "" {
 			crt.Subject.StreetAddress = append(crt.Subject.StreetAddress, def.StreetAddress)
 		}
-
+		if len(crt.Subject.SerialNumber) == 0 && def.SerialNumber != "" {
+			crt.Subject.SerialNumber = def.SerialNumber
+		}
+		if len(crt.Subject.CommonName) == 0 && def.CommonName != "" {
+			crt.Subject.CommonName = def.CommonName
+		}
 		return nil
 	}
 }
