@@ -63,6 +63,15 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 				Key:       mustMarshalToStruct(k),
 			})
 		}
+		if b := v.Bastion; b != nil {
+			c.Ssh.Bastion = &config.Bastion{
+				Hostname: b.Hostname,
+				User:     b.User,
+				Port:     b.Port,
+				Command:  b.Command,
+				Flags:    b.Flags,
+			}
+		}
 	}
 
 	// KMS
