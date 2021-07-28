@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"unicode"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
@@ -23,6 +25,7 @@ func init() {
 		Action:    exportAction,
 		Description: `**step-ca export** exports the current configuration of step-ca.
 
+Note that neither the PKI password nor
 ## POSITIONAL ARGUMENTS
 
 <config>
@@ -34,6 +37,18 @@ Export the current configuration:
 '''
 $ step-ca export $(step path)/config/ca.json
 '''`,
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name: "password-file",
+				Usage: `path to the <file> containing the password to decrypt the
+intermediate private key.`,
+			},
+			cli.StringFlag{
+				Name: "issuer-password-file",
+				Usage: `path to the <file> containing the password to decrypt the
+	certificate issuer private key used in the RA mode.`,
+			},
+		},
 	})
 }
 
@@ -43,10 +58,32 @@ func exportAction(ctx *cli.Context) error {
 	}
 
 	configFile := ctx.Args().Get(0)
+	passwordFile := ctx.String("password-file")
+	issuerPasswordFile := ctx.String("issuer-password-file")
 
 	config, err := config.LoadConfiguration(configFile)
 	if err != nil {
 		return err
+	}
+	if err := config.Validate(); err != nil {
+		return err
+	}
+
+	if passwordFile != "" {
+		b, err := ioutil.ReadFile(passwordFile)
+		if err != nil {
+			return errors.Wrapf(err, "error reading %s", passwordFile)
+		}
+		config.Password = string(bytes.TrimRightFunc(b, unicode.IsSpace))
+	}
+	if issuerPasswordFile != "" {
+		b, err := ioutil.ReadFile(issuerPasswordFile)
+		if err != nil {
+			return errors.Wrapf(err, "error reading %s", issuerPasswordFile)
+		}
+		if config.AuthorityConfig.CertificateIssuer != nil {
+			config.AuthorityConfig.CertificateIssuer.Password = string(bytes.TrimRightFunc(b, unicode.IsSpace))
+		}
 	}
 
 	auth, err := authority.New(config)
