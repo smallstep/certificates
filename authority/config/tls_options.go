@@ -15,8 +15,9 @@ var (
 	// DefaultTLSRenegotiation default TLS connection renegotiation policy.
 	DefaultTLSRenegotiation = false // Never regnegotiate.
 	// DefaultTLSCipherSuites specifies default step ciphersuite(s).
+	// These are TLS 1.0 - 1.2 cipher suites.
 	DefaultTLSCipherSuites = CipherSuites{
-		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
 		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
 	}
 	// ApprovedTLSCipherSuites smallstep approved ciphersuites.
@@ -26,25 +27,21 @@ var (
 		"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
 		"TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA",
 		"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
-		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
 		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",
 		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256",
 		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
 		"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
 		"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-		"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+		"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256",
 	}
 	// DefaultTLSOptions represents the default TLS version as well as the cipher
 	// suites used in the TLS certificates.
 	DefaultTLSOptions = TLSOptions{
-		CipherSuites: CipherSuites{
-			"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
-			"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-			"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
-		},
-		MinVersion:    1.2,
-		MaxVersion:    1.2,
-		Renegotiation: false,
+		CipherSuites:  DefaultTLSCipherSuites,
+		MinVersion:    DefaultTLSMinVersion,
+		MaxVersion:    DefaultTLSMaxVersion,
+		Renegotiation: DefaultTLSRenegotiation,
 	}
 )
 

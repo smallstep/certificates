@@ -189,9 +189,10 @@ func (c *Config) Validate() error {
 	switch {
 	case c.Address == "":
 		return errors.New("address cannot be empty")
-
 	case len(c.DNSNames) == 0:
 		return errors.New("dnsNames cannot be empty")
+	case c.AuthorityConfig == nil:
+		return errors.New("authority cannot be nil")
 	}
 
 	// Options holds the RA/CAS configuration.
