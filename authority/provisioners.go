@@ -716,6 +716,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			return nil, errors.Wrap(err, "error marshaling key")
 		}
 		return &linkedca.Provisioner{
+			Id:   p.ID,
 			Type: linkedca.Provisioner_JWK,
 			Name: p.GetName(),
 			Details: &linkedca.ProvisionerDetails{
@@ -736,6 +737,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			return nil, err
 		}
 		return &linkedca.Provisioner{
+			Id:   p.ID,
 			Type: linkedca.Provisioner_OIDC,
 			Name: p.GetName(),
 			Details: &linkedca.ProvisionerDetails{
@@ -762,6 +764,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			return nil, err
 		}
 		return &linkedca.Provisioner{
+			Id:   p.ID,
 			Type: linkedca.Provisioner_GCP,
 			Name: p.GetName(),
 			Details: &linkedca.ProvisionerDetails{
@@ -785,6 +788,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			return nil, err
 		}
 		return &linkedca.Provisioner{
+			Id:   p.ID,
 			Type: linkedca.Provisioner_AWS,
 			Name: p.GetName(),
 			Details: &linkedca.ProvisionerDetails{
@@ -807,6 +811,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			return nil, err
 		}
 		return &linkedca.Provisioner{
+			Id:   p.ID,
 			Type: linkedca.Provisioner_AZURE,
 			Name: p.GetName(),
 			Details: &linkedca.ProvisionerDetails{
@@ -830,6 +835,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			return nil, err
 		}
 		return &linkedca.Provisioner{
+			Id:   p.ID,
 			Type: linkedca.Provisioner_ACME,
 			Name: p.GetName(),
 			Details: &linkedca.ProvisionerDetails{
@@ -849,6 +855,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			return nil, err
 		}
 		return &linkedca.Provisioner{
+			Id:   p.ID,
 			Type: linkedca.Provisioner_X5C,
 			Name: p.GetName(),
 			Details: &linkedca.ProvisionerDetails{
@@ -868,6 +875,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			return nil, err
 		}
 		return &linkedca.Provisioner{
+			Id:   p.ID,
 			Type: linkedca.Provisioner_K8SSA,
 			Name: p.GetName(),
 			Details: &linkedca.ProvisionerDetails{
@@ -883,6 +891,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 		}, nil
 	case *provisioner.SSHPOP:
 		return &linkedca.Provisioner{
+			Id:   p.ID,
 			Type: linkedca.Provisioner_SSHPOP,
 			Name: p.GetName(),
 			Details: &linkedca.ProvisionerDetails{
@@ -898,6 +907,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			return nil, err
 		}
 		return &linkedca.Provisioner{
+			Id:   p.ID,
 			Type: linkedca.Provisioner_SCEP,
 			Name: p.GetName(),
 			Details: &linkedca.ProvisionerDetails{
