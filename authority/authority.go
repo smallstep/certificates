@@ -207,6 +207,11 @@ func (a *Authority) init() error {
 
 	var err error
 
+	// Automatically enable admin for all linked cas.
+	if a.linkedCAToken != "" {
+		a.config.AuthorityConfig.EnableAdmin = true
+	}
+
 	// Initialize step-ca Database if it's not already initialized with WithDB.
 	// If a.config.DB is nil then a simple, barebones in memory DB will be used.
 	if a.db == nil {
@@ -440,7 +445,7 @@ func (a *Authority) init() error {
 		// TODO: mimick the x509CAService GetCertificateAuthority here too?
 	}
 
-	if a.config.AuthorityConfig.EnableAdmin || a.linkedCAToken != "" {
+	if a.config.AuthorityConfig.EnableAdmin {
 		// Initialize step-ca Admin Database if it's not already initialized using
 		// WithAdminDB.
 		if a.adminDB == nil {
