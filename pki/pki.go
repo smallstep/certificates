@@ -19,12 +19,16 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/admin"
+	admindb "github.com/smallstep/certificates/authority/admin/db/nosql"
 	authconfig "github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/nosql"
 	"go.step.sm/cli-utils/config"
 	"go.step.sm/cli-utils/errs"
 	"go.step.sm/cli-utils/fileutil"
@@ -32,7 +36,24 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
+	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
+)
+
+// DeploymentType defines witch type of deployment a user is initializing
+type DeploymentType int
+
+const (
+	// StandaloneDeployment is a deployment where all the components like keys,
+	// provisioners, admins, certificates and others are managed by the user.
+	StandaloneDeployment DeploymentType = iota
+	// LinkedDeployment is a deployment where the keys are managed by the user,
+	// but provisioners, admins and the record of certificates are managed in
+	// the cloud.
+	LinkedDeployment
+	// HostedDeployment is a deployment where all the components are managed in
+	// the cloud by smallstep.com/certificate-manager.
+	HostedDeployment
 )
 
 const (
@@ -134,9 +155,88 @@ func GetProvisionerKey(caURL, rootFile, kid string) (string, error) {
 	return resp.Key, nil
 }
 
+type options struct {
+	address        string
+	caURL          string
+	dnsNames       []string
+	provisioner    string
+	enableACME     bool
+	enableSSH      bool
+	enableAdmin    bool
+	noDB           bool
+	deploymentType DeploymentType
+}
+
+// PKIOption is the type of a configuration option on the pki constructor.
+type PKIOption func(o *options)
+
+// WithAddress sets the listen address of step-ca.
+func WithAddress(s string) PKIOption {
+	return func(o *options) {
+		o.address = s
+	}
+}
+
+// WithCaUrl sets the default ca-url of step-ca.
+func WithCaUrl(s string) PKIOption {
+	return func(o *options) {
+		o.caURL = s
+	}
+}
+
+// WithDNSNames sets the SANs of step-ca.
+func WithDNSNames(s []string) PKIOption {
+	return func(o *options) {
+		o.dnsNames = s
+	}
+}
+
+// WithProvisioner defines the name of the default provisioner.
+func WithProvisioner(s string) PKIOption {
+	return func(o *options) {
+		o.provisioner = s
+	}
+}
+
+// WithACME enables acme provisioner in step-ca.
+func WithACME() PKIOption {
+	return func(o *options) {
+		o.enableACME = true
+	}
+}
+
+// WithSSH enables ssh in step-ca.
+func WithSSH() PKIOption {
+	return func(o *options) {
+		o.enableSSH = true
+	}
+}
+
+// WithAdmin enables the admin api in step-ca.
+func WithAdmin() PKIOption {
+	return func(o *options) {
+		o.enableAdmin = true
+	}
+}
+
+// WithNoDB disables the db in step-ca.
+func WithNoDB() PKIOption {
+	return func(o *options) {
+		o.noDB = true
+	}
+}
+
+// WithDeploymentType defines the deployment type of step-ca.
+func WithDeploymentType(dt DeploymentType) PKIOption {
+	return func(o *options) {
+		o.deploymentType = dt
+	}
+}
+
 // PKI represents the Public Key Infrastructure used by a certificate authority.
 type PKI struct {
 	casOptions                     apiv1.Options
+	caService                      apiv1.CertificateAuthorityService
 	caCreator                      apiv1.CertificateAuthorityCreator
 	root, rootKey, rootFingerprint string
 	intermediate, intermediateKey  string
@@ -145,18 +245,23 @@ type PKI struct {
 	config, defaults               string
 	ottPublicKey                   *jose.JSONWebKey
 	ottPrivateKey                  *jose.JSONWebEncryption
-	provisioner                    string
-	address                        string
-	dnsNames                       []string
-	caURL                          string
-	enableSSH                      bool
+	options                        *options
 }
 
 // New creates a new PKI configuration.
-func New(opts apiv1.Options) (*PKI, error) {
-	caCreator, err := cas.NewCreator(context.Background(), opts)
+func New(o apiv1.Options, opts ...PKIOption) (*PKI, error) {
+	caService, err := cas.New(context.Background(), o)
 	if err != nil {
 		return nil, err
+	}
+
+	var caCreator apiv1.CertificateAuthorityCreator
+	if o.IsCreator {
+		creator, ok := caService.(apiv1.CertificateAuthorityCreator)
+		if !ok {
+			return nil, errors.Errorf("cas type '%s' does not implements CertificateAuthorityCreator", o.Type)
+		}
+		caCreator = creator
 	}
 
 	public := GetPublicPath()
@@ -180,12 +285,19 @@ func New(opts apiv1.Options) (*PKI, error) {
 	}
 
 	p := &PKI{
-		casOptions:  opts,
-		caCreator:   caCreator,
-		provisioner: "step-cli",
-		address:     "127.0.0.1:9000",
-		dnsNames:    []string{"127.0.0.1"},
+		casOptions: o,
+		caCreator:  caCreator,
+		caService:  caService,
+		options: &options{
+			provisioner: "step-cli",
+			address:     "127.0.0.1:9000",
+			dnsNames:    []string{"127.0.0.1"},
+		},
 	}
+	for _, fn := range opts {
+		fn(p.options)
+	}
+
 	if p.root, err = getPath(public, "root_ca.crt"); err != nil {
 		return nil, err
 	}
@@ -233,23 +345,31 @@ func (p *PKI) GetRootFingerprint() string {
 }
 
 // SetProvisioner sets the provisioner name of the OTT keys.
+//
+// Deprecated: this method is deprecated in favor of WithProvisioner.
 func (p *PKI) SetProvisioner(s string) {
-	p.provisioner = s
+	p.options.provisioner = s
 }
 
 // SetAddress sets the listening address of the CA.
+//
+// Deprecated: this method is deprecated in favor of WithAddress.
 func (p *PKI) SetAddress(s string) {
-	p.address = s
+	p.options.address = s
 }
 
 // SetDNSNames sets the dns names of the CA.
+//
+// Deprecated: this method is deprecated in favor of WithDNSNames.
 func (p *PKI) SetDNSNames(s []string) {
-	p.dnsNames = s
+	p.options.dnsNames = s
 }
 
 // SetCAURL sets the ca-url to use in the defaults.json.
+//
+// Deprecated: this method is deprecated in favor of WithCaUrl.
 func (p *PKI) SetCAURL(s string) {
-	p.caURL = s
+	p.options.caURL = s
 }
 
 // GenerateKeyPairs generates the key pairs used by the certificate authority.
@@ -379,7 +499,7 @@ func (p *PKI) CreateCertificateAuthorityResponse(cert *x509.Certificate, key cry
 // GetCertificateAuthority attempts to load the certificate authority from the
 // RA.
 func (p *PKI) GetCertificateAuthority() error {
-	srv, ok := p.caCreator.(apiv1.CertificateAuthorityGetter)
+	srv, ok := p.caService.(apiv1.CertificateAuthorityGetter)
 	if !ok {
 		return nil
 	}
@@ -427,7 +547,7 @@ func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 			return err
 		}
 	}
-	p.enableSSH = true
+	p.options.enableSSH = true
 	return nil
 }
 
@@ -440,7 +560,8 @@ func (p *PKI) askFeedback() {
 	ui.Println("      phone home. But your feedback is extremely valuable. Any information you")
 	ui.Println("      can provide regarding how you’re using `step` helps. Please send us a")
 	ui.Println("      sentence or two, good or bad: \033[1mfeedback@smallstep.com\033[0m or join")
-	ui.Println("      \033[1mhttps://github.com/smallstep/certificates/discussions\033[0m.")
+	ui.Println("      \033[1mhttps://github.com/smallstep/certificates/discussions\033[0m and our Discord")
+	ui.Println("      \033[1mhttps://bit.ly/step-discord\033[0m.")
 }
 
 // TellPKI outputs the locations of public and private keys generated
@@ -465,7 +586,7 @@ func (p *PKI) tellPKI() {
 	} else {
 		ui.Printf(`{{ "%s" | red }} {{ "Root certificate:" | bold }} failed to retrieve it from RA`+"\n", ui.IconBad)
 	}
-	if p.enableSSH {
+	if p.options.enableSSH {
 		ui.PrintSelected("SSH user root certificate", p.sshUserPubKey)
 		ui.PrintSelected("SSH user root private key", p.sshUserKey)
 		ui.PrintSelected("SSH host root certificate", p.sshHostPubKey)
@@ -485,6 +606,8 @@ type Option func(c *authconfig.Config) error
 
 // WithDefaultDB is a configuration modifier that adds a default DB stanza to
 // the authority config.
+//
+// Deprecated: this method is deprecated because this is the default behavior.
 func WithDefaultDB() Option {
 	return func(c *authconfig.Config) error {
 		c.DB = &db.Config{
@@ -497,6 +620,8 @@ func WithDefaultDB() Option {
 
 // WithoutDB is a configuration modifier that adds a default DB stanza to
 // the authority config.
+//
+// De[recated: this method is deprecated in favor or WithNoDB.
 func WithoutDB() Option {
 	return func(c *authconfig.Config) error {
 		c.DB = nil
@@ -506,18 +631,6 @@ func WithoutDB() Option {
 
 // GenerateConfig returns the step certificates configuration.
 func (p *PKI) GenerateConfig(opt ...Option) (*authconfig.Config, error) {
-	key, err := p.ottPrivateKey.CompactSerialize()
-	if err != nil {
-		return nil, errors.Wrap(err, "error serializing private key")
-	}
-
-	prov := &provisioner.JWK{
-		Name:         p.provisioner,
-		Type:         "JWK",
-		Key:          p.ottPublicKey,
-		EncryptedKey: key,
-	}
-
 	var authorityOptions *apiv1.Options
 	if !p.casOptions.Is(apiv1.SoftCAS) {
 		authorityOptions = &p.casOptions
@@ -528,8 +641,8 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authconfig.Config, error) {
 		FederatedRoots:   []string{},
 		IntermediateCert: p.intermediate,
 		IntermediateKey:  p.intermediateKey,
-		Address:          p.address,
-		DNSNames:         p.dnsNames,
+		Address:          p.options.address,
+		DNSNames:         p.options.dnsNames,
 		Logger:           []byte(`{"format": "text"}`),
 		DB: &db.Config{
 			Type:       "badger",
@@ -538,41 +651,106 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authconfig.Config, error) {
 		AuthorityConfig: &authconfig.AuthConfig{
 			Options:              authorityOptions,
 			DisableIssuedAtCheck: false,
-			Provisioners:         provisioner.List{prov},
+			EnableAdmin:          false,
 		},
-		TLS: &authconfig.TLSOptions{
-			MinVersion:    authconfig.DefaultTLSMinVersion,
-			MaxVersion:    authconfig.DefaultTLSMaxVersion,
-			Renegotiation: authconfig.DefaultTLSRenegotiation,
-			CipherSuites:  authconfig.DefaultTLSCipherSuites,
-		},
+		TLS:       &authconfig.DefaultTLSOptions,
 		Templates: p.getTemplates(),
 	}
-	if p.enableSSH {
-		enableSSHCA := true
-		config.SSH = &authconfig.SSHConfig{
-			HostKey: p.sshHostKey,
-			UserKey: p.sshUserKey,
+
+	// On standalone deployments add the provisioners to either the ca.json or
+	// the database.
+	var provisioners []provisioner.Interface
+	if p.options.deploymentType == StandaloneDeployment {
+		key, err := p.ottPrivateKey.CompactSerialize()
+		if err != nil {
+			return nil, errors.Wrap(err, "error serializing private key")
 		}
-		// Enable SSH authorization for default JWK provisioner
-		prov.Claims = &provisioner.Claims{
-			EnableSSHCA: &enableSSHCA,
+
+		prov := &provisioner.JWK{
+			Name:         p.options.provisioner,
+			Type:         "JWK",
+			Key:          p.ottPublicKey,
+			EncryptedKey: key,
 		}
-		// Add default SSHPOP provisioner
-		sshpop := &provisioner.SSHPOP{
-			Type: "SSHPOP",
-			Name: "sshpop",
-			Claims: &provisioner.Claims{
+		provisioners = append(provisioners, prov)
+
+		// Add default ACME provisioner if enabled
+		if p.options.enableACME {
+			provisioners = append(provisioners, &provisioner.ACME{
+				Type: "ACME",
+				Name: "acme",
+			})
+		}
+
+		if p.options.enableSSH {
+			enableSSHCA := true
+			config.SSH = &authconfig.SSHConfig{
+				HostKey: p.sshHostKey,
+				UserKey: p.sshUserKey,
+			}
+			// Enable SSH authorization for default JWK provisioner
+			prov.Claims = &provisioner.Claims{
 				EnableSSHCA: &enableSSHCA,
-			},
+			}
+
+			// Add default SSHPOP provisioner
+			provisioners = append(provisioners, &provisioner.SSHPOP{
+				Type: "SSHPOP",
+				Name: "sshpop",
+				Claims: &provisioner.Claims{
+					EnableSSHCA: &enableSSHCA,
+				},
+			})
 		}
-		config.AuthorityConfig.Provisioners = append(config.AuthorityConfig.Provisioners, sshpop)
 	}
 
 	// Apply configuration modifiers
 	for _, o := range opt {
-		if err = o(config); err != nil {
+		if err := o(config); err != nil {
 			return nil, err
+		}
+	}
+
+	// Set authority.enableAdmin to true
+	if p.options.enableAdmin {
+		config.AuthorityConfig.EnableAdmin = true
+	}
+
+	if p.options.deploymentType == StandaloneDeployment {
+		if !config.AuthorityConfig.EnableAdmin {
+			config.AuthorityConfig.Provisioners = provisioners
+		} else {
+			db, err := db.New(config.DB)
+			if err != nil {
+				return nil, err
+			}
+			adminDB, err := admindb.New(db.(nosql.DB), admin.DefaultAuthorityID)
+			if err != nil {
+				return nil, err
+			}
+			// Add all the provisioners to the db.
+			var adminID string
+			for i, p := range provisioners {
+				prov, err := authority.ProvisionerToLinkedca(p)
+				if err != nil {
+					return nil, err
+				}
+				if err := adminDB.CreateProvisioner(context.Background(), prov); err != nil {
+					return nil, err
+				}
+				if i == 0 {
+					adminID = prov.Id
+				}
+			}
+			// Add the first provisioner as an admin.
+			if err := adminDB.CreateAdmin(context.Background(), &linkedca.Admin{
+				AuthorityId:   admin.DefaultAuthorityID,
+				Subject:       "step",
+				Type:          linkedca.Admin_SUPER_ADMIN,
+				ProvisionerId: adminID,
+			}); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -599,17 +777,16 @@ func (p *PKI) Save(opt ...Option) error {
 	}
 
 	// Generate the CA URL.
-	if p.caURL == "" {
-		p.caURL = p.dnsNames[0]
-		var port string
-		_, port, err = net.SplitHostPort(p.address)
+	if p.options.caURL == "" {
+		p.options.caURL = p.options.dnsNames[0]
+		_, port, err := net.SplitHostPort(p.options.address)
 		if err != nil {
-			return errors.Wrapf(err, "error parsing %s", p.address)
+			return errors.Wrapf(err, "error parsing %s", p.options.address)
 		}
 		if port == "443" {
-			p.caURL = fmt.Sprintf("https://%s", p.caURL)
+			p.options.caURL = fmt.Sprintf("https://%s", p.options.caURL)
 		} else {
-			p.caURL = fmt.Sprintf("https://%s:%s", p.caURL, port)
+			p.options.caURL = fmt.Sprintf("https://%s:%s", p.options.caURL, port)
 		}
 	}
 
@@ -617,7 +794,7 @@ func (p *PKI) Save(opt ...Option) error {
 	defaults := &caDefaults{
 		Root:        p.root,
 		CAConfig:    p.config,
-		CAUrl:       p.caURL,
+		CAUrl:       p.options.caURL,
 		Fingerprint: p.rootFingerprint,
 	}
 	b, err = json.MarshalIndent(defaults, "", "\t")
