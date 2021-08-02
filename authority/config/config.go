@@ -85,7 +85,7 @@ type ASN1DN struct {
 type AuthConfig struct {
 	*cas.Options
 	AuthorityID          string                `json:"authorityId,omitempty"`
-	Provisioners         provisioner.List      `json:"provisioners"`
+	Provisioners         provisioner.List      `json:"provisioners,omitempty"`
 	Admins               []*linkedca.Admin     `json:"-"`
 	Template             *ASN1DN               `json:"template,omitempty"`
 	Claims               *provisioner.Claims   `json:"claims,omitempty"`
