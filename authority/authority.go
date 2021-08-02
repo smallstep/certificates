@@ -440,7 +440,7 @@ func (a *Authority) init() error {
 		// TODO: mimick the x509CAService GetCertificateAuthority here too?
 	}
 
-	if a.config.AuthorityConfig.EnableAdmin {
+	if a.config.AuthorityConfig.EnableAdmin || a.linkedCAToken != "" {
 		// Initialize step-ca Admin Database if it's not already initialized using
 		// WithAdminDB.
 		if a.adminDB == nil {
