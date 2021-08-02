@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/tlsutil"
@@ -141,18 +140,13 @@ func (c *linkedCaClient) CreateProvisioner(ctx context.Context, prov *linkedca.P
 }
 
 func (c *linkedCaClient) GetProvisioner(ctx context.Context, id string) (*linkedca.Provisioner, error) {
-	resp, err := c.client.GetConfiguration(ctx, &linkedca.ConfigurationRequest{
-		AuthorityId: c.authorityID,
+	resp, err := c.client.GetProvisioner(ctx, &linkedca.GetProvisionerRequest{
+		Id: id,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting provisioners")
 	}
-	for _, p := range resp.Provisioners {
-		if p.Id == id {
-			return p, nil
-		}
-	}
-	return nil, errs.NotFound("provisioner not found")
+	return resp, nil
 }
 
 func (c *linkedCaClient) GetProvisioners(ctx context.Context) ([]*linkedca.Provisioner, error) {
@@ -199,18 +193,13 @@ func (c *linkedCaClient) CreateAdmin(ctx context.Context, adm *linkedca.Admin) e
 }
 
 func (c *linkedCaClient) GetAdmin(ctx context.Context, id string) (*linkedca.Admin, error) {
-	resp, err := c.client.GetConfiguration(ctx, &linkedca.ConfigurationRequest{
-		AuthorityId: c.authorityID,
+	resp, err := c.client.GetAdmin(ctx, &linkedca.GetAdminRequest{
+		Id: id,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting admins")
 	}
-	for _, a := range resp.Admins {
-		if a.Id == id {
-			return a, nil
-		}
-	}
-	return nil, errs.NotFound("admin not found")
+	return resp, nil
 }
 
 func (c *linkedCaClient) GetAdmins(ctx context.Context) ([]*linkedca.Admin, error) {
