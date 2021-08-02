@@ -39,8 +39,9 @@ certificate issuer private key used in the RA mode.`,
 			Usage: "address of a DNS resolver to be used instead of the default.",
 		},
 		cli.StringFlag{
-			Name:  "token",
-			Usage: "token used to enable the linked ca.",
+			Name:   "token",
+			Usage:  "token used to enable the linked ca.",
+			EnvVar: "STEP_CA_TOKEN",
 		},
 	},
 }
