@@ -156,10 +156,8 @@ func GetProvisionerKey(caURL, rootFile, kid string) (string, error) {
 }
 
 type options struct {
-	// address        string
-	// caURL          string
-	// dnsNames       []string
 	provisioner    string
+	pkiOnly        bool
 	enableACME     bool
 	enableSSH      bool
 	enableAdmin    bool
@@ -196,6 +194,13 @@ func WithDNSNames(s []string) PKIOption {
 func WithProvisioner(s string) PKIOption {
 	return func(p *PKI) {
 		p.options.provisioner = s
+	}
+}
+
+// WithPKIOnly will only generate the PKI without the step-ca config files.
+func WithPKIOnly() PKIOption {
+	return func(p *PKI) {
+		p.options.pkiOnly = true
 	}
 }
 
@@ -244,17 +249,12 @@ func WithDeploymentType(dt DeploymentType) PKIOption {
 // PKI represents the Public Key Infrastructure used by a certificate authority.
 type PKI struct {
 	linkedca.Configuration
-	Defaults   linkedca.Defaults
-	casOptions apiv1.Options
-	caService  apiv1.CertificateAuthorityService
-	caCreator  apiv1.CertificateAuthorityCreator
-	// root, rootKey, rootFingerprint string
-	// intermediate, intermediateKey  string
-	// sshHostPubKey, sshHostKey      string
-	// sshUserPubKey, sshUserKey      string
-	config   string
-	defaults string
-	// rootFingerprint     string
+	Defaults      linkedca.Defaults
+	casOptions    apiv1.Options
+	caService     apiv1.CertificateAuthorityService
+	caCreator     apiv1.CertificateAuthorityCreator
+	config        string
+	defaults      string
 	ottPublicKey  *jose.JSONWebKey
 	ottPrivateKey *jose.JSONWebEncryption
 	options       *options
@@ -386,34 +386,6 @@ func (p *PKI) GetRootFingerprint() string {
 	return p.Defaults.Fingerprint
 }
 
-// SetProvisioner sets the provisioner name of the OTT keys.
-//
-// Deprecated: this method is deprecated in favor of WithProvisioner.
-func (p *PKI) SetProvisioner(s string) {
-	p.options.provisioner = s
-}
-
-// SetAddress sets the listening address of the CA.
-//
-// Deprecated: this method is deprecated in favor of WithAddress.
-func (p *PKI) SetAddress(s string) {
-	p.Address = s
-}
-
-// SetDNSNames sets the dns names of the CA.
-//
-// Deprecated: this method is deprecated in favor of WithDNSNames.
-func (p *PKI) SetDNSNames(s []string) {
-	p.DnsNames = s
-}
-
-// SetCAURL sets the ca-url to use in the defaults.json.
-//
-// Deprecated: this method is deprecated in favor of WithCaUrl.
-func (p *PKI) SetCAURL(s string) {
-	p.Defaults.CaUrl = s
-}
-
 // GenerateKeyPairs generates the key pairs used by the certificate authority.
 func (p *PKI) GenerateKeyPairs(pass []byte) error {
 	var err error
@@ -450,20 +422,27 @@ func (p *PKI) GenerateRootCertificate(name, org, resource string, pass []byte) (
 		return nil, err
 	}
 
-	sum := sha256.Sum256(resp.Certificate.Raw)
-	p.Defaults.Fingerprint = strings.ToLower(hex.EncodeToString(sum[:]))
-	p.Files[p.Root[0]] = encodeCertificate(resp.Certificate)
-	p.Files[p.RootKey[0]], err = encodePrivateKey(resp.PrivateKey, pass)
-	if err != nil {
+	// PrivateKey will only be set if we have access to it (SoftCAS).
+	if err := p.WriteRootCertificate(resp.Certificate, resp.PrivateKey, pass); err != nil {
 		return nil, err
 	}
 
-	// PrivateKey will only be set if we have access to it (SoftCAS).
-	// if err := p.WriteRootCertificate(resp.Certificate, resp.PrivateKey, pass); err != nil {
-	// 	return nil, err
-	// }
-
 	return resp, nil
+}
+
+// WriteRootCertificate writes to the buffer the given certificate and key if given.
+func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{}, pass []byte) error {
+	p.Files[p.Root[0]] = encodeCertificate(rootCrt)
+	if rootKey != nil {
+		var err error
+		p.Files[p.RootKey[0]], err = encodePrivateKey(rootKey, pass)
+		if err != nil {
+			return err
+		}
+	}
+	sum := sha256.Sum256(rootCrt.Raw)
+	p.Defaults.Fingerprint = strings.ToLower(hex.EncodeToString(sum[:]))
+	return nil
 }
 
 // GenerateIntermediateCertificate generates an intermediate certificate with
@@ -494,60 +473,7 @@ func (p *PKI) GenerateIntermediateCertificate(name, org, resource string, parent
 	p.casOptions.CertificateAuthority = resp.Name
 	p.Files[p.Intermediate] = encodeCertificate(resp.Certificate)
 	p.Files[p.IntermediateKey], err = encodePrivateKey(resp.PrivateKey, pass)
-	if err != nil {
-		return err
-	}
-
-	return nil
-	// return p.WriteIntermediateCertificate(resp.Certificate, resp.PrivateKey, pass)
-}
-
-// WriteRootCertificate writes to disk the given certificate and key.
-func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{}, pass []byte) error {
-	fmt.Println(p.options.isHelm)
-	if p.options.isHelm {
-		return nil
-	}
-
-	if err := fileutil.WriteFile(p.Root[0], pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: rootCrt.Raw,
-	}), 0600); err != nil {
-		return err
-	}
-
-	if rootKey != nil {
-		_, err := pemutil.Serialize(rootKey, pemutil.WithPassword(pass), pemutil.ToFile(p.RootKey[0], 0600))
-		if err != nil {
-			return err
-		}
-	}
-
-	sum := sha256.Sum256(rootCrt.Raw)
-	p.Defaults.Fingerprint = strings.ToLower(hex.EncodeToString(sum[:]))
-
-	return nil
-}
-
-// WriteIntermediateCertificate writes to disk the given certificate and key.
-func (p *PKI) WriteIntermediateCertificate(crt *x509.Certificate, key interface{}, pass []byte) error {
-	if p.options.isHelm {
-		return nil
-	}
-
-	if err := fileutil.WriteFile(p.Intermediate, pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: crt.Raw,
-	}), 0600); err != nil {
-		return err
-	}
-	if key != nil {
-		_, err := pemutil.Serialize(key, pemutil.WithPassword(pass), pemutil.ToFile(p.IntermediateKey, 0600))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return err
 }
 
 // CreateCertificateAuthorityResponse returns a
@@ -610,16 +536,18 @@ func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 		if err != nil {
 			return err
 		}
-
-		// _, err = pemutil.Serialize(priv, pemutil.WithFilename(privNames[i]), pemutil.WithPassword(password))
-		// if err != nil {
-		// 	return err
-		// }
-		// if err = fileutil.WriteFile(pubNames[i], ssh.MarshalAuthorizedKey(sshKey), 0600); err != nil {
-		// 	return err
-		// }
 	}
 	p.options.enableSSH = true
+	return nil
+}
+
+// WriteFiles writes on disk the previously generated files.
+func (p *PKI) WriteFiles() error {
+	for fn, b := range p.Files {
+		if err := fileutil.WriteFile(fn, b, 0600); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -634,14 +562,6 @@ func (p *PKI) askFeedback() {
 	ui.Println("      sentence or two, good or bad: \033[1mfeedback@smallstep.com\033[0m or join")
 	ui.Println("      \033[1mhttps://github.com/smallstep/certificates/discussions\033[0m and our Discord")
 	ui.Println("      \033[1mhttps://bit.ly/step-discord\033[0m.")
-}
-
-// TellPKI outputs the locations of public and private keys generated
-// generated for a new PKI. Generally this will consist of a root certificate
-// and key and an intermediate certificate and key.
-func (p *PKI) TellPKI() {
-	p.tellPKI()
-	p.askFeedback()
 }
 
 func (p *PKI) tellPKI() {
@@ -832,67 +752,67 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authconfig.Config, error) {
 // Save stores the pki on a json file that will be used as the certificate
 // authority configuration.
 func (p *PKI) Save(opt ...Option) error {
-	// Write pre-generated files.
-	for fn, b := range p.Files {
-		if err := fileutil.WriteFile(fn, b, 0600); err != nil {
-			return err
-		}
+	// Write generated files
+	if err := p.WriteFiles(); err != nil {
+		return err
 	}
 
+	// Display only the
 	p.tellPKI()
 
 	// Generate and write ca.json
-	config, err := p.GenerateConfig(opt...)
-	if err != nil {
-		return err
-	}
+	if !p.options.pkiOnly {
+		config, err := p.GenerateConfig(opt...)
+		if err != nil {
+			return err
+		}
 
-	b, err := json.MarshalIndent(config, "", "\t")
-	if err != nil {
-		return errors.Wrapf(err, "error marshaling %s", p.config)
-	}
-	if err = fileutil.WriteFile(p.config, b, 0644); err != nil {
-		return errs.FileError(err, p.config)
-	}
+		b, err := json.MarshalIndent(config, "", "\t")
+		if err != nil {
+			return errors.Wrapf(err, "error marshaling %s", p.config)
+		}
+		if err = fileutil.WriteFile(p.config, b, 0644); err != nil {
+			return errs.FileError(err, p.config)
+		}
 
-	// Generate and write defaults.json
-	defaults := &caDefaults{
-		Root:        p.Defaults.Root,
-		CAConfig:    p.Defaults.CaConfig,
-		CAUrl:       p.Defaults.CaUrl,
-		Fingerprint: p.Defaults.Fingerprint,
-	}
-	b, err = json.MarshalIndent(defaults, "", "\t")
-	if err != nil {
-		return errors.Wrapf(err, "error marshaling %s", p.defaults)
-	}
-	if err = fileutil.WriteFile(p.defaults, b, 0644); err != nil {
-		return errs.FileError(err, p.defaults)
-	}
+		// Generate and write defaults.json
+		defaults := &caDefaults{
+			Root:        p.Defaults.Root,
+			CAConfig:    p.Defaults.CaConfig,
+			CAUrl:       p.Defaults.CaUrl,
+			Fingerprint: p.Defaults.Fingerprint,
+		}
+		b, err = json.MarshalIndent(defaults, "", "\t")
+		if err != nil {
+			return errors.Wrapf(err, "error marshaling %s", p.defaults)
+		}
+		if err = fileutil.WriteFile(p.defaults, b, 0644); err != nil {
+			return errs.FileError(err, p.defaults)
+		}
 
-	// Generate and write templates
-	if err := generateTemplates(config.Templates); err != nil {
-		return err
-	}
+		// Generate and write templates
+		if err := generateTemplates(config.Templates); err != nil {
+			return err
+		}
 
-	if config.DB != nil {
-		ui.PrintSelected("Database folder", config.DB.DataSource)
-	}
-	if config.Templates != nil {
-		ui.PrintSelected("Templates folder", GetTemplatesPath())
-	}
+		if config.DB != nil {
+			ui.PrintSelected("Database folder", config.DB.DataSource)
+		}
+		if config.Templates != nil {
+			ui.PrintSelected("Templates folder", GetTemplatesPath())
+		}
 
-	ui.PrintSelected("Default configuration", p.defaults)
-	ui.PrintSelected("Certificate Authority configuration", p.config)
-	ui.Println()
-	if p.casOptions.Is(apiv1.SoftCAS) {
-		ui.Println("Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.")
-	} else {
-		ui.Println("Your registration authority is ready to go. To generate certificates for individual services see 'step help ca'.")
+		ui.PrintSelected("Default configuration", p.defaults)
+		ui.PrintSelected("Certificate Authority configuration", p.config)
+		ui.Println()
+		if p.casOptions.Is(apiv1.SoftCAS) {
+			ui.Println("Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.")
+		} else {
+			ui.Println("Your registration authority is ready to go. To generate certificates for individual services see 'step help ca'.")
+		}
 	}
 
 	p.askFeedback()
-
 	return nil
 }
 
