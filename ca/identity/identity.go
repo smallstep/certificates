@@ -16,7 +16,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
-	"go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/step"
 	"go.step.sm/crypto/pemutil"
 )
 
@@ -40,10 +40,10 @@ const TunnelTLS Type = "tTLS"
 const DefaultLeeway = 1 * time.Minute
 
 // IdentityFile contains the location of the identity file.
-var IdentityFile = filepath.Join(config.StepPath(), "config", "identity.json")
+var IdentityFile = filepath.Join(step.Path(), "config", "identity.json")
 
 // DefaultsFile contains the location of the defaults file.
-var DefaultsFile = filepath.Join(config.StepPath(), "config", "defaults.json")
+var DefaultsFile = filepath.Join(step.Path(), "config", "defaults.json")
 
 // Identity represents the identity file that can be used to authenticate with
 // the CA.
@@ -80,8 +80,8 @@ func LoadDefaultIdentity() (*Identity, error) {
 // configDir and identityDir are used in WriteDefaultIdentity for testing
 // purposes.
 var (
-	configDir   = filepath.Join(config.StepPath(), "config")
-	identityDir = filepath.Join(config.StepPath(), "identity")
+	configDir   = filepath.Join(step.Path(), "config")
+	identityDir = filepath.Join(step.Path(), "identity")
 )
 
 // WriteDefaultIdentity writes the given certificates and key and the

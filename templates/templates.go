@@ -10,8 +10,8 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/pkg/errors"
-	"go.step.sm/cli-utils/config"
 	"go.step.sm/cli-utils/fileutil"
+	"go.step.sm/cli-utils/step"
 )
 
 // TemplateType defines how a template will be written in disk.
@@ -132,7 +132,7 @@ func (t *Template) Validate() error {
 
 	if t.TemplatePath != "" {
 		// Check for file
-		st, err := os.Stat(config.StepAbs(t.TemplatePath))
+		st, err := os.Stat(step.Abs(t.TemplatePath))
 		if err != nil {
 			return errors.Wrapf(err, "error reading %s", t.TemplatePath)
 		}
@@ -166,7 +166,7 @@ func (t *Template) Load() error {
 	if t.Template == nil && t.Type != Directory {
 		switch {
 		case t.TemplatePath != "":
-			filename := config.StepAbs(t.TemplatePath)
+			filename := step.Abs(t.TemplatePath)
 			b, err := ioutil.ReadFile(filename)
 			if err != nil {
 				return errors.Wrapf(err, "error reading %s", filename)
@@ -247,7 +247,7 @@ type Output struct {
 
 // Write writes the Output to the filesystem as a directory, file or snippet.
 func (o *Output) Write() error {
-	path := config.StepAbs(o.Path)
+	path := step.Abs(o.Path)
 	if o.Type == Directory {
 		return mkdir(path, 0700)
 	}
