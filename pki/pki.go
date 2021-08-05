@@ -832,6 +832,13 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authconfig.Config, error) {
 // Save stores the pki on a json file that will be used as the certificate
 // authority configuration.
 func (p *PKI) Save(opt ...Option) error {
+	// Write pre-generated files.
+	for fn, b := range p.Files {
+		if err := fileutil.WriteFile(fn, b, 0600); err != nil {
+			return err
+		}
+	}
+
 	p.tellPKI()
 
 	// Generate and write ca.json
