@@ -156,96 +156,108 @@ func GetProvisionerKey(caURL, rootFile, kid string) (string, error) {
 }
 
 type options struct {
-	address        string
-	caURL          string
-	dnsNames       []string
+	// address        string
+	// caURL          string
+	// dnsNames       []string
 	provisioner    string
 	enableACME     bool
 	enableSSH      bool
 	enableAdmin    bool
 	noDB           bool
+	isHelm         bool
 	deploymentType DeploymentType
 }
 
 // PKIOption is the type of a configuration option on the pki constructor.
-type PKIOption func(o *options)
+type PKIOption func(p *PKI)
 
 // WithAddress sets the listen address of step-ca.
 func WithAddress(s string) PKIOption {
-	return func(o *options) {
-		o.address = s
+	return func(p *PKI) {
+		p.Address = s
 	}
 }
 
 // WithCaUrl sets the default ca-url of step-ca.
 func WithCaUrl(s string) PKIOption {
-	return func(o *options) {
-		o.caURL = s
+	return func(p *PKI) {
+		p.Defaults.CaUrl = s
 	}
 }
 
 // WithDNSNames sets the SANs of step-ca.
 func WithDNSNames(s []string) PKIOption {
-	return func(o *options) {
-		o.dnsNames = s
+	return func(p *PKI) {
+		p.DnsNames = s
 	}
 }
 
 // WithProvisioner defines the name of the default provisioner.
 func WithProvisioner(s string) PKIOption {
-	return func(o *options) {
-		o.provisioner = s
+	return func(p *PKI) {
+		p.options.provisioner = s
 	}
 }
 
 // WithACME enables acme provisioner in step-ca.
 func WithACME() PKIOption {
-	return func(o *options) {
-		o.enableACME = true
+	return func(p *PKI) {
+		p.options.enableACME = true
 	}
 }
 
 // WithSSH enables ssh in step-ca.
 func WithSSH() PKIOption {
-	return func(o *options) {
-		o.enableSSH = true
+	return func(p *PKI) {
+		p.options.enableSSH = true
 	}
 }
 
 // WithAdmin enables the admin api in step-ca.
 func WithAdmin() PKIOption {
-	return func(o *options) {
-		o.enableAdmin = true
+	return func(p *PKI) {
+		p.options.enableAdmin = true
 	}
 }
 
 // WithNoDB disables the db in step-ca.
 func WithNoDB() PKIOption {
-	return func(o *options) {
-		o.noDB = true
+	return func(p *PKI) {
+		p.options.noDB = true
+	}
+}
+
+// WithHelm configures the pki to create a helm values.yaml.
+func WithHelm() PKIOption {
+	return func(p *PKI) {
+		p.options.isHelm = true
 	}
 }
 
 // WithDeploymentType defines the deployment type of step-ca.
 func WithDeploymentType(dt DeploymentType) PKIOption {
-	return func(o *options) {
-		o.deploymentType = dt
+	return func(p *PKI) {
+		p.options.deploymentType = dt
 	}
 }
 
 // PKI represents the Public Key Infrastructure used by a certificate authority.
 type PKI struct {
-	casOptions                     apiv1.Options
-	caService                      apiv1.CertificateAuthorityService
-	caCreator                      apiv1.CertificateAuthorityCreator
-	root, rootKey, rootFingerprint string
-	intermediate, intermediateKey  string
-	sshHostPubKey, sshHostKey      string
-	sshUserPubKey, sshUserKey      string
-	config, defaults               string
-	ottPublicKey                   *jose.JSONWebKey
-	ottPrivateKey                  *jose.JSONWebEncryption
-	options                        *options
+	linkedca.Configuration
+	Defaults   linkedca.Defaults
+	casOptions apiv1.Options
+	caService  apiv1.CertificateAuthorityService
+	caCreator  apiv1.CertificateAuthorityCreator
+	// root, rootKey, rootFingerprint string
+	// intermediate, intermediateKey  string
+	// sshHostPubKey, sshHostKey      string
+	// sshUserPubKey, sshUserKey      string
+	config   string
+	defaults string
+	// rootFingerprint     string
+	ottPublicKey  *jose.JSONWebKey
+	ottPrivateKey *jose.JSONWebEncryption
+	options       *options
 }
 
 // New creates a new PKI configuration.
@@ -264,20 +276,6 @@ func New(o apiv1.Options, opts ...PKIOption) (*PKI, error) {
 		caCreator = creator
 	}
 
-	public := GetPublicPath()
-	private := GetSecretsPath()
-	config := GetConfigPath()
-
-	// Create directories
-	dirs := []string{public, private, config, GetTemplatesPath()}
-	for _, name := range dirs {
-		if _, err := os.Stat(name); os.IsNotExist(err) {
-			if err = os.MkdirAll(name, 0700); err != nil {
-				return nil, errs.FileError(err, name)
-			}
-		}
-	}
-
 	// get absolute path for dir/name
 	getPath := func(dir string, name string) (string, error) {
 		s, err := filepath.Abs(filepath.Join(dir, name))
@@ -285,51 +283,95 @@ func New(o apiv1.Options, opts ...PKIOption) (*PKI, error) {
 	}
 
 	p := &PKI{
+		Configuration: linkedca.Configuration{
+			Address:  "127.0.0.1:9000",
+			DnsNames: []string{"127.0.0.1"},
+			Ssh:      &linkedca.SSH{},
+			Files:    make(map[string][]byte),
+		},
 		casOptions: o,
 		caCreator:  caCreator,
 		caService:  caService,
 		options: &options{
 			provisioner: "step-cli",
-			address:     "127.0.0.1:9000",
-			dnsNames:    []string{"127.0.0.1"},
 		},
 	}
 	for _, fn := range opts {
-		fn(p.options)
+		fn(p)
 	}
 
-	if p.root, err = getPath(public, "root_ca.crt"); err != nil {
-		return nil, err
-	}
-	if p.rootKey, err = getPath(private, "root_ca_key"); err != nil {
-		return nil, err
-	}
-	if p.intermediate, err = getPath(public, "intermediate_ca.crt"); err != nil {
-		return nil, err
-	}
-	if p.intermediateKey, err = getPath(private, "intermediate_ca_key"); err != nil {
-		return nil, err
-	}
-	if p.sshHostPubKey, err = getPath(public, "ssh_host_ca_key.pub"); err != nil {
-		return nil, err
-	}
-	if p.sshUserPubKey, err = getPath(public, "ssh_user_ca_key.pub"); err != nil {
-		return nil, err
-	}
-	if p.sshHostKey, err = getPath(private, "ssh_host_ca_key"); err != nil {
-		return nil, err
-	}
-	if p.sshUserKey, err = getPath(private, "ssh_user_ca_key"); err != nil {
-		return nil, err
-	}
-	if len(config) > 0 {
-		if p.config, err = getPath(config, "ca.json"); err != nil {
-			return nil, err
-		}
-		if p.defaults, err = getPath(config, "defaults.json"); err != nil {
-			return nil, err
+	// Use /home/step as the step path in helm configurations.
+	// Use the current step path when creating pki in files.
+	var public, private, config string
+	if p.options.isHelm {
+		public = "/home/step/certs"
+		private = "/home/step/secrets"
+		config = "/home/step/config"
+	} else {
+		public = GetPublicPath()
+		private = GetSecretsPath()
+		config = GetConfigPath()
+		// Create directories
+		dirs := []string{public, private, config, GetTemplatesPath()}
+		for _, name := range dirs {
+			if _, err := os.Stat(name); os.IsNotExist(err) {
+				if err = os.MkdirAll(name, 0700); err != nil {
+					return nil, errs.FileError(err, name)
+				}
+			}
 		}
 	}
+
+	if p.Defaults.CaUrl == "" {
+		p.Defaults.CaUrl = p.DnsNames[0]
+		_, port, err := net.SplitHostPort(p.Address)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error parsing %s", p.Address)
+		}
+		if port == "443" {
+			p.Defaults.CaUrl = fmt.Sprintf("https://%s", p.Defaults.CaUrl)
+		} else {
+			p.Defaults.CaUrl = fmt.Sprintf("https://%s:%s", p.Defaults.CaUrl, port)
+		}
+	}
+
+	root, err := getPath(public, "root_ca.crt")
+	if err != nil {
+		return nil, err
+	}
+	rootKey, err := getPath(private, "root_ca_key")
+	if err != nil {
+		return nil, err
+	}
+	p.Root = []string{root}
+	p.RootKey = []string{rootKey}
+	p.Defaults.Root = root
+
+	if p.Intermediate, err = getPath(public, "intermediate_ca.crt"); err != nil {
+		return nil, err
+	}
+	if p.IntermediateKey, err = getPath(private, "intermediate_ca_key"); err != nil {
+		return nil, err
+	}
+	if p.Ssh.HostPublicKey, err = getPath(public, "ssh_host_ca_key.pub"); err != nil {
+		return nil, err
+	}
+	if p.Ssh.UserPublicKey, err = getPath(public, "ssh_user_ca_key.pub"); err != nil {
+		return nil, err
+	}
+	if p.Ssh.HostKey, err = getPath(private, "ssh_host_ca_key"); err != nil {
+		return nil, err
+	}
+	if p.Ssh.UserKey, err = getPath(private, "ssh_user_ca_key"); err != nil {
+		return nil, err
+	}
+	if p.defaults, err = getPath(config, "defaults.json"); err != nil {
+		return nil, err
+	}
+	if p.config, err = getPath(config, "ca.json"); err != nil {
+		return nil, err
+	}
+	p.Defaults.CaConfig = p.config
 
 	return p, nil
 }
@@ -341,7 +383,7 @@ func (p *PKI) GetCAConfigPath() string {
 
 // GetRootFingerprint returns the root fingerprint.
 func (p *PKI) GetRootFingerprint() string {
-	return p.rootFingerprint
+	return p.Defaults.Fingerprint
 }
 
 // SetProvisioner sets the provisioner name of the OTT keys.
@@ -355,21 +397,21 @@ func (p *PKI) SetProvisioner(s string) {
 //
 // Deprecated: this method is deprecated in favor of WithAddress.
 func (p *PKI) SetAddress(s string) {
-	p.options.address = s
+	p.Address = s
 }
 
 // SetDNSNames sets the dns names of the CA.
 //
 // Deprecated: this method is deprecated in favor of WithDNSNames.
 func (p *PKI) SetDNSNames(s []string) {
-	p.options.dnsNames = s
+	p.DnsNames = s
 }
 
 // SetCAURL sets the ca-url to use in the defaults.json.
 //
 // Deprecated: this method is deprecated in favor of WithCaUrl.
 func (p *PKI) SetCAURL(s string) {
-	p.options.caURL = s
+	p.Defaults.CaUrl = s
 }
 
 // GenerateKeyPairs generates the key pairs used by the certificate authority.
@@ -408,10 +450,18 @@ func (p *PKI) GenerateRootCertificate(name, org, resource string, pass []byte) (
 		return nil, err
 	}
 
-	// PrivateKey will only be set if we have access to it (SoftCAS).
-	if err := p.WriteRootCertificate(resp.Certificate, resp.PrivateKey, pass); err != nil {
+	sum := sha256.Sum256(resp.Certificate.Raw)
+	p.Defaults.Fingerprint = strings.ToLower(hex.EncodeToString(sum[:]))
+	p.Files[p.Root[0]] = encodeCertificate(resp.Certificate)
+	p.Files[p.RootKey[0]], err = encodePrivateKey(resp.PrivateKey, pass)
+	if err != nil {
 		return nil, err
 	}
+
+	// PrivateKey will only be set if we have access to it (SoftCAS).
+	// if err := p.WriteRootCertificate(resp.Certificate, resp.PrivateKey, pass); err != nil {
+	// 	return nil, err
+	// }
 
 	return resp, nil
 }
@@ -442,12 +492,24 @@ func (p *PKI) GenerateIntermediateCertificate(name, org, resource string, parent
 	}
 
 	p.casOptions.CertificateAuthority = resp.Name
-	return p.WriteIntermediateCertificate(resp.Certificate, resp.PrivateKey, pass)
+	p.Files[p.Intermediate] = encodeCertificate(resp.Certificate)
+	p.Files[p.IntermediateKey], err = encodePrivateKey(resp.PrivateKey, pass)
+	if err != nil {
+		return err
+	}
+
+	return nil
+	// return p.WriteIntermediateCertificate(resp.Certificate, resp.PrivateKey, pass)
 }
 
 // WriteRootCertificate writes to disk the given certificate and key.
 func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{}, pass []byte) error {
-	if err := fileutil.WriteFile(p.root, pem.EncodeToMemory(&pem.Block{
+	fmt.Println(p.options.isHelm)
+	if p.options.isHelm {
+		return nil
+	}
+
+	if err := fileutil.WriteFile(p.Root[0], pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: rootCrt.Raw,
 	}), 0600); err != nil {
@@ -455,28 +517,32 @@ func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{
 	}
 
 	if rootKey != nil {
-		_, err := pemutil.Serialize(rootKey, pemutil.WithPassword(pass), pemutil.ToFile(p.rootKey, 0600))
+		_, err := pemutil.Serialize(rootKey, pemutil.WithPassword(pass), pemutil.ToFile(p.RootKey[0], 0600))
 		if err != nil {
 			return err
 		}
 	}
 
 	sum := sha256.Sum256(rootCrt.Raw)
-	p.rootFingerprint = strings.ToLower(hex.EncodeToString(sum[:]))
+	p.Defaults.Fingerprint = strings.ToLower(hex.EncodeToString(sum[:]))
 
 	return nil
 }
 
 // WriteIntermediateCertificate writes to disk the given certificate and key.
 func (p *PKI) WriteIntermediateCertificate(crt *x509.Certificate, key interface{}, pass []byte) error {
-	if err := fileutil.WriteFile(p.intermediate, pem.EncodeToMemory(&pem.Block{
+	if p.options.isHelm {
+		return nil
+	}
+
+	if err := fileutil.WriteFile(p.Intermediate, pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: crt.Raw,
 	}), 0600); err != nil {
 		return err
 	}
 	if key != nil {
-		_, err := pemutil.Serialize(key, pemutil.WithPassword(pass), pemutil.ToFile(p.intermediateKey, 0600))
+		_, err := pemutil.Serialize(key, pemutil.WithPassword(pass), pemutil.ToFile(p.IntermediateKey, 0600))
 		if err != nil {
 			return err
 		}
@@ -516,8 +582,8 @@ func (p *PKI) GetCertificateAuthority() error {
 	}
 
 	// Issuer is in the RA
-	p.intermediate = ""
-	p.intermediateKey = ""
+	p.Intermediate = ""
+	p.IntermediateKey = ""
 
 	return nil
 }
@@ -525,8 +591,8 @@ func (p *PKI) GetCertificateAuthority() error {
 // GenerateSSHSigningKeys generates and encrypts a private key used for signing
 // SSH user certificates and a private key used for signing host certificates.
 func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
-	var pubNames = []string{p.sshHostPubKey, p.sshUserPubKey}
-	var privNames = []string{p.sshHostKey, p.sshUserKey}
+	var pubNames = []string{p.Ssh.HostPublicKey, p.Ssh.UserPublicKey}
+	var privNames = []string{p.Ssh.HostKey, p.Ssh.UserKey}
 	for i := 0; i < 2; i++ {
 		pub, priv, err := keyutil.GenerateDefaultKeyPair()
 		if err != nil {
@@ -539,13 +605,19 @@ func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 		if err != nil {
 			return errors.Wrapf(err, "error converting public key")
 		}
-		_, err = pemutil.Serialize(priv, pemutil.WithFilename(privNames[i]), pemutil.WithPassword(password))
+		p.Files[pubNames[i]] = ssh.MarshalAuthorizedKey(sshKey)
+		p.Files[privNames[i]], err = encodePrivateKey(priv, password)
 		if err != nil {
 			return err
 		}
-		if err = fileutil.WriteFile(pubNames[i], ssh.MarshalAuthorizedKey(sshKey), 0600); err != nil {
-			return err
-		}
+
+		// _, err = pemutil.Serialize(priv, pemutil.WithFilename(privNames[i]), pemutil.WithPassword(password))
+		// if err != nil {
+		// 	return err
+		// }
+		// if err = fileutil.WriteFile(pubNames[i], ssh.MarshalAuthorizedKey(sshKey), 0600); err != nil {
+		// 	return err
+		// }
 	}
 	p.options.enableSSH = true
 	return nil
@@ -575,22 +647,22 @@ func (p *PKI) TellPKI() {
 func (p *PKI) tellPKI() {
 	ui.Println()
 	if p.casOptions.Is(apiv1.SoftCAS) {
-		ui.PrintSelected("Root certificate", p.root)
-		ui.PrintSelected("Root private key", p.rootKey)
-		ui.PrintSelected("Root fingerprint", p.rootFingerprint)
-		ui.PrintSelected("Intermediate certificate", p.intermediate)
-		ui.PrintSelected("Intermediate private key", p.intermediateKey)
-	} else if p.rootFingerprint != "" {
-		ui.PrintSelected("Root certificate", p.root)
-		ui.PrintSelected("Root fingerprint", p.rootFingerprint)
+		ui.PrintSelected("Root certificate", p.Root[0])
+		ui.PrintSelected("Root private key", p.RootKey[0])
+		ui.PrintSelected("Root fingerprint", p.Defaults.Fingerprint)
+		ui.PrintSelected("Intermediate certificate", p.Intermediate)
+		ui.PrintSelected("Intermediate private key", p.IntermediateKey)
+	} else if p.Defaults.Fingerprint != "" {
+		ui.PrintSelected("Root certificate", p.Root[0])
+		ui.PrintSelected("Root fingerprint", p.Defaults.Fingerprint)
 	} else {
 		ui.Printf(`{{ "%s" | red }} {{ "Root certificate:" | bold }} failed to retrieve it from RA`+"\n", ui.IconBad)
 	}
 	if p.options.enableSSH {
-		ui.PrintSelected("SSH user root certificate", p.sshUserPubKey)
-		ui.PrintSelected("SSH user root private key", p.sshUserKey)
-		ui.PrintSelected("SSH host root certificate", p.sshHostPubKey)
-		ui.PrintSelected("SSH host root private key", p.sshHostKey)
+		ui.PrintSelected("SSH user public key", p.Ssh.UserPublicKey)
+		ui.PrintSelected("SSH user private key", p.Ssh.UserKey)
+		ui.PrintSelected("SSH host public key", p.Ssh.HostPublicKey)
+		ui.PrintSelected("SSH host private key", p.Ssh.HostKey)
 	}
 }
 
@@ -637,12 +709,12 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authconfig.Config, error) {
 	}
 
 	config := &authconfig.Config{
-		Root:             []string{p.root},
-		FederatedRoots:   []string{},
-		IntermediateCert: p.intermediate,
-		IntermediateKey:  p.intermediateKey,
-		Address:          p.options.address,
-		DNSNames:         p.options.dnsNames,
+		Root:             p.Root,
+		FederatedRoots:   p.FederatedRoots,
+		IntermediateCert: p.Intermediate,
+		IntermediateKey:  p.IntermediateKey,
+		Address:          p.Address,
+		DNSNames:         p.DnsNames,
 		Logger:           []byte(`{"format": "text"}`),
 		DB: &db.Config{
 			Type:       "badger",
@@ -685,8 +757,8 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authconfig.Config, error) {
 		if p.options.enableSSH {
 			enableSSHCA := true
 			config.SSH = &authconfig.SSHConfig{
-				HostKey: p.sshHostKey,
-				UserKey: p.sshUserKey,
+				HostKey: p.Ssh.HostKey,
+				UserKey: p.Ssh.UserKey,
 			}
 			// Enable SSH authorization for default JWK provisioner
 			prov.Claims = &provisioner.Claims{
@@ -776,26 +848,12 @@ func (p *PKI) Save(opt ...Option) error {
 		return errs.FileError(err, p.config)
 	}
 
-	// Generate the CA URL.
-	if p.options.caURL == "" {
-		p.options.caURL = p.options.dnsNames[0]
-		_, port, err := net.SplitHostPort(p.options.address)
-		if err != nil {
-			return errors.Wrapf(err, "error parsing %s", p.options.address)
-		}
-		if port == "443" {
-			p.options.caURL = fmt.Sprintf("https://%s", p.options.caURL)
-		} else {
-			p.options.caURL = fmt.Sprintf("https://%s:%s", p.options.caURL, port)
-		}
-	}
-
 	// Generate and write defaults.json
 	defaults := &caDefaults{
-		Root:        p.root,
-		CAConfig:    p.config,
-		CAUrl:       p.options.caURL,
-		Fingerprint: p.rootFingerprint,
+		Root:        p.Defaults.Root,
+		CAConfig:    p.Defaults.CaConfig,
+		CAUrl:       p.Defaults.CaUrl,
+		Fingerprint: p.Defaults.Fingerprint,
 	}
 	b, err = json.MarshalIndent(defaults, "", "\t")
 	if err != nil {
@@ -829,4 +887,27 @@ func (p *PKI) Save(opt ...Option) error {
 	p.askFeedback()
 
 	return nil
+}
+
+func encodeCertificate(c *x509.Certificate) []byte {
+	return pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: c.Raw,
+	})
+}
+
+func encodePublicKey(key crypto.PublicKey) ([]byte, error) {
+	block, err := pemutil.Serialize(key)
+	if err != nil {
+		return nil, err
+	}
+	return pem.EncodeToMemory(block), nil
+}
+
+func encodePrivateKey(key crypto.PrivateKey, pass []byte) ([]byte, error) {
+	block, err := pemutil.Serialize(key, pemutil.WithPassword(pass))
+	if err != nil {
+		return nil, err
+	}
+	return pem.EncodeToMemory(block), nil
 }
