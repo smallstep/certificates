@@ -8,8 +8,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	step "go.step.sm/cli-utils/config"
-	"go.step.sm/linkedca/config"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"go.step.sm/cli-utils/config"
+	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -18,7 +19,7 @@ import (
 //
 // Note that export will not export neither the pki password nor the certificate
 // issuer password.
-func (a *Authority) Export() (c *config.Configuration, err error) {
+func (a *Authority) Export() (c *linkedca.Configuration, err error) {
 	// Recover from panics
 	defer func() {
 		if r := recover(); r != nil {
@@ -29,7 +30,7 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 	files := make(map[string][]byte)
 
 	// The exported configuration should not include the password in it.
-	c = &config.Configuration{
+	c = &linkedca.Configuration{
 		Version:         "1.0",
 		Root:            mustReadFilesOrUris(a.config.Root, files),
 		FederatedRoots:  mustReadFilesOrUris(a.config.FederatedRoots, files),
@@ -41,36 +42,36 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 		Db:              mustMarshalToStruct(a.config.DB),
 		Logger:          mustMarshalToStruct(a.config.Logger),
 		Monitoring:      mustMarshalToStruct(a.config.Monitoring),
-		Authority: &config.Authority{
+		Authority: &linkedca.Authority{
 			Id:                   a.config.AuthorityConfig.AuthorityID,
 			EnableAdmin:          a.config.AuthorityConfig.EnableAdmin,
 			DisableIssuedAtCheck: a.config.AuthorityConfig.DisableIssuedAtCheck,
-			Backdate:             a.config.AuthorityConfig.Backdate.String(),
+			Backdate:             mustDuration(a.config.AuthorityConfig.Backdate),
 		},
 		Files: files,
 	}
 
 	// SSH
 	if v := a.config.SSH; v != nil {
-		c.Ssh = &config.SSH{
+		c.Ssh = &linkedca.SSH{
 			HostKey:          mustReadFileOrUri(v.HostKey, files),
 			UserKey:          mustReadFileOrUri(v.UserKey, files),
 			AddUserPrincipal: v.AddUserPrincipal,
 			AddUserCommand:   v.AddUserCommand,
 		}
 		for _, k := range v.Keys {
-			typ, ok := config.SSHPublicKey_Type_value[strings.ToUpper(k.Type)]
+			typ, ok := linkedca.SSHPublicKey_Type_value[strings.ToUpper(k.Type)]
 			if !ok {
 				return nil, errors.Errorf("unsupported ssh key type %s", k.Type)
 			}
-			c.Ssh.Keys = append(c.Ssh.Keys, &config.SSHPublicKey{
-				Type:      config.SSHPublicKey_Type(typ),
+			c.Ssh.Keys = append(c.Ssh.Keys, &linkedca.SSHPublicKey{
+				Type:      linkedca.SSHPublicKey_Type(typ),
 				Federated: k.Federated,
 				Key:       mustMarshalToStruct(k),
 			})
 		}
 		if b := v.Bastion; b != nil {
-			c.Ssh.Bastion = &config.Bastion{
+			c.Ssh.Bastion = &linkedca.Bastion{
 				Hostname: b.Hostname,
 				User:     b.User,
 				Port:     b.Port,
@@ -85,15 +86,15 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 		var typ int32
 		var ok bool
 		if v.Type == "" {
-			typ = int32(config.KMS_SOFTKMS)
+			typ = int32(linkedca.KMS_SOFTKMS)
 		} else {
-			typ, ok = config.KMS_Type_value[strings.ToUpper(v.Type)]
+			typ, ok = linkedca.KMS_Type_value[strings.ToUpper(v.Type)]
 			if !ok {
 				return nil, errors.Errorf("unsupported kms type %s", v.Type)
 			}
 		}
-		c.Kms = &config.KMS{
-			Type:            config.KMS_Type(typ),
+		c.Kms = &linkedca.KMS{
+			Type:            linkedca.KMS_Type(typ),
 			CredentialsFile: v.CredentialsFile,
 			Uri:             v.URI,
 			Pin:             v.Pin,
@@ -111,13 +112,13 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 		c.Authority.CertificateAuthorityFingerprint = v.CertificateAuthorityFingerprint
 		c.Authority.CredentialsFile = v.CredentialsFile
 		if iss := v.CertificateIssuer; iss != nil {
-			typ, ok := config.CertificateIssuer_Type_value[strings.ToUpper(iss.Type)]
+			typ, ok := linkedca.CertificateIssuer_Type_value[strings.ToUpper(iss.Type)]
 			if !ok {
 				return nil, errors.Errorf("unknown certificate issuer type %s", iss.Type)
 			}
 			// The exporte certificate issuer should not include the password.
-			c.Authority.CertificateIssuer = &config.CertificateIssuer{
-				Type:        config.CertificateIssuer_Type(typ),
+			c.Authority.CertificateIssuer = &linkedca.CertificateIssuer{
+				Type:        linkedca.CertificateIssuer_Type(typ),
 				Provisioner: iss.Provisioner,
 				Certificate: mustReadFileOrUri(iss.Certificate, files),
 				Key:         mustReadFileOrUri(iss.Key, files),
@@ -150,7 +151,7 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 	c.Authority.Claims = claimsToLinkedca(a.config.AuthorityConfig.Claims)
 	// Distiguised names template
 	if v := a.config.AuthorityConfig.Template; v != nil {
-		c.Authority.Template = &config.DistinguishedName{
+		c.Authority.Template = &linkedca.DistinguishedName{
 			Country:            v.Country,
 			Organization:       v.Organization,
 			OrganizationalUnit: v.OrganizationalUnit,
@@ -164,20 +165,20 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 
 	// TLS
 	if v := a.config.TLS; v != nil {
-		c.Tls = &config.TLS{
+		c.Tls = &linkedca.TLS{
 			MinVersion:    v.MinVersion.String(),
 			MaxVersion:    v.MaxVersion.String(),
 			Renegotiation: v.Renegotiation,
 		}
 		for _, cs := range v.CipherSuites.Value() {
-			c.Tls.CipherSuites = append(c.Tls.CipherSuites, config.TLS_CiperSuite(cs))
+			c.Tls.CipherSuites = append(c.Tls.CipherSuites, linkedca.TLS_CiperSuite(cs))
 		}
 	}
 
 	// Templates
 	if v := a.config.Templates; v != nil {
-		c.Templates = &config.Templates{
-			Ssh:  &config.SSHTemplate{},
+		c.Templates = &linkedca.ConfigTemplates{
+			Ssh:  &linkedca.SSHConfigTemplate{},
 			Data: mustMarshalToStruct(v.Data),
 		}
 		// Remove automatically loaded vars
@@ -185,12 +186,12 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 			delete(c.Templates.Data.Fields, "Step")
 		}
 		for _, t := range v.SSH.Host {
-			typ, ok := config.Template_Type_value[strings.ToUpper(string(t.Type))]
+			typ, ok := linkedca.ConfigTemplate_Type_value[strings.ToUpper(string(t.Type))]
 			if !ok {
 				return nil, errors.Errorf("unsupported template type %s", t.Type)
 			}
-			c.Templates.Ssh.Hosts = append(c.Templates.Ssh.Hosts, &config.Template{
-				Type:     config.Template_Type(typ),
+			c.Templates.Ssh.Hosts = append(c.Templates.Ssh.Hosts, &linkedca.ConfigTemplate{
+				Type:     linkedca.ConfigTemplate_Type(typ),
 				Name:     t.Name,
 				Template: mustReadFileOrUri(t.TemplatePath, files),
 				Path:     t.Path,
@@ -200,12 +201,12 @@ func (a *Authority) Export() (c *config.Configuration, err error) {
 			})
 		}
 		for _, t := range v.SSH.User {
-			typ, ok := config.Template_Type_value[strings.ToUpper(string(t.Type))]
+			typ, ok := linkedca.ConfigTemplate_Type_value[strings.ToUpper(string(t.Type))]
 			if !ok {
 				return nil, errors.Errorf("unsupported template type %s", t.Type)
 			}
-			c.Templates.Ssh.Users = append(c.Templates.Ssh.Users, &config.Template{
-				Type:     config.Template_Type(typ),
+			c.Templates.Ssh.Users = append(c.Templates.Ssh.Users, &linkedca.ConfigTemplate{
+				Type:     linkedca.ConfigTemplate_Type(typ),
 				Name:     t.Name,
 				Template: mustReadFileOrUri(t.TemplatePath, files),
 				Path:     t.Path,
@@ -226,6 +227,13 @@ func mustPassword(s string) []byte {
 	return []byte(s)
 }
 
+func mustDuration(d *provisioner.Duration) string {
+	if d == nil || d.Duration == 0 {
+		return ""
+	}
+	return d.String()
+}
+
 func mustMarshalToStruct(v interface{}) *structpb.Struct {
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -243,7 +251,7 @@ func mustReadFileOrUri(fn string, m map[string][]byte) string {
 		return ""
 	}
 
-	stepPath := filepath.ToSlash(step.StepPath())
+	stepPath := filepath.ToSlash(config.StepPath())
 	if !strings.HasSuffix(stepPath, "/") {
 		stepPath += "/"
 	}
@@ -255,7 +263,7 @@ func mustReadFileOrUri(fn string, m map[string][]byte) string {
 		panic(err)
 	}
 	if ok {
-		b, err := ioutil.ReadFile(step.StepAbs(fn))
+		b, err := ioutil.ReadFile(config.StepAbs(fn))
 		if err != nil {
 			panic(errors.Wrapf(err, "error reading %s", fn))
 		}
