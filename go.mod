@@ -44,7 +44,10 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
-// replace github.com/smallstep/nosql => ../nosql
-// replace go.step.sm/crypto => ../crypto
-// replace go.step.sm/cli-utils => ../cli-utils
-// replace go.step.sm/linkedca => ../linkedca
+//replace github.com/smallstep/nosql => ../nosql
+
+//replace go.step.sm/crypto => ../crypto
+
+replace go.step.sm/cli-utils => ../cli-utils
+
+replace go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 => github.com/omorsi/pkcs7 v0.0.0-20210217142924-a7b80a2a8568
