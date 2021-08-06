@@ -220,13 +220,6 @@ func (a *Authority) Export() (c *linkedca.Configuration, err error) {
 	return c, nil
 }
 
-func mustPassword(s string) []byte {
-	if s == "" {
-		return nil
-	}
-	return []byte(s)
-}
-
 func mustDuration(d *provisioner.Duration) string {
 	if d == nil || d.Duration == 0 {
 		return ""
