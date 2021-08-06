@@ -562,7 +562,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 
 	details := p.Details.GetData()
 	if details == nil {
-		return nil, fmt.Errorf("provisioner does not have any details")
+		return nil, errors.New("provisioner does not have any details")
 	}
 
 	options := optionsToCertificates(p)
@@ -571,7 +571,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 	case *linkedca.ProvisionerDetails_JWK:
 		jwk := new(jose.JSONWebKey)
 		if err := json.Unmarshal(d.JWK.PublicKey, &jwk); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "error unmarshaling public key")
 		}
 		return &provisioner.JWK{
 			ID:           p.Id,
