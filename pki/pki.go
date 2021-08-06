@@ -798,14 +798,6 @@ func encodeCertificate(c *x509.Certificate) []byte {
 	})
 }
 
-func encodePublicKey(key crypto.PublicKey) ([]byte, error) {
-	block, err := pemutil.Serialize(key)
-	if err != nil {
-		return nil, err
-	}
-	return pem.EncodeToMemory(block), nil
-}
-
 func encodePrivateKey(key crypto.PrivateKey, pass []byte) ([]byte, error) {
 	block, err := pemutil.Serialize(key, pemutil.WithPassword(pass))
 	if err != nil {
