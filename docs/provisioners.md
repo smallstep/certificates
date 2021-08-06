@@ -346,6 +346,7 @@ Below is an example of an ACME provisioner in the `ca.json`:
     "type": "ACME",
     "name": "my-acme-provisioner",
     "forceCN": true,
+    "requireEAB": false,
     "claims": {
         "maxTLSCertDuration": "8h",
         "defaultTLSCertDuration": "2h",
@@ -360,6 +361,9 @@ Below is an example of an ACME provisioner in the `ca.json`:
 
 * `forceCN` (optional): force one of the SANs to become the Common Name, if a
   common name is not provided.
+
+* `requireEAB` (optional): require clients to provide External Account Binding 
+  credentials when creating an ACME Account.
 
 * `claims` (optional): overwrites the default claims set in the authority, see
   the [top](#provisioners) section for all the options.
