@@ -32,10 +32,10 @@ func (a *Authority) Export() (c *linkedca.Configuration, err error) {
 	// The exported configuration should not include the password in it.
 	c = &linkedca.Configuration{
 		Version:         "1.0",
-		Root:            mustReadFilesOrUris(a.config.Root, files),
-		FederatedRoots:  mustReadFilesOrUris(a.config.FederatedRoots, files),
-		Intermediate:    mustReadFileOrUri(a.config.IntermediateCert, files),
-		IntermediateKey: mustReadFileOrUri(a.config.IntermediateKey, files),
+		Root:            mustReadFilesOrURIs(a.config.Root, files),
+		FederatedRoots:  mustReadFilesOrURIs(a.config.FederatedRoots, files),
+		Intermediate:    mustReadFileOrURI(a.config.IntermediateCert, files),
+		IntermediateKey: mustReadFileOrURI(a.config.IntermediateKey, files),
 		Address:         a.config.Address,
 		InsecureAddress: a.config.InsecureAddress,
 		DnsNames:        a.config.DNSNames,
@@ -54,8 +54,8 @@ func (a *Authority) Export() (c *linkedca.Configuration, err error) {
 	// SSH
 	if v := a.config.SSH; v != nil {
 		c.Ssh = &linkedca.SSH{
-			HostKey:          mustReadFileOrUri(v.HostKey, files),
-			UserKey:          mustReadFileOrUri(v.UserKey, files),
+			HostKey:          mustReadFileOrURI(v.HostKey, files),
+			UserKey:          mustReadFileOrURI(v.UserKey, files),
 			AddUserPrincipal: v.AddUserPrincipal,
 			AddUserCommand:   v.AddUserCommand,
 		}
@@ -120,8 +120,8 @@ func (a *Authority) Export() (c *linkedca.Configuration, err error) {
 			c.Authority.CertificateIssuer = &linkedca.CertificateIssuer{
 				Type:        linkedca.CertificateIssuer_Type(typ),
 				Provisioner: iss.Provisioner,
-				Certificate: mustReadFileOrUri(iss.Certificate, files),
-				Key:         mustReadFileOrUri(iss.Key, files),
+				Certificate: mustReadFileOrURI(iss.Certificate, files),
+				Key:         mustReadFileOrURI(iss.Key, files),
 			}
 		}
 	}
@@ -193,7 +193,7 @@ func (a *Authority) Export() (c *linkedca.Configuration, err error) {
 			c.Templates.Ssh.Hosts = append(c.Templates.Ssh.Hosts, &linkedca.ConfigTemplate{
 				Type:     linkedca.ConfigTemplate_Type(typ),
 				Name:     t.Name,
-				Template: mustReadFileOrUri(t.TemplatePath, files),
+				Template: mustReadFileOrURI(t.TemplatePath, files),
 				Path:     t.Path,
 				Comment:  t.Comment,
 				Requires: t.RequiredData,
@@ -208,7 +208,7 @@ func (a *Authority) Export() (c *linkedca.Configuration, err error) {
 			c.Templates.Ssh.Users = append(c.Templates.Ssh.Users, &linkedca.ConfigTemplate{
 				Type:     linkedca.ConfigTemplate_Type(typ),
 				Name:     t.Name,
-				Template: mustReadFileOrUri(t.TemplatePath, files),
+				Template: mustReadFileOrURI(t.TemplatePath, files),
 				Path:     t.Path,
 				Comment:  t.Comment,
 				Requires: t.RequiredData,
@@ -239,7 +239,7 @@ func mustMarshalToStruct(v interface{}) *structpb.Struct {
 	return r
 }
 
-func mustReadFileOrUri(fn string, m map[string][]byte) string {
+func mustReadFileOrURI(fn string, m map[string][]byte) string {
 	if fn == "" {
 		return ""
 	}
@@ -266,10 +266,10 @@ func mustReadFileOrUri(fn string, m map[string][]byte) string {
 	return fn
 }
 
-func mustReadFilesOrUris(fns []string, m map[string][]byte) []string {
+func mustReadFilesOrURIs(fns []string, m map[string][]byte) []string {
 	var result []string
 	for _, fn := range fns {
-		result = append(result, mustReadFileOrUri(fn, m))
+		result = append(result, mustReadFileOrURI(fn, m))
 	}
 	return result
 }
