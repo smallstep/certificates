@@ -444,10 +444,8 @@ func (a *Authority) revoke(crt *x509.Certificate, rci *db.RevokedCertificateInfo
 	if lca, ok := a.adminDB.(interface {
 		Revoke(*x509.Certificate, *db.RevokedCertificateInfo) error
 	}); ok {
-		println(true)
 		return lca.Revoke(crt, rci)
 	}
-	println(false)
 	return a.db.Revoke(rci)
 }
 
