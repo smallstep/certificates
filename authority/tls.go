@@ -21,6 +21,7 @@ import (
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
+	"golang.org/x/crypto/ssh"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -397,7 +398,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 	}
 
 	if provisioner.MethodFromContext(ctx) == provisioner.SSHRevokeMethod {
-		err = a.db.RevokeSSH(rci)
+		err = a.revokeSSH(nil, rci)
 	} else {
 		// Revoke an X.509 certificate using CAS. If the certificate is not
 		// provided we will try to read it from the db. If the read fails we
@@ -424,7 +425,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		}
 
 		// Save as revoked in the Db.
-		err = a.db.Revoke(rci)
+		err = a.revoke(revokedCert, rci)
 	}
 	switch err {
 	case nil:
@@ -437,6 +438,26 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 	default:
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
 	}
+}
+
+func (a *Authority) revoke(crt *x509.Certificate, rci *db.RevokedCertificateInfo) error {
+	if lca, ok := a.adminDB.(interface {
+		Revoke(*x509.Certificate, *db.RevokedCertificateInfo) error
+	}); ok {
+		println(true)
+		return lca.Revoke(crt, rci)
+	}
+	println(false)
+	return a.db.Revoke(rci)
+}
+
+func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateInfo) error {
+	if lca, ok := a.adminDB.(interface {
+		RevokeSSH(*ssh.Certificate, *db.RevokedCertificateInfo) error
+	}); ok {
+		return lca.RevokeSSH(crt, rci)
+	}
+	return a.db.Revoke(rci)
 }
 
 // GetTLSCertificate creates a new leaf certificate to be used by the CA HTTPS server.

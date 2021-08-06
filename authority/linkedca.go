@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/db"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/tlsutil"
@@ -257,6 +258,34 @@ func (c *linkedCaClient) StoreSSHCertificate(crt *ssh.Certificate) error {
 	return errors.Wrap(err, "error posting ssh certificate")
 }
 
+func (c *linkedCaClient) Revoke(crt *x509.Certificate, rci *db.RevokedCertificateInfo) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_, err := c.client.RevokeCertificate(ctx, &linkedca.RevokeCertificateRequest{
+		Serial:         rci.Serial,
+		PemCertificate: serializeCertificate(crt),
+		Reason:         rci.Reason,
+		ReasonCode:     linkedca.RevocationReasonCode(rci.ReasonCode),
+		Passive:        true,
+	})
+
+	return errors.Wrap(err, "error revoking certificate")
+}
+
+func (c *linkedCaClient) RevokeSSH(ssh *ssh.Certificate, rci *db.RevokedCertificateInfo) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_, err := c.client.RevokeSSHCertificate(ctx, &linkedca.RevokeSSHCertificateRequest{
+		Serial:      rci.Serial,
+		Certificate: serializeSSHCertificate(ssh),
+		Reason:      rci.Reason,
+		ReasonCode:  linkedca.RevocationReasonCode(rci.ReasonCode),
+		Passive:     true,
+	})
+
+	return errors.Wrap(err, "error revoking ssh certificate")
+}
+
 func (c *linkedCaClient) IsRevoked(serial string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -281,6 +310,16 @@ func (c *linkedCaClient) IsSSHRevoked(serial string) (bool, error) {
 	return resp.Status != linkedca.RevocationStatus_ACTIVE, nil
 }
 
+func serializeCertificate(crt *x509.Certificate) string {
+	if crt == nil {
+		return ""
+	}
+	return string(pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: crt.Raw,
+	}))
+}
+
 func serializeCertificateChain(fullchain ...*x509.Certificate) string {
 	var chain string
 	for _, crt := range fullchain {
@@ -290,6 +329,13 @@ func serializeCertificateChain(fullchain ...*x509.Certificate) string {
 		}))
 	}
 	return chain
+}
+
+func serializeSSHCertificate(crt *ssh.Certificate) string {
+	if crt == nil {
+		return ""
+	}
+	return string(ssh.MarshalAuthorizedKey(crt))
 }
 
 func getAuthority(sans []string) (string, error) {
