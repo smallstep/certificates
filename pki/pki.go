@@ -596,31 +596,6 @@ type caDefaults struct {
 // Option is the type for modifiers over the auth config object.
 type Option func(c *authconfig.Config) error
 
-// WithDefaultDB is a configuration modifier that adds a default DB stanza to
-// the authority config.
-//
-// Deprecated: this method is deprecated because this is the default behavior.
-func WithDefaultDB() Option {
-	return func(c *authconfig.Config) error {
-		c.DB = &db.Config{
-			Type:       "badger",
-			DataSource: GetDBPath(),
-		}
-		return nil
-	}
-}
-
-// WithoutDB is a configuration modifier that adds a default DB stanza to
-// the authority config.
-//
-// De[recated: this method is deprecated in favor or WithNoDB.
-func WithoutDB() Option {
-	return func(c *authconfig.Config) error {
-		c.DB = nil
-		return nil
-	}
-}
-
 // GenerateConfig returns the step certificates configuration.
 func (p *PKI) GenerateConfig(opt ...Option) (*authconfig.Config, error) {
 	var authorityOptions *apiv1.Options
