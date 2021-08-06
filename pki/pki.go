@@ -166,81 +166,81 @@ type options struct {
 	deploymentType DeploymentType
 }
 
-// PKIOption is the type of a configuration option on the pki constructor.
-type PKIOption func(p *PKI)
+// Option is the type of a configuration option on the pki constructor.
+type Option func(p *PKI)
 
 // WithAddress sets the listen address of step-ca.
-func WithAddress(s string) PKIOption {
+func WithAddress(s string) Option {
 	return func(p *PKI) {
 		p.Address = s
 	}
 }
 
-// WithCaUrl sets the default ca-url of step-ca.
-func WithCaUrl(s string) PKIOption {
+// WithCaURL sets the default ca-url of step-ca.
+func WithCaURL(s string) Option {
 	return func(p *PKI) {
 		p.Defaults.CaUrl = s
 	}
 }
 
 // WithDNSNames sets the SANs of step-ca.
-func WithDNSNames(s []string) PKIOption {
+func WithDNSNames(s []string) Option {
 	return func(p *PKI) {
 		p.DnsNames = s
 	}
 }
 
 // WithProvisioner defines the name of the default provisioner.
-func WithProvisioner(s string) PKIOption {
+func WithProvisioner(s string) Option {
 	return func(p *PKI) {
 		p.options.provisioner = s
 	}
 }
 
 // WithPKIOnly will only generate the PKI without the step-ca config files.
-func WithPKIOnly() PKIOption {
+func WithPKIOnly() Option {
 	return func(p *PKI) {
 		p.options.pkiOnly = true
 	}
 }
 
 // WithACME enables acme provisioner in step-ca.
-func WithACME() PKIOption {
+func WithACME() Option {
 	return func(p *PKI) {
 		p.options.enableACME = true
 	}
 }
 
 // WithSSH enables ssh in step-ca.
-func WithSSH() PKIOption {
+func WithSSH() Option {
 	return func(p *PKI) {
 		p.options.enableSSH = true
 	}
 }
 
 // WithAdmin enables the admin api in step-ca.
-func WithAdmin() PKIOption {
+func WithAdmin() Option {
 	return func(p *PKI) {
 		p.options.enableAdmin = true
 	}
 }
 
 // WithNoDB disables the db in step-ca.
-func WithNoDB() PKIOption {
+func WithNoDB() Option {
 	return func(p *PKI) {
 		p.options.noDB = true
 	}
 }
 
 // WithHelm configures the pki to create a helm values.yaml.
-func WithHelm() PKIOption {
+func WithHelm() Option {
 	return func(p *PKI) {
 		p.options.isHelm = true
 	}
 }
 
 // WithDeploymentType defines the deployment type of step-ca.
-func WithDeploymentType(dt DeploymentType) PKIOption {
+func WithDeploymentType(dt DeploymentType) Option {
 	return func(p *PKI) {
 		p.options.deploymentType = dt
 	}
@@ -261,7 +261,7 @@ type PKI struct {
 }
 
 // New creates a new PKI configuration.
-func New(o apiv1.Options, opts ...PKIOption) (*PKI, error) {
+func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	caService, err := cas.New(context.Background(), o)
 	if err != nil {
 		return nil, err
@@ -284,10 +284,11 @@ func New(o apiv1.Options, opts ...PKIOption) (*PKI, error) {
 
 	p := &PKI{
 		Configuration: linkedca.Configuration{
-			Address:  "127.0.0.1:9000",
-			DnsNames: []string{"127.0.0.1"},
-			Ssh:      &linkedca.SSH{},
-			Files:    make(map[string][]byte),
+			Address:   "127.0.0.1:9000",
+			DnsNames:  []string{"127.0.0.1"},
+			Ssh:       &linkedca.SSH{},
+			Authority: &linkedca.Authority{},
+			Files:     make(map[string][]byte),
 		},
 		casOptions: o,
 		caCreator:  caCreator,
@@ -394,6 +395,28 @@ func (p *PKI) GenerateKeyPairs(pass []byte) error {
 	if err != nil {
 		return err
 	}
+
+	// Add JWK provisioner to the configuration.
+	publicKey, err := json.Marshal(p.ottPublicKey)
+	if err != nil {
+		return errors.Wrap(err, "error marshaling public key")
+	}
+	encryptedKey, err := p.ottPrivateKey.CompactSerialize()
+	if err != nil {
+		return errors.Wrap(err, "error serializing private key")
+	}
+	p.Authority.Provisioners = append(p.Authority.Provisioners, &linkedca.Provisioner{
+		Type: linkedca.Provisioner_JWK,
+		Name: p.options.provisioner,
+		Details: &linkedca.ProvisionerDetails{
+			Data: &linkedca.ProvisionerDetails_JWK{
+				JWK: &linkedca.JWKProvisioner{
+					PublicKey:           publicKey,
+					EncryptedPrivateKey: []byte(encryptedKey),
+				},
+			},
+		},
+	})
 
 	return nil
 }
@@ -593,11 +616,11 @@ type caDefaults struct {
 	Root        string `json:"root"`
 }
 
-// Option is the type for modifiers over the auth config object.
-type Option func(c *authconfig.Config) error
+// ConfigOption is the type for modifiers over the auth config object.
+type ConfigOption func(c *authconfig.Config) error
 
 // GenerateConfig returns the step certificates configuration.
-func (p *PKI) GenerateConfig(opt ...Option) (*authconfig.Config, error) {
+func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 	var authorityOptions *apiv1.Options
 	if !p.casOptions.Is(apiv1.SoftCAS) {
 		authorityOptions = &p.casOptions
@@ -726,7 +749,7 @@ func (p *PKI) GenerateConfig(opt ...Option) (*authconfig.Config, error) {
 
 // Save stores the pki on a json file that will be used as the certificate
 // authority configuration.
-func (p *PKI) Save(opt ...Option) error {
+func (p *PKI) Save(opt ...ConfigOption) error {
 	// Write generated files
 	if err := p.WriteFiles(); err != nil {
 		return err

@@ -6,14 +6,15 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority"
 	authconfig "github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/linkedca"
 )
 
 type helmVariables struct {
-	linkedca.Configuration
-	Defaults linkedca.Defaults
+	*linkedca.Configuration
+	Defaults *linkedca.Defaults
 	Password string
 	SSH      struct {
 		Enabled bool
@@ -33,19 +34,22 @@ func (p *PKI) WriteHelmTemplate(w io.Writer) error {
 		p.Ssh = nil
 	}
 
+	// Convert provisioner to ca.json
+	provisioners := make([]provisioner.Interface, len(p.Authority.Provisioners))
+	for i, p := range p.Authority.Provisioners {
+		pp, err := authority.ProvisionerToCertificates(p)
+		if err != nil {
+			return err
+		}
+		provisioners[i] = pp
+	}
+
 	if err := tmpl.Execute(w, helmVariables{
-		Configuration: p.Configuration,
-		Defaults:      p.Defaults,
-		Password:      "asdf",
+		Configuration: &p.Configuration,
+		Defaults:      &p.Defaults,
+		Password:      "",
 		TLS:           authconfig.DefaultTLSOptions,
-		Provisioners: []provisioner.Interface{
-			&provisioner.JWK{
-				Name:         p.options.provisioner,
-				Type:         "JWK",
-				Key:          p.ottPublicKey,
-				EncryptedKey: "",
-			},
-		},
+		Provisioners:  provisioners,
 	}); err != nil {
 		return errors.Wrap(err, "error executing helm template")
 	}

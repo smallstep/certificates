@@ -163,7 +163,7 @@ func onboardAction(ctx *cli.Context) error {
 }
 
 func onboardPKI(config onboardingConfiguration) (*config.Config, string, error) {
-	var opts = []pki.PKIOption{
+	var opts = []pki.Option{
 		pki.WithAddress(config.Address),
 		pki.WithDNSNames([]string{config.DNS}),
 		pki.WithProvisioner("admin"),
