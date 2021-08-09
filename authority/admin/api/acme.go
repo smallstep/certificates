@@ -9,14 +9,16 @@ import (
 
 // CreateExternalAccountKeyRequest is the type for POST /admin/acme/eab requests
 type CreateExternalAccountKeyRequest struct {
-	Name string `json:"name"`
+	ProvisionerName string `json:"provisioner"`
+	Name            string `json:"name"`
 }
 
 // CreateExternalAccountKeyResponse is the type for POST /admin/acme/eab responses
 type CreateExternalAccountKeyResponse struct {
-	KeyID string `json:"keyID"`
-	Name  string `json:"name"`
-	Key   []byte `json:"key"`
+	ProvisionerName string `json:"provisioner"`
+	KeyID           string `json:"keyID"`
+	Name            string `json:"name"`
+	Key             []byte `json:"key"`
 }
 
 // GetExternalAccountKeysResponse is the type for GET /admin/acme/eab responses
@@ -35,16 +37,17 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 
 	// TODO: Validate input
 
-	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), body.Name)
+	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), body.ProvisionerName, body.Name)
 	if err != nil {
 		api.WriteError(w, admin.WrapErrorISE(err, "error creating external account key %s", body.Name))
 		return
 	}
 
 	eakResponse := CreateExternalAccountKeyResponse{
-		KeyID: eak.ID,
-		Name:  eak.Name,
-		Key:   eak.KeyBytes,
+		ProvisionerName: eak.ProvisionerName,
+		KeyID:           eak.ID,
+		Name:            eak.Name,
+		Key:             eak.KeyBytes,
 	}
 
 	api.JSONStatus(w, eakResponse, http.StatusCreated) // TODO: rewrite into protobuf json (likely)

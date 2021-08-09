@@ -93,6 +93,12 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	prov, err := acmeProvisionerFromContext(ctx)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
 	httpStatus := http.StatusCreated
 	acc, err := accountFromContext(r.Context())
 	if err != nil {
@@ -126,7 +132,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 		}
 		if eak != nil { // means that we have a (valid) External Account Binding key that should be bound, updated and sent in the response
 			eak.BindTo(acc)
-			if err := h.db.UpdateExternalAccountKey(ctx, eak); err != nil {
+			if err := h.db.UpdateExternalAccountKey(ctx, prov.Name, eak); err != nil {
 				api.WriteError(w, acme.WrapErrorISE(err, "error updating external account binding key"))
 				return
 			}
@@ -224,7 +230,7 @@ func (h *Handler) GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 	logOrdersByAccount(w, orders)
 }
 
-// validateExternalAccountBinding validates the externalAccountBinding property in a call to new-account
+// validateExternalAccountBinding validates the externalAccountBinding property in a call to new-account.
 func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest) (*acme.ExternalAccountKey, error) {
 	acmeProv, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
@@ -253,8 +259,11 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 	// TODO: implement strategy pattern to allow for different ways of verification (i.e. webhook call) based on configuration
 
 	keyID := eabJWS.Signatures[0].Protected.KeyID
-	externalAccountKey, err := h.db.GetExternalAccountKey(ctx, keyID)
+	externalAccountKey, err := h.db.GetExternalAccountKey(ctx, acmeProv.Name, keyID)
 	if err != nil {
+		if _, ok := err.(*acme.Error); ok {
+			return nil, err
+		}
 		return nil, acme.WrapErrorISE(err, "error retrieving external account key")
 	}
 
@@ -285,6 +294,8 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 	return externalAccountKey, nil
 }
 
+// keysAreEqual performs an equality check on two JWKs by comparing
+// the (base64 encoding) of the Key IDs.
 func keysAreEqual(x, y *squarejose.JSONWebKey) bool {
 	if x == nil || y == nil {
 		return false

@@ -3,11 +3,19 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/hmac"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
@@ -16,6 +24,7 @@ import (
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/jose"
+	squarejose "gopkg.in/square/go-jose.v2"
 )
 
 var (
@@ -38,6 +47,136 @@ func newProv() acme.Provisioner {
 		fmt.Printf("%v", err)
 	}
 	return p
+}
+
+func newACMEProv(t *testing.T) *provisioner.ACME {
+	p := newProv()
+	a, ok := p.(*provisioner.ACME)
+	if !ok {
+		t.Fatal("not a valid ACME provisioner")
+	}
+	return a
+}
+
+var errUnsupportedKey = fmt.Errorf("unknown key type; only RSA and ECDSA are supported")
+
+// keyID is the account identity provided by a CA during registration.
+type keyID string
+
+// noKeyID indicates that jwsEncodeJSON should compute and use JWK instead of a KID.
+// See jwsEncodeJSON for details.
+const noKeyID = keyID("")
+
+// jwsEncodeEAB creates a JWS payload for External Account Binding according to RFC 8555 §7.3.4.
+// Implementation taken from github.com/mholt/acmez
+func jwsEncodeEAB(accountKey crypto.PublicKey, hmacKey []byte, kid keyID, url string) ([]byte, error) {
+	// §7.3.4: "The 'alg' field MUST indicate a MAC-based algorithm"
+	alg, sha := "HS256", crypto.SHA256
+
+	// §7.3.4: "The 'nonce' field MUST NOT be present"
+	phead, err := jwsHead(alg, "", url, kid, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	encodedKey, err := jwkEncode(accountKey)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := base64.RawURLEncoding.EncodeToString([]byte(encodedKey))
+
+	payloadToSign := []byte(phead + "." + payload)
+
+	h := hmac.New(sha256.New, hmacKey)
+	h.Write(payloadToSign)
+	sig := h.Sum(nil)
+
+	return jwsFinal(sha, sig, phead, payload)
+}
+
+// jwsHead constructs the protected JWS header for the given fields.
+// Since jwk and kid are mutually-exclusive, the jwk will be encoded
+// only if kid is empty. If nonce is empty, it will not be encoded.
+// Implementation taken from github.com/mholt/acmez
+func jwsHead(alg, nonce, url string, kid keyID, key crypto.Signer) (string, error) {
+	phead := fmt.Sprintf(`{"alg":%q`, alg)
+	if kid == noKeyID {
+		jwk, err := jwkEncode(key.Public())
+		if err != nil {
+			return "", err
+		}
+		phead += fmt.Sprintf(`,"jwk":%s`, jwk)
+	} else {
+		phead += fmt.Sprintf(`,"kid":%q`, kid)
+	}
+	if nonce != "" {
+		phead += fmt.Sprintf(`,"nonce":%q`, nonce)
+	}
+	phead += fmt.Sprintf(`,"url":%q}`, url)
+	phead = base64.RawURLEncoding.EncodeToString([]byte(phead))
+	return phead, nil
+}
+
+// jwkEncode encodes public part of an RSA or ECDSA key into a JWK.
+// The result is also suitable for creating a JWK thumbprint.
+// https://tools.ietf.org/html/rfc7517
+// Implementation taken from github.com/mholt/acmez
+func jwkEncode(pub crypto.PublicKey) (string, error) {
+	switch pub := pub.(type) {
+	case *rsa.PublicKey:
+		// https://tools.ietf.org/html/rfc7518#section-6.3.1
+		n := pub.N
+		e := big.NewInt(int64(pub.E))
+		// Field order is important.
+		// See https://tools.ietf.org/html/rfc7638#section-3.3 for details.
+		return fmt.Sprintf(`{"e":"%s","kty":"RSA","n":"%s"}`,
+			base64.RawURLEncoding.EncodeToString(e.Bytes()),
+			base64.RawURLEncoding.EncodeToString(n.Bytes()),
+		), nil
+	case *ecdsa.PublicKey:
+		// https://tools.ietf.org/html/rfc7518#section-6.2.1
+		p := pub.Curve.Params()
+		n := p.BitSize / 8
+		if p.BitSize%8 != 0 {
+			n++
+		}
+		x := pub.X.Bytes()
+		if n > len(x) {
+			x = append(make([]byte, n-len(x)), x...)
+		}
+		y := pub.Y.Bytes()
+		if n > len(y) {
+			y = append(make([]byte, n-len(y)), y...)
+		}
+		// Field order is important.
+		// See https://tools.ietf.org/html/rfc7638#section-3.3 for details.
+		return fmt.Sprintf(`{"crv":"%s","kty":"EC","x":"%s","y":"%s"}`,
+			p.Name,
+			base64.RawURLEncoding.EncodeToString(x),
+			base64.RawURLEncoding.EncodeToString(y),
+		), nil
+	}
+	return "", errUnsupportedKey
+}
+
+// jwsFinal constructs the final JWS object.
+// Implementation taken from github.com/mholt/acmez
+func jwsFinal(sha crypto.Hash, sig []byte, phead, payload string) ([]byte, error) {
+	enc := struct {
+		Protected string `json:"protected"`
+		Payload   string `json:"payload"`
+		Sig       string `json:"signature"`
+	}{
+		Protected: phead,
+		Payload:   payload,
+		Sig:       base64.RawURLEncoding.EncodeToString(sig),
+	}
+	result, err := json.Marshal(&enc)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func TestNewAccountRequest_Validate(t *testing.T) {
@@ -377,6 +516,27 @@ func TestHandler_NewAccount(t *testing.T) {
 				err:        acme.NewErrorISE("jwk expected in request context"),
 			}
 		},
+		"fail/new-account-no-eab-provided": func(t *testing.T) test {
+			nar := &NewAccountRequest{
+				Contact:                []string{"foo", "bar"},
+				ExternalAccountBinding: nil,
+			}
+			b, err := json.Marshal(nar)
+			assert.FatalError(t, err)
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
+			ctx = context.WithValue(ctx, jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			return test{
+				ctx:        ctx,
+				statusCode: 400,
+				err:        acme.NewError(acme.ErrorExternalAccountRequiredType, "no external account binding provided"),
+			}
+		},
 		"fail/db.CreateAccount-error": func(t *testing.T) test {
 			nar := &NewAccountRequest{
 				Contact: []string{"foo", "bar"},
@@ -454,6 +614,94 @@ func TestHandler_NewAccount(t *testing.T) {
 				ctx:        ctx,
 				acc:        acc,
 				statusCode: 200,
+			}
+		},
+		"ok/new-account-no-eab-required": func(t *testing.T) test {
+			nar := &NewAccountRequest{
+				Contact:                []string{"foo", "bar"},
+				ExternalAccountBinding: struct{}{},
+			}
+			b, err := json.Marshal(nar)
+			assert.FatalError(t, err)
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = false
+			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
+			ctx = context.WithValue(ctx, jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			return test{
+				db: &acme.MockDB{
+					MockCreateAccount: func(ctx context.Context, acc *acme.Account) error {
+						acc.ID = "accountID"
+						assert.Equals(t, acc.Contact, nar.Contact)
+						assert.Equals(t, acc.Key, jwk)
+						return nil
+					},
+				},
+				acc: &acme.Account{
+					ID:        "accountID",
+					Key:       jwk,
+					Status:    acme.StatusValid,
+					Contact:   []string{"foo", "bar"},
+					OrdersURL: fmt.Sprintf("%s/acme/%s/account/accountID/orders", baseURL.String(), escProvName),
+				},
+				ctx:        ctx,
+				statusCode: 201,
+			}
+		},
+		"ok/new-account-with-eab": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			assert.FatalError(t, err)
+			mappedEAB := make(map[string]interface{})
+			err = json.Unmarshal(eabJWS, &mappedEAB)
+			assert.FatalError(t, err)
+			nar := &NewAccountRequest{
+				Contact:                []string{"foo", "bar"},
+				ExternalAccountBinding: mappedEAB,
+			}
+			b, err := json.Marshal(nar)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
+			ctx = context.WithValue(ctx, jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			return test{
+				db: &acme.MockDB{
+					MockCreateAccount: func(ctx context.Context, acc *acme.Account) error {
+						acc.ID = "accountID"
+						assert.Equals(t, acc.Contact, nar.Contact)
+						assert.Equals(t, acc.Key, jwk)
+						return nil
+					},
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+						return &acme.ExternalAccountKey{
+							ID:              "eakID",
+							ProvisionerName: escProvName,
+							Name:            "testeak",
+							KeyBytes:        []byte{1, 3, 3, 7},
+							CreatedAt:       time.Now(),
+						}, nil
+					},
+					MockUpdateExternalAccountKey: func(ctx context.Context, provisionerName string, eak *acme.ExternalAccountKey) error {
+						return nil
+					},
+				},
+				acc: &acme.Account{
+					ID:                     "accountID",
+					Key:                    jwk,
+					Status:                 acme.StatusValid,
+					Contact:                []string{"foo", "bar"},
+					OrdersURL:              fmt.Sprintf("%s/acme/%s/account/accountID/orders", baseURL.String(), escProvName),
+					ExternalAccountBinding: mappedEAB,
+				},
+				ctx:        ctx,
+				statusCode: 201,
 			}
 		},
 	}
@@ -690,6 +938,96 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 					[]string{fmt.Sprintf("%s/acme/%s/account/%s", baseURL.String(),
 						escProvName, accID)})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
+			}
+		})
+	}
+}
+
+func Test_keysAreEqual(t *testing.T) {
+	jwkX, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	assert.FatalError(t, err)
+	jwkY, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	assert.FatalError(t, err)
+	type args struct {
+		x *squarejose.JSONWebKey
+		y *squarejose.JSONWebKey
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "ok/nil",
+			args: args{
+				x: jwkX,
+				y: nil,
+			},
+			want: false,
+		},
+		{
+			name: "ok/equal",
+			args: args{
+				x: jwkX,
+				y: jwkX,
+			},
+			want: true,
+		},
+		{
+			name: "ok/not-equal",
+			args: args{
+				x: jwkX,
+				y: jwkY,
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := keysAreEqual(tt.args.x, tt.args.y); got != tt.want {
+				t.Errorf("keysAreEqual() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHandler_validateExternalAccountBinding(t *testing.T) {
+	type fields struct {
+		db                       acme.DB
+		backdate                 provisioner.Duration
+		ca                       acme.CertificateAuthority
+		linker                   Linker
+		validateChallengeOptions *acme.ValidateChallengeOptions
+	}
+	type args struct {
+		ctx context.Context
+		nar *NewAccountRequest
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *acme.ExternalAccountKey
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := &Handler{
+				db:                       tt.fields.db,
+				backdate:                 tt.fields.backdate,
+				ca:                       tt.fields.ca,
+				linker:                   tt.fields.linker,
+				validateChallengeOptions: tt.fields.validateChallengeOptions,
+			}
+			got, err := h.validateExternalAccountBinding(tt.args.ctx, tt.args.nar)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Handler.validateExternalAccountBinding() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Handler.validateExternalAccountBinding() = %v, want %v", got, tt.want)
 			}
 		})
 	}

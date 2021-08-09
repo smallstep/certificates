@@ -28,12 +28,13 @@ func (dba *dbAccount) clone() *dbAccount {
 }
 
 type dbExternalAccountKey struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	AccountID string    `json:"accountID,omitempty"`
-	KeyBytes  []byte    `json:"key"`
-	CreatedAt time.Time `json:"createdAt"`
-	BoundAt   time.Time `json:"boundAt"`
+	ID              string    `json:"id"`
+	ProvisionerName string    `json:"provisioner_name"`
+	Name            string    `json:"name"`
+	AccountID       string    `json:"accountID,omitempty"`
+	KeyBytes        []byte    `json:"key"`
+	CreatedAt       time.Time `json:"createdAt"`
+	BoundAt         time.Time `json:"boundAt"`
 }
 
 func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, error) {
@@ -164,7 +165,7 @@ func (db *DB) UpdateAccount(ctx context.Context, acc *acme.Account) error {
 }
 
 // CreateExternalAccountKey creates a new External Account Binding key with a name
-func (db *DB) CreateExternalAccountKey(ctx context.Context, name string) (*acme.ExternalAccountKey, error) {
+func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName string, name string) (*acme.ExternalAccountKey, error) {
 	keyID, err := randID()
 	if err != nil {
 		return nil, err
@@ -177,55 +178,67 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, name string) (*acme.
 	}
 
 	dbeak := &dbExternalAccountKey{
-		ID:        keyID,
-		Name:      name,
-		KeyBytes:  random,
-		CreatedAt: clock.Now(),
+		ID:              keyID,
+		ProvisionerName: provisionerName,
+		Name:            name,
+		KeyBytes:        random,
+		CreatedAt:       clock.Now(),
 	}
 
 	if err = db.save(ctx, keyID, dbeak, nil, "external_account_key", externalAccountKeyTable); err != nil {
 		return nil, err
 	}
 	return &acme.ExternalAccountKey{
-		ID:        dbeak.ID,
-		Name:      dbeak.Name,
-		AccountID: dbeak.AccountID,
-		KeyBytes:  dbeak.KeyBytes,
-		CreatedAt: dbeak.CreatedAt,
-		BoundAt:   dbeak.BoundAt,
+		ID:              dbeak.ID,
+		ProvisionerName: dbeak.ProvisionerName,
+		Name:            dbeak.Name,
+		AccountID:       dbeak.AccountID,
+		KeyBytes:        dbeak.KeyBytes,
+		CreatedAt:       dbeak.CreatedAt,
+		BoundAt:         dbeak.BoundAt,
 	}, nil
 }
 
 // GetExternalAccountKey retrieves an External Account Binding key by KeyID
-func (db *DB) GetExternalAccountKey(ctx context.Context, keyID string) (*acme.ExternalAccountKey, error) {
+func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
 	dbeak, err := db.getDBExternalAccountKey(ctx, keyID)
 	if err != nil {
 		return nil, err
 	}
 
+	if dbeak.ProvisionerName != provisionerName {
+		return nil, acme.NewError(acme.ErrorUnauthorizedType, "name of provisioner does not match provisioner for which the EAB key was created")
+	}
+
 	return &acme.ExternalAccountKey{
-		ID:        dbeak.ID,
-		Name:      dbeak.Name,
-		AccountID: dbeak.AccountID,
-		KeyBytes:  dbeak.KeyBytes,
-		CreatedAt: dbeak.CreatedAt,
-		BoundAt:   dbeak.BoundAt,
+		ID:              dbeak.ID,
+		ProvisionerName: dbeak.ProvisionerName,
+		Name:            dbeak.Name,
+		AccountID:       dbeak.AccountID,
+		KeyBytes:        dbeak.KeyBytes,
+		CreatedAt:       dbeak.CreatedAt,
+		BoundAt:         dbeak.BoundAt,
 	}, nil
 }
 
-func (db *DB) UpdateExternalAccountKey(ctx context.Context, eak *acme.ExternalAccountKey) error {
+func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerName string, eak *acme.ExternalAccountKey) error {
 	old, err := db.getDBExternalAccountKey(ctx, eak.ID)
 	if err != nil {
 		return err
 	}
 
+	if old.ProvisionerName != provisionerName {
+		return acme.NewError(acme.ErrorUnauthorizedType, "name of provisioner does not match provisioner for which the EAB key was created")
+	}
+
 	nu := dbExternalAccountKey{
-		ID:        eak.ID,
-		Name:      eak.Name,
-		AccountID: eak.AccountID,
-		KeyBytes:  eak.KeyBytes,
-		CreatedAt: eak.CreatedAt,
-		BoundAt:   eak.BoundAt,
+		ID:              eak.ID,
+		ProvisionerName: eak.ProvisionerName,
+		Name:            eak.Name,
+		AccountID:       eak.AccountID,
+		KeyBytes:        eak.KeyBytes,
+		CreatedAt:       eak.CreatedAt,
+		BoundAt:         eak.BoundAt,
 	}
 
 	return db.save(ctx, nu.ID, nu, old, "external_account_key", externalAccountKeyTable)
