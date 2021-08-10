@@ -29,9 +29,9 @@ import (
 	"github.com/smallstep/certificates/kms"
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/nosql"
-	"go.step.sm/cli-utils/config"
 	"go.step.sm/cli-utils/errs"
 	"go.step.sm/cli-utils/fileutil"
+	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
@@ -89,42 +89,42 @@ const (
 // GetDBPath returns the path where the file-system persistence is stored
 // based on the STEPPATH environment variable.
 func GetDBPath() string {
-	return filepath.Join(config.StepPath(), dbPath)
+	return filepath.Join(step.Path(), dbPath)
 }
 
 // GetConfigPath returns the directory where the configuration files are stored
 // based on the STEPPATH environment variable.
 func GetConfigPath() string {
-	return filepath.Join(config.StepPath(), configPath)
+	return filepath.Join(step.Path(), configPath)
 }
 
 // GetPublicPath returns the directory where the public keys are stored based on
 // the STEPPATH environment variable.
 func GetPublicPath() string {
-	return filepath.Join(config.StepPath(), publicPath)
+	return filepath.Join(step.Path(), publicPath)
 }
 
 // GetSecretsPath returns the directory where the private keys are stored based
 // on the STEPPATH environment variable.
 func GetSecretsPath() string {
-	return filepath.Join(config.StepPath(), privatePath)
+	return filepath.Join(step.Path(), privatePath)
 }
 
 // GetRootCAPath returns the path where the root CA is stored based on the
 // STEPPATH environment variable.
 func GetRootCAPath() string {
-	return filepath.Join(config.StepPath(), publicPath, "root_ca.crt")
+	return filepath.Join(step.Path(), publicPath, "root_ca.crt")
 }
 
 // GetOTTKeyPath returns the path where the one-time token key is stored based
 // on the STEPPATH environment variable.
 func GetOTTKeyPath() string {
-	return filepath.Join(config.StepPath(), privatePath, "ott_key")
+	return filepath.Join(step.Path(), privatePath, "ott_key")
 }
 
 // GetTemplatesPath returns the path where the templates are stored.
 func GetTemplatesPath() string {
-	return filepath.Join(config.StepPath(), templatesPath)
+	return filepath.Join(step.Path(), templatesPath)
 }
 
 // GetProvisioners returns the map of provisioners on the given CA.
