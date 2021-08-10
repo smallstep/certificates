@@ -10,11 +10,9 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"html"
 	"net"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -576,15 +574,22 @@ func (p *PKI) WriteFiles() error {
 
 func (p *PKI) askFeedback() {
 	ui.Println()
-	ui.Printf("\033[1mFEEDBACK\033[0m %s %s\n",
-		html.UnescapeString("&#"+strconv.Itoa(128525)+";"),
-		html.UnescapeString("&#"+strconv.Itoa(127867)+";"))
-	ui.Println("      The \033[1mstep\033[0m utility is not instrumented for usage statistics. It does not")
-	ui.Println("      phone home. But your feedback is extremely valuable. Any information you")
-	ui.Println("      can provide regarding how you’re using `step` helps. Please send us a")
-	ui.Println("      sentence or two, good or bad: \033[1mfeedback@smallstep.com\033[0m or join")
-	ui.Println("      \033[1mhttps://github.com/smallstep/certificates/discussions\033[0m and our Discord")
-	ui.Println("      \033[1mhttps://bit.ly/step-discord\033[0m.")
+	ui.Println("\033[1mFEEDBACK\033[0m 😍 🍻")
+	ui.Println("  The \033[1mstep\033[0m utility is not instrumented for usage statistics. It does not phone")
+	ui.Println("  home. But your feedback is extremely valuable. Any information you can provide")
+	ui.Println("  regarding how you’re using `step` helps. Please send us a sentence or two,")
+	ui.Println("  good or bad at \033[1mfeedback@smallstep.com\033[0m or join GitHub Discussions")
+	ui.Println("  \033[1mhttps://github.com/smallstep/certificates/discussions\033[0m and our Discord ")
+	ui.Println("  \033[1mhttps://bit.ly/step-discord\033[0m.")
+
+	if p.options.deploymentType == LinkedDeployment {
+		ui.Println()
+		ui.Println("\033[1mNEXT STEPS\033[0m")
+		ui.Println("  1. Log in or create a Certificate Manager account at \033[1mhttps://u.step.sm/linked\033[0m")
+		ui.Println("  2. Add a new authority with \"linked\" type")
+		ui.Println("  3. Follow instructions in browser to start `step-ca` using the `--token` flag")
+		ui.Println()
+	}
 }
 
 func (p *PKI) tellPKI() {
@@ -802,11 +807,13 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 
 		ui.PrintSelected("Default configuration", p.defaults)
 		ui.PrintSelected("Certificate Authority configuration", p.config)
-		ui.Println()
-		if p.casOptions.Is(apiv1.SoftCAS) {
-			ui.Println("Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.")
-		} else {
-			ui.Println("Your registration authority is ready to go. To generate certificates for individual services see 'step help ca'.")
+		if p.options.deploymentType != LinkedDeployment {
+			ui.Println()
+			if p.casOptions.Is(apiv1.SoftCAS) {
+				ui.Println("Your PKI is ready to go. To generate certificates for individual services see 'step help ca'.")
+			} else {
+				ui.Println("Your registration authority is ready to go. To generate certificates for individual services see 'step help ca'.")
+			}
 		}
 	}
 
