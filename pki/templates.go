@@ -6,9 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/templates"
-	"go.step.sm/cli-utils/config"
 	"go.step.sm/cli-utils/errs"
 	"go.step.sm/cli-utils/fileutil"
+	"go.step.sm/cli-utils/step"
 )
 
 // getTemplates returns all the templates enabled
@@ -44,7 +44,7 @@ func generateTemplates(t *templates.Templates) error {
 			if !ok {
 				return errors.Errorf("template %s does not exists", t.Name)
 			}
-			if err := fileutil.WriteFile(config.StepAbs(t.TemplatePath), []byte(data), 0644); err != nil {
+			if err := fileutil.WriteFile(step.Abs(t.TemplatePath), []byte(data), 0644); err != nil {
 				return err
 			}
 		}
@@ -53,7 +53,7 @@ func generateTemplates(t *templates.Templates) error {
 			if !ok {
 				return errors.Errorf("template %s does not exists", t.Name)
 			}
-			if err := fileutil.WriteFile(config.StepAbs(t.TemplatePath), []byte(data), 0644); err != nil {
+			if err := fileutil.WriteFile(step.Abs(t.TemplatePath), []byte(data), 0644); err != nil {
 				return err
 			}
 		}
