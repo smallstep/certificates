@@ -13,12 +13,19 @@ import (
 	squarejose "gopkg.in/square/go-jose.v2"
 )
 
+// ExternalAccountBinding represents the ACME externalAccountBinding JWS
+type ExternalAccountBinding struct {
+	Protected string `json:"protected"`
+	Payload   string `json:"payload"`
+	Sig       string `json:"signature"`
+}
+
 // NewAccountRequest represents the payload for a new account request.
 type NewAccountRequest struct {
-	Contact                []string    `json:"contact"`
-	OnlyReturnExisting     bool        `json:"onlyReturnExisting"`
-	TermsOfServiceAgreed   bool        `json:"termsOfServiceAgreed"`
-	ExternalAccountBinding interface{} `json:"externalAccountBinding,omitempty"`
+	Contact                []string                `json:"contact"`
+	OnlyReturnExisting     bool                    `json:"onlyReturnExisting"`
+	TermsOfServiceAgreed   bool                    `json:"termsOfServiceAgreed"`
+	ExternalAccountBinding *ExternalAccountBinding `json:"externalAccountBinding,omitempty"`
 }
 
 func validateContacts(cs []string) error {
@@ -245,6 +252,9 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 		return nil, acme.NewError(acme.ErrorExternalAccountRequiredType, "no external account binding provided")
 	}
 
+	// TODO: extract the EAB in a similar manner as JWS, JWK, payload, etc? That would probably move a lot/all of
+	// the logic of this function into the middleware. Should not be too hard, because the middleware does know
+	// about the handler and thus about its dependencies.
 	eabJSONBytes, err := json.Marshal(nar.ExternalAccountBinding)
 	if err != nil {
 		return nil, acme.WrapErrorISE(err, "error marshaling externalAccountBinding into JSON")

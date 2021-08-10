@@ -45,7 +45,7 @@ func KeyToID(jwk *jose.JSONWebKey) (string, error) {
 
 type ExternalAccountKey struct {
 	ID              string    `json:"id"`
-	ProvisionerName string    `json:"provisioner_name"`
+	ProvisionerName string    `json:"provisionerName"`
 	Name            string    `json:"name"`
 	AccountID       string    `json:"-"`
 	KeyBytes        []byte    `json:"-"`

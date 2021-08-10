@@ -13,10 +13,14 @@ import (
 // provisioning flow.
 type ACME struct {
 	*base
-	ID         string   `json:"-"`
-	Type       string   `json:"type"`
-	Name       string   `json:"name"`
-	ForceCN    bool     `json:"forceCN,omitempty"`
+	ID      string `json:"-"`
+	Type    string `json:"type"`
+	Name    string `json:"name"`
+	ForceCN bool   `json:"forceCN,omitempty"`
+	// RequireEAB makes the provisioner require ACME EAB to be provided
+	// by clients when creating a new Account. If set to true, the provided
+	// EAB will be verified. If set to false and an EAB is provided, it is
+	// not verified. Defaults to false.
 	RequireEAB bool     `json:"requireEAB,omitempty"`
 	Claims     *Claims  `json:"claims,omitempty"`
 	Options    *Options `json:"options,omitempty"`

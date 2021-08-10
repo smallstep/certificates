@@ -15,11 +15,11 @@ import (
 	"math/big"
 	"net/http/httptest"
 	"net/url"
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/go-chi/chi"
+	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -617,13 +617,18 @@ func TestHandler_NewAccount(t *testing.T) {
 			}
 		},
 		"ok/new-account-no-eab-required": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(eabJWS, &eab)
+			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
-				ExternalAccountBinding: struct{}{},
+				ExternalAccountBinding: eab,
 			}
 			b, err := json.Marshal(nar)
-			assert.FatalError(t, err)
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			prov := newACMEProv(t)
 			prov.RequireEAB = false
@@ -656,12 +661,12 @@ func TestHandler_NewAccount(t *testing.T) {
 			assert.FatalError(t, err)
 			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
 			assert.FatalError(t, err)
-			mappedEAB := make(map[string]interface{})
-			err = json.Unmarshal(eabJWS, &mappedEAB)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(eabJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
-				ExternalAccountBinding: mappedEAB,
+				ExternalAccountBinding: eab,
 			}
 			b, err := json.Marshal(nar)
 			assert.FatalError(t, err)
@@ -698,7 +703,7 @@ func TestHandler_NewAccount(t *testing.T) {
 					Status:                 acme.StatusValid,
 					Contact:                []string{"foo", "bar"},
 					OrdersURL:              fmt.Sprintf("%s/acme/%s/account/accountID/orders", baseURL.String(), escProvName),
-					ExternalAccountBinding: mappedEAB,
+					ExternalAccountBinding: eab,
 				},
 				ctx:        ctx,
 				statusCode: 201,
@@ -948,6 +953,9 @@ func Test_keysAreEqual(t *testing.T) {
 	assert.FatalError(t, err)
 	jwkY, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	assert.FatalError(t, err)
+	wrongJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	assert.FatalError(t, err)
+	wrongJWK.Key = struct{}{}
 	type args struct {
 		x *squarejose.JSONWebKey
 		y *squarejose.JSONWebKey
@@ -981,6 +989,14 @@ func Test_keysAreEqual(t *testing.T) {
 			},
 			want: false,
 		},
+		{
+			name: "ok/wrong-key-type",
+			args: args{
+				x: wrongJWK,
+				y: jwkY,
+			},
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -992,42 +1008,323 @@ func Test_keysAreEqual(t *testing.T) {
 }
 
 func TestHandler_validateExternalAccountBinding(t *testing.T) {
-	type fields struct {
-		db                       acme.DB
-		backdate                 provisioner.Duration
-		ca                       acme.CertificateAuthority
-		linker                   Linker
-		validateChallengeOptions *acme.ValidateChallengeOptions
-	}
-	type args struct {
+	acmeProv := newACMEProv(t)
+	escProvName := url.PathEscape(acmeProv.GetName())
+	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+	type test struct {
+		db  acme.DB
 		ctx context.Context
 		nar *NewAccountRequest
+		eak *acme.ExternalAccountKey
+		err *acme.Error
 	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    *acme.ExternalAccountKey
-		wantErr bool
-	}{
-		// TODO: Add test cases.
+	var tests = map[string]func(t *testing.T) test{
+		"ok/no-eab-required-but-provided": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(eabJWS, &eab)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			return test{
+				db:  &acme.MockDB{},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: nil,
+				err: nil,
+			}
+		},
+		"ok/eab": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(eabJWS, &eab)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			return test{
+				db: &acme.MockDB{
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+						return &acme.ExternalAccountKey{
+							ID:              "eakID",
+							ProvisionerName: escProvName,
+							Name:            "testeak",
+							KeyBytes:        []byte{1, 3, 3, 7},
+							CreatedAt:       time.Now(),
+						}, nil
+					},
+				},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: &acme.ExternalAccountKey{},
+				err: nil,
+			}
+		},
+		"fail/parse-eab-jose": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(eabJWS, &eab)
+			assert.FatalError(t, err)
+			eab.Payload = eab.Payload + "{}"
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			return test{
+				db:  &acme.MockDB{},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: nil,
+				err: acme.NewErrorISE("error parsing externalAccountBinding jws"),
+			}
+		},
+		"fail/retrieve-eab-key-db-failure": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(eabJWS, &eab)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			return test{
+				db: &acme.MockDB{
+					MockError: errors.New("db failure"),
+				},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: nil,
+				err: acme.NewErrorISE("error retrieving external account key"),
+			}
+		},
+		"fail/retrieve-eab-key-not-found": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "unknown-key-id", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(eabJWS, &eab)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			return test{
+				db: &acme.MockDB{
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+						return nil, acme.NewErrorISE("error retrieving external account key")
+					},
+				},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: nil,
+				err: acme.NewErrorISE("error loading external account key unknown-key-id"),
+			}
+		},
+		"fail/retrieve-eab-wrong-provisioner": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(eabJWS, &eab)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			return test{
+				db: &acme.MockDB{
+					MockError: acme.NewError(acme.ErrorUnauthorizedType, "name of provisioner does not match provisioner for which the EAB key was created"),
+				},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: nil,
+				err: acme.NewError(acme.ErrorUnauthorizedType, "name of provisioner does not match provisioner for which the EAB key was created"),
+			}
+		},
+		"fail/eab-already-bound": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(eabJWS, &eab)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			createdAt := time.Now()
+			boundAt := time.Now().Add(1 * time.Second)
+			return test{
+				db: &acme.MockDB{
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+						return &acme.ExternalAccountKey{
+							ID:              "eakID",
+							ProvisionerName: escProvName,
+							Name:            "testeak",
+							CreatedAt:       createdAt,
+							AccountID:       "some-account-id",
+							BoundAt:         boundAt,
+						}, nil
+					},
+				},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: nil,
+				err: acme.NewError(acme.ErrorUnauthorizedType, "external account binding key with id '%s' was already bound to account '%s' on %s", "eakID", "some-account-id", boundAt),
+			}
+		},
+		"fail/eab-verify": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(eabJWS, &eab)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			return test{
+				db: &acme.MockDB{
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+						return &acme.ExternalAccountKey{
+							ID:              "eakID",
+							ProvisionerName: escProvName,
+							Name:            "testeak",
+							KeyBytes:        []byte{1, 2, 3, 4},
+							CreatedAt:       time.Now(),
+						}, nil
+					},
+				},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: nil,
+				err: acme.NewErrorISE("error verifying externalAccountBinding signature"),
+			}
+		},
+		"fail/eab-non-matching-keys": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			differentJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			eabJWS, err := jwsEncodeEAB(differentJWK.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(eabJWS, &eab)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			return test{
+				db: &acme.MockDB{
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+						return &acme.ExternalAccountKey{
+							ID:              "eakID",
+							ProvisionerName: escProvName,
+							Name:            "testeak",
+							KeyBytes:        []byte{1, 3, 3, 7},
+							CreatedAt:       time.Now(),
+						}, nil
+					},
+				},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: nil,
+				err: acme.NewError(acme.ErrorMalformedType, "keys in jws and eab payload do not match"),
+			}
+		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for name, run := range tests {
+		tc := run(t)
+		t.Run(name, func(t *testing.T) {
 			h := &Handler{
-				db:                       tt.fields.db,
-				backdate:                 tt.fields.backdate,
-				ca:                       tt.fields.ca,
-				linker:                   tt.fields.linker,
-				validateChallengeOptions: tt.fields.validateChallengeOptions,
+				db: tc.db,
 			}
-			got, err := h.validateExternalAccountBinding(tt.args.ctx, tt.args.nar)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Handler.validateExternalAccountBinding() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			got, err := h.validateExternalAccountBinding(tc.ctx, tc.nar)
+			wantErr := tc.err != nil
+			gotErr := err != nil
+			if wantErr != gotErr {
+				// fmt.Println(got)
+				// fmt.Println(fmt.Sprintf("%#+v", got))
+				t.Errorf("Handler.validateExternalAccountBinding() error = %v, want %v", err, tc.err)
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Handler.validateExternalAccountBinding() = %v, want %v", got, tt.want)
+			if wantErr {
+				assert.NotNil(t, err)
+				assert.Type(t, &acme.Error{}, err)
+				ae, _ := err.(*acme.Error)
+				assert.Equals(t, ae.Type, tc.err.Type)
+				assert.Equals(t, ae.Detail, tc.err.Detail)
+				assert.Equals(t, ae.Identifier, tc.err.Identifier)
+				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
+
+				// fmt.Println(fmt.Sprintf("%#+v", ae))
+				// fmt.Println(fmt.Sprintf("%#+v", tc.err))
+
+				//t.Fail()
+			} else {
+				if got == nil {
+					assert.Nil(t, tc.eak)
+				} else {
+					// TODO: equality check on certain fields?
+					assert.NotNil(t, tc.eak)
+				}
+				//assert.Equals(t, tc.eak, got)
+				//assert.NotNil(t, got)
 			}
 		})
 	}
