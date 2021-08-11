@@ -54,6 +54,20 @@ const (
 	HostedDeployment
 )
 
+// String returns the string version of the deployment type.
+func (d DeploymentType) String() string {
+	switch d {
+	case StandaloneDeployment:
+		return "standalone"
+	case LinkedDeployment:
+		return "linked"
+	case HostedDeployment:
+		return "hosted"
+	default:
+		return "unknown"
+	}
+}
+
 const (
 	// ConfigPath is the directory name under the step path where the configuration
 	// files will be stored.
@@ -580,7 +594,7 @@ func (p *PKI) askFeedback() {
 	ui.Println("  regarding how you’re using `step` helps. Please send us a sentence or two,")
 	ui.Println("  good or bad at \033[1mfeedback@smallstep.com\033[0m or join GitHub Discussions")
 	ui.Println("  \033[1mhttps://github.com/smallstep/certificates/discussions\033[0m and our Discord ")
-	ui.Println("  \033[1mhttps://bit.ly/step-discord\033[0m.")
+	ui.Println("  \033[1mhttps://u.step.sm/discord\033[0m.")
 
 	if p.options.deploymentType == LinkedDeployment {
 		ui.Println()
@@ -650,6 +664,12 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 		},
 		TLS:       &authconfig.DefaultTLSOptions,
 		Templates: p.getTemplates(),
+	}
+
+	// Add linked as a deployment type to detect it on start and provide a
+	// message if the token is not given.
+	if p.options.deploymentType == LinkedDeployment {
+		config.AuthorityConfig.DeploymentType = LinkedDeployment.String()
 	}
 
 	// On standalone deployments add the provisioners to either the ca.json or
