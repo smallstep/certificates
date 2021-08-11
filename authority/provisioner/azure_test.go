@@ -72,7 +72,7 @@ func TestAzure_GetTokenID(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", p1, args{t1}, w1, false},
-		{"ok no TOFU", p2, args{t2}, "the-jti", false},
+		{"ok no TOFU", p2, args{t2}, "", true},
 		{"fail token", p1, args{"bad-token"}, "", true},
 		{"fail claims", p1, args{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ey.fooo"}, "", true},
 	}

@@ -131,9 +131,10 @@ func (p *Azure) GetTokenID(token string) (string, error) {
 		return "", errors.Wrap(err, "error verifying claims")
 	}
 
-	// If TOFU is disabled create return the token kid
+	// If TOFU is disabled then allow token re-use. Azure caches the token for
+	// 24h and without allowing the re-use we cannot use it twice.
 	if p.DisableTrustOnFirstUse {
-		return claims.ID, nil
+		return "", ErrAllowTokenReuse
 	}
 
 	sum := sha256.Sum256([]byte(claims.XMSMirID))
