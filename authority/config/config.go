@@ -225,7 +225,7 @@ func (c *Config) Validate() error {
 			c.TLS.MaxVersion = DefaultTLSOptions.MaxVersion
 		}
 		if c.TLS.MinVersion == 0 {
-			c.TLS.MinVersion = c.TLS.MaxVersion
+			c.TLS.MinVersion = DefaultTLSOptions.MinVersion
 		}
 		if c.TLS.MinVersion > c.TLS.MaxVersion {
 			return errors.New("tls minVersion cannot exceed tls maxVersion")
