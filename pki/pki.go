@@ -654,7 +654,7 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 		DNSNames:         p.DnsNames,
 		Logger:           []byte(`{"format": "text"}`),
 		DB: &db.Config{
-			Type:       "badger",
+			Type:       "badgerv2",
 			DataSource: GetDBPath(),
 		},
 		AuthorityConfig: &authconfig.AuthConfig{
