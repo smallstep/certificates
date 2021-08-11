@@ -36,12 +36,12 @@ type Interface interface {
 // ErrAllowTokenReuse is an error that is returned by provisioners that allows
 // the reuse of tokens.
 //
-// This is for example returned by the Azure provisioner when
-// DisableTrustOnFirstUse is set to true. For AWS and GCP DisableTrustOnFirst
-// use means that we allow the re-use of a token coming from a specific
-// instance, but in these providers we can always get a new token, but because
-// Azure caches the token for up to 24h we should add a mechanism to allow the
-// re-use.
+// This is, for example, returned by the Azure provisioner when
+// DisableTrustOnFirstUse is set to true. Azure caches tokens for up to 24hr and
+// has no mechanism for getting a different token - this can be an issue when
+// rebooting a VM. In contrast, AWS and GCP have facilities for requesting a new
+// token. Therefore, for the Azure provisioner we are enabling token reuse, with
+// the understanding that we are not following security best practices
 var ErrAllowTokenReuse = stderrors.New("allow token reuse")
 
 // Audiences stores all supported audiences by request type.
