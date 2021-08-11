@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	stderrors "errors"
 	"net/url"
 	"regexp"
 	"strings"
@@ -31,6 +32,17 @@ type Interface interface {
 	AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error)
 	AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error)
 }
+
+// ErrAllowTokenReuse is an error that is returned by provisioners that allows
+// the reuse of tokens.
+//
+// This is for example returned by the Azure provisioner when
+// DisableTrustOnFirstUse is set to true. For AWS and GCP DisableTrustOnFirst
+// use means that we allow the re-use of a token coming from a specific
+// instance, but in these providers we can always get a new token, but because
+// Azure caches the token for up to 24h we should add a mechanism to allow the
+// re-use.
+var ErrAllowTokenReuse = stderrors.New("allow token reuse")
 
 // Audiences stores all supported audiences by request type.
 type Audiences struct {
