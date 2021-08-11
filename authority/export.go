@@ -47,6 +47,7 @@ func (a *Authority) Export() (c *linkedca.Configuration, err error) {
 			EnableAdmin:          a.config.AuthorityConfig.EnableAdmin,
 			DisableIssuedAtCheck: a.config.AuthorityConfig.DisableIssuedAtCheck,
 			Backdate:             mustDuration(a.config.AuthorityConfig.Backdate),
+			DeploymentType:       a.config.AuthorityConfig.DeploymentType,
 		},
 		Files: files,
 	}
