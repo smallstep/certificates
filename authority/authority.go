@@ -11,24 +11,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smallstep/certificates/cas"
-	"github.com/smallstep/certificates/scep"
-	"go.step.sm/linkedca"
-
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/admin"
 	adminDBNosql "github.com/smallstep/certificates/authority/admin/db/nosql"
 	"github.com/smallstep/certificates/authority/administrator"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/kms"
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/sshagentkms"
+	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/nosql"
 	"go.step.sm/crypto/pemutil"
+	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -474,7 +473,7 @@ func (a *Authority) init() error {
 		if err != nil {
 			return admin.WrapErrorISE(err, "error loading provisioners to initialize authority")
 		}
-		if len(provs) == 0 {
+		if len(provs) == 0 && !strings.EqualFold(a.config.AuthorityConfig.DeploymentType, "linked") {
 			// Create First Provisioner
 			prov, err := CreateFirstProvisioner(context.Background(), a.adminDB, a.config.Password)
 			if err != nil {

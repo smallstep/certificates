@@ -14,6 +14,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	step "go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/linkedca"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -238,6 +239,14 @@ func (a *Authority) RemoveProvisioner(ctx context.Context, id string) error {
 }
 
 func CreateFirstProvisioner(ctx context.Context, db admin.DB, password string) (*linkedca.Provisioner, error) {
+	if password == "" {
+		pass, err := ui.PromptPasswordGenerate("Please enter the password to encrypt your first provisioner, leave empty and we'll generate one")
+		if err != nil {
+			return nil, err
+		}
+		password = string(pass)
+	}
+
 	jwk, jwe, err := jose.GenerateDefaultKeyPair([]byte(password))
 	if err != nil {
 		return nil, admin.WrapErrorISE(err, "error generating JWK key pair")
