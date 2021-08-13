@@ -600,7 +600,7 @@ func (p *PKI) askFeedback() {
 		ui.Println()
 		ui.Println("\033[1mNEXT STEPS\033[0m")
 		ui.Println("  1. Log in or create a Certificate Manager account at \033[1mhttps://u.step.sm/linked\033[0m")
-		ui.Println("  2. Add a new authority with \"linked\" type")
+		ui.Println("  2. Add a new authority and select \"Link a step-ca instance\"")
 		ui.Println("  3. Follow instructions in browser to start `step-ca` using the `--token` flag")
 		ui.Println()
 	}

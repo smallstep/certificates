@@ -75,7 +75,7 @@ func appAction(ctx *cli.Context) error {
 
 To get a linked authority token:
   1. Log in or create a Certificate Manager account at ` + "\033[1mhttps://u.step.sm/linked\033[0m" + `
-  2. Add a new authority with "linked" type
+  2. Add a new authority and select "Link a step-ca instance"
   3. Follow instructions in browser to start 'step-ca' using the '--token' flag
 `)
 		}
