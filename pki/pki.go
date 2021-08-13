@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -96,6 +97,12 @@ func GetDBPath() string {
 // based on the STEPPATH environment variable.
 func GetConfigPath() string {
 	return filepath.Join(step.Path(), configPath)
+}
+
+// GetProfileConfigPath returns the directory where the profile configuration
+// files are stored based on the STEPPATH environment variable.
+func GetProfileConfigPath() string {
+	return filepath.Join(step.ProfilePath(), configPath)
 }
 
 // GetPublicPath returns the directory where the public keys are stored based on
@@ -364,6 +371,21 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 					return nil, errs.FileError(err, name)
 				}
 			}
+		}
+	}
+
+	// Create profile directory and stub for default profile configuration.
+	if currentCtx := step.GetCurrentContext(); currentCtx != nil {
+		profile := GetProfileConfigPath()
+		if err := os.MkdirAll(profile, 0700); err != nil {
+			return nil, errs.FileError(err, profile)
+		}
+		if p.profileDefaults, err = getPath(profile, "defaults.json"); err != nil {
+			return nil, err
+		}
+		if err := ioutil.WriteFile(p.profileDefaults,
+			[]byte("{}"), 0600); err != nil {
+			return nil, err
 		}
 	}
 
@@ -958,6 +980,9 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 		}
 
 		ui.PrintSelected("Default configuration", p.defaults)
+		if p.profileDefaults != "" {
+			ui.PrintSelected("Profile default configuration", p.profileDefaults)
+		}
 		ui.PrintSelected("Certificate Authority configuration", p.config)
 		if p.options.deploymentType != LinkedDeployment {
 			ui.Println()
