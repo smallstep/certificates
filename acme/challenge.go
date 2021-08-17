@@ -129,6 +129,12 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	conn, err := vo.TLSDial("tcp", hostPort, config)
 	if err != nil {
+		// With Go 1.17+ tls.Dial fails if there's no overlap between configured
+		// client and server protocols. See https://golang.org/doc/go1.17#ALPN
+		if err.Error() == "remote error: tls: no application protocol" {
+			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+				"cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge"))
+		}
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
 			"error doing TLS dial for %s", hostPort))
 	}
