@@ -8,10 +8,11 @@ set -eo pipefail
 export STEPPATH=$(step path)
 
 # List of env vars required for step ca init
-declare -ra REQUIRED_INIT_VARS=(DOCKER_STEPCA_INIT_NAME DOCKER_STEPCA_INIT_DNS DOCKER_STEPCA_INIT_EMAIL DOCKER_STEPCA_INIT_PASSWORD)
+declare -ra REQUIRED_INIT_VARS=(DOCKER_STEPCA_INIT_NAME DOCKER_STEPCA_INIT_DNS DOCKER_STEPCA_INIT_EMAIL)
 
 # optional:
-# DOCKER_STEPCA_INIT_SSH (boolean default false)
+# DOCKER_STEPCA_INIT_PASSWORD (initial CA password)
+# DOCKER_STEPCA_INIT_SSH (boolean: given a non-empty value, create an SSH CA)
 
 # Ensure all env vars required to run step ca init are set.
 function init_if_possible () {
@@ -28,9 +29,19 @@ function init_if_possible () {
     fi
 }
 
+function generate_password () {
+    set +o pipefail
+    < /dev/urandom tr -dc A-Za-z0-9 | head -c40
+    set -o pipefail
+}
+
 # Initialize a CA if not already initialized
 function step_ca_init () {
-    echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
+    if [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
+        echo -n "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
+    else
+        generate_password > "${STEPPATH}/password"
+    fi
     local -a setup_args=(
         --name "${DOCKER_STEPCA_INIT_NAME}"
 		--dns "${DOCKER_STEPCA_INIT_DNS}"
