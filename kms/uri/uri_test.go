@@ -274,3 +274,28 @@ func TestURI_Pin(t *testing.T) {
 		})
 	}
 }
+
+func TestURI_String(t *testing.T) {
+	mustParse := func(s string) *URI {
+		u, err := Parse(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
+	tests := []struct {
+		name string
+		uri  *URI
+		want string
+	}{
+		{"ok new", New("yubikey", url.Values{"slot-id": []string{"9a"}, "foo": []string{"bar"}}), "yubikey:foo=bar;slot-id=9a"},
+		{"ok parse", mustParse("yubikey:slot-id=9a;foo=bar?bar=zar"), "yubikey:slot-id=9a;foo=bar?bar=zar"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.uri.String(); got != tt.want {
+				t.Errorf("URI.String() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
