@@ -8,11 +8,7 @@ set -eo pipefail
 export STEPPATH=$(step path)
 
 # List of env vars required for step ca init
-declare -ra REQUIRED_INIT_VARS=(DOCKER_STEPCA_INIT_NAME DOCKER_STEPCA_INIT_DNS DOCKER_STEPCA_INIT_EMAIL)
-
-# optional:
-# DOCKER_STEPCA_INIT_PASSWORD (initial CA password)
-# DOCKER_STEPCA_INIT_SSH (boolean: given a non-empty value, create an SSH CA)
+declare -ra REQUIRED_INIT_VARS=(DOCKER_STEPCA_INIT_NAME DOCKER_STEPCA_INIT_DNS_NAMES)
 
 # Ensure all env vars required to run step ca init are set.
 function init_if_possible () {
@@ -40,8 +36,8 @@ function generate_password () {
 function step_ca_init () {
     local -a setup_args=(
         --name "${DOCKER_STEPCA_INIT_NAME}"
-		--dns "${DOCKER_STEPCA_INIT_DNS}"
-		--provisioner "${DOCKER_STEPCA_INIT_EMAIL}"
+		--dns "${DOCKER_STEPCA_INIT_DNS_NAMES}"
+		--provisioner "${DOCKER_STEPCA_INIT_PROVISIONER_NAME:-admin}"
 		--password-file "${STEPPATH}/password"
         --address ":9000"
     )
