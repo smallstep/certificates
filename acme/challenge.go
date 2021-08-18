@@ -10,11 +10,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
@@ -114,6 +116,17 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	return nil
 }
 
+func tlsAlert(err error) uint8 {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		v := reflect.ValueOf(opErr.Err)
+		if v.Kind() == reflect.Uint8 {
+			return uint8(v.Uint())
+		}
+	}
+	return 0
+}
+
 func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
 	config := &tls.Config{
 		NextProtos: []string{"acme-tls/1"},
@@ -130,8 +143,10 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 	conn, err := vo.TLSDial("tcp", hostPort, config)
 	if err != nil {
 		// With Go 1.17+ tls.Dial fails if there's no overlap between configured
-		// client and server protocols. See https://golang.org/doc/go1.17#ALPN
-		if err.Error() == "remote error: tls: no application protocol" {
+		// client and server protocols. When this happens the connection is
+		// closed with the error no_application_protocol(120) as required by
+		// RFC7301. See https://golang.org/doc/go1.17#ALPN
+		if tlsAlert(err) == 120 {
 			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 				"cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge"))
 		}
