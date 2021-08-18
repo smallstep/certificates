@@ -1,0 +1,52 @@
+#!/bin/bash
+set -eo pipefail
+
+# Paraphrased from:
+# https://github.com/influxdata/influxdata-docker/blob/0d341f18067c4652dfa8df7dcb24d69bf707363d/influxdb/2.0/entrypoint.sh
+# (a repo with no LICENSE.md)
+
+export STEPPATH=$(step path)
+
+# List of env vars required for step ca init
+declare -ra REQUIRED_INIT_VARS=(DOCKER_STEPCA_INIT_NAME DOCKER_STEPCA_INIT_DNS DOCKER_STEPCA_INIT_EMAIL DOCKER_STEPCA_INIT_PASSWORD)
+
+# optional:
+# DOCKER_STEPCA_INIT_SSH (boolean default false)
+
+# Ensure all env vars required to run step ca init are set.
+function init_if_possible () {
+    local missing_vars=0
+    for var in "${REQUIRED_INIT_VARS[@]}"; do
+        if [ -z "${!var}" ]; then
+            missing_vars=1
+        fi
+    done
+    if [ ${missing_vars} = 1 ]; then
+		>&2 echo "there is no ca.json config file; please run step ca init, or provide config parameters via DOCKER_STEPCA_INIT_ vars"
+    else
+        step_ca_init "${@}"
+    fi
+}
+
+# Initialize a CA if not already initialized
+function step_ca_init () {
+    echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
+    local -a setup_args=(
+        --name "${DOCKER_STEPCA_INIT_NAME}"
+		--dns "${DOCKER_STEPCA_INIT_DNS}"
+		--provisioner "${DOCKER_STEPCA_INIT_EMAIL}"
+		--password-file "${STEPPATH}/password"
+        --address ":9000"
+    )
+    if [ -n "${DOCKER_STEPCA_INIT_SSH}" ]; then
+        setup_args=("${setup_args[@]}" --ssh)
+    fi
+    step ca init "${setup_args[@]}"
+    mv $STEPPATH/password $PWDPATH
+}
+
+if [ ! -f "${STEPPATH}/config/ca.json" ]; then
+	init_if_possible
+fi
+
+exec "${@}"
