@@ -1,6 +1,18 @@
 #!/bin/bash
 set -e
 
+# TODO:
+# - Parse params using argbash (argbash.io). Here's a template that I have tested but have not implemented yet:
+# 
+# ARG_OPTIONAL_SINGLE([ca-url], , [the URL of the upstream (issuing) step-ca server])
+# ARG_OPTIONAL_SINGLE([fingerprint], , [the SHA256 fingerprint of the upstream peer step-ca server])
+# ARG_OPTIONAL_SINGLE([provisioner-name], , [the name of a JWK provisioner on the upstream CA that this RA will use])
+# ARG_OPTIONAL_SINGLE([provisioner-password-file], , [the name a file containing the upstream JWK provisioner password])
+# ARG_OPTIONAL_REPEATED([dns-name], , [DNS name of this RA that will appear on its TLS certificate; you may pass this flag multiple times])
+# ARG_OPTIONAL_SINGLE([listen-address], , [the address (and port #) this RA will listen on, eg. :443 or 127.0.0.1:4443])
+# ARG_HELP([This script will install and configure a Registration Authority that connects to an upstream CA running step-ca.])
+# ARGBASH_GO
+
 echo "This script will install and start a step-ca server running in Registration Authority (RA) mode."
 echo ""
 echo "You will need an upstream CA (URL and fingerprint)"
