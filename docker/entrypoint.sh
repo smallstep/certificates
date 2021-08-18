@@ -37,11 +37,6 @@ function generate_password () {
 
 # Initialize a CA if not already initialized
 function step_ca_init () {
-    if [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
-        echo -n "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
-    else
-        generate_password > "${STEPPATH}/password"
-    fi
     local -a setup_args=(
         --name "${DOCKER_STEPCA_INIT_NAME}"
 		--dns "${DOCKER_STEPCA_INIT_DNS}"
@@ -49,6 +44,11 @@ function step_ca_init () {
 		--password-file "${STEPPATH}/password"
         --address ":9000"
     )
+    if [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
+        echo -n "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
+    else
+        generate_password > "${STEPPATH}/password"
+    fi
     if [ -n "${DOCKER_STEPCA_INIT_SSH}" ]; then
         setup_args=("${setup_args[@]}" --ssh)
     fi
