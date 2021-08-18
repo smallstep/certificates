@@ -32,6 +32,7 @@ function init_if_possible () {
 function generate_password () {
     set +o pipefail
     < /dev/urandom tr -dc A-Za-z0-9 | head -c40
+    echo
     set -o pipefail
 }
 
@@ -45,7 +46,7 @@ function step_ca_init () {
         --address ":9000"
     )
     if [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
-        echo -n "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
+        echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
     else
         generate_password > "${STEPPATH}/password"
     fi
