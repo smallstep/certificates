@@ -18,7 +18,7 @@ You can use it to:
 
 Whatever your use case, `step-ca` is easy to use and hard to misuse, thanks to [safe, sane defaults](https://smallstep.com/docs/step-ca/certificate-authority-server-production#sane-cryptographic-defaults).
 
-**Questions? Find us in [Discussions](https://github.com/smallstep/certificates/discussions) or [Join our Discord](https://bit.ly/stepdiscord).**
+**Questions? Find us in [Discussions](https://github.com/smallstep/certificates/discussions) or [Join our Discord](https://bit.ly/step-discord).**
 
 [Website](https://smallstep.com/certificates) |
 [Documentation](https://smallstep.com/docs) |
