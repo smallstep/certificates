@@ -735,6 +735,13 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 		if !config.AuthorityConfig.EnableAdmin {
 			config.AuthorityConfig.Provisioners = provisioners
 		} else {
+			// At this moment this code path is never used because `step ca
+			// init` will always set enableAdmin to false for a standalone
+			// deployment. Once we move `step beta` commands out of the beta we
+			// should probably default to this route.
+			//
+			// Note that we might want to be able to define the database as a
+			// flag in `step ca init` so we can write to the proper place.
 			db, err := db.New(config.DB)
 			if err != nil {
 				return nil, err
