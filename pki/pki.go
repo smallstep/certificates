@@ -780,7 +780,7 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 		return err
 	}
 
-	// Display only the
+	// Display the files written
 	p.tellPKI()
 
 	// Generate and write ca.json
