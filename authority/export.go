@@ -117,7 +117,7 @@ func (a *Authority) Export() (c *linkedca.Configuration, err error) {
 			if !ok {
 				return nil, errors.Errorf("unknown certificate issuer type %s", iss.Type)
 			}
-			// The exporte certificate issuer should not include the password.
+			// The exported certificate issuer should not include the password.
 			c.Authority.CertificateIssuer = &linkedca.CertificateIssuer{
 				Type:        linkedca.CertificateIssuer_Type(typ),
 				Provisioner: iss.Provisioner,
@@ -150,7 +150,7 @@ func (a *Authority) Export() (c *linkedca.Configuration, err error) {
 	}
 	// global claims
 	c.Authority.Claims = claimsToLinkedca(a.config.AuthorityConfig.Claims)
-	// Distiguised names template
+	// Distinguished names template
 	if v := a.config.AuthorityConfig.Template; v != nil {
 		c.Authority.Template = &linkedca.DistinguishedName{
 			Country:            v.Country,
