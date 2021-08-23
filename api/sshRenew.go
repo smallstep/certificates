@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -62,7 +63,11 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	identity, err := h.renewIdentityCertificate(r)
+	// Match identity cert with the SSH cert
+	notBefore := time.Unix(int64(oldCert.ValidAfter), 0)
+	notAfter := time.Unix(int64(oldCert.ValidBefore), 0)
+
+	identity, err := h.renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
 		WriteError(w, errs.ForbiddenErr(err))
 		return
@@ -74,13 +79,24 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusCreated)
 }
 
-// renewIdentityCertificate request the client TLS certificate if present.
-func (h *caHandler) renewIdentityCertificate(r *http.Request) ([]Certificate, error) {
+// renewIdentityCertificate request the client TLS certificate if present. If notBefore and notAfter are passed the
+func (h *caHandler) renewIdentityCertificate(r *http.Request, notBefore, notAfter time.Time) ([]Certificate, error) {
 	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
 		return nil, nil
 	}
 
-	certChain, err := h.Authority.Renew(r.TLS.PeerCertificates[0])
+	cert := r.TLS.PeerCertificates[0]
+
+	// Enforce the cert to match another certificate, for example an ssh
+	// certificate.
+	if !notBefore.IsZero() {
+		cert.NotBefore = notBefore
+	}
+	if !notAfter.IsZero() {
+		cert.NotAfter = notAfter
+	}
+
+	certChain, err := h.Authority.Renew(cert)
 	if err != nil {
 		return nil, err
 	}
