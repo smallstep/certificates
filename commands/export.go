@@ -48,7 +48,7 @@ intermediate private key.`,
 			cli.StringFlag{
 				Name: "issuer-password-file",
 				Usage: `path to the <file> containing the password to decrypt the
-	certificate issuer private key used in the RA mode.`,
+certificate issuer private key used in the RA mode.`,
 			},
 		},
 	})
