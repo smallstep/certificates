@@ -25,7 +25,9 @@ func init() {
 		Action:    exportAction,
 		Description: `**step-ca export** exports the current configuration of step-ca.
 
-Note that neither the PKI password nor
+Note that neither the PKI password nor the certificate issuer password will be
+included in the export file.
+
 ## POSITIONAL ARGUMENTS
 
 <config>
