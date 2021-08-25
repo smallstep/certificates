@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/x509"
 	"net/http"
 	"time"
 
@@ -85,7 +86,11 @@ func (h *caHandler) renewIdentityCertificate(r *http.Request, notBefore, notAfte
 		return nil, nil
 	}
 
-	cert := r.TLS.PeerCertificates[0]
+	// Clone the certificate as we can modify it.
+	cert, err := x509.ParseCertificate(r.TLS.PeerCertificates[0].Raw)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing client certificate")
+	}
 
 	// Enforce the cert to match another certificate, for example an ssh
 	// certificate.
