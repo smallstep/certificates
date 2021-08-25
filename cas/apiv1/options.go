@@ -38,9 +38,16 @@ type Options struct {
 	CertificateChain []*x509.Certificate `json:"-"`
 	Signer           crypto.Signer       `json:"-"`
 
-	// IsCreator is set to true when we're creating a certificate authority. Is
-	// used to skip some validations when initializing a CertificateAuthority.
+	// IsCreator is set to true when we're creating a certificate authority. It
+	// is used to skip some validations when initializing a
+	// CertificateAuthority. This option is used on SoftCAS and CloudCAS.
 	IsCreator bool `json:"-"`
+
+	// IsCAGetter is set to true when we're just using the
+	// CertificateAuthorityGetter interface to retrieve the root certificate. It
+	// is used to skip some validations when initializing a
+	// CertificateAuthority. This option is used on StepCAS.
+	IsCAGetter bool `json:"-"`
 
 	// KeyManager is the KMS used to generate keys in SoftCAS.
 	KeyManager kms.KeyManager `json:"-"`

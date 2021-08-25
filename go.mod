@@ -29,20 +29,20 @@ require (
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
 	go.step.sm/cli-utils v0.4.1
 	go.step.sm/crypto v0.9.0
-	go.step.sm/linkedca v0.0.0-20210611183751-27424aae8d25
+	go.step.sm/linkedca v0.5.0
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
-	golang.org/x/net v0.0.0-20210503060351-7fd8e65b6420
+	golang.org/x/net v0.0.0-20210716203947-853a461950ff
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	google.golang.org/api v0.47.0
-	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c
-	google.golang.org/grpc v1.38.0
-	google.golang.org/protobuf v1.26.0
+	google.golang.org/genproto v0.0.0-20210719143636-1d5a45f8e492
+	google.golang.org/grpc v1.39.0
+	google.golang.org/protobuf v1.27.1
 	gopkg.in/square/go-jose.v2 v2.5.1
 )
 
-//replace github.com/smallstep/nosql => ../nosql
-
-//replace go.step.sm/crypto => ../crypto
-
-//replace go.step.sm/cli-utils => ../cli-utils
+// replace github.com/smallstep/nosql => ../nosql
+// replace go.step.sm/crypto => ../crypto
+// replace go.step.sm/cli-utils => ../cli-utils
+// replace go.step.sm/linkedca => ../linkedca
 
 replace go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 => github.com/omorsi/pkcs7 v0.0.0-20210217142924-a7b80a2a8568

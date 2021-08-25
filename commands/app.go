@@ -8,11 +8,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"unicode"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/ca"
+	"github.com/smallstep/certificates/pki"
 	"github.com/urfave/cli"
 	"go.step.sm/cli-utils/errs"
 )
@@ -38,6 +40,11 @@ certificate issuer private key used in the RA mode.`,
 			Name:  "resolver",
 			Usage: "address of a DNS resolver to be used instead of the default.",
 		},
+		cli.StringFlag{
+			Name:   "token",
+			Usage:  "token used to enable the linked ca.",
+			EnvVar: "STEP_CA_TOKEN",
+		},
 	},
 }
 
@@ -46,6 +53,7 @@ func appAction(ctx *cli.Context) error {
 	passFile := ctx.String("password-file")
 	issuerPassFile := ctx.String("issuer-password-file")
 	resolver := ctx.String("resolver")
+	token := ctx.String("token")
 
 	// If zero cmd line args show help, if >1 cmd line args show error.
 	if ctx.NArg() == 0 {
@@ -59,6 +67,18 @@ func appAction(ctx *cli.Context) error {
 	config, err := config.LoadConfiguration(configFile)
 	if err != nil {
 		fatal(err)
+	}
+
+	if config.AuthorityConfig != nil {
+		if token == "" && strings.EqualFold(config.AuthorityConfig.DeploymentType, pki.LinkedDeployment.String()) {
+			return errors.New(`'step-ca' requires the '--token' flag for linked deploy type.
+
+To get a linked authority token:
+  1. Log in or create a Certificate Manager account at ` + "\033[1mhttps://u.step.sm/linked\033[0m" + `
+  2. Add a new authority and select "Link a step-ca instance"
+  3. Follow instructions in browser to start 'step-ca' using the '--token' flag
+`)
+		}
 	}
 
 	var password []byte
@@ -88,7 +108,8 @@ func appAction(ctx *cli.Context) error {
 	srv, err := ca.New(config,
 		ca.WithConfigFile(configFile),
 		ca.WithPassword(password),
-		ca.WithIssuerPassword(issuerPassword))
+		ca.WithIssuerPassword(issuerPassword),
+		ca.WithLinkedCAToken(token))
 	if err != nil {
 		fatal(err)
 	}

@@ -4,12 +4,17 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
+	step "go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/linkedca"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -234,6 +239,14 @@ func (a *Authority) RemoveProvisioner(ctx context.Context, id string) error {
 }
 
 func CreateFirstProvisioner(ctx context.Context, db admin.DB, password string) (*linkedca.Provisioner, error) {
+	if password == "" {
+		pass, err := ui.PromptPasswordGenerate("Please enter the password to encrypt your first provisioner, leave empty and we'll generate one")
+		if err != nil {
+			return nil, err
+		}
+		password = string(pass)
+	}
+
 	jwk, jwe, err := jose.GenerateDefaultKeyPair([]byte(password))
 	if err != nil {
 		return nil, admin.WrapErrorISE(err, "error generating JWK key pair")
@@ -398,6 +411,13 @@ func durationsToCertificates(d *linkedca.Durations) (min, max, def *provisioner.
 	return
 }
 
+func durationsToLinkedca(d *provisioner.Duration) string {
+	if d == nil {
+		return ""
+	}
+	return d.Duration.String()
+}
+
 // claimsToCertificates converts the linkedca provisioner claims type to the
 // certifictes claims type.
 func claimsToCertificates(c *linkedca.Claims) (*provisioner.Claims, error) {
@@ -438,6 +458,109 @@ func claimsToCertificates(c *linkedca.Claims) (*provisioner.Claims, error) {
 	return pc, nil
 }
 
+func claimsToLinkedca(c *provisioner.Claims) *linkedca.Claims {
+	if c == nil {
+		return nil
+	}
+
+	disableRenewal := config.DefaultDisableRenewal
+	if c.DisableRenewal != nil {
+		disableRenewal = *c.DisableRenewal
+	}
+
+	lc := &linkedca.Claims{
+		DisableRenewal: disableRenewal,
+	}
+
+	if c.DefaultTLSDur != nil || c.MinTLSDur != nil || c.MaxTLSDur != nil {
+		lc.X509 = &linkedca.X509Claims{
+			Enabled: true,
+			Durations: &linkedca.Durations{
+				Default: durationsToLinkedca(c.DefaultTLSDur),
+				Min:     durationsToLinkedca(c.MinTLSDur),
+				Max:     durationsToLinkedca(c.MaxTLSDur),
+			},
+		}
+	}
+
+	if c.EnableSSHCA != nil && *c.EnableSSHCA {
+		lc.Ssh = &linkedca.SSHClaims{
+			Enabled: true,
+		}
+		if c.DefaultUserSSHDur != nil || c.MinUserSSHDur != nil || c.MaxUserSSHDur != nil {
+			lc.Ssh.UserDurations = &linkedca.Durations{
+				Default: durationsToLinkedca(c.DefaultUserSSHDur),
+				Min:     durationsToLinkedca(c.MinUserSSHDur),
+				Max:     durationsToLinkedca(c.MaxUserSSHDur),
+			}
+		}
+		if c.DefaultHostSSHDur != nil || c.MinHostSSHDur != nil || c.MaxHostSSHDur != nil {
+			lc.Ssh.HostDurations = &linkedca.Durations{
+				Default: durationsToLinkedca(c.DefaultHostSSHDur),
+				Min:     durationsToLinkedca(c.MinHostSSHDur),
+				Max:     durationsToLinkedca(c.MaxHostSSHDur),
+			}
+		}
+	}
+
+	return lc
+}
+
+func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *linkedca.Template, error) {
+	var err error
+	var x509Template, sshTemplate *linkedca.Template
+
+	if p == nil {
+		return nil, nil, nil
+	}
+
+	if p.X509 != nil && p.X509.HasTemplate() {
+		x509Template = &linkedca.Template{
+			Template: nil,
+			Data:     nil,
+		}
+
+		if p.X509.Template != "" {
+			x509Template.Template = []byte(p.SSH.Template)
+		} else if p.X509.TemplateFile != "" {
+			filename := step.StepAbs(p.X509.TemplateFile)
+			if x509Template.Template, err = ioutil.ReadFile(filename); err != nil {
+				return nil, nil, errors.Wrap(err, "error reading x509 template")
+			}
+		}
+	}
+
+	if p.SSH != nil && p.SSH.HasTemplate() {
+		sshTemplate = &linkedca.Template{
+			Template: nil,
+			Data:     nil,
+		}
+
+		if p.SSH.Template != "" {
+			sshTemplate.Template = []byte(p.SSH.Template)
+		} else if p.SSH.TemplateFile != "" {
+			filename := step.StepAbs(p.SSH.TemplateFile)
+			if sshTemplate.Template, err = ioutil.ReadFile(filename); err != nil {
+				return nil, nil, errors.Wrap(err, "error reading ssh template")
+			}
+		}
+	}
+
+	return x509Template, sshTemplate, nil
+}
+
+func provisionerPEMToLinkedca(b []byte) [][]byte {
+	var roots [][]byte
+	var block *pem.Block
+	for {
+		if block, b = pem.Decode(b); block == nil {
+			break
+		}
+		roots = append(roots, pem.EncodeToMemory(block))
+	}
+	return roots
+}
+
 // ProvisionerToCertificates converts the linkedca provisioner type to the certificates provisioner
 // interface.
 func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, error) {
@@ -448,7 +571,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 
 	details := p.Details.GetData()
 	if details == nil {
-		return nil, fmt.Errorf("provisioner does not have any details")
+		return nil, errors.New("provisioner does not have any details")
 	}
 
 	options := optionsToCertificates(p)
@@ -457,7 +580,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 	case *linkedca.ProvisionerDetails_JWK:
 		jwk := new(jose.JSONWebKey)
 		if err := json.Unmarshal(d.JWK.PublicKey, &jwk); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "error unmarshaling public key")
 		}
 		return &provisioner.JWK{
 			ID:           p.Id,
@@ -585,6 +708,233 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 		}, nil
 	default:
 		return nil, fmt.Errorf("provisioner %s not implemented", p.Type)
+	}
+}
+
+// ProvisionerToLinkedca converts a provisioner.Interface to a
+// linkedca.Provisioner type.
+func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, error) {
+	switch p := p.(type) {
+	case *provisioner.JWK:
+		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		if err != nil {
+			return nil, err
+		}
+		publicKey, err := json.Marshal(p.Key)
+		if err != nil {
+			return nil, errors.Wrap(err, "error marshaling key")
+		}
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_JWK,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_JWK{
+					JWK: &linkedca.JWKProvisioner{
+						PublicKey:           publicKey,
+						EncryptedPrivateKey: []byte(p.EncryptedKey),
+					},
+				},
+			},
+			Claims:       claimsToLinkedca(p.Claims),
+			X509Template: x509Template,
+			SshTemplate:  sshTemplate,
+		}, nil
+	case *provisioner.OIDC:
+		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		if err != nil {
+			return nil, err
+		}
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_OIDC,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_OIDC{
+					OIDC: &linkedca.OIDCProvisioner{
+						ClientId:              p.ClientID,
+						ClientSecret:          p.ClientSecret,
+						ConfigurationEndpoint: p.ConfigurationEndpoint,
+						Admins:                p.Admins,
+						Domains:               p.Domains,
+						Groups:                p.Groups,
+						ListenAddress:         p.ListenAddress,
+						TenantId:              p.TenantID,
+					},
+				},
+			},
+			Claims:       claimsToLinkedca(p.Claims),
+			X509Template: x509Template,
+			SshTemplate:  sshTemplate,
+		}, nil
+	case *provisioner.GCP:
+		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		if err != nil {
+			return nil, err
+		}
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_GCP,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_GCP{
+					GCP: &linkedca.GCPProvisioner{
+						ServiceAccounts:        p.ServiceAccounts,
+						ProjectIds:             p.ProjectIDs,
+						DisableCustomSans:      p.DisableCustomSANs,
+						DisableTrustOnFirstUse: p.DisableTrustOnFirstUse,
+						InstanceAge:            p.InstanceAge.String(),
+					},
+				},
+			},
+			Claims:       claimsToLinkedca(p.Claims),
+			X509Template: x509Template,
+			SshTemplate:  sshTemplate,
+		}, nil
+	case *provisioner.AWS:
+		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		if err != nil {
+			return nil, err
+		}
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_AWS,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_AWS{
+					AWS: &linkedca.AWSProvisioner{
+						Accounts:               p.Accounts,
+						DisableCustomSans:      p.DisableCustomSANs,
+						DisableTrustOnFirstUse: p.DisableTrustOnFirstUse,
+						InstanceAge:            p.InstanceAge.String(),
+					},
+				},
+			},
+			Claims:       claimsToLinkedca(p.Claims),
+			X509Template: x509Template,
+			SshTemplate:  sshTemplate,
+		}, nil
+	case *provisioner.Azure:
+		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		if err != nil {
+			return nil, err
+		}
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_AZURE,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_Azure{
+					Azure: &linkedca.AzureProvisioner{
+						TenantId:               p.TenantID,
+						ResourceGroups:         p.ResourceGroups,
+						Audience:               p.Audience,
+						DisableCustomSans:      p.DisableCustomSANs,
+						DisableTrustOnFirstUse: p.DisableTrustOnFirstUse,
+					},
+				},
+			},
+			Claims:       claimsToLinkedca(p.Claims),
+			X509Template: x509Template,
+			SshTemplate:  sshTemplate,
+		}, nil
+	case *provisioner.ACME:
+		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		if err != nil {
+			return nil, err
+		}
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_ACME,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_ACME{
+					ACME: &linkedca.ACMEProvisioner{
+						ForceCn: p.ForceCN,
+					},
+				},
+			},
+			Claims:       claimsToLinkedca(p.Claims),
+			X509Template: x509Template,
+			SshTemplate:  sshTemplate,
+		}, nil
+	case *provisioner.X5C:
+		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		if err != nil {
+			return nil, err
+		}
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_X5C,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_X5C{
+					X5C: &linkedca.X5CProvisioner{
+						Roots: provisionerPEMToLinkedca(p.Roots),
+					},
+				},
+			},
+			Claims:       claimsToLinkedca(p.Claims),
+			X509Template: x509Template,
+			SshTemplate:  sshTemplate,
+		}, nil
+	case *provisioner.K8sSA:
+		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		if err != nil {
+			return nil, err
+		}
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_K8SSA,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_K8SSA{
+					K8SSA: &linkedca.K8SSAProvisioner{
+						PublicKeys: provisionerPEMToLinkedca(p.PubKeys),
+					},
+				},
+			},
+			Claims:       claimsToLinkedca(p.Claims),
+			X509Template: x509Template,
+			SshTemplate:  sshTemplate,
+		}, nil
+	case *provisioner.SSHPOP:
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_SSHPOP,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_SSHPOP{
+					SSHPOP: &linkedca.SSHPOPProvisioner{},
+				},
+			},
+			Claims: claimsToLinkedca(p.Claims),
+		}, nil
+	case *provisioner.SCEP:
+		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		if err != nil {
+			return nil, err
+		}
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_SCEP,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_SCEP{
+					SCEP: &linkedca.SCEPProvisioner{
+						ForceCn:                p.ForceCN,
+						Challenge:              p.GetChallengePassword(),
+						Capabilities:           p.Capabilities,
+						MinimumPublicKeyLength: int32(p.MinimumPublicKeyLength),
+					},
+				},
+			},
+			Claims:       claimsToLinkedca(p.Claims),
+			X509Template: x509Template,
+			SshTemplate:  sshTemplate,
+		}, nil
+	default:
+		return nil, fmt.Errorf("provisioner %s not implemented", p.GetType())
 	}
 }
 

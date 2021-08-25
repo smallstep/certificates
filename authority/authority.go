@@ -7,12 +7,9 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"log"
+	"strings"
 	"sync"
 	"time"
-
-	"github.com/smallstep/certificates/cas"
-	"github.com/smallstep/certificates/scep"
-	"go.step.sm/linkedca"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/admin"
@@ -20,26 +17,30 @@ import (
 	"github.com/smallstep/certificates/authority/administrator"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/kms"
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/sshagentkms"
+	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/nosql"
 	"go.step.sm/crypto/pemutil"
+	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
 )
 
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
-	config       *config.Config
-	keyManager   kms.KeyManager
-	provisioners *provisioner.Collection
-	admins       *administrator.Collection
-	db           db.AuthDB
-	adminDB      admin.DB
-	templates    *templates.Templates
+	config        *config.Config
+	keyManager    kms.KeyManager
+	provisioners  *provisioner.Collection
+	admins        *administrator.Collection
+	db            db.AuthDB
+	adminDB       admin.DB
+	templates     *templates.Templates
+	linkedCAToken string
 
 	// X509 CA
 	x509CAService      cas.CertificateAuthorityService
@@ -204,6 +205,11 @@ func (a *Authority) init() error {
 	}
 
 	var err error
+
+	// Automatically enable admin for all linked cas.
+	if a.linkedCAToken != "" {
+		a.config.AuthorityConfig.EnableAdmin = true
+	}
 
 	// Initialize step-ca Database if it's not already initialized with WithDB.
 	// If a.config.DB is nil then a simple, barebones in memory DB will be used.
@@ -442,10 +448,24 @@ func (a *Authority) init() error {
 		// Initialize step-ca Admin Database if it's not already initialized using
 		// WithAdminDB.
 		if a.adminDB == nil {
-			// Check if AuthConfig already exists
-			a.adminDB, err = adminDBNosql.New(a.db.(nosql.DB), admin.DefaultAuthorityID)
-			if err != nil {
-				return err
+			if a.linkedCAToken == "" {
+				// Check if AuthConfig already exists
+				a.adminDB, err = adminDBNosql.New(a.db.(nosql.DB), admin.DefaultAuthorityID)
+				if err != nil {
+					return err
+				}
+			} else {
+				// Use the linkedca client as the admindb.
+				client, err := newLinkedCAClient(a.linkedCAToken)
+				if err != nil {
+					return err
+				}
+				// If authorityId is configured make sure it matches the one in the token
+				if id := a.config.AuthorityConfig.AuthorityID; id != "" && !strings.EqualFold(id, client.authorityID) {
+					return errors.New("error initializing linkedca: token authority and configured authority do not match")
+				}
+				client.Run()
+				a.adminDB = client
 			}
 		}
 
@@ -453,7 +473,7 @@ func (a *Authority) init() error {
 		if err != nil {
 			return admin.WrapErrorISE(err, "error loading provisioners to initialize authority")
 		}
-		if len(provs) == 0 {
+		if len(provs) == 0 && !strings.EqualFold(a.config.AuthorityConfig.DeploymentType, "linked") {
 			// Create First Provisioner
 			prov, err := CreateFirstProvisioner(context.Background(), a.adminDB, a.config.Password)
 			if err != nil {
@@ -526,6 +546,9 @@ func (a *Authority) Shutdown() error {
 func (a *Authority) CloseForReload() {
 	if err := a.keyManager.Close(); err != nil {
 		log.Printf("error closing the key manager: %v", err)
+	}
+	if client, ok := a.adminDB.(*linkedCaClient); ok {
+		client.Stop()
 	}
 }
 
