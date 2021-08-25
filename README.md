@@ -18,6 +18,13 @@ You can use it to:
 
 Whatever your use case, `step-ca` is easy to use and hard to misuse, thanks to [safe, sane defaults](https://smallstep.com/docs/step-ca/certificate-authority-server-production#sane-cryptographic-defaults).
 
+---
+
+**Don't want to run your own CA?**
+To get up and running quickly, or as an alternative to running your own `step-ca` server, consider creating a [free hosted smallstep Certificate Manager authority](https://info.smallstep.com/certificate-manager-early-access-mvp/).
+
+---
+
 **Questions? Find us in [Discussions](https://github.com/smallstep/certificates/discussions) or [Join our Discord](https://bit.ly/step-discord).**
 
 [Website](https://smallstep.com/certificates) |
