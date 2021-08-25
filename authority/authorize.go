@@ -174,6 +174,9 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 }
 
 // UseToken stores the token to protect against reuse.
+//
+// This method currently ignores any error coming from the GetTokenID, but it
+// should specifically ignore the error provisioner.ErrAllowTokenReuse.
 func (a *Authority) UseToken(token string, prov provisioner.Interface) error {
 	if reuseKey, err := prov.GetTokenID(token); err == nil {
 		if reuseKey == "" {

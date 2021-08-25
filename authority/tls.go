@@ -383,7 +383,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		}
 		rci.ProvisionerID = p.GetID()
 		rci.TokenID, err = p.GetTokenID(revokeOpts.OTT)
-		if err != nil {
+		if err != nil && !errors.Is(err, provisioner.ErrAllowTokenReuse) {
 			return errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Revoke; could not get ID for token")
 		}

@@ -7,6 +7,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.1.0
 	github.com/ThalesIgnite/crypto11 v1.2.4
 	github.com/aws/aws-sdk-go v1.30.29
+	github.com/dgraph-io/ristretto v0.0.4-0.20200906165740-41ebdbffecfd // indirect
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-piv/piv-go v1.7.0
@@ -22,7 +23,7 @@ require (
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
-	github.com/smallstep/nosql v0.3.6
+	github.com/smallstep/nosql v0.3.8
 	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
