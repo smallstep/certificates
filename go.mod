@@ -7,6 +7,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.1.0
 	github.com/ThalesIgnite/crypto11 v1.2.4
 	github.com/aws/aws-sdk-go v1.30.29
+	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
 	github.com/dgraph-io/ristretto v0.0.4-0.20200906165740-41ebdbffecfd // indirect
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/go-kit/kit v0.10.0 // indirect
