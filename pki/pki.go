@@ -408,6 +408,15 @@ func (p *PKI) GenerateKeyPairs(pass []byte) error {
 		return err
 	}
 
+	var claims *linkedca.Claims
+	if p.options.enableSSH {
+		claims = &linkedca.Claims{
+			Ssh: &linkedca.SSHClaims{
+				Enabled: true,
+			},
+		}
+	}
+
 	// Add JWK provisioner to the configuration.
 	publicKey, err := json.Marshal(p.ottPublicKey)
 	if err != nil {
@@ -418,8 +427,9 @@ func (p *PKI) GenerateKeyPairs(pass []byte) error {
 		return errors.Wrap(err, "error serializing private key")
 	}
 	p.Authority.Provisioners = append(p.Authority.Provisioners, &linkedca.Provisioner{
-		Type: linkedca.Provisioner_JWK,
-		Name: p.options.provisioner,
+		Type:   linkedca.Provisioner_JWK,
+		Name:   p.options.provisioner,
+		Claims: claims,
 		Details: &linkedca.ProvisionerDetails{
 			Data: &linkedca.ProvisionerDetails_JWK{
 				JWK: &linkedca.JWKProvisioner{

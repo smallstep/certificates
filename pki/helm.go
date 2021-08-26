@@ -14,11 +14,9 @@ import (
 
 type helmVariables struct {
 	*linkedca.Configuration
-	Defaults *linkedca.Defaults
-	Password string
-	SSH      struct {
-		Enabled bool
-	}
+	Defaults     *linkedca.Defaults
+	Password     string
+	EnableSSH    bool
 	TLS          authconfig.TLSOptions
 	Provisioners []provisioner.Interface
 }
@@ -48,6 +46,7 @@ func (p *PKI) WriteHelmTemplate(w io.Writer) error {
 		Configuration: &p.Configuration,
 		Defaults:      &p.Defaults,
 		Password:      "",
+		EnableSSH:     p.options.enableSSH,
 		TLS:           authconfig.DefaultTLSOptions,
 		Provisioners:  provisioners,
 	}); err != nil {
@@ -67,7 +66,7 @@ inject:
         federateRoots: []
         crt: {{ .Intermediate }}
         key: {{ .IntermediateKey }}
-        {{- if .SSH.Enabled }}
+        {{- if .EnableSSH }}
         ssh:
           hostKey: {{ .Ssh.HostKey }}
           userKey: {{ .Ssh.UserKey }}
