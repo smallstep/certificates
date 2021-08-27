@@ -59,7 +59,9 @@ func Parse(rawuri string) (*URI, error) {
 	if u.Scheme == "" {
 		return nil, errors.Errorf("error parsing %s: scheme is missing", rawuri)
 	}
-	v, err := url.ParseQuery(u.Opaque)
+	// Starting with Go 1.17 url.ParseQuery returns an error using semicolon as
+	// separator.
+	v, err := url.ParseQuery(strings.ReplaceAll(u.Opaque, ";", "&"))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing %s", rawuri)
 	}

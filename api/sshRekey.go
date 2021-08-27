@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -72,7 +73,11 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	identity, err := h.renewIdentityCertificate(r)
+	// Match identity cert with the SSH cert
+	notBefore := time.Unix(int64(oldCert.ValidAfter), 0)
+	notAfter := time.Unix(int64(oldCert.ValidBefore), 0)
+
+	identity, err := h.renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
 		WriteError(w, errs.ForbiddenErr(err))
 		return

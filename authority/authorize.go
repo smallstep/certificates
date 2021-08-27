@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -173,6 +174,9 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 }
 
 // UseToken stores the token to protect against reuse.
+//
+// This method currently ignores any error coming from the GetTokenID, but it
+// should specifically ignore the error provisioner.ErrAllowTokenReuse.
 func (a *Authority) UseToken(token string, prov provisioner.Interface) error {
 	if reuseKey, err := prov.GetTokenID(token); err == nil {
 		if reuseKey == "" {
@@ -270,10 +274,19 @@ func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
 //
 // TODO(mariano): should we authorize by default?
 func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
+	var err error
+	var isRevoked bool
 	var opts = []interface{}{errs.WithKeyVal("serialNumber", cert.SerialNumber.String())}
 
 	// Check the passive revocation table.
-	isRevoked, err := a.db.IsRevoked(cert.SerialNumber.String())
+	serial := cert.SerialNumber.String()
+	if lca, ok := a.adminDB.(interface {
+		IsRevoked(string) (bool, error)
+	}); ok {
+		isRevoked, err = lca.IsRevoked(serial)
+	} else {
+		isRevoked, err = a.db.IsRevoked(serial)
+	}
 	if err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
 	}
@@ -287,6 +300,28 @@ func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 	}
 	if err := p.AuthorizeRenew(context.Background(), cert); err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
+	}
+	return nil
+}
+
+// authorizeSSHCertificate returns an error if the given certificate is revoked.
+func (a *Authority) authorizeSSHCertificate(ctx context.Context, cert *ssh.Certificate) error {
+	var err error
+	var isRevoked bool
+
+	serial := strconv.FormatUint(cert.Serial, 10)
+	if lca, ok := a.adminDB.(interface {
+		IsSSHRevoked(string) (bool, error)
+	}); ok {
+		isRevoked, err = lca.IsSSHRevoked(serial)
+	} else {
+		isRevoked, err = a.db.IsSSHRevoked(serial)
+	}
+	if err != nil {
+		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeSSHCertificate", errs.WithKeyVal("serialNumber", serial))
+	}
+	if isRevoked {
+		return errs.Unauthorized("authority.authorizeSSHCertificate: certificate has been revoked", errs.WithKeyVal("serialNumber", serial))
 	}
 	return nil
 }

@@ -47,10 +47,13 @@ func New(ctx context.Context, opts apiv1.Options) (*StepCAS, error) {
 		return nil, err
 	}
 
-	// Create configured issuer
-	iss, err := newStepIssuer(caURL, client, opts.CertificateIssuer)
-	if err != nil {
-		return nil, err
+	var iss stepIssuer
+	// Create configured issuer unless we only want to use GetCertificateAuthority.
+	// This avoid the request for the password if not provided.
+	if !opts.IsCAGetter {
+		if iss, err = newStepIssuer(caURL, client, opts.CertificateIssuer); err != nil {
+			return nil, err
+		}
 	}
 
 	return &StepCAS{

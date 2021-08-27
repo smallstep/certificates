@@ -46,8 +46,8 @@ var signatureAlgorithmMapping = map[apiv1.SignatureAlgorithm]interface{}{
 		4096: kmspb.CryptoKeyVersion_RSA_SIGN_PKCS1_4096_SHA256,
 	},
 	apiv1.SHA512WithRSA: map[int]kmspb.CryptoKeyVersion_CryptoKeyVersionAlgorithm{
-		0:    kmspb.CryptoKeyVersion_RSA_SIGN_PKCS1_4096_SHA256,
-		4096: kmspb.CryptoKeyVersion_RSA_SIGN_PKCS1_4096_SHA256,
+		0:    kmspb.CryptoKeyVersion_RSA_SIGN_PKCS1_4096_SHA512,
+		4096: kmspb.CryptoKeyVersion_RSA_SIGN_PKCS1_4096_SHA512,
 	},
 	apiv1.SHA256WithRSAPSS: map[int]kmspb.CryptoKeyVersion_CryptoKeyVersionAlgorithm{
 		0:    kmspb.CryptoKeyVersion_RSA_SIGN_PSS_3072_SHA256,

@@ -12,6 +12,7 @@ import (
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/nosql"
+	"github.com/smallstep/nosql/database"
 	nosqldb "github.com/smallstep/nosql/database"
 )
 
@@ -708,6 +709,34 @@ func TestDB_updateAddOrderIDs(t *testing.T) {
 				},
 				addOids: addOids,
 				err:     errors.Errorf("error saving orderIDs index for account %s", accID),
+			}
+		},
+		"ok/no-old": func(t *testing.T) test {
+			return test{
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(ordersByAccountIDTable):
+							return nil, database.ErrNotFound
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, errors.New("force")
+						}
+					},
+					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
+						switch string(bucket) {
+						case string(ordersByAccountIDTable):
+							assert.Equals(t, key, []byte(accID))
+							assert.Equals(t, old, nil)
+							assert.Equals(t, nu, nil)
+							return nil, true, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, false, errors.New("force")
+						}
+					},
+				},
+				res: []string{},
 			}
 		},
 		"ok/all-old-not-pending": func(t *testing.T) test {

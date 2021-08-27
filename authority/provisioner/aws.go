@@ -515,6 +515,11 @@ func (p *AWS) readURL(url string) ([]byte, error) {
 	var resp *http.Response
 	var err error
 
+	// Initialize IMDS versions when this is called from the cli.
+	if len(p.IMDSVersions) == 0 {
+		p.IMDSVersions = []string{"v2", "v1"}
+	}
+
 	for _, v := range p.IMDSVersions {
 		switch v {
 		case "v1":
