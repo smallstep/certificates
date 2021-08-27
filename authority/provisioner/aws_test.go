@@ -141,6 +141,12 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 	p7.config.signatureURL = p1.config.signatureURL
 	p7.config.tokenURL = p1.config.tokenURL
 
+	p8, err := generateAWS()
+	assert.FatalError(t, err)
+	p8.IMDSVersions = nil
+	p8.Accounts = p1.Accounts
+	p8.config = p1.config
+
 	caURL := "https://ca.smallstep.com"
 	u, err := url.Parse(caURL)
 	assert.FatalError(t, err)
@@ -156,6 +162,7 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", p1, args{"foo.local", caURL}, false},
+		{"ok no imds", p8, args{"foo.local", caURL}, false},
 		{"fail ca url", p1, args{"foo.local", "://ca.smallstep.com"}, true},
 		{"fail identityURL", p2, args{"foo.local", caURL}, true},
 		{"fail signatureURL", p3, args{"foo.local", caURL}, true},
