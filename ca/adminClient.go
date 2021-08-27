@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -600,7 +599,7 @@ retry:
 }
 
 // CreateExternalAccountKey performs the POST /admin/acme/eab request to the CA.
-func (c *AdminClient) CreateExternalAccountKey(eakRequest *adminAPI.CreateExternalAccountKeyRequest) (*adminAPI.CreateExternalAccountKeyResponse, error) {
+func (c *AdminClient) CreateExternalAccountKey(eakRequest *adminAPI.CreateExternalAccountKeyRequest) (*linkedca.EABKey, error) {
 	var retried bool
 	body, err := json.Marshal(eakRequest)
 	if err != nil {
@@ -628,18 +627,18 @@ retry:
 		}
 		return nil, readAdminError(resp.Body)
 	}
-	var eakResp = new(adminAPI.CreateExternalAccountKeyResponse)
-	if err := api.ReadJSON(resp.Body, &eakResp); err != nil {
+	var eabKey = new(linkedca.EABKey)
+	if err := readProtoJSON(resp.Body, eabKey); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
-	return eakResp, nil
+	return eabKey, nil
 }
 
 // GetExternalAccountKeys returns all ACME EAB Keys from the GET /admin/acme/eab request to the CA.
-func (c *AdminClient) GetExternalAccountKeys(opts ...AdminOption) ([]*adminAPI.CreateExternalAccountKeyResponse, error) {
+func (c *AdminClient) GetExternalAccountKeys(opts ...AdminOption) ([]*linkedca.EABKey, error) {
 	var (
 		cursor = ""
-		eaks   = []*adminAPI.CreateExternalAccountKeyResponse{}
+		eaks   = []*linkedca.EABKey{}
 	)
 	for {
 		resp, err := c.GetExternalAccountKeysPaginate(WithAdminCursor(cursor), WithAdminLimit(100))

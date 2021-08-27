@@ -265,7 +265,6 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 		return nil, acme.WrapErrorISE(err, "error parsing externalAccountBinding jws")
 	}
 
-	// TODO: verify supported algorithms against the incoming alg (and corresponding settings)?
 	// TODO: implement strategy pattern to allow for different ways of verification (i.e. webhook call) based on configuration
 
 	keyID := eabJWS.Signatures[0].Protected.KeyID

@@ -5,6 +5,7 @@ import (
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
+	"go.step.sm/linkedca"
 )
 
 // CreateExternalAccountKeyRequest is the type for POST /admin/acme/eab requests
@@ -13,29 +14,35 @@ type CreateExternalAccountKeyRequest struct {
 	Name            string `json:"name"`
 }
 
-// CreateExternalAccountKeyResponse is the type for POST /admin/acme/eab responses
-type CreateExternalAccountKeyResponse struct {
-	ProvisionerName string `json:"provisioner"`
-	KeyID           string `json:"keyID"`
-	Name            string `json:"name"`
-	Key             []byte `json:"key"`
+// Validate validates a new-admin request body.
+func (r *CreateExternalAccountKeyRequest) Validate() error {
+	if r.ProvisionerName == "" {
+		return admin.NewError(admin.ErrorBadRequestType, "provisioner name cannot be empty")
+	}
+	if r.Name == "" {
+		return admin.NewError(admin.ErrorBadRequestType, "name / reference cannot be empty")
+	}
+	return nil
 }
 
 // GetExternalAccountKeysResponse is the type for GET /admin/acme/eab responses
 type GetExternalAccountKeysResponse struct {
-	EAKs       []*CreateExternalAccountKeyResponse `json:"eaks"`
-	NextCursor string                              `json:"nextCursor"`
+	EAKs       []*linkedca.EABKey `json:"eaks"`
+	NextCursor string             `json:"nextCursor"`
 }
 
 // CreateExternalAccountKey creates a new External Account Binding key
 func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Request) {
 	var body CreateExternalAccountKeyRequest
 	if err := api.ReadJSON(r.Body, &body); err != nil { // TODO: rewrite into protobuf json (likely)
-		api.WriteError(w, err)
+		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error reading request body"))
 		return
 	}
 
-	// TODO: Validate input
+	if err := body.Validate(); err != nil {
+		api.WriteError(w, err)
+		return
+	}
 
 	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), body.ProvisionerName, body.Name)
 	if err != nil {
@@ -43,14 +50,14 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	eakResponse := CreateExternalAccountKeyResponse{
+	response := &linkedca.EABKey{
+		EabKid:          eak.ID,
+		EabHmacKey:      eak.KeyBytes,
 		ProvisionerName: eak.ProvisionerName,
-		KeyID:           eak.ID,
 		Name:            eak.Name,
-		Key:             eak.KeyBytes,
 	}
 
-	api.JSONStatus(w, eakResponse, http.StatusCreated) // TODO: rewrite into protobuf json (likely)
+	api.ProtoJSONStatus(w, response, http.StatusCreated)
 }
 
 // GetExternalAccountKeys returns a segment of ACME EAB Keys.
