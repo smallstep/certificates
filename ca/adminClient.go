@@ -634,6 +634,34 @@ retry:
 	return eabKey, nil
 }
 
+// RemoveExternalAccountKey performs the DELETE /admin/acme/eab/{key_id} request to the CA.
+func (c *AdminClient) RemoveExternalAccountKey(keyID string) error {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab", keyID)})
+	tok, err := c.generateAdminToken(u.Path)
+	if err != nil {
+		return errors.Wrapf(err, "error generating admin token")
+	}
+	req, err := http.NewRequest("DELETE", u.String(), nil)
+	if err != nil {
+		return errors.Wrapf(err, "create DELETE %s request failed", u)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return errors.Wrapf(err, "client DELETE %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return readAdminError(resp.Body)
+	}
+	return nil
+}
+
 // GetExternalAccountKeys returns all ACME EAB Keys from the GET /admin/acme/eab request to the CA.
 func (c *AdminClient) GetExternalAccountKeys(opts ...AdminOption) ([]*linkedca.EABKey, error) {
 	var (

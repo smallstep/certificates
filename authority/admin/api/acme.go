@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"go.step.sm/linkedca"
@@ -58,6 +59,18 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 	}
 
 	api.ProtoJSONStatus(w, response, http.StatusCreated)
+}
+
+// DeleteExternalAccountKey deletes an ACME External Account Key.
+func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	if err := h.acmeDB.DeleteExternalAccountKey(r.Context(), id); err != nil {
+		api.WriteError(w, admin.WrapErrorISE(err, "error deleting ACME EAB Key %s", id))
+		return
+	}
+
+	api.JSON(w, &DeleteResponse{Status: "ok"})
 }
 
 // GetExternalAccountKeys returns a segment of ACME EAB Keys.

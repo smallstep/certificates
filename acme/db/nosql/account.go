@@ -221,6 +221,14 @@ func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerName string,
 	}, nil
 }
 
+func (db *DB) DeleteExternalAccountKey(ctx context.Context, keyID string) error {
+	err := db.db.Del(externalAccountKeyTable, []byte(keyID))
+	if err != nil {
+		return errors.Wrapf(err, "error deleting ACME EAB Key with Key ID: %s", keyID)
+	}
+	return nil
+}
+
 func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerName string, eak *acme.ExternalAccountKey) error {
 	old, err := db.getDBExternalAccountKey(ctx, eak.ID)
 	if err != nil {
