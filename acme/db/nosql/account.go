@@ -233,6 +233,33 @@ func (db *DB) DeleteExternalAccountKey(ctx context.Context, keyID string) error 
 	return nil
 }
 
+// GetExternalAccountKeys retrieves all External Account Binding keys for a provisioner
+func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName string) ([]*acme.ExternalAccountKey, error) {
+	entries, err := db.db.List(externalAccountKeyTable)
+	if err != nil {
+		return nil, err
+	}
+
+	keys := make([]*acme.ExternalAccountKey, len(entries))
+	for i, entry := range entries {
+		dbeak := new(dbExternalAccountKey)
+		if err = json.Unmarshal(entry.Value, dbeak); err != nil {
+			return nil, errors.Wrapf(err, "error unmarshaling external account key %s into dbExternalAccountKey", string(entry.Key))
+		}
+		keys[i] = &acme.ExternalAccountKey{
+			ID:              dbeak.ID,
+			KeyBytes:        dbeak.KeyBytes,
+			ProvisionerName: dbeak.ProvisionerName,
+			Name:            dbeak.Name,
+			AccountID:       dbeak.AccountID,
+			CreatedAt:       dbeak.CreatedAt,
+			BoundAt:         dbeak.BoundAt,
+		}
+	}
+
+	return keys, nil
+}
+
 func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerName string, eak *acme.ExternalAccountKey) error {
 	old, err := db.getDBExternalAccountKey(ctx, eak.ID)
 	if err != nil {

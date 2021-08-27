@@ -559,14 +559,14 @@ retry:
 }
 
 // GetExternalAccountKeysPaginate returns a page from the the GET /admin/acme/eab request to the CA.
-func (c *AdminClient) GetExternalAccountKeysPaginate(opts ...AdminOption) (*adminAPI.GetExternalAccountKeysResponse, error) {
+func (c *AdminClient) GetExternalAccountKeysPaginate(provisionerName string, opts ...AdminOption) (*adminAPI.GetExternalAccountKeysResponse, error) {
 	var retried bool
 	o := new(adminOptions)
 	if err := o.apply(opts); err != nil {
 		return nil, err
 	}
 	u := c.endpoint.ResolveReference(&url.URL{
-		Path:     "/admin/acme/eab",
+		Path:     path.Join(adminURLPrefix, "acme/eab", provisionerName),
 		RawQuery: o.rawQuery(),
 	})
 	tok, err := c.generateAdminToken(u.Path)
@@ -590,12 +590,11 @@ retry:
 		}
 		return nil, readAdminError(resp.Body)
 	}
-	// var body = new(GetExternalAccountKeysResponse)
-	// if err := readJSON(resp.Body, body); err != nil {
-	// 	return nil, errors.Wrapf(err, "error reading %s", u)
-	// }
-	// return body, nil
-	return nil, nil // TODO: fix correctly
+	var body = new(adminAPI.GetExternalAccountKeysResponse)
+	if err := readJSON(resp.Body, body); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return body, nil
 }
 
 // CreateExternalAccountKey performs the POST /admin/acme/eab request to the CA.
@@ -663,13 +662,13 @@ retry:
 }
 
 // GetExternalAccountKeys returns all ACME EAB Keys from the GET /admin/acme/eab request to the CA.
-func (c *AdminClient) GetExternalAccountKeys(opts ...AdminOption) ([]*linkedca.EABKey, error) {
+func (c *AdminClient) GetExternalAccountKeys(provisionerName string, opts ...AdminOption) ([]*linkedca.EABKey, error) {
 	var (
 		cursor = ""
 		eaks   = []*linkedca.EABKey{}
 	)
 	for {
-		resp, err := c.GetExternalAccountKeysPaginate(WithAdminCursor(cursor), WithAdminLimit(100))
+		resp, err := c.GetExternalAccountKeysPaginate(provisionerName, WithAdminCursor(cursor), WithAdminLimit(100))
 		if err != nil {
 			return nil, err
 		}

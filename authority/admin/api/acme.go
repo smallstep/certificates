@@ -7,6 +7,7 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"go.step.sm/linkedca"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // CreateExternalAccountKeyRequest is the type for POST /admin/acme/eab requests
@@ -35,7 +36,7 @@ type GetExternalAccountKeysResponse struct {
 // CreateExternalAccountKey creates a new External Account Binding key
 func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Request) {
 	var body CreateExternalAccountKeyRequest
-	if err := api.ReadJSON(r.Body, &body); err != nil { // TODO: rewrite into protobuf json (likely)
+	if err := api.ReadJSON(r.Body, &body); err != nil {
 		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error reading request body"))
 		return
 	}
@@ -75,6 +76,9 @@ func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Reques
 
 // GetExternalAccountKeys returns a segment of ACME EAB Keys.
 func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request) {
+	prov := chi.URLParam(r, "prov")
+
+	// TODO: support paging properly? It'll probably leak to the DB layer, as we have to loop through all keys
 	// cursor, limit, err := api.ParseCursor(r)
 	// if err != nil {
 	// 	api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err,
@@ -82,13 +86,28 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 	// 	return
 	// }
 
-	// eaks, nextCursor, err := h.acmeDB.GetExternalAccountKeys(cursor, limit)
-	// if err != nil {
-	// 	api.WriteError(w, admin.WrapErrorISE(err, "error retrieving paginated admins"))
-	// 	return
-	// }
-	// api.JSON(w, &GetExternalAccountKeysResponse{
-	// 	EAKs:       eaks,
-	// 	NextCursor: nextCursor,
-	// })
+	keys, err := h.acmeDB.GetExternalAccountKeys(r.Context(), prov)
+	if err != nil {
+		api.WriteError(w, admin.WrapErrorISE(err, "error getting external account keys"))
+		return
+	}
+
+	eaks := make([]*linkedca.EABKey, len(keys))
+	for i, k := range keys {
+		eaks[i] = &linkedca.EABKey{
+			EabKid:          k.ID,
+			EabHmacKey:      []byte{},
+			ProvisionerName: k.ProvisionerName,
+			Name:            k.Name,
+			Account:         k.AccountID,
+			CreatedAt:       timestamppb.New(k.CreatedAt),
+			BoundAt:         timestamppb.New(k.BoundAt),
+		}
+	}
+
+	nextCursor := ""
+	api.JSON(w, &GetExternalAccountKeysResponse{
+		EAKs:       eaks,
+		NextCursor: nextCursor,
+	})
 }
