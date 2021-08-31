@@ -37,8 +37,9 @@ func (p provisionerSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 // provisioner.
 type loadByTokenPayload struct {
 	jose.Claims
-	AuthorizedParty string `json:"azp"` // OIDC client id
-	TenantID        string `json:"tid"` // Microsoft Azure tenant id
+	Email           string `json:"email"` // OIDC email
+	AuthorizedParty string `json:"azp"`   // OIDC client id
+	TenantID        string `json:"tid"`   // Microsoft Azure tenant id
 }
 
 // Collection is a memory map of provisioners.
@@ -129,12 +130,20 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 			return p, ok
 		}
 	}
-	// Try with tid (Azure)
+	// Try with tid (Azure, Azure OIDC)
 	if payload.TenantID != "" {
+		// Try to load an OIDC provisioner first.
+		if payload.Email != "" {
+			if p, ok := c.LoadByTokenID(payload.Audience[0]); ok {
+				return p, ok
+			}
+		}
+		// Try to load an Azure provisioner.
 		if p, ok := c.LoadByTokenID(payload.TenantID); ok {
 			return p, ok
 		}
 	}
+
 	// Fallback to aud
 	return c.LoadByTokenID(payload.Audience[0])
 }
