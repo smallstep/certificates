@@ -17,3 +17,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Additional way to distinguish Azure IID and Azure OIDC tokens.
 ### Security
 - Sign over all goreleaser github artifacts using cosign
+
+## [0.17.1] - 2021-08-26
+
+## [0.17.0] - 2021-08-25
+### Added
+- Add support for Linked CAs using protocol buffers and gRPC
+- `step-ca init` adds support for
+  - configuring a StepCAS RA
+  - configuring a Linked CA
+  - congifuring a `step-ca` using Helm
+### Changed
+- Update badger driver to use v2 by default
+- Update TLS cipher suites to include 1.3
+### Security
+- Fix key version when SHA512WithRSA is used. There was a typo creating RSA keys with SHA256 digests instead of SHA512.
+
