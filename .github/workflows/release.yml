@@ -158,13 +158,25 @@ jobs:
     runs-on: ubuntu-20.04
     needs: test
     steps:
-      - name: Checkout
+      -
+        name: Checkout
         uses: actions/checkout@v2
-      - name: Setup Go
+      -
+        name: Setup Go
         uses: actions/setup-go@v2
         with:
           go-version: '1.16'
-      - name: Build
+      -
+        name: Install cosign
+        uses: sigstore/cosign-installer@main
+        with:
+          cosign-release: 'v1.1.0'
+      -
+        name: Write cosign key to disk
+        id: write_key
+        run: echo "${{ secrets.COSIGN_KEY }}" > "/tmp/cosign.key"
+      -
+        name: Build
         id: build
         run: |
           PATH=$PATH:/usr/local/go/bin:/home/admin/go/bin
@@ -172,3 +184,4 @@ jobs:
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          COSIGN_PWD: ${{ secrets.COSIGN_PWD }}
