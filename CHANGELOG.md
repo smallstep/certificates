@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Removed
 ### Fixed
 ### Security
+- Use cosign to sign and upload signatures for multi-arch Docker container.
 
 ## [0.17.2] - 08.30.2021
 ### Added
