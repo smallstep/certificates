@@ -29,13 +29,19 @@ type DB struct {
 // New configures and returns a new ACME DB backend implemented using a nosql DB.
 func New(db nosqlDB.DB) (*DB, error) {
 	tables := [][]byte{accountTable, accountByKeyIDTable, authzTable,
-		challengeTable, nonceTable, orderTable, ordersByAccountIDTable, certTable}
+		challengeTable, nonceTable, orderTable, ordersByAccountIDTable}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
 			return nil, errors.Wrapf(err, "error creating table %s",
 				string(b))
 		}
 	}
+	// Separate schema for Certs Table so that queries on these tables can be done in the future.
+	if err := db.CreateX509CertificateTable(certTable); err != nil {
+		return nil, errors.Wrapf(err, "error creating table %s",
+			string(certTable))
+	}
+
 	return &DB{db}, nil
 }
 
