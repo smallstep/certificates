@@ -1,10 +1,12 @@
 # This is an example .goreleaser.yml file with some sane defaults.
 # Make sure to check the documentation at http://goreleaser.com
 project_name: step-ca
+
 before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod download
+
 builds:
   -
     id: step-ca
@@ -93,6 +95,7 @@ builds:
     binary: bin/step-awskms-init
     ldflags:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
+
 archives:
   -
     # Can be used to change the archive formats for specific GOOSs.
@@ -106,18 +109,25 @@ archives:
     files:
       - README.md
       - LICENSE
+
 source:
   enabled: true
   name_template: '{{ .ProjectName }}_{{ .Version }}'
+
 checksum:
   name_template: 'checksums.txt'
+  extra_files:
+    - glob: ./.releases/*
+
 signs:
 - cmd: cosign
   stdin: '{{ .Env.COSIGN_PWD }}'
   args: ["sign-blob", "-key=/tmp/cosign.key", "-output=${signature}", "${artifact}"]
   artifacts: all
+
 snapshot:
   name_template: "{{ .Tag }}-next"
+
 release:
   # Repo in which the release will be created.
   # Default is extracted from the origin remote URL or empty if its private hosted.
@@ -154,6 +164,8 @@ release:
   # The filename on the release will be the last part of the path (base). If
   # another file with the same name exists, the latest one found will be used.
   # Defaults to empty.
+  extra_files:
+    - glob: ./.releases/*
   #extra_files:
   #  - glob: ./path/to/file.txt
   #  - glob: ./glob/**/to/**/file/**/*
