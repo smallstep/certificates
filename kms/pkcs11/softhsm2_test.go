@@ -1,3 +1,4 @@
+//go:build cgo && softhsm2
 // +build cgo,softhsm2
 
 package pkcs11
