@@ -132,40 +132,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PAT }}
           COSIGN_PWD: ${{ secrets.COSIGN_PWD }}
 
-  release_deb:
-    name: Build & Upload Debian Package To Github
-    runs-on: ubuntu-20.04
-    needs: create_release
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      -
-        name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: '1.17'
-      -
-        name: APT Install
-        id: aptInstall
-        run: sudo apt-get -y install build-essential debhelper fakeroot
-      -
-        name: Build Debian package
-        id: build
-        run: |
-          PATH=$PATH:/usr/local/go/bin:/home/admin/go/bin
-          make debian
-      -
-        name: Upload Debian Package
-        id: upload_deb
-        run: |
-          tag_name="${GITHUB_REF##*/}"
-          hub release edit $(find ./.releases -type f -printf "-a %p ") -m "" "$tag_name"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   build_upload_docker:
     name: Build & Upload Docker Images
     runs-on: ubuntu-20.04
