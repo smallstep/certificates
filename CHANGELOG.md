@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Use cosign to sign and upload signatures for multi-arch Docker container.
 - Add debian checksum
 
-## [0.17.2] - 08.30.2021
+## [0.17.2] - 2021-08-30
 ### Added
 - Additional way to distinguish Azure IID and Azure OIDC tokens.
 ### Security
