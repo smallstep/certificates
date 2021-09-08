@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -455,10 +456,10 @@ func containsAllMembers(group, subgroup []string) bool {
 	}
 	visit := make(map[string]struct{}, lg)
 	for i := 0; i < lg; i++ {
-		visit[group[i]] = struct{}{}
+		visit[strings.ToLower(group[i])] = struct{}{}
 	}
 	for i := 0; i < lsg; i++ {
-		if _, ok := visit[subgroup[i]]; !ok {
+		if _, ok := visit[strings.ToLower(subgroup[i])]; !ok {
 			return false
 		}
 	}
