@@ -68,7 +68,7 @@ func (c *SoftCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 	}
 	req.Template.Issuer = c.CertificateChain[0].Subject
 
-	cert, err := x509util.CreateCertificate(req.Template, c.CertificateChain[0], req.Template.PublicKey, c.Signer)
+	cert, err := createCertificate(req.Template, c.CertificateChain[0], req.Template.PublicKey, c.Signer)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (c *SoftCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.R
 	req.Template.NotAfter = t.Add(req.Lifetime)
 	req.Template.Issuer = c.CertificateChain[0].Subject
 
-	cert, err := x509util.CreateCertificate(req.Template, c.CertificateChain[0], req.Template.PublicKey, c.Signer)
+	cert, err := createCertificate(req.Template, c.CertificateChain[0], req.Template.PublicKey, c.Signer)
 	if err != nil {
 		return nil, err
 	}
@@ -150,12 +150,12 @@ func (c *SoftCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthori
 	var cert *x509.Certificate
 	switch req.Type {
 	case apiv1.RootCA:
-		cert, err = x509util.CreateCertificate(req.Template, req.Template, signer.Public(), signer)
+		cert, err = createCertificate(req.Template, req.Template, signer.Public(), signer)
 		if err != nil {
 			return nil, err
 		}
 	case apiv1.IntermediateCA:
-		cert, err = x509util.CreateCertificate(req.Template, req.Parent.Certificate, signer.Public(), req.Parent.Signer)
+		cert, err = createCertificate(req.Template, req.Parent.Certificate, signer.Public(), req.Parent.Signer)
 		if err != nil {
 			return nil, err
 		}
@@ -209,4 +209,17 @@ func (c *SoftCAS) createSigner(req *kmsapi.CreateSignerRequest) (crypto.Signer, 
 		return nil, err
 	}
 	return c.KeyManager.CreateSigner(req)
+}
+
+// createCertificate sets the SignatureAlgorithm of the template if necessary
+// and calls x509util.CreateCertificate.
+func createCertificate(template, parent *x509.Certificate, pub crypto.PublicKey, signer crypto.Signer) (*x509.Certificate, error) {
+	// Signers can specify the signature algorithm. This is specially important
+	// when x509.CreateCertificates attempts to validate a RSAPSS signature.
+	if template.SignatureAlgorithm == 0 {
+		if sa, ok := signer.(apiv1.SignatureAlgorithmGetter); ok {
+			template.SignatureAlgorithm = sa.SignatureAlgorithm()
+		}
+	}
+	return x509util.CreateCertificate(template, parent, pub, signer)
 }
