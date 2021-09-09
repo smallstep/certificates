@@ -2,6 +2,7 @@ package cloudkms
 
 import (
 	"crypto"
+	"crypto/x509"
 	"io"
 
 	"github.com/pkg/errors"
@@ -13,6 +14,7 @@ import (
 type Signer struct {
 	client     KeyManagementClient
 	signingKey string
+	algorithm  x509.SignatureAlgorithm
 	publicKey  crypto.PublicKey
 }
 
@@ -40,7 +42,7 @@ func (s *Signer) preloadKey(signingKey string) error {
 	if err != nil {
 		return errors.Wrap(err, "cloudKMS GetPublicKey failed")
 	}
-
+	s.algorithm = cryptoKeyVersionMapping[response.Algorithm]
 	s.publicKey, err = pemutil.ParseKey([]byte(response.Pem))
 	return err
 }
@@ -83,4 +85,11 @@ func (s *Signer) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	}
 
 	return response.Signature, nil
+}
+
+// SignatureAlgorithm returns the algorithm that must be specified in a
+// certificate to sign. This is specially important to distinguish RSA and
+// RSAPSS schemas.
+func (s *Signer) SignatureAlgorithm() x509.SignatureAlgorithm {
+	return s.algorithm
 }
