@@ -214,8 +214,8 @@ func (c *SoftCAS) createSigner(req *kmsapi.CreateSignerRequest) (crypto.Signer, 
 // createCertificate sets the SignatureAlgorithm of the template if necessary
 // and calls x509util.CreateCertificate.
 func createCertificate(template, parent *x509.Certificate, pub crypto.PublicKey, signer crypto.Signer) (*x509.Certificate, error) {
-	// Signers can specify the signature algorithm. This is specially important
-	// when x509.CreateCertificates attempts to validate a RSAPSS signature.
+	// Signers can specify the signature algorithm. This is especially important
+	// when x509.CreateCertificate attempts to validate a RSAPSS signature.
 	if template.SignatureAlgorithm == 0 {
 		if sa, ok := signer.(apiv1.SignatureAlgorithmGetter); ok {
 			template.SignatureAlgorithm = sa.SignatureAlgorithm()
