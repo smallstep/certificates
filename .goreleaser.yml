@@ -168,7 +168,7 @@ release:
 
     ```
     cosign verify-blob \
-      -key https://raw.githubusercontent.com/smallstep/cli/master/cosign.pub \
+      -key https://raw.githubusercontent.com/smallstep/certificates/master/cosign.pub \
       -signature ~/Downloads/step-ca_darwin_0.17.2_amd64.tar.gz.sig
       ~/Downloads/step-ca_darwin_0.17.2_amd64.tar.gz
     ```
