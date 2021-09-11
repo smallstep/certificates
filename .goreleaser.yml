@@ -188,8 +188,8 @@ release:
     ```
     cosign verify-blob \
       -key https://raw.githubusercontent.com/smallstep/certificates/master/cosign.pub \
-      -signature ~/Downloads/step-ca_darwin_{{ .Version }_amd64.tar.gz.sig
-      ~/Downloads/step-ca_darwin_{{ .Version }_amd64.tar.gz
+      -signature ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig
+      ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz
     ```
 
     The `checksums.txt` file (in the `Assets` section below) contains a checksum for every artifact in the release.
