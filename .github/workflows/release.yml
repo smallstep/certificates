@@ -62,8 +62,15 @@ jobs:
     needs: test
     runs-on: ubuntu-20.04
     outputs:
+      debversion: ${{ steps.extract-tag.outputs.DEB_VERSION }}
       is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
     steps:
+      -
+        name: Extract Tag Names
+        id: extract-tag
+        run: |
+          DEB_VERSION=$(echo ${GITHUB_REF#refs/tags/v} | sed 's/-/./')
+          echo "::set-output name=DEB_VERSION::${DEB_VERSION}"
       -
         name: Is Pre-release
         id: is_prerelease
@@ -123,6 +130,12 @@ jobs:
         id: write_key
         run: echo "${{ secrets.COSIGN_KEY }}" > "/tmp/cosign.key"
       -
+        name: Get Release Date
+        id: release_date
+        run: |
+          RELEASE_DATE=$(date +"%y-%m-%d")
+          echo "::set-output name=RELEASE_DATE::${RELEASE_DATE}"
+      -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@5a54d7e660bda43b405e8463261b3d25631ffe86 # v2.7.0
         with:
@@ -131,6 +144,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }}
           COSIGN_PWD: ${{ secrets.COSIGN_PWD }}
+          DEB_VERSION: ${{ needs.create_release.outputs.debversion }}
+          RELEASE_DATE: ${{ steps.release_date.outputs.RELEASE_DATE }}
 
   build_upload_docker:
     name: Build & Upload Docker Images
