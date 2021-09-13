@@ -68,7 +68,7 @@ PUSHTYPE := branch
 endif
 
 VERSION := $(shell echo $(VERSION) | sed 's/^v//')
-DEB_VERSION := $(shell echo $(VERSION) | sed 's/-/~/g')
+DEB_VERSION := $(shell echo $(VERSION) | sed 's/-/./g')
 
 ifdef V
 $(info    TRAVIS_TAG is $(TRAVIS_TAG))

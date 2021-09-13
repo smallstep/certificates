@@ -154,26 +154,45 @@ release:
 
   # You can change the name of the release.
   # Default is `{{.Tag}}`
-  #name_template: "{{.ProjectName}}-v{{.Version}} {{.Env.USER}}"
+  name_template: "Step CA {{ .Tag }} ({{ .Env.RELEASE_DATE }})"
 
   # Header template for the release body.
   # Defaults to empty.
   header: |
-    Welcome to this new release!
+    ## Official Release Artifacts
+
+    #### Linux
+
+    - 📦 [step-ca_linux_{{ .Version }}_amd64.tar.gz](https://dl.step.sm/certificates/{{ .Tag }}/step-ca_linux_{{ .Version }}_amd64.tar.gz)
+    - 📦 [step-ca_{{ .Env.DEB_VERSION }}_amd64.deb](https://dl.step.sm/certificates/{{ .Tag }}/step-ca_{{ .Env.DEB_VERSION }}_amd64.deb)
+
+    #### OSX Darwin
+
+    - 📦 [step-ca_darwin_{{ .Version }}_amd64.tar.gz](https://dl.step.sm/certificates/{{ .Tag }}/step-ca_darwin_{{ .Version }}_amd64.tar.gz)
+    - 📦 [step-ca_darwin_{{ .Version }}_arm64.tar.gz](https://dl.step.sm/certificates/{{ .Tag }}/step-ca_darwin_{{ .Version }}_arm64.tar.gz)
+
+    #### Windows
+
+    - 📦 [step-ca_windows_{{ .Version }}_arm64.zip](https://dl.step.sm/certificates/{{ .Tag }}/step-ca_windows_{{ .Version }}_amd64.zip)
+
+    For more builds across platforms and architectures see the `Assets` section below.
+
+    Don't see the artifact you need? Open an issue [here](https://github.com/smallstep/certificates/issues/new/choose).
 
     ## Signatures and Checksums
 
     `step-ca` uses [sigstore/cosign](https://github.com/sigstore/cosign) for signing and verifying release artifacts.
-    Here is an example of how to use `cosign` to verify a release artifact:
+
+    Below is an example using `cosign` to verify a release artifact:
 
     ```
     cosign verify-blob \
       -key https://raw.githubusercontent.com/smallstep/certificates/master/cosign.pub \
-      -signature ~/Downloads/step-ca_darwin_0.17.2_amd64.tar.gz.sig
-      ~/Downloads/step-ca_darwin_0.17.2_amd64.tar.gz
+      -signature ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig
+      ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz
     ```
 
-    We use the `checksums.txt` file to store checksums for every artifact in the release.
+    The `checksums.txt` file (in the `Assets` section below) contains a checksum for every artifact in the release.
 
   # Footer template for the release body.
   # Defaults to empty.
@@ -182,8 +201,7 @@ release:
 
     Those were the changes on {{ .Tag }}!
 
-    Come join us on [Discord](https://discord.gg/X2RKGwEbV9) to ask questions, chat about PKI,
-    or get a sneak peak at the freshest PKI memes.
+    Come join us on [Discord](https://discord.gg/X2RKGwEbV9) to ask questions, chat about PKI, or get a sneak peak at the freshest PKI memes.
 
   # You can disable this pipe in order to not upload any artifacts.
   # Defaults to false.
