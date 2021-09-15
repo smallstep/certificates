@@ -175,7 +175,8 @@ release:
 
     - 📦 [step-ca_windows_{{ .Version }}_arm64.zip](https://dl.step.sm/certificates/{{ .Tag }}/step-ca_windows_{{ .Version }}_amd64.zip)
 
-    For more builds across platforms and architectures see the `Assets` section below.
+    For more builds across platforms and architectures, see the `Assets` section below.
+    And for packaged versions (Docker, k8s, Homebrew), see our [installation docs](https://smallstep.com/docs/step-ca/installation).
 
     Don't see the artifact you need? Open an issue [here](https://github.com/smallstep/certificates/issues/new/choose).
 
