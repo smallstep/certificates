@@ -257,7 +257,7 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 	// about the handler and thus about its dependencies.
 	eabJSONBytes, err := json.Marshal(nar.ExternalAccountBinding)
 	if err != nil {
-		return nil, acme.WrapErrorISE(err, "error marshaling externalAccountBinding into JSON")
+		return nil, acme.WrapErrorISE(err, "error marshaling externalAccountBinding into bytes")
 	}
 
 	eabJWS, err := squarejose.ParseSigned(string(eabJSONBytes))

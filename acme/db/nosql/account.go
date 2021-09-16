@@ -28,13 +28,13 @@ func (dba *dbAccount) clone() *dbAccount {
 }
 
 type dbExternalAccountKey struct {
-	ID              string    `json:"id"`
-	ProvisionerName string    `json:"provisioner_name"`
-	Name            string    `json:"name"`
-	AccountID       string    `json:"accountID,omitempty"`
-	KeyBytes        []byte    `json:"key"`
-	CreatedAt       time.Time `json:"createdAt"`
-	BoundAt         time.Time `json:"boundAt"`
+	ID          string    `json:"id"`
+	Provisioner string    `json:"provisioner"`
+	Reference   string    `json:"reference"`
+	AccountID   string    `json:"accountID,omitempty"`
+	KeyBytes    []byte    `json:"key"`
+	CreatedAt   time.Time `json:"createdAt"`
+	BoundAt     time.Time `json:"boundAt"`
 }
 
 func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, error) {
@@ -165,7 +165,7 @@ func (db *DB) UpdateAccount(ctx context.Context, acc *acme.Account) error {
 }
 
 // CreateExternalAccountKey creates a new External Account Binding key with a name
-func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName string, name string) (*acme.ExternalAccountKey, error) {
+func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName string, reference string) (*acme.ExternalAccountKey, error) {
 	keyID, err := randID()
 	if err != nil {
 		return nil, err
@@ -178,24 +178,24 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName stri
 	}
 
 	dbeak := &dbExternalAccountKey{
-		ID:              keyID,
-		ProvisionerName: provisionerName,
-		Name:            name,
-		KeyBytes:        random,
-		CreatedAt:       clock.Now(),
+		ID:          keyID,
+		Provisioner: provisionerName,
+		Reference:   reference,
+		KeyBytes:    random,
+		CreatedAt:   clock.Now(),
 	}
 
 	if err = db.save(ctx, keyID, dbeak, nil, "external_account_key", externalAccountKeyTable); err != nil {
 		return nil, err
 	}
 	return &acme.ExternalAccountKey{
-		ID:              dbeak.ID,
-		ProvisionerName: dbeak.ProvisionerName,
-		Name:            dbeak.Name,
-		AccountID:       dbeak.AccountID,
-		KeyBytes:        dbeak.KeyBytes,
-		CreatedAt:       dbeak.CreatedAt,
-		BoundAt:         dbeak.BoundAt,
+		ID:          dbeak.ID,
+		Provisioner: dbeak.Provisioner,
+		Reference:   dbeak.Reference,
+		AccountID:   dbeak.AccountID,
+		KeyBytes:    dbeak.KeyBytes,
+		CreatedAt:   dbeak.CreatedAt,
+		BoundAt:     dbeak.BoundAt,
 	}, nil
 }
 
@@ -206,18 +206,18 @@ func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerName string,
 		return nil, err
 	}
 
-	if dbeak.ProvisionerName != provisionerName {
+	if dbeak.Provisioner != provisionerName {
 		return nil, acme.NewError(acme.ErrorUnauthorizedType, "name of provisioner does not match provisioner for which the EAB key was created")
 	}
 
 	return &acme.ExternalAccountKey{
-		ID:              dbeak.ID,
-		ProvisionerName: dbeak.ProvisionerName,
-		Name:            dbeak.Name,
-		AccountID:       dbeak.AccountID,
-		KeyBytes:        dbeak.KeyBytes,
-		CreatedAt:       dbeak.CreatedAt,
-		BoundAt:         dbeak.BoundAt,
+		ID:          dbeak.ID,
+		Provisioner: dbeak.Provisioner,
+		Reference:   dbeak.Reference,
+		AccountID:   dbeak.AccountID,
+		KeyBytes:    dbeak.KeyBytes,
+		CreatedAt:   dbeak.CreatedAt,
+		BoundAt:     dbeak.BoundAt,
 	}, nil
 }
 
@@ -240,21 +240,24 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName string
 		return nil, err
 	}
 
-	keys := make([]*acme.ExternalAccountKey, len(entries))
-	for i, entry := range entries {
+	keys := []*acme.ExternalAccountKey{}
+	for _, entry := range entries {
 		dbeak := new(dbExternalAccountKey)
 		if err = json.Unmarshal(entry.Value, dbeak); err != nil {
 			return nil, errors.Wrapf(err, "error unmarshaling external account key %s into dbExternalAccountKey", string(entry.Key))
 		}
-		keys[i] = &acme.ExternalAccountKey{
-			ID:              dbeak.ID,
-			KeyBytes:        dbeak.KeyBytes,
-			ProvisionerName: dbeak.ProvisionerName,
-			Name:            dbeak.Name,
-			AccountID:       dbeak.AccountID,
-			CreatedAt:       dbeak.CreatedAt,
-			BoundAt:         dbeak.BoundAt,
+		if dbeak.Provisioner != provisionerName {
+			continue
 		}
+		keys = append(keys, &acme.ExternalAccountKey{
+			ID:          dbeak.ID,
+			KeyBytes:    dbeak.KeyBytes,
+			Provisioner: dbeak.Provisioner,
+			Reference:   dbeak.Reference,
+			AccountID:   dbeak.AccountID,
+			CreatedAt:   dbeak.CreatedAt,
+			BoundAt:     dbeak.BoundAt,
+		})
 	}
 
 	return keys, nil
@@ -266,18 +269,18 @@ func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerName stri
 		return err
 	}
 
-	if old.ProvisionerName != provisionerName {
+	if old.Provisioner != provisionerName {
 		return acme.NewError(acme.ErrorUnauthorizedType, "name of provisioner does not match provisioner for which the EAB key was created")
 	}
 
 	nu := dbExternalAccountKey{
-		ID:              eak.ID,
-		ProvisionerName: eak.ProvisionerName,
-		Name:            eak.Name,
-		AccountID:       eak.AccountID,
-		KeyBytes:        eak.KeyBytes,
-		CreatedAt:       eak.CreatedAt,
-		BoundAt:         eak.BoundAt,
+		ID:          eak.ID,
+		Provisioner: eak.Provisioner,
+		Reference:   eak.Reference,
+		AccountID:   eak.AccountID,
+		KeyBytes:    eak.KeyBytes,
+		CreatedAt:   eak.CreatedAt,
+		BoundAt:     eak.BoundAt,
 	}
 
 	return db.save(ctx, nu.ID, nu, old, "external_account_key", externalAccountKeyTable)

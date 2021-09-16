@@ -1,28 +1,30 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // CreateExternalAccountKeyRequest is the type for POST /admin/acme/eab requests
 type CreateExternalAccountKeyRequest struct {
-	ProvisionerName string `json:"provisioner"`
-	Name            string `json:"name"`
+	Provisioner string `json:"provisioner"`
+	Reference   string `json:"reference"`
 }
 
-// Validate validates a new-admin request body.
+// Validate validates a new ACME EAB Key request body.
 func (r *CreateExternalAccountKeyRequest) Validate() error {
-	if r.ProvisionerName == "" {
+	if r.Provisioner == "" {
 		return admin.NewError(admin.ErrorBadRequestType, "provisioner name cannot be empty")
 	}
-	if r.Name == "" {
-		return admin.NewError(admin.ErrorBadRequestType, "name / reference cannot be empty")
+	if r.Reference == "" {
+		return admin.NewError(admin.ErrorBadRequestType, "reference cannot be empty")
 	}
 	return nil
 }
@@ -31,6 +33,38 @@ func (r *CreateExternalAccountKeyRequest) Validate() error {
 type GetExternalAccountKeysResponse struct {
 	EAKs       []*linkedca.EABKey `json:"eaks"`
 	NextCursor string             `json:"nextCursor"`
+}
+
+// provisionerHasEABEnabled determines if the "requireEAB" setting for an ACME
+// provisioner is set to true and thus has EAB enabled.
+// TODO: rewrite this into a middleware for the ACME handlers? This probably requires
+// ensuring that all the ACME EAB APIs that need the middleware work the same in terms
+// of specifying the provisioner; probably a bit of refactoring required.
+func (h *Handler) provisionerHasEABEnabled(ctx context.Context, provisionerName string) (bool, error) {
+	var (
+		p   provisioner.Interface
+		err error
+	)
+	if p, err = h.auth.LoadProvisionerByName(provisionerName); err != nil {
+		return false, admin.WrapErrorISE(err, "error loading provisioner %s", provisionerName)
+	}
+
+	prov, err := h.db.GetProvisioner(ctx, p.GetID())
+	if err != nil {
+		return false, admin.WrapErrorISE(err, "error getting provisioner with ID: %s", p.GetID())
+	}
+
+	details := prov.GetDetails()
+	if details == nil {
+		return false, admin.NewErrorISE("error getting details for provisioner with ID: %s", p.GetID())
+	}
+
+	acme := details.GetACME()
+	if acme == nil {
+		return false, admin.NewErrorISE("error getting ACME details for provisioner with ID: %s", p.GetID())
+	}
+
+	return acme.GetRequireEab(), nil
 }
 
 // CreateExternalAccountKey creates a new External Account Binding key
@@ -46,17 +80,28 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), body.ProvisionerName, body.Name)
+	eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), body.Provisioner)
 	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error creating external account key %s", body.Name))
+		api.WriteError(w, err)
+		return
+	}
+
+	if !eabEnabled {
+		api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", body.Provisioner))
+		return
+	}
+
+	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), body.Provisioner, body.Reference)
+	if err != nil {
+		api.WriteError(w, admin.WrapErrorISE(err, "error creating external account key %s for provisioner %s", body.Reference, body.Provisioner))
 		return
 	}
 
 	response := &linkedca.EABKey{
-		EabKid:          eak.ID,
-		EabHmacKey:      eak.KeyBytes,
-		ProvisionerName: eak.ProvisionerName,
-		Name:            eak.Name,
+		Id:          eak.ID,
+		HmacKey:     eak.KeyBytes,
+		Provisioner: eak.Provisioner,
+		Reference:   eak.Reference,
 	}
 
 	api.ProtoJSONStatus(w, response, http.StatusCreated)
@@ -65,6 +110,8 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 // DeleteExternalAccountKey deletes an ACME External Account Key.
 func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+
+	// TODO: add provisioner as parameter, so that check can be performed if EAB is enabled or not
 
 	if err := h.acmeDB.DeleteExternalAccountKey(r.Context(), id); err != nil {
 		api.WriteError(w, admin.WrapErrorISE(err, "error deleting ACME EAB Key %s", id))
@@ -77,6 +124,17 @@ func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Reques
 // GetExternalAccountKeys returns a segment of ACME EAB Keys.
 func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request) {
 	prov := chi.URLParam(r, "prov")
+
+	eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), prov)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
+	if !eabEnabled {
+		api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", prov))
+		return
+	}
 
 	// TODO: support paging properly? It'll probably leak to the DB layer, as we have to loop through all keys
 	// cursor, limit, err := api.ParseCursor(r)
@@ -95,13 +153,13 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 	eaks := make([]*linkedca.EABKey, len(keys))
 	for i, k := range keys {
 		eaks[i] = &linkedca.EABKey{
-			EabKid:          k.ID,
-			EabHmacKey:      []byte{},
-			ProvisionerName: k.ProvisionerName,
-			Name:            k.Name,
-			Account:         k.AccountID,
-			CreatedAt:       timestamppb.New(k.CreatedAt),
-			BoundAt:         timestamppb.New(k.BoundAt),
+			Id:          k.ID,
+			HmacKey:     []byte{},
+			Provisioner: k.Provisioner,
+			Reference:   k.Reference,
+			Account:     k.AccountID,
+			CreatedAt:   timestamppb.New(k.CreatedAt),
+			BoundAt:     timestamppb.New(k.BoundAt),
 		}
 	}
 

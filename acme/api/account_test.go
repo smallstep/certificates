@@ -686,11 +686,11 @@ func TestHandler_NewAccount(t *testing.T) {
 					},
 					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
 						return &acme.ExternalAccountKey{
-							ID:              "eakID",
-							ProvisionerName: escProvName,
-							Name:            "testeak",
-							KeyBytes:        []byte{1, 3, 3, 7},
-							CreatedAt:       time.Now(),
+							ID:          "eakID",
+							Provisioner: escProvName,
+							Reference:   "testeak",
+							KeyBytes:    []byte{1, 3, 3, 7},
+							CreatedAt:   time.Now(),
 						}, nil
 					},
 					MockUpdateExternalAccountKey: func(ctx context.Context, provisionerName string, eak *acme.ExternalAccountKey) error {
@@ -1059,11 +1059,11 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 				db: &acme.MockDB{
 					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
 						return &acme.ExternalAccountKey{
-							ID:              "eakID",
-							ProvisionerName: escProvName,
-							Name:            "testeak",
-							KeyBytes:        []byte{1, 3, 3, 7},
-							CreatedAt:       time.Now(),
+							ID:          "eakID",
+							Provisioner: escProvName,
+							Reference:   "testeak",
+							KeyBytes:    []byte{1, 3, 3, 7},
+							CreatedAt:   time.Now(),
 						}, nil
 					},
 				},
@@ -1200,12 +1200,12 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 				db: &acme.MockDB{
 					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
 						return &acme.ExternalAccountKey{
-							ID:              "eakID",
-							ProvisionerName: escProvName,
-							Name:            "testeak",
-							CreatedAt:       createdAt,
-							AccountID:       "some-account-id",
-							BoundAt:         boundAt,
+							ID:          "eakID",
+							Provisioner: escProvName,
+							Reference:   "testeak",
+							CreatedAt:   createdAt,
+							AccountID:   "some-account-id",
+							BoundAt:     boundAt,
 						}, nil
 					},
 				},
@@ -1235,11 +1235,11 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 				db: &acme.MockDB{
 					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
 						return &acme.ExternalAccountKey{
-							ID:              "eakID",
-							ProvisionerName: escProvName,
-							Name:            "testeak",
-							KeyBytes:        []byte{1, 2, 3, 4},
-							CreatedAt:       time.Now(),
+							ID:          "eakID",
+							Provisioner: escProvName,
+							Reference:   "testeak",
+							KeyBytes:    []byte{1, 2, 3, 4},
+							CreatedAt:   time.Now(),
 						}, nil
 					},
 				},
@@ -1271,11 +1271,11 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 				db: &acme.MockDB{
 					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
 						return &acme.ExternalAccountKey{
-							ID:              "eakID",
-							ProvisionerName: escProvName,
-							Name:            "testeak",
-							KeyBytes:        []byte{1, 3, 3, 7},
-							CreatedAt:       time.Now(),
+							ID:          "eakID",
+							Provisioner: escProvName,
+							Reference:   "testeak",
+							KeyBytes:    []byte{1, 3, 3, 7},
+							CreatedAt:   time.Now(),
 						}, nil
 					},
 				},

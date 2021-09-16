@@ -44,13 +44,13 @@ func KeyToID(jwk *jose.JSONWebKey) (string, error) {
 }
 
 type ExternalAccountKey struct {
-	ID              string    `json:"id"`
-	ProvisionerName string    `json:"provisionerName"`
-	Name            string    `json:"name"`
-	AccountID       string    `json:"-"`
-	KeyBytes        []byte    `json:"-"`
-	CreatedAt       time.Time `json:"createdAt"`
-	BoundAt         time.Time `json:"boundAt,omitempty"`
+	ID          string    `json:"id"`
+	Provisioner string    `json:"provisioner"`
+	Reference   string    `json:"reference"`
+	AccountID   string    `json:"-"`
+	KeyBytes    []byte    `json:"-"`
+	CreatedAt   time.Time `json:"createdAt"`
+	BoundAt     time.Time `json:"boundAt,omitempty"`
 }
 
 func (eak *ExternalAccountKey) AlreadyBound() bool {
