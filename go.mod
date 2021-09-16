@@ -25,7 +25,7 @@ require (
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/nosql v0.3.8
 	github.com/urfave/cli v1.22.4
-	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
+	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.4.1
 	go.step.sm/crypto v0.9.2
 	go.step.sm/linkedca v0.5.0
@@ -43,4 +43,3 @@ require (
 // replace go.step.sm/cli-utils => ../cli-utils
 // replace go.step.sm/linkedca => ../linkedca
 
-replace go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 => github.com/omorsi/pkcs7 v0.0.0-20210217142924-a7b80a2a8568
