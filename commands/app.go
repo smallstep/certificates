@@ -23,13 +23,26 @@ import (
 var AppCommand = cli.Command{
 	Name:   "start",
 	Action: appAction,
-	UsageText: `**step-ca** <config>
-[**--password-file**=<file>] [**--issuer-password-file**=<file>] [**--resolver**=<addr>]`,
+	UsageText: `**step-ca** <config> [**--password-file**=<file>]
+[**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]	
+[**--issuer-password-file**=<file>] [**--resolver**=<addr>]`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name: "password-file",
 			Usage: `path to the <file> containing the password to decrypt the
 intermediate private key.`,
+		},
+		cli.StringFlag{
+			Name: "ssh-host-password-file",
+			Usage: `path to the <file> containing the password to decrypt the
+private key used to sign SSH host certificates. If the flag is not passed it
+will default to --password-file.`,
+		},
+		cli.StringFlag{
+			Name: "ssh-user-password-file",
+			Usage: `path to the <file> containing the password to decrypt the
+private key used to sign SSH user certificates. If the flag is not passed it
+will default to --password-file.`,
 		},
 		cli.StringFlag{
 			Name: "issuer-password-file",
@@ -51,6 +64,8 @@ certificate issuer private key used in the RA mode.`,
 // AppAction is the action used when the top command runs.
 func appAction(ctx *cli.Context) error {
 	passFile := ctx.String("password-file")
+	sshHostPassFile := ctx.String("ssh-host-password-file")
+	sshUserPassFile := ctx.String("ssh-user-password-file")
 	issuerPassFile := ctx.String("issuer-password-file")
 	resolver := ctx.String("resolver")
 	token := ctx.String("token")
@@ -89,6 +104,22 @@ To get a linked authority token:
 		password = bytes.TrimRightFunc(password, unicode.IsSpace)
 	}
 
+	var sshHostPassword []byte
+	if sshHostPassFile != "" {
+		if sshHostPassword, err = ioutil.ReadFile(sshHostPassFile); err != nil {
+			fatal(errors.Wrapf(err, "error reading %s", sshHostPassFile))
+		}
+		sshHostPassword = bytes.TrimRightFunc(sshHostPassword, unicode.IsSpace)
+	}
+
+	var sshUserPassword []byte
+	if sshUserPassFile != "" {
+		if sshUserPassword, err = ioutil.ReadFile(sshUserPassFile); err != nil {
+			fatal(errors.Wrapf(err, "error reading %s", sshUserPassFile))
+		}
+		sshUserPassword = bytes.TrimRightFunc(sshUserPassword, unicode.IsSpace)
+	}
+
 	var issuerPassword []byte
 	if issuerPassFile != "" {
 		if issuerPassword, err = ioutil.ReadFile(issuerPassFile); err != nil {
@@ -108,6 +139,8 @@ To get a linked authority token:
 	srv, err := ca.New(config,
 		ca.WithConfigFile(configFile),
 		ca.WithPassword(password),
+		ca.WithSSHHostPassword(sshHostPassword),
+		ca.WithSSHUserPassword(sshUserPassword),
 		ca.WithIssuerPassword(issuerPassword),
 		ca.WithLinkedCAToken(token))
 	if err != nil {
