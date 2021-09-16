@@ -23,8 +23,9 @@ import (
 var AppCommand = cli.Command{
 	Name:   "start",
 	Action: appAction,
-	UsageText: `**step-ca** <config>
-[**--password-file**=<file>] [**--issuer-password-file**=<file>] [**--resolver**=<addr>]`,
+	UsageText: `**step-ca** <config> [**--password-file**=<file>]
+[**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]	
+[**--issuer-password-file**=<file>] [**--resolver**=<addr>]`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name: "password-file",
