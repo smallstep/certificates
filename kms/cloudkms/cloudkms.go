@@ -3,6 +3,7 @@ package cloudkms
 import (
 	"context"
 	"crypto"
+	"crypto/x509"
 	"log"
 	"strings"
 	"time"
@@ -61,6 +62,19 @@ var signatureAlgorithmMapping = map[apiv1.SignatureAlgorithm]interface{}{
 	},
 	apiv1.ECDSAWithSHA256: kmspb.CryptoKeyVersion_EC_SIGN_P256_SHA256,
 	apiv1.ECDSAWithSHA384: kmspb.CryptoKeyVersion_EC_SIGN_P384_SHA384,
+}
+
+var cryptoKeyVersionMapping = map[kmspb.CryptoKeyVersion_CryptoKeyVersionAlgorithm]x509.SignatureAlgorithm{
+	kmspb.CryptoKeyVersion_EC_SIGN_P256_SHA256:        x509.ECDSAWithSHA256,
+	kmspb.CryptoKeyVersion_EC_SIGN_P384_SHA384:        x509.ECDSAWithSHA384,
+	kmspb.CryptoKeyVersion_RSA_SIGN_PKCS1_2048_SHA256: x509.SHA256WithRSA,
+	kmspb.CryptoKeyVersion_RSA_SIGN_PKCS1_3072_SHA256: x509.SHA256WithRSA,
+	kmspb.CryptoKeyVersion_RSA_SIGN_PKCS1_4096_SHA256: x509.SHA256WithRSA,
+	kmspb.CryptoKeyVersion_RSA_SIGN_PKCS1_4096_SHA512: x509.SHA512WithRSA,
+	kmspb.CryptoKeyVersion_RSA_SIGN_PSS_2048_SHA256:   x509.SHA256WithRSAPSS,
+	kmspb.CryptoKeyVersion_RSA_SIGN_PSS_3072_SHA256:   x509.SHA256WithRSAPSS,
+	kmspb.CryptoKeyVersion_RSA_SIGN_PSS_4096_SHA256:   x509.SHA256WithRSAPSS,
+	kmspb.CryptoKeyVersion_RSA_SIGN_PSS_4096_SHA512:   x509.SHA512WithRSAPSS,
 }
 
 // KeyManagementClient defines the methods on KeyManagementClient that this

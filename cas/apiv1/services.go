@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"crypto/x509"
 	"net/http"
 	"strings"
 )
@@ -24,6 +25,12 @@ type CertificateAuthorityGetter interface {
 // authority.
 type CertificateAuthorityCreator interface {
 	CreateCertificateAuthority(req *CreateCertificateAuthorityRequest) (*CreateCertificateAuthorityResponse, error)
+}
+
+// SignatureAlgorithmGetter is an optional implementation in a crypto.Signer
+// that returns the SignatureAlgorithm to use.
+type SignatureAlgorithmGetter interface {
+	SignatureAlgorithm() x509.SignatureAlgorithm
 }
 
 // Type represents the CAS type used.

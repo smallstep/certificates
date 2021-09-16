@@ -1,3 +1,4 @@
+//go:build cgo && !softhsm2 && !yubihsm2 && !opensc
 // +build cgo,!softhsm2,!yubihsm2,!opensc
 
 package pkcs11
