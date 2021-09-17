@@ -79,7 +79,7 @@ inject:
         logger:
           format: json
         db:
-          type: badger
+          type: badgerv2
           dataSource: /home/step/db
         authority:
           provisioners:
