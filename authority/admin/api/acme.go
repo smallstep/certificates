@@ -120,12 +120,22 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 
 // DeleteExternalAccountKey deletes an ACME External Account Key.
 func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+	provisioner := chi.URLParam(r, "prov")
+	keyID := chi.URLParam(r, "id")
 
-	// TODO: add provisioner as parameter, so that check can be performed if EAB is enabled or not
+	eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), provisioner)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
 
-	if err := h.acmeDB.DeleteExternalAccountKey(r.Context(), id); err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error deleting ACME EAB Key %s", id))
+	if !eabEnabled {
+		api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", provisioner))
+		return
+	}
+
+	if err := h.acmeDB.DeleteExternalAccountKey(r.Context(), provisioner, keyID); err != nil {
+		api.WriteError(w, admin.WrapErrorISE(err, "error deleting ACME EAB Key %s", keyID))
 		return
 	}
 

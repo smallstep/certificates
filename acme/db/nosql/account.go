@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
-	"github.com/smallstep/nosql"
 	nosqlDB "github.com/smallstep/nosql"
 	"go.step.sm/crypto/jose"
 )
@@ -238,10 +237,20 @@ func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerName string,
 	}, nil
 }
 
-func (db *DB) DeleteExternalAccountKey(ctx context.Context, keyID string) error {
-	_, err := db.db.Get(externalAccountKeyTable, []byte(keyID))
+func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerName string, keyID string) error {
+	dbeak, err := db.getDBExternalAccountKey(ctx, keyID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading ACME EAB Key with Key ID %s", keyID)
+	}
+	if dbeak.Provisioner != provisionerName {
+		// TODO: change these ACME error types; they don't make a lot of sense if used in the Admin APIs
+		return acme.NewError(acme.ErrorUnauthorizedType, "name of provisioner does not match provisioner for which the EAB key was created")
+	}
+	if dbeak.Reference != "" {
+		err = db.db.Del(externalAccountKeysByReferenceTable, []byte(dbeak.Reference))
+		if err != nil {
+			return errors.Wrapf(err, "error deleting ACME EAB Key Reference with Key ID %s and reference %s", keyID, dbeak.Reference)
+		}
 	}
 	err = db.db.Del(externalAccountKeyTable, []byte(keyID))
 	if err != nil {
@@ -286,7 +295,7 @@ func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerN
 		return nil, nil
 	}
 	k, err := db.db.Get(externalAccountKeysByReferenceTable, []byte(reference))
-	if nosql.IsErrNotFound(err) {
+	if nosqlDB.IsErrNotFound(err) {
 		return nil, errors.Errorf("ACME EAB key for reference %s not found", reference)
 	} else if err != nil {
 		return nil, errors.Wrapf(err, "error loading ACME EAB key for reference %s", reference)

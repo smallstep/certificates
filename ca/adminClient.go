@@ -637,10 +637,10 @@ retry:
 	return eabKey, nil
 }
 
-// RemoveExternalAccountKey performs the DELETE /admin/acme/eab/{key_id} request to the CA.
-func (c *AdminClient) RemoveExternalAccountKey(keyID string) error {
+// RemoveExternalAccountKey performs the DELETE /admin/acme/eab/{prov}/{key_id} request to the CA.
+func (c *AdminClient) RemoveExternalAccountKey(provisionerName string, keyID string) error {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab", keyID)})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab", provisionerName, "/", keyID)})
 	tok, err := c.generateAdminToken(u.Path)
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")

@@ -47,5 +47,5 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("GET", "/acme/eab/{prov}/{ref}", authnz(h.GetExternalAccountKeys))
 	r.MethodFunc("GET", "/acme/eab/{prov}", authnz(h.GetExternalAccountKeys))
 	r.MethodFunc("POST", "/acme/eab", authnz(h.CreateExternalAccountKey))
-	r.MethodFunc("DELETE", "/acme/eab/{id}", authnz(h.DeleteExternalAccountKey))
+	r.MethodFunc("DELETE", "/acme/eab/{prov}/{id}", authnz(h.DeleteExternalAccountKey))
 }

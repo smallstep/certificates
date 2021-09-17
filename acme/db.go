@@ -23,7 +23,7 @@ type DB interface {
 	GetExternalAccountKey(ctx context.Context, provisionerName string, keyID string) (*ExternalAccountKey, error)
 	GetExternalAccountKeys(ctx context.Context, provisionerName string) ([]*ExternalAccountKey, error)
 	GetExternalAccountKeyByReference(ctx context.Context, provisionerName string, reference string) (*ExternalAccountKey, error)
-	DeleteExternalAccountKey(ctx context.Context, keyID string) error
+	DeleteExternalAccountKey(ctx context.Context, provisionerName string, keyID string) error
 	UpdateExternalAccountKey(ctx context.Context, provisionerName string, eak *ExternalAccountKey) error
 
 	CreateNonce(ctx context.Context) (Nonce, error)
@@ -58,7 +58,7 @@ type MockDB struct {
 	MockGetExternalAccountKey            func(ctx context.Context, provisionerName string, keyID string) (*ExternalAccountKey, error)
 	MockGetExternalAccountKeys           func(ctx context.Context, provisionerName string) ([]*ExternalAccountKey, error)
 	MockGetExternalAccountKeyByReference func(ctx context.Context, provisionerName string, reference string) (*ExternalAccountKey, error)
-	MockDeleteExternalAccountKey         func(ctx context.Context, keyID string) error
+	MockDeleteExternalAccountKey         func(ctx context.Context, provisionerName string, keyID string) error
 	MockUpdateExternalAccountKey         func(ctx context.Context, provisionerName string, eak *ExternalAccountKey) error
 
 	MockCreateNonce func(ctx context.Context) (Nonce, error)
@@ -165,9 +165,9 @@ func (m *MockDB) GetExternalAccountKeyByReference(ctx context.Context, provision
 }
 
 // DeleteExternalAccountKey mock
-func (m *MockDB) DeleteExternalAccountKey(ctx context.Context, keyID string) error {
+func (m *MockDB) DeleteExternalAccountKey(ctx context.Context, provisionerName string, keyID string) error {
 	if m.MockDeleteExternalAccountKey != nil {
-		return m.MockDeleteExternalAccountKey(ctx, keyID)
+		return m.MockDeleteExternalAccountKey(ctx, provisionerName, keyID)
 	} else if m.MockError != nil {
 		return m.MockError
 	}
