@@ -282,6 +282,9 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName string
 
 // GetExternalAccountKeyByReference retrieves an External Account Binding key with unique reference
 func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerName string, reference string) (*acme.ExternalAccountKey, error) {
+	if reference == "" {
+		return nil, nil
+	}
 	k, err := db.db.Get(externalAccountKeysByReferenceTable, []byte(reference))
 	if nosql.IsErrNotFound(err) {
 		return nil, errors.Errorf("ACME EAB key for reference %s not found", reference)

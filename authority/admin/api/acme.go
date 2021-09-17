@@ -78,20 +78,33 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), body.Provisioner)
+	provisioner := body.Provisioner
+	reference := body.Reference
+
+	eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), provisioner)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
 	if !eabEnabled {
-		api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", body.Provisioner))
+		api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", provisioner))
 		return
 	}
 
-	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), body.Provisioner, body.Reference)
+	if reference != "" {
+		k, err := h.acmeDB.GetExternalAccountKeyByReference(r.Context(), provisioner, reference)
+		if err == nil || k != nil {
+			err := admin.NewError(admin.ErrorBadRequestType, "an ACME EAB key for provisioner %s with reference %s already exists", provisioner, reference)
+			err.Status = 409
+			api.WriteError(w, err)
+			return
+		}
+	}
+
+	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), provisioner, reference)
 	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error creating external account key %s for provisioner %s", body.Reference, body.Provisioner))
+		api.WriteError(w, admin.WrapErrorISE(err, "error creating ACME EAB key for provisioner %s and reference %s", provisioner, reference))
 		return
 	}
 
