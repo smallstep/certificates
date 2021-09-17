@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/nosql"
 	nosqlDB "github.com/smallstep/nosql"
 	"go.step.sm/crypto/jose"
 )
@@ -35,6 +36,11 @@ type dbExternalAccountKey struct {
 	KeyBytes    []byte    `json:"key"`
 	CreatedAt   time.Time `json:"createdAt"`
 	BoundAt     time.Time `json:"boundAt"`
+}
+
+type dbExternalAccountKeyReference struct {
+	Reference            string `json:"reference"`
+	ExternalAccountKeyID string `json:"externalAccountKeyID"`
 }
 
 func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, error) {
@@ -188,6 +194,17 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName stri
 	if err = db.save(ctx, keyID, dbeak, nil, "external_account_key", externalAccountKeyTable); err != nil {
 		return nil, err
 	}
+
+	if dbeak.Reference != "" {
+		dbExternalAccountKeyReference := &dbExternalAccountKeyReference{
+			Reference:            dbeak.Reference,
+			ExternalAccountKeyID: dbeak.ID,
+		}
+		if err = db.save(ctx, dbeak.Reference, dbExternalAccountKeyReference, nil, "external_account_key_reference", externalAccountKeysByReferenceTable); err != nil {
+			return nil, err
+		}
+	}
+
 	return &acme.ExternalAccountKey{
 		ID:          dbeak.ID,
 		Provisioner: dbeak.Provisioner,
@@ -261,6 +278,21 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName string
 	}
 
 	return keys, nil
+}
+
+// GetExternalAccountKeyByReference retrieves an External Account Binding key with unique reference
+func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerName string, reference string) (*acme.ExternalAccountKey, error) {
+	k, err := db.db.Get(externalAccountKeysByReferenceTable, []byte(reference))
+	if nosql.IsErrNotFound(err) {
+		return nil, errors.Errorf("ACME EAB key for reference %s not found", reference)
+	} else if err != nil {
+		return nil, errors.Wrapf(err, "error loading ACME EAB key for reference %s", reference)
+	}
+	dbExternalAccountKeyReference := new(dbExternalAccountKeyReference)
+	if err := json.Unmarshal(k, dbExternalAccountKeyReference); err != nil {
+		return nil, errors.Wrapf(err, "error unmarshaling ACME EAB key for reference %s", reference)
+	}
+	return db.GetExternalAccountKey(ctx, provisionerName, dbExternalAccountKeyReference.ExternalAccountKeyID)
 }
 
 func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerName string, eak *acme.ExternalAccountKey) error {

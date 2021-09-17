@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
+	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -22,9 +23,6 @@ type CreateExternalAccountKeyRequest struct {
 func (r *CreateExternalAccountKeyRequest) Validate() error {
 	if r.Provisioner == "" {
 		return admin.NewError(admin.ErrorBadRequestType, "provisioner name cannot be empty")
-	}
-	if r.Reference == "" {
-		return admin.NewError(admin.ErrorBadRequestType, "reference cannot be empty")
 	}
 	return nil
 }
@@ -124,6 +122,7 @@ func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Reques
 // GetExternalAccountKeys returns a segment of ACME EAB Keys.
 func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request) {
 	prov := chi.URLParam(r, "prov")
+	reference := chi.URLParam(r, "ref")
 
 	eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), prov)
 	if err != nil {
@@ -144,10 +143,23 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 	// 	return
 	// }
 
-	keys, err := h.acmeDB.GetExternalAccountKeys(r.Context(), prov)
-	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error getting external account keys"))
-		return
+	var (
+		key  *acme.ExternalAccountKey
+		keys []*acme.ExternalAccountKey
+	)
+	if reference != "" {
+		key, err = h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference)
+		if err != nil {
+			api.WriteError(w, admin.WrapErrorISE(err, "error getting external account key with reference %s", reference))
+			return
+		}
+		keys = []*acme.ExternalAccountKey{key}
+	} else {
+		keys, err = h.acmeDB.GetExternalAccountKeys(r.Context(), prov)
+		if err != nil {
+			api.WriteError(w, admin.WrapErrorISE(err, "error getting external account keys"))
+			return
+		}
 	}
 
 	eaks := make([]*linkedca.EABKey, len(keys))
