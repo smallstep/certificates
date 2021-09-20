@@ -80,7 +80,7 @@ func New(c *Config) (AuthDB, error) {
 	}
 
 	tables := [][]byte{
-		revokedCertsTable, usedOTTTable,
+		revokedCertsTable, certsTable, usedOTTTable,
 		sshCertsTable, sshHostsTable, sshHostPrincipalsTable, sshUsersTable,
 		revokedSSHCertsTable,
 	}
@@ -89,11 +89,6 @@ func New(c *Config) (AuthDB, error) {
 			return nil, errors.Wrapf(err, "error creating table %s",
 				string(b))
 		}
-	}
-	// Separate schema for Certs Table so that queries on these tables can be done in the future.
-	if err := db.CreateX509CertificateTable(certsTable); err != nil {
-		return nil, errors.Wrapf(err, "error creating table %s",
-			string(certsTable))
 	}
 
 	return &DB{db, true}, nil
@@ -208,7 +203,7 @@ func (db *DB) GetCertificate(serialNumber string) (*x509.Certificate, error) {
 
 // StoreCertificate stores a certificate PEM.
 func (db *DB) StoreCertificate(crt *x509.Certificate) error {
-	if err := db.SetX509Certificate(certsTable, []byte(crt.SerialNumber.String()), crt.Raw, crt.NotBefore, crt.NotAfter, crt.Subject.Province, crt.Subject.Locality, crt.Subject.Country, crt.Subject.Organization, crt.Subject.OrganizationalUnit, crt.Subject.CommonName, crt.Issuer.String()); err != nil {
+	if err := db.Set(certsTable, []byte(crt.SerialNumber.String()), crt.Raw); err != nil {
 		return errors.Wrap(err, "database Set error")
 	}
 	return nil
@@ -409,20 +404,18 @@ func (m *MockAuthDB) Shutdown() error {
 
 // MockNoSQLDB //
 type MockNoSQLDB struct {
-	Err                         error
-	Ret1, Ret2                  interface{}
-	MGet                        func(bucket, key []byte) ([]byte, error)
-	MSet                        func(bucket, key, value []byte) error
-	MSetX509Certificate         func(bucket, key, value []byte, notBefore time.Time, notAfter time.Time, province []string, locality []string, country []string, organization []string, organizationalUnit []string, commonName string, issuer string) error
-	MOpen                       func(dataSourceName string, opt ...database.Option) error
-	MClose                      func() error
-	MCreateX509CertificateTable func(bucket []byte) error
-	MCreateTable                func(bucket []byte) error
-	MDeleteTable                func(bucket []byte) error
-	MDel                        func(bucket, key []byte) error
-	MList                       func(bucket []byte) ([]*database.Entry, error)
-	MUpdate                     func(tx *database.Tx) error
-	MCmpAndSwap                 func(bucket, key, old, newval []byte) ([]byte, bool, error)
+	Err          error
+	Ret1, Ret2   interface{}
+	MGet         func(bucket, key []byte) ([]byte, error)
+	MSet         func(bucket, key, value []byte) error
+	MOpen        func(dataSourceName string, opt ...database.Option) error
+	MClose       func() error
+	MCreateTable func(bucket []byte) error
+	MDeleteTable func(bucket []byte) error
+	MDel         func(bucket, key []byte) error
+	MList        func(bucket []byte) ([]*database.Entry, error)
+	MUpdate      func(tx *database.Tx) error
+	MCmpAndSwap  func(bucket, key, old, newval []byte) ([]byte, bool, error)
 }
 
 // CmpAndSwap mock
@@ -455,14 +448,6 @@ func (m *MockNoSQLDB) Set(bucket, key, value []byte) error {
 	return m.Err
 }
 
-// SetX509Certificate mock
-func (m *MockNoSQLDB) SetX509Certificate(bucket, key, value []byte, notBefore time.Time, notAfter time.Time, province []string, locality []string, country []string, organization []string, organizationalUnit []string, commonName string, issuer string) error {
-	if m.MSetX509Certificate != nil {
-		return m.MSetX509Certificate(bucket, key, value, notBefore, notAfter, province, locality, country, organization, organizationalUnit, commonName, issuer)
-	}
-	return m.Err
-}
-
 // Open mock
 func (m *MockNoSQLDB) Open(dataSourceName string, opt ...database.Option) error {
 	if m.MOpen != nil {
@@ -483,14 +468,6 @@ func (m *MockNoSQLDB) Close() error {
 func (m *MockNoSQLDB) CreateTable(bucket []byte) error {
 	if m.MCreateTable != nil {
 		return m.MCreateTable(bucket)
-	}
-	return m.Err
-}
-
-// CreateX509CertificateTable mock
-func (m *MockNoSQLDB) CreateX509CertificateTable(bucket []byte) error {
-	if m.MCreateX509CertificateTable != nil {
-		return m.MCreateX509CertificateTable(bucket)
 	}
 	return m.Err
 }
