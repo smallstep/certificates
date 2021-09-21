@@ -11,7 +11,7 @@ import (
 func TestIsRevoked(t *testing.T) {
 	tests := map[string]struct {
 		key       string
-		db        *DB
+		db        *NoSQLDB
 		isRevoked bool
 		err       error
 	}{
@@ -20,16 +20,16 @@ func TestIsRevoked(t *testing.T) {
 		},
 		"false/ErrNotFound": {
 			key: "sn",
-			db:  &DB{&MockNoSQLDB{Err: database.ErrNotFound, Ret1: nil}, true},
+			db:  &NoSQLDB{&MockNoSQLDB{Err: database.ErrNotFound, Ret1: nil}, true},
 		},
 		"error/checking bucket": {
 			key: "sn",
-			db:  &DB{&MockNoSQLDB{Err: errors.New("force"), Ret1: nil}, true},
+			db:  &NoSQLDB{&MockNoSQLDB{Err: errors.New("force"), Ret1: nil}, true},
 			err: errors.New("error checking revocation bucket: force"),
 		},
 		"true": {
 			key:       "sn",
-			db:        &DB{&MockNoSQLDB{Ret1: []byte("value")}, true},
+			db:        &NoSQLDB{&MockNoSQLDB{Ret1: []byte("value")}, true},
 			isRevoked: true,
 		},
 	}
@@ -51,12 +51,12 @@ func TestIsRevoked(t *testing.T) {
 func TestRevoke(t *testing.T) {
 	tests := map[string]struct {
 		rci *RevokedCertificateInfo
-		db  *DB
+		db  *NoSQLDB
 		err error
 	}{
 		"error/force isRevoked": {
 			rci: &RevokedCertificateInfo{Serial: "sn"},
-			db: &DB{&MockNoSQLDB{
+			db: &NoSQLDB{&MockNoSQLDB{
 				MCmpAndSwap: func(bucket, sn, old, newval []byte) ([]byte, bool, error) {
 					return nil, false, errors.New("force")
 				},
@@ -65,7 +65,7 @@ func TestRevoke(t *testing.T) {
 		},
 		"error/was already revoked": {
 			rci: &RevokedCertificateInfo{Serial: "sn"},
-			db: &DB{&MockNoSQLDB{
+			db: &NoSQLDB{&MockNoSQLDB{
 				MCmpAndSwap: func(bucket, sn, old, newval []byte) ([]byte, bool, error) {
 					return []byte("foo"), false, nil
 				},
@@ -74,7 +74,7 @@ func TestRevoke(t *testing.T) {
 		},
 		"ok": {
 			rci: &RevokedCertificateInfo{Serial: "sn"},
-			db: &DB{&MockNoSQLDB{
+			db: &NoSQLDB{&MockNoSQLDB{
 				MCmpAndSwap: func(bucket, sn, old, newval []byte) ([]byte, bool, error) {
 					return []byte("foo"), true, nil
 				},
@@ -101,13 +101,13 @@ func TestUseToken(t *testing.T) {
 	}
 	tests := map[string]struct {
 		id, tok string
-		db      *DB
+		db      *NoSQLDB
 		want    result
 	}{
 		"fail/force-CmpAndSwap-error": {
 			id:  "id",
 			tok: "token",
-			db: &DB{&MockNoSQLDB{
+			db: &NoSQLDB{&MockNoSQLDB{
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return nil, false, errors.New("force")
 				},
@@ -120,7 +120,7 @@ func TestUseToken(t *testing.T) {
 		"fail/CmpAndSwap-already-exists": {
 			id:  "id",
 			tok: "token",
-			db: &DB{&MockNoSQLDB{
+			db: &NoSQLDB{&MockNoSQLDB{
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return []byte("foo"), false, nil
 				},
@@ -132,7 +132,7 @@ func TestUseToken(t *testing.T) {
 		"ok/cmpAndSwap-success": {
 			id:  "id",
 			tok: "token",
-			db: &DB{&MockNoSQLDB{
+			db: &NoSQLDB{&MockNoSQLDB{
 				MCmpAndSwap: func(bucket, key, old, newval []byte) ([]byte, bool, error) {
 					return []byte("bar"), true, nil
 				},

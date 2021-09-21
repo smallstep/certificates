@@ -408,7 +408,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		if revokeOpts.Crt != nil {
 			revokedCert = revokeOpts.Crt
 		} else if rci.Serial != "" {
-			revokedCert, _ = a.db.GetCertificate(rci.Serial)
+			revokedCert, _ = a.db.GetCertificate(ctx, rci.Serial)
 		}
 
 		// CAS operation, note that SoftCAS (default) is a noop.

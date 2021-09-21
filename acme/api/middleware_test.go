@@ -117,7 +117,7 @@ func TestHandler_addNonce(t *testing.T) {
 	var tests = map[string]func(t *testing.T) test{
 		"fail/AddNonce-error": func(t *testing.T) test {
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateNonce: func(ctx context.Context) (acme.Nonce, error) {
 						return acme.Nonce(""), acme.NewErrorISE("force")
 					},
@@ -128,7 +128,7 @@ func TestHandler_addNonce(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateNonce: func(ctx context.Context) (acme.Nonce, error) {
 						return "bar", nil
 					},
@@ -806,7 +806,7 @@ func TestHandler_lookupJWK(t *testing.T) {
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
 				linker: NewLinker("dns", "acme"),
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetAccount: func(ctx context.Context, accID string) (*acme.Account, error) {
 						assert.Equals(t, accID, accID)
 						return nil, database.ErrNotFound
@@ -823,7 +823,7 @@ func TestHandler_lookupJWK(t *testing.T) {
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
 				linker: NewLinker("dns", "acme"),
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetAccount: func(ctx context.Context, id string) (*acme.Account, error) {
 						assert.Equals(t, id, accID)
 						return nil, acme.NewErrorISE("force")
@@ -841,7 +841,7 @@ func TestHandler_lookupJWK(t *testing.T) {
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
 				linker: NewLinker("dns", "acme"),
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetAccount: func(ctx context.Context, id string) (*acme.Account, error) {
 						assert.Equals(t, id, accID)
 						return acc, nil
@@ -859,7 +859,7 @@ func TestHandler_lookupJWK(t *testing.T) {
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
 				linker: NewLinker("dns", "acme"),
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetAccount: func(ctx context.Context, id string) (*acme.Account, error) {
 						assert.Equals(t, id, accID)
 						return acc, nil
@@ -1001,7 +1001,7 @@ func TestHandler_extractJWK(t *testing.T) {
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				ctx: ctx,
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetAccountByKeyID: func(ctx context.Context, kid string) (*acme.Account, error) {
 						assert.Equals(t, kid, pub.KeyID)
 						return nil, acme.NewErrorISE("force")
@@ -1017,7 +1017,7 @@ func TestHandler_extractJWK(t *testing.T) {
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				ctx: ctx,
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetAccountByKeyID: func(ctx context.Context, kid string) (*acme.Account, error) {
 						assert.Equals(t, kid, pub.KeyID)
 						return acc, nil
@@ -1033,7 +1033,7 @@ func TestHandler_extractJWK(t *testing.T) {
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				ctx: ctx,
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetAccountByKeyID: func(ctx context.Context, kid string) (*acme.Account, error) {
 						assert.Equals(t, kid, pub.KeyID)
 						return acc, nil
@@ -1056,7 +1056,7 @@ func TestHandler_extractJWK(t *testing.T) {
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				ctx: ctx,
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetAccountByKeyID: func(ctx context.Context, kid string) (*acme.Account, error) {
 						assert.Equals(t, kid, pub.KeyID)
 						return nil, acme.ErrNotFound
@@ -1205,7 +1205,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockDeleteNonce: func(ctx context.Context, n acme.Nonce) error {
 						return nil
 					},
@@ -1233,7 +1233,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockDeleteNonce: func(ctx context.Context, n acme.Nonce) error {
 						return nil
 					},
@@ -1250,7 +1250,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockDeleteNonce: func(ctx context.Context, n acme.Nonce) error {
 						return acme.NewErrorISE("force")
 					},
@@ -1267,7 +1267,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockDeleteNonce: func(ctx context.Context, n acme.Nonce) error {
 						return nil
 					},
@@ -1291,7 +1291,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockDeleteNonce: func(ctx context.Context, n acme.Nonce) error {
 						return nil
 					},
@@ -1320,7 +1320,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockDeleteNonce: func(ctx context.Context, n acme.Nonce) error {
 						return nil
 					},
@@ -1344,7 +1344,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockDeleteNonce: func(ctx context.Context, n acme.Nonce) error {
 						return nil
 					},
@@ -1369,7 +1369,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockDeleteNonce: func(ctx context.Context, n acme.Nonce) error {
 						return nil
 					},
@@ -1399,7 +1399,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockDeleteNonce: func(ctx context.Context, n acme.Nonce) error {
 						return nil
 					},
@@ -1429,7 +1429,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockDeleteNonce: func(ctx context.Context, n acme.Nonce) error {
 						return nil
 					},

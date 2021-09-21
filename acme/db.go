@@ -26,7 +26,7 @@ type DB interface {
 	GetAuthorization(ctx context.Context, id string) (*Authorization, error)
 	UpdateAuthorization(ctx context.Context, az *Authorization) error
 
-	CreateCertificate(ctx context.Context, cert *Certificate) error
+	CreateCertificate(ctx context.Context, cert *Certificate, provisionerName string) error
 	GetCertificate(ctx context.Context, id string) (*Certificate, error)
 
 	CreateChallenge(ctx context.Context, ch *Challenge) error
@@ -39,9 +39,9 @@ type DB interface {
 	UpdateOrder(ctx context.Context, o *Order) error
 }
 
-// MockDB is an implementation of the DB interface that should only be used as
+// MockNOSQLDB is an implementation of the DB interface that should only be used as
 // a mock in tests.
-type MockDB struct {
+type MockNOSQLDB struct {
 	MockCreateAccount     func(ctx context.Context, acc *Account) error
 	MockGetAccount        func(ctx context.Context, id string) (*Account, error)
 	MockGetAccountByKeyID func(ctx context.Context, kid string) (*Account, error)
@@ -54,7 +54,7 @@ type MockDB struct {
 	MockGetAuthorization    func(ctx context.Context, id string) (*Authorization, error)
 	MockUpdateAuthorization func(ctx context.Context, az *Authorization) error
 
-	MockCreateCertificate func(ctx context.Context, cert *Certificate) error
+	MockCreateCertificate func(ctx context.Context, cert *Certificate, provisionerName string) error
 	MockGetCertificate    func(ctx context.Context, id string) (*Certificate, error)
 
 	MockCreateChallenge func(ctx context.Context, ch *Challenge) error
@@ -71,7 +71,7 @@ type MockDB struct {
 }
 
 // CreateAccount mock.
-func (m *MockDB) CreateAccount(ctx context.Context, acc *Account) error {
+func (m *MockNOSQLDB) CreateAccount(ctx context.Context, acc *Account) error {
 	if m.MockCreateAccount != nil {
 		return m.MockCreateAccount(ctx, acc)
 	} else if m.MockError != nil {
@@ -81,7 +81,7 @@ func (m *MockDB) CreateAccount(ctx context.Context, acc *Account) error {
 }
 
 // GetAccount mock.
-func (m *MockDB) GetAccount(ctx context.Context, id string) (*Account, error) {
+func (m *MockNOSQLDB) GetAccount(ctx context.Context, id string) (*Account, error) {
 	if m.MockGetAccount != nil {
 		return m.MockGetAccount(ctx, id)
 	} else if m.MockError != nil {
@@ -91,7 +91,7 @@ func (m *MockDB) GetAccount(ctx context.Context, id string) (*Account, error) {
 }
 
 // GetAccountByKeyID mock
-func (m *MockDB) GetAccountByKeyID(ctx context.Context, kid string) (*Account, error) {
+func (m *MockNOSQLDB) GetAccountByKeyID(ctx context.Context, kid string) (*Account, error) {
 	if m.MockGetAccountByKeyID != nil {
 		return m.MockGetAccountByKeyID(ctx, kid)
 	} else if m.MockError != nil {
@@ -101,7 +101,7 @@ func (m *MockDB) GetAccountByKeyID(ctx context.Context, kid string) (*Account, e
 }
 
 // UpdateAccount mock
-func (m *MockDB) UpdateAccount(ctx context.Context, acc *Account) error {
+func (m *MockNOSQLDB) UpdateAccount(ctx context.Context, acc *Account) error {
 	if m.MockUpdateAccount != nil {
 		return m.MockUpdateAccount(ctx, acc)
 	} else if m.MockError != nil {
@@ -111,7 +111,7 @@ func (m *MockDB) UpdateAccount(ctx context.Context, acc *Account) error {
 }
 
 // CreateNonce mock
-func (m *MockDB) CreateNonce(ctx context.Context) (Nonce, error) {
+func (m *MockNOSQLDB) CreateNonce(ctx context.Context) (Nonce, error) {
 	if m.MockCreateNonce != nil {
 		return m.MockCreateNonce(ctx)
 	} else if m.MockError != nil {
@@ -121,7 +121,7 @@ func (m *MockDB) CreateNonce(ctx context.Context) (Nonce, error) {
 }
 
 // DeleteNonce mock
-func (m *MockDB) DeleteNonce(ctx context.Context, nonce Nonce) error {
+func (m *MockNOSQLDB) DeleteNonce(ctx context.Context, nonce Nonce) error {
 	if m.MockDeleteNonce != nil {
 		return m.MockDeleteNonce(ctx, nonce)
 	} else if m.MockError != nil {
@@ -131,7 +131,7 @@ func (m *MockDB) DeleteNonce(ctx context.Context, nonce Nonce) error {
 }
 
 // CreateAuthorization mock
-func (m *MockDB) CreateAuthorization(ctx context.Context, az *Authorization) error {
+func (m *MockNOSQLDB) CreateAuthorization(ctx context.Context, az *Authorization) error {
 	if m.MockCreateAuthorization != nil {
 		return m.MockCreateAuthorization(ctx, az)
 	} else if m.MockError != nil {
@@ -141,7 +141,7 @@ func (m *MockDB) CreateAuthorization(ctx context.Context, az *Authorization) err
 }
 
 // GetAuthorization mock
-func (m *MockDB) GetAuthorization(ctx context.Context, id string) (*Authorization, error) {
+func (m *MockNOSQLDB) GetAuthorization(ctx context.Context, id string) (*Authorization, error) {
 	if m.MockGetAuthorization != nil {
 		return m.MockGetAuthorization(ctx, id)
 	} else if m.MockError != nil {
@@ -151,7 +151,7 @@ func (m *MockDB) GetAuthorization(ctx context.Context, id string) (*Authorizatio
 }
 
 // UpdateAuthorization mock
-func (m *MockDB) UpdateAuthorization(ctx context.Context, az *Authorization) error {
+func (m *MockNOSQLDB) UpdateAuthorization(ctx context.Context, az *Authorization) error {
 	if m.MockUpdateAuthorization != nil {
 		return m.MockUpdateAuthorization(ctx, az)
 	} else if m.MockError != nil {
@@ -161,9 +161,9 @@ func (m *MockDB) UpdateAuthorization(ctx context.Context, az *Authorization) err
 }
 
 // CreateCertificate mock
-func (m *MockDB) CreateCertificate(ctx context.Context, cert *Certificate) error {
+func (m *MockNOSQLDB) CreateCertificate(ctx context.Context, cert *Certificate, provisionerName string) error {
 	if m.MockCreateCertificate != nil {
-		return m.MockCreateCertificate(ctx, cert)
+		return m.MockCreateCertificate(ctx, cert, provisionerName)
 	} else if m.MockError != nil {
 		return m.MockError
 	}
@@ -171,7 +171,7 @@ func (m *MockDB) CreateCertificate(ctx context.Context, cert *Certificate) error
 }
 
 // GetCertificate mock
-func (m *MockDB) GetCertificate(ctx context.Context, id string) (*Certificate, error) {
+func (m *MockNOSQLDB) GetCertificate(ctx context.Context, id string) (*Certificate, error) {
 	if m.MockGetCertificate != nil {
 		return m.MockGetCertificate(ctx, id)
 	} else if m.MockError != nil {
@@ -181,7 +181,7 @@ func (m *MockDB) GetCertificate(ctx context.Context, id string) (*Certificate, e
 }
 
 // CreateChallenge mock
-func (m *MockDB) CreateChallenge(ctx context.Context, ch *Challenge) error {
+func (m *MockNOSQLDB) CreateChallenge(ctx context.Context, ch *Challenge) error {
 	if m.MockCreateChallenge != nil {
 		return m.MockCreateChallenge(ctx, ch)
 	} else if m.MockError != nil {
@@ -191,7 +191,7 @@ func (m *MockDB) CreateChallenge(ctx context.Context, ch *Challenge) error {
 }
 
 // GetChallenge mock
-func (m *MockDB) GetChallenge(ctx context.Context, chID, azID string) (*Challenge, error) {
+func (m *MockNOSQLDB) GetChallenge(ctx context.Context, chID, azID string) (*Challenge, error) {
 	if m.MockGetChallenge != nil {
 		return m.MockGetChallenge(ctx, chID, azID)
 	} else if m.MockError != nil {
@@ -201,7 +201,7 @@ func (m *MockDB) GetChallenge(ctx context.Context, chID, azID string) (*Challeng
 }
 
 // UpdateChallenge mock
-func (m *MockDB) UpdateChallenge(ctx context.Context, ch *Challenge) error {
+func (m *MockNOSQLDB) UpdateChallenge(ctx context.Context, ch *Challenge) error {
 	if m.MockUpdateChallenge != nil {
 		return m.MockUpdateChallenge(ctx, ch)
 	} else if m.MockError != nil {
@@ -211,7 +211,7 @@ func (m *MockDB) UpdateChallenge(ctx context.Context, ch *Challenge) error {
 }
 
 // CreateOrder mock
-func (m *MockDB) CreateOrder(ctx context.Context, o *Order) error {
+func (m *MockNOSQLDB) CreateOrder(ctx context.Context, o *Order) error {
 	if m.MockCreateOrder != nil {
 		return m.MockCreateOrder(ctx, o)
 	} else if m.MockError != nil {
@@ -221,7 +221,7 @@ func (m *MockDB) CreateOrder(ctx context.Context, o *Order) error {
 }
 
 // GetOrder mock
-func (m *MockDB) GetOrder(ctx context.Context, id string) (*Order, error) {
+func (m *MockNOSQLDB) GetOrder(ctx context.Context, id string) (*Order, error) {
 	if m.MockGetOrder != nil {
 		return m.MockGetOrder(ctx, id)
 	} else if m.MockError != nil {
@@ -231,7 +231,7 @@ func (m *MockDB) GetOrder(ctx context.Context, id string) (*Order, error) {
 }
 
 // UpdateOrder mock
-func (m *MockDB) UpdateOrder(ctx context.Context, o *Order) error {
+func (m *MockNOSQLDB) UpdateOrder(ctx context.Context, o *Order) error {
 	if m.MockUpdateOrder != nil {
 		return m.MockUpdateOrder(ctx, o)
 	} else if m.MockError != nil {
@@ -241,7 +241,218 @@ func (m *MockDB) UpdateOrder(ctx context.Context, o *Order) error {
 }
 
 // GetOrdersByAccountID mock
-func (m *MockDB) GetOrdersByAccountID(ctx context.Context, accID string) ([]string, error) {
+func (m *MockNOSQLDB) GetOrdersByAccountID(ctx context.Context, accID string) ([]string, error) {
+	if m.MockGetOrdersByAccountID != nil {
+		return m.MockGetOrdersByAccountID(ctx, accID)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.([]string), m.MockError
+}
+
+// MockSQLDB is an implementation of the DB interface that should only be used as
+// a mock in tests.
+type MockSQLDB struct {
+	MockCreateAccount     func(ctx context.Context, acc *Account) error
+	MockGetAccount        func(ctx context.Context, id string) (*Account, error)
+	MockGetAccountByKeyID func(ctx context.Context, kid string) (*Account, error)
+	MockUpdateAccount     func(ctx context.Context, acc *Account) error
+
+	MockCreateNonce func(ctx context.Context) (Nonce, error)
+	MockDeleteNonce func(ctx context.Context, nonce Nonce) error
+
+	MockCreateAuthorization func(ctx context.Context, az *Authorization) error
+	MockGetAuthorization    func(ctx context.Context, id string) (*Authorization, error)
+	MockUpdateAuthorization func(ctx context.Context, az *Authorization) error
+
+	MockCreateCertificate func(ctx context.Context, cert *Certificate, provisionerName string) error
+	MockGetCertificate    func(ctx context.Context, id string) (*Certificate, error)
+
+	MockCreateChallenge func(ctx context.Context, ch *Challenge) error
+	MockGetChallenge    func(ctx context.Context, id, authzID string) (*Challenge, error)
+	MockUpdateChallenge func(ctx context.Context, ch *Challenge) error
+
+	MockCreateOrder          func(ctx context.Context, o *Order) error
+	MockGetOrder             func(ctx context.Context, id string) (*Order, error)
+	MockGetOrdersByAccountID func(ctx context.Context, accountID string) ([]string, error)
+	MockUpdateOrder          func(ctx context.Context, o *Order) error
+
+	MockRet1  interface{}
+	MockError error
+}
+
+// CreateAccount mock.
+func (m *MockSQLDB) CreateAccount(ctx context.Context, acc *Account) error {
+	if m.MockCreateAccount != nil {
+		return m.MockCreateAccount(ctx, acc)
+	} else if m.MockError != nil {
+		return m.MockError
+	}
+	return m.MockError
+}
+
+// GetAccount mock.
+func (m *MockSQLDB) GetAccount(ctx context.Context, id string) (*Account, error) {
+	if m.MockGetAccount != nil {
+		return m.MockGetAccount(ctx, id)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(*Account), m.MockError
+}
+
+// GetAccountByKeyID mock
+func (m *MockSQLDB) GetAccountByKeyID(ctx context.Context, kid string) (*Account, error) {
+	if m.MockGetAccountByKeyID != nil {
+		return m.MockGetAccountByKeyID(ctx, kid)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(*Account), m.MockError
+}
+
+// UpdateAccount mock
+func (m *MockSQLDB) UpdateAccount(ctx context.Context, acc *Account) error {
+	if m.MockUpdateAccount != nil {
+		return m.MockUpdateAccount(ctx, acc)
+	} else if m.MockError != nil {
+		return m.MockError
+	}
+	return m.MockError
+}
+
+// CreateNonce mock
+func (m *MockSQLDB) CreateNonce(ctx context.Context) (Nonce, error) {
+	if m.MockCreateNonce != nil {
+		return m.MockCreateNonce(ctx)
+	} else if m.MockError != nil {
+		return Nonce(""), m.MockError
+	}
+	return m.MockRet1.(Nonce), m.MockError
+}
+
+// DeleteNonce mock
+func (m *MockSQLDB) DeleteNonce(ctx context.Context, nonce Nonce) error {
+	if m.MockDeleteNonce != nil {
+		return m.MockDeleteNonce(ctx, nonce)
+	} else if m.MockError != nil {
+		return m.MockError
+	}
+	return m.MockError
+}
+
+// CreateAuthorization mock
+func (m *MockSQLDB) CreateAuthorization(ctx context.Context, az *Authorization) error {
+	if m.MockCreateAuthorization != nil {
+		return m.MockCreateAuthorization(ctx, az)
+	} else if m.MockError != nil {
+		return m.MockError
+	}
+	return m.MockError
+}
+
+// GetAuthorization mock
+func (m *MockSQLDB) GetAuthorization(ctx context.Context, id string) (*Authorization, error) {
+	if m.MockGetAuthorization != nil {
+		return m.MockGetAuthorization(ctx, id)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(*Authorization), m.MockError
+}
+
+// UpdateAuthorization mock
+func (m *MockSQLDB) UpdateAuthorization(ctx context.Context, az *Authorization) error {
+	if m.MockUpdateAuthorization != nil {
+		return m.MockUpdateAuthorization(ctx, az)
+	} else if m.MockError != nil {
+		return m.MockError
+	}
+	return m.MockError
+}
+
+// CreateCertificate mock
+func (m *MockSQLDB) CreateCertificate(ctx context.Context, cert *Certificate, provisionerName string) error {
+	if m.MockCreateCertificate != nil {
+		return m.MockCreateCertificate(ctx, cert, provisionerName)
+	} else if m.MockError != nil {
+		return m.MockError
+	}
+	return m.MockError
+}
+
+// GetCertificate mock
+func (m *MockSQLDB) GetCertificate(ctx context.Context, id string) (*Certificate, error) {
+	if m.MockGetCertificate != nil {
+		return m.MockGetCertificate(ctx, id)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(*Certificate), m.MockError
+}
+
+// CreateChallenge mock
+func (m *MockSQLDB) CreateChallenge(ctx context.Context, ch *Challenge) error {
+	if m.MockCreateChallenge != nil {
+		return m.MockCreateChallenge(ctx, ch)
+	} else if m.MockError != nil {
+		return m.MockError
+	}
+	return m.MockError
+}
+
+// GetChallenge mock
+func (m *MockSQLDB) GetChallenge(ctx context.Context, chID, azID string) (*Challenge, error) {
+	if m.MockGetChallenge != nil {
+		return m.MockGetChallenge(ctx, chID, azID)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(*Challenge), m.MockError
+}
+
+// UpdateChallenge mock
+func (m *MockSQLDB) UpdateChallenge(ctx context.Context, ch *Challenge) error {
+	if m.MockUpdateChallenge != nil {
+		return m.MockUpdateChallenge(ctx, ch)
+	} else if m.MockError != nil {
+		return m.MockError
+	}
+	return m.MockError
+}
+
+// CreateOrder mock
+func (m *MockSQLDB) CreateOrder(ctx context.Context, o *Order) error {
+	if m.MockCreateOrder != nil {
+		return m.MockCreateOrder(ctx, o)
+	} else if m.MockError != nil {
+		return m.MockError
+	}
+	return m.MockError
+}
+
+// GetOrder mock
+func (m *MockSQLDB) GetOrder(ctx context.Context, id string) (*Order, error) {
+	if m.MockGetOrder != nil {
+		return m.MockGetOrder(ctx, id)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(*Order), m.MockError
+}
+
+// UpdateOrder mock
+func (m *MockSQLDB) UpdateOrder(ctx context.Context, o *Order) error {
+	if m.MockUpdateOrder != nil {
+		return m.MockUpdateOrder(ctx, o)
+	} else if m.MockError != nil {
+		return m.MockError
+	}
+	return m.MockError
+}
+
+// GetOrdersByAccountID mock
+func (m *MockSQLDB) GetOrdersByAccountID(ctx context.Context, accID string) ([]string, error) {
 	if m.MockGetOrdersByAccountID != nil {
 		return m.MockGetOrdersByAccountID(ctx, accID)
 	} else if m.MockError != nil {

@@ -1,4 +1,4 @@
-package nosql
+package sql
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
-	"github.com/smallstep/nosql"
+	"github.com/smallstep/certificates/db/sql"
 )
 
 type dbCert struct {
@@ -28,7 +28,6 @@ func (db *DB) CreateCertificate(ctx context.Context, cert *acme.Certificate, pro
 	if err != nil {
 		return err
 	}
-
 	leaf := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: cert.Leaf.Raw,
@@ -49,14 +48,14 @@ func (db *DB) CreateCertificate(ctx context.Context, cert *acme.Certificate, pro
 		Intermediates: intermediates,
 		CreatedAt:     time.Now().UTC(),
 	}
-	return db.save(ctx, cert.ID, dbch, nil, "certificate", certTable)
+	return db.saveACMECertificate(ctx, []byte(cert.ID), cert.Leaf, dbch, nil, "certificate", certTable, ACMEcertExtensionsTable, ACMEcertSANsTable, provisionerName)
 }
 
 // GetCertificate retrieves and unmarshals an ACME certificate type from the
 // datastore.
 func (db *DB) GetCertificate(ctx context.Context, id string) (*acme.Certificate, error) {
 	b, err := db.db.Get(certTable, []byte(id))
-	if nosql.IsErrNotFound(err) {
+	if sql.IsErrNotFound(err) {
 		return nil, acme.NewError(acme.ErrorMalformedType, "certificate %s not found", id)
 	} else if err != nil {
 		return nil, errors.Wrapf(err, "error loading certificate %s", id)

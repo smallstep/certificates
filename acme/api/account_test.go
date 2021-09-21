@@ -195,7 +195,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-account": func(t *testing.T) test {
 			return test{
-				db:         &acme.MockDB{},
+				db:         &acme.MockNOSQLDB{},
 				ctx:        context.Background(),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
@@ -203,7 +203,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 		},
 		"fail/nil-account": func(t *testing.T) test {
 			return test{
-				db:         &acme.MockDB{},
+				db:         &acme.MockNOSQLDB{},
 				ctx:        context.WithValue(context.Background(), accContextKey, nil),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
@@ -214,7 +214,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db:         &acme.MockDB{},
+				db:         &acme.MockNOSQLDB{},
 				ctx:        ctx,
 				statusCode: 401,
 				err:        acme.NewError(acme.ErrorUnauthorizedType, "account ID does not match url param"),
@@ -225,7 +225,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockError: acme.NewErrorISE("force"),
 				},
 				ctx:        ctx,
@@ -240,7 +240,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetOrdersByAccountID: func(ctx context.Context, id string) ([]string, error) {
 						assert.Equals(t, id, acc.ID)
 						return oids, nil
@@ -387,7 +387,7 @@ func TestHandler_NewAccount(t *testing.T) {
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, jwkContextKey, jwk)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateAccount: func(ctx context.Context, acc *acme.Account) error {
 						assert.Equals(t, acc.Contact, nar.Contact)
 						assert.Equals(t, acc.Key, jwk)
@@ -412,7 +412,7 @@ func TestHandler_NewAccount(t *testing.T) {
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateAccount: func(ctx context.Context, acc *acme.Account) error {
 						acc.ID = "accountID"
 						assert.Equals(t, acc.Contact, nar.Contact)
@@ -576,7 +576,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, &acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockUpdateAccount: func(ctx context.Context, upd *acme.Account) error {
 						assert.Equals(t, upd.Status, acme.StatusDeactivated)
 						assert.Equals(t, upd.ID, acc.ID)
@@ -599,7 +599,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockUpdateAccount: func(ctx context.Context, upd *acme.Account) error {
 						assert.Equals(t, upd.Status, acme.StatusDeactivated)
 						assert.Equals(t, upd.ID, acc.ID)
@@ -634,7 +634,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockUpdateAccount: func(ctx context.Context, upd *acme.Account) error {
 						assert.Equals(t, upd.Contact, uar.Contact)
 						assert.Equals(t, upd.ID, acc.ID)

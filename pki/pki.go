@@ -19,13 +19,15 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"
-	admindb "github.com/smallstep/certificates/authority/admin/db/nosql"
+	admindbNOSQL "github.com/smallstep/certificates/authority/admin/db/nosql"
+	admindbSQL "github.com/smallstep/certificates/authority/admin/db/sql"
 	authconfig "github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/db/sql/sql"
 	"github.com/smallstep/nosql"
 	"go.step.sm/cli-utils/config"
 	"go.step.sm/cli-utils/errs"
@@ -756,7 +758,15 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 			if err != nil {
 				return nil, err
 			}
-			adminDB, err := admindb.New(db.(nosql.DB), admin.DefaultAuthorityID)
+			var adminDB admin.DB
+
+			if config.DB.EnableSQL {
+				adminDB, err = admindbSQL.New(db.(sql.DB), admin.DefaultAuthorityID)
+
+			} else {
+				adminDB, err = admindbNOSQL.New(db.(nosql.DB), admin.DefaultAuthorityID)
+
+			}
 			if err != nil {
 				return nil, err
 			}

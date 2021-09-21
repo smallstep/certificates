@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"crypto/x509"
 	"sync"
 	"time"
@@ -47,7 +48,7 @@ func (s *SimpleDB) RevokeSSH(rci *RevokedCertificateInfo) error {
 }
 
 // GetCertificate returns a "NotImplemented" error.
-func (s *SimpleDB) GetCertificate(serialNumber string) (*x509.Certificate, error) {
+func (s *SimpleDB) GetCertificate(ctx context.Context, serialNumber string) (*x509.Certificate, error) {
 	return nil, ErrNotImplemented
 }
 

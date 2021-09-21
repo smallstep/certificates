@@ -58,7 +58,7 @@ func TestOrder_UpdateStatus(t *testing.T) {
 			}
 			return test{
 				o: o,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
 						assert.Equals(t, updo.ID, o.ID)
 						assert.Equals(t, updo.AccountID, o.AccountID)
@@ -79,7 +79,7 @@ func TestOrder_UpdateStatus(t *testing.T) {
 			}
 			return test{
 				o: o,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
 						assert.Equals(t, updo.ID, o.ID)
 						assert.Equals(t, updo.AccountID, o.AccountID)
@@ -101,7 +101,7 @@ func TestOrder_UpdateStatus(t *testing.T) {
 			}
 			return test{
 				o: o,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
 						assert.Equals(t, updo.ID, o.ID)
 						assert.Equals(t, updo.AccountID, o.AccountID)
@@ -139,7 +139,7 @@ func TestOrder_UpdateStatus(t *testing.T) {
 
 			return test{
 				o: o,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
 						assert.Equals(t, updo.ID, o.ID)
 						assert.Equals(t, updo.AccountID, o.AccountID)
@@ -181,7 +181,7 @@ func TestOrder_UpdateStatus(t *testing.T) {
 
 			return test{
 				o: o,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
 						switch id {
 						case az1.ID:
@@ -216,7 +216,7 @@ func TestOrder_UpdateStatus(t *testing.T) {
 
 			return test{
 				o: o,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
 						assert.Equals(t, updo.ID, o.ID)
 						assert.Equals(t, updo.AccountID, o.AccountID)
@@ -327,7 +327,7 @@ func TestOrder_Finalize(t *testing.T) {
 
 			return test{
 				o: o,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
 						switch id {
 						case az1.ID:
@@ -521,8 +521,8 @@ func TestOrder_Finalize(t *testing.T) {
 						return []*x509.Certificate{foo, bar, baz}, nil
 					},
 				},
-				db: &MockDB{
-					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+				db: &MockNOSQLDB{
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate, provisionerName string) error {
 						assert.Equals(t, cert.AccountID, o.AccountID)
 						assert.Equals(t, cert.OrderID, o.ID)
 						assert.Equals(t, cert.Leaf, foo)
@@ -575,8 +575,8 @@ func TestOrder_Finalize(t *testing.T) {
 						return []*x509.Certificate{foo, bar, baz}, nil
 					},
 				},
-				db: &MockDB{
-					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+				db: &MockNOSQLDB{
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate, provisionerName string) error {
 						cert.ID = "certID"
 						assert.Equals(t, cert.AccountID, o.AccountID)
 						assert.Equals(t, cert.OrderID, o.ID)
@@ -640,8 +640,8 @@ func TestOrder_Finalize(t *testing.T) {
 						return []*x509.Certificate{foo, bar, baz}, nil
 					},
 				},
-				db: &MockDB{
-					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+				db: &MockNOSQLDB{
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate, provisionerName string) error {
 						cert.ID = "certID"
 						assert.Equals(t, cert.AccountID, o.AccountID)
 						assert.Equals(t, cert.OrderID, o.ID)
@@ -701,8 +701,8 @@ func TestOrder_Finalize(t *testing.T) {
 						return []*x509.Certificate{foo, bar, baz}, nil
 					},
 				},
-				db: &MockDB{
-					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+				db: &MockNOSQLDB{
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate, provisionerName string) error {
 						cert.ID = "certID"
 						assert.Equals(t, cert.AccountID, o.AccountID)
 						assert.Equals(t, cert.OrderID, o.ID)
@@ -765,8 +765,8 @@ func TestOrder_Finalize(t *testing.T) {
 						return []*x509.Certificate{foo, bar, baz}, nil
 					},
 				},
-				db: &MockDB{
-					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+				db: &MockNOSQLDB{
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate, provisionerName string) error {
 						cert.ID = "certID"
 						assert.Equals(t, cert.AccountID, o.AccountID)
 						assert.Equals(t, cert.OrderID, o.ID)
