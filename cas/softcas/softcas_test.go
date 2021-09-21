@@ -75,6 +75,15 @@ var (
 	testSignedIntermediateTemplate = mustSign(testIntermediateTemplate, testSignedRootTemplate, testNow, testNow.Add(24*time.Hour))
 )
 
+type signatureAlgorithmSigner struct {
+	crypto.Signer
+	algorithm x509.SignatureAlgorithm
+}
+
+func (s *signatureAlgorithmSigner) SignatureAlgorithm() x509.SignatureAlgorithm {
+	return s.algorithm
+}
+
 type mockKeyManager struct {
 	signer          crypto.Signer
 	errGetPublicKey error
@@ -247,6 +256,13 @@ func TestSoftCAS_CreateCertificate(t *testing.T) {
 	tmplNoSerial := *testTemplate
 	tmplNoSerial.SerialNumber = nil
 
+	saTemplate := *testSignedTemplate
+	saTemplate.SignatureAlgorithm = 0
+	saSigner := &signatureAlgorithmSigner{
+		Signer:    testSigner,
+		algorithm: x509.PureEd25519,
+	}
+
 	type fields struct {
 		Issuer *x509.Certificate
 		Signer crypto.Signer
@@ -263,6 +279,12 @@ func TestSoftCAS_CreateCertificate(t *testing.T) {
 	}{
 		{"ok", fields{testIssuer, testSigner}, args{&apiv1.CreateCertificateRequest{
 			Template: testTemplate, Lifetime: 24 * time.Hour,
+		}}, &apiv1.CreateCertificateResponse{
+			Certificate:      testSignedTemplate,
+			CertificateChain: []*x509.Certificate{testIssuer},
+		}, false},
+		{"ok signature algorithm", fields{testIssuer, saSigner}, args{&apiv1.CreateCertificateRequest{
+			Template: &saTemplate, Lifetime: 24 * time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      testSignedTemplate,
 			CertificateChain: []*x509.Certificate{testIssuer},
@@ -316,6 +338,11 @@ func TestSoftCAS_RenewCertificate(t *testing.T) {
 	tmplNoSerial := *testTemplate
 	tmplNoSerial.SerialNumber = nil
 
+	saSigner := &signatureAlgorithmSigner{
+		Signer:    testSigner,
+		algorithm: x509.PureEd25519,
+	}
+
 	type fields struct {
 		Issuer *x509.Certificate
 		Signer crypto.Signer
@@ -331,6 +358,12 @@ func TestSoftCAS_RenewCertificate(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", fields{testIssuer, testSigner}, args{&apiv1.RenewCertificateRequest{
+			Template: testTemplate, Lifetime: 24 * time.Hour,
+		}}, &apiv1.RenewCertificateResponse{
+			Certificate:      testSignedTemplate,
+			CertificateChain: []*x509.Certificate{testIssuer},
+		}, false},
+		{"ok signature algorithm", fields{testIssuer, saSigner}, args{&apiv1.RenewCertificateRequest{
 			Template: testTemplate, Lifetime: 24 * time.Hour,
 		}}, &apiv1.RenewCertificateResponse{
 			Certificate:      testSignedTemplate,
@@ -425,6 +458,11 @@ func Test_now(t *testing.T) {
 func TestSoftCAS_CreateCertificateAuthority(t *testing.T) {
 	mockNow(t)
 
+	saSigner := &signatureAlgorithmSigner{
+		Signer:    testSigner,
+		algorithm: x509.PureEd25519,
+	}
+
 	type fields struct {
 		Issuer     *x509.Certificate
 		Signer     crypto.Signer
@@ -466,6 +504,17 @@ func TestSoftCAS_CreateCertificateAuthority(t *testing.T) {
 			PublicKey:        testSignedIntermediateTemplate.PublicKey,
 			PrivateKey:       testSigner,
 			Signer:           testSigner,
+		}, false},
+		{"ok signature algorithm", fields{nil, nil, &mockKeyManager{signer: saSigner}}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: testRootTemplate,
+			Lifetime: 24 * time.Hour,
+		}}, &apiv1.CreateCertificateAuthorityResponse{
+			Name:        "Test Root CA",
+			Certificate: testSignedRootTemplate,
+			PublicKey:   testSignedRootTemplate.PublicKey,
+			PrivateKey:  saSigner,
+			Signer:      saSigner,
 		}, false},
 		{"fail template", fields{nil, nil, &mockKeyManager{}}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,

@@ -31,11 +31,13 @@ import (
 )
 
 type options struct {
-	configFile     string
-	linkedCAToken  string
-	password       []byte
-	issuerPassword []byte
-	database       db.AuthDB
+	configFile      string
+	linkedCAToken   string
+	password        []byte
+	issuerPassword  []byte
+	sshHostPassword []byte
+	sshUserPassword []byte
+	database        db.AuthDB
 }
 
 func (o *options) apply(opts []Option) {
@@ -60,6 +62,22 @@ func WithConfigFile(name string) Option {
 func WithPassword(password []byte) Option {
 	return func(o *options) {
 		o.password = password
+	}
+}
+
+// WithSSHHostPassword sets the given password to decrypt the key used to sign
+// ssh host certificates.
+func WithSSHHostPassword(password []byte) Option {
+	return func(o *options) {
+		o.sshHostPassword = password
+	}
+}
+
+// WithSSHUserPassword sets the given password to decrypt the key used to sign
+// ssh user certificates.
+func WithSSHUserPassword(password []byte) Option {
+	return func(o *options) {
+		o.sshUserPassword = password
 	}
 }
 
@@ -108,19 +126,14 @@ func New(config *config.Config, opts ...Option) (*CA, error) {
 
 // Init initializes the CA with the given configuration.
 func (ca *CA) Init(config *config.Config) (*CA, error) {
-	// Intermediate Password.
-	if len(ca.opts.password) > 0 {
-		ca.config.Password = string(ca.opts.password)
+	// Set password, it's ok to set nil password, the ca will prompt for them if
+	// they are required.
+	opts := []authority.Option{
+		authority.WithPassword(ca.opts.password),
+		authority.WithSSHHostPassword(ca.opts.sshHostPassword),
+		authority.WithSSHUserPassword(ca.opts.sshUserPassword),
+		authority.WithIssuerPassword(ca.opts.issuerPassword),
 	}
-
-	// Certificate issuer password for RA mode.
-	if len(ca.opts.issuerPassword) > 0 {
-		if ca.config.AuthorityConfig != nil && ca.config.AuthorityConfig.CertificateIssuer != nil {
-			ca.config.AuthorityConfig.CertificateIssuer.Password = string(ca.opts.issuerPassword)
-		}
-	}
-
-	var opts []authority.Option
 	if ca.opts.linkedCAToken != "" {
 		opts = append(opts, authority.WithLinkedCAToken(ca.opts.linkedCAToken))
 	}
@@ -345,6 +358,8 @@ func (ca *CA) Reload() error {
 
 	newCA, err := New(config,
 		WithPassword(ca.opts.password),
+		WithSSHHostPassword(ca.opts.sshHostPassword),
+		WithSSHUserPassword(ca.opts.sshUserPassword),
 		WithIssuerPassword(ca.opts.issuerPassword),
 		WithLinkedCAToken(ca.opts.linkedCAToken),
 		WithConfigFile(ca.opts.configFile),

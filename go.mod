@@ -18,7 +18,7 @@ require (
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
-	github.com/micromdm/scep/v2 v2.0.0
+	github.com/micromdm/scep/v2 v2.1.0
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
@@ -26,7 +26,7 @@ require (
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/nosql v0.3.8
 	github.com/urfave/cli v1.22.4
-	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
+	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.4.1
 	go.step.sm/crypto v0.9.2
 	go.step.sm/linkedca v0.5.0
@@ -43,5 +43,3 @@ require (
 // replace go.step.sm/crypto => ../crypto
 // replace go.step.sm/cli-utils => ../cli-utils
 // replace go.step.sm/linkedca => ../linkedca
-
-replace go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 => github.com/omorsi/pkcs7 v0.0.0-20210217142924-a7b80a2a8568

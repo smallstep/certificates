@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        go: [ '1.15', '1.16' ]
+        go: [ '1.15', '1.16', '1.17' ]
     outputs:
       is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
     steps:
@@ -62,8 +62,15 @@ jobs:
     needs: test
     runs-on: ubuntu-20.04
     outputs:
+      debversion: ${{ steps.extract-tag.outputs.DEB_VERSION }}
       is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
     steps:
+      -
+        name: Extract Tag Names
+        id: extract-tag
+        run: |
+          DEB_VERSION=$(echo ${GITHUB_REF#refs/tags/v} | sed 's/-/./')
+          echo "::set-output name=DEB_VERSION::${DEB_VERSION}"
       -
         name: Is Pre-release
         id: is_prerelease
@@ -99,16 +106,35 @@ jobs:
         name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.16
+          go-version: 1.17
+      -
+        name: APT Install
+        id: aptInstall
+        run: sudo apt-get -y install build-essential debhelper fakeroot
+      -
+        name: Build Debian package
+        id: make_debian
+        run: |
+          PATH=$PATH:/usr/local/go/bin:/home/admin/go/bin
+          make debian
+          # need to restore the git state otherwise goreleaser fails due to dirty state
+          git restore debian/changelog
+          git clean -fd
       -
         name: Install cosign
-        uses: sigstore/cosign-installer@main
+        uses: sigstore/cosign-installer@v1.1.0
         with:
           cosign-release: 'v1.1.0'
       -
         name: Write cosign key to disk
         id: write_key
         run: echo "${{ secrets.COSIGN_KEY }}" > "/tmp/cosign.key"
+      -
+        name: Get Release Date
+        id: release_date
+        run: |
+          RELEASE_DATE=$(date +"%y-%m-%d")
+          echo "::set-output name=RELEASE_DATE::${RELEASE_DATE}"
       -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@5a54d7e660bda43b405e8463261b3d25631ffe86 # v2.7.0
@@ -118,40 +144,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }}
           COSIGN_PWD: ${{ secrets.COSIGN_PWD }}
-
-  release_deb:
-    name: Build & Upload Debian Package To Github
-    runs-on: ubuntu-20.04
-    needs: create_release
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      -
-        name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: '1.16'
-      -
-        name: APT Install
-        id: aptInstall
-        run: sudo apt-get -y install build-essential debhelper fakeroot
-      -
-        name: Build Debian package
-        id: build
-        run: |
-          PATH=$PATH:/usr/local/go/bin:/home/admin/go/bin
-          make debian
-      -
-        name: Upload Debian Package
-        id: upload_deb
-        run: |
-          tag_name="${GITHUB_REF##*/}"
-          hub release edit $(find ./.releases -type f -printf "-a %p ") -m "" "$tag_name"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEB_VERSION: ${{ needs.create_release.outputs.debversion }}
+          RELEASE_DATE: ${{ steps.release_date.outputs.RELEASE_DATE }}
 
   build_upload_docker:
     name: Build & Upload Docker Images
@@ -165,10 +159,10 @@ jobs:
         name: Setup Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.16'
+          go-version: '1.17'
       -
         name: Install cosign
-        uses: sigstore/cosign-installer@main
+        uses: sigstore/cosign-installer@v1.1.0
         with:
           cosign-release: 'v1.1.0'
       -
