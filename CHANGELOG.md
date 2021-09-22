@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - go 1.17 to github action test matrix
 - Support for CloudKMS RSA-PSS signers without using templates.
+- Add flags to support different passwords for the intermediate and SSH keys.
 ### Changed
 - Using go 1.17 for binaries
 ### Deprecated
