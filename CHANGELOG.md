@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Deprecated
 ### Removed
 ### Fixed
+- Upgrade go-jose.v2 to fix a bug in the JWK fingerprint of Ed25519 keys.
 ### Security
 - Use cosign to sign and upload signatures for multi-arch Docker container.
 - Add debian checksum
