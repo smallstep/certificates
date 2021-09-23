@@ -698,3 +698,39 @@ func Test_sanitizeEmail(t *testing.T) {
 		})
 	}
 }
+
+func Test_openIDPayload_IsAdmin(t *testing.T) {
+	type fields struct {
+		Email  string
+		Groups []string
+	}
+	type args struct {
+		admins []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   bool
+	}{
+		{"ok email", fields{"admin@smallstep.com", nil}, args{[]string{"admin@smallstep.com"}}, true},
+		{"ok email multiple", fields{"admin@smallstep.com", []string{"admin", "eng"}}, args{[]string{"eng@smallstep.com", "admin@smallstep.com"}}, true},
+		{"ok email sanitized", fields{"admin@Smallstep.com", nil}, args{[]string{"admin@smallStep.com"}}, true},
+		{"ok group", fields{"", []string{"admin"}}, args{[]string{"admin"}}, true},
+		{"ok group multiple", fields{"admin@smallstep.com", []string{"engineering", "admin"}}, args{[]string{"admin"}}, true},
+		{"fail missing", fields{"eng@smallstep.com", []string{"admin"}}, args{[]string{"admin@smallstep.com"}}, false},
+		{"fail email letter case", fields{"Admin@smallstep.com", []string{}}, args{[]string{"admin@smallstep.com"}}, false},
+		{"fail group letter case", fields{"", []string{"Admin"}}, args{[]string{"admin"}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &openIDPayload{
+				Email:  tt.fields.Email,
+				Groups: tt.fields.Groups,
+			}
+			if got := o.IsAdmin(tt.args.admins); got != tt.want {
+				t.Errorf("openIDPayload.IsAdmin() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
