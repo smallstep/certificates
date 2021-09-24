@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased - 0.17.3] - DATE
+## [Unreleased - 0.17.4] - DATE
+### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+### Security
+
+## [0.17.3] - 2021-09-24
 ### Added
 - go 1.17 to github action test matrix
 - Support for CloudKMS RSA-PSS signers without using templates.
@@ -12,8 +20,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Global support for group admins in the OIDC provisioner.
 ### Changed
 - Using go 1.17 for binaries
-### Deprecated
-### Removed
 ### Fixed
 - Upgrade go-jose.v2 to fix a bug in the JWK fingerprint of Ed25519 keys.
 ### Security
