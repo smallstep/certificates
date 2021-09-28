@@ -4,12 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased - 0.17.4] - DATE
+## [Unreleased - 0.17.5] - DATE
 ### Added
 ### Changed
 ### Deprecated
 ### Removed
 ### Fixed
+### Security
+
+## [0.17.4] - 2021-09-28
+### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+- Support host-only or user-only SSH CA.
 ### Security
 
 ## [0.17.3] - 2021-09-24
@@ -18,7 +27,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Support for CloudKMS RSA-PSS signers without using templates.
 - Add flags to support individual passwords for the intermediate and SSH keys.
 - Global support for group admins in the OIDC provisioner.
-- Support host-only or user-only SSH CA.
 ### Changed
 - Using go 1.17 for binaries
 ### Fixed
