@@ -361,8 +361,6 @@ func (a *Authority) init() error {
 			// Append public key to list of host certs
 			a.sshCAHostCerts = append(a.sshCAHostCerts, a.sshCAHostCertSignKey.PublicKey())
 			a.sshCAHostFederatedCerts = append(a.sshCAHostFederatedCerts, a.sshCAHostCertSignKey.PublicKey())
-			// Configure template variables.
-			tmplVars.SSH.HostKey = a.sshCAHostCertSignKey.PublicKey()
 		}
 		if a.config.SSH.UserKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
@@ -389,8 +387,6 @@ func (a *Authority) init() error {
 			// Append public key to list of user certs
 			a.sshCAUserCerts = append(a.sshCAUserCerts, a.sshCAUserCertSignKey.PublicKey())
 			a.sshCAUserFederatedCerts = append(a.sshCAUserFederatedCerts, a.sshCAUserCertSignKey.PublicKey())
-			// Configure template variables.
-			tmplVars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
 		}
 
 		// Append other public keys and add them to the template variables.
@@ -400,14 +396,12 @@ func (a *Authority) init() error {
 			case provisioner.SSHHostCert:
 				if key.Federated {
 					a.sshCAHostFederatedCerts = append(a.sshCAHostFederatedCerts, publicKey)
-					tmplVars.SSH.HostFederatedKeys = append(tmplVars.SSH.HostFederatedKeys, publicKey)
 				} else {
 					a.sshCAHostCerts = append(a.sshCAHostCerts, publicKey)
 				}
 			case provisioner.SSHUserCert:
 				if key.Federated {
 					a.sshCAUserFederatedCerts = append(a.sshCAUserFederatedCerts, publicKey)
-					tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, publicKey)
 				} else {
 					a.sshCAUserCerts = append(a.sshCAUserCerts, publicKey)
 				}
@@ -415,6 +409,25 @@ func (a *Authority) init() error {
 				return errors.Errorf("unsupported type %s", key.Type)
 			}
 		}
+	}
+
+	// Configure template variables. On the template variables HostFederatedKeys
+	// and UserFederatedKeys we will skip the actual CA that will be available
+	// in HostKey and UserKey.
+	//
+	// We cannot do it in the previous blocks because this configuration can be
+	// injected using options.
+	if a.sshCAHostCertSignKey != nil {
+		tmplVars.SSH.HostKey = a.sshCAHostCertSignKey.PublicKey()
+		tmplVars.SSH.HostFederatedKeys = append(tmplVars.SSH.HostFederatedKeys, a.sshCAHostFederatedCerts[1:]...)
+	} else {
+		tmplVars.SSH.HostFederatedKeys = append(tmplVars.SSH.HostFederatedKeys, a.sshCAHostFederatedCerts...)
+	}
+	if a.sshCAUserCertSignKey != nil {
+		tmplVars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
+		tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts[1:]...)
+	} else {
+		tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts...)
 	}
 
 	// Check if a KMS with decryption capability is required and available
