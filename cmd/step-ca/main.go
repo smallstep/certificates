@@ -26,6 +26,7 @@ import (
 
 	// Enabled kms interfaces.
 	_ "github.com/smallstep/certificates/kms/awskms"
+	_ "github.com/smallstep/certificates/kms/azurekms"
 	_ "github.com/smallstep/certificates/kms/cloudkms"
 	_ "github.com/smallstep/certificates/kms/softkms"
 	_ "github.com/smallstep/certificates/kms/sshagentkms"
