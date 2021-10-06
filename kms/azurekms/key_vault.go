@@ -114,8 +114,7 @@ type KeyVault struct {
 	baseClient KeyVaultClient
 }
 
-// New initializes a new KMS implemented using Azure Key Vault.
-func New(ctx context.Context, opts apiv1.Options) (*KeyVault, error) {
+var createClient = func(ctx context.Context, opts apiv1.Options) (KeyVaultClient, error) {
 	// Attempt to authorize with the following methods:
 	// 1. Environment variables.
 	//    - Client credentials
@@ -133,9 +132,17 @@ func New(ctx context.Context, opts apiv1.Options) (*KeyVault, error) {
 
 	baseClient := keyvault.New()
 	baseClient.Authorizer = authorizer
+	return &baseClient, nil
+}
 
+// New initializes a new KMS implemented using Azure Key Vault.
+func New(ctx context.Context, opts apiv1.Options) (*KeyVault, error) {
+	baseClient, err := createClient(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
 	return &KeyVault{
-		baseClient: &baseClient,
+		baseClient: baseClient,
 	}, nil
 }
 
@@ -164,6 +171,10 @@ func (k *KeyVault) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKe
 
 // CreateKey creates a asymmetric key in Azure Key Vault.
 func (k *KeyVault) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyResponse, error) {
+	if req.Name == "" {
+		return nil, errors.New("createKeyRequest 'name' cannot be empty")
+	}
+
 	vault, name, _, err := parseKeyName(req.Name)
 	if err != nil {
 		return nil, err

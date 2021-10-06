@@ -24,7 +24,7 @@ type Signer struct {
 }
 
 // NewSigner creates a new signer using a key in the AWS KMS.
-func NewSigner(client KeyVaultClient, signingKey string) (*Signer, error) {
+func NewSigner(client KeyVaultClient, signingKey string) (crypto.Signer, error) {
 	vault, name, version, err := parseKeyName(signingKey)
 	if err != nil {
 		return nil, err
@@ -114,8 +114,17 @@ func (s *Signer) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 func getSigningAlgorithm(key crypto.PublicKey, opts crypto.SignerOpts) (keyvault.JSONWebKeySignatureAlgorithm, error) {
 	switch key.(type) {
 	case *rsa.PublicKey:
-		_, isPSS := opts.(*rsa.PSSOptions)
-		switch h := opts.HashFunc(); h {
+		hashFunc := opts.HashFunc()
+		pss, isPSS := opts.(*rsa.PSSOptions)
+		// Random salt lengths are not supported
+		if isPSS &&
+			pss.SaltLength != rsa.PSSSaltLengthAuto &&
+			pss.SaltLength != rsa.PSSSaltLengthEqualsHash &&
+			pss.SaltLength != hashFunc.Size() {
+			return "", errors.Errorf("unsupported RSA-PSS salt length %d", pss.SaltLength)
+		}
+
+		switch h := hashFunc; h {
 		case crypto.SHA256:
 			if isPSS {
 				return keyvault.PS256, nil
