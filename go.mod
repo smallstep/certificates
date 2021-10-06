@@ -1,9 +1,14 @@
 module github.com/smallstep/certificates
 
-go 1.14
+go 1.15
 
 require (
 	cloud.google.com/go v0.83.0
+	github.com/Azure/azure-sdk-for-go v58.0.0+incompatible
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.8
+	github.com/Azure/go-autorest/autorest/date v0.3.0
+	github.com/Azure/go-autorest/autorest/to v0.4.0 // indirect
+	github.com/Azure/go-autorest/autorest/validation v0.3.1 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/ThalesIgnite/crypto11 v1.2.4
 	github.com/aws/aws-sdk-go v1.30.29
