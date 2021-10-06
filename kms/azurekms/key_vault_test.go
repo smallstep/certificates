@@ -70,6 +70,13 @@ func createJWK(t *testing.T, pub crypto.PublicKey) *keyvault.JSONWebKey {
 	return key
 }
 
+func Test_now(t *testing.T) {
+	t0 := now()
+	if loc := t0.Location(); loc != time.UTC {
+		t.Errorf("now() Location = %v, want %v", loc, time.UTC)
+	}
+}
+
 func TestNew(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockCreateClient(t, ctrl)
@@ -438,6 +445,9 @@ func TestKeyVault_CreateSigner(t *testing.T) {
 		}, false},
 		{"fail GetKey", fields{client}, args{&apiv1.CreateSignerRequest{
 			SigningKey: "azurekms:vault=my-vault;id=not-found;version=my-version",
+		}}, nil, true},
+		{"fail SigningKey", fields{client}, args{&apiv1.CreateSignerRequest{
+			SigningKey: "",
 		}}, nil, true},
 	}
 	for _, tt := range tests {
