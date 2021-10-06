@@ -47,11 +47,11 @@ func vaultBaseURL(vault string) string {
 func convertKey(key *keyvault.JSONWebKey) (crypto.PublicKey, error) {
 	b, err := json.Marshal(key)
 	if err != nil {
-		return nil, errors.Wrap(err, "error marshalling key")
+		return nil, errors.Wrap(err, "error marshaling key")
 	}
 	var jwk jose.JSONWebKey
 	if err := jwk.UnmarshalJSON(b); err != nil {
-		return nil, errors.Wrap(err, "error unmarshalling key")
+		return nil, errors.Wrap(err, "error unmarshaling key")
 	}
 	return jwk.Key, nil
 }
