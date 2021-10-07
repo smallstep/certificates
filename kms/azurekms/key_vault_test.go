@@ -42,21 +42,6 @@ func mockClient(t *testing.T) *mock.KeyVaultClient {
 	return mock.NewKeyVaultClient(ctrl)
 }
 
-func mockCreateClient(t *testing.T) *mock.KeyVaultClient {
-	t.Helper()
-	ctrl := gomock.NewController(t)
-	client := mock.NewKeyVaultClient(ctrl)
-	old := createClient
-	createClient = func(ctx context.Context, opts apiv1.Options) (KeyVaultClient, error) {
-		return client, nil
-	}
-	t.Cleanup(func() {
-		createClient = old
-		ctrl.Finish()
-	})
-	return client
-}
-
 func createJWK(t *testing.T, pub crypto.PublicKey) *keyvault.JSONWebKey {
 	t.Helper()
 	b, err := json.Marshal(&jose.JSONWebKey{
