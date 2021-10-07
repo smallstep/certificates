@@ -31,6 +31,10 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
+	// Initialize windows terminal
+	ui.Init()
+	defer ui.Reset()
+
 	c, err := awskms.New(context.Background(), apiv1.Options{
 		Type:            string(apiv1.AmazonKMS),
 		Region:          region,

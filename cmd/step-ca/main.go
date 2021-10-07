@@ -22,6 +22,7 @@ import (
 	"go.step.sm/cli-utils/command"
 	"go.step.sm/cli-utils/command/version"
 	"go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/ui"
 	"go.step.sm/cli-utils/usage"
 
 	// Enabled kms interfaces.
@@ -90,6 +91,10 @@ Please send us a sentence or two, good or bad: **feedback@smallstep.com** or htt
 `
 
 func main() {
+	// Initialize windows terminal
+	ui.Init()
+	defer ui.Reset()
+
 	// Override global framework components
 	cli.VersionPrinter = func(c *cli.Context) {
 		version.Command(c)

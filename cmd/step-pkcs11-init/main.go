@@ -129,6 +129,10 @@ func main() {
 		fatal(err)
 	}
 
+	// Initialize windows terminal
+	ui.Init()
+	defer ui.Reset()
+
 	if u.Get("pin-value") == "" && u.Get("pin-source") == "" && c.Pin == "" {
 		pin, err := ui.PromptPassword("What is the PKCS#11 PIN?")
 		if err != nil {
