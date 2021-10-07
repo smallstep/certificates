@@ -95,6 +95,16 @@ func (u *URI) Get(key string) string {
 	return v
 }
 
+// GetBool returns true if a given key has the value "true". It will returns
+// false otherwise.
+func (u *URI) GetBool(key string) bool {
+	v := u.Values.Get(key)
+	if v == "" {
+		v = u.URL.Query().Get(key)
+	}
+	return strings.EqualFold(v, "true")
+}
+
 // GetEncoded returns the first value in the uri with the given key, it will
 // return empty nil if that field is not present or is empty. If the return
 // value is hex encoded it will decode it and return it.
