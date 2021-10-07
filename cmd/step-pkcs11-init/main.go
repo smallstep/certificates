@@ -131,7 +131,6 @@ func main() {
 
 	// Initialize windows terminal
 	ui.Init()
-	defer ui.Reset()
 
 	if u.Get("pin-value") == "" && u.Get("pin-source") == "" && c.Pin == "" {
 		pin, err := ui.PromptPassword("What is the PKCS#11 PIN?")
@@ -205,6 +204,9 @@ func main() {
 	if err := createPKI(k, c); err != nil {
 		fatalClose(err, k)
 	}
+
+	// Reset windows terminal
+	ui.Reset()
 }
 
 func fatal(err error) {
@@ -213,6 +215,7 @@ func fatal(err error) {
 	} else {
 		fmt.Fprintln(os.Stderr, err)
 	}
+	ui.Reset()
 	os.Exit(1)
 }
 

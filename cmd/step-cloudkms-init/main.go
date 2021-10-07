@@ -64,7 +64,6 @@ func main() {
 
 	// Initialize windows terminal
 	ui.Init()
-	defer ui.Reset()
 
 	c, err := cloudkms.New(context.Background(), apiv1.Options{
 		Type:            string(apiv1.CloudKMS),
@@ -84,10 +83,14 @@ func main() {
 			fatal(err)
 		}
 	}
+
+	// Reset windows terminal
+	ui.Reset()
 }
 
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, err)
+	ui.Reset()
 	os.Exit(1)
 }
 

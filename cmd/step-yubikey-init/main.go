@@ -89,7 +89,6 @@ func main() {
 
 	// Initialize windows terminal
 	ui.Init()
-	defer ui.Reset()
 
 	pin, err := ui.PromptPassword("What is the YubiKey PIN?")
 	if err != nil {
@@ -123,6 +122,9 @@ func main() {
 	defer func() {
 		_ = k.Close()
 	}()
+
+	// Reset windows terminal
+	ui.Reset()
 }
 
 func fatal(err error) {
@@ -131,6 +133,7 @@ func fatal(err error) {
 	} else {
 		fmt.Fprintln(os.Stderr, err)
 	}
+	ui.Reset()
 	os.Exit(1)
 }
 
