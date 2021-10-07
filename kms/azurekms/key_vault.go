@@ -38,9 +38,8 @@ var now = func() time.Time {
 }
 
 type keyType struct {
-	Kty     keyvault.JSONWebKeyType
-	Curve   keyvault.JSONWebKeyCurveName
-	KeySize int
+	Kty   keyvault.JSONWebKeyType
+	Curve keyvault.JSONWebKeyCurveName
 }
 
 func (k keyType) KeyType(pl apiv1.ProtectionLevel) keyvault.JSONWebKeyType {
