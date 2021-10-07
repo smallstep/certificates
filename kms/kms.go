@@ -18,6 +18,9 @@ type KeyManager = apiv1.KeyManager
 // store x509.Certificates.
 type CertificateManager = apiv1.CertificateManager
 
+// Options are the KMS options. They represent the kms object in the ca.json.
+type Options = apiv1.Options
+
 // New initializes a new KMS from the given type.
 func New(ctx context.Context, opts apiv1.Options) (KeyManager, error) {
 	if err := opts.Validate(); err != nil {
