@@ -54,6 +54,7 @@ func Test_parseKeyName(t *testing.T) {
 		wantErr     bool
 	}{
 		{"ok", args{"azurekms:name=my-key;vault=my-vault?version=my-version"}, "my-vault", "my-key", "my-version", false},
+		{"ok opaque version", args{"azurekms:name=my-key;vault=my-vault;version=my-version"}, "my-vault", "my-key", "my-version", false},
 		{"ok no version", args{"azurekms:name=my-key;vault=my-vault"}, "my-vault", "my-key", "", false},
 		{"fail scheme", args{"azure:name=my-key;vault=my-vault"}, "", "", "", true},
 		{"fail parse uri", args{"azurekms:name=%ZZ;vault=my-vault"}, "", "", "", true},
