@@ -44,24 +44,24 @@ func TestNewSigner(t *testing.T) {
 		want    crypto.Signer
 		wantErr bool
 	}{
-		{"ok", args{client, "azurekms:vault=my-vault;id=my-key"}, &Signer{
+		{"ok", args{client, "azurekms:vault=my-vault;name=my-key"}, &Signer{
 			client:       client,
 			vaultBaseURL: "https://my-vault.vault.azure.net/",
 			name:         "my-key",
 			version:      "",
 			publicKey:    pub,
 		}, false},
-		{"ok with version", args{client, "azurekms:id=my-key;vault=my-vault?version=my-version"}, &Signer{
+		{"ok with version", args{client, "azurekms:name=my-key;vault=my-vault?version=my-version"}, &Signer{
 			client:       client,
 			vaultBaseURL: "https://my-vault.vault.azure.net/",
 			name:         "my-key",
 			version:      "my-version",
 			publicKey:    pub,
 		}, false},
-		{"fail GetKey", args{client, "azurekms:id=not-found;vault=my-vault?version=my-version"}, nil, true},
-		{"fail vault", args{client, "azurekms:id=not-found;vault="}, nil, true},
-		{"fail id", args{client, "azurekms:id=;vault=my-vault?version=my-version"}, nil, true},
-		{"fail scheme", args{client, "kms:id=not-found;vault=my-vault?version=my-version"}, nil, true},
+		{"fail GetKey", args{client, "azurekms:name=not-found;vault=my-vault?version=my-version"}, nil, true},
+		{"fail vault", args{client, "azurekms:name=not-found;vault="}, nil, true},
+		{"fail id", args{client, "azurekms:name=;vault=my-vault?version=my-version"}, nil, true},
+		{"fail scheme", args{client, "kms:name=not-found;vault=my-vault?version=my-version"}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

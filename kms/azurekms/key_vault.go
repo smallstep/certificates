@@ -3,7 +3,7 @@ package azurekms
 import (
 	"context"
 	"crypto"
-	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/keyvault/v7.1/keyvault"
@@ -11,17 +11,20 @@ import (
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/certificates/kms/uri"
 )
 
 func init() {
-	apiv1.Register(apiv1.CloudKMS, func(ctx context.Context, opts apiv1.Options) (apiv1.KeyManager, error) {
+	apiv1.Register(apiv1.AzureKMS, func(ctx context.Context, opts apiv1.Options) (apiv1.KeyManager, error) {
 		return New(ctx, opts)
 	})
 }
 
 // Scheme is the scheme used for Azure Key Vault uris.
 const Scheme = "azurekms"
+
+// keyIDRegexp is the regular experssion that Key Vault uses for on the kid. We
+// can extract the vault, name and version of the key.
+var keyIDRegexp = regexp.MustCompile("^https://([0-9a-zA-Z-]+).vault.azure.net/keys/([0-9a-zA-Z-]+)/([0-9a-zA-Z-]+)$")
 
 var (
 	valueTrue       = true
@@ -106,6 +109,16 @@ type KeyVaultClient interface {
 }
 
 // KeyVault implements a KMS using Azure Key Vault.
+//
+// The URI format used in Azure Key Vault is the following:
+//
+//   - azurekms:name=key-name;vault=vault-name
+//   - azurekms:name=key-name;vault=vault-name?version=key-version
+//
+// The scheme is "azurekms"; "name" is the key name; "vault" is the key vault
+// name where the key is located; "version" is an optional parameter that
+// defines the version of they key, if version is not given, the latest one will
+// be used.
 //
 // TODO(mariano): The implementation is using /services/keyvault/v7.1/keyvault
 // package, at some point Azure might create a keyvault client with all the
@@ -220,16 +233,12 @@ func (k *KeyVault) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 		return nil, errors.Wrap(err, "keyVault CreateKey failed")
 	}
 
-	keyURI := uri.New("azurekms", url.Values{
-		"vault": []string{vault},
-		"id":    []string{name},
-	}).String()
-
 	publicKey, err := convertKey(resp.Key)
 	if err != nil {
 		return nil, err
 	}
 
+	keyURI := getKeyName(vault, name, resp)
 	return &apiv1.CreateKeyResponse{
 		Name:      keyURI,
 		PublicKey: publicKey,

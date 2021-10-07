@@ -140,19 +140,19 @@ func TestKeyVault_GetPublicKey(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", fields{client}, args{&apiv1.GetPublicKeyRequest{
-			Name: "azurekms:vault=my-vault;id=my-key",
+			Name: "azurekms:vault=my-vault;name=my-key",
 		}}, pub, false},
 		{"ok with version", fields{client}, args{&apiv1.GetPublicKeyRequest{
-			Name: "azurekms:vault=my-vault;id=my-key?version=my-version",
+			Name: "azurekms:vault=my-vault;name=my-key?version=my-version",
 		}}, pub, false},
 		{"fail GetKey", fields{client}, args{&apiv1.GetPublicKeyRequest{
-			Name: "azurekms:vault=my-vault;id=not-found?version=my-version",
+			Name: "azurekms:vault=my-vault;name=not-found?version=my-version",
 		}}, nil, true},
 		{"fail vault", fields{client}, args{&apiv1.GetPublicKeyRequest{
-			Name: "azurekms:vault=;id=not-found?version=my-version",
+			Name: "azurekms:vault=;name=not-found?version=my-version",
 		}}, nil, true},
 		{"fail id", fields{client}, args{&apiv1.GetPublicKeyRequest{
-			Name: "azurekms:vault=;id=?version=my-version",
+			Name: "azurekms:vault=;name=?version=my-version",
 		}}, nil, true},
 	}
 	for _, tt := range tests {
@@ -244,136 +244,136 @@ func TestKeyVault_CreateKey(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok P-256", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=my-key",
+			Name:               "azurekms:vault=my-vault;name=my-key",
 			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
 			ProtectionLevel:    apiv1.Software,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "azurekms:id=my-key;vault=my-vault",
+			Name:      "azurekms:name=my-key;vault=my-vault",
 			PublicKey: ecPub,
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "azurekms:id=my-key;vault=my-vault",
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
 			},
 		}, false},
 		{"ok P-256 HSM", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=my-key",
+			Name:               "azurekms:vault=my-vault;name=my-key",
 			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
 			ProtectionLevel:    apiv1.HSM,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "azurekms:id=my-key;vault=my-vault",
+			Name:      "azurekms:name=my-key;vault=my-vault",
 			PublicKey: ecPub,
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "azurekms:id=my-key;vault=my-vault",
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
 			},
 		}, false},
 		{"ok P-256 Default", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name: "azurekms:vault=my-vault;id=my-key",
+			Name: "azurekms:vault=my-vault;name=my-key",
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "azurekms:id=my-key;vault=my-vault",
+			Name:      "azurekms:name=my-key;vault=my-vault",
 			PublicKey: ecPub,
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "azurekms:id=my-key;vault=my-vault",
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
 			},
 		}, false},
 		{"ok P-384", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=my-key",
+			Name:               "azurekms:vault=my-vault;name=my-key",
 			SignatureAlgorithm: apiv1.ECDSAWithSHA384,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "azurekms:id=my-key;vault=my-vault",
+			Name:      "azurekms:name=my-key;vault=my-vault",
 			PublicKey: ecPub,
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "azurekms:id=my-key;vault=my-vault",
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
 			},
 		}, false},
 		{"ok P-521", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=my-key",
+			Name:               "azurekms:vault=my-vault;name=my-key",
 			SignatureAlgorithm: apiv1.ECDSAWithSHA512,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "azurekms:id=my-key;vault=my-vault",
+			Name:      "azurekms:name=my-key;vault=my-vault",
 			PublicKey: ecPub,
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "azurekms:id=my-key;vault=my-vault",
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
 			},
 		}, false},
 		{"ok RSA 0", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=my-key",
+			Name:               "azurekms:vault=my-vault;name=my-key",
 			Bits:               0,
 			SignatureAlgorithm: apiv1.SHA256WithRSA,
 			ProtectionLevel:    apiv1.Software,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "azurekms:id=my-key;vault=my-vault",
+			Name:      "azurekms:name=my-key;vault=my-vault",
 			PublicKey: rsaPub,
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "azurekms:id=my-key;vault=my-vault",
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
 			},
 		}, false},
 		{"ok RSA 0 HSM", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=my-key",
+			Name:               "azurekms:vault=my-vault;name=my-key",
 			Bits:               0,
 			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
 			ProtectionLevel:    apiv1.HSM,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "azurekms:id=my-key;vault=my-vault",
+			Name:      "azurekms:name=my-key;vault=my-vault",
 			PublicKey: rsaPub,
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "azurekms:id=my-key;vault=my-vault",
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
 			},
 		}, false},
 		{"ok RSA 2048", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=my-key",
+			Name:               "azurekms:vault=my-vault;name=my-key",
 			Bits:               2048,
 			SignatureAlgorithm: apiv1.SHA384WithRSA,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "azurekms:id=my-key;vault=my-vault",
+			Name:      "azurekms:name=my-key;vault=my-vault",
 			PublicKey: rsaPub,
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "azurekms:id=my-key;vault=my-vault",
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
 			},
 		}, false},
 		{"ok RSA 3072", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=my-key",
+			Name:               "azurekms:vault=my-vault;name=my-key",
 			Bits:               3072,
 			SignatureAlgorithm: apiv1.SHA512WithRSA,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "azurekms:id=my-key;vault=my-vault",
+			Name:      "azurekms:name=my-key;vault=my-vault",
 			PublicKey: rsaPub,
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "azurekms:id=my-key;vault=my-vault",
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
 			},
 		}, false},
 		{"ok RSA 4096", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=my-key",
+			Name:               "azurekms:vault=my-vault;name=my-key",
 			Bits:               4096,
 			SignatureAlgorithm: apiv1.SHA512WithRSAPSS,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      "azurekms:id=my-key;vault=my-vault",
+			Name:      "azurekms:name=my-key;vault=my-vault",
 			PublicKey: rsaPub,
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: "azurekms:id=my-key;vault=my-vault",
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
 			},
 		}, false},
 		{"fail createKey", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=not-found",
+			Name:               "azurekms:vault=my-vault;name=not-found",
 			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
 		}}, nil, true},
 		{"fail convertKey", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=not-found",
+			Name:               "azurekms:vault=my-vault;name=not-found",
 			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
 		}}, nil, true},
 		{"fail name", fields{client}, args{&apiv1.CreateKeyRequest{
 			Name: "",
 		}}, nil, true},
 		{"fail vault", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name: "azurekms:vault=;id=not-found?version=my-version",
+			Name: "azurekms:vault=;name=not-found?version=my-version",
 		}}, nil, true},
 		{"fail id", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name: "azurekms:vault=my-vault;id=?version=my-version",
+			Name: "azurekms:vault=my-vault;name=?version=my-version",
 		}}, nil, true},
 		{"fail SignatureAlgorithm", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=not-found",
+			Name:               "azurekms:vault=my-vault;name=not-found",
 			SignatureAlgorithm: apiv1.PureEd25519,
 		}}, nil, true},
 		{"fail bit size", fields{client}, args{&apiv1.CreateKeyRequest{
-			Name:               "azurekms:vault=my-vault;id=not-found",
+			Name:               "azurekms:vault=my-vault;name=not-found",
 			SignatureAlgorithm: apiv1.SHA384WithRSAPSS,
 			Bits:               1024,
 		}}, nil, true},
@@ -426,7 +426,7 @@ func TestKeyVault_CreateSigner(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", fields{client}, args{&apiv1.CreateSignerRequest{
-			SigningKey: "azurekms:vault=my-vault;id=my-key",
+			SigningKey: "azurekms:vault=my-vault;name=my-key",
 		}}, &Signer{
 			client:       client,
 			vaultBaseURL: "https://my-vault.vault.azure.net/",
@@ -435,7 +435,7 @@ func TestKeyVault_CreateSigner(t *testing.T) {
 			publicKey:    pub,
 		}, false},
 		{"ok with version", fields{client}, args{&apiv1.CreateSignerRequest{
-			SigningKey: "azurekms:vault=my-vault;id=my-key;version=my-version",
+			SigningKey: "azurekms:vault=my-vault;name=my-key;version=my-version",
 		}}, &Signer{
 			client:       client,
 			vaultBaseURL: "https://my-vault.vault.azure.net/",
@@ -444,7 +444,7 @@ func TestKeyVault_CreateSigner(t *testing.T) {
 			publicKey:    pub,
 		}, false},
 		{"fail GetKey", fields{client}, args{&apiv1.CreateSignerRequest{
-			SigningKey: "azurekms:vault=my-vault;id=not-found;version=my-version",
+			SigningKey: "azurekms:vault=my-vault;name=not-found;version=my-version",
 		}}, nil, true},
 		{"fail SigningKey", fields{client}, args{&apiv1.CreateSignerRequest{
 			SigningKey: "",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	"encoding/json"
+	"net/url"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/keyvault/v7.1/keyvault"
@@ -17,9 +18,34 @@ func defaultContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 15*time.Second)
 }
 
-// parseKeyName returns the key vault, name and version for urls like
-// azurekms:vault=key-vault;id=key-name?version=key-version. If version is not
-// passed the latest version will be used.
+// getKeyName returns the uri of the key vault key.
+func getKeyName(vault, name string, bundle keyvault.KeyBundle) string {
+	if bundle.Key != nil && bundle.Key.Kid != nil {
+		sm := keyIDRegexp.FindAllStringSubmatch(*bundle.Key.Kid, 1)
+		if len(sm) == 1 && len(sm[0]) == 4 {
+			m := sm[0]
+			u := uri.New(Scheme, url.Values{
+				"vault": []string{m[1]},
+				"name":  []string{m[2]},
+			})
+			u.RawQuery = url.Values{"version": []string{m[3]}}.Encode()
+			return u.String()
+		}
+	}
+	// Fallback to URI without id.
+	return uri.New(Scheme, url.Values{
+		"vault": []string{vault},
+		"name":  []string{name},
+	}).String()
+}
+
+// parseKeyName returns the key vault, name and version from URIs like:
+//
+//   - azurekms:vault=key-vault;name=key-name
+//   - azurekms:vault=key-vault;name=key-name;id=key-id
+//
+// The key-id defines the version of the key, if it is not passed the latest
+// version will be used.
 func parseKeyName(rawURI string) (vault, name, version string, err error) {
 	var u *uri.URI
 
@@ -27,13 +53,13 @@ func parseKeyName(rawURI string) (vault, name, version string, err error) {
 	if err != nil {
 		return
 	}
-
-	if vault = u.Get("vault"); vault == "" {
-		err = errors.Errorf("key uri %s is not valid: vault is missing", rawURI)
+	if name = u.Get("name"); name == "" {
+		err = errors.Errorf("key uri %s is not valid: name is missing", rawURI)
 		return
 	}
-	if name = u.Get("id"); name == "" {
-		err = errors.Errorf("key uri %s is not valid: id is missing", rawURI)
+	if vault = u.Get("vault"); vault == "" {
+		err = errors.Errorf("key uri %s is not valid: vault is missing", rawURI)
+		name = ""
 		return
 	}
 	version = u.Get("version")
