@@ -221,6 +221,12 @@ func TestSigner_Sign(t *testing.T) {
 		{"fail sign length", "", keyvault.ES256, p256Digest, keyvault.KeyOperationResult{
 			Result: &rsaSHA256ResultSig,
 		}, nil},
+		{"fail base64", "", keyvault.ES256, p256Digest, keyvault.KeyOperationResult{
+			Result: func() *string {
+				v := "😎"
+				return &v
+			}(),
+		}, nil},
 	}
 	for _, e := range expects {
 		value := base64.RawURLEncoding.EncodeToString(e.digest)
@@ -289,6 +295,9 @@ func TestSigner_Sign(t *testing.T) {
 			rand.Reader, rsaSHA256Digest[:], crypto.SHA256,
 		}, nil, true},
 		{"fail sign length", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", p256}, args{
+			rand.Reader, p256Digest[:], crypto.SHA256,
+		}, nil, true},
+		{"fail base64", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", p256}, args{
 			rand.Reader, p256Digest[:], crypto.SHA256,
 		}, nil, true},
 		{"fail RSA-PSS salt length", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", rsaPSSSHA256}, args{

@@ -113,11 +113,13 @@ type KeyVaultClient interface {
 //
 //   - azurekms:name=key-name;vault=vault-name
 //   - azurekms:name=key-name;vault=vault-name?version=key-version
+//   - azurekms:name=key-name;vault=vault-name?hsm=true
 //
 // The scheme is "azurekms"; "name" is the key name; "vault" is the key vault
 // name where the key is located; "version" is an optional parameter that
 // defines the version of they key, if version is not given, the latest one will
-// be used.
+// be used; "hsm" defines if an HSM want to be used for this key, this is
+// specially useful when this is used from `step`.
 //
 // TODO(mariano): The implementation is using /services/keyvault/v7.1/keyvault
 // package, at some point Azure might create a keyvault client with all the
@@ -165,7 +167,7 @@ func (k *KeyVault) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKe
 		return nil, errors.New("getPublicKeyRequest 'name' cannot be empty")
 	}
 
-	vault, name, version, err := parseKeyName(req.Name)
+	vault, name, version, _, err := parseKeyName(req.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -187,9 +189,16 @@ func (k *KeyVault) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 		return nil, errors.New("createKeyRequest 'name' cannot be empty")
 	}
 
-	vault, name, _, err := parseKeyName(req.Name)
+	vault, name, _, hsm, err := parseKeyName(req.Name)
 	if err != nil {
 		return nil, err
+	}
+
+	// Override protection level to HSM only if it's not specified, and is given
+	// in the uri.
+	protectionLevel := req.ProtectionLevel
+	if protectionLevel == apiv1.UnspecifiedProtectionLevel && hsm {
+		protectionLevel = apiv1.HSM
 	}
 
 	kt, ok := signatureAlgorithmMapping[req.SignatureAlgorithm]
@@ -216,7 +225,7 @@ func (k *KeyVault) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 	defer cancel()
 
 	resp, err := k.baseClient.CreateKey(ctx, vaultBaseURL(vault), name, keyvault.KeyCreateParameters{
-		Kty:     kt.KeyType(req.ProtectionLevel),
+		Kty:     kt.KeyType(protectionLevel),
 		KeySize: keySize,
 		Curve:   kt.Curve,
 		KeyOps: &[]keyvault.JSONWebKeyOperation{

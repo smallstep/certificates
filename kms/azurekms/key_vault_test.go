@@ -202,11 +202,13 @@ func TestKeyVault_CreateKey(t *testing.T) {
 	}{
 		{"P-256", keyvault.EC, nil, keyvault.P256, ecJWK},
 		{"P-256 HSM", keyvault.ECHSM, nil, keyvault.P256, ecJWK},
+		{"P-256 HSM (uri)", keyvault.ECHSM, nil, keyvault.P256, ecJWK},
 		{"P-256 Default", keyvault.EC, nil, keyvault.P256, ecJWK},
 		{"P-384", keyvault.EC, nil, keyvault.P384, ecJWK},
 		{"P-521", keyvault.EC, nil, keyvault.P521, ecJWK},
 		{"RSA 0", keyvault.RSA, &value3072, "", rsaJWK},
 		{"RSA 0 HSM", keyvault.RSAHSM, &value3072, "", rsaJWK},
+		{"RSA 0 HSM (uri)", keyvault.RSAHSM, &value3072, "", rsaJWK},
 		{"RSA 2048", keyvault.RSA, &value2048, "", rsaJWK},
 		{"RSA 3072", keyvault.RSA, &value3072, "", rsaJWK},
 		{"RSA 4096", keyvault.RSA, &value4096, "", rsaJWK},
@@ -269,6 +271,16 @@ func TestKeyVault_CreateKey(t *testing.T) {
 				SigningKey: "azurekms:name=my-key;vault=my-vault",
 			},
 		}, false},
+		{"ok P-256 HSM (uri)", fields{client}, args{&apiv1.CreateKeyRequest{
+			Name:               "azurekms:vault=my-vault;name=my-key?hsm=true",
+			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
+		}}, &apiv1.CreateKeyResponse{
+			Name:      "azurekms:name=my-key;vault=my-vault",
+			PublicKey: ecPub,
+			CreateSignerRequest: apiv1.CreateSignerRequest{
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
+			},
+		}, false},
 		{"ok P-256 Default", fields{client}, args{&apiv1.CreateKeyRequest{
 			Name: "azurekms:vault=my-vault;name=my-key",
 		}}, &apiv1.CreateKeyResponse{
@@ -315,6 +327,17 @@ func TestKeyVault_CreateKey(t *testing.T) {
 			Bits:               0,
 			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
 			ProtectionLevel:    apiv1.HSM,
+		}}, &apiv1.CreateKeyResponse{
+			Name:      "azurekms:name=my-key;vault=my-vault",
+			PublicKey: rsaPub,
+			CreateSignerRequest: apiv1.CreateSignerRequest{
+				SigningKey: "azurekms:name=my-key;vault=my-vault",
+			},
+		}, false},
+		{"ok RSA 0 HSM (uri)", fields{client}, args{&apiv1.CreateKeyRequest{
+			Name:               "azurekms:vault=my-vault;name=my-key;hsm=true",
+			Bits:               0,
+			SignatureAlgorithm: apiv1.SHA256WithRSAPSS,
 		}}, &apiv1.CreateKeyResponse{
 			Name:      "azurekms:name=my-key;vault=my-vault",
 			PublicKey: rsaPub,

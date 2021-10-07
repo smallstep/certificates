@@ -25,7 +25,7 @@ type Signer struct {
 
 // NewSigner creates a new signer using a key in the AWS KMS.
 func NewSigner(client KeyVaultClient, signingKey string) (crypto.Signer, error) {
-	vault, name, version, err := parseKeyName(signingKey)
+	vault, name, version, _, err := parseKeyName(signingKey)
 	if err != nil {
 		return nil, err
 	}

@@ -42,11 +42,15 @@ func getKeyName(vault, name string, bundle keyvault.KeyBundle) string {
 // parseKeyName returns the key vault, name and version from URIs like:
 //
 //   - azurekms:vault=key-vault;name=key-name
-//   - azurekms:vault=key-vault;name=key-name;id=key-id
+//   - azurekms:vault=key-vault;name=key-name?version=key-id
+//   - azurekms:vault=key-vault;name=key-name?version=key-id&hsm=true
 //
 // The key-id defines the version of the key, if it is not passed the latest
 // version will be used.
-func parseKeyName(rawURI string) (vault, name, version string, err error) {
+//
+// HSM can also be passed to define the protection level if this is not given in
+// CreateQuery.
+func parseKeyName(rawURI string) (vault, name, version string, hsm bool, err error) {
 	var u *uri.URI
 
 	u, err = uri.ParseWithScheme("azurekms", rawURI)
@@ -63,6 +67,7 @@ func parseKeyName(rawURI string) (vault, name, version string, err error) {
 		return
 	}
 	version = u.Get("version")
+	hsm = u.GetBool("hsm")
 	return
 }
 
