@@ -73,6 +73,8 @@ const (
 	YubiKey Type = "yubikey"
 	// SSHAgentKMS is a KMS implementation using ssh-agent to access keys.
 	SSHAgentKMS Type = "sshagentkms"
+	// AzureKMS is a KMS implementation using Azure Key Vault.
+	AzureKMS Type = "azurekms"
 )
 
 // Options are the KMS options. They represent the kms object in the ca.json.
@@ -118,8 +120,9 @@ func (o *Options) Validate() error {
 
 	switch Type(strings.ToLower(o.Type)) {
 	case DefaultKMS, SoftKMS: // Go crypto based kms.
-	case CloudKMS, AmazonKMS, SSHAgentKMS: // Cloud based kms.
+	case CloudKMS, AmazonKMS, AzureKMS: // Cloud based kms.
 	case YubiKey, PKCS11: // Hardware based kms.
+	case SSHAgentKMS: // Others
 	default:
 		return errors.Errorf("unsupported kms type %s", o.Type)
 	}
