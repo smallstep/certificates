@@ -106,6 +106,7 @@ func (m *mockKeyManager) CreateKey(req *kmsapi.CreateKeyRequest) (*kmsapi.Create
 		signer = m.signer
 	}
 	return &kmsapi.CreateKeyResponse{
+		Name:       req.Name,
 		PrivateKey: signer,
 		PublicKey:  signer.Public(),
 	}, m.errCreateKey
@@ -515,6 +516,22 @@ func TestSoftCAS_CreateCertificateAuthority(t *testing.T) {
 			PublicKey:   testSignedRootTemplate.PublicKey,
 			PrivateKey:  saSigner,
 			Signer:      saSigner,
+		}, false},
+		{"ok createKey", fields{nil, nil, &mockKeyManager{}}, args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.RootCA,
+			Template: testRootTemplate,
+			Lifetime: 24 * time.Hour,
+			CreateKey: &kmsapi.CreateKeyRequest{
+				Name:               "root_ca.crt",
+				SignatureAlgorithm: kmsapi.ECDSAWithSHA256,
+			},
+		}}, &apiv1.CreateCertificateAuthorityResponse{
+			Name:        "Test Root CA",
+			Certificate: testSignedRootTemplate,
+			PublicKey:   testSignedRootTemplate.PublicKey,
+			KeyName:     "root_ca.crt",
+			PrivateKey:  testSigner,
+			Signer:      testSigner,
 		}, false},
 		{"fail template", fields{nil, nil, &mockKeyManager{}}, args{&apiv1.CreateCertificateAuthorityRequest{
 			Type:     apiv1.RootCA,

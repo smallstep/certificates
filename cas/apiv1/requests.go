@@ -108,6 +108,9 @@ type GetCertificateAuthorityResponse struct {
 	RootCertificate *x509.Certificate
 }
 
+// CreateKeyRequest is the request used to generate a new key using a KMS.
+type CreateKeyRequest = apiv1.CreateKeyRequest
+
 // CreateCertificateAuthorityRequest is the request used to generate a root or
 // intermediate certificate.
 type CreateCertificateAuthorityRequest struct {
@@ -126,7 +129,7 @@ type CreateCertificateAuthorityRequest struct {
 	// CreateKey defines the KMS CreateKeyRequest to use when creating a new
 	// CertificateAuthority. If CreateKey is nil, a default algorithm will be
 	// used.
-	CreateKey *apiv1.CreateKeyRequest
+	CreateKey *CreateKeyRequest
 }
 
 // CreateCertificateAuthorityResponse is the response for
@@ -136,6 +139,7 @@ type CreateCertificateAuthorityResponse struct {
 	Name             string
 	Certificate      *x509.Certificate
 	CertificateChain []*x509.Certificate
+	KeyName          string
 	PublicKey        crypto.PublicKey
 	PrivateKey       crypto.PrivateKey
 	Signer           crypto.Signer
