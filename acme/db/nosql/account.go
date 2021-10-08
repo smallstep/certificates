@@ -243,8 +243,7 @@ func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerName stri
 		return errors.Wrapf(err, "error loading ACME EAB Key with Key ID %s", keyID)
 	}
 	if dbeak.Provisioner != provisionerName {
-		// TODO: change these ACME error types; they don't make a lot of sense if used in the Admin APIs
-		return acme.NewError(acme.ErrorUnauthorizedType, "name of provisioner does not match provisioner for which the EAB key was created")
+		return errors.New("name of provisioner does not match provisioner for which the EAB key was created")
 	}
 	if dbeak.Reference != "" {
 		err = db.db.Del(externalAccountKeysByReferenceTable, []byte(dbeak.Reference))
@@ -270,7 +269,7 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName string
 	for _, entry := range entries {
 		dbeak := new(dbExternalAccountKey)
 		if err = json.Unmarshal(entry.Value, dbeak); err != nil {
-			return nil, errors.Wrapf(err, "error unmarshaling external account key %s into dbExternalAccountKey", string(entry.Key))
+			return nil, errors.Wrapf(err, "error unmarshaling external account key %s into ExternalAccountKey", string(entry.Key))
 		}
 		if dbeak.Provisioner != provisionerName {
 			continue
@@ -314,7 +313,7 @@ func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerName stri
 	}
 
 	if old.Provisioner != provisionerName {
-		return acme.NewError(acme.ErrorUnauthorizedType, "name of provisioner does not match provisioner for which the EAB key was created")
+		return errors.New("name of provisioner does not match provisioner for which the EAB key was created")
 	}
 
 	nu := dbExternalAccountKey{

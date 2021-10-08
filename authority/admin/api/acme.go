@@ -137,13 +137,7 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 	prov := chi.URLParam(r, "prov")
 	reference := chi.URLParam(r, "ref")
 
-	// TODO: support paging properly? It'll probably leak to the DB layer, as we have to loop through all keys
-	// cursor, limit, err := api.ParseCursor(r)
-	// if err != nil {
-	// 	api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err,
-	// 		"error parsing cursor and limit from query params"))
-	// 	return
-	// }
+	// TODO: support paging? It'll probably leak to the DB layer, as we have to loop through all keys
 
 	var (
 		key  *acme.ExternalAccountKey
