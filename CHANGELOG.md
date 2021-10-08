@@ -6,10 +6,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased - 0.17.5] - DATE
 ### Added
+- gocritic linter
 ### Changed
 ### Deprecated
 ### Removed
 ### Fixed
+- gocritic warnings
 ### Security
 
 ## [0.17.4] - 2021-09-28
