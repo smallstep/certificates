@@ -62,6 +62,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize windows terminal
+	ui.Init()
+
 	c, err := cloudkms.New(context.Background(), apiv1.Options{
 		Type:            string(apiv1.CloudKMS),
 		CredentialsFile: credentialsFile,
@@ -80,10 +83,14 @@ func main() {
 			fatal(err)
 		}
 	}
+
+	// Reset windows terminal
+	ui.Reset()
 }
 
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, err)
+	ui.Reset()
 	os.Exit(1)
 }
 

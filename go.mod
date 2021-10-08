@@ -4,7 +4,7 @@ go 1.14
 
 require (
 	cloud.google.com/go v0.83.0
-	github.com/Masterminds/sprig/v3 v3.1.0
+	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/ThalesIgnite/crypto11 v1.2.4
 	github.com/aws/aws-sdk-go v1.30.29
 	github.com/dgraph-io/ristretto v0.0.4-0.20200906165740-41ebdbffecfd // indirect
@@ -12,7 +12,7 @@ require (
 	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-piv/piv-go v1.7.0
 	github.com/golang/mock v1.5.0
-	github.com/google/uuid v1.1.2
+	github.com/google/uuid v1.3.0
 	github.com/googleapis/gax-go/v2 v2.0.5
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
@@ -26,16 +26,16 @@ require (
 	github.com/smallstep/nosql v0.3.8
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
-	go.step.sm/cli-utils v0.4.1
-	go.step.sm/crypto v0.9.2
+	go.step.sm/cli-utils v0.6.0
+	go.step.sm/crypto v0.11.0
 	go.step.sm/linkedca v0.5.0
-	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
-	golang.org/x/net v0.0.0-20210825183410-e898025ed96a
+	golang.org/x/crypto v0.0.0-20210915214749-c084706c2272
+	golang.org/x/net v0.0.0-20210913180222-943fd674d43e
 	google.golang.org/api v0.47.0
 	google.golang.org/genproto v0.0.0-20210719143636-1d5a45f8e492
 	google.golang.org/grpc v1.39.0
 	google.golang.org/protobuf v1.27.1
-	gopkg.in/square/go-jose.v2 v2.5.1
+	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
 // replace github.com/smallstep/nosql => ../nosql

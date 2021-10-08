@@ -38,6 +38,42 @@ func WithConfigFile(filename string) Option {
 	}
 }
 
+// WithPassword set the password to decrypt the intermediate key as well as the
+// ssh host and user keys if they are not overridden by other options.
+func WithPassword(password []byte) Option {
+	return func(a *Authority) (err error) {
+		a.password = password
+		return
+	}
+}
+
+// WithSSHHostPassword set the password to decrypt the key used to sign SSH host
+// certificates.
+func WithSSHHostPassword(password []byte) Option {
+	return func(a *Authority) (err error) {
+		a.sshHostPassword = password
+		return
+	}
+}
+
+// WithSSHUserPassword set the password to decrypt the key used to sign SSH user
+// certificates.
+func WithSSHUserPassword(password []byte) Option {
+	return func(a *Authority) (err error) {
+		a.sshUserPassword = password
+		return
+	}
+}
+
+// WithIssuerPassword set the password to decrypt the certificate issuer private
+// key used in RA mode.
+func WithIssuerPassword(password []byte) Option {
+	return func(a *Authority) (err error) {
+		a.issuerPassword = password
+		return
+	}
+}
+
 // WithDatabase sets an already initialized authority database to a new
 // authority. This option is intended to be use on graceful reloads.
 func WithDatabase(db db.AuthDB) Option {

@@ -31,6 +31,9 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
+	// Initialize windows terminal
+	ui.Init()
+
 	c, err := awskms.New(context.Background(), apiv1.Options{
 		Type:            string(apiv1.AmazonKMS),
 		Region:          region,
@@ -50,10 +53,14 @@ func main() {
 			fatal(err)
 		}
 	}
+
+	// Reset windows terminal
+	ui.Reset()
 }
 
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, err)
+	ui.Reset()
 	os.Exit(1)
 }
 

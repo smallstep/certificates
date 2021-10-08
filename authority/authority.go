@@ -43,6 +43,8 @@ type Authority struct {
 	linkedCAToken string
 
 	// X509 CA
+	password           []byte
+	issuerPassword     []byte
 	x509CAService      cas.CertificateAuthorityService
 	rootX509Certs      []*x509.Certificate
 	rootX509CertPool   *x509.CertPool
@@ -53,6 +55,8 @@ type Authority struct {
 	scepService *scep.Service
 
 	// SSH CA
+	sshHostPassword         []byte
+	sshUserPassword         []byte
 	sshCAUserCertSignKey    ssh.Signer
 	sshCAHostCertSignKey    ssh.Signer
 	sshCAUserCerts          []ssh.PublicKey
@@ -206,6 +210,21 @@ func (a *Authority) init() error {
 
 	var err error
 
+	// Set password if they are not set.
+	var configPassword []byte
+	if a.config.Password != "" {
+		configPassword = []byte(a.config.Password)
+	}
+	if configPassword != nil && a.password == nil {
+		a.password = configPassword
+	}
+	if a.sshHostPassword == nil {
+		a.sshHostPassword = a.password
+	}
+	if a.sshUserPassword == nil {
+		a.sshUserPassword = a.password
+	}
+
 	// Automatically enable admin for all linked cas.
 	if a.linkedCAToken != "" {
 		a.config.AuthorityConfig.EnableAdmin = true
@@ -238,6 +257,11 @@ func (a *Authority) init() error {
 			options = *a.config.AuthorityConfig.Options
 		}
 
+		// Set the issuer password if passed in the flags.
+		if options.CertificateIssuer != nil && a.issuerPassword != nil {
+			options.CertificateIssuer.Password = string(a.issuerPassword)
+		}
+
 		// Read intermediate and create X509 signer for default CAS.
 		if options.Is(casapi.SoftCAS) {
 			options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
@@ -246,7 +270,7 @@ func (a *Authority) init() error {
 			}
 			options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.IntermediateKey,
-				Password:   []byte(a.config.Password),
+				Password:   []byte(a.password),
 			})
 			if err != nil {
 				return err
@@ -315,7 +339,7 @@ func (a *Authority) init() error {
 		if a.config.SSH.HostKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.SSH.HostKey,
-				Password:   []byte(a.config.Password),
+				Password:   []byte(a.sshHostPassword),
 			})
 			if err != nil {
 				return err
@@ -341,7 +365,7 @@ func (a *Authority) init() error {
 		if a.config.SSH.UserKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.SSH.UserKey,
-				Password:   []byte(a.config.Password),
+				Password:   []byte(a.sshUserPassword),
 			})
 			if err != nil {
 				return err
@@ -365,33 +389,45 @@ func (a *Authority) init() error {
 			a.sshCAUserFederatedCerts = append(a.sshCAUserFederatedCerts, a.sshCAUserCertSignKey.PublicKey())
 		}
 
-		// Append other public keys
+		// Append other public keys and add them to the template variables.
 		for _, key := range a.config.SSH.Keys {
+			publicKey := key.PublicKey()
 			switch key.Type {
 			case provisioner.SSHHostCert:
 				if key.Federated {
-					a.sshCAHostFederatedCerts = append(a.sshCAHostFederatedCerts, key.PublicKey())
+					a.sshCAHostFederatedCerts = append(a.sshCAHostFederatedCerts, publicKey)
 				} else {
-					a.sshCAHostCerts = append(a.sshCAHostCerts, key.PublicKey())
+					a.sshCAHostCerts = append(a.sshCAHostCerts, publicKey)
 				}
 			case provisioner.SSHUserCert:
 				if key.Federated {
-					a.sshCAUserFederatedCerts = append(a.sshCAUserFederatedCerts, key.PublicKey())
+					a.sshCAUserFederatedCerts = append(a.sshCAUserFederatedCerts, publicKey)
 				} else {
-					a.sshCAUserCerts = append(a.sshCAUserCerts, key.PublicKey())
+					a.sshCAUserCerts = append(a.sshCAUserCerts, publicKey)
 				}
 			default:
 				return errors.Errorf("unsupported type %s", key.Type)
 			}
 		}
+	}
 
-		// Configure template variables.
+	// Configure template variables. On the template variables HostFederatedKeys
+	// and UserFederatedKeys we will skip the actual CA that will be available
+	// in HostKey and UserKey.
+	//
+	// We cannot do it in the previous blocks because this configuration can be
+	// injected using options.
+	if a.sshCAHostCertSignKey != nil {
 		tmplVars.SSH.HostKey = a.sshCAHostCertSignKey.PublicKey()
-		tmplVars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
-		// On the templates we skip the first one because there's a distinction
-		// between the main key and federated keys.
 		tmplVars.SSH.HostFederatedKeys = append(tmplVars.SSH.HostFederatedKeys, a.sshCAHostFederatedCerts[1:]...)
+	} else {
+		tmplVars.SSH.HostFederatedKeys = append(tmplVars.SSH.HostFederatedKeys, a.sshCAHostFederatedCerts...)
+	}
+	if a.sshCAUserCertSignKey != nil {
+		tmplVars.SSH.UserKey = a.sshCAUserCertSignKey.PublicKey()
 		tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts[1:]...)
+	} else {
+		tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts...)
 	}
 
 	// Check if a KMS with decryption capability is required and available
@@ -420,7 +456,7 @@ func (a *Authority) init() error {
 		}
 		options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 			SigningKey: a.config.IntermediateKey,
-			Password:   []byte(a.config.Password),
+			Password:   []byte(a.password),
 		})
 		if err != nil {
 			return err
@@ -429,7 +465,7 @@ func (a *Authority) init() error {
 		if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
 			options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
 				DecryptionKey: a.config.IntermediateKey,
-				Password:      []byte(a.config.Password),
+				Password:      []byte(a.password),
 			})
 			if err != nil {
 				return err
@@ -475,7 +511,7 @@ func (a *Authority) init() error {
 		}
 		if len(provs) == 0 && !strings.EqualFold(a.config.AuthorityConfig.DeploymentType, "linked") {
 			// Create First Provisioner
-			prov, err := CreateFirstProvisioner(context.Background(), a.adminDB, a.config.Password)
+			prov, err := CreateFirstProvisioner(context.Background(), a.adminDB, string(a.password))
 			if err != nil {
 				return admin.WrapErrorISE(err, "error creating first provisioner")
 			}

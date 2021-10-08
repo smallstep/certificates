@@ -341,7 +341,9 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "error parsing %s", p.Address)
 		}
-		if port == "443" {
+		// On k8s we usually access through a service, and this is configured on
+		// port 443 by default.
+		if port == "443" || p.options.isHelm {
 			p.Defaults.CaUrl = fmt.Sprintf("https://%s", p.Defaults.CaUrl)
 		} else {
 			p.Defaults.CaUrl = fmt.Sprintf("https://%s:%s", p.Defaults.CaUrl, port)

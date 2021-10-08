@@ -87,6 +87,52 @@ func (m sshTestOptionsModifier) Modify(cert *ssh.Certificate, opts provisioner.S
 	return fmt.Errorf(string(m))
 }
 
+func TestAuthority_initHostOnly(t *testing.T) {
+	auth := testAuthority(t, func(a *Authority) error {
+		a.config.SSH.UserKey = ""
+		return nil
+	})
+
+	// Check keys
+	keys, err := auth.GetSSHRoots(context.Background())
+	assert.NoError(t, err)
+	assert.Len(t, 1, keys.HostKeys)
+	assert.Len(t, 0, keys.UserKeys)
+
+	// Check templates, user templates should work fine.
+	_, err = auth.GetSSHConfig(context.Background(), "user", nil)
+	assert.NoError(t, err)
+
+	_, err = auth.GetSSHConfig(context.Background(), "host", map[string]string{
+		"Certificate": "ssh_host_ecdsa_key-cert.pub",
+		"Key":         "ssh_host_ecdsa_key",
+	})
+	assert.Error(t, err)
+}
+
+func TestAuthority_initUserOnly(t *testing.T) {
+	auth := testAuthority(t, func(a *Authority) error {
+		a.config.SSH.HostKey = ""
+		return nil
+	})
+
+	// Check keys
+	keys, err := auth.GetSSHRoots(context.Background())
+	assert.NoError(t, err)
+	assert.Len(t, 0, keys.HostKeys)
+	assert.Len(t, 1, keys.UserKeys)
+
+	// Check templates, host templates should work fine.
+	_, err = auth.GetSSHConfig(context.Background(), "host", map[string]string{
+		"Certificate": "ssh_host_ecdsa_key-cert.pub",
+		"Key":         "ssh_host_ecdsa_key",
+	})
+	assert.NoError(t, err)
+
+	_, err = auth.GetSSHConfig(context.Background(), "user", nil)
+	assert.Error(t, err)
+}
+
 func TestAuthority_SignSSH(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.FatalError(t, err)
@@ -153,6 +199,8 @@ func TestAuthority_SignSSH(t *testing.T) {
 	}{
 		{"ok-user", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions}}, want{CertType: ssh.UserCert}, false},
 		{"ok-host", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{hostTemplate, hostOptions}}, want{CertType: ssh.HostCert}, false},
+		{"ok-user-only", fields{signer, nil}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions}}, want{CertType: ssh.UserCert}, false},
+		{"ok-host-only", fields{nil, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{hostTemplate, hostOptions}}, want{CertType: ssh.HostCert}, false},
 		{"ok-opts-type-user", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{CertType: "user"}, []provisioner.SignOption{userTemplate}}, want{CertType: ssh.UserCert}, false},
 		{"ok-opts-type-host", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{CertType: "host"}, []provisioner.SignOption{hostTemplate}}, want{CertType: ssh.HostCert}, false},
 		{"ok-opts-principals", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{CertType: "user", Principals: []string{"user"}}, []provisioner.SignOption{userTemplateWithUser}}, want{CertType: ssh.UserCert, Principals: []string{"user"}}, false},
