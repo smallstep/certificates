@@ -22,9 +22,9 @@ type Option func(*Authority) error
 
 // WithConfig replaces the current config with the given one. No validation is
 // performed in the given value.
-func WithConfig(config *config.Config) Option {
+func WithConfig(cfg *config.Config) Option {
 	return func(a *Authority) error {
-		a.config = config
+		a.config = cfg
 		return nil
 	}
 }
@@ -76,9 +76,9 @@ func WithIssuerPassword(password []byte) Option {
 
 // WithDatabase sets an already initialized authority database to a new
 // authority. This option is intended to be use on graceful reloads.
-func WithDatabase(db db.AuthDB) Option {
+func WithDatabase(d db.AuthDB) Option {
 	return func(a *Authority) error {
-		a.db = db
+		a.db = d
 		return nil
 	}
 }
@@ -225,9 +225,9 @@ func WithX509FederatedBundle(pemCerts []byte) Option {
 }
 
 // WithAdminDB is an option to set the database backing the admin APIs.
-func WithAdminDB(db admin.DB) Option {
+func WithAdminDB(d admin.DB) Option {
 	return func(a *Authority) error {
-		a.adminDB = db
+		a.adminDB = d
 		return nil
 	}
 }

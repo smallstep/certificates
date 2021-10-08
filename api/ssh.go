@@ -52,7 +52,7 @@ func (s *SSHSignRequest) Validate() error {
 		return errors.Errorf("unknown certType %s", s.CertType)
 	case len(s.PublicKey) == 0:
 		return errors.New("missing or empty publicKey")
-	case len(s.OTT) == 0:
+	case s.OTT == "":
 		return errors.New("missing or empty ott")
 	default:
 		// Validate identity signature if provided
@@ -408,18 +408,18 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var config SSHConfigResponse
+	var cfg SSHConfigResponse
 	switch body.Type {
 	case provisioner.SSHUserCert:
-		config.UserTemplates = ts
+		cfg.UserTemplates = ts
 	case provisioner.SSHHostCert:
-		config.HostTemplates = ts
+		cfg.HostTemplates = ts
 	default:
 		WriteError(w, errs.InternalServer("it should hot get here"))
 		return
 	}
 
-	JSON(w, config)
+	JSON(w, cfg)
 }
 
 // SSHCheckHost is the HTTP handler that returns if a hosts certificate exists or not.

@@ -78,14 +78,14 @@ type Authority struct {
 }
 
 // New creates and initiates a new Authority type.
-func New(config *config.Config, opts ...Option) (*Authority, error) {
-	err := config.Validate()
+func New(cfg *config.Config, opts ...Option) (*Authority, error) {
+	err := cfg.Validate()
 	if err != nil {
 		return nil, err
 	}
 
 	var a = &Authority{
-		config:       config,
+		config:       cfg,
 		certificates: new(sync.Map),
 	}
 

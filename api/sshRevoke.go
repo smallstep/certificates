@@ -36,7 +36,7 @@ func (r *SSHRevokeRequest) Validate() (err error) {
 	if !r.Passive {
 		return errs.NotImplemented("non-passive revocation not implemented")
 	}
-	if len(r.OTT) == 0 {
+	if r.OTT == "" {
 		return errs.BadRequest("missing ott")
 	}
 	return

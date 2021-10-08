@@ -240,9 +240,9 @@ type caHandler struct {
 }
 
 // New creates a new RouterHandler with the CA endpoints.
-func New(authority Authority) RouterHandler {
+func New(auth Authority) RouterHandler {
 	return &caHandler{
-		Authority: authority,
+		Authority: auth,
 	}
 }
 
@@ -295,7 +295,7 @@ func (h *caHandler) Health(w http.ResponseWriter, r *http.Request) {
 // certificate for the given SHA256.
 func (h *caHandler) Root(w http.ResponseWriter, r *http.Request) {
 	sha := chi.URLParam(r, "sha")
-	sum := strings.ToLower(strings.Replace(sha, "-", "", -1))
+	sum := strings.ToLower(strings.ReplaceAll(sha, "-", ""))
 	// Load root certificate with the
 	cert, err := h.Authority.Root(sum)
 	if err != nil {
@@ -409,19 +409,20 @@ func LogCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 			"certificate": base64.StdEncoding.EncodeToString(cert.Raw),
 		}
 		for _, ext := range cert.Extensions {
-			if ext.Id.Equal(oidStepProvisioner) {
-				val := &stepProvisioner{}
-				rest, err := asn1.Unmarshal(ext.Value, val)
-				if err != nil || len(rest) > 0 {
-					break
-				}
-				if len(val.CredentialID) > 0 {
-					m["provisioner"] = fmt.Sprintf("%s (%s)", val.Name, val.CredentialID)
-				} else {
-					m["provisioner"] = string(val.Name)
-				}
+			if !ext.Id.Equal(oidStepProvisioner) {
+				continue
+			}
+			val := &stepProvisioner{}
+			rest, err := asn1.Unmarshal(ext.Value, val)
+			if err != nil || len(rest) > 0 {
 				break
 			}
+			if len(val.CredentialID) > 0 {
+				m["provisioner"] = fmt.Sprintf("%s (%s)", val.Name, val.CredentialID)
+			} else {
+				m["provisioner"] = string(val.Name)
+			}
+			break
 		}
 		rl.WithFields(m)
 	}

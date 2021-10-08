@@ -289,6 +289,7 @@ func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.Certificate
 	// name or in an extensionRequest attribute [RFC2985] requesting a
 	// subjectAltName extension, or both.
 	if csr.Subject.CommonName != "" {
+		// nolint:gocritic
 		canonicalized.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
 	}
 	canonicalized.DNSNames = uniqueSortedLowerNames(csr.DNSNames)

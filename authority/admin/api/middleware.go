@@ -27,7 +27,7 @@ func (h *Handler) requireAPIEnabled(next nextHTTP) nextHTTP {
 func (h *Handler) extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tok := r.Header.Get("Authorization")
-		if len(tok) == 0 {
+		if tok == "" {
 			api.WriteError(w, admin.NewError(admin.ErrorUnauthorizedType,
 				"missing authorization header token"))
 			return

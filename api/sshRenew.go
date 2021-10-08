@@ -18,7 +18,7 @@ type SSHRenewRequest struct {
 // Validate validates the SSHSignRequest.
 func (s *SSHRenewRequest) Validate() error {
 	switch {
-	case len(s.OTT) == 0:
+	case s.OTT == "":
 		return errors.New("missing or empty ott")
 	default:
 		return nil

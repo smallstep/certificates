@@ -27,13 +27,13 @@ func main() {
 	var credentialsFile string
 	var project, location, ring string
 	var protectionLevelName string
-	var ssh bool
+	var enableSSH bool
 	flag.StringVar(&credentialsFile, "credentials-file", "", "Path to the `file` containing the Google's Cloud KMS credentials.")
 	flag.StringVar(&project, "project", "", "Google Cloud Project ID.")
 	flag.StringVar(&location, "location", "global", "Cloud KMS location name.")
 	flag.StringVar(&ring, "ring", "pki", "Cloud KMS ring name.")
 	flag.StringVar(&protectionLevelName, "protection-level", "SOFTWARE", "Protection level to use, SOFTWARE or HSM.")
-	flag.BoolVar(&ssh, "ssh", false, "Create SSH keys.")
+	flag.BoolVar(&enableSSH, "ssh", false, "Create SSH keys.")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -77,7 +77,7 @@ func main() {
 		fatal(err)
 	}
 
-	if ssh {
+	if enableSSH {
 		ui.Println()
 		if err := createSSH(c, project, location, ring, protectionLevel); err != nil {
 			fatal(err)
@@ -153,7 +153,7 @@ func createPKI(c *cloudkms.CloudKMS, project, location, keyRing string, protecti
 		return err
 	}
 
-	if err = fileutil.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
+	if err := fileutil.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: b,
 	}), 0600); err != nil {
@@ -197,7 +197,7 @@ func createPKI(c *cloudkms.CloudKMS, project, location, keyRing string, protecti
 		return err
 	}
 
-	if err = fileutil.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
+	if err := fileutil.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: b,
 	}), 0600); err != nil {
@@ -230,7 +230,7 @@ func createSSH(c *cloudkms.CloudKMS, project, location, keyRing string, protecti
 		return err
 	}
 
-	if err = fileutil.WriteFile("ssh_user_ca_key.pub", ssh.MarshalAuthorizedKey(key), 0600); err != nil {
+	if err := fileutil.WriteFile("ssh_user_ca_key.pub", ssh.MarshalAuthorizedKey(key), 0600); err != nil {
 		return err
 	}
 
@@ -252,7 +252,7 @@ func createSSH(c *cloudkms.CloudKMS, project, location, keyRing string, protecti
 		return err
 	}
 
-	if err = fileutil.WriteFile("ssh_host_ca_key.pub", ssh.MarshalAuthorizedKey(key), 0600); err != nil {
+	if err := fileutil.WriteFile("ssh_host_ca_key.pub", ssh.MarshalAuthorizedKey(key), 0600); err != nil {
 		return err
 	}
 

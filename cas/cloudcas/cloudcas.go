@@ -29,9 +29,7 @@ func init() {
 	})
 }
 
-var now = func() time.Time {
-	return time.Now()
-}
+var now = time.Now
 
 // The actual regular expression that matches a certificate authority is:
 //   ^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z0-9-]+/caPools/[a-zA-Z0-9-_]+/certificateAuthorities/[a-zA-Z0-9-_]+$

@@ -22,7 +22,7 @@ func (b noneSigner) Public() crypto.PublicKey {
 	return []byte(b)
 }
 
-func (b noneSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+func (b noneSigner) Sign(rnd io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
 	return digest, nil
 }
 

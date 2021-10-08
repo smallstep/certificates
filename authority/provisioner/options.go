@@ -138,7 +138,7 @@ func unsafeParseSigned(s string) (map[string]interface{}, error) {
 		return nil, err
 	}
 	claims := make(map[string]interface{})
-	if err = token.UnsafeClaimsWithoutVerification(&claims); err != nil {
+	if err := token.UnsafeClaimsWithoutVerification(&claims); err != nil {
 		return nil, err
 	}
 	return claims, nil

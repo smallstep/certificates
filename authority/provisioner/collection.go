@@ -229,14 +229,15 @@ func (c *Collection) Remove(id string) error {
 
 	var found bool
 	for i, elem := range c.sorted {
-		if elem.provisioner.GetID() == id {
-			// Remove index in sorted list
-			copy(c.sorted[i:], c.sorted[i+1:])           // Shift a[i+1:] left one index.
-			c.sorted[len(c.sorted)-1] = uidProvisioner{} // Erase last element (write zero value).
-			c.sorted = c.sorted[:len(c.sorted)-1]        // Truncate slice.
-			found = true
-			break
+		if elem.provisioner.GetID() != id {
+			continue
 		}
+		// Remove index in sorted list
+		copy(c.sorted[i:], c.sorted[i+1:])           // Shift a[i+1:] left one index.
+		c.sorted[len(c.sorted)-1] = uidProvisioner{} // Erase last element (write zero value).
+		c.sorted = c.sorted[:len(c.sorted)-1]        // Truncate slice.
+		found = true
+		break
 	}
 	if !found {
 		return admin.NewError(admin.ErrorNotFoundType, "provisioner %s not found in sorted list", prov.GetName())

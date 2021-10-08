@@ -29,7 +29,7 @@ func (p *noop) GetType() Type {
 	return noopType
 }
 
-func (p *noop) GetEncryptedKey() (kid string, key string, ok bool) {
+func (p *noop) GetEncryptedKey() (kid, key string, ok bool) {
 	return "", "", false
 }
 
