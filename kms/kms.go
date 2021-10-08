@@ -8,7 +8,7 @@ import (
 	"github.com/smallstep/certificates/kms/apiv1"
 
 	// Enable default implementation
-	_ "github.com/smallstep/certificates/kms/softkms"
+	"github.com/smallstep/certificates/kms/softkms"
 )
 
 // KeyManager is the interface implemented by all the KMS.
@@ -20,6 +20,9 @@ type CertificateManager = apiv1.CertificateManager
 
 // Options are the KMS options. They represent the kms object in the ca.json.
 type Options = apiv1.Options
+
+// Default is the implementation of the default KMS.
+var Default = &softkms.SoftKMS{}
 
 // New initializes a new KMS from the given type.
 func New(ctx context.Context, opts apiv1.Options) (KeyManager, error) {
