@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased - 0.17.5] - DATE
 ### Added
+- Support for Azure Key Vault as a KMS.
+- Adapt `pki` package to support key managers.
 ### Changed
 ### Deprecated
 ### Removed
@@ -13,13 +15,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Security
 
 ## [0.17.4] - 2021-09-28
-### Added
-### Changed
-### Deprecated
-### Removed
 ### Fixed
 - Support host-only or user-only SSH CA.
-### Security
 
 ## [0.17.3] - 2021-09-24
 ### Added
@@ -55,4 +52,3 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Update TLS cipher suites to include 1.3
 ### Security
 - Fix key version when SHA512WithRSA is used. There was a typo creating RSA keys with SHA256 digests instead of SHA512.
-
