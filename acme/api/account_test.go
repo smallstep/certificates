@@ -1055,6 +1055,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			createdAt := time.Now()
 			return test{
 				db: &acme.MockDB{
 					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
@@ -1063,7 +1064,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							Provisioner: escProvName,
 							Reference:   "testeak",
 							KeyBytes:    []byte{1, 3, 3, 7},
-							CreatedAt:   time.Now(),
+							CreatedAt:   createdAt,
 						}, nil
 					},
 				},
@@ -1072,7 +1073,13 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 					Contact:                []string{"foo", "bar"},
 					ExternalAccountBinding: eab,
 				},
-				eak: &acme.ExternalAccountKey{},
+				eak: &acme.ExternalAccountKey{
+					ID:          "eakID",
+					Provisioner: escProvName,
+					Reference:   "testeak",
+					KeyBytes:    []byte{1, 3, 3, 7},
+					CreatedAt:   createdAt,
+				},
 				err: nil,
 			}
 		},
@@ -1299,8 +1306,6 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			wantErr := tc.err != nil
 			gotErr := err != nil
 			if wantErr != gotErr {
-				// fmt.Println(got)
-				// fmt.Println(fmt.Sprintf("%#+v", got))
 				t.Errorf("Handler.validateExternalAccountBinding() error = %v, want %v", err, tc.err)
 			}
 			if wantErr {
@@ -1311,20 +1316,19 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 				assert.Equals(t, ae.Detail, tc.err.Detail)
 				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
-
-				// fmt.Println(fmt.Sprintf("%#+v", ae))
-				// fmt.Println(fmt.Sprintf("%#+v", tc.err))
-
-				//t.Fail()
 			} else {
 				if got == nil {
 					assert.Nil(t, tc.eak)
 				} else {
-					// TODO: equality check on certain fields?
 					assert.NotNil(t, tc.eak)
+					assert.Equals(t, got.ID, tc.eak.ID)
+					assert.Equals(t, got.KeyBytes, tc.eak.KeyBytes)
+					assert.Equals(t, got.Provisioner, tc.eak.Provisioner)
+					assert.Equals(t, got.Reference, tc.eak.Reference)
+					assert.Equals(t, got.CreatedAt, tc.eak.CreatedAt)
+					assert.Equals(t, got.AccountID, tc.eak.AccountID)
+					assert.Equals(t, got.BoundAt, tc.eak.BoundAt)
 				}
-				//assert.Equals(t, tc.eak, got)
-				//assert.NotNil(t, got)
 			}
 		})
 	}

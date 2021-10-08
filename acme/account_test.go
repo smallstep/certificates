@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"encoding/base64"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
@@ -76,6 +77,70 @@ func TestAccount_IsValid(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			assert.Equals(t, tc.acc.IsValid(), tc.exp)
+		})
+	}
+}
+
+func TestExternalAccountKey_BindTo(t *testing.T) {
+	boundAt := time.Now()
+	tests := []struct {
+		name string
+		eak  *ExternalAccountKey
+		acct *Account
+		err  *Error
+	}{
+		{
+			name: "ok",
+			eak: &ExternalAccountKey{
+				ID:          "eakID",
+				Provisioner: "prov",
+				Reference:   "ref",
+				KeyBytes:    []byte{1, 3, 3, 7},
+			},
+			acct: &Account{
+				ID: "accountID",
+			},
+			err: nil,
+		},
+		{
+			name: "fail/already-bound",
+			eak: &ExternalAccountKey{
+				ID:          "eakID",
+				Provisioner: "prov",
+				Reference:   "ref",
+				KeyBytes:    []byte{1, 3, 3, 7},
+				AccountID:   "someAccountID",
+				BoundAt:     boundAt,
+			},
+			acct: &Account{
+				ID: "accountID",
+			},
+			err: NewError(ErrorUnauthorizedType, "external account binding key with id '%s' was already bound to account '%s' on %s", "eakID", "someAccountID", boundAt),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			eak := tt.eak
+			acct := tt.acct
+			err := eak.BindTo(acct)
+			wantErr := tt.err != nil
+			gotErr := err != nil
+			if wantErr != gotErr {
+				t.Errorf("ExternalAccountKey.BindTo() error = %v, wantErr %v", err, tt.err)
+			}
+			if wantErr {
+				assert.NotNil(t, err)
+				assert.Type(t, &Error{}, err)
+				ae, _ := err.(*Error)
+				assert.Equals(t, ae.Type, tt.err.Type)
+				assert.Equals(t, ae.Detail, tt.err.Detail)
+				assert.Equals(t, ae.Identifier, tt.err.Identifier)
+				assert.Equals(t, ae.Subproblems, tt.err.Subproblems)
+			} else {
+				assert.Equals(t, eak.AccountID, acct.ID)
+				assert.Equals(t, eak.KeyBytes, []byte{})
+				assert.NotNil(t, eak.BoundAt)
+			}
 		})
 	}
 }
