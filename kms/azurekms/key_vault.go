@@ -268,3 +268,9 @@ func (k *KeyVault) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, 
 func (k *KeyVault) Close() error {
 	return nil
 }
+
+// ValidateName validates that the given string is a valid URI.
+func (k *KeyVault) ValidateName(s string) error {
+	_, _, _, _, err := parseKeyName(s)
+	return err
+}

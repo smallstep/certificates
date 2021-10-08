@@ -29,6 +29,12 @@ type CertificateManager interface {
 	StoreCertificate(req *StoreCertificateRequest) error
 }
 
+// ValidateName is an interface that KeyManager can implement to validate a
+// given name or URI.
+type NameValidator interface {
+	ValidateName(s string) error
+}
+
 // ErrNotImplemented is the type of error returned if an operation is not
 // implemented.
 type ErrNotImplemented struct {

@@ -65,6 +65,7 @@ func Test_parseKeyName(t *testing.T) {
 		{"fail empty name", args{"azurekms:name=;vault=my-vault"}, "", "", "", false, true},
 		{"fail no vault", args{"azurekms:name=my-key"}, "", "", "", false, true},
 		{"fail empty vault", args{"azurekms:name=my-key;vault="}, "", "", "", false, true},
+		{"fail empty", args{""}, "", "", "", false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

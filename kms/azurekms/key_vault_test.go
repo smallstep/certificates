@@ -552,3 +552,30 @@ func Test_keyType_KeyType(t *testing.T) {
 		})
 	}
 }
+
+func TestKeyVault_ValidateName(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"ok", args{"azurekms:name=my-key;vault=my-vault"}, false},
+		{"ok hsm", args{"azurekms:name=my-key;vault=my-vault?hsm=true"}, false},
+		{"fail scheme", args{"azure:name=my-key;vault=my-vault"}, true},
+		{"fail parse uri", args{"azurekms:name=%ZZ;vault=my-vault"}, true},
+		{"fail no name", args{"azurekms:vault=my-vault"}, true},
+		{"fail no vault", args{"azurekms:name=my-key"}, true},
+		{"fail empty", args{""}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			k := &KeyVault{}
+			if err := k.ValidateName(tt.args.s); (err != nil) != tt.wantErr {
+				t.Errorf("KeyVault.ValidateName() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
