@@ -89,18 +89,18 @@ type Options struct {
 	Type string `json:"type"`
 
 	// Path to the credentials file used in CloudKMS and AmazonKMS.
-	CredentialsFile string `json:"credentialsFile"`
+	CredentialsFile string `json:"credentialsFile,omitempty"`
 
 	// URI is based on the PKCS #11 URI Scheme defined in
 	// https://tools.ietf.org/html/rfc7512 and represents the configuration used
 	// to connect to the KMS.
 	//
 	// Used by: pkcs11
-	URI string `json:"uri"`
+	URI string `json:"uri,omitempty"`
 
 	// Pin used to access the PKCS11 module. It can be defined in the URI using
 	// the pin-value or pin-source properties.
-	Pin string `json:"pin"`
+	Pin string `json:"pin,omitempty"`
 
 	// ManagementKey used in YubiKeys. Default management key is the hexadecimal
 	// string 010203040506070801020304050607080102030405060708:
@@ -109,13 +109,13 @@ type Options struct {
 	//       0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
 	//       0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
 	//   }
-	ManagementKey string `json:"managementKey"`
+	ManagementKey string `json:"managementKey,omitempty"`
 
 	// Region to use in AmazonKMS.
-	Region string `json:"region"`
+	Region string `json:"region,omitempty"`
 
 	// Profile to use in AmazonKMS.
-	Profile string `json:"profile"`
+	Profile string `json:"profile,omitempty"`
 }
 
 // Validate checks the fields in Options.
