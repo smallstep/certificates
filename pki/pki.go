@@ -341,7 +341,7 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	}
 
 	// Use default key manager
-	if p.keyManager != nil {
+	if p.keyManager == nil {
 		p.keyManager = kms.Default
 	}
 
@@ -634,7 +634,7 @@ func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 
 	// Create SSH key used to sign host certificates. Using
 	// kmsapi.UnspecifiedSignAlgorithm will default to the default algorithm.
-	name := p.Ssh.HostPublicKey
+	name := p.Ssh.HostKey
 	if uri := p.options.hostKeyURI; uri != "" {
 		name = uri
 	}
@@ -649,7 +649,7 @@ func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 	if err != nil {
 		return errors.Wrapf(err, "error converting public key")
 	}
-	p.Files[resp.Name] = ssh.MarshalAuthorizedKey(sshKey)
+	p.Files[p.Ssh.HostPublicKey] = ssh.MarshalAuthorizedKey(sshKey)
 
 	// On softkms we will have the private key
 	if resp.PrivateKey != nil {
@@ -657,11 +657,13 @@ func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 		if err != nil {
 			return err
 		}
+	} else {
+		p.Ssh.HostKey = resp.Name
 	}
 
 	// Create SSH key used to sign user certificates. Using
 	// kmsapi.UnspecifiedSignAlgorithm will default to the default algorithm.
-	name = p.Ssh.UserPublicKey
+	name = p.Ssh.UserKey
 	if uri := p.options.userKeyURI; uri != "" {
 		name = uri
 	}
@@ -676,7 +678,7 @@ func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 	if err != nil {
 		return errors.Wrapf(err, "error converting public key")
 	}
-	p.Files[resp.Name] = ssh.MarshalAuthorizedKey(sshKey)
+	p.Files[p.Ssh.UserPublicKey] = ssh.MarshalAuthorizedKey(sshKey)
 
 	// On softkms we will have the private key
 	if resp.PrivateKey != nil {
@@ -684,6 +686,8 @@ func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 		if err != nil {
 			return err
 		}
+	} else {
+		p.Ssh.UserKey = resp.Name
 	}
 
 	return nil
