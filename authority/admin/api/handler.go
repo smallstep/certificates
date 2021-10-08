@@ -29,6 +29,10 @@ func (h *Handler) Route(r api.Router) {
 		return h.extractAuthorizeTokenAdmin(h.requireAPIEnabled(next))
 	}
 
+	requireEABEnabled := func(next nextHTTP) nextHTTP {
+		return h.requireEABEnabled(next)
+	}
+
 	// Provisioners
 	r.MethodFunc("GET", "/provisioners/{name}", authnz(h.GetProvisioner))
 	r.MethodFunc("GET", "/provisioners", authnz(h.GetProvisioners))
@@ -44,8 +48,8 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("DELETE", "/admins/{id}", authnz(h.DeleteAdmin))
 
 	// ACME External Account Binding Keys
-	r.MethodFunc("GET", "/acme/eab/{prov}/{ref}", authnz(h.GetExternalAccountKeys))
-	r.MethodFunc("GET", "/acme/eab/{prov}", authnz(h.GetExternalAccountKeys))
-	r.MethodFunc("POST", "/acme/eab", authnz(h.CreateExternalAccountKey))
-	r.MethodFunc("DELETE", "/acme/eab/{prov}/{id}", authnz(h.DeleteExternalAccountKey))
+	r.MethodFunc("GET", "/acme/eab/{prov}/{ref}", authnz(requireEABEnabled(h.GetExternalAccountKeys)))
+	r.MethodFunc("GET", "/acme/eab/{prov}", authnz(requireEABEnabled(h.GetExternalAccountKeys)))
+	r.MethodFunc("POST", "/acme/eab/{prov}", authnz(requireEABEnabled(h.CreateExternalAccountKey)))
+	r.MethodFunc("DELETE", "/acme/eab/{prov}/{id}", authnz(requireEABEnabled(h.DeleteExternalAccountKey)))
 }

@@ -602,13 +602,13 @@ retry:
 }
 
 // CreateExternalAccountKey performs the POST /admin/acme/eab request to the CA.
-func (c *AdminClient) CreateExternalAccountKey(eakRequest *adminAPI.CreateExternalAccountKeyRequest) (*linkedca.EABKey, error) {
+func (c *AdminClient) CreateExternalAccountKey(provisionerName string, eakRequest *adminAPI.CreateExternalAccountKeyRequest) (*linkedca.EABKey, error) {
 	var retried bool
 	body, err := json.Marshal(eakRequest)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab")})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab/", provisionerName)})
 	tok, err := c.generateAdminToken(u.Path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")

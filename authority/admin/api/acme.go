@@ -15,15 +15,11 @@ import (
 
 // CreateExternalAccountKeyRequest is the type for POST /admin/acme/eab requests
 type CreateExternalAccountKeyRequest struct {
-	Provisioner string `json:"provisioner"`
-	Reference   string `json:"reference"`
+	Reference string `json:"reference"`
 }
 
 // Validate validates a new ACME EAB Key request body.
 func (r *CreateExternalAccountKeyRequest) Validate() error {
-	if r.Provisioner == "" {
-		return admin.NewError(admin.ErrorBadRequestType, "provisioner name cannot be empty")
-	}
 	return nil
 }
 
@@ -33,11 +29,26 @@ type GetExternalAccountKeysResponse struct {
 	NextCursor string             `json:"nextCursor"`
 }
 
+// requireEABEnabled is a middleware that ensures ACME EAB is enabled
+// before serving requests that act on ACME EAB credentials.
+func (h *Handler) requireEABEnabled(next nextHTTP) nextHTTP {
+	return func(w http.ResponseWriter, r *http.Request) {
+		provisioner := chi.URLParam(r, "prov")
+		eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), provisioner)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+		if !eabEnabled {
+			api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", provisioner))
+			return
+		}
+		next(w, r)
+	}
+}
+
 // provisionerHasEABEnabled determines if the "requireEAB" setting for an ACME
 // provisioner is set to true and thus has EAB enabled.
-// TODO: rewrite this into a middleware for the ACME handlers? This probably requires
-// ensuring that all the ACME EAB APIs that need the middleware work the same in terms
-// of specifying the provisioner; probably a bit of refactoring required.
 func (h *Handler) provisionerHasEABEnabled(ctx context.Context, provisionerName string) (bool, error) {
 	var (
 		p   provisioner.Interface
@@ -78,22 +89,12 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	provisioner := body.Provisioner
+	provisioner := chi.URLParam(r, "prov")
 	reference := body.Reference
-
-	eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), provisioner)
-	if err != nil {
-		api.WriteError(w, err)
-		return
-	}
-
-	if !eabEnabled {
-		api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", provisioner))
-		return
-	}
 
 	if reference != "" {
 		k, err := h.acmeDB.GetExternalAccountKeyByReference(r.Context(), provisioner, reference)
+		// retrieving an EAB key from DB results in error if it doesn't exist, which is what we're looking for
 		if err == nil || k != nil {
 			err := admin.NewError(admin.ErrorBadRequestType, "an ACME EAB key for provisioner %s with reference %s already exists", provisioner, reference)
 			err.Status = 409
@@ -123,17 +124,6 @@ func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Reques
 	provisioner := chi.URLParam(r, "prov")
 	keyID := chi.URLParam(r, "id")
 
-	eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), provisioner)
-	if err != nil {
-		api.WriteError(w, err)
-		return
-	}
-
-	if !eabEnabled {
-		api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", provisioner))
-		return
-	}
-
 	if err := h.acmeDB.DeleteExternalAccountKey(r.Context(), provisioner, keyID); err != nil {
 		api.WriteError(w, admin.WrapErrorISE(err, "error deleting ACME EAB Key %s", keyID))
 		return
@@ -147,17 +137,6 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 	prov := chi.URLParam(r, "prov")
 	reference := chi.URLParam(r, "ref")
 
-	eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), prov)
-	if err != nil {
-		api.WriteError(w, err)
-		return
-	}
-
-	if !eabEnabled {
-		api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", prov))
-		return
-	}
-
 	// TODO: support paging properly? It'll probably leak to the DB layer, as we have to loop through all keys
 	// cursor, limit, err := api.ParseCursor(r)
 	// if err != nil {
@@ -169,6 +148,7 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 	var (
 		key  *acme.ExternalAccountKey
 		keys []*acme.ExternalAccountKey
+		err  error
 	)
 	if reference != "" {
 		key, err = h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference)
