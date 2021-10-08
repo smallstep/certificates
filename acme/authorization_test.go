@@ -51,7 +51,7 @@ func TestAuthorization_UpdateStatus(t *testing.T) {
 			}
 			return test{
 				az: az,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateAuthorization: func(ctx context.Context, updaz *Authorization) error {
 						assert.Equals(t, updaz.ID, az.ID)
 						assert.Equals(t, updaz.AccountID, az.AccountID)
@@ -72,7 +72,7 @@ func TestAuthorization_UpdateStatus(t *testing.T) {
 			}
 			return test{
 				az: az,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateAuthorization: func(ctx context.Context, updaz *Authorization) error {
 						assert.Equals(t, updaz.ID, az.ID)
 						assert.Equals(t, updaz.AccountID, az.AccountID)
@@ -112,7 +112,7 @@ func TestAuthorization_UpdateStatus(t *testing.T) {
 			}
 			return test{
 				az: az,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateAuthorization: func(ctx context.Context, updaz *Authorization) error {
 						assert.Equals(t, updaz.ID, az.ID)
 						assert.Equals(t, updaz.AccountID, az.AccountID)

@@ -47,7 +47,7 @@ func Test_storeError(t *testing.T) {
 			}
 			return test{
 				ch: ch,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -74,7 +74,7 @@ func Test_storeError(t *testing.T) {
 			}
 			return test{
 				ch: ch,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -101,7 +101,7 @@ func Test_storeError(t *testing.T) {
 			}
 			return test{
 				ch: ch,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -127,7 +127,7 @@ func Test_storeError(t *testing.T) {
 			}
 			return test{
 				ch: ch,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -278,7 +278,7 @@ func TestChallenge_Validate(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -314,7 +314,7 @@ func TestChallenge_Validate(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -349,7 +349,7 @@ func TestChallenge_Validate(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -386,7 +386,7 @@ func TestChallenge_Validate(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -421,7 +421,7 @@ func TestChallenge_Validate(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -469,7 +469,7 @@ func TestChallenge_Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -546,7 +546,7 @@ func TestHTTP01Validate(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -580,7 +580,7 @@ func TestHTTP01Validate(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -616,7 +616,7 @@ func TestHTTP01Validate(t *testing.T) {
 						}, nil
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -653,7 +653,7 @@ func TestHTTP01Validate(t *testing.T) {
 						}, nil
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -738,7 +738,7 @@ func TestHTTP01Validate(t *testing.T) {
 					},
 				},
 				jwk: jwk,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -780,7 +780,7 @@ func TestHTTP01Validate(t *testing.T) {
 					},
 				},
 				jwk: jwk,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -823,7 +823,7 @@ func TestHTTP01Validate(t *testing.T) {
 					},
 				},
 				jwk: jwk,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -865,7 +865,7 @@ func TestHTTP01Validate(t *testing.T) {
 					},
 				},
 				jwk: jwk,
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -933,7 +933,7 @@ func TestDNS01Validate(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -968,7 +968,7 @@ func TestDNS01Validate(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1031,7 +1031,7 @@ func TestDNS01Validate(t *testing.T) {
 						return []string{"foo", "bar"}, nil
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1073,7 +1073,7 @@ func TestDNS01Validate(t *testing.T) {
 						return []string{"foo", "bar"}, nil
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1116,7 +1116,7 @@ func TestDNS01Validate(t *testing.T) {
 						return []string{"foo", expected}, nil
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1161,7 +1161,7 @@ func TestDNS01Validate(t *testing.T) {
 						return []string{"foo", expected}, nil
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1326,7 +1326,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1356,7 +1356,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						return nil, errors.New("force")
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1387,7 +1387,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1418,7 +1418,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						return tls.Client(&noopConn{}, config), nil
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1448,7 +1448,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						return tls.Client(&noopConn{}, config), nil
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1484,7 +1484,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						return tls.DialWithDialer(&net.Dialer{Timeout: time.Second}, "tcp", srv.Listener.Addr().String(), config)
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1521,7 +1521,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						return tls.DialWithDialer(&net.Dialer{Timeout: time.Second}, "tcp", srv.Listener.Addr().String(), config)
 					},
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1565,7 +1565,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1608,7 +1608,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1652,7 +1652,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1695,7 +1695,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1761,7 +1761,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1800,7 +1800,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1844,7 +1844,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1887,7 +1887,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1927,7 +1927,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -1966,7 +1966,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -2011,7 +2011,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -2057,7 +2057,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -2103,7 +2103,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -2147,7 +2147,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -2192,7 +2192,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)
@@ -2229,7 +2229,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					TLSDial: tlsDial,
 				},
-				db: &MockDB{
+				db: &MockNOSQLDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equals(t, updch.ID, ch.ID)
 						assert.Equals(t, updch.Token, ch.Token)

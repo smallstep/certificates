@@ -315,7 +315,7 @@ func TestHandler_GetOrder(t *testing.T) {
 			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockError: acme.NewErrorISE("force"),
 				},
 				ctx:        ctx,
@@ -329,7 +329,7 @@ func TestHandler_GetOrder(t *testing.T) {
 			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						return &acme.Order{AccountID: "foo"}, nil
 					},
@@ -345,7 +345,7 @@ func TestHandler_GetOrder(t *testing.T) {
 			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						return &acme.Order{AccountID: "accountID", ProvisionerID: "bar"}, nil
 					},
@@ -361,7 +361,7 @@ func TestHandler_GetOrder(t *testing.T) {
 			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						return &acme.Order{
 							AccountID:     "accountID",
@@ -386,7 +386,7 @@ func TestHandler_GetOrder(t *testing.T) {
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						return &acme.Order{
 							ID:               "orderID",
@@ -471,7 +471,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 				},
 			}
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						assert.Equals(t, ch.AccountID, az.AccountID)
 						assert.Equals(t, ch.Type, acme.DNS01)
@@ -498,7 +498,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 			count := 0
 			var ch1, ch2, ch3 **acme.Challenge
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
 						case 0:
@@ -552,7 +552,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 			count := 0
 			var ch1, ch2, ch3 **acme.Challenge
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
 						case 0:
@@ -604,7 +604,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 			}
 			var ch1 **acme.Challenge
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						ch.ID = "dns"
 						assert.Equals(t, ch.Type, acme.DNS01)
@@ -771,7 +771,7 @@ func TestHandler_NewOrder(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				statusCode: 500,
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						assert.Equals(t, ch.AccountID, "accID")
 						assert.Equals(t, ch.Type, acme.DNS01)
@@ -804,7 +804,7 @@ func TestHandler_NewOrder(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				statusCode: 500,
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
 						case 0:
@@ -876,7 +876,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch chCount {
 						case 0:
@@ -991,7 +991,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
 						case 0:
@@ -1083,7 +1083,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
 						case 0:
@@ -1174,7 +1174,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
 						case 0:
@@ -1266,7 +1266,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
 						case 0:
@@ -1516,7 +1516,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockError: acme.NewErrorISE("force"),
 				},
 				ctx:        ctx,
@@ -1531,7 +1531,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						return &acme.Order{AccountID: "foo"}, nil
 					},
@@ -1548,7 +1548,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						return &acme.Order{AccountID: "accountID", ProvisionerID: "bar"}, nil
 					},
@@ -1565,7 +1565,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						return &acme.Order{
 							AccountID:     "accountID",
@@ -1591,7 +1591,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						return &acme.Order{
 							ID:               "orderID",

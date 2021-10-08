@@ -182,7 +182,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		Leaf:          certChain[0],
 		Intermediates: certChain[1:],
 	}
-	if err := db.CreateCertificate(ctx, cert); err != nil {
+	if err := db.CreateCertificate(ctx, cert, p.GetName()); err != nil {
 		return WrapErrorISE(err, "error creating certificate for order %s", o.ID)
 	}
 

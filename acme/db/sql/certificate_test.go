@@ -1,4 +1,4 @@
-package nosql
+package sql
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/nosql"
+	"github.com/smallstep/certificates/db/sql/sqldatabase"
 	nosqldb "github.com/smallstep/nosql/database"
 
 	"go.step.sm/crypto/pemutil"
@@ -26,7 +26,7 @@ func TestDB_CreateCertificate(t *testing.T) {
 	root, err := pemutil.ReadCertificate("../../../authority/testdata/certs/root_ca.crt")
 	assert.FatalError(t, err)
 	type test struct {
-		db   nosql.DB
+		db   sqldatabase.SQLDB
 		cert *acme.Certificate
 		err  error
 		_id  *string
@@ -40,7 +40,7 @@ func TestDB_CreateCertificate(t *testing.T) {
 				Intermediates: []*x509.Certificate{inter, root},
 			}
 			return test{
-				db: &db.MockNoSQLDB{
+				db: &db.MockSQLDB{
 					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
 						assert.Equals(t, bucket, certTable)
 						assert.Equals(t, key, []byte(cert.ID))
@@ -73,7 +73,7 @@ func TestDB_CreateCertificate(t *testing.T) {
 			)
 
 			return test{
-				db: &db.MockNoSQLDB{
+				db: &db.MockSQLDB{
 					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
 						*idPtr = string(key)
 						assert.Equals(t, bucket, certTable)
@@ -122,14 +122,14 @@ func TestDB_GetCertificate(t *testing.T) {
 
 	certID := "certID"
 	type test struct {
-		db      nosql.DB
+		db      sqldatabase.SQLDB
 		err     error
 		acmeErr *acme.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/not-found": func(t *testing.T) test {
 			return test{
-				db: &db.MockNoSQLDB{
+				db: &db.MockSQLDB{
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						assert.Equals(t, bucket, certTable)
 						assert.Equals(t, string(key), certID)
@@ -142,7 +142,7 @@ func TestDB_GetCertificate(t *testing.T) {
 		},
 		"fail/db.Get-error": func(t *testing.T) test {
 			return test{
-				db: &db.MockNoSQLDB{
+				db: &db.MockSQLDB{
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						assert.Equals(t, bucket, certTable)
 						assert.Equals(t, string(key), certID)
@@ -155,7 +155,7 @@ func TestDB_GetCertificate(t *testing.T) {
 		},
 		"fail/unmarshal-error": func(t *testing.T) test {
 			return test{
-				db: &db.MockNoSQLDB{
+				db: &db.MockSQLDB{
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						assert.Equals(t, bucket, certTable)
 						assert.Equals(t, string(key), certID)
@@ -168,7 +168,7 @@ func TestDB_GetCertificate(t *testing.T) {
 		},
 		"fail/parseBundle-error": func(t *testing.T) test {
 			return test{
-				db: &db.MockNoSQLDB{
+				db: &db.MockSQLDB{
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						assert.Equals(t, bucket, certTable)
 						assert.Equals(t, string(key), certID)
@@ -194,7 +194,7 @@ func TestDB_GetCertificate(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			return test{
-				db: &db.MockNoSQLDB{
+				db: &db.MockSQLDB{
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						assert.Equals(t, bucket, certTable)
 						assert.Equals(t, string(key), certID)

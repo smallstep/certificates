@@ -15,11 +15,13 @@ import (
 	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
 	acmeNoSQL "github.com/smallstep/certificates/acme/db/nosql"
+	acmeSQL "github.com/smallstep/certificates/acme/db/sql"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/db/sql/sql"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/scep"
@@ -182,7 +184,13 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	if config.DB == nil {
 		acmeDB = nil
 	} else {
-		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
+		if config.DB.EnableSQL {
+			acmeDB, err = acmeSQL.New(auth.GetDatabase().(sql.DB))
+
+		} else {
+			acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
+
+		}
 		if err != nil {
 			return nil, errors.Wrap(err, "error configuring ACME DB interface")
 		}

@@ -160,7 +160,7 @@ func TestHandler_GetAuthorization(t *testing.T) {
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-account": func(t *testing.T) test {
 			return test{
-				db:         &acme.MockDB{},
+				db:         &acme.MockNOSQLDB{},
 				ctx:        context.Background(),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
@@ -170,7 +170,7 @@ func TestHandler_GetAuthorization(t *testing.T) {
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, accContextKey, nil)
 			return test{
-				db:         &acme.MockDB{},
+				db:         &acme.MockNOSQLDB{},
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
@@ -181,7 +181,7 @@ func TestHandler_GetAuthorization(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockError: acme.NewErrorISE("force"),
 				},
 				ctx:        ctx,
@@ -194,7 +194,7 @@ func TestHandler_GetAuthorization(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetAuthorization: func(ctx context.Context, id string) (*acme.Authorization, error) {
 						assert.Equals(t, id, az.ID)
 						return &acme.Authorization{
@@ -212,7 +212,7 @@ func TestHandler_GetAuthorization(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetAuthorization: func(ctx context.Context, id string) (*acme.Authorization, error) {
 						assert.Equals(t, id, az.ID)
 						return &acme.Authorization{
@@ -238,7 +238,7 @@ func TestHandler_GetAuthorization(t *testing.T) {
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetAuthorization: func(ctx context.Context, id string) (*acme.Authorization, error) {
 						assert.Equals(t, id, az.ID)
 						return &az, nil
@@ -326,7 +326,7 @@ func TestHandler_GetCertificate(t *testing.T) {
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-account": func(t *testing.T) test {
 			return test{
-				db:         &acme.MockDB{},
+				db:         &acme.MockNOSQLDB{},
 				ctx:        context.Background(),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
@@ -335,7 +335,7 @@ func TestHandler_GetCertificate(t *testing.T) {
 		"fail/nil-account": func(t *testing.T) test {
 			ctx := context.WithValue(context.Background(), accContextKey, nil)
 			return test{
-				db:         &acme.MockDB{},
+				db:         &acme.MockNOSQLDB{},
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
@@ -346,7 +346,7 @@ func TestHandler_GetCertificate(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockError: acme.NewErrorISE("force"),
 				},
 				ctx:        ctx,
@@ -359,7 +359,7 @@ func TestHandler_GetCertificate(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetCertificate: func(ctx context.Context, id string) (*acme.Certificate, error) {
 						assert.Equals(t, id, certID)
 						return &acme.Certificate{AccountID: "foo"}, nil
@@ -375,7 +375,7 @@ func TestHandler_GetCertificate(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, acc)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetCertificate: func(ctx context.Context, id string) (*acme.Certificate, error) {
 						assert.Equals(t, id, certID)
 						return &acme.Certificate{
@@ -487,7 +487,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{isEmptyJSON: true})
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetChallenge: func(ctx context.Context, chID, azID string) (*acme.Challenge, error) {
 						assert.Equals(t, chID, "chID")
 						assert.Equals(t, azID, "authzID")
@@ -506,7 +506,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{isEmptyJSON: true})
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetChallenge: func(ctx context.Context, chID, azID string) (*acme.Challenge, error) {
 						assert.Equals(t, chID, "chID")
 						assert.Equals(t, azID, "authzID")
@@ -525,7 +525,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{isEmptyJSON: true})
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetChallenge: func(ctx context.Context, chID, azID string) (*acme.Challenge, error) {
 						assert.Equals(t, chID, "chID")
 						assert.Equals(t, azID, "authzID")
@@ -545,7 +545,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 			ctx = context.WithValue(ctx, jwkContextKey, nil)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetChallenge: func(ctx context.Context, chID, azID string) (*acme.Challenge, error) {
 						assert.Equals(t, chID, "chID")
 						assert.Equals(t, azID, "authzID")
@@ -568,7 +568,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 			ctx = context.WithValue(ctx, jwkContextKey, &_pub)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetChallenge: func(ctx context.Context, chID, azID string) (*acme.Challenge, error) {
 						assert.Equals(t, chID, "chID")
 						assert.Equals(t, azID, "authzID")
@@ -609,7 +609,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			return test{
-				db: &acme.MockDB{
+				db: &acme.MockNOSQLDB{
 					MockGetChallenge: func(ctx context.Context, chID, azID string) (*acme.Challenge, error) {
 						assert.Equals(t, chID, "chID")
 						assert.Equals(t, azID, "authzID")
