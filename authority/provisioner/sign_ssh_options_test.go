@@ -44,7 +44,7 @@ func TestSSHOptions_Modify(t *testing.T) {
 		valid func(*ssh.Certificate)
 		err   error
 	}
-	tests := map[string](func() test){
+	tests := map[string]func() test{
 		"fail/unexpected-cert-type": func() test {
 			return test{
 				so:   SignSSHOptions{CertType: "foo"},
@@ -117,7 +117,7 @@ func TestSSHOptions_Match(t *testing.T) {
 		cmp SignSSHOptions
 		err error
 	}
-	tests := map[string](func() test){
+	tests := map[string]func() test{
 		"fail/cert-type": func() test {
 			return test{
 				so:  SignSSHOptions{CertType: "foo"},
@@ -208,7 +208,7 @@ func Test_sshCertPrincipalsModifier_Modify(t *testing.T) {
 		cert     *ssh.Certificate
 		expected []string
 	}
-	tests := map[string](func() test){
+	tests := map[string]func() test{
 		"ok": func() test {
 			a := []string{"foo", "bar"}
 			return test{
@@ -234,7 +234,7 @@ func Test_sshCertKeyIDModifier_Modify(t *testing.T) {
 		cert     *ssh.Certificate
 		expected string
 	}
-	tests := map[string](func() test){
+	tests := map[string]func() test{
 		"ok": func() test {
 			a := "foo"
 			return test{
@@ -260,7 +260,7 @@ func Test_sshCertTypeModifier_Modify(t *testing.T) {
 		cert     *ssh.Certificate
 		expected uint32
 	}
-	tests := map[string](func() test){
+	tests := map[string]func() test{
 		"ok/user": func() test {
 			return test{
 				modifier: sshCertTypeModifier("user"),
@@ -299,7 +299,7 @@ func Test_sshCertValidAfterModifier_Modify(t *testing.T) {
 		cert     *ssh.Certificate
 		expected uint64
 	}
-	tests := map[string](func() test){
+	tests := map[string]func() test{
 		"ok": func() test {
 			return test{
 				modifier: sshCertValidAfterModifier(15),
@@ -324,7 +324,7 @@ func Test_sshCertDefaultsModifier_Modify(t *testing.T) {
 		cert     *ssh.Certificate
 		valid    func(*ssh.Certificate)
 	}
-	tests := map[string](func() test){
+	tests := map[string]func() test{
 		"ok/changes": func() test {
 			n := time.Now()
 			va := NewTimeDuration(n.Add(1 * time.Minute))
@@ -388,7 +388,7 @@ func Test_sshDefaultExtensionModifier_Modify(t *testing.T) {
 		valid    func(*ssh.Certificate)
 		err      error
 	}
-	tests := map[string](func() test){
+	tests := map[string]func() test{
 		"fail/unexpected-cert-type": func() test {
 			cert := &ssh.Certificate{CertType: 3}
 			return test{

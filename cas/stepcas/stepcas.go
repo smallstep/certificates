@@ -90,9 +90,9 @@ func (s *StepCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.R
 	return nil, apiv1.ErrNotImplemented{Message: "stepCAS does not support mTLS renewals"}
 }
 
+// RevokeCertificate revokes a certificate.
 func (s *StepCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {
-	switch {
-	case req.SerialNumber == "" && req.Certificate == nil:
+	if req.SerialNumber == "" && req.Certificate == nil {
 		return nil, errors.New("revokeCertificateRequest `serialNumber` or `certificate` are required")
 	}
 

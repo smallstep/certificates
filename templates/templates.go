@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
@@ -226,14 +227,11 @@ func (t *Template) Output(data interface{}) (Output, error) {
 
 // backfill updates old templates with the required data.
 func (t *Template) backfill(b []byte) {
-	switch t.Name {
-	case "sshd_config.tpl":
-		if len(t.RequiredData) == 0 {
-			a := bytes.TrimSpace(b)
-			b := bytes.TrimSpace([]byte(DefaultSSHTemplateData[t.Name]))
-			if bytes.Equal(a, b) {
-				t.RequiredData = []string{"Certificate", "Key"}
-			}
+	if strings.EqualFold(t.Name, "sshd_config.tpl") && len(t.RequiredData) == 0 {
+		a := bytes.TrimSpace(b)
+		b := bytes.TrimSpace([]byte(DefaultSSHTemplateData[t.Name]))
+		if bytes.Equal(a, b) {
+			t.RequiredData = []string{"Certificate", "Key"}
 		}
 	}
 }

@@ -98,8 +98,8 @@ func TestDB_CreateCertificate(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if err := db.CreateCertificate(context.Background(), tc.cert); err != nil {
+			d := DB{db: tc.db}
+			if err := d.CreateCertificate(context.Background(), tc.cert); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -228,8 +228,8 @@ func TestDB_GetCertificate(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			cert, err := db.GetCertificate(context.Background(), certID)
+			d := DB{db: tc.db}
+			cert, err := d.GetCertificate(context.Background(), certID)
 			if err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
@@ -245,14 +245,12 @@ func TestDB_GetCertificate(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, cert.ID, certID)
-					assert.Equals(t, cert.AccountID, "accountID")
-					assert.Equals(t, cert.OrderID, "orderID")
-					assert.Equals(t, cert.Leaf, leaf)
-					assert.Equals(t, cert.Intermediates, []*x509.Certificate{inter, root})
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, cert.ID, certID)
+				assert.Equals(t, cert.AccountID, "accountID")
+				assert.Equals(t, cert.OrderID, "orderID")
+				assert.Equals(t, cert.Leaf, leaf)
+				assert.Equals(t, cert.Intermediates, []*x509.Certificate{inter, root})
 			}
 		})
 	}

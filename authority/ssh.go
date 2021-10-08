@@ -108,7 +108,7 @@ func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[strin
 
 // GetSSHBastion returns the bastion configuration, for the given pair user,
 // hostname.
-func (a *Authority) GetSSHBastion(ctx context.Context, user string, hostname string) (*config.Bastion, error) {
+func (a *Authority) GetSSHBastion(ctx context.Context, user, hostname string) (*config.Bastion, error) {
 	if a.sshBastionFunc != nil {
 		bs, err := a.sshBastionFunc(ctx, user, hostname)
 		return bs, errs.Wrap(http.StatusInternalServerError, err, "authority.GetSSHBastion")
@@ -477,7 +477,7 @@ func (a *Authority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, subje
 }
 
 // CheckSSHHost checks the given principal has been registered before.
-func (a *Authority) CheckSSHHost(ctx context.Context, principal string, token string) (bool, error) {
+func (a *Authority) CheckSSHHost(ctx context.Context, principal, token string) (bool, error) {
 	if a.sshCheckHostFunc != nil {
 		exists, err := a.sshCheckHostFunc(ctx, principal, token, a.GetRootCertificates())
 		if err != nil {
@@ -531,5 +531,5 @@ func (a *Authority) getAddUserCommand(principal string) string {
 	} else {
 		cmd = a.config.SSH.AddUserCommand
 	}
-	return strings.Replace(cmd, "<principal>", principal, -1)
+	return strings.ReplaceAll(cmd, "<principal>", principal)
 }

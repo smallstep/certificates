@@ -13,7 +13,6 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/nosql"
 	"github.com/smallstep/nosql/database"
-	nosqldb "github.com/smallstep/nosql/database"
 )
 
 func TestDB_getDBOrder(t *testing.T) {
@@ -32,7 +31,7 @@ func TestDB_getDBOrder(t *testing.T) {
 						assert.Equals(t, bucket, orderTable)
 						assert.Equals(t, string(key), orderID)
 
-						return nil, nosqldb.ErrNotFound
+						return nil, database.ErrNotFound
 					},
 				},
 				acmeErr: acme.NewError(acme.ErrorMalformedType, "order orderID not found"),
@@ -101,8 +100,8 @@ func TestDB_getDBOrder(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if dbo, err := db.getDBOrder(context.Background(), orderID); err != nil {
+			d := DB{db: tc.db}
+			if dbo, err := d.getDBOrder(context.Background(), orderID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -117,20 +116,18 @@ func TestDB_getDBOrder(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, dbo.ID, tc.dbo.ID)
-					assert.Equals(t, dbo.ProvisionerID, tc.dbo.ProvisionerID)
-					assert.Equals(t, dbo.CertificateID, tc.dbo.CertificateID)
-					assert.Equals(t, dbo.Status, tc.dbo.Status)
-					assert.Equals(t, dbo.CreatedAt, tc.dbo.CreatedAt)
-					assert.Equals(t, dbo.ExpiresAt, tc.dbo.ExpiresAt)
-					assert.Equals(t, dbo.NotBefore, tc.dbo.NotBefore)
-					assert.Equals(t, dbo.NotAfter, tc.dbo.NotAfter)
-					assert.Equals(t, dbo.Identifiers, tc.dbo.Identifiers)
-					assert.Equals(t, dbo.AuthorizationIDs, tc.dbo.AuthorizationIDs)
-					assert.Equals(t, dbo.Error.Error(), tc.dbo.Error.Error())
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, dbo.ID, tc.dbo.ID)
+				assert.Equals(t, dbo.ProvisionerID, tc.dbo.ProvisionerID)
+				assert.Equals(t, dbo.CertificateID, tc.dbo.CertificateID)
+				assert.Equals(t, dbo.Status, tc.dbo.Status)
+				assert.Equals(t, dbo.CreatedAt, tc.dbo.CreatedAt)
+				assert.Equals(t, dbo.ExpiresAt, tc.dbo.ExpiresAt)
+				assert.Equals(t, dbo.NotBefore, tc.dbo.NotBefore)
+				assert.Equals(t, dbo.NotAfter, tc.dbo.NotAfter)
+				assert.Equals(t, dbo.Identifiers, tc.dbo.Identifiers)
+				assert.Equals(t, dbo.AuthorizationIDs, tc.dbo.AuthorizationIDs)
+				assert.Equals(t, dbo.Error.Error(), tc.dbo.Error.Error())
 			}
 		})
 	}
@@ -165,7 +162,7 @@ func TestDB_GetOrder(t *testing.T) {
 						assert.Equals(t, bucket, orderTable)
 						assert.Equals(t, string(key), orderID)
 
-						return nil, nosqldb.ErrNotFound
+						return nil, database.ErrNotFound
 					},
 				},
 				acmeErr: acme.NewError(acme.ErrorMalformedType, "order orderID not found"),
@@ -207,8 +204,8 @@ func TestDB_GetOrder(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if o, err := db.GetOrder(context.Background(), orderID); err != nil {
+			d := DB{db: tc.db}
+			if o, err := d.GetOrder(context.Background(), orderID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -223,20 +220,18 @@ func TestDB_GetOrder(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, o.ID, tc.dbo.ID)
-					assert.Equals(t, o.AccountID, tc.dbo.AccountID)
-					assert.Equals(t, o.ProvisionerID, tc.dbo.ProvisionerID)
-					assert.Equals(t, o.CertificateID, tc.dbo.CertificateID)
-					assert.Equals(t, o.Status, tc.dbo.Status)
-					assert.Equals(t, o.ExpiresAt, tc.dbo.ExpiresAt)
-					assert.Equals(t, o.NotBefore, tc.dbo.NotBefore)
-					assert.Equals(t, o.NotAfter, tc.dbo.NotAfter)
-					assert.Equals(t, o.Identifiers, tc.dbo.Identifiers)
-					assert.Equals(t, o.AuthorizationIDs, tc.dbo.AuthorizationIDs)
-					assert.Equals(t, o.Error.Error(), tc.dbo.Error.Error())
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, o.ID, tc.dbo.ID)
+				assert.Equals(t, o.AccountID, tc.dbo.AccountID)
+				assert.Equals(t, o.ProvisionerID, tc.dbo.ProvisionerID)
+				assert.Equals(t, o.CertificateID, tc.dbo.CertificateID)
+				assert.Equals(t, o.Status, tc.dbo.Status)
+				assert.Equals(t, o.ExpiresAt, tc.dbo.ExpiresAt)
+				assert.Equals(t, o.NotBefore, tc.dbo.NotBefore)
+				assert.Equals(t, o.NotAfter, tc.dbo.NotAfter)
+				assert.Equals(t, o.Identifiers, tc.dbo.Identifiers)
+				assert.Equals(t, o.AuthorizationIDs, tc.dbo.AuthorizationIDs)
+				assert.Equals(t, o.Error.Error(), tc.dbo.Error.Error())
 			}
 		})
 	}
@@ -367,8 +362,8 @@ func TestDB_UpdateOrder(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if err := db.UpdateOrder(context.Background(), tc.o); err != nil {
+			d := DB{db: tc.db}
+			if err := d.UpdateOrder(context.Background(), tc.o); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -512,7 +507,7 @@ func TestDB_CreateOrder(t *testing.T) {
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						assert.Equals(t, string(bucket), string(ordersByAccountIDTable))
 						assert.Equals(t, string(key), o.AccountID)
-						return nil, nosqldb.ErrNotFound
+						return nil, database.ErrNotFound
 					},
 					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
 						switch string(bucket) {
@@ -558,8 +553,8 @@ func TestDB_CreateOrder(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if err := db.CreateOrder(context.Background(), tc.o); err != nil {
+			d := DB{db: tc.db}
+			if err := d.CreateOrder(context.Background(), tc.o); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -681,7 +676,7 @@ func TestDB_updateAddOrderIDs(t *testing.T) {
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						assert.Equals(t, bucket, ordersByAccountIDTable)
 						assert.Equals(t, key, []byte(accID))
-						return nil, nosqldb.ErrNotFound
+						return nil, database.ErrNotFound
 					},
 					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
 						assert.Equals(t, bucket, ordersByAccountIDTable)
@@ -996,15 +991,15 @@ func TestDB_updateAddOrderIDs(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
+			d := DB{db: tc.db}
 			var (
 				res []string
 				err error
 			)
 			if tc.addOids == nil {
-				res, err = db.updateAddOrderIDs(context.Background(), accID)
+				res, err = d.updateAddOrderIDs(context.Background(), accID)
 			} else {
-				res, err = db.updateAddOrderIDs(context.Background(), accID, tc.addOids...)
+				res, err = d.updateAddOrderIDs(context.Background(), accID, tc.addOids...)
 			}
 
 			if err != nil {
@@ -1022,10 +1017,8 @@ func TestDB_updateAddOrderIDs(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.True(t, reflect.DeepEqual(res, tc.res))
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.True(t, reflect.DeepEqual(res, tc.res))
 			}
 		})
 	}

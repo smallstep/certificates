@@ -732,7 +732,7 @@ func withSSHPOPFile(cert *ssh.Certificate) tokOption {
 	}
 }
 
-func generateToken(sub, iss, aud string, email string, sans []string, iat time.Time, jwk *jose.JSONWebKey, tokOpts ...tokOption) (string, error) {
+func generateToken(sub, iss, aud, email string, sans []string, iat time.Time, jwk *jose.JSONWebKey, tokOpts ...tokOption) (string, error) {
 	so := new(jose.SignerOptions)
 	so.WithType("JWT")
 	so.WithHeader("kid", jwk.KeyID)
@@ -773,7 +773,7 @@ func generateToken(sub, iss, aud string, email string, sans []string, iat time.T
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }
 
-func generateOIDCToken(sub, iss, aud string, email string, preferredUsername string, iat time.Time, jwk *jose.JSONWebKey, tokOpts ...tokOption) (string, error) {
+func generateOIDCToken(sub, iss, aud, email, preferredUsername string, iat time.Time, jwk *jose.JSONWebKey, tokOpts ...tokOption) (string, error) {
 	so := new(jose.SignerOptions)
 	so.WithType("JWT")
 	so.WithHeader("kid", jwk.KeyID)

@@ -54,7 +54,7 @@ func (a *Authority) authorizeToken(ctx context.Context, token string) (provision
 	// key in order to verify the claims and we need the issuer from the claims
 	// before we can look up the provisioner.
 	var claims Claims
-	if err = tok.UnsafeClaimsWithoutVerification(&claims); err != nil {
+	if err := tok.UnsafeClaimsWithoutVerification(&claims); err != nil {
 		return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.authorizeToken")
 	}
 
@@ -77,7 +77,7 @@ func (a *Authority) authorizeToken(ctx context.Context, token string) (provision
 	// Store the token to protect against reuse unless it's skipped.
 	// If we cannot get a token id from the provisioner, just hash the token.
 	if !SkipTokenReuseFromContext(ctx) {
-		if err = a.UseToken(token, p); err != nil {
+		if err := a.UseToken(token, p); err != nil {
 			return nil, err
 		}
 	}
@@ -112,7 +112,7 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 	//      to the public certificate in the `x5c` header of the token.
 	//   2. Asserts that the claims are valid - have not been tampered with.
 	var claims jose.Claims
-	if err = jwt.Claims(leaf.PublicKey, &claims); err != nil {
+	if err := jwt.Claims(leaf.PublicKey, &claims); err != nil {
 		return nil, admin.WrapError(admin.ErrorUnauthorizedType, err, "adminHandler.authorizeToken; error parsing x5c claims")
 	}
 
@@ -122,13 +122,13 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 	}
 
 	// Check that the token has not been used.
-	if err = a.UseToken(token, prov); err != nil {
+	if err := a.UseToken(token, prov); err != nil {
 		return nil, admin.WrapError(admin.ErrorUnauthorizedType, err, "adminHandler.authorizeToken; error with reuse token")
 	}
 
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
 	// more than a few minutes.
-	if err = claims.ValidateWithLeeway(jose.Expected{
+	if err := claims.ValidateWithLeeway(jose.Expected{
 		Issuer: prov.GetName(),
 		Time:   time.Now().UTC(),
 	}, time.Minute); err != nil {
@@ -262,7 +262,7 @@ func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
 	if err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRevoke")
 	}
-	if err = p.AuthorizeRevoke(ctx, token); err != nil {
+	if err := p.AuthorizeRevoke(ctx, token); err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRevoke")
 	}
 	return nil

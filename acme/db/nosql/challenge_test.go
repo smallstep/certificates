@@ -92,8 +92,8 @@ func TestDB_getDBChallenge(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if ch, err := db.getDBChallenge(context.Background(), chID); err != nil {
+			d := DB{db: tc.db}
+			if ch, err := d.getDBChallenge(context.Background(), chID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -108,17 +108,15 @@ func TestDB_getDBChallenge(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, ch.ID, tc.dbc.ID)
-					assert.Equals(t, ch.AccountID, tc.dbc.AccountID)
-					assert.Equals(t, ch.Type, tc.dbc.Type)
-					assert.Equals(t, ch.Status, tc.dbc.Status)
-					assert.Equals(t, ch.Token, tc.dbc.Token)
-					assert.Equals(t, ch.Value, tc.dbc.Value)
-					assert.Equals(t, ch.ValidatedAt, tc.dbc.ValidatedAt)
-					assert.Equals(t, ch.Error.Error(), tc.dbc.Error.Error())
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, ch.ID, tc.dbc.ID)
+				assert.Equals(t, ch.AccountID, tc.dbc.AccountID)
+				assert.Equals(t, ch.Type, tc.dbc.Type)
+				assert.Equals(t, ch.Status, tc.dbc.Status)
+				assert.Equals(t, ch.Token, tc.dbc.Token)
+				assert.Equals(t, ch.Value, tc.dbc.Value)
+				assert.Equals(t, ch.ValidatedAt, tc.dbc.ValidatedAt)
+				assert.Equals(t, ch.Error.Error(), tc.dbc.Error.Error())
 			}
 		})
 	}
@@ -206,8 +204,8 @@ func TestDB_CreateChallenge(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if err := db.CreateChallenge(context.Background(), tc.ch); err != nil {
+			d := DB{db: tc.db}
+			if err := d.CreateChallenge(context.Background(), tc.ch); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -286,8 +284,8 @@ func TestDB_GetChallenge(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if ch, err := db.GetChallenge(context.Background(), chID, azID); err != nil {
+			d := DB{db: tc.db}
+			if ch, err := d.GetChallenge(context.Background(), chID, azID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -302,17 +300,15 @@ func TestDB_GetChallenge(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, ch.ID, tc.dbc.ID)
-					assert.Equals(t, ch.AccountID, tc.dbc.AccountID)
-					assert.Equals(t, ch.Type, tc.dbc.Type)
-					assert.Equals(t, ch.Status, tc.dbc.Status)
-					assert.Equals(t, ch.Token, tc.dbc.Token)
-					assert.Equals(t, ch.Value, tc.dbc.Value)
-					assert.Equals(t, ch.ValidatedAt, tc.dbc.ValidatedAt)
-					assert.Equals(t, ch.Error.Error(), tc.dbc.Error.Error())
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, ch.ID, tc.dbc.ID)
+				assert.Equals(t, ch.AccountID, tc.dbc.AccountID)
+				assert.Equals(t, ch.Type, tc.dbc.Type)
+				assert.Equals(t, ch.Status, tc.dbc.Status)
+				assert.Equals(t, ch.Token, tc.dbc.Token)
+				assert.Equals(t, ch.Value, tc.dbc.Value)
+				assert.Equals(t, ch.ValidatedAt, tc.dbc.ValidatedAt)
+				assert.Equals(t, ch.Error.Error(), tc.dbc.Error.Error())
 			}
 		})
 	}
@@ -442,8 +438,8 @@ func TestDB_UpdateChallenge(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if err := db.UpdateChallenge(context.Background(), tc.ch); err != nil {
+			d := DB{db: tc.db}
+			if err := d.UpdateChallenge(context.Background(), tc.ch); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}

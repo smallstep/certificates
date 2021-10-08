@@ -535,15 +535,15 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewContextWithMethod(context.Background(), SignMethod)
-			got, err := tt.gcp.AuthorizeSign(ctx, tt.args.token)
-			if (err != nil) != tt.wantErr {
+			switch got, err := tt.gcp.AuthorizeSign(ctx, tt.args.token); {
+			case (err != nil) != tt.wantErr:
 				t.Errorf("GCP.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			} else if err != nil {
+			case err != nil:
 				sc, ok := err.(errs.StatusCoder)
 				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
-			} else {
+			default:
 				assert.Len(t, tt.wantLen, got)
 				for _, o := range got {
 					switch v := o.(type) {

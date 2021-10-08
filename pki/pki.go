@@ -128,7 +128,7 @@ func GetTemplatesPath() string {
 
 // GetProvisioners returns the map of provisioners on the given CA.
 func GetProvisioners(caURL, rootFile string) (provisioner.List, error) {
-	if len(rootFile) == 0 {
+	if rootFile == "" {
 		rootFile = GetRootCAPath()
 	}
 	client, err := ca.NewClient(caURL, ca.WithRootFile(rootFile))
@@ -153,7 +153,7 @@ func GetProvisioners(caURL, rootFile string) (provisioner.List, error) {
 // GetProvisionerKey returns the encrypted provisioner key with the for the
 // given kid.
 func GetProvisionerKey(caURL, rootFile, kid string) (string, error) {
-	if len(rootFile) == 0 {
+	if rootFile == "" {
 		rootFile = GetRootCAPath()
 	}
 	client, err := ca.NewClient(caURL, ca.WithRootFile(rootFile))
@@ -315,17 +315,17 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 
 	// Use /home/step as the step path in helm configurations.
 	// Use the current step path when creating pki in files.
-	var public, private, config string
+	var public, private, cfg string
 	if p.options.isHelm {
 		public = "/home/step/certs"
 		private = "/home/step/secrets"
-		config = "/home/step/config"
+		cfg = "/home/step/config"
 	} else {
 		public = GetPublicPath()
 		private = GetSecretsPath()
-		config = GetConfigPath()
+		cfg = GetConfigPath()
 		// Create directories
-		dirs := []string{public, private, config, GetTemplatesPath()}
+		dirs := []string{public, private, cfg, GetTemplatesPath()}
 		for _, name := range dirs {
 			if _, err := os.Stat(name); os.IsNotExist(err) {
 				if err = os.MkdirAll(name, 0700); err != nil {
@@ -380,10 +380,10 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	if p.Ssh.UserKey, err = getPath(private, "ssh_user_ca_key"); err != nil {
 		return nil, err
 	}
-	if p.defaults, err = getPath(config, "defaults.json"); err != nil {
+	if p.defaults, err = getPath(cfg, "defaults.json"); err != nil {
 		return nil, err
 	}
-	if p.config, err = getPath(config, "ca.json"); err != nil {
+	if p.config, err = getPath(cfg, "ca.json"); err != nil {
 		return nil, err
 	}
 	p.Defaults.CaConfig = p.config
@@ -620,16 +620,17 @@ func (p *PKI) askFeedback() {
 
 func (p *PKI) tellPKI() {
 	ui.Println()
-	if p.casOptions.Is(apiv1.SoftCAS) {
+	switch {
+	case p.casOptions.Is(apiv1.SoftCAS):
 		ui.PrintSelected("Root certificate", p.Root[0])
 		ui.PrintSelected("Root private key", p.RootKey[0])
 		ui.PrintSelected("Root fingerprint", p.Defaults.Fingerprint)
 		ui.PrintSelected("Intermediate certificate", p.Intermediate)
 		ui.PrintSelected("Intermediate private key", p.IntermediateKey)
-	} else if p.Defaults.Fingerprint != "" {
+	case p.Defaults.Fingerprint != "":
 		ui.PrintSelected("Root certificate", p.Root[0])
 		ui.PrintSelected("Root fingerprint", p.Defaults.Fingerprint)
-	} else {
+	default:
 		ui.Printf(`{{ "%s" | red }} {{ "Root certificate:" | bold }} failed to retrieve it from RA`+"\n", ui.IconBad)
 	}
 	if p.options.enableSSH {
@@ -657,7 +658,7 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 		authorityOptions = &p.casOptions
 	}
 
-	config := &authconfig.Config{
+	cfg := &authconfig.Config{
 		Root:             p.Root,
 		FederatedRoots:   p.FederatedRoots,
 		IntermediateCert: p.Intermediate,
@@ -681,7 +682,7 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 	// Add linked as a deployment type to detect it on start and provide a
 	// message if the token is not given.
 	if p.options.deploymentType == LinkedDeployment {
-		config.AuthorityConfig.DeploymentType = LinkedDeployment.String()
+		cfg.AuthorityConfig.DeploymentType = LinkedDeployment.String()
 	}
 
 	// On standalone deployments add the provisioners to either the ca.json or
@@ -711,7 +712,7 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 
 		if p.options.enableSSH {
 			enableSSHCA := true
-			config.SSH = &authconfig.SSHConfig{
+			cfg.SSH = &authconfig.SSHConfig{
 				HostKey: p.Ssh.HostKey,
 				UserKey: p.Ssh.UserKey,
 			}
@@ -733,19 +734,19 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 
 	// Apply configuration modifiers
 	for _, o := range opt {
-		if err := o(config); err != nil {
+		if err := o(cfg); err != nil {
 			return nil, err
 		}
 	}
 
 	// Set authority.enableAdmin to true
 	if p.options.enableAdmin {
-		config.AuthorityConfig.EnableAdmin = true
+		cfg.AuthorityConfig.EnableAdmin = true
 	}
 
 	if p.options.deploymentType == StandaloneDeployment {
-		if !config.AuthorityConfig.EnableAdmin {
-			config.AuthorityConfig.Provisioners = provisioners
+		if !cfg.AuthorityConfig.EnableAdmin {
+			cfg.AuthorityConfig.Provisioners = provisioners
 		} else {
 			// At this moment this code path is never used because `step ca
 			// init` will always set enableAdmin to false for a standalone
@@ -754,11 +755,11 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 			//
 			// Note that we might want to be able to define the database as a
 			// flag in `step ca init` so we can write to the proper place.
-			db, err := db.New(config.DB)
+			_db, err := db.New(cfg.DB)
 			if err != nil {
 				return nil, err
 			}
-			adminDB, err := admindb.New(db.(nosql.DB), admin.DefaultAuthorityID)
+			adminDB, err := admindb.New(_db.(nosql.DB), admin.DefaultAuthorityID)
 			if err != nil {
 				return nil, err
 			}
@@ -788,7 +789,7 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 		}
 	}
 
-	return config, nil
+	return cfg, nil
 }
 
 // Save stores the pki on a json file that will be used as the certificate
@@ -804,12 +805,12 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 
 	// Generate and write ca.json
 	if !p.options.pkiOnly {
-		config, err := p.GenerateConfig(opt...)
+		cfg, err := p.GenerateConfig(opt...)
 		if err != nil {
 			return err
 		}
 
-		b, err := json.MarshalIndent(config, "", "\t")
+		b, err := json.MarshalIndent(cfg, "", "\t")
 		if err != nil {
 			return errors.Wrapf(err, "error marshaling %s", p.config)
 		}
@@ -833,14 +834,14 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 		}
 
 		// Generate and write templates
-		if err := generateTemplates(config.Templates); err != nil {
+		if err := generateTemplates(cfg.Templates); err != nil {
 			return err
 		}
 
-		if config.DB != nil {
-			ui.PrintSelected("Database folder", config.DB.DataSource)
+		if cfg.DB != nil {
+			ui.PrintSelected("Database folder", cfg.DB.DataSource)
 		}
-		if config.Templates != nil {
+		if cfg.Templates != nil {
 			ui.PrintSelected("Templates folder", GetTemplatesPath())
 		}
 

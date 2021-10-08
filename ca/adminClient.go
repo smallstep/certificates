@@ -70,7 +70,7 @@ func NewAdminClient(endpoint string, opts ...ClientOption) (*AdminClient, error)
 	}, nil
 }
 
-func (c *AdminClient) generateAdminToken(path string) (string, error) {
+func (c *AdminClient) generateAdminToken(urlPath string) (string, error) {
 	// A random jwt id will be used to identify duplicated tokens
 	jwtID, err := randutil.Hex(64) // 256 bits
 	if err != nil {
@@ -82,7 +82,7 @@ func (c *AdminClient) generateAdminToken(path string) (string, error) {
 		token.WithJWTID(jwtID),
 		token.WithKid(c.x5cJWK.KeyID),
 		token.WithIssuer(c.x5cIssuer),
-		token.WithAudience(path),
+		token.WithAudience(urlPath),
 		token.WithValidity(now, now.Add(token.DefaultValidity)),
 		token.WithX5CCerts(c.x5cCertStrs),
 	}
@@ -348,14 +348,15 @@ func (c *AdminClient) GetProvisioner(opts ...ProvisionerOption) (*linkedca.Provi
 		return nil, err
 	}
 	var u *url.URL
-	if len(o.id) > 0 {
+	switch {
+	case len(o.id) > 0:
 		u = c.endpoint.ResolveReference(&url.URL{
 			Path:     "/admin/provisioners/id",
 			RawQuery: o.rawQuery(),
 		})
-	} else if len(o.name) > 0 {
+	case len(o.name) > 0:
 		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.name)})
-	} else {
+	default:
 		return nil, errors.New("must set either name or id in method options")
 	}
 	tok, err := c.generateAdminToken(u.Path)
@@ -456,14 +457,15 @@ func (c *AdminClient) RemoveProvisioner(opts ...ProvisionerOption) error {
 		return err
 	}
 
-	if len(o.id) > 0 {
+	switch {
+	case len(o.id) > 0:
 		u = c.endpoint.ResolveReference(&url.URL{
 			Path:     path.Join(adminURLPrefix, "provisioners/id"),
 			RawQuery: o.rawQuery(),
 		})
-	} else if len(o.name) > 0 {
+	case len(o.name) > 0:
 		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.name)})
-	} else {
+	default:
 		return errors.New("must set either name or id in method options")
 	}
 	tok, err := c.generateAdminToken(u.Path)

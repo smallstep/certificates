@@ -917,7 +917,7 @@ func createSSHCert(cert *ssh.Certificate, signer ssh.Signer) (*ssh.Certificate, 
 	if err != nil {
 		return nil, nil, err
 	}
-	if err = cert.SignCert(rand.Reader, signer); err != nil {
+	if err := cert.SignCert(rand.Reader, signer); err != nil {
 		return nil, nil, err
 	}
 	return cert, jwk, nil

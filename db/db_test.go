@@ -144,15 +144,15 @@ func TestUseToken(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ok, err := tc.db.UseToken(tc.id, tc.tok)
-			if err != nil {
+			switch ok, err := tc.db.UseToken(tc.id, tc.tok); {
+			case err != nil:
 				if assert.NotNil(t, tc.want.err) {
 					assert.HasPrefix(t, err.Error(), tc.want.err.Error())
 				}
 				assert.False(t, ok)
-			} else if ok {
+			case ok:
 				assert.True(t, tc.want.ok)
-			} else {
+			default:
 				assert.False(t, tc.want.ok)
 			}
 		})

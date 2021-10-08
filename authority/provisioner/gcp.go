@@ -150,7 +150,7 @@ func (p *GCP) GetType() Type {
 }
 
 // GetEncryptedKey is not available in a GCP provisioner.
-func (p *GCP) GetEncryptedKey() (kid string, key string, ok bool) {
+func (p *GCP) GetEncryptedKey() (kid, key string, ok bool) {
 	return "", "", false
 }
 
@@ -244,15 +244,17 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	if p.DisableCustomSANs {
 		dnsName1 := fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID)
 		dnsName2 := fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID)
-		so = append(so, commonNameSliceValidator([]string{
-			ce.InstanceName, ce.InstanceID, dnsName1, dnsName2,
-		}))
-		so = append(so, dnsNamesValidator([]string{
-			dnsName1, dnsName2,
-		}))
-		so = append(so, ipAddressesValidator(nil))
-		so = append(so, emailAddressesValidator(nil))
-		so = append(so, urisValidator(nil))
+		so = append(so,
+			commonNameSliceValidator([]string{
+				ce.InstanceName, ce.InstanceID, dnsName1, dnsName2,
+			}),
+			dnsNamesValidator([]string{
+				dnsName1, dnsName2,
+			}),
+			ipAddressesValidator(nil),
+			emailAddressesValidator(nil),
+			urisValidator(nil),
+		)
 
 		// Template SANs
 		data.SetSANs([]string{dnsName1, dnsName2})
