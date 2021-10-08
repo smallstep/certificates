@@ -74,17 +74,17 @@ func (c *uaClient) SetTransport(tr http.RoundTripper) {
 	c.Client.Transport = tr
 }
 
-func (c *uaClient) Get(url string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", url, nil)
+func (c *uaClient) Get(u string) (*http.Response, error) {
+	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
-		return nil, errors.Wrapf(err, "new request GET %s failed", url)
+		return nil, errors.Wrapf(err, "new request GET %s failed", u)
 	}
 	req.Header.Set("User-Agent", UserAgent)
 	return c.Client.Do(req)
 }
 
-func (c *uaClient) Post(url, contentType string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest("POST", url, body)
+func (c *uaClient) Post(u, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequest("POST", u, body)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +305,7 @@ func WithAdminX5C(certs []*x509.Certificate, key interface{}, passwordFile strin
 			err  error
 			opts []jose.Option
 		)
-		if len(passwordFile) != 0 {
+		if passwordFile != "" {
 			opts = append(opts, jose.WithPasswordFile(passwordFile))
 		}
 		blk, err := pemutil.Serialize(key)
@@ -326,14 +326,14 @@ func WithAdminX5C(certs []*x509.Certificate, key interface{}, passwordFile strin
 
 		for _, e := range o.x5cCert.Extensions {
 			if e.Id.Equal(stepOIDProvisioner) {
-				var provisioner stepProvisionerASN1
-				if _, err := asn1.Unmarshal(e.Value, &provisioner); err != nil {
+				var prov stepProvisionerASN1
+				if _, err := asn1.Unmarshal(e.Value, &prov); err != nil {
 					return errors.Wrap(err, "error unmarshaling provisioner OID from certificate")
 				}
-				o.x5cIssuer = string(provisioner.Name)
+				o.x5cIssuer = string(prov.Name)
 			}
 		}
-		if len(o.x5cIssuer) == 0 {
+		if o.x5cIssuer == "" {
 			return errors.New("provisioner extension not found in certificate")
 		}
 
@@ -631,7 +631,7 @@ retry:
 // do not match.
 func (c *Client) Root(sha256Sum string) (*api.RootResponse, error) {
 	var retried bool
-	sha256Sum = strings.ToLower(strings.Replace(sha256Sum, "-", "", -1))
+	sha256Sum = strings.ToLower(strings.ReplaceAll(sha256Sum, "-", ""))
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/root/" + sha256Sum})
 retry:
 	resp, err := newInsecureClient().Get(u.String())
@@ -651,7 +651,7 @@ retry:
 	}
 	// verify the sha256
 	sum := sha256.Sum256(root.RootPEM.Raw)
-	if sha256Sum != strings.ToLower(hex.EncodeToString(sum[:])) {
+	if !strings.EqualFold(sha256Sum, strings.ToLower(hex.EncodeToString(sum[:]))) {
 		return nil, errs.BadRequest("client.Root; root certificate SHA256 fingerprint do not match")
 	}
 	return &root, nil
@@ -1066,16 +1066,16 @@ retry:
 		}
 		return nil, readError(resp.Body)
 	}
-	var config api.SSHConfigResponse
-	if err := readJSON(resp.Body, &config); err != nil {
+	var cfg api.SSHConfigResponse
+	if err := readJSON(resp.Body, &cfg); err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", u)
 	}
-	return &config, nil
+	return &cfg, nil
 }
 
 // SSHCheckHost performs the POST /ssh/check-host request to the CA with the
 // given principal.
-func (c *Client) SSHCheckHost(principal string, token string) (*api.SSHCheckPrincipalResponse, error) {
+func (c *Client) SSHCheckHost(principal, token string) (*api.SSHCheckPrincipalResponse, error) {
 	var retried bool
 	body, err := json.Marshal(&api.SSHCheckPrincipalRequest{
 		Type:      provisioner.SSHHostCert,

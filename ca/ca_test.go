@@ -322,7 +322,7 @@ ZEp7knvU2psWRw==
 					assert.Equals(t, intermediate, realIntermediate)
 				} else {
 					err := readError(body)
-					if len(tc.errMsg) == 0 {
+					if tc.errMsg == "" {
 						assert.FatalError(t, errors.New("must validate response error"))
 					}
 					assert.HasPrefix(t, err.Error(), tc.errMsg)
@@ -375,7 +375,7 @@ func TestCAProvisioners(t *testing.T) {
 					assert.Equals(t, a, b)
 				} else {
 					err := readError(body)
-					if len(tc.errMsg) == 0 {
+					if tc.errMsg == "" {
 						assert.FatalError(t, errors.New("must validate response error"))
 					}
 					assert.HasPrefix(t, err.Error(), tc.errMsg)
@@ -436,7 +436,7 @@ func TestCAProvisionerEncryptedKey(t *testing.T) {
 					assert.Equals(t, ek.Key, tc.expectedKey)
 				} else {
 					err := readError(body)
-					if len(tc.errMsg) == 0 {
+					if tc.errMsg == "" {
 						assert.FatalError(t, errors.New("must validate response error"))
 					}
 					assert.HasPrefix(t, err.Error(), tc.errMsg)
@@ -497,7 +497,7 @@ func TestCARoot(t *testing.T) {
 					assert.Equals(t, root.RootPEM.Certificate, rootCrt)
 				} else {
 					err := readError(body)
-					if len(tc.errMsg) == 0 {
+					if tc.errMsg == "" {
 						assert.FatalError(t, errors.New("must validate response error"))
 					}
 					assert.HasPrefix(t, err.Error(), tc.errMsg)
@@ -665,7 +665,7 @@ func TestCARenew(t *testing.T) {
 					assert.Equals(t, *sign.TLSOptions, authority.DefaultTLSOptions)
 				} else {
 					err := readError(body)
-					if len(tc.errMsg) == 0 {
+					if tc.errMsg == "" {
 						assert.FatalError(t, errors.New("must validate response error"))
 					}
 					assert.HasPrefix(t, err.Error(), tc.errMsg)

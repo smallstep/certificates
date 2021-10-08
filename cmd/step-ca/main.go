@@ -116,7 +116,7 @@ func main() {
 	app.HelpName = "step-ca"
 	app.Version = config.Version()
 	app.Usage = "an online certificate authority for secure automated certificate management"
-	app.UsageText = `**step-ca** <config> [**--password-file**=<file>] 
+	app.UsageText = `**step-ca** <config> [**--password-file**=<file>]
 [**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]
 [**--issuer-password-file**=<file>] [**--resolver**=<addr>] [**--help**] [**--version**]`
 	app.Description = `**step-ca** runs the Step Online Certificate Authority
@@ -191,8 +191,8 @@ var placeholderString = regexp.MustCompile(`<.*?>`)
 
 func stringifyFlag(f cli.Flag) string {
 	fv := flagValue(f)
-	usage := fv.FieldByName("Usage").String()
-	placeholder := placeholderString.FindString(usage)
+	usg := fv.FieldByName("Usage").String()
+	placeholder := placeholderString.FindString(usg)
 	if placeholder == "" {
 		switch f.(type) {
 		case cli.BoolFlag, cli.BoolTFlag:
@@ -200,5 +200,5 @@ func stringifyFlag(f cli.Flag) string {
 			placeholder = "<value>"
 		}
 	}
-	return cli.FlagNamePrefixer(fv.FieldByName("Name").String(), placeholder) + "\t" + usage
+	return cli.FlagNamePrefixer(fv.FieldByName("Name").String(), placeholder) + "\t" + usg
 }

@@ -228,7 +228,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 
 		if cm, ok := k.(kms.CertificateManager); ok {
-			if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+			if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 				Name:        c.RootSlot,
 				Certificate: root,
 			}); err != nil {
@@ -236,7 +236,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			}
 		}
 
-		if err = fileutil.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
+		if err := fileutil.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
 			Type:  "CERTIFICATE",
 			Bytes: b,
 		}), 0600); err != nil {
@@ -305,7 +305,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 	}
 
 	if cm, ok := k.(kms.CertificateManager); ok {
-		if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+		if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 			Name:        c.CrtSlot,
 			Certificate: intermediate,
 		}); err != nil {
@@ -313,7 +313,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 	}
 
-	if err = fileutil.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
+	if err := fileutil.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: b,
 	}), 0600); err != nil {

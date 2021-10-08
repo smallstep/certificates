@@ -18,7 +18,7 @@ const (
 	defaultCacheJitter = 1 * time.Hour
 )
 
-var maxAgeRegex = regexp.MustCompile("max-age=([0-9]+)")
+var maxAgeRegex = regexp.MustCompile(`max-age=(\d+)`)
 
 type keyStore struct {
 	sync.RWMutex

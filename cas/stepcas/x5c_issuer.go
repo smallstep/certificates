@@ -19,9 +19,7 @@ const defaultValidity = 5 * time.Minute
 
 // timeNow returns the current time.
 // This method is used for unit testing purposes.
-var timeNow = func() time.Time {
-	return time.Now()
-}
+var timeNow = time.Now
 
 type x5cIssuer struct {
 	caURL    *url.URL

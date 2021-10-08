@@ -55,10 +55,10 @@ func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 		if len(crt.Subject.StreetAddress) == 0 && def.StreetAddress != "" {
 			crt.Subject.StreetAddress = append(crt.Subject.StreetAddress, def.StreetAddress)
 		}
-		if len(crt.Subject.SerialNumber) == 0 && def.SerialNumber != "" {
+		if crt.Subject.SerialNumber == "" && def.SerialNumber != "" {
 			crt.Subject.SerialNumber = def.SerialNumber
 		}
-		if len(crt.Subject.CommonName) == 0 && def.CommonName != "" {
+		if crt.Subject.CommonName == "" && def.CommonName != "" {
 			crt.Subject.CommonName = def.CommonName
 		}
 		return nil
@@ -387,14 +387,14 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 			return errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Revoke; could not get ID for token")
 		}
-		opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
-		opts = append(opts, errs.WithKeyVal("tokenID", rci.TokenID))
-	} else {
+		opts = append(opts,
+			errs.WithKeyVal("provisionerID", rci.ProvisionerID),
+			errs.WithKeyVal("tokenID", rci.TokenID),
+		)
+	} else if p, err = a.LoadProvisionerByCertificate(revokeOpts.Crt); err == nil {
 		// Load the Certificate provisioner if one exists.
-		if p, err = a.LoadProvisionerByCertificate(revokeOpts.Crt); err == nil {
-			rci.ProvisionerID = p.GetID()
-			opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
-		}
+		rci.ProvisionerID = p.GetID()
+		opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
 	}
 
 	if provisioner.MethodFromContext(ctx) == provisioner.SSHRevokeMethod {

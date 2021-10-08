@@ -187,11 +187,12 @@ func TestLoadClient(t *testing.T) {
 			} else {
 				gotTransport := got.Client.Transport.(*http.Transport)
 				wantTransport := tt.want.Client.Transport.(*http.Transport)
-				if gotTransport.TLSClientConfig.GetClientCertificate == nil {
+				switch {
+				case gotTransport.TLSClientConfig.GetClientCertificate == nil:
 					t.Error("LoadClient() transport does not define GetClientCertificate")
-				} else if !reflect.DeepEqual(got.CaURL, tt.want.CaURL) || !reflect.DeepEqual(gotTransport.TLSClientConfig.RootCAs.Subjects(), wantTransport.TLSClientConfig.RootCAs.Subjects()) {
+				case !reflect.DeepEqual(got.CaURL, tt.want.CaURL) || !reflect.DeepEqual(gotTransport.TLSClientConfig.RootCAs.Subjects(), wantTransport.TLSClientConfig.RootCAs.Subjects()):
 					t.Errorf("LoadClient() = %#v, want %#v", got, tt.want)
-				} else {
+				default:
 					crt, err := gotTransport.TLSClientConfig.GetClientCertificate(nil)
 					if err != nil {
 						t.Errorf("LoadClient() GetClientCertificate error = %v", err)
