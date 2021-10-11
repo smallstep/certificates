@@ -190,7 +190,7 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName, ref
 		CreatedAt:   clock.Now(),
 	}
 
-	if err = db.save(ctx, keyID, dbeak, nil, "external_account_key", externalAccountKeyTable); err != nil {
+	if err := db.save(ctx, keyID, dbeak, nil, "external_account_key", externalAccountKeyTable); err != nil {
 		return nil, err
 	}
 
@@ -199,7 +199,7 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName, ref
 			Reference:            dbeak.Reference,
 			ExternalAccountKeyID: dbeak.ID,
 		}
-		if err = db.save(ctx, dbeak.Reference, dbExternalAccountKeyReference, nil, "external_account_key_reference", externalAccountKeysByReferenceTable); err != nil {
+		if err := db.save(ctx, dbeak.Reference, dbExternalAccountKeyReference, nil, "external_account_key_reference", externalAccountKeysByReferenceTable); err != nil {
 			return nil, err
 		}
 	}

@@ -561,7 +561,7 @@ retry:
 }
 
 // GetExternalAccountKeysPaginate returns a page from the the GET /admin/acme/eab request to the CA.
-func (c *AdminClient) GetExternalAccountKeysPaginate(provisionerName string, reference string, opts ...AdminOption) (*adminAPI.GetExternalAccountKeysResponse, error) {
+func (c *AdminClient) GetExternalAccountKeysPaginate(provisionerName, reference string, opts ...AdminOption) (*adminAPI.GetExternalAccountKeysResponse, error) {
 	var retried bool
 	o := new(adminOptions)
 	if err := o.apply(opts); err != nil {
@@ -640,7 +640,7 @@ retry:
 }
 
 // RemoveExternalAccountKey performs the DELETE /admin/acme/eab/{prov}/{key_id} request to the CA.
-func (c *AdminClient) RemoveExternalAccountKey(provisionerName string, keyID string) error {
+func (c *AdminClient) RemoveExternalAccountKey(provisionerName, keyID string) error {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab", provisionerName, "/", keyID)})
 	tok, err := c.generateAdminToken(u.Path)
@@ -668,7 +668,7 @@ retry:
 }
 
 // GetExternalAccountKeys returns all ACME EAB Keys from the GET /admin/acme/eab request to the CA.
-func (c *AdminClient) GetExternalAccountKeys(provisionerName string, reference string, opts ...AdminOption) ([]*linkedca.EABKey, error) {
+func (c *AdminClient) GetExternalAccountKeys(provisionerName, reference string, opts ...AdminOption) ([]*linkedca.EABKey, error) {
 	var (
 		cursor = ""
 		eaks   = []*linkedca.EABKey{}

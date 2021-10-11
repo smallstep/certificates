@@ -771,8 +771,8 @@ func TestDB_getDBExternalAccountKey(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if dbeak, err := db.getDBExternalAccountKey(context.Background(), keyID); err != nil {
+			d := DB{db: tc.db}
+			if dbeak, err := d.getDBExternalAccountKey(context.Background(), keyID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -787,16 +787,14 @@ func TestDB_getDBExternalAccountKey(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, dbeak.ID, tc.dbeak.ID)
-					assert.Equals(t, dbeak.KeyBytes, tc.dbeak.KeyBytes)
-					assert.Equals(t, dbeak.Provisioner, tc.dbeak.Provisioner)
-					assert.Equals(t, dbeak.Reference, tc.dbeak.Reference)
-					assert.Equals(t, dbeak.CreatedAt, tc.dbeak.CreatedAt)
-					assert.Equals(t, dbeak.AccountID, tc.dbeak.AccountID)
-					assert.Equals(t, dbeak.BoundAt, tc.dbeak.BoundAt)
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, dbeak.ID, tc.dbeak.ID)
+				assert.Equals(t, dbeak.KeyBytes, tc.dbeak.KeyBytes)
+				assert.Equals(t, dbeak.Provisioner, tc.dbeak.Provisioner)
+				assert.Equals(t, dbeak.Reference, tc.dbeak.Reference)
+				assert.Equals(t, dbeak.CreatedAt, tc.dbeak.CreatedAt)
+				assert.Equals(t, dbeak.AccountID, tc.dbeak.AccountID)
+				assert.Equals(t, dbeak.BoundAt, tc.dbeak.BoundAt)
 			}
 		})
 	}
@@ -890,8 +888,8 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if eak, err := db.GetExternalAccountKey(context.Background(), prov, keyID); err != nil {
+			d := DB{db: tc.db}
+			if eak, err := d.GetExternalAccountKey(context.Background(), prov, keyID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -906,16 +904,14 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, eak.ID, tc.eak.ID)
-					assert.Equals(t, eak.KeyBytes, tc.eak.KeyBytes)
-					assert.Equals(t, eak.Provisioner, tc.eak.Provisioner)
-					assert.Equals(t, eak.Reference, tc.eak.Reference)
-					assert.Equals(t, eak.CreatedAt, tc.eak.CreatedAt)
-					assert.Equals(t, eak.AccountID, tc.eak.AccountID)
-					assert.Equals(t, eak.BoundAt, tc.eak.BoundAt)
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, eak.ID, tc.eak.ID)
+				assert.Equals(t, eak.KeyBytes, tc.eak.KeyBytes)
+				assert.Equals(t, eak.Provisioner, tc.eak.Provisioner)
+				assert.Equals(t, eak.Reference, tc.eak.Reference)
+				assert.Equals(t, eak.CreatedAt, tc.eak.CreatedAt)
+				assert.Equals(t, eak.AccountID, tc.eak.AccountID)
+				assert.Equals(t, eak.BoundAt, tc.eak.BoundAt)
 			}
 		})
 	}
@@ -1056,8 +1052,8 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if eak, err := db.GetExternalAccountKeyByReference(context.Background(), prov, tc.ref); err != nil {
+			d := DB{db: tc.db}
+			if eak, err := d.GetExternalAccountKeyByReference(context.Background(), prov, tc.ref); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -1072,16 +1068,14 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) && tc.eak != nil {
-					assert.Equals(t, eak.ID, tc.eak.ID)
-					assert.Equals(t, eak.AccountID, tc.eak.AccountID)
-					assert.Equals(t, eak.BoundAt, tc.eak.BoundAt)
-					assert.Equals(t, eak.CreatedAt, tc.eak.CreatedAt)
-					assert.Equals(t, eak.KeyBytes, tc.eak.KeyBytes)
-					assert.Equals(t, eak.Provisioner, tc.eak.Provisioner)
-					assert.Equals(t, eak.Reference, tc.eak.Reference)
-				}
+			} else if assert.Nil(t, tc.err) && tc.eak != nil {
+				assert.Equals(t, eak.ID, tc.eak.ID)
+				assert.Equals(t, eak.AccountID, tc.eak.AccountID)
+				assert.Equals(t, eak.BoundAt, tc.eak.BoundAt)
+				assert.Equals(t, eak.CreatedAt, tc.eak.CreatedAt)
+				assert.Equals(t, eak.KeyBytes, tc.eak.KeyBytes)
+				assert.Equals(t, eak.Provisioner, tc.eak.Provisioner)
+				assert.Equals(t, eak.Reference, tc.eak.Reference)
 			}
 		})
 	}
@@ -1208,8 +1202,8 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if eaks, err := db.GetExternalAccountKeys(context.Background(), prov); err != nil {
+			d := DB{db: tc.db}
+			if eaks, err := d.GetExternalAccountKeys(context.Background(), prov); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -1224,18 +1218,16 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, len(eaks), len(tc.eaks))
-					for i, eak := range eaks {
-						assert.Equals(t, eak.ID, tc.eaks[i].ID)
-						assert.Equals(t, eak.KeyBytes, tc.eaks[i].KeyBytes)
-						assert.Equals(t, eak.Provisioner, tc.eaks[i].Provisioner)
-						assert.Equals(t, eak.Reference, tc.eaks[i].Reference)
-						assert.Equals(t, eak.CreatedAt, tc.eaks[i].CreatedAt)
-						assert.Equals(t, eak.AccountID, tc.eaks[i].AccountID)
-						assert.Equals(t, eak.BoundAt, tc.eaks[i].BoundAt)
-					}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, len(eaks), len(tc.eaks))
+				for i, eak := range eaks {
+					assert.Equals(t, eak.ID, tc.eaks[i].ID)
+					assert.Equals(t, eak.KeyBytes, tc.eaks[i].KeyBytes)
+					assert.Equals(t, eak.Provisioner, tc.eaks[i].Provisioner)
+					assert.Equals(t, eak.Reference, tc.eaks[i].Reference)
+					assert.Equals(t, eak.CreatedAt, tc.eaks[i].CreatedAt)
+					assert.Equals(t, eak.AccountID, tc.eaks[i].AccountID)
+					assert.Equals(t, eak.BoundAt, tc.eaks[i].BoundAt)
 				}
 			}
 		})
@@ -1440,8 +1432,8 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if err := db.DeleteExternalAccountKey(context.Background(), prov, keyID); err != nil {
+			d := DB{db: tc.db}
+			if err := d.DeleteExternalAccountKey(context.Background(), prov, keyID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -1569,22 +1561,20 @@ func TestDB_CreateExternalAccountKey(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			eak, err := db.CreateExternalAccountKey(context.Background(), prov, ref)
+			d := DB{db: tc.db}
+			eak, err := d.CreateExternalAccountKey(context.Background(), prov, ref)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, *tc._id, eak.ID)
-					assert.Equals(t, prov, eak.Provisioner)
-					assert.Equals(t, ref, eak.Reference)
-					assert.Equals(t, "", eak.AccountID)
-					assert.False(t, eak.CreatedAt.IsZero())
-					assert.False(t, eak.AlreadyBound())
-					assert.True(t, eak.BoundAt.IsZero())
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, *tc._id, eak.ID)
+				assert.Equals(t, prov, eak.Provisioner)
+				assert.Equals(t, ref, eak.Reference)
+				assert.Equals(t, "", eak.AccountID)
+				assert.False(t, eak.CreatedAt.IsZero())
+				assert.False(t, eak.AlreadyBound())
+				assert.True(t, eak.BoundAt.IsZero())
 			}
 		})
 	}
@@ -1649,7 +1639,7 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 			}
 		},
 		"fail/provisioner-mismatch": func(t *testing.T) test {
-			dbeak := &dbExternalAccountKey{
+			newDBEAK := &dbExternalAccountKey{
 				ID:          keyID,
 				Provisioner: "differentProvisioner",
 				Reference:   ref,
@@ -1657,7 +1647,7 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 				KeyBytes:    []byte{1, 3, 3, 7},
 				CreatedAt:   now,
 			}
-			b, err := json.Marshal(dbeak)
+			b, err := json.Marshal(newDBEAK)
 			assert.FatalError(t, err)
 			return test{
 				eak: &acme.ExternalAccountKey{
@@ -1694,21 +1684,19 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if err := db.UpdateExternalAccountKey(context.Background(), prov, tc.eak); err != nil {
+			d := DB{db: tc.db}
+			if err := d.UpdateExternalAccountKey(context.Background(), prov, tc.eak); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, dbeak.ID, tc.eak.ID)
-					assert.Equals(t, dbeak.Provisioner, tc.eak.Provisioner)
-					assert.Equals(t, dbeak.Reference, tc.eak.Reference)
-					assert.Equals(t, dbeak.AccountID, tc.eak.AccountID)
-					assert.Equals(t, dbeak.CreatedAt, tc.eak.CreatedAt)
-					assert.Equals(t, dbeak.BoundAt, tc.eak.BoundAt)
-					assert.Equals(t, dbeak.KeyBytes, tc.eak.KeyBytes)
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, dbeak.ID, tc.eak.ID)
+				assert.Equals(t, dbeak.Provisioner, tc.eak.Provisioner)
+				assert.Equals(t, dbeak.Reference, tc.eak.Reference)
+				assert.Equals(t, dbeak.AccountID, tc.eak.AccountID)
+				assert.Equals(t, dbeak.CreatedAt, tc.eak.CreatedAt)
+				assert.Equals(t, dbeak.BoundAt, tc.eak.BoundAt)
+				assert.Equals(t, dbeak.KeyBytes, tc.eak.KeyBytes)
 			}
 		})
 	}

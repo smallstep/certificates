@@ -69,12 +69,12 @@ const noKeyID = keyID("")
 
 // jwsEncodeEAB creates a JWS payload for External Account Binding according to RFC 8555 §7.3.4.
 // Implementation taken from github.com/mholt/acmez
-func jwsEncodeEAB(accountKey crypto.PublicKey, hmacKey []byte, kid keyID, url string) ([]byte, error) {
+func jwsEncodeEAB(accountKey crypto.PublicKey, hmacKey []byte, kid keyID, u string) ([]byte, error) {
 	// §7.3.4: "The 'alg' field MUST indicate a MAC-based algorithm"
 	alg, sha := "HS256", crypto.SHA256
 
 	// §7.3.4: "The 'nonce' field MUST NOT be present"
-	phead, err := jwsHead(alg, "", url, kid, nil)
+	phead, err := jwsHead(alg, "", u, kid, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func jwsEncodeEAB(accountKey crypto.PublicKey, hmacKey []byte, kid keyID, url st
 // Since jwk and kid are mutually-exclusive, the jwk will be encoded
 // only if kid is empty. If nonce is empty, it will not be encoded.
 // Implementation taken from github.com/mholt/acmez
-func jwsHead(alg, nonce, url string, kid keyID, key crypto.Signer) (string, error) {
+func jwsHead(alg, nonce, u string, kid keyID, key crypto.Signer) (string, error) {
 	phead := fmt.Sprintf(`{"alg":%q`, alg)
 	if kid == noKeyID {
 		jwk, err := jwkEncode(key.Public())
@@ -113,7 +113,7 @@ func jwsHead(alg, nonce, url string, kid keyID, key crypto.Signer) (string, erro
 	if nonce != "" {
 		phead += fmt.Sprintf(`,"nonce":%q`, nonce)
 	}
-	phead += fmt.Sprintf(`,"url":%q}`, url)
+	phead += fmt.Sprintf(`,"url":%q}`, u)
 	phead = base64.RawURLEncoding.EncodeToString([]byte(phead))
 	return phead, nil
 }
@@ -684,7 +684,7 @@ func TestHandler_NewAccount(t *testing.T) {
 						assert.Equals(t, acc.Key, jwk)
 						return nil
 					},
-					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName, keyID string) (*acme.ExternalAccountKey, error) {
 						return &acme.ExternalAccountKey{
 							ID:          "eakID",
 							Provisioner: escProvName,
@@ -1058,7 +1058,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			createdAt := time.Now()
 			return test{
 				db: &acme.MockDB{
-					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName, keyID string) (*acme.ExternalAccountKey, error) {
 						return &acme.ExternalAccountKey{
 							ID:          "eakID",
 							Provisioner: escProvName,
@@ -1091,7 +1091,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(eabJWS, &eab)
 			assert.FatalError(t, err)
-			eab.Payload = eab.Payload + "{}"
+			eab.Payload += "{}"
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
@@ -1149,7 +1149,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			return test{
 				db: &acme.MockDB{
-					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName, keyID string) (*acme.ExternalAccountKey, error) {
 						return nil, acme.NewErrorISE("error retrieving external account key")
 					},
 				},
@@ -1205,7 +1205,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			boundAt := time.Now().Add(1 * time.Second)
 			return test{
 				db: &acme.MockDB{
-					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName, keyID string) (*acme.ExternalAccountKey, error) {
 						return &acme.ExternalAccountKey{
 							ID:          "eakID",
 							Provisioner: escProvName,
@@ -1240,7 +1240,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			return test{
 				db: &acme.MockDB{
-					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName, keyID string) (*acme.ExternalAccountKey, error) {
 						return &acme.ExternalAccountKey{
 							ID:          "eakID",
 							Provisioner: escProvName,
@@ -1276,7 +1276,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			return test{
 				db: &acme.MockDB{
-					MockGetExternalAccountKey: func(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName, keyID string) (*acme.ExternalAccountKey, error) {
 						return &acme.ExternalAccountKey{
 							ID:          "eakID",
 							Provisioner: escProvName,

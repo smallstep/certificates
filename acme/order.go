@@ -17,7 +17,9 @@ import (
 type IdentifierType string
 
 const (
-	IP  IdentifierType = "ip"
+	// IP identifier type
+	IP IdentifierType = "ip"
+	// DNS identifier type
 	DNS IdentifierType = "dns"
 )
 

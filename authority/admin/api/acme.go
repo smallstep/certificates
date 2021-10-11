@@ -33,14 +33,14 @@ type GetExternalAccountKeysResponse struct {
 // before serving requests that act on ACME EAB credentials.
 func (h *Handler) requireEABEnabled(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		provisioner := chi.URLParam(r, "prov")
-		eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), provisioner)
+		prov := chi.URLParam(r, "prov")
+		eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), prov)
 		if err != nil {
 			api.WriteError(w, err)
 			return
 		}
 		if !eabEnabled {
-			api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", provisioner))
+			api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", prov))
 			return
 		}
 		next(w, r)
@@ -68,12 +68,12 @@ func (h *Handler) provisionerHasEABEnabled(ctx context.Context, provisionerName 
 		return false, admin.NewErrorISE("error getting details for provisioner with ID: %s", p.GetID())
 	}
 
-	acme := details.GetACME()
-	if acme == nil {
+	acmeProvisioner := details.GetACME()
+	if acmeProvisioner == nil {
 		return false, admin.NewErrorISE("error getting ACME details for provisioner with ID: %s", p.GetID())
 	}
 
-	return acme.GetRequireEab(), nil
+	return acmeProvisioner.GetRequireEab(), nil
 }
 
 // CreateExternalAccountKey creates a new External Account Binding key
@@ -89,23 +89,23 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	provisioner := chi.URLParam(r, "prov")
+	prov := chi.URLParam(r, "prov")
 	reference := body.Reference
 
 	if reference != "" {
-		k, err := h.acmeDB.GetExternalAccountKeyByReference(r.Context(), provisioner, reference)
+		k, err := h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference)
 		// retrieving an EAB key from DB results in error if it doesn't exist, which is what we're looking for
 		if err == nil || k != nil {
-			err := admin.NewError(admin.ErrorBadRequestType, "an ACME EAB key for provisioner %s with reference %s already exists", provisioner, reference)
+			err := admin.NewError(admin.ErrorBadRequestType, "an ACME EAB key for provisioner %s with reference %s already exists", prov, reference)
 			err.Status = 409
 			api.WriteError(w, err)
 			return
 		}
 	}
 
-	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), provisioner, reference)
+	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), prov, reference)
 	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error creating ACME EAB key for provisioner %s and reference %s", provisioner, reference))
+		api.WriteError(w, admin.WrapErrorISE(err, "error creating ACME EAB key for provisioner %s and reference %s", prov, reference))
 		return
 	}
 
@@ -121,10 +121,10 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 
 // DeleteExternalAccountKey deletes an ACME External Account Key.
 func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Request) {
-	provisioner := chi.URLParam(r, "prov")
+	prov := chi.URLParam(r, "prov")
 	keyID := chi.URLParam(r, "id")
 
-	if err := h.acmeDB.DeleteExternalAccountKey(r.Context(), provisioner, keyID); err != nil {
+	if err := h.acmeDB.DeleteExternalAccountKey(r.Context(), prov, keyID); err != nil {
 		api.WriteError(w, admin.WrapErrorISE(err, "error deleting ACME EAB Key %s", keyID))
 		return
 	}

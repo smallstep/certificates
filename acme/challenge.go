@@ -26,8 +26,11 @@ import (
 type ChallengeType string
 
 const (
-	HTTP01    ChallengeType = "http-01"
-	DNS01     ChallengeType = "dns-01"
+	// HTTP-01 challenge type
+	HTTP01 ChallengeType = "http-01"
+	// DNS-01 challenge type
+	DNS01 ChallengeType = "dns-01"
+	// TLS-ALPN-01 challenge type
 	TLSALPN01 ChallengeType = "tls-alpn-01"
 )
 
