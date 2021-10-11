@@ -170,7 +170,7 @@ func (db *DB) UpdateAccount(ctx context.Context, acc *acme.Account) error {
 }
 
 // CreateExternalAccountKey creates a new External Account Binding key with a name
-func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName string, reference string) (*acme.ExternalAccountKey, error) {
+func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
 	keyID, err := randID()
 	if err != nil {
 		return nil, err
@@ -216,7 +216,7 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName stri
 }
 
 // GetExternalAccountKey retrieves an External Account Binding key by KeyID
-func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerName string, keyID string) (*acme.ExternalAccountKey, error) {
+func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerName, keyID string) (*acme.ExternalAccountKey, error) {
 	dbeak, err := db.getDBExternalAccountKey(ctx, keyID)
 	if err != nil {
 		return nil, err
@@ -237,7 +237,7 @@ func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerName string,
 	}, nil
 }
 
-func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerName string, keyID string) error {
+func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerName, keyID string) error {
 	dbeak, err := db.getDBExternalAccountKey(ctx, keyID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading ACME EAB Key with Key ID %s", keyID)
@@ -289,7 +289,7 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName string
 }
 
 // GetExternalAccountKeyByReference retrieves an External Account Binding key with unique reference
-func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerName string, reference string) (*acme.ExternalAccountKey, error) {
+func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
 	if reference == "" {
 		return nil, nil
 	}
