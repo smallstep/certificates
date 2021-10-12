@@ -19,9 +19,7 @@ func init() {
 	})
 }
 
-var now = func() time.Time {
-	return time.Now()
-}
+var now = time.Now
 
 // SoftCAS implements a Certificate Authority Service using Golang or KMS
 // crypto. This is the default CAS used in step-ca.

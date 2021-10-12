@@ -16,10 +16,10 @@ func (a *Authority) LoadAdminByID(id string) (*linkedca.Admin, bool) {
 }
 
 // LoadAdminBySubProv returns an *linkedca.Admin with the given ID.
-func (a *Authority) LoadAdminBySubProv(subject, provisioner string) (*linkedca.Admin, bool) {
+func (a *Authority) LoadAdminBySubProv(subject, prov string) (*linkedca.Admin, bool) {
 	a.adminMutex.RLock()
 	defer a.adminMutex.RUnlock()
-	return a.admins.LoadBySubProv(subject, provisioner)
+	return a.admins.LoadBySubProv(subject, prov)
 }
 
 // GetAdmins returns a map listing each provisioner and the JWK Key Set

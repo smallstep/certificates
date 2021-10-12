@@ -19,7 +19,7 @@ type SSHRekeyRequest struct {
 // Validate validates the SSHSignRekey.
 func (s *SSHRekeyRequest) Validate() error {
 	switch {
-	case len(s.OTT) == 0:
+	case s.OTT == "":
 		return errors.New("missing or empty ott")
 	case len(s.PublicKey) == 0:
 		return errors.New("missing or empty public key")

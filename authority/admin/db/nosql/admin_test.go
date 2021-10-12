@@ -12,7 +12,6 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/nosql"
 	"github.com/smallstep/nosql/database"
-	nosqldb "github.com/smallstep/nosql/database"
 	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -32,7 +31,7 @@ func TestDB_getDBAdminBytes(t *testing.T) {
 						assert.Equals(t, bucket, adminsTable)
 						assert.Equals(t, string(key), adminID)
 
-						return nil, nosqldb.ErrNotFound
+						return nil, database.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "admin adminID not found"),
@@ -67,8 +66,8 @@ func TestDB_getDBAdminBytes(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if b, err := db.getDBAdminBytes(context.Background(), adminID); err != nil {
+			d := DB{db: tc.db}
+			if b, err := d.getDBAdminBytes(context.Background(), adminID); err != nil {
 				switch k := err.(type) {
 				case *admin.Error:
 					if assert.NotNil(t, tc.adminErr) {
@@ -83,10 +82,8 @@ func TestDB_getDBAdminBytes(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, string(b), "foo")
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, string(b), "foo")
 			}
 		})
 	}
@@ -108,7 +105,7 @@ func TestDB_getDBAdmin(t *testing.T) {
 						assert.Equals(t, bucket, adminsTable)
 						assert.Equals(t, string(key), adminID)
 
-						return nil, nosqldb.ErrNotFound
+						return nil, database.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "admin adminID not found"),
@@ -193,8 +190,8 @@ func TestDB_getDBAdmin(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
-			if dba, err := db.getDBAdmin(context.Background(), adminID); err != nil {
+			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
+			if dba, err := d.getDBAdmin(context.Background(), adminID); err != nil {
 				switch k := err.(type) {
 				case *admin.Error:
 					if assert.NotNil(t, tc.adminErr) {
@@ -209,16 +206,14 @@ func TestDB_getDBAdmin(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) {
-					assert.Equals(t, dba.ID, adminID)
-					assert.Equals(t, dba.AuthorityID, tc.dba.AuthorityID)
-					assert.Equals(t, dba.ProvisionerID, tc.dba.ProvisionerID)
-					assert.Equals(t, dba.Subject, tc.dba.Subject)
-					assert.Equals(t, dba.Type, tc.dba.Type)
-					assert.Equals(t, dba.CreatedAt, tc.dba.CreatedAt)
-					assert.Fatal(t, dba.DeletedAt.IsZero())
-				}
+			} else if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) {
+				assert.Equals(t, dba.ID, adminID)
+				assert.Equals(t, dba.AuthorityID, tc.dba.AuthorityID)
+				assert.Equals(t, dba.ProvisionerID, tc.dba.ProvisionerID)
+				assert.Equals(t, dba.Subject, tc.dba.Subject)
+				assert.Equals(t, dba.Type, tc.dba.Type)
+				assert.Equals(t, dba.CreatedAt, tc.dba.CreatedAt)
+				assert.Fatal(t, dba.DeletedAt.IsZero())
 			}
 		})
 	}
@@ -283,8 +278,8 @@ func TestDB_unmarshalDBAdmin(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{authorityID: admin.DefaultAuthorityID}
-			if dba, err := db.unmarshalDBAdmin(tc.in, adminID); err != nil {
+			d := DB{authorityID: admin.DefaultAuthorityID}
+			if dba, err := d.unmarshalDBAdmin(tc.in, adminID); err != nil {
 				switch k := err.(type) {
 				case *admin.Error:
 					if assert.NotNil(t, tc.adminErr) {
@@ -299,16 +294,14 @@ func TestDB_unmarshalDBAdmin(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) {
-					assert.Equals(t, dba.ID, adminID)
-					assert.Equals(t, dba.AuthorityID, tc.dba.AuthorityID)
-					assert.Equals(t, dba.ProvisionerID, tc.dba.ProvisionerID)
-					assert.Equals(t, dba.Subject, tc.dba.Subject)
-					assert.Equals(t, dba.Type, tc.dba.Type)
-					assert.Equals(t, dba.CreatedAt, tc.dba.CreatedAt)
-					assert.Fatal(t, dba.DeletedAt.IsZero())
-				}
+			} else if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) {
+				assert.Equals(t, dba.ID, adminID)
+				assert.Equals(t, dba.AuthorityID, tc.dba.AuthorityID)
+				assert.Equals(t, dba.ProvisionerID, tc.dba.ProvisionerID)
+				assert.Equals(t, dba.Subject, tc.dba.Subject)
+				assert.Equals(t, dba.Type, tc.dba.Type)
+				assert.Equals(t, dba.CreatedAt, tc.dba.CreatedAt)
+				assert.Fatal(t, dba.DeletedAt.IsZero())
 			}
 		})
 	}
@@ -360,8 +353,8 @@ func TestDB_unmarshalAdmin(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{authorityID: admin.DefaultAuthorityID}
-			if adm, err := db.unmarshalAdmin(tc.in, adminID); err != nil {
+			d := DB{authorityID: admin.DefaultAuthorityID}
+			if adm, err := d.unmarshalAdmin(tc.in, adminID); err != nil {
 				switch k := err.(type) {
 				case *admin.Error:
 					if assert.NotNil(t, tc.adminErr) {
@@ -376,16 +369,14 @@ func TestDB_unmarshalAdmin(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) {
-					assert.Equals(t, adm.Id, adminID)
-					assert.Equals(t, adm.AuthorityId, tc.dba.AuthorityID)
-					assert.Equals(t, adm.ProvisionerId, tc.dba.ProvisionerID)
-					assert.Equals(t, adm.Subject, tc.dba.Subject)
-					assert.Equals(t, adm.Type, tc.dba.Type)
-					assert.Equals(t, adm.CreatedAt, timestamppb.New(tc.dba.CreatedAt))
-					assert.Equals(t, adm.DeletedAt, timestamppb.New(tc.dba.DeletedAt))
-				}
+			} else if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) {
+				assert.Equals(t, adm.Id, adminID)
+				assert.Equals(t, adm.AuthorityId, tc.dba.AuthorityID)
+				assert.Equals(t, adm.ProvisionerId, tc.dba.ProvisionerID)
+				assert.Equals(t, adm.Subject, tc.dba.Subject)
+				assert.Equals(t, adm.Type, tc.dba.Type)
+				assert.Equals(t, adm.CreatedAt, timestamppb.New(tc.dba.CreatedAt))
+				assert.Equals(t, adm.DeletedAt, timestamppb.New(tc.dba.DeletedAt))
 			}
 		})
 	}
@@ -407,7 +398,7 @@ func TestDB_GetAdmin(t *testing.T) {
 						assert.Equals(t, bucket, adminsTable)
 						assert.Equals(t, string(key), adminID)
 
-						return nil, nosqldb.ErrNotFound
+						return nil, database.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "admin adminID not found"),
@@ -516,8 +507,8 @@ func TestDB_GetAdmin(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
-			if adm, err := db.GetAdmin(context.Background(), adminID); err != nil {
+			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
+			if adm, err := d.GetAdmin(context.Background(), adminID); err != nil {
 				switch k := err.(type) {
 				case *admin.Error:
 					if assert.NotNil(t, tc.adminErr) {
@@ -532,16 +523,14 @@ func TestDB_GetAdmin(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) {
-					assert.Equals(t, adm.Id, adminID)
-					assert.Equals(t, adm.AuthorityId, tc.dba.AuthorityID)
-					assert.Equals(t, adm.ProvisionerId, tc.dba.ProvisionerID)
-					assert.Equals(t, adm.Subject, tc.dba.Subject)
-					assert.Equals(t, adm.Type, tc.dba.Type)
-					assert.Equals(t, adm.CreatedAt, timestamppb.New(tc.dba.CreatedAt))
-					assert.Equals(t, adm.DeletedAt, timestamppb.New(tc.dba.DeletedAt))
-				}
+			} else if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) {
+				assert.Equals(t, adm.Id, adminID)
+				assert.Equals(t, adm.AuthorityId, tc.dba.AuthorityID)
+				assert.Equals(t, adm.ProvisionerId, tc.dba.ProvisionerID)
+				assert.Equals(t, adm.Subject, tc.dba.Subject)
+				assert.Equals(t, adm.Type, tc.dba.Type)
+				assert.Equals(t, adm.CreatedAt, timestamppb.New(tc.dba.CreatedAt))
+				assert.Equals(t, adm.DeletedAt, timestamppb.New(tc.dba.DeletedAt))
 			}
 		})
 	}
@@ -562,7 +551,7 @@ func TestDB_DeleteAdmin(t *testing.T) {
 						assert.Equals(t, bucket, adminsTable)
 						assert.Equals(t, string(key), adminID)
 
-						return nil, nosqldb.ErrNotFound
+						return nil, database.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "admin adminID not found"),
@@ -670,8 +659,8 @@ func TestDB_DeleteAdmin(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
-			if err := db.DeleteAdmin(context.Background(), adminID); err != nil {
+			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
+			if err := d.DeleteAdmin(context.Background(), adminID); err != nil {
 				switch k := err.(type) {
 				case *admin.Error:
 					if assert.NotNil(t, tc.adminErr) {
@@ -708,7 +697,7 @@ func TestDB_UpdateAdmin(t *testing.T) {
 						assert.Equals(t, bucket, adminsTable)
 						assert.Equals(t, string(key), adminID)
 
-						return nil, nosqldb.ErrNotFound
+						return nil, database.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "admin adminID not found"),
@@ -821,8 +810,8 @@ func TestDB_UpdateAdmin(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
-			if err := db.UpdateAdmin(context.Background(), tc.adm); err != nil {
+			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
+			if err := d.UpdateAdmin(context.Background(), tc.adm); err != nil {
 				switch k := err.(type) {
 				case *admin.Error:
 					if assert.NotNil(t, tc.adminErr) {
@@ -919,8 +908,8 @@ func TestDB_CreateAdmin(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
-			if err := db.CreateAdmin(context.Background(), tc.adm); err != nil {
+			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
+			if err := d.CreateAdmin(context.Background(), tc.adm); err != nil {
 				switch k := err.(type) {
 				case *admin.Error:
 					if assert.NotNil(t, tc.adminErr) {
@@ -1095,8 +1084,8 @@ func TestDB_GetAdmins(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
-			if admins, err := db.GetAdmins(context.Background()); err != nil {
+			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
+			if admins, err := d.GetAdmins(context.Background()); err != nil {
 				switch k := err.(type) {
 				case *admin.Error:
 					if assert.NotNil(t, tc.adminErr) {
@@ -1111,10 +1100,8 @@ func TestDB_GetAdmins(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) {
-					tc.verify(t, admins)
-				}
+			} else if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) {
+				tc.verify(t, admins)
 			}
 		})
 	}

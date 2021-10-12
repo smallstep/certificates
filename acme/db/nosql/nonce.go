@@ -31,7 +31,7 @@ func (db *DB) CreateNonce(ctx context.Context) (acme.Nonce, error) {
 		ID:        id,
 		CreatedAt: clock.Now(),
 	}
-	if err = db.save(ctx, id, n, nil, "nonce", nonceTable); err != nil {
+	if err := db.save(ctx, id, n, nil, "nonce", nonceTable); err != nil {
 		return "", err
 	}
 	return acme.Nonce(id), nil

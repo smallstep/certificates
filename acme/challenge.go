@@ -76,23 +76,23 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 }
 
 func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
-	url := &url.URL{Scheme: "http", Host: ch.Value, Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
+	u := &url.URL{Scheme: "http", Host: ch.Value, Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
 
-	resp, err := vo.HTTPGet(url.String())
+	resp, err := vo.HTTPGet(u.String())
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
-			"error doing http GET for url %s", url))
+			"error doing http GET for url %s", u))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return storeError(ctx, db, ch, false, NewError(ErrorConnectionType,
-			"error doing http GET for url %s with status code %d", url, resp.StatusCode))
+			"error doing http GET for url %s with status code %d", u, resp.StatusCode))
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return WrapErrorISE(err, "error reading "+
-			"response body for url %s", url)
+			"response body for url %s", u)
 	}
 	keyAuth := strings.TrimSpace(string(body))
 

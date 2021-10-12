@@ -134,7 +134,7 @@ func (b *badSigner) Public() crypto.PublicKey {
 	return testSigner.Public()
 }
 
-func (b *badSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+func (b *badSigner) Sign(_ io.Reader, _ []byte, _ crypto.SignerOpts) ([]byte, error) {
 	return nil, fmt.Errorf("💥")
 }
 

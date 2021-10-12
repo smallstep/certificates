@@ -46,7 +46,7 @@ func createSSHCert(cert *ssh.Certificate, signer ssh.Signer) (*ssh.Certificate, 
 	if err != nil {
 		return nil, nil, err
 	}
-	if err = cert.SignCert(rand.Reader, signer); err != nil {
+	if err := cert.SignCert(rand.Reader, signer); err != nil {
 		return nil, nil, err
 	}
 	return cert, jwk, nil
@@ -214,10 +214,8 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.NotNil(t, claims)
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.NotNil(t, claims)
 			}
 		})
 	}

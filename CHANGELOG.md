@@ -8,10 +8,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Support for Azure Key Vault as a KMS.
 - Adapt `pki` package to support key managers.
+- gocritic linter
 ### Changed
 ### Deprecated
 ### Removed
 ### Fixed
+- gocritic warnings
 ### Security
 
 ## [0.17.4] - 2021-09-28

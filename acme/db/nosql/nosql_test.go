@@ -126,8 +126,8 @@ func TestDB_save(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			db := &DB{db: tc.db}
-			if err := db.save(context.Background(), "id", tc.nu, tc.old, "challenge", challengeTable); err != nil {
+			d := &DB{db: tc.db}
+			if err := d.save(context.Background(), "id", tc.nu, tc.old, "challenge", challengeTable); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}

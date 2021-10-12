@@ -148,7 +148,7 @@ func (o *OIDC) GetType() Type {
 }
 
 // GetEncryptedKey is not available in an OIDC provisioner.
-func (o *OIDC) GetEncryptedKey() (kid string, key string, ok bool) {
+func (o *OIDC) GetEncryptedKey() (kid, key string, ok bool) {
 	return "", "", false
 }
 
@@ -193,7 +193,7 @@ func (o *OIDC) Init(config Config) (err error) {
 	}
 	// Replace {tenantid} with the configured one
 	if o.TenantID != "" {
-		o.configuration.Issuer = strings.Replace(o.configuration.Issuer, "{tenantid}", o.TenantID, -1)
+		o.configuration.Issuer = strings.ReplaceAll(o.configuration.Issuer, "{tenantid}", o.TenantID)
 	}
 	// Get JWK key set
 	o.keyStore, err = newKeyStore(o.configuration.JWKSetURI)

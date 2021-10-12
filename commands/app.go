@@ -24,7 +24,7 @@ var AppCommand = cli.Command{
 	Name:   "start",
 	Action: appAction,
 	UsageText: `**step-ca** <config> [**--password-file**=<file>]
-[**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]	
+[**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]
 [**--issuer-password-file**=<file>] [**--resolver**=<addr>]`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
@@ -79,13 +79,13 @@ func appAction(ctx *cli.Context) error {
 	}
 
 	configFile := ctx.Args().Get(0)
-	config, err := config.LoadConfiguration(configFile)
+	cfg, err := config.LoadConfiguration(configFile)
 	if err != nil {
 		fatal(err)
 	}
 
-	if config.AuthorityConfig != nil {
-		if token == "" && strings.EqualFold(config.AuthorityConfig.DeploymentType, pki.LinkedDeployment.String()) {
+	if cfg.AuthorityConfig != nil {
+		if token == "" && strings.EqualFold(cfg.AuthorityConfig.DeploymentType, pki.LinkedDeployment.String()) {
 			return errors.New(`'step-ca' requires the '--token' flag for linked deploy type.
 
 To get a linked authority token:
@@ -136,7 +136,7 @@ To get a linked authority token:
 		}
 	}
 
-	srv, err := ca.New(config,
+	srv, err := ca.New(cfg,
 		ca.WithConfigFile(configFile),
 		ca.WithPassword(password),
 		ca.WithSSHHostPassword(sshHostPassword),

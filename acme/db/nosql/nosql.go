@@ -41,7 +41,7 @@ func New(db nosqlDB.DB) (*DB, error) {
 
 // save writes the new data to the database, overwriting the old data if it
 // existed.
-func (db *DB) save(ctx context.Context, id string, nu interface{}, old interface{}, typ string, table []byte) error {
+func (db *DB) save(ctx context.Context, id string, nu, old interface{}, typ string, table []byte) error {
 	var (
 		err  error
 		newB []byte

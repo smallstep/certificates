@@ -135,7 +135,7 @@ func parseCertificateRequest(data string) *x509.CertificateRequest {
 	return csr
 }
 
-func equalJSON(t *testing.T, a interface{}, b interface{}) bool {
+func equalJSON(t *testing.T, a, b interface{}) bool {
 	if reflect.DeepEqual(a, b) {
 		return true
 	}

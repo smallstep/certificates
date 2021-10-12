@@ -22,6 +22,7 @@ import (
 	"go.step.sm/cli-utils/command"
 	"go.step.sm/cli-utils/command/version"
 	"go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/ui"
 	"go.step.sm/cli-utils/usage"
 
 	// Enabled kms interfaces.
@@ -51,6 +52,11 @@ func init() {
 	config.Set("Smallstep CA", Version, BuildTime)
 	authority.GlobalVersion.Version = Version
 	rand.Seed(time.Now().UnixNano())
+}
+
+func exit(code int) {
+	ui.Reset()
+	os.Exit(code)
 }
 
 // appHelpTemplate contains the modified template for the main app
@@ -91,6 +97,9 @@ Please send us a sentence or two, good or bad: **feedback@smallstep.com** or htt
 `
 
 func main() {
+	// Initialize windows terminal
+	ui.Init()
+
 	// Override global framework components
 	cli.VersionPrinter = func(c *cli.Context) {
 		version.Command(c)
@@ -108,7 +117,7 @@ func main() {
 	app.HelpName = "step-ca"
 	app.Version = config.Version()
 	app.Usage = "an online certificate authority for secure automated certificate management"
-	app.UsageText = `**step-ca** <config> [**--password-file**=<file>] 
+	app.UsageText = `**step-ca** <config> [**--password-file**=<file>]
 [**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]
 [**--issuer-password-file**=<file>] [**--resolver**=<addr>] [**--help**] [**--version**]`
 	app.Description = `**step-ca** runs the Step Online Certificate Authority
@@ -165,8 +174,10 @@ $ step-ca $STEPPATH/config/ca.json --password-file ./password.txt
 		} else {
 			fmt.Fprintln(os.Stderr, err)
 		}
-		os.Exit(1)
+		exit(1)
 	}
+
+	exit(0)
 }
 
 func flagValue(f cli.Flag) reflect.Value {
@@ -181,8 +192,8 @@ var placeholderString = regexp.MustCompile(`<.*?>`)
 
 func stringifyFlag(f cli.Flag) string {
 	fv := flagValue(f)
-	usage := fv.FieldByName("Usage").String()
-	placeholder := placeholderString.FindString(usage)
+	usg := fv.FieldByName("Usage").String()
+	placeholder := placeholderString.FindString(usg)
 	if placeholder == "" {
 		switch f.(type) {
 		case cli.BoolFlag, cli.BoolTFlag:
@@ -190,5 +201,5 @@ func stringifyFlag(f cli.Flag) string {
 			placeholder = "<value>"
 		}
 	}
-	return cli.FlagNamePrefixer(fv.FieldByName("Name").String(), placeholder) + "\t" + usage
+	return cli.FlagNamePrefixer(fv.FieldByName("Name").String(), placeholder) + "\t" + usg
 }

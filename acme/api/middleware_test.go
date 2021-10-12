@@ -108,7 +108,7 @@ func TestHandler_baseURLFromRequest(t *testing.T) {
 }
 
 func TestHandler_addNonce(t *testing.T) {
-	url := "https://ca.smallstep.com/acme/new-nonce"
+	u := "https://ca.smallstep.com/acme/new-nonce"
 	type test struct {
 		db         acme.DB
 		err        *acme.Error
@@ -141,7 +141,7 @@ func TestHandler_addNonce(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{db: tc.db}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			w := httptest.NewRecorder()
 			h.addNonce(testNext)(w, req)
 			res := w.Result()
@@ -230,7 +230,7 @@ func TestHandler_verifyContentType(t *testing.T) {
 	prov := newProv()
 	escProvName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	url := fmt.Sprintf("%s/acme/%s/certificate/abc123", baseURL.String(), escProvName)
+	u := fmt.Sprintf("%s/acme/%s/certificate/abc123", baseURL.String(), escProvName)
 	type test struct {
 		h           Handler
 		ctx         context.Context
@@ -245,7 +245,7 @@ func TestHandler_verifyContentType(t *testing.T) {
 				h: Handler{
 					linker: NewLinker("dns", "acme"),
 				},
-				url:         url,
+				url:         u,
 				ctx:         context.Background(),
 				contentType: "foo",
 				statusCode:  500,
@@ -257,7 +257,7 @@ func TestHandler_verifyContentType(t *testing.T) {
 				h: Handler{
 					linker: NewLinker("dns", "acme"),
 				},
-				url:         url,
+				url:         u,
 				ctx:         context.WithValue(context.Background(), provisionerContextKey, prov),
 				contentType: "foo",
 				statusCode:  400,
@@ -319,11 +319,11 @@ func TestHandler_verifyContentType(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			_url := url
+			_u := u
 			if tc.url != "" {
-				_url = tc.url
+				_u = tc.url
 			}
-			req := httptest.NewRequest("GET", _url, nil)
+			req := httptest.NewRequest("GET", _u, nil)
 			req = req.WithContext(tc.ctx)
 			req.Header.Add("Content-Type", tc.contentType)
 			w := httptest.NewRecorder()
@@ -353,7 +353,7 @@ func TestHandler_verifyContentType(t *testing.T) {
 }
 
 func TestHandler_isPostAsGet(t *testing.T) {
-	url := "https://ca.smallstep.com/acme/new-account"
+	u := "https://ca.smallstep.com/acme/new-account"
 	type test struct {
 		ctx        context.Context
 		err        *acme.Error
@@ -392,7 +392,7 @@ func TestHandler_isPostAsGet(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.isPostAsGet(testNext)(w, req)
@@ -430,7 +430,7 @@ func (errReader) Close() error {
 }
 
 func TestHandler_parseJWS(t *testing.T) {
-	url := "https://ca.smallstep.com/acme/new-account"
+	u := "https://ca.smallstep.com/acme/new-account"
 	type test struct {
 		next       nextHTTP
 		body       io.Reader
@@ -483,7 +483,7 @@ func TestHandler_parseJWS(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{}
-			req := httptest.NewRequest("GET", url, tc.body)
+			req := httptest.NewRequest("GET", u, tc.body)
 			w := httptest.NewRecorder()
 			h.parseJWS(tc.next)(w, req)
 			res := w.Result()
@@ -528,7 +528,7 @@ func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 	assert.FatalError(t, err)
 	parsedJWS, err := jose.ParseJWS(raw)
 	assert.FatalError(t, err)
-	url := "https://ca.smallstep.com/acme/account/1234"
+	u := "https://ca.smallstep.com/acme/account/1234"
 	type test struct {
 		ctx        context.Context
 		next       func(http.ResponseWriter, *http.Request)
@@ -681,7 +681,7 @@ func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.verifyAndExtractJWSPayload(tc.next)(w, req)
@@ -713,7 +713,7 @@ func TestHandler_lookupJWK(t *testing.T) {
 	prov := newProv()
 	provName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	url := fmt.Sprintf("%s/acme/%s/account/1234",
+	u := fmt.Sprintf("%s/acme/%s/account/1234",
 		baseURL, provName)
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	assert.FatalError(t, err)
@@ -883,7 +883,7 @@ func TestHandler_lookupJWK(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{db: tc.db, linker: tc.linker}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.lookupJWK(tc.next)(w, req)
@@ -934,7 +934,7 @@ func TestHandler_extractJWK(t *testing.T) {
 	assert.FatalError(t, err)
 	parsedJWS, err := jose.ParseJWS(raw)
 	assert.FatalError(t, err)
-	url := fmt.Sprintf("https://ca.smallstep.com/acme/%s/account/1234",
+	u := fmt.Sprintf("https://ca.smallstep.com/acme/%s/account/1234",
 		provName)
 	type test struct {
 		db         acme.DB
@@ -1079,7 +1079,7 @@ func TestHandler_extractJWK(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{db: tc.db}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.extractJWK(tc.next)(w, req)
@@ -1108,7 +1108,7 @@ func TestHandler_extractJWK(t *testing.T) {
 }
 
 func TestHandler_validateJWS(t *testing.T) {
-	url := "https://ca.smallstep.com/acme/account/1234"
+	u := "https://ca.smallstep.com/acme/account/1234"
 	type test struct {
 		db         acme.DB
 		ctx        context.Context
@@ -1198,7 +1198,7 @@ func TestHandler_validateJWS(t *testing.T) {
 							Algorithm:  jose.RS256,
 							JSONWebKey: &pub,
 							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": url,
+								"url": u,
 							},
 						},
 					},
@@ -1226,7 +1226,7 @@ func TestHandler_validateJWS(t *testing.T) {
 							Algorithm:  jose.RS256,
 							JSONWebKey: &pub,
 							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": url,
+								"url": u,
 							},
 						},
 					},
@@ -1298,7 +1298,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 				ctx:        context.WithValue(context.Background(), jwsContextKey, jws),
 				statusCode: 400,
-				err:        acme.NewError(acme.ErrorMalformedType, "url header in JWS (foo) does not match request url (%s)", url),
+				err:        acme.NewError(acme.ErrorMalformedType, "url header in JWS (foo) does not match request url (%s)", u),
 			}
 		},
 		"fail/both-jwk-kid": func(t *testing.T) test {
@@ -1313,7 +1313,7 @@ func TestHandler_validateJWS(t *testing.T) {
 							KeyID:      "bar",
 							JSONWebKey: &pub,
 							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": url,
+								"url": u,
 							},
 						},
 					},
@@ -1337,7 +1337,7 @@ func TestHandler_validateJWS(t *testing.T) {
 						Protected: jose.Header{
 							Algorithm: jose.ES256,
 							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": url,
+								"url": u,
 							},
 						},
 					},
@@ -1362,7 +1362,7 @@ func TestHandler_validateJWS(t *testing.T) {
 							Algorithm: jose.ES256,
 							KeyID:     "bar",
 							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": url,
+								"url": u,
 							},
 						},
 					},
@@ -1392,7 +1392,7 @@ func TestHandler_validateJWS(t *testing.T) {
 							Algorithm:  jose.ES256,
 							JSONWebKey: &pub,
 							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": url,
+								"url": u,
 							},
 						},
 					},
@@ -1422,7 +1422,7 @@ func TestHandler_validateJWS(t *testing.T) {
 							Algorithm:  jose.RS256,
 							JSONWebKey: &pub,
 							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": url,
+								"url": u,
 							},
 						},
 					},
@@ -1446,7 +1446,7 @@ func TestHandler_validateJWS(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{db: tc.db}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.validateJWS(tc.next)(w, req)

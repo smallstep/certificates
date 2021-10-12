@@ -12,7 +12,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"reflect"
@@ -103,7 +102,7 @@ MHcCAQEEIN51Rgg6YcQVLeCRzumdw4pjM3VWqFIdCbnsV3Up1e/goAoGCCqGSM49
 AwEHoUQDQgAEjJIcDhvvxi7gu4aFkiW/8+E3BfPhmhXU5RlDQusre+MHXc7XYMtk
 Lm6PXPeTF1DNdS21Ju1G/j1yUykGJOmxkg==
 -----END EC PRIVATE KEY-----`
-	// nolint:unused,deadcode
+	// nolint:unused,deadcode,gocritic
 	testIntermediateKey = `-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIMMX/XkXGnRDD4fYu7Z4rHACdJn/iyOy2UTwsv+oZ0C+oAoGCCqGSM49
 AwEHoUQDQgAE8u6rGAFj5CZpdzzMogLwUyCMnp0X9wtv4OKDRcpzkYf9PU5GuGA6
@@ -190,7 +189,7 @@ func (b *badSigner) Public() crypto.PublicKey {
 	return b.pub
 }
 
-func (b *badSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+func (b *badSigner) Sign(rnd io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	return nil, fmt.Errorf("💥")
 }
 
@@ -730,7 +729,7 @@ func TestCloudCAS_RevokeCertificate(t *testing.T) {
 func Test_createCertificateID(t *testing.T) {
 	buf := new(bytes.Buffer)
 	setTeeReader(t, buf)
-	uuid, err := uuid.NewRandomFromReader(rand.Reader)
+	id, err := uuid.NewRandomFromReader(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -741,7 +740,7 @@ func Test_createCertificateID(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{"ok", uuid.String(), false},
+		{"ok", id.String(), false},
 		{"fail", "", true},
 	}
 	for _, tt := range tests {
@@ -858,7 +857,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 			return lis.Dial()
 		}))
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	client, err := lroauto.NewOperationsClient(context.Background(), option.WithGRPCConn(conn))

@@ -88,9 +88,9 @@ func WithIssuerPassword(password []byte) Option {
 }
 
 // WithDatabase sets the given authority database to the CA options.
-func WithDatabase(db db.AuthDB) Option {
+func WithDatabase(d db.AuthDB) Option {
 	return func(o *options) {
-		o.database = db
+		o.database = d
 	}
 }
 
@@ -113,17 +113,17 @@ type CA struct {
 }
 
 // New creates and initializes the CA with the given configuration and options.
-func New(config *config.Config, opts ...Option) (*CA, error) {
+func New(cfg *config.Config, opts ...Option) (*CA, error) {
 	ca := &CA{
-		config: config,
+		config: cfg,
 		opts:   new(options),
 	}
 	ca.opts.apply(opts)
-	return ca.Init(config)
+	return ca.Init(cfg)
 }
 
 // Init initializes the CA with the given configuration.
-func (ca *CA) Init(config *config.Config) (*CA, error) {
+func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	// Set password, it's ok to set nil password, the ca will prompt for them if
 	// they are required.
 	opts := []authority.Option{
@@ -140,7 +140,7 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithDatabase(ca.opts.database))
 	}
 
-	auth, err := authority.New(config, opts...)
+	auth, err := authority.New(cfg, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -166,8 +166,8 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	})
 
 	//Add ACME api endpoints in /acme and /1.0/acme
-	dns := config.DNSNames[0]
-	u, err := url.Parse("https://" + config.Address)
+	dns := cfg.DNSNames[0]
+	u, err := url.Parse("https://" + cfg.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	// ACME Router
 	prefix := "acme"
 	var acmeDB acme.DB
-	if config.DB == nil {
+	if cfg.DB == nil {
 		acmeDB = nil
 	} else {
 		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
@@ -188,7 +188,7 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 		}
 	}
 	acmeHandler := acmeAPI.NewHandler(acmeAPI.HandlerOptions{
-		Backdate: *config.AuthorityConfig.Backdate,
+		Backdate: *cfg.AuthorityConfig.Backdate,
 		DB:       acmeDB,
 		DNS:      dns,
 		Prefix:   prefix,
@@ -204,7 +204,7 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	})
 
 	// Admin API Router
-	if config.AuthorityConfig.EnableAdmin {
+	if cfg.AuthorityConfig.EnableAdmin {
 		adminDB := auth.GetAdminDatabase()
 		if adminDB != nil {
 			adminHandler := adminAPI.NewHandler(auth)
@@ -248,8 +248,8 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	//dumpRoutes(mux)
 
 	// Add monitoring if configured
-	if len(config.Monitoring) > 0 {
-		m, err := monitoring.New(config.Monitoring)
+	if len(cfg.Monitoring) > 0 {
+		m, err := monitoring.New(cfg.Monitoring)
 		if err != nil {
 			return nil, err
 		}
@@ -258,8 +258,8 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 	}
 
 	// Add logger if configured
-	if len(config.Logger) > 0 {
-		logger, err := logging.New("ca", config.Logger)
+	if len(cfg.Logger) > 0 {
+		logger, err := logging.New("ca", cfg.Logger)
 		if err != nil {
 			return nil, err
 		}
@@ -267,16 +267,16 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 		insecureHandler = logger.Middleware(insecureHandler)
 	}
 
-	ca.srv = server.New(config.Address, handler, tlsConfig)
+	ca.srv = server.New(cfg.Address, handler, tlsConfig)
 
 	// only start the insecure server if the insecure address is configured
 	// and, currently, also only when it should serve SCEP endpoints.
-	if ca.shouldServeSCEPEndpoints() && config.InsecureAddress != "" {
+	if ca.shouldServeSCEPEndpoints() && cfg.InsecureAddress != "" {
 		// TODO: instead opt for having a single server.Server but two
 		// http.Servers handling the HTTP and HTTPS handler? The latter
 		// will probably introduce more complexity in terms of graceful
 		// reload.
-		ca.insecureSrv = server.New(config.InsecureAddress, insecureHandler, nil)
+		ca.insecureSrv = server.New(cfg.InsecureAddress, insecureHandler, nil)
 	}
 
 	return ca, nil
@@ -285,24 +285,24 @@ func (ca *CA) Init(config *config.Config) (*CA, error) {
 // Run starts the CA calling to the server ListenAndServe method.
 func (ca *CA) Run() error {
 	var wg sync.WaitGroup
-	errors := make(chan error, 1)
+	errs := make(chan error, 1)
 
 	if ca.insecureSrv != nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			errors <- ca.insecureSrv.ListenAndServe()
+			errs <- ca.insecureSrv.ListenAndServe()
 		}()
 	}
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		errors <- ca.srv.ListenAndServe()
+		errs <- ca.srv.ListenAndServe()
 	}()
 
 	// wait till error occurs; ensures the servers keep listening
-	err := <-errors
+	err := <-errs
 
 	wg.Wait()
 
@@ -331,7 +331,7 @@ func (ca *CA) Stop() error {
 // Reload reloads the configuration of the CA and calls to the server Reload
 // method.
 func (ca *CA) Reload() error {
-	config, err := config.LoadConfiguration(ca.opts.configFile)
+	cfg, err := config.LoadConfiguration(ca.opts.configFile)
 	if err != nil {
 		return errors.Wrap(err, "error reloading ca configuration")
 	}
@@ -343,12 +343,12 @@ func (ca *CA) Reload() error {
 	}
 
 	// Do not allow reload if the database configuration has changed.
-	if !reflect.DeepEqual(ca.config.DB, config.DB) {
+	if !reflect.DeepEqual(ca.config.DB, cfg.DB) {
 		logContinue("Reload failed because the database configuration has changed.")
 		return errors.New("error reloading ca: database configuration cannot change")
 	}
 
-	newCA, err := New(config,
+	newCA, err := New(cfg,
 		WithPassword(ca.opts.password),
 		WithSSHHostPassword(ca.opts.sshHostPassword),
 		WithSSHUserPassword(ca.opts.sshUserPassword),

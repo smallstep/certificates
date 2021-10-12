@@ -272,12 +272,12 @@ func (c *linkedCaClient) Revoke(crt *x509.Certificate, rci *db.RevokedCertificat
 	return errors.Wrap(err, "error revoking certificate")
 }
 
-func (c *linkedCaClient) RevokeSSH(ssh *ssh.Certificate, rci *db.RevokedCertificateInfo) error {
+func (c *linkedCaClient) RevokeSSH(cert *ssh.Certificate, rci *db.RevokedCertificateInfo) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err := c.client.RevokeSSHCertificate(ctx, &linkedca.RevokeSSHCertificateRequest{
 		Serial:      rci.Serial,
-		Certificate: serializeSSHCertificate(ssh),
+		Certificate: serializeSSHCertificate(cert),
 		Reason:      rci.Reason,
 		ReasonCode:  linkedca.RevocationReasonCode(rci.ReasonCode),
 		Passive:     true,

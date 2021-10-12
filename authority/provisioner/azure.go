@@ -152,7 +152,7 @@ func (p *Azure) GetType() Type {
 }
 
 // GetEncryptedKey is not available in an Azure provisioner.
-func (p *Azure) GetEncryptedKey() (kid string, key string, ok bool) {
+func (p *Azure) GetEncryptedKey() (kid, key string, ok bool) {
 	return "", "", false
 }
 
@@ -303,11 +303,13 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	var so []SignOption
 	if p.DisableCustomSANs {
 		// name will work only inside the virtual network
-		so = append(so, commonNameValidator(name))
-		so = append(so, dnsNamesValidator([]string{name}))
-		so = append(so, ipAddressesValidator(nil))
-		so = append(so, emailAddressesValidator(nil))
-		so = append(so, urisValidator(nil))
+		so = append(so,
+			commonNameValidator(name),
+			dnsNamesValidator([]string{name}),
+			ipAddressesValidator(nil),
+			emailAddressesValidator(nil),
+			urisValidator(nil),
+		)
 
 		// Enforce SANs in the template.
 		data.SetSANs([]string{name})

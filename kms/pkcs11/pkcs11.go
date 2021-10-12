@@ -145,8 +145,7 @@ func (k *PKCS11) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespons
 // CreateSigner creates a signer using the key present in the PKCS#11 MODULE signature
 // slot.
 func (k *PKCS11) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, error) {
-	switch {
-	case req.SigningKey == "":
+	if req.SigningKey == "" {
 		return nil, errors.New("createSignerRequest 'signingKey' cannot be empty")
 	}
 
@@ -204,8 +203,8 @@ func (k *PKCS11) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 }
 
 // DeleteKey is a utility function to delete a key given an uri.
-func (k *PKCS11) DeleteKey(uri string) error {
-	id, object, err := parseObject(uri)
+func (k *PKCS11) DeleteKey(u string) error {
+	id, object, err := parseObject(u)
 	if err != nil {
 		return errors.Wrap(err, "deleteKey failed")
 	}
@@ -223,8 +222,8 @@ func (k *PKCS11) DeleteKey(uri string) error {
 }
 
 // DeleteCertificate is a utility function to delete a certificate given an uri.
-func (k *PKCS11) DeleteCertificate(uri string) error {
-	id, object, err := parseObject(uri)
+func (k *PKCS11) DeleteCertificate(u string) error {
+	id, object, err := parseObject(u)
 	if err != nil {
 		return errors.Wrap(err, "deleteCertificate failed")
 	}
