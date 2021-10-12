@@ -95,8 +95,8 @@ func (u *URI) Get(key string) string {
 	return v
 }
 
-// GetBool returns true if a given key has the value "true". It will returns
-// false otherwise.
+// GetBool returns true if a given key has the value "true". It returns false
+// otherwise.
 func (u *URI) GetBool(key string) bool {
 	v := u.Values.Get(key)
 	if v == "" {
