@@ -24,7 +24,7 @@ const Scheme = "azurekms"
 
 // keyIDRegexp is the regular expression that Key Vault uses on the kid. We can
 // extract the vault, name and version of the key.
-var keyIDRegexp = regexp.MustCompile("^https://([0-9a-zA-Z-]+).vault.azure.net/keys/([0-9a-zA-Z-]+)/([0-9a-zA-Z-]+)$")
+var keyIDRegexp = regexp.MustCompile(`^https://([0-9a-zA-Z-]+)\.vault\.azure\.net/keys/([0-9a-zA-Z-]+)/([0-9a-zA-Z-]+)$`)
 
 var (
 	valueTrue       = true
@@ -162,8 +162,7 @@ func New(ctx context.Context, opts apiv1.Options) (*KeyVault, error) {
 
 // GetPublicKey loads a public key from Azure Key Vault by its resource name.
 func (k *KeyVault) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey, error) {
-	switch {
-	case req.Name == "":
+	if req.Name == "" {
 		return nil, errors.New("getPublicKeyRequest 'name' cannot be empty")
 	}
 

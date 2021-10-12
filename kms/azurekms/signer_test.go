@@ -134,6 +134,7 @@ func TestSigner_Sign(t *testing.T) {
 			sBytes := s.Bytes()
 			sBytesPadded := make([]byte, keyBytes)
 			copy(sBytesPadded[keyBytes-len(sBytes):], sBytes)
+			// nolint:gocritic
 			resultSig = append(rBytesPadded, sBytesPadded...)
 
 			var b cryptobyte.Builder
@@ -256,61 +257,61 @@ func TestSigner_Sign(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok P-256", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", p256}, args{
-			rand.Reader, p256Digest[:], crypto.SHA256,
+			rand.Reader, p256Digest, crypto.SHA256,
 		}, p256Sig, false},
 		{"ok P-384", fields{client, "https://my-vault.vault.azure.net/", "my-key", "my-version", p384}, args{
-			rand.Reader, p384Digest[:], crypto.SHA384,
+			rand.Reader, p384Digest, crypto.SHA384,
 		}, p384Sig, false},
 		{"ok P-521", fields{client, "https://my-vault.vault.azure.net/", "my-key", "my-version", p521}, args{
-			rand.Reader, p521Digest[:], crypto.SHA512,
+			rand.Reader, p521Digest, crypto.SHA512,
 		}, p521Sig, false},
 		{"ok RSA SHA256", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", rsaSHA256}, args{
-			rand.Reader, rsaSHA256Digest[:], crypto.SHA256,
+			rand.Reader, rsaSHA256Digest, crypto.SHA256,
 		}, rsaSHA256Sig, false},
 		{"ok RSA SHA384", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", rsaSHA384}, args{
-			rand.Reader, rsaSHA384Digest[:], crypto.SHA384,
+			rand.Reader, rsaSHA384Digest, crypto.SHA384,
 		}, rsaSHA384Sig, false},
 		{"ok RSA SHA512", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", rsaSHA512}, args{
-			rand.Reader, rsaSHA512Digest[:], crypto.SHA512,
+			rand.Reader, rsaSHA512Digest, crypto.SHA512,
 		}, rsaSHA512Sig, false},
 		{"ok RSA-PSS SHA256", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", rsaPSSSHA256}, args{
-			rand.Reader, rsaPSSSHA256Digest[:], &rsa.PSSOptions{
+			rand.Reader, rsaPSSSHA256Digest, &rsa.PSSOptions{
 				SaltLength: rsa.PSSSaltLengthAuto,
 				Hash:       crypto.SHA256,
 			},
 		}, rsaPSSSHA256Sig, false},
 		{"ok RSA-PSS SHA384", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", rsaPSSSHA384}, args{
-			rand.Reader, rsaPSSSHA384Digest[:], &rsa.PSSOptions{
+			rand.Reader, rsaPSSSHA384Digest, &rsa.PSSOptions{
 				SaltLength: rsa.PSSSaltLengthEqualsHash,
 				Hash:       crypto.SHA384,
 			},
 		}, rsaPSSSHA384Sig, false},
 		{"ok RSA-PSS SHA512", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", rsaPSSSHA512}, args{
-			rand.Reader, rsaPSSSHA512Digest[:], &rsa.PSSOptions{
+			rand.Reader, rsaPSSSHA512Digest, &rsa.PSSOptions{
 				SaltLength: 64,
 				Hash:       crypto.SHA512,
 			},
 		}, rsaPSSSHA512Sig, false},
 		{"fail Sign", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", rsaSHA256}, args{
-			rand.Reader, rsaSHA256Digest[:], crypto.SHA256,
+			rand.Reader, rsaSHA256Digest, crypto.SHA256,
 		}, nil, true},
 		{"fail sign length", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", p256}, args{
-			rand.Reader, p256Digest[:], crypto.SHA256,
+			rand.Reader, p256Digest, crypto.SHA256,
 		}, nil, true},
 		{"fail base64", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", p256}, args{
-			rand.Reader, p256Digest[:], crypto.SHA256,
+			rand.Reader, p256Digest, crypto.SHA256,
 		}, nil, true},
 		{"fail RSA-PSS salt length", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", rsaPSSSHA256}, args{
-			rand.Reader, rsaPSSSHA256Digest[:], &rsa.PSSOptions{
+			rand.Reader, rsaPSSSHA256Digest, &rsa.PSSOptions{
 				SaltLength: 64,
 				Hash:       crypto.SHA256,
 			},
 		}, nil, true},
 		{"fail RSA Hash", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", rsaSHA256}, args{
-			rand.Reader, rsaSHA256Digest[:], crypto.SHA1,
+			rand.Reader, rsaSHA256Digest, crypto.SHA1,
 		}, nil, true},
 		{"fail ECDSA Hash", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", p256}, args{
-			rand.Reader, p256Digest[:], crypto.MD5,
+			rand.Reader, p256Digest, crypto.MD5,
 		}, nil, true},
 		{"fail Ed25519", fields{client, "https://my-vault.vault.azure.net/", "my-key", "", ed25519Key}, args{
 			rand.Reader, []byte("message"), crypto.Hash(0),

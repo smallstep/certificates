@@ -792,7 +792,7 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 
 	// Enable KMS if necessary
 	if p.Kms != nil {
-		config.KMS = &kmsapi.Options{
+		cfg.KMS = &kmsapi.Options{
 			Type: strings.ToLower(p.Kms.Type.String()),
 		}
 	}
