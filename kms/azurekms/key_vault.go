@@ -22,8 +22,8 @@ func init() {
 // Scheme is the scheme used for the Azure Key Vault uris.
 const Scheme = "azurekms"
 
-// keyIDRegexp is the regular expression that Key Vault uses for on the kid. We
-// can extract the vault, name and version of the key.
+// keyIDRegexp is the regular expression that Key Vault uses on the kid. We can
+// extract the vault, name and version of the key.
 var keyIDRegexp = regexp.MustCompile("^https://([0-9a-zA-Z-]+).vault.azure.net/keys/([0-9a-zA-Z-]+)/([0-9a-zA-Z-]+)$")
 
 var (
