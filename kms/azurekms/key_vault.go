@@ -19,7 +19,7 @@ func init() {
 	})
 }
 
-// Scheme is the scheme used for Azure Key Vault uris.
+// Scheme is the scheme used for the Azure Key Vault uris.
 const Scheme = "azurekms"
 
 // keyIDRegexp is the regular expression that Key Vault uses for on the kid. We
@@ -96,11 +96,11 @@ var signatureAlgorithmMapping = map[apiv1.SignatureAlgorithm]keyType{
 	},
 }
 
-// vaultResource is that the client will use as audience.
+// vaultResource is the value the client will use as audience.
 const vaultResource = "https://vault.azure.net"
 
-// KeyVaultClient is the interface implemented by keyvault.BaseClient. It it
-// will be used for testing purposes.
+// KeyVaultClient is the interface implemented by keyvault.BaseClient. It will
+// be used for testing purposes.
 type KeyVaultClient interface {
 	GetKey(ctx context.Context, vaultBaseURL string, keyName string, keyVersion string) (keyvault.KeyBundle, error)
 	CreateKey(ctx context.Context, vaultBaseURL string, keyName string, parameters keyvault.KeyCreateParameters) (keyvault.KeyBundle, error)

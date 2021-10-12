@@ -263,7 +263,7 @@ func WithDeploymentType(dt DeploymentType) Option {
 	}
 }
 
-// WithKMS enabled the kms with the given name.
+// WithKMS enables the kms with the given name.
 func WithKMS(name string) Option {
 	return func(p *PKI) {
 		typ := linkedca.KMS_Type_value[strings.ToUpper(name)]

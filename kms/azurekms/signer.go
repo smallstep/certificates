@@ -99,7 +99,7 @@ func (s *Signer) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 		return sig, nil
 	}
 
-	// Convert to ans1
+	// Convert to asn1
 	if len(sig) != octetSize*2 {
 		return nil, errors.Errorf("keyVault Sign failed: unexpected signature length")
 	}
