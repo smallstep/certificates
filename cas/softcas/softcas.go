@@ -172,6 +172,7 @@ func (c *SoftCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthori
 		Name:             cert.Subject.CommonName,
 		Certificate:      cert,
 		CertificateChain: chain,
+		KeyName:          key.Name,
 		PublicKey:        key.PublicKey,
 		PrivateKey:       key.PrivateKey,
 		Signer:           signer,

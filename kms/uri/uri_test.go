@@ -212,6 +212,40 @@ func TestURI_Get(t *testing.T) {
 	}
 }
 
+func TestURI_GetBool(t *testing.T) {
+	mustParse := func(s string) *URI {
+		u, err := Parse(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
+	type args struct {
+		key string
+	}
+	tests := []struct {
+		name string
+		uri  *URI
+		args args
+		want bool
+	}{
+		{"true", mustParse("azurekms:name=foo;vault=bar;hsm=true"), args{"hsm"}, true},
+		{"TRUE", mustParse("azurekms:name=foo;vault=bar;hsm=TRUE"), args{"hsm"}, true},
+		{"tRUe query", mustParse("azurekms:name=foo;vault=bar?hsm=tRUe"), args{"hsm"}, true},
+		{"false", mustParse("azurekms:name=foo;vault=bar;hsm=false"), args{"hsm"}, false},
+		{"false query", mustParse("azurekms:name=foo;vault=bar?hsm=false"), args{"hsm"}, false},
+		{"empty", mustParse("azurekms:name=foo;vault=bar;hsm=?bar=true"), args{"hsm"}, false},
+		{"missing", mustParse("azurekms:name=foo;vault=bar"), args{"hsm"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.uri.GetBool(tt.args.key); got != tt.want {
+				t.Errorf("URI.GetBool() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestURI_GetEncoded(t *testing.T) {
 	mustParse := func(s string) *URI {
 		u, err := Parse(s)
