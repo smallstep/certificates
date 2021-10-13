@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/keyvault/v7.1/keyvault"
+	"github.com/smallstep/certificates/kms/apiv1"
 )
 
 func Test_getKeyName(t *testing.T) {
@@ -42,8 +43,10 @@ func Test_getKeyName(t *testing.T) {
 }
 
 func Test_parseKeyName(t *testing.T) {
+	var noOptions DefaultOptions
 	type args struct {
-		rawURI string
+		rawURI   string
+		defaults DefaultOptions
 	}
 	tests := []struct {
 		name        string
@@ -54,22 +57,24 @@ func Test_parseKeyName(t *testing.T) {
 		wantHsm     bool
 		wantErr     bool
 	}{
-		{"ok", args{"azurekms:name=my-key;vault=my-vault?version=my-version"}, "my-vault", "my-key", "my-version", false, false},
-		{"ok opaque version", args{"azurekms:name=my-key;vault=my-vault;version=my-version"}, "my-vault", "my-key", "my-version", false, false},
-		{"ok no version", args{"azurekms:name=my-key;vault=my-vault"}, "my-vault", "my-key", "", false, false},
-		{"ok hsm", args{"azurekms:name=my-key;vault=my-vault?hsm=true"}, "my-vault", "my-key", "", true, false},
-		{"ok hsm false", args{"azurekms:name=my-key;vault=my-vault?hsm=false"}, "my-vault", "my-key", "", false, false},
-		{"fail scheme", args{"azure:name=my-key;vault=my-vault"}, "", "", "", false, true},
-		{"fail parse uri", args{"azurekms:name=%ZZ;vault=my-vault"}, "", "", "", false, true},
-		{"fail no name", args{"azurekms:vault=my-vault"}, "", "", "", false, true},
-		{"fail empty name", args{"azurekms:name=;vault=my-vault"}, "", "", "", false, true},
-		{"fail no vault", args{"azurekms:name=my-key"}, "", "", "", false, true},
-		{"fail empty vault", args{"azurekms:name=my-key;vault="}, "", "", "", false, true},
-		{"fail empty", args{""}, "", "", "", false, true},
+		{"ok", args{"azurekms:name=my-key;vault=my-vault?version=my-version", noOptions}, "my-vault", "my-key", "my-version", false, false},
+		{"ok opaque version", args{"azurekms:name=my-key;vault=my-vault;version=my-version", noOptions}, "my-vault", "my-key", "my-version", false, false},
+		{"ok no version", args{"azurekms:name=my-key;vault=my-vault", noOptions}, "my-vault", "my-key", "", false, false},
+		{"ok hsm", args{"azurekms:name=my-key;vault=my-vault?hsm=true", noOptions}, "my-vault", "my-key", "", true, false},
+		{"ok hsm false", args{"azurekms:name=my-key;vault=my-vault?hsm=false", noOptions}, "my-vault", "my-key", "", false, false},
+		{"ok default vault", args{"azurekms:name=my-key?version=my-version", DefaultOptions{Vault: "my-vault"}}, "my-vault", "my-key", "my-version", false, false},
+		{"ok default hsm", args{"azurekms:name=my-key;vault=my-vault?version=my-version", DefaultOptions{Vault: "other-vault", ProtectionLevel: apiv1.HSM}}, "my-vault", "my-key", "my-version", true, false},
+		{"fail scheme", args{"azure:name=my-key;vault=my-vault", noOptions}, "", "", "", false, true},
+		{"fail parse uri", args{"azurekms:name=%ZZ;vault=my-vault", noOptions}, "", "", "", false, true},
+		{"fail no name", args{"azurekms:vault=my-vault", noOptions}, "", "", "", false, true},
+		{"fail empty name", args{"azurekms:name=;vault=my-vault", noOptions}, "", "", "", false, true},
+		{"fail no vault", args{"azurekms:name=my-key", noOptions}, "", "", "", false, true},
+		{"fail empty vault", args{"azurekms:name=my-key;vault=", noOptions}, "", "", "", false, true},
+		{"fail empty", args{"", noOptions}, "", "", "", false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotVault, gotName, gotVersion, gotHsm, err := parseKeyName(tt.args.rawURI)
+			gotVault, gotName, gotVersion, gotHsm, err := parseKeyName(tt.args.rawURI, tt.args.defaults)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseKeyName() error = %v, wantErr %v", err, tt.wantErr)
 				return

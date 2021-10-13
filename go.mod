@@ -5,6 +5,7 @@ go 1.15
 require (
 	cloud.google.com/go v0.83.0
 	github.com/Azure/azure-sdk-for-go v58.0.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.11.17
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.8
 	github.com/Azure/go-autorest/autorest/date v0.3.0
 	github.com/Azure/go-autorest/autorest/to v0.4.0 // indirect

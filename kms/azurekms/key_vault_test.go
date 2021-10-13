@@ -89,11 +89,44 @@ func TestNew(t *testing.T) {
 		}, args{context.Background(), apiv1.Options{}}, &KeyVault{
 			baseClient: client,
 		}, false},
+		{"ok with vault", func() {
+			createClient = func(ctx context.Context, opts apiv1.Options) (KeyVaultClient, error) {
+				return client, nil
+			}
+		}, args{context.Background(), apiv1.Options{
+			URI: "azurekms:vault=my-vault",
+		}}, &KeyVault{
+			baseClient: client,
+			defaults: DefaultOptions{
+				Vault:           "my-vault",
+				ProtectionLevel: apiv1.UnspecifiedProtectionLevel,
+			},
+		}, false},
+		{"ok with vault + hsm", func() {
+			createClient = func(ctx context.Context, opts apiv1.Options) (KeyVaultClient, error) {
+				return client, nil
+			}
+		}, args{context.Background(), apiv1.Options{
+			URI: "azurekms:vault=my-vault;hsm=true",
+		}}, &KeyVault{
+			baseClient: client,
+			defaults: DefaultOptions{
+				Vault:           "my-vault",
+				ProtectionLevel: apiv1.HSM,
+			},
+		}, false},
 		{"fail", func() {
 			createClient = func(ctx context.Context, opts apiv1.Options) (KeyVaultClient, error) {
 				return nil, errTest
 			}
 		}, args{context.Background(), apiv1.Options{}}, nil, true},
+		{"fail uri", func() {
+			createClient = func(ctx context.Context, opts apiv1.Options) (KeyVaultClient, error) {
+				return client, nil
+			}
+		}, args{context.Background(), apiv1.Options{
+			URI: "kms:vault=my-vault;hsm=true",
+		}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -105,6 +138,45 @@ func TestNew(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("New() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestKeyVault_createClient(t *testing.T) {
+	type args struct {
+		ctx  context.Context
+		opts apiv1.Options
+	}
+	tests := []struct {
+		name    string
+		args    args
+		skip    bool
+		wantErr bool
+	}{
+		{"ok", args{context.Background(), apiv1.Options{}}, true, false},
+		{"ok with uri", args{context.Background(), apiv1.Options{
+			URI: "azurekms:client-id=id;client-secret=secret;tenant-id=id",
+		}}, false, false},
+		{"ok with uri+aad", args{context.Background(), apiv1.Options{
+			URI: "azurekms:client-id=id;client-secret=secret;tenant-id=id;aad-enpoint=https%3A%2F%2Flogin.microsoftonline.us%2F",
+		}}, false, false},
+		{"ok with uri no config", args{context.Background(), apiv1.Options{
+			URI: "azurekms:",
+		}}, true, false},
+		{"fail uri", args{context.Background(), apiv1.Options{
+			URI: "kms:client-id=id;client-secret=secret;tenant-id=id",
+		}}, false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.skip {
+				t.SkipNow()
+			}
+			_, err := createClient(tt.args.ctx, tt.args.opts)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
