@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/keyvault/v7.1/keyvault"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
+	"github.com/smallstep/certificates/kms/uri"
 )
 
 func init() {
@@ -126,9 +128,60 @@ type KeyVaultClient interface {
 // functionality in /sdk/keyvault, we should migrate to that once available.
 type KeyVault struct {
 	baseClient KeyVaultClient
+	defaults   DefaultOptions
+}
+
+// DefaultOptions are custom options that can be passed as defaults using the
+// URI in apiv1.Options.
+type DefaultOptions struct {
+	Vault           string
+	ProtectionLevel apiv1.ProtectionLevel
 }
 
 var createClient = func(ctx context.Context, opts apiv1.Options) (KeyVaultClient, error) {
+	baseClient := keyvault.New()
+
+	// With an URI, try to log in only using client credentials in the URI.
+	// Client credentials requires:
+	// - client-id
+	// - client-secret
+	// - tenant-id
+	// And optionally the aad-endpoint to support custom clouds:
+	// - aad-endpoint (defaults to https://login.microsoftonline.com/)
+	if opts.URI != "" {
+		u, err := uri.ParseWithScheme(Scheme, opts.URI)
+		if err != nil {
+			return nil, err
+		}
+
+		// Required options
+		clientID := u.Get("client-id")
+		clientSecret := u.Get("client-secret")
+		tenantID := u.Get("tenant-id")
+		// optional
+		aadEndpoint := u.Get("aad-endpoint")
+
+		if clientID != "" && clientSecret != "" && tenantID != "" {
+			s := auth.EnvironmentSettings{
+				Values: map[string]string{
+					auth.ClientID:     clientID,
+					auth.ClientSecret: clientSecret,
+					auth.TenantID:     tenantID,
+					auth.Resource:     vaultResource,
+				},
+				Environment: azure.PublicCloud,
+			}
+			if aadEndpoint != "" {
+				s.Environment.ActiveDirectoryEndpoint = aadEndpoint
+			}
+			baseClient.Authorizer, err = s.GetAuthorizer()
+			if err != nil {
+				return nil, err
+			}
+			return baseClient, nil
+		}
+	}
+
 	// Attempt to authorize with the following methods:
 	// 1. Environment variables.
 	//    - Client credentials
@@ -143,8 +196,6 @@ var createClient = func(ctx context.Context, opts apiv1.Options) (KeyVaultClient
 			return nil, errors.Wrap(err, "error getting authorizer for key vault")
 		}
 	}
-
-	baseClient := keyvault.New()
 	baseClient.Authorizer = authorizer
 	return &baseClient, nil
 }
@@ -155,8 +206,24 @@ func New(ctx context.Context, opts apiv1.Options) (*KeyVault, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// step and step-ca do not need and URI, but having a default vault and
+	// protection level is useful if this package is used as an api
+	var defaults DefaultOptions
+	if opts.URI != "" {
+		u, err := uri.ParseWithScheme(Scheme, opts.URI)
+		if err != nil {
+			return nil, err
+		}
+		defaults.Vault = u.Get("vault")
+		if u.GetBool("hsm") {
+			defaults.ProtectionLevel = apiv1.HSM
+		}
+	}
+
 	return &KeyVault{
 		baseClient: baseClient,
+		defaults:   defaults,
 	}, nil
 }
 
@@ -166,7 +233,7 @@ func (k *KeyVault) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKe
 		return nil, errors.New("getPublicKeyRequest 'name' cannot be empty")
 	}
 
-	vault, name, version, _, err := parseKeyName(req.Name)
+	vault, name, version, _, err := parseKeyName(req.Name, k.defaults)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +255,7 @@ func (k *KeyVault) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespo
 		return nil, errors.New("createKeyRequest 'name' cannot be empty")
 	}
 
-	vault, name, _, hsm, err := parseKeyName(req.Name)
+	vault, name, _, hsm, err := parseKeyName(req.Name, k.defaults)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +327,7 @@ func (k *KeyVault) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, 
 	if req.SigningKey == "" {
 		return nil, errors.New("createSignerRequest 'signingKey' cannot be empty")
 	}
-	return NewSigner(k.baseClient, req.SigningKey)
+	return NewSigner(k.baseClient, req.SigningKey, k.defaults)
 }
 
 // Close closes the client connection to the Azure Key Vault. This is a noop.
@@ -270,6 +337,6 @@ func (k *KeyVault) Close() error {
 
 // ValidateName validates that the given string is a valid URI.
 func (k *KeyVault) ValidateName(s string) error {
-	_, _, _, _, err := parseKeyName(s)
+	_, _, _, _, err := parseKeyName(s, k.defaults)
 	return err
 }

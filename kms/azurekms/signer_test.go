@@ -12,6 +12,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/keyvault/v7.1/keyvault"
 	"github.com/golang/mock/gomock"
+	"github.com/smallstep/certificates/kms/apiv1"
 	"go.step.sm/crypto/keyutil"
 	"golang.org/x/crypto/cryptobyte"
 	"golang.org/x/crypto/cryptobyte/asn1"
@@ -32,11 +33,16 @@ func TestNewSigner(t *testing.T) {
 	client.EXPECT().GetKey(gomock.Any(), "https://my-vault.vault.azure.net/", "my-key", "my-version").Return(keyvault.KeyBundle{
 		Key: jwk,
 	}, nil)
+	client.EXPECT().GetKey(gomock.Any(), "https://my-vault.vault.azure.net/", "my-key", "my-version").Return(keyvault.KeyBundle{
+		Key: jwk,
+	}, nil)
 	client.EXPECT().GetKey(gomock.Any(), "https://my-vault.vault.azure.net/", "not-found", "my-version").Return(keyvault.KeyBundle{}, errTest)
 
+	var noOptions DefaultOptions
 	type args struct {
 		client     KeyVaultClient
 		signingKey string
+		defaults   DefaultOptions
 	}
 	tests := []struct {
 		name    string
@@ -44,28 +50,35 @@ func TestNewSigner(t *testing.T) {
 		want    crypto.Signer
 		wantErr bool
 	}{
-		{"ok", args{client, "azurekms:vault=my-vault;name=my-key"}, &Signer{
+		{"ok", args{client, "azurekms:vault=my-vault;name=my-key", noOptions}, &Signer{
 			client:       client,
 			vaultBaseURL: "https://my-vault.vault.azure.net/",
 			name:         "my-key",
 			version:      "",
 			publicKey:    pub,
 		}, false},
-		{"ok with version", args{client, "azurekms:name=my-key;vault=my-vault?version=my-version"}, &Signer{
+		{"ok with version", args{client, "azurekms:name=my-key;vault=my-vault?version=my-version", noOptions}, &Signer{
 			client:       client,
 			vaultBaseURL: "https://my-vault.vault.azure.net/",
 			name:         "my-key",
 			version:      "my-version",
 			publicKey:    pub,
 		}, false},
-		{"fail GetKey", args{client, "azurekms:name=not-found;vault=my-vault?version=my-version"}, nil, true},
-		{"fail vault", args{client, "azurekms:name=not-found;vault="}, nil, true},
-		{"fail id", args{client, "azurekms:name=;vault=my-vault?version=my-version"}, nil, true},
-		{"fail scheme", args{client, "kms:name=not-found;vault=my-vault?version=my-version"}, nil, true},
+		{"ok with options", args{client, "azurekms:name=my-key?version=my-version", DefaultOptions{Vault: "my-vault", ProtectionLevel: apiv1.HSM}}, &Signer{
+			client:       client,
+			vaultBaseURL: "https://my-vault.vault.azure.net/",
+			name:         "my-key",
+			version:      "my-version",
+			publicKey:    pub,
+		}, false},
+		{"fail GetKey", args{client, "azurekms:name=not-found;vault=my-vault?version=my-version", noOptions}, nil, true},
+		{"fail vault", args{client, "azurekms:name=not-found;vault=", noOptions}, nil, true},
+		{"fail id", args{client, "azurekms:name=;vault=my-vault?version=my-version", noOptions}, nil, true},
+		{"fail scheme", args{client, "kms:name=not-found;vault=my-vault?version=my-version", noOptions}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewSigner(tt.args.client, tt.args.signingKey)
+			got, err := NewSigner(tt.args.client, tt.args.signingKey, tt.args.defaults)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewSigner() error = %v, wantErr %v", err, tt.wantErr)
 				return

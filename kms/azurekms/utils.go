@@ -9,6 +9,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/keyvault/v7.1/keyvault"
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/uri"
 	"go.step.sm/crypto/jose"
 )
@@ -50,10 +51,10 @@ func getKeyName(vault, name string, bundle keyvault.KeyBundle) string {
 //
 // HSM can also be passed to define the protection level if this is not given in
 // CreateQuery.
-func parseKeyName(rawURI string) (vault, name, version string, hsm bool, err error) {
+func parseKeyName(rawURI string, defaults DefaultOptions) (vault, name, version string, hsm bool, err error) {
 	var u *uri.URI
 
-	u, err = uri.ParseWithScheme("azurekms", rawURI)
+	u, err = uri.ParseWithScheme(Scheme, rawURI)
 	if err != nil {
 		return
 	}
@@ -62,12 +63,21 @@ func parseKeyName(rawURI string) (vault, name, version string, hsm bool, err err
 		return
 	}
 	if vault = u.Get("vault"); vault == "" {
-		err = errors.Errorf("key uri %s is not valid: vault is missing", rawURI)
-		name = ""
-		return
+		if defaults.Vault == "" {
+			name = ""
+			err = errors.Errorf("key uri %s is not valid: vault is missing", rawURI)
+			return
+		}
+		vault = defaults.Vault
 	}
+	if u.Get("hsm") == "" {
+		hsm = (defaults.ProtectionLevel == apiv1.HSM)
+	} else {
+		hsm = u.GetBool("hsm")
+	}
+
 	version = u.Get("version")
-	hsm = u.GetBool("hsm")
+
 	return
 }
 
