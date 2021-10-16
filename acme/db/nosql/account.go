@@ -295,7 +295,7 @@ func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerN
 	}
 	k, err := db.db.Get(externalAccountKeysByReferenceTable, []byte(reference))
 	if nosqlDB.IsErrNotFound(err) {
-		return nil, errors.Errorf("ACME EAB key for reference %s not found", reference)
+		return nil, acme.ErrNotFound
 	} else if err != nil {
 		return nil, errors.Wrapf(err, "error loading ACME EAB key for reference %s", reference)
 	}

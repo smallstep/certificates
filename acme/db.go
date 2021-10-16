@@ -154,7 +154,7 @@ func (m *MockDB) GetExternalAccountKeys(ctx context.Context, provisionerName str
 	return m.MockRet1.([]*ExternalAccountKey), m.MockError
 }
 
-// GetExtrnalAccountKeyByReference mock
+// GetExternalAccountKeyByReference mock
 func (m *MockDB) GetExternalAccountKeyByReference(ctx context.Context, provisionerName, reference string) (*ExternalAccountKey, error) {
 	if m.MockGetExternalAccountKeys != nil {
 		return m.GetExternalAccountKeyByReference(ctx, provisionerName, reference)

@@ -992,7 +992,7 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 						return nil, nosqldb.ErrNotFound
 					},
 				},
-				err: errors.New("ACME EAB key for reference ref not found"),
+				err: errors.New("not found"),
 			}
 		},
 		"fail/reference-load-error": func(t *testing.T) test {

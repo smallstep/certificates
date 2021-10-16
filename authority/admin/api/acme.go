@@ -92,15 +92,24 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 	prov := chi.URLParam(r, "prov")
 	reference := body.Reference
 
+	// check if a key with the reference does not exist (only when a reference was in the request)
 	if reference != "" {
 		k, err := h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference)
-		// retrieving an EAB key from DB results in error if it doesn't exist, which is what we're looking for
-		if err == nil || k != nil {
+		// retrieving an EAB key from DB results in an error if it doesn't exist, which is what we're looking for,
+		// but other errors can also happen. Return early if that happens; continuing if it was acme.ErrNotFound.
+		shouldWriteError := err != nil && !(acme.ErrNotFound == err)
+		if shouldWriteError {
+			api.WriteError(w, err)
+			return
+		}
+		// if a key was found, return HTTP 409 conflict
+		if k != nil {
 			err := admin.NewError(admin.ErrorBadRequestType, "an ACME EAB key for provisioner %s with reference %s already exists", prov, reference)
 			err.Status = 409
 			api.WriteError(w, err)
 			return
 		}
+		// continue execution if no key was found for the reference
 	}
 
 	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), prov, reference)
