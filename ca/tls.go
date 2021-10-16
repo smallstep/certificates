@@ -279,9 +279,9 @@ func getDefaultTLSConfig(sign *api.SignResponse) *tls.Config {
 
 // getDefaultDialer returns a new dialer with the default configuration.
 func getDefaultDialer() *net.Dialer {
+	// With the KeepAlive parameter set to 0, it will be use Golang's default.
 	return &net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 }
 

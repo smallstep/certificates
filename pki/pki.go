@@ -26,13 +26,14 @@ import (
 	"github.com/smallstep/certificates/cas"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/kms"
+	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/nosql"
 	"go.step.sm/cli-utils/config"
 	"go.step.sm/cli-utils/errs"
 	"go.step.sm/cli-utils/fileutil"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
@@ -168,14 +169,18 @@ func GetProvisionerKey(caURL, rootFile, kid string) (string, error) {
 }
 
 type options struct {
-	provisioner    string
-	pkiOnly        bool
-	enableACME     bool
-	enableSSH      bool
-	enableAdmin    bool
-	noDB           bool
-	isHelm         bool
-	deploymentType DeploymentType
+	provisioner        string
+	pkiOnly            bool
+	enableACME         bool
+	enableSSH          bool
+	enableAdmin        bool
+	noDB               bool
+	isHelm             bool
+	deploymentType     DeploymentType
+	rootKeyURI         string
+	intermediateKeyURI string
+	hostKeyURI         string
+	userKeyURI         string
 }
 
 // Option is the type of a configuration option on the pki constructor.
@@ -258,6 +263,26 @@ func WithDeploymentType(dt DeploymentType) Option {
 	}
 }
 
+// WithKMS enables the kms with the given name.
+func WithKMS(name string) Option {
+	return func(p *PKI) {
+		typ := linkedca.KMS_Type_value[strings.ToUpper(name)]
+		p.Configuration.Kms = &linkedca.KMS{
+			Type: linkedca.KMS_Type(typ),
+		}
+	}
+}
+
+// WithKeyURIs defines the key uris for X.509 and SSH keys.
+func WithKeyURIs(rootKey, intermediateKey, hostKey, userKey string) Option {
+	return func(p *PKI) {
+		p.options.rootKeyURI = rootKey
+		p.options.intermediateKeyURI = intermediateKey
+		p.options.hostKeyURI = hostKey
+		p.options.userKeyURI = userKey
+	}
+}
+
 // PKI represents the Public Key Infrastructure used by a certificate authority.
 type PKI struct {
 	linkedca.Configuration
@@ -265,6 +290,7 @@ type PKI struct {
 	casOptions    apiv1.Options
 	caService     apiv1.CertificateAuthorityService
 	caCreator     apiv1.CertificateAuthorityCreator
+	keyManager    kmsapi.KeyManager
 	config        string
 	defaults      string
 	ottPublicKey  *jose.JSONWebKey
@@ -303,14 +329,20 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 			Files:     make(map[string][]byte),
 		},
 		casOptions: o,
-		caCreator:  caCreator,
 		caService:  caService,
+		caCreator:  caCreator,
+		keyManager: o.KeyManager,
 		options: &options{
 			provisioner: "step-cli",
 		},
 	}
 	for _, fn := range opts {
 		fn(p)
+	}
+
+	// Use default key manager
+	if p.keyManager == nil {
+		p.keyManager = kms.Default
 	}
 
 	// Use /home/step as the step path in helm configurations.
@@ -448,11 +480,18 @@ func (p *PKI) GenerateKeyPairs(pass []byte) error {
 // GenerateRootCertificate generates a root certificate with the given name
 // and using the default key type.
 func (p *PKI) GenerateRootCertificate(name, org, resource string, pass []byte) (*apiv1.CreateCertificateAuthorityResponse, error) {
+	if uri := p.options.rootKeyURI; uri != "" {
+		p.RootKey[0] = uri
+	}
+
 	resp, err := p.caCreator.CreateCertificateAuthority(&apiv1.CreateCertificateAuthorityRequest{
-		Name:      resource + "-Root-CA",
-		Type:      apiv1.RootCA,
-		Lifetime:  10 * 365 * 24 * time.Hour,
-		CreateKey: nil, // use default
+		Name:     resource + "-Root-CA",
+		Type:     apiv1.RootCA,
+		Lifetime: 10 * 365 * 24 * time.Hour,
+		CreateKey: &apiv1.CreateKeyRequest{
+			Name:               p.RootKey[0],
+			SignatureAlgorithm: kmsapi.UnspecifiedSignAlgorithm,
+		},
 		Template: &x509.Certificate{
 			Subject: pkix.Name{
 				CommonName:   name + " Root CA",
@@ -467,6 +506,13 @@ func (p *PKI) GenerateRootCertificate(name, org, resource string, pass []byte) (
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	// Replace key name with the one from the key manager if available. On
+	// softcas this will be the original filename, on any other kms will be the
+	// uri to the key.
+	if resp.KeyName != "" {
+		p.RootKey[0] = resp.KeyName
 	}
 
 	// PrivateKey will only be set if we have access to it (SoftCAS).
@@ -495,11 +541,18 @@ func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{
 // GenerateIntermediateCertificate generates an intermediate certificate with
 // the given name and using the default key type.
 func (p *PKI) GenerateIntermediateCertificate(name, org, resource string, parent *apiv1.CreateCertificateAuthorityResponse, pass []byte) error {
+	if uri := p.options.intermediateKeyURI; uri != "" {
+		p.IntermediateKey = uri
+	}
+
 	resp, err := p.caCreator.CreateCertificateAuthority(&apiv1.CreateCertificateAuthorityRequest{
-		Name:      resource + "-Intermediate-CA",
-		Type:      apiv1.IntermediateCA,
-		Lifetime:  10 * 365 * 24 * time.Hour,
-		CreateKey: nil, // use default
+		Name:     resource + "-Intermediate-CA",
+		Type:     apiv1.IntermediateCA,
+		Lifetime: 10 * 365 * 24 * time.Hour,
+		CreateKey: &apiv1.CreateKeyRequest{
+			Name:               p.IntermediateKey,
+			SignatureAlgorithm: kmsapi.UnspecifiedSignAlgorithm,
+		},
 		Template: &x509.Certificate{
 			Subject: pkix.Name{
 				CommonName:   name + " Intermediate CA",
@@ -519,7 +572,19 @@ func (p *PKI) GenerateIntermediateCertificate(name, org, resource string, parent
 
 	p.casOptions.CertificateAuthority = resp.Name
 	p.Files[p.Intermediate] = encodeCertificate(resp.Certificate)
-	p.Files[p.IntermediateKey], err = encodePrivateKey(resp.PrivateKey, pass)
+
+	// Replace the key name with the one from the key manager. On softcas this
+	// will be the original filename, on any other kms will be the uri to the
+	// key.
+	if resp.KeyName != "" {
+		p.IntermediateKey = resp.KeyName
+	}
+
+	// If a kms is used it will not have the private key
+	if resp.PrivateKey != nil {
+		p.Files[p.IntermediateKey], err = encodePrivateKey(resp.PrivateKey, pass)
+	}
+
 	return err
 }
 
@@ -564,27 +629,67 @@ func (p *PKI) GetCertificateAuthority() error {
 // GenerateSSHSigningKeys generates and encrypts a private key used for signing
 // SSH user certificates and a private key used for signing host certificates.
 func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
-	var pubNames = []string{p.Ssh.HostPublicKey, p.Ssh.UserPublicKey}
-	var privNames = []string{p.Ssh.HostKey, p.Ssh.UserKey}
-	for i := 0; i < 2; i++ {
-		pub, priv, err := keyutil.GenerateDefaultKeyPair()
-		if err != nil {
-			return err
-		}
-		if _, ok := priv.(crypto.Signer); !ok {
-			return errors.Errorf("key of type %T is not a crypto.Signer", priv)
-		}
-		sshKey, err := ssh.NewPublicKey(pub)
-		if err != nil {
-			return errors.Wrapf(err, "error converting public key")
-		}
-		p.Files[pubNames[i]] = ssh.MarshalAuthorizedKey(sshKey)
-		p.Files[privNames[i]], err = encodePrivateKey(priv, password)
-		if err != nil {
-			return err
-		}
-	}
+	// Enable SSH
 	p.options.enableSSH = true
+
+	// Create SSH key used to sign host certificates. Using
+	// kmsapi.UnspecifiedSignAlgorithm will default to the default algorithm.
+	name := p.Ssh.HostKey
+	if uri := p.options.hostKeyURI; uri != "" {
+		name = uri
+	}
+	resp, err := p.keyManager.CreateKey(&kmsapi.CreateKeyRequest{
+		Name:               name,
+		SignatureAlgorithm: kmsapi.UnspecifiedSignAlgorithm,
+	})
+	if err != nil {
+		return err
+	}
+	sshKey, err := ssh.NewPublicKey(resp.PublicKey)
+	if err != nil {
+		return errors.Wrapf(err, "error converting public key")
+	}
+	p.Files[p.Ssh.HostPublicKey] = ssh.MarshalAuthorizedKey(sshKey)
+
+	// On softkms we will have the private key
+	if resp.PrivateKey != nil {
+		p.Files[p.Ssh.HostKey], err = encodePrivateKey(resp.PrivateKey, password)
+		if err != nil {
+			return err
+		}
+	} else {
+		p.Ssh.HostKey = resp.Name
+	}
+
+	// Create SSH key used to sign user certificates. Using
+	// kmsapi.UnspecifiedSignAlgorithm will default to the default algorithm.
+	name = p.Ssh.UserKey
+	if uri := p.options.userKeyURI; uri != "" {
+		name = uri
+	}
+	resp, err = p.keyManager.CreateKey(&kmsapi.CreateKeyRequest{
+		Name:               name,
+		SignatureAlgorithm: kmsapi.UnspecifiedSignAlgorithm,
+	})
+	if err != nil {
+		return err
+	}
+	sshKey, err = ssh.NewPublicKey(resp.PublicKey)
+	if err != nil {
+		return errors.Wrapf(err, "error converting public key")
+	}
+	p.Files[p.Ssh.UserPublicKey] = ssh.MarshalAuthorizedKey(sshKey)
+
+	// On softkms we will have the private key
+	if resp.PrivateKey != nil {
+		p.Files[p.Ssh.UserKey], err = encodePrivateKey(resp.PrivateKey, password)
+		if err != nil {
+			return err
+		}
+	} else {
+		p.Ssh.UserKey = resp.Name
+	}
+
 	return nil
 }
 
@@ -683,6 +788,13 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 	// message if the token is not given.
 	if p.options.deploymentType == LinkedDeployment {
 		cfg.AuthorityConfig.DeploymentType = LinkedDeployment.String()
+	}
+
+	// Enable KMS if necessary
+	if p.Kms != nil {
+		cfg.KMS = &kmsapi.Options{
+			Type: strings.ToLower(p.Kms.Type.String()),
+		}
 	}
 
 	// On standalone deployments add the provisioners to either the ca.json or
