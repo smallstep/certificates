@@ -146,13 +146,22 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 	prov := chi.URLParam(r, "prov")
 	reference := chi.URLParam(r, "ref")
 
-	// TODO: support paging? It'll probably leak to the DB layer, as we have to loop through all keys
-
 	var (
-		key  *acme.ExternalAccountKey
-		keys []*acme.ExternalAccountKey
-		err  error
+		key        *acme.ExternalAccountKey
+		keys       []*acme.ExternalAccountKey
+		err        error
+		cursor     string
+		nextCursor string
+		limit      int
 	)
+
+	cursor, limit, err = api.ParseCursor(r)
+	if err != nil {
+		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err,
+			"error parsing cursor and limit from query params"))
+		return
+	}
+
 	if reference != "" {
 		key, err = h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference)
 		if err != nil {
@@ -161,7 +170,7 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 		}
 		keys = []*acme.ExternalAccountKey{key}
 	} else {
-		keys, err = h.acmeDB.GetExternalAccountKeys(r.Context(), prov)
+		keys, nextCursor, err = h.acmeDB.GetExternalAccountKeys(r.Context(), prov, cursor, limit)
 		if err != nil {
 			api.WriteError(w, admin.WrapErrorISE(err, "error getting external account keys"))
 			return
@@ -181,7 +190,6 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	nextCursor := ""
 	api.JSON(w, &GetExternalAccountKeysResponse{
 		EAKs:       eaks,
 		NextCursor: nextCursor,

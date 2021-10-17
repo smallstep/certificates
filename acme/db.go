@@ -21,7 +21,7 @@ type DB interface {
 
 	CreateExternalAccountKey(ctx context.Context, provisionerName, name string) (*ExternalAccountKey, error)
 	GetExternalAccountKey(ctx context.Context, provisionerName, keyID string) (*ExternalAccountKey, error)
-	GetExternalAccountKeys(ctx context.Context, provisionerName string) ([]*ExternalAccountKey, error)
+	GetExternalAccountKeys(ctx context.Context, provisionerName, cursor string, limit int) ([]*ExternalAccountKey, string, error)
 	GetExternalAccountKeyByReference(ctx context.Context, provisionerName, reference string) (*ExternalAccountKey, error)
 	DeleteExternalAccountKey(ctx context.Context, provisionerName, keyID string) error
 	UpdateExternalAccountKey(ctx context.Context, provisionerName string, eak *ExternalAccountKey) error
@@ -56,7 +56,7 @@ type MockDB struct {
 
 	MockCreateExternalAccountKey         func(ctx context.Context, provisionerName, name string) (*ExternalAccountKey, error)
 	MockGetExternalAccountKey            func(ctx context.Context, provisionerName, keyID string) (*ExternalAccountKey, error)
-	MockGetExternalAccountKeys           func(ctx context.Context, provisionerName string) ([]*ExternalAccountKey, error)
+	MockGetExternalAccountKeys           func(ctx context.Context, provisionerName string, cursor string, limit int) ([]*ExternalAccountKey, string, error)
 	MockGetExternalAccountKeyByReference func(ctx context.Context, provisionerName, reference string) (*ExternalAccountKey, error)
 	MockDeleteExternalAccountKey         func(ctx context.Context, provisionerName, keyID string) error
 	MockUpdateExternalAccountKey         func(ctx context.Context, provisionerName string, eak *ExternalAccountKey) error
@@ -145,13 +145,13 @@ func (m *MockDB) GetExternalAccountKey(ctx context.Context, provisionerName, key
 }
 
 // GetExternalAccountKeys mock
-func (m *MockDB) GetExternalAccountKeys(ctx context.Context, provisionerName string) ([]*ExternalAccountKey, error) {
+func (m *MockDB) GetExternalAccountKeys(ctx context.Context, provisionerName, cursor string, limit int) ([]*ExternalAccountKey, string, error) {
 	if m.MockGetExternalAccountKeys != nil {
-		return m.MockGetExternalAccountKeys(ctx, provisionerName)
+		return m.MockGetExternalAccountKeys(ctx, provisionerName, cursor, limit)
 	} else if m.MockError != nil {
-		return nil, m.MockError
+		return nil, "", m.MockError
 	}
-	return m.MockRet1.([]*ExternalAccountKey), m.MockError
+	return m.MockRet1.([]*ExternalAccountKey), "", m.MockError
 }
 
 // GetExternalAccountKeyByReference mock
