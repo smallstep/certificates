@@ -97,7 +97,7 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 		k, err := h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference)
 		// retrieving an EAB key from DB results in an error if it doesn't exist, which is what we're looking for,
 		// but other errors can also happen. Return early if that happens; continuing if it was acme.ErrNotFound.
-		shouldWriteError := err != nil && !(acme.ErrNotFound == err)
+		shouldWriteError := err != nil && acme.ErrNotFound != err
 		if shouldWriteError {
 			api.WriteError(w, err)
 			return
