@@ -293,16 +293,17 @@ func WithKeyURIs(rootKey, intermediateKey, hostKey, userKey string) Option {
 // PKI represents the Public Key Infrastructure used by a certificate authority.
 type PKI struct {
 	linkedca.Configuration
-	Defaults      linkedca.Defaults
-	casOptions    apiv1.Options
-	caService     apiv1.CertificateAuthorityService
-	caCreator     apiv1.CertificateAuthorityCreator
-	keyManager    kmsapi.KeyManager
-	config        string
-	defaults      string
-	ottPublicKey  *jose.JSONWebKey
-	ottPrivateKey *jose.JSONWebEncryption
-	options       *options
+	Defaults        linkedca.Defaults
+	casOptions      apiv1.Options
+	caService       apiv1.CertificateAuthorityService
+	caCreator       apiv1.CertificateAuthorityCreator
+	keyManager      kmsapi.KeyManager
+	config          string
+	defaults        string
+	profileDefaults string
+	ottPublicKey    *jose.JSONWebKey
+	ottPrivateKey   *jose.JSONWebEncryption
+	options         *options
 }
 
 // New creates a new PKI configuration.

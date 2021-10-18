@@ -13,7 +13,7 @@ import (
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
-	step "go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/linkedca"
@@ -523,7 +523,7 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 		if p.X509.Template != "" {
 			x509Template.Template = []byte(p.SSH.Template)
 		} else if p.X509.TemplateFile != "" {
-			filename := step.StepAbs(p.X509.TemplateFile)
+			filename := step.Abs(p.X509.TemplateFile)
 			if x509Template.Template, err = ioutil.ReadFile(filename); err != nil {
 				return nil, nil, errors.Wrap(err, "error reading x509 template")
 			}
@@ -539,7 +539,7 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 		if p.SSH.Template != "" {
 			sshTemplate.Template = []byte(p.SSH.Template)
 		} else if p.SSH.TemplateFile != "" {
-			filename := step.StepAbs(p.SSH.TemplateFile)
+			filename := step.Abs(p.SSH.TemplateFile)
 			if sshTemplate.Template, err = ioutil.ReadFile(filename); err != nil {
 				return nil, nil, errors.Wrap(err, "error reading ssh template")
 			}
