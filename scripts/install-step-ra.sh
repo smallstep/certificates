@@ -154,6 +154,27 @@ if [ -z "$RA_DNS_NAMES" ]; then
   done
 fi
 
+
+count=0
+ra_dns_names_quoted=""
+
+for i in ${RA_DNS_NAMES//,/ }
+do
+  if [ "$count" = "0" ]; then
+    ra_dns_names_quoted="\"$i\""
+  else 
+    ra_dns_names_quoted="${ra_dns_names_quoted}, \"$i\""
+  fi
+  count=$((count+1))
+done
+
+if [ "$count" = "0" ]; then
+  echo "You must supply at least one RA DNS name"
+  exit 1
+fi
+
+echo "Got here"
+
 if [ -z "$RA_ADDRESS" ]; then
   RA_ADDRESS=""
   while [[ $RA_ADDRESS = "" ]] ; do
@@ -189,7 +210,7 @@ mkdir -p $(step path)/config
 cat <<EOF > $(step path)/config/ca.json
 {
   "address": "$RA_ADDRESS",
-  "dnsNames": ["$RA_DNS_NAMES"],
+  "dnsNames": [$ra_dns_names_quoted],
   "db": {
     "type": "badgerV2",
     "dataSource": "/etc/step-ca/db"
