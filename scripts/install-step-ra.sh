@@ -126,25 +126,17 @@ fi
 
 echo "Bootstrapping with the CA..."
 export STEPPATH=$(mktemp -d)
-export STEP_CONSOLE=true
 
 step ca bootstrap --ca-url $CA_URL --fingerprint $CA_FINGERPRINT
 
 if [ -z "$CA_PROVISIONER_NAME" ]; then
   declare -a provisioners
   readarray -t provisioners < <(step ca provisioner list | jq -r '.[] | select(.type == "JWK") | .name')
-  provisioners+=("Create provisioner")
   printf '%s\n' "${provisioners[@]}"
 
   printf "%b" "\nSelect a JWK provisioner:\n" >&2
   select provisioner in "${provisioners[@]}"; do
-    if [ "$provisioner" == "Create provisioner" ]; then
-      echo "Creating a JWK provisioner on the upstream CA..."
-      echo ""
-      read -p "Label your provisioner (e.g. example-ra): " CA_PROVISIONER_NAME < /dev/tty
-      step beta ca provisioner add $CA_PROVISIONER_NAME  --type JWK --create
-      break
-    elif [ -n "$provisioner" ]; then
+    if [ -n "$provisioner" ]; then
       echo "Using existing provisioner $provisioner."
       CA_PROVISIONER_NAME=$provisioner
       break
