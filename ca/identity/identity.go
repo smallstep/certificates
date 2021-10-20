@@ -39,12 +39,6 @@ const TunnelTLS Type = "tTLS"
 // DefaultLeeway is the duration for matching not before claims.
 const DefaultLeeway = 1 * time.Minute
 
-// IdentityFile contains the location of the identity file.
-var IdentityFile = filepath.Join(step.ProfilePath(), "config", "identity.json")
-
-// DefaultsFile contains the location of the defaults file.
-var DefaultsFile = filepath.Join(step.ProfilePath(), "config", "defaults.json")
-
 // Identity represents the identity file that can be used to authenticate with
 // the CA.
 type Identity struct {
@@ -74,23 +68,25 @@ func LoadIdentity(filename string) (*Identity, error) {
 
 // LoadDefaultIdentity loads the default identity.
 func LoadDefaultIdentity() (*Identity, error) {
-	return LoadIdentity(IdentityFile)
+	return LoadIdentity(step.IdentityFile())
 }
 
-// configDir and identityDir are used in WriteDefaultIdentity for testing
-// purposes.
-var (
-	configDir   = filepath.Join(step.ProfilePath(), "config")
-	identityDir = filepath.Join(step.ProfilePath(), "identity")
-)
+func profileConfigDir() string {
+	return filepath.Join(step.ProfilePath(), "config")
+}
+
+func profileIdentityDir() string {
+	return filepath.Join(step.ProfilePath(), "identity")
+}
 
 // WriteDefaultIdentity writes the given certificates and key and the
 // identity.json pointing to the new files.
 func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) error {
-	if err := os.MkdirAll(configDir, 0700); err != nil {
+	if err := os.MkdirAll(profileConfigDir(), 0700); err != nil {
 		return errors.Wrap(err, "error creating config directory")
 	}
 
+	identityDir := profileIdentityDir()
 	if err := os.MkdirAll(identityDir, 0700); err != nil {
 		return errors.Wrap(err, "error creating identity directory")
 	}
@@ -127,7 +123,7 @@ func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) er
 	}); err != nil {
 		return errors.Wrap(err, "error writing identity json")
 	}
-	if err := ioutil.WriteFile(IdentityFile, buf.Bytes(), 0600); err != nil {
+	if err := ioutil.WriteFile(step.IdentityFile(), buf.Bytes(), 0600); err != nil {
 		return errors.Wrap(err, "error writing identity certificate")
 	}
 
@@ -136,7 +132,7 @@ func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) er
 
 // WriteIdentityCertificate writes the identity certificate to disk.
 func WriteIdentityCertificate(certChain []api.Certificate) error {
-	filename := filepath.Join(identityDir, "identity.crt")
+	filename := filepath.Join(profileIdentityDir(), "identity.crt")
 	return writeCertificate(filename, certChain)
 }
 
@@ -319,7 +315,7 @@ func (i *Identity) Renew(client Renewer) error {
 				return errors.Wrap(err, "error encoding identity certificate")
 			}
 		}
-		certFilename := filepath.Join(identityDir, "identity.crt")
+		certFilename := filepath.Join(profileIdentityDir(), "identity.crt")
 		if err := ioutil.WriteFile(certFilename, buf.Bytes(), 0600); err != nil {
 			return errors.Wrap(err, "error writing identity certificate")
 		}

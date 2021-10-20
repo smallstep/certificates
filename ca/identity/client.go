@@ -10,6 +10,7 @@ import (
 	"net/url"
 
 	"github.com/pkg/errors"
+	"go.step.sm/cli-utils/step"
 )
 
 // Client wraps http.Client with a transport using the step root and identity.
@@ -27,21 +28,22 @@ func (c *Client) ResolveReference(ref *url.URL) *url.URL {
 // $STEPPATH/config/defaults.json and the identity defined in
 // $STEPPATH/config/identity.json
 func LoadClient() (*Client, error) {
-	b, err := ioutil.ReadFile(DefaultsFile)
+	defaultsFile := step.DefaultsFile()
+	b, err := ioutil.ReadFile(defaultsFile)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading %s", DefaultsFile)
+		return nil, errors.Wrapf(err, "error reading %s", defaultsFile)
 	}
 
 	var defaults defaultsConfig
 	if err := json.Unmarshal(b, &defaults); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling %s", DefaultsFile)
+		return nil, errors.Wrapf(err, "error unmarshaling %s", defaultsFile)
 	}
 	if err := defaults.Validate(); err != nil {
-		return nil, errors.Wrapf(err, "error validating %s", DefaultsFile)
+		return nil, errors.Wrapf(err, "error validating %s", defaultsFile)
 	}
 	caURL, err := url.Parse(defaults.CaURL)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error validating %s", DefaultsFile)
+		return nil, errors.Wrapf(err, "error validating %s", defaultsFile)
 	}
 	if caURL.Scheme == "" {
 		caURL.Scheme = "https"
@@ -52,7 +54,7 @@ func LoadClient() (*Client, error) {
 		return nil, err
 	}
 	if err := identity.Validate(); err != nil {
-		return nil, errors.Wrapf(err, "error validating %s", IdentityFile)
+		return nil, errors.Wrapf(err, "error validating %s", step.IdentityFile())
 	}
 	if kind := identity.Kind(); kind != MutualTLS {
 		return nil, errors.Errorf("unsupported identity %s: only mTLS is currently supported", kind)
