@@ -25,7 +25,7 @@ To get up and running quickly, or as an alternative to running your own `step-ca
 
 ---
 
-**Questions? Find us in [Discussions](https://github.com/smallstep/certificates/discussions) or [Join our Discord](https://bit.ly/step-discord).**
+**Questions? Find us in [Discussions](https://github.com/smallstep/certificates/discussions) or [Join our Discord](https://u.step.sm/discord).**
 
 [Website](https://smallstep.com/certificates) |
 [Documentation](https://smallstep.com/docs) |
