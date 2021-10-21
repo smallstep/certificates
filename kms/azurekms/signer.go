@@ -7,8 +7,10 @@ import (
 	"encoding/base64"
 	"io"
 	"math/big"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/keyvault/v7.1/keyvault"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/cryptobyte"
 	"golang.org/x/crypto/cryptobyte/asn1"
@@ -69,15 +71,10 @@ func (s *Signer) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 		return nil, err
 	}
 
-	ctx, cancel := defaultContext()
-	defer cancel()
-
 	b64 := base64.RawURLEncoding.EncodeToString(digest)
 
-	resp, err := s.client.Sign(ctx, s.vaultBaseURL, s.name, s.version, keyvault.KeySignParameters{
-		Algorithm: alg,
-		Value:     &b64,
-	})
+	// Sign with retry if the key is not ready
+	resp, err := s.signWithRetry(alg, b64, 3)
 	if err != nil {
 		return nil, errors.Wrap(err, "keyVault Sign failed")
 	}
@@ -109,6 +106,31 @@ func (s *Signer) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 		b.AddASN1BigInt(new(big.Int).SetBytes(sig[octetSize:])) // S
 	})
 	return b.Bytes()
+}
+
+func (s *Signer) signWithRetry(alg keyvault.JSONWebKeySignatureAlgorithm, b64 string, retryAttemps int) (keyvault.KeyOperationResult, error) {
+retry:
+	ctx, cancel := defaultContext()
+	defer cancel()
+
+	resp, err := s.client.Sign(ctx, s.vaultBaseURL, s.name, s.version, keyvault.KeySignParameters{
+		Algorithm: alg,
+		Value:     &b64,
+	})
+	if err != nil && retryAttemps > 0 {
+		var requestError *azure.RequestError
+		if errors.As(err, &requestError) {
+			if se := requestError.ServiceError; se != nil && se.InnerError != nil {
+				code, ok := se.InnerError["code"].(string)
+				if ok && code == "KeyNotYetValid" {
+					time.Sleep(time.Second / time.Duration(retryAttemps))
+					retryAttemps--
+					goto retry
+				}
+			}
+		}
+	}
+	return resp, err
 }
 
 func getSigningAlgorithm(key crypto.PublicKey, opts crypto.SignerOpts) (keyvault.JSONWebKeySignatureAlgorithm, error) {
