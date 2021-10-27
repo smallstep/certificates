@@ -4,11 +4,11 @@ import (
 	"io"
 	"text/template"
 
-	"github.com/Masterminds/sprig/v3"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
 	authconfig "github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/templates"
 	"go.step.sm/linkedca"
 )
 
@@ -24,11 +24,7 @@ type helmVariables struct {
 // WriteHelmTemplate a helm template to configure the
 // smallstep/step-certificates helm chart.
 func (p *PKI) WriteHelmTemplate(w io.Writer) error {
-	funcs := sprig.TxtFuncMap()
-	delete(funcs, "env")
-	delete(funcs, "expandenv")
-
-	tmpl, err := template.New("helm").Funcs(funcs).Parse(helmTemplate)
+	tmpl, err := template.New("helm").Funcs(templates.StepFuncMap()).Parse(helmTemplate)
 	if err != nil {
 		return errors.Wrap(err, "error writing helm template")
 	}

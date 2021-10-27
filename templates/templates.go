@@ -183,7 +183,7 @@ func (t *Template) Load() error {
 // the template fails.
 func (t *Template) LoadBytes(b []byte) error {
 	t.backfill(b)
-	tmpl, err := template.New(t.Name).Funcs(getFuncMap()).Parse(string(b))
+	tmpl, err := template.New(t.Name).Funcs(StepFuncMap()).Parse(string(b))
 	if err != nil {
 		return errors.Wrapf(err, "error parsing template %s", t.Name)
 	}
@@ -271,9 +271,9 @@ func mkdir(path string, perm os.FileMode) error {
 	return nil
 }
 
-// getFuncMap returns sprig.TxtFuncMap but removing the "env" and "expandenv"
+// StepFuncMap returns sprig.TxtFuncMap but removing the "env" and "expandenv"
 // functions to avoid any leak of information.
-func getFuncMap() template.FuncMap {
+func StepFuncMap() template.FuncMap {
 	m := sprig.TxtFuncMap()
 	delete(m, "env")
 	delete(m, "expandenv")
