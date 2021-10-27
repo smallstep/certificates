@@ -21,8 +21,14 @@ type helmVariables struct {
 	Provisioners []provisioner.Interface
 }
 
+// WriteHelmTemplate a helm template to configure the
+// smallstep/step-certificates helm chart.
 func (p *PKI) WriteHelmTemplate(w io.Writer) error {
-	tmpl, err := template.New("helm").Funcs(sprig.TxtFuncMap()).Parse(helmTemplate)
+	funcs := sprig.TxtFuncMap()
+	delete(funcs, "env")
+	delete(funcs, "expandenv")
+
+	tmpl, err := template.New("helm").Funcs(funcs).Parse(helmTemplate)
 	if err != nil {
 		return errors.Wrap(err, "error writing helm template")
 	}
