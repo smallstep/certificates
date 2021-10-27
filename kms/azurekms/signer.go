@@ -108,7 +108,7 @@ func (s *Signer) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]
 	return b.Bytes()
 }
 
-func (s *Signer) signWithRetry(alg keyvault.JSONWebKeySignatureAlgorithm, b64 string, retryAttemps int) (keyvault.KeyOperationResult, error) {
+func (s *Signer) signWithRetry(alg keyvault.JSONWebKeySignatureAlgorithm, b64 string, retryAttempts int) (keyvault.KeyOperationResult, error) {
 retry:
 	ctx, cancel := defaultContext()
 	defer cancel()
@@ -117,14 +117,14 @@ retry:
 		Algorithm: alg,
 		Value:     &b64,
 	})
-	if err != nil && retryAttemps > 0 {
+	if err != nil && retryAttempts > 0 {
 		var requestError *azure.RequestError
 		if errors.As(err, &requestError) {
 			if se := requestError.ServiceError; se != nil && se.InnerError != nil {
 				code, ok := se.InnerError["code"].(string)
 				if ok && code == "KeyNotYetValid" {
-					time.Sleep(time.Second / time.Duration(retryAttemps))
-					retryAttemps--
+					time.Sleep(time.Second / time.Duration(retryAttempts))
+					retryAttempts--
 					goto retry
 				}
 			}
