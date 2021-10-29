@@ -32,7 +32,7 @@ const DefaultRSASize = 3072
 type P11 interface {
 	FindKeyPair(id, label []byte) (crypto11.Signer, error)
 	FindCertificate(id, label []byte, serial *big.Int) (*x509.Certificate, error)
-	ImportCertificateWithLabel(id, label []byte, certificate *x509.Certificate) error
+	ImportCertificateWithAttributes(template crypto11.AttributeSet, certificate *x509.Certificate) error
 	DeleteCertificate(id, label []byte, serial *big.Int) error
 	GenerateRSAKeyPairWithAttributes(public, private crypto11.AttributeSet, bits int) (crypto11.SignerDecrypter, error)
 	GenerateECDSAKeyPairWithAttributes(public, private crypto11.AttributeSet, curve elliptic.Curve) (crypto11.Signer, error)
@@ -201,7 +201,15 @@ func (k *PKCS11) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 		}, "storeCertificate failed")
 	}
 
-	if err := k.p11.ImportCertificateWithLabel(id, object, req.Certificate); err != nil {
+	// Import certificate with the necessary attributes.
+	template, err := crypto11.NewAttributeSetWithIDAndLabel(id, object)
+	if err != nil {
+		return errors.Wrap(err, "storeCertificate failed")
+	}
+	if req.Extractable {
+		template.Set(crypto11.CkaExtractable, true)
+	}
+	if err := k.p11.ImportCertificateWithAttributes(template, req.Certificate); err != nil {
 		return errors.Wrap(err, "storeCertificate failed")
 	}
 

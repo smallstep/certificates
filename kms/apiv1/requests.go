@@ -100,7 +100,7 @@ type GetPublicKeyRequest struct {
 type CreateKeyRequest struct {
 	// Name represents the key name or label used to identify a key.
 	//
-	// Used by: awskms, cloudkms, azurekms, pkcs11, yubikey.
+	// Used by: awskms, cloudkms, pkcs11, yubikey.
 	Name string
 
 	// SignatureAlgorithm represents the type of key to create.
@@ -110,13 +110,11 @@ type CreateKeyRequest struct {
 	Bits int
 
 	// ProtectionLevel specifies how cryptographic operations are performed.
-	// Used by: cloudkms, azurekms
+	// Used by: cloudkms
 	ProtectionLevel ProtectionLevel
 
-	// Extractable defines if the new key may be exported from the HSM under a
-	// wrap key. On pkcs11 sets the CKA_EXTRACTABLE bit.
-	//
-	// Used by: pkcs11
+	// Whether the key may be exported from the HSM under a wrap key.
+	// Sets the CKA_EXTRACTABLE bit.
 	Extractable bool
 }
 
@@ -158,4 +156,8 @@ type LoadCertificateRequest struct {
 type StoreCertificateRequest struct {
 	Name        string
 	Certificate *x509.Certificate
+
+	// Whether the key may be exported from the HSM under a wrap key.
+	// Sets the CKA_EXTRACTABLE bit.
+	Extractable bool
 }
