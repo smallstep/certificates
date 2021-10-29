@@ -72,11 +72,11 @@ func LoadDefaultIdentity() (*Identity, error) {
 }
 
 func profileConfigDir() string {
-	return filepath.Join(step.ProfilePath(), "config")
+	return filepath.Join(step.Path(), "config")
 }
 
 func profileIdentityDir() string {
-	return filepath.Join(step.ProfilePath(), "identity")
+	return filepath.Join(step.Path(), "identity")
 }
 
 // WriteDefaultIdentity writes the given certificates and key and the
