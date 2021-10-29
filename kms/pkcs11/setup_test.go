@@ -18,6 +18,7 @@ import (
 var (
 	testModule        = ""
 	testObject        = "pkcs11:id=7370;object=test-name"
+	testObjectAlt     = "pkcs11:id=7377;object=alt-test-name"
 	testObjectByID    = "pkcs11:id=7370"
 	testObjectByLabel = "pkcs11:object=test-name"
 	testKeys          = []struct {
