@@ -226,7 +226,7 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 	return tr, nil
 }
 
-// WithTransport adds a custom transport to the Client.  It will fail if a
+// WithTransport adds a custom transport to the Client. It will fail if a
 // previous option to create the transport has been configured.
 func WithTransport(tr http.RoundTripper) ClientOption {
 	return func(o *clientOptions) error {
@@ -234,6 +234,17 @@ func WithTransport(tr http.RoundTripper) ClientOption {
 			return err
 		}
 		o.transport = tr
+		return nil
+	}
+}
+
+// WithInsecure adds a insecure transport that bypasses TLS verification.
+func WithInsecure() ClientOption {
+	return func(o *clientOptions) error {
+		o.transport = &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
 		return nil
 	}
 }

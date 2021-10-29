@@ -376,15 +376,12 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	}
 
 	// Create profile directory and stub for default profile configuration.
-	if currentCtx := step.GetCurrentContext(); currentCtx != nil {
+	if currentCtx := step.Contexts().GetCurrent(); currentCtx != nil {
 		profile := GetProfileConfigPath()
 		if err := os.MkdirAll(profile, 0700); err != nil {
 			return nil, errs.FileError(err, profile)
 		}
-		if p.profileDefaults, err = getPath(profile, "defaults.json"); err != nil {
-			return nil, err
-		}
-		if err := ioutil.WriteFile(p.profileDefaults,
+		if err := ioutil.WriteFile(step.ProfileDefaultsFile(),
 			[]byte("{}"), 0600); err != nil {
 			return nil, err
 		}
