@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased - 0.17.7] - DATE
 ### Added
+- Support for generate extractable keys and certificates on a pkcs#11 module.
 ### Changed
 ### Deprecated
 ### Removed
