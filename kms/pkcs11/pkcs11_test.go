@@ -209,13 +209,13 @@ func TestPKCS11_CreateKey(t *testing.T) {
 			},
 		}, false},
 		{"default extractable", args{&apiv1.CreateKeyRequest{
-			Name:        testObject,
+			Name:        testObjectAlt,
 			Extractable: true,
 		}}, &apiv1.CreateKeyResponse{
-			Name:      testObject,
+			Name:      testObjectAlt,
 			PublicKey: &ecdsa.PublicKey{},
 			CreateSignerRequest: apiv1.CreateSignerRequest{
-				SigningKey: testObject,
+				SigningKey: testObjectAlt,
 			},
 		}, false},
 		{"RSA SHA256WithRSA", args{&apiv1.CreateKeyRequest{
@@ -573,7 +573,6 @@ func TestPKCS11_StoreCertificate(t *testing.T) {
 	// Make sure to delete the created certificate
 	t.Cleanup(func() {
 		k.DeleteCertificate(testObject)
-		k.DeleteCertificate(testObjectAlt)
 	})
 
 	type args struct {
@@ -587,11 +586,6 @@ func TestPKCS11_StoreCertificate(t *testing.T) {
 		{"ok", args{&apiv1.StoreCertificateRequest{
 			Name:        testObject,
 			Certificate: cert,
-		}}, false},
-		{"ok extractable", args{&apiv1.StoreCertificateRequest{
-			Name:        testObjectAlt,
-			Certificate: cert,
-			Extractable: true,
 		}}, false},
 		{"fail already exists", args{&apiv1.StoreCertificateRequest{
 			Name:        testObject,
@@ -620,11 +614,6 @@ func TestPKCS11_StoreCertificate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.args.req.Extractable {
-				if testModule == "SoftHSM2" {
-					t.Skip("Extractable certificates are not supported on SoftHSM2")
-				}
-			}
 			if err := k.StoreCertificate(tt.args.req); (err != nil) != tt.wantErr {
 				t.Errorf("PKCS11.StoreCertificate() error = %v, wantErr %v", err, tt.wantErr)
 			}
