@@ -105,7 +105,7 @@ func setup(t TBTesting, k *PKCS11) {
 		}); err != nil && !errors.Is(errors.Cause(err), apiv1.ErrAlreadyExists{
 			Message: c.Name + " already exists",
 		}) {
-			t.Errorf("PKCS1.StoreCertificate() error = %+v", err)
+			t.Errorf("PKCS1.StoreCertificate() error = %v", err)
 			continue
 		}
 		testCerts[i].Certificates = append(testCerts[i].Certificates, cert)

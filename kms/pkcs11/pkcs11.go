@@ -209,7 +209,7 @@ func (k *PKCS11) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 	if req.Extractable {
 		template.Set(crypto11.CkaExtractable, true)
 	}
-	if err := k.p11.ImportCertificateWithAttributes(template, cert); err != nil {
+	if err := k.p11.ImportCertificateWithAttributes(template, req.Certificate); err != nil {
 		return errors.Wrap(err, "storeCertificate failed")
 	}
 
