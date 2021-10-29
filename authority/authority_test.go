@@ -11,6 +11,7 @@ import (
 	"net"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
@@ -82,6 +83,10 @@ func testAuthority(t *testing.T, opts ...Option) *Authority {
 	}
 	a, err := New(c, opts...)
 	assert.FatalError(t, err)
+	// Avoid errors when test tokens are created before the test authority. This
+	// happens in some tests where we re-create the same authority to test
+	// special cases without re-creating the token.
+	a.startTime = a.startTime.Add(-1 * time.Minute)
 	return a
 }
 
@@ -454,8 +459,6 @@ func TestAuthority_GetSCEPService(t *testing.T) {
 			// 	getIdentityFunc:         tt.fields.getIdentityFunc,
 			// }
 			a, err := New(tt.fields.config)
-			fmt.Println(err)
-			fmt.Println(a)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.New(), error = %v, wantErr %v", err, tt.wantErr)
 				return

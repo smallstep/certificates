@@ -201,10 +201,10 @@ func (s *privateKey) Delete() error {
 	return nil
 }
 
-func (s *privateKey) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) (plaintext []byte, err error) {
+func (s *privateKey) Decrypt(rnd io.Reader, msg []byte, opts crypto.DecrypterOpts) (plaintext []byte, err error) {
 	k, ok := s.Signer.(*rsa.PrivateKey)
 	if !ok {
 		return nil, errors.New("key is not an rsa key")
 	}
-	return k.Decrypt(rand, msg, opts)
+	return k.Decrypt(rnd, msg, opts)
 }

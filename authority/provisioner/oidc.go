@@ -49,11 +49,35 @@ type openIDPayload struct {
 	Groups          []string `json:"groups"`
 }
 
+func (o *openIDPayload) IsAdmin(admins []string) bool {
+	if o.Email != "" {
+		email := sanitizeEmail(o.Email)
+		for _, e := range admins {
+			if email == sanitizeEmail(e) {
+				return true
+			}
+		}
+	}
+
+	// The groups and emails can be in the same array for now, but consider
+	// making a specialized option later.
+	for _, name := range o.Groups {
+		for _, admin := range admins {
+			if name == admin {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // OIDC represents an OAuth 2.0 OpenID Connect provider.
 //
 // ClientSecret is mandatory, but it can be an empty string.
 type OIDC struct {
 	*base
+	ID                    string   `json:"-"`
 	Type                  string   `json:"type"`
 	Name                  string   `json:"name"`
 	ClientID              string   `json:"clientID"`
@@ -72,35 +96,6 @@ type OIDC struct {
 	getIdentityFunc       GetIdentityFunc
 }
 
-// IsAdmin returns true if the given email is in the Admins allowlist, false
-// otherwise.
-func (o *OIDC) IsAdmin(email string) bool {
-	if email != "" {
-		email = sanitizeEmail(email)
-		for _, e := range o.Admins {
-			if email == sanitizeEmail(e) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// IsAdminGroup returns true if the one group in the given list is in the Admins
-// allowlist, false otherwise.
-func (o *OIDC) IsAdminGroup(groups []string) bool {
-	for _, g := range groups {
-		// The groups and emails can be in the same array for now, but consider
-		// making a specialized option later.
-		for _, gadmin := range o.Admins {
-			if g == gadmin {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func sanitizeEmail(email string) string {
 	if i := strings.LastIndex(email, "@"); i >= 0 {
 		email = email[:i] + strings.ToLower(email[i:])
@@ -111,6 +106,15 @@ func sanitizeEmail(email string) string {
 // GetID returns the provisioner unique identifier, the OIDC provisioner the
 // uses the clientID for this.
 func (o *OIDC) GetID() string {
+	if o.ID != "" {
+		return o.ID
+	}
+	return o.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (o *OIDC) GetIDForToken() string {
 	return o.ClientID
 }
 
@@ -144,7 +148,7 @@ func (o *OIDC) GetType() Type {
 }
 
 // GetEncryptedKey is not available in an OIDC provisioner.
-func (o *OIDC) GetEncryptedKey() (kid string, key string, ok bool) {
+func (o *OIDC) GetEncryptedKey() (kid, key string, ok bool) {
 	return "", "", false
 }
 
@@ -189,7 +193,7 @@ func (o *OIDC) Init(config Config) (err error) {
 	}
 	// Replace {tenantid} with the configured one
 	if o.TenantID != "" {
-		o.configuration.Issuer = strings.Replace(o.configuration.Issuer, "{tenantid}", o.TenantID, -1)
+		o.configuration.Issuer = strings.ReplaceAll(o.configuration.Issuer, "{tenantid}", o.TenantID)
 	}
 	// Get JWK key set
 	o.keyStore, err = newKeyStore(o.configuration.JWKSetURI)
@@ -224,7 +228,7 @@ func (o *OIDC) ValidatePayload(p openIDPayload) error {
 	}
 
 	// Validate domains (case-insensitive)
-	if p.Email != "" && len(o.Domains) > 0 && !o.IsAdmin(p.Email) {
+	if p.Email != "" && len(o.Domains) > 0 && !p.IsAdmin(o.Admins) {
 		email := sanitizeEmail(p.Email)
 		var found bool
 		for _, d := range o.Domains {
@@ -303,9 +307,10 @@ func (o *OIDC) AuthorizeRevoke(ctx context.Context, token string) error {
 	}
 
 	// Only admins can revoke certificates.
-	if o.IsAdmin(claims.Email) {
+	if claims.IsAdmin(o.Admins) {
 		return nil
 	}
+
 	return errs.Unauthorized("oidc.AuthorizeRevoke; cannot revoke with non-admin oidc token")
 }
 
@@ -341,7 +346,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	// Use the default template unless no-templates are configured and email is
 	// an admin, in that case we will use the CR template.
 	defaultTemplate := x509util.DefaultLeafTemplate
-	if !o.Options.GetX509Options().HasTemplate() && o.IsAdmin(claims.Email) {
+	if !o.Options.GetX509Options().HasTemplate() && claims.IsAdmin(o.Admins) {
 		defaultTemplate = x509util.DefaultAdminLeafTemplate
 	}
 
@@ -367,7 +372,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 // certificate was configured to allow renewals.
 func (o *OIDC) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if o.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("oidc.AuthorizeRenew; renew is disabled for oidc provisioner %s", o.GetID())
+		return errs.Unauthorized("oidc.AuthorizeRenew; renew is disabled for oidc provisioner '%s'", o.GetName())
 	}
 	return nil
 }
@@ -375,7 +380,7 @@ func (o *OIDC) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !o.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized("oidc.AuthorizeSSHSign; sshCA is disabled for oidc provisioner %s", o.GetID())
+		return nil, errs.Unauthorized("oidc.AuthorizeSSHSign; sshCA is disabled for oidc provisioner '%s'", o.GetName())
 	}
 	claims, err := o.authorizeToken(token)
 	if err != nil {
@@ -410,10 +415,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 
 	// Use the default template unless no-templates are configured and email is
 	// an admin, in that case we will use the parameters in the request.
-	isAdmin := o.IsAdmin(claims.Email)
-	if !isAdmin && len(claims.Groups) > 0 {
-		isAdmin = o.IsAdminGroup(claims.Groups)
-	}
+	isAdmin := claims.IsAdmin(o.Admins)
 	defaultTemplate := sshutil.DefaultTemplate
 	if isAdmin && !o.Options.GetSSHOptions().HasTemplate() {
 		defaultTemplate = sshutil.DefaultAdminTemplate
@@ -461,10 +463,11 @@ func (o *OIDC) AuthorizeSSHRevoke(ctx context.Context, token string) error {
 	}
 
 	// Only admins can revoke certificates.
-	if !o.IsAdmin(claims.Email) {
-		return errs.Unauthorized("oidc.AuthorizeSSHRevoke; cannot revoke with non-admin oidc token")
+	if claims.IsAdmin(o.Admins) {
+		return nil
 	}
-	return nil
+
+	return errs.Unauthorized("oidc.AuthorizeSSHRevoke; cannot revoke with non-admin oidc token")
 }
 
 func getAndDecode(uri string, v interface{}) error {

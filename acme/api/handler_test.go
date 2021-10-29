@@ -148,7 +148,7 @@ func TestHandler_GetAuthorization(t *testing.T) {
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("authzID", az.ID)
-	url := fmt.Sprintf("%s/acme/%s/authz/%s",
+	u := fmt.Sprintf("%s/acme/%s/authz/%s",
 		baseURL.String(), provName, az.ID)
 
 	type test struct {
@@ -280,7 +280,7 @@ func TestHandler_GetAuthorization(t *testing.T) {
 				expB, err := json.Marshal(az)
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
-				assert.Equals(t, res.Header["Location"], []string{url})
+				assert.Equals(t, res.Header["Location"], []string{u})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
@@ -314,7 +314,7 @@ func TestHandler_GetCertificate(t *testing.T) {
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("certID", certID)
-	url := fmt.Sprintf("%s/acme/%s/certificate/%s",
+	u := fmt.Sprintf("%s/acme/%s/certificate/%s",
 		baseURL.String(), provName, certID)
 
 	type test struct {
@@ -396,7 +396,7 @@ func TestHandler_GetCertificate(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{db: tc.db}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.GetCertificate(w, req)
@@ -434,7 +434,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
 
-	url := fmt.Sprintf("%s/acme/%s/challenge/%s/%s",
+	u := fmt.Sprintf("%s/acme/%s/challenge/%s/%s",
 		baseURL.String(), provName, "authzID", "chID")
 
 	type test struct {
@@ -574,13 +574,13 @@ func TestHandler_GetChallenge(t *testing.T) {
 						assert.Equals(t, azID, "authzID")
 						return &acme.Challenge{
 							Status:    acme.StatusPending,
-							Type:      "http-01",
+							Type:      acme.HTTP01,
 							AccountID: "accID",
 						}, nil
 					},
 					MockUpdateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						assert.Equals(t, ch.Status, acme.StatusPending)
-						assert.Equals(t, ch.Type, "http-01")
+						assert.Equals(t, ch.Type, acme.HTTP01)
 						assert.Equals(t, ch.AccountID, "accID")
 						assert.Equals(t, ch.AuthorizationID, "authzID")
 						assert.HasSuffix(t, ch.Error.Type, acme.ErrorConnectionType.String())
@@ -616,13 +616,13 @@ func TestHandler_GetChallenge(t *testing.T) {
 						return &acme.Challenge{
 							ID:        "chID",
 							Status:    acme.StatusPending,
-							Type:      "http-01",
+							Type:      acme.HTTP01,
 							AccountID: "accID",
 						}, nil
 					},
 					MockUpdateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						assert.Equals(t, ch.Status, acme.StatusPending)
-						assert.Equals(t, ch.Type, "http-01")
+						assert.Equals(t, ch.Type, acme.HTTP01)
 						assert.Equals(t, ch.AccountID, "accID")
 						assert.Equals(t, ch.AuthorizationID, "authzID")
 						assert.HasSuffix(t, ch.Error.Type, acme.ErrorConnectionType.String())
@@ -633,9 +633,9 @@ func TestHandler_GetChallenge(t *testing.T) {
 					ID:              "chID",
 					Status:          acme.StatusPending,
 					AuthorizationID: "authzID",
-					Type:            "http-01",
+					Type:            acme.HTTP01,
 					AccountID:       "accID",
-					URL:             url,
+					URL:             u,
 					Error:           acme.NewError(acme.ErrorConnectionType, "force"),
 				},
 				vco: &acme.ValidateChallengeOptions{
@@ -652,7 +652,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{db: tc.db, linker: NewLinker("dns", "acme"), validateChallengeOptions: tc.vco}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.GetChallenge(w, req)
@@ -678,7 +678,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<%s/acme/%s/authz/%s>;rel=\"up\"", baseURL, provName, "authzID")})
-				assert.Equals(t, res.Header["Location"], []string{url})
+				assert.Equals(t, res.Header["Location"], []string{u})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})

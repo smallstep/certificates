@@ -1,5 +1,5 @@
 ---
-name: Certificates Enhancement
+name: Enhancement
 about: Suggest an enhancement to step certificates
 title: ''
 labels: enhancement, needs triage

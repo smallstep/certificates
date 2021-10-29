@@ -19,9 +19,7 @@ const defaultValidity = 5 * time.Minute
 
 // timeNow returns the current time.
 // This method is used for unit testing purposes.
-var timeNow = func() time.Time {
-	return time.Now()
-}
+var timeNow = time.Now
 
 type x5cIssuer struct {
 	caURL    *url.URL
@@ -143,7 +141,11 @@ func newX5CSigner(certFile, keyFile, password string) (jose.Signer, error) {
 	if err != nil {
 		return nil, err
 	}
-	certs, err := jose.ValidateX5C(certFile, signer)
+	certs, err := pemutil.ReadCertificateBundle(certFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "error reading x5c certificate chain")
+	}
+	certStrs, err := jose.ValidateX5C(certs, signer)
 	if err != nil {
 		return nil, errors.Wrap(err, "error validating x5c certificate chain and key")
 	}
@@ -151,7 +153,7 @@ func newX5CSigner(certFile, keyFile, password string) (jose.Signer, error) {
 	so := new(jose.SignerOptions)
 	so.WithType("JWT")
 	so.WithHeader("kid", kid)
-	so.WithHeader("x5c", certs)
+	so.WithHeader("x5c", certStrs)
 	return newJoseSigner(signer, so)
 }
 

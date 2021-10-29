@@ -42,6 +42,7 @@ type k8sSAPayload struct {
 // entity trusted to make signature requests.
 type K8sSA struct {
 	*base
+	ID        string   `json:"-"`
 	Type      string   `json:"type"`
 	Name      string   `json:"name"`
 	PubKeys   []byte   `json:"publicKeys,omitempty"`
@@ -56,6 +57,15 @@ type K8sSA struct {
 // GetID returns the provisioner unique identifier. The name and credential id
 // should uniquely identify any K8sSA provisioner.
 func (p *K8sSA) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (p *K8sSA) GetIDForToken() string {
 	return K8sSAID
 }
 
@@ -101,12 +111,12 @@ func (p *K8sSA) Init(config Config) (err error) {
 			}
 			key, err := pemutil.ParseKey(pem.EncodeToMemory(block))
 			if err != nil {
-				return errors.Wrapf(err, "error parsing public key in provisioner %s", p.GetID())
+				return errors.Wrapf(err, "error parsing public key in provisioner '%s'", p.GetName())
 			}
 			switch q := key.(type) {
 			case *rsa.PublicKey, *ecdsa.PublicKey, ed25519.PublicKey:
 			default:
-				return errors.Errorf("Unexpected public key type %T in provisioner %s", q, p.GetID())
+				return errors.Errorf("Unexpected public key type %T in provisioner '%s'", q, p.GetName())
 			}
 			p.pubKeys = append(p.pubKeys, key)
 		}
@@ -240,7 +250,7 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 // AuthorizeRenew returns an error if the renewal is disabled.
 func (p *K8sSA) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("k8ssa.AuthorizeRenew; renew is disabled for k8sSA provisioner %s", p.GetID())
+		return errs.Unauthorized("k8ssa.AuthorizeRenew; renew is disabled for k8sSA provisioner '%s'", p.GetName())
 	}
 	return nil
 }
@@ -248,7 +258,7 @@ func (p *K8sSA) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) erro
 // AuthorizeSSHSign validates an request for an SSH certificate.
 func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized("k8ssa.AuthorizeSSHSign; sshCA is disabled for k8sSA provisioner %s", p.GetID())
+		return nil, errs.Unauthorized("k8ssa.AuthorizeSSHSign; sshCA is disabled for k8sSA provisioner '%s'", p.GetName())
 	}
 	claims, err := p.authorizeToken(token, p.audiences.SSHSign)
 	if err != nil {

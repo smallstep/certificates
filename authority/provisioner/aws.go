@@ -252,6 +252,7 @@ type awsInstanceIdentityDocument struct {
 // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-identity-documents.html
 type AWS struct {
 	*base
+	ID                     string   `json:"-"`
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
 	Accounts               []string `json:"accounts"`
@@ -269,6 +270,15 @@ type AWS struct {
 
 // GetID returns the provisioner unique identifier.
 func (p *AWS) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (p *AWS) GetIDForToken() string {
 	return "aws/" + p.Name
 }
 
@@ -286,7 +296,7 @@ func (p *AWS) GetTokenID(token string) (string, error) {
 	}
 
 	// Use provisioner + instance-id as the identifier.
-	unique := fmt.Sprintf("%s.%s", p.GetID(), payload.document.InstanceID)
+	unique := fmt.Sprintf("%s.%s", p.GetIDForToken(), payload.document.InstanceID)
 	sum := sha256.Sum256([]byte(unique))
 	return strings.ToLower(hex.EncodeToString(sum[:])), nil
 }
@@ -302,7 +312,7 @@ func (p *AWS) GetType() Type {
 }
 
 // GetEncryptedKey is not available in an AWS provisioner.
-func (p *AWS) GetEncryptedKey() (kid string, key string, ok bool) {
+func (p *AWS) GetEncryptedKey() (kid, key string, ok bool) {
 	return "", "", false
 }
 
@@ -334,7 +344,7 @@ func (p *AWS) GetIdentityToken(subject, caURL string) (string, error) {
 		return "", err
 	}
 
-	audience, err := generateSignAudience(caURL, p.GetID())
+	audience, err := generateSignAudience(caURL, p.GetIDForToken())
 	if err != nil {
 		return "", err
 	}
@@ -342,7 +352,7 @@ func (p *AWS) GetIdentityToken(subject, caURL string) (string, error) {
 	// Create unique ID for Trust On First Use (TOFU). Only the first instance
 	// per provisioner is allowed as we don't have a way to trust the given
 	// sans.
-	unique := fmt.Sprintf("%s.%s", p.GetID(), idoc.InstanceID)
+	unique := fmt.Sprintf("%s.%s", p.GetIDForToken(), idoc.InstanceID)
 	sum := sha256.Sum256([]byte(unique))
 
 	// Create a JWT from the identity document
@@ -397,7 +407,7 @@ func (p *AWS) Init(config Config) (err error) {
 	if p.config, err = newAWSConfig(p.IIDRoots); err != nil {
 		return err
 	}
-	p.audiences = config.Audiences.WithFragment(p.GetID())
+	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
 
 	// validate IMDS versions
 	if len(p.IMDSVersions) == 0 {
@@ -439,13 +449,15 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	// There's no way to trust them other than TOFU.
 	var so []SignOption
 	if p.DisableCustomSANs {
-		dnsName := fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region)
-		so = append(so, dnsNamesValidator([]string{dnsName}))
-		so = append(so, ipAddressesValidator([]net.IP{
-			net.ParseIP(doc.PrivateIP),
-		}))
-		so = append(so, emailAddressesValidator(nil))
-		so = append(so, urisValidator(nil))
+		dnsName := fmt.Sprintf("ip-%s.%s.compute.internal", strings.ReplaceAll(doc.PrivateIP, ".", "-"), doc.Region)
+		so = append(so,
+			dnsNamesValidator([]string{dnsName}),
+			ipAddressesValidator([]net.IP{
+				net.ParseIP(doc.PrivateIP),
+			}),
+			emailAddressesValidator(nil),
+			urisValidator(nil),
+		)
 
 		// Template options
 		data.SetSANs([]string{dnsName, doc.PrivateIP})
@@ -474,7 +486,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // certificate was configured to allow renewals.
 func (p *AWS) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("aws.AuthorizeRenew; renew is disabled for aws provisioner %s", p.GetID())
+		return errs.Unauthorized("aws.AuthorizeRenew; renew is disabled for aws provisioner '%s'", p.GetName())
 	}
 	return nil
 }
@@ -504,6 +516,11 @@ func (p *AWS) checkSignature(signed, signature []byte) error {
 func (p *AWS) readURL(url string) ([]byte, error) {
 	var resp *http.Response
 	var err error
+
+	// Initialize IMDS versions when this is called from the cli.
+	if len(p.IMDSVersions) == 0 {
+		p.IMDSVersions = []string{"v2", "v1"}
+	}
 
 	for _, v := range p.IMDSVersions {
 		switch v {
@@ -654,7 +671,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 	if p.DisableCustomSANs {
 		if payload.Subject != doc.InstanceID &&
 			payload.Subject != doc.PrivateIP &&
-			payload.Subject != fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region) {
+			payload.Subject != fmt.Sprintf("ip-%s.%s.compute.internal", strings.ReplaceAll(doc.PrivateIP, ".", "-"), doc.Region) {
 			return nil, errs.Unauthorized("aws.authorizeToken; invalid token - invalid subject claim (sub)")
 		}
 	}
@@ -687,7 +704,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized("aws.AuthorizeSSHSign; ssh ca is disabled for aws provisioner %s", p.GetID())
+		return nil, errs.Unauthorized("aws.AuthorizeSSHSign; ssh ca is disabled for aws provisioner '%s'", p.GetName())
 	}
 	claims, err := p.authorizeToken(token)
 	if err != nil {
@@ -705,7 +722,7 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	// Validated principals.
 	principals := []string{
 		doc.PrivateIP,
-		fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region),
+		fmt.Sprintf("ip-%s.%s.compute.internal", strings.ReplaceAll(doc.PrivateIP, ".", "-"), doc.Region),
 	}
 
 	// Only enforce known principals if disable custom sans is true.

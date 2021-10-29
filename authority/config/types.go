@@ -1,4 +1,4 @@
-package authority
+package config
 
 import (
 	"encoding/json"
@@ -25,7 +25,7 @@ func (s multiString) HasEmpties() bool {
 		return true
 	}
 	for _, ss := range s {
-		if len(ss) == 0 {
+		if ss == "" {
 			return true
 		}
 	}

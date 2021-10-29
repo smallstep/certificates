@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/scep"
@@ -18,6 +19,9 @@ func WriteError(w http.ResponseWriter, err error) {
 	switch k := err.(type) {
 	case *acme.Error:
 		acme.WriteError(w, k)
+		return
+	case *admin.Error:
+		admin.WriteError(w, k)
 		return
 	case *scep.Error:
 		w.Header().Set("Content-Type", "text/plain")
@@ -46,12 +50,10 @@ func WriteError(w http.ResponseWriter, err error) {
 				rl.WithFields(map[string]interface{}{
 					"stack-trace": fmt.Sprintf("%+v", e),
 				})
-			} else {
-				if e, ok := cause.(errs.StackTracer); ok {
-					rl.WithFields(map[string]interface{}{
-						"stack-trace": fmt.Sprintf("%+v", e),
-					})
-				}
+			} else if e, ok := cause.(errs.StackTracer); ok {
+				rl.WithFields(map[string]interface{}{
+					"stack-trace": fmt.Sprintf("%+v", e),
+				})
 			}
 		}
 	}

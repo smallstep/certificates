@@ -56,7 +56,7 @@ func TestGetEncryptedKey(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					val, ok := tc.a.provisioners.Load("max:" + tc.kid)
+					val, ok := tc.a.provisioners.Load("mike:" + tc.kid)
 					assert.Fatal(t, ok)
 					p, ok := val.(*provisioner.JWK)
 					assert.Fatal(t, ok)

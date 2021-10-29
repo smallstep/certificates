@@ -178,7 +178,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 	provName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
 
-	url := fmt.Sprintf("http://ca.smallstep.com/acme/%s/account/%s/orders", provName, accID)
+	u := fmt.Sprintf("http://ca.smallstep.com/acme/%s/account/%s/orders", provName, accID)
 
 	oids := []string{"foo", "bar"}
 	oidURLs := []string{
@@ -255,7 +255,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.GetOrdersByAccountID(w, req)

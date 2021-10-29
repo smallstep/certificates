@@ -411,6 +411,19 @@ func TestNew(t *testing.T) {
 			client:      client,
 			fingerprint: testRootFingerprint,
 		}, false},
+		{"ok ca getter", args{context.TODO(), apiv1.Options{
+			IsCAGetter:                      true,
+			CertificateAuthority:            caURL.String(),
+			CertificateAuthorityFingerprint: testRootFingerprint,
+			CertificateIssuer: &apiv1.CertificateIssuer{
+				Type:        "jwk",
+				Provisioner: "ra@doe.org",
+			},
+		}}, &StepCAS{
+			iss:         nil,
+			client:      client,
+			fingerprint: testRootFingerprint,
+		}, false},
 		{"fail authority", args{context.TODO(), apiv1.Options{
 			CertificateAuthority:            "",
 			CertificateAuthorityFingerprint: testRootFingerprint,

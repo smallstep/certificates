@@ -5,12 +5,15 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
+	"net"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"go.step.sm/crypto/x509util"
 )
 
 func TestOrder_UpdateStatus(t *testing.T) {
@@ -261,10 +264,10 @@ func TestOrder_UpdateStatus(t *testing.T) {
 }
 
 type mockSignAuth struct {
-	sign                func(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
-	loadProvisionerByID func(string) (provisioner.Interface, error)
-	ret1, ret2          interface{}
-	err                 error
+	sign                  func(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	loadProvisionerByName func(string) (provisioner.Interface, error)
+	ret1, ret2            interface{}
+	err                   error
 }
 
 func (m *mockSignAuth) Sign(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
@@ -276,9 +279,9 @@ func (m *mockSignAuth) Sign(csr *x509.CertificateRequest, signOpts provisioner.S
 	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
 }
 
-func (m *mockSignAuth) LoadProvisionerByID(id string) (provisioner.Interface, error) {
-	if m.loadProvisionerByID != nil {
-		return m.loadProvisionerByID(id)
+func (m *mockSignAuth) LoadProvisionerByName(name string) (provisioner.Interface, error) {
+	if m.loadProvisionerByName != nil {
+		return m.loadProvisionerByName(name)
 	}
 	return m.ret1.(provisioner.Interface), m.err
 }
@@ -362,61 +365,6 @@ func TestOrder_Finalize(t *testing.T) {
 			return test{
 				o:   o,
 				err: NewErrorISE("unrecognized order status: %s", o.Status),
-			}
-		},
-		"fail/error-names-length-mismatch": func(t *testing.T) test {
-			now := clock.Now()
-			o := &Order{
-				ID:               "oID",
-				AccountID:        "accID",
-				Status:           StatusReady,
-				ExpiresAt:        now.Add(5 * time.Minute),
-				AuthorizationIDs: []string{"a", "b"},
-				Identifiers: []Identifier{
-					{Type: "dns", Value: "foo.internal"},
-					{Type: "dns", Value: "bar.internal"},
-				},
-			}
-			orderNames := []string{"bar.internal", "foo.internal"}
-			csr := &x509.CertificateRequest{
-				Subject: pkix.Name{
-					CommonName: "foo.internal",
-				},
-			}
-
-			return test{
-				o:   o,
-				csr: csr,
-				err: NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
-					"CSR names = %v, Order names = %v", []string{"foo.internal"}, orderNames),
-			}
-		},
-		"fail/error-names-mismatch": func(t *testing.T) test {
-			now := clock.Now()
-			o := &Order{
-				ID:               "oID",
-				AccountID:        "accID",
-				Status:           StatusReady,
-				ExpiresAt:        now.Add(5 * time.Minute),
-				AuthorizationIDs: []string{"a", "b"},
-				Identifiers: []Identifier{
-					{Type: "dns", Value: "foo.internal"},
-					{Type: "dns", Value: "bar.internal"},
-				},
-			}
-			orderNames := []string{"bar.internal", "foo.internal"}
-			csr := &x509.CertificateRequest{
-				Subject: pkix.Name{
-					CommonName: "foo.internal",
-				},
-				DNSNames: []string{"zap.internal"},
-			}
-
-			return test{
-				o:   o,
-				csr: csr,
-				err: NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
-					"CSR names = %v, Order names = %v", []string{"foo.internal", "zap.internal"}, orderNames),
 			}
 		},
 		"fail/error-provisioner-auth": func(t *testing.T) test {
@@ -650,7 +598,7 @@ func TestOrder_Finalize(t *testing.T) {
 				err: NewErrorISE("error updating order oID: force"),
 			}
 		},
-		"ok/new-cert": func(t *testing.T) test {
+		"ok/new-cert-dns": func(t *testing.T) test {
 			now := clock.Now()
 			o := &Order{
 				ID:               "oID",
@@ -668,6 +616,131 @@ func TestOrder_Finalize(t *testing.T) {
 					CommonName: "foo.internal",
 				},
 				DNSNames: []string{"bar.internal"},
+			}
+
+			foo := &x509.Certificate{Subject: pkix.Name{CommonName: "foo"}}
+			bar := &x509.Certificate{Subject: pkix.Name{CommonName: "bar"}}
+			baz := &x509.Certificate{Subject: pkix.Name{CommonName: "baz"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{foo, bar, baz}, nil
+					},
+				},
+				db: &MockDB{
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+						cert.ID = "certID"
+						assert.Equals(t, cert.AccountID, o.AccountID)
+						assert.Equals(t, cert.OrderID, o.ID)
+						assert.Equals(t, cert.Leaf, foo)
+						assert.Equals(t, cert.Intermediates, []*x509.Certificate{bar, baz})
+						return nil
+					},
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.CertificateID, "certID")
+						assert.Equals(t, updo.Status, StatusValid)
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						assert.Equals(t, updo.AuthorizationIDs, o.AuthorizationIDs)
+						assert.Equals(t, updo.Identifiers, o.Identifiers)
+						return nil
+					},
+				},
+			}
+		},
+		"ok/new-cert-ip": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "192.168.42.42"},
+					{Type: "ip", Value: "192.168.43.42"},
+				},
+			}
+			csr := &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")}, // in case of IPs, no Common Name
+			}
+
+			foo := &x509.Certificate{Subject: pkix.Name{CommonName: "foo"}}
+			bar := &x509.Certificate{Subject: pkix.Name{CommonName: "bar"}}
+			baz := &x509.Certificate{Subject: pkix.Name{CommonName: "baz"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{foo, bar, baz}, nil
+					},
+				},
+				db: &MockDB{
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+						cert.ID = "certID"
+						assert.Equals(t, cert.AccountID, o.AccountID)
+						assert.Equals(t, cert.OrderID, o.ID)
+						assert.Equals(t, cert.Leaf, foo)
+						assert.Equals(t, cert.Intermediates, []*x509.Certificate{bar, baz})
+						return nil
+					},
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.CertificateID, "certID")
+						assert.Equals(t, updo.Status, StatusValid)
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						assert.Equals(t, updo.AuthorizationIDs, o.AuthorizationIDs)
+						assert.Equals(t, updo.Identifiers, o.Identifiers)
+						return nil
+					},
+				},
+			}
+		},
+		"ok/new-cert-dns-and-ip": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+					{Type: "ip", Value: "192.168.42.42"},
+				},
+			}
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "foo.internal",
+				},
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42")},
 			}
 
 			foo := &x509.Certificate{Subject: pkix.Name{CommonName: "foo"}}
@@ -733,6 +806,595 @@ func TestOrder_Finalize(t *testing.T) {
 				}
 			} else {
 				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
+func Test_uniqueSortedIPs(t *testing.T) {
+	type args struct {
+		ips []net.IP
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantUnique []net.IP
+	}{
+		{
+			name: "ok/empty",
+			args: args{
+				ips: []net.IP{},
+			},
+			wantUnique: []net.IP{},
+		},
+		{
+			name: "ok/single-ipv4",
+			args: args{
+				ips: []net.IP{net.ParseIP("192.168.42.42")},
+			},
+			wantUnique: []net.IP{net.ParseIP("192.168.42.42")},
+		},
+		{
+			name: "ok/multiple-ipv4",
+			args: args{
+				ips: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.10"), net.ParseIP("192.168.42.1")},
+			},
+			wantUnique: []net.IP{net.ParseIP("192.168.42.1"), net.ParseIP("192.168.42.10"), net.ParseIP("192.168.42.42")},
+		},
+		{
+			name: "ok/unique-ipv4",
+			args: args{
+				ips: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.42")},
+			},
+			wantUnique: []net.IP{net.ParseIP("192.168.42.42")},
+		},
+		{
+			name: "ok/single-ipv6",
+			args: args{
+				ips: []net.IP{net.ParseIP("2001:db8::30")},
+			},
+			wantUnique: []net.IP{net.ParseIP("2001:db8::30")},
+		},
+		{
+			name: "ok/multiple-ipv6",
+			args: args{
+				ips: []net.IP{net.ParseIP("2001:db8::30"), net.ParseIP("2001:db8::20"), net.ParseIP("2001:db8::10")},
+			},
+			wantUnique: []net.IP{net.ParseIP("2001:db8::10"), net.ParseIP("2001:db8::20"), net.ParseIP("2001:db8::30")},
+		},
+		{
+			name: "ok/unique-ipv6",
+			args: args{
+				ips: []net.IP{net.ParseIP("2001:db8::1"), net.ParseIP("2001:db8::1")},
+			},
+			wantUnique: []net.IP{net.ParseIP("2001:db8::1")},
+		},
+		{
+			name: "ok/mixed-ipv4-and-ipv6",
+			args: args{
+				ips: []net.IP{net.ParseIP("2001:db8::1"), net.ParseIP("2001:db8::1"), net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.42")},
+			},
+			wantUnique: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("2001:db8::1")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotUnique := uniqueSortedIPs(tt.args.ips); !reflect.DeepEqual(gotUnique, tt.wantUnique) {
+				t.Errorf("uniqueSortedIPs() = %v, want %v", gotUnique, tt.wantUnique)
+			}
+		})
+	}
+}
+
+func Test_numberOfIdentifierType(t *testing.T) {
+	type args struct {
+		typ IdentifierType
+		ids []Identifier
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "ok/no-identifiers",
+			args: args{
+				typ: DNS,
+				ids: []Identifier{},
+			},
+			want: 0,
+		},
+		{
+			name: "ok/no-dns",
+			args: args{
+				typ: DNS,
+				ids: []Identifier{
+					{
+						Type:  IP,
+						Value: "192.168.42.42",
+					},
+				},
+			},
+			want: 0,
+		},
+		{
+			name: "ok/no-ips",
+			args: args{
+				typ: IP,
+				ids: []Identifier{
+					{
+						Type:  DNS,
+						Value: "example.com",
+					},
+				},
+			},
+			want: 0,
+		},
+		{
+			name: "ok/one-dns",
+			args: args{
+				typ: DNS,
+				ids: []Identifier{
+					{
+						Type:  DNS,
+						Value: "example.com",
+					},
+					{
+						Type:  IP,
+						Value: "192.168.42.42",
+					},
+				},
+			},
+			want: 1,
+		},
+		{
+			name: "ok/one-ip",
+			args: args{
+				typ: IP,
+				ids: []Identifier{
+					{
+						Type:  DNS,
+						Value: "example.com",
+					},
+					{
+						Type:  IP,
+						Value: "192.168.42.42",
+					},
+				},
+			},
+			want: 1,
+		},
+		{
+			name: "ok/more-dns",
+			args: args{
+				typ: DNS,
+				ids: []Identifier{
+					{
+						Type:  DNS,
+						Value: "example.com",
+					},
+					{
+						Type:  DNS,
+						Value: "*.example.com",
+					},
+					{
+						Type:  IP,
+						Value: "192.168.42.42",
+					},
+				},
+			},
+			want: 2,
+		},
+		{
+			name: "ok/more-ips",
+			args: args{
+				typ: IP,
+				ids: []Identifier{
+					{
+						Type:  DNS,
+						Value: "example.com",
+					},
+					{
+						Type:  IP,
+						Value: "192.168.42.42",
+					},
+					{
+						Type:  IP,
+						Value: "192.168.42.43",
+					},
+				},
+			},
+			want: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := numberOfIdentifierType(tt.args.typ, tt.args.ids); got != tt.want {
+				t.Errorf("numberOfIdentifierType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_ipsAreEqual(t *testing.T) {
+	type args struct {
+		x net.IP
+		y net.IP
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "ok/ipv4",
+			args: args{
+				x: net.ParseIP("192.168.42.42"),
+				y: net.ParseIP("192.168.42.42"),
+			},
+			want: true,
+		},
+		{
+			name: "fail/ipv4",
+			args: args{
+				x: net.ParseIP("192.168.42.42"),
+				y: net.ParseIP("192.168.42.43"),
+			},
+			want: false,
+		},
+		{
+			name: "ok/ipv6",
+			args: args{
+				x: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
+			want: true,
+		},
+		{
+			name: "fail/ipv6",
+			args: args{
+				x: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7335"),
+			},
+			want: false,
+		},
+		{
+			name: "fail/ipv4-and-ipv6",
+			args: args{
+				x: net.ParseIP("192.168.42.42"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
+			want: false,
+		},
+		{
+			name: "ok/ipv4-mapped-to-ipv6",
+			args: args{
+				x: net.ParseIP("192.168.42.42"),
+				y: net.ParseIP("::ffff:192.168.42.42"), // parsed to the same IPv4 by Go
+			},
+			want: true, // we expect this to happen; a known issue in which ipv4 mapped ipv6 addresses are considered the same as their ipv4 counterpart
+		},
+		{
+			name: "fail/invalid-ipv4-and-valid-ipv6",
+			args: args{
+				x: net.ParseIP("192.168.42.1000"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			},
+			want: false,
+		},
+		{
+			name: "fail/valid-ipv4-and-invalid-ipv6",
+			args: args{
+				x: net.ParseIP("192.168.42.42"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:733400"),
+			},
+			want: false,
+		},
+		{
+			name: "fail/invalid-ipv4-and-invalid-ipv6",
+			args: args{
+				x: net.ParseIP("192.168.42.1000"),
+				y: net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:1000000"),
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ipsAreEqual(tt.args.x, tt.args.y); got != tt.want {
+				t.Errorf("ipsAreEqual() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_canonicalize(t *testing.T) {
+	type args struct {
+		csr *x509.CertificateRequest
+	}
+	tests := []struct {
+		name              string
+		args              args
+		wantCanonicalized *x509.CertificateRequest
+	}{
+		{
+			name: "ok/dns",
+			args: args{
+				csr: &x509.CertificateRequest{
+					DNSNames: []string{"www.example.com", "example.com"},
+				},
+			},
+			wantCanonicalized: &x509.CertificateRequest{
+				DNSNames:    []string{"example.com", "www.example.com"},
+				IPAddresses: []net.IP{},
+			},
+		},
+		{
+			name: "ok/common-name",
+			args: args{
+				csr: &x509.CertificateRequest{
+					Subject: pkix.Name{
+						CommonName: "example.com",
+					},
+					DNSNames: []string{"www.example.com"},
+				},
+			},
+			wantCanonicalized: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "example.com",
+				},
+				DNSNames:    []string{"example.com", "www.example.com"},
+				IPAddresses: []net.IP{},
+			},
+		},
+		{
+			name: "ok/ipv4",
+			args: args{
+				csr: &x509.CertificateRequest{
+					IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
+				},
+			},
+			wantCanonicalized: &x509.CertificateRequest{
+				DNSNames:    []string{},
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
+			},
+		},
+		{
+			name: "ok/mixed",
+			args: args{
+				csr: &x509.CertificateRequest{
+					DNSNames:    []string{"www.example.com", "example.com"},
+					IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
+				},
+			},
+			wantCanonicalized: &x509.CertificateRequest{
+				DNSNames:    []string{"example.com", "www.example.com"},
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
+			},
+		},
+		{
+			name: "ok/mixed-common-name",
+			args: args{
+				csr: &x509.CertificateRequest{
+					Subject: pkix.Name{
+						CommonName: "example.com",
+					},
+					DNSNames:    []string{"www.example.com"},
+					IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
+				},
+			},
+			wantCanonicalized: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "example.com",
+				},
+				DNSNames:    []string{"example.com", "www.example.com"},
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotCanonicalized := canonicalize(tt.args.csr); !reflect.DeepEqual(gotCanonicalized, tt.wantCanonicalized) {
+				t.Errorf("canonicalize() = %v, want %v", gotCanonicalized, tt.wantCanonicalized)
+			}
+		})
+	}
+}
+
+func TestOrder_sans(t *testing.T) {
+	type fields struct {
+		Identifiers []Identifier
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		csr    *x509.CertificateRequest
+		want   []x509util.SubjectAlternativeName
+		err    *Error
+	}{
+		{
+			name: "ok/dns",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "example.com"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "example.com",
+				},
+			},
+			want: []x509util.SubjectAlternativeName{
+				{Type: "dns", Value: "example.com"},
+			},
+			err: nil,
+		},
+		{
+			name: "fail/error-names-length-mismatch",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+					{Type: "dns", Value: "bar.internal"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "foo.internal",
+				},
+			},
+			want: []x509util.SubjectAlternativeName{},
+			err: NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
+				"CSR names = %v, Order names = %v", []string{"foo.internal"}, []string{"bar.internal", "foo.internal"}),
+		},
+		{
+			name: "fail/error-names-mismatch",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+					{Type: "dns", Value: "bar.internal"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "foo.internal",
+				},
+				DNSNames: []string{"zap.internal"},
+			},
+			want: []x509util.SubjectAlternativeName{},
+			err: NewError(ErrorBadCSRType, "CSR names do not match identifiers exactly: "+
+				"CSR names = %v, Order names = %v", []string{"foo.internal", "zap.internal"}, []string{"bar.internal", "foo.internal"}),
+		},
+		{
+			name: "ok/ipv4",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "192.168.43.42"},
+					{Type: "ip", Value: "192.168.42.42"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
+			},
+			want: []x509util.SubjectAlternativeName{
+				{Type: "ip", Value: "192.168.42.42"},
+				{Type: "ip", Value: "192.168.43.42"},
+			},
+			err: nil,
+		},
+		{
+			name: "ok/ipv6",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "2001:0db8:85a3::8a2e:0370:7335"},
+					{Type: "ip", Value: "2001:0db8:85a3::8a2e:0370:7334"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7335"), net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")},
+			},
+			want: []x509util.SubjectAlternativeName{
+				{Type: "ip", Value: "2001:db8:85a3::8a2e:370:7334"},
+				{Type: "ip", Value: "2001:db8:85a3::8a2e:370:7335"},
+			},
+			err: nil,
+		},
+		{
+			name: "fail/error-ips-length-mismatch",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "192.168.42.42"},
+					{Type: "ip", Value: "192.168.43.42"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42")},
+			},
+			want: []x509util.SubjectAlternativeName{},
+			err: NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
+				"CSR IPs = %v, Order IPs = %v", []net.IP{net.ParseIP("192.168.42.42")}, []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")}),
+		},
+		{
+			name: "fail/error-ips-mismatch",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "ip", Value: "192.168.42.42"},
+					{Type: "ip", Value: "192.168.43.42"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.32")},
+			},
+			want: []x509util.SubjectAlternativeName{},
+			err: NewError(ErrorBadCSRType, "CSR IPs do not match identifiers exactly: "+
+				"CSR IPs = %v, Order IPs = %v", []net.IP{net.ParseIP("192.168.42.32"), net.ParseIP("192.168.42.42")}, []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")}),
+		},
+		{
+			name: "ok/mixed",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+					{Type: "dns", Value: "bar.internal"},
+					{Type: "ip", Value: "192.168.43.42"},
+					{Type: "ip", Value: "192.168.42.42"},
+					{Type: "ip", Value: "2001:0db8:85a3:0000:0000:8a2e:0370:7334"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "bar.internal",
+				},
+				DNSNames:    []string{"foo.internal"},
+				IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42"), net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334")},
+			},
+			want: []x509util.SubjectAlternativeName{
+				{Type: "dns", Value: "bar.internal"},
+				{Type: "dns", Value: "foo.internal"},
+				{Type: "ip", Value: "192.168.42.42"},
+				{Type: "ip", Value: "192.168.43.42"},
+				{Type: "ip", Value: "2001:db8:85a3::8a2e:370:7334"},
+			},
+			err: nil,
+		},
+		{
+			name: "fail/unsupported-identifier-type",
+			fields: fields{
+				Identifiers: []Identifier{
+					{Type: "ipv4", Value: "192.168.42.42"},
+				},
+			},
+			csr: &x509.CertificateRequest{
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42")},
+			},
+			want: []x509util.SubjectAlternativeName{},
+			err:  NewError(ErrorServerInternalType, "unsupported identifier type in order: ipv4"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &Order{
+				Identifiers: tt.fields.Identifiers,
+			}
+			canonicalizedCSR := canonicalize(tt.csr)
+			got, err := o.sans(canonicalizedCSR)
+			if tt.err != nil {
+				if err == nil {
+					t.Errorf("Order.sans() = %v, want error; got none", got)
+					return
+				}
+				switch k := err.(type) {
+				case *Error:
+					assert.Equals(t, k.Type, tt.err.Type)
+					assert.Equals(t, k.Detail, tt.err.Detail)
+					assert.Equals(t, k.Status, tt.err.Status)
+					assert.Equals(t, k.Err.Error(), tt.err.Err.Error())
+					assert.Equals(t, k.Detail, tt.err.Detail)
+				default:
+					assert.FatalError(t, errors.New("unexpected error type"))
+				}
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Order.sans() = %v, want %v", got, tt.want)
 			}
 		})
 	}

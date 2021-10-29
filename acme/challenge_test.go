@@ -1276,7 +1276,7 @@ func newTLSALPNValidationCert(keyAuthHash []byte, obsoleteOID, critical bool, na
 			oid = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 30, 1}
 		}
 
-		keyAuthHashEnc, _ := asn1.Marshal(keyAuthHash[:])
+		keyAuthHashEnc, _ := asn1.Marshal(keyAuthHash)
 
 		certTemplate.ExtraExtensions = []pkix.Extension{
 			{
@@ -1395,7 +1395,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
-						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443: tls: DialWithDialer timed out", ch.Value)
+						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443:", ch.Value)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
@@ -1544,7 +1544,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				err: NewErrorISE("failure saving error to acme challenge: force"),
 			}
 		},
-		"ok/no-names-error": func(t *testing.T) test {
+		"ok/no-names-nor-ips-error": func(t *testing.T) test {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -1573,7 +1573,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
-						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value)
+						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
@@ -1616,7 +1616,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
-						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value)
+						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
@@ -1660,7 +1660,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
-						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value)
+						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
@@ -1703,7 +1703,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
-						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value)
+						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
@@ -2207,6 +2207,43 @@ func TestTLSALPN01Validate(t *testing.T) {
 				jwk: jwk,
 			}
 		},
+		"ok/ip": func(t *testing.T) test {
+			ch := makeTLSCh()
+			ch.Value = "127.0.0.1"
+
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+
+			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+			assert.FatalError(t, err)
+			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
+
+			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true, ch.Value)
+			assert.FatalError(t, err)
+
+			srv, tlsDial := newTestTLSALPNServer(cert)
+			srv.Start()
+
+			return test{
+				ch: ch,
+				vo: &ValidateChallengeOptions{
+					TLSDial: tlsDial,
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Status, StatusValid)
+						assert.Equals(t, updch.Type, ch.Type)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Error, nil)
+						return nil
+					},
+				},
+				srv: srv,
+				jwk: jwk,
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -2231,6 +2268,85 @@ func TestTLSALPN01Validate(t *testing.T) {
 				}
 			} else {
 				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
+func Test_reverseAddr(t *testing.T) {
+	type args struct {
+		ip net.IP
+	}
+	tests := []struct {
+		name     string
+		args     args
+		wantArpa string
+	}{
+		{
+			name: "ok/ipv4",
+			args: args{
+				ip: net.ParseIP("127.0.0.1"),
+			},
+			wantArpa: "1.0.0.127.in-addr.arpa.",
+		},
+		{
+			name: "ok/ipv6",
+			args: args{
+				ip: net.ParseIP("2001:db8::567:89ab"),
+			},
+			wantArpa: "b.a.9.8.7.6.5.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotArpa := reverseAddr(tt.args.ip); gotArpa != tt.wantArpa {
+				t.Errorf("reverseAddr() = %v, want %v", gotArpa, tt.wantArpa)
+			}
+		})
+	}
+}
+
+func Test_serverName(t *testing.T) {
+	type args struct {
+		ch *Challenge
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "ok/dns",
+			args: args{
+				ch: &Challenge{
+					Value: "example.com",
+				},
+			},
+			want: "example.com",
+		},
+		{
+			name: "ok/ipv4",
+			args: args{
+				ch: &Challenge{
+					Value: "127.0.0.1",
+				},
+			},
+			want: "1.0.0.127.in-addr.arpa.",
+		},
+		{
+			name: "ok/ipv6",
+			args: args{
+				ch: &Challenge{
+					Value: "2001:db8::567:89ab",
+				},
+			},
+			want: "b.a.9.8.7.6.5.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := serverName(tt.args.ch); got != tt.want {
+				t.Errorf("serverName() = %v, want %v", got, tt.want)
 			}
 		})
 	}

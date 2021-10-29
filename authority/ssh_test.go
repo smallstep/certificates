@@ -87,6 +87,52 @@ func (m sshTestOptionsModifier) Modify(cert *ssh.Certificate, opts provisioner.S
 	return fmt.Errorf(string(m))
 }
 
+func TestAuthority_initHostOnly(t *testing.T) {
+	auth := testAuthority(t, func(a *Authority) error {
+		a.config.SSH.UserKey = ""
+		return nil
+	})
+
+	// Check keys
+	keys, err := auth.GetSSHRoots(context.Background())
+	assert.NoError(t, err)
+	assert.Len(t, 1, keys.HostKeys)
+	assert.Len(t, 0, keys.UserKeys)
+
+	// Check templates, user templates should work fine.
+	_, err = auth.GetSSHConfig(context.Background(), "user", nil)
+	assert.NoError(t, err)
+
+	_, err = auth.GetSSHConfig(context.Background(), "host", map[string]string{
+		"Certificate": "ssh_host_ecdsa_key-cert.pub",
+		"Key":         "ssh_host_ecdsa_key",
+	})
+	assert.Error(t, err)
+}
+
+func TestAuthority_initUserOnly(t *testing.T) {
+	auth := testAuthority(t, func(a *Authority) error {
+		a.config.SSH.HostKey = ""
+		return nil
+	})
+
+	// Check keys
+	keys, err := auth.GetSSHRoots(context.Background())
+	assert.NoError(t, err)
+	assert.Len(t, 0, keys.HostKeys)
+	assert.Len(t, 1, keys.UserKeys)
+
+	// Check templates, host templates should work fine.
+	_, err = auth.GetSSHConfig(context.Background(), "host", map[string]string{
+		"Certificate": "ssh_host_ecdsa_key-cert.pub",
+		"Key":         "ssh_host_ecdsa_key",
+	})
+	assert.NoError(t, err)
+
+	_, err = auth.GetSSHConfig(context.Background(), "user", nil)
+	assert.Error(t, err)
+}
+
 func TestAuthority_SignSSH(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.FatalError(t, err)
@@ -153,6 +199,8 @@ func TestAuthority_SignSSH(t *testing.T) {
 	}{
 		{"ok-user", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions}}, want{CertType: ssh.UserCert}, false},
 		{"ok-host", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{hostTemplate, hostOptions}}, want{CertType: ssh.HostCert}, false},
+		{"ok-user-only", fields{signer, nil}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions}}, want{CertType: ssh.UserCert}, false},
+		{"ok-host-only", fields{nil, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{hostTemplate, hostOptions}}, want{CertType: ssh.HostCert}, false},
 		{"ok-opts-type-user", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{CertType: "user"}, []provisioner.SignOption{userTemplate}}, want{CertType: ssh.UserCert}, false},
 		{"ok-opts-type-host", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{CertType: "host"}, []provisioner.SignOption{hostTemplate}}, want{CertType: ssh.HostCert}, false},
 		{"ok-opts-principals", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{CertType: "user", Principals: []string{"user"}}, []provisioner.SignOption{userTemplateWithUser}}, want{CertType: ssh.UserCert, Principals: []string{"user"}}, false},
@@ -590,69 +638,6 @@ func TestSSHConfig_Validate(t *testing.T) {
 	}
 }
 
-func TestSSHPublicKey_Validate(t *testing.T) {
-	key, err := jose.GenerateJWK("EC", "P-256", "", "sig", "", 0)
-	assert.FatalError(t, err)
-
-	type fields struct {
-		Type      string
-		Federated bool
-		Key       jose.JSONWebKey
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
-	}{
-		{"user", fields{"user", true, key.Public()}, false},
-		{"host", fields{"host", false, key.Public()}, false},
-		{"empty", fields{"", true, key.Public()}, true},
-		{"badType", fields{"bad", false, key.Public()}, true},
-		{"badKey", fields{"user", false, *key}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			k := &SSHPublicKey{
-				Type:      tt.fields.Type,
-				Federated: tt.fields.Federated,
-				Key:       tt.fields.Key,
-			}
-			if err := k.Validate(); (err != nil) != tt.wantErr {
-				t.Errorf("SSHPublicKey.Validate() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestSSHPublicKey_PublicKey(t *testing.T) {
-	key, err := jose.GenerateJWK("EC", "P-256", "", "sig", "", 0)
-	assert.FatalError(t, err)
-	pub, err := ssh.NewPublicKey(key.Public().Key)
-	assert.FatalError(t, err)
-
-	type fields struct {
-		publicKey ssh.PublicKey
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   ssh.PublicKey
-	}{
-		{"ok", fields{pub}, pub},
-		{"nil", fields{nil}, nil},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			k := &SSHPublicKey{
-				publicKey: tt.fields.publicKey,
-			}
-			if got := k.PublicKey(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("SSHPublicKey.PublicKey() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestAuthority_GetSSHBastion(t *testing.T) {
 	bastion := &Bastion{
 		Hostname: "bastion.local",
@@ -813,6 +798,11 @@ func TestAuthority_RekeySSH(t *testing.T) {
 	now := time.Now().UTC()
 
 	a := testAuthority(t)
+	a.db = &db.MockAuthDB{
+		MIsSSHRevoked: func(sn string) (bool, error) {
+			return false, nil
+		},
+	}
 
 	type test struct {
 		auth       *Authority
@@ -826,6 +816,56 @@ func TestAuthority_RekeySSH(t *testing.T) {
 		code       int
 	}
 	tests := map[string]func(t *testing.T) *test{
+		"fail/is-revoked": func(t *testing.T) *test {
+			auth := testAuthority(t)
+			auth.db = &db.MockAuthDB{
+				MIsSSHRevoked: func(sn string) (bool, error) {
+					return true, nil
+				},
+			}
+			return &test{
+				auth:       auth,
+				userSigner: signer,
+				hostSigner: signer,
+				cert: &ssh.Certificate{
+					Serial:          1234567890,
+					ValidAfter:      uint64(now.Unix()),
+					ValidBefore:     uint64(now.Add(time.Hour).Unix()),
+					CertType:        ssh.UserCert,
+					ValidPrincipals: []string{"foo", "bar"},
+					KeyId:           "foo",
+				},
+				key:      pub,
+				signOpts: []provisioner.SignOption{},
+				err:      errors.New("authority.authorizeSSHCertificate: certificate has been revoked"),
+				code:     http.StatusUnauthorized,
+			}
+		},
+		"fail/is-revoked-error": func(t *testing.T) *test {
+			auth := testAuthority(t)
+			auth.db = &db.MockAuthDB{
+				MIsSSHRevoked: func(sn string) (bool, error) {
+					return false, errors.New("an error")
+				},
+			}
+			return &test{
+				auth:       auth,
+				userSigner: signer,
+				hostSigner: signer,
+				cert: &ssh.Certificate{
+					Serial:          1234567890,
+					ValidAfter:      uint64(now.Unix()),
+					ValidBefore:     uint64(now.Add(time.Hour).Unix()),
+					CertType:        ssh.UserCert,
+					ValidPrincipals: []string{"foo", "bar"},
+					KeyId:           "foo",
+				},
+				key:      pub,
+				signOpts: []provisioner.SignOption{},
+				err:      errors.New("authority.authorizeSSHCertificate: an error"),
+				code:     http.StatusInternalServerError,
+			}
+		},
 		"fail/opts-type": func(t *testing.T) *test {
 			return &test{
 				userSigner: signer,
@@ -894,6 +934,9 @@ func TestAuthority_RekeySSH(t *testing.T) {
 		"fail/db-store": func(t *testing.T) *test {
 			return &test{
 				auth: testAuthority(t, WithDatabase(&db.MockAuthDB{
+					MIsSSHRevoked: func(sn string) (bool, error) {
+						return false, nil
+					},
 					MStoreSSHCertificate: func(cert *ssh.Certificate) error {
 						return errors.New("force")
 					},

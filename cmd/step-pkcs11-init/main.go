@@ -131,6 +131,9 @@ func main() {
 		fatal(err)
 	}
 
+	// Initialize windows terminal
+	ui.Init()
+
 	if u.Get("pin-value") == "" && u.Get("pin-source") == "" && c.Pin == "" {
 		pin, err := ui.PromptPassword("What is the PKCS#11 PIN?")
 		if err != nil {
@@ -203,6 +206,9 @@ func main() {
 	if err := createPKI(k, c); err != nil {
 		fatalClose(err, k)
 	}
+
+	// Reset windows terminal
+	ui.Reset()
 }
 
 func fatal(err error) {
@@ -211,6 +217,7 @@ func fatal(err error) {
 	} else {
 		fmt.Fprintln(os.Stderr, err)
 	}
+	ui.Reset()
 	os.Exit(1)
 }
 
@@ -325,7 +332,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 
 		if cm, ok := k.(kms.CertificateManager); ok && !c.NoCerts {
-			if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+			if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 				Name:        c.RootObject,
 				Certificate: root,
 				Extractable: c.Extractable,
@@ -334,7 +341,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			}
 		}
 
-		if err = fileutil.WriteFile(c.RootPath, pem.EncodeToMemory(&pem.Block{
+		if err := fileutil.WriteFile(c.RootPath, pem.EncodeToMemory(&pem.Block{
 			Type:  "CERTIFICATE",
 			Bytes: b,
 		}), 0600); err != nil {
@@ -404,7 +411,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 	}
 
 	if cm, ok := k.(kms.CertificateManager); ok && !c.NoCerts {
-		if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+		if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 			Name:        c.CrtObject,
 			Certificate: intermediate,
 			Extractable: c.Extractable,
@@ -413,7 +420,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 	}
 
-	if err = fileutil.WriteFile(c.CrtPath, pem.EncodeToMemory(&pem.Block{
+	if err := fileutil.WriteFile(c.CrtPath, pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: b,
 	}), 0600); err != nil {

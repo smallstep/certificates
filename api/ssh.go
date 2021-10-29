@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/templates"
@@ -22,12 +23,12 @@ type SSHAuthority interface {
 	RenewSSH(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error)
 	RekeySSH(ctx context.Context, cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	SignSSHAddUser(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
-	GetSSHRoots(ctx context.Context) (*authority.SSHKeys, error)
-	GetSSHFederation(ctx context.Context) (*authority.SSHKeys, error)
+	GetSSHRoots(ctx context.Context) (*config.SSHKeys, error)
+	GetSSHFederation(ctx context.Context) (*config.SSHKeys, error)
 	GetSSHConfig(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error)
 	CheckSSHHost(ctx context.Context, principal string, token string) (bool, error)
-	GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]authority.Host, error)
-	GetSSHBastion(ctx context.Context, user string, hostname string) (*authority.Bastion, error)
+	GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)
+	GetSSHBastion(ctx context.Context, user string, hostname string) (*config.Bastion, error)
 }
 
 // SSHSignRequest is the request body of an SSH certificate request.
@@ -51,7 +52,7 @@ func (s *SSHSignRequest) Validate() error {
 		return errors.Errorf("unknown certType %s", s.CertType)
 	case len(s.PublicKey) == 0:
 		return errors.New("missing or empty publicKey")
-	case len(s.OTT) == 0:
+	case s.OTT == "":
 		return errors.New("missing or empty ott")
 	default:
 		// Validate identity signature if provided
@@ -86,7 +87,7 @@ type SSHCertificate struct {
 // SSHGetHostsResponse is the response object that returns the list of valid
 // hosts for SSH.
 type SSHGetHostsResponse struct {
-	Hosts []authority.Host `json:"hosts"`
+	Hosts []config.Host `json:"hosts"`
 }
 
 // MarshalJSON implements the json.Marshaler interface. Returns a quoted,
@@ -239,8 +240,8 @@ func (r *SSHBastionRequest) Validate() error {
 // SSHBastionResponse is the response body used to return the bastion for a
 // given host.
 type SSHBastionResponse struct {
-	Hostname string             `json:"hostname"`
-	Bastion  *authority.Bastion `json:"bastion,omitempty"`
+	Hostname string          `json:"hostname"`
+	Bastion  *config.Bastion `json:"bastion,omitempty"`
 }
 
 // SSHSign is an HTTP handler that reads an SignSSHRequest with a one-time-token
@@ -407,18 +408,18 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var config SSHConfigResponse
+	var cfg SSHConfigResponse
 	switch body.Type {
 	case provisioner.SSHUserCert:
-		config.UserTemplates = ts
+		cfg.UserTemplates = ts
 	case provisioner.SSHHostCert:
-		config.HostTemplates = ts
+		cfg.HostTemplates = ts
 	default:
 		WriteError(w, errs.InternalServer("it should hot get here"))
 		return
 	}
 
-	JSON(w, config)
+	JSON(w, cfg)
 }
 
 // SSHCheckHost is the HTTP handler that returns if a hosts certificate exists or not.

@@ -10,29 +10,39 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
 	"go.step.sm/crypto/jose"
 )
 
+type ChallengeType string
+
+const (
+	HTTP01    ChallengeType = "http-01"
+	DNS01     ChallengeType = "dns-01"
+	TLSALPN01 ChallengeType = "tls-alpn-01"
+)
+
 // Challenge represents an ACME response Challenge type.
 type Challenge struct {
-	ID              string `json:"-"`
-	AccountID       string `json:"-"`
-	AuthorizationID string `json:"-"`
-	Value           string `json:"-"`
-	Type            string `json:"type"`
-	Status          Status `json:"status"`
-	Token           string `json:"token"`
-	ValidatedAt     string `json:"validated,omitempty"`
-	URL             string `json:"url"`
-	Error           *Error `json:"error,omitempty"`
+	ID              string        `json:"-"`
+	AccountID       string        `json:"-"`
+	AuthorizationID string        `json:"-"`
+	Value           string        `json:"-"`
+	Type            ChallengeType `json:"type"`
+	Status          Status        `json:"status"`
+	Token           string        `json:"token"`
+	ValidatedAt     string        `json:"validated,omitempty"`
+	URL             string        `json:"url"`
+	Error           *Error        `json:"error,omitempty"`
 }
 
 // ToLog enables response logging.
@@ -54,11 +64,11 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 		return nil
 	}
 	switch ch.Type {
-	case "http-01":
+	case HTTP01:
 		return http01Validate(ctx, ch, db, jwk, vo)
-	case "dns-01":
+	case DNS01:
 		return dns01Validate(ctx, ch, db, jwk, vo)
-	case "tls-alpn-01":
+	case TLSALPN01:
 		return tlsalpn01Validate(ctx, ch, db, jwk, vo)
 	default:
 		return NewErrorISE("unexpected challenge type '%s'", ch.Type)
@@ -66,23 +76,23 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 }
 
 func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
-	url := &url.URL{Scheme: "http", Host: ch.Value, Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
+	u := &url.URL{Scheme: "http", Host: ch.Value, Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
 
-	resp, err := vo.HTTPGet(url.String())
+	resp, err := vo.HTTPGet(u.String())
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
-			"error doing http GET for url %s", url))
+			"error doing http GET for url %s", u))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return storeError(ctx, db, ch, false, NewError(ErrorConnectionType,
-			"error doing http GET for url %s with status code %d", url, resp.StatusCode))
+			"error doing http GET for url %s with status code %d", u, resp.StatusCode))
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return WrapErrorISE(err, "error reading "+
-			"response body for url %s", url)
+			"response body for url %s", u)
 	}
 	keyAuth := strings.TrimSpace(string(body))
 
@@ -106,6 +116,17 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	return nil
 }
 
+func tlsAlert(err error) uint8 {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		v := reflect.ValueOf(opErr.Err)
+		if v.Kind() == reflect.Uint8 {
+			return uint8(v.Uint())
+		}
+	}
+	return 0
+}
+
 func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
 	config := &tls.Config{
 		NextProtos: []string{"acme-tls/1"},
@@ -113,7 +134,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 		// ACME servers that implement "acme-tls/1" MUST only negotiate TLS 1.2
 		// [RFC5246] or higher when connecting to clients for validation.
 		MinVersion:         tls.VersionTLS12,
-		ServerName:         ch.Value,
+		ServerName:         serverName(ch),
 		InsecureSkipVerify: true, // we expect a self-signed challenge certificate
 	}
 
@@ -121,6 +142,14 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	conn, err := vo.TLSDial("tcp", hostPort, config)
 	if err != nil {
+		// With Go 1.17+ tls.Dial fails if there's no overlap between configured
+		// client and server protocols. When this happens the connection is
+		// closed with the error no_application_protocol(120) as required by
+		// RFC7301. See https://golang.org/doc/go1.17#ALPN
+		if tlsAlert(err) == 120 {
+			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+				"cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge"))
+		}
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
 			"error doing TLS dial for %s", hostPort))
 	}
@@ -141,9 +170,17 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	leafCert := certs[0]
 
-	if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], ch.Value) {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single DNS name, %v", ch.Value))
+	// if no DNS names present, look for IP address and verify that exactly one exists
+	if len(leafCert.DNSNames) == 0 {
+		if len(leafCert.IPAddresses) != 1 || !leafCert.IPAddresses[0].Equal(net.ParseIP(ch.Value)) {
+			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+				"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value))
+		}
+	} else {
+		if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], ch.Value) {
+			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+				"incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value))
+		}
 	}
 
 	idPeAcmeIdentifier := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 31}
@@ -243,6 +280,65 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	}
 	return nil
 }
+
+// serverName determines the SNI HostName to set based on an acme.Challenge
+// for TLS-ALPN-01 challenges RFC8738 states that, if HostName is an IP, it
+// should be the ARPA address https://datatracker.ietf.org/doc/html/rfc8738#section-6.
+// It also references TLS Extensions [RFC6066].
+func serverName(ch *Challenge) string {
+	var serverName string
+	ip := net.ParseIP(ch.Value)
+	if ip != nil {
+		serverName = reverseAddr(ip)
+	} else {
+		serverName = ch.Value
+	}
+	return serverName
+}
+
+// reverseaddr returns the in-addr.arpa. or ip6.arpa. hostname of the IP
+// address addr suitable for rDNS (PTR) record lookup or an error if it fails
+// to parse the IP address.
+// Implementation taken and adapted from https://golang.org/src/net/dnsclient.go?s=780:834#L20
+func reverseAddr(ip net.IP) (arpa string) {
+	if ip.To4() != nil {
+		return uitoa(uint(ip[15])) + "." + uitoa(uint(ip[14])) + "." + uitoa(uint(ip[13])) + "." + uitoa(uint(ip[12])) + ".in-addr.arpa."
+	}
+	// Must be IPv6
+	buf := make([]byte, 0, len(ip)*4+len("ip6.arpa."))
+	// Add it, in reverse, to the buffer
+	for i := len(ip) - 1; i >= 0; i-- {
+		v := ip[i]
+		buf = append(buf, hexit[v&0xF],
+			'.',
+			hexit[v>>4],
+			'.')
+	}
+	// Append "ip6.arpa." and return (buf already has the final .)
+	buf = append(buf, "ip6.arpa."...)
+	return string(buf)
+}
+
+// Convert unsigned integer to decimal string.
+// Implementation taken from https://golang.org/src/net/parse.go
+func uitoa(val uint) string {
+	if val == 0 { // avoid string allocation
+		return "0"
+	}
+	var buf [20]byte // big enough for 64bit value base 10
+	i := len(buf) - 1
+	for val >= 10 {
+		q := val / 10
+		buf[i] = byte('0' + val - q*10)
+		i--
+		val = q
+	}
+	// val < 10
+	buf[i] = byte('0' + val)
+	return string(buf[i:])
+}
+
+const hexit = "0123456789abcdef"
 
 // KeyAuthorization creates the ACME key authorization value from a token
 // and a jwk.

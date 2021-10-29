@@ -28,6 +28,7 @@ type stepPayload struct {
 // signature requests.
 type JWK struct {
 	*base
+	ID           string           `json:"-"`
 	Type         string           `json:"type"`
 	Name         string           `json:"name"`
 	Key          *jose.JSONWebKey `json:"key"`
@@ -41,6 +42,15 @@ type JWK struct {
 // GetID returns the provisioner unique identifier. The name and credential id
 // should uniquely identify any JWK provisioner.
 func (p *JWK) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (p *JWK) GetIDForToken() string {
 	return p.Name + ":" + p.Key.KeyID
 }
 
@@ -184,7 +194,7 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // certificate was configured to allow renewals.
 func (p *JWK) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("jwk.AuthorizeRenew; renew is disabled for jwk provisioner %s", p.GetID())
+		return errs.Unauthorized("jwk.AuthorizeRenew; renew is disabled for jwk provisioner '%s'", p.GetName())
 	}
 	return nil
 }
@@ -192,7 +202,7 @@ func (p *JWK) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized("jwk.AuthorizeSSHSign; sshCA is disabled for jwk provisioner %s", p.GetID())
+		return nil, errs.Unauthorized("jwk.AuthorizeSSHSign; sshCA is disabled for jwk provisioner '%s'", p.GetName())
 	}
 	claims, err := p.authorizeToken(token, p.audiences.SSHSign)
 	if err != nil {

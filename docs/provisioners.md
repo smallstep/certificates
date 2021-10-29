@@ -1,7 +1,7 @@
 # Provisioners
 
 > Note: The canonical documentation for `step-ca` provisioners now lives at
-> https://smallstep.com/docs/step-ca/configuration#provisioners. Documentation
+> https://smallstep.com/docs/step-ca/provisioners. Documentation
 > found on this page may be out of date.
 
 Provisioners are people or code that are registered with the CA and authorized

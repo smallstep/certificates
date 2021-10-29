@@ -14,6 +14,10 @@ func (p *noop) GetID() string {
 	return "noop"
 }
 
+func (p *noop) GetIDForToken() string {
+	return "noop"
+}
+
 func (p *noop) GetTokenID(token string) (string, error) {
 	return "", nil
 }
@@ -25,7 +29,7 @@ func (p *noop) GetType() Type {
 	return noopType
 }
 
-func (p *noop) GetEncryptedKey() (kid string, key string, ok bool) {
+func (p *noop) GetEncryptedKey() (kid, key string, ok bool) {
 	return "", "", false
 }
 

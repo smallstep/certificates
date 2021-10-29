@@ -15,6 +15,7 @@ PREFIX?=
 SRC=$(shell find . -type f -name '*.go' -not -path "./vendor/*")
 GOOS_OVERRIDE ?=
 OUTPUT_ROOT=output/
+RELEASE=./.releases
 
 all: lint test build
 
@@ -28,7 +29,7 @@ ci: testcgo build
 
 bootstra%:
 	# Using a released version of golangci-lint to take into account custom replacements in their go.mod
-	$Q curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.39.0
+	$Q curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.42.0
 
 .PHONY: bootstra%
 
@@ -67,7 +68,7 @@ PUSHTYPE := branch
 endif
 
 VERSION := $(shell echo $(VERSION) | sed 's/^v//')
-DEB_VERSION := $(shell echo $(VERSION) | sed 's/-/~/g')
+DEB_VERSION := $(shell echo $(VERSION) | sed 's/-/./g')
 
 ifdef V
 $(info    TRAVIS_TAG is $(TRAVIS_TAG))
@@ -153,7 +154,7 @@ fmt:
 	$Q gofmt -l -w $(SRC)
 
 lint:
-	$Q $(GOFLAGS) LOG_LEVEL=error golangci-lint run --timeout=30m
+	$Q golangci-lint run --timeout=30m
 
 lintcgo:
 	$Q LOG_LEVEL=error golangci-lint run --timeout=30m

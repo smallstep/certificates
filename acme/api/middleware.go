@@ -223,7 +223,7 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "jwk and kid are mutually exclusive"))
 			return
 		}
-		if hdr.JSONWebKey == nil && len(hdr.KeyID) == 0 {
+		if hdr.JSONWebKey == nil && hdr.KeyID == "" {
 			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "either jwk or kid must be defined in jws protected header"))
 			return
 		}
@@ -288,13 +288,13 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		name := chi.URLParam(r, "provisionerID")
-		provID, err := url.PathUnescape(name)
+		nameEscaped := chi.URLParam(r, "provisionerID")
+		name, err := url.PathUnescape(nameEscaped)
 		if err != nil {
-			api.WriteError(w, acme.WrapErrorISE(err, "error url unescaping provisioner id '%s'", name))
+			api.WriteError(w, acme.WrapErrorISE(err, "error url unescaping provisioner name '%s'", nameEscaped))
 			return
 		}
-		p, err := h.ca.LoadProvisionerByID("acme/" + provID)
+		p, err := h.ca.LoadProvisionerByName(name)
 		if err != nil {
 			api.WriteError(w, err)
 			return
@@ -367,7 +367,7 @@ func (h *Handler) verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 			api.WriteError(w, err)
 			return
 		}
-		if len(jwk.Algorithm) != 0 && jwk.Algorithm != jws.Signatures[0].Protected.Algorithm {
+		if jwk.Algorithm != "" && jwk.Algorithm != jws.Signatures[0].Protected.Algorithm {
 			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "verifier and signature algorithm do not match"))
 			return
 		}

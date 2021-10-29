@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
@@ -20,22 +21,22 @@ import (
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
+	"golang.org/x/crypto/ssh"
 )
 
 // GetTLSOptions returns the tls options configured.
-func (a *Authority) GetTLSOptions() *TLSOptions {
+func (a *Authority) GetTLSOptions() *config.TLSOptions {
 	return a.config.TLS
 }
 
 var oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
 var oidSubjectKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 14}
 
-func withDefaultASN1DN(def *ASN1DN) provisioner.CertificateModifierFunc {
+func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 	return func(crt *x509.Certificate, opts provisioner.SignOptions) error {
 		if def == nil {
 			return errors.New("default ASN1DN template cannot be nil")
 		}
-
 		if len(crt.Subject.Country) == 0 && def.Country != "" {
 			crt.Subject.Country = append(crt.Subject.Country, def.Country)
 		}
@@ -54,7 +55,12 @@ func withDefaultASN1DN(def *ASN1DN) provisioner.CertificateModifierFunc {
 		if len(crt.Subject.StreetAddress) == 0 && def.StreetAddress != "" {
 			crt.Subject.StreetAddress = append(crt.Subject.StreetAddress, def.StreetAddress)
 		}
-
+		if crt.Subject.SerialNumber == "" && def.SerialNumber != "" {
+			crt.Subject.SerialNumber = def.SerialNumber
+		}
+		if crt.Subject.CommonName == "" && def.CommonName != "" {
+			crt.Subject.CommonName = def.CommonName
+		}
 		return nil
 	}
 }
@@ -279,9 +285,15 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 // `StoreCertificate(...*x509.Certificate) error` instead of just
 // `StoreCertificate(*x509.Certificate) error`.
 func (a *Authority) storeCertificate(fullchain []*x509.Certificate) error {
-	if s, ok := a.db.(interface {
+	type certificateChainStorer interface {
 		StoreCertificateChain(...*x509.Certificate) error
-	}); ok {
+	}
+	// Store certificate in linkedca
+	if s, ok := a.adminDB.(certificateChainStorer); ok {
+		return s.StoreCertificateChain(fullchain...)
+	}
+	// Store certificate in local db
+	if s, ok := a.db.(certificateChainStorer); ok {
 		return s.StoreCertificateChain(fullchain...)
 	}
 	return a.db.StoreCertificate(fullchain[0])
@@ -292,9 +304,15 @@ func (a *Authority) storeCertificate(fullchain []*x509.Certificate) error {
 //
 // TODO: at some point we should implement this in the standard implementation.
 func (a *Authority) storeRenewedCertificate(oldCert *x509.Certificate, fullchain []*x509.Certificate) error {
-	if s, ok := a.db.(interface {
+	type renewedCertificateChainStorer interface {
 		StoreRenewedCertificate(*x509.Certificate, ...*x509.Certificate) error
-	}); ok {
+	}
+	// Store certificate in linkedca
+	if s, ok := a.adminDB.(renewedCertificateChainStorer); ok {
+		return s.StoreRenewedCertificate(oldCert, fullchain...)
+	}
+	// Store certificate in local db
+	if s, ok := a.db.(renewedCertificateChainStorer); ok {
 		return s.StoreRenewedCertificate(oldCert, fullchain...)
 	}
 	return a.db.StoreCertificate(fullchain[0])
@@ -359,29 +377,28 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		}
 
 		// This method will also validate the audiences for JWK provisioners.
-		var ok bool
-		p, ok = a.provisioners.LoadByToken(token, &claims.Claims)
-		if !ok {
-			return errs.InternalServer("authority.Revoke; provisioner not found", opts...)
+		p, err = a.LoadProvisionerByToken(token, &claims.Claims)
+		if err != nil {
+			return err
 		}
 		rci.ProvisionerID = p.GetID()
 		rci.TokenID, err = p.GetTokenID(revokeOpts.OTT)
-		if err != nil {
+		if err != nil && !errors.Is(err, provisioner.ErrAllowTokenReuse) {
 			return errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Revoke; could not get ID for token")
 		}
-		opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
-		opts = append(opts, errs.WithKeyVal("tokenID", rci.TokenID))
-	} else {
+		opts = append(opts,
+			errs.WithKeyVal("provisionerID", rci.ProvisionerID),
+			errs.WithKeyVal("tokenID", rci.TokenID),
+		)
+	} else if p, err = a.LoadProvisionerByCertificate(revokeOpts.Crt); err == nil {
 		// Load the Certificate provisioner if one exists.
-		if p, err = a.LoadProvisionerByCertificate(revokeOpts.Crt); err == nil {
-			rci.ProvisionerID = p.GetID()
-			opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
-		}
+		rci.ProvisionerID = p.GetID()
+		opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
 	}
 
 	if provisioner.MethodFromContext(ctx) == provisioner.SSHRevokeMethod {
-		err = a.db.RevokeSSH(rci)
+		err = a.revokeSSH(nil, rci)
 	} else {
 		// Revoke an X.509 certificate using CAS. If the certificate is not
 		// provided we will try to read it from the db. If the read fails we
@@ -408,7 +425,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		}
 
 		// Save as revoked in the Db.
-		err = a.db.Revoke(rci)
+		err = a.revoke(revokedCert, rci)
 	}
 	switch err {
 	case nil:
@@ -421,6 +438,24 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 	default:
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
 	}
+}
+
+func (a *Authority) revoke(crt *x509.Certificate, rci *db.RevokedCertificateInfo) error {
+	if lca, ok := a.adminDB.(interface {
+		Revoke(*x509.Certificate, *db.RevokedCertificateInfo) error
+	}); ok {
+		return lca.Revoke(crt, rci)
+	}
+	return a.db.Revoke(rci)
+}
+
+func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateInfo) error {
+	if lca, ok := a.adminDB.(interface {
+		RevokeSSH(*ssh.Certificate, *db.RevokedCertificateInfo) error
+	}); ok {
+		return lca.RevokeSSH(crt, rci)
+	}
+	return a.db.Revoke(rci)
 }
 
 // GetTLSCertificate creates a new leaf certificate to be used by the CA HTTPS server.

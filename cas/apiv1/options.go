@@ -38,17 +38,29 @@ type Options struct {
 	CertificateChain []*x509.Certificate `json:"-"`
 	Signer           crypto.Signer       `json:"-"`
 
-	// IsCreator is set to true when we're creating a certificate authority. Is
-	// used to skip some validations when initializing a CertificateAuthority.
+	// IsCreator is set to true when we're creating a certificate authority. It
+	// is used to skip some validations when initializing a
+	// CertificateAuthority. This option is used on SoftCAS and CloudCAS.
 	IsCreator bool `json:"-"`
+
+	// IsCAGetter is set to true when we're just using the
+	// CertificateAuthorityGetter interface to retrieve the root certificate. It
+	// is used to skip some validations when initializing a
+	// CertificateAuthority. This option is used on StepCAS.
+	IsCAGetter bool `json:"-"`
 
 	// KeyManager is the KMS used to generate keys in SoftCAS.
 	KeyManager kms.KeyManager `json:"-"`
 
-	// Project and Location are parameters used in CloudCAS to create a new
-	// certificate authority.
-	Project  string `json:"-"`
-	Location string `json:"-"`
+	// Project, Location, CaPool and GCSBucket are parameters used in CloudCAS
+	// to create a new certificate authority. If a CaPool does not exist it will
+	// be created. GCSBucket is optional, if not provided GCloud will create a
+	// managed bucket.
+	Project    string `json:"-"`
+	Location   string `json:"-"`
+	CaPool     string `json:"-"`
+	CaPoolTier string `json:"-"`
+	GCSBucket  string `json:"-"`
 }
 
 // CertificateIssuer contains the properties used to use the StepCAS certificate

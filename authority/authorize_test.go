@@ -822,7 +822,7 @@ func TestAuthority_authorizeRenew(t *testing.T) {
 			return &authorizeTest{
 				auth: a,
 				cert: renewDisabledCrt,
-				err:  errors.New("authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner renew_disabled:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
+				err:  errors.New("authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner 'renew_disabled'"),
 				code: http.StatusUnauthorized,
 			}
 		},
@@ -917,7 +917,7 @@ func createSSHCert(cert *ssh.Certificate, signer ssh.Signer) (*ssh.Certificate, 
 	if err != nil {
 		return nil, nil, err
 	}
-	if err = cert.SignCert(rand.Reader, signer); err != nil {
+	if err := cert.SignCert(rand.Reader, signer); err != nil {
 		return nil, nil, err
 	}
 	return cert, jwk, nil

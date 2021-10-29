@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -28,8 +29,11 @@ func (n *NewOrderRequest) Validate() error {
 		return acme.NewError(acme.ErrorMalformedType, "identifiers list cannot be empty")
 	}
 	for _, id := range n.Identifiers {
-		if id.Type != "dns" {
+		if !(id.Type == acme.DNS || id.Type == acme.IP) {
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
+		}
+		if id.Type == acme.IP && net.ParseIP(id.Value) == nil {
+			return acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", id.Value)
 		}
 	}
 	return nil
@@ -85,6 +89,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 			"failed to unmarshal new-order request payload"))
 		return
 	}
+
 	if err := nor.Validate(); err != nil {
 		api.WriteError(w, err)
 		return
@@ -149,15 +154,9 @@ func (h *Handler) newAuthorization(ctx context.Context, az *acme.Authorization) 
 		}
 	}
 
-	var (
-		err     error
-		chTypes = []string{"dns-01"}
-	)
-	// HTTP and TLS challenges can only be used for identifiers without wildcards.
-	if !az.Wildcard {
-		chTypes = append(chTypes, []string{"http-01", "tls-alpn-01"}...)
-	}
+	chTypes := challengeTypes(az)
 
+	var err error
 	az.Token, err = randutil.Alphanumeric(32)
 	if err != nil {
 		return acme.WrapErrorISE(err, "error generating random alphanumeric ID")
@@ -274,4 +273,25 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
 	api.JSON(w, o)
+}
+
+// challengeTypes determines the types of challenges that should be used
+// for the ACME authorization request.
+func challengeTypes(az *acme.Authorization) []acme.ChallengeType {
+	var chTypes []acme.ChallengeType
+
+	switch az.Identifier.Type {
+	case acme.IP:
+		chTypes = []acme.ChallengeType{acme.HTTP01, acme.TLSALPN01}
+	case acme.DNS:
+		chTypes = []acme.ChallengeType{acme.DNS01}
+		// HTTP and TLS challenges can only be used for identifiers without wildcards.
+		if !az.Wildcard {
+			chTypes = append(chTypes, []acme.ChallengeType{acme.HTTP01, acme.TLSALPN01}...)
+		}
+	default:
+		chTypes = []acme.ChallengeType{}
+	}
+
+	return chTypes
 }

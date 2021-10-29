@@ -284,7 +284,7 @@ func Test_caHandler_SSHSign(t *testing.T) {
 	identityCerts := []*x509.Certificate{
 		parseCertificate(certPEM),
 	}
-	identityCertsPEM := []byte(`"` + strings.Replace(certPEM, "\n", `\n`, -1) + `\n"`)
+	identityCertsPEM := []byte(`"` + strings.ReplaceAll(certPEM, "\n", `\n`) + `\n"`)
 
 	tests := []struct {
 		name         string

@@ -15,7 +15,6 @@ import (
 	"sync"
 
 	"github.com/ThalesIgnite/crypto11"
-	"github.com/miekg/pkcs11"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/kms/uri"
@@ -146,8 +145,7 @@ func (k *PKCS11) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespons
 // CreateSigner creates a signer using the key present in the PKCS#11 MODULE signature
 // slot.
 func (k *PKCS11) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, error) {
-	switch {
-	case req.SigningKey == "":
+	if req.SigningKey == "" {
 		return nil, errors.New("createSignerRequest 'signingKey' cannot be empty")
 	}
 
@@ -209,9 +207,7 @@ func (k *PKCS11) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 		return errors.Wrap(err, "storeCertificate failed")
 	}
 	if req.Extractable {
-		template.AddIfNotPresent([]*pkcs11.Attribute{
-			pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, true),
-		})
+		template.Set(crypto11.CkaExtractable, true)
 	}
 	if err := k.p11.ImportCertificateWithAttributes(template, cert); err != nil {
 		return errors.Wrap(err, "storeCertificate failed")
@@ -221,8 +217,8 @@ func (k *PKCS11) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 }
 
 // DeleteKey is a utility function to delete a key given an uri.
-func (k *PKCS11) DeleteKey(uri string) error {
-	id, object, err := parseObject(uri)
+func (k *PKCS11) DeleteKey(u string) error {
+	id, object, err := parseObject(u)
 	if err != nil {
 		return errors.Wrap(err, "deleteKey failed")
 	}
@@ -240,8 +236,8 @@ func (k *PKCS11) DeleteKey(uri string) error {
 }
 
 // DeleteCertificate is a utility function to delete a certificate given an uri.
-func (k *PKCS11) DeleteCertificate(uri string) error {
-	id, object, err := parseObject(uri)
+func (k *PKCS11) DeleteCertificate(u string) error {
+	id, object, err := parseObject(u)
 	if err != nil {
 		return errors.Wrap(err, "deleteCertificate failed")
 	}
@@ -309,9 +305,7 @@ func generateKey(ctx P11, req *apiv1.CreateKeyRequest) (crypto11.Signer, error) 
 	}
 	private := public.Copy()
 	if req.Extractable {
-		private.AddIfNotPresent([]*pkcs11.Attribute{
-			pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, true),
-		})
+		private.Set(crypto11.CkaExtractable, true)
 	}
 
 	bits := req.Bits
@@ -337,20 +331,6 @@ func generateKey(ctx P11, req *apiv1.CreateKeyRequest) (crypto11.Signer, error) 
 	default:
 		return nil, fmt.Errorf("signature algorithm %s is not supported", req.SignatureAlgorithm)
 	}
-}
-
-func GenerateECDSAKeyPairWithLabel(ctx P11, id, label []byte, curve elliptic.Curve, extractable bool) (crypto11.Signer, error) {
-	public, err := crypto11.NewAttributeSetWithIDAndLabel(id, label)
-	if err != nil {
-		return nil, err
-	}
-	// Copy the AttributeSet to allow modifications.
-	private := public.Copy()
-	private.AddIfNotPresent([]*pkcs11.Attribute{
-		pkcs11.NewAttribute(pkcs11.CKA_EXTRACTABLE, extractable),
-	})
-
-	return ctx.GenerateECDSAKeyPairWithAttributes(public, private, curve)
 }
 
 func findSigner(ctx P11, rawuri string) (crypto11.Signer, error) {

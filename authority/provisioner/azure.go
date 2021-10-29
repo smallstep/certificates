@@ -84,6 +84,7 @@ type azurePayload struct {
 // and https://docs.microsoft.com/en-us/azure/virtual-machines/windows/instance-metadata-service
 type Azure struct {
 	*base
+	ID                     string   `json:"-"`
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
 	TenantID               string   `json:"tenantID"`
@@ -101,6 +102,15 @@ type Azure struct {
 
 // GetID returns the provisioner unique identifier.
 func (p *Azure) GetID() string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (p *Azure) GetIDForToken() string {
 	return p.TenantID
 }
 
@@ -121,9 +131,10 @@ func (p *Azure) GetTokenID(token string) (string, error) {
 		return "", errors.Wrap(err, "error verifying claims")
 	}
 
-	// If TOFU is disabled create return the token kid
+	// If TOFU is disabled then allow token re-use. Azure caches the token for
+	// 24h and without allowing the re-use we cannot use it twice.
 	if p.DisableTrustOnFirstUse {
-		return claims.ID, nil
+		return "", ErrAllowTokenReuse
 	}
 
 	sum := sha256.Sum256([]byte(claims.XMSMirID))
@@ -141,7 +152,7 @@ func (p *Azure) GetType() Type {
 }
 
 // GetEncryptedKey is not available in an Azure provisioner.
-func (p *Azure) GetEncryptedKey() (kid string, key string, ok bool) {
+func (p *Azure) GetEncryptedKey() (kid, key string, ok bool) {
 	return "", "", false
 }
 
@@ -292,11 +303,13 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	var so []SignOption
 	if p.DisableCustomSANs {
 		// name will work only inside the virtual network
-		so = append(so, commonNameValidator(name))
-		so = append(so, dnsNamesValidator([]string{name}))
-		so = append(so, ipAddressesValidator(nil))
-		so = append(so, emailAddressesValidator(nil))
-		so = append(so, urisValidator(nil))
+		so = append(so,
+			commonNameValidator(name),
+			dnsNamesValidator([]string{name}),
+			ipAddressesValidator(nil),
+			emailAddressesValidator(nil),
+			urisValidator(nil),
+		)
 
 		// Enforce SANs in the template.
 		data.SetSANs([]string{name})
@@ -324,7 +337,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 // certificate was configured to allow renewals.
 func (p *Azure) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("azure.AuthorizeRenew; renew is disabled for azure provisioner %s", p.GetID())
+		return errs.Unauthorized("azure.AuthorizeRenew; renew is disabled for azure provisioner '%s'", p.GetName())
 	}
 	return nil
 }
@@ -332,7 +345,7 @@ func (p *Azure) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) erro
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized("azure.AuthorizeSSHSign; sshCA is disabled for provisioner %s", p.GetID())
+		return nil, errs.Unauthorized("azure.AuthorizeSSHSign; sshCA is disabled for provisioner '%s'", p.GetName())
 	}
 
 	_, name, _, err := p.authorizeToken(token)

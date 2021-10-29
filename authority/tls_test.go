@@ -426,6 +426,7 @@ ZYtQ9Ot36qc=
 				{Id: stepOIDProvisioner, Value: []byte("foo")},
 				{Id: []int{1, 1, 1}, Value: []byte("bar")}}))
 			now := time.Now().UTC()
+			// nolint:gocritic
 			enforcedExtraOptions := append(extraOpts, &certificateDurationEnforcer{
 				NotBefore: now,
 				NotAfter:  now.Add(365 * 24 * time.Hour),
@@ -656,7 +657,7 @@ func TestAuthority_Renew(t *testing.T) {
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner 'dev'"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -856,7 +857,7 @@ func TestAuthority_Rekey(t *testing.T) {
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner dev:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk"),
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner 'dev'"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},

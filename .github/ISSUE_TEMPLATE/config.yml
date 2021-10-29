@@ -1,0 +1,9 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Ask on Discord
+    url: https://discord.gg/7xgjhVAg6g
+    about: You can ask for help here!
+  - name: Want to contribute to step certificates?
+    url: https://github.com/smallstep/certificates/blob/master/docs/CONTRIBUTING.md
+    about: Be sure to read contributing guidelines!
+

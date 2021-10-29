@@ -9,12 +9,11 @@
     "logger": {"format": "text"},
     "tls": {
         "minVersion": 1.2,
-        "maxVersion": 1.2,
+        "maxVersion": 1.3,
         "renegotiation": false,
         "cipherSuites": [
-            "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
-            "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-            "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+            "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+			"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
         ]
     },
     "authority": {
@@ -34,7 +33,7 @@
                     "y": "ZhYcFQBqtErdC_pA7sOXrO7AboCEPIKP9Ik4CHJqANk"
                 }
             }, {
-                "name": "max",
+                "name": "mike",
                 "type": "jwk",
                 "encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlZsWnl0dUxrWTR5enlqZXJybnN0aGcifQ.QP15wQYjZ12BLgl-XTq2Vb12G3OHAfic.X35QqAaXwnlmeCUU._2qIUp0TI8yDI7c2e9upIRdrnmB5OvtLfrYN-Su2NLBpaoYtr9O55Wo0Iryc0W2pYqnVDPvgPPes4P4nQAnzw5WhFYc1Xf1ZEetfdNhwi1x2FNwPbACBAgxm5AW40O5AAlbLcWushYASfeMBZocTGXuSGUzwFqoWD-5EDJ80TWQ7cAj3ttHrJ_3QV9hi4O9KJUCiXngN-Yz2zXrhBL4NOH2fmRbaf5c0rF8xUJIIW-TcyYJeX_Fbx1IzzKKPd9USUwkDhxD4tLa51I345xVqjuwG1PEn6nF8JKqLRVUKEKFin-ShXrfE61KceyAvm4YhWKrbJWIm3bH5Hxaphy4.TexIrIhsRxJStpE3EJ925Q",
                 "key": {
@@ -76,7 +75,7 @@
                     "minTLSCertDuration": "1s"
                 }
             }, {
-                "name": "mariano",
+                "name": "maxey",
                 "type": "jwk",
                 "encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6Ik5SLTk5ZkVMSm1CLW1FZGllUlFFc3cifQ.Fr314BEUGTda4ICJl2uxFdjpEUGGqJEV.gBbu_DZE1ONDu14r.X-7MKMyokZIF1HTCVqqL0tTWgaC1ZGZBLLltd11ZUhQTswo_8kvgiTv3cFShj7ATF0tAY8HStyJmzLO8mKPVOPDXSwjdNsPriZclI6JWGi9iOu8pEiN9pZM6-itxan1JMcDUNg2U-P1BmKppHRbDKsOTivymfRyeUk51dBIlS54p5xNK1HFLc1YtWC1Rc_ngYVqOgqlhIrCHArAEBe3jrfUaH2ym-8fkVdwVqtxmte3XXK9g8FchsygRNnOKtRcr0TyzTUV-7bPi8_t02Zi-EHLFaSawVXWV_Qk1GeLYJR22Rp74beo-b5-lCNVp10btO0xdGySUWmCJ4v4_QZw.c8unwWycwtfdJMM_0b0fuA",
                 "key": {

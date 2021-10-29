@@ -87,6 +87,9 @@ func main() {
 		fatal(err)
 	}
 
+	// Initialize windows terminal
+	ui.Init()
+
 	pin, err := ui.PromptPassword("What is the YubiKey PIN?")
 	if err != nil {
 		fatal(err)
@@ -119,6 +122,9 @@ func main() {
 	defer func() {
 		_ = k.Close()
 	}()
+
+	// Reset windows terminal
+	ui.Reset()
 }
 
 func fatal(err error) {
@@ -127,6 +133,7 @@ func fatal(err error) {
 	} else {
 		fmt.Fprintln(os.Stderr, err)
 	}
+	ui.Reset()
 	os.Exit(1)
 }
 
@@ -221,7 +228,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 
 		if cm, ok := k.(kms.CertificateManager); ok {
-			if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+			if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 				Name:        c.RootSlot,
 				Certificate: root,
 			}); err != nil {
@@ -229,7 +236,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			}
 		}
 
-		if err = fileutil.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
+		if err := fileutil.WriteFile("root_ca.crt", pem.EncodeToMemory(&pem.Block{
 			Type:  "CERTIFICATE",
 			Bytes: b,
 		}), 0600); err != nil {
@@ -298,7 +305,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 	}
 
 	if cm, ok := k.(kms.CertificateManager); ok {
-		if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+		if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 			Name:        c.CrtSlot,
 			Certificate: intermediate,
 		}); err != nil {
@@ -306,7 +313,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 	}
 
-	if err = fileutil.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
+	if err := fileutil.WriteFile("intermediate_ca.crt", pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: b,
 	}), 0600); err != nil {

@@ -72,7 +72,7 @@ func TestAzure_GetTokenID(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", p1, args{t1}, w1, false},
-		{"ok no TOFU", p2, args{t2}, "the-jti", false},
+		{"ok no TOFU", p2, args{t2}, "", true},
 		{"fail token", p1, args{"bad-token"}, "", true},
 		{"fail claims", p1, args{"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ey.fooo"}, "", true},
 	}
@@ -446,15 +446,15 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewContextWithMethod(context.Background(), SignMethod)
-			got, err := tt.azure.AuthorizeSign(ctx, tt.args.token)
-			if (err != nil) != tt.wantErr {
+			switch got, err := tt.azure.AuthorizeSign(ctx, tt.args.token); {
+			case (err != nil) != tt.wantErr:
 				t.Errorf("Azure.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			} else if err != nil {
+			case err != nil:
 				sc, ok := err.(errs.StatusCoder)
 				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
-			} else {
+			default:
 				assert.Len(t, tt.wantLen, got)
 				for _, o := range got {
 					switch v := o.(type) {

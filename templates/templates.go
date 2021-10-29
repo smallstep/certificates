@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
@@ -182,7 +183,7 @@ func (t *Template) Load() error {
 // the template fails.
 func (t *Template) LoadBytes(b []byte) error {
 	t.backfill(b)
-	tmpl, err := template.New(t.Name).Funcs(sprig.TxtFuncMap()).Parse(string(b))
+	tmpl, err := template.New(t.Name).Funcs(StepFuncMap()).Parse(string(b))
 	if err != nil {
 		return errors.Wrapf(err, "error parsing template %s", t.Name)
 	}
@@ -226,14 +227,11 @@ func (t *Template) Output(data interface{}) (Output, error) {
 
 // backfill updates old templates with the required data.
 func (t *Template) backfill(b []byte) {
-	switch t.Name {
-	case "sshd_config.tpl":
-		if len(t.RequiredData) == 0 {
-			a := bytes.TrimSpace(b)
-			b := bytes.TrimSpace([]byte(DefaultSSHTemplateData[t.Name]))
-			if bytes.Equal(a, b) {
-				t.RequiredData = []string{"Certificate", "Key"}
-			}
+	if strings.EqualFold(t.Name, "sshd_config.tpl") && len(t.RequiredData) == 0 {
+		a := bytes.TrimSpace(b)
+		b := bytes.TrimSpace([]byte(DefaultSSHTemplateData[t.Name]))
+		if bytes.Equal(a, b) {
+			t.RequiredData = []string{"Certificate", "Key"}
 		}
 	}
 }
@@ -271,4 +269,13 @@ func mkdir(path string, perm os.FileMode) error {
 		return errors.Wrapf(err, "error creating %s", path)
 	}
 	return nil
+}
+
+// StepFuncMap returns sprig.TxtFuncMap but removing the "env" and "expandenv"
+// functions to avoid any leak of information.
+func StepFuncMap() template.FuncMap {
+	m := sprig.TxtFuncMap()
+	delete(m, "env")
+	delete(m, "expandenv")
+	return m
 }

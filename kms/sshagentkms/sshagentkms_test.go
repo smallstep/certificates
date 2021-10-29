@@ -378,6 +378,7 @@ func TestSSHAgentKMS_CreateSigner(t *testing.T) {
 					t.Errorf("SSHAgentKMS.CreateSigner() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
+				// nolint:gocritic
 				switch s := got.(type) {
 				case *WrappedSSHSigner:
 					gotPkS := s.Sshsigner.PublicKey().(*agent.Key).String() + "\n"
@@ -562,6 +563,7 @@ func TestSSHAgentKMS_GetPublicKey(t *testing.T) {
 					t.Errorf("SSHAgentKMS.GetPublicKey() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
+				// nolint:gocritic
 				switch tt.want.(type) {
 				case ssh.PublicKey:
 					// If we want a ssh.PublicKey, protote got to a

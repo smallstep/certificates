@@ -11,6 +11,7 @@ import (
 // SCEP provisioning flow
 type SCEP struct {
 	*base
+	ID   string `json:"-"`
 	Type string `json:"type"`
 	Name string `json:"name"`
 
@@ -27,7 +28,16 @@ type SCEP struct {
 }
 
 // GetID returns the provisioner unique identifier.
-func (s SCEP) GetID() string {
+func (s *SCEP) GetID() string {
+	if s.ID != "" {
+		return s.ID
+	}
+	return s.GetIDForToken()
+}
+
+// GetIDForToken returns an identifier that will be used to load the provisioner
+// from a token.
+func (s *SCEP) GetIDForToken() string {
 	return "scep/" + s.Name
 }
 

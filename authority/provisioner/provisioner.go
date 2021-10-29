@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	stderrors "errors"
 	"net/url"
 	"regexp"
 	"strings"
@@ -17,6 +18,7 @@ import (
 // Interface is the interface that all provisioner types must implement.
 type Interface interface {
 	GetID() string
+	GetIDForToken() string
 	GetTokenID(token string) (string, error)
 	GetName() string
 	GetType() Type
@@ -30,6 +32,17 @@ type Interface interface {
 	AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error)
 	AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error)
 }
+
+// ErrAllowTokenReuse is an error that is returned by provisioners that allows
+// the reuse of tokens.
+//
+// This is, for example, returned by the Azure provisioner when
+// DisableTrustOnFirstUse is set to true. Azure caches tokens for up to 24hr and
+// has no mechanism for getting a different token - this can be an issue when
+// rebooting a VM. In contrast, AWS and GCP have facilities for requesting a new
+// token. Therefore, for the Azure provisioner we are enabling token reuse, with
+// the understanding that we are not following security best practices
+var ErrAllowTokenReuse = stderrors.New("allow token reuse")
 
 // Audiences stores all supported audiences by request type.
 type Audiences struct {
@@ -110,7 +123,7 @@ func (a Audiences) WithFragment(fragment string) Audiences {
 
 // generateSignAudience generates a sign audience with the format
 // https://<host>/1.0/sign#provisionerID
-func generateSignAudience(caURL string, provisionerID string) (string, error) {
+func generateSignAudience(caURL, provisionerID string) (string, error) {
 	u, err := url.Parse(caURL)
 	if err != nil {
 		return "", errors.Wrapf(err, "error parsing %s", caURL)
@@ -394,6 +407,7 @@ type MockProvisioner struct {
 	Mret1, Mret2, Mret3 interface{}
 	Merr                error
 	MgetID              func() string
+	MgetIDForToken      func() string
 	MgetTokenID         func(string) (string, error)
 	MgetName            func() string
 	MgetType            func() Type
@@ -412,6 +426,14 @@ type MockProvisioner struct {
 func (m *MockProvisioner) GetID() string {
 	if m.MgetID != nil {
 		return m.MgetID()
+	}
+	return m.Mret1.(string)
+}
+
+// GetIDForToken mock
+func (m *MockProvisioner) GetIDForToken() string {
+	if m.MgetIDForToken != nil {
+		return m.MgetIDForToken()
 	}
 	return m.Mret1.(string)
 }

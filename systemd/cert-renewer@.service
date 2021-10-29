@@ -12,17 +12,13 @@ Environment=STEPPATH=/etc/step-ca \
             CERT_LOCATION=/etc/step/certs/%i.crt \
             KEY_LOCATION=/etc/step/certs/%i.key
 
-; ExecStartPre checks if the certificate is ready for renewal,
+; ExecCondition checks if the certificate is ready for renewal,
 ; based on the exit status of the command.
-; (In systemd 243 and above, you can use ExecCondition= here.)
-ExecStartPre=/usr/bin/env bash -c \
-  'step certificate inspect $CERT_LOCATION --format json --roots "$STEPPATH/certs/root_ca.crt" | \
-  jq -e "(((.validity.start | fromdate) + \
-          ((.validity.end | fromdate) - (.validity.start | fromdate)) * 0.66) \
-           - now) <= 0" > /dev/null'
+; (In systemd 242 or below, you can use ExecStartPre= here.)
+ExecCondition=/usr/bin/step certificate needs-renewal ${CERT_LOCATION}
 
 ; ExecStart renews the certificate, if ExecStartPre was successful.
-ExecStart=/usr/bin/step ca renew --force $CERT_LOCATION $KEY_LOCATION
+ExecStart=/usr/bin/step ca renew --force ${CERT_LOCATION} ${KEY_LOCATION}
 
 ; Try to reload or restart the systemd service that relies on this cert-renewer
 ; If the relying service doesn't exist, forge ahead.
