@@ -46,6 +46,7 @@ type Authority interface {
 	GetRoots() (federation []*x509.Certificate, err error)
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
+	GenerateCertificateRevocationList(force bool) (string, error)
 }
 
 // TimeDuration is an alias of provisioner.TimeDuration
@@ -254,6 +255,7 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("POST", "/renew", h.Renew)
 	r.MethodFunc("POST", "/rekey", h.Rekey)
 	r.MethodFunc("POST", "/revoke", h.Revoke)
+	r.MethodFunc("GET", "/crl", h.CRL)
 	r.MethodFunc("GET", "/provisioners", h.Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
 	r.MethodFunc("GET", "/roots", h.Roots)

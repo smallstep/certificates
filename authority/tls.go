@@ -5,9 +5,12 @@ import (
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
+	"fmt"
+	"math/big"
 	"net/http"
 	"time"
 
@@ -426,6 +429,9 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 
 		// Save as revoked in the Db.
 		err = a.revoke(revokedCert, rci)
+
+		// Generate a new CRL so CRL requesters will always get an up-to-date CRL whenever they request it
+		_, _ = a.GenerateCertificateRevocationList(true)
 	}
 	switch err {
 	case nil:
@@ -456,6 +462,95 @@ func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateIn
 		return lca.RevokeSSH(crt, rci)
 	}
 	return a.db.Revoke(rci)
+}
+
+// GenerateCertificateRevocationList returns a PEM representation of a signed CRL.
+// It will look for a valid generated CRL in the database, check if it has expired, and generate
+// a new CRL on demand if it has expired (or a CRL does not already exist).
+//
+// force set to true will force regeneration of the CRL regardless of whether it has actually expired
+func (a *Authority) GenerateCertificateRevocationList(force bool) (string, error) {
+
+	// check for an existing CRL in the database, and return that if its valid
+	crlInfo, err := a.db.GetCRL()
+
+	if err != nil {
+		return "", err
+	}
+
+	if !force && crlInfo != nil && crlInfo.ExpiresAt.After(time.Now().UTC()) {
+		return crlInfo.PEM, nil
+	}
+
+	// some CAS may not implement the CRLGenerator interface, so check before we proceed
+	caCRLGenerator, ok := a.x509CAService.(casapi.CertificateAuthorityCRLGenerator)
+
+	if !ok {
+		return "", errors.Errorf("CRL Generator not implemented")
+	}
+
+	revokedList, err := a.db.GetRevokedCertificates()
+
+	// Number is a monotonically increasing integer (essentially the CRL version number) that we need to
+	// keep track of and increase every time we generate a new CRL
+	var n int64 = 0
+	var bn big.Int
+
+	if crlInfo != nil {
+		n = crlInfo.Number + 1
+	}
+	bn.SetInt64(n)
+
+	// Convert our database db.RevokedCertificateInfo types into the pkix representation ready for the
+	// CAS to sign it
+	var revokedCertificates []pkix.RevokedCertificate
+
+	for _, revokedCert := range *revokedList {
+		var sn big.Int
+		sn.SetString(revokedCert.Serial, 10)
+		revokedCertificates = append(revokedCertificates, pkix.RevokedCertificate{
+			SerialNumber:   &sn,
+			RevocationTime: revokedCert.RevokedAt,
+			Extensions:     nil,
+		})
+	}
+
+	// Create a RevocationList representation ready for the CAS to sign
+	// TODO: use a config value for the NextUpdate time duration
+	// TODO: allow SignatureAlgorithm to be specified?
+	revocationList := x509.RevocationList{
+		SignatureAlgorithm:  0,
+		RevokedCertificates: revokedCertificates,
+		Number:              &bn,
+		ThisUpdate:          time.Now().UTC(),
+		NextUpdate:          time.Now().UTC().Add(time.Minute * 10),
+		ExtraExtensions:     nil,
+	}
+
+	certificateRevocationList, err := caCRLGenerator.CreateCertificateRevocationList(&revocationList)
+	if err != nil {
+		return "", err
+	}
+
+	// Quick and dirty PEM encoding
+	// TODO: clean this up
+	pemCRL := fmt.Sprintf("-----BEGIN X509 CRL-----\n%s\n-----END X509 CRL-----\n", base64.StdEncoding.EncodeToString(certificateRevocationList))
+
+	// Create a new db.CertificateRevocationListInfo, which stores the new Number we just generated, the
+	// expiry time, and the byte-encoded CRL - then store it in the DB
+	newCRLInfo := db.CertificateRevocationListInfo{
+		Number:    n,
+		ExpiresAt: revocationList.NextUpdate,
+		PEM:       pemCRL,
+	}
+
+	err = a.db.StoreCRL(&newCRLInfo)
+	if err != nil {
+		return "", err
+	}
+
+	// Finally, return our CRL PEM
+	return pemCRL, nil
 }
 
 // GetTLSCertificate creates a new leaf certificate to be used by the CA HTTPS server.
