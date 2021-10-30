@@ -14,6 +14,12 @@ type CertificateAuthorityService interface {
 	RevokeCertificate(req *RevokeCertificateRequest) (*RevokeCertificateResponse, error)
 }
 
+// CertificateAuthorityCRLGenerator is an optional interface implemented by CertificateAuthorityService
+// that has a method to create a CRL
+type CertificateAuthorityCRLGenerator interface {
+	CreateCertificateRevocationList(crl *x509.RevocationList) ([]byte, error)
+}
+
 // CertificateAuthorityGetter is an interface implemented by a
 // CertificateAuthorityService that has a method to get the root certificate.
 type CertificateAuthorityGetter interface {
