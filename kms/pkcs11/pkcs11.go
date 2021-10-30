@@ -32,10 +32,10 @@ const DefaultRSASize = 3072
 type P11 interface {
 	FindKeyPair(id, label []byte) (crypto11.Signer, error)
 	FindCertificate(id, label []byte, serial *big.Int) (*x509.Certificate, error)
-	ImportCertificateWithLabel(id, label []byte, cert *x509.Certificate) error
+	ImportCertificateWithAttributes(template crypto11.AttributeSet, certificate *x509.Certificate) error
 	DeleteCertificate(id, label []byte, serial *big.Int) error
-	GenerateRSAKeyPairWithLabel(id, label []byte, bits int) (crypto11.SignerDecrypter, error)
-	GenerateECDSAKeyPairWithLabel(id, label []byte, curve elliptic.Curve) (crypto11.Signer, error)
+	GenerateRSAKeyPairWithAttributes(public, private crypto11.AttributeSet, bits int) (crypto11.SignerDecrypter, error)
+	GenerateECDSAKeyPairWithAttributes(public, private crypto11.AttributeSet, curve elliptic.Curve) (crypto11.Signer, error)
 	Close() error
 }
 
@@ -185,6 +185,12 @@ func (k *PKCS11) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 		return errors.Wrap(err, "storeCertificate failed")
 	}
 
+	// Enforce the use of both id and labels. This is not strictly necessary in
+	// PKCS #11, but it's a good practice.
+	if len(id) == 0 || len(object) == 0 {
+		return errors.Errorf("key with uri %s is not valid, id and object are required", req.Name)
+	}
+
 	cert, err := k.p11.FindCertificate(id, object, nil)
 	if err != nil {
 		return errors.Wrap(err, "storeCertificate failed")
@@ -195,7 +201,15 @@ func (k *PKCS11) StoreCertificate(req *apiv1.StoreCertificateRequest) error {
 		}, "storeCertificate failed")
 	}
 
-	if err := k.p11.ImportCertificateWithLabel(id, object, req.Certificate); err != nil {
+	// Import certificate with the necessary attributes.
+	template, err := crypto11.NewAttributeSetWithIDAndLabel(id, object)
+	if err != nil {
+		return errors.Wrap(err, "storeCertificate failed")
+	}
+	if req.Extractable {
+		template.Set(crypto11.CkaExtractable, true)
+	}
+	if err := k.p11.ImportCertificateWithAttributes(template, req.Certificate); err != nil {
 		return errors.Wrap(err, "storeCertificate failed")
 	}
 
@@ -284,6 +298,16 @@ func generateKey(ctx P11, req *apiv1.CreateKeyRequest) (crypto11.Signer, error) 
 		return nil, errors.Errorf("key with uri %s is not valid, id and object are required", req.Name)
 	}
 
+	// Create template for public and private keys
+	public, err := crypto11.NewAttributeSetWithIDAndLabel(id, object)
+	if err != nil {
+		return nil, err
+	}
+	private := public.Copy()
+	if req.Extractable {
+		private.Set(crypto11.CkaExtractable, true)
+	}
+
 	bits := req.Bits
 	if bits == 0 {
 		bits = DefaultRSASize
@@ -291,17 +315,17 @@ func generateKey(ctx P11, req *apiv1.CreateKeyRequest) (crypto11.Signer, error) 
 
 	switch req.SignatureAlgorithm {
 	case apiv1.UnspecifiedSignAlgorithm:
-		return ctx.GenerateECDSAKeyPairWithLabel(id, object, elliptic.P256())
+		return ctx.GenerateECDSAKeyPairWithAttributes(public, private, elliptic.P256())
 	case apiv1.SHA256WithRSA, apiv1.SHA384WithRSA, apiv1.SHA512WithRSA:
-		return ctx.GenerateRSAKeyPairWithLabel(id, object, bits)
+		return ctx.GenerateRSAKeyPairWithAttributes(public, private, bits)
 	case apiv1.SHA256WithRSAPSS, apiv1.SHA384WithRSAPSS, apiv1.SHA512WithRSAPSS:
-		return ctx.GenerateRSAKeyPairWithLabel(id, object, bits)
+		return ctx.GenerateRSAKeyPairWithAttributes(public, private, bits)
 	case apiv1.ECDSAWithSHA256:
-		return ctx.GenerateECDSAKeyPairWithLabel(id, object, elliptic.P256())
+		return ctx.GenerateECDSAKeyPairWithAttributes(public, private, elliptic.P256())
 	case apiv1.ECDSAWithSHA384:
-		return ctx.GenerateECDSAKeyPairWithLabel(id, object, elliptic.P384())
+		return ctx.GenerateECDSAKeyPairWithAttributes(public, private, elliptic.P384())
 	case apiv1.ECDSAWithSHA512:
-		return ctx.GenerateECDSAKeyPairWithLabel(id, object, elliptic.P521())
+		return ctx.GenerateECDSAKeyPairWithAttributes(public, private, elliptic.P521())
 	case apiv1.PureEd25519:
 		return nil, fmt.Errorf("signature algorithm %s is not supported", req.SignatureAlgorithm)
 	default:

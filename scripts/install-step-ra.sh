@@ -126,25 +126,17 @@ fi
 
 echo "Bootstrapping with the CA..."
 export STEPPATH=$(mktemp -d)
-export STEP_CONSOLE=true
 
 step ca bootstrap --ca-url $CA_URL --fingerprint $CA_FINGERPRINT
 
 if [ -z "$CA_PROVISIONER_NAME" ]; then
   declare -a provisioners
   readarray -t provisioners < <(step ca provisioner list | jq -r '.[] | select(.type == "JWK") | .name')
-  provisioners+=("Create provisioner")
   printf '%s\n' "${provisioners[@]}"
 
   printf "%b" "\nSelect a JWK provisioner:\n" >&2
   select provisioner in "${provisioners[@]}"; do
-    if [ "$provisioner" == "Create provisioner" ]; then
-      echo "Creating a JWK provisioner on the upstream CA..."
-      echo ""
-      read -p "Label your provisioner (e.g. example-ra): " CA_PROVISIONER_NAME < /dev/tty
-      step beta ca provisioner add $CA_PROVISIONER_NAME  --type JWK --create
-      break
-    elif [ -n "$provisioner" ]; then
+    if [ -n "$provisioner" ]; then
       echo "Using existing provisioner $provisioner."
       CA_PROVISIONER_NAME=$provisioner
       break
@@ -161,6 +153,27 @@ if [ -z "$RA_DNS_NAMES" ]; then
     read -p "(e.g. acme.example.com[,1.1.1.1,etc.]): " RA_DNS_NAMES < /dev/tty
   done
 fi
+
+
+count=0
+ra_dns_names_quoted=""
+
+for i in ${RA_DNS_NAMES//,/ }
+do
+  if [ "$count" = "0" ]; then
+    ra_dns_names_quoted="\"$i\""
+  else 
+    ra_dns_names_quoted="${ra_dns_names_quoted}, \"$i\""
+  fi
+  count=$((count+1))
+done
+
+if [ "$count" = "0" ]; then
+  echo "You must supply at least one RA DNS name"
+  exit 1
+fi
+
+echo "Got here"
 
 if [ -z "$RA_ADDRESS" ]; then
   RA_ADDRESS=""
@@ -197,7 +210,7 @@ mkdir -p $(step path)/config
 cat <<EOF > $(step path)/config/ca.json
 {
   "address": "$RA_ADDRESS",
-  "dnsNames": ["$RA_DNS_NAMES"],
+  "dnsNames": [$ra_dns_names_quoted],
   "db": {
     "type": "badgerV2",
     "dataSource": "/etc/step-ca/db"
