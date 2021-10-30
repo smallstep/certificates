@@ -13,7 +13,7 @@ import (
 
 // getTemplates returns all the templates enabled
 func (p *PKI) getTemplates() *templates.Templates {
-	if !p.enableSSH {
+	if !p.options.enableSSH {
 		return nil
 	}
 	return &templates.Templates{

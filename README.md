@@ -18,7 +18,14 @@ You can use it to:
 
 Whatever your use case, `step-ca` is easy to use and hard to misuse, thanks to [safe, sane defaults](https://smallstep.com/docs/step-ca/certificate-authority-server-production#sane-cryptographic-defaults).
 
-**Questions? Find us in [Discussions](https://github.com/smallstep/certificates/discussions).**
+---
+
+**Don't want to run your own CA?**
+To get up and running quickly, or as an alternative to running your own `step-ca` server, consider creating a [free hosted smallstep Certificate Manager authority](https://info.smallstep.com/certificate-manager-early-access-mvp/).
+
+---
+
+**Questions? Find us in [Discussions](https://github.com/smallstep/certificates/discussions) or [Join our Discord](https://u.step.sm/discord).**
 
 [Website](https://smallstep.com/certificates) |
 [Documentation](https://smallstep.com/docs) |
@@ -27,7 +34,6 @@ Whatever your use case, `step-ca` is easy to use and hard to misuse, thanks to [
 [Contributor's Guide](./docs/CONTRIBUTING.md)
 
 [![GitHub release](https://img.shields.io/github/release/smallstep/certificates.svg)](https://github.com/smallstep/certificates/releases/latest)
-[![CA Image](https://images.microbadger.com/badges/image/smallstep/step-ca.svg)](https://microbadger.com/images/smallstep/step-ca)
 [![Go Report Card](https://goreportcard.com/badge/github.com/smallstep/certificates)](https://goreportcard.com/report/github.com/smallstep/certificates)
 [![Build Status](https://travis-ci.com/smallstep/certificates.svg?branch=master)](https://travis-ci.com/smallstep/certificates)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -58,10 +64,11 @@ You can issue certificates in exchange for:
   - ID tokens from Okta, GSuite, Azure AD, Auth0.
   - ID tokens from an OAuth OIDC service that you host, like [Keycloak](https://www.keycloak.org/) or [Dex](https://github.com/dexidp/dex)
 - [Cloud instance identity documents](https://smallstep.com/blog/embarrassingly-easy-certificates-on-aws-azure-gcp/), for VMs on AWS, GCP, and Azure
-- [Single-use, short-lived JWK tokens]() issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
+- [Single-use, short-lived JWK tokens](https://smallstep.com/docs/step-ca/provisioners#jwk) issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
 - A trusted X.509 certificate (X5C provisioner)
-- Expiring SSH host certificates needing rotation (the SSHPOP provisioner)
-- Learn more in our [provisioner documentation](https://smallstep.com/docs/step-ca/configuration#jwk)
+- A SCEP challenge (SCEP provisioner)
+- An SSH host certificates needing renewal (the SSHPOP provisioner)
+- Learn more in our [provisioner documentation](https://smallstep.com/docs/step-ca/provisioners)
 
 ### 🏔 Your own private ACME server
 
@@ -74,16 +81,17 @@ ACME is the protocol used by Let's Encrypt to automate the issuance of HTTPS cer
   - For `tls-alpn-01`, respond to the challenge at the TLS layer ([as Caddy does](https://caddy.community/t/caddy-supports-the-acme-tls-alpn-challenge/4860)) to prove that you control the web server
 
 - Works with any ACME client. We've written examples for:
-  - [certbot](https://smallstep.com/blog/private-acme-server/#certbotuploadsacme-certbotpng-certbot-example)
-  - [acme.sh](https://smallstep.com/blog/private-acme-server/#acmeshuploadsacme-acme-shpng-acmesh-example)
-  - [Caddy](https://smallstep.com/blog/private-acme-server/#caddyuploadsacme-caddypng-caddy-example)
-  - [Traefik](https://smallstep.com/blog/private-acme-server/#traefikuploadsacme-traefikpng-traefik-example)
-  - [Apache](https://smallstep.com/blog/private-acme-server/#apacheuploadsacme-apachepng-apache-example)
-  - [nginx](https://smallstep.com/blog/private-acme-server/#nginxuploadsacme-nginxpng-nginx-example)
+  - [certbot](https://smallstep.com/docs/tutorials/acme-protocol-acme-clients#certbot)
+  - [acme.sh](https://smallstep.com/docs/tutorials/acme-protocol-acme-clients#acmesh)
+  - [win-acme](https://smallstep.com/docs/tutorials/acme-protocol-acme-clients#win-acme)
+  - [Caddy](https://smallstep.com/docs/tutorials/acme-protocol-acme-clients#caddy-v2)
+  - [Traefik](https://smallstep.com/docs/tutorials/acme-protocol-acme-clients#traefik)
+  - [Apache](https://smallstep.com/docs/tutorials/acme-protocol-acme-clients#apache)
+  - [nginx](https://smallstep.com/docs/tutorials/acme-protocol-acme-clients#nginx)
 - Get certificates programmatically using ACME, using these libraries:
-  - [`lego`](https://github.com/go-acme/lego) for Golang ([example usage](https://smallstep.com/blog/private-acme-server/#golanguploadsacme-golangpng-go-example))
-  - certbot's [`acme` module](https://github.com/certbot/certbot/tree/master/acme) for Python ([example usage](https://smallstep.com/blog/private-acme-server/#pythonuploadsacme-pythonpng-python-example))
-  - [`acme-client`](https://github.com/publishlab/node-acme-client) for Node.js ([example usage](https://smallstep.com/blog/private-acme-server/#nodejsuploadsacme-node-jspng-nodejs-example))
+  - [`lego`](https://github.com/go-acme/lego) for Golang ([example usage](https://smallstep.com/docs/tutorials/acme-protocol-acme-clients#golang))
+  - certbot's [`acme` module](https://github.com/certbot/certbot/tree/master/acme) for Python ([example usage](https://smallstep.com/docs/tutorials/acme-protocol-acme-clients#python))
+  - [`acme-client`](https://github.com/publishlab/node-acme-client) for Node.js ([example usage](https://smallstep.com/docs/tutorials/acme-protocol-acme-clients#node))
 - Our own [`step` CLI tool](https://github.com/smallstep/cli) is also an ACME client!
 - See our [ACME tutorial](https://smallstep.com/docs/tutorials/acme-challenge) for more
 

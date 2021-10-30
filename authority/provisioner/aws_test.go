@@ -141,6 +141,12 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 	p7.config.signatureURL = p1.config.signatureURL
 	p7.config.tokenURL = p1.config.tokenURL
 
+	p8, err := generateAWS()
+	assert.FatalError(t, err)
+	p8.IMDSVersions = nil
+	p8.Accounts = p1.Accounts
+	p8.config = p1.config
+
 	caURL := "https://ca.smallstep.com"
 	u, err := url.Parse(caURL)
 	assert.FatalError(t, err)
@@ -156,6 +162,7 @@ func TestAWS_GetIdentityToken(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", p1, args{"foo.local", caURL}, false},
+		{"ok no imds", p8, args{"foo.local", caURL}, false},
 		{"fail ca url", p1, args{"foo.local", "://ca.smallstep.com"}, true},
 		{"fail identityURL", p2, args{"foo.local", caURL}, true},
 		{"fail signatureURL", p3, args{"foo.local", caURL}, true},
@@ -656,15 +663,15 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := NewContextWithMethod(context.Background(), SignMethod)
-			got, err := tt.aws.AuthorizeSign(ctx, tt.args.token)
-			if (err != nil) != tt.wantErr {
+			switch got, err := tt.aws.AuthorizeSign(ctx, tt.args.token); {
+			case (err != nil) != tt.wantErr:
 				t.Errorf("AWS.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			} else if err != nil {
+			case err != nil:
 				sc, ok := err.(errs.StatusCoder)
 				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
-			} else {
+			default:
 				assert.Len(t, tt.wantLen, got)
 				for _, o := range got {
 					switch v := o.(type) {

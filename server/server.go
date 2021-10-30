@@ -72,10 +72,10 @@ func (srv *Server) Serve(ln net.Listener) error {
 		// Start server
 		if srv.TLSConfig == nil || (len(srv.TLSConfig.Certificates) == 0 && srv.TLSConfig.GetCertificate == nil) {
 			log.Printf("Serving HTTP on %s ...", srv.Addr)
-			err = srv.Server.Serve(tcpKeepAliveListener{ln.(*net.TCPListener)})
+			err = srv.Server.Serve(ln)
 		} else {
 			log.Printf("Serving HTTPS on %s ...", srv.Addr)
-			err = srv.Server.ServeTLS(tcpKeepAliveListener{ln.(*net.TCPListener)}, "", "")
+			err = srv.Server.ServeTLS(ln, "", "")
 		}
 
 		// log unexpected errors
@@ -154,22 +154,4 @@ func (srv *Server) Forbidden(w http.ResponseWriter) {
 	header.Set("Content-Length", "11")
 	w.WriteHeader(http.StatusForbidden)
 	w.Write([]byte("Forbidden.\n"))
-}
-
-// tcpKeepAliveListener sets TCP keep-alive timeouts on accepted
-// connections. It's used by ListenAndServe and ListenAndServeTLS so
-// dead TCP connections (e.g. closing laptop mid-download) eventually
-// go away.
-type tcpKeepAliveListener struct {
-	*net.TCPListener
-}
-
-func (ln tcpKeepAliveListener) Accept() (c net.Conn, err error) {
-	tc, err := ln.AcceptTCP()
-	if err != nil {
-		return
-	}
-	tc.SetKeepAlive(true)
-	tc.SetKeepAlivePeriod(3 * time.Minute)
-	return tc, nil
 }

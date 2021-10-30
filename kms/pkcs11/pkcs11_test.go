@@ -1,3 +1,4 @@
+//go:build cgo
 // +build cgo
 
 package pkcs11
@@ -200,6 +201,16 @@ func TestPKCS11_CreateKey(t *testing.T) {
 	}{
 		{"default", args{&apiv1.CreateKeyRequest{
 			Name: testObject,
+		}}, &apiv1.CreateKeyResponse{
+			Name:      testObject,
+			PublicKey: &ecdsa.PublicKey{},
+			CreateSignerRequest: apiv1.CreateSignerRequest{
+				SigningKey: testObject,
+			},
+		}, false},
+		{"default extractable", args{&apiv1.CreateKeyRequest{
+			Name:        testObject,
+			Extractable: true,
 		}}, &apiv1.CreateKeyResponse{
 			Name:      testObject,
 			PublicKey: &ecdsa.PublicKey{},
@@ -562,6 +573,7 @@ func TestPKCS11_StoreCertificate(t *testing.T) {
 	// Make sure to delete the created certificate
 	t.Cleanup(func() {
 		k.DeleteCertificate(testObject)
+		k.DeleteCertificate(testObjectAlt)
 	})
 
 	type args struct {
@@ -575,6 +587,11 @@ func TestPKCS11_StoreCertificate(t *testing.T) {
 		{"ok", args{&apiv1.StoreCertificateRequest{
 			Name:        testObject,
 			Certificate: cert,
+		}}, false},
+		{"ok extractable", args{&apiv1.StoreCertificateRequest{
+			Name:        testObjectAlt,
+			Certificate: cert,
+			Extractable: true,
 		}}, false},
 		{"fail already exists", args{&apiv1.StoreCertificateRequest{
 			Name:        testObject,
@@ -592,13 +609,22 @@ func TestPKCS11_StoreCertificate(t *testing.T) {
 			Name:        "http:id=7770;object=create-cert",
 			Certificate: cert,
 		}}, true},
-		{"fail ImportCertificateWithLabel", args{&apiv1.StoreCertificateRequest{
-			Name:        "pkcs11:foo=bar",
+		{"fail missing id", args{&apiv1.StoreCertificateRequest{
+			Name:        "pkcs11:object=create-cert",
+			Certificate: cert,
+		}}, true},
+		{"fail missing object", args{&apiv1.StoreCertificateRequest{
+			Name:        "pkcs11:id=7770;object=",
 			Certificate: cert,
 		}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.args.req.Extractable {
+				if testModule == "SoftHSM2" {
+					t.Skip("Extractable certificates are not supported on SoftHSM2")
+				}
+			}
 			if err := k.StoreCertificate(tt.args.req); (err != nil) != tt.wantErr {
 				t.Errorf("PKCS11.StoreCertificate() error = %v, wantErr %v", err, tt.wantErr)
 			}

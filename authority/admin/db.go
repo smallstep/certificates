@@ -54,7 +54,7 @@ func UnmarshalProvisionerDetails(typ linkedca.Provisioner_Type, data []byte) (*l
 	return &linkedca.ProvisionerDetails{Data: v.Data}, nil
 }
 
-// DB is the DB interface expected by the step-ca ACME API.
+// DB is the DB interface expected by the step-ca Admin API.
 type DB interface {
 	CreateProvisioner(ctx context.Context, prov *linkedca.Provisioner) error
 	GetProvisioner(ctx context.Context, id string) (*linkedca.Provisioner, error)

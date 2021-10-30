@@ -426,6 +426,7 @@ ZYtQ9Ot36qc=
 				{Id: stepOIDProvisioner, Value: []byte("foo")},
 				{Id: []int{1, 1, 1}, Value: []byte("bar")}}))
 			now := time.Now().UTC()
+			// nolint:gocritic
 			enforcedExtraOptions := append(extraOpts, &certificateDurationEnforcer{
 				NotBefore: now,
 				NotAfter:  now.Add(365 * 24 * time.Hour),

@@ -75,6 +75,7 @@ type ASN1DN struct {
 	Locality           string `json:"locality,omitempty"`
 	Province           string `json:"province,omitempty"`
 	StreetAddress      string `json:"streetAddress,omitempty"`
+	SerialNumber       string `json:"serialNumber,omitempty"`
 	CommonName         string `json:"commonName,omitempty"`
 }
 
@@ -83,8 +84,9 @@ type ASN1DN struct {
 // cas.Options.
 type AuthConfig struct {
 	*cas.Options
-	AuthorityID          string                `json:"authorityID,omitempty"`
-	Provisioners         provisioner.List      `json:"provisioners"`
+	AuthorityID          string                `json:"authorityId,omitempty"`
+	DeploymentType       string                `json:"deploymentType,omitempty"`
+	Provisioners         provisioner.List      `json:"provisioners,omitempty"`
 	Admins               []*linkedca.Admin     `json:"-"`
 	Template             *ASN1DN               `json:"template,omitempty"`
 	Claims               *provisioner.Claims   `json:"claims,omitempty"`
@@ -188,9 +190,10 @@ func (c *Config) Validate() error {
 	switch {
 	case c.Address == "":
 		return errors.New("address cannot be empty")
-
 	case len(c.DNSNames) == 0:
 		return errors.New("dnsNames cannot be empty")
+	case c.AuthorityConfig == nil:
+		return errors.New("authority cannot be nil")
 	}
 
 	// Options holds the RA/CAS configuration.
@@ -222,7 +225,7 @@ func (c *Config) Validate() error {
 			c.TLS.MaxVersion = DefaultTLSOptions.MaxVersion
 		}
 		if c.TLS.MinVersion == 0 {
-			c.TLS.MinVersion = c.TLS.MaxVersion
+			c.TLS.MinVersion = DefaultTLSOptions.MinVersion
 		}
 		if c.TLS.MinVersion > c.TLS.MaxVersion {
 			return errors.New("tls minVersion cannot exceed tls maxVersion")

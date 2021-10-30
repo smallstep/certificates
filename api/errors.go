@@ -50,12 +50,10 @@ func WriteError(w http.ResponseWriter, err error) {
 				rl.WithFields(map[string]interface{}{
 					"stack-trace": fmt.Sprintf("%+v", e),
 				})
-			} else {
-				if e, ok := cause.(errs.StackTracer); ok {
-					rl.WithFields(map[string]interface{}{
-						"stack-trace": fmt.Sprintf("%+v", e),
-					})
-				}
+			} else if e, ok := cause.(errs.StackTracer); ok {
+				rl.WithFields(map[string]interface{}{
+					"stack-trace": fmt.Sprintf("%+v", e),
+				})
 			}
 		}
 	}

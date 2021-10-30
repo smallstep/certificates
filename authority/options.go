@@ -22,9 +22,9 @@ type Option func(*Authority) error
 
 // WithConfig replaces the current config with the given one. No validation is
 // performed in the given value.
-func WithConfig(config *config.Config) Option {
+func WithConfig(cfg *config.Config) Option {
 	return func(a *Authority) error {
-		a.config = config
+		a.config = cfg
 		return nil
 	}
 }
@@ -38,11 +38,47 @@ func WithConfigFile(filename string) Option {
 	}
 }
 
+// WithPassword set the password to decrypt the intermediate key as well as the
+// ssh host and user keys if they are not overridden by other options.
+func WithPassword(password []byte) Option {
+	return func(a *Authority) (err error) {
+		a.password = password
+		return
+	}
+}
+
+// WithSSHHostPassword set the password to decrypt the key used to sign SSH host
+// certificates.
+func WithSSHHostPassword(password []byte) Option {
+	return func(a *Authority) (err error) {
+		a.sshHostPassword = password
+		return
+	}
+}
+
+// WithSSHUserPassword set the password to decrypt the key used to sign SSH user
+// certificates.
+func WithSSHUserPassword(password []byte) Option {
+	return func(a *Authority) (err error) {
+		a.sshUserPassword = password
+		return
+	}
+}
+
+// WithIssuerPassword set the password to decrypt the certificate issuer private
+// key used in RA mode.
+func WithIssuerPassword(password []byte) Option {
+	return func(a *Authority) (err error) {
+		a.issuerPassword = password
+		return
+	}
+}
+
 // WithDatabase sets an already initialized authority database to a new
 // authority. This option is intended to be use on graceful reloads.
-func WithDatabase(db db.AuthDB) Option {
+func WithDatabase(d db.AuthDB) Option {
 	return func(a *Authority) error {
-		a.db = db
+		a.db = d
 		return nil
 	}
 }
@@ -189,9 +225,18 @@ func WithX509FederatedBundle(pemCerts []byte) Option {
 }
 
 // WithAdminDB is an option to set the database backing the admin APIs.
-func WithAdminDB(db admin.DB) Option {
+func WithAdminDB(d admin.DB) Option {
 	return func(a *Authority) error {
-		a.adminDB = db
+		a.adminDB = d
+		return nil
+	}
+}
+
+// WithLinkedCAToken is an option to set the authentication token used to enable
+// linked ca.
+func WithLinkedCAToken(token string) Option {
+	return func(a *Authority) error {
+		a.linkedCAToken = token
 		return nil
 	}
 }

@@ -1276,7 +1276,7 @@ func newTLSALPNValidationCert(keyAuthHash []byte, obsoleteOID, critical bool, na
 			oid = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 1, 30, 1}
 		}
 
-		keyAuthHashEnc, _ := asn1.Marshal(keyAuthHash[:])
+		keyAuthHashEnc, _ := asn1.Marshal(keyAuthHash)
 
 		certTemplate.ExtraExtensions = []pkix.Extension{
 			{
@@ -1395,7 +1395,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equals(t, updch.Type, ch.Type)
 						assert.Equals(t, updch.Value, ch.Value)
 
-						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443: tls: DialWithDialer timed out", ch.Value)
+						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443:", ch.Value)
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)

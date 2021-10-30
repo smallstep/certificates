@@ -93,8 +93,8 @@ func TestDB_getDBAccount(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if dbacc, err := db.getDBAccount(context.Background(), accID); err != nil {
+			d := DB{db: tc.db}
+			if dbacc, err := d.getDBAccount(context.Background(), accID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -109,15 +109,13 @@ func TestDB_getDBAccount(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, dbacc.ID, tc.dbacc.ID)
-					assert.Equals(t, dbacc.Status, tc.dbacc.Status)
-					assert.Equals(t, dbacc.CreatedAt, tc.dbacc.CreatedAt)
-					assert.Equals(t, dbacc.DeactivatedAt, tc.dbacc.DeactivatedAt)
-					assert.Equals(t, dbacc.Contact, tc.dbacc.Contact)
-					assert.Equals(t, dbacc.Key.KeyID, tc.dbacc.Key.KeyID)
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, dbacc.ID, tc.dbacc.ID)
+				assert.Equals(t, dbacc.Status, tc.dbacc.Status)
+				assert.Equals(t, dbacc.CreatedAt, tc.dbacc.CreatedAt)
+				assert.Equals(t, dbacc.DeactivatedAt, tc.dbacc.DeactivatedAt)
+				assert.Equals(t, dbacc.Contact, tc.dbacc.Contact)
+				assert.Equals(t, dbacc.Key.KeyID, tc.dbacc.Key.KeyID)
 			}
 		})
 	}
@@ -174,8 +172,8 @@ func TestDB_getAccountIDByKeyID(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if retAccID, err := db.getAccountIDByKeyID(context.Background(), kid); err != nil {
+			d := DB{db: tc.db}
+			if retAccID, err := d.getAccountIDByKeyID(context.Background(), kid); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -190,10 +188,8 @@ func TestDB_getAccountIDByKeyID(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, retAccID, accID)
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, retAccID, accID)
 			}
 		})
 	}
@@ -250,8 +246,8 @@ func TestDB_GetAccount(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if acc, err := db.GetAccount(context.Background(), accID); err != nil {
+			d := DB{db: tc.db}
+			if acc, err := d.GetAccount(context.Background(), accID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -266,13 +262,11 @@ func TestDB_GetAccount(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, acc.ID, tc.dbacc.ID)
-					assert.Equals(t, acc.Status, tc.dbacc.Status)
-					assert.Equals(t, acc.Contact, tc.dbacc.Contact)
-					assert.Equals(t, acc.Key.KeyID, tc.dbacc.Key.KeyID)
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, acc.ID, tc.dbacc.ID)
+				assert.Equals(t, acc.Status, tc.dbacc.Status)
+				assert.Equals(t, acc.Contact, tc.dbacc.Contact)
+				assert.Equals(t, acc.Key.KeyID, tc.dbacc.Key.KeyID)
 			}
 		})
 	}
@@ -358,8 +352,8 @@ func TestDB_GetAccountByKeyID(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if acc, err := db.GetAccountByKeyID(context.Background(), kid); err != nil {
+			d := DB{db: tc.db}
+			if acc, err := d.GetAccountByKeyID(context.Background(), kid); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -374,13 +368,11 @@ func TestDB_GetAccountByKeyID(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, acc.ID, tc.dbacc.ID)
-					assert.Equals(t, acc.Status, tc.dbacc.Status)
-					assert.Equals(t, acc.Contact, tc.dbacc.Contact)
-					assert.Equals(t, acc.Key.KeyID, tc.dbacc.Key.KeyID)
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, acc.ID, tc.dbacc.ID)
+				assert.Equals(t, acc.Status, tc.dbacc.Status)
+				assert.Equals(t, acc.Contact, tc.dbacc.Contact)
+				assert.Equals(t, acc.Key.KeyID, tc.dbacc.Key.KeyID)
 			}
 		})
 	}
@@ -527,8 +519,8 @@ func TestDB_CreateAccount(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if err := db.CreateAccount(context.Background(), tc.acc); err != nil {
+			d := DB{db: tc.db}
+			if err := d.CreateAccount(context.Background(), tc.acc); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -688,8 +680,8 @@ func TestDB_UpdateAccount(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if err := db.UpdateAccount(context.Background(), tc.acc); err != nil {
+			d := DB{db: tc.db}
+			if err := d.UpdateAccount(context.Background(), tc.acc); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}

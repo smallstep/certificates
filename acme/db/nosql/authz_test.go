@@ -97,8 +97,8 @@ func TestDB_getDBAuthz(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if dbaz, err := db.getDBAuthz(context.Background(), azID); err != nil {
+			d := DB{db: tc.db}
+			if dbaz, err := d.getDBAuthz(context.Background(), azID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -113,18 +113,16 @@ func TestDB_getDBAuthz(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, dbaz.ID, tc.dbaz.ID)
-					assert.Equals(t, dbaz.AccountID, tc.dbaz.AccountID)
-					assert.Equals(t, dbaz.Identifier, tc.dbaz.Identifier)
-					assert.Equals(t, dbaz.Status, tc.dbaz.Status)
-					assert.Equals(t, dbaz.Token, tc.dbaz.Token)
-					assert.Equals(t, dbaz.CreatedAt, tc.dbaz.CreatedAt)
-					assert.Equals(t, dbaz.ExpiresAt, tc.dbaz.ExpiresAt)
-					assert.Equals(t, dbaz.Error.Error(), tc.dbaz.Error.Error())
-					assert.Equals(t, dbaz.Wildcard, tc.dbaz.Wildcard)
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, dbaz.ID, tc.dbaz.ID)
+				assert.Equals(t, dbaz.AccountID, tc.dbaz.AccountID)
+				assert.Equals(t, dbaz.Identifier, tc.dbaz.Identifier)
+				assert.Equals(t, dbaz.Status, tc.dbaz.Status)
+				assert.Equals(t, dbaz.Token, tc.dbaz.Token)
+				assert.Equals(t, dbaz.CreatedAt, tc.dbaz.CreatedAt)
+				assert.Equals(t, dbaz.ExpiresAt, tc.dbaz.ExpiresAt)
+				assert.Equals(t, dbaz.Error.Error(), tc.dbaz.Error.Error())
+				assert.Equals(t, dbaz.Wildcard, tc.dbaz.Wildcard)
 			}
 		})
 	}
@@ -293,8 +291,8 @@ func TestDB_GetAuthorization(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if az, err := db.GetAuthorization(context.Background(), azID); err != nil {
+			d := DB{db: tc.db}
+			if az, err := d.GetAuthorization(context.Background(), azID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -309,21 +307,19 @@ func TestDB_GetAuthorization(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, az.ID, tc.dbaz.ID)
-					assert.Equals(t, az.AccountID, tc.dbaz.AccountID)
-					assert.Equals(t, az.Identifier, tc.dbaz.Identifier)
-					assert.Equals(t, az.Status, tc.dbaz.Status)
-					assert.Equals(t, az.Token, tc.dbaz.Token)
-					assert.Equals(t, az.Wildcard, tc.dbaz.Wildcard)
-					assert.Equals(t, az.ExpiresAt, tc.dbaz.ExpiresAt)
-					assert.Equals(t, az.Challenges, []*acme.Challenge{
-						{ID: "foo"},
-						{ID: "bar"},
-					})
-					assert.Equals(t, az.Error.Error(), tc.dbaz.Error.Error())
-				}
+			} else if assert.Nil(t, tc.err) {
+				assert.Equals(t, az.ID, tc.dbaz.ID)
+				assert.Equals(t, az.AccountID, tc.dbaz.AccountID)
+				assert.Equals(t, az.Identifier, tc.dbaz.Identifier)
+				assert.Equals(t, az.Status, tc.dbaz.Status)
+				assert.Equals(t, az.Token, tc.dbaz.Token)
+				assert.Equals(t, az.Wildcard, tc.dbaz.Wildcard)
+				assert.Equals(t, az.ExpiresAt, tc.dbaz.ExpiresAt)
+				assert.Equals(t, az.Challenges, []*acme.Challenge{
+					{ID: "foo"},
+					{ID: "bar"},
+				})
+				assert.Equals(t, az.Error.Error(), tc.dbaz.Error.Error())
 			}
 		})
 	}
@@ -445,8 +441,8 @@ func TestDB_CreateAuthorization(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if err := db.CreateAuthorization(context.Background(), tc.az); err != nil {
+			d := DB{db: tc.db}
+			if err := d.CreateAuthorization(context.Background(), tc.az); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -594,8 +590,8 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			db := DB{db: tc.db}
-			if err := db.UpdateAuthorization(context.Background(), tc.az); err != nil {
+			d := DB{db: tc.db}
+			if err := d.UpdateAuthorization(context.Background(), tc.az); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}

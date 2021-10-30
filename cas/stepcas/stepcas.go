@@ -47,10 +47,13 @@ func New(ctx context.Context, opts apiv1.Options) (*StepCAS, error) {
 		return nil, err
 	}
 
-	// Create configured issuer
-	iss, err := newStepIssuer(caURL, client, opts.CertificateIssuer)
-	if err != nil {
-		return nil, err
+	var iss stepIssuer
+	// Create configured issuer unless we only want to use GetCertificateAuthority.
+	// This avoid the request for the password if not provided.
+	if !opts.IsCAGetter {
+		if iss, err = newStepIssuer(caURL, client, opts.CertificateIssuer); err != nil {
+			return nil, err
+		}
 	}
 
 	return &StepCAS{
@@ -87,9 +90,9 @@ func (s *StepCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.R
 	return nil, apiv1.ErrNotImplemented{Message: "stepCAS does not support mTLS renewals"}
 }
 
+// RevokeCertificate revokes a certificate.
 func (s *StepCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {
-	switch {
-	case req.SerialNumber == "" && req.Certificate == nil:
+	if req.SerialNumber == "" && req.Certificate == nil {
 		return nil, errors.New("revokeCertificateRequest `serialNumber` or `certificate` are required")
 	}
 

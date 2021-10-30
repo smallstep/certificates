@@ -312,7 +312,7 @@ func (p *AWS) GetType() Type {
 }
 
 // GetEncryptedKey is not available in an AWS provisioner.
-func (p *AWS) GetEncryptedKey() (kid string, key string, ok bool) {
+func (p *AWS) GetEncryptedKey() (kid, key string, ok bool) {
 	return "", "", false
 }
 
@@ -449,13 +449,15 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	// There's no way to trust them other than TOFU.
 	var so []SignOption
 	if p.DisableCustomSANs {
-		dnsName := fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region)
-		so = append(so, dnsNamesValidator([]string{dnsName}))
-		so = append(so, ipAddressesValidator([]net.IP{
-			net.ParseIP(doc.PrivateIP),
-		}))
-		so = append(so, emailAddressesValidator(nil))
-		so = append(so, urisValidator(nil))
+		dnsName := fmt.Sprintf("ip-%s.%s.compute.internal", strings.ReplaceAll(doc.PrivateIP, ".", "-"), doc.Region)
+		so = append(so,
+			dnsNamesValidator([]string{dnsName}),
+			ipAddressesValidator([]net.IP{
+				net.ParseIP(doc.PrivateIP),
+			}),
+			emailAddressesValidator(nil),
+			urisValidator(nil),
+		)
 
 		// Template options
 		data.SetSANs([]string{dnsName, doc.PrivateIP})
@@ -514,6 +516,11 @@ func (p *AWS) checkSignature(signed, signature []byte) error {
 func (p *AWS) readURL(url string) ([]byte, error) {
 	var resp *http.Response
 	var err error
+
+	// Initialize IMDS versions when this is called from the cli.
+	if len(p.IMDSVersions) == 0 {
+		p.IMDSVersions = []string{"v2", "v1"}
+	}
 
 	for _, v := range p.IMDSVersions {
 		switch v {
@@ -664,7 +671,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 	if p.DisableCustomSANs {
 		if payload.Subject != doc.InstanceID &&
 			payload.Subject != doc.PrivateIP &&
-			payload.Subject != fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region) {
+			payload.Subject != fmt.Sprintf("ip-%s.%s.compute.internal", strings.ReplaceAll(doc.PrivateIP, ".", "-"), doc.Region) {
 			return nil, errs.Unauthorized("aws.authorizeToken; invalid token - invalid subject claim (sub)")
 		}
 	}
@@ -715,7 +722,7 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	// Validated principals.
 	principals := []string{
 		doc.PrivateIP,
-		fmt.Sprintf("ip-%s.%s.compute.internal", strings.Replace(doc.PrivateIP, ".", "-", -1), doc.Region),
+		fmt.Sprintf("ip-%s.%s.compute.internal", strings.ReplaceAll(doc.PrivateIP, ".", "-"), doc.Region),
 	}
 
 	// Only enforce known principals if disable custom sans is true.

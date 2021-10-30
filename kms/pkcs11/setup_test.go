@@ -1,3 +1,4 @@
+//go:build cgo
 // +build cgo
 
 package pkcs11
@@ -17,6 +18,7 @@ import (
 var (
 	testModule        = ""
 	testObject        = "pkcs11:id=7370;object=test-name"
+	testObjectAlt     = "pkcs11:id=7377;object=alt-test-name"
 	testObjectByID    = "pkcs11:id=7370"
 	testObjectByLabel = "pkcs11:object=test-name"
 	testKeys          = []struct {
@@ -104,7 +106,7 @@ func setup(t TBTesting, k *PKCS11) {
 		}); err != nil && !errors.Is(errors.Cause(err), apiv1.ErrAlreadyExists{
 			Message: c.Name + " already exists",
 		}) {
-			t.Errorf("PKCS1.StoreCertificate() error = %+v", err)
+			t.Errorf("PKCS1.StoreCertificate() error = %v", err)
 			continue
 		}
 		testCerts[i].Certificates = append(testCerts[i].Certificates, cert)

@@ -14,8 +14,8 @@
 
 # Others
 *.swp
-.travis-releases
+.releases
 coverage.txt
-vendor
 output
+vendor
 .idea

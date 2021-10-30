@@ -50,6 +50,7 @@ type Config struct {
 	NoCerts          bool
 	EnableSSH        bool
 	Force            bool
+	Extractable      bool
 }
 
 // Validate checks the flags in the config.
@@ -117,6 +118,7 @@ func main() {
 	flag.BoolVar(&c.EnableSSH, "ssh", false, "Enable the creation of ssh keys.")
 	flag.BoolVar(&c.NoCerts, "no-certs", false, "Do not store certificates in the module.")
 	flag.BoolVar(&c.Force, "force", false, "Force the delete of previous keys.")
+	flag.BoolVar(&c.Extractable, "extractable", false, "Allow export of private keys under wrap.")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -128,6 +130,9 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
+
+	// Initialize windows terminal
+	ui.Init()
 
 	if u.Get("pin-value") == "" && u.Get("pin-source") == "" && c.Pin == "" {
 		pin, err := ui.PromptPassword("What is the PKCS#11 PIN?")
@@ -201,6 +206,9 @@ func main() {
 	if err := createPKI(k, c); err != nil {
 		fatalClose(err, k)
 	}
+
+	// Reset windows terminal
+	ui.Reset()
 }
 
 func fatal(err error) {
@@ -209,6 +217,7 @@ func fatal(err error) {
 	} else {
 		fmt.Fprintln(os.Stderr, err)
 	}
+	ui.Reset()
 	os.Exit(1)
 }
 
@@ -286,6 +295,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		resp, err := k.CreateKey(&apiv1.CreateKeyRequest{
 			Name:               c.RootKeyObject,
 			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
+			Extractable:        c.Extractable,
 		})
 		if err != nil {
 			return err
@@ -322,15 +332,16 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 
 		if cm, ok := k.(kms.CertificateManager); ok && !c.NoCerts {
-			if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+			if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 				Name:        c.RootObject,
 				Certificate: root,
+				Extractable: c.Extractable,
 			}); err != nil {
 				return err
 			}
 		}
 
-		if err = fileutil.WriteFile(c.RootPath, pem.EncodeToMemory(&pem.Block{
+		if err := fileutil.WriteFile(c.RootPath, pem.EncodeToMemory(&pem.Block{
 			Type:  "CERTIFICATE",
 			Bytes: b,
 		}), 0600); err != nil {
@@ -366,6 +377,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		resp, err := k.CreateKey(&apiv1.CreateKeyRequest{
 			Name:               c.CrtKeyObject,
 			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
+			Extractable:        c.Extractable,
 		})
 		if err != nil {
 			return err
@@ -399,15 +411,16 @@ func createPKI(k kms.KeyManager, c Config) error {
 	}
 
 	if cm, ok := k.(kms.CertificateManager); ok && !c.NoCerts {
-		if err = cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+		if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 			Name:        c.CrtObject,
 			Certificate: intermediate,
+			Extractable: c.Extractable,
 		}); err != nil {
 			return err
 		}
 	}
 
-	if err = fileutil.WriteFile(c.CrtPath, pem.EncodeToMemory(&pem.Block{
+	if err := fileutil.WriteFile(c.CrtPath, pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: b,
 	}), 0600); err != nil {

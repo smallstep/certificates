@@ -10,11 +10,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
@@ -74,23 +76,23 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 }
 
 func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
-	url := &url.URL{Scheme: "http", Host: ch.Value, Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
+	u := &url.URL{Scheme: "http", Host: ch.Value, Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
 
-	resp, err := vo.HTTPGet(url.String())
+	resp, err := vo.HTTPGet(u.String())
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
-			"error doing http GET for url %s", url))
+			"error doing http GET for url %s", u))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return storeError(ctx, db, ch, false, NewError(ErrorConnectionType,
-			"error doing http GET for url %s with status code %d", url, resp.StatusCode))
+			"error doing http GET for url %s with status code %d", u, resp.StatusCode))
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return WrapErrorISE(err, "error reading "+
-			"response body for url %s", url)
+			"response body for url %s", u)
 	}
 	keyAuth := strings.TrimSpace(string(body))
 
@@ -114,6 +116,17 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	return nil
 }
 
+func tlsAlert(err error) uint8 {
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		v := reflect.ValueOf(opErr.Err)
+		if v.Kind() == reflect.Uint8 {
+			return uint8(v.Uint())
+		}
+	}
+	return 0
+}
+
 func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
 	config := &tls.Config{
 		NextProtos: []string{"acme-tls/1"},
@@ -129,6 +142,14 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 
 	conn, err := vo.TLSDial("tcp", hostPort, config)
 	if err != nil {
+		// With Go 1.17+ tls.Dial fails if there's no overlap between configured
+		// client and server protocols. When this happens the connection is
+		// closed with the error no_application_protocol(120) as required by
+		// RFC7301. See https://golang.org/doc/go1.17#ALPN
+		if tlsAlert(err) == 120 {
+			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+				"cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge"))
+		}
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
 			"error doing TLS dial for %s", hostPort))
 	}

@@ -124,10 +124,8 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...st
 	ordersByAccountMux.Lock()
 	defer ordersByAccountMux.Unlock()
 
+	var oldOids []string
 	b, err := db.db.Get(ordersByAccountIDTable, []byte(accID))
-	var (
-		oldOids []string
-	)
 	if err != nil {
 		if !nosql.IsErrNotFound(err) {
 			return nil, errors.Wrapf(err, "error loading orderIDs for account %s", accID)

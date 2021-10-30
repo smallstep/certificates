@@ -345,7 +345,7 @@ func readACMEError(r io.ReadCloser) error {
 	ae := new(acme.Error)
 	err = json.Unmarshal(b, &ae)
 	// If we successfully marshaled to an ACMEError then return the ACMEError.
-	if err != nil || len(ae.Error()) == 0 {
+	if err != nil || ae.Error() == "" {
 		fmt.Printf("b = %s\n", b)
 		// Throw up our hands.
 		return errors.Errorf("%s", b)

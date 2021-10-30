@@ -59,7 +59,9 @@ func Parse(rawuri string) (*URI, error) {
 	if u.Scheme == "" {
 		return nil, errors.Errorf("error parsing %s: scheme is missing", rawuri)
 	}
-	v, err := url.ParseQuery(u.Opaque)
+	// Starting with Go 1.17 url.ParseQuery returns an error using semicolon as
+	// separator.
+	v, err := url.ParseQuery(strings.ReplaceAll(u.Opaque, ";", "&"))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error parsing %s", rawuri)
 	}
@@ -91,6 +93,16 @@ func (u *URI) Get(key string) string {
 		v = u.URL.Query().Get(key)
 	}
 	return v
+}
+
+// GetBool returns true if a given key has the value "true". It returns false
+// otherwise.
+func (u *URI) GetBool(key string) bool {
+	v := u.Values.Get(key)
+	if v == "" {
+		v = u.URL.Query().Get(key)
+	}
+	return strings.EqualFold(v, "true")
 }
 
 // GetEncoded returns the first value in the uri with the given key, it will

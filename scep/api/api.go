@@ -198,14 +198,14 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 			return
 		}
 
-		provisioner, ok := p.(*provisioner.SCEP)
+		prov, ok := p.(*provisioner.SCEP)
 		if !ok {
 			api.WriteError(w, errors.New("provisioner must be of type SCEP"))
 			return
 		}
 
 		ctx := r.Context()
-		ctx = context.WithValue(ctx, scep.ProvisionerContextKey, scep.Provisioner(provisioner))
+		ctx = context.WithValue(ctx, scep.ProvisionerContextKey, scep.Provisioner(prov))
 		next(w, r.WithContext(ctx))
 	}
 }

@@ -8,11 +8,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"unicode"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/ca"
+	"github.com/smallstep/certificates/pki"
 	"github.com/urfave/cli"
 	"go.step.sm/cli-utils/errs"
 )
@@ -21,13 +23,26 @@ import (
 var AppCommand = cli.Command{
 	Name:   "start",
 	Action: appAction,
-	UsageText: `**step-ca** <config>
-[**--password-file**=<file>] [**--issuer-password-file**=<file>] [**--resolver**=<addr>]`,
+	UsageText: `**step-ca** <config> [**--password-file**=<file>]
+[**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]
+[**--issuer-password-file**=<file>] [**--resolver**=<addr>]`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name: "password-file",
 			Usage: `path to the <file> containing the password to decrypt the
 intermediate private key.`,
+		},
+		cli.StringFlag{
+			Name: "ssh-host-password-file",
+			Usage: `path to the <file> containing the password to decrypt the
+private key used to sign SSH host certificates. If the flag is not passed it
+will default to --password-file.`,
+		},
+		cli.StringFlag{
+			Name: "ssh-user-password-file",
+			Usage: `path to the <file> containing the password to decrypt the
+private key used to sign SSH user certificates. If the flag is not passed it
+will default to --password-file.`,
 		},
 		cli.StringFlag{
 			Name: "issuer-password-file",
@@ -38,14 +53,22 @@ certificate issuer private key used in the RA mode.`,
 			Name:  "resolver",
 			Usage: "address of a DNS resolver to be used instead of the default.",
 		},
+		cli.StringFlag{
+			Name:   "token",
+			Usage:  "token used to enable the linked ca.",
+			EnvVar: "STEP_CA_TOKEN",
+		},
 	},
 }
 
 // AppAction is the action used when the top command runs.
 func appAction(ctx *cli.Context) error {
 	passFile := ctx.String("password-file")
+	sshHostPassFile := ctx.String("ssh-host-password-file")
+	sshUserPassFile := ctx.String("ssh-user-password-file")
 	issuerPassFile := ctx.String("issuer-password-file")
 	resolver := ctx.String("resolver")
+	token := ctx.String("token")
 
 	// If zero cmd line args show help, if >1 cmd line args show error.
 	if ctx.NArg() == 0 {
@@ -56,9 +79,21 @@ func appAction(ctx *cli.Context) error {
 	}
 
 	configFile := ctx.Args().Get(0)
-	config, err := config.LoadConfiguration(configFile)
+	cfg, err := config.LoadConfiguration(configFile)
 	if err != nil {
 		fatal(err)
+	}
+
+	if cfg.AuthorityConfig != nil {
+		if token == "" && strings.EqualFold(cfg.AuthorityConfig.DeploymentType, pki.LinkedDeployment.String()) {
+			return errors.New(`'step-ca' requires the '--token' flag for linked deploy type.
+
+To get a linked authority token:
+  1. Log in or create a Certificate Manager account at ` + "\033[1mhttps://u.step.sm/linked\033[0m" + `
+  2. Add a new authority and select "Link a step-ca instance"
+  3. Follow instructions in browser to start 'step-ca' using the '--token' flag
+`)
+		}
 	}
 
 	var password []byte
@@ -67,6 +102,22 @@ func appAction(ctx *cli.Context) error {
 			fatal(errors.Wrapf(err, "error reading %s", passFile))
 		}
 		password = bytes.TrimRightFunc(password, unicode.IsSpace)
+	}
+
+	var sshHostPassword []byte
+	if sshHostPassFile != "" {
+		if sshHostPassword, err = ioutil.ReadFile(sshHostPassFile); err != nil {
+			fatal(errors.Wrapf(err, "error reading %s", sshHostPassFile))
+		}
+		sshHostPassword = bytes.TrimRightFunc(sshHostPassword, unicode.IsSpace)
+	}
+
+	var sshUserPassword []byte
+	if sshUserPassFile != "" {
+		if sshUserPassword, err = ioutil.ReadFile(sshUserPassFile); err != nil {
+			fatal(errors.Wrapf(err, "error reading %s", sshUserPassFile))
+		}
+		sshUserPassword = bytes.TrimRightFunc(sshUserPassword, unicode.IsSpace)
 	}
 
 	var issuerPassword []byte
@@ -85,10 +136,13 @@ func appAction(ctx *cli.Context) error {
 		}
 	}
 
-	srv, err := ca.New(config,
+	srv, err := ca.New(cfg,
 		ca.WithConfigFile(configFile),
 		ca.WithPassword(password),
-		ca.WithIssuerPassword(issuerPassword))
+		ca.WithSSHHostPassword(sshHostPassword),
+		ca.WithSSHUserPassword(sshUserPassword),
+		ca.WithIssuerPassword(issuerPassword),
+		ca.WithLinkedCAToken(token))
 	if err != nil {
 		fatal(err)
 	}

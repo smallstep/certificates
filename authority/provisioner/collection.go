@@ -37,8 +37,9 @@ func (p provisionerSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 // provisioner.
 type loadByTokenPayload struct {
 	jose.Claims
-	AuthorizedParty string `json:"azp"` // OIDC client id
-	TenantID        string `json:"tid"` // Microsoft Azure tenant id
+	Email           string `json:"email"` // OIDC email
+	AuthorizedParty string `json:"azp"`   // OIDC client id
+	TenantID        string `json:"tid"`   // Microsoft Azure tenant id
 }
 
 // Collection is a memory map of provisioners.
@@ -129,12 +130,20 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 			return p, ok
 		}
 	}
-	// Try with tid (Azure)
+	// Try with tid (Azure, Azure OIDC)
 	if payload.TenantID != "" {
+		// Try to load an OIDC provisioner first.
+		if payload.Email != "" {
+			if p, ok := c.LoadByTokenID(payload.Audience[0]); ok {
+				return p, ok
+			}
+		}
+		// Try to load an Azure provisioner.
 		if p, ok := c.LoadByTokenID(payload.TenantID); ok {
 			return p, ok
 		}
 	}
+
 	// Fallback to aud
 	return c.LoadByTokenID(payload.Audience[0])
 }
@@ -220,14 +229,15 @@ func (c *Collection) Remove(id string) error {
 
 	var found bool
 	for i, elem := range c.sorted {
-		if elem.provisioner.GetID() == id {
-			// Remove index in sorted list
-			copy(c.sorted[i:], c.sorted[i+1:])           // Shift a[i+1:] left one index.
-			c.sorted[len(c.sorted)-1] = uidProvisioner{} // Erase last element (write zero value).
-			c.sorted = c.sorted[:len(c.sorted)-1]        // Truncate slice.
-			found = true
-			break
+		if elem.provisioner.GetID() != id {
+			continue
 		}
+		// Remove index in sorted list
+		copy(c.sorted[i:], c.sorted[i+1:])           // Shift a[i+1:] left one index.
+		c.sorted[len(c.sorted)-1] = uidProvisioner{} // Erase last element (write zero value).
+		c.sorted = c.sorted[:len(c.sorted)-1]        // Truncate slice.
+		found = true
+		break
 	}
 	if !found {
 		return admin.NewError(admin.ErrorNotFoundType, "provisioner %s not found in sorted list", prov.GetName())

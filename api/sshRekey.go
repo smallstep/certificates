@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -18,7 +19,7 @@ type SSHRekeyRequest struct {
 // Validate validates the SSHSignRekey.
 func (s *SSHRekeyRequest) Validate() error {
 	switch {
-	case len(s.OTT) == 0:
+	case s.OTT == "":
 		return errors.New("missing or empty ott")
 	case len(s.PublicKey) == 0:
 		return errors.New("missing or empty public key")
@@ -72,7 +73,11 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	identity, err := h.renewIdentityCertificate(r)
+	// Match identity cert with the SSH cert
+	notBefore := time.Unix(int64(oldCert.ValidAfter), 0)
+	notAfter := time.Unix(int64(oldCert.ValidBefore), 0)
+
+	identity, err := h.renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
 		WriteError(w, errs.ForbiddenErr(err))
 		return

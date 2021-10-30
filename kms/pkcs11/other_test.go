@@ -1,3 +1,4 @@
+//go:build cgo && !softhsm2 && !yubihsm2 && !opensc
 // +build cgo,!softhsm2,!yubihsm2,!opensc
 
 package pkcs11
@@ -79,10 +80,23 @@ func (s *stubPKCS11) FindCertificate(id, label []byte, serial *big.Int) (*x509.C
 
 }
 
+func (s *stubPKCS11) ImportCertificateWithAttributes(template crypto11.AttributeSet, cert *x509.Certificate) error {
+	var id, label []byte
+	if v := template[crypto11.CkaId]; v != nil {
+		id = v.Value
+	}
+	if v := template[crypto11.CkaLabel]; v != nil {
+		label = v.Value
+	}
+	return s.ImportCertificateWithLabel(id, label, cert)
+}
+
 func (s *stubPKCS11) ImportCertificateWithLabel(id, label []byte, cert *x509.Certificate) error {
 	switch {
-	case id == nil && label == nil:
-		return errors.New("id and label cannot both be nil")
+	case id == nil:
+		return errors.New("id cannot both be nil")
+	case label == nil:
+		return errors.New("label cannot both be nil")
 	case cert == nil:
 		return errors.New("certificate cannot be nil")
 	}
@@ -110,6 +124,17 @@ func (s *stubPKCS11) DeleteCertificate(id, label []byte, serial *big.Int) error 
 	return nil
 }
 
+func (s *stubPKCS11) GenerateRSAKeyPairWithAttributes(public, private crypto11.AttributeSet, bits int) (crypto11.SignerDecrypter, error) {
+	var id, label []byte
+	if v := public[crypto11.CkaId]; v != nil {
+		id = v.Value
+	}
+	if v := public[crypto11.CkaLabel]; v != nil {
+		label = v.Value
+	}
+	return s.GenerateRSAKeyPairWithLabel(id, label, bits)
+}
+
 func (s *stubPKCS11) GenerateRSAKeyPairWithLabel(id, label []byte, bits int) (crypto11.SignerDecrypter, error) {
 	if id == nil && label == nil {
 		return nil, errors.New("id and label cannot both be nil")
@@ -128,6 +153,17 @@ func (s *stubPKCS11) GenerateRSAKeyPairWithLabel(id, label []byte, bits int) (cr
 	s.signerIndex[newKey(id, nil, nil)] = k.index
 	s.signerIndex[newKey(nil, label, nil)] = k.index
 	return k, nil
+}
+
+func (s *stubPKCS11) GenerateECDSAKeyPairWithAttributes(public, private crypto11.AttributeSet, curve elliptic.Curve) (crypto11.Signer, error) {
+	var id, label []byte
+	if v := public[crypto11.CkaId]; v != nil {
+		id = v.Value
+	}
+	if v := public[crypto11.CkaLabel]; v != nil {
+		label = v.Value
+	}
+	return s.GenerateECDSAKeyPairWithLabel(id, label, curve)
 }
 
 func (s *stubPKCS11) GenerateECDSAKeyPairWithLabel(id, label []byte, curve elliptic.Curve) (crypto11.Signer, error) {
@@ -165,10 +201,10 @@ func (s *privateKey) Delete() error {
 	return nil
 }
 
-func (s *privateKey) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) (plaintext []byte, err error) {
+func (s *privateKey) Decrypt(rnd io.Reader, msg []byte, opts crypto.DecrypterOpts) (plaintext []byte, err error) {
 	k, ok := s.Signer.(*rsa.PrivateKey)
 	if !ok {
 		return nil, errors.New("key is not an rsa key")
 	}
-	return k.Decrypt(rand, msg, opts)
+	return k.Decrypt(rnd, msg, opts)
 }

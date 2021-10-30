@@ -264,7 +264,7 @@ func TestHandler_GetOrder(t *testing.T) {
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("ordID", o.ID)
-	url := fmt.Sprintf("%s/acme/%s/order/%s",
+	u := fmt.Sprintf("%s/acme/%s/order/%s",
 		baseURL.String(), escProvName, o.ID)
 
 	type test struct {
@@ -422,7 +422,7 @@ func TestHandler_GetOrder(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.GetOrder(w, req)
@@ -448,7 +448,7 @@ func TestHandler_GetOrder(t *testing.T) {
 				assert.FatalError(t, err)
 
 				assert.Equals(t, bytes.TrimSpace(body), expB)
-				assert.Equals(t, res.Header["Location"], []string{url})
+				assert.Equals(t, res.Header["Location"], []string{u})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
@@ -663,7 +663,7 @@ func TestHandler_NewOrder(t *testing.T) {
 	prov := newProv()
 	escProvName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	url := fmt.Sprintf("%s/acme/%s/order/ordID",
+	u := fmt.Sprintf("%s/acme/%s/order/ordID",
 		baseURL.String(), escProvName)
 
 	type test struct {
@@ -1335,7 +1335,7 @@ func TestHandler_NewOrder(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.NewOrder(w, req)
@@ -1363,7 +1363,7 @@ func TestHandler_NewOrder(t *testing.T) {
 					tc.vr(t, ro)
 				}
 
-				assert.Equals(t, res.Header["Location"], []string{url})
+				assert.Equals(t, res.Header["Location"], []string{u})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})
@@ -1406,7 +1406,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("ordID", o.ID)
-	url := fmt.Sprintf("%s/acme/%s/order/%s",
+	u := fmt.Sprintf("%s/acme/%s/order/%s",
 		baseURL.String(), escProvName, o.ID)
 
 	_csr, err := pemutil.Read("../../authority/testdata/certs/foo.csr")
@@ -1625,7 +1625,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db}
-			req := httptest.NewRequest("GET", url, nil)
+			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.FinalizeOrder(w, req)
@@ -1654,7 +1654,7 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(body, ro))
 
 				assert.Equals(t, bytes.TrimSpace(body), expB)
-				assert.Equals(t, res.Header["Location"], []string{url})
+				assert.Equals(t, res.Header["Location"], []string{u})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})

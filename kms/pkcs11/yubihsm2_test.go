@@ -1,3 +1,4 @@
+//go:build cgo && yubihsm2
 // +build cgo,yubihsm2
 
 package pkcs11

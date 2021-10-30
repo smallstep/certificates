@@ -55,8 +55,8 @@ type subProv struct {
 	provisioner string
 }
 
-func newSubProv(subject, provisioner string) subProv {
-	return subProv{subject, provisioner}
+func newSubProv(subject, prov string) subProv {
+	return subProv{subject, prov}
 }
 
 // LoadBySubProv a admin by the subject and provisioner name.
