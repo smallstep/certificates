@@ -50,7 +50,7 @@ type Authority interface {
 	GetRoots() ([]*x509.Certificate, error)
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
-	GenerateCertificateRevocationList(force bool) (string, error)
+	GenerateCertificateRevocationList(force bool) ([]byte, error)
 }
 
 // TimeDuration is an alias of provisioner.TimeDuration
