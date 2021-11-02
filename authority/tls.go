@@ -509,7 +509,7 @@ func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateIn
 	return a.db.Revoke(rci)
 }
 
-// GenerateCertificateRevocationList returns a PEM representation of a signed CRL.
+// GenerateCertificateRevocationList returns a DER representation of a signed CRL.
 // It will look for a valid generated CRL in the database, check if it has expired, and generate
 // a new CRL on demand if it has expired (or a CRL does not already exist).
 //
@@ -578,7 +578,7 @@ func (a *Authority) GenerateCertificateRevocationList(force bool) ([]byte, error
 	}
 
 	// Create a new db.CertificateRevocationListInfo, which stores the new Number we just generated, the
-	// expiry time, and the byte-encoded CRL - then store it in the DB
+	// expiry time, and the DER-encoded CRL - then store it in the DB
 	newCRLInfo := db.CertificateRevocationListInfo{
 		Number:    n,
 		ExpiresAt: revocationList.NextUpdate,
@@ -590,7 +590,7 @@ func (a *Authority) GenerateCertificateRevocationList(force bool) ([]byte, error
 		return nil, err
 	}
 
-	// Finally, return our CRL PEM
+	// Finally, return our CRL in DER
 	return certificateRevocationList, nil
 }
 
