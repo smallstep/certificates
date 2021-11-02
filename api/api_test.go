@@ -580,6 +580,10 @@ type mockAuthority struct {
 	version                      func() authority.Version
 }
 
+func (m *mockAuthority) GenerateCertificateRevocationList(force bool) ([]byte, error) {
+	panic("implement me")
+}
+
 // TODO: remove once Authorize is deprecated.
 func (m *mockAuthority) Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 	return m.AuthorizeSign(ott)

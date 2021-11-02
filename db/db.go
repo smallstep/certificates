@@ -113,12 +113,12 @@ type RevokedCertificateInfo struct {
 	MTLS          bool
 }
 
-// CertificateRevocationListInfo contains a CRL in PEM and associated metadata to allow a decision on whether
-// to regenerate the CRL or not easier
+// CertificateRevocationListInfo contains a CRL in DER format and associated
+// metadata to allow a decision on whether to regenerate the CRL or not easier
 type CertificateRevocationListInfo struct {
 	Number    int64
 	ExpiresAt time.Time
-	PEM       string
+	DER       []byte
 }
 
 // IsRevoked returns whether or not a certificate with the given identifier
@@ -376,6 +376,18 @@ type MockAuthDB struct {
 	MStoreSSHCertificate  func(crt *ssh.Certificate) error
 	MGetSSHHostPrincipals func() ([]string, error)
 	MShutdown             func() error
+}
+
+func (m *MockAuthDB) GetRevokedCertificates() (*[]RevokedCertificateInfo, error) {
+	panic("implement me")
+}
+
+func (m *MockAuthDB) GetCRL() (*CertificateRevocationListInfo, error) {
+	panic("implement me")
+}
+
+func (m *MockAuthDB) StoreCRL(info *CertificateRevocationListInfo) error {
+	panic("implement me")
 }
 
 // IsRevoked mock.

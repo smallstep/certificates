@@ -9,7 +9,6 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
-	"fmt"
 	"math/big"
 	"net/http"
 	"time"
@@ -469,24 +468,24 @@ func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateIn
 // a new CRL on demand if it has expired (or a CRL does not already exist).
 //
 // force set to true will force regeneration of the CRL regardless of whether it has actually expired
-func (a *Authority) GenerateCertificateRevocationList(force bool) (string, error) {
+func (a *Authority) GenerateCertificateRevocationList(force bool) ([]byte, error) {
 
 	// check for an existing CRL in the database, and return that if its valid
 	crlInfo, err := a.db.GetCRL()
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if !force && crlInfo != nil && crlInfo.ExpiresAt.After(time.Now().UTC()) {
-		return crlInfo.PEM, nil
+		return crlInfo.DER, nil
 	}
 
 	// some CAS may not implement the CRLGenerator interface, so check before we proceed
 	caCRLGenerator, ok := a.x509CAService.(casapi.CertificateAuthorityCRLGenerator)
 
 	if !ok {
-		return "", errors.Errorf("CRL Generator not implemented")
+		return nil, errors.Errorf("CRL Generator not implemented")
 	}
 
 	revokedList, err := a.db.GetRevokedCertificates()
@@ -529,28 +528,24 @@ func (a *Authority) GenerateCertificateRevocationList(force bool) (string, error
 
 	certificateRevocationList, err := caCRLGenerator.CreateCertificateRevocationList(&revocationList)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-
-	// Quick and dirty PEM encoding
-	// TODO: clean this up
-	pemCRL := fmt.Sprintf("-----BEGIN X509 CRL-----\n%s\n-----END X509 CRL-----\n", base64.StdEncoding.EncodeToString(certificateRevocationList))
 
 	// Create a new db.CertificateRevocationListInfo, which stores the new Number we just generated, the
 	// expiry time, and the byte-encoded CRL - then store it in the DB
 	newCRLInfo := db.CertificateRevocationListInfo{
 		Number:    n,
 		ExpiresAt: revocationList.NextUpdate,
-		PEM:       pemCRL,
+		DER:       certificateRevocationList,
 	}
 
 	err = a.db.StoreCRL(&newCRLInfo)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Finally, return our CRL PEM
-	return pemCRL, nil
+	return certificateRevocationList, nil
 }
 
 // GetTLSCertificate creates a new leaf certificate to be used by the CA HTTPS server.
