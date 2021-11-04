@@ -64,6 +64,7 @@ type Config struct {
 	TLS              *TLSOptions          `json:"tls,omitempty"`
 	Password         string               `json:"password,omitempty"`
 	Templates        *templates.Templates `json:"templates,omitempty"`
+	CRL              *CRLConfig           `json:"crl,omitempty"`
 }
 
 // ASN1DN contains ASN1.DN attributes that are used in Subject and Issuer
@@ -93,6 +94,12 @@ type AuthConfig struct {
 	DisableIssuedAtCheck bool                  `json:"disableIssuedAtCheck,omitempty"`
 	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
 	EnableAdmin          bool                  `json:"enableAdmin,omitempty"`
+}
+
+// CRLConfig represents config options for CRL generation
+type CRLConfig struct {
+	Generate      bool                  `json:"generate,omitempty"`
+	CacheDuration *provisioner.Duration `json:"cacheDuration,omitempty"`
 }
 
 // init initializes the required fields in the AuthConfig if they are not
