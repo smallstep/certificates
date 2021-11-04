@@ -130,15 +130,15 @@ func (c *SoftCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1
 	}, nil
 }
 
-// CreateCertificateRevocationList will create a new CRL based on the RevocationList passed to it
-func (c *SoftCAS) CreateCertificateRevocationList(crl *x509.RevocationList) ([]byte, error) {
+// CreateCRL will create a new CRL based on the RevocationList passed to it
+func (c *SoftCAS) CreateCRL(req *apiv1.CreateCRLRequest) (*apiv1.CreateCRLResponse, error) {
 
-	revocationList, err := x509.CreateRevocationList(rand.Reader, crl, c.CertificateChain[0], c.Signer)
+	revocationListBytes, err := x509.CreateRevocationList(rand.Reader, req.RevocationList, c.CertificateChain[0], c.Signer)
 	if err != nil {
 		return nil, err
 	}
 
-	return revocationList, nil
+	return &apiv1.CreateCRLResponse{CRL: revocationListBytes}, nil
 }
 
 // CreateCertificateAuthority creates a root or an intermediate certificate.

@@ -144,3 +144,13 @@ type CreateCertificateAuthorityResponse struct {
 	PrivateKey       crypto.PrivateKey
 	Signer           crypto.Signer
 }
+
+// CreateCRLRequest is the request to create a Certificate Revocation List.
+type CreateCRLRequest struct {
+	RevocationList *x509.RevocationList
+}
+
+// CreateCRLResponse is the response to a Certificate Revocation List request.
+type CreateCRLResponse struct {
+	CRL []byte //the CRL in DER format
+}

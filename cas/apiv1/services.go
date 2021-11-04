@@ -17,7 +17,7 @@ type CertificateAuthorityService interface {
 // CertificateAuthorityCRLGenerator is an optional interface implemented by CertificateAuthorityService
 // that has a method to create a CRL
 type CertificateAuthorityCRLGenerator interface {
-	CreateCertificateRevocationList(crl *x509.RevocationList) ([]byte, error)
+	CreateCRL(req *CreateCRLRequest) (*CreateCRLResponse, error)
 }
 
 // CertificateAuthorityGetter is an interface implemented by a

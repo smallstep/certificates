@@ -51,9 +51,6 @@ type AuthDB interface {
 	IsSSHRevoked(sn string) (bool, error)
 	Revoke(rci *RevokedCertificateInfo) error
 	RevokeSSH(rci *RevokedCertificateInfo) error
-	GetRevokedCertificates() (*[]RevokedCertificateInfo, error)
-	GetCRL() (*CertificateRevocationListInfo, error)
-	StoreCRL(*CertificateRevocationListInfo) error
 	GetCertificate(serialNumber string) (*x509.Certificate, error)
 	StoreCertificate(crt *x509.Certificate) error
 	UseToken(id, tok string) (bool, error)
@@ -61,6 +58,13 @@ type AuthDB interface {
 	StoreSSHCertificate(crt *ssh.Certificate) error
 	GetSSHHostPrincipals() ([]string, error)
 	Shutdown() error
+}
+
+// CertificateRevocationListDB is an interface to indicate whether the DB supports CRL generation
+type CertificateRevocationListDB interface {
+	GetRevokedCertificates() (*[]RevokedCertificateInfo, error)
+	GetCRL() (*CertificateRevocationListInfo, error)
+	StoreCRL(*CertificateRevocationListInfo) error
 }
 
 // DB is a wrapper over the nosql.DB interface.
@@ -109,6 +113,7 @@ type RevokedCertificateInfo struct {
 	ReasonCode    int
 	Reason        string
 	RevokedAt     time.Time
+	ExpiresAt     time.Time
 	TokenID       string
 	MTLS          bool
 	ACME          bool
@@ -216,7 +221,22 @@ func (db *DB) GetRevokedCertificates() (*[]RevokedCertificateInfo, error) {
 		if err := json.Unmarshal(e.Value, &data); err != nil {
 			return nil, err
 		}
-		revokedCerts = append(revokedCerts, data)
+
+		if !data.ExpiresAt.IsZero() && data.ExpiresAt.After(time.Now().UTC()) {
+			revokedCerts = append(revokedCerts, data)
+		} else if data.ExpiresAt.IsZero() {
+			cert, err := db.GetCertificate(data.Serial)
+			if err != nil {
+				revokedCerts = append(revokedCerts, data) // a revoked certificate may not be in the database,
+				// so its expiry date is undiscoverable and will need
+				// to be added to the crl always
+				continue
+			}
+
+			if cert.NotAfter.After(time.Now().UTC()) {
+				revokedCerts = append(revokedCerts, data)
+			}
+		}
 
 	}
 	return &revokedCerts, nil
