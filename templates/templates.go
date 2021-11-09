@@ -20,6 +20,8 @@ type TemplateType string
 const (
 	// Snippet will mark a template as a part of a file.
 	Snippet TemplateType = "snippet"
+	// FullSnippet will mark a template that includes header and footer as a part of a file.
+	FullSnippet TemplateType = "fullSnippet"
 	// File will mark a templates as a full file.
 	File TemplateType = "file"
 	// Directory will mark a template as a directory.
@@ -99,7 +101,7 @@ func (t *SSHTemplates) Validate() (err error) {
 	return
 }
 
-// Template represents on template file.
+// Template represents a template file.
 type Template struct {
 	*template.Template
 	Name         string       `json:"name"`
@@ -118,8 +120,8 @@ func (t *Template) Validate() error {
 		return nil
 	case t.Name == "":
 		return errors.New("template name cannot be empty")
-	case t.Type != Snippet && t.Type != File && t.Type != Directory:
-		return errors.Errorf("invalid template type %s, it must be %s, %s, or %s", t.Type, Snippet, File, Directory)
+	case t.Type != Snippet && t.Type != File && t.Type != Directory && t.Type != FullSnippet:
+		return errors.Errorf("invalid template type %s, it must be %s, %s, %s, or %s", t.Type, Snippet, FullSnippet, File, Directory)
 	case t.TemplatePath == "" && t.Type != Directory && len(t.Content) == 0:
 		return errors.New("template template cannot be empty")
 	case t.TemplatePath != "" && t.Type == Directory:
@@ -257,11 +259,17 @@ func (o *Output) Write() error {
 		return err
 	}
 
-	if o.Type == File {
+	switch o.Type {
+	case File:
 		return fileutil.WriteFile(path, o.Content, 0600)
+	case Snippet:
+		return fileutil.WriteSnippet(path, o.Content, 0600)
+	case FullSnippet:
+		lines := strings.Split(string(o.Content), "\n")
+		return fileutil.WriteFullSnippet(path, o.Content, lines[0], lines[len(lines)-1], 0600)
+	default:
+		return errors.Errorf("unexpected output template type %s", string(o.Type))
 	}
-
-	return fileutil.WriteSnippet(path, o.Content, 0600)
 }
 
 func mkdir(path string, perm os.FileMode) error {
