@@ -29,10 +29,10 @@ var DefaultSSHTemplates = SSHTemplates{
 			Comment:      "#",
 		},
 		{
-			Name:         "include.tpl",
+			Name:         "includes.tpl",
 			Type:         Line,
-			TemplatePath: "templates/ssh/include.tpl",
-			Path:         "~/.ssh/include",
+			TemplatePath: "templates/ssh/includes.tpl",
+			Path:         "${STEPPATH}/ssh/includes",
 			Comment:      "#",
 		},
 		{
@@ -77,22 +77,22 @@ var DefaultSSHTemplateData = map[string]string{
 	"base_config.tpl": `Host *
 {{- if or .User.GOOS "none" | eq "windows" }}
 {{- if .User.Authority }}
-	Include "{{ .User.Home | replace "\\" "/" | trimPrefix "C:" }}/.ssh/include"
+	Include "{{ .User.StepBasePath | replace "\\" "/" | trimPrefix "C:" }}/ssh/includes"
 {{- else }}
 	Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config"
 {{- end }}
 {{- else }}
 {{- if .User.Authority }}
-	Include "{{.User.Home}}/.ssh/include"
+	Include "{{.User.StepBasePath}}/ssh/includes"
 {{- else }}
 	Include "{{.User.StepPath}}/ssh/config"
 {{- end }}
 {{- end }}`,
 
-	// include.tpl adds the step ssh config file.
+	// includes.tpl adds the step ssh config file.
 	//
 	// Note: on windows `Include C:\...` is treated as a relative path.
-	"include.tpl": `{{- if or .User.GOOS "none" | eq "windows" }}Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config"{{- else }}Include "{{.User.StepPath}}/ssh/config"{{- end }}`,
+	"includes.tpl": `{{- if or .User.GOOS "none" | eq "windows" }}Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config"{{- else }}Include "{{.User.StepPath}}/ssh/config"{{- end }}`,
 
 	// config.tpl is the step ssh config file, it includes the Match rule and
 	// references the step known_hosts file.

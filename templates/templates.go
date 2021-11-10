@@ -249,6 +249,9 @@ type Output struct {
 
 // Write writes the Output to the filesystem as a directory, file or snippet.
 func (o *Output) Write() error {
+	// Replace ${STEPPATH} with the base step path.
+	o.Path = strings.Replace(o.Path, "${STEPPATH}", step.BasePath(), -1)
+
 	path := step.Abs(o.Path)
 	if o.Type == Directory {
 		return mkdir(path, 0700)
