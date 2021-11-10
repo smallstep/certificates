@@ -20,8 +20,8 @@ type TemplateType string
 const (
 	// Snippet will mark a template as a part of a file.
 	Snippet TemplateType = "snippet"
-	// Fragment will mark a template that includes header and footer as a part of a file.
-	Fragment TemplateType = "fragment"
+	// Line is a template for a single line in a file.
+	Line TemplateType = "line"
 	// File will mark a templates as a full file.
 	File TemplateType = "file"
 	// Directory will mark a template as a directory.
@@ -120,8 +120,8 @@ func (t *Template) Validate() error {
 		return nil
 	case t.Name == "":
 		return errors.New("template name cannot be empty")
-	case t.Type != Snippet && t.Type != File && t.Type != Directory && t.Type != Fragment:
-		return errors.Errorf("invalid template type %s, it must be %s, %s, %s, or %s", t.Type, Snippet, Fragment, File, Directory)
+	case t.Type != Snippet && t.Type != File && t.Type != Directory && t.Type != Line:
+		return errors.Errorf("invalid template type %s, it must be %s, %s, %s, or %s", t.Type, Snippet, Line, File, Directory)
 	case t.TemplatePath == "" && t.Type != Directory && len(t.Content) == 0:
 		return errors.New("template template cannot be empty")
 	case t.TemplatePath != "" && t.Type == Directory:
@@ -264,9 +264,8 @@ func (o *Output) Write() error {
 		return fileutil.WriteFile(path, o.Content, 0600)
 	case Snippet:
 		return fileutil.WriteSnippet(path, o.Content, 0600)
-	case Fragment:
-		lines := strings.Split(string(o.Content), "\n")
-		return fileutil.WriteFragment(path, o.Content, lines[0], lines[len(lines)-1], 0600)
+	case Line:
+		return fileutil.WriteLine(path, o.Content, 0600)
 	default:
 		return errors.Errorf("unexpected output template type %s", string(o.Type))
 	}
