@@ -23,7 +23,7 @@ var DefaultSSHTemplates = SSHTemplates{
 	User: []Template{
 		{
 			Name:         "include.tpl",
-			Type:         FullSnippet,
+			Type:         Fragment,
 			TemplatePath: "templates/ssh/include.tpl",
 			Path:         "~/.ssh/config",
 			Comment:      "#",
