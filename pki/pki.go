@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -97,12 +96,6 @@ func GetDBPath() string {
 // based on the STEPPATH environment variable.
 func GetConfigPath() string {
 	return filepath.Join(step.Path(), configPath)
-}
-
-// GetProfileConfigPath returns the directory where the profile configuration
-// files are stored based on the STEPPATH environment variable.
-func GetProfileConfigPath() string {
-	return filepath.Join(step.ProfilePath(), configPath)
 }
 
 // GetPublicPath returns the directory where the public keys are stored based on
@@ -375,18 +368,6 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 		}
 	}
 
-	// Create profile directory and stub for default profile configuration.
-	if currentCtx := step.Contexts().GetCurrent(); currentCtx != nil {
-		profile := GetProfileConfigPath()
-		if err := os.MkdirAll(profile, 0700); err != nil {
-			return nil, errs.FileError(err, profile)
-		}
-		if err := ioutil.WriteFile(step.ProfileDefaultsFile(),
-			[]byte("{}"), 0600); err != nil {
-			return nil, err
-		}
-	}
-
 	if p.Defaults.CaUrl == "" {
 		p.Defaults.CaUrl = p.DnsNames[0]
 		_, port, err := net.SplitHostPort(p.Address)
@@ -435,6 +416,10 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	if p.defaults, err = getPath(cfg, "defaults.json"); err != nil {
 		return nil, err
 	}
+	if c := step.Contexts().GetCurrent(); c != nil {
+		p.profileDefaults = c.ProfileDefaultsFile()
+	}
+
 	if p.config, err = getPath(cfg, "ca.json"); err != nil {
 		return nil, err
 	}
@@ -964,6 +949,11 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 		if err = fileutil.WriteFile(p.defaults, b, 0644); err != nil {
 			return errs.FileError(err, p.defaults)
 		}
+		if p.profileDefaults != "" {
+			if err = fileutil.WriteFile(p.profileDefaults, []byte("{}"), 0644); err != nil {
+				return errs.FileError(err, p.profileDefaults)
+			}
+		}
 
 		// Generate and write templates
 		if err := generateTemplates(cfg.Templates); err != nil {
@@ -979,7 +969,7 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 
 		ui.PrintSelected("Default configuration", p.defaults)
 		if p.profileDefaults != "" {
-			ui.PrintSelected("Profile default configuration", p.profileDefaults)
+			ui.PrintSelected("Default profile configuration", p.profileDefaults)
 		}
 		ui.PrintSelected("Certificate Authority configuration", p.config)
 		if p.options.deploymentType != LinkedDeployment {
