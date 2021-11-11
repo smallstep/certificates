@@ -268,7 +268,7 @@ func (o *Output) Write() error {
 	case Snippet:
 		return fileutil.WriteSnippet(path, o.Content, 0600)
 	case Line:
-		return fileutil.WriteLine(path, o.Content, 0600)
+		return fileutil.PrependLine(path, o.Content, 0600)
 	default:
 		return errors.Errorf("unexpected output template type %s", string(o.Type))
 	}
