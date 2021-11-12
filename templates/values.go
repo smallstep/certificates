@@ -98,7 +98,7 @@ var DefaultSSHTemplateData = map[string]string{
 	// references the step known_hosts file.
 	//
 	// Note: on windows ProxyCommand requires the full path
-	"step_config.tpl": `Match exec "step ssh{{- if .User.Context }} --context {{ .User.Context }}{{- end }} check-host %h"
+	"step_config.tpl": `Match exec "step ssh check-host{{- if .User.Context }} --context {{ .User.Context }}{{- end }} %h"
 {{- if .User.User }}
 	User {{.User.User}}
 {{- end }}
