@@ -378,6 +378,9 @@ func (h *Handler) extractOrLookupJWK(next nextHTTP) nextHTTP {
 
 // canExtractJWKFrom checks if the JWS has a JWK that can be extracted
 func canExtractJWKFrom(jws *jose.JSONWebSignature) bool {
+	if jws == nil {
+		return false
+	}
 	if len(jws.Signatures) == 0 {
 		return false
 	}
