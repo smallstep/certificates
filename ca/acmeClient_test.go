@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -317,7 +317,7 @@ func TestACMEClient_post(t *testing.T) {
 				}
 
 				// validate jws request protected headers and body
-				body, err := ioutil.ReadAll(req.Body)
+				body, err := io.ReadAll(req.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -455,7 +455,7 @@ func TestACMEClient_NewOrder(t *testing.T) {
 				}
 
 				// validate jws request protected headers and body
-				body, err := ioutil.ReadAll(req.Body)
+				body, err := io.ReadAll(req.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -575,7 +575,7 @@ func TestACMEClient_GetOrder(t *testing.T) {
 				}
 
 				// validate jws request protected headers and body
-				body, err := ioutil.ReadAll(req.Body)
+				body, err := io.ReadAll(req.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -695,7 +695,7 @@ func TestACMEClient_GetAuthz(t *testing.T) {
 				}
 
 				// validate jws request protected headers and body
-				body, err := ioutil.ReadAll(req.Body)
+				body, err := io.ReadAll(req.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -815,7 +815,7 @@ func TestACMEClient_GetChallenge(t *testing.T) {
 				}
 
 				// validate jws request protected headers and body
-				body, err := ioutil.ReadAll(req.Body)
+				body, err := io.ReadAll(req.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -936,7 +936,7 @@ func TestACMEClient_ValidateChallenge(t *testing.T) {
 				}
 
 				// validate jws request protected headers and body
-				body, err := ioutil.ReadAll(req.Body)
+				body, err := io.ReadAll(req.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -1061,7 +1061,7 @@ func TestACMEClient_FinalizeOrder(t *testing.T) {
 				}
 
 				// validate jws request protected headers and body
-				body, err := ioutil.ReadAll(req.Body)
+				body, err := io.ReadAll(req.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -1188,7 +1188,7 @@ func TestACMEClient_GetAccountOrders(t *testing.T) {
 				}
 
 				// validate jws request protected headers and body
-				body, err := ioutil.ReadAll(req.Body)
+				body, err := io.ReadAll(req.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -1317,7 +1317,7 @@ func TestACMEClient_GetCertificate(t *testing.T) {
 				}
 
 				// validate jws request protected headers and body
-				body, err := ioutil.ReadAll(req.Body)
+				body, err := io.ReadAll(req.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)

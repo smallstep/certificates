@@ -9,9 +9,10 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -165,7 +166,7 @@ func newAWSConfig(certPath string) (*awsConfig, error) {
 	if certPath == "" {
 		certBytes = []byte(awsCertificate)
 	} else {
-		if b, err := ioutil.ReadFile(certPath); err == nil {
+		if b, err := os.ReadFile(certPath); err == nil {
 			certBytes = b
 		} else {
 			return nil, errors.Wrapf(err, "error reading %s", certPath)
@@ -569,7 +570,7 @@ func (p *AWS) readURLv2(url string) (*http.Response, error) {
 	client := http.Client{}
 
 	// first get the token
-	req, err := http.NewRequest(http.MethodPut, p.config.tokenURL, nil)
+	req, err := http.NewRequest(http.MethodPut, p.config.tokenURL, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -582,7 +583,7 @@ func (p *AWS) readURLv2(url string) (*http.Response, error) {
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("Request for API token returned non-successful status code %d", resp.StatusCode)
 	}
-	token, err := ioutil.ReadAll(resp.Body)
+	token, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +603,7 @@ func (p *AWS) readURLv2(url string) (*http.Response, error) {
 
 func (p *AWS) readResponseBody(resp *http.Response) ([]byte, error) {
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

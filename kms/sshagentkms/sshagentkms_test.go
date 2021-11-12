@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -202,7 +201,7 @@ func TestNew(t *testing.T) {
 	})
 
 	// Load ssh test fixtures
-	b, err := ioutil.ReadFile("testdata/ssh")
+	b, err := os.ReadFile("testdata/ssh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +289,7 @@ func TestSSHAgentKMS_CreateSigner(t *testing.T) {
 	}
 
 	// Read and decode file using standard packages
-	b, err := ioutil.ReadFile("testdata/priv.pem")
+	b, err := os.ReadFile("testdata/priv.pem")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,7 +314,7 @@ func TestSSHAgentKMS_CreateSigner(t *testing.T) {
 	})
 
 	// Load ssh test fixtures
-	sshPubKeyStr, err := ioutil.ReadFile("testdata/ssh.pub")
+	sshPubKeyStr, err := os.ReadFile("testdata/ssh.pub")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +322,7 @@ func TestSSHAgentKMS_CreateSigner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err = ioutil.ReadFile("testdata/ssh")
+	b, err = os.ReadFile("testdata/ssh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -499,7 +498,7 @@ func TestSSHAgentKMS_CreateKey(t *testing.T) {
 */
 
 func TestSSHAgentKMS_GetPublicKey(t *testing.T) {
-	b, err := ioutil.ReadFile("testdata/pub.pem")
+	b, err := os.ReadFile("testdata/pub.pem")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -510,7 +509,7 @@ func TestSSHAgentKMS_GetPublicKey(t *testing.T) {
 	}
 
 	// Load ssh test fixtures
-	b, err = ioutil.ReadFile("testdata/ssh.pub")
+	b, err = os.ReadFile("testdata/ssh.pub")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -518,7 +517,7 @@ func TestSSHAgentKMS_GetPublicKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err = ioutil.ReadFile("testdata/ssh")
+	b, err = os.ReadFile("testdata/ssh")
 	if err != nil {
 		t.Fatal(err)
 	}

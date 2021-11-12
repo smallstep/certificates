@@ -7,7 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -183,7 +183,7 @@ func (p *GCP) GetIdentityToken(subject, caURL string) (string, error) {
 		return "", errors.Wrap(err, "error doing identity request, are you in a GCP VM?")
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errors.Wrap(err, "error on identity request")
 	}

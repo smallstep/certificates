@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/admin"
@@ -524,7 +524,7 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 			x509Template.Template = []byte(p.SSH.Template)
 		} else if p.X509.TemplateFile != "" {
 			filename := step.StepAbs(p.X509.TemplateFile)
-			if x509Template.Template, err = ioutil.ReadFile(filename); err != nil {
+			if x509Template.Template, err = os.ReadFile(filename); err != nil {
 				return nil, nil, errors.Wrap(err, "error reading x509 template")
 			}
 		}
@@ -540,7 +540,7 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 			sshTemplate.Template = []byte(p.SSH.Template)
 		} else if p.SSH.TemplateFile != "" {
 			filename := step.StepAbs(p.SSH.TemplateFile)
-			if sshTemplate.Template, err = ioutil.ReadFile(filename); err != nil {
+			if sshTemplate.Template, err = os.ReadFile(filename); err != nil {
 				return nil, nil, errors.Wrap(err, "error reading ssh template")
 			}
 		}

@@ -2,7 +2,6 @@ package templates
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,7 +166,7 @@ func (t *Template) Load() error {
 		switch {
 		case t.TemplatePath != "":
 			filename := config.StepAbs(t.TemplatePath)
-			b, err := ioutil.ReadFile(filename)
+			b, err := os.ReadFile(filename)
 			if err != nil {
 				return errors.Wrapf(err, "error reading %s", filename)
 			}

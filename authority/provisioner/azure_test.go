@@ -107,7 +107,7 @@ func TestAzure_GetIdentityToken(t *testing.T) {
 			w.Write([]byte(t1))
 		default:
 			w.Header().Add("Content-Type", "application/json")
-			w.Write([]byte(fmt.Sprintf(`{"access_token":"%s"}`, t1)))
+			fmt.Fprintf(w, `{"access_token":"%s"}`, t1)
 		}
 	}))
 	defer srv.Close()

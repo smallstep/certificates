@@ -294,15 +294,15 @@ ZEp7knvU2psWRw==
 					assert.Equals(t, leaf.NotBefore, now.Truncate(time.Second))
 					assert.Equals(t, leaf.NotAfter, leafExpiry.Truncate(time.Second))
 
-					assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
-						fmt.Sprintf("%v", &pkix.Name{
+					assert.Equals(t, leaf.Subject.String(),
+						pkix.Name{
 							Country:       []string{asn1dn.Country},
 							Organization:  []string{asn1dn.Organization},
 							Locality:      []string{asn1dn.Locality},
 							StreetAddress: []string{asn1dn.StreetAddress},
 							Province:      []string{asn1dn.Province},
 							CommonName:    asn1dn.CommonName,
-						}))
+						}.String())
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
 
 					assert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
@@ -641,10 +641,10 @@ func TestCARenew(t *testing.T) {
 					assert.Equals(t, leaf.NotBefore, now.Truncate(time.Second))
 					assert.Equals(t, leaf.NotAfter, leafExpiry.Truncate(time.Second))
 
-					assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
-						fmt.Sprintf("%v", &pkix.Name{
+					assert.Equals(t, leaf.Subject.String(),
+						pkix.Name{
 							CommonName: asn1dn.CommonName,
-						}))
+						}.String())
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
 
 					assert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)

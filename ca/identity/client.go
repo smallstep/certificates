@@ -5,9 +5,9 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 
 	"github.com/pkg/errors"
 )
@@ -27,7 +27,7 @@ func (c *Client) ResolveReference(ref *url.URL) *url.URL {
 // $STEPPATH/config/defaults.json and the identity defined in
 // $STEPPATH/config/identity.json
 func LoadClient() (*Client, error) {
-	b, err := ioutil.ReadFile(DefaultsFile)
+	b, err := os.ReadFile(DefaultsFile)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", DefaultsFile)
 	}
@@ -65,7 +65,7 @@ func LoadClient() (*Client, error) {
 	}
 
 	// RootCAs
-	b, err = ioutil.ReadFile(defaults.Root)
+	b, err = os.ReadFile(defaults.Root)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error loading %s", defaults.Root)
 	}
