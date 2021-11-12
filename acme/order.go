@@ -17,7 +17,9 @@ import (
 type IdentifierType string
 
 const (
-	IP  IdentifierType = "ip"
+	// IP is the ACME ip identifier type
+	IP IdentifierType = "ip"
+	// DNS is the ACME dns identifier type
 	DNS IdentifierType = "dns"
 )
 
