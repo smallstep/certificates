@@ -950,7 +950,11 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 			return errs.FileError(err, p.defaults)
 		}
 		if p.profileDefaults != "" {
-			if err = fileutil.WriteFile(p.profileDefaults, []byte("{}"), 0644); err != nil {
+			if _, err := os.Stat(p.profileDefaults); os.IsNotExist(err) {
+				if err = fileutil.WriteFile(p.profileDefaults, []byte("{}"), 0644); err != nil {
+					return errs.FileError(err, p.profileDefaults)
+				}
+			} else if err != nil {
 				return errs.FileError(err, p.profileDefaults)
 			}
 		}

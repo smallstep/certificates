@@ -22,23 +22,23 @@ type StepSSH struct {
 var DefaultSSHTemplates = SSHTemplates{
 	User: []Template{
 		{
-			Name:         "base_config.tpl",
+			Name:         "config.tpl",
 			Type:         Snippet,
-			TemplatePath: "templates/ssh/base_config.tpl",
+			TemplatePath: "templates/ssh/config.tpl",
 			Path:         "~/.ssh/config",
 			Comment:      "#",
 		},
 		{
-			Name:         "includes.tpl",
-			Type:         Line,
-			TemplatePath: "templates/ssh/includes.tpl",
+			Name:         "step_includes.tpl",
+			Type:         PrependLine,
+			TemplatePath: "templates/ssh/step_includes.tpl",
 			Path:         "${STEPPATH}/ssh/includes",
 			Comment:      "#",
 		},
 		{
-			Name:         "config.tpl",
+			Name:         "step_config.tpl",
 			Type:         File,
-			TemplatePath: "templates/ssh/config.tpl",
+			TemplatePath: "templates/ssh/step_config.tpl",
 			Path:         "ssh/config",
 			Comment:      "#",
 		},
@@ -76,16 +76,16 @@ var DefaultSSHTemplateData = map[string]string{
 	// Note: on windows `Include C:\...` is treated as a relative path.
 	"base_config.tpl": `Host *
 {{- if or .User.GOOS "none" | eq "windows" }}
-{{- if .User.Authority }}
+{{- if .User.StepBasePath }}
 	Include "{{ .User.StepBasePath | replace "\\" "/" | trimPrefix "C:" }}/ssh/includes"
 {{- else }}
-	Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config"
+	Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/includes"
 {{- end }}
 {{- else }}
-{{- if .User.Authority }}
+{{- if .User.StepBasePath }}
 	Include "{{.User.StepBasePath}}/ssh/includes"
 {{- else }}
-	Include "{{.User.StepPath}}/ssh/config"
+	Include "{{.User.StepPath}}/ssh/includes"
 {{- end }}
 {{- end }}`,
 

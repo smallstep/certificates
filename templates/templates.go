@@ -20,8 +20,9 @@ type TemplateType string
 const (
 	// Snippet will mark a template as a part of a file.
 	Snippet TemplateType = "snippet"
-	// Line is a template for a single line in a file.
-	Line TemplateType = "line"
+	// PrependLine is a template for prepending a single line to a file. If the
+	// line already exists in the file it will be removed first.
+	PrependLine TemplateType = "prepend-line"
 	// File will mark a templates as a full file.
 	File TemplateType = "file"
 	// Directory will mark a template as a directory.
@@ -120,8 +121,8 @@ func (t *Template) Validate() error {
 		return nil
 	case t.Name == "":
 		return errors.New("template name cannot be empty")
-	case t.Type != Snippet && t.Type != File && t.Type != Directory && t.Type != Line:
-		return errors.Errorf("invalid template type %s, it must be %s, %s, %s, or %s", t.Type, Snippet, Line, File, Directory)
+	case t.Type != Snippet && t.Type != File && t.Type != Directory && t.Type != PrependLine:
+		return errors.Errorf("invalid template type %s, it must be %s, %s, %s, or %s", t.Type, Snippet, PrependLine, File, Directory)
 	case t.TemplatePath == "" && t.Type != Directory && len(t.Content) == 0:
 		return errors.New("template template cannot be empty")
 	case t.TemplatePath != "" && t.Type == Directory:
@@ -267,7 +268,7 @@ func (o *Output) Write() error {
 		return fileutil.WriteFile(path, o.Content, 0600)
 	case Snippet:
 		return fileutil.WriteSnippet(path, o.Content, 0600)
-	case Line:
+	case PrependLine:
 		return fileutil.PrependLine(path, o.Content, 0600)
 	default:
 		return errors.Errorf("unexpected output template type %s", string(o.Type))
