@@ -358,6 +358,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 	// Intermediate Certificate
 	var keyName string
 	var publicKey crypto.PublicKey
+	var intSigner crypto.Signer
 	if c.CrtKeyPath != "" {
 		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
@@ -376,6 +377,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 
 		publicKey = priv.Public()
+		intSigner = priv
 	} else {
 		resp, err := k.CreateKey(&apiv1.CreateKeyRequest{
 			Name:               c.CrtKeyObject,
@@ -387,47 +389,70 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 		publicKey = resp.PublicKey
 		keyName = resp.Name
-	}
 
-	template := &x509.Certificate{
-		IsCA:                  true,
-		NotBefore:             now,
-		NotAfter:              now.Add(time.Hour * 24 * 365 * 10),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		BasicConstraintsValid: true,
-		MaxPathLen:            0,
-		MaxPathLenZero:        true,
-		Issuer:                root.Subject,
-		Subject:               pkix.Name{CommonName: c.CrtSubject},
-		SerialNumber:          mustSerialNumber(),
-		SubjectKeyId:          mustSubjectKeyID(publicKey),
-	}
-
-	b, err := x509.CreateCertificate(rand.Reader, template, root, publicKey, signer)
-	if err != nil {
-		return err
-	}
-
-	intermediate, err := x509.ParseCertificate(b)
-	if err != nil {
-		return errors.Wrap(err, "error parsing intermediate certificate")
-	}
-
-	if cm, ok := k.(kms.CertificateManager); ok && !c.NoCerts {
-		if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
-			Name:        c.CrtObject,
-			Certificate: intermediate,
-			Extractable: c.Extractable,
-		}); err != nil {
+		intSigner, err = k.CreateSigner(&resp.CreateSignerRequest)
+		if err != nil {
 			return err
 		}
 	}
 
-	if err := fileutil.WriteFile(c.CrtPath, pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: b,
-	}), 0600); err != nil {
-		return err
+	if root != nil {
+		template := &x509.Certificate{
+			IsCA:                  true,
+			NotBefore:             now,
+			NotAfter:              now.Add(time.Hour * 24 * 365 * 10),
+			KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+			BasicConstraintsValid: true,
+			MaxPathLen:            0,
+			MaxPathLenZero:        true,
+			Issuer:                root.Subject,
+			Subject:               pkix.Name{CommonName: c.CrtSubject},
+			SerialNumber:          mustSerialNumber(),
+			SubjectKeyId:          mustSubjectKeyID(publicKey),
+		}
+
+		b, err := x509.CreateCertificate(rand.Reader, template, root, publicKey, signer)
+		if err != nil {
+			return err
+		}
+
+		intermediate, err := x509.ParseCertificate(b)
+		if err != nil {
+			return errors.Wrap(err, "error parsing intermediate certificate")
+		}
+
+		if cm, ok := k.(kms.CertificateManager); ok && !c.NoCerts {
+			if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+				Name:        c.CrtObject,
+				Certificate: intermediate,
+				Extractable: c.Extractable,
+			}); err != nil {
+				return err
+			}
+		}
+
+		if err := fileutil.WriteFile(c.CrtPath, pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: b,
+		}), 0600); err != nil {
+			return err
+		}
+	} else { // No root available, generate CSR for external root.
+		csrTemplate := x509.CertificateRequest{
+			Subject:            pkix.Name{CommonName: c.CrtSubject},
+			SignatureAlgorithm: x509.ECDSAWithSHA256,
+		}
+		// step: generate the csr request
+		csrCertificate, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, intSigner)
+		if err != nil {
+			return err
+		}
+		if err := fileutil.WriteFile(c.CrtPath, pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE REQUEST",
+			Bytes: csrCertificate,
+		}), 0600); err != nil {
+			return err
+		}
 	}
 
 	if c.CrtKeyPath != "" {
