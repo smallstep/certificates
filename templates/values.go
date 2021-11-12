@@ -74,7 +74,7 @@ var DefaultSSHTemplateData = map[string]string{
 	// base_config.tpl adds the step ssh config file.
 	//
 	// Note: on windows `Include C:\...` is treated as a relative path.
-	"base_config.tpl": `Host *
+	"config.tpl": `Host *
 {{- if or .User.GOOS "none" | eq "windows" }}
 {{- if .User.StepBasePath }}
 	Include "{{ .User.StepBasePath | replace "\\" "/" | trimPrefix "C:" }}/ssh/includes"
@@ -92,13 +92,13 @@ var DefaultSSHTemplateData = map[string]string{
 	// includes.tpl adds the step ssh config file.
 	//
 	// Note: on windows `Include C:\...` is treated as a relative path.
-	"includes.tpl": `{{- if or .User.GOOS "none" | eq "windows" }}Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config"{{- else }}Include "{{.User.StepPath}}/ssh/config"{{- end }}`,
+	"step_includes.tpl": `{{- if or .User.GOOS "none" | eq "windows" }}Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config"{{- else }}Include "{{.User.StepPath}}/ssh/config"{{- end }}`,
 
 	// config.tpl is the step ssh config file, it includes the Match rule and
 	// references the step known_hosts file.
 	//
 	// Note: on windows ProxyCommand requires the full path
-	"config.tpl": `Match exec "step ssh{{- if .User.Context }} --context {{ .User.Context }}{{- end }} check-host %h"
+	"step_config.tpl": `Match exec "step ssh{{- if .User.Context }} --context {{ .User.Context }}{{- end }} check-host %h"
 {{- if .User.User }}
 	User {{.User.User}}
 {{- end }}

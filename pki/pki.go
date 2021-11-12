@@ -87,37 +87,43 @@ const (
 )
 
 // GetDBPath returns the path where the file-system persistence is stored
-// based on the STEPPATH environment variable.
+// based on the $(step path).
 func GetDBPath() string {
 	return filepath.Join(step.Path(), dbPath)
 }
 
 // GetConfigPath returns the directory where the configuration files are stored
-// based on the STEPPATH environment variable.
+// based on the $(step path).
 func GetConfigPath() string {
 	return filepath.Join(step.Path(), configPath)
 }
 
+// GetProfileConfigPath returns the directory where the profile configuration
+// files are stored based on the $(step path).
+func GetProfileConfigPath() string {
+	return filepath.Join(step.ProfilePath(), configPath)
+}
+
 // GetPublicPath returns the directory where the public keys are stored based on
-// the STEPPATH environment variable.
+// the $(step path).
 func GetPublicPath() string {
 	return filepath.Join(step.Path(), publicPath)
 }
 
 // GetSecretsPath returns the directory where the private keys are stored based
-// on the STEPPATH environment variable.
+// on the $(step path).
 func GetSecretsPath() string {
 	return filepath.Join(step.Path(), privatePath)
 }
 
 // GetRootCAPath returns the path where the root CA is stored based on the
-// STEPPATH environment variable.
+// $(step path).
 func GetRootCAPath() string {
 	return filepath.Join(step.Path(), publicPath, "root_ca.crt")
 }
 
 // GetOTTKeyPath returns the path where the one-time token key is stored based
-// on the STEPPATH environment variable.
+// on the $(step path).
 func GetOTTKeyPath() string {
 	return filepath.Join(step.Path(), privatePath, "ott_key")
 }
@@ -301,6 +307,7 @@ type PKI struct {
 
 // New creates a new PKI configuration.
 func New(o apiv1.Options, opts ...Option) (*PKI, error) {
+	currentCtx := step.Contexts().GetCurrent()
 	caService, err := cas.New(context.Background(), o)
 	if err != nil {
 		return nil, err
@@ -359,6 +366,9 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 		cfg = GetConfigPath()
 		// Create directories
 		dirs := []string{public, private, cfg, GetTemplatesPath()}
+		if currentCtx != nil {
+			dirs = append(dirs, GetProfileConfigPath())
+		}
 		for _, name := range dirs {
 			if _, err := os.Stat(name); os.IsNotExist(err) {
 				if err = os.MkdirAll(name, 0700); err != nil {
@@ -416,8 +426,8 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	if p.defaults, err = getPath(cfg, "defaults.json"); err != nil {
 		return nil, err
 	}
-	if c := step.Contexts().GetCurrent(); c != nil {
-		p.profileDefaults = c.ProfileDefaultsFile()
+	if currentCtx != nil {
+		p.profileDefaults = currentCtx.ProfileDefaultsFile()
 	}
 
 	if p.config, err = getPath(cfg, "ca.json"); err != nil {
