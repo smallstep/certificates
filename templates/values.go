@@ -4,6 +4,10 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// SSHTemplateVersionKey is a key that can be submitted by a client to select
+// the template version that will be returned by the server.
+var SSHTemplateVersionKey = "StepSSHTemplateVersion"
+
 // Step represents the default variables available in the CA.
 type Step struct {
 	SSH StepSSH

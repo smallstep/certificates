@@ -103,7 +103,7 @@ func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[strin
 		}
 
 		// Backwards compatibility for version of the cli older than v0.18.0
-		if o.Name == "step_includes.tpl" && (data == nil || data["Version"] != "v2") {
+		if o.Name == "step_includes.tpl" && (data == nil || data[templates.SSHTemplateVersionKey] != "v2") {
 			o.Type = templates.File
 			o.Path = strings.TrimPrefix(o.Path, "${STEPPATH}/")
 		}
