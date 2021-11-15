@@ -959,9 +959,12 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 		if err = fileutil.WriteFile(p.defaults, b, 0644); err != nil {
 			return errs.FileError(err, p.defaults)
 		}
+		// If we're using contexts then write a blank object to the defualt profile
+		// configuration location.
 		if p.profileDefaults != "" {
 			if _, err := os.Stat(p.profileDefaults); os.IsNotExist(err) {
-				if err = fileutil.WriteFile(p.profileDefaults, []byte("{}"), 0644); err != nil {
+				// Write with 0600 to be consistent with directories structure.
+				if err = fileutil.WriteFile(p.profileDefaults, []byte("{}"), 0600); err != nil {
 					return errs.FileError(err, p.profileDefaults)
 				}
 			} else if err != nil {
