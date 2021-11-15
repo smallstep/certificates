@@ -102,10 +102,14 @@ func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[strin
 			return nil, err
 		}
 
-		// Backwards compatibility for version of the cli older than v0.18.0
-		if o.Name == "step_includes.tpl" && (data == nil || data[templates.SSHTemplateVersionKey] != "v2") {
-			o.Type = templates.File
-			o.Path = strings.TrimPrefix(o.Path, "${STEPPATH}/")
+		// Backwards compatibility for version of the cli older than v0.18.0.
+		// Before v0.18.0 we were not passing any value for SSHTemplateVersionKey
+		// from the cli.
+		if o.Name == "step_includes.tpl" {
+			if val, ok := data[templates.SSHTemplateVersionKey]; !ok || val == "" {
+				o.Type = templates.File
+				o.Path = strings.TrimPrefix(o.Path, "${STEPPATH}/")
+			}
 		}
 
 		output = append(output, o)

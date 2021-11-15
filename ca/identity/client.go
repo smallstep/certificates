@@ -10,7 +10,6 @@ import (
 	"net/url"
 
 	"github.com/pkg/errors"
-	"go.step.sm/cli-utils/step"
 )
 
 // Client wraps http.Client with a transport using the step root and identity.
@@ -28,7 +27,7 @@ func (c *Client) ResolveReference(ref *url.URL) *url.URL {
 // $STEPPATH/config/defaults.json and the identity defined in
 // $STEPPATH/config/identity.json
 func LoadClient() (*Client, error) {
-	defaultsFile := step.DefaultsFile()
+	defaultsFile := DefaultsFile()
 	b, err := ioutil.ReadFile(defaultsFile)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", defaultsFile)
@@ -54,7 +53,7 @@ func LoadClient() (*Client, error) {
 		return nil, err
 	}
 	if err := identity.Validate(); err != nil {
-		return nil, errors.Wrapf(err, "error validating %s", step.IdentityFile())
+		return nil, errors.Wrapf(err, "error validating %s", IdentityFile())
 	}
 	if kind := identity.Kind(); kind != MutualTLS {
 		return nil, errors.Errorf("unsupported identity %s: only mTLS is currently supported", kind)
