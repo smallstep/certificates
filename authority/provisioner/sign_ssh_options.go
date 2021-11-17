@@ -362,9 +362,9 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 
 	switch {
 	case dur < min:
-		return unauthorized("requested duration of %s is less than minimum accepted duration for selected provisioner of %s", dur, min)
+		return badRequest("requested duration of %s is less than minimum accepted duration for selected provisioner of %s", dur, min)
 	case dur > max+opts.Backdate:
-		return unauthorized("requested duration of %s is greater than maximum accepted duration for selected provisioner of %s", dur, max+opts.Backdate)
+		return badRequest("requested duration of %s is greater than maximum accepted duration for selected provisioner of %s", dur, max+opts.Backdate)
 	default:
 		return nil
 	}
