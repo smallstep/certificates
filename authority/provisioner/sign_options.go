@@ -8,12 +8,15 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/json"
+	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -369,6 +372,28 @@ func newValidityValidator(min, max time.Duration) *validityValidator {
 	return &validityValidator{min: min, max: max}
 }
 
+// TODO(mariano): refactor errs package to allow sending real errors to the
+// user.
+func badRequest(format string, args ...interface{}) error {
+	msg := fmt.Sprintf(format, args...)
+	return &errs.Error{
+		Status: http.StatusBadRequest,
+		Msg:    msg,
+		Err:    errors.New(msg),
+	}
+}
+
+// TODO(mariano): refactor errs package to allow sending real errors to the
+// user.
+func unauthorized(format string, args ...interface{}) error {
+	msg := fmt.Sprintf(format, args...)
+	return &errs.Error{
+		Status: http.StatusUnauthorized,
+		Msg:    msg,
+		Err:    errors.New(msg),
+	}
+}
+
 // Valid validates the certificate validity settings (notBefore/notAfter) and
 // and total duration.
 func (v *validityValidator) Valid(cert *x509.Certificate, o SignOptions) error {
@@ -381,22 +406,20 @@ func (v *validityValidator) Valid(cert *x509.Certificate, o SignOptions) error {
 	d := na.Sub(nb)
 
 	if na.Before(now) {
-		return errors.Errorf("notAfter cannot be in the past; na=%v", na)
+		return badRequest("notAfter cannot be in the past; na=%v", na)
 	}
 	if na.Before(nb) {
-		return errors.Errorf("notAfter cannot be before notBefore; na=%v, nb=%v", na, nb)
+		return badRequest("notAfter cannot be before notBefore; na=%v, nb=%v", na, nb)
 	}
 	if d < v.min {
-		return errors.Errorf("requested duration of %v is less than the authorized minimum certificate duration of %v",
-			d, v.min)
+		return unauthorized("requested duration of %v is less than the authorized minimum certificate duration of %v", d, v.min)
 	}
 	// NOTE: this check is not "technically correct". We're allowing the max
 	// duration of a cert to be "max + backdate" and not all certificates will
 	// be backdated (e.g. if a user passes the NotBefore value then we do not
 	// apply a backdate). This is good enough.
 	if d > v.max+o.Backdate {
-		return errors.Errorf("requested duration of %v is more than the authorized maximum certificate duration of %v",
-			d, v.max+o.Backdate)
+		return unauthorized("requested duration of %v is more than the authorized maximum certificate duration of %v", d, v.max+o.Backdate)
 	}
 	return nil
 }
