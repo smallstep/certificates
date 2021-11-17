@@ -384,7 +384,7 @@ func badRequest(format string, args ...interface{}) error {
 }
 
 // Valid validates the certificate validity settings (notBefore/notAfter) and
-// and total duration.
+// total duration.
 func (v *validityValidator) Valid(cert *x509.Certificate, o SignOptions) error {
 	var (
 		na  = cert.NotAfter.Truncate(time.Second)
