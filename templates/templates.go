@@ -2,7 +2,6 @@ package templates
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -170,7 +169,7 @@ func (t *Template) Load() error {
 		switch {
 		case t.TemplatePath != "":
 			filename := step.Abs(t.TemplatePath)
-			b, err := ioutil.ReadFile(filename)
+			b, err := os.ReadFile(filename)
 			if err != nil {
 				return errors.Wrapf(err, "error reading %s", filename)
 			}
@@ -251,7 +250,7 @@ type Output struct {
 // Write writes the Output to the filesystem as a directory, file or snippet.
 func (o *Output) Write() error {
 	// Replace ${STEPPATH} with the base step path.
-	o.Path = strings.Replace(o.Path, "${STEPPATH}", step.BasePath(), -1)
+	o.Path = strings.ReplaceAll(o.Path, "${STEPPATH}", step.BasePath())
 
 	path := step.Abs(o.Path)
 	if o.Type == Directory {

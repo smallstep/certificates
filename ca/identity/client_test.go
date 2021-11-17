@@ -3,10 +3,10 @@ package identity
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -46,7 +46,7 @@ func TestClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := ioutil.ReadFile("testdata/certs/root_ca.crt")
+	b, err := os.ReadFile("testdata/certs/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestLoadClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := ioutil.ReadFile("testdata/certs/root_ca.crt")
+	b, err := os.ReadFile("testdata/certs/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}

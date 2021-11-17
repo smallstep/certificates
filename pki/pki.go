@@ -959,7 +959,7 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 		if err = fileutil.WriteFile(p.defaults, b, 0644); err != nil {
 			return errs.FileError(err, p.defaults)
 		}
-		// If we're using contexts then write a blank object to the defualt profile
+		// If we're using contexts then write a blank object to the default profile
 		// configuration location.
 		if p.profileDefaults != "" {
 			if _, err := os.Stat(p.profileDefaults); os.IsNotExist(err) {

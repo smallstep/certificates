@@ -6,7 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -173,7 +173,7 @@ func (p *Azure) GetIdentityToken(subject, caURL string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errors.Wrap(err, "error reading identity token response")
 	}

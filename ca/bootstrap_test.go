@@ -3,7 +3,7 @@ package ca
 import (
 	"context"
 	"crypto/tls"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -382,7 +382,7 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 			return errors.Wrapf(err, "client.Get(%s) failed", srvURL)
 		}
 		defer resp.Body.Close()
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return errors.Wrap(err, "client.Get() error reading response")
 		}
@@ -499,7 +499,7 @@ func TestBootstrapClientServerFederation(t *testing.T) {
 			return errors.Wrapf(err, "client.Get(%s) failed", srvURL)
 		}
 		defer resp.Body.Close()
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return errors.Wrap(err, "client.Get() error reading response")
 		}
@@ -589,9 +589,9 @@ func TestBootstrapListener(t *testing.T) {
 				return
 			}
 			defer resp.Body.Close()
-			b, err := ioutil.ReadAll(resp.Body)
+			b, err := io.ReadAll(resp.Body)
 			if err != nil {
-				t.Errorf("ioutil.ReadAll() error = %v", err)
+				t.Errorf("io.ReadAll() error = %v", err)
 				return
 			}
 			if string(b) != "ok" {

@@ -538,15 +538,15 @@ ZYtQ9Ot36qc=
 					if tc.csr.Subject.CommonName == "" {
 						assert.Equals(t, leaf.Subject, pkix.Name{})
 					} else {
-						assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
-							fmt.Sprintf("%v", &pkix.Name{
+						assert.Equals(t, leaf.Subject.String(),
+							pkix.Name{
 								Country:       []string{tmplt.Country},
 								Organization:  []string{tmplt.Organization},
 								Locality:      []string{tmplt.Locality},
 								StreetAddress: []string{tmplt.StreetAddress},
 								Province:      []string{tmplt.Province},
 								CommonName:    "smallstep test",
-							}))
+							}.String())
 						assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
 					}
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
@@ -718,15 +718,15 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Minute)))
 
 					tmplt := a.config.AuthorityConfig.Template
-					assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
-						fmt.Sprintf("%v", &pkix.Name{
+					assert.Equals(t, leaf.Subject.String(),
+						pkix.Name{
 							Country:       []string{tmplt.Country},
 							Organization:  []string{tmplt.Organization},
 							Locality:      []string{tmplt.Locality},
 							StreetAddress: []string{tmplt.StreetAddress},
 							Province:      []string{tmplt.Province},
 							CommonName:    tmplt.CommonName,
-						}))
+						}.String())
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
 
 					assert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
@@ -925,15 +925,15 @@ func TestAuthority_Rekey(t *testing.T) {
 					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Minute)))
 
 					tmplt := a.config.AuthorityConfig.Template
-					assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
-						fmt.Sprintf("%v", &pkix.Name{
+					assert.Equals(t, leaf.Subject.String(),
+						pkix.Name{
 							Country:       []string{tmplt.Country},
 							Organization:  []string{tmplt.Organization},
 							Locality:      []string{tmplt.Locality},
 							StreetAddress: []string{tmplt.StreetAddress},
 							Province:      []string{tmplt.Province},
 							CommonName:    tmplt.CommonName,
-						}))
+						}.String())
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
 
 					assert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)

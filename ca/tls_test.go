@@ -8,7 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -221,7 +221,7 @@ func TestClient_GetServerTLSConfig_http(t *testing.T) {
 						return
 					}
 					defer resp.Body.Close()
-					b, err := ioutil.ReadAll(resp.Body)
+					b, err := io.ReadAll(resp.Body)
 					if err != nil {
 						t.Fatalf("ioutil.RealAdd() error = %v", err)
 					}
@@ -335,7 +335,7 @@ func TestClient_GetServerTLSConfig_renew(t *testing.T) {
 					}
 
 					defer resp.Body.Close()
-					b, err := ioutil.ReadAll(resp.Body)
+					b, err := io.ReadAll(resp.Body)
 					if err != nil {
 						t.Errorf("ioutil.RealAdd() error = %v", err)
 						return
@@ -374,9 +374,9 @@ func TestClient_GetServerTLSConfig_renew(t *testing.T) {
 					}
 
 					defer resp.Body.Close()
-					b, err := ioutil.ReadAll(resp.Body)
+					b, err := io.ReadAll(resp.Body)
 					if err != nil {
-						t.Errorf("ioutil.RealAdd() error = %v", err)
+						t.Errorf("io.ReadAll() error = %v", err)
 						return
 					}
 					if !bytes.Equal(b, []byte("ok")) {

@@ -15,7 +15,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -75,7 +74,7 @@ func (c *uaClient) SetTransport(tr http.RoundTripper) {
 }
 
 func (c *uaClient) Get(u string) (*http.Response, error) {
-	req, err := http.NewRequest("GET", u, nil)
+	req, err := http.NewRequest("GET", u, http.NoBody)
 	if err != nil {
 		return nil, errors.Wrapf(err, "new request GET %s failed", u)
 	}
@@ -361,7 +360,7 @@ func WithRetryFunc(fn RetryFunc) ClientOption {
 }
 
 func getTransportFromFile(filename string) (http.RoundTripper, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", filename)
 	}
@@ -1316,7 +1315,7 @@ func readJSON(r io.ReadCloser, v interface{}) error {
 
 func readProtoJSON(r io.ReadCloser, m proto.Message) error {
 	defer r.Close()
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}

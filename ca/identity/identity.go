@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -68,7 +67,7 @@ type Identity struct {
 
 // LoadIdentity loads an identity present in the given filename.
 func LoadIdentity(filename string) (*Identity, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", filename)
 	}
@@ -113,7 +112,7 @@ func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) er
 	if err := pem.Encode(buf, block); err != nil {
 		return errors.Wrap(err, "error encoding identity key")
 	}
-	if err := ioutil.WriteFile(keyFilename, buf.Bytes(), 0600); err != nil {
+	if err := os.WriteFile(keyFilename, buf.Bytes(), 0600); err != nil {
 		return errors.Wrap(err, "error writing identity certificate")
 	}
 
@@ -128,7 +127,7 @@ func WriteDefaultIdentity(certChain []api.Certificate, key crypto.PrivateKey) er
 	}); err != nil {
 		return errors.Wrap(err, "error writing identity json")
 	}
-	if err := ioutil.WriteFile(IdentityFile(), buf.Bytes(), 0600); err != nil {
+	if err := os.WriteFile(IdentityFile(), buf.Bytes(), 0600); err != nil {
 		return errors.Wrap(err, "error writing identity certificate")
 	}
 
@@ -154,7 +153,7 @@ func writeCertificate(filename string, certChain []api.Certificate) error {
 		}
 	}
 
-	if err := ioutil.WriteFile(filename, buf.Bytes(), 0600); err != nil {
+	if err := os.WriteFile(filename, buf.Bytes(), 0600); err != nil {
 		return errors.Wrap(err, "error writing certificate")
 	}
 
@@ -264,7 +263,7 @@ func (i *Identity) GetCertPool() (*x509.CertPool, error) {
 	if i.Root == "" {
 		return nil, nil
 	}
-	b, err := ioutil.ReadFile(i.Root)
+	b, err := os.ReadFile(i.Root)
 	if err != nil {
 		return nil, errors.Wrap(err, "error reading identity root")
 	}
@@ -321,7 +320,7 @@ func (i *Identity) Renew(client Renewer) error {
 			}
 		}
 		certFilename := filepath.Join(identityDir(), "identity.crt")
-		if err := ioutil.WriteFile(certFilename, buf.Bytes(), 0600); err != nil {
+		if err := os.WriteFile(certFilename, buf.Bytes(), 0600); err != nil {
 			return errors.Wrap(err, "error writing identity certificate")
 		}
 
