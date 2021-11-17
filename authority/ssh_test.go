@@ -501,6 +501,32 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 		{Name: "sshd_config.tpl", Type: templates.File, Comment: "#", Path: "/etc/ssh/sshd_config", Content: []byte("Match all\n\tTrustedUserCAKeys /etc/ssh/ca.pub\n\tHostCertificate /etc/ssh/ssh_host_ecdsa_key-cert.pub\n\tHostKey /etc/ssh/ssh_host_ecdsa_key")},
 	}
 
+	tmplConfigUserIncludes := &templates.Templates{
+		SSH: &templates.SSHTemplates{
+			User: []templates.Template{
+				{Name: "step_includes.tpl", Type: templates.PrependLine, TemplatePath: "./testdata/templates/step_includes.tpl", Path: "${STEPPATH}/ssh/includes", Comment: "#"},
+			},
+		},
+		Data: map[string]interface{}{
+			"Step": &templates.Step{
+				SSH: templates.StepSSH{
+					UserKey: user,
+					HostKey: host,
+				},
+			},
+		},
+	}
+
+	userOutputEmptyData := []templates.Output{
+		{Name: "step_includes.tpl", Type: templates.File, Comment: "#", Path: "ssh/includes", Content: []byte("Include \"<no value>/ssh/config\"\n")},
+	}
+	userOutputWithoutTemplateVersion := []templates.Output{
+		{Name: "step_includes.tpl", Type: templates.File, Comment: "#", Path: "ssh/includes", Content: []byte("Include \"/home/user/.step/ssh/config\"\n")},
+	}
+	userOutputWithTemplateVersion := []templates.Output{
+		{Name: "step_includes.tpl", Type: templates.PrependLine, Comment: "#", Path: "${STEPPATH}/ssh/includes", Content: []byte("Include \"/home/user/.step/ssh/config\"\n")},
+	}
+
 	tmplConfigErr := &templates.Templates{
 		SSH: &templates.SSHTemplates{
 			User: []templates.Template{
@@ -542,6 +568,9 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 		{"host", fields{tmplConfig, nil, hostSigner}, args{"host", nil}, hostOutput, false},
 		{"userWithData", fields{tmplConfigWithUserData, userSigner, hostSigner}, args{"user", map[string]string{"StepPath": "/home/user/.step"}}, userOutputWithUserData, false},
 		{"hostWithData", fields{tmplConfigWithUserData, userSigner, hostSigner}, args{"host", map[string]string{"Certificate": "ssh_host_ecdsa_key-cert.pub", "Key": "ssh_host_ecdsa_key"}}, hostOutputWithUserData, false},
+		{"userIncludesEmptyData", fields{tmplConfigUserIncludes, userSigner, hostSigner}, args{"user", nil}, userOutputEmptyData, false},
+		{"userIncludesWithoutTemplateVersion", fields{tmplConfigUserIncludes, userSigner, hostSigner}, args{"user", map[string]string{"StepPath": "/home/user/.step"}}, userOutputWithoutTemplateVersion, false},
+		{"userIncludesWithTemplateVersion", fields{tmplConfigUserIncludes, userSigner, hostSigner}, args{"user", map[string]string{"StepPath": "/home/user/.step", "StepSSHTemplateVersion": "v2"}}, userOutputWithTemplateVersion, false},
 		{"disabled", fields{tmplConfig, nil, nil}, args{"host", nil}, nil, true},
 		{"badType", fields{tmplConfig, userSigner, hostSigner}, args{"bad", nil}, nil, true},
 		{"userError", fields{tmplConfigErr, userSigner, hostSigner}, args{"user", nil}, nil, true},

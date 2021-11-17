@@ -11,6 +11,12 @@ import (
 	"testing"
 )
 
+func returnInput(val string) func() string {
+	return func() string {
+		return val
+	}
+}
+
 func TestClient(t *testing.T) {
 	oldIdentityFile := IdentityFile
 	oldDefaultsFile := DefaultsFile
@@ -19,8 +25,8 @@ func TestClient(t *testing.T) {
 		DefaultsFile = oldDefaultsFile
 	}()
 
-	IdentityFile = "testdata/config/identity.json"
-	DefaultsFile = "testdata/config/defaults.json"
+	IdentityFile = returnInput("testdata/config/identity.json")
+	DefaultsFile = returnInput("testdata/config/defaults.json")
 
 	client, err := LoadClient()
 	if err != nil {
@@ -140,36 +146,36 @@ func TestLoadClient(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", func() {
-			IdentityFile = "testdata/config/identity.json"
-			DefaultsFile = "testdata/config/defaults.json"
+			IdentityFile = returnInput("testdata/config/identity.json")
+			DefaultsFile = returnInput("testdata/config/defaults.json")
 		}, expected, false},
 		{"fail identity", func() {
-			IdentityFile = "testdata/config/missing.json"
-			DefaultsFile = "testdata/config/defaults.json"
+			IdentityFile = returnInput("testdata/config/missing.json")
+			DefaultsFile = returnInput("testdata/config/defaults.json")
 		}, nil, true},
 		{"fail identity", func() {
-			IdentityFile = "testdata/config/fail.json"
-			DefaultsFile = "testdata/config/defaults.json"
+			IdentityFile = returnInput("testdata/config/fail.json")
+			DefaultsFile = returnInput("testdata/config/defaults.json")
 		}, nil, true},
 		{"fail defaults", func() {
-			IdentityFile = "testdata/config/identity.json"
-			DefaultsFile = "testdata/config/missing.json"
+			IdentityFile = returnInput("testdata/config/identity.json")
+			DefaultsFile = returnInput("testdata/config/missing.json")
 		}, nil, true},
 		{"fail defaults", func() {
-			IdentityFile = "testdata/config/identity.json"
-			DefaultsFile = "testdata/config/fail.json"
+			IdentityFile = returnInput("testdata/config/identity.json")
+			DefaultsFile = returnInput("testdata/config/fail.json")
 		}, nil, true},
 		{"fail ca", func() {
-			IdentityFile = "testdata/config/identity.json"
-			DefaultsFile = "testdata/config/badca.json"
+			IdentityFile = returnInput("testdata/config/identity.json")
+			DefaultsFile = returnInput("testdata/config/badca.json")
 		}, nil, true},
 		{"fail root", func() {
-			IdentityFile = "testdata/config/identity.json"
-			DefaultsFile = "testdata/config/badroot.json"
+			IdentityFile = returnInput("testdata/config/identity.json")
+			DefaultsFile = returnInput("testdata/config/badroot.json")
 		}, nil, true},
 		{"fail type", func() {
-			IdentityFile = "testdata/config/badIdentity.json"
-			DefaultsFile = "testdata/config/defaults.json"
+			IdentityFile = returnInput("testdata/config/badIdentity.json")
+			DefaultsFile = returnInput("testdata/config/defaults.json")
 		}, nil, true},
 	}
 	for _, tt := range tests {

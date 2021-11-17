@@ -28,7 +28,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca/identity"
 	"github.com/smallstep/certificates/errs"
-	"go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/step"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
@@ -225,7 +225,7 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 	return tr, nil
 }
 
-// WithTransport adds a custom transport to the Client.  It will fail if a
+// WithTransport adds a custom transport to the Client. It will fail if a
 // previous option to create the transport has been configured.
 func WithTransport(tr http.RoundTripper) ClientOption {
 	return func(o *clientOptions) error {
@@ -233,6 +233,17 @@ func WithTransport(tr http.RoundTripper) ClientOption {
 			return err
 		}
 		o.transport = tr
+		return nil
+	}
+}
+
+// WithInsecure adds a insecure transport that bypasses TLS verification.
+func WithInsecure() ClientOption {
+	return func(o *clientOptions) error {
+		o.transport = &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
 		return nil
 	}
 }
@@ -1294,7 +1305,7 @@ func createCertificateRequest(commonName string, sans []string, key crypto.Priva
 // getRootCAPath returns the path where the root CA is stored based on the
 // STEPPATH environment variable.
 func getRootCAPath() string {
-	return filepath.Join(config.StepPath(), "certs", "root_ca.crt")
+	return filepath.Join(step.Path(), "certs", "root_ca.crt")
 }
 
 func readJSON(r io.ReadCloser, v interface{}) error {

@@ -29,9 +29,9 @@ import (
 	"github.com/smallstep/certificates/kms"
 	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/nosql"
-	"go.step.sm/cli-utils/config"
 	"go.step.sm/cli-utils/errs"
 	"go.step.sm/cli-utils/fileutil"
+	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
@@ -87,44 +87,50 @@ const (
 )
 
 // GetDBPath returns the path where the file-system persistence is stored
-// based on the STEPPATH environment variable.
+// based on the $(step path).
 func GetDBPath() string {
-	return filepath.Join(config.StepPath(), dbPath)
+	return filepath.Join(step.Path(), dbPath)
 }
 
 // GetConfigPath returns the directory where the configuration files are stored
-// based on the STEPPATH environment variable.
+// based on the $(step path).
 func GetConfigPath() string {
-	return filepath.Join(config.StepPath(), configPath)
+	return filepath.Join(step.Path(), configPath)
+}
+
+// GetProfileConfigPath returns the directory where the profile configuration
+// files are stored based on the $(step path).
+func GetProfileConfigPath() string {
+	return filepath.Join(step.ProfilePath(), configPath)
 }
 
 // GetPublicPath returns the directory where the public keys are stored based on
-// the STEPPATH environment variable.
+// the $(step path).
 func GetPublicPath() string {
-	return filepath.Join(config.StepPath(), publicPath)
+	return filepath.Join(step.Path(), publicPath)
 }
 
 // GetSecretsPath returns the directory where the private keys are stored based
-// on the STEPPATH environment variable.
+// on the $(step path).
 func GetSecretsPath() string {
-	return filepath.Join(config.StepPath(), privatePath)
+	return filepath.Join(step.Path(), privatePath)
 }
 
 // GetRootCAPath returns the path where the root CA is stored based on the
-// STEPPATH environment variable.
+// $(step path).
 func GetRootCAPath() string {
-	return filepath.Join(config.StepPath(), publicPath, "root_ca.crt")
+	return filepath.Join(step.Path(), publicPath, "root_ca.crt")
 }
 
 // GetOTTKeyPath returns the path where the one-time token key is stored based
-// on the STEPPATH environment variable.
+// on the $(step path).
 func GetOTTKeyPath() string {
-	return filepath.Join(config.StepPath(), privatePath, "ott_key")
+	return filepath.Join(step.Path(), privatePath, "ott_key")
 }
 
 // GetTemplatesPath returns the path where the templates are stored.
 func GetTemplatesPath() string {
-	return filepath.Join(config.StepPath(), templatesPath)
+	return filepath.Join(step.Path(), templatesPath)
 }
 
 // GetProvisioners returns the map of provisioners on the given CA.
@@ -286,20 +292,22 @@ func WithKeyURIs(rootKey, intermediateKey, hostKey, userKey string) Option {
 // PKI represents the Public Key Infrastructure used by a certificate authority.
 type PKI struct {
 	linkedca.Configuration
-	Defaults      linkedca.Defaults
-	casOptions    apiv1.Options
-	caService     apiv1.CertificateAuthorityService
-	caCreator     apiv1.CertificateAuthorityCreator
-	keyManager    kmsapi.KeyManager
-	config        string
-	defaults      string
-	ottPublicKey  *jose.JSONWebKey
-	ottPrivateKey *jose.JSONWebEncryption
-	options       *options
+	Defaults        linkedca.Defaults
+	casOptions      apiv1.Options
+	caService       apiv1.CertificateAuthorityService
+	caCreator       apiv1.CertificateAuthorityCreator
+	keyManager      kmsapi.KeyManager
+	config          string
+	defaults        string
+	profileDefaults string
+	ottPublicKey    *jose.JSONWebKey
+	ottPrivateKey   *jose.JSONWebEncryption
+	options         *options
 }
 
 // New creates a new PKI configuration.
 func New(o apiv1.Options, opts ...Option) (*PKI, error) {
+	currentCtx := step.Contexts().GetCurrent()
 	caService, err := cas.New(context.Background(), o)
 	if err != nil {
 		return nil, err
@@ -358,6 +366,9 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 		cfg = GetConfigPath()
 		// Create directories
 		dirs := []string{public, private, cfg, GetTemplatesPath()}
+		if currentCtx != nil {
+			dirs = append(dirs, GetProfileConfigPath())
+		}
 		for _, name := range dirs {
 			if _, err := os.Stat(name); os.IsNotExist(err) {
 				if err = os.MkdirAll(name, 0700); err != nil {
@@ -415,6 +426,10 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	if p.defaults, err = getPath(cfg, "defaults.json"); err != nil {
 		return nil, err
 	}
+	if currentCtx != nil {
+		p.profileDefaults = currentCtx.ProfileDefaultsFile()
+	}
+
 	if p.config, err = getPath(cfg, "ca.json"); err != nil {
 		return nil, err
 	}
@@ -944,6 +959,18 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 		if err = fileutil.WriteFile(p.defaults, b, 0644); err != nil {
 			return errs.FileError(err, p.defaults)
 		}
+		// If we're using contexts then write a blank object to the default profile
+		// configuration location.
+		if p.profileDefaults != "" {
+			if _, err := os.Stat(p.profileDefaults); os.IsNotExist(err) {
+				// Write with 0600 to be consistent with directories structure.
+				if err = fileutil.WriteFile(p.profileDefaults, []byte("{}"), 0600); err != nil {
+					return errs.FileError(err, p.profileDefaults)
+				}
+			} else if err != nil {
+				return errs.FileError(err, p.profileDefaults)
+			}
+		}
 
 		// Generate and write templates
 		if err := generateTemplates(cfg.Templates); err != nil {
@@ -958,6 +985,9 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 		}
 
 		ui.PrintSelected("Default configuration", p.defaults)
+		if p.profileDefaults != "" {
+			ui.PrintSelected("Default profile configuration", p.profileDefaults)
+		}
 		ui.PrintSelected("Certificate Authority configuration", p.config)
 		if p.options.deploymentType != LinkedDeployment {
 			ui.Println()
