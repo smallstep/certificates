@@ -58,6 +58,7 @@ jobs:
         run: V=1 make ci
       -
         name: Codecov
+        if: matrix.go == '1.17'
         uses: codecov/codecov-action@v1.2.1
         with:
           file: ./coverage.out # optional
