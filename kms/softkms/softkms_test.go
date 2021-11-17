@@ -11,7 +11,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -78,7 +78,7 @@ func TestSoftKMS_CreateSigner(t *testing.T) {
 	}
 
 	// Read and decode file using standard packages
-	b, err := ioutil.ReadFile("testdata/priv.pem")
+	b, err := os.ReadFile("testdata/priv.pem")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +234,7 @@ func TestSoftKMS_CreateKey(t *testing.T) {
 }
 
 func TestSoftKMS_GetPublicKey(t *testing.T) {
-	b, err := ioutil.ReadFile("testdata/pub.pem")
+	b, err := os.ReadFile("testdata/pub.pem")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +332,7 @@ func TestSoftKMS_CreateDecrypter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := ioutil.ReadFile("testdata/rsa.priv.pem")
+	b, err := os.ReadFile("testdata/rsa.priv.pem")
 	if err != nil {
 		t.Fatal(err)
 	}

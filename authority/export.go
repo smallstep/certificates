@@ -2,8 +2,8 @@ package authority
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -257,7 +257,7 @@ func mustReadFileOrURI(fn string, m map[string][]byte) string {
 		panic(err)
 	}
 	if ok {
-		b, err := ioutil.ReadFile(config.StepAbs(fn))
+		b, err := os.ReadFile(config.StepAbs(fn))
 		if err != nil {
 			panic(errors.Wrapf(err, "error reading %s", fn))
 		}

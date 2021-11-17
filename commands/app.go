@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -98,7 +97,7 @@ To get a linked authority token:
 
 	var password []byte
 	if passFile != "" {
-		if password, err = ioutil.ReadFile(passFile); err != nil {
+		if password, err = os.ReadFile(passFile); err != nil {
 			fatal(errors.Wrapf(err, "error reading %s", passFile))
 		}
 		password = bytes.TrimRightFunc(password, unicode.IsSpace)
@@ -106,7 +105,7 @@ To get a linked authority token:
 
 	var sshHostPassword []byte
 	if sshHostPassFile != "" {
-		if sshHostPassword, err = ioutil.ReadFile(sshHostPassFile); err != nil {
+		if sshHostPassword, err = os.ReadFile(sshHostPassFile); err != nil {
 			fatal(errors.Wrapf(err, "error reading %s", sshHostPassFile))
 		}
 		sshHostPassword = bytes.TrimRightFunc(sshHostPassword, unicode.IsSpace)
@@ -114,7 +113,7 @@ To get a linked authority token:
 
 	var sshUserPassword []byte
 	if sshUserPassFile != "" {
-		if sshUserPassword, err = ioutil.ReadFile(sshUserPassFile); err != nil {
+		if sshUserPassword, err = os.ReadFile(sshUserPassFile); err != nil {
 			fatal(errors.Wrapf(err, "error reading %s", sshUserPassFile))
 		}
 		sshUserPassword = bytes.TrimRightFunc(sshUserPassword, unicode.IsSpace)
@@ -122,7 +121,7 @@ To get a linked authority token:
 
 	var issuerPassword []byte
 	if issuerPassFile != "" {
-		if issuerPassword, err = ioutil.ReadFile(issuerPassFile); err != nil {
+		if issuerPassword, err = os.ReadFile(issuerPassFile); err != nil {
 			fatal(errors.Wrapf(err, "error reading %s", issuerPassFile))
 		}
 		issuerPassword = bytes.TrimRightFunc(issuerPassword, unicode.IsSpace)
