@@ -433,8 +433,10 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 	case db.ErrNotImplemented:
 		return errs.NotImplemented("authority.Revoke; no persistence layer configured", opts...)
 	case db.ErrAlreadyExists:
-		return errs.BadRequest("authority.Revoke; certificate with serial "+
-			"number %s has already been revoked", append([]interface{}{rci.Serial}, opts...)...)
+		return errs.ApplyOptions(
+			errs.BadRequest("certificate with serial number '%s' is already revoked", rci.Serial),
+			opts...,
+		)
 	default:
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
 	}

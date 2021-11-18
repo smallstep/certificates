@@ -26,9 +26,8 @@ func (s *RekeyRequest) Validate() error {
 
 // Rekey is similar to renew except that the certificate will be renewed with new key from csr.
 func (h *caHandler) Rekey(w http.ResponseWriter, r *http.Request) {
-
 	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-		WriteError(w, errs.BadRequest("missing peer certificate"))
+		WriteError(w, errs.BadRequest("missing client certificate"))
 		return
 	}
 

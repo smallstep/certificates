@@ -912,7 +912,7 @@ func TestAuthority_RekeySSH(t *testing.T) {
 				cert:       &ssh.Certificate{},
 				key:        pub,
 				signOpts:   []provisioner.SignOption{},
-				err:        errors.New("rekeySSH; cannot rekey certificate without validity period"),
+				err:        errors.New("The request could not be completed: cannot rekey a certificate without validity period."),
 				code:       http.StatusBadRequest,
 			}
 		},
@@ -923,7 +923,7 @@ func TestAuthority_RekeySSH(t *testing.T) {
 				cert:       &ssh.Certificate{ValidAfter: uint64(now.Unix())},
 				key:        pub,
 				signOpts:   []provisioner.SignOption{},
-				err:        errors.New("rekeySSH; cannot rekey certificate without validity period"),
+				err:        errors.New("The request could not be completed: cannot rekey a certificate without validity period."),
 				code:       http.StatusBadRequest,
 			}
 		},
@@ -956,7 +956,7 @@ func TestAuthority_RekeySSH(t *testing.T) {
 				cert:       &ssh.Certificate{ValidAfter: uint64(now.Unix()), ValidBefore: uint64(now.Add(10 * time.Minute).Unix()), CertType: 0},
 				key:        pub,
 				signOpts:   []provisioner.SignOption{},
-				err:        errors.New("rekeySSH; unexpected ssh certificate type: 0"),
+				err:        errors.New("The request could not be completed: unexpected certificate type '0'."),
 				code:       http.StatusBadRequest,
 			}
 		},

@@ -28,7 +28,7 @@ func TestRevokeRequestValidate(t *testing.T) {
 	tests := map[string]test{
 		"error/missing serial": {
 			rr:  &RevokeRequest{},
-			err: &errs.Error{Err: errors.New("missing serial"), Status: http.StatusBadRequest},
+			err: &errs.Error{Err: errors.New("The request could not be completed: missing serial."), Status: http.StatusBadRequest},
 		},
 		"error/bad reasonCode": {
 			rr: &RevokeRequest{
@@ -36,7 +36,7 @@ func TestRevokeRequestValidate(t *testing.T) {
 				ReasonCode: 15,
 				Passive:    true,
 			},
-			err: &errs.Error{Err: errors.New("reasonCode out of bounds"), Status: http.StatusBadRequest},
+			err: &errs.Error{Err: errors.New("The request could not be completed: reasonCode out of bounds."), Status: http.StatusBadRequest},
 		},
 		"error/non-passive not implemented": {
 			rr: &RevokeRequest{

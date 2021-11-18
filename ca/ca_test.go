@@ -588,7 +588,7 @@ func TestCARenew(t *testing.T) {
 				ca:           ca,
 				tlsConnState: nil,
 				status:       http.StatusBadRequest,
-				errMsg:       errs.BadRequestDefaultMsg,
+				errMsg:       errs.BadRequestPrefix,
 			}
 		},
 		"request-missing-peer-certificate": func(t *testing.T) *renewTest {
@@ -596,7 +596,7 @@ func TestCARenew(t *testing.T) {
 				ca:           ca,
 				tlsConnState: &tls.ConnectionState{PeerCertificates: []*x509.Certificate{}},
 				status:       http.StatusBadRequest,
-				errMsg:       errs.BadRequestDefaultMsg,
+				errMsg:       errs.BadRequestPrefix,
 			}
 		},
 		"success": func(t *testing.T) *renewTest {

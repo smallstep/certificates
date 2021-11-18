@@ -403,9 +403,9 @@ func TestSignRequest_Validate(t *testing.T) {
 		fields fields
 		err    error
 	}{
-		{"missing csr", fields{CertificateRequest{}, "foobarzar", time.Time{}, time.Time{}}, errors.New("missing csr")},
+		{"missing csr", fields{CertificateRequest{}, "foobarzar", time.Time{}, time.Time{}}, errors.New("The request could not be completed: missing csr.")},
 		{"invalid csr", fields{CertificateRequest{bad}, "foobarzar", time.Time{}, time.Time{}}, errors.New("invalid csr")},
-		{"missing ott", fields{CertificateRequest{csr}, "", time.Time{}, time.Time{}}, errors.New("missing ott")},
+		{"missing ott", fields{CertificateRequest{csr}, "", time.Time{}, time.Time{}}, errors.New("The request could not be completed: missing ott.")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1087,7 +1087,7 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedError400 := errs.BadRequest("force")
+	expectedError400 := errs.BadRequestErr(errors.New("force"))
 	expectedError400Bytes, err := json.Marshal(expectedError400)
 	assert.FatalError(t, err)
 	expectedError500 := errs.InternalServer("force")
