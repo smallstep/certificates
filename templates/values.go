@@ -75,7 +75,7 @@ var DefaultSSHTemplates = SSHTemplates{
 
 // DefaultSSHTemplateData contains the data of the default templates used on ssh.
 var DefaultSSHTemplateData = map[string]string{
-	// base_config.tpl adds the step ssh config file.
+	// config.tpl adds the step ssh config file.
 	//
 	// Note: on windows `Include C:\...` is treated as a relative path.
 	"config.tpl": `Host *
@@ -93,12 +93,12 @@ var DefaultSSHTemplateData = map[string]string{
 {{- end }}
 {{- end }}`,
 
-	// includes.tpl adds the step ssh config file.
+	// step_includes.tpl adds the step ssh config file.
 	//
 	// Note: on windows `Include C:\...` is treated as a relative path.
 	"step_includes.tpl": `{{- if or .User.GOOS "none" | eq "windows" }}Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config"{{- else }}Include "{{.User.StepPath}}/ssh/config"{{- end }}`,
 
-	// config.tpl is the step ssh config file, it includes the Match rule and
+	// step_config.tpl is the step ssh config file, it includes the Match rule and
 	// references the step known_hosts file.
 	//
 	// Note: on windows ProxyCommand requires the full path
