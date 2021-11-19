@@ -1,6 +1,6 @@
 module github.com/smallstep/certificates
 
-go 1.15
+go 1.16
 
 require (
 	cloud.google.com/go v0.83.0
@@ -29,10 +29,10 @@ require (
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
-	github.com/smallstep/nosql v0.3.8
+	github.com/smallstep/nosql v0.3.9
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
-	go.step.sm/cli-utils v0.6.2
+	go.step.sm/cli-utils v0.7.0
 	go.step.sm/crypto v0.13.0
 	go.step.sm/linkedca v0.7.0
 	golang.org/x/crypto v0.0.0-20210915214749-c084706c2272
@@ -44,7 +44,8 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
-// replace github.com/smallstep/nosql => ../nosql
-// replace go.step.sm/crypto => ../crypto
-// replace go.step.sm/cli-utils => ../cli-utils
-// replace go.step.sm/linkedca => ../linkedca
+//replace github.com/smallstep/nosql => ../nosql
+
+//replace go.step.sm/crypto => ../crypto
+
+//replace go.step.sm/cli-utils => ../cli-utils

@@ -10,9 +10,9 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"time"
 
@@ -188,7 +188,7 @@ func generateJWK() (*JWK, error) {
 }
 
 func generateK8sSA(inputPubKey interface{}) (*K8sSA, error) {
-	fooPubB, err := ioutil.ReadFile("./testdata/certs/foo.pub")
+	fooPubB, err := os.ReadFile("./testdata/certs/foo.pub")
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func generateK8sSA(inputPubKey interface{}) (*K8sSA, error) {
 	if err != nil {
 		return nil, err
 	}
-	barPubB, err := ioutil.ReadFile("./testdata/certs/bar.pub")
+	barPubB, err := os.ReadFile("./testdata/certs/bar.pub")
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +234,7 @@ func generateSSHPOP() (*SSHPOP, error) {
 		return nil, err
 	}
 
-	userB, err := ioutil.ReadFile("./testdata/certs/ssh_user_ca_key.pub")
+	userB, err := os.ReadFile("./testdata/certs/ssh_user_ca_key.pub")
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +242,7 @@ func generateSSHPOP() (*SSHPOP, error) {
 	if err != nil {
 		return nil, err
 	}
-	hostB, err := ioutil.ReadFile("./testdata/certs/ssh_host_ca_key.pub")
+	hostB, err := os.ReadFile("./testdata/certs/ssh_host_ca_key.pub")
 	if err != nil {
 		return nil, err
 	}

@@ -7,8 +7,8 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -195,7 +195,7 @@ func TestAuthority_GetDatabase(t *testing.T) {
 }
 
 func TestNewEmbedded(t *testing.T) {
-	caPEM, err := ioutil.ReadFile("testdata/certs/root_ca.crt")
+	caPEM, err := os.ReadFile("testdata/certs/root_ca.crt")
 	assert.FatalError(t, err)
 
 	crt, err := pemutil.ReadCertificate("testdata/certs/intermediate_ca.crt")
@@ -268,7 +268,7 @@ func TestNewEmbedded(t *testing.T) {
 }
 
 func TestNewEmbedded_Sign(t *testing.T) {
-	caPEM, err := ioutil.ReadFile("testdata/certs/root_ca.crt")
+	caPEM, err := os.ReadFile("testdata/certs/root_ca.crt")
 	assert.FatalError(t, err)
 
 	crt, err := pemutil.ReadCertificate("testdata/certs/intermediate_ca.crt")
@@ -294,7 +294,7 @@ func TestNewEmbedded_Sign(t *testing.T) {
 }
 
 func TestNewEmbedded_GetTLSCertificate(t *testing.T) {
-	caPEM, err := ioutil.ReadFile("testdata/certs/root_ca.crt")
+	caPEM, err := os.ReadFile("testdata/certs/root_ca.crt")
 	assert.FatalError(t, err)
 
 	crt, err := pemutil.ReadCertificate("testdata/certs/intermediate_ca.crt")

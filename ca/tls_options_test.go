@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"sort"
 	"testing"
@@ -202,7 +202,7 @@ func TestAddRootsToRootCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	root, err := ioutil.ReadFile("testdata/secrets/root_ca.crt")
+	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestAddRootsToClientCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	root, err := ioutil.ReadFile("testdata/secrets/root_ca.crt")
+	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,12 +310,12 @@ func TestAddFederationToRootCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	root, err := ioutil.ReadFile("testdata/secrets/root_ca.crt")
+	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	federated, err := ioutil.ReadFile("testdata/secrets/federated_ca.crt")
+	federated, err := os.ReadFile("testdata/secrets/federated_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,12 +374,12 @@ func TestAddFederationToClientCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	root, err := ioutil.ReadFile("testdata/secrets/root_ca.crt")
+	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	federated, err := ioutil.ReadFile("testdata/secrets/federated_ca.crt")
+	federated, err := os.ReadFile("testdata/secrets/federated_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +438,7 @@ func TestAddRootsToCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	root, err := ioutil.ReadFile("testdata/secrets/root_ca.crt")
+	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,12 +492,12 @@ func TestAddFederationToCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	root, err := ioutil.ReadFile("testdata/secrets/root_ca.crt")
+	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	federated, err := ioutil.ReadFile("testdata/secrets/federated_ca.crt")
+	federated, err := os.ReadFile("testdata/secrets/federated_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}

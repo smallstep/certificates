@@ -17,7 +17,7 @@ import (
 )
 
 func link(url, typ string) string {
-	return fmt.Sprintf("<%s>;rel=\"%s\"", url, typ)
+	return fmt.Sprintf("<%s>;rel=%q", url, typ)
 }
 
 // Clock that returns time in UTC rounded to seconds.

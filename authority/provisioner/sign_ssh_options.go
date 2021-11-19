@@ -335,11 +335,11 @@ type sshCertValidityValidator struct {
 func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOptions) error {
 	switch {
 	case cert.ValidAfter == 0:
-		return errors.New("ssh certificate validAfter cannot be 0")
+		return badRequest("ssh certificate validAfter cannot be 0")
 	case cert.ValidBefore < uint64(now().Unix()):
-		return errors.New("ssh certificate validBefore cannot be in the past")
+		return badRequest("ssh certificate validBefore cannot be in the past")
 	case cert.ValidBefore < cert.ValidAfter:
-		return errors.New("ssh certificate validBefore cannot be before validAfter")
+		return badRequest("ssh certificate validBefore cannot be before validAfter")
 	}
 
 	var min, max time.Duration
@@ -351,9 +351,9 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 		min = v.MinHostSSHCertDuration()
 		max = v.MaxHostSSHCertDuration()
 	case 0:
-		return errors.New("ssh certificate type has not been set")
+		return badRequest("ssh certificate type has not been set")
 	default:
-		return errors.Errorf("unknown ssh certificate type %d", cert.CertType)
+		return badRequest("unknown ssh certificate type %d", cert.CertType)
 	}
 
 	// To not take into account the backdate, time.Now() will be used to
@@ -362,11 +362,9 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 
 	switch {
 	case dur < min:
-		return errors.Errorf("requested duration of %s is less than minimum "+
-			"accepted duration for selected provisioner of %s", dur, min)
+		return badRequest("requested duration of %s is less than minimum accepted duration for selected provisioner of %s", dur, min)
 	case dur > max+opts.Backdate:
-		return errors.Errorf("requested duration of %s is greater than maximum "+
-			"accepted duration for selected provisioner of %s", dur, max+opts.Backdate)
+		return badRequest("requested duration of %s is greater than maximum accepted duration for selected provisioner of %s", dur, max+opts.Backdate)
 	default:
 		return nil
 	}

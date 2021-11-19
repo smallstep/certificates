@@ -4,14 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased - 0.17.7] - DATE
+## [Unreleased - 0.18.1] - DATE
 ### Added
-- Support for generate extractable keys and certificates on a pkcs#11 module.
 ### Changed
 ### Deprecated
 ### Removed
 ### Fixed
 ### Security
+
+## [0.18.0] - 2021-11-17
+### Added
+- Support for multiple certificate authority contexts.
+- Support for generating extractable keys and certificates on a pkcs#11 module.
+### Changed
+- Support two latest versions of golang (1.16, 1.17)
+### Deprecated
+- go 1.15 support
 
 ## [0.17.6] - 2021-10-20
 ### Notes

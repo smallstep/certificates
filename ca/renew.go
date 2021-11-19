@@ -18,7 +18,7 @@ var minCertDuration = time.Minute
 
 // TLSRenewer automatically renews a tls certificate using a RenewFunc.
 type TLSRenewer struct {
-	sync.RWMutex
+	renewMutex       sync.RWMutex
 	RenewCertificate RenewFunc
 	cert             *tls.Certificate
 	timer            *time.Timer
@@ -81,9 +81,9 @@ func NewTLSRenewer(cert *tls.Certificate, fn RenewFunc, opts ...tlsRenewerOption
 func (r *TLSRenewer) Run() {
 	cert := r.getCertificate()
 	next := r.nextRenewDuration(cert.Leaf.NotAfter)
-	r.Lock()
+	r.renewMutex.Lock()
 	r.timer = time.AfterFunc(next, r.renewCertificate)
-	r.Unlock()
+	r.renewMutex.Unlock()
 }
 
 // RunContext starts the certificate renewer for the given certificate.
@@ -133,25 +133,25 @@ func (r *TLSRenewer) GetClientCertificate(*tls.CertificateRequestInfo) (*tls.Cer
 // if the timer does not fire e.g. when the CA is run from a laptop that
 // enters sleep mode.
 func (r *TLSRenewer) getCertificate() *tls.Certificate {
-	r.RLock()
+	r.renewMutex.RLock()
 	cert := r.cert
-	r.RUnlock()
+	r.renewMutex.RUnlock()
 	return cert
 }
 
 // getCertificateForCA returns the certificate using a read-only lock. It will
 // automatically renew the certificate if it has expired.
 func (r *TLSRenewer) getCertificateForCA() *tls.Certificate {
-	r.RLock()
+	r.renewMutex.RLock()
 	// Force certificate renewal if the timer didn't run.
 	// This is an special case that can happen after a computer sleep.
 	if time.Now().After(r.certNotAfter) {
-		r.RUnlock()
+		r.renewMutex.RUnlock()
 		r.renewCertificate()
-		r.RLock()
+		r.renewMutex.RLock()
 	}
 	cert := r.cert
-	r.RUnlock()
+	r.renewMutex.RUnlock()
 	return cert
 }
 
@@ -159,10 +159,10 @@ func (r *TLSRenewer) getCertificateForCA() *tls.Certificate {
 // updates certNotAfter with 1m of delta; this will force the renewal of the
 // certificate if it is about to expire.
 func (r *TLSRenewer) setCertificate(cert *tls.Certificate) {
-	r.Lock()
+	r.renewMutex.Lock()
 	r.cert = cert
 	r.certNotAfter = cert.Leaf.NotAfter.Add(-1 * time.Minute)
-	r.Unlock()
+	r.renewMutex.Unlock()
 }
 
 func (r *TLSRenewer) renewCertificate() {
@@ -175,9 +175,9 @@ func (r *TLSRenewer) renewCertificate() {
 		r.setCertificate(cert)
 		next = r.nextRenewDuration(cert.Leaf.NotAfter)
 	}
-	r.Lock()
+	r.renewMutex.Lock()
 	r.timer.Reset(next)
-	r.Unlock()
+	r.renewMutex.Unlock()
 }
 
 func (r *TLSRenewer) nextRenewDuration(notAfter time.Time) time.Duration {

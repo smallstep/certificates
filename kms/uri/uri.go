@@ -3,8 +3,8 @@ package uri
 import (
 	"bytes"
 	"encoding/hex"
-	"io/ioutil"
 	"net/url"
+	"os"
 	"strings"
 	"unicode"
 
@@ -140,7 +140,7 @@ func readFile(path string) ([]byte, error) {
 	if err == nil && (u.Scheme == "" || u.Scheme == "file") && u.Path != "" {
 		path = u.Path
 	}
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", path)
 	}

@@ -32,7 +32,7 @@ import (
 // Config is a mapping of the cli flags.
 type Config struct {
 	KMS              string
-	RootOnly         bool
+	GenerateRoot     bool
 	RootObject       string
 	RootKeyObject    string
 	RootSubject      string
@@ -58,22 +58,29 @@ func (c *Config) Validate() error {
 	switch {
 	case c.KMS == "":
 		return errors.New("flag `--kms` is required")
+	case c.CrtPath == "":
+		return errors.New("flag `--crt-cert-path` is required")
 	case c.RootFile != "" && c.KeyFile == "":
-		return errors.New("flag `--root` requires flag `--key`")
+		return errors.New("flag `--root-cert-file` requires flag `--root-key-file`")
 	case c.KeyFile != "" && c.RootFile == "":
-		return errors.New("flag `--key` requires flag `--root`")
-	case c.RootOnly && c.RootFile != "":
-		return errors.New("flag `--root-only` is incompatible with flag `--root`")
+		return errors.New("flag `--root-key-file` requires flag `--root-cert-file`")
 	case c.RootFile == "" && c.RootObject == "":
-		return errors.New("one of flag `--root` or `--root-cert` is required")
-	case c.RootFile == "" && c.RootKeyObject == "":
-		return errors.New("one of flag `--root` or `--root-key` is required")
+		return errors.New("one of flag `--root-cert-file` or `--root-cert-obj` is required")
+	case c.KeyFile == "" && c.RootKeyObject == "":
+		return errors.New("one of flag `--root-key-file` or `--root-key-obj` is required")
+	case c.CrtKeyPath == "" && c.CrtKeyObject == "":
+		return errors.New("one of flag `--crt-key-path` or `--crt-key-obj` is required")
+	case c.RootFile == "" && c.GenerateRoot && c.RootKeyObject == "":
+		return errors.New("flag `--root-gen` requires flag `--root-key-obj`")
+	case c.RootFile == "" && c.GenerateRoot && c.RootPath == "":
+		return errors.New("flag `--root-gen` requires `--root-cert-path`")
 	default:
 		if c.RootFile != "" {
+			c.GenerateRoot = false
 			c.RootObject = ""
 			c.RootKeyObject = ""
 		}
-		if c.RootOnly {
+		if c.CrtKeyPath != "" {
 			c.CrtObject = ""
 			c.CrtKeyObject = ""
 		}
@@ -101,21 +108,27 @@ func main() {
 	var c Config
 	flag.StringVar(&c.KMS, "kms", kmsuri, "PKCS #11 URI with the module-path and token to connect to the module.")
 	flag.StringVar(&c.Pin, "pin", "", "PKCS #11 PIN")
-	flag.StringVar(&c.RootObject, "root-cert", "pkcs11:id=7330;object=root-cert", "PKCS #11 URI with object id and label to store the root certificate.")
-	flag.StringVar(&c.RootPath, "root-cert-path", "root_ca.crt", "Location to write the root certificate.")
-	flag.StringVar(&c.RootKeyObject, "root-key", "pkcs11:id=7330;object=root-key", "PKCS #11 URI with object id and label to store the root key.")
+	// Option 1: Generate new root
+	flag.BoolVar(&c.GenerateRoot, "root-gen", true, "Enable the generation of a root key.")
 	flag.StringVar(&c.RootSubject, "root-name", "PKCS #11 Smallstep Root", "Subject and Issuer of the root certificate.")
-	flag.StringVar(&c.CrtObject, "crt-cert", "pkcs11:id=7331;object=intermediate-cert", "PKCS #11 URI with object id and label to store the intermediate certificate.")
-	flag.StringVar(&c.CrtPath, "crt-cert-path", "intermediate_ca.crt", "Location to write the intermediate certificate.")
-	flag.StringVar(&c.CrtKeyObject, "crt-key", "pkcs11:id=7331;object=intermediate-key", "PKCS #11 URI with object id and label to store the intermediate certificate.")
+	flag.StringVar(&c.RootObject, "root-cert-obj", "pkcs11:id=7330;object=root-cert", "PKCS #11 URI with object id and label to store the root certificate.")
+	flag.StringVar(&c.RootKeyObject, "root-key-obj", "pkcs11:id=7330;object=root-key", "PKCS #11 URI with object id and label to store the root key.")
+	// Option 2: Read root from disk and sign intermediate
+	flag.StringVar(&c.RootFile, "root-cert-file", "", "Path to the root certificate to use.")
+	flag.StringVar(&c.KeyFile, "root-key-file", "", "Path to the root key to use.")
+	// Option 3: Generate certificate signing request
 	flag.StringVar(&c.CrtSubject, "crt-name", "PKCS #11 Smallstep Intermediate", "Subject of the intermediate certificate.")
-	flag.StringVar(&c.CrtKeyPath, "crt-key-path", "intermediate_ca_key", "Location to write the intermediate private key.")
+	flag.StringVar(&c.CrtObject, "crt-cert-obj", "pkcs11:id=7331;object=intermediate-cert", "PKCS #11 URI with object id and label to store the intermediate certificate.")
+	flag.StringVar(&c.CrtKeyObject, "crt-key-obj", "pkcs11:id=7331;object=intermediate-key", "PKCS #11 URI with object id and label to store the intermediate certificate.")
+	// SSH certificates
+	flag.BoolVar(&c.EnableSSH, "ssh", false, "Enable the creation of ssh keys.")
 	flag.StringVar(&c.SSHHostKeyObject, "ssh-host-key", "pkcs11:id=7332;object=ssh-host-key", "PKCS #11 URI with object id and label to store the key used to sign SSH host certificates.")
 	flag.StringVar(&c.SSHUserKeyObject, "ssh-user-key", "pkcs11:id=7333;object=ssh-user-key", "PKCS #11 URI with object id and label to store the key used to sign SSH user certificates.")
-	flag.BoolVar(&c.RootOnly, "root-only", false, "Store only only the root certificate and sign and intermediate.")
-	flag.StringVar(&c.RootFile, "root", "", "Path to the root certificate to use.")
-	flag.StringVar(&c.KeyFile, "key", "", "Path to the root key to use.")
-	flag.BoolVar(&c.EnableSSH, "ssh", false, "Enable the creation of ssh keys.")
+	// Output files
+	flag.StringVar(&c.RootPath, "root-cert-path", "root_ca.crt", "Location to write the root certificate.")
+	flag.StringVar(&c.CrtPath, "crt-cert-path", "intermediate_ca.crt", "Location to write the intermediate certificate.")
+	flag.StringVar(&c.CrtKeyPath, "crt-key-path", "", "Location to write the intermediate private key.")
+	// Others
 	flag.BoolVar(&c.NoCerts, "no-certs", false, "Do not store certificates in the module.")
 	flag.BoolVar(&c.Force, "force", false, "Force the delete of previous keys.")
 	flag.BoolVar(&c.Extractable, "extractable", false, "Allow export of private keys under wrap.")
@@ -276,22 +289,8 @@ func createPKI(k kms.KeyManager, c Config) error {
 	// Root Certificate
 	var signer crypto.Signer
 	var root *x509.Certificate
-	if c.RootFile != "" && c.KeyFile != "" {
-		root, err = pemutil.ReadCertificate(c.RootFile)
-		if err != nil {
-			return err
-		}
-
-		key, err := pemutil.Read(c.KeyFile)
-		if err != nil {
-			return err
-		}
-
-		var ok bool
-		if signer, ok = key.(crypto.Signer); !ok {
-			return errors.Errorf("key type '%T' does not implement a signer", key)
-		}
-	} else {
+	switch {
+	case c.GenerateRoot:
 		resp, err := k.CreateKey(&apiv1.CreateKeyRequest{
 			Name:               c.RootKeyObject,
 			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
@@ -331,7 +330,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			return errors.Wrap(err, "error parsing root certificate")
 		}
 
-		if cm, ok := k.(kms.CertificateManager); ok && !c.NoCerts {
+		if cm, ok := k.(kms.CertificateManager); ok && c.RootObject != "" && !c.NoCerts {
 			if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
 				Name:        c.RootObject,
 				Certificate: root,
@@ -339,6 +338,8 @@ func createPKI(k kms.KeyManager, c Config) error {
 			}); err != nil {
 				return err
 			}
+		} else {
+			c.RootObject = ""
 		}
 
 		if err := fileutil.WriteFile(c.RootPath, pem.EncodeToMemory(&pem.Block{
@@ -350,12 +351,31 @@ func createPKI(k kms.KeyManager, c Config) error {
 
 		ui.PrintSelected("Root Key", resp.Name)
 		ui.PrintSelected("Root Certificate", c.RootPath)
+		if c.RootObject != "" {
+			ui.PrintSelected("Root Certificate Object", c.RootObject)
+		}
+	case c.RootFile != "" && c.KeyFile != "": // Read Root From File
+		root, err = pemutil.ReadCertificate(c.RootFile)
+		if err != nil {
+			return err
+		}
+
+		key, err := pemutil.Read(c.KeyFile)
+		if err != nil {
+			return err
+		}
+
+		var ok bool
+		if signer, ok = key.(crypto.Signer); !ok {
+			return errors.Errorf("key type '%T' does not implement a signer", key)
+		}
 	}
 
 	// Intermediate Certificate
 	var keyName string
 	var publicKey crypto.PublicKey
-	if c.RootOnly {
+	var intSigner crypto.Signer
+	if c.CrtKeyPath != "" {
 		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
 			return errors.Wrap(err, "error creating intermediate key")
@@ -373,6 +393,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 
 		publicKey = priv.Public()
+		intSigner = priv
 	} else {
 		resp, err := k.CreateKey(&apiv1.CreateKeyRequest{
 			Name:               c.CrtKeyObject,
@@ -384,56 +405,89 @@ func createPKI(k kms.KeyManager, c Config) error {
 		}
 		publicKey = resp.PublicKey
 		keyName = resp.Name
-	}
 
-	template := &x509.Certificate{
-		IsCA:                  true,
-		NotBefore:             now,
-		NotAfter:              now.Add(time.Hour * 24 * 365 * 10),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		BasicConstraintsValid: true,
-		MaxPathLen:            0,
-		MaxPathLenZero:        true,
-		Issuer:                root.Subject,
-		Subject:               pkix.Name{CommonName: c.CrtSubject},
-		SerialNumber:          mustSerialNumber(),
-		SubjectKeyId:          mustSubjectKeyID(publicKey),
-	}
-
-	b, err := x509.CreateCertificate(rand.Reader, template, root, publicKey, signer)
-	if err != nil {
-		return err
-	}
-
-	intermediate, err := x509.ParseCertificate(b)
-	if err != nil {
-		return errors.Wrap(err, "error parsing intermediate certificate")
-	}
-
-	if cm, ok := k.(kms.CertificateManager); ok && !c.NoCerts {
-		if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
-			Name:        c.CrtObject,
-			Certificate: intermediate,
-			Extractable: c.Extractable,
-		}); err != nil {
+		intSigner, err = k.CreateSigner(&resp.CreateSignerRequest)
+		if err != nil {
 			return err
 		}
 	}
 
-	if err := fileutil.WriteFile(c.CrtPath, pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: b,
-	}), 0600); err != nil {
-		return err
+	if root != nil {
+		template := &x509.Certificate{
+			IsCA:                  true,
+			NotBefore:             now,
+			NotAfter:              now.Add(time.Hour * 24 * 365 * 10),
+			KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+			BasicConstraintsValid: true,
+			MaxPathLen:            0,
+			MaxPathLenZero:        true,
+			Issuer:                root.Subject,
+			Subject:               pkix.Name{CommonName: c.CrtSubject},
+			SerialNumber:          mustSerialNumber(),
+			SubjectKeyId:          mustSubjectKeyID(publicKey),
+		}
+
+		b, err := x509.CreateCertificate(rand.Reader, template, root, publicKey, signer)
+		if err != nil {
+			return err
+		}
+
+		intermediate, err := x509.ParseCertificate(b)
+		if err != nil {
+			return errors.Wrap(err, "error parsing intermediate certificate")
+		}
+
+		if cm, ok := k.(kms.CertificateManager); ok && c.CrtObject != "" && !c.NoCerts {
+			if err := cm.StoreCertificate(&apiv1.StoreCertificateRequest{
+				Name:        c.CrtObject,
+				Certificate: intermediate,
+				Extractable: c.Extractable,
+			}); err != nil {
+				return err
+			}
+		} else {
+			c.CrtObject = ""
+		}
+
+		if err := fileutil.WriteFile(c.CrtPath, pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: b,
+		}), 0600); err != nil {
+			return err
+		}
+	} else {
+		// No root available, generate CSR for external root.
+		csrTemplate := x509.CertificateRequest{
+			Subject:            pkix.Name{CommonName: c.CrtSubject},
+			SignatureAlgorithm: x509.ECDSAWithSHA256,
+		}
+		// step: generate the csr request
+		csrCertificate, err := x509.CreateCertificateRequest(rand.Reader, &csrTemplate, intSigner)
+		if err != nil {
+			return err
+		}
+		if err := fileutil.WriteFile(c.CrtPath, pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE REQUEST",
+			Bytes: csrCertificate,
+		}), 0600); err != nil {
+			return err
+		}
 	}
 
-	if c.RootOnly {
+	if c.CrtKeyPath != "" {
 		ui.PrintSelected("Intermediate Key", c.CrtKeyPath)
 	} else {
 		ui.PrintSelected("Intermediate Key", keyName)
 	}
 
-	ui.PrintSelected("Intermediate Certificate", c.CrtPath)
+	if root != nil {
+		ui.PrintSelected("Intermediate Certificate", c.CrtPath)
+		if c.CrtObject != "" {
+			ui.PrintSelected("Intermediate Certificate Object", c.CrtObject)
+		}
+	} else {
+		ui.PrintSelected("Intermediate Certificate Request", c.CrtPath)
+	}
 
 	if c.SSHHostKeyObject != "" {
 		resp, err := k.CreateKey(&apiv1.CreateKeyRequest{

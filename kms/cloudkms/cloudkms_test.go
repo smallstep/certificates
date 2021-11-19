@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -165,7 +165,7 @@ func TestCloudKMS_Close(t *testing.T) {
 
 func TestCloudKMS_CreateSigner(t *testing.T) {
 	keyName := "projects/p/locations/l/keyRings/k/cryptoKeys/c/cryptoKeyVersions/1"
-	pemBytes, err := ioutil.ReadFile("testdata/pub.pem")
+	pemBytes, err := os.ReadFile("testdata/pub.pem")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func TestCloudKMS_CreateKey(t *testing.T) {
 	testError := fmt.Errorf("an error")
 	alreadyExists := status.Error(codes.AlreadyExists, "already exists")
 
-	pemBytes, err := ioutil.ReadFile("testdata/pub.pem")
+	pemBytes, err := os.ReadFile("testdata/pub.pem")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +389,7 @@ func TestCloudKMS_GetPublicKey(t *testing.T) {
 	keyName := "projects/p/locations/l/keyRings/k/cryptoKeys/c/cryptoKeyVersions/1"
 	testError := fmt.Errorf("an error")
 
-	pemBytes, err := ioutil.ReadFile("testdata/pub.pem")
+	pemBytes, err := os.ReadFile("testdata/pub.pem")
 	if err != nil {
 		t.Fatal(err)
 	}

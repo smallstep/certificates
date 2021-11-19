@@ -15,7 +15,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
@@ -707,7 +706,7 @@ func TestHTTP01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
-							Body: ioutil.NopCloser(bytes.NewBufferString("foo")),
+							Body: io.NopCloser(bytes.NewBufferString("foo")),
 						}, nil
 					},
 				},
@@ -733,7 +732,7 @@ func TestHTTP01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
-							Body: ioutil.NopCloser(bytes.NewBufferString("foo")),
+							Body: io.NopCloser(bytes.NewBufferString("foo")),
 						}, nil
 					},
 				},
@@ -775,7 +774,7 @@ func TestHTTP01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
-							Body: ioutil.NopCloser(bytes.NewBufferString("foo")),
+							Body: io.NopCloser(bytes.NewBufferString("foo")),
 						}, nil
 					},
 				},
@@ -818,7 +817,7 @@ func TestHTTP01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
-							Body: ioutil.NopCloser(bytes.NewBufferString(expKeyAuth)),
+							Body: io.NopCloser(bytes.NewBufferString(expKeyAuth)),
 						}, nil
 					},
 				},
@@ -860,7 +859,7 @@ func TestHTTP01Validate(t *testing.T) {
 				vo: &ValidateChallengeOptions{
 					HTTPGet: func(url string) (*http.Response, error) {
 						return &http.Response{
-							Body: ioutil.NopCloser(bytes.NewBufferString(expKeyAuth)),
+							Body: io.NopCloser(bytes.NewBufferString(expKeyAuth)),
 						}, nil
 					},
 				},

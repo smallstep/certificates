@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -118,7 +118,7 @@ func (h *Handler) verifyContentType(next nextHTTP) nextHTTP {
 // parseJWS is a middleware that parses a request body into a JSONWebSignature struct.
 func (h *Handler) parseJWS(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			api.WriteError(w, acme.WrapErrorISE(err, "failed to read request body"))
 			return
@@ -413,7 +413,7 @@ func (h *Handler) verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 		}
 		ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{
 			value:       payload,
-			isPostAsGet: string(payload) == "",
+			isPostAsGet: len(payload) == 0,
 			isEmptyJSON: string(payload) == "{}",
 		})
 		next(w, r.WithContext(ctx))

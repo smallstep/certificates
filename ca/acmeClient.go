@@ -7,7 +7,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -292,7 +291,7 @@ func (c *ACMEClient) GetCertificate(url string) (*x509.Certificate, []*x509.Cert
 		return nil, nil, readACMEError(resp.Body)
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error reading GET certificate response")
 	}
@@ -338,7 +337,7 @@ func (c *ACMEClient) GetAccountOrders() ([]string, error) {
 
 func readACMEError(r io.ReadCloser) error {
 	defer r.Close()
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return errors.Wrap(err, "error reading from body")
 	}
