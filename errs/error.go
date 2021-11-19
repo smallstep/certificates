@@ -25,7 +25,7 @@ type Option func(e *Error) error
 // message only if it is empty.
 func withDefaultMessage(format string, args ...interface{}) Option {
 	return func(e *Error) error {
-		if len(e.Msg) > 0 {
+		if e.Msg != "" {
 			return e
 		}
 		e.Msg = fmt.Sprintf(format, args...)
@@ -164,7 +164,8 @@ type Messenger interface {
 func StatusCodeError(code int, e error, opts ...Option) error {
 	switch code {
 	case http.StatusBadRequest:
-		return BadRequestErr(e, opts...)
+		opts = append(opts, withDefaultMessage(BadRequestDefaultMsg))
+		return NewErr(http.StatusBadRequest, e, opts...)
 	case http.StatusUnauthorized:
 		return UnauthorizedErr(e, opts...)
 	case http.StatusForbidden:
@@ -200,6 +201,15 @@ var (
 	BadRequestPrefix = "The request could not be completed: "
 )
 
+func formatMessage(status int, msg string) string {
+	switch status {
+	case http.StatusBadRequest:
+		return BadRequestPrefix + msg + "."
+	default:
+		return msg
+	}
+}
+
 // splitOptionArgs splits the variadic length args into string formatting args
 // and Option(s) to apply to an Error.
 func splitOptionArgs(args []interface{}) ([]interface{}, []Option) {
@@ -229,8 +239,21 @@ func New(status int, format string, args ...interface{}) error {
 	msg := fmt.Sprintf(format, args...)
 	return &Error{
 		Status: status,
-		Msg:    msg,
+		Msg:    formatMessage(status, msg),
 		Err:    errors.New(msg),
+	}
+}
+
+// NewError creates a new http error with the given error and message.
+func NewError(status int, err error, format string, args ...interface{}) error {
+	msg := fmt.Sprintf(format, args...)
+	if _, ok := err.(StackTracer); !ok {
+		err = errors.Wrap(err, msg)
+	}
+	return &Error{
+		Status: status,
+		Msg:    formatMessage(status, msg),
+		Err:    err,
 	}
 }
 
@@ -308,14 +331,12 @@ func NotImplementedErr(err error, opts ...Option) error {
 
 // BadRequest creates a 400 error with the given format and arguments.
 func BadRequest(format string, args ...interface{}) error {
-	format = BadRequestPrefix + format + "."
 	return New(http.StatusBadRequest, format, args...)
 }
 
 // BadRequestErr returns an 400 error with the given error.
-func BadRequestErr(err error, opts ...Option) error {
-	opts = append(opts, withDefaultMessage(BadRequestDefaultMsg))
-	return NewErr(http.StatusBadRequest, err, opts...)
+func BadRequestErr(err error, format string, args ...interface{}) error {
+	return NewError(http.StatusBadRequest, err, format, args...)
 }
 
 // Unauthorized creates a 401 error with the given format and arguments.

@@ -1108,8 +1108,7 @@ retry:
 			retried = true
 			goto retry
 		}
-
-		return nil, errs.StatusCodeError(resp.StatusCode, readError(resp.Body))
+		return nil, readError(resp.Body)
 	}
 	var check api.SSHCheckPrincipalResponse
 	if err := readJSON(resp.Body, &check); err != nil {

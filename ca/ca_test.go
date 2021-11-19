@@ -115,7 +115,7 @@ func TestCASign(t *testing.T) {
 				ca:     ca,
 				body:   "invalid json",
 				status: http.StatusBadRequest,
-				errMsg: errs.BadRequestDefaultMsg,
+				errMsg: errs.BadRequestPrefix,
 			}
 		},
 		"fail invalid-csr-sig": func(t *testing.T) *signTest {
@@ -153,7 +153,7 @@ ZEp7knvU2psWRw==
 				ca:     ca,
 				body:   string(body),
 				status: http.StatusBadRequest,
-				errMsg: errs.BadRequestDefaultMsg,
+				errMsg: errs.BadRequestPrefix,
 			}
 		},
 		"fail unauthorized-ott": func(t *testing.T) *signTest {

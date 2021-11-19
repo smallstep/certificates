@@ -94,7 +94,7 @@ func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[strin
 
 		// Check for required variables.
 		if err := t.ValidateRequiredData(data); err != nil {
-			return nil, errs.BadRequestErr(err, errs.WithMessage("%v, please use `--set <key=value>` flag", err))
+			return nil, errs.BadRequestErr(err, "%v, please use `--set <key=value>` flag", err)
 		}
 
 		o, err := t.Output(mergedData)

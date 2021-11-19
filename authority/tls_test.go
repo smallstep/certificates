@@ -1187,7 +1187,7 @@ func TestAuthority_Revoke(t *testing.T) {
 					Reason:     reason,
 					OTT:        raw,
 				},
-				err:  errors.New("The request could not be completed: certificate with serial number 'sn' is already revoked"),
+				err:  errors.New("certificate with serial number 'sn' is already revoked"),
 				code: http.StatusBadRequest,
 				checkErrDetails: func(err *errs.Error) {
 					assert.Equals(t, err.Details["token"], raw)
