@@ -246,6 +246,9 @@ func New(status int, format string, args ...interface{}) error {
 
 // NewError creates a new http error with the given error and message.
 func NewError(status int, err error, format string, args ...interface{}) error {
+	if _, ok := err.(*Error); ok {
+		return err
+	}
 	msg := fmt.Sprintf(format, args...)
 	if _, ok := err.(StackTracer); !ok {
 		err = errors.Wrap(err, msg)
