@@ -49,7 +49,7 @@ func (r *RevokeRequest) Validate() (err error) {
 func (h *caHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	var body RevokeRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 

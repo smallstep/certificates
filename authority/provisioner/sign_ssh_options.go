@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/keyutil"
 	"golang.org/x/crypto/ssh"
 )
@@ -55,7 +56,7 @@ type SignSSHOptions struct {
 // Validate validates the given SignSSHOptions.
 func (o SignSSHOptions) Validate() error {
 	if o.CertType != "" && o.CertType != SSHUserCert && o.CertType != SSHHostCert {
-		return errors.Errorf("unknown certType %s", o.CertType)
+		return errs.BadRequest("unknown certificate type '%s'", o.CertType)
 	}
 	return nil
 }

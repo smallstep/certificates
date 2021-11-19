@@ -39,7 +39,7 @@ type SSHRekeyResponse struct {
 func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 	var body SSHRekeyRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
@@ -51,7 +51,7 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 
 	publicKey, err := ssh.ParsePublicKey(body.PublicKey)
 	if err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error parsing publicKey"))
+		WriteError(w, errs.BadRequestErr(err, "error parsing publicKey"))
 		return
 	}
 

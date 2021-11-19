@@ -18,7 +18,7 @@ func (s *RekeyRequest) Validate() error {
 		return errs.BadRequest("missing csr")
 	}
 	if err := s.CsrPEM.CertificateRequest.CheckSignature(); err != nil {
-		return errs.Wrap(http.StatusBadRequest, err, "invalid csr")
+		return errs.BadRequestErr(err, "invalid csr")
 	}
 
 	return nil
@@ -33,7 +33,7 @@ func (h *caHandler) Rekey(w http.ResponseWriter, r *http.Request) {
 
 	var body RekeyRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 

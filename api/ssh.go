@@ -250,7 +250,7 @@ type SSHBastionResponse struct {
 func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	var body SSHSignRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
@@ -262,7 +262,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 
 	publicKey, err := ssh.ParsePublicKey(body.PublicKey)
 	if err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error parsing publicKey"))
+		WriteError(w, errs.BadRequestErr(err, "error parsing publicKey"))
 		return
 	}
 
@@ -270,7 +270,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	if body.AddUserPublicKey != nil {
 		addUserPublicKey, err = ssh.ParsePublicKey(body.AddUserPublicKey)
 		if err != nil {
-			WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error parsing addUserPublicKey"))
+			WriteError(w, errs.BadRequestErr(err, "error parsing addUserPublicKey"))
 			return
 		}
 	}
@@ -394,7 +394,7 @@ func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 	var body SSHConfigRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {
@@ -426,7 +426,7 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 	var body SSHCheckPrincipalRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {
@@ -465,7 +465,7 @@ func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHBastion(w http.ResponseWriter, r *http.Request) {
 	var body SSHBastionRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {

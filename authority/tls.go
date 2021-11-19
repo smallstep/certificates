@@ -76,7 +76,10 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	opts := []interface{}{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
 	if err := csr.CheckSignature(); err != nil {
-		return nil, errs.Wrap(http.StatusBadRequest, err, "authority.Sign; invalid certificate request", opts...)
+		return nil, errs.ApplyOptions(
+			errs.BadRequestErr(err, "invalid certificate request"),
+			opts...,
+		)
 	}
 
 	// Set backdate with the configured value
@@ -114,8 +117,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	cert, err := x509util.NewCertificate(csr, certOptions...)
 	if err != nil {
 		if _, ok := err.(*x509util.TemplateError); ok {
-			return nil, errs.NewErr(http.StatusBadRequest, err,
-				errs.WithMessage(err.Error()),
+			return nil, errs.ApplyOptions(
+				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("csr", csr),
 				errs.WithKeyVal("signOptions", signOpts),
 			)

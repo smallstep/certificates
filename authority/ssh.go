@@ -151,7 +151,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 
 	// Validate given options.
 	if err := opts.Validate(); err != nil {
-		return nil, errs.Wrap(http.StatusBadRequest, err, "authority.SignSSH")
+		return nil, err
 	}
 
 	// Set backdate with the configured value
@@ -194,8 +194,8 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	certificate, err := sshutil.NewCertificate(cr, certOptions...)
 	if err != nil {
 		if _, ok := err.(*sshutil.TemplateError); ok {
-			return nil, errs.NewErr(http.StatusBadRequest, err,
-				errs.WithMessage(err.Error()),
+			return nil, errs.ApplyOptions(
+				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
 		}
@@ -208,7 +208,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	// Use SignSSHOptions to modify the certificate validity. It will be later
 	// checked or set if not defined.
 	if err := opts.ModifyValidity(certTpl); err != nil {
-		return nil, errs.Wrap(http.StatusBadRequest, err, "authority.SignSSH")
+		return nil, errs.BadRequestErr(err, err.Error())
 	}
 
 	// Use provisioner modifiers.

@@ -256,7 +256,7 @@ func TestAuthority_Sign(t *testing.T) {
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
-				err:       errors.New("authority.Sign; invalid certificate request"),
+				err:       errors.New("invalid certificate request"),
 				code:      http.StatusBadRequest,
 			}
 		},
