@@ -69,7 +69,7 @@ func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[strin
 			ts = a.templates.SSH.Host
 		}
 	default:
-		return nil, errs.BadRequest("getSSHConfig: type %s is not valid", typ)
+		return nil, errs.BadRequest("invalid certificate type '%s'", typ)
 	}
 
 	// Merge user and default data
@@ -94,7 +94,7 @@ func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[strin
 
 		// Check for required variables.
 		if err := t.ValidateRequiredData(data); err != nil {
-			return nil, errs.BadRequestErr(err, errs.WithMessage("%v, please use `--set <key=value>` flag", err))
+			return nil, errs.BadRequestErr(err, "%v, please use `--set <key=value>` flag", err)
 		}
 
 		o, err := t.Output(mergedData)
@@ -151,7 +151,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 
 	// Validate given options.
 	if err := opts.Validate(); err != nil {
-		return nil, errs.Wrap(http.StatusBadRequest, err, "authority.SignSSH")
+		return nil, err
 	}
 
 	// Set backdate with the configured value
@@ -194,8 +194,8 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	certificate, err := sshutil.NewCertificate(cr, certOptions...)
 	if err != nil {
 		if _, ok := err.(*sshutil.TemplateError); ok {
-			return nil, errs.NewErr(http.StatusBadRequest, err,
-				errs.WithMessage(err.Error()),
+			return nil, errs.ApplyOptions(
+				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
 		}
@@ -208,7 +208,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	// Use SignSSHOptions to modify the certificate validity. It will be later
 	// checked or set if not defined.
 	if err := opts.ModifyValidity(certTpl); err != nil {
-		return nil, errs.Wrap(http.StatusBadRequest, err, "authority.SignSSH")
+		return nil, errs.BadRequestErr(err, err.Error())
 	}
 
 	// Use provisioner modifiers.
@@ -258,7 +258,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 // RenewSSH creates a signed SSH certificate using the old SSH certificate as a template.
 func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ssh.Certificate, error) {
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
-		return nil, errs.BadRequest("renewSSH: cannot renew certificate without validity period")
+		return nil, errs.BadRequest("cannot renew a certificate without validity period")
 	}
 
 	if err := a.authorizeSSHCertificate(ctx, oldCert); err != nil {
@@ -329,7 +329,7 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 	}
 
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
-		return nil, errs.BadRequest("rekeySSH; cannot rekey certificate without validity period")
+		return nil, errs.BadRequest("cannot rekey a certificate without validity period")
 	}
 
 	if err := a.authorizeSSHCertificate(ctx, oldCert); err != nil {
@@ -369,7 +369,7 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 		}
 		signer = a.sshCAHostCertSignKey
 	default:
-		return nil, errs.BadRequest("rekeySSH; unexpected ssh certificate type: %d", cert.CertType)
+		return nil, errs.BadRequest("unexpected certificate type '%d'", cert.CertType)
 	}
 
 	var err error

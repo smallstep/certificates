@@ -271,7 +271,7 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	// Use options in the token.
 	if opts.CertType != "" {
 		if certType, err = sshutil.CertTypeFromString(opts.CertType); err != nil {
-			return nil, errs.Wrap(http.StatusBadRequest, err, "x5c.AuthorizeSSHSign")
+			return nil, errs.BadRequestErr(err, err.Error())
 		}
 	}
 	if opts.KeyID != "" {

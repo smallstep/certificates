@@ -662,7 +662,7 @@ retry:
 	// verify the sha256
 	sum := sha256.Sum256(root.RootPEM.Raw)
 	if !strings.EqualFold(sha256Sum, strings.ToLower(hex.EncodeToString(sum[:]))) {
-		return nil, errs.BadRequest("client.Root; root certificate SHA256 fingerprint do not match")
+		return nil, errs.BadRequest("root certificate fingerprint does not match")
 	}
 	return &root, nil
 }
@@ -1108,8 +1108,7 @@ retry:
 			retried = true
 			goto retry
 		}
-
-		return nil, errs.StatusCodeError(resp.StatusCode, readError(resp.Body))
+		return nil, readError(resp.Body)
 	}
 	var check api.SSHCheckPrincipalResponse
 	if err := readJSON(resp.Body, &check); err != nil {
