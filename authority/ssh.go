@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
@@ -174,7 +173,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		// validate the given SSHOptions
 		case provisioner.SSHCertOptionsValidator:
 			if err := o.Valid(opts); err != nil {
-				return nil, errs.Wrap(http.StatusForbidden, err, "authority.SignSSH")
+				return nil, errs.ForbiddenErr(err, "error validating ssh certificate options")
 			}
 
 		default:
@@ -214,7 +213,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	// Use provisioner modifiers.
 	for _, m := range mods {
 		if err := m.Modify(certTpl, opts); err != nil {
-			return nil, errs.Wrap(http.StatusForbidden, err, "authority.SignSSH")
+			return nil, errs.ForbiddenErr(err, "error creating ssh certificate")
 		}
 	}
 
@@ -244,7 +243,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	// User provisioners validators.
 	for _, v := range validators {
 		if err := v.Valid(cert, opts); err != nil {
-			return nil, errs.Wrap(http.StatusForbidden, err, "authority.SignSSH")
+			return nil, errs.ForbiddenErr(err, "error validating ssh certificate")
 		}
 	}
 
@@ -382,7 +381,7 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 	// Apply validators from provisioner.
 	for _, v := range validators {
 		if err := v.Valid(cert, provisioner.SignSSHOptions{Backdate: backdate}); err != nil {
-			return nil, errs.Wrap(http.StatusForbidden, err, "rekeySSH")
+			return nil, errs.ForbiddenErr(err, "error validating ssh certificate")
 		}
 	}
 
@@ -407,12 +406,12 @@ func (a *Authority) storeSSHCertificate(cert *ssh.Certificate) error {
 // the given certificate.
 func IsValidForAddUser(cert *ssh.Certificate) error {
 	if cert.CertType != ssh.UserCert {
-		return errors.New("certificate is not a user certificate")
+		return errs.Forbidden("certificate is not a user certificate")
 	}
 
 	switch len(cert.ValidPrincipals) {
 	case 0:
-		return errors.New("certificate does not have any principals")
+		return errs.Forbidden("certificate does not have any principals")
 	case 1:
 		return nil
 	case 2:
@@ -421,9 +420,9 @@ func IsValidForAddUser(cert *ssh.Certificate) error {
 		if strings.Index(cert.ValidPrincipals[1], "@") > 0 {
 			return nil
 		}
-		return errors.New("certificate does not have only one principal")
+		return errs.Forbidden("certificate does not have only one principal")
 	default:
-		return errors.New("certificate does not have only one principal")
+		return errs.Forbidden("certificate does not have only one principal")
 	}
 }
 
@@ -433,7 +432,7 @@ func (a *Authority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, subje
 		return nil, errs.NotImplemented("signSSHAddUser: user certificate signing is not enabled")
 	}
 	if err := IsValidForAddUser(subject); err != nil {
-		return nil, errs.Wrap(http.StatusForbidden, err, "signSSHAddUser")
+		return nil, err
 	}
 
 	nonce, err := randutil.ASCII(32)
