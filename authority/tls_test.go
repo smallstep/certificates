@@ -310,7 +310,7 @@ func TestAuthority_Sign(t *testing.T) {
 				extraOpts: extraOpts,
 				signOpts:  _signOpts,
 				err:       errors.New("requested duration of 25h0m0s is more than the authorized maximum certificate duration of 24h1m0s"),
-				code:      http.StatusBadRequest,
+				code:      http.StatusForbidden,
 			}
 		},
 		"fail validate sans when adding common name not in claims": func(t *testing.T) *signTest {
@@ -323,7 +323,7 @@ func TestAuthority_Sign(t *testing.T) {
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
 				err:       errors.New("certificate request does not contain the valid DNS names - got [test.smallstep.com smallstep test], want [test.smallstep.com]"),
-				code:      http.StatusBadRequest,
+				code:      http.StatusForbidden,
 			}
 		},
 		"fail rsa key too short": func(t *testing.T) *signTest {

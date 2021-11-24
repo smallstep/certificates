@@ -200,8 +200,8 @@ ZEp7knvU2psWRw==
 			return &signTest{
 				ca:     ca,
 				body:   string(body),
-				status: http.StatusBadRequest,
-				errMsg: errs.BadRequestPrefix,
+				status: http.StatusForbidden,
+				errMsg: errs.ForbiddenPrefix,
 			}
 		},
 		"ok": func(t *testing.T) *signTest {
