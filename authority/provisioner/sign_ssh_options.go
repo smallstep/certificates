@@ -109,16 +109,16 @@ func (o SignSSHOptions) ModifyValidity(cert *ssh.Certificate) error {
 // ignores zero values.
 func (o SignSSHOptions) match(got SignSSHOptions) error {
 	if o.CertType != "" && got.CertType != "" && o.CertType != got.CertType {
-		return errs.BadRequest("ssh certificate type does not match - got %v, want %v", got.CertType, o.CertType)
+		return errs.Forbidden("ssh certificate type does not match - got %v, want %v", got.CertType, o.CertType)
 	}
 	if len(o.Principals) > 0 && len(got.Principals) > 0 && !containsAllMembers(o.Principals, got.Principals) {
-		return errs.BadRequest("ssh certificate principals does not match - got %v, want %v", got.Principals, o.Principals)
+		return errs.Forbidden("ssh certificate principals does not match - got %v, want %v", got.Principals, o.Principals)
 	}
 	if !o.ValidAfter.IsZero() && !got.ValidAfter.IsZero() && !o.ValidAfter.Equal(&got.ValidAfter) {
-		return errs.BadRequest("ssh certificate validAfter does not match - got %v, want %v", got.ValidAfter, o.ValidAfter)
+		return errs.Forbidden("ssh certificate validAfter does not match - got %v, want %v", got.ValidAfter, o.ValidAfter)
 	}
 	if !o.ValidBefore.IsZero() && !got.ValidBefore.IsZero() && !o.ValidBefore.Equal(&got.ValidBefore) {
-		return errs.BadRequest("ssh certificate validBefore does not match - got %v, want %v", got.ValidBefore, o.ValidBefore)
+		return errs.Forbidden("ssh certificate validBefore does not match - got %v, want %v", got.ValidBefore, o.ValidBefore)
 	}
 	return nil
 }
@@ -368,9 +368,9 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 
 	switch {
 	case dur < min:
-		return errs.BadRequest("requested duration of %s is less than minimum accepted duration for selected provisioner of %s", dur, min)
+		return errs.Forbidden("requested duration of %s is less than minimum accepted duration for selected provisioner of %s", dur, min)
 	case dur > max+opts.Backdate:
-		return errs.BadRequest("requested duration of %s is greater than maximum accepted duration for selected provisioner of %s", dur, max+opts.Backdate)
+		return errs.Forbidden("requested duration of %s is greater than maximum accepted duration for selected provisioner of %s", dur, max+opts.Backdate)
 	default:
 		return nil
 	}
