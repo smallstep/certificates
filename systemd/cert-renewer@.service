@@ -14,7 +14,7 @@ Environment=STEPPATH=/etc/step-ca \
 
 ; ExecCondition checks if the certificate is ready for renewal,
 ; based on the exit status of the command.
-; (In systemd 242 or below, you can use ExecStartPre= here.)
+; (In systemd <242, you can use ExecStartPre= here.)
 ExecCondition=/usr/bin/step certificate needs-renewal ${CERT_LOCATION}
 
 ; ExecStart renews the certificate, if ExecStartPre was successful.
@@ -22,6 +22,7 @@ ExecStart=/usr/bin/step ca renew --force ${CERT_LOCATION} ${KEY_LOCATION}
 
 ; Try to reload or restart the systemd service that relies on this cert-renewer
 ; If the relying service doesn't exist, forge ahead.
+; (In systemd <229, use `reload-or-try-restart` instead of `try-reload-or-restart`)
 ExecStartPost=/usr/bin/env sh -c "! systemctl --quiet is-enabled %i.service || systemctl try-reload-or-restart %i"
 
 [Install]
