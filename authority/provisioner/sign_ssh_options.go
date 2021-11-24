@@ -56,7 +56,7 @@ type SignSSHOptions struct {
 // Validate validates the given SignSSHOptions.
 func (o SignSSHOptions) Validate() error {
 	if o.CertType != "" && o.CertType != SSHUserCert && o.CertType != SSHHostCert {
-		return errs.BadRequest("unknown certificate type '%s'", o.CertType)
+		return errs.BadRequest("certType '%s' is not valid", o.CertType)
 	}
 	for _, p := range o.Principals {
 		if p == "" {
@@ -359,7 +359,7 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 	case 0:
 		return errs.BadRequest("ssh certificate type has not been set")
 	default:
-		return errs.BadRequest("unknown ssh certificate type '%d'", cert.CertType)
+		return errs.BadRequest("ssh certificate has an unknown type '%d'", cert.CertType)
 	}
 
 	// To not take into account the backdate, time.Now() will be used to
