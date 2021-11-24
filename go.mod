@@ -12,45 +12,36 @@ require (
 	github.com/Azure/go-autorest/autorest/validation v0.3.1 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/ThalesIgnite/crypto11 v1.2.4
-	github.com/aws/aws-sdk-go v1.37.0
+	github.com/aws/aws-sdk-go v1.30.29
 	github.com/dgraph-io/ristretto v0.0.4-0.20200906165740-41ebdbffecfd // indirect
-	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-piv/piv-go v1.7.0
-	github.com/go-sql-driver/mysql v1.6.0 // indirect
-	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/googleapis/gax-go/v2 v2.0.5
+	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/micromdm/scep/v2 v2.1.0
-	github.com/miekg/pkcs11 v1.0.3 // indirect
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
-	github.com/sirupsen/logrus v1.7.0
+	github.com/sirupsen/logrus v1.4.2
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
-	github.com/smallstep/cli v0.18.0 // indirect
 	github.com/smallstep/nosql v0.3.9
-	github.com/stretchr/testify v1.7.0 // indirect
-	github.com/urfave/cli v1.22.5
-	go.etcd.io/bbolt v1.3.6 // indirect
+	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.0
 	go.step.sm/crypto v0.13.0
 	go.step.sm/linkedca v0.7.0
 	golang.org/x/crypto v0.0.0-20210915214749-c084706c2272
 	golang.org/x/net v0.0.0-20210913180222-943fd674d43e
-	golang.org/x/term v0.0.0-20210503060354-a79de5458b56 // indirect
-	google.golang.org/api v0.48.0
+	google.golang.org/api v0.47.0
 	google.golang.org/genproto v0.0.0-20210719143636-1d5a45f8e492
 	google.golang.org/grpc v1.39.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/square/go-jose.v2 v2.6.0
-	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
 //replace github.com/smallstep/nosql => ../nosql
