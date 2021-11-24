@@ -173,7 +173,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		// validate the given SSHOptions
 		case provisioner.SSHCertOptionsValidator:
 			if err := o.Valid(opts); err != nil {
-				return nil, errs.ForbiddenErr(err, "error validating ssh certificate options")
+				return nil, errs.BadRequestErr(err, "error validating ssh certificate options")
 			}
 
 		default:
