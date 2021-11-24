@@ -94,7 +94,10 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		// Validate the given certificate request.
 		case provisioner.CertificateRequestValidator:
 			if err := k.Valid(csr); err != nil {
-				return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)
+				return nil, errs.ApplyOptions(
+					errs.ForbiddenErr(err, "error validating certificate"),
+					opts...,
+				)
 			}
 
 		// Validates the unsigned certificate template.
@@ -131,26 +134,38 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	// Set default subject
 	if err := withDefaultASN1DN(a.config.AuthorityConfig.Template).Modify(leaf, signOpts); err != nil {
-		return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)
+		return nil, errs.ApplyOptions(
+			errs.ForbiddenErr(err, "error creating certificate"),
+			opts...,
+		)
 	}
 
 	for _, m := range certModifiers {
 		if err := m.Modify(leaf, signOpts); err != nil {
-			return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(err, "error creating certificate"),
+				opts...,
+			)
 		}
 	}
 
 	// Certificate validation.
 	for _, v := range certValidators {
 		if err := v.Valid(leaf, signOpts); err != nil {
-			return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(err, "error validating certificate"),
+				opts...,
+			)
 		}
 	}
 
 	// Certificate modifiers after validation
 	for _, m := range certEnforcers {
 		if err := m.Enforce(leaf); err != nil {
-			return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.Sign", opts...)
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(err, "error creating certificate"),
+				opts...,
+			)
 		}
 	}
 
