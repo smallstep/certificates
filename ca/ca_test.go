@@ -200,8 +200,8 @@ ZEp7knvU2psWRw==
 			return &signTest{
 				ca:     ca,
 				body:   string(body),
-				status: http.StatusUnauthorized,
-				errMsg: errs.UnauthorizedDefaultMsg,
+				status: http.StatusBadRequest,
+				errMsg: errs.BadRequestPrefix,
 			}
 		},
 		"ok": func(t *testing.T) *signTest {

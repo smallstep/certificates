@@ -323,7 +323,7 @@ func TestAuthority_Sign(t *testing.T) {
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
 				err:       errors.New("authority.Sign: certificate request does not contain the valid DNS names - got [test.smallstep.com smallstep test], want [test.smallstep.com]"),
-				code:      http.StatusUnauthorized,
+				code:      http.StatusBadRequest,
 			}
 		},
 		"fail rsa key too short": func(t *testing.T) *signTest {
@@ -348,8 +348,8 @@ ZYtQ9Ot36qc=
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
-				err:       errors.New("authority.Sign: rsa key in CSR must be at least 2048 bits (256 bytes)"),
-				code:      http.StatusUnauthorized,
+				err:       errors.New("authority.Sign: certificate request RSA key must be at least 2048 bits (256 bytes)"),
+				code:      http.StatusForbidden,
 			}
 		},
 		"fail store cert in db": func(t *testing.T) *signTest {
