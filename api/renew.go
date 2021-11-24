@@ -10,7 +10,7 @@ import (
 // new one.
 func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-		WriteError(w, errs.BadRequest("missing peer certificate"))
+		WriteError(w, errs.BadRequest("missing client certificate"))
 		return
 	}
 

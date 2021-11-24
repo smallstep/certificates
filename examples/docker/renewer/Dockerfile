@@ -1,7 +1,7 @@
-FROM alpine:latest
+FROM smallstep/step-cli
 
+USER root
 RUN mkdir -p /var/local/step
-ADD step /usr/local/bin/step
 ADD crontab /var/spool/cron/crontabs/root
 RUN chmod 0644 /var/spool/cron/crontabs/root
 

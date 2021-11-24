@@ -337,8 +337,8 @@ func TestClient_Sign(t *testing.T) {
 	}{
 		{"ok", request, ok, 200, false, nil},
 		{"unauthorized", request, errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
-		{"empty request", &api.SignRequest{}, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
-		{"nil request", nil, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"empty request", &api.SignRequest{}, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestPrefix + "force.")},
+		{"nil request", nil, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestPrefix + "force.")},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -410,7 +410,7 @@ func TestClient_Revoke(t *testing.T) {
 	}{
 		{"ok", request, ok, 200, false, nil},
 		{"unauthorized", request, errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
-		{"nil request", nil, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"nil request", nil, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestPrefix)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -455,7 +455,7 @@ func TestClient_Revoke(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.Revoke() = %v, want nil", got)
 				}
-				assert.HasPrefix(t, tt.expectedErr.Error(), err.Error())
+				assert.HasPrefix(t, err.Error(), tt.expectedErr.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.Revoke() = %v, want %v", got, tt.response)
@@ -484,8 +484,8 @@ func TestClient_Renew(t *testing.T) {
 	}{
 		{"ok", ok, 200, false, nil},
 		{"unauthorized", errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
-		{"empty request", errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
-		{"nil request", errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"empty request", errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestPrefix)},
+		{"nil request", errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestPrefix)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -519,7 +519,7 @@ func TestClient_Renew(t *testing.T) {
 				sc, ok := err.(errs.StatusCoder)
 				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
-				assert.HasPrefix(t, tt.err.Error(), err.Error())
+				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.Renew() = %v, want %v", got, tt.response)
@@ -553,8 +553,8 @@ func TestClient_Rekey(t *testing.T) {
 	}{
 		{"ok", request, ok, 200, false, nil},
 		{"unauthorized", request, errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
-		{"empty request", &api.RekeyRequest{}, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
-		{"nil request", nil, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"empty request", &api.RekeyRequest{}, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestPrefix)},
+		{"nil request", nil, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestPrefix)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -588,7 +588,7 @@ func TestClient_Rekey(t *testing.T) {
 				sc, ok := err.(errs.StatusCoder)
 				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
-				assert.HasPrefix(t, tt.err.Error(), err.Error())
+				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.Renew() = %v, want %v", got, tt.response)
@@ -735,7 +735,7 @@ func TestClient_Roots(t *testing.T) {
 	}{
 		{"ok", ok, 200, false, nil},
 		{"unauthorized", errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
-		{"bad-request", errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"bad-request", errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestPrefix)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -768,7 +768,7 @@ func TestClient_Roots(t *testing.T) {
 				sc, ok := err.(errs.StatusCoder)
 				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
-				assert.HasPrefix(t, tt.err.Error(), err.Error())
+				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.Roots() = %v, want %v", got, tt.response)
@@ -1016,7 +1016,7 @@ func TestClient_SSHBastion(t *testing.T) {
 	}{
 		{"ok", &api.SSHBastionRequest{Hostname: "host.local"}, ok, 200, false, nil},
 		{"bad-response", &api.SSHBastionRequest{Hostname: "host.local"}, "bad json", 200, true, nil},
-		{"bad-request", &api.SSHBastionRequest{}, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestDefaultMsg)},
+		{"bad-request", &api.SSHBastionRequest{}, errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestPrefix)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -1050,7 +1050,7 @@ func TestClient_SSHBastion(t *testing.T) {
 					sc, ok := err.(errs.StatusCoder)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 					assert.Equals(t, sc.StatusCode(), tt.responseCode)
-					assert.HasPrefix(t, tt.err.Error(), err.Error())
+					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
 			default:
 				if !reflect.DeepEqual(got, tt.response) {

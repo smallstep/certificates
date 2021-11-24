@@ -26,7 +26,7 @@ func (s *SignRequest) Validate() error {
 		return errs.BadRequest("missing csr")
 	}
 	if err := s.CsrPEM.CertificateRequest.CheckSignature(); err != nil {
-		return errs.Wrap(http.StatusBadRequest, err, "invalid csr")
+		return errs.BadRequestErr(err, "invalid csr")
 	}
 	if s.OTT == "" {
 		return errs.BadRequest("missing ott")
@@ -50,7 +50,7 @@ type SignResponse struct {
 func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 	var body SignRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 

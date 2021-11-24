@@ -49,7 +49,7 @@ func (r *RevokeRequest) Validate() (err error) {
 func (h *caHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	var body RevokeRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
@@ -80,12 +80,12 @@ func (h *caHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 		// the client certificate Serial Number must match the serial number
 		// being revoked.
 		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-			WriteError(w, errs.BadRequest("missing ott or peer certificate"))
+			WriteError(w, errs.BadRequest("missing ott or client certificate"))
 			return
 		}
 		opts.Crt = r.TLS.PeerCertificates[0]
 		if opts.Crt.SerialNumber.String() != opts.Serial {
-			WriteError(w, errs.BadRequest("revoke: serial number in mtls certificate different than body"))
+			WriteError(w, errs.BadRequest("serial number in client certificate different than body"))
 			return
 		}
 		// TODO: should probably be checking if the certificate was revoked here.

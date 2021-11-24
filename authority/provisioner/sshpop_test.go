@@ -258,7 +258,7 @@ func TestSSHPOP_AuthorizeSSHRevoke(t *testing.T) {
 				p:     p,
 				token: tok,
 				code:  http.StatusBadRequest,
-				err:   errors.New("sshpop.AuthorizeSSHRevoke; sshpop token subject must be equivalent to sshpop certificate serial number"),
+				err:   errors.New("sshpop token subject must be equivalent to sshpop certificate serial number"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -337,7 +337,7 @@ func TestSSHPOP_AuthorizeSSHRenew(t *testing.T) {
 				p:     p,
 				token: tok,
 				code:  http.StatusBadRequest,
-				err:   errors.New("sshpop.AuthorizeSSHRenew; sshpop certificate must be a host ssh certificate"),
+				err:   errors.New("sshpop certificate must be a host ssh certificate"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -419,7 +419,7 @@ func TestSSHPOP_AuthorizeSSHRekey(t *testing.T) {
 				p:     p,
 				token: tok,
 				code:  http.StatusBadRequest,
-				err:   errors.New("sshpop.AuthorizeSSHRekey; sshpop certificate must be a host ssh certificate"),
+				err:   errors.New("sshpop certificate must be a host ssh certificate"),
 			}
 		},
 		"ok": func(t *testing.T) test {

@@ -49,16 +49,16 @@ type SSHSignRequest struct {
 func (s *SSHSignRequest) Validate() error {
 	switch {
 	case s.CertType != "" && s.CertType != provisioner.SSHUserCert && s.CertType != provisioner.SSHHostCert:
-		return errors.Errorf("unknown certType %s", s.CertType)
+		return errs.BadRequest("invalid certType '%s'", s.CertType)
 	case len(s.PublicKey) == 0:
-		return errors.New("missing or empty publicKey")
+		return errs.BadRequest("missing or empty publicKey")
 	case s.OTT == "":
-		return errors.New("missing or empty ott")
+		return errs.BadRequest("missing or empty ott")
 	default:
 		// Validate identity signature if provided
 		if s.IdentityCSR.CertificateRequest != nil {
 			if err := s.IdentityCSR.CertificateRequest.CheckSignature(); err != nil {
-				return errors.Wrap(err, "invalid identityCSR")
+				return errs.BadRequestErr(err, "invalid identityCSR")
 			}
 		}
 		return nil
@@ -185,7 +185,7 @@ func (r *SSHConfigRequest) Validate() error {
 	case provisioner.SSHUserCert, provisioner.SSHHostCert:
 		return nil
 	default:
-		return errors.Errorf("unsupported type %s", r.Type)
+		return errs.BadRequest("invalid type '%s'", r.Type)
 	}
 }
 
@@ -208,9 +208,9 @@ type SSHCheckPrincipalRequest struct {
 func (r *SSHCheckPrincipalRequest) Validate() error {
 	switch {
 	case r.Type != provisioner.SSHHostCert:
-		return errors.Errorf("unsupported type %s", r.Type)
+		return errs.BadRequest("unsupported type '%s'", r.Type)
 	case r.Principal == "":
-		return errors.New("missing or empty principal")
+		return errs.BadRequest("missing or empty principal")
 	default:
 		return nil
 	}
@@ -232,7 +232,7 @@ type SSHBastionRequest struct {
 // Validate checks the values of the SSHBastionRequest.
 func (r *SSHBastionRequest) Validate() error {
 	if r.Hostname == "" {
-		return errors.New("missing or empty hostname")
+		return errs.BadRequest("missing or empty hostname")
 	}
 	return nil
 }
@@ -250,19 +250,19 @@ type SSHBastionResponse struct {
 func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	var body SSHSignRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, errs.BadRequestErr(err))
+		WriteError(w, err)
 		return
 	}
 
 	publicKey, err := ssh.ParsePublicKey(body.PublicKey)
 	if err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error parsing publicKey"))
+		WriteError(w, errs.BadRequestErr(err, "error parsing publicKey"))
 		return
 	}
 
@@ -270,7 +270,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	if body.AddUserPublicKey != nil {
 		addUserPublicKey, err = ssh.ParsePublicKey(body.AddUserPublicKey)
 		if err != nil {
-			WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error parsing addUserPublicKey"))
+			WriteError(w, errs.BadRequestErr(err, "error parsing addUserPublicKey"))
 			return
 		}
 	}
@@ -394,11 +394,11 @@ func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 	var body SSHConfigRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, errs.BadRequestErr(err))
+		WriteError(w, err)
 		return
 	}
 
@@ -426,11 +426,11 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 	var body SSHCheckPrincipalRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, errs.BadRequestErr(err))
+		WriteError(w, err)
 		return
 	}
 
@@ -465,11 +465,11 @@ func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHBastion(w http.ResponseWriter, r *http.Request) {
 	var body SSHBastionRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, errs.BadRequestErr(err))
+		WriteError(w, err)
 		return
 	}
 

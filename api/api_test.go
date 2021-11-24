@@ -1087,7 +1087,7 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedError400 := errs.BadRequest("force")
+	expectedError400 := errs.BadRequest("limit 'abc' is not an integer")
 	expectedError400Bytes, err := json.Marshal(expectedError400)
 	assert.FatalError(t, err)
 	expectedError500 := errs.InternalServer("force")

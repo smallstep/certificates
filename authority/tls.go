@@ -76,7 +76,10 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	opts := []interface{}{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
 	if err := csr.CheckSignature(); err != nil {
-		return nil, errs.Wrap(http.StatusBadRequest, err, "authority.Sign; invalid certificate request", opts...)
+		return nil, errs.ApplyOptions(
+			errs.BadRequestErr(err, "invalid certificate request"),
+			opts...,
+		)
 	}
 
 	// Set backdate with the configured value
@@ -114,8 +117,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	cert, err := x509util.NewCertificate(csr, certOptions...)
 	if err != nil {
 		if _, ok := err.(*x509util.TemplateError); ok {
-			return nil, errs.NewErr(http.StatusBadRequest, err,
-				errs.WithMessage(err.Error()),
+			return nil, errs.ApplyOptions(
+				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("csr", csr),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
@@ -435,8 +438,10 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 	case db.ErrNotImplemented:
 		return errs.NotImplemented("authority.Revoke; no persistence layer configured", opts...)
 	case db.ErrAlreadyExists:
-		return errs.BadRequest("authority.Revoke; certificate with serial "+
-			"number %s has already been revoked", append([]interface{}{rci.Serial}, opts...)...)
+		return errs.ApplyOptions(
+			errs.BadRequest("certificate with serial number '%s' is already revoked", rci.Serial),
+			opts...,
+		)
 	default:
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
 	}
