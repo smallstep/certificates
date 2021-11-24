@@ -1641,7 +1641,7 @@ func TestHandler_extractOrLookupJWK(t *testing.T) {
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
 
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			assert.FatalError(t, err)
 
