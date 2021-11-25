@@ -6,7 +6,7 @@
     "password": "asdf",
     "address": "127.0.0.1:0",
     "dnsNames": ["127.0.0.1"],
-    "logger": {"format": "text"},
+    "_logger": {"format": "text"},
     "tls": {
         "minVersion": 1.2,
         "maxVersion": 1.2,
