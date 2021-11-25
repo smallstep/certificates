@@ -15,7 +15,7 @@ func (a *Authority) Root(sum string) (*x509.Certificate, error) {
 
 	crt, ok := val.(*x509.Certificate)
 	if !ok {
-		return nil, errs.InternalServer("stored value is not a *x509.Certificate")
+		return nil, errs.Internal("stored value is not a *x509.Certificate")
 	}
 	return crt, nil
 }
@@ -49,7 +49,7 @@ func (a *Authority) GetFederation() (federation []*x509.Certificate, err error) 
 		crt, ok := v.(*x509.Certificate)
 		if !ok {
 			federation = nil
-			err = errs.InternalServer("stored value is not a *x509.Certificate")
+			err = errs.Internal("stored value is not a *x509.Certificate")
 			return false
 		}
 		federation = append(federation, crt)

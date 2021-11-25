@@ -44,7 +44,7 @@ func (h *caHandler) Rekey(w http.ResponseWriter, r *http.Request) {
 
 	certChain, err := h.Authority.Rekey(r.TLS.PeerCertificates[0], body.CsrPEM.CertificateRequest.PublicKey)
 	if err != nil {
-		WriteError(w, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Rekey"))
+		WriteError(w, errs.InternalServerErr(err, "error rekeying certificate"))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)

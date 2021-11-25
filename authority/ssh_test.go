@@ -901,7 +901,7 @@ func TestAuthority_RekeySSH(t *testing.T) {
 				hostSigner: signer,
 				key:        pub,
 				signOpts:   []provisioner.SignOption{userOptions},
-				err:        errors.New("rekeySSH; invalid extra option type"),
+				err:        errors.New(errs.InternalServerErrorDefaultMsg),
 				code:       http.StatusInternalServerError,
 			}
 		},

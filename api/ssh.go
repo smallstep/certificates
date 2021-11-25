@@ -344,7 +344,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHRoots(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.Authority.GetSSHRoots(r.Context())
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		WriteError(w, errs.InternalServerErr(err, "error getting ssh roots"))
 		return
 	}
 
@@ -369,7 +369,7 @@ func (h *caHandler) SSHRoots(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.Authority.GetSSHFederation(r.Context())
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		WriteError(w, errs.InternalServerErr(err, "error getting federated ssh roots"))
 		return
 	}
 
@@ -404,7 +404,7 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 
 	ts, err := h.Authority.GetSSHConfig(r.Context(), body.Type, body.Data)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		WriteError(w, errs.InternalServerErr(err, "error getting ssh config"))
 		return
 	}
 
@@ -415,7 +415,7 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 	case provisioner.SSHHostCert:
 		cfg.HostTemplates = ts
 	default:
-		WriteError(w, errs.InternalServer("it should hot get here"))
+		WriteError(w, errs.Internal("it should hot get here"))
 		return
 	}
 
@@ -436,7 +436,7 @@ func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 
 	exists, err := h.Authority.CheckSSHHost(r.Context(), body.Principal, body.Token)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		WriteError(w, errs.InternalServerErr(err, "error checking for host"))
 		return
 	}
 	JSON(w, &SSHCheckPrincipalResponse{
@@ -453,7 +453,7 @@ func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 
 	hosts, err := h.Authority.GetSSHHosts(r.Context(), cert)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		WriteError(w, errs.InternalServerErr(err, "error getting ssh hosts"))
 		return
 	}
 	JSON(w, &SSHGetHostsResponse{
@@ -475,7 +475,7 @@ func (h *caHandler) SSHBastion(w http.ResponseWriter, r *http.Request) {
 
 	bastion, err := h.Authority.GetSSHBastion(r.Context(), body.User, body.Hostname)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		WriteError(w, errs.InternalServerErr(err, "error getting ssh bastion"))
 		return
 	}
 

@@ -227,7 +227,10 @@ func (a *Authority) Authorize(ctx context.Context, token string) ([]provisioner.
 		_, signOpts, err := a.authorizeSSHRekey(ctx, token)
 		return signOpts, errs.Wrap(http.StatusInternalServerError, err, "authority.Authorize", opts...)
 	default:
-		return nil, errs.InternalServer("authority.Authorize; method %d is not supported", append([]interface{}{m}, opts...)...)
+		return nil, errs.ApplyOptions(
+			errs.InternalServer("method %d is not supported", m),
+			opts...,
+		)
 	}
 }
 

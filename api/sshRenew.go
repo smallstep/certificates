@@ -55,7 +55,7 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 	}
 	oldCert, _, err := provisioner.ExtractSSHPOPCert(body.OTT)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		WriteError(w, errs.InternalServerErr(err, "error extraction ssh certificate"))
 	}
 
 	newCert, err := h.Authority.RenewSSH(ctx, oldCert)

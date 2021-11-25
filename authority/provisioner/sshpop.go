@@ -126,7 +126,7 @@ func (p *SSHPOP) authorizeToken(token string, audiences []string) (*sshPOPPayloa
 	}
 	sshCryptoPubKey, ok := sshCert.Key.(ssh.CryptoPublicKey)
 	if !ok {
-		return nil, errs.InternalServer("sshpop.authorizeToken; sshpop public key could not be cast to ssh CryptoPublicKey")
+		return nil, errs.Internal("sshpop public key could not be cast to ssh CryptoPublicKey")
 	}
 	pubKey := sshCryptoPubKey.CryptoPublicKey()
 

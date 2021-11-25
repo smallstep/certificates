@@ -53,14 +53,13 @@ func (h *Handler) GetProvisioner(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 	cursor, limit, err := api.ParseCursor(r)
 	if err != nil {
-		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err,
-			"error parsing cursor & limit query params"))
+		api.WriteError(w, err)
 		return
 	}
 
 	p, next, err := h.auth.GetProvisioners(cursor, limit)
 	if err != nil {
-		api.WriteError(w, errs.InternalServerErr(err))
+		api.WriteError(w, errs.InternalServerErr(err, "error getting provisioners"))
 		return
 	}
 	api.JSON(w, &GetProvisionersResponse{

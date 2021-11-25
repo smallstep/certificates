@@ -324,7 +324,7 @@ func (h *caHandler) Provisioners(w http.ResponseWriter, r *http.Request) {
 
 	p, next, err := h.Authority.GetProvisioners(cursor, limit)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		WriteError(w, errs.InternalServerErr(err, "error getting provisioners"))
 		return
 	}
 	JSON(w, &ProvisionersResponse{

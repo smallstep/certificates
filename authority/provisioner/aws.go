@@ -619,7 +619,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 		return nil, errs.Wrapf(http.StatusUnauthorized, err, "aws.authorizeToken; error parsing aws token")
 	}
 	if len(jwt.Headers) == 0 {
-		return nil, errs.InternalServer("aws.authorizeToken; error parsing token, header is missing")
+		return nil, errs.BadRequest("error parsing token, header is missing")
 	}
 
 	var unsafeClaims awsPayload
