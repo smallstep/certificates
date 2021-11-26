@@ -287,6 +287,10 @@ func (m *mockSignAuth) LoadProvisionerByName(name string) (provisioner.Interface
 	return m.ret1.(provisioner.Interface), m.err
 }
 
+func (m *mockSignAuth) IsRevoked(sn string) (bool, error) {
+	return false, nil
+}
+
 func (m *mockSignAuth) Revoke(context.Context, *authority.RevokeOptions) error {
 	return nil
 }

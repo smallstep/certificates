@@ -274,19 +274,9 @@ func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
 //
 // TODO(mariano): should we authorize by default?
 func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
-	var err error
-	var isRevoked bool
-	var opts = []interface{}{errs.WithKeyVal("serialNumber", cert.SerialNumber.String())}
-
-	// Check the passive revocation table.
 	serial := cert.SerialNumber.String()
-	if lca, ok := a.adminDB.(interface {
-		IsRevoked(string) (bool, error)
-	}); ok {
-		isRevoked, err = lca.IsRevoked(serial)
-	} else {
-		isRevoked, err = a.db.IsRevoked(serial)
-	}
+	var opts = []interface{}{errs.WithKeyVal("serialNumber", serial)}
+	isRevoked, err := a.IsRevoked(serial)
 	if err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
 	}

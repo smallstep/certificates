@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -37,28 +38,30 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p, err := payloadFromContext(ctx)
+	payload, err := payloadFromContext(ctx)
 	if err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
-	var payload revokePayload
-	err = json.Unmarshal(p.value, &payload)
+	var p revokePayload
+	err = json.Unmarshal(payload.value, &p)
 	if err != nil {
 		api.WriteError(w, acme.WrapErrorISE(err, "error unmarshaling payload"))
 		return
 	}
 
-	certBytes, err := base64.RawURLEncoding.DecodeString(payload.Certificate)
+	certBytes, err := base64.RawURLEncoding.DecodeString(p.Certificate)
 	if err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error decoding base64 certificate"))
+		// in this case the most likely cause is a client that didn't properly encode the certificate
+		api.WriteError(w, acme.WrapError(acme.ErrorMalformedType, err, "error base64url decoding payload certificate property"))
 		return
 	}
 
 	certToBeRevoked, err := x509.ParseCertificate(certBytes)
 	if err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error parsing certificate"))
+		// in this case a client may have encoded something different than a certificate
+		api.WriteError(w, acme.WrapError(acme.ErrorMalformedType, err, "error parsing certificate"))
 		return
 	}
 
@@ -76,28 +79,38 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !account.IsValid() {
-			api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
-				"account '%s' has status '%s'", account.ID, account.Status))
+			api.WriteError(w, wrapUnauthorizedError(certToBeRevoked, fmt.Sprintf("account '%s' has status '%s'", account.ID, account.Status), nil))
 			return
 		}
-		if existingCert.AccountID != account.ID {
-			api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
-				"account '%s' does not own certificate '%s'", account.ID, existingCert.ID))
+		if existingCert.AccountID != account.ID { // TODO: combine with the below; ony one of the two has to be true
+			api.WriteError(w, wrapUnauthorizedError(certToBeRevoked, fmt.Sprintf("account '%s' does not own certificate '%s'", account.ID, existingCert.ID), nil))
 			return
 		}
-		// TODO: check "an account that holds authorizations for all of the identifiers in the certificate."
+		// TODO: check and implement "an account that holds authorizations for all of the identifiers in the certificate."
+		// In that case the certificate may not have been created by this account, but another account that was authorized before.
 	} else {
 		// if account doesn't need to be checked, the JWS should be verified to be signed by the
 		// private key that belongs to the public key in the certificate to be revoked.
+		// TODO: implement test case for this
 		_, err := jws.Verify(certToBeRevoked.PublicKey)
 		if err != nil {
-			api.WriteError(w, acme.WrapError(acme.ErrorUnauthorizedType, err,
-				"verification of jws using certificate public key failed"))
+			api.WriteError(w, wrapUnauthorizedError(certToBeRevoked, "verification of jws using certificate public key failed", err))
 			return
 		}
 	}
 
-	reasonCode := payload.ReasonCode
+	hasBeenRevokedBefore, err := h.ca.IsRevoked(serial)
+	if err != nil {
+		api.WriteError(w, acme.WrapErrorISE(err, "error retrieving revocation status of certificate"))
+		return
+	}
+
+	if hasBeenRevokedBefore {
+		api.WriteError(w, acme.NewError(acme.ErrorAlreadyRevokedType, "certificate was already revoked"))
+		return
+	}
+
+	reasonCode := p.ReasonCode
 	acmeErr := validateReasonCode(reasonCode)
 	if acmeErr != nil {
 		api.WriteError(w, acmeErr)
@@ -132,6 +145,21 @@ func wrapRevokeErr(err error) *acme.Error {
 		return acme.NewError(acme.ErrorAlreadyRevokedType, t)
 	}
 	return acme.WrapErrorISE(err, "error when revoking certificate")
+}
+
+// unauthorizedError returns an ACME error indicating the request was
+// not authorized to revoke the certificate.
+func wrapUnauthorizedError(cert *x509.Certificate, msg string, err error) *acme.Error {
+	var acmeErr *acme.Error
+	if err == nil {
+		acmeErr = acme.NewError(acme.ErrorUnauthorizedType, msg)
+	} else {
+		acmeErr = acme.WrapError(acme.ErrorUnauthorizedType, err, msg)
+	}
+	acmeErr.Status = http.StatusForbidden
+	acmeErr.Detail = fmt.Sprintf("No authorization provided for name %s", cert.Subject.String()) // TODO: what about other SANs?
+
+	return acmeErr
 }
 
 // logRevoke logs successful revocation of certificate

@@ -12,6 +12,7 @@ import (
 // CertificateAuthority is the interface implemented by a CA authority.
 type CertificateAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	IsRevoked(sn string) (bool, error)
 	Revoke(context.Context, *authority.RevokeOptions) error
 	LoadProvisionerByName(string) (provisioner.Interface, error)
 }
