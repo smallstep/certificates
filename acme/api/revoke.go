@@ -91,9 +91,9 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// if account doesn't need to be checked, the JWS should be verified to be signed by the
 		// private key that belongs to the public key in the certificate to be revoked.
-		// TODO: implement test case for this
 		_, err := jws.Verify(certToBeRevoked.PublicKey)
 		if err != nil {
+			// TODO(hs): possible to determine an error vs. unauthorized and thus provide an ISE vs. Unauthorized?
 			api.WriteError(w, wrapUnauthorizedError(certToBeRevoked, "verification of jws using certificate public key failed", err))
 			return
 		}
@@ -141,7 +141,7 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 // revocation into an ACME error, so that clients can understand the error.
 func wrapRevokeErr(err error) *acme.Error {
 	t := err.Error()
-	if strings.Contains(t, "has already been revoked") {
+	if strings.Contains(t, "is already revoked") {
 		return acme.NewError(acme.ErrorAlreadyRevokedType, t)
 	}
 	return acme.WrapErrorISE(err, "error when revoking certificate")
@@ -157,7 +157,7 @@ func wrapUnauthorizedError(cert *x509.Certificate, msg string, err error) *acme.
 		acmeErr = acme.WrapError(acme.ErrorUnauthorizedType, err, msg)
 	}
 	acmeErr.Status = http.StatusForbidden
-	acmeErr.Detail = fmt.Sprintf("No authorization provided for name %s", cert.Subject.String()) // TODO: what about other SANs?
+	acmeErr.Detail = fmt.Sprintf("No authorization provided for name %s", cert.Subject.String()) // TODO: what about other SANs? When no Subject is in the certificate?
 
 	return acmeErr
 }
