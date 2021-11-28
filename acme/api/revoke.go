@@ -82,11 +82,11 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, wrapUnauthorizedError(certToBeRevoked, fmt.Sprintf("account '%s' has status '%s'", account.ID, account.Status), nil))
 			return
 		}
-		if existingCert.AccountID != account.ID { // TODO: combine with the below; ony one of the two has to be true
+		if existingCert.AccountID != account.ID { // TODO(hs): combine this check with the one below; ony one of the two has to be true
 			api.WriteError(w, wrapUnauthorizedError(certToBeRevoked, fmt.Sprintf("account '%s' does not own certificate '%s'", account.ID, existingCert.ID), nil))
 			return
 		}
-		// TODO: check and implement "an account that holds authorizations for all of the identifiers in the certificate."
+		// TODO(hs): check and implement "an account that holds authorizations for all of the identifiers in the certificate."
 		// In that case the certificate may not have been created by this account, but another account that was authorized before.
 	} else {
 		// if account doesn't need to be checked, the JWS should be verified to be signed by the
@@ -157,7 +157,7 @@ func wrapUnauthorizedError(cert *x509.Certificate, msg string, err error) *acme.
 		acmeErr = acme.WrapError(acme.ErrorUnauthorizedType, err, msg)
 	}
 	acmeErr.Status = http.StatusForbidden
-	acmeErr.Detail = fmt.Sprintf("No authorization provided for name %s", cert.Subject.String()) // TODO: what about other SANs? When no Subject is in the certificate?
+	acmeErr.Detail = fmt.Sprintf("No authorization provided for name %s", cert.Subject.String()) // TODO(hs): what about other SANs? When no Subject is in the certificate?
 
 	return acmeErr
 }

@@ -102,7 +102,7 @@ func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 // AuthorizeRevoke is called just before the certificate is to be revoked by
 // the CA. It can be used to authorize revocation of a certificate. It
 // currently is a no-op.
-// TODO: add configuration option that toggles revocation? Or change function signature to make it more useful?
+// TODO(hs): add configuration option that toggles revocation? Or change function signature to make it more useful?
 // Or move certain logic out of the Revoke API to here? Would likely involve some more stuff in the ctx.
 func (p *ACME) AuthorizeRevoke(ctx context.Context, token string) error {
 	return nil

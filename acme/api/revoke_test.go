@@ -616,10 +616,10 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/wrong-certificate-encoding": func(t *testing.T) test {
-			rp := &revokePayload{
+			wrongPayload := &revokePayload{
 				Certificate: base64.StdEncoding.EncodeToString(cert.Raw),
 			}
-			wronglyEncodedPayloadBytes, err := json.Marshal(rp)
+			wronglyEncodedPayloadBytes, err := json.Marshal(wrongPayload)
 			assert.FatalError(t, err)
 			jws := &jose.JSONWebSignature{
 				Signatures: []jose.Signature{
@@ -648,10 +648,10 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/no-certificate-encoded": func(t *testing.T) test {
-			rp := &revokePayload{
+			emptyPayload := &revokePayload{
 				Certificate: base64.RawURLEncoding.EncodeToString([]byte{}),
 			}
-			wrongPayloadBytes, err := json.Marshal(rp)
+			wrongPayloadBytes, err := json.Marshal(emptyPayload)
 			assert.FatalError(t, err)
 			jws := &jose.JSONWebSignature{
 				Signatures: []jose.Signature{
@@ -856,15 +856,15 @@ func TestHandler_RevokeCert(t *testing.T) {
 		"fail/unauthorized-certificate-key": func(t *testing.T) test {
 			_, unauthorizedKey, err := generateCertKeyPair()
 			assert.FatalError(t, err)
-			rp := &revokePayload{
+			jwsPayload := &revokePayload{
 				Certificate: base64.RawURLEncoding.EncodeToString(cert.Raw),
-				ReasonCode:  v(1),
+				ReasonCode:  v(2),
 			}
 			jwsBytes, err := jwsEncodeJSON(rp, unauthorizedKey, "", "nonce", revokeURL)
 			assert.FatalError(t, err)
 			jws, err := jose.ParseJWS(string(jwsBytes))
 			assert.FatalError(t, err)
-			unauthorizedPayloadBytes, err := json.Marshal(rp)
+			unauthorizedPayloadBytes, err := json.Marshal(jwsPayload)
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: unauthorizedPayloadBytes})
@@ -981,11 +981,11 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/invalid-reasoncode": func(t *testing.T) test {
-			rp := &revokePayload{
+			invalidReasonPayload := &revokePayload{
 				Certificate: base64.RawURLEncoding.EncodeToString(cert.Raw),
 				ReasonCode:  v(7),
 			}
-			wrongReasonCodePayloadBytes, err := json.Marshal(rp)
+			wrongReasonCodePayloadBytes, err := json.Marshal(invalidReasonPayload)
 			assert.FatalError(t, err)
 			jws := &jose.JSONWebSignature{
 				Signatures: []jose.Signature{
@@ -1205,15 +1205,9 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"ok/using-certificate-key": func(t *testing.T) test {
-			rp := &revokePayload{
-				Certificate: base64.RawURLEncoding.EncodeToString(cert.Raw),
-				ReasonCode:  v(1),
-			}
 			jwsBytes, err := jwsEncodeJSON(rp, key, "", "nonce", revokeURL)
 			assert.FatalError(t, err)
 			jws, err := jose.ParseJWS(string(jwsBytes))
-			assert.FatalError(t, err)
-			payloadBytes, err := json.Marshal(rp)
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
