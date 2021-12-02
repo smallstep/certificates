@@ -1557,7 +1557,7 @@ func TestHandler_extractOrLookupJWK(t *testing.T) {
 			pub := jwk.Public()
 			pub.KeyID = base64.RawURLEncoding.EncodeToString(kid)
 			so := new(jose.SignerOptions)
-			so.WithHeader("jwk", pub)
+			so.WithHeader("jwk", pub) // JWK for certificate private key flow
 			signer, err := jose.NewSigner(jose.SigningKey{
 				Algorithm: jose.SignatureAlgorithm(jwk.Algorithm),
 				Key:       jwk.Key,
@@ -1569,14 +1569,12 @@ func TestHandler_extractOrLookupJWK(t *testing.T) {
 			assert.FatalError(t, err)
 			parsedJWS, err := jose.ParseJWS(raw)
 			assert.FatalError(t, err)
-			assert.FatalError(t, err)
-			acc := &acme.Account{Status: "valid"}
 			return test{
 				linker: NewLinker("dns", "acme"),
 				db: &acme.MockDB{
 					MockGetAccountByKeyID: func(ctx context.Context, kid string) (*acme.Account, error) {
 						assert.Equals(t, kid, pub.KeyID)
-						return acc, nil
+						return nil, acme.ErrNotFound
 					},
 				},
 				ctx:        context.WithValue(context.Background(), jwsContextKey, parsedJWS),
@@ -1595,7 +1593,7 @@ func TestHandler_extractOrLookupJWK(t *testing.T) {
 			accID := "accID"
 			prefix := fmt.Sprintf("%s/acme/%s/account/", baseURL, provName)
 			so := new(jose.SignerOptions)
-			so.WithHeader("kid", fmt.Sprintf("%s%s", prefix, accID))
+			so.WithHeader("kid", fmt.Sprintf("%s%s", prefix, accID)) // KID for account private key flow
 			signer, err := jose.NewSigner(jose.SigningKey{
 				Algorithm: jose.SignatureAlgorithm(jwk.Algorithm),
 				Key:       jwk.Key,
@@ -1607,8 +1605,6 @@ func TestHandler_extractOrLookupJWK(t *testing.T) {
 			assert.FatalError(t, err)
 			parsedJWS, err := jose.ParseJWS(raw)
 			assert.FatalError(t, err)
-			assert.FatalError(t, err)
-			//acc := &acme.Account{Status: "valid", Key: jwk}
 			acc := &acme.Account{ID: "accID", Key: jwk, Status: "valid"}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
