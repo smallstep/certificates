@@ -360,6 +360,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		ReasonCode: revokeOpts.ReasonCode,
 		Reason:     revokeOpts.Reason,
 		MTLS:       revokeOpts.MTLS,
+		ACME:       revokeOpts.ACME,
 		RevokedAt:  time.Now().UTC(),
 	}
 
