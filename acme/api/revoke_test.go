@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -37,6 +39,10 @@ func v(v int) *int {
 	return &v
 }
 
+func generateSerial() (*big.Int, error) {
+	return rand.Int(rand.Reader, big.NewInt(1000000000000000000))
+}
+
 // generateCertKeyPair generates fresh x509 certificate/key pairs for testing
 func generateCertKeyPair() (*x509.Certificate, crypto.Signer, error) {
 
@@ -45,15 +51,16 @@ func generateCertKeyPair() (*x509.Certificate, crypto.Signer, error) {
 		return nil, nil, err
 	}
 
-	serial, err := rand.Int(rand.Reader, big.NewInt(1000000000000000000))
+	serial, err := generateSerial()
 	if err != nil {
 		return nil, nil, err
 	}
 
 	now := time.Now()
 	template := &x509.Certificate{
-		Subject:      pkix.Name{CommonName: "Test ACME Revoke Certificate"},
+		Subject:      pkix.Name{CommonName: "127.0.0.1"},
 		Issuer:       pkix.Name{CommonName: "Test ACME Revoke Certificate"},
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
 		IsCA:         false,
 		MaxPathLen:   0,
 		KeyUsage:     x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
@@ -453,7 +460,7 @@ func Test_revokeOptions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := revokeOptions(tt.args.serial, tt.args.certToBeRevoked, tt.args.reasonCode); !cmp.Equal(got, tt.want) {
-				t.Errorf("revokeOptions() diff = %s", cmp.Diff(got, tt.want))
+				t.Errorf("revokeOptions() diff =\n%s", cmp.Diff(got, tt.want))
 			}
 		})
 	}
@@ -477,6 +484,20 @@ func TestHandler_RevokeCert(t *testing.T) {
 	}
 	payloadBytes, err := json.Marshal(rp)
 	assert.FatalError(t, err)
+
+	jws := &jose.JSONWebSignature{
+		Signatures: []jose.Signature{
+			{
+				Protected: jose.Header{
+					Algorithm: jose.ES256,
+					KeyID:     "bar",
+					ExtraHeaders: map[jose.HeaderKey]interface{}{
+						"url": revokeURL,
+					},
+				},
+			},
+		},
+	}
 
 	type test struct {
 		db         acme.DB
@@ -504,19 +525,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/no-provisioner": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			ctx := context.WithValue(context.Background(), jwsContextKey, jws)
 			return test{
 				ctx:        ctx,
@@ -525,19 +533,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/nil-provisioner": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			ctx := context.WithValue(context.Background(), jwsContextKey, jws)
 			ctx = context.WithValue(ctx, provisionerContextKey, nil)
 			return test{
@@ -547,19 +542,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/no-payload": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			ctx := context.WithValue(context.Background(), jwsContextKey, jws)
 			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			return test{
@@ -569,19 +551,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/nil-payload": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			ctx := context.WithValue(context.Background(), jwsContextKey, jws)
 			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, payloadContextKey, nil)
@@ -592,19 +561,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/unmarshal-payload": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			malformedPayload := []byte(`{"payload":malformed?}`)
 			ctx := context.WithValue(context.Background(), jwsContextKey, jws)
 			ctx = context.WithValue(ctx, provisionerContextKey, prov)
@@ -621,19 +577,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 			wronglyEncodedPayloadBytes, err := json.Marshal(wrongPayload)
 			assert.FatalError(t, err)
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: wronglyEncodedPayloadBytes})
 			ctx = context.WithValue(ctx, jwsContextKey, jws)
@@ -651,23 +594,10 @@ func TestHandler_RevokeCert(t *testing.T) {
 			emptyPayload := &revokePayload{
 				Certificate: base64.RawURLEncoding.EncodeToString([]byte{}),
 			}
-			wrongPayloadBytes, err := json.Marshal(emptyPayload)
+			emptyPayloadBytes, err := json.Marshal(emptyPayload)
 			assert.FatalError(t, err)
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
-			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: wrongPayloadBytes})
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: emptyPayloadBytes})
 			ctx = context.WithValue(ctx, jwsContextKey, jws)
 			return test{
 				ctx:        ctx,
@@ -680,19 +610,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/db.GetCertificateBySerial": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
 			ctx = context.WithValue(ctx, jwsContextKey, jws)
@@ -708,27 +625,37 @@ func TestHandler_RevokeCert(t *testing.T) {
 				err:        acme.NewErrorISE("error retrieving certificate by serial"),
 			}
 		},
-		"fail/no-account": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
+		"fail/different-certificate-contents": func(t *testing.T) test {
+			aDifferentCert, _, err := generateCertKeyPair()
+			assert.FatalError(t, err)
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
 			ctx = context.WithValue(ctx, jwsContextKey, jws)
 			db := &acme.MockDB{
 				MockGetCertificateBySerial: func(ctx context.Context, serial string) (*acme.Certificate, error) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
-					return &acme.Certificate{}, nil
+					return &acme.Certificate{
+						Leaf: aDifferentCert,
+					}, nil
+				},
+			}
+			return test{
+				db:         db,
+				ctx:        ctx,
+				statusCode: 500,
+				err:        acme.NewErrorISE("certificate raw bytes are not equal"),
+			}
+		},
+		"fail/no-account": func(t *testing.T) test {
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
+			ctx = context.WithValue(ctx, jwsContextKey, jws)
+			db := &acme.MockDB{
+				MockGetCertificateBySerial: func(ctx context.Context, serial string) (*acme.Certificate, error) {
+					assert.Equals(t, cert.SerialNumber.String(), serial)
+					return &acme.Certificate{
+						Leaf: cert,
+					}, nil
 				},
 			}
 			return test{
@@ -739,19 +666,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/nil-account": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
 			ctx = context.WithValue(ctx, jwsContextKey, jws)
@@ -759,7 +673,9 @@ func TestHandler_RevokeCert(t *testing.T) {
 			db := &acme.MockDB{
 				MockGetCertificateBySerial: func(ctx context.Context, serial string) (*acme.Certificate, error) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
-					return &acme.Certificate{}, nil
+					return &acme.Certificate{
+						Leaf: cert,
+					}, nil
 				},
 			}
 			return test{
@@ -770,19 +686,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/account-not-valid": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			acc := &acme.Account{ID: "accountID", Status: acme.StatusInvalid}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -795,6 +698,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
 					return &acme.Certificate{
 						AccountID: "accountID",
+						Leaf:      cert,
 					}, nil
 				},
 			}
@@ -806,25 +710,12 @@ func TestHandler_RevokeCert(t *testing.T) {
 				statusCode: 403,
 				err: &acme.Error{
 					Type:   "urn:ietf:params:acme:error:unauthorized",
-					Detail: fmt.Sprintf("No authorization provided for name %s", cert.Subject.String()),
+					Detail: "No authorization provided for name 127.0.0.1",
 					Status: 403,
 				},
 			}
 		},
-		"fail/account-not-authorized": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
+		"fail/db.GetAuthorizationsByAccountID-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accountID", Status: acme.StatusValid}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -837,6 +728,49 @@ func TestHandler_RevokeCert(t *testing.T) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
 					return &acme.Certificate{
 						AccountID: "differentAccountID",
+						Leaf:      cert,
+					}, nil
+				},
+				MockGetAuthorizationsByAccountID: func(ctx context.Context, accountID string) ([]*acme.Authorization, error) {
+					return nil, errors.New("force")
+				},
+			}
+			ca := &mockCA{}
+			return test{
+				db:         db,
+				ca:         ca,
+				ctx:        ctx,
+				statusCode: 500,
+				err:        acme.NewErrorISE("error retrieving authorizations for Account %s", "accountID"),
+			}
+		},
+		"fail/account-not-authorized": func(t *testing.T) test {
+			acc := &acme.Account{ID: "accountID", Status: acme.StatusValid}
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
+			ctx = context.WithValue(ctx, jwsContextKey, jws)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
+			db := &acme.MockDB{
+				MockGetCertificateBySerial: func(ctx context.Context, serial string) (*acme.Certificate, error) {
+					assert.Equals(t, cert.SerialNumber.String(), serial)
+					return &acme.Certificate{
+						AccountID: "differentAccountID",
+						Leaf:      cert,
+					}, nil
+				},
+				MockGetAuthorizationsByAccountID: func(ctx context.Context, accountID string) ([]*acme.Authorization, error) {
+					assert.Equals(t, "accountID", accountID)
+					return []*acme.Authorization{
+						{
+							AccountID: "accountID",
+							Status:    acme.StatusValid,
+							Identifier: acme.Identifier{
+								Type:  acme.IP,
+								Value: "127.0.1.0",
+							},
+						},
 					}, nil
 				},
 			}
@@ -848,7 +782,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 				statusCode: 403,
 				err: &acme.Error{
 					Type:   "urn:ietf:params:acme:error:unauthorized",
-					Detail: fmt.Sprintf("No authorization provided for name %s", cert.Subject.String()),
+					Detail: "No authorization provided for name 127.0.0.1",
 					Status: 403,
 				},
 			}
@@ -862,13 +796,13 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 			jwsBytes, err := jwsEncodeJSON(rp, unauthorizedKey, "", "nonce", revokeURL)
 			assert.FatalError(t, err)
-			jws, err := jose.ParseJWS(string(jwsBytes))
+			parsedJWS, err := jose.ParseJWS(string(jwsBytes))
 			assert.FatalError(t, err)
 			unauthorizedPayloadBytes, err := json.Marshal(jwsPayload)
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: unauthorizedPayloadBytes})
-			ctx = context.WithValue(ctx, jwsContextKey, jws)
+			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			db := &acme.MockDB{
@@ -876,12 +810,13 @@ func TestHandler_RevokeCert(t *testing.T) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
 					return &acme.Certificate{
 						AccountID: "accountID",
+						Leaf:      cert,
 					}, nil
 				},
 			}
 			ca := &mockCA{}
 			acmeErr := acme.NewError(acme.ErrorUnauthorizedType, "verification of jws using certificate public key failed")
-			acmeErr.Detail = "No authorization provided for name CN=Test ACME Revoke Certificate"
+			acmeErr.Detail = "No authorization provided for name 127.0.0.1"
 			return test{
 				db:         db,
 				ca:         ca,
@@ -891,19 +826,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/certificate-revoked-check-fails": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			acc := &acme.Account{ID: "accountID", Status: acme.StatusValid}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -916,6 +838,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
 					return &acme.Certificate{
 						AccountID: "accountID",
+						Leaf:      cert,
 					}, nil
 				},
 			}
@@ -937,19 +860,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/certificate-already-revoked": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			acc := &acme.Account{ID: "accountID", Status: acme.StatusValid}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -960,6 +870,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
 					return &acme.Certificate{
 						AccountID: "accountID",
+						Leaf:      cert,
 					}, nil
 				},
 			}
@@ -985,31 +896,19 @@ func TestHandler_RevokeCert(t *testing.T) {
 				Certificate: base64.RawURLEncoding.EncodeToString(cert.Raw),
 				ReasonCode:  v(7),
 			}
-			wrongReasonCodePayloadBytes, err := json.Marshal(invalidReasonPayload)
+			invalidReasonCodePayloadBytes, err := json.Marshal(invalidReasonPayload)
 			assert.FatalError(t, err)
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			acc := &acme.Account{ID: "accountID", Status: acme.StatusValid}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, accContextKey, acc)
-			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: wrongReasonCodePayloadBytes})
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: invalidReasonCodePayloadBytes})
 			ctx = context.WithValue(ctx, jwsContextKey, jws)
 			db := &acme.MockDB{
 				MockGetCertificateBySerial: func(ctx context.Context, serial string) (*acme.Certificate, error) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
 					return &acme.Certificate{
 						AccountID: "accountID",
+						Leaf:      cert,
 					}, nil
 				},
 			}
@@ -1032,19 +931,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 		},
 		"fail/prov.AuthorizeRevoke": func(t *testing.T) test {
 			assert.FatalError(t, err)
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			mockACMEProv := &acme.MockProvisioner{
 				MauthorizeRevoke: func(ctx context.Context, token string) error {
 					return errors.New("force")
@@ -1060,6 +946,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
 					return &acme.Certificate{
 						AccountID: "accountID",
+						Leaf:      cert,
 					}, nil
 				},
 			}
@@ -1081,19 +968,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/ca.Revoke": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			acc := &acme.Account{ID: "accountID", Status: acme.StatusValid}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -1104,6 +978,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
 					return &acme.Certificate{
 						AccountID: "accountID",
+						Leaf:      cert,
 					}, nil
 				},
 			}
@@ -1125,19 +1000,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"fail/ca.Revoke-already-revoked": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			acc := &acme.Account{ID: "accountID", Status: acme.StatusValid}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -1148,6 +1010,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
 					return &acme.Certificate{
 						AccountID: "accountID",
+						Leaf:      cert,
 					}, nil
 				},
 			}
@@ -1168,19 +1031,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 			}
 		},
 		"ok/using-account-key": func(t *testing.T) test {
-			jws := &jose.JSONWebSignature{
-				Signatures: []jose.Signature{
-					{
-						Protected: jose.Header{
-							Algorithm: jose.ES256,
-							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
-								"url": revokeURL,
-							},
-						},
-					},
-				},
-			}
 			acc := &acme.Account{ID: "accountID", Status: acme.StatusValid}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -1193,6 +1043,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
 					return &acme.Certificate{
 						AccountID: "accountID",
+						Leaf:      cert,
 					}, nil
 				},
 			}
@@ -1218,7 +1069,8 @@ func TestHandler_RevokeCert(t *testing.T) {
 				MockGetCertificateBySerial: func(ctx context.Context, serial string) (*acme.Certificate, error) {
 					assert.Equals(t, cert.SerialNumber.String(), serial)
 					return &acme.Certificate{
-						AccountID: "accountID",
+						AccountID: "someDifferentAccountID",
+						Leaf:      cert,
 					}, nil
 				},
 			}
@@ -1260,6 +1112,403 @@ func TestHandler_RevokeCert(t *testing.T) {
 				assert.True(t, bytes.Equal(bytes.TrimSpace(body), []byte{}))
 				assert.Equals(t, int64(0), req.ContentLength)
 				assert.Equals(t, []string{fmt.Sprintf("<%s/acme/%s/directory>;rel=\"index\"", baseURL.String(), escProvName)}, res.Header["Link"])
+			}
+		})
+	}
+}
+
+func TestHandler_isAccountAuthorized(t *testing.T) {
+	type test struct {
+		db              acme.DB
+		ctx             context.Context
+		existingCert    *acme.Certificate
+		certToBeRevoked *x509.Certificate
+		account         *acme.Account
+		err             *acme.Error
+	}
+	accountID := "accountID"
+	var tests = map[string]func(t *testing.T) test{
+		"fail/account-invalid": func(t *testing.T) test {
+			account := &acme.Account{
+				ID:     accountID,
+				Status: acme.StatusInvalid,
+			}
+			certToBeRevoked := &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "127.0.0.1",
+				},
+			}
+			return test{
+				ctx:             context.TODO(),
+				certToBeRevoked: certToBeRevoked,
+				account:         account,
+				err: &acme.Error{
+					Type:   "urn:ietf:params:acme:error:unauthorized",
+					Status: http.StatusForbidden,
+					Detail: "No authorization provided for name 127.0.0.1",
+					Err:    errors.New("account 'accountID' has status 'invalid'"),
+				},
+			}
+		},
+		"fail/no-certificate-identifiers": func(t *testing.T) test {
+			account := &acme.Account{
+				ID:     accountID,
+				Status: acme.StatusValid,
+			}
+			certToBeRevoked := &x509.Certificate{}
+			existingCert := &acme.Certificate{
+				AccountID: "differentAccountID",
+			}
+			return test{
+				ctx:             context.TODO(),
+				existingCert:    existingCert,
+				certToBeRevoked: certToBeRevoked,
+				account:         account,
+				err: &acme.Error{
+					Type:   "urn:ietf:params:acme:error:unauthorized",
+					Status: http.StatusForbidden,
+					Detail: "No authorization provided",
+					Err:    errors.New("cannot authorize revocation without providing identifiers to authorize"),
+				},
+			}
+		},
+		"fail/db.GetAuthorizationsByAccountID-error": func(t *testing.T) test {
+			account := &acme.Account{
+				ID:     accountID,
+				Status: acme.StatusValid,
+			}
+			certToBeRevoked := &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "127.0.0.1",
+				},
+			}
+			existingCert := &acme.Certificate{
+				AccountID: "differentAccountID",
+			}
+			return test{
+				db: &acme.MockDB{
+					MockGetAuthorizationsByAccountID: func(ctx context.Context, accountID string) ([]*acme.Authorization, error) {
+						assert.Equals(t, "accountID", accountID)
+						return nil, errors.New("force")
+					},
+				},
+				ctx:             context.TODO(),
+				existingCert:    existingCert,
+				certToBeRevoked: certToBeRevoked,
+				account:         account,
+				err:             acme.NewErrorISE("error retrieving authorizations for Account %s: force", accountID),
+			}
+		},
+		"fail/no-valid-authorizations": func(t *testing.T) test {
+			account := &acme.Account{
+				ID:     accountID,
+				Status: acme.StatusValid,
+			}
+			certToBeRevoked := &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "127.0.0.1",
+				},
+			}
+			existingCert := &acme.Certificate{
+				AccountID: "differentAccountID",
+			}
+			return test{
+				db: &acme.MockDB{
+					MockGetAuthorizationsByAccountID: func(ctx context.Context, accountID string) ([]*acme.Authorization, error) {
+						assert.Equals(t, "accountID", accountID)
+						return []*acme.Authorization{
+							{
+								AccountID: accountID,
+								Status:    acme.StatusInvalid,
+							},
+						}, nil
+					},
+				},
+				ctx:             context.TODO(),
+				existingCert:    existingCert,
+				certToBeRevoked: certToBeRevoked,
+				account:         account,
+				err: &acme.Error{
+					Type:   "urn:ietf:params:acme:error:unauthorized",
+					Status: http.StatusForbidden,
+					Detail: "No authorization provided for name 127.0.0.1",
+					Err:    errors.New("account 'accountID' does not have valid authorizations"),
+				},
+			}
+		},
+		"fail/authorizations-do-not-match-identifiers": func(t *testing.T) test {
+			account := &acme.Account{
+				ID:     accountID,
+				Status: acme.StatusValid,
+			}
+			certToBeRevoked := &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "127.0.0.1",
+				},
+			}
+			existingCert := &acme.Certificate{
+				AccountID: "differentAccountID",
+			}
+			return test{
+				db: &acme.MockDB{
+					MockGetAuthorizationsByAccountID: func(ctx context.Context, accountID string) ([]*acme.Authorization, error) {
+						assert.Equals(t, "accountID", accountID)
+						return []*acme.Authorization{
+							{
+								AccountID: accountID,
+								Status:    acme.StatusValid,
+								Identifier: acme.Identifier{
+									Type:  acme.IP,
+									Value: "127.0.0.2",
+								},
+							},
+						}, nil
+					},
+				},
+				ctx:             context.TODO(),
+				existingCert:    existingCert,
+				certToBeRevoked: certToBeRevoked,
+				account:         account,
+				err: &acme.Error{
+					Type:   "urn:ietf:params:acme:error:unauthorized",
+					Status: http.StatusForbidden,
+					Detail: "No authorization provided for name 127.0.0.1",
+					Err:    errors.New("account 'accountID' does not have authorizations for all identifiers"),
+				},
+			}
+		},
+		"ok": func(t *testing.T) test {
+			account := &acme.Account{
+				ID:     accountID,
+				Status: acme.StatusValid,
+			}
+			certToBeRevoked := &x509.Certificate{
+				IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+			}
+			existingCert := &acme.Certificate{
+				AccountID: "differentAccountID",
+			}
+			return test{
+				db: &acme.MockDB{
+					MockGetAuthorizationsByAccountID: func(ctx context.Context, accountID string) ([]*acme.Authorization, error) {
+						assert.Equals(t, "accountID", accountID)
+						return []*acme.Authorization{
+							{
+								AccountID: accountID,
+								Status:    acme.StatusValid,
+								Identifier: acme.Identifier{
+									Type:  acme.IP,
+									Value: "127.0.0.1",
+								},
+							},
+						}, nil
+					},
+				},
+				ctx:             context.TODO(),
+				existingCert:    existingCert,
+				certToBeRevoked: certToBeRevoked,
+				account:         account,
+				err:             nil,
+			}
+		},
+	}
+	for name, setup := range tests {
+		tc := setup(t)
+		t.Run(name, func(t *testing.T) {
+			h := &Handler{db: tc.db}
+			acmeErr := h.isAccountAuthorized(tc.ctx, tc.existingCert, tc.certToBeRevoked, tc.account)
+
+			expectError := tc.err != nil
+			gotError := acmeErr != nil
+			if expectError != gotError {
+				t.Errorf("expected: %t, got: %t", expectError, gotError)
+				return
+			}
+
+			if !gotError {
+				return // nothing to check; return early
+			}
+
+			assert.Equals(t, acmeErr.Err.Error(), tc.err.Err.Error())
+			assert.Equals(t, acmeErr.Type, tc.err.Type)
+			assert.Equals(t, acmeErr.Status, tc.err.Status)
+			assert.Equals(t, acmeErr.Detail, tc.err.Detail)
+			assert.Equals(t, acmeErr.Identifier, tc.err.Identifier)
+			assert.Equals(t, acmeErr.Subproblems, tc.err.Subproblems)
+
+		})
+	}
+}
+
+func Test_identifierKey(t *testing.T) {
+	tests := []struct {
+		name       string
+		identifier acme.Identifier
+		want       string
+	}{
+		{
+			name: "ip",
+			identifier: acme.Identifier{
+				Type:  acme.IP,
+				Value: "10.0.0.1",
+			},
+			want: "ip|10.0.0.1",
+		},
+		{
+			name: "dns",
+			identifier: acme.Identifier{
+				Type:  acme.DNS,
+				Value: "*.example.com",
+			},
+			want: "dns|*.example.com",
+		},
+		{
+			name: "unknown",
+			identifier: acme.Identifier{
+				Type:  "InvalidType",
+				Value: "<<>>",
+			},
+			want: "unsupported|<<>>",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := identifierKey(tt.identifier)
+			if !cmp.Equal(tt.want, got) {
+				t.Errorf("identifierKey() diff = \n%s", cmp.Diff(tt.want, got))
+			}
+		})
+	}
+}
+
+func Test_extractIdentifiers(t *testing.T) {
+	tests := []struct {
+		name string
+		cert *x509.Certificate
+		want map[string]acme.Identifier
+	}{
+		{
+			name: "ip",
+			cert: &x509.Certificate{
+				IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+			},
+			want: map[string]acme.Identifier{
+				"ip|127.0.0.1": {
+					Type:  acme.IP,
+					Value: "127.0.0.1",
+				},
+			},
+		},
+		{
+			name: "dns",
+			cert: &x509.Certificate{
+				DNSNames: []string{"*.example.com"},
+			},
+			want: map[string]acme.Identifier{
+				"dns|*.example.com": {
+					Type:  acme.DNS,
+					Value: "*.example.com",
+				},
+			},
+		},
+		{
+			name: "dns-subject",
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "www.example.com",
+				},
+			},
+			want: map[string]acme.Identifier{
+				"dns|www.example.com": {
+					Type:  acme.DNS,
+					Value: "www.example.com",
+				},
+			},
+		},
+		{
+			name: "ip-subject",
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "127.0.0.1",
+				},
+			},
+			want: map[string]acme.Identifier{
+				"dns|127.0.0.1": { // this is the currently expected behavior
+					Type:  acme.DNS,
+					Value: "127.0.0.1",
+				},
+			},
+		},
+		{
+			name: "combined",
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "127.0.0.1",
+				},
+				IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.2")},
+				DNSNames:    []string{"*.example.com", "www.example.com"},
+			},
+			want: map[string]acme.Identifier{
+				"ip|127.0.0.1": {
+					Type:  acme.IP,
+					Value: "127.0.0.1",
+				},
+				"ip|127.0.0.2": {
+					Type:  acme.IP,
+					Value: "127.0.0.2",
+				},
+				"dns|*.example.com": {
+					Type:  acme.DNS,
+					Value: "*.example.com",
+				},
+				"dns|www.example.com": {
+					Type:  acme.DNS,
+					Value: "www.example.com",
+				},
+				"dns|127.0.0.1": { // this is the currently expected behavior
+					Type:  acme.DNS,
+					Value: "127.0.0.1",
+				},
+			},
+		},
+		{
+			name: "ip-duplicates",
+			cert: &x509.Certificate{
+				IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.2")},
+			},
+			want: map[string]acme.Identifier{
+				"ip|127.0.0.1": {
+					Type:  acme.IP,
+					Value: "127.0.0.1",
+				},
+				"ip|127.0.0.2": {
+					Type:  acme.IP,
+					Value: "127.0.0.2",
+				},
+			},
+		},
+		{
+			name: "dns-duplicates",
+			cert: &x509.Certificate{
+				DNSNames: []string{"*.example.com", "www.example.com", "www.example.com"},
+			},
+			want: map[string]acme.Identifier{
+				"dns|*.example.com": {
+					Type:  acme.DNS,
+					Value: "*.example.com",
+				},
+				"dns|www.example.com": {
+					Type:  acme.DNS,
+					Value: "www.example.com",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractIdentifiers(tt.cert)
+			if !cmp.Equal(tt.want, got) {
+				t.Errorf("extractIdentifiers() diff=\n%s", cmp.Diff(tt.want, got))
 			}
 		})
 	}

@@ -1,6 +1,8 @@
 package api
 
 import (
+	"bytes"
+	"context"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -66,9 +68,15 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serial := certToBeRevoked.SerialNumber.String()
-	existingCert, err := h.db.GetCertificateBySerial(ctx, serial)
+	dbCert, err := h.db.GetCertificateBySerial(ctx, serial)
 	if err != nil {
 		api.WriteError(w, acme.WrapErrorISE(err, "error retrieving certificate by serial"))
+		return
+	}
+
+	if !bytes.Equal(dbCert.Leaf.Raw, certToBeRevoked.Raw) {
+		// this should never happen
+		api.WriteError(w, acme.NewErrorISE("certificate raw bytes are not equal"))
 		return
 	}
 
@@ -78,23 +86,18 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, err)
 			return
 		}
-		if !account.IsValid() {
-			api.WriteError(w, wrapUnauthorizedError(certToBeRevoked, fmt.Sprintf("account '%s' has status '%s'", account.ID, account.Status), nil))
+		acmeErr := h.isAccountAuthorized(ctx, dbCert, certToBeRevoked, account)
+		if acmeErr != nil {
+			api.WriteError(w, acmeErr)
 			return
 		}
-		if existingCert.AccountID != account.ID { // TODO(hs): combine this check with the one below; ony one of the two has to be true
-			api.WriteError(w, wrapUnauthorizedError(certToBeRevoked, fmt.Sprintf("account '%s' does not own certificate '%s'", account.ID, existingCert.ID), nil))
-			return
-		}
-		// TODO(hs): check and implement "an account that holds authorizations for all of the identifiers in the certificate."
-		// In that case the certificate may not have been created by this account, but another account that was authorized before.
 	} else {
 		// if account doesn't need to be checked, the JWS should be verified to be signed by the
 		// private key that belongs to the public key in the certificate to be revoked.
 		_, err := jws.Verify(certToBeRevoked.PublicKey)
 		if err != nil {
 			// TODO(hs): possible to determine an error vs. unauthorized and thus provide an ISE vs. Unauthorized?
-			api.WriteError(w, wrapUnauthorizedError(certToBeRevoked, "verification of jws using certificate public key failed", err))
+			api.WriteError(w, wrapUnauthorizedError(certToBeRevoked, nil, "verification of jws using certificate public key failed", err))
 			return
 		}
 	}
@@ -137,6 +140,107 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 	w.Write(nil)
 }
 
+// isAccountAuthorized checks if an ACME account that was retrieved earlier is authorized
+// to revoke the certificate. An Account must always be valid in order to revoke a certificate.
+// In case the certificate retrieved from the database belongs to the Account, the Account is
+// authorized. If the certificate retrieved from the database doesn't belong to the Account,
+// the identifiers in the certificate are extracted and compared against the (valid) Authorizations
+// that are stored for the ACME Account. If these sets match, the Account is considered authorized
+// to revoke the certificate. If this check fails, the client will receive an unauthorized error.
+func (h *Handler) isAccountAuthorized(ctx context.Context, dbCert *acme.Certificate, certToBeRevoked *x509.Certificate, account *acme.Account) *acme.Error {
+	if !account.IsValid() {
+		return wrapUnauthorizedError(certToBeRevoked, nil, fmt.Sprintf("account '%s' has status '%s'", account.ID, account.Status), nil)
+	}
+	certificateBelongsToAccount := dbCert.AccountID == account.ID
+	if certificateBelongsToAccount {
+		return nil // return early; skip relatively expensive database check
+	}
+	requiredIdentifiers := extractIdentifiers(certToBeRevoked)
+	if len(requiredIdentifiers) == 0 {
+		return wrapUnauthorizedError(certToBeRevoked, nil, "cannot authorize revocation without providing identifiers to authorize", nil)
+	}
+	authzs, err := h.db.GetAuthorizationsByAccountID(ctx, account.ID)
+	if err != nil {
+		return acme.WrapErrorISE(err, "error retrieving authorizations for Account %s", account.ID)
+	}
+	authorizedIdentifiers := map[string]acme.Identifier{}
+	for _, authz := range authzs {
+		// Only valid Authorizations are included
+		if authz.Status != acme.StatusValid {
+			continue
+		}
+		authorizedIdentifiers[identifierKey(authz.Identifier)] = authz.Identifier
+	}
+	if len(authorizedIdentifiers) == 0 {
+		unauthorizedIdentifiers := []acme.Identifier{}
+		for _, identifier := range requiredIdentifiers {
+			unauthorizedIdentifiers = append(unauthorizedIdentifiers, identifier)
+		}
+		return wrapUnauthorizedError(certToBeRevoked, unauthorizedIdentifiers, fmt.Sprintf("account '%s' does not have valid authorizations", account.ID), nil)
+	}
+	unauthorizedIdentifiers := []acme.Identifier{}
+	for key := range requiredIdentifiers {
+		_, ok := authorizedIdentifiers[key]
+		if !ok {
+			unauthorizedIdentifiers = append(unauthorizedIdentifiers, requiredIdentifiers[key])
+		}
+	}
+	if len(unauthorizedIdentifiers) != 0 {
+		return wrapUnauthorizedError(certToBeRevoked, unauthorizedIdentifiers, fmt.Sprintf("account '%s' does not have authorizations for all identifiers", account.ID), nil)
+	}
+
+	return nil
+}
+
+// identifierKey creates a unique key for an ACME identifier using
+// the following format: ip|127.0.0.1; dns|*.example.com
+func identifierKey(identifier acme.Identifier) string {
+	if identifier.Type == acme.IP {
+		return "ip|" + identifier.Value
+	}
+	if identifier.Type == acme.DNS {
+		return "dns|" + identifier.Value
+	}
+	return "unsupported|" + identifier.Value
+}
+
+// extractIdentifiers extracts ACME identifiers from an x509 certificate and
+// creates a map from them. The map ensures that double SANs are deduplicated.
+// The Subject CommonName is included, because RFC8555 7.4 states that DNS
+// identifiers can come from either the CommonName or a DNS SAN or both. When
+// authorizing issuance, the DNS identifier must be in the request and will be
+// included in the validation (see Order.sans()) as of now. This means that the
+// CommonName will in fact have an authorization available.
+func extractIdentifiers(cert *x509.Certificate) map[string]acme.Identifier {
+	result := map[string]acme.Identifier{}
+	for _, name := range cert.DNSNames {
+		identifier := acme.Identifier{
+			Type:  acme.DNS,
+			Value: name,
+		}
+		result[identifierKey(identifier)] = identifier
+	}
+	for _, ip := range cert.IPAddresses {
+		identifier := acme.Identifier{
+			Type:  acme.IP,
+			Value: ip.String(),
+		}
+		result[identifierKey(identifier)] = identifier
+	}
+	// TODO(hs): should we include the CommonName or not?
+	if cert.Subject.CommonName != "" {
+		identifier := acme.Identifier{
+			// assuming only DNS can be in Common Name (RFC8555, 7.4); RFC8738
+			// IP Identifier Validation Extension does not state anything about this.
+			// This logic is in accordance with the logic in order.canonicalize()
+			Type:  acme.DNS,
+			Value: cert.Subject.CommonName,
+		}
+		result[identifierKey(identifier)] = identifier
+	}
+	return result
+}
+
 // wrapRevokeErr is a best effort implementation to transform an error during
 // revocation into an ACME error, so that clients can understand the error.
 func wrapRevokeErr(err error) *acme.Error {
@@ -149,15 +253,24 @@ func wrapRevokeErr(err error) *acme.Error {
 
 // unauthorizedError returns an ACME error indicating the request was
 // not authorized to revoke the certificate.
-func wrapUnauthorizedError(cert *x509.Certificate, msg string, err error) *acme.Error {
+func wrapUnauthorizedError(cert *x509.Certificate, unauthorizedIdentifiers []acme.Identifier, msg string, err error) *acme.Error {
 	var acmeErr *acme.Error
 	if err == nil {
 		acmeErr = acme.NewError(acme.ErrorUnauthorizedType, msg)
 	} else {
 		acmeErr = acme.WrapError(acme.ErrorUnauthorizedType, err, msg)
 	}
-	acmeErr.Status = http.StatusForbidden
-	acmeErr.Detail = fmt.Sprintf("No authorization provided for name %s", cert.Subject.String()) // TODO(hs): what about other SANs? When no Subject is in the certificate?
+	acmeErr.Status = http.StatusForbidden // RFC8555 7.6 shows example with 403
+
+	switch {
+	case len(unauthorizedIdentifiers) > 0:
+		identifier := unauthorizedIdentifiers[0] // picking the first; compound may be an option too?
+		acmeErr.Detail = fmt.Sprintf("No authorization provided for name %s", identifier.Value)
+	case cert.Subject.String() != "":
+		acmeErr.Detail = fmt.Sprintf("No authorization provided for name %s", cert.Subject.CommonName)
+	default:
+		acmeErr.Detail = "No authorization provided"
+	}
 
 	return acmeErr
 }
