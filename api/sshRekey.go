@@ -68,7 +68,7 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 
 	newCert, err := h.Authority.RekeySSH(ctx, oldCert, publicKey, signOpts...)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
+		WriteError(w, errs.ForbiddenErr(err, "error rekeying ssh certificate"))
 		return
 	}
 
@@ -78,7 +78,7 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 
 	identity, err := h.renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error signing identity certificate"))
+		WriteError(w, errs.ForbiddenErr(err, "error renewing identity certificate"))
 		return
 	}
 
