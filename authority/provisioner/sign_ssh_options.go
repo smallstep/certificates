@@ -414,6 +414,10 @@ func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate, o SignSSHOptions)
 type sshDefaultPublicKeyValidator struct{}
 
 // Valid checks that certificate request common name matches the one configured.
+//
+// TODO: this is the only validator that checks the key type. We should execute
+// this before the signing. We should add a new validations interface or extend
+// SSHCertOptionsValidator with the key.
 func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, o SignSSHOptions) error {
 	if cert.Key == nil {
 		return errs.BadRequest("ssh certificate key cannot be nil")
