@@ -60,7 +60,7 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 
 	newCert, err := h.Authority.RenewSSH(ctx, oldCert)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
+		WriteError(w, errs.ForbiddenErr(err, "error renewing ssh certificate"))
 		return
 	}
 
@@ -70,7 +70,7 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 
 	identity, err := h.renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error signing identity certificate"))
+		WriteError(w, errs.ForbiddenErr(err, "error renewing identity certificate"))
 		return
 	}
 
