@@ -101,16 +101,16 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("HEAD", getPath(DirectoryLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.GetDirectory)))
 
 	validatingMiddleware := func(next nextHTTP) nextHTTP {
-		return h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(next))))))
+		return h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(h.validateJWS(next)))))))
 	}
 	extractPayloadByJWK := func(next nextHTTP) nextHTTP {
-		return validatingMiddleware(h.validateJWS(h.extractJWK(h.verifyAndExtractJWSPayload(next))))
+		return validatingMiddleware(h.extractJWK(h.verifyAndExtractJWSPayload(next)))
 	}
 	extractPayloadByKid := func(next nextHTTP) nextHTTP {
-		return validatingMiddleware(h.validateJWS(h.lookupJWK(h.verifyAndExtractJWSPayload(next))))
+		return validatingMiddleware(h.lookupJWK(h.verifyAndExtractJWSPayload(next)))
 	}
 	extractPayloadByKidOrJWK := func(next nextHTTP) nextHTTP {
-		return validatingMiddleware(h.validateJWS(h.extractOrLookupJWK(h.verifyAndExtractJWSPayload(next))))
+		return validatingMiddleware(h.extractOrLookupJWK(h.verifyAndExtractJWSPayload(next)))
 	}
 
 	r.MethodFunc("POST", getPath(NewAccountLinkType, "{provisionerID}"), extractPayloadByJWK(h.NewAccount))

@@ -205,7 +205,7 @@ func identifierKey(identifier acme.Identifier) string {
 }
 
 // extractIdentifiers extracts ACME identifiers from an x509 certificate and
-// creates a map from them. The map ensures that double SANs are deduplicated.
+// creates a map from them. The map ensures that duplicate SANs are deduplicated.
 // The Subject CommonName is included, because RFC8555 7.4 states that DNS
 // identifiers can come from either the CommonName or a DNS SAN or both. When
 // authorizing issuance, the DNS identifier must be in the request and will be
@@ -227,7 +227,6 @@ func extractIdentifiers(cert *x509.Certificate) map[string]acme.Identifier {
 		}
 		result[identifierKey(identifier)] = identifier
 	}
-	// TODO(hs): should we include the CommonName or not?
 	if cert.Subject.CommonName != "" {
 		identifier := acme.Identifier{
 			// assuming only DNS can be in Common Name (RFC8555, 7.4); RFC8738
@@ -302,7 +301,7 @@ func validateReasonCode(reasonCode *int) *acme.Error {
 	return nil
 }
 
-// revokeOptions determines the the RevokeOptions for the Authority to use in revocation
+// revokeOptions determines the RevokeOptions for the Authority to use in revocation
 func revokeOptions(serial string, certToBeRevoked *x509.Certificate, reasonCode *int) *authority.RevokeOptions {
 	opts := &authority.RevokeOptions{
 		Serial: serial,
