@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -94,7 +93,7 @@ func ProtoJSONStatus(w http.ResponseWriter, m proto.Message, status int) {
 // pointed by v.
 func ReadJSON(r io.Reader, v interface{}) error {
 	if err := json.NewDecoder(r).Decode(v); err != nil {
-		return errs.Wrap(http.StatusBadRequest, err, "error decoding json")
+		return errs.BadRequestErr(err, "error decoding json")
 	}
 	return nil
 }
@@ -102,9 +101,9 @@ func ReadJSON(r io.Reader, v interface{}) error {
 // ReadProtoJSON reads JSON from the request body and stores it in the value
 // pointed by v.
 func ReadProtoJSON(r io.Reader, m proto.Message) error {
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
-		return errs.Wrap(http.StatusBadRequest, err, "error reading request body")
+		return errs.BadRequestErr(err, "error reading request body")
 	}
 	return protojson.Unmarshal(data, m)
 }

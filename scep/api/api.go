@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -167,7 +166,7 @@ func decodeSCEPRequest(r *http.Request) (SCEPRequest, error) {
 			return SCEPRequest{}, errors.Errorf("unsupported operation: %s", operation)
 		}
 	case http.MethodPost:
-		body, err := ioutil.ReadAll(io.LimitReader(r.Body, maxPayloadSize))
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxPayloadSize))
 		if err != nil {
 			return SCEPRequest{}, err
 		}

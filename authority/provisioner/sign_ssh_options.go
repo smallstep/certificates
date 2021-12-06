@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/keyutil"
 	"golang.org/x/crypto/ssh"
 )
@@ -55,7 +56,7 @@ type SignSSHOptions struct {
 // Validate validates the given SignSSHOptions.
 func (o SignSSHOptions) Validate() error {
 	if o.CertType != "" && o.CertType != SSHUserCert && o.CertType != SSHHostCert {
-		return errors.Errorf("unknown certType %s", o.CertType)
+		return errs.BadRequest("unknown certificate type '%s'", o.CertType)
 	}
 	return nil
 }
@@ -335,11 +336,11 @@ type sshCertValidityValidator struct {
 func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOptions) error {
 	switch {
 	case cert.ValidAfter == 0:
-		return errors.New("ssh certificate validAfter cannot be 0")
+		return errs.BadRequest("ssh certificate validAfter cannot be 0")
 	case cert.ValidBefore < uint64(now().Unix()):
-		return errors.New("ssh certificate validBefore cannot be in the past")
+		return errs.BadRequest("ssh certificate validBefore cannot be in the past")
 	case cert.ValidBefore < cert.ValidAfter:
-		return errors.New("ssh certificate validBefore cannot be before validAfter")
+		return errs.BadRequest("ssh certificate validBefore cannot be before validAfter")
 	}
 
 	var min, max time.Duration
@@ -351,9 +352,9 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 		min = v.MinHostSSHCertDuration()
 		max = v.MaxHostSSHCertDuration()
 	case 0:
-		return errors.New("ssh certificate type has not been set")
+		return errs.BadRequest("ssh certificate type has not been set")
 	default:
-		return errors.Errorf("unknown ssh certificate type %d", cert.CertType)
+		return errs.BadRequest("unknown ssh certificate type %d", cert.CertType)
 	}
 
 	// To not take into account the backdate, time.Now() will be used to
@@ -362,11 +363,9 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 
 	switch {
 	case dur < min:
-		return errors.Errorf("requested duration of %s is less than minimum "+
-			"accepted duration for selected provisioner of %s", dur, min)
+		return errs.BadRequest("requested duration of %s is less than minimum accepted duration for selected provisioner of %s", dur, min)
 	case dur > max+opts.Backdate:
-		return errors.Errorf("requested duration of %s is greater than maximum "+
-			"accepted duration for selected provisioner of %s", dur, max+opts.Backdate)
+		return errs.BadRequest("requested duration of %s is greater than maximum accepted duration for selected provisioner of %s", dur, max+opts.Backdate)
 	default:
 		return nil
 	}

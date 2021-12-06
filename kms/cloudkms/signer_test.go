@@ -7,7 +7,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -17,7 +17,7 @@ import (
 )
 
 func Test_newSigner(t *testing.T) {
-	pemBytes, err := ioutil.ReadFile("testdata/pub.pem")
+	pemBytes, err := os.ReadFile("testdata/pub.pem")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func Test_newSigner(t *testing.T) {
 }
 
 func Test_signer_Public(t *testing.T) {
-	pemBytes, err := ioutil.ReadFile("testdata/pub.pem")
+	pemBytes, err := os.ReadFile("testdata/pub.pem")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +159,7 @@ func Test_signer_Sign(t *testing.T) {
 }
 
 func TestSigner_SignatureAlgorithm(t *testing.T) {
-	pemBytes, err := ioutil.ReadFile("testdata/pub.pem")
+	pemBytes, err := os.ReadFile("testdata/pub.pem")
 	if err != nil {
 		t.Fatal(err)
 	}

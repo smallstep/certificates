@@ -318,7 +318,7 @@ func certChainToPEM(certChain []*x509.Certificate) []Certificate {
 func (h *caHandler) Provisioners(w http.ResponseWriter, r *http.Request) {
 	cursor, limit, err := ParseCursor(r)
 	if err != nil {
-		WriteError(w, errs.BadRequestErr(err))
+		WriteError(w, err)
 		return
 	}
 
@@ -435,7 +435,7 @@ func ParseCursor(r *http.Request) (cursor string, limit int, err error) {
 	if v := q.Get("limit"); len(v) > 0 {
 		limit, err = strconv.Atoi(v)
 		if err != nil {
-			return "", 0, errors.Wrapf(err, "error converting %s to integer", v)
+			return "", 0, errs.BadRequestErr(err, "limit '%s' is not an integer", v)
 		}
 	}
 	return

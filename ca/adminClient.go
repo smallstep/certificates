@@ -197,7 +197,7 @@ func (c *AdminClient) GetAdminsPaginate(opts ...AdminOption) (*adminAPI.GetAdmin
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequest("GET", u.String(), http.NoBody)
 	if err != nil {
 		return nil, errors.Wrapf(err, "create GET %s request failed", u)
 	}
@@ -284,7 +284,7 @@ func (c *AdminClient) RemoveAdmin(id string) error {
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")
 	}
-	req, err := http.NewRequest("DELETE", u.String(), nil)
+	req, err := http.NewRequest("DELETE", u.String(), http.NoBody)
 	if err != nil {
 		return errors.Wrapf(err, "create DELETE %s request failed", u)
 	}
@@ -363,7 +363,7 @@ func (c *AdminClient) GetProvisioner(opts ...ProvisionerOption) (*linkedca.Provi
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequest("GET", u.String(), http.NoBody)
 	if err != nil {
 		return nil, errors.Wrapf(err, "create PUT %s request failed", u)
 	}
@@ -402,7 +402,7 @@ func (c *AdminClient) GetProvisionersPaginate(opts ...ProvisionerOption) (*admin
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequest("GET", u.String(), http.NoBody)
 	if err != nil {
 		return nil, errors.Wrapf(err, "create PUT %s request failed", u)
 	}
@@ -472,7 +472,7 @@ func (c *AdminClient) RemoveProvisioner(opts ...ProvisionerOption) error {
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")
 	}
-	req, err := http.NewRequest("DELETE", u.String(), nil)
+	req, err := http.NewRequest("DELETE", u.String(), http.NoBody)
 	if err != nil {
 		return errors.Wrapf(err, "create DELETE %s request failed", u)
 	}
@@ -579,7 +579,7 @@ func (c *AdminClient) GetExternalAccountKeysPaginate(provisionerName, reference 
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequest("GET", u.String(), http.NoBody)
 	if err != nil {
 		return nil, errors.Wrapf(err, "create GET %s request failed", u)
 	}
@@ -647,7 +647,7 @@ func (c *AdminClient) RemoveExternalAccountKey(provisionerName, keyID string) er
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")
 	}
-	req, err := http.NewRequest("DELETE", u.String(), nil)
+	req, err := http.NewRequest("DELETE", u.String(), http.NoBody)
 	if err != nil {
 		return errors.Wrapf(err, "create DELETE %s request failed", u)
 	}

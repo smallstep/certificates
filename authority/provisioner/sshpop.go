@@ -191,8 +191,7 @@ func (p *SSHPOP) AuthorizeSSHRevoke(ctx context.Context, token string) error {
 		return errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRevoke")
 	}
 	if claims.Subject != strconv.FormatUint(claims.sshCert.Serial, 10) {
-		return errs.BadRequest("sshpop.AuthorizeSSHRevoke; sshpop token subject " +
-			"must be equivalent to sshpop certificate serial number")
+		return errs.BadRequest("sshpop token subject must be equivalent to sshpop certificate serial number")
 	}
 	return nil
 }
@@ -205,7 +204,7 @@ func (p *SSHPOP) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Cert
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRenew")
 	}
 	if claims.sshCert.CertType != ssh.HostCert {
-		return nil, errs.BadRequest("sshpop.AuthorizeSSHRenew; sshpop certificate must be a host ssh certificate")
+		return nil, errs.BadRequest("sshpop certificate must be a host ssh certificate")
 	}
 
 	return claims.sshCert, nil
@@ -220,7 +219,7 @@ func (p *SSHPOP) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Cert
 		return nil, nil, errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRekey")
 	}
 	if claims.sshCert.CertType != ssh.HostCert {
-		return nil, nil, errs.BadRequest("sshpop.AuthorizeSSHRekey; sshpop certificate must be a host ssh certificate")
+		return nil, nil, errs.BadRequest("sshpop certificate must be a host ssh certificate")
 	}
 	return claims.sshCert, []SignOption{
 		// Validate public key

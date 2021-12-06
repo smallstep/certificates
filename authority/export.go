@@ -2,14 +2,14 @@ package authority
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/step"
 	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -245,7 +245,7 @@ func mustReadFileOrURI(fn string, m map[string][]byte) string {
 		return ""
 	}
 
-	stepPath := filepath.ToSlash(config.StepPath())
+	stepPath := filepath.ToSlash(step.Path())
 	if !strings.HasSuffix(stepPath, "/") {
 		stepPath += "/"
 	}
@@ -257,7 +257,7 @@ func mustReadFileOrURI(fn string, m map[string][]byte) string {
 		panic(err)
 	}
 	if ok {
-		b, err := ioutil.ReadFile(config.StepAbs(fn))
+		b, err := os.ReadFile(step.Abs(fn))
 		if err != nil {
 			panic(errors.Wrapf(err, "error reading %s", fn))
 		}

@@ -6,14 +6,14 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
-	step "go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/linkedca"
@@ -238,6 +238,8 @@ func (a *Authority) RemoveProvisioner(ctx context.Context, id string) error {
 	return nil
 }
 
+// CreateFirstProvisioner creates and stores the first provisioner when using
+// admin database provisioner storage.
 func CreateFirstProvisioner(ctx context.Context, db admin.DB, password string) (*linkedca.Provisioner, error) {
 	if password == "" {
 		pass, err := ui.PromptPasswordGenerate("Please enter the password to encrypt your first provisioner, leave empty and we'll generate one")
@@ -287,6 +289,7 @@ func CreateFirstProvisioner(ctx context.Context, db admin.DB, password string) (
 	return p, nil
 }
 
+// ValidateClaims validates the Claims type.
 func ValidateClaims(c *linkedca.Claims) error {
 	if c == nil {
 		return nil
@@ -313,6 +316,7 @@ func ValidateClaims(c *linkedca.Claims) error {
 	return nil
 }
 
+// ValidateDurations validates the Durations type.
 func ValidateDurations(d *linkedca.Durations) error {
 	var (
 		err           error
@@ -523,8 +527,8 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 		if p.X509.Template != "" {
 			x509Template.Template = []byte(p.SSH.Template)
 		} else if p.X509.TemplateFile != "" {
-			filename := step.StepAbs(p.X509.TemplateFile)
-			if x509Template.Template, err = ioutil.ReadFile(filename); err != nil {
+			filename := step.Abs(p.X509.TemplateFile)
+			if x509Template.Template, err = os.ReadFile(filename); err != nil {
 				return nil, nil, errors.Wrap(err, "error reading x509 template")
 			}
 		}
@@ -539,8 +543,8 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 		if p.SSH.Template != "" {
 			sshTemplate.Template = []byte(p.SSH.Template)
 		} else if p.SSH.TemplateFile != "" {
-			filename := step.StepAbs(p.SSH.TemplateFile)
-			if sshTemplate.Template, err = ioutil.ReadFile(filename); err != nil {
+			filename := step.Abs(p.SSH.TemplateFile)
+			if sshTemplate.Template, err = os.ReadFile(filename); err != nil {
 				return nil, nil, errors.Wrap(err, "error reading ssh template")
 			}
 		}

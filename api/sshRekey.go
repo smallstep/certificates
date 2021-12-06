@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"golang.org/x/crypto/ssh"
@@ -20,9 +19,9 @@ type SSHRekeyRequest struct {
 func (s *SSHRekeyRequest) Validate() error {
 	switch {
 	case s.OTT == "":
-		return errors.New("missing or empty ott")
+		return errs.BadRequest("missing or empty ott")
 	case len(s.PublicKey) == 0:
-		return errors.New("missing or empty public key")
+		return errs.BadRequest("missing or empty public key")
 	default:
 		return nil
 	}
@@ -40,19 +39,19 @@ type SSHRekeyResponse struct {
 func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 	var body SSHRekeyRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, errs.BadRequestErr(err))
+		WriteError(w, err)
 		return
 	}
 
 	publicKey, err := ssh.ParsePublicKey(body.PublicKey)
 	if err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error parsing publicKey"))
+		WriteError(w, errs.BadRequestErr(err, "error parsing publicKey"))
 		return
 	}
 

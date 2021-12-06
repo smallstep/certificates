@@ -21,7 +21,7 @@ import (
 	"github.com/urfave/cli"
 	"go.step.sm/cli-utils/command"
 	"go.step.sm/cli-utils/command/version"
-	"go.step.sm/cli-utils/config"
+	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/cli-utils/usage"
 
@@ -49,7 +49,7 @@ var (
 )
 
 func init() {
-	config.Set("Smallstep CA", Version, BuildTime)
+	step.Set("Smallstep CA", Version, BuildTime)
 	authority.GlobalVersion.Version = Version
 	rand.Seed(time.Now().UnixNano())
 }
@@ -115,7 +115,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "step-ca"
 	app.HelpName = "step-ca"
-	app.Version = config.Version()
+	app.Version = step.Version()
 	app.Usage = "an online certificate authority for secure automated certificate management"
 	app.UsageText = `**step-ca** <config> [**--password-file**=<file>]
 [**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]

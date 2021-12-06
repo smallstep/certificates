@@ -1,8 +1,8 @@
 package ca
 
 import (
-	"io/ioutil"
 	"net/url"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -45,7 +45,7 @@ func TestNewProvisioner(t *testing.T) {
 	defer ca.Close()
 	want := getTestProvisioner(t, ca.URL)
 
-	caBundle, err := ioutil.ReadFile("testdata/secrets/root_ca.crt")
+	caBundle, err := os.ReadFile("testdata/secrets/root_ca.crt")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -256,7 +256,7 @@ func TestAuthority_Sign(t *testing.T) {
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
-				err:       errors.New("authority.Sign; invalid certificate request"),
+				err:       errors.New("invalid certificate request"),
 				code:      http.StatusBadRequest,
 			}
 		},
@@ -310,7 +310,7 @@ func TestAuthority_Sign(t *testing.T) {
 				extraOpts: extraOpts,
 				signOpts:  _signOpts,
 				err:       errors.New("authority.Sign: requested duration of 25h0m0s is more than the authorized maximum certificate duration of 24h1m0s"),
-				code:      http.StatusUnauthorized,
+				code:      http.StatusBadRequest,
 			}
 		},
 		"fail validate sans when adding common name not in claims": func(t *testing.T) *signTest {
@@ -538,15 +538,15 @@ ZYtQ9Ot36qc=
 					if tc.csr.Subject.CommonName == "" {
 						assert.Equals(t, leaf.Subject, pkix.Name{})
 					} else {
-						assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
-							fmt.Sprintf("%v", &pkix.Name{
+						assert.Equals(t, leaf.Subject.String(),
+							pkix.Name{
 								Country:       []string{tmplt.Country},
 								Organization:  []string{tmplt.Organization},
 								Locality:      []string{tmplt.Locality},
 								StreetAddress: []string{tmplt.StreetAddress},
 								Province:      []string{tmplt.Province},
 								CommonName:    "smallstep test",
-							}))
+							}.String())
 						assert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
 					}
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
@@ -718,15 +718,15 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Minute)))
 
 					tmplt := a.config.AuthorityConfig.Template
-					assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
-						fmt.Sprintf("%v", &pkix.Name{
+					assert.Equals(t, leaf.Subject.String(),
+						pkix.Name{
 							Country:       []string{tmplt.Country},
 							Organization:  []string{tmplt.Organization},
 							Locality:      []string{tmplt.Locality},
 							StreetAddress: []string{tmplt.StreetAddress},
 							Province:      []string{tmplt.Province},
 							CommonName:    tmplt.CommonName,
-						}))
+						}.String())
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
 
 					assert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
@@ -925,15 +925,15 @@ func TestAuthority_Rekey(t *testing.T) {
 					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Minute)))
 
 					tmplt := a.config.AuthorityConfig.Template
-					assert.Equals(t, fmt.Sprintf("%v", leaf.Subject),
-						fmt.Sprintf("%v", &pkix.Name{
+					assert.Equals(t, leaf.Subject.String(),
+						pkix.Name{
 							Country:       []string{tmplt.Country},
 							Organization:  []string{tmplt.Organization},
 							Locality:      []string{tmplt.Locality},
 							StreetAddress: []string{tmplt.StreetAddress},
 							Province:      []string{tmplt.Province},
 							CommonName:    tmplt.CommonName,
-						}))
+						}.String())
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
 
 					assert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
@@ -1187,7 +1187,7 @@ func TestAuthority_Revoke(t *testing.T) {
 					Reason:     reason,
 					OTT:        raw,
 				},
-				err:  errors.New("authority.Revoke; certificate with serial number sn has already been revoked"),
+				err:  errors.New("certificate with serial number 'sn' is already revoked"),
 				code: http.StatusBadRequest,
 				checkErrDetails: func(err *errs.Error) {
 					assert.Equals(t, err.Details["token"], raw)

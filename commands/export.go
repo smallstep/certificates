@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"unicode"
 
 	"github.com/pkg/errors"
@@ -72,14 +72,14 @@ func exportAction(ctx *cli.Context) error {
 	}
 
 	if passwordFile != "" {
-		b, err := ioutil.ReadFile(passwordFile)
+		b, err := os.ReadFile(passwordFile)
 		if err != nil {
 			return errors.Wrapf(err, "error reading %s", passwordFile)
 		}
 		cfg.Password = string(bytes.TrimRightFunc(b, unicode.IsSpace))
 	}
 	if issuerPasswordFile != "" {
-		b, err := ioutil.ReadFile(issuerPasswordFile)
+		b, err := os.ReadFile(issuerPasswordFile)
 		if err != nil {
 			return errors.Wrapf(err, "error reading %s", issuerPasswordFile)
 		}

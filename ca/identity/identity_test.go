@@ -33,9 +33,9 @@ func TestLoadDefaultIdentity(t *testing.T) {
 		want    *Identity
 		wantErr bool
 	}{
-		{"ok", func() { IdentityFile = "testdata/config/identity.json" }, expected, false},
-		{"fail read", func() { IdentityFile = "testdata/config/missing.json" }, nil, true},
-		{"fail unmarshal", func() { IdentityFile = "testdata/config/fail.json" }, nil, true},
+		{"ok", func() { IdentityFile = returnInput("testdata/config/identity.json") }, expected, false},
+		{"fail read", func() { IdentityFile = returnInput("testdata/config/missing.json") }, nil, true},
+		{"fail unmarshal", func() { IdentityFile = returnInput("testdata/config/fail.json") }, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -217,9 +217,9 @@ func TestWriteDefaultIdentity(t *testing.T) {
 		certChain = append(certChain, api.Certificate{Certificate: c})
 	}
 
-	configDir = filepath.Join(tmpDir, "config")
-	identityDir = filepath.Join(tmpDir, "identity")
-	IdentityFile = filepath.Join(tmpDir, "config", "identity.json")
+	configDir = returnInput(filepath.Join(tmpDir, "config"))
+	identityDir = returnInput(filepath.Join(tmpDir, "identity"))
+	IdentityFile = returnInput(filepath.Join(tmpDir, "config", "identity.json"))
 
 	type args struct {
 		certChain []api.Certificate
@@ -233,27 +233,27 @@ func TestWriteDefaultIdentity(t *testing.T) {
 	}{
 		{"ok", func() {}, args{certChain, key}, false},
 		{"fail mkdir config", func() {
-			configDir = filepath.Join(tmpDir, "identity", "identity.crt")
-			identityDir = filepath.Join(tmpDir, "identity")
+			configDir = returnInput(filepath.Join(tmpDir, "identity", "identity.crt"))
+			identityDir = returnInput(filepath.Join(tmpDir, "identity"))
 		}, args{certChain, key}, true},
 		{"fail mkdir identity", func() {
-			configDir = filepath.Join(tmpDir, "config")
-			identityDir = filepath.Join(tmpDir, "identity", "identity.crt")
+			configDir = returnInput(filepath.Join(tmpDir, "config"))
+			identityDir = returnInput(filepath.Join(tmpDir, "identity", "identity.crt"))
 		}, args{certChain, key}, true},
 		{"fail certificate", func() {
-			configDir = filepath.Join(tmpDir, "config")
-			identityDir = filepath.Join(tmpDir, "bad-dir")
-			os.MkdirAll(identityDir, 0600)
+			configDir = returnInput(filepath.Join(tmpDir, "config"))
+			identityDir = returnInput(filepath.Join(tmpDir, "bad-dir"))
+			os.MkdirAll(identityDir(), 0600)
 		}, args{certChain, key}, true},
 		{"fail key", func() {
-			configDir = filepath.Join(tmpDir, "config")
-			identityDir = filepath.Join(tmpDir, "identity")
+			configDir = returnInput(filepath.Join(tmpDir, "config"))
+			identityDir = returnInput(filepath.Join(tmpDir, "identity"))
 		}, args{certChain, "badKey"}, true},
 		{"fail write identity", func() {
-			configDir = filepath.Join(tmpDir, "bad-dir")
-			identityDir = filepath.Join(tmpDir, "identity")
-			IdentityFile = filepath.Join(configDir, "identity.json")
-			os.MkdirAll(configDir, 0600)
+			configDir = returnInput(filepath.Join(tmpDir, "bad-dir"))
+			identityDir = returnInput(filepath.Join(tmpDir, "identity"))
+			IdentityFile = returnInput(filepath.Join(configDir(), "identity.json"))
+			os.MkdirAll(configDir(), 0600)
 		}, args{certChain, key}, true},
 	}
 
@@ -377,7 +377,7 @@ func TestIdentity_Renew(t *testing.T) {
 	}
 
 	oldIdentityDir := identityDir
-	identityDir = "testdata/identity"
+	identityDir = returnInput("testdata/identity")
 	defer func() {
 		identityDir = oldIdentityDir
 		os.RemoveAll(tmpDir)
@@ -432,8 +432,8 @@ func TestIdentity_Renew(t *testing.T) {
 		{"fail renew", func() {}, fields{"mTLS", "testdata/identity/identity.crt", "testdata/identity/identity_key"}, args{fail}, true},
 		{"fail certificate", func() {}, fields{"mTLS", "testdata/certs/server.crt", "testdata/identity/identity_key"}, args{ok}, true},
 		{"fail write identity", func() {
-			identityDir = filepath.Join(tmpDir, "bad-dir")
-			os.MkdirAll(identityDir, 0600)
+			identityDir = returnInput(filepath.Join(tmpDir, "bad-dir"))
+			os.MkdirAll(identityDir(), 0600)
 		}, fields{"mTLS", "testdata/identity/identity.crt", "testdata/identity/identity_key"}, args{ok}, true},
 	}
 	for _, tt := range tests {

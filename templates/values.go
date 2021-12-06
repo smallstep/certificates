@@ -4,6 +4,10 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// SSHTemplateVersionKey is a key that can be submitted by a client to select
+// the template version that will be returned by the server.
+var SSHTemplateVersionKey = "StepSSHTemplateVersion"
+
 // Step represents the default variables available in the CA.
 type Step struct {
 	SSH StepSSH
@@ -22,16 +26,23 @@ type StepSSH struct {
 var DefaultSSHTemplates = SSHTemplates{
 	User: []Template{
 		{
-			Name:         "include.tpl",
+			Name:         "config.tpl",
 			Type:         Snippet,
-			TemplatePath: "templates/ssh/include.tpl",
+			TemplatePath: "templates/ssh/config.tpl",
 			Path:         "~/.ssh/config",
 			Comment:      "#",
 		},
 		{
-			Name:         "config.tpl",
+			Name:         "step_includes.tpl",
+			Type:         PrependLine,
+			TemplatePath: "templates/ssh/step_includes.tpl",
+			Path:         "${STEPPATH}/ssh/includes",
+			Comment:      "#",
+		},
+		{
+			Name:         "step_config.tpl",
 			Type:         File,
-			TemplatePath: "templates/ssh/config.tpl",
+			TemplatePath: "templates/ssh/step_config.tpl",
 			Path:         "ssh/config",
 			Comment:      "#",
 		},
@@ -64,30 +75,43 @@ var DefaultSSHTemplates = SSHTemplates{
 
 // DefaultSSHTemplateData contains the data of the default templates used on ssh.
 var DefaultSSHTemplateData = map[string]string{
-	// include.tpl adds the step ssh config file.
+	// config.tpl adds the step ssh config file.
 	//
 	// Note: on windows `Include C:\...` is treated as a relative path.
-	"include.tpl": `Host *
+	"config.tpl": `Host *
 {{- if or .User.GOOS "none" | eq "windows" }}
-	Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config"
+{{- if .User.StepBasePath }}
+	Include "{{ .User.StepBasePath | replace "\\" "/" | trimPrefix "C:" }}/ssh/includes"
 {{- else }}
-	Include "{{.User.StepPath}}/ssh/config"
+	Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/includes"
+{{- end }}
+{{- else }}
+{{- if .User.StepBasePath }}
+	Include "{{.User.StepBasePath}}/ssh/includes"
+{{- else }}
+	Include "{{.User.StepPath}}/ssh/includes"
+{{- end }}
 {{- end }}`,
 
-	// config.tpl is the step ssh config file, it includes the Match rule and
+	// step_includes.tpl adds the step ssh config file.
+	//
+	// Note: on windows `Include C:\...` is treated as a relative path.
+	"step_includes.tpl": `{{- if or .User.GOOS "none" | eq "windows" }}Include "{{ .User.StepPath | replace "\\" "/" | trimPrefix "C:" }}/ssh/config"{{- else }}Include "{{.User.StepPath}}/ssh/config"{{- end }}`,
+
+	// step_config.tpl is the step ssh config file, it includes the Match rule and
 	// references the step known_hosts file.
 	//
 	// Note: on windows ProxyCommand requires the full path
-	"config.tpl": `Match exec "step ssh check-host %h"
+	"step_config.tpl": `Match exec "step ssh check-host{{- if .User.Context }} --context {{ .User.Context }}{{- end }} %h"
 {{- if .User.User }}
 	User {{.User.User}}
 {{- end }}
 {{- if or .User.GOOS "none" | eq "windows" }}
 	UserKnownHostsFile "{{.User.StepPath}}\ssh\known_hosts"
-	ProxyCommand C:\Windows\System32\cmd.exe /c step ssh proxycommand %r %h %p
+	ProxyCommand C:\Windows\System32\cmd.exe /c step ssh proxycommand{{- if .User.Context }} --context {{ .User.Context }}{{- end }} %r %h %p
 {{- else }}
 	UserKnownHostsFile "{{.User.StepPath}}/ssh/known_hosts"
-	ProxyCommand step ssh proxycommand %r %h %p
+	ProxyCommand step ssh proxycommand{{- if .User.Context }} --context {{ .User.Context }}{{- end }} %r %h %p
 {{- end }}
 `,
 

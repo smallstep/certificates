@@ -16,7 +16,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -788,7 +788,7 @@ func Test_caHandler_Health(t *testing.T) {
 		t.Errorf("caHandler.Health StatusCode = %d, wants 200", res.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
 		t.Errorf("caHandler.Health unexpected error = %v", err)
@@ -829,7 +829,7 @@ func Test_caHandler_Root(t *testing.T) {
 				t.Errorf("caHandler.Root StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
 			}
 
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			if err != nil {
 				t.Errorf("caHandler.Root unexpected error = %v", err)
@@ -902,7 +902,7 @@ func Test_caHandler_Sign(t *testing.T) {
 				t.Errorf("caHandler.Root StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
 			}
 
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			if err != nil {
 				t.Errorf("caHandler.Root unexpected error = %v", err)
@@ -954,7 +954,7 @@ func Test_caHandler_Renew(t *testing.T) {
 				t.Errorf("caHandler.Renew StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
 			}
 
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			if err != nil {
 				t.Errorf("caHandler.Renew unexpected error = %v", err)
@@ -1015,7 +1015,7 @@ func Test_caHandler_Rekey(t *testing.T) {
 				t.Errorf("caHandler.Rekey StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
 			}
 
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			if err != nil {
 				t.Errorf("caHandler.Rekey unexpected error = %v", err)
@@ -1038,12 +1038,12 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		r *http.Request
 	}
 
-	req, err := http.NewRequest("GET", "http://example.com/provisioners?cursor=foo&limit=20", nil)
+	req, err := http.NewRequest("GET", "http://example.com/provisioners?cursor=foo&limit=20", http.NoBody)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	reqLimitFail, err := http.NewRequest("GET", "http://example.com/provisioners?limit=abc", nil)
+	reqLimitFail, err := http.NewRequest("GET", "http://example.com/provisioners?limit=abc", http.NoBody)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1087,7 +1087,7 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedError400 := errs.BadRequest("force")
+	expectedError400 := errs.BadRequest("limit 'abc' is not an integer")
 	expectedError400Bytes, err := json.Marshal(expectedError400)
 	assert.FatalError(t, err)
 	expectedError500 := errs.InternalServer("force")
@@ -1105,7 +1105,7 @@ func Test_caHandler_Provisioners(t *testing.T) {
 			if res.StatusCode != tt.statusCode {
 				t.Errorf("caHandler.Provisioners StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
 			}
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			if err != nil {
 				t.Errorf("caHandler.Provisioners unexpected error = %v", err)
@@ -1175,7 +1175,7 @@ func Test_caHandler_ProvisionerKey(t *testing.T) {
 			if res.StatusCode != tt.statusCode {
 				t.Errorf("caHandler.Provisioners StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
 			}
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			if err != nil {
 				t.Errorf("caHandler.Provisioners unexpected error = %v", err)
@@ -1225,7 +1225,7 @@ func Test_caHandler_Roots(t *testing.T) {
 				t.Errorf("caHandler.Roots StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
 			}
 
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			if err != nil {
 				t.Errorf("caHandler.Roots unexpected error = %v", err)
@@ -1271,7 +1271,7 @@ func Test_caHandler_Federation(t *testing.T) {
 				t.Errorf("caHandler.Federation StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
 			}
 
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			if err != nil {
 				t.Errorf("caHandler.Federation unexpected error = %v", err)

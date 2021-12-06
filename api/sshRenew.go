@@ -19,7 +19,7 @@ type SSHRenewRequest struct {
 func (s *SSHRenewRequest) Validate() error {
 	switch {
 	case s.OTT == "":
-		return errors.New("missing or empty ott")
+		return errs.BadRequest("missing or empty ott")
 	default:
 		return nil
 	}
@@ -37,13 +37,13 @@ type SSHRenewResponse struct {
 func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 	var body SSHRenewRequest
 	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.Wrap(http.StatusBadRequest, err, "error reading request body"))
+		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, errs.BadRequestErr(err))
+		WriteError(w, err)
 		return
 	}
 

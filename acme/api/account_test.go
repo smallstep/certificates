@@ -11,8 +11,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
+
+	"io"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -130,7 +131,7 @@ func jwkEncode(pub crypto.PublicKey) (string, error) {
 		e := big.NewInt(int64(pub.E))
 		// Field order is important.
 		// See https://tools.ietf.org/html/rfc7638#section-3.3 for details.
-		return fmt.Sprintf(`{"e":"%s","kty":"RSA","n":"%s"}`,
+		return fmt.Sprintf(`{"e":%q,"kty":"RSA","n":%q}`,
 			base64.RawURLEncoding.EncodeToString(e.Bytes()),
 			base64.RawURLEncoding.EncodeToString(n.Bytes()),
 		), nil
@@ -151,7 +152,7 @@ func jwkEncode(pub crypto.PublicKey) (string, error) {
 		}
 		// Field order is important.
 		// See https://tools.ietf.org/html/rfc7638#section-3.3 for details.
-		return fmt.Sprintf(`{"crv":"%s","kty":"EC","x":"%s","y":"%s"}`,
+		return fmt.Sprintf(`{"crv":%q,"kty":"EC","x":%q,"y":%q}`,
 			p.Name,
 			base64.RawURLEncoding.EncodeToString(x),
 			base64.RawURLEncoding.EncodeToString(y),
@@ -402,7 +403,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
 
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			assert.FatalError(t, err)
 
@@ -722,7 +723,7 @@ func TestHandler_NewAccount(t *testing.T) {
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
 
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			assert.FatalError(t, err)
 
@@ -922,7 +923,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
 
-			body, err := ioutil.ReadAll(res.Body)
+			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
 			assert.FatalError(t, err)
 

@@ -91,7 +91,7 @@ func mustSerializeCrt(filename string, certs ...*x509.Certificate) {
 			panic(err)
 		}
 	}
-	if err := ioutil.WriteFile(filename, buf.Bytes(), 0600); err != nil {
+	if err := os.WriteFile(filename, buf.Bytes(), 0600); err != nil {
 		panic(err)
 	}
 }
@@ -105,7 +105,7 @@ func mustSerializeKey(filename string, key crypto.Signer) {
 		Type:  "PRIVATE KEY",
 		Bytes: b,
 	})
-	if err := ioutil.WriteFile(filename, b, 0600); err != nil {
+	if err := os.WriteFile(filename, b, 0600); err != nil {
 		panic(err)
 	}
 }
