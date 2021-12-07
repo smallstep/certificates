@@ -3,16 +3,9 @@ package api
 import (
 	"bytes"
 	"context"
-	"crypto"
-	"crypto/ecdsa"
-	"crypto/hmac"
-	"crypto/rsa"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -57,125 +50,55 @@ func newACMEProv(t *testing.T) *provisioner.ACME {
 	return a
 }
 
-var errUnsupportedKey = fmt.Errorf("unknown key type; only RSA and ECDSA are supported")
-
-// keyID is the account identity provided by a CA during registration.
-type keyID string
-
-// noKeyID indicates that jwsEncodeJSON should compute and use JWK instead of a KID.
-// See jwsEncodeJSON for details.
-const noKeyID = keyID("")
-
-// jwsEncodeEAB creates a JWS payload for External Account Binding according to RFC 8555 §7.3.4.
-// Implementation taken from github.com/mholt/acmez
-func jwsEncodeEAB(accountKey crypto.PublicKey, hmacKey []byte, kid keyID, u string) ([]byte, error) {
-	// §7.3.4: "The 'alg' field MUST indicate a MAC-based algorithm"
-	alg, sha := "HS256", crypto.SHA256
-
-	// §7.3.4: "The 'nonce' field MUST NOT be present"
-	phead, err := jwsHead(alg, "", u, kid, nil)
+func createEABJWS(jwk *jose.JSONWebKey, hmacKey []byte, keyID string, url string) (*jose.JSONWebSignature, error) {
+	signer, err := jose.NewSigner(
+		jose.SigningKey{
+			Algorithm: jose.SignatureAlgorithm("HS256"),
+			Key:       hmacKey,
+		},
+		&jose.SignerOptions{
+			ExtraHeaders: map[jose.HeaderKey]interface{}{
+				"kid": keyID,
+				"url": url,
+			},
+			EmbedJWK: false,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	encodedKey, err := jwkEncode(accountKey)
+	jwkJSONBytes, err := jwk.Public().MarshalJSON()
 	if err != nil {
 		return nil, err
 	}
 
-	payload := base64.RawURLEncoding.EncodeToString([]byte(encodedKey))
-
-	payloadToSign := []byte(phead + "." + payload)
-
-	h := hmac.New(sha256.New, hmacKey)
-	h.Write(payloadToSign)
-	sig := h.Sum(nil)
-
-	return jwsFinal(sha, sig, phead, payload)
-}
-
-// jwsHead constructs the protected JWS header for the given fields.
-// Since jwk and kid are mutually-exclusive, the jwk will be encoded
-// only if kid is empty. If nonce is empty, it will not be encoded.
-// Implementation taken from github.com/mholt/acmez
-func jwsHead(alg, nonce, u string, kid keyID, key crypto.Signer) (string, error) {
-	phead := fmt.Sprintf(`{"alg":%q`, alg)
-	if kid == noKeyID {
-		jwk, err := jwkEncode(key.Public())
-		if err != nil {
-			return "", err
-		}
-		phead += fmt.Sprintf(`,"jwk":%s`, jwk)
-	} else {
-		phead += fmt.Sprintf(`,"kid":%q`, kid)
-	}
-	if nonce != "" {
-		phead += fmt.Sprintf(`,"nonce":%q`, nonce)
-	}
-	phead += fmt.Sprintf(`,"url":%q}`, u)
-	phead = base64.RawURLEncoding.EncodeToString([]byte(phead))
-	return phead, nil
-}
-
-// jwkEncode encodes public part of an RSA or ECDSA key into a JWK.
-// The result is also suitable for creating a JWK thumbprint.
-// https://tools.ietf.org/html/rfc7517
-// Implementation taken from github.com/mholt/acmez
-func jwkEncode(pub crypto.PublicKey) (string, error) {
-	switch pub := pub.(type) {
-	case *rsa.PublicKey:
-		// https://tools.ietf.org/html/rfc7518#section-6.3.1
-		n := pub.N
-		e := big.NewInt(int64(pub.E))
-		// Field order is important.
-		// See https://tools.ietf.org/html/rfc7638#section-3.3 for details.
-		return fmt.Sprintf(`{"e":%q,"kty":"RSA","n":%q}`,
-			base64.RawURLEncoding.EncodeToString(e.Bytes()),
-			base64.RawURLEncoding.EncodeToString(n.Bytes()),
-		), nil
-	case *ecdsa.PublicKey:
-		// https://tools.ietf.org/html/rfc7518#section-6.2.1
-		p := pub.Curve.Params()
-		n := p.BitSize / 8
-		if p.BitSize%8 != 0 {
-			n++
-		}
-		x := pub.X.Bytes()
-		if n > len(x) {
-			x = append(make([]byte, n-len(x)), x...)
-		}
-		y := pub.Y.Bytes()
-		if n > len(y) {
-			y = append(make([]byte, n-len(y)), y...)
-		}
-		// Field order is important.
-		// See https://tools.ietf.org/html/rfc7638#section-3.3 for details.
-		return fmt.Sprintf(`{"crv":%q,"kty":"EC","x":%q,"y":%q}`,
-			p.Name,
-			base64.RawURLEncoding.EncodeToString(x),
-			base64.RawURLEncoding.EncodeToString(y),
-		), nil
-	}
-	return "", errUnsupportedKey
-}
-
-// jwsFinal constructs the final JWS object.
-// Implementation taken from github.com/mholt/acmez
-func jwsFinal(sha crypto.Hash, sig []byte, phead, payload string) ([]byte, error) {
-	enc := struct {
-		Protected string `json:"protected"`
-		Payload   string `json:"payload"`
-		Sig       string `json:"signature"`
-	}{
-		Protected: phead,
-		Payload:   payload,
-		Sig:       base64.RawURLEncoding.EncodeToString(sig),
-	}
-	result, err := json.Marshal(&enc)
+	jws, err := signer.Sign(jwkJSONBytes)
 	if err != nil {
 		return nil, err
 	}
-	return result, nil
+
+	raw, err := jws.CompactSerialize()
+	if err != nil {
+		return nil, err
+	}
+
+	parsedJWS, err := jose.ParseJWS(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return parsedJWS, nil
+}
+
+func createRawEABJWS(jwk *jose.JSONWebKey, hmacKey []byte, keyID string, url string) ([]byte, error) {
+	jws, err := createEABJWS(jwk, hmacKey, keyID, url)
+	if err != nil {
+		return nil, err
+	}
+
+	rawJWS := jws.FullSerialize()
+	return []byte(rawJWS), nil
 }
 
 func TestNewAccountRequest_Validate(t *testing.T) {
@@ -565,10 +488,11 @@ func TestHandler_NewAccount(t *testing.T) {
 		"fail/acmeProvisionerFromContext": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -597,10 +521,10 @@ func TestHandler_NewAccount(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -723,10 +647,11 @@ func TestHandler_NewAccount(t *testing.T) {
 		"ok/new-account-no-eab-required": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -764,10 +689,10 @@ func TestHandler_NewAccount(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1142,10 +1067,11 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 		"ok/no-eab-required-but-provided": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			prov := newACMEProv(t)
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
@@ -1166,10 +1092,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1228,10 +1154,11 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 		"fail/acmeProvisionerFromContext": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1258,10 +1185,11 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 		"fail/parse-eab-jose": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			eab.Payload += "{}"
 			prov := newACMEProv(t)
@@ -1284,10 +1212,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1331,10 +1259,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1379,10 +1307,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1429,10 +1357,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1479,10 +1407,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1527,10 +1455,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1586,10 +1514,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1644,10 +1572,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			differentJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(differentJWK.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(differentJWK, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1700,10 +1628,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1755,10 +1683,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
+			err = json.Unmarshal(rawEABJWS, &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1868,109 +1796,86 @@ func Test_validateEABJWS(t *testing.T) {
 		"fail/invalid-number-of-signatures": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
-			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
-			assert.FatalError(t, err)
-			parsedEABJWS, err := jose.ParseJWS(string(eabJWS))
-			assert.FatalError(t, err)
-			parsedEABJWS.Signatures = append(parsedEABJWS.Signatures, jose.Signature{})
+			eabJWS.Signatures = append(eabJWS.Signatures, jose.Signature{})
 			return test{
-				jws: parsedEABJWS,
+				jws: eabJWS,
 				err: acme.NewError(acme.ErrorMalformedType, "JWS must have one signature"),
 			}
 		},
 		"fail/invalid-algorithm": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
-			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
-			assert.FatalError(t, err)
-			parsedEABJWS, err := jose.ParseJWS(string(eabJWS))
-			assert.FatalError(t, err)
-			parsedEABJWS.Signatures[0].Protected.Algorithm = "HS42"
+			eabJWS.Signatures[0].Protected.Algorithm = "HS42"
 			return test{
-				jws: parsedEABJWS,
+				jws: eabJWS,
 				err: acme.NewError(acme.ErrorMalformedType, "'alg' field set to invalid algorithm 'HS42'"),
 			}
 		},
 		"fail/kid-not-set": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
-			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
-			assert.FatalError(t, err)
-			parsedEABJWS, err := jose.ParseJWS(string(eabJWS))
-			assert.FatalError(t, err)
-			parsedEABJWS.Signatures[0].Protected.KeyID = ""
+			eabJWS.Signatures[0].Protected.KeyID = ""
 			return test{
-				jws: parsedEABJWS,
+				jws: eabJWS,
 				err: acme.NewError(acme.ErrorMalformedType, "'kid' field is required"),
 			}
 		},
 		"fail/nonce-not-empty": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
-			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
-			assert.FatalError(t, err)
-			parsedEABJWS, err := jose.ParseJWS(string(eabJWS))
-			assert.FatalError(t, err)
-			parsedEABJWS.Signatures[0].Protected.Nonce = "some-bogus-nonce"
+			eabJWS.Signatures[0].Protected.Nonce = "some-bogus-nonce"
 			return test{
-				jws: parsedEABJWS,
+				jws: eabJWS,
 				err: acme.NewError(acme.ErrorMalformedType, "'nonce' must not be present"),
 			}
 		},
 		"fail/url-not-set": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
-			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
-			assert.FatalError(t, err)
-			parsedEABJWS, err := jose.ParseJWS(string(eabJWS))
-			assert.FatalError(t, err)
-			delete(parsedEABJWS.Signatures[0].Protected.ExtraHeaders, "url")
+			delete(eabJWS.Signatures[0].Protected.ExtraHeaders, "url")
 			return test{
-				jws: parsedEABJWS,
+				jws: eabJWS,
 				err: acme.NewError(acme.ErrorMalformedType, "'url' field is required"),
 			}
 		},
 		"fail/no-outer-jws": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
-			assert.FatalError(t, err)
-			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
-			assert.FatalError(t, err)
-			parsedEABJWS, err := jose.ParseJWS(string(eabJWS))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.TODO(), jwsContextKey, nil)
 			return test{
 				ctx: ctx,
-				jws: parsedEABJWS,
+				jws: eabJWS,
 				err: acme.NewErrorISE("could not retrieve outer JWS from context"),
 			}
 		},
 		"fail/outer-jws-multiple-signatures": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			assert.FatalError(t, err)
+			rawEABJWS := eabJWS.FullSerialize()
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
-			assert.FatalError(t, err)
-			parsedEABJWS, err := jose.ParseJWS(string(eabJWS))
+			err = json.Unmarshal([]byte(rawEABJWS), &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -1995,19 +1900,20 @@ func Test_validateEABJWS(t *testing.T) {
 			ctx := context.WithValue(context.TODO(), jwsContextKey, outerJWS)
 			return test{
 				ctx: ctx,
-				jws: parsedEABJWS,
+				jws: eabJWS,
 				err: acme.NewError(acme.ErrorMalformedType, "outer JWS must have one signature"),
 			}
 		},
 		"fail/outer-jws-no-url": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			assert.FatalError(t, err)
+			rawEABJWS := eabJWS.FullSerialize()
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
-			assert.FatalError(t, err)
-			parsedEABJWS, err := jose.ParseJWS(string(eabJWS))
+			err = json.Unmarshal([]byte(rawEABJWS), &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -2031,19 +1937,20 @@ func Test_validateEABJWS(t *testing.T) {
 			ctx := context.WithValue(context.TODO(), jwsContextKey, outerJWS)
 			return test{
 				ctx: ctx,
-				jws: parsedEABJWS,
+				jws: eabJWS,
 				err: acme.NewError(acme.ErrorMalformedType, "'url' field must be set in outer JWS"),
 			}
 		},
 		"fail/outer-jws-with-different-url": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName))
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			assert.FatalError(t, err)
+			rawEABJWS := eabJWS.FullSerialize()
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
-			assert.FatalError(t, err)
-			parsedEABJWS, err := jose.ParseJWS(string(eabJWS))
+			err = json.Unmarshal([]byte(rawEABJWS), &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -2068,7 +1975,7 @@ func Test_validateEABJWS(t *testing.T) {
 			ctx := context.WithValue(context.TODO(), jwsContextKey, outerJWS)
 			return test{
 				ctx: ctx,
-				jws: parsedEABJWS,
+				jws: eabJWS,
 				err: acme.NewError(acme.ErrorMalformedType, "'url' field is not the same value as the outer JWS"),
 			}
 		},
@@ -2076,12 +1983,12 @@ func Test_validateEABJWS(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := jwsEncodeEAB(jwk.Public().Key, []byte{1, 3, 3, 7}, "eakID", url)
+			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			assert.FatalError(t, err)
+			rawEABJWS := eabJWS.FullSerialize()
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
-			err = json.Unmarshal(eabJWS, &eab)
-			assert.FatalError(t, err)
-			parsedEABJWS, err := jose.ParseJWS(string(eabJWS))
+			err = json.Unmarshal([]byte(rawEABJWS), &eab)
 			assert.FatalError(t, err)
 			nar := &NewAccountRequest{
 				Contact:                []string{"foo", "bar"},
@@ -2106,7 +2013,7 @@ func Test_validateEABJWS(t *testing.T) {
 			ctx := context.WithValue(context.TODO(), jwsContextKey, outerJWS)
 			return test{
 				ctx:   ctx,
-				jws:   parsedEABJWS,
+				jws:   eabJWS,
 				keyID: "eakID",
 				err:   nil,
 			}
