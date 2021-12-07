@@ -281,8 +281,8 @@ func TestAuthority_Sign(t *testing.T) {
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
-				err:       errors.New("authority.Sign: default ASN1DN template cannot be nil"),
-				code:      http.StatusUnauthorized,
+				err:       errors.New("default ASN1DN template cannot be nil"),
+				code:      http.StatusForbidden,
 			}
 		},
 		"fail create cert": func(t *testing.T) *signTest {
@@ -309,8 +309,8 @@ func TestAuthority_Sign(t *testing.T) {
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  _signOpts,
-				err:       errors.New("authority.Sign: requested duration of 25h0m0s is more than the authorized maximum certificate duration of 24h1m0s"),
-				code:      http.StatusBadRequest,
+				err:       errors.New("requested duration of 25h0m0s is more than the authorized maximum certificate duration of 24h1m0s"),
+				code:      http.StatusForbidden,
 			}
 		},
 		"fail validate sans when adding common name not in claims": func(t *testing.T) *signTest {
@@ -322,8 +322,8 @@ func TestAuthority_Sign(t *testing.T) {
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
-				err:       errors.New("authority.Sign: certificate request does not contain the valid DNS names - got [test.smallstep.com smallstep test], want [test.smallstep.com]"),
-				code:      http.StatusUnauthorized,
+				err:       errors.New("certificate request does not contain the valid DNS names - got [test.smallstep.com smallstep test], want [test.smallstep.com]"),
+				code:      http.StatusForbidden,
 			}
 		},
 		"fail rsa key too short": func(t *testing.T) *signTest {
@@ -348,8 +348,8 @@ ZYtQ9Ot36qc=
 				csr:       csr,
 				extraOpts: extraOpts,
 				signOpts:  signOpts,
-				err:       errors.New("authority.Sign: rsa key in CSR must be at least 2048 bits (256 bytes)"),
-				code:      http.StatusUnauthorized,
+				err:       errors.New("certificate request RSA key must be at least 2048 bits (256 bytes)"),
+				code:      http.StatusForbidden,
 			}
 		},
 		"fail store cert in db": func(t *testing.T) *signTest {

@@ -169,7 +169,8 @@ func StatusCodeError(code int, e error, opts ...Option) error {
 	case http.StatusUnauthorized:
 		return UnauthorizedErr(e, opts...)
 	case http.StatusForbidden:
-		return ForbiddenErr(e, opts...)
+		opts = append(opts, withDefaultMessage(ForbiddenDefaultMsg))
+		return NewErr(http.StatusForbidden, e, opts...)
 	case http.StatusInternalServerError:
 		return InternalServerErr(e, opts...)
 	case http.StatusNotImplemented:
@@ -199,12 +200,18 @@ var (
 	// BadRequestPrefix is the prefix added to the bad request messages that are
 	// directly sent to the cli.
 	BadRequestPrefix = "The request could not be completed: "
+
+	// ForbiddenPrefix is the prefix added to the forbidden messates that are
+	// sent to the cli.
+	ForbiddenPrefix = "The request was forbidden by the certificate authority: "
 )
 
 func formatMessage(status int, msg string) string {
 	switch status {
 	case http.StatusBadRequest:
 		return BadRequestPrefix + msg + "."
+	case http.StatusForbidden:
+		return ForbiddenPrefix + msg + "."
 	default:
 		return msg
 	}
@@ -356,14 +363,12 @@ func UnauthorizedErr(err error, opts ...Option) error {
 
 // Forbidden creates a 403 error with the given format and arguments.
 func Forbidden(format string, args ...interface{}) error {
-	args = append(args, withDefaultMessage(ForbiddenDefaultMsg))
-	return Errorf(http.StatusForbidden, format, args...)
+	return New(http.StatusForbidden, format, args...)
 }
 
 // ForbiddenErr returns an 403 error with the given error.
-func ForbiddenErr(err error, opts ...Option) error {
-	opts = append(opts, withDefaultMessage(ForbiddenDefaultMsg))
-	return NewErr(http.StatusForbidden, err, opts...)
+func ForbiddenErr(err error, format string, args ...interface{}) error {
+	return NewError(http.StatusForbidden, err, format, args...)
 }
 
 // NotFound creates a 404 error with the given format and arguments.
