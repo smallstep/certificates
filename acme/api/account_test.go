@@ -50,7 +50,7 @@ func newACMEProv(t *testing.T) *provisioner.ACME {
 	return a
 }
 
-func createEABJWS(jwk *jose.JSONWebKey, hmacKey []byte, keyID string, url string) (*jose.JSONWebSignature, error) {
+func createEABJWS(jwk *jose.JSONWebKey, hmacKey []byte, keyID, u string) (*jose.JSONWebSignature, error) {
 	signer, err := jose.NewSigner(
 		jose.SigningKey{
 			Algorithm: jose.SignatureAlgorithm("HS256"),
@@ -59,7 +59,7 @@ func createEABJWS(jwk *jose.JSONWebKey, hmacKey []byte, keyID string, url string
 		&jose.SignerOptions{
 			ExtraHeaders: map[jose.HeaderKey]interface{}{
 				"kid": keyID,
-				"url": url,
+				"url": u,
 			},
 			EmbedJWK: false,
 		},
@@ -91,8 +91,8 @@ func createEABJWS(jwk *jose.JSONWebKey, hmacKey []byte, keyID string, url string
 	return parsedJWS, nil
 }
 
-func createRawEABJWS(jwk *jose.JSONWebKey, hmacKey []byte, keyID string, url string) ([]byte, error) {
-	jws, err := createEABJWS(jwk, hmacKey, keyID, url)
+func createRawEABJWS(jwk *jose.JSONWebKey, hmacKey []byte, keyID, u string) ([]byte, error) {
+	jws, err := createEABJWS(jwk, hmacKey, keyID, u)
 	if err != nil {
 		return nil, err
 	}
