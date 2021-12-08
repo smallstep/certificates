@@ -153,91 +153,22 @@ func (h *Handler) isAccountAuthorized(ctx context.Context, dbCert *acme.Certific
 	}
 	certificateBelongsToAccount := dbCert.AccountID == account.ID
 	if certificateBelongsToAccount {
-		return nil // return early; skip relatively expensive database check
-	}
-	requiredIdentifiers := extractIdentifiers(certToBeRevoked)
-	if len(requiredIdentifiers) == 0 {
-		return wrapUnauthorizedError(certToBeRevoked, nil, "cannot authorize revocation without providing identifiers to authorize", nil)
-	}
-	authzs, err := h.db.GetAuthorizationsByAccountID(ctx, account.ID)
-	if err != nil {
-		return acme.WrapErrorISE(err, "error retrieving authorizations for Account %s", account.ID)
-	}
-	authorizedIdentifiers := map[string]acme.Identifier{}
-	for _, authz := range authzs {
-		// Only valid Authorizations are included
-		if authz.Status != acme.StatusValid {
-			continue
-		}
-		authorizedIdentifiers[identifierKey(authz.Identifier)] = authz.Identifier
-	}
-	if len(authorizedIdentifiers) == 0 {
-		unauthorizedIdentifiers := []acme.Identifier{}
-		for _, identifier := range requiredIdentifiers {
-			unauthorizedIdentifiers = append(unauthorizedIdentifiers, identifier)
-		}
-		return wrapUnauthorizedError(certToBeRevoked, unauthorizedIdentifiers, fmt.Sprintf("account '%s' does not have valid authorizations", account.ID), nil)
-	}
-	unauthorizedIdentifiers := []acme.Identifier{}
-	for key := range requiredIdentifiers {
-		_, ok := authorizedIdentifiers[key]
-		if !ok {
-			unauthorizedIdentifiers = append(unauthorizedIdentifiers, requiredIdentifiers[key])
-		}
-	}
-	if len(unauthorizedIdentifiers) != 0 {
-		return wrapUnauthorizedError(certToBeRevoked, unauthorizedIdentifiers, fmt.Sprintf("account '%s' does not have authorizations for all identifiers", account.ID), nil)
+		return nil // return early
 	}
 
-	return nil
-}
+	// TODO(hs): according to RFC8555: 7.6, a server MUST consider the following accounts authorized
+	// to revoke a certificate:
+	//
+	//	o  the account that issued the certificate.
+	//	o  an account that holds authorizations for all of the identifiers in the certificate.
+	//
+	// We currently only support the first case. The second might result in step going OOM when
+	// large numbers of Authorizations are involved when the current nosql interface is in use.
+	// We want to protect users from this failure scenario, so that's why it hasn't been added yet.
+	// This issue is tracked in https://github.com/smallstep/certificates/issues/767
 
-// identifierKey creates a unique key for an ACME identifier using
-// the following format: ip|127.0.0.1; dns|*.example.com
-func identifierKey(identifier acme.Identifier) string {
-	if identifier.Type == acme.IP {
-		return "ip|" + identifier.Value
-	}
-	if identifier.Type == acme.DNS {
-		return "dns|" + identifier.Value
-	}
-	return "unsupported|" + identifier.Value
-}
-
-// extractIdentifiers extracts ACME identifiers from an x509 certificate and
-// creates a map from them. The map ensures that duplicate SANs are deduplicated.
-// The Subject CommonName is included, because RFC8555 7.4 states that DNS
-// identifiers can come from either the CommonName or a DNS SAN or both. When
-// authorizing issuance, the DNS identifier must be in the request and will be
-// included in the validation (see Order.sans()) as of now. This means that the
-// CommonName will in fact have an authorization available.
-func extractIdentifiers(cert *x509.Certificate) map[string]acme.Identifier {
-	result := map[string]acme.Identifier{}
-	for _, name := range cert.DNSNames {
-		identifier := acme.Identifier{
-			Type:  acme.DNS,
-			Value: name,
-		}
-		result[identifierKey(identifier)] = identifier
-	}
-	for _, ip := range cert.IPAddresses {
-		identifier := acme.Identifier{
-			Type:  acme.IP,
-			Value: ip.String(),
-		}
-		result[identifierKey(identifier)] = identifier
-	}
-	if cert.Subject.CommonName != "" {
-		identifier := acme.Identifier{
-			// assuming only DNS can be in Common Name (RFC8555, 7.4); RFC8738
-			// IP Identifier Validation Extension does not state anything about this.
-			// This logic is in accordance with the logic in order.canonicalize()
-			Type:  acme.DNS,
-			Value: cert.Subject.CommonName,
-		}
-		result[identifierKey(identifier)] = identifier
-	}
-	return result
+	// not authorized; fail closed.
+	return wrapUnauthorizedError(certToBeRevoked, nil, fmt.Sprintf("account '%s' is not authorized", account.ID), nil)
 }
 
 // wrapRevokeErr is a best effort implementation to transform an error during

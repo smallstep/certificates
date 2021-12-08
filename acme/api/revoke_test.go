@@ -715,35 +715,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 				},
 			}
 		},
-		"fail/db.GetAuthorizationsByAccountID-error": func(t *testing.T) test {
-			acc := &acme.Account{ID: "accountID", Status: acme.StatusValid}
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
-			ctx = context.WithValue(ctx, accContextKey, acc)
-			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
-			ctx = context.WithValue(ctx, jwsContextKey, jws)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
-			db := &acme.MockDB{
-				MockGetCertificateBySerial: func(ctx context.Context, serial string) (*acme.Certificate, error) {
-					assert.Equals(t, cert.SerialNumber.String(), serial)
-					return &acme.Certificate{
-						AccountID: "differentAccountID",
-						Leaf:      cert,
-					}, nil
-				},
-				MockGetAuthorizationsByAccountID: func(ctx context.Context, accountID string) ([]*acme.Authorization, error) {
-					return nil, errors.New("force")
-				},
-			}
-			ca := &mockCA{}
-			return test{
-				db:         db,
-				ca:         ca,
-				ctx:        ctx,
-				statusCode: 500,
-				err:        acme.NewErrorISE("error retrieving authorizations for Account %s", "accountID"),
-			}
-		},
 		"fail/account-not-authorized": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accountID", Status: acme.StatusValid}
 			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
@@ -1150,101 +1121,13 @@ func TestHandler_isAccountAuthorized(t *testing.T) {
 				},
 			}
 		},
-		"fail/no-certificate-identifiers": func(t *testing.T) test {
-			account := &acme.Account{
-				ID:     accountID,
-				Status: acme.StatusValid,
-			}
-			certToBeRevoked := &x509.Certificate{}
-			existingCert := &acme.Certificate{
-				AccountID: "differentAccountID",
-			}
-			return test{
-				ctx:             context.TODO(),
-				existingCert:    existingCert,
-				certToBeRevoked: certToBeRevoked,
-				account:         account,
-				err: &acme.Error{
-					Type:   "urn:ietf:params:acme:error:unauthorized",
-					Status: http.StatusForbidden,
-					Detail: "No authorization provided",
-					Err:    errors.New("cannot authorize revocation without providing identifiers to authorize"),
-				},
-			}
-		},
-		"fail/db.GetAuthorizationsByAccountID-error": func(t *testing.T) test {
+		"fail/different-account": func(t *testing.T) test {
 			account := &acme.Account{
 				ID:     accountID,
 				Status: acme.StatusValid,
 			}
 			certToBeRevoked := &x509.Certificate{
-				Subject: pkix.Name{
-					CommonName: "127.0.0.1",
-				},
-			}
-			existingCert := &acme.Certificate{
-				AccountID: "differentAccountID",
-			}
-			return test{
-				db: &acme.MockDB{
-					MockGetAuthorizationsByAccountID: func(ctx context.Context, accountID string) ([]*acme.Authorization, error) {
-						assert.Equals(t, "accountID", accountID)
-						return nil, errors.New("force")
-					},
-				},
-				ctx:             context.TODO(),
-				existingCert:    existingCert,
-				certToBeRevoked: certToBeRevoked,
-				account:         account,
-				err:             acme.NewErrorISE("error retrieving authorizations for Account %s: force", accountID),
-			}
-		},
-		"fail/no-valid-authorizations": func(t *testing.T) test {
-			account := &acme.Account{
-				ID:     accountID,
-				Status: acme.StatusValid,
-			}
-			certToBeRevoked := &x509.Certificate{
-				Subject: pkix.Name{
-					CommonName: "127.0.0.1",
-				},
-			}
-			existingCert := &acme.Certificate{
-				AccountID: "differentAccountID",
-			}
-			return test{
-				db: &acme.MockDB{
-					MockGetAuthorizationsByAccountID: func(ctx context.Context, accountID string) ([]*acme.Authorization, error) {
-						assert.Equals(t, "accountID", accountID)
-						return []*acme.Authorization{
-							{
-								AccountID: accountID,
-								Status:    acme.StatusInvalid,
-							},
-						}, nil
-					},
-				},
-				ctx:             context.TODO(),
-				existingCert:    existingCert,
-				certToBeRevoked: certToBeRevoked,
-				account:         account,
-				err: &acme.Error{
-					Type:   "urn:ietf:params:acme:error:unauthorized",
-					Status: http.StatusForbidden,
-					Detail: "No authorization provided for name 127.0.0.1",
-					Err:    errors.New("account 'accountID' does not have valid authorizations"),
-				},
-			}
-		},
-		"fail/authorizations-do-not-match-identifiers": func(t *testing.T) test {
-			account := &acme.Account{
-				ID:     accountID,
-				Status: acme.StatusValid,
-			}
-			certToBeRevoked := &x509.Certificate{
-				Subject: pkix.Name{
-					CommonName: "127.0.0.1",
-				},
+				IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
 			}
 			existingCert := &acme.Certificate{
 				AccountID: "differentAccountID",
@@ -1259,7 +1142,7 @@ func TestHandler_isAccountAuthorized(t *testing.T) {
 								Status:    acme.StatusValid,
 								Identifier: acme.Identifier{
 									Type:  acme.IP,
-									Value: "127.0.0.2",
+									Value: "127.0.0.1",
 								},
 							},
 						}, nil
@@ -1272,8 +1155,8 @@ func TestHandler_isAccountAuthorized(t *testing.T) {
 				err: &acme.Error{
 					Type:   "urn:ietf:params:acme:error:unauthorized",
 					Status: http.StatusForbidden,
-					Detail: "No authorization provided for name 127.0.0.1",
-					Err:    errors.New("account 'accountID' does not have authorizations for all identifiers"),
+					Detail: "No authorization provided",
+					Err:    errors.New("account 'accountID' is not authorized"),
 				},
 			}
 		},
@@ -1286,7 +1169,7 @@ func TestHandler_isAccountAuthorized(t *testing.T) {
 				IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
 			}
 			existingCert := &acme.Certificate{
-				AccountID: "differentAccountID",
+				AccountID: "accountID",
 			}
 			return test{
 				db: &acme.MockDB{
@@ -1340,176 +1223,94 @@ func TestHandler_isAccountAuthorized(t *testing.T) {
 	}
 }
 
-func Test_identifierKey(t *testing.T) {
-	tests := []struct {
-		name       string
-		identifier acme.Identifier
-		want       string
-	}{
-		{
-			name: "ip",
-			identifier: acme.Identifier{
-				Type:  acme.IP,
-				Value: "10.0.0.1",
-			},
-			want: "ip|10.0.0.1",
-		},
-		{
-			name: "dns",
-			identifier: acme.Identifier{
-				Type:  acme.DNS,
-				Value: "*.example.com",
-			},
-			want: "dns|*.example.com",
-		},
-		{
-			name: "unknown",
-			identifier: acme.Identifier{
-				Type:  "InvalidType",
-				Value: "<<>>",
-			},
-			want: "unsupported|<<>>",
-		},
+func Test_wrapUnauthorizedError(t *testing.T) {
+	type test struct {
+		cert                    *x509.Certificate
+		unauthorizedIdentifiers []acme.Identifier
+		msg                     string
+		err                     error
+		want                    *acme.Error
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := identifierKey(tt.identifier)
-			if !cmp.Equal(tt.want, got) {
-				t.Errorf("identifierKey() diff = \n%s", cmp.Diff(tt.want, got))
+	var tests = map[string]func(t *testing.T) test{
+		"unauthorizedIdentifiers": func(t *testing.T) test {
+			acmeErr := acme.NewError(acme.ErrorUnauthorizedType, "account 'accountID' is not authorized")
+			acmeErr.Status = http.StatusForbidden
+			acmeErr.Detail = "No authorization provided for name 127.0.0.1"
+			return test{
+				err:  nil,
+				cert: nil,
+				unauthorizedIdentifiers: []acme.Identifier{
+					{
+						Type:  acme.IP,
+						Value: "127.0.0.1",
+					},
+				},
+				msg:  "account 'accountID' is not authorized",
+				want: acmeErr,
 			}
-		})
-	}
-}
-
-func Test_extractIdentifiers(t *testing.T) {
-	tests := []struct {
-		name string
-		cert *x509.Certificate
-		want map[string]acme.Identifier
-	}{
-		{
-			name: "ip",
-			cert: &x509.Certificate{
-				IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
-			},
-			want: map[string]acme.Identifier{
-				"ip|127.0.0.1": {
-					Type:  acme.IP,
-					Value: "127.0.0.1",
-				},
-			},
 		},
-		{
-			name: "dns",
-			cert: &x509.Certificate{
-				DNSNames: []string{"*.example.com"},
-			},
-			want: map[string]acme.Identifier{
-				"dns|*.example.com": {
-					Type:  acme.DNS,
-					Value: "*.example.com",
-				},
-			},
-		},
-		{
-			name: "dns-subject",
-			cert: &x509.Certificate{
+		"subject": func(t *testing.T) test {
+			acmeErr := acme.NewError(acme.ErrorUnauthorizedType, "account 'accountID' is not authorized")
+			acmeErr.Status = http.StatusForbidden
+			acmeErr.Detail = "No authorization provided for name test.example.com"
+			cert := &x509.Certificate{
 				Subject: pkix.Name{
-					CommonName: "www.example.com",
+					CommonName: "test.example.com",
 				},
-			},
-			want: map[string]acme.Identifier{
-				"dns|www.example.com": {
-					Type:  acme.DNS,
-					Value: "www.example.com",
-				},
-			},
-		},
-		{
-			name: "ip-subject",
-			cert: &x509.Certificate{
-				Subject: pkix.Name{
-					CommonName: "127.0.0.1",
-				},
-			},
-			want: map[string]acme.Identifier{
-				"dns|127.0.0.1": { // this is the currently expected behavior
-					Type:  acme.DNS,
-					Value: "127.0.0.1",
-				},
-			},
-		},
-		{
-			name: "combined",
-			cert: &x509.Certificate{
-				Subject: pkix.Name{
-					CommonName: "127.0.0.1",
-				},
-				IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.2")},
-				DNSNames:    []string{"*.example.com", "www.example.com"},
-			},
-			want: map[string]acme.Identifier{
-				"ip|127.0.0.1": {
-					Type:  acme.IP,
-					Value: "127.0.0.1",
-				},
-				"ip|127.0.0.2": {
-					Type:  acme.IP,
-					Value: "127.0.0.2",
-				},
-				"dns|*.example.com": {
-					Type:  acme.DNS,
-					Value: "*.example.com",
-				},
-				"dns|www.example.com": {
-					Type:  acme.DNS,
-					Value: "www.example.com",
-				},
-				"dns|127.0.0.1": { // this is the currently expected behavior
-					Type:  acme.DNS,
-					Value: "127.0.0.1",
-				},
-			},
-		},
-		{
-			name: "ip-duplicates",
-			cert: &x509.Certificate{
-				IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.2")},
-			},
-			want: map[string]acme.Identifier{
-				"ip|127.0.0.1": {
-					Type:  acme.IP,
-					Value: "127.0.0.1",
-				},
-				"ip|127.0.0.2": {
-					Type:  acme.IP,
-					Value: "127.0.0.2",
-				},
-			},
-		},
-		{
-			name: "dns-duplicates",
-			cert: &x509.Certificate{
-				DNSNames: []string{"*.example.com", "www.example.com", "www.example.com"},
-			},
-			want: map[string]acme.Identifier{
-				"dns|*.example.com": {
-					Type:  acme.DNS,
-					Value: "*.example.com",
-				},
-				"dns|www.example.com": {
-					Type:  acme.DNS,
-					Value: "www.example.com",
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractIdentifiers(tt.cert)
-			if !cmp.Equal(tt.want, got) {
-				t.Errorf("extractIdentifiers() diff=\n%s", cmp.Diff(tt.want, got))
 			}
+			return test{
+				err:                     nil,
+				cert:                    cert,
+				unauthorizedIdentifiers: []acme.Identifier{},
+				msg:                     "account 'accountID' is not authorized",
+				want:                    acmeErr,
+			}
+		},
+		"wrap-subject": func(t *testing.T) test {
+			acmeErr := acme.NewError(acme.ErrorUnauthorizedType, "verification of jws using certificate public key failed: square/go-jose: error in cryptographic primitive")
+			acmeErr.Status = http.StatusForbidden
+			acmeErr.Detail = "No authorization provided for name test.example.com"
+			cert := &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "test.example.com",
+				},
+			}
+			return test{
+				err:                     errors.New("square/go-jose: error in cryptographic primitive"),
+				cert:                    cert,
+				unauthorizedIdentifiers: []acme.Identifier{},
+				msg:                     "verification of jws using certificate public key failed",
+				want:                    acmeErr,
+			}
+		},
+		"default": func(t *testing.T) test {
+			acmeErr := acme.NewError(acme.ErrorUnauthorizedType, "account 'accountID' is not authorized")
+			acmeErr.Status = http.StatusForbidden
+			acmeErr.Detail = "No authorization provided"
+			cert := &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "",
+				},
+			}
+			return test{
+				err:                     nil,
+				cert:                    cert,
+				unauthorizedIdentifiers: []acme.Identifier{},
+				msg:                     "account 'accountID' is not authorized",
+				want:                    acmeErr,
+			}
+		},
+	}
+	for name, prep := range tests {
+		tc := prep(t)
+		t.Run(name, func(t *testing.T) {
+			acmeErr := wrapUnauthorizedError(tc.cert, tc.unauthorizedIdentifiers, tc.msg, tc.err)
+			assert.Equals(t, acmeErr.Err.Error(), tc.want.Err.Error())
+			assert.Equals(t, acmeErr.Type, tc.want.Type)
+			assert.Equals(t, acmeErr.Status, tc.want.Status)
+			assert.Equals(t, acmeErr.Detail, tc.want.Detail)
+			assert.Equals(t, acmeErr.Identifier, tc.want.Identifier)
+			assert.Equals(t, acmeErr.Subproblems, tc.want.Subproblems)
 		})
 	}
 }
