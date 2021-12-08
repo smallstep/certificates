@@ -25,6 +25,9 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
+	"github.com/smallstep/certificates/templates"
+	"go.step.sm/linkedca"
+	"golang.org/x/crypto/ssh"
 )
 
 // Authority is the interface implemented by a CA authority.
@@ -46,6 +49,21 @@ type Authority interface {
 	GetRoots() (federation []*x509.Certificate, err error)
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
+}
+
+type LinkedAuthority interface { // TODO(hs): name is not great; it is related to LinkedCA, though
+	Authority
+	IsAdminAPIEnabled() bool
+	LoadAdminByID(id string) (*linkedca.Admin, bool)
+	GetAdmins(cursor string, limit int) ([]*linkedca.Admin, string, error)
+	StoreAdmin(ctx context.Context, adm *linkedca.Admin, prov provisioner.Interface) error
+	UpdateAdmin(ctx context.Context, id string, nu *linkedca.Admin) (*linkedca.Admin, error)
+	RemoveAdmin(ctx context.Context, id string) error
+	AuthorizeAdminToken(r *http.Request, token string) (*linkedca.Admin, error)
+	StoreProvisioner(ctx context.Context, prov *linkedca.Provisioner) error
+	LoadProvisionerByID(id string) (provisioner.Interface, error)
+	UpdateProvisioner(ctx context.Context, nu *linkedca.Provisioner) error
+	RemoveProvisioner(ctx context.Context, id string) error
 }
 
 // TimeDuration is an alias of provisioner.TimeDuration
@@ -456,4 +474,297 @@ func fmtPublicKey(cert *x509.Certificate) string {
 		params = "unknown"
 	}
 	return fmt.Sprintf("%s %s", cert.PublicKeyAlgorithm, params)
+}
+
+type MockAuthority struct {
+	ret1, ret2                   interface{}
+	err                          error
+	authorizeSign                func(ott string) ([]provisioner.SignOption, error)
+	getTLSOptions                func() *authority.TLSOptions
+	root                         func(shasum string) (*x509.Certificate, error)
+	sign                         func(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	renew                        func(cert *x509.Certificate) ([]*x509.Certificate, error)
+	rekey                        func(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
+	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
+	MockLoadProvisionerByName    func(name string) (provisioner.Interface, error)
+	getProvisioners              func(nextCursor string, limit int) (provisioner.List, string, error)
+	revoke                       func(context.Context, *authority.RevokeOptions) error
+	getEncryptedKey              func(kid string) (string, error)
+	getRoots                     func() ([]*x509.Certificate, error)
+	getFederation                func() ([]*x509.Certificate, error)
+	signSSH                      func(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
+	signSSHAddUser               func(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
+	renewSSH                     func(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error)
+	rekeySSH                     func(ctx context.Context, cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
+	getSSHHosts                  func(ctx context.Context, cert *x509.Certificate) ([]authority.Host, error)
+	getSSHRoots                  func(ctx context.Context) (*authority.SSHKeys, error)
+	getSSHFederation             func(ctx context.Context) (*authority.SSHKeys, error)
+	getSSHConfig                 func(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error)
+	checkSSHHost                 func(ctx context.Context, principal, token string) (bool, error)
+	getSSHBastion                func(ctx context.Context, user string, hostname string) (*authority.Bastion, error)
+	version                      func() authority.Version
+
+	MockRet1, MockRet2      interface{} // TODO: refactor the ret1/ret2 into those two
+	MockErr                 error
+	MockIsAdminAPIEnabled   func() bool
+	MockLoadAdminByID       func(id string) (*linkedca.Admin, bool)
+	MockGetAdmins           func(cursor string, limit int) ([]*linkedca.Admin, string, error)
+	MockStoreAdmin          func(ctx context.Context, adm *linkedca.Admin, prov provisioner.Interface) error
+	MockUpdateAdmin         func(ctx context.Context, id string, nu *linkedca.Admin) (*linkedca.Admin, error)
+	MockRemoveAdmin         func(ctx context.Context, id string) error
+	MockAuthorizeAdminToken func(r *http.Request, token string) (*linkedca.Admin, error)
+	MockStoreProvisioner    func(ctx context.Context, prov *linkedca.Provisioner) error
+	MockLoadProvisionerByID func(id string) (provisioner.Interface, error)
+	MockUpdateProvisioner   func(ctx context.Context, nu *linkedca.Provisioner) error
+	MockRemoveProvisioner   func(ctx context.Context, id string) error
+}
+
+// TODO: remove once Authorize is deprecated.
+func (m *MockAuthority) Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
+	return m.AuthorizeSign(ott)
+}
+
+func (m *MockAuthority) AuthorizeSign(ott string) ([]provisioner.SignOption, error) {
+	if m.authorizeSign != nil {
+		return m.authorizeSign(ott)
+	}
+	return m.ret1.([]provisioner.SignOption), m.err
+}
+
+func (m *MockAuthority) GetTLSOptions() *authority.TLSOptions {
+	if m.getTLSOptions != nil {
+		return m.getTLSOptions()
+	}
+	return m.ret1.(*authority.TLSOptions)
+}
+
+func (m *MockAuthority) Root(shasum string) (*x509.Certificate, error) {
+	if m.root != nil {
+		return m.root(shasum)
+	}
+	return m.ret1.(*x509.Certificate), m.err
+}
+
+func (m *MockAuthority) Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+	if m.sign != nil {
+		return m.sign(cr, opts, signOpts...)
+	}
+	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
+}
+
+func (m *MockAuthority) Renew(cert *x509.Certificate) ([]*x509.Certificate, error) {
+	if m.renew != nil {
+		return m.renew(cert)
+	}
+	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
+}
+
+func (m *MockAuthority) Rekey(oldcert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
+	if m.rekey != nil {
+		return m.rekey(oldcert, pk)
+	}
+	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
+}
+
+func (m *MockAuthority) GetProvisioners(nextCursor string, limit int) (provisioner.List, string, error) {
+	if m.getProvisioners != nil {
+		return m.getProvisioners(nextCursor, limit)
+	}
+	return m.ret1.(provisioner.List), m.ret2.(string), m.err
+}
+
+func (m *MockAuthority) LoadProvisionerByCertificate(cert *x509.Certificate) (provisioner.Interface, error) {
+	if m.loadProvisionerByCertificate != nil {
+		return m.loadProvisionerByCertificate(cert)
+	}
+	return m.ret1.(provisioner.Interface), m.err
+}
+
+func (m *MockAuthority) LoadProvisionerByName(name string) (provisioner.Interface, error) {
+	if m.MockLoadProvisionerByName != nil {
+		return m.MockLoadProvisionerByName(name)
+	}
+	return m.ret1.(provisioner.Interface), m.err
+}
+
+func (m *MockAuthority) Revoke(ctx context.Context, opts *authority.RevokeOptions) error {
+	if m.revoke != nil {
+		return m.revoke(ctx, opts)
+	}
+	return m.err
+}
+
+func (m *MockAuthority) GetEncryptedKey(kid string) (string, error) {
+	if m.getEncryptedKey != nil {
+		return m.getEncryptedKey(kid)
+	}
+	return m.ret1.(string), m.err
+}
+
+func (m *MockAuthority) GetRoots() ([]*x509.Certificate, error) {
+	if m.getRoots != nil {
+		return m.getRoots()
+	}
+	return m.ret1.([]*x509.Certificate), m.err
+}
+
+func (m *MockAuthority) GetFederation() ([]*x509.Certificate, error) {
+	if m.getFederation != nil {
+		return m.getFederation()
+	}
+	return m.ret1.([]*x509.Certificate), m.err
+}
+
+func (m *MockAuthority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+	if m.signSSH != nil {
+		return m.signSSH(ctx, key, opts, signOpts...)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *MockAuthority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error) {
+	if m.signSSHAddUser != nil {
+		return m.signSSHAddUser(ctx, key, cert)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *MockAuthority) RenewSSH(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error) {
+	if m.renewSSH != nil {
+		return m.renewSSH(ctx, cert)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *MockAuthority) RekeySSH(ctx context.Context, cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+	if m.rekeySSH != nil {
+		return m.rekeySSH(ctx, cert, key, signOpts...)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *MockAuthority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]authority.Host, error) {
+	if m.getSSHHosts != nil {
+		return m.getSSHHosts(ctx, cert)
+	}
+	return m.ret1.([]authority.Host), m.err
+}
+
+func (m *MockAuthority) GetSSHRoots(ctx context.Context) (*authority.SSHKeys, error) {
+	if m.getSSHRoots != nil {
+		return m.getSSHRoots(ctx)
+	}
+	return m.ret1.(*authority.SSHKeys), m.err
+}
+
+func (m *MockAuthority) GetSSHFederation(ctx context.Context) (*authority.SSHKeys, error) {
+	if m.getSSHFederation != nil {
+		return m.getSSHFederation(ctx)
+	}
+	return m.ret1.(*authority.SSHKeys), m.err
+}
+
+func (m *MockAuthority) GetSSHConfig(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error) {
+	if m.getSSHConfig != nil {
+		return m.getSSHConfig(ctx, typ, data)
+	}
+	return m.ret1.([]templates.Output), m.err
+}
+
+func (m *MockAuthority) CheckSSHHost(ctx context.Context, principal, token string) (bool, error) {
+	if m.checkSSHHost != nil {
+		return m.checkSSHHost(ctx, principal, token)
+	}
+	return m.ret1.(bool), m.err
+}
+
+func (m *MockAuthority) GetSSHBastion(ctx context.Context, user, hostname string) (*authority.Bastion, error) {
+	if m.getSSHBastion != nil {
+		return m.getSSHBastion(ctx, user, hostname)
+	}
+	return m.ret1.(*authority.Bastion), m.err
+}
+
+func (m *MockAuthority) Version() authority.Version {
+	if m.version != nil {
+		return m.version()
+	}
+	return m.ret1.(authority.Version)
+}
+
+func (m *MockAuthority) IsAdminAPIEnabled() bool {
+	if m.MockIsAdminAPIEnabled != nil {
+		return m.MockIsAdminAPIEnabled()
+	}
+	return m.MockRet1.(bool)
+}
+
+func (m *MockAuthority) LoadAdminByID(id string) (*linkedca.Admin, bool) {
+	if m.MockLoadAdminByID != nil {
+		return m.MockLoadAdminByID(id)
+	}
+	return m.MockRet1.(*linkedca.Admin), m.MockRet2.(bool)
+}
+
+func (m *MockAuthority) GetAdmins(cursor string, limit int) ([]*linkedca.Admin, string, error) {
+	if m.MockGetAdmins != nil {
+		return m.MockGetAdmins(cursor, limit)
+	}
+	return m.MockRet1.([]*linkedca.Admin), m.MockRet2.(string), m.MockErr
+}
+
+func (m *MockAuthority) StoreAdmin(ctx context.Context, adm *linkedca.Admin, prov provisioner.Interface) error {
+	if m.MockStoreAdmin != nil {
+		return m.MockStoreAdmin(ctx, adm, prov)
+	}
+	return m.MockErr
+}
+
+func (m *MockAuthority) UpdateAdmin(ctx context.Context, id string, nu *linkedca.Admin) (*linkedca.Admin, error) {
+	if m.MockUpdateAdmin != nil {
+		return m.MockUpdateAdmin(ctx, id, nu)
+	}
+	return m.MockRet1.(*linkedca.Admin), m.MockErr
+}
+
+func (m *MockAuthority) RemoveAdmin(ctx context.Context, id string) error {
+	if m.MockRemoveAdmin != nil {
+		return m.MockRemoveAdmin(ctx, id)
+	}
+	return m.MockErr
+}
+
+func (m *MockAuthority) AuthorizeAdminToken(r *http.Request, token string) (*linkedca.Admin, error) {
+	if m.MockAuthorizeAdminToken != nil {
+		return m.MockAuthorizeAdminToken(r, token)
+	}
+	return m.MockRet1.(*linkedca.Admin), m.MockErr
+}
+
+func (m *MockAuthority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisioner) error {
+	if m.MockStoreProvisioner != nil {
+		return m.MockStoreProvisioner(ctx, prov)
+	}
+	return m.MockErr
+}
+
+func (m *MockAuthority) LoadProvisionerByID(id string) (provisioner.Interface, error) {
+	if m.MockLoadProvisionerByID != nil {
+		return m.MockLoadProvisionerByID(id)
+	}
+	return m.MockRet1.(provisioner.Interface), m.MockErr
+}
+
+func (m *MockAuthority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisioner) error {
+	if m.MockUpdateProvisioner != nil {
+		return m.MockUpdateProvisioner(ctx, nu)
+	}
+	return m.MockErr
+}
+
+func (m *MockAuthority) RemoveProvisioner(ctx context.Context, id string) error {
+	if m.MockRemoveProvisioner != nil {
+		return m.MockRemoveProvisioner(ctx, id)
+	}
+	return m.MockErr
 }

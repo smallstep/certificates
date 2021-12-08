@@ -106,7 +106,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 			return test{
 				input:      string(input),
 				statusCode: http.StatusOK,
-				auth: &mockAuthority{
+				auth: &MockAuthority{
 					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
 						return nil, nil
 					},
@@ -150,7 +150,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 				input:      string(input),
 				statusCode: http.StatusOK,
 				tls:        cs,
-				auth: &mockAuthority{
+				auth: &MockAuthority{
 					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
 						return nil, nil
 					},
@@ -185,7 +185,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 			return test{
 				input:      string(input),
 				statusCode: http.StatusInternalServerError,
-				auth: &mockAuthority{
+				auth: &MockAuthority{
 					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
 						return nil, nil
 					},
@@ -207,7 +207,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 			return test{
 				input:      string(input),
 				statusCode: http.StatusForbidden,
-				auth: &mockAuthority{
+				auth: &MockAuthority{
 					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
 						return nil, nil
 					},

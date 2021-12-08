@@ -3,19 +3,18 @@ package api
 import (
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"
 )
 
-// Handler is the ACME API request handler.
+// Handler is the Admin API request handler.
 type Handler struct {
 	db     admin.DB
-	auth   *authority.Authority
+	auth   api.LinkedAuthority // was: *authority.Authority
 	acmeDB acme.DB
 }
 
 // NewHandler returns a new Authority Config Handler.
-func NewHandler(auth *authority.Authority, adminDB admin.DB, acmeDB acme.DB) api.RouterHandler {
+func NewHandler(auth api.LinkedAuthority, adminDB admin.DB, acmeDB acme.DB) api.RouterHandler {
 	return &Handler{
 		db:     adminDB,
 		auth:   auth,
