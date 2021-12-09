@@ -42,6 +42,8 @@ To get up and running quickly, or as an alternative to running your own `step-ca
 [![GitHub stars](https://img.shields.io/github/stars/smallstep/certificates.svg?style=social)](https://github.com/smallstep/certificates/stargazers)
 [![Twitter followers](https://img.shields.io/twitter/follow/smallsteplabs.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=smallsteplabs)
 
+![star us](https://github.com/smallstep/certificates/raw/master/docs/images/star.gif)
+
 ## Features
 
 ### 🦾 A fast, stable, flexible private CA

@@ -77,12 +77,12 @@ func Test_defaultPublicKeyValidator_Valid(t *testing.T) {
 		{
 			"fail/unrecognized-key-type",
 			&x509.CertificateRequest{PublicKey: "foo"},
-			errors.New("unrecognized public key of type 'string' in CSR"),
+			errors.New("certificate request key of type 'string' is not supported"),
 		},
 		{
 			"fail/rsa/too-short",
 			shortRSA,
-			errors.New("rsa key in CSR must be at least 2048 bits (256 bytes)"),
+			errors.New("certificate request RSA key must be at least 2048 bits (256 bytes)"),
 		},
 		{
 			"ok/rsa",
@@ -303,14 +303,14 @@ func Test_defaultSANsValidator_Valid(t *testing.T) {
 			return test{
 				csr:          &x509.CertificateRequest{EmailAddresses: []string{"max@fx.com", "mariano@fx.com"}},
 				expectedSANs: []string{"dcow@fx.com"},
-				err:          errors.New("certificate request does not contain the valid Email Addresses"),
+				err:          errors.New("certificate request does not contain the valid email addresses"),
 			}
 		},
 		"fail/ipAddressesValidator": func() test {
 			return test{
 				csr:          &x509.CertificateRequest{IPAddresses: []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("127.0.0.1")}},
 				expectedSANs: []string{"127.0.0.1"},
-				err:          errors.New("IP Addresses claim failed"),
+				err:          errors.New("certificate request does not contain the valid IP addresses"),
 			}
 		},
 		"fail/urisValidator": func() test {
@@ -321,7 +321,7 @@ func Test_defaultSANsValidator_Valid(t *testing.T) {
 			return test{
 				csr:          &x509.CertificateRequest{URIs: []*url.URL{u1, u2}},
 				expectedSANs: []string{"urn:uuid:ddfe62ba-7e99-4bc1-83b3-8f57fe3e9959"},
-				err:          errors.New("URIs claim failed"),
+				err:          errors.New("certificate request does not contain the valid URIs"),
 			}
 		},
 		"ok": func() test {
@@ -512,7 +512,7 @@ func Test_forceCN_Option(t *testing.T) {
 					Subject:  pkix.Name{},
 					DNSNames: []string{},
 				},
-				err: errors.New("Cannot force CN, DNSNames is empty"),
+				err: errors.New("cannot force common name, DNS names is empty"),
 			}
 		},
 	}

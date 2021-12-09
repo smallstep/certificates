@@ -75,7 +75,7 @@ func (h *caHandler) SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	opts.OTT = body.OTT
 
 	if err := h.Authority.Revoke(ctx, opts); err != nil {
-		WriteError(w, errs.ForbiddenErr(err))
+		WriteError(w, errs.ForbiddenErr(err, "error revoking ssh certificate"))
 		return
 	}
 
