@@ -343,6 +343,7 @@ type RevokeOptions struct {
 	ReasonCode  int
 	PassiveOnly bool
 	MTLS        bool
+	ACME        bool
 	Crt         *x509.Certificate
 	OTT         string
 }
@@ -360,9 +361,10 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		errs.WithKeyVal("reason", revokeOpts.Reason),
 		errs.WithKeyVal("passiveOnly", revokeOpts.PassiveOnly),
 		errs.WithKeyVal("MTLS", revokeOpts.MTLS),
+		errs.WithKeyVal("ACME", revokeOpts.ACME),
 		errs.WithKeyVal("context", provisioner.MethodFromContext(ctx).String()),
 	}
-	if revokeOpts.MTLS {
+	if revokeOpts.MTLS || revokeOpts.ACME {
 		opts = append(opts, errs.WithKeyVal("certificate", base64.StdEncoding.EncodeToString(revokeOpts.Crt.Raw)))
 	} else {
 		opts = append(opts, errs.WithKeyVal("token", revokeOpts.OTT))
@@ -373,6 +375,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		ReasonCode: revokeOpts.ReasonCode,
 		Reason:     revokeOpts.Reason,
 		MTLS:       revokeOpts.MTLS,
+		ACME:       revokeOpts.ACME,
 		RevokedAt:  time.Now().UTC(),
 	}
 
@@ -380,8 +383,8 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		p   provisioner.Interface
 		err error
 	)
-	// If not mTLS then get the TokenID of the token.
-	if !revokeOpts.MTLS {
+	// If not mTLS nor ACME, then get the TokenID of the token.
+	if !(revokeOpts.MTLS || revokeOpts.ACME) {
 		token, err := jose.ParseSigned(revokeOpts.OTT)
 		if err != nil {
 			return errs.Wrap(http.StatusUnauthorized, err,

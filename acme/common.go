@@ -5,12 +5,15 @@ import (
 	"crypto/x509"
 	"time"
 
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 // CertificateAuthority is the interface implemented by a CA authority.
 type CertificateAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	IsRevoked(sn string) (bool, error)
+	Revoke(context.Context, *authority.RevokeOptions) error
 	LoadProvisionerByName(string) (provisioner.Interface, error)
 }
 
@@ -28,6 +31,7 @@ var clock Clock
 // only those methods required by the ACME api/authority.
 type Provisioner interface {
 	AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error)
+	AuthorizeRevoke(ctx context.Context, token string) error
 	GetID() string
 	GetName() string
 	DefaultTLSCertDuration() time.Duration
@@ -41,6 +45,7 @@ type MockProvisioner struct {
 	MgetID                  func() string
 	MgetName                func() string
 	MauthorizeSign          func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
+	MauthorizeRevoke        func(ctx context.Context, token string) error
 	MdefaultTLSCertDuration func() time.Duration
 	MgetOptions             func() *provisioner.Options
 }
@@ -59,6 +64,14 @@ func (m *MockProvisioner) AuthorizeSign(ctx context.Context, ott string) ([]prov
 		return m.MauthorizeSign(ctx, ott)
 	}
 	return m.Mret1.([]provisioner.SignOption), m.Merr
+}
+
+// AuthorizeRevoke mock
+func (m *MockProvisioner) AuthorizeRevoke(ctx context.Context, token string) error {
+	if m.MauthorizeRevoke != nil {
+		return m.MauthorizeRevoke(ctx, token)
+	}
+	return m.Merr
 }
 
 // DefaultTLSCertDuration mock

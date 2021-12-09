@@ -1267,6 +1267,23 @@ func TestAuthority_Revoke(t *testing.T) {
 				},
 			}
 		},
+		"ok/ACME": func() test {
+			_a := testAuthority(t, WithDatabase(&db.MockAuthDB{}))
+
+			crt, err := pemutil.ReadCertificate("./testdata/certs/foo.crt")
+			assert.FatalError(t, err)
+
+			return test{
+				auth: _a,
+				opts: &RevokeOptions{
+					Crt:        crt,
+					Serial:     "102012593071130646873265215610956555026",
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					ACME:       true,
+				},
+			}
+		},
 	}
 	for name, f := range tests {
 		tc := f()

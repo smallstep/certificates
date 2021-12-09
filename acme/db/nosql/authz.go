@@ -116,3 +116,37 @@ func (db *DB) UpdateAuthorization(ctx context.Context, az *acme.Authorization) e
 	nu.Error = az.Error
 	return db.save(ctx, old.ID, nu, old, "authz", authzTable)
 }
+
+// GetAuthorizationsByAccountID retrieves and unmarshals ACME authz types from the database.
+func (db *DB) GetAuthorizationsByAccountID(ctx context.Context, accountID string) ([]*acme.Authorization, error) {
+	entries, err := db.db.List(authzTable)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error listing authz")
+	}
+	authzs := []*acme.Authorization{}
+	for _, entry := range entries {
+		dbaz := new(dbAuthz)
+		if err = json.Unmarshal(entry.Value, dbaz); err != nil {
+			return nil, errors.Wrapf(err, "error unmarshaling dbAuthz key '%s' into dbAuthz struct", string(entry.Key))
+		}
+		// Filter out all dbAuthzs that don't belong to the accountID. This
+		// could be made more efficient with additional data structures mapping the
+		// Account ID to authorizations. Not trivial to do, though.
+		if dbaz.AccountID != accountID {
+			continue
+		}
+		authzs = append(authzs, &acme.Authorization{
+			ID:         dbaz.ID,
+			AccountID:  dbaz.AccountID,
+			Identifier: dbaz.Identifier,
+			Status:     dbaz.Status,
+			Challenges: nil, // challenges not required for current use case
+			Wildcard:   dbaz.Wildcard,
+			ExpiresAt:  dbaz.ExpiresAt,
+			Token:      dbaz.Token,
+			Error:      dbaz.Error,
+		})
+	}
+
+	return authzs, nil
+}
