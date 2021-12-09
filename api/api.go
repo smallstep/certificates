@@ -487,7 +487,7 @@ type MockAuthority struct {
 	rekey                        func(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
 	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
 	MockLoadProvisionerByName    func(name string) (provisioner.Interface, error)
-	getProvisioners              func(nextCursor string, limit int) (provisioner.List, string, error)
+	MockGetProvisioners          func(nextCursor string, limit int) (provisioner.List, string, error)
 	revoke                       func(context.Context, *authority.RevokeOptions) error
 	getEncryptedKey              func(kid string) (string, error)
 	getRoots                     func() ([]*x509.Certificate, error)
@@ -567,8 +567,8 @@ func (m *MockAuthority) Rekey(oldcert *x509.Certificate, pk crypto.PublicKey) ([
 }
 
 func (m *MockAuthority) GetProvisioners(nextCursor string, limit int) (provisioner.List, string, error) {
-	if m.getProvisioners != nil {
-		return m.getProvisioners(nextCursor, limit)
+	if m.MockGetProvisioners != nil {
+		return m.MockGetProvisioners(nextCursor, limit)
 	}
 	return m.ret1.(provisioner.List), m.ret2.(string), m.err
 }

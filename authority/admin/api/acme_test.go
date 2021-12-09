@@ -1154,21 +1154,23 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 				assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
 				assert.Equals(t, tc.err.Detail, adminErr.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
-			} else {
-				body, err := io.ReadAll(res.Body)
-				res.Body.Close()
-				assert.FatalError(t, err)
-
-				response := GetExternalAccountKeysResponse{}
-				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &response))
-
-				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
-
-				opts := []cmp.Option{cmpopts.IgnoreUnexported(linkedca.EABKey{}, timestamppb.Timestamp{})}
-				if !cmp.Equal(tc.resp, response, opts...) {
-					t.Errorf("h.GetExternalAccountKeys diff =\n%s", cmp.Diff(tc.resp, response, opts...))
-				}
+				return
 			}
+
+			body, err := io.ReadAll(res.Body)
+			res.Body.Close()
+			assert.FatalError(t, err)
+
+			response := GetExternalAccountKeysResponse{}
+			assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &response))
+
+			assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+			opts := []cmp.Option{cmpopts.IgnoreUnexported(linkedca.EABKey{}, timestamppb.Timestamp{})}
+			if !cmp.Equal(tc.resp, response, opts...) {
+				t.Errorf("h.GetExternalAccountKeys diff =\n%s", cmp.Diff(tc.resp, response, opts...))
+			}
+
 		})
 	}
 }
