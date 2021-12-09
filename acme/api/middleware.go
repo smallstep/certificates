@@ -262,11 +262,11 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 		// Store the JWK in the context.
 		ctx = context.WithValue(ctx, jwkContextKey, jwk)
 
-		// Get Account or continue to generate a new one.
+		// Get Account OR continue to generate a new one OR continue Revoke with certificate private key
 		acc, err := h.db.GetAccountByKeyID(ctx, jwk.KeyID)
 		switch {
 		case errors.Is(err, acme.ErrNotFound):
-			// For NewAccount requests ...
+			// For NewAccount and Revoke requests ...
 			break
 		case err != nil:
 			api.WriteError(w, err)
@@ -350,6 +350,42 @@ func (h *Handler) lookupJWK(next nextHTTP) nextHTTP {
 			return
 		}
 	}
+}
+
+// extractOrLookupJWK forwards handling to either extractJWK or
+// lookupJWK based on the presence of a JWK or a KID, respectively.
+func (h *Handler) extractOrLookupJWK(next nextHTTP) nextHTTP {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		jws, err := jwsFromContext(ctx)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+
+		// at this point the JWS has already been verified (if correctly configured in middleware),
+		// and it can be used to check if a JWK exists. This flow is used when the ACME client
+		// signed the payload with a certificate private key.
+		if canExtractJWKFrom(jws) {
+			h.extractJWK(next)(w, r)
+			return
+		}
+
+		// default to looking up the JWK based on KeyID. This flow is used when the ACME client
+		// signed the payload with an account private key.
+		h.lookupJWK(next)(w, r)
+	}
+}
+
+// canExtractJWKFrom checks if the JWS has a JWK that can be extracted
+func canExtractJWKFrom(jws *jose.JSONWebSignature) bool {
+	if jws == nil {
+		return false
+	}
+	if len(jws.Signatures) == 0 {
+		return false
+	}
+	return jws.Signatures[0].Protected.JSONWebKey != nil
 }
 
 // verifyAndExtractJWSPayload extracts the JWK from the JWS and saves it in the context.

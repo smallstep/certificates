@@ -442,7 +442,7 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-// shouldMountSCEPEndpoints returns if the CA should be
+// shouldServeSCEPEndpoints returns if the CA should be
 // configured with endpoints for SCEP. This is assumed to be
 // true if a SCEPService exists, which is true in case a
 // SCEP provisioner was configured.

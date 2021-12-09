@@ -17,9 +17,9 @@ import (
 type IdentifierType string
 
 const (
-	// IP identifier type
+	// IP is the ACME ip identifier type
 	IP IdentifierType = "ip"
-	// DNS identifier type
+	// DNS is the ACME dns identifier type
 	DNS IdentifierType = "dns"
 )
 
@@ -290,6 +290,9 @@ func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.Certificate
 	// MUST appear either in the commonName portion of the requested subject
 	// name or in an extensionRequest attribute [RFC2985] requesting a
 	// subjectAltName extension, or both.
+	// TODO(hs): we might want to check if the CommonName is in fact a DNS (and cannot
+	// be parsed as IP). This is related to https://github.com/smallstep/cli/pull/576
+	// (ACME IP SANS)
 	if csr.Subject.CommonName != "" {
 		// nolint:gocritic
 		canonicalized.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)

@@ -104,6 +104,7 @@ type RevokedCertificateInfo struct {
 	RevokedAt     time.Time
 	TokenID       string
 	MTLS          bool
+	ACME          bool
 }
 
 // IsRevoked returns whether or not a certificate with the given identifier

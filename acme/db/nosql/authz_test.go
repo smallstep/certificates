@@ -3,9 +3,11 @@ package nosql
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
@@ -609,6 +611,157 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 						{ID: "bar"},
 					})
 					assert.Equals(t, tc.az.Error.Error(), acme.NewError(acme.ErrorMalformedType, "malformed").Error())
+				}
+			}
+		})
+	}
+}
+
+func TestDB_GetAuthorizationsByAccountID(t *testing.T) {
+	azID := "azID"
+	accountID := "accountID"
+	type test struct {
+		db      nosql.DB
+		err     error
+		acmeErr *acme.Error
+		authzs  []*acme.Authorization
+	}
+	var tests = map[string]func(t *testing.T) test{
+		"fail/db.List-error": func(t *testing.T) test {
+			return test{
+				db: &db.MockNoSQLDB{
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
+						assert.Equals(t, bucket, authzTable)
+						return nil, errors.New("force")
+					},
+				},
+				err: errors.New("error listing authz: force"),
+			}
+		},
+		"fail/unmarshal": func(t *testing.T) test {
+			b := []byte(`{malformed}`)
+			return test{
+				db: &db.MockNoSQLDB{
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
+						assert.Equals(t, bucket, authzTable)
+						return []*nosqldb.Entry{
+							{
+								Bucket: bucket,
+								Key:    []byte(azID),
+								Value:  b,
+							},
+						}, nil
+					},
+				},
+				authzs: nil,
+				err:    fmt.Errorf("error unmarshaling dbAuthz key '%s' into dbAuthz struct", azID),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			now := clock.Now()
+			dbaz := &dbAuthz{
+				ID:        azID,
+				AccountID: accountID,
+				Identifier: acme.Identifier{
+					Type:  "dns",
+					Value: "test.ca.smallstep.com",
+				},
+				Status:       acme.StatusValid,
+				Token:        "token",
+				CreatedAt:    now,
+				ExpiresAt:    now.Add(5 * time.Minute),
+				ChallengeIDs: []string{"foo", "bar"},
+				Wildcard:     true,
+			}
+			b, err := json.Marshal(dbaz)
+			assert.FatalError(t, err)
+
+			return test{
+				db: &db.MockNoSQLDB{
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
+						assert.Equals(t, bucket, authzTable)
+						return []*nosqldb.Entry{
+							{
+								Bucket: bucket,
+								Key:    []byte(azID),
+								Value:  b,
+							},
+						}, nil
+					},
+				},
+				authzs: []*acme.Authorization{
+					{
+						ID:         dbaz.ID,
+						AccountID:  dbaz.AccountID,
+						Token:      dbaz.Token,
+						Identifier: dbaz.Identifier,
+						Status:     dbaz.Status,
+						Challenges: nil,
+						Wildcard:   dbaz.Wildcard,
+						ExpiresAt:  dbaz.ExpiresAt,
+						Error:      dbaz.Error,
+					},
+				},
+			}
+		},
+		"ok/skip-different-account": func(t *testing.T) test {
+			now := clock.Now()
+			dbaz := &dbAuthz{
+				ID:        azID,
+				AccountID: "differentAccountID",
+				Identifier: acme.Identifier{
+					Type:  "dns",
+					Value: "test.ca.smallstep.com",
+				},
+				Status:       acme.StatusValid,
+				Token:        "token",
+				CreatedAt:    now,
+				ExpiresAt:    now.Add(5 * time.Minute),
+				ChallengeIDs: []string{"foo", "bar"},
+				Wildcard:     true,
+			}
+			b, err := json.Marshal(dbaz)
+			assert.FatalError(t, err)
+
+			return test{
+				db: &db.MockNoSQLDB{
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
+						assert.Equals(t, bucket, authzTable)
+						return []*nosqldb.Entry{
+							{
+								Bucket: bucket,
+								Key:    []byte(azID),
+								Value:  b,
+							},
+						}, nil
+					},
+				},
+				authzs: []*acme.Authorization{},
+			}
+		},
+	}
+	for name, run := range tests {
+		tc := run(t)
+		t.Run(name, func(t *testing.T) {
+			d := DB{db: tc.db}
+			if azs, err := d.GetAuthorizationsByAccountID(context.Background(), accountID); err != nil {
+				switch k := err.(type) {
+				case *acme.Error:
+					if assert.NotNil(t, tc.acmeErr) {
+						assert.Equals(t, k.Type, tc.acmeErr.Type)
+						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, k.Status, tc.acmeErr.Status)
+						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+					}
+				default:
+					if assert.NotNil(t, tc.err) {
+						assert.HasPrefix(t, err.Error(), tc.err.Error())
+					}
+				}
+			} else if assert.Nil(t, tc.err) {
+				if !cmp.Equal(azs, tc.authzs) {
+					t.Errorf("db.GetAuthorizationsByAccountID() diff =\n%s", cmp.Diff(azs, tc.authzs))
 				}
 			}
 		})

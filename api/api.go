@@ -366,7 +366,7 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 	roots, err := h.Authority.GetRoots()
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err))
+		WriteError(w, errs.ForbiddenErr(err, "error getting roots"))
 		return
 	}
 
@@ -384,7 +384,7 @@ func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) Federation(w http.ResponseWriter, r *http.Request) {
 	federated, err := h.Authority.GetFederation()
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err))
+		WriteError(w, errs.ForbiddenErr(err, "error getting federated roots"))
 		return
 	}
 

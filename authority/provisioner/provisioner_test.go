@@ -184,7 +184,6 @@ func TestUnimplementedMethods(t *testing.T) {
 		{"x5c/sshRenew", &X5C{}, SSHRenewMethod},
 		{"x5c/sshRekey", &X5C{}, SSHRekeyMethod},
 		{"x5c/sshRevoke", &X5C{}, SSHRekeyMethod},
-		{"acme/revoke", &ACME{}, RevokeMethod},
 		{"acme/sshSign", &ACME{}, SSHSignMethod},
 		{"acme/sshRekey", &ACME{}, SSHRekeyMethod},
 		{"acme/sshRenew", &ACME{}, SSHRenewMethod},

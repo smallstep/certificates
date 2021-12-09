@@ -21,6 +21,11 @@ type dbCert struct {
 	Intermediates []byte    `json:"intermediates"`
 }
 
+type dbSerial struct {
+	Serial        string `json:"serial"`
+	CertificateID string `json:"certificateID"`
+}
+
 // CreateCertificate creates and stores an ACME certificate type.
 func (db *DB) CreateCertificate(ctx context.Context, cert *acme.Certificate) error {
 	var err error
@@ -49,7 +54,17 @@ func (db *DB) CreateCertificate(ctx context.Context, cert *acme.Certificate) err
 		Intermediates: intermediates,
 		CreatedAt:     time.Now().UTC(),
 	}
-	return db.save(ctx, cert.ID, dbch, nil, "certificate", certTable)
+	err = db.save(ctx, cert.ID, dbch, nil, "certificate", certTable)
+	if err != nil {
+		return err
+	}
+
+	serial := cert.Leaf.SerialNumber.String()
+	dbSerial := &dbSerial{
+		Serial:        serial,
+		CertificateID: cert.ID,
+	}
+	return db.save(ctx, serial, dbSerial, nil, "serial", certBySerialTable)
 }
 
 // GetCertificate retrieves and unmarshals an ACME certificate type from the
@@ -78,6 +93,24 @@ func (db *DB) GetCertificate(ctx context.Context, id string) (*acme.Certificate,
 		Leaf:          certs[0],
 		Intermediates: certs[1:],
 	}, nil
+}
+
+// GetCertificateBySerial retrieves and unmarshals an ACME certificate type from the
+// datastore based on a certificate serial number.
+func (db *DB) GetCertificateBySerial(ctx context.Context, serial string) (*acme.Certificate, error) {
+	b, err := db.db.Get(certBySerialTable, []byte(serial))
+	if nosql.IsErrNotFound(err) {
+		return nil, acme.NewError(acme.ErrorMalformedType, "certificate with serial %s not found", serial)
+	} else if err != nil {
+		return nil, errors.Wrapf(err, "error loading certificate ID for serial %s", serial)
+	}
+
+	dbSerial := new(dbSerial)
+	if err := json.Unmarshal(b, dbSerial); err != nil {
+		return nil, errors.Wrapf(err, "error unmarshaling certificate with serial %s", serial)
+	}
+
+	return db.GetCertificate(ctx, dbSerial.CertificateID)
 }
 
 func parseBundle(b []byte) ([]*x509.Certificate, error) {

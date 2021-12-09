@@ -74,7 +74,7 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 
 	certChain, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, opts, signOpts...)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err))
+		WriteError(w, errs.ForbiddenErr(err, "error signing certificate"))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)
