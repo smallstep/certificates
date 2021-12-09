@@ -723,18 +723,19 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 				assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
 				assert.Equals(t, tc.err.Detail, adminErr.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
-			} else {
-				eabKey := &linkedca.EABKey{}
-				err := readProtoJSON(res.Body, eabKey)
-				assert.FatalError(t, err)
-
-				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
-
-				opts := []cmp.Option{cmpopts.IgnoreUnexported(linkedca.EABKey{})}
-				if !cmp.Equal(tc.eak, eabKey, opts...) {
-					t.Errorf("h.CreateExternalAccountKey diff =\n%s", cmp.Diff(tc.eak, eabKey, opts...))
-				}
+				return
 			}
+
+			eabKey := &linkedca.EABKey{}
+			err := readProtoJSON(res.Body, eabKey)
+			assert.FatalError(t, err)
+			assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+			opts := []cmp.Option{cmpopts.IgnoreUnexported(linkedca.EABKey{})}
+			if !cmp.Equal(tc.eak, eabKey, opts...) {
+				t.Errorf("h.CreateExternalAccountKey diff =\n%s", cmp.Diff(tc.eak, eabKey, opts...))
+			}
+
 		})
 	}
 }
@@ -817,16 +818,18 @@ func TestHandler_DeleteExternalAccountKey(t *testing.T) {
 				assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
 				assert.Equals(t, tc.err.Detail, adminErr.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
-			} else {
-				body, err := io.ReadAll(res.Body)
-				res.Body.Close()
-				assert.FatalError(t, err)
-
-				response := DeleteResponse{}
-				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &response))
-				assert.Equals(t, "ok", response.Status)
-				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+				return
 			}
+
+			body, err := io.ReadAll(res.Body)
+			res.Body.Close()
+			assert.FatalError(t, err)
+
+			response := DeleteResponse{}
+			assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &response))
+			assert.Equals(t, "ok", response.Status)
+			assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
 		})
 	}
 }
