@@ -161,7 +161,7 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 			h.requireEABEnabled(tc.next)(w, req)
 			res := w.Result()
 
-			assert.Equals(t, res.StatusCode, tc.statusCode)
+			assert.Equals(t, tc.statusCode, res.StatusCode)
 
 			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
@@ -178,8 +178,6 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
 				return
 			}
-
-			// nothing to test when the requireEABEnabled middleware succeeds, currently
 		})
 	}
 }
@@ -405,6 +403,13 @@ func TestCreateExternalAccountKeyRequest_Validate(t *testing.T) {
 		fields  fields
 		wantErr bool
 	}{
+		{
+			name: "fail/reference-too-long",
+			fields: fields{
+				Reference: strings.Repeat("A", 257),
+			},
+			wantErr: true,
+		},
 		{
 			name: "ok/empty-reference",
 			fields: fields{
@@ -702,7 +707,7 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 			w := httptest.NewRecorder()
 			h.CreateExternalAccountKey(w, req)
 			res := w.Result()
-			assert.Equals(t, res.StatusCode, tc.statusCode)
+			assert.Equals(t, tc.statusCode, res.StatusCode)
 
 			if res.StatusCode >= 400 {
 
@@ -797,7 +802,7 @@ func TestHandler_DeleteExternalAccountKey(t *testing.T) {
 			w := httptest.NewRecorder()
 			h.DeleteExternalAccountKey(w, req)
 			res := w.Result()
-			assert.Equals(t, res.StatusCode, tc.statusCode)
+			assert.Equals(t, tc.statusCode, res.StatusCode)
 
 			if res.StatusCode >= 400 {
 				body, err := io.ReadAll(res.Body)
@@ -1131,7 +1136,7 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			w := httptest.NewRecorder()
 			h.GetExternalAccountKeys(w, req)
 			res := w.Result()
-			assert.Equals(t, res.StatusCode, tc.statusCode)
+			assert.Equals(t, tc.statusCode, res.StatusCode)
 
 			if res.StatusCode >= 400 {
 				body, err := io.ReadAll(res.Body)
@@ -1158,7 +1163,7 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 
 				opts := []cmp.Option{cmpopts.IgnoreUnexported(linkedca.EABKey{}, timestamppb.Timestamp{})}
 				if !cmp.Equal(tc.resp, response, opts...) {
-					t.Errorf("h.CreateExternalAccountKey diff =\n%s", cmp.Diff(tc.resp, response, opts...))
+					t.Errorf("h.GetExternalAccountKeys diff =\n%s", cmp.Diff(tc.resp, response, opts...))
 				}
 			}
 		})
