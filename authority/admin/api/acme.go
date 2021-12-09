@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -20,6 +22,9 @@ type CreateExternalAccountKeyRequest struct {
 
 // Validate validates a new ACME EAB Key request body.
 func (r *CreateExternalAccountKeyRequest) Validate() error {
+	if len(r.Reference) > 256 { // an arbitrary, but sensible (IMO), limit
+		return fmt.Errorf("reference length %d exceeds the maximum (256)", len(r.Reference))
+	}
 	return nil
 }
 
@@ -85,7 +90,7 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := body.Validate(); err != nil {
-		api.WriteError(w, err)
+		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error validating request body"))
 		return
 	}
 
@@ -97,9 +102,9 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 		k, err := h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference)
 		// retrieving an EAB key from DB results in an error if it doesn't exist, which is what we're looking for,
 		// but other errors can also happen. Return early if that happens; continuing if it was acme.ErrNotFound.
-		shouldWriteError := err != nil && acme.ErrNotFound != err
+		shouldWriteError := err != nil && !errors.Is(err, acme.ErrNotFound)
 		if shouldWriteError {
-			api.WriteError(w, err)
+			api.WriteError(w, admin.WrapErrorISE(err, "could not lookup external account key by reference"))
 			return
 		}
 		// if a key was found, return HTTP 409 conflict
@@ -114,7 +119,11 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 
 	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), prov, reference)
 	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error creating ACME EAB key for provisioner %s and reference %s", prov, reference))
+		msg := fmt.Sprintf("error creating ACME EAB key for provisioner '%s'", prov)
+		if reference != "" {
+			msg += fmt.Sprintf(" and reference '%s'", reference)
+		}
+		api.WriteError(w, admin.WrapErrorISE(err, msg))
 		return
 	}
 
@@ -134,7 +143,7 @@ func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Reques
 	keyID := chi.URLParam(r, "id")
 
 	if err := h.acmeDB.DeleteExternalAccountKey(r.Context(), prov, keyID); err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error deleting ACME EAB Key %s", keyID))
+		api.WriteError(w, admin.WrapErrorISE(err, "error deleting ACME EAB Key '%s'", keyID))
 		return
 	}
 
@@ -165,14 +174,16 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 	if reference != "" {
 		key, err = h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference)
 		if err != nil {
-			api.WriteError(w, admin.WrapErrorISE(err, "error getting external account key with reference %s", reference))
+			api.WriteError(w, admin.WrapErrorISE(err, "error retrieving external account key with reference '%s'", reference))
 			return
 		}
-		keys = []*acme.ExternalAccountKey{key}
+		if key != nil {
+			keys = []*acme.ExternalAccountKey{key}
+		}
 	} else {
 		keys, nextCursor, err = h.acmeDB.GetExternalAccountKeys(r.Context(), prov, cursor, limit)
 		if err != nil {
-			api.WriteError(w, admin.WrapErrorISE(err, "error getting external account keys"))
+			api.WriteError(w, admin.WrapErrorISE(err, "error retrieving external account keys"))
 			return
 		}
 	}
