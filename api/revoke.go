@@ -96,7 +96,7 @@ func (h *caHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Authority.Revoke(ctx, opts); err != nil {
-		WriteError(w, errs.ForbiddenErr(err))
+		WriteError(w, errs.ForbiddenErr(err, "error revoking certificate"))
 		return
 	}
 

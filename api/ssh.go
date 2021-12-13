@@ -293,7 +293,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 
 	cert, err := h.Authority.SignSSH(ctx, publicKey, opts, signOpts...)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err))
+		WriteError(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
 		return
 	}
 
@@ -301,7 +301,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	if addUserPublicKey != nil && authority.IsValidForAddUser(cert) == nil {
 		addUserCert, err := h.Authority.SignSSHAddUser(ctx, addUserPublicKey, cert)
 		if err != nil {
-			WriteError(w, errs.ForbiddenErr(err))
+			WriteError(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
 			return
 		}
 		addUserCertificate = &SSHCertificate{addUserCert}
@@ -326,7 +326,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 
 		certChain, err := h.Authority.Sign(cr, provisioner.SignOptions{}, signOpts...)
 		if err != nil {
-			WriteError(w, errs.ForbiddenErr(err))
+			WriteError(w, errs.ForbiddenErr(err, "error signing identity certificate"))
 			return
 		}
 		identityCertificate = certChainToPEM(certChain)

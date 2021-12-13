@@ -588,6 +588,19 @@ func (a *Authority) CloseForReload() {
 	}
 }
 
+// IsRevoked returns whether or not a certificate has been
+// revoked before.
+func (a *Authority) IsRevoked(sn string) (bool, error) {
+	// Check the passive revocation table.
+	if lca, ok := a.adminDB.(interface {
+		IsRevoked(string) (bool, error)
+	}); ok {
+		return lca.IsRevoked(sn)
+	}
+
+	return a.db.IsRevoked(sn)
+}
+
 // requiresDecrypter returns whether the Authority
 // requires a KMS that provides a crypto.Decrypter
 // Currently this is only required when SCEP is

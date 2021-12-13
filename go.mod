@@ -18,6 +18,7 @@ require (
 	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-piv/piv-go v1.7.0
 	github.com/golang/mock v1.6.0
+	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0
 	github.com/googleapis/gax-go/v2 v2.0.5
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect

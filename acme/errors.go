@@ -147,7 +147,7 @@ var (
 		},
 		ErrorAlreadyRevokedType: {
 			typ:     officialACMEPrefix + ErrorAlreadyRevokedType.String(),
-			details: "Certificate already Revoked",
+			details: "Certificate already revoked",
 			status:  400,
 		},
 		ErrorBadCSRType: {
