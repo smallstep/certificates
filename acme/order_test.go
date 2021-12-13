@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -816,71 +817,92 @@ func Test_uniqueSortedIPs(t *testing.T) {
 		ips []net.IP
 	}
 	tests := []struct {
-		name       string
-		args       args
-		wantUnique []net.IP
+		name string
+		args args
+		want []net.IP
 	}{
 		{
 			name: "ok/empty",
 			args: args{
 				ips: []net.IP{},
 			},
-			wantUnique: []net.IP{},
+			want: []net.IP{},
 		},
 		{
 			name: "ok/single-ipv4",
 			args: args{
 				ips: []net.IP{net.ParseIP("192.168.42.42")},
 			},
-			wantUnique: []net.IP{net.ParseIP("192.168.42.42")},
+			want: []net.IP{net.ParseIP("192.168.42.42")},
 		},
 		{
 			name: "ok/multiple-ipv4",
 			args: args{
-				ips: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.10"), net.ParseIP("192.168.42.1")},
+				ips: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.10"), net.ParseIP("192.168.42.1"), net.ParseIP("127.0.0.1")},
 			},
-			wantUnique: []net.IP{net.ParseIP("192.168.42.1"), net.ParseIP("192.168.42.10"), net.ParseIP("192.168.42.42")},
+			want: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("192.168.42.1"), net.ParseIP("192.168.42.10"), net.ParseIP("192.168.42.42")},
+		}, {
+			name: "ok/multiple-ipv4-with-varying-byte-representations",
+			args: args{
+				ips: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.10"), net.ParseIP("192.168.42.1"), []byte{0x7f, 0x0, 0x0, 0x1}},
+			},
+			want: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("192.168.42.1"), net.ParseIP("192.168.42.10"), net.ParseIP("192.168.42.42")},
 		},
 		{
 			name: "ok/unique-ipv4",
 			args: args{
 				ips: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.42")},
 			},
-			wantUnique: []net.IP{net.ParseIP("192.168.42.42")},
+			want: []net.IP{net.ParseIP("192.168.42.42")},
 		},
 		{
 			name: "ok/single-ipv6",
 			args: args{
 				ips: []net.IP{net.ParseIP("2001:db8::30")},
 			},
-			wantUnique: []net.IP{net.ParseIP("2001:db8::30")},
+			want: []net.IP{net.ParseIP("2001:db8::30")},
 		},
 		{
 			name: "ok/multiple-ipv6",
 			args: args{
 				ips: []net.IP{net.ParseIP("2001:db8::30"), net.ParseIP("2001:db8::20"), net.ParseIP("2001:db8::10")},
 			},
-			wantUnique: []net.IP{net.ParseIP("2001:db8::10"), net.ParseIP("2001:db8::20"), net.ParseIP("2001:db8::30")},
+			want: []net.IP{net.ParseIP("2001:db8::10"), net.ParseIP("2001:db8::20"), net.ParseIP("2001:db8::30")},
 		},
 		{
 			name: "ok/unique-ipv6",
 			args: args{
 				ips: []net.IP{net.ParseIP("2001:db8::1"), net.ParseIP("2001:db8::1")},
 			},
-			wantUnique: []net.IP{net.ParseIP("2001:db8::1")},
+			want: []net.IP{net.ParseIP("2001:db8::1")},
 		},
 		{
 			name: "ok/mixed-ipv4-and-ipv6",
 			args: args{
 				ips: []net.IP{net.ParseIP("2001:db8::1"), net.ParseIP("2001:db8::1"), net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.42")},
 			},
-			wantUnique: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("2001:db8::1")},
+			want: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("2001:db8::1")},
+		},
+		{
+			name: "ok/mixed-ipv4-and-ipv6-and-varying-byte-representations",
+			args: args{
+				ips: []net.IP{net.ParseIP("2001:db8::1"), net.ParseIP("2001:db8::1"), net.ParseIP("192.168.42.42"), net.ParseIP("192.168.42.42"), []byte{0x7f, 0x0, 0x0, 0x1}},
+			},
+			want: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("192.168.42.42"), net.ParseIP("2001:db8::1")},
+		},
+		{
+			name: "ok/mixed-ipv4-and-ipv6-and-more-varying-byte-representations",
+			args: args{
+				ips: []net.IP{net.ParseIP("2001:db8::1"), net.ParseIP("2001:db8::1"), net.ParseIP("192.168.42.42"), net.ParseIP("2001:db8::2"), net.ParseIP("192.168.42.42"), []byte{0x7f, 0x0, 0x0, 0x1}, []byte{0x7f, 0x0, 0x0, 0x1}, []byte{0x7f, 0x0, 0x0, 0x2}},
+			},
+			want: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("127.0.0.2"), net.ParseIP("192.168.42.42"), net.ParseIP("2001:db8::1"), net.ParseIP("2001:db8::2")},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if gotUnique := uniqueSortedIPs(tt.args.ips); !reflect.DeepEqual(gotUnique, tt.wantUnique) {
-				t.Errorf("uniqueSortedIPs() = %v, want %v", gotUnique, tt.wantUnique)
+			got := uniqueSortedIPs(tt.args.ips)
+			if !cmp.Equal(tt.want, got) {
+				t.Errorf("uniqueSortedIPs() diff =\n%s", cmp.Diff(tt.want, got))
 			}
 		})
 	}
@@ -1113,9 +1135,9 @@ func Test_canonicalize(t *testing.T) {
 		csr *x509.CertificateRequest
 	}
 	tests := []struct {
-		name              string
-		args              args
-		wantCanonicalized *x509.CertificateRequest
+		name string
+		args args
+		want *x509.CertificateRequest
 	}{
 		{
 			name: "ok/dns",
@@ -1124,7 +1146,7 @@ func Test_canonicalize(t *testing.T) {
 					DNSNames: []string{"www.example.com", "example.com"},
 				},
 			},
-			wantCanonicalized: &x509.CertificateRequest{
+			want: &x509.CertificateRequest{
 				DNSNames:    []string{"example.com", "www.example.com"},
 				IPAddresses: []net.IP{},
 			},
@@ -1139,7 +1161,7 @@ func Test_canonicalize(t *testing.T) {
 					DNSNames: []string{"www.example.com"},
 				},
 			},
-			wantCanonicalized: &x509.CertificateRequest{
+			want: &x509.CertificateRequest{
 				Subject: pkix.Name{
 					CommonName: "example.com",
 				},
@@ -1154,7 +1176,7 @@ func Test_canonicalize(t *testing.T) {
 					IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
 				},
 			},
-			wantCanonicalized: &x509.CertificateRequest{
+			want: &x509.CertificateRequest{
 				DNSNames:    []string{},
 				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
 			},
@@ -1167,7 +1189,7 @@ func Test_canonicalize(t *testing.T) {
 					IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
 				},
 			},
-			wantCanonicalized: &x509.CertificateRequest{
+			want: &x509.CertificateRequest{
 				DNSNames:    []string{"example.com", "www.example.com"},
 				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
 			},
@@ -1183,7 +1205,7 @@ func Test_canonicalize(t *testing.T) {
 					IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
 				},
 			},
-			wantCanonicalized: &x509.CertificateRequest{
+			want: &x509.CertificateRequest{
 				Subject: pkix.Name{
 					CommonName: "example.com",
 				},
@@ -1191,11 +1213,31 @@ func Test_canonicalize(t *testing.T) {
 				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
 			},
 		},
+		{
+			name: "ok/exclude-ip-from-common-name",
+			args: args{
+				csr: &x509.CertificateRequest{
+					Subject: pkix.Name{
+						CommonName: "127.0.0.1",
+					},
+					DNSNames:    []string{"example.com"},
+					IPAddresses: []net.IP{net.ParseIP("192.168.43.42"), net.ParseIP("192.168.42.42")},
+				},
+			},
+			want: &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "127.0.0.1",
+				},
+				DNSNames:    []string{"example.com"},
+				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if gotCanonicalized := canonicalize(tt.args.csr); !reflect.DeepEqual(gotCanonicalized, tt.wantCanonicalized) {
-				t.Errorf("canonicalize() = %v, want %v", gotCanonicalized, tt.wantCanonicalized)
+			got := canonicalize(tt.args.csr)
+			if !cmp.Equal(tt.want, got) {
+				t.Errorf("canonicalize() diff =\n%s", cmp.Diff(tt.want, got))
 			}
 		})
 	}

@@ -277,7 +277,9 @@ func numberOfIdentifierType(typ IdentifierType, ids []Identifier) int {
 
 // canonicalize canonicalizes a CSR so that it can be compared against an Order
 // NOTE: this effectively changes the order of SANs in the CSR, which may be OK,
-// but may not be expected.
+// but may not be expected. It also adds a Subject Common Name to either the IP
+// addresses or DNS names slice, depending on whether it can be parsed as an IP
+// or not. This might result in an additional SAN in the final certificate.
 func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.CertificateRequest) {
 
 	// for clarity only; we're operating on the same object by pointer
@@ -287,11 +289,20 @@ func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.Certificate
 	// identifiers as the initial newOrder request. Identifiers of type "dns"
 	// MUST appear either in the commonName portion of the requested subject
 	// name or in an extensionRequest attribute [RFC2985] requesting a
-	// subjectAltName extension, or both.
+	// subjectAltName extension, or both. Subject Common Names that can be
+	// parsed as an IP are included as an IP address for the equality check.
+	// If these were excluded, a certificate could contain an IP as the
+	// common name without having been challenged.
 	if csr.Subject.CommonName != "" {
-		// nolint:gocritic
-		canonicalized.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
+		ip := net.ParseIP(csr.Subject.CommonName)
+		subjectIsIP := ip != nil
+		if subjectIsIP {
+			canonicalized.IPAddresses = append(csr.IPAddresses, ip)
+		} else {
+			canonicalized.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
+		}
 	}
+
 	canonicalized.DNSNames = uniqueSortedLowerNames(csr.DNSNames)
 	canonicalized.IPAddresses = uniqueSortedIPs(csr.IPAddresses)
 
@@ -335,7 +346,10 @@ func uniqueSortedIPs(ips []net.IP) (unique []net.IP) {
 	}
 	ipEntryMap := make(map[string]entry, len(ips))
 	for _, ip := range ips {
-		ipEntryMap[ip.String()] = entry{ip: ip}
+		// reparsing the IP results in the IP being represented using 16 bytes
+		// for both IPv4 as well as IPv6, even when the ips slice contains IPs that
+		// are represented by 4 bytes. This ensures a fair comparison and thus ordering.
+		ipEntryMap[ip.String()] = entry{ip: net.ParseIP(ip.String())}
 	}
 	unique = make([]net.IP, 0, len(ipEntryMap))
 	for _, entry := range ipEntryMap {
