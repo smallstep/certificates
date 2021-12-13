@@ -297,8 +297,10 @@ func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.Certificate
 		ip := net.ParseIP(csr.Subject.CommonName)
 		subjectIsIP := ip != nil
 		if subjectIsIP {
+			// nolint:gocritic
 			canonicalized.IPAddresses = append(csr.IPAddresses, ip)
 		} else {
+			// nolint:gocritic
 			canonicalized.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
 		}
 	}
