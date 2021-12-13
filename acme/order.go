@@ -200,6 +200,10 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 
 	var sans []x509util.SubjectAlternativeName
 
+	if len(csr.EmailAddresses) > 0 || len(csr.URIs) > 0 {
+		return sans, NewError(ErrorBadCSRType, "Only DNS names and IP addresses are allowed")
+	}
+
 	// order the DNS names and IP addresses, so that they can be compared against the canonicalized CSR
 	orderNames := make([]string, numberOfIdentifierType(DNS, o.Identifiers))
 	orderIPs := make([]net.IP, numberOfIdentifierType(IP, o.Identifiers))
