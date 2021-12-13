@@ -1229,7 +1229,7 @@ func Test_canonicalize(t *testing.T) {
 					CommonName: "127.0.0.1",
 				},
 				DNSNames:    []string{"example.com"},
-				IPAddresses: []net.IP{net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
+				IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("192.168.42.42"), net.ParseIP("192.168.43.42")},
 			},
 		},
 	}
