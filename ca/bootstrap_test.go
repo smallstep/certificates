@@ -603,7 +603,7 @@ func TestBootstrapListener(t *testing.T) {
 	mtlsServer.Config.Handler = mTLSMiddleware(next, "/root/", "/sign")
 	defer mtlsServer.Close()
 	mtlsToken := func() string {
-		return generateBootstrapToken(mtlsServer.URL, "subject", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
+		return generateBootstrapToken(mtlsServer.URL, "127.0.0.1", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
 	}
 
 	type args struct {
