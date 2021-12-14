@@ -63,6 +63,11 @@ func BootstrapClient(ctx context.Context, token string, options ...TLSOption) (*
 		return nil, err
 	}
 
+	version, err := client.Version()
+	if err != nil {
+		return nil, err
+	}
+
 	req, pk, err := CreateSignRequest(token)
 	if err != nil {
 		return nil, err
@@ -73,8 +78,14 @@ func BootstrapClient(ctx context.Context, token string, options ...TLSOption) (*
 		return nil, err
 	}
 
-	// Make sure the tlsConfig have all supported roots on RootCAs
-	options = append(options, AddRootsToRootCAs())
+	// Make sure the tlsConfig have all supported roots on RootCAs.
+	//
+	// The roots request is only supported if identity certificates are not
+	// required. In all cases the current root is also added after applying all
+	// options too.
+	if !version.RequireClientAuthentication {
+		options = append(options, AddRootsToRootCAs())
+	}
 
 	transport, err := client.Transport(ctx, sign, pk, options...)
 	if err != nil {
@@ -125,6 +136,11 @@ func BootstrapServer(ctx context.Context, token string, base *http.Server, optio
 		return nil, err
 	}
 
+	version, err := client.Version()
+	if err != nil {
+		return nil, err
+	}
+
 	req, pk, err := CreateSignRequest(token)
 	if err != nil {
 		return nil, err
@@ -135,8 +151,14 @@ func BootstrapServer(ctx context.Context, token string, base *http.Server, optio
 		return nil, err
 	}
 
-	// Make sure the tlsConfig have all supported roots on ClientCAs and RootCAs
-	options = append(options, AddRootsToCAs())
+	// Make sure the tlsConfig have all supported roots on RootCAs.
+	//
+	// The roots request is only supported if identity certificates are not
+	// required. In all cases the current root is also added after applying all
+	// options too.
+	if !version.RequireClientAuthentication {
+		options = append(options, AddRootsToCAs())
+	}
 
 	tlsConfig, err := client.GetServerTLSConfig(ctx, sign, pk, options...)
 	if err != nil {
@@ -177,6 +199,11 @@ func BootstrapListener(ctx context.Context, token string, inner net.Listener, op
 		return nil, err
 	}
 
+	version, err := client.Version()
+	if err != nil {
+		return nil, err
+	}
+
 	req, pk, err := CreateSignRequest(token)
 	if err != nil {
 		return nil, err
@@ -187,8 +214,14 @@ func BootstrapListener(ctx context.Context, token string, inner net.Listener, op
 		return nil, err
 	}
 
-	// Make sure the tlsConfig have all supported roots on ClientCAs and RootCAs
-	options = append(options, AddRootsToCAs())
+	// Make sure the tlsConfig have all supported roots on RootCAs.
+	//
+	// The roots request is only supported if identity certificates are not
+	// required. In all cases the current root is also added after applying all
+	// options too.
+	if !version.RequireClientAuthentication {
+		options = append(options, AddRootsToCAs())
+	}
 
 	tlsConfig, err := client.GetServerTLSConfig(ctx, sign, pk, options...)
 	if err != nil {
