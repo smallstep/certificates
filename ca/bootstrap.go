@@ -2,12 +2,14 @@ package ca
 
 import (
 	"context"
+	"crypto"
 	"crypto/tls"
 	"net"
 	"net/http"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/api"
 	"go.step.sm/crypto/jose"
 )
 
@@ -58,25 +60,21 @@ func Bootstrap(token string) (*Client, error) {
 //   }
 //   resp, err := client.Get("https://internal.smallstep.com")
 func BootstrapClient(ctx context.Context, token string, options ...TLSOption) (*http.Client, error) {
-	client, err := Bootstrap(token)
+	b, err := createBootstrap(token)
 	if err != nil {
 		return nil, err
 	}
 
-	req, pk, err := CreateSignRequest(token)
-	if err != nil {
-		return nil, err
+	// Make sure the tlsConfig has all supported roots on RootCAs.
+	//
+	// The roots request is only supported if identity certificates are not
+	// required. In all cases the current root is also added after applying all
+	// options too.
+	if !b.RequireClientAuth {
+		options = append(options, AddRootsToRootCAs())
 	}
 
-	sign, err := client.Sign(req)
-	if err != nil {
-		return nil, err
-	}
-
-	// Make sure the tlsConfig have all supported roots on RootCAs
-	options = append(options, AddRootsToRootCAs())
-
-	transport, err := client.Transport(ctx, sign, pk, options...)
+	transport, err := b.Client.Transport(ctx, b.SignResponse, b.PrivateKey, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -120,25 +118,21 @@ func BootstrapServer(ctx context.Context, token string, base *http.Server, optio
 		return nil, errors.New("server TLSConfig is already set")
 	}
 
-	client, err := Bootstrap(token)
+	b, err := createBootstrap(token)
 	if err != nil {
 		return nil, err
 	}
 
-	req, pk, err := CreateSignRequest(token)
-	if err != nil {
-		return nil, err
+	// Make sure the tlsConfig has all supported roots on RootCAs.
+	//
+	// The roots request is only supported if identity certificates are not
+	// required. In all cases the current root is also added after applying all
+	// options too.
+	if !b.RequireClientAuth {
+		options = append(options, AddRootsToCAs())
 	}
 
-	sign, err := client.Sign(req)
-	if err != nil {
-		return nil, err
-	}
-
-	// Make sure the tlsConfig have all supported roots on ClientCAs and RootCAs
-	options = append(options, AddRootsToCAs())
-
-	tlsConfig, err := client.GetServerTLSConfig(ctx, sign, pk, options...)
+	tlsConfig, err := b.Client.GetServerTLSConfig(ctx, b.SignResponse, b.PrivateKey, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +166,42 @@ func BootstrapServer(ctx context.Context, token string, base *http.Server, optio
 //   ... // register services
 //   srv.Serve(lis)
 func BootstrapListener(ctx context.Context, token string, inner net.Listener, options ...TLSOption) (net.Listener, error) {
+	b, err := createBootstrap(token)
+	if err != nil {
+		return nil, err
+	}
+
+	// Make sure the tlsConfig has all supported roots on RootCAs.
+	//
+	// The roots request is only supported if identity certificates are not
+	// required. In all cases the current root is also added after applying all
+	// options too.
+	if !b.RequireClientAuth {
+		options = append(options, AddRootsToCAs())
+	}
+
+	tlsConfig, err := b.Client.GetServerTLSConfig(ctx, b.SignResponse, b.PrivateKey, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	return tls.NewListener(inner, tlsConfig), nil
+}
+
+type bootstrap struct {
+	Client            *Client
+	RequireClientAuth bool
+	SignResponse      *api.SignResponse
+	PrivateKey        crypto.PrivateKey
+}
+
+func createBootstrap(token string) (*bootstrap, error) {
 	client, err := Bootstrap(token)
+	if err != nil {
+		return nil, err
+	}
+
+	version, err := client.Version()
 	if err != nil {
 		return nil, err
 	}
@@ -187,13 +216,10 @@ func BootstrapListener(ctx context.Context, token string, inner net.Listener, op
 		return nil, err
 	}
 
-	// Make sure the tlsConfig have all supported roots on ClientCAs and RootCAs
-	options = append(options, AddRootsToCAs())
-
-	tlsConfig, err := client.GetServerTLSConfig(ctx, sign, pk, options...)
-	if err != nil {
-		return nil, err
-	}
-
-	return tls.NewListener(inner, tlsConfig), nil
+	return &bootstrap{
+		Client:            client,
+		RequireClientAuth: version.RequireClientAuthentication,
+		SignResponse:      sign,
+		PrivateKey:        pk,
+	}, nil
 }
