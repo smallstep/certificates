@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/elliptic"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
@@ -142,8 +143,7 @@ func (k *PKCS11) CreateKey(req *apiv1.CreateKeyRequest) (*apiv1.CreateKeyRespons
 	}, nil
 }
 
-// CreateSigner creates a signer using the key present in the PKCS#11 MODULE signature
-// slot.
+// CreateSigner creates a signer using a key present in the PKCS#11 module.
 func (k *PKCS11) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, error) {
 	if req.SigningKey == "" {
 		return nil, errors.New("createSignerRequest 'signingKey' cannot be empty")
@@ -155,6 +155,27 @@ func (k *PKCS11) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, er
 	}
 
 	return signer, nil
+}
+
+// CreateDecrypter creates a decrypter using a key present in the PKCS#11
+// module.
+func (k *PKCS11) CreateDecrypter(req *apiv1.CreateDecrypterRequest) (crypto.Decrypter, error) {
+	if req.DecryptionKey == "" {
+		return nil, errors.New("createDecrypterRequest 'decriptionKey' cannot be empty")
+	}
+
+	signer, err := findSigner(k.p11, req.DecryptionKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "createDecrypterRequest failed")
+	}
+
+	// Only RSA keys will implement the Decrypter interface.
+	if _, ok := signer.Public().(*rsa.PublicKey); ok {
+		if dec, ok := signer.(crypto.Decrypter); ok {
+			return dec, nil
+		}
+	}
+	return nil, errors.New("createDecrypterRequest failed: signer does not implement crypto.Decrypter")
 }
 
 // LoadCertificate implements kms.CertificateManager and loads a certificate
