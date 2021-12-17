@@ -161,7 +161,7 @@ func (k *PKCS11) CreateSigner(req *apiv1.CreateSignerRequest) (crypto.Signer, er
 // module.
 func (k *PKCS11) CreateDecrypter(req *apiv1.CreateDecrypterRequest) (crypto.Decrypter, error) {
 	if req.DecryptionKey == "" {
-		return nil, errors.New("createDecrypterRequest 'decriptionKey' cannot be empty")
+		return nil, errors.New("createDecrypterRequest 'decryptionKey' cannot be empty")
 	}
 
 	signer, err := findSigner(k.p11, req.DecryptionKey)
