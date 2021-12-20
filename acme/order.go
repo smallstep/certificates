@@ -300,19 +300,15 @@ func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.Certificate
 	// If these were excluded, a certificate could contain an IP as the
 	// common name without having been challenged.
 	if csr.Subject.CommonName != "" {
-		ip := net.ParseIP(csr.Subject.CommonName)
-		subjectIsIP := ip != nil
-		if subjectIsIP {
-			// nolint:gocritic
-			canonicalized.IPAddresses = append(csr.IPAddresses, ip)
+		if ip := net.ParseIP(csr.Subject.CommonName); ip != nil {
+			canonicalized.IPAddresses = append(canonicalized.IPAddresses, ip)
 		} else {
-			// nolint:gocritic
-			canonicalized.DNSNames = append(csr.DNSNames, csr.Subject.CommonName)
+			canonicalized.DNSNames = append(canonicalized.DNSNames, csr.Subject.CommonName)
 		}
 	}
 
-	canonicalized.DNSNames = uniqueSortedLowerNames(csr.DNSNames)
-	canonicalized.IPAddresses = uniqueSortedIPs(csr.IPAddresses)
+	canonicalized.DNSNames = uniqueSortedLowerNames(canonicalized.DNSNames)
+	canonicalized.IPAddresses = uniqueSortedIPs(canonicalized.IPAddresses)
 
 	return canonicalized
 }
