@@ -297,8 +297,7 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 	}
 
 	var payloadJWK *jose.JSONWebKey
-	err = json.Unmarshal(payload, &payloadJWK)
-	if err != nil {
+	if err = json.Unmarshal(payload, &payloadJWK); err != nil {
 		return nil, acme.WrapError(acme.ErrorMalformedType, err, "error unmarshaling payload into jwk")
 	}
 

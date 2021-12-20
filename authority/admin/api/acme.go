@@ -102,8 +102,7 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 		k, err := h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference)
 		// retrieving an EAB key from DB results in an error if it doesn't exist, which is what we're looking for,
 		// but other errors can also happen. Return early if that happens; continuing if it was acme.ErrNotFound.
-		shouldWriteError := err != nil && !errors.Is(err, acme.ErrNotFound)
-		if shouldWriteError {
+		if shouldWriteError := err != nil && !errors.Is(err, acme.ErrNotFound); shouldWriteError {
 			api.WriteError(w, admin.WrapErrorISE(err, "could not lookup external account key by reference"))
 			return
 		}
@@ -164,16 +163,14 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 		limit      int
 	)
 
-	cursor, limit, err = api.ParseCursor(r)
-	if err != nil {
+	if cursor, limit, err = api.ParseCursor(r); err != nil {
 		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err,
 			"error parsing cursor and limit from query params"))
 		return
 	}
 
 	if reference != "" {
-		key, err = h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference)
-		if err != nil {
+		if key, err = h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference); err != nil {
 			api.WriteError(w, admin.WrapErrorISE(err, "error retrieving external account key with reference '%s'", reference))
 			return
 		}
@@ -181,8 +178,7 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 			keys = []*acme.ExternalAccountKey{key}
 		}
 	} else {
-		keys, nextCursor, err = h.acmeDB.GetExternalAccountKeys(r.Context(), prov, cursor, limit)
-		if err != nil {
+		if keys, nextCursor, err = h.acmeDB.GetExternalAccountKeys(r.Context(), prov, cursor, limit); err != nil {
 			api.WriteError(w, admin.WrapErrorISE(err, "error retrieving external account keys"))
 			return
 		}

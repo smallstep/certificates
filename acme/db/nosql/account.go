@@ -251,8 +251,7 @@ func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerName, key
 			return errors.Wrapf(err, "error deleting ACME EAB Key Reference with Key ID %s and reference %s", keyID, dbeak.Reference)
 		}
 	}
-	err = db.db.Del(externalAccountKeyTable, []byte(keyID))
-	if err != nil {
+	if err = db.db.Del(externalAccountKeyTable, []byte(keyID)); err != nil {
 		return errors.Wrapf(err, "error deleting ACME EAB Key with Key ID %s", keyID)
 	}
 	return nil
