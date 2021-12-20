@@ -1224,7 +1224,7 @@ func Test_canonicalize(t *testing.T) {
 			},
 		},
 		{
-			name: "ok/exclude-ip-from-common-name",
+			name: "ok/ip-common-name",
 			args: args{
 				csr: &x509.CertificateRequest{
 					Subject: pkix.Name{
