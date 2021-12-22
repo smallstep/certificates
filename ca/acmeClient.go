@@ -37,15 +37,18 @@ func NewACMEClient(endpoint string, contact []string, opts ...ClientOption) (*AC
 	if err != nil {
 		return nil, err
 	}
-
 	ac := &ACMEClient{
 		client: &http.Client{
 			Transport: tr,
 		},
 		dirLoc: endpoint,
 	}
-
-	resp, err := ac.client.Get(endpoint)
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "creating GET request %s failed", endpoint)
+	}
+	req.Header.Set("User-Agent", UserAgent)
+	resp, err := ac.client.Do(req)
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", endpoint)
 	}
@@ -99,7 +102,12 @@ func (c *ACMEClient) GetDirectory() (*acmeAPI.Directory, error) {
 // GetNonce makes a nonce request to the ACME api and returns an
 // ACME directory object.
 func (c *ACMEClient) GetNonce() (string, error) {
-	resp, err := c.client.Get(c.dir.NewNonce)
+	req, err := http.NewRequest("GET", c.dir.NewNonce, nil)
+	if err != nil {
+		return "", errors.Wrapf(err, "creating GET request %s failed", c.dir.NewNonce)
+	}
+	req.Header.Set("User-Agent", UserAgent)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return "", errors.Wrapf(err, "client GET %s failed", c.dir.NewNonce)
 	}
@@ -171,9 +179,15 @@ func (c *ACMEClient) post(payload []byte, url string, headerOps ...withHeaderOpt
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.client.Post(url, "application/jose+json", strings.NewReader(raw))
+	req, err := http.NewRequest("POST", url, strings.NewReader(raw))
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", c.dir.NewOrder)
+		return nil, errors.Wrapf(err, "creating POST request %s failed", url)
+	}
+	req.Header.Set("Content-Type", "application/jose+json")
+	req.Header.Set("User-Agent", UserAgent)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", c.dir.NewOrder)
 	}
 	return resp, nil
 }
