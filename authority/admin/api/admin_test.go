@@ -15,12 +15,120 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+type mockAdminAuthority struct {
+	MockLoadProvisionerByName func(name string) (provisioner.Interface, error)
+	MockGetProvisioners       func(nextCursor string, limit int) (provisioner.List, string, error)
+	MockRet1, MockRet2        interface{} // TODO: refactor the ret1/ret2 into those two
+	MockErr                   error
+	MockIsAdminAPIEnabled     func() bool
+	MockLoadAdminByID         func(id string) (*linkedca.Admin, bool)
+	MockGetAdmins             func(cursor string, limit int) ([]*linkedca.Admin, string, error)
+	MockStoreAdmin            func(ctx context.Context, adm *linkedca.Admin, prov provisioner.Interface) error
+	MockUpdateAdmin           func(ctx context.Context, id string, nu *linkedca.Admin) (*linkedca.Admin, error)
+	MockRemoveAdmin           func(ctx context.Context, id string) error
+	MockAuthorizeAdminToken   func(r *http.Request, token string) (*linkedca.Admin, error)
+	MockStoreProvisioner      func(ctx context.Context, prov *linkedca.Provisioner) error
+	MockLoadProvisionerByID   func(id string) (provisioner.Interface, error)
+	MockUpdateProvisioner     func(ctx context.Context, nu *linkedca.Provisioner) error
+	MockRemoveProvisioner     func(ctx context.Context, id string) error
+}
+
+func (m *mockAdminAuthority) IsAdminAPIEnabled() bool {
+	if m.MockIsAdminAPIEnabled != nil {
+		return m.MockIsAdminAPIEnabled()
+	}
+	return m.MockRet1.(bool)
+}
+
+func (m *mockAdminAuthority) LoadProvisionerByName(name string) (provisioner.Interface, error) {
+	if m.MockLoadProvisionerByName != nil {
+		return m.MockLoadProvisionerByName(name)
+	}
+	return m.MockRet1.(provisioner.Interface), m.MockErr
+}
+
+func (m *mockAdminAuthority) GetProvisioners(nextCursor string, limit int) (provisioner.List, string, error) {
+	if m.MockGetProvisioners != nil {
+		return m.MockGetProvisioners(nextCursor, limit)
+	}
+	return m.MockRet1.(provisioner.List), m.MockRet2.(string), m.MockErr
+}
+
+func (m *mockAdminAuthority) LoadAdminByID(id string) (*linkedca.Admin, bool) {
+	if m.MockLoadAdminByID != nil {
+		return m.MockLoadAdminByID(id)
+	}
+	return m.MockRet1.(*linkedca.Admin), m.MockRet2.(bool)
+}
+
+func (m *mockAdminAuthority) GetAdmins(cursor string, limit int) ([]*linkedca.Admin, string, error) {
+	if m.MockGetAdmins != nil {
+		return m.MockGetAdmins(cursor, limit)
+	}
+	return m.MockRet1.([]*linkedca.Admin), m.MockRet2.(string), m.MockErr
+}
+
+func (m *mockAdminAuthority) StoreAdmin(ctx context.Context, adm *linkedca.Admin, prov provisioner.Interface) error {
+	if m.MockStoreAdmin != nil {
+		return m.MockStoreAdmin(ctx, adm, prov)
+	}
+	return m.MockErr
+}
+
+func (m *mockAdminAuthority) UpdateAdmin(ctx context.Context, id string, nu *linkedca.Admin) (*linkedca.Admin, error) {
+	if m.MockUpdateAdmin != nil {
+		return m.MockUpdateAdmin(ctx, id, nu)
+	}
+	return m.MockRet1.(*linkedca.Admin), m.MockErr
+}
+
+func (m *mockAdminAuthority) RemoveAdmin(ctx context.Context, id string) error {
+	if m.MockRemoveAdmin != nil {
+		return m.MockRemoveAdmin(ctx, id)
+	}
+	return m.MockErr
+}
+
+func (m *mockAdminAuthority) AuthorizeAdminToken(r *http.Request, token string) (*linkedca.Admin, error) {
+	if m.MockAuthorizeAdminToken != nil {
+		return m.MockAuthorizeAdminToken(r, token)
+	}
+	return m.MockRet1.(*linkedca.Admin), m.MockErr
+}
+
+func (m *mockAdminAuthority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisioner) error {
+	if m.MockStoreProvisioner != nil {
+		return m.MockStoreProvisioner(ctx, prov)
+	}
+	return m.MockErr
+}
+
+func (m *mockAdminAuthority) LoadProvisionerByID(id string) (provisioner.Interface, error) {
+	if m.MockLoadProvisionerByID != nil {
+		return m.MockLoadProvisionerByID(id)
+	}
+	return m.MockRet1.(provisioner.Interface), m.MockErr
+}
+
+func (m *mockAdminAuthority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisioner) error {
+	if m.MockUpdateProvisioner != nil {
+		return m.MockUpdateProvisioner(ctx, nu)
+	}
+	return m.MockErr
+}
+
+func (m *mockAdminAuthority) RemoveProvisioner(ctx context.Context, id string) error {
+	if m.MockRemoveProvisioner != nil {
+		return m.MockRemoveProvisioner(ctx, id)
+	}
+	return m.MockErr
+}
 
 func TestCreateAdminRequest_Validate(t *testing.T) {
 	type fields struct {
@@ -148,7 +256,7 @@ func TestUpdateAdminRequest_Validate(t *testing.T) {
 func TestHandler_GetAdmin(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		statusCode int
 		err        *admin.Error
 		adm        *linkedca.Admin
@@ -158,7 +266,7 @@ func TestHandler_GetAdmin(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("id", "adminID")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadAdminByID: func(id string) (*linkedca.Admin, bool) {
 					assert.Equals(t, "adminID", id)
 					return nil, false
@@ -191,7 +299,7 @@ func TestHandler_GetAdmin(t *testing.T) {
 				CreatedAt:     timestamppb.New(createdAt),
 				DeletedAt:     timestamppb.New(deletedAt),
 			}
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadAdminByID: func(id string) (*linkedca.Admin, bool) {
 					assert.Equals(t, "adminID", id)
 					return adm, true
@@ -254,7 +362,7 @@ func TestHandler_GetAdmin(t *testing.T) {
 func TestHandler_GetAdmins(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		req        *http.Request
 		statusCode int
 		err        *admin.Error
@@ -277,7 +385,7 @@ func TestHandler_GetAdmins(t *testing.T) {
 		},
 		"fail/auth.GetAdmins": func(t *testing.T) test {
 			req := httptest.NewRequest("GET", "/foo", nil)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockGetAdmins: func(cursor string, limit int) ([]*linkedca.Admin, string, error) {
 					assert.Equals(t, "", cursor)
 					assert.Equals(t, 0, limit)
@@ -319,7 +427,7 @@ func TestHandler_GetAdmins(t *testing.T) {
 				CreatedAt:     timestamppb.New(createdAt),
 				DeletedAt:     timestamppb.New(deletedAt),
 			}
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockGetAdmins: func(cursor string, limit int) ([]*linkedca.Admin, string, error) {
 					assert.Equals(t, "", cursor)
 					assert.Equals(t, 0, limit)
@@ -390,7 +498,7 @@ func TestHandler_GetAdmins(t *testing.T) {
 func TestHandler_CreateAdmin(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		body       []byte
 		statusCode int
 		err        *admin.Error
@@ -439,7 +547,7 @@ func TestHandler_CreateAdmin(t *testing.T) {
 			}
 			body, err := json.Marshal(req)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "prov", name)
 					return nil, errors.New("force")
@@ -466,7 +574,7 @@ func TestHandler_CreateAdmin(t *testing.T) {
 			}
 			body, err := json.Marshal(req)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "prov", name)
 					return &provisioner.ACME{
@@ -501,7 +609,7 @@ func TestHandler_CreateAdmin(t *testing.T) {
 			}
 			body, err := json.Marshal(req)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "prov", name)
 					return &provisioner.ACME{
@@ -576,7 +684,7 @@ func TestHandler_CreateAdmin(t *testing.T) {
 func TestHandler_DeleteAdmin(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		statusCode int
 		err        *admin.Error
 	}
@@ -585,7 +693,7 @@ func TestHandler_DeleteAdmin(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("id", "adminID")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockRemoveAdmin: func(ctx context.Context, id string) error {
 					assert.Equals(t, "adminID", id)
 					return errors.New("force")
@@ -607,7 +715,7 @@ func TestHandler_DeleteAdmin(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("id", "adminID")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockRemoveAdmin: func(ctx context.Context, id string) error {
 					assert.Equals(t, "adminID", id)
 					return nil
@@ -666,7 +774,7 @@ func TestHandler_DeleteAdmin(t *testing.T) {
 func TestHandler_UpdateAdmin(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		body       []byte
 		statusCode int
 		err        *admin.Error
@@ -714,7 +822,7 @@ func TestHandler_UpdateAdmin(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("id", "adminID")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockUpdateAdmin: func(ctx context.Context, id string, nu *linkedca.Admin) (*linkedca.Admin, error) {
 					assert.Equals(t, "adminID", id)
 					assert.Equals(t, linkedca.Admin_ADMIN, nu.Type)
@@ -749,7 +857,7 @@ func TestHandler_UpdateAdmin(t *testing.T) {
 				Subject:       "admin",
 				Type:          linkedca.Admin_SUPER_ADMIN,
 			}
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockUpdateAdmin: func(ctx context.Context, id string, nu *linkedca.Admin) (*linkedca.Admin, error) {
 					assert.Equals(t, "adminID", id)
 					assert.Equals(t, linkedca.Admin_ADMIN, nu.Type)

@@ -54,7 +54,7 @@ func (h *Handler) requireEABEnabled(next nextHTTP) nextHTTP {
 
 // provisionerHasEABEnabled determines if the "requireEAB" setting for an ACME
 // provisioner is set to true and thus has EAB enabled.
-func (h *Handler) provisionerHasEABEnabled(ctx context.Context, provisionerName string) (bool, *admin.Error) {
+func (h *Handler) provisionerHasEABEnabled(ctx context.Context, provisionerName string) (bool, error) {
 	var (
 		p   provisioner.Interface
 		err error

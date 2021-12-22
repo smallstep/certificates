@@ -15,7 +15,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/linkedca"
@@ -26,7 +25,7 @@ import (
 func TestHandler_GetProvisioner(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		db         admin.DB
 		req        *http.Request
 		statusCode int
@@ -38,7 +37,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 			req := httptest.NewRequest("GET", "/foo?id=provID", nil)
 			chiCtx := chi.NewRouteContext()
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByID: func(id string) (provisioner.Interface, error) {
 					assert.Equals(t, "provID", id)
 					return nil, errors.New("force")
@@ -62,7 +61,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return nil, errors.New("force")
@@ -86,7 +85,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.ACME{
@@ -120,7 +119,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.ACME{
@@ -198,7 +197,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 func TestHandler_GetProvisioners(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		req        *http.Request
 		statusCode int
 		err        *admin.Error
@@ -221,7 +220,7 @@ func TestHandler_GetProvisioners(t *testing.T) {
 		},
 		"fail/auth.GetProvisioners": func(t *testing.T) test {
 			req := httptest.NewRequest("GET", "/foo", nil)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockGetProvisioners: func(cursor string, limit int) (provisioner.List, string, error) {
 					assert.Equals(t, "", cursor)
 					assert.Equals(t, 0, limit)
@@ -255,7 +254,7 @@ func TestHandler_GetProvisioners(t *testing.T) {
 					RequireEAB: false,
 				},
 			}
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockGetProvisioners: func(cursor string, limit int) (provisioner.List, string, error) {
 					assert.Equals(t, "", cursor)
 					assert.Equals(t, 0, limit)
@@ -324,7 +323,7 @@ func TestHandler_GetProvisioners(t *testing.T) {
 func TestHandler_CreateProvisioner(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		body       []byte
 		statusCode int
 		err        *admin.Error
@@ -357,7 +356,7 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockStoreProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
 					assert.Equals(t, "provID", prov.Id)
 					return errors.New("force")
@@ -384,7 +383,7 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockStoreProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
 					assert.Equals(t, "provID", prov.Id)
 					return nil
@@ -447,7 +446,7 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 func TestHandler_DeleteProvisioner(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		req        *http.Request
 		statusCode int
 		err        *admin.Error
@@ -457,7 +456,7 @@ func TestHandler_DeleteProvisioner(t *testing.T) {
 			req := httptest.NewRequest("DELETE", "/foo?id=provID", nil)
 			chiCtx := chi.NewRouteContext()
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByID: func(id string) (provisioner.Interface, error) {
 					assert.Equals(t, "provID", id)
 					return nil, errors.New("force")
@@ -481,7 +480,7 @@ func TestHandler_DeleteProvisioner(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return nil, errors.New("force")
@@ -505,7 +504,7 @@ func TestHandler_DeleteProvisioner(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.OIDC{
@@ -537,7 +536,7 @@ func TestHandler_DeleteProvisioner(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.OIDC{
@@ -604,7 +603,7 @@ func TestHandler_DeleteProvisioner(t *testing.T) {
 func TestHandler_UpdateProvisioner(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		body       []byte
 		db         admin.DB
 		statusCode int
@@ -637,13 +636,9 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
-					// return &provisioner.OIDC{
-					// 	ID:   "provID",
-					// 	Name: "provName",
-					// }, nil
 					return nil, errors.New("force")
 				},
 			}
@@ -671,7 +666,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.OIDC{
@@ -711,7 +706,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.OIDC{
@@ -754,7 +749,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.OIDC{
@@ -799,7 +794,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.OIDC{
@@ -847,7 +842,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.OIDC{
@@ -898,7 +893,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.OIDC{
@@ -952,7 +947,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.OIDC{
@@ -1017,7 +1012,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.OIDC{

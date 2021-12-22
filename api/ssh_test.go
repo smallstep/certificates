@@ -314,7 +314,7 @@ func Test_caHandler_SSHSign(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{
+			h := New(&mockAuthority{
 				authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
 					return []provisioner.SignOption{}, tt.authErr
 				},
@@ -377,7 +377,7 @@ func Test_caHandler_SSHRoots(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{
+			h := New(&mockAuthority{
 				getSSHRoots: func(ctx context.Context) (*authority.SSHKeys, error) {
 					return tt.keys, tt.keysErr
 				},
@@ -431,7 +431,7 @@ func Test_caHandler_SSHFederation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{
+			h := New(&mockAuthority{
 				getSSHFederation: func(ctx context.Context) (*authority.SSHKeys, error) {
 					return tt.keys, tt.keysErr
 				},
@@ -491,7 +491,7 @@ func Test_caHandler_SSHConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{
+			h := New(&mockAuthority{
 				getSSHConfig: func(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error) {
 					return tt.output, tt.err
 				},
@@ -538,7 +538,7 @@ func Test_caHandler_SSHCheckHost(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{
+			h := New(&mockAuthority{
 				checkSSHHost: func(ctx context.Context, principal, token string) (bool, error) {
 					return tt.exists, tt.err
 				},
@@ -589,7 +589,7 @@ func Test_caHandler_SSHGetHosts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{
+			h := New(&mockAuthority{
 				getSSHHosts: func(context.Context, *x509.Certificate) ([]authority.Host, error) {
 					return tt.hosts, tt.err
 				},
@@ -644,7 +644,7 @@ func Test_caHandler_SSHBastion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{
+			h := New(&mockAuthority{
 				getSSHBastion: func(ctx context.Context, user, hostname string) (*authority.Bastion, error) {
 					return tt.bastion, tt.bastionErr
 				},

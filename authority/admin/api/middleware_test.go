@@ -13,7 +13,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,7 +21,7 @@ import (
 func TestHandler_requireAPIEnabled(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		next       nextHTTP
 		err        *admin.Error
 		statusCode int
@@ -31,7 +30,7 @@ func TestHandler_requireAPIEnabled(t *testing.T) {
 		"fail/auth.IsAdminAPIEnabled": func(t *testing.T) test {
 			return test{
 				ctx: context.Background(),
-				auth: &api.MockAuthority{
+				auth: &mockAdminAuthority{
 					MockIsAdminAPIEnabled: func() bool {
 						return false
 					},
@@ -46,7 +45,7 @@ func TestHandler_requireAPIEnabled(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) test {
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockIsAdminAPIEnabled: func() bool {
 					return true
 				},
@@ -101,7 +100,7 @@ func TestHandler_requireAPIEnabled(t *testing.T) {
 func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		req        *http.Request
 		next       nextHTTP
 		err        *admin.Error
@@ -126,7 +125,7 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 		"fail/auth.AuthorizeAdminToken": func(t *testing.T) test {
 			req := httptest.NewRequest("GET", "/foo", nil)
 			req.Header["Authorization"] = []string{"token"}
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockAuthorizeAdminToken: func(r *http.Request, token string) (*linkedca.Admin, error) {
 					assert.Equals(t, "token", token)
 					return nil, admin.NewError(
@@ -162,7 +161,7 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 				CreatedAt:     timestamppb.New(createdAt),
 				DeletedAt:     timestamppb.New(deletedAt),
 			}
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockAuthorizeAdminToken: func(r *http.Request, token string) (*linkedca.Admin, error) {
 					assert.Equals(t, "token", token)
 					return admin, nil

@@ -9,12 +9,12 @@ import (
 // Handler is the Admin API request handler.
 type Handler struct {
 	db     admin.DB
-	auth   api.LinkedAuthority // was: *authority.Authority
+	auth   adminAuthority
 	acmeDB acme.DB
 }
 
 // NewHandler returns a new Authority Config Handler.
-func NewHandler(auth api.LinkedAuthority, adminDB admin.DB, acmeDB acme.DB) api.RouterHandler {
+func NewHandler(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB) api.RouterHandler {
 	return &Handler{
 		db:     adminDB,
 		auth:   auth,

@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto"
 	"crypto/dsa" //nolint
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -31,6 +32,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
+	"github.com/smallstep/certificates/templates"
 	"go.step.sm/crypto/jose"
 	"golang.org/x/crypto/ssh"
 )
@@ -163,6 +165,208 @@ func parseCertificateRequest(data string) *x509.CertificateRequest {
 		panic("failed to parse certificate request: " + err.Error())
 	}
 	return csr
+}
+
+type mockAuthority struct {
+	ret1, ret2                   interface{}
+	err                          error
+	authorizeSign                func(ott string) ([]provisioner.SignOption, error)
+	getTLSOptions                func() *authority.TLSOptions
+	root                         func(shasum string) (*x509.Certificate, error)
+	sign                         func(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	renew                        func(cert *x509.Certificate) ([]*x509.Certificate, error)
+	rekey                        func(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
+	loadProvisionerByCertificate func(cert *x509.Certificate) (provisioner.Interface, error)
+	loadProvisionerByName        func(name string) (provisioner.Interface, error)
+	getProvisioners              func(nextCursor string, limit int) (provisioner.List, string, error)
+	revoke                       func(context.Context, *authority.RevokeOptions) error
+	getEncryptedKey              func(kid string) (string, error)
+	getRoots                     func() ([]*x509.Certificate, error)
+	getFederation                func() ([]*x509.Certificate, error)
+	signSSH                      func(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
+	signSSHAddUser               func(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
+	renewSSH                     func(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error)
+	rekeySSH                     func(ctx context.Context, cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
+	getSSHHosts                  func(ctx context.Context, cert *x509.Certificate) ([]authority.Host, error)
+	getSSHRoots                  func(ctx context.Context) (*authority.SSHKeys, error)
+	getSSHFederation             func(ctx context.Context) (*authority.SSHKeys, error)
+	getSSHConfig                 func(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error)
+	checkSSHHost                 func(ctx context.Context, principal, token string) (bool, error)
+	getSSHBastion                func(ctx context.Context, user string, hostname string) (*authority.Bastion, error)
+	version                      func() authority.Version
+}
+
+// TODO: remove once Authorize is deprecated.
+func (m *mockAuthority) Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
+	return m.AuthorizeSign(ott)
+}
+
+func (m *mockAuthority) AuthorizeSign(ott string) ([]provisioner.SignOption, error) {
+	if m.authorizeSign != nil {
+		return m.authorizeSign(ott)
+	}
+	return m.ret1.([]provisioner.SignOption), m.err
+}
+
+func (m *mockAuthority) GetTLSOptions() *authority.TLSOptions {
+	if m.getTLSOptions != nil {
+		return m.getTLSOptions()
+	}
+	return m.ret1.(*authority.TLSOptions)
+}
+
+func (m *mockAuthority) Root(shasum string) (*x509.Certificate, error) {
+	if m.root != nil {
+		return m.root(shasum)
+	}
+	return m.ret1.(*x509.Certificate), m.err
+}
+
+func (m *mockAuthority) Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+	if m.sign != nil {
+		return m.sign(cr, opts, signOpts...)
+	}
+	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
+}
+
+func (m *mockAuthority) Renew(cert *x509.Certificate) ([]*x509.Certificate, error) {
+	if m.renew != nil {
+		return m.renew(cert)
+	}
+	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
+}
+
+func (m *mockAuthority) Rekey(oldcert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
+	if m.rekey != nil {
+		return m.rekey(oldcert, pk)
+	}
+	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
+}
+
+func (m *mockAuthority) GetProvisioners(nextCursor string, limit int) (provisioner.List, string, error) {
+	if m.getProvisioners != nil {
+		return m.getProvisioners(nextCursor, limit)
+	}
+	return m.ret1.(provisioner.List), m.ret2.(string), m.err
+}
+
+func (m *mockAuthority) LoadProvisionerByCertificate(cert *x509.Certificate) (provisioner.Interface, error) {
+	if m.loadProvisionerByCertificate != nil {
+		return m.loadProvisionerByCertificate(cert)
+	}
+	return m.ret1.(provisioner.Interface), m.err
+}
+
+func (m *mockAuthority) LoadProvisionerByName(name string) (provisioner.Interface, error) {
+	if m.loadProvisionerByName != nil {
+		return m.loadProvisionerByName(name)
+	}
+	return m.ret1.(provisioner.Interface), m.err
+}
+
+func (m *mockAuthority) Revoke(ctx context.Context, opts *authority.RevokeOptions) error {
+	if m.revoke != nil {
+		return m.revoke(ctx, opts)
+	}
+	return m.err
+}
+
+func (m *mockAuthority) GetEncryptedKey(kid string) (string, error) {
+	if m.getEncryptedKey != nil {
+		return m.getEncryptedKey(kid)
+	}
+	return m.ret1.(string), m.err
+}
+
+func (m *mockAuthority) GetRoots() ([]*x509.Certificate, error) {
+	if m.getRoots != nil {
+		return m.getRoots()
+	}
+	return m.ret1.([]*x509.Certificate), m.err
+}
+
+func (m *mockAuthority) GetFederation() ([]*x509.Certificate, error) {
+	if m.getFederation != nil {
+		return m.getFederation()
+	}
+	return m.ret1.([]*x509.Certificate), m.err
+}
+
+func (m *mockAuthority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+	if m.signSSH != nil {
+		return m.signSSH(ctx, key, opts, signOpts...)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *mockAuthority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error) {
+	if m.signSSHAddUser != nil {
+		return m.signSSHAddUser(ctx, key, cert)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *mockAuthority) RenewSSH(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error) {
+	if m.renewSSH != nil {
+		return m.renewSSH(ctx, cert)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *mockAuthority) RekeySSH(ctx context.Context, cert *ssh.Certificate, key ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+	if m.rekeySSH != nil {
+		return m.rekeySSH(ctx, cert, key, signOpts...)
+	}
+	return m.ret1.(*ssh.Certificate), m.err
+}
+
+func (m *mockAuthority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]authority.Host, error) {
+	if m.getSSHHosts != nil {
+		return m.getSSHHosts(ctx, cert)
+	}
+	return m.ret1.([]authority.Host), m.err
+}
+
+func (m *mockAuthority) GetSSHRoots(ctx context.Context) (*authority.SSHKeys, error) {
+	if m.getSSHRoots != nil {
+		return m.getSSHRoots(ctx)
+	}
+	return m.ret1.(*authority.SSHKeys), m.err
+}
+
+func (m *mockAuthority) GetSSHFederation(ctx context.Context) (*authority.SSHKeys, error) {
+	if m.getSSHFederation != nil {
+		return m.getSSHFederation(ctx)
+	}
+	return m.ret1.(*authority.SSHKeys), m.err
+}
+
+func (m *mockAuthority) GetSSHConfig(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error) {
+	if m.getSSHConfig != nil {
+		return m.getSSHConfig(ctx, typ, data)
+	}
+	return m.ret1.([]templates.Output), m.err
+}
+
+func (m *mockAuthority) CheckSSHHost(ctx context.Context, principal, token string) (bool, error) {
+	if m.checkSSHHost != nil {
+		return m.checkSSHHost(ctx, principal, token)
+	}
+	return m.ret1.(bool), m.err
+}
+
+func (m *mockAuthority) GetSSHBastion(ctx context.Context, user, hostname string) (*authority.Bastion, error) {
+	if m.getSSHBastion != nil {
+		return m.getSSHBastion(ctx, user, hostname)
+	}
+	return m.ret1.(*authority.Bastion), m.err
+}
+
+func (m *mockAuthority) Version() authority.Version {
+	if m.version != nil {
+		return m.version()
+	}
+	return m.ret1.(authority.Version)
 }
 
 func TestNewCertificate(t *testing.T) {
@@ -561,7 +765,7 @@ func Test_caHandler_Route(t *testing.T) {
 		fields fields
 		args   args
 	}{
-		{"ok", fields{&MockAuthority{}}, args{chi.NewRouter()}},
+		{"ok", fields{&mockAuthority{}}, args{chi.NewRouter()}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -576,7 +780,7 @@ func Test_caHandler_Route(t *testing.T) {
 func Test_caHandler_Health(t *testing.T) {
 	req := httptest.NewRequest("GET", "http://example.com/health", nil)
 	w := httptest.NewRecorder()
-	h := New(&MockAuthority{}).(*caHandler)
+	h := New(&mockAuthority{}).(*caHandler)
 	h.Health(w, req)
 
 	res := w.Result()
@@ -616,7 +820,7 @@ func Test_caHandler_Root(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{ret1: tt.root, err: tt.err}).(*caHandler)
+			h := New(&mockAuthority{ret1: tt.root, err: tt.err}).(*caHandler)
 			w := httptest.NewRecorder()
 			h.Root(w, req)
 			res := w.Result()
@@ -680,7 +884,7 @@ func Test_caHandler_Sign(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{
+			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.signErr,
 				authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
 					return tt.certAttrOpts, tt.autherr
@@ -734,7 +938,7 @@ func Test_caHandler_Renew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{
+			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.err,
 				getTLSOptions: func() *authority.TLSOptions {
 					return nil
@@ -795,7 +999,7 @@ func Test_caHandler_Rekey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{
+			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.err,
 				getTLSOptions: func() *authority.TLSOptions {
 					return nil
@@ -873,9 +1077,9 @@ func Test_caHandler_Provisioners(t *testing.T) {
 		args       args
 		statusCode int
 	}{
-		{"ok", fields{&MockAuthority{ret1: p, ret2: ""}}, args{httptest.NewRecorder(), req}, 200},
-		{"fail", fields{&MockAuthority{ret1: p, ret2: "", err: fmt.Errorf("the error")}}, args{httptest.NewRecorder(), req}, 500},
-		{"limit fail", fields{&MockAuthority{ret1: p, ret2: ""}}, args{httptest.NewRecorder(), reqLimitFail}, 400},
+		{"ok", fields{&mockAuthority{ret1: p, ret2: ""}}, args{httptest.NewRecorder(), req}, 200},
+		{"fail", fields{&mockAuthority{ret1: p, ret2: "", err: fmt.Errorf("the error")}}, args{httptest.NewRecorder(), req}, 500},
+		{"limit fail", fields{&mockAuthority{ret1: p, ret2: ""}}, args{httptest.NewRecorder(), reqLimitFail}, 400},
 	}
 
 	expected, err := json.Marshal(pr)
@@ -950,8 +1154,8 @@ func Test_caHandler_ProvisionerKey(t *testing.T) {
 		args       args
 		statusCode int
 	}{
-		{"ok", fields{&MockAuthority{ret1: privKey}}, args{httptest.NewRecorder(), req}, 200},
-		{"fail", fields{&MockAuthority{ret1: "", err: fmt.Errorf("not found")}}, args{httptest.NewRecorder(), req}, 404},
+		{"ok", fields{&mockAuthority{ret1: privKey}}, args{httptest.NewRecorder(), req}, 200},
+		{"fail", fields{&mockAuthority{ret1: "", err: fmt.Errorf("not found")}}, args{httptest.NewRecorder(), req}, 404},
 	}
 
 	expected := []byte(`{"key":"` + privKey + `"}`)
@@ -1010,7 +1214,7 @@ func Test_caHandler_Roots(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err}).(*caHandler)
+			h := New(&mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err}).(*caHandler)
 			req := httptest.NewRequest("GET", "http://example.com/roots", nil)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
@@ -1056,7 +1260,7 @@ func Test_caHandler_Federation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&MockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err}).(*caHandler)
+			h := New(&mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err}).(*caHandler)
 			req := httptest.NewRequest("GET", "http://example.com/federation", nil)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()

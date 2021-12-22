@@ -1,13 +1,31 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/linkedca"
 )
+
+type adminAuthority interface {
+	LoadProvisionerByName(string) (provisioner.Interface, error)
+	GetProvisioners(cursor string, limit int) (provisioner.List, string, error)
+	IsAdminAPIEnabled() bool
+	LoadAdminByID(id string) (*linkedca.Admin, bool)
+	GetAdmins(cursor string, limit int) ([]*linkedca.Admin, string, error)
+	StoreAdmin(ctx context.Context, adm *linkedca.Admin, prov provisioner.Interface) error
+	UpdateAdmin(ctx context.Context, id string, nu *linkedca.Admin) (*linkedca.Admin, error)
+	RemoveAdmin(ctx context.Context, id string) error
+	AuthorizeAdminToken(r *http.Request, token string) (*linkedca.Admin, error)
+	StoreProvisioner(ctx context.Context, prov *linkedca.Provisioner) error
+	LoadProvisionerByID(id string) (provisioner.Interface, error)
+	UpdateProvisioner(ctx context.Context, nu *linkedca.Provisioner) error
+	RemoveProvisioner(ctx context.Context, id string) error
+}
 
 // CreateAdminRequest represents the body for a CreateAdmin request.
 type CreateAdminRequest struct {

@@ -17,7 +17,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
-	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/linkedca"
@@ -39,7 +38,7 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 	type test struct {
 		ctx        context.Context
 		db         admin.DB
-		auth       api.LinkedAuthority
+		auth       adminAuthority
 		next       nextHTTP
 		err        *admin.Error
 		statusCode int
@@ -49,7 +48,7 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return nil, errors.New("force")
@@ -68,7 +67,7 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.MockProvisioner{
@@ -108,7 +107,7 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.MockProvisioner{
@@ -185,14 +184,14 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 func TestHandler_provisionerHasEABEnabled(t *testing.T) {
 	type test struct {
 		db              admin.DB
-		auth            api.LinkedAuthority
+		auth            adminAuthority
 		provisionerName string
 		want            bool
 		err             *admin.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/auth.LoadProvisionerByName": func(t *testing.T) test {
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return nil, errors.New("force")
@@ -206,7 +205,7 @@ func TestHandler_provisionerHasEABEnabled(t *testing.T) {
 			}
 		},
 		"fail/db.GetProvisioner": func(t *testing.T) test {
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.MockProvisioner{
@@ -231,7 +230,7 @@ func TestHandler_provisionerHasEABEnabled(t *testing.T) {
 			}
 		},
 		"fail/prov.GetDetails": func(t *testing.T) test {
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.MockProvisioner{
@@ -260,7 +259,7 @@ func TestHandler_provisionerHasEABEnabled(t *testing.T) {
 			}
 		},
 		"fail/details.GetACME": func(t *testing.T) test {
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "provName", name)
 					return &provisioner.MockProvisioner{
@@ -293,7 +292,7 @@ func TestHandler_provisionerHasEABEnabled(t *testing.T) {
 			}
 		},
 		"ok/eab-disabled": func(t *testing.T) test {
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "eab-disabled", name)
 					return &provisioner.MockProvisioner{
@@ -327,7 +326,7 @@ func TestHandler_provisionerHasEABEnabled(t *testing.T) {
 			}
 		},
 		"ok/eab-enabled": func(t *testing.T) test {
-			auth := &api.MockAuthority{
+			auth := &mockAdminAuthority{
 				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
 					assert.Equals(t, "eab-enabled", name)
 					return &provisioner.MockProvisioner{
@@ -375,16 +374,13 @@ func TestHandler_provisionerHasEABEnabled(t *testing.T) {
 				return
 			}
 			if tc.err != nil {
-				// TODO(hs): the output of the diff seems to be equal to each other; not sure why it's marked as different =/
-				// opts := []cmp.Option{cmpopts.EquateErrors()}
-				// if !cmp.Equal(tc.err, err, opts...) {
-				// 	t.Errorf("Handler.provisionerHasEABEnabled() diff =\n%v", cmp.Diff(tc.err, err, opts...))
-				// }
-				assert.Equals(t, tc.err.Type, err.Type)
-				assert.Equals(t, tc.err.Status, err.Status)
-				assert.Equals(t, tc.err.StatusCode(), err.StatusCode())
-				assert.Equals(t, tc.err.Message, err.Message)
-				assert.Equals(t, tc.err.Detail, err.Detail)
+				assert.Type(t, &admin.Error{}, err)
+				adminError, _ := err.(*admin.Error)
+				assert.Equals(t, tc.err.Type, adminError.Type)
+				assert.Equals(t, tc.err.Status, adminError.Status)
+				assert.Equals(t, tc.err.StatusCode(), adminError.StatusCode())
+				assert.Equals(t, tc.err.Message, adminError.Message)
+				assert.Equals(t, tc.err.Detail, adminError.Detail)
 				return
 			}
 			if got != tc.want {
