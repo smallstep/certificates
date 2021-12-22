@@ -282,13 +282,15 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName, curso
 		if dbeak.Provisioner != provisionerName {
 			continue
 		}
-		// skip the IDs not matching the cursor to look for in the sorted list.
-		if cursor != "" && !foundCursorKey && cursor != dbeak.ID {
-			continue
-		}
-		// look for the entry pointed to by the cursor (the next item to return), to start selecting items
-		if cursor != "" && !foundCursorKey && cursor == dbeak.ID {
-			foundCursorKey = true
+		// look for the entry pointed to by the cursor (the next item to return) and start selecting items after finding it
+		if cursor != "" && !foundCursorKey {
+			if cursor == dbeak.ID {
+				// from here on, items should be selected for the result.
+				foundCursorKey = true
+			} else {
+				// skip the IDs not matching the cursor to look for.
+				continue
+			}
 		}
 		// return if the limit of items was found in the previous iteration; the next cursor is set to the next item to return
 		if len(keys) == limit {
