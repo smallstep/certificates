@@ -43,7 +43,7 @@ func NewACMEClient(endpoint string, contact []string, opts ...ClientOption) (*AC
 		},
 		dirLoc: endpoint,
 	}
-	req, err := http.NewRequest("GET", endpoint, nil)
+	req, err := http.NewRequest("GET", endpoint, http.NoBody)
 	if err != nil {
 		return nil, errors.Wrapf(err, "creating GET request %s failed", endpoint)
 	}
@@ -102,7 +102,7 @@ func (c *ACMEClient) GetDirectory() (*acmeAPI.Directory, error) {
 // GetNonce makes a nonce request to the ACME api and returns an
 // ACME directory object.
 func (c *ACMEClient) GetNonce() (string, error) {
-	req, err := http.NewRequest("GET", c.dir.NewNonce, nil)
+	req, err := http.NewRequest("GET", c.dir.NewNonce, http.NoBody)
 	if err != nil {
 		return "", errors.Wrapf(err, "creating GET request %s failed", c.dir.NewNonce)
 	}
