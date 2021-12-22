@@ -4,6 +4,7 @@
 package pkcs11
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -487,6 +488,86 @@ func TestPKCS11_CreateSigner(t *testing.T) {
 
 			}
 
+		})
+	}
+}
+
+func TestPKCS11_CreateDecrypter(t *testing.T) {
+	k := setupPKCS11(t)
+	data := []byte("buggy-coheir-RUBRIC-rabbet-liberal-eaglet-khartoum-stagger")
+
+	type args struct {
+		req *apiv1.CreateDecrypterRequest
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"RSA", args{&apiv1.CreateDecrypterRequest{
+			DecryptionKey: "pkcs11:id=7371;object=rsa-key",
+		}}, false},
+		{"RSA PSS", args{&apiv1.CreateDecrypterRequest{
+			DecryptionKey: "pkcs11:id=7372;object=rsa-pss-key",
+		}}, false},
+		{"ECDSA P256", args{&apiv1.CreateDecrypterRequest{
+			DecryptionKey: "pkcs11:id=7373;object=ecdsa-p256-key",
+		}}, true},
+		{"ECDSA P384", args{&apiv1.CreateDecrypterRequest{
+			DecryptionKey: "pkcs11:id=7374;object=ecdsa-p384-key",
+		}}, true},
+		{"ECDSA P521", args{&apiv1.CreateDecrypterRequest{
+			DecryptionKey: "pkcs11:id=7375;object=ecdsa-p521-key",
+		}}, true},
+		{"fail DecryptionKey", args{&apiv1.CreateDecrypterRequest{
+			DecryptionKey: "",
+		}}, true},
+		{"fail uri", args{&apiv1.CreateDecrypterRequest{
+			DecryptionKey: "https:id=7375;object=ecdsa-p521-key",
+		}}, true},
+		{"fail FindKeyPair", args{&apiv1.CreateDecrypterRequest{
+			DecryptionKey: "pkcs11:foo=bar",
+		}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := k.CreateDecrypter(tt.args.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PKCS11.CreateDecrypter() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if got != nil {
+				pub := got.Public().(*rsa.PublicKey)
+				// PKCS#1 v1.5
+				enc, err := rsa.EncryptPKCS1v15(rand.Reader, pub, data)
+				if err != nil {
+					t.Errorf("rsa.EncryptPKCS1v15() error = %v", err)
+					return
+				}
+				dec, err := got.Decrypt(rand.Reader, enc, nil)
+				if err != nil {
+					t.Errorf("PKCS1v15.Decrypt() error = %v", err)
+				} else if !bytes.Equal(dec, data) {
+					t.Errorf("PKCS1v15.Decrypt() failed got = %s, want = %s", dec, data)
+				}
+
+				// RSA-OAEP
+				enc, err = rsa.EncryptOAEP(crypto.SHA256.New(), rand.Reader, pub, data, []byte("label"))
+				if err != nil {
+					t.Errorf("rsa.EncryptOAEP() error = %v", err)
+					return
+				}
+				dec, err = got.Decrypt(rand.Reader, enc, &rsa.OAEPOptions{
+					Hash:  crypto.SHA256,
+					Label: []byte("label"),
+				})
+				if err != nil {
+					t.Errorf("RSA-OAEP.Decrypt() error = %v", err)
+				} else if !bytes.Equal(dec, data) {
+					t.Errorf("RSA-OAEP.Decrypt() RSA-OAEP failed got = %s, want = %s", dec, data)
+				}
+			}
 		})
 	}
 }

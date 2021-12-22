@@ -115,6 +115,7 @@ func AddRootCA(cert *x509.Certificate) TLSOption {
 		if ctx.Config.RootCAs == nil {
 			ctx.Config.RootCAs = x509.NewCertPool()
 		}
+		ctx.hasRootCA = true
 		ctx.Config.RootCAs.AddCert(cert)
 		ctx.mutableConfig.AddImmutableRootCACert(cert)
 		return nil
@@ -129,6 +130,7 @@ func AddClientCA(cert *x509.Certificate) TLSOption {
 		if ctx.Config.ClientCAs == nil {
 			ctx.Config.ClientCAs = x509.NewCertPool()
 		}
+		ctx.hasClientCA = true
 		ctx.Config.ClientCAs.AddCert(cert)
 		ctx.mutableConfig.AddImmutableClientCACert(cert)
 		return nil
