@@ -156,6 +156,8 @@ const (
 	TypeSSHPOP Type = 9
 	// TypeSCEP is used to indicate the SCEP provisioners
 	TypeSCEP Type = 10
+	// TypeNebula is used to indicate the Nebula provisioners
+	TypeNebula Type = 11
 )
 
 // String returns the string representation of the type.
@@ -181,6 +183,8 @@ func (t Type) String() string {
 		return "SSHPOP"
 	case TypeSCEP:
 		return "SCEP"
+	case TypeNebula:
+		return "Nebula"
 	default:
 		return ""
 	}
@@ -251,6 +255,8 @@ func (l *List) UnmarshalJSON(data []byte) error {
 			p = &SSHPOP{}
 		case "scep":
 			p = &SCEP{}
+		case "nebula":
+			p = &Nebula{}
 		default:
 			// Skip unsupported provisioners. A client using this method may be
 			// compiled with a version of smallstep/certificates that does not
