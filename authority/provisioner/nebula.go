@@ -109,7 +109,7 @@ func (p *Nebula) GetEncryptedKey() (kid string, key string, ok bool) {
 
 // AuthorizeSign returns the list of SignOption for a Sign request.
 func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	cert, claims, err := p.authorizeToken(token, p.audiences.Sign)
+	crt, claims, err := p.authorizeToken(token, p.audiences.Sign)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,10 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 	if v, err := unsafeParseSigned(token); err == nil {
 		data.SetToken(v)
 	}
-	data.Set("Cert", cert)
+
+	// The nebula certificate will be available using the template variable Crt.
+	// For example {{ .Crt.Details.Groups }} can be used to get all the groups.
+	// data.SetCertificate(crt)
 
 	templateOptions, err := TemplateOptions(p.Options, data)
 	if err != nil {
@@ -131,14 +134,14 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 		newProvisionerExtensionOption(TypeNebula, p.Name, ""),
 		profileLimitDuration{
 			def:       p.claimer.DefaultTLSCertDuration(),
-			notBefore: cert.Details.NotBefore,
-			notAfter:  cert.Details.NotAfter,
+			notBefore: crt.Details.NotBefore,
+			notAfter:  crt.Details.NotAfter,
 		},
 		// validators
 		commonNameValidator(claims.Subject),
 		nebulaSANsValidator{
-			Name: cert.Details.Name,
-			IPs:  cert.Details.Ips,
+			Name: crt.Details.Name,
+			IPs:  crt.Details.Ips,
 		},
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
@@ -152,16 +155,16 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 		return nil, errs.Unauthorized("ssh is disabled for nebula provisioner '%s'", p.Name)
 	}
 
-	cert, claims, err := p.authorizeToken(token, p.audiences.SSHSign)
+	crt, claims, err := p.authorizeToken(token, p.audiences.SSHSign)
 	if err != nil {
 		return nil, err
 	}
 
 	// Default template attributes.
 	keyID := claims.Subject
-	principals := make([]string, len(cert.Details.Ips)+1)
-	principals[0] = cert.Details.Name
-	for i, ipnet := range cert.Details.Ips {
+	principals := make([]string, len(crt.Details.Ips)+1)
+	principals[0] = crt.Details.Name
+	for i, ipnet := range crt.Details.Ips {
 		principals[i+1] = ipnet.IP.String()
 	}
 
@@ -173,8 +176,8 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 
 		// Check that the token only contains valid principals.
 		v := nebulaPrincipalsValidator{
-			Name: cert.Details.Name,
-			IPs:  cert.Details.Ips,
+			Name: crt.Details.Name,
+			IPs:  crt.Details.Ips,
 		}
 		if err := v.Valid(*opts); err != nil {
 			return nil, err
@@ -217,7 +220,10 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 	if v, err := unsafeParseSigned(token); err == nil {
 		data.SetToken(v)
 	}
-	data.Set("Cert", cert)
+
+	// The nebula certificate will be available using the template variable Crt.
+	// For example {{ .Crt.Details.Groups }} can be used to get all the groups.
+	// data.SetCertificate(crt)
 
 	templateOptions, err := TemplateSSHOptions(p.Options, data)
 	if err != nil {
@@ -227,7 +233,7 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 	return append(signOptions,
 		templateOptions,
 		// Checks the validity bounds, and set the validity if has not been set.
-		&sshLimitDuration{p.claimer, cert.Details.NotAfter},
+		&sshLimitDuration{p.claimer, crt.Details.NotAfter},
 		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
@@ -291,7 +297,7 @@ func (p *Nebula) authorizeToken(token string, audiences []string) (*cert.NebulaC
 	if !ok {
 		return nil, nil, errs.Unauthorized("failed to parse token: nbc header is not valid")
 	}
-	b, err := base64.RawURLEncoding.DecodeString(s)
+	b, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
 		return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse token: nbc header is not valid"))
 	}
