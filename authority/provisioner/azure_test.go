@@ -431,9 +431,9 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 5, http.StatusOK, false},
-		{"ok", p2, args{t2}, 10, http.StatusOK, false},
-		{"ok", p1, args{t11}, 5, http.StatusOK, false},
+		{"ok", p1, args{t1}, 6, http.StatusOK, false},
+		{"ok", p2, args{t2}, 11, http.StatusOK, false},
+		{"ok", p1, args{t11}, 6, http.StatusOK, false},
 		{"fail tenant", p3, args{t3}, 0, http.StatusUnauthorized, true},
 		{"fail resource group", p4, args{t4}, 0, http.StatusUnauthorized, true},
 		{"fail token", p1, args{"token"}, 0, http.StatusUnauthorized, true},
@@ -480,6 +480,8 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, v, nil)
 					case dnsNamesValidator:
 						assert.Equals(t, []string(v), []string{"virtualMachine"})
+					case *x509NamePolicyValidator:
+						assert.Equals(t, nil, v.policyEngine)
 					default:
 						assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
 					}

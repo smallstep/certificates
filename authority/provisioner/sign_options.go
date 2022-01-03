@@ -16,6 +16,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	x509policy "github.com/smallstep/certificates/policy/x509"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
 )
@@ -400,6 +401,32 @@ func (v *validityValidator) Valid(cert *x509.Certificate, o SignOptions) error {
 	// apply a backdate). This is good enough.
 	if d > v.max+o.Backdate {
 		return errs.Forbidden("requested duration of %v is more than the authorized maximum certificate duration of %v", d, v.max+o.Backdate)
+	}
+	return nil
+}
+
+// x509NamePolicyValidator validates that the certificate (to be signed)
+// contains only allowed SANs.
+type x509NamePolicyValidator struct {
+	policyEngine *x509policy.NamePolicyEngine
+}
+
+// newX509NamePolicyValidator return a new SANs allow/deny validator.
+func newX509NamePolicyValidator(engine *x509policy.NamePolicyEngine) *x509NamePolicyValidator {
+	return &x509NamePolicyValidator{
+		policyEngine: engine,
+	}
+}
+
+// Valid validates validates that the certificate (to be signed)
+// contains only allowed SANs.
+func (v *x509NamePolicyValidator) Valid(cert *x509.Certificate, _ SignOptions) error {
+	if v.policyEngine == nil {
+		return nil
+	}
+	_, err := v.policyEngine.AreCertificateNamesAllowed(cert)
+	if err != nil {
+		return err
 	}
 	return nil
 }

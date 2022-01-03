@@ -56,11 +56,69 @@ type X509Options struct {
 	// TemplateData is a JSON object with variables that can be used in custom
 	// templates.
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
+
+	// AllowedNames contains the SANs the provisioner is authorized to sign
+	AllowedNames *AllowedX509NameOptions `json:"allow,omitempty"`
+
+	// DeniedNames contains the SANs the provisioner is not authorized to sign
+	DeniedNames *DeniedX509NameOptions `json:"deny,omitempty"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
 func (o *X509Options) HasTemplate() bool {
 	return o != nil && (o.Template != "" || o.TemplateFile != "")
+}
+
+// GetAllowedNameOptions returns the AllowedNameOptions, which models the
+// SANs that a provisioner is authorized to sign x509 certificates for.
+func (o *X509Options) GetAllowedNameOptions() *AllowedX509NameOptions {
+	if o == nil {
+		return nil
+	}
+	return o.AllowedNames
+}
+
+// GetDeniedNameOptions returns the DeniedNameOptions, which models the
+// SANs that a provisioner is NOT authorized to sign x509 certificates for.
+func (o *X509Options) GetDeniedNameOptions() *DeniedX509NameOptions {
+	if o == nil {
+		return nil
+	}
+	return o.DeniedNames
+}
+
+// AllowedX509NameOptions models the allowed names
+type AllowedX509NameOptions struct {
+	DNSDomains     []string `json:"dns,omitempty"`
+	IPRanges       []string `json:"ip,omitempty"` // TODO(hs): support IPs as well as ranges
+	EmailAddresses []string `json:"email,omitempty"`
+	URIDomains     []string `json:"uri,omitempty"`
+}
+
+// DeniedX509NameOptions models the denied names
+type DeniedX509NameOptions struct {
+	DNSDomains     []string `json:"dns,omitempty"`
+	IPRanges       []string `json:"ip,omitempty"` // TODO(hs): support IPs as well as ranges
+	EmailAddresses []string `json:"email,omitempty"`
+	URIDomains     []string `json:"uri,omitempty"`
+}
+
+// HasNames checks if the AllowedNameOptions has one or more
+// names configured.
+func (o *AllowedX509NameOptions) HasNames() bool {
+	return len(o.DNSDomains) > 0 ||
+		len(o.IPRanges) > 0 ||
+		len(o.EmailAddresses) > 0 ||
+		len(o.URIDomains) > 0
+}
+
+// HasNames checks if the DeniedNameOptions has one or more
+// names configured.
+func (o *DeniedX509NameOptions) HasNames() bool {
+	return len(o.DNSDomains) > 0 ||
+		len(o.IPRanges) > 0 ||
+		len(o.EmailAddresses) > 0 ||
+		len(o.URIDomains) > 0
 }
 
 // TemplateOptions generates a CertificateOptions with the template and data

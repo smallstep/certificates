@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"net"
 	"time"
 
 	"github.com/pkg/errors"
@@ -67,8 +68,9 @@ func (p *ACME) DefaultTLSCertDuration() time.Duration {
 	return p.claimer.DefaultTLSCertDuration()
 }
 
-// Init initializes and validates the fields of a JWK type.
+// Init initializes and validates the fields of an ACME type.
 func (p *ACME) Init(config Config) (err error) {
+	p.base = &base{} // prevent nil pointers
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -81,6 +83,47 @@ func (p *ACME) Init(config Config) (err error) {
 		return err
 	}
 
+	// Initialize the x509 allow/deny policy engine
+	// TODO(hs): ensure no race conditions happen when reloading settings and requesting certs?
+	// TODO(hs): implement memoization strategy, so that reloading is not required when no changes were made to allow/deny?
+	if p.x509PolicyEngine, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ACMEIdentifierType encodes ACME Identifier types
+type ACMEIdentifierType string
+
+const (
+	// IP is the ACME ip identifier type
+	IP ACMEIdentifierType = "ip"
+	// DNS is the ACME dns identifier type
+	DNS ACMEIdentifierType = "dns"
+)
+
+// ACMEIdentifier encodes ACME Order Identifiers
+type ACMEIdentifier struct {
+	Type  ACMEIdentifierType
+	Value string
+}
+
+// AuthorizeOrderIdentifiers verifies the provisioner is authorized to issue a
+// certificate for the Identifiers provided in an Order.
+func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier string) error {
+
+	if p.x509PolicyEngine == nil {
+		return nil
+	}
+
+	var err error
+	if ip := net.ParseIP(identifier); ip != nil {
+		_, err = p.x509PolicyEngine.IsIPAllowed(ip)
+	} else {
+		_, err = p.x509PolicyEngine.IsDNSAllowed(identifier)
+	}
+
 	return err
 }
 
@@ -88,7 +131,7 @@ func (p *ACME) Init(config Config) (err error) {
 // in the ACME protocol. This method returns a list of modifiers / constraints
 // on the resulting certificate.
 func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	return []SignOption{
+	opts := []SignOption{
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeACME, p.Name, ""),
 		newForceCNOption(p.ForceCN),
@@ -96,7 +139,10 @@ func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
-	}, nil
+		newX509NamePolicyValidator(p.x509PolicyEngine),
+	}
+
+	return opts, nil
 }
 
 // AuthorizeRevoke is called just before the certificate is to be revoked by

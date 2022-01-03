@@ -322,7 +322,7 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
-				assert.Len(t, 5, got)
+				assert.Len(t, 6, got)
 				for _, o := range got {
 					switch v := o.(type) {
 					case certificateOptionsFunc:
@@ -339,6 +339,8 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, v.max, tt.prov.claimer.MaxTLSCertDuration())
 					case emailOnlyIdentity:
 						assert.Equals(t, string(v), "name@smallstep.com")
+					case *x509NamePolicyValidator:
+						assert.Equals(t, nil, v.policyEngine)
 					default:
 						assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
 					}

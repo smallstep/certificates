@@ -35,6 +35,8 @@ func (n *NewOrderRequest) Validate() error {
 		if id.Type == acme.IP && net.ParseIP(id.Value) == nil {
 			return acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", id.Value)
 		}
+		// TODO: add some validations for DNS domains?
+		// TODO: combine the errors from this with allow/deny policy, like example error in https://datatracker.ietf.org/doc/html/rfc8555#section-6.7.1
 	}
 	return nil
 }
@@ -83,6 +85,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, err)
 		return
 	}
+
 	var nor NewOrderRequest
 	if err := json.Unmarshal(payload.value, &nor); err != nil {
 		api.WriteError(w, acme.WrapError(acme.ErrorMalformedType, err,
@@ -93,6 +96,22 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	if err := nor.Validate(); err != nil {
 		api.WriteError(w, err)
 		return
+	}
+
+	// TODO(hs): this should also verify rules set in the Account (i.e. allowed/denied
+	// DNS and IPs; it's probably good to connect those to the EAB credentials and management? Or
+	// should we do it fully properly and connect them to the Account directly? The latter would allow
+	// management of allowed/denied names based on just the name, without having bound to EAB. Still,
+	// EAB is not illogical, because that's the way Accounts are connected to an external system and
+	// thus make sense to also set the allowed/denied names based on that info.
+
+	for _, identifier := range nor.Identifiers {
+		// TODO: gather all errors, so that we can build subproblems; include the nor.Validate() error here too, like in example?
+		err = prov.AuthorizeOrderIdentifier(ctx, identifier.Value)
+		if err != nil {
+			api.WriteError(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			return
+		}
 	}
 
 	now := clock.Now()

@@ -392,6 +392,7 @@ func (p *AWS) GetIdentityToken(subject, caURL string) (string, error) {
 
 // Init validates and initializes the AWS provisioner.
 func (p *AWS) Init(config Config) (err error) {
+	p.base = &base{} // prevent nil pointers
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -423,6 +424,16 @@ func (p *AWS) Init(config Config) (err error) {
 		default:
 			return errors.Errorf("%s: not a supported AWS Instance Metadata Service version", v)
 		}
+	}
+
+	// Initialize the x509 allow/deny policy engine
+	if p.x509PolicyEngine, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine
+	if p.sshPolicyEngine, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+		return err
 	}
 
 	return nil
@@ -478,6 +489,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		defaultPublicKeyValidator{},
 		commonNameValidator(payload.Claims.Subject),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(p.x509PolicyEngine),
 	), nil
 }
 
@@ -759,5 +771,7 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		&sshCertValidityValidator{p.claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
+		// Ensure that all principal names are allowed
+		newSSHNamePolicyValidator(p.sshPolicyEngine),
 	), nil
 }

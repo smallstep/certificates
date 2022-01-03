@@ -84,6 +84,7 @@ func (p *SSHPOP) GetEncryptedKey() (string, string, bool) {
 
 // Init initializes and validates the fields of a SSHPOP type.
 func (p *SSHPOP) Init(config Config) error {
+	p.base = &base{} // prevent nil pointers
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -98,6 +99,8 @@ func (p *SSHPOP) Init(config Config) error {
 	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
 		return err
 	}
+
+	// TODO(hs): initialize the policy engine and add it as an SSH cert validator
 
 	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
 	p.sshPubKeys = config.SSHKeys

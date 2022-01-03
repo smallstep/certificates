@@ -89,6 +89,7 @@ func (p *JWK) GetEncryptedKey() (string, string, bool) {
 
 // Init initializes and validates the fields of a JWK type.
 func (p *JWK) Init(config Config) (err error) {
+	p.base = &base{} // prevent nil pointers
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -100,6 +101,16 @@ func (p *JWK) Init(config Config) (err error) {
 
 	// Update claims with global ones
 	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
+		return err
+	}
+
+	// Initialize the x509 allow/deny policy engine
+	if p.x509PolicyEngine, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine
+	if p.sshPolicyEngine, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -185,6 +196,7 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		defaultPublicKeyValidator{},
 		defaultSANsValidator(claims.SANs),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(p.x509PolicyEngine),
 	}, nil
 }
 
@@ -268,6 +280,8 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		&sshCertValidityValidator{p.claimer},
 		// Require and validate all the default fields in the SSH certificate.
 		&sshCertDefaultValidator{},
+		// Ensure that all principal names are allowed
+		newSSHNamePolicyValidator(p.sshPolicyEngine),
 	), nil
 }
 

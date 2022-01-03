@@ -515,9 +515,9 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 5, http.StatusOK, false},
-		{"ok", p2, args{t2}, 10, http.StatusOK, false},
-		{"ok", p3, args{t3}, 5, http.StatusOK, false},
+		{"ok", p1, args{t1}, 6, http.StatusOK, false},
+		{"ok", p2, args{t2}, 11, http.StatusOK, false},
+		{"ok", p3, args{t3}, 6, http.StatusOK, false},
 		{"fail token", p1, args{"token"}, 0, http.StatusUnauthorized, true},
 		{"fail key", p1, args{failKey}, 0, http.StatusUnauthorized, true},
 		{"fail iss", p1, args{failIss}, 0, http.StatusUnauthorized, true},
@@ -569,6 +569,8 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, v, nil)
 					case dnsNamesValidator:
 						assert.Equals(t, []string(v), []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"})
+					case *x509NamePolicyValidator:
+						assert.Equals(t, nil, v.policyEngine)
 					default:
 						assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
 					}

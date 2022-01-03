@@ -154,6 +154,7 @@ func (o *OIDC) GetEncryptedKey() (kid, key string, ok bool) {
 
 // Init validates and initializes the OIDC provider.
 func (o *OIDC) Init(config Config) (err error) {
+	o.base = &base{} // prevent nil pointers
 	switch {
 	case o.Type == "":
 		return errors.New("type cannot be empty")
@@ -207,6 +208,17 @@ func (o *OIDC) Init(config Config) (err error) {
 	} else {
 		o.getIdentityFunc = config.GetIdentityFunc
 	}
+
+	// Initialize the x509 allow/deny policy engine
+	if o.x509PolicyEngine, err = newX509PolicyEngine(o.Options.GetX509Options()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine
+	if o.sshPolicyEngine, err = newSSHPolicyEngine(o.Options.GetSSHOptions()); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -363,6 +375,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(o.x509PolicyEngine),
 	}, nil
 }
 
@@ -452,6 +465,8 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		&sshCertValidityValidator{o.claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
+		// Ensure that all principal names are allowed
+		newSSHNamePolicyValidator(o.sshPolicyEngine),
 	), nil
 }
 

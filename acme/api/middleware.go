@@ -283,7 +283,7 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 }
 
 // lookupProvisioner loads the provisioner associated with the request.
-// Responsds 404 if the provisioner does not exist.
+// Responds 404 if the provisioner does not exist.
 func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

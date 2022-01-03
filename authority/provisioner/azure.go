@@ -191,6 +191,7 @@ func (p *Azure) GetIdentityToken(subject, caURL string) (string, error) {
 
 // Init validates and initializes the Azure provisioner.
 func (p *Azure) Init(config Config) (err error) {
+	p.base = &base{} // prevent nil pointers
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -218,6 +219,16 @@ func (p *Azure) Init(config Config) (err error) {
 	}
 	// Get JWK key set
 	if p.keyStore, err = newKeyStore(p.oidcConfig.JWKSetURI); err != nil {
+		return err
+	}
+
+	// Initialize the x509 allow/deny policy engine
+	if p.x509PolicyEngine, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine
+	if p.sshPolicyEngine, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -328,6 +339,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(p.x509PolicyEngine),
 	), nil
 }
 
@@ -396,6 +408,8 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		&sshCertValidityValidator{p.claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
+		// Ensure that all principal names are allowed
+		newSSHNamePolicyValidator(p.sshPolicyEngine),
 	), nil
 }
 

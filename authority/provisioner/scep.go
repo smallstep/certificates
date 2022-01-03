@@ -74,7 +74,7 @@ func (s *SCEP) DefaultTLSCertDuration() time.Duration {
 
 // Init initializes and validates the fields of a SCEP type.
 func (s *SCEP) Init(config Config) (err error) {
-
+	s.base = &base{} // prevent nil pointers
 	switch {
 	case s.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -102,6 +102,11 @@ func (s *SCEP) Init(config Config) (err error) {
 
 	// TODO: add other, SCEP specific, options?
 
+	// Initialize the x509 allow/deny policy engine
+	if s.x509PolicyEngine, err = newX509PolicyEngine(s.Options.GetX509Options()); err != nil {
+		return err
+	}
+
 	return err
 }
 
@@ -117,6 +122,7 @@ func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		newPublicKeyMinimumLengthValidator(s.MinimumPublicKeyLength),
 		newValidityValidator(s.claimer.MinTLSCertDuration(), s.claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(s.x509PolicyEngine),
 	}, nil
 }
 

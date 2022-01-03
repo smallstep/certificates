@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	sshpolicy "github.com/smallstep/certificates/policy/ssh"
 	"go.step.sm/crypto/keyutil"
 	"golang.org/x/crypto/ssh"
 )
@@ -442,6 +443,35 @@ func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, o SignSSHOpti
 	default:
 		return nil
 	}
+}
+
+// sshNamePolicyValidator validates that the certificate (to be signed)
+// contains only allowed principals.
+type sshNamePolicyValidator struct {
+	policyEngine *sshpolicy.NamePolicyEngine
+}
+
+// newSSHNamePolicyValidator return a new SSH allow/deny validator.
+func newSSHNamePolicyValidator(engine *sshpolicy.NamePolicyEngine) *sshNamePolicyValidator {
+	return &sshNamePolicyValidator{
+		policyEngine: engine,
+	}
+}
+
+// Valid validates validates that the certificate (to be signed)
+// contains only allowed principals.
+func (v *sshNamePolicyValidator) Valid(cert *ssh.Certificate, _ SignSSHOptions) error {
+	if v.policyEngine == nil {
+		return nil
+	}
+	// TODO(hs): should this perform checks only for hosts vs. user certs depending on context?
+	// The current best practice is to have separate provisioners for hosts and users, and thus
+	// separate policy engines for the principals that are allowed.
+	_, err := v.policyEngine.ArePrincipalsAllowed(cert)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // sshCertTypeUInt32

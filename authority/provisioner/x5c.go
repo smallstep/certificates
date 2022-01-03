@@ -87,6 +87,7 @@ func (p *X5C) GetEncryptedKey() (string, string, bool) {
 
 // Init initializes and validates the fields of a X5C type.
 func (p *X5C) Init(config Config) error {
+	p.base = &base{} // prevent nil pointers
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -122,6 +123,16 @@ func (p *X5C) Init(config Config) error {
 	// Update claims with global ones
 	var err error
 	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
+		return err
+	}
+
+	// Initialize the x509 allow/deny policy engine
+	if p.x509PolicyEngine, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine
+	if p.sshPolicyEngine, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -229,6 +240,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		defaultSANsValidator(claims.SANs),
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(p.x509PolicyEngine),
 	}, nil
 }
 
@@ -311,5 +323,7 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		&sshCertValidityValidator{p.claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
+		// Ensure that all principal names are allowed
+		newSSHNamePolicyValidator(p.sshPolicyEngine),
 	), nil
 }

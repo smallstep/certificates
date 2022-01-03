@@ -33,11 +33,65 @@ type SSHOptions struct {
 	// TemplateData is a JSON object with variables that can be used in custom
 	// templates.
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
+
+	// AllowedNames contains the names the provisioner is authorized to sign
+	AllowedNames *AllowedSSHNameOptions `json:"allow,omitempty"`
+
+	// DeniedNames contains the names the provisioner is not authorized to sign
+	DeniedNames *DeniedSSHNameOptions `json:"deny,omitempty"`
+}
+
+// AllowedSSHNameOptions models the allowed names
+type AllowedSSHNameOptions struct {
+	DNSDomains     []string `json:"dns,omitempty"`
+	EmailAddresses []string `json:"email,omitempty"`
+	Principals     []string `json:"principal,omitempty"`
+}
+
+// DeniedSSHNameOptions models the denied names
+type DeniedSSHNameOptions struct {
+	DNSDomains     []string `json:"dns,omitempty"`
+	EmailAddresses []string `json:"email,omitempty"`
+	Principals     []string `json:"principal,omitempty"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
 func (o *SSHOptions) HasTemplate() bool {
 	return o != nil && (o.Template != "" || o.TemplateFile != "")
+}
+
+// GetAllowedNameOptions returns the AllowedSSHNameOptions, which models the
+// names that a provisioner is authorized to sign SSH certificates for.
+func (o *SSHOptions) GetAllowedNameOptions() *AllowedSSHNameOptions {
+	if o == nil {
+		return nil
+	}
+	return o.AllowedNames
+}
+
+// GetDeniedNameOptions returns the DeniedSSHNameOptions, which models the
+// names that a provisioner is NOT authorized to sign SSH certificates for.
+func (o *SSHOptions) GetDeniedNameOptions() *DeniedSSHNameOptions {
+	if o == nil {
+		return nil
+	}
+	return o.DeniedNames
+}
+
+// HasNames checks if the AllowedSSHNameOptions has one or more
+// names configured.
+func (o *AllowedSSHNameOptions) HasNames() bool {
+	return len(o.DNSDomains) > 0 ||
+		len(o.EmailAddresses) > 0 ||
+		len(o.Principals) > 0
+}
+
+// HasNames checks if the DeniedSSHNameOptions has one or more
+// names configured.
+func (o *DeniedSSHNameOptions) HasNames() bool {
+	return len(o.DNSDomains) > 0 ||
+		len(o.EmailAddresses) > 0 ||
+		len(o.Principals) > 0
 }
 
 // TemplateSSHOptions generates a SSHCertificateOptions with the template and

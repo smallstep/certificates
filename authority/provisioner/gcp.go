@@ -195,6 +195,7 @@ func (p *GCP) GetIdentityToken(subject, caURL string) (string, error) {
 
 // Init validates and initializes the GCP provisioner.
 func (p *GCP) Init(config Config) error {
+	p.base = &base{} // prevent nil pointers
 	var err error
 	switch {
 	case p.Type == "":
@@ -213,6 +214,16 @@ func (p *GCP) Init(config Config) error {
 	// Initialize key store
 	p.keyStore, err = newKeyStore(p.config.CertsURL)
 	if err != nil {
+		return err
+	}
+
+	// Initialize the x509 allow/deny policy engine
+	if p.x509PolicyEngine, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine
+	if p.sshPolicyEngine, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -273,6 +284,7 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(p.x509PolicyEngine),
 	), nil
 }
 
@@ -438,5 +450,7 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		&sshCertValidityValidator{p.claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
+		// Ensure that all principal names are allowed
+		newSSHNamePolicyValidator(p.sshPolicyEngine),
 	), nil
 }

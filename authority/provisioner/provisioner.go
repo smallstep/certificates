@@ -12,6 +12,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	sshpolicy "github.com/smallstep/certificates/policy/ssh"
+	x509policy "github.com/smallstep/certificates/policy/x509"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -298,7 +300,10 @@ func SanitizeSSHUserPrincipal(email string) string {
 	}, strings.ToLower(email))
 }
 
-type base struct{}
+type base struct {
+	x509PolicyEngine *x509policy.NamePolicyEngine
+	sshPolicyEngine  *sshpolicy.NamePolicyEngine
+}
 
 // AuthorizeSign returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for signing x509 Certificates.
