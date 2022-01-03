@@ -12,6 +12,13 @@ type NamePolicyOption func(e *NamePolicyEngine) error
 
 // TODO: wrap (more) errors; and prove a set of known (exported) errors
 
+func WithEnableSubjectCommonNameVerification() NamePolicyOption {
+	return func(e *NamePolicyEngine) error {
+		e.verifySubjectCommonName = true
+		return nil
+	}
+}
+
 func WithPermittedDNSDomains(domains []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		for _, domain := range domains {

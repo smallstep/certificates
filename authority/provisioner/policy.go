@@ -12,7 +12,9 @@ func newX509PolicyEngine(x509Opts *X509Options) (*x509policy.NamePolicyEngine, e
 		return nil, nil
 	}
 
-	options := []x509policy.NamePolicyOption{}
+	options := []x509policy.NamePolicyOption{
+		x509policy.WithEnableSubjectCommonNameVerification(), // enable x509 Subject Common Name validation by default
+	}
 
 	allowed := x509Opts.GetAllowedNameOptions()
 	if allowed != nil && allowed.HasNames() {

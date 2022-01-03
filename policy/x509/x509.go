@@ -3,6 +3,7 @@ package x509policy
 import (
 	"bytes"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"fmt"
 	"net"
 	"net/url"
@@ -50,6 +51,7 @@ func (e CertificateInvalidError) Error() string {
 // TODO(hs): implement Stringer interface: describe the contents of the NamePolicyEngine?
 type NamePolicyEngine struct {
 	options                 []NamePolicyOption
+	verifySubjectCommonName bool
 	permittedDNSDomains     []string
 	excludedDNSDomains      []string
 	permittedIPRanges       []*net.IPNet
@@ -76,7 +78,13 @@ func New(opts ...NamePolicyOption) (*NamePolicyEngine, error) {
 
 // AreCertificateNamesAllowed verifies that all SANs in a Certificate are allowed.
 func (e *NamePolicyEngine) AreCertificateNamesAllowed(cert *x509.Certificate) (bool, error) {
-	if err := e.validateNames(cert.DNSNames, cert.IPAddresses, cert.EmailAddresses, cert.URIs); err != nil {
+	dnsNames, ips, emails, uris := cert.DNSNames, cert.IPAddresses, cert.EmailAddresses, cert.URIs
+	// when Subject Common Name must be verified in addition to the SANs, it is
+	// added to the appropriate slice of names.
+	if e.verifySubjectCommonName {
+		appendSubjectCommonName(cert.Subject, &dnsNames, &ips, &emails, &uris)
+	}
+	if err := e.validateNames(dnsNames, ips, emails, uris); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -84,7 +92,13 @@ func (e *NamePolicyEngine) AreCertificateNamesAllowed(cert *x509.Certificate) (b
 
 // AreCSRNamesAllowed verifies that all names in the CSR are allowed.
 func (e *NamePolicyEngine) AreCSRNamesAllowed(csr *x509.CertificateRequest) (bool, error) {
-	if err := e.validateNames(csr.DNSNames, csr.IPAddresses, csr.EmailAddresses, csr.URIs); err != nil {
+	dnsNames, ips, emails, uris := csr.DNSNames, csr.IPAddresses, csr.EmailAddresses, csr.URIs
+	// when Subject Common Name must be verified in addition to the SANs, it is
+	// added to the appropriate slice of names.
+	if e.verifySubjectCommonName {
+		appendSubjectCommonName(csr.Subject, &dnsNames, &ips, &emails, &uris)
+	}
+	if err := e.validateNames(dnsNames, ips, emails, uris); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -114,6 +128,26 @@ func (e *NamePolicyEngine) IsIPAllowed(ip net.IP) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// appendSubjectCommonName appends the Subject Common Name to the appropriate slice of names. The logic is
+// similar as x509util.SplitSANs: if the subject can be parsed as an IP, it's added to the ips. If it can
+// be parsed as an URL, it is added to the URIs. If it contains an @, it is added to emails. When it's none
+// of these, it's added to the DNS names.
+func appendSubjectCommonName(subject pkix.Name, dnsNames *[]string, ips *[]net.IP, emails *[]string, uris *[]*url.URL) {
+	commonName := subject.CommonName
+	if commonName == "" {
+		return
+	}
+	if ip := net.ParseIP(commonName); ip != nil {
+		*ips = append(*ips, ip)
+	} else if u, err := url.Parse(commonName); err == nil && u.Scheme != "" {
+		*uris = append(*uris, u)
+	} else if strings.Contains(commonName, "@") {
+		*emails = append(*emails, commonName)
+	} else {
+		*dnsNames = append(*dnsNames, commonName)
+	}
 }
 
 // validateNames verifies that all names are allowed.
@@ -508,7 +542,7 @@ func matchIPConstraint(ip net.IP, constraint *net.IPNet) (bool, error) {
 	// 	return false, nil
 	// }
 
-	contained := constraint.Contains(ip) // TODO(hs): validate that this is the correct behavior.
+	contained := constraint.Contains(ip) // TODO(hs): validate that this is the correct behavior; also check IPv4-in-IPv6 (again)
 
 	return contained, nil
 }

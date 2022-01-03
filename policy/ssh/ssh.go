@@ -80,7 +80,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames, emails, userNames []string) e
 	/* No regexes for now. But if we ever implement them, they'd probably look like this */
 	/*"principal": ["foo.smallstep.com", "/^*\.smallstep\.com$/"]*/
 
-	// Principals can be single user names (mariano, max, mike, ...), hostnames/domains (*.smallstep.com, host.smallstep.com, ...) and emails (max@smallstep.com, @smallstep.com, ...)
+	// Principals can be single user names (mariano, max, mike, ...), hostnames/domains (*.smallstep.com, host.smallstep.com, ...) and "emails" (max@smallstep.com, @smallstep.com, ...)
 	// All ValidPrincipals can thus be any one of those, and they can be mixed (mike@smallstep.com, mike, ...); we need to split this?
 	// Should we assume a generic engine, or can we do it host vs. user based? If host vs. user based, then it becomes easier w.r.t. dns; hosts will only be DNS, right?
 	// If we assume generic, we _may_ have a harder time distinguishing host vs. user certs. We propose to use host + user specific provisioners, though...

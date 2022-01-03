@@ -117,6 +117,7 @@ func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier string) 
 		return nil
 	}
 
+	// assuming only valid identifiers (IP or DNS) are provided
 	var err error
 	if ip := net.ParseIP(identifier); ip != nil {
 		_, err = p.x509PolicyEngine.IsIPAllowed(ip)

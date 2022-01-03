@@ -158,6 +158,7 @@ func (p *JWK) authorizeToken(token string, audiences []string) (*jwtPayload, err
 // revoke the certificate with serial number in the `sub` property.
 func (p *JWK) AuthorizeRevoke(ctx context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.audiences.Revoke)
+	// TODO(hs): authorize the SANs using x509 name policy allow/deny rules (also for other provisioners with AuthorizeRevoke)
 	return errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeRevoke")
 }
 
@@ -208,8 +209,18 @@ func (p *JWK) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error 
 	if p.claimer.IsDisableRenewal() {
 		return errs.Unauthorized("jwk.AuthorizeRenew; renew is disabled for jwk provisioner '%s'", p.GetName())
 	}
+	// TODO(hs): authorize the SANs using x509 name policy allow/deny rules (also for other provisioners with AuthorizeRewew and AuthorizeSSHRenew)
+	//return p.authorizeRenew(cert)
 	return nil
 }
+
+// func (p *JWK) authorizeRenew(cert *x509.Certificate) error {
+// 	if p.x509PolicyEngine == nil {
+// 		return nil
+// 	}
+// 	_, err := p.x509PolicyEngine.AreCertificateNamesAllowed(cert)
+// 	return err
+// }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
@@ -288,5 +299,6 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 // AuthorizeSSHRevoke returns nil if the token is valid, false otherwise.
 func (p *JWK) AuthorizeSSHRevoke(ctx context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.audiences.SSHRevoke)
+	// TODO(hs): authorize the principals using SSH name policy allow/deny rules (also for other provisioners with AuthorizeSSHRevoke)
 	return errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSSHRevoke")
 }
