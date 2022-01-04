@@ -114,7 +114,16 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 		return nil, err
 	}
 
-	data := x509util.CreateTemplateData(claims.Subject, claims.SANs)
+	sans := claims.SANs
+	if len(sans) == 0 {
+		sans = make([]string, len(crt.Details.Ips)+1)
+		sans[0] = crt.Details.Name
+		for i, ipnet := range crt.Details.Ips {
+			sans[i+1] = ipnet.IP.String()
+		}
+	}
+
+	data := x509util.CreateTemplateData(claims.Subject, sans)
 	if v, err := unsafeParseSigned(token); err == nil {
 		data.SetToken(v)
 	}
@@ -171,7 +180,7 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 	var signOptions []SignOption
 	// If step ssh options are given, validate them and set key id, principals
 	// and validity.
-	if claims.Step != nil || claims.Step.SSH != nil {
+	if claims.Step != nil && claims.Step.SSH != nil {
 		opts := claims.Step.SSH
 
 		// Check that the token only contains valid principals.
@@ -261,7 +270,7 @@ func (p *Nebula) AuthorizeSSHRevoke(ctx context.Context, token string) error {
 	if !p.claimer.IsSSHCAEnabled() {
 		return errs.Unauthorized("ssh is disabled for nebula provisioner '%s'", p.Name)
 	}
-	if _, _, err := p.authorizeToken(token, p.audiences.Revoke); err != nil {
+	if _, _, err := p.authorizeToken(token, p.audiences.SSHRevoke); err != nil {
 		return err
 	}
 	return nil
