@@ -103,7 +103,7 @@ func (p *Nebula) GetType() Type {
 }
 
 // GetEncryptedKey returns the base provisioner encrypted key if it's defined.
-func (p *Nebula) GetEncryptedKey() (kid string, key string, ok bool) {
+func (p *Nebula) GetEncryptedKey() (kid, key string, ok bool) {
 	return "", "", false
 }
 
@@ -121,7 +121,7 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 
 	// The nebula certificate will be available using the template variable Crt.
 	// For example {{ .Crt.Details.Groups }} can be used to get all the groups.
-	// data.SetCertificate(crt)
+	data.SetAuthorizationCertificate(crt)
 
 	templateOptions, err := TemplateOptions(p.Options, data)
 	if err != nil {
@@ -222,8 +222,8 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 	}
 
 	// The nebula certificate will be available using the template variable Crt.
-	// For example {{ .Crt.Details.Groups }} can be used to get all the groups.
-	// data.SetCertificate(crt)
+	// For example {{ .AuthorizationCrt.Details.Groups }} can be used to get all the groups.
+	data.SetAuthorizationCertificate(crt)
 
 	templateOptions, err := TemplateSSHOptions(p.Options, data)
 	if err != nil {
@@ -244,7 +244,7 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 }
 
 // AuthorizeRenew returns an error if the renewal is disabled.
-func (p *Nebula) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
+func (p *Nebula) AuthorizeRenew(ctx context.Context, crt *x509.Certificate) error {
 	if p.claimer.IsDisableRenewal() {
 		return errs.Unauthorized("renew is disabled for nebula provisioner '%s'", p.GetName())
 	}
