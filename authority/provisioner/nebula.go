@@ -23,6 +23,15 @@ const (
 	NebulaCertHeader jose.HeaderKey = "nbc"
 )
 
+// Nebula is a provisioner that verifies tokens signed using nebula private
+// keys. The tokens embed a header parameter with the certificate that can be
+// used to verify the signature. Those certificates are verified using the
+// Nebula CAs encoded in Roots. The process is similar to X5C or SSHPOP tokens.
+//
+// Because of Nebula "leaf" certificates use X25519 keys, the tokens are signed
+// using XEd25519 defined at
+// https://signal.org/docs/specifications/xeddsa/#xeddsa and implemented by
+// go.step.sm/crypto/x25519.
 type Nebula struct {
 	ID        string   `json:"-"`
 	Type      string   `json:"type"`
@@ -35,6 +44,7 @@ type Nebula struct {
 	audiences Audiences
 }
 
+// Init verifies and initializes the nebula provisioner.
 func (p *Nebula) Init(config Config) error {
 	switch {
 	case p.Type == "":
