@@ -52,7 +52,7 @@ func (p *Nebula) Init(config Config) error {
 
 	p.caPool, err = cert.NewCAPoolFromBytes(p.Roots)
 	if err != nil {
-		return errs.InternalServer("failed to start ca pool: %v", err)
+		return errs.InternalServer("failed to create ca pool: %v", err)
 	}
 
 	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
@@ -399,7 +399,7 @@ func (v nebulaSANsValidator) Valid(req *x509.CertificateRequest) error {
 				}
 			}
 			if !valid {
-				return errs.Forbidden("certificate request does not contain the valid IP addresses - got %v, want %v", req.IPAddresses, v.IPs)
+				return errs.Forbidden("certificate request does not contain a valid IP addresses - got %v, want %v", req.IPAddresses, v.IPs)
 			}
 		}
 	}
@@ -433,7 +433,7 @@ func (v nebulaPrincipalsValidator) Valid(got SignSSHOptions) error {
 
 		if !valid {
 			return errs.Forbidden(
-				"ssh certificate principals does contain a valid name or IP address - got %v, want %s or %v",
+				"ssh certificate principals does not contain a valid name or IP address - got %v, want %s or %v",
 				got.Principals, v.Name, v.IPs,
 			)
 		}
