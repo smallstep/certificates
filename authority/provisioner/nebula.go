@@ -20,7 +20,7 @@ import (
 
 const (
 	// NebulaCertHeader is the token header that contains a nebula certificate.
-	NebulaCertHeader jose.HeaderKey = "nbc"
+	NebulaCertHeader jose.HeaderKey = "nebula"
 )
 
 // Nebula is a provisioner that verifies tokens signed using nebula private
@@ -308,21 +308,21 @@ func (p *Nebula) authorizeToken(token string, audiences []string) (*cert.NebulaC
 	}
 
 	// Extract nebula certificate
-	nbc, ok := jwt.Headers[0].ExtraHeaders[NebulaCertHeader]
+	h, ok := jwt.Headers[0].ExtraHeaders[NebulaCertHeader]
 	if !ok {
-		return nil, nil, errs.Unauthorized("failed to parse token: nbc header is missing")
+		return nil, nil, errs.Unauthorized("failed to parse token: nebula header is missing")
 	}
-	s, ok := nbc.(string)
+	s, ok := h.(string)
 	if !ok {
-		return nil, nil, errs.Unauthorized("failed to parse token: nbc header is not valid")
+		return nil, nil, errs.Unauthorized("failed to parse token: nebula header is not valid")
 	}
 	b, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
-		return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse token: nbc header is not valid"))
+		return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse token: nebula header is not valid"))
 	}
-	c, _, err := cert.UnmarshalNebulaCertificateFromPEM(b)
+	c, err := cert.UnmarshalNebulaCertificate(b)
 	if err != nil {
-		return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse nebula certificate: nbc header is not valid"))
+		return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse nebula certificate: nebula header is not valid"))
 	}
 
 	// Validate nebula certificate against CA

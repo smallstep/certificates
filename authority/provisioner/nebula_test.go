@@ -131,14 +131,14 @@ func mustNebulaProvisioner(t *testing.T) (*Nebula, *cert.NebulaCertificate, ed25
 
 func mustNebulaToken(t *testing.T, sub, iss, aud string, iat time.Time, sans []string, nc *cert.NebulaCertificate, key crypto.Signer) string {
 	t.Helper()
-	ncPEM, err := nc.MarshalToPEM()
+	ncDer, err := nc.Marshal()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	so := new(jose.SignerOptions)
 	so.WithType("JWT")
-	so.WithHeader(NebulaCertHeader, ncPEM)
+	so.WithHeader(NebulaCertHeader, ncDer)
 
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.XEdDSA, Key: key}, so)
 	if err != nil {
@@ -174,14 +174,14 @@ func mustNebulaToken(t *testing.T, sub, iss, aud string, iat time.Time, sans []s
 
 func mustNebulaSSHToken(t *testing.T, sub, iss, aud string, iat time.Time, opts *SignSSHOptions, nc *cert.NebulaCertificate, key crypto.Signer) string {
 	t.Helper()
-	ncPEM, err := nc.MarshalToPEM()
+	ncDer, err := nc.Marshal()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	so := new(jose.SignerOptions)
 	so.WithType("JWT")
-	so.WithHeader(NebulaCertHeader, ncPEM)
+	so.WithHeader(NebulaCertHeader, ncDer)
 
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.XEdDSA, Key: key}, so)
 	if err != nil {
