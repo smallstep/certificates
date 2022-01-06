@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/slackhq/nebula/cert"
+	nebula "github.com/slackhq/nebula/cert"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
@@ -19,16 +19,17 @@ import (
 )
 
 const (
-	// NebulaCertHeader is the token header that contains a nebula certificate.
+	// NebulaCertHeader is the token header that contains a Nebula certificate.
 	NebulaCertHeader jose.HeaderKey = "nebula"
 )
 
-// Nebula is a provisioner that verifies tokens signed using nebula private
-// keys. The tokens embed a header parameter with the certificate that can be
-// used to verify the signature. Those certificates are verified using the
-// Nebula CAs encoded in Roots. The process is similar to X5C or SSHPOP tokens.
+// Nebula is a provisioner that verifies tokens signed using Nebula private
+// keys. The tokens contain a Nebula certificate in the header, which can be
+// used to verify the token signature. The certificates are themselves verified
+// using the Nebula CA certificates encoded in Roots. The verification process
+// is similar to the process for X5C tokens.
 //
-// Because of Nebula "leaf" certificates use X25519 keys, the tokens are signed
+// Because Nebula "leaf" certificates use X25519 keys, the tokens are signed
 // using XEd25519 defined at
 // https://signal.org/docs/specifications/xeddsa/#xeddsa and implemented by
 // go.step.sm/crypto/x25519.
@@ -40,11 +41,11 @@ type Nebula struct {
 	Claims    *Claims  `json:"claims,omitempty"`
 	Options   *Options `json:"options,omitempty"`
 	claimer   *Claimer
-	caPool    *cert.NebulaCAPool
+	caPool    *nebula.NebulaCAPool
 	audiences Audiences
 }
 
-// Init verifies and initializes the nebula provisioner.
+// Init verifies and initializes the Nebula provisioner.
 func (p *Nebula) Init(config Config) error {
 	switch {
 	case p.Type == "":
@@ -60,7 +61,7 @@ func (p *Nebula) Init(config Config) error {
 		return err
 	}
 
-	p.caPool, err = cert.NewCAPoolFromBytes(p.Roots)
+	p.caPool, err = nebula.NewCAPoolFromBytes(p.Roots)
 	if err != nil {
 		return errs.InternalServer("failed to create ca pool: %v", err)
 	}
@@ -138,7 +139,7 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 		data.SetToken(v)
 	}
 
-	// The nebula certificate will be available using the template variable Crt.
+	// The Nebula certificate will be available using the template variable Crt.
 	// For example {{ .Crt.Details.Groups }} can be used to get all the groups.
 	data.SetAuthorizationCertificate(crt)
 
@@ -168,7 +169,7 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
-// Currently the nebula provisioner only grant host ssh certificates
+// Currently the Nebula provisioner only grants host SSH certificates.
 func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("ssh is disabled for nebula provisioner '%s'", p.Name)
@@ -240,7 +241,7 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 		data.SetToken(v)
 	}
 
-	// The nebula certificate will be available using the template variable Crt.
+	// The Nebula certificate will be available using the template variable Crt.
 	// For example {{ .AuthorizationCrt.Details.Groups }} can be used to get all the groups.
 	data.SetAuthorizationCertificate(crt)
 
@@ -301,13 +302,13 @@ func (p *Nebula) validateToken(token string, audiences []string) error {
 	return err
 }
 
-func (p *Nebula) authorizeToken(token string, audiences []string) (*cert.NebulaCertificate, *jwtPayload, error) {
+func (p *Nebula) authorizeToken(token string, audiences []string) (*nebula.NebulaCertificate, *jwtPayload, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
 		return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse token"))
 	}
 
-	// Extract nebula certificate
+	// Extract Nebula certificate
 	h, ok := jwt.Headers[0].ExtraHeaders[NebulaCertHeader]
 	if !ok {
 		return nil, nil, errs.Unauthorized("failed to parse token: nebula header is missing")
@@ -320,7 +321,7 @@ func (p *Nebula) authorizeToken(token string, audiences []string) (*cert.NebulaC
 	if err != nil {
 		return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse token: nebula header is not valid"))
 	}
-	c, err := cert.UnmarshalNebulaCertificate(b)
+	c, err := nebula.UnmarshalNebulaCertificate(b)
 	if err != nil {
 		return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse nebula certificate: nebula header is not valid"))
 	}
@@ -401,15 +402,18 @@ func (v nebulaSANsValidator) Valid(req *x509.CertificateRequest) error {
 			}
 			// Check ip network
 			if !valid {
-				for _, ipnet := range v.IPs {
-					if ip.Equal(ipnet.IP) {
+				for _, ipNet := range v.IPs {
+					if ip.Equal(ipNet.IP) {
 						valid = true
 						break
 					}
 				}
 			}
 			if !valid {
-				return errs.Forbidden("certificate request does not contain a valid IP addresses - got %v, want %v", req.IPAddresses, v.IPs)
+				for _, ipNet := range v.IPs {
+					ips = append(ips, ipNet.IP)
+				}
+				return errs.Forbidden("certificate request contains invalid IP addresses - got %v, want %v", req.IPAddresses, ips)
 			}
 		}
 	}
@@ -423,7 +427,7 @@ type nebulaPrincipalsValidator struct {
 }
 
 // Valid checks that the SignSSHOptions principals contains only names in the
-// nebula certificate.
+// Nebula certificate.
 func (v nebulaPrincipalsValidator) Valid(got SignSSHOptions) error {
 	for _, p := range got.Principals {
 		var valid bool
@@ -442,9 +446,13 @@ func (v nebulaPrincipalsValidator) Valid(got SignSSHOptions) error {
 		}
 
 		if !valid {
+			ips := make([]net.IP, len(v.IPs))
+			for i, ipNet := range v.IPs {
+				ips[i] = ipNet.IP
+			}
 			return errs.Forbidden(
-				"ssh certificate principals does not contain a valid name or IP address - got %v, want %s or %v",
-				got.Principals, v.Name, v.IPs,
+				"ssh certificate principals contains invalid name or IP addresses - got %v, want %s or %v",
+				got.Principals, v.Name, ips,
 			)
 		}
 	}
