@@ -30,8 +30,7 @@ func (r *CreateExternalAccountKeyRequest) Validate() error {
 
 // GetExternalAccountKeysResponse is the type for GET /admin/acme/eab responses
 type GetExternalAccountKeysResponse struct {
-	EAKs       []*linkedca.EABKey `json:"eaks"`
-	NextCursor string             `json:"nextCursor"`
+	EAKs []*linkedca.EABKey `json:"eaks"`
 }
 
 // requireEABEnabled is a middleware that ensures ACME EAB is enabled
@@ -149,25 +148,18 @@ func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Reques
 	api.JSON(w, &DeleteResponse{Status: "ok"})
 }
 
-// GetExternalAccountKeys returns a segment of ACME EAB Keys.
+// GetExternalAccountKeys returns ACME EAB Keys. If a reference is specified,
+// only the ExternalAccountKey with that reference is returned. Otherwise all
+// ExternalAccountKeys in the system for a specific provisioner are returned.
 func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request) {
 	prov := chi.URLParam(r, "prov")
 	reference := chi.URLParam(r, "ref")
 
 	var (
-		key        *acme.ExternalAccountKey
-		keys       []*acme.ExternalAccountKey
-		err        error
-		cursor     string
-		nextCursor string
-		limit      int
+		key  *acme.ExternalAccountKey
+		keys []*acme.ExternalAccountKey
+		err  error
 	)
-
-	if cursor, limit, err = api.ParseCursor(r); err != nil {
-		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err,
-			"error parsing cursor and limit from query params"))
-		return
-	}
 
 	if reference != "" {
 		if key, err = h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference); err != nil {
@@ -178,7 +170,7 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 			keys = []*acme.ExternalAccountKey{key}
 		}
 	} else {
-		if keys, nextCursor, err = h.acmeDB.GetExternalAccountKeys(r.Context(), prov, cursor, limit); err != nil {
+		if keys, err = h.acmeDB.GetExternalAccountKeys(r.Context(), prov); err != nil {
 			api.WriteError(w, admin.WrapErrorISE(err, "error retrieving external account keys"))
 			return
 		}
@@ -198,7 +190,6 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 	}
 
 	api.JSON(w, &GetExternalAccountKeysResponse{
-		EAKs:       eaks,
-		NextCursor: nextCursor,
+		EAKs: eaks,
 	})
 }

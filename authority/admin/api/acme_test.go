@@ -840,23 +840,6 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 		err        *admin.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
-		"fail/parse-cursor": func(t *testing.T) test {
-			chiCtx := chi.NewRouteContext()
-			chiCtx.URLParams.Add("prov", "provName")
-			req := httptest.NewRequest("GET", "/foo?limit=A", nil)
-			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			return test{
-				ctx:        ctx,
-				statusCode: 400,
-				req:        req,
-				err: &admin.Error{
-					Status:  400,
-					Type:    admin.ErrorBadRequestType.String(),
-					Detail:  "bad request",
-					Message: "error parsing cursor and limit from query params: limit 'A' is not an integer: strconv.Atoi: parsing \"A\": invalid syntax",
-				},
-			}
-		},
 		"fail/acmeDB.GetExternalAccountKeyByReference": func(t *testing.T) test {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
@@ -889,11 +872,9 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			req := httptest.NewRequest("GET", "/foo", nil)
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
 			db := &acme.MockDB{
-				MockGetExternalAccountKeys: func(ctx context.Context, provisionerName, cursor string, limit int) ([]*acme.ExternalAccountKey, string, error) {
+				MockGetExternalAccountKeys: func(ctx context.Context, provisionerName string) ([]*acme.ExternalAccountKey, error) {
 					assert.Equals(t, "provName", provisionerName)
-					assert.Equals(t, "", cursor)
-					assert.Equals(t, 0, limit)
-					return nil, "", errors.New("force")
+					return nil, errors.New("force")
 				},
 			}
 			return test{
@@ -927,8 +908,7 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 				statusCode: 200,
 				req:        req,
 				resp: GetExternalAccountKeysResponse{
-					EAKs:       []*linkedca.EABKey{},
-					NextCursor: "",
+					EAKs: []*linkedca.EABKey{},
 				},
 				db:  db,
 				err: nil,
@@ -968,7 +948,6 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 							BoundAt:     timestamppb.New(boundAt),
 						},
 					},
-					NextCursor: "",
 				},
 				db:  db,
 				err: nil,
@@ -983,10 +962,8 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			var boundAt time.Time
 			boundAtSet := time.Now().Add(-12 * time.Hour)
 			db := &acme.MockDB{
-				MockGetExternalAccountKeys: func(ctx context.Context, provisionerName, cursor string, limit int) ([]*acme.ExternalAccountKey, string, error) {
+				MockGetExternalAccountKeys: func(ctx context.Context, provisionerName string) ([]*acme.ExternalAccountKey, error) {
 					assert.Equals(t, "provName", provisionerName)
-					assert.Equals(t, "", cursor)
-					assert.Equals(t, 0, limit)
 					return []*acme.ExternalAccountKey{
 						{
 							ID:          "eakID1",
@@ -1011,7 +988,7 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 							BoundAt:     boundAtSet,
 							AccountID:   "accountID",
 						},
-					}, "nextCursorValue", nil
+					}, nil
 				},
 			}
 			return test{
@@ -1043,7 +1020,6 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 							Account:     "accountID",
 						},
 					},
-					NextCursor: "nextCursorValue",
 				},
 				db:  db,
 				err: nil,
@@ -1058,10 +1034,8 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			var boundAt time.Time
 			boundAtSet := time.Now().Add(-12 * time.Hour)
 			db := &acme.MockDB{
-				MockGetExternalAccountKeys: func(ctx context.Context, provisionerName, cursor string, limit int) ([]*acme.ExternalAccountKey, string, error) {
+				MockGetExternalAccountKeys: func(ctx context.Context, provisionerName string) ([]*acme.ExternalAccountKey, error) {
 					assert.Equals(t, "provName", provisionerName)
-					assert.Equals(t, "eakID1", cursor)
-					assert.Equals(t, 10, limit)
 					return []*acme.ExternalAccountKey{
 						{
 							ID:          "eakID1",
@@ -1086,7 +1060,7 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 							BoundAt:     boundAtSet,
 							AccountID:   "accountID",
 						},
-					}, "eakID4", nil
+					}, nil
 				},
 			}
 			return test{
@@ -1118,7 +1092,6 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 							Account:     "accountID",
 						},
 					},
-					NextCursor: "eakID4",
 				},
 				db:  db,
 				err: nil,
@@ -1166,7 +1139,6 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			if !cmp.Equal(tc.resp, response, opts...) {
 				t.Errorf("h.GetExternalAccountKeys diff =\n%s", cmp.Diff(tc.resp, response, opts...))
 			}
-
 		})
 	}
 }

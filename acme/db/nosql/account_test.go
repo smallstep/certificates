@@ -1085,17 +1085,13 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 	keyID1 := "keyID1"
 	keyID2 := "keyID2"
 	keyID3 := "keyID3"
-	keyID4 := "keyID4"
 	prov := "acmeProv"
 	ref := "ref"
 	type test struct {
-		db         nosql.DB
-		err        error
-		cursor     string
-		nextCursor string
-		limit      int
-		acmeErr    *acme.Error
-		eaks       []*acme.ExternalAccountKey
+		db      nosql.DB
+		err     error
+		acmeErr *acme.Error
+		eaks    []*acme.ExternalAccountKey
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"ok": func(t *testing.T) test {
@@ -1173,103 +1169,6 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 				},
 			}
 		},
-		"ok/paging-single-entry": func(t *testing.T) test {
-			now := clock.Now()
-			dbeak1 := &dbExternalAccountKey{
-				ID:          keyID1,
-				Provisioner: prov,
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
-			}
-			b1, err := json.Marshal(dbeak1)
-			assert.FatalError(t, err)
-			dbeak2 := &dbExternalAccountKey{
-				ID:          keyID2,
-				Provisioner: prov,
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
-			}
-			b2, err := json.Marshal(dbeak2)
-			assert.FatalError(t, err)
-			dbeak3 := &dbExternalAccountKey{
-				ID:          keyID3,
-				Provisioner: "differentProvisioner",
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
-			}
-			b3, err := json.Marshal(dbeak3)
-			assert.FatalError(t, err)
-			dbeak4 := &dbExternalAccountKey{
-				ID:          keyID4,
-				Provisioner: prov,
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
-			}
-			b4, err := json.Marshal(dbeak4)
-			assert.FatalError(t, err)
-			return test{
-				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
-						assert.Equals(t, bucket, externalAccountKeyTable)
-						return []*nosqldb.Entry{
-							{
-								Bucket: bucket,
-								Key:    []byte(keyID1),
-								Value:  b1,
-							},
-							{
-								Bucket: bucket,
-								Key:    []byte(keyID2),
-								Value:  b2,
-							},
-							{
-								Bucket: bucket,
-								Key:    []byte(keyID3),
-								Value:  b3,
-							},
-							{
-								Bucket: bucket,
-								Key:    []byte(keyID4),
-								Value:  b4,
-							},
-						}, nil
-					},
-				},
-				cursor:     keyID2,
-				limit:      1,
-				nextCursor: keyID4,
-				eaks: []*acme.ExternalAccountKey{
-					{
-						ID:          keyID2,
-						Provisioner: prov,
-						Reference:   ref,
-						AccountID:   "",
-						KeyBytes:    []byte{1, 3, 3, 7},
-						CreatedAt:   now,
-					},
-				},
-			}
-		},
-		"ok/paging-max-limit": func(t *testing.T) test {
-			return test{
-				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
-						assert.Equals(t, bucket, externalAccountKeyTable)
-						return []*nosqldb.Entry{}, nil
-					},
-				},
-				limit: 1337,
-				eaks:  []*acme.ExternalAccountKey{},
-			}
-		},
 		"fail/db.List-error": func(t *testing.T) test {
 			return test{
 				db: &db.MockNoSQLDB{
@@ -1304,7 +1203,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
-			if eaks, nextCursor, err := d.GetExternalAccountKeys(context.Background(), prov, tc.cursor, tc.limit); err != nil {
+			if eaks, err := d.GetExternalAccountKeys(context.Background(), prov); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -1330,7 +1229,6 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 					assert.Equals(t, eak.AccountID, tc.eaks[i].AccountID)
 					assert.Equals(t, eak.BoundAt, tc.eaks[i].BoundAt)
 				}
-				assert.Equals(t, nextCursor, tc.nextCursor)
 			}
 		})
 	}

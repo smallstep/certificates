@@ -258,43 +258,22 @@ func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerName, key
 }
 
 // GetExternalAccountKeys retrieves all External Account Binding keys for a provisioner
-func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName, cursor string, limit int) ([]*acme.ExternalAccountKey, string, error) {
+func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName string) ([]*acme.ExternalAccountKey, error) {
+
+	// TODO: lookup by provisioner based on index
 	entries, err := db.db.List(externalAccountKeyTable)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	// set sane limits; based on the Admin API limits
-	switch {
-	case limit <= 0:
-		limit = 20
-	case limit > 100:
-		limit = 100
-	}
-
-	foundCursorKey := false
 	keys := []*acme.ExternalAccountKey{}
 	for _, entry := range entries { // entries is sorted alphabetically on the key (ID) of the EAK; no need to sort this again.
 		dbeak := new(dbExternalAccountKey)
 		if err = json.Unmarshal(entry.Value, dbeak); err != nil {
-			return nil, "", errors.Wrapf(err, "error unmarshaling external account key %s into ExternalAccountKey", string(entry.Key))
+			return nil, errors.Wrapf(err, "error unmarshaling external account key %s into ExternalAccountKey", string(entry.Key))
 		}
 		if dbeak.Provisioner != provisionerName {
 			continue
-		}
-		// look for the entry pointed to by the cursor (the next item to return) and start selecting items after finding it
-		if cursor != "" && !foundCursorKey {
-			if cursor == dbeak.ID {
-				// from here on, items should be selected for the result.
-				foundCursorKey = true
-			} else {
-				// skip the IDs not matching the cursor to look for.
-				continue
-			}
-		}
-		// return if the limit of items was found in the previous iteration; the next cursor is set to the next item to return
-		if len(keys) == limit {
-			return keys, dbeak.ID, nil
 		}
 		keys = append(keys, &acme.ExternalAccountKey{
 			ID:          dbeak.ID,
@@ -307,7 +286,7 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName, curso
 		})
 	}
 
-	return keys, "", nil
+	return keys, nil
 }
 
 // GetExternalAccountKeyByReference retrieves an External Account Binding key with unique reference

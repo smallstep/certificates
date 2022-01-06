@@ -560,7 +560,7 @@ retry:
 	return nil
 }
 
-// GetExternalAccountKeysPaginate returns a page from the the GET /admin/acme/eab request to the CA.
+// GetExternalAccountKeysPaginate returns a page from the GET /admin/acme/eab request to the CA.
 func (c *AdminClient) GetExternalAccountKeysPaginate(provisionerName, reference string, opts ...AdminOption) (*adminAPI.GetExternalAccountKeysResponse, error) {
 	var retried bool
 	o := new(adminOptions)
@@ -669,21 +669,45 @@ retry:
 
 // GetExternalAccountKeys returns all ACME EAB Keys from the GET /admin/acme/eab request to the CA.
 func (c *AdminClient) GetExternalAccountKeys(provisionerName, reference string, opts ...AdminOption) ([]*linkedca.EABKey, error) {
-	var (
-		cursor = ""
-		eaks   = []*linkedca.EABKey{}
-	)
-	for {
-		resp, err := c.GetExternalAccountKeysPaginate(provisionerName, reference, WithAdminCursor(cursor), WithAdminLimit(100))
-		if err != nil {
-			return nil, err
-		}
-		eaks = append(eaks, resp.EAKs...)
-		if resp.NextCursor == "" {
-			return eaks, nil
-		}
-		cursor = resp.NextCursor
+	var retried bool
+	o := new(adminOptions)
+	if err := o.apply(opts); err != nil {
+		return nil, err
 	}
+	p := path.Join(adminURLPrefix, "acme/eab", provisionerName)
+	if reference != "" {
+		p = path.Join(p, "/", reference)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{
+		Path:     p,
+		RawQuery: o.rawQuery(),
+	})
+	tok, err := c.generateAdminToken(u.Path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error generating admin token")
+	}
+	req, err := http.NewRequest("GET", u.String(), http.NoBody)
+	if err != nil {
+		return nil, errors.Wrapf(err, "create GET %s request failed", u)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var body = new(adminAPI.GetExternalAccountKeysResponse)
+	if err := readJSON(resp.Body, body); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return body.EAKs, nil
 }
 
 func readAdminError(r io.ReadCloser) error {
