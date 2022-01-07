@@ -11,17 +11,18 @@ import (
 )
 
 var (
-	accountTable                        = []byte("acme_accounts")
-	accountByKeyIDTable                 = []byte("acme_keyID_accountID_index")
-	authzTable                          = []byte("acme_authzs")
-	challengeTable                      = []byte("acme_challenges")
-	nonceTable                          = []byte("nonces")
-	orderTable                          = []byte("acme_orders")
-	ordersByAccountIDTable              = []byte("acme_account_orders_index")
-	certTable                           = []byte("acme_certs")
-	certBySerialTable                   = []byte("acme_serial_certs_index")
-	externalAccountKeyTable             = []byte("acme_external_account_keys")
-	externalAccountKeysByReferenceTable = []byte("acme_external_account_key_reference_index")
+	accountTable                            = []byte("acme_accounts")
+	accountByKeyIDTable                     = []byte("acme_keyID_accountID_index")
+	authzTable                              = []byte("acme_authzs")
+	challengeTable                          = []byte("acme_challenges")
+	nonceTable                              = []byte("nonces")
+	orderTable                              = []byte("acme_orders")
+	ordersByAccountIDTable                  = []byte("acme_account_orders_index")
+	certTable                               = []byte("acme_certs")
+	certBySerialTable                       = []byte("acme_serial_certs_index")
+	externalAccountKeyTable                 = []byte("acme_external_account_keys")
+	externalAccountKeysByReferenceTable     = []byte("acme_external_account_key_reference_index")
+	externalAccountKeysByProvisionerIDTable = []byte("acme_external_account_keyID_provisionerID_index")
 )
 
 // DB is a struct that implements the AcmeDB interface.
@@ -33,7 +34,8 @@ type DB struct {
 func New(db nosqlDB.DB) (*DB, error) {
 	tables := [][]byte{accountTable, accountByKeyIDTable, authzTable,
 		challengeTable, nonceTable, orderTable, ordersByAccountIDTable,
-		certTable, certBySerialTable, externalAccountKeyTable, externalAccountKeysByReferenceTable,
+		certTable, certBySerialTable, externalAccountKeyTable,
+		externalAccountKeysByReferenceTable, externalAccountKeysByProvisionerIDTable,
 	}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {

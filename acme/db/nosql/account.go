@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -11,6 +12,9 @@ import (
 	nosqlDB "github.com/smallstep/nosql"
 	"go.step.sm/crypto/jose"
 )
+
+// Mutex for locking referencesByProvisioner index operations.
+var referencesByProvisionerIndexMux sync.Mutex
 
 // dbAccount represents an ACME account.
 type dbAccount struct {
@@ -28,13 +32,13 @@ func (dba *dbAccount) clone() *dbAccount {
 }
 
 type dbExternalAccountKey struct {
-	ID          string    `json:"id"`
-	Provisioner string    `json:"provisioner"`
-	Reference   string    `json:"reference"`
-	AccountID   string    `json:"accountID,omitempty"`
-	KeyBytes    []byte    `json:"key"`
-	CreatedAt   time.Time `json:"createdAt"`
-	BoundAt     time.Time `json:"boundAt"`
+	ID            string    `json:"id"`
+	ProvisionerID string    `json:"provisionerID"`
+	Reference     string    `json:"reference"`
+	AccountID     string    `json:"accountID,omitempty"`
+	KeyBytes      []byte    `json:"key"`
+	CreatedAt     time.Time `json:"createdAt"`
+	BoundAt       time.Time `json:"boundAt"`
 }
 
 type dbExternalAccountKeyReference struct {
@@ -170,7 +174,7 @@ func (db *DB) UpdateAccount(ctx context.Context, acc *acme.Account) error {
 }
 
 // CreateExternalAccountKey creates a new External Account Binding key with a name
-func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
+func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
 	keyID, err := randID()
 	if err != nil {
 		return nil, err
@@ -183,14 +187,18 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName, ref
 	}
 
 	dbeak := &dbExternalAccountKey{
-		ID:          keyID,
-		Provisioner: provisionerName,
-		Reference:   reference,
-		KeyBytes:    random,
-		CreatedAt:   clock.Now(),
+		ID:            keyID,
+		ProvisionerID: provisionerID,
+		Reference:     reference,
+		KeyBytes:      random,
+		CreatedAt:     clock.Now(),
 	}
 
 	if err := db.save(ctx, keyID, dbeak, nil, "external_account_key", externalAccountKeyTable); err != nil {
+		return nil, err
+	}
+
+	if err := db.addEAKID(ctx, provisionerID, dbeak.ID); err != nil {
 		return nil, err
 	}
 
@@ -199,90 +207,105 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerName, ref
 			Reference:            dbeak.Reference,
 			ExternalAccountKeyID: dbeak.ID,
 		}
-		if err := db.save(ctx, dbeak.Reference, dbExternalAccountKeyReference, nil, "external_account_key_reference", externalAccountKeysByReferenceTable); err != nil {
+		if err := db.save(ctx, referenceKey(provisionerID, dbeak.Reference), dbExternalAccountKeyReference, nil, "external_account_key_reference", externalAccountKeysByReferenceTable); err != nil {
 			return nil, err
 		}
 	}
 
 	return &acme.ExternalAccountKey{
-		ID:          dbeak.ID,
-		Provisioner: dbeak.Provisioner,
-		Reference:   dbeak.Reference,
-		AccountID:   dbeak.AccountID,
-		KeyBytes:    dbeak.KeyBytes,
-		CreatedAt:   dbeak.CreatedAt,
-		BoundAt:     dbeak.BoundAt,
+		ID:            dbeak.ID,
+		ProvisionerID: dbeak.ProvisionerID,
+		Reference:     dbeak.Reference,
+		AccountID:     dbeak.AccountID,
+		KeyBytes:      dbeak.KeyBytes,
+		CreatedAt:     dbeak.CreatedAt,
+		BoundAt:       dbeak.BoundAt,
 	}, nil
 }
 
 // GetExternalAccountKey retrieves an External Account Binding key by KeyID
-func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerName, keyID string) (*acme.ExternalAccountKey, error) {
+func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerID, keyID string) (*acme.ExternalAccountKey, error) {
 	dbeak, err := db.getDBExternalAccountKey(ctx, keyID)
 	if err != nil {
 		return nil, err
 	}
 
-	if dbeak.Provisioner != provisionerName {
-		return nil, acme.NewError(acme.ErrorUnauthorizedType, "name of provisioner does not match provisioner for which the EAB key was created")
+	if dbeak.ProvisionerID != provisionerID {
+		return nil, acme.NewError(acme.ErrorUnauthorizedType, "provisioner does not match provisioner for which the EAB key was created")
 	}
 
 	return &acme.ExternalAccountKey{
-		ID:          dbeak.ID,
-		Provisioner: dbeak.Provisioner,
-		Reference:   dbeak.Reference,
-		AccountID:   dbeak.AccountID,
-		KeyBytes:    dbeak.KeyBytes,
-		CreatedAt:   dbeak.CreatedAt,
-		BoundAt:     dbeak.BoundAt,
+		ID:            dbeak.ID,
+		ProvisionerID: dbeak.ProvisionerID,
+		Reference:     dbeak.Reference,
+		AccountID:     dbeak.AccountID,
+		KeyBytes:      dbeak.KeyBytes,
+		CreatedAt:     dbeak.CreatedAt,
+		BoundAt:       dbeak.BoundAt,
 	}, nil
 }
 
-func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerName, keyID string) error {
+func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerID, keyID string) error {
 	dbeak, err := db.getDBExternalAccountKey(ctx, keyID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading ACME EAB Key with Key ID %s", keyID)
 	}
-	if dbeak.Provisioner != provisionerName {
-		return errors.New("name of provisioner does not match provisioner for which the EAB key was created")
+
+	if dbeak.ProvisionerID != provisionerID {
+		return errors.New("provisioner does not match provisioner for which the EAB key was created")
 	}
+
 	if dbeak.Reference != "" {
-		err = db.db.Del(externalAccountKeysByReferenceTable, []byte(dbeak.Reference))
-		if err != nil {
-			return errors.Wrapf(err, "error deleting ACME EAB Key Reference with Key ID %s and reference %s", keyID, dbeak.Reference)
+		if err := db.db.Del(externalAccountKeysByReferenceTable, []byte(referenceKey(provisionerID, dbeak.Reference))); err != nil {
+			return errors.Wrapf(err, "error deleting ACME EAB Key reference with Key ID %s and reference %s", keyID, dbeak.Reference)
 		}
 	}
-	if err = db.db.Del(externalAccountKeyTable, []byte(keyID)); err != nil {
+	if err := db.db.Del(externalAccountKeyTable, []byte(keyID)); err != nil {
 		return errors.Wrapf(err, "error deleting ACME EAB Key with Key ID %s", keyID)
 	}
+	if err := db.deleteEAKID(ctx, provisionerID, keyID); err != nil {
+		return errors.Wrapf(err, "error removing ACME EAB Key ID %s", keyID)
+	}
+
 	return nil
 }
 
 // GetExternalAccountKeys retrieves all External Account Binding keys for a provisioner
-func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName string) ([]*acme.ExternalAccountKey, error) {
+func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerID string) ([]*acme.ExternalAccountKey, error) {
 
-	// TODO: lookup by provisioner based on index
-	entries, err := db.db.List(externalAccountKeyTable)
+	// TODO: mutex?
+
+	var eakIDs []string
+	r, err := db.db.Get(externalAccountKeysByProvisionerIDTable, []byte(provisionerID))
 	if err != nil {
-		return nil, err
+		if !nosqlDB.IsErrNotFound(err) {
+			return nil, errors.Wrapf(err, "error loading ACME EAB Key IDs for provisioner %s", provisionerID)
+		}
+	} else {
+		if err := json.Unmarshal(r, &eakIDs); err != nil {
+			return nil, errors.Wrapf(err, "error unmarshaling ACME EAB Key IDs for provisioner %s", provisionerID)
+		}
 	}
 
 	keys := []*acme.ExternalAccountKey{}
-	for _, entry := range entries { // entries is sorted alphabetically on the key (ID) of the EAK; no need to sort this again.
-		dbeak := new(dbExternalAccountKey)
-		if err = json.Unmarshal(entry.Value, dbeak); err != nil {
-			return nil, errors.Wrapf(err, "error unmarshaling external account key %s into ExternalAccountKey", string(entry.Key))
+	for _, eakID := range eakIDs {
+		if eakID == "" {
+			continue // shouldn't happen; just in case
 		}
-		if dbeak.Provisioner != provisionerName {
-			continue
+		eak, err := db.getDBExternalAccountKey(ctx, eakID)
+		if err != nil {
+			if !nosqlDB.IsErrNotFound(err) {
+				return nil, errors.Wrapf(err, "error retrieving ACME EAB Key for provisioner %s and keyID %s", provisionerID, eakID)
+			}
 		}
 		keys = append(keys, &acme.ExternalAccountKey{
-			ID:          dbeak.ID,
-			KeyBytes:    dbeak.KeyBytes,
-			Provisioner: dbeak.Provisioner,
-			Reference:   dbeak.Reference,
-			AccountID:   dbeak.AccountID,
-			CreatedAt:   dbeak.CreatedAt,
-			BoundAt:     dbeak.BoundAt,
+			ID:            eak.ID,
+			KeyBytes:      eak.KeyBytes,
+			ProvisionerID: eak.ProvisionerID,
+			Reference:     eak.Reference,
+			AccountID:     eak.AccountID,
+			CreatedAt:     eak.CreatedAt,
+			BoundAt:       eak.BoundAt,
 		})
 	}
 
@@ -290,11 +313,12 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerName string
 }
 
 // GetExternalAccountKeyByReference retrieves an External Account Binding key with unique reference
-func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
+func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
 	if reference == "" {
 		return nil, nil
 	}
-	k, err := db.db.Get(externalAccountKeysByReferenceTable, []byte(reference))
+
+	k, err := db.db.Get(externalAccountKeysByReferenceTable, []byte(referenceKey(provisionerID, reference)))
 	if nosqlDB.IsErrNotFound(err) {
 		return nil, acme.ErrNotFound
 	} else if err != nil {
@@ -304,28 +328,139 @@ func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerN
 	if err := json.Unmarshal(k, dbExternalAccountKeyReference); err != nil {
 		return nil, errors.Wrapf(err, "error unmarshaling ACME EAB key for reference %s", reference)
 	}
-	return db.GetExternalAccountKey(ctx, provisionerName, dbExternalAccountKeyReference.ExternalAccountKeyID)
+
+	return db.GetExternalAccountKey(ctx, provisionerID, dbExternalAccountKeyReference.ExternalAccountKeyID)
 }
 
-func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerName string, eak *acme.ExternalAccountKey) error {
+func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerID string, eak *acme.ExternalAccountKey) error {
 	old, err := db.getDBExternalAccountKey(ctx, eak.ID)
 	if err != nil {
 		return err
 	}
 
-	if old.Provisioner != provisionerName {
-		return errors.New("name of provisioner does not match provisioner for which the EAB key was created")
+	if old.ProvisionerID != provisionerID {
+		return errors.New("provisioner does not match provisioner for which the EAB key was created")
+	}
+
+	if old.ProvisionerID != eak.ProvisionerID {
+		return errors.New("cannot change provisioner for an existing ACME EAB Key")
+	}
+
+	if old.Reference != eak.Reference {
+		return errors.New("cannot change reference for an existing ACME EAB Key")
 	}
 
 	nu := dbExternalAccountKey{
-		ID:          eak.ID,
-		Provisioner: eak.Provisioner,
-		Reference:   eak.Reference,
-		AccountID:   eak.AccountID,
-		KeyBytes:    eak.KeyBytes,
-		CreatedAt:   eak.CreatedAt,
-		BoundAt:     eak.BoundAt,
+		ID:            eak.ID,
+		ProvisionerID: eak.ProvisionerID,
+		Reference:     eak.Reference,
+		AccountID:     eak.AccountID,
+		KeyBytes:      eak.KeyBytes,
+		CreatedAt:     eak.CreatedAt,
+		BoundAt:       eak.BoundAt,
 	}
 
 	return db.save(ctx, nu.ID, nu, old, "external_account_key", externalAccountKeyTable)
+}
+
+func (db *DB) addEAKID(ctx context.Context, provisionerID, eakID string) error {
+	referencesByProvisionerIndexMux.Lock()
+	defer referencesByProvisionerIndexMux.Unlock()
+
+	var eakIDs []string
+	b, err := db.db.Get(externalAccountKeysByProvisionerIDTable, []byte(provisionerID))
+	if err != nil {
+		if !nosqlDB.IsErrNotFound(err) {
+			return errors.Wrapf(err, "error loading eakIDs for provisioner %s", provisionerID)
+		}
+	} else {
+		if err := json.Unmarshal(b, &eakIDs); err != nil {
+			return errors.Wrapf(err, "error unmarshaling eakIDs for provisioner %s", provisionerID)
+		}
+	}
+
+	var newEAKIDs []string
+	newEAKIDs = append(newEAKIDs, eakIDs...)
+	newEAKIDs = append(newEAKIDs, eakID)
+	var (
+		_old interface{} = eakIDs
+		_new interface{} = newEAKIDs
+	)
+
+	if len(eakIDs) == 0 {
+		_old = nil
+	}
+
+	if err = db.save(ctx, provisionerID, _new, _old, "externalAccountKeysByProvisionerID", externalAccountKeysByProvisionerIDTable); err != nil {
+		return errors.Wrapf(err, "error saving eakIDs index for provisioner %s", provisionerID)
+	}
+
+	return nil
+}
+
+func (db *DB) deleteEAKID(ctx context.Context, provisionerID, eakID string) error {
+	referencesByProvisionerIndexMux.Lock()
+	defer referencesByProvisionerIndexMux.Unlock()
+
+	var eakIDs []string
+	b, err := db.db.Get(externalAccountKeysByProvisionerIDTable, []byte(provisionerID))
+	if err != nil {
+		if !nosqlDB.IsErrNotFound(err) {
+			return errors.Wrapf(err, "error loading reference IDs for provisioner %s", provisionerID)
+		}
+	} else {
+		if err := json.Unmarshal(b, &eakIDs); err != nil {
+			return errors.Wrapf(err, "error unmarshaling eakIDs for provisioner %s", provisionerID)
+		}
+	}
+
+	newEAKIDs := removeElement(eakIDs, eakID)
+	var (
+		_old interface{} = eakIDs
+		_new interface{} = newEAKIDs
+	)
+
+	switch {
+	case len(eakIDs) == 0:
+		_old = nil
+	case len(newEAKIDs) == 0:
+		_new = nil
+	}
+
+	if err = db.save(ctx, provisionerID, _new, _old, "externalAccountKeysByProvisionerID", externalAccountKeysByProvisionerIDTable); err != nil {
+		return errors.Wrapf(err, "error saving referenceIDs index for provisioner %s", provisionerID)
+	}
+
+	return nil
+}
+
+// referenceKey returns a unique key for a reference per provisioner
+func referenceKey(provisionerID, reference string) string {
+	return provisionerID + "." + reference
+}
+
+// sliceIndex finds the index of item in slice
+func sliceIndex(slice []string, item string) int {
+	for i := range slice {
+		if slice[i] == item {
+			return i
+		}
+	}
+	return -1
+}
+
+// removeElement deletes the item if it exists in the
+// slice. It returns a new slice, keeping the old one intact.
+func removeElement(slice []string, item string) []string {
+
+	newSlice := make([]string, 0)
+	index := sliceIndex(slice, item)
+	if index < 0 {
+		newSlice = append(newSlice, slice...)
+		return newSlice
+	}
+
+	newSlice = append(newSlice, slice[:index]...)
+
+	return append(newSlice, slice[index+1:]...)
 }

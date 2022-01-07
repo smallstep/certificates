@@ -3,6 +3,7 @@ package nosql
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -307,7 +308,7 @@ func TestDB_GetAccountByKeyID(t *testing.T) {
 							assert.Equals(t, string(key), accID)
 							return nil, errors.New("force")
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, errors.New("force")
 						}
 					},
@@ -340,7 +341,7 @@ func TestDB_GetAccountByKeyID(t *testing.T) {
 							assert.Equals(t, string(key), accID)
 							return b, nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, errors.New("force")
 						}
 					},
@@ -462,7 +463,7 @@ func TestDB_CreateAccount(t *testing.T) {
 							assert.True(t, dbacc.DeactivatedAt.IsZero())
 							return nil, false, errors.New("force")
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, false, errors.New("force")
 						}
 					},
@@ -506,7 +507,7 @@ func TestDB_CreateAccount(t *testing.T) {
 							assert.True(t, dbacc.DeactivatedAt.IsZero())
 							return nu, true, nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, false, errors.New("force")
 						}
 					},
@@ -699,6 +700,7 @@ func TestDB_UpdateAccount(t *testing.T) {
 
 func TestDB_getDBExternalAccountKey(t *testing.T) {
 	keyID := "keyID"
+	provID := "provID"
 	type test struct {
 		db      nosql.DB
 		err     error
@@ -709,12 +711,12 @@ func TestDB_getDBExternalAccountKey(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			now := clock.Now()
 			dbeak := &dbExternalAccountKey{
-				ID:          keyID,
-				Provisioner: "prov",
-				Reference:   "ref",
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID,
+				ProvisionerID: provID,
+				Reference:     "ref",
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			b, err := json.Marshal(dbeak)
 			assert.FatalError(t, err)
@@ -790,7 +792,7 @@ func TestDB_getDBExternalAccountKey(t *testing.T) {
 			} else if assert.Nil(t, tc.err) {
 				assert.Equals(t, dbeak.ID, tc.dbeak.ID)
 				assert.Equals(t, dbeak.KeyBytes, tc.dbeak.KeyBytes)
-				assert.Equals(t, dbeak.Provisioner, tc.dbeak.Provisioner)
+				assert.Equals(t, dbeak.ProvisionerID, tc.dbeak.ProvisionerID)
 				assert.Equals(t, dbeak.Reference, tc.dbeak.Reference)
 				assert.Equals(t, dbeak.CreatedAt, tc.dbeak.CreatedAt)
 				assert.Equals(t, dbeak.AccountID, tc.dbeak.AccountID)
@@ -802,7 +804,7 @@ func TestDB_getDBExternalAccountKey(t *testing.T) {
 
 func TestDB_GetExternalAccountKey(t *testing.T) {
 	keyID := "keyID"
-	prov := "acmeProv"
+	provID := "provID"
 	type test struct {
 		db      nosql.DB
 		err     error
@@ -813,12 +815,12 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			now := clock.Now()
 			dbeak := &dbExternalAccountKey{
-				ID:          keyID,
-				Provisioner: prov,
-				Reference:   "ref",
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID,
+				ProvisionerID: provID,
+				Reference:     "ref",
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			b, err := json.Marshal(dbeak)
 			assert.FatalError(t, err)
@@ -831,12 +833,12 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 					},
 				},
 				eak: &acme.ExternalAccountKey{
-					ID:          keyID,
-					Provisioner: prov,
-					Reference:   "ref",
-					AccountID:   "",
-					KeyBytes:    []byte{1, 3, 3, 7},
-					CreatedAt:   now,
+					ID:            keyID,
+					ProvisionerID: provID,
+					Reference:     "ref",
+					AccountID:     "",
+					KeyBytes:      []byte{1, 3, 3, 7},
+					CreatedAt:     now,
 				},
 			}
 		},
@@ -856,12 +858,12 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 		"fail/non-matching-provisioner": func(t *testing.T) test {
 			now := clock.Now()
 			dbeak := &dbExternalAccountKey{
-				ID:          keyID,
-				Provisioner: "aDifferentProv",
-				Reference:   "ref",
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID,
+				ProvisionerID: "aDifferentProvID",
+				Reference:     "ref",
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			b, err := json.Marshal(dbeak)
 			assert.FatalError(t, err)
@@ -874,14 +876,14 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 					},
 				},
 				eak: &acme.ExternalAccountKey{
-					ID:          keyID,
-					Provisioner: prov,
-					Reference:   "ref",
-					AccountID:   "",
-					KeyBytes:    []byte{1, 3, 3, 7},
-					CreatedAt:   now,
+					ID:            keyID,
+					ProvisionerID: provID,
+					Reference:     "ref",
+					AccountID:     "",
+					KeyBytes:      []byte{1, 3, 3, 7},
+					CreatedAt:     now,
 				},
-				acmeErr: acme.NewError(acme.ErrorUnauthorizedType, "name of provisioner does not match provisioner for which the EAB key was created"),
+				acmeErr: acme.NewError(acme.ErrorUnauthorizedType, "provisioner does not match provisioner for which the EAB key was created"),
 			}
 		},
 	}
@@ -889,7 +891,7 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
-			if eak, err := d.GetExternalAccountKey(context.Background(), prov, keyID); err != nil {
+			if eak, err := d.GetExternalAccountKey(context.Background(), provID, keyID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -907,7 +909,7 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 			} else if assert.Nil(t, tc.err) {
 				assert.Equals(t, eak.ID, tc.eak.ID)
 				assert.Equals(t, eak.KeyBytes, tc.eak.KeyBytes)
-				assert.Equals(t, eak.Provisioner, tc.eak.Provisioner)
+				assert.Equals(t, eak.ProvisionerID, tc.eak.ProvisionerID)
 				assert.Equals(t, eak.Reference, tc.eak.Reference)
 				assert.Equals(t, eak.CreatedAt, tc.eak.CreatedAt)
 				assert.Equals(t, eak.AccountID, tc.eak.AccountID)
@@ -919,7 +921,7 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 
 func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 	keyID := "keyID"
-	prov := "acmeProv"
+	provID := "provID"
 	ref := "ref"
 	type test struct {
 		db      nosql.DB
@@ -932,12 +934,12 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			now := clock.Now()
 			dbeak := &dbExternalAccountKey{
-				ID:          keyID,
-				Provisioner: prov,
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID,
+				ProvisionerID: provID,
+				Reference:     ref,
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			dbref := &dbExternalAccountKeyReference{
 				Reference:            ref,
@@ -953,24 +955,24 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						switch string(bucket) {
 						case string(externalAccountKeysByReferenceTable):
-							assert.Equals(t, string(key), ref)
+							assert.Equals(t, string(key), provID+"."+ref)
 							return dbrefBytes, nil
 						case string(externalAccountKeyTable):
 							assert.Equals(t, string(key), keyID)
 							return b, nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, errors.New("force")
 						}
 					},
 				},
 				eak: &acme.ExternalAccountKey{
-					ID:          keyID,
-					Provisioner: prov,
-					Reference:   ref,
-					AccountID:   "",
-					KeyBytes:    []byte{1, 3, 3, 7},
-					CreatedAt:   now,
+					ID:            keyID,
+					ProvisionerID: provID,
+					Reference:     ref,
+					AccountID:     "",
+					KeyBytes:      []byte{1, 3, 3, 7},
+					CreatedAt:     now,
 				},
 				err: nil,
 			}
@@ -988,7 +990,7 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 				db: &db.MockNoSQLDB{
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						assert.Equals(t, string(bucket), string(externalAccountKeysByReferenceTable))
-						assert.Equals(t, string(key), ref)
+						assert.Equals(t, string(key), provID+"."+ref)
 						return nil, nosqldb.ErrNotFound
 					},
 				},
@@ -1001,7 +1003,7 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 				db: &db.MockNoSQLDB{
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						assert.Equals(t, string(bucket), string(externalAccountKeysByReferenceTable))
-						assert.Equals(t, string(key), ref)
+						assert.Equals(t, string(key), provID+"."+ref)
 						return nil, errors.New("force")
 					},
 				},
@@ -1014,7 +1016,7 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 				db: &db.MockNoSQLDB{
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						assert.Equals(t, string(bucket), string(externalAccountKeysByReferenceTable))
-						assert.Equals(t, string(key), ref)
+						assert.Equals(t, string(key), provID+"."+ref)
 						return []byte{0}, nil
 					},
 				},
@@ -1034,13 +1036,13 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						switch string(bucket) {
 						case string(externalAccountKeysByReferenceTable):
-							assert.Equals(t, string(key), ref)
+							assert.Equals(t, string(key), provID+"."+ref)
 							return dbrefBytes, nil
 						case string(externalAccountKeyTable):
 							assert.Equals(t, string(key), keyID)
 							return nil, errors.New("force")
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, errors.New("force")
 						}
 					},
@@ -1053,7 +1055,7 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
-			if eak, err := d.GetExternalAccountKeyByReference(context.Background(), prov, tc.ref); err != nil {
+			if eak, err := d.GetExternalAccountKeyByReference(context.Background(), provID, tc.ref); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -1074,7 +1076,7 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 				assert.Equals(t, eak.BoundAt, tc.eak.BoundAt)
 				assert.Equals(t, eak.CreatedAt, tc.eak.CreatedAt)
 				assert.Equals(t, eak.KeyBytes, tc.eak.KeyBytes)
-				assert.Equals(t, eak.Provisioner, tc.eak.Provisioner)
+				assert.Equals(t, eak.ProvisionerID, tc.eak.ProvisionerID)
 				assert.Equals(t, eak.Reference, tc.eak.Reference)
 			}
 		})
@@ -1085,7 +1087,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 	keyID1 := "keyID1"
 	keyID2 := "keyID2"
 	keyID3 := "keyID3"
-	prov := "acmeProv"
+	provID := "provID"
 	ref := "ref"
 	type test struct {
 		db      nosql.DB
@@ -1097,105 +1099,147 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			now := clock.Now()
 			dbeak1 := &dbExternalAccountKey{
-				ID:          keyID1,
-				Provisioner: prov,
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID1,
+				ProvisionerID: provID,
+				Reference:     ref,
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			b1, err := json.Marshal(dbeak1)
 			assert.FatalError(t, err)
 			dbeak2 := &dbExternalAccountKey{
-				ID:          keyID2,
-				Provisioner: prov,
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID2,
+				ProvisionerID: provID,
+				Reference:     ref,
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			b2, err := json.Marshal(dbeak2)
 			assert.FatalError(t, err)
 			dbeak3 := &dbExternalAccountKey{
-				ID:          keyID3,
-				Provisioner: "differentProvisioner",
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID3,
+				ProvisionerID: "aDifferentProvID",
+				Reference:     ref,
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			b3, err := json.Marshal(dbeak3)
 			assert.FatalError(t, err)
 			return test{
 				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(externalAccountKeysByProvisionerIDTable):
+							keys := []string{keyID1, keyID2}
+							b, err := json.Marshal(keys)
+							assert.FatalError(t, err)
+							return b, nil
+						case string(externalAccountKeyTable):
+							switch string(key) {
+							case keyID1:
+								return b1, nil
+							case keyID2:
+								return b2, nil
+							default:
+								assert.FatalError(t, errors.Errorf("unexpected key %s", string(key)))
+								return nil, errors.New("force")
+							}
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, errors.New("force")
+						}
+					},
+					// TODO: remove the MList
 					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
-						assert.Equals(t, bucket, externalAccountKeyTable)
-						return []*nosqldb.Entry{
-							{
-								Bucket: bucket,
-								Key:    []byte(keyID1),
-								Value:  b1,
-							},
-							{
-								Bucket: bucket,
-								Key:    []byte(keyID2),
-								Value:  b2,
-							},
-							{
-								Bucket: bucket,
-								Key:    []byte(keyID3),
-								Value:  b3,
-							},
-						}, nil
+						switch string(bucket) {
+						case string(externalAccountKeyTable):
+							return []*nosqldb.Entry{
+								{
+									Bucket: bucket,
+									Key:    []byte(keyID1),
+									Value:  b1,
+								},
+								{
+									Bucket: bucket,
+									Key:    []byte(keyID2),
+									Value:  b2,
+								},
+								{
+									Bucket: bucket,
+									Key:    []byte(keyID3),
+									Value:  b3,
+								},
+							}, nil
+						case string(externalAccountKeysByProvisionerIDTable):
+							keys := []string{keyID1, keyID2}
+							b, err := json.Marshal(keys)
+							assert.FatalError(t, err)
+							return []*nosqldb.Entry{
+								{
+									Bucket: bucket,
+									Key:    []byte(provID),
+									Value:  b,
+								},
+							}, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, errors.New("force default")
+						}
 					},
 				},
 				eaks: []*acme.ExternalAccountKey{
 					{
-						ID:          keyID1,
-						Provisioner: prov,
-						Reference:   ref,
-						AccountID:   "",
-						KeyBytes:    []byte{1, 3, 3, 7},
-						CreatedAt:   now,
+						ID:            keyID1,
+						ProvisionerID: provID,
+						Reference:     ref,
+						AccountID:     "",
+						KeyBytes:      []byte{1, 3, 3, 7},
+						CreatedAt:     now,
 					},
 					{
-						ID:          keyID2,
-						Provisioner: prov,
-						Reference:   ref,
-						AccountID:   "",
-						KeyBytes:    []byte{1, 3, 3, 7},
-						CreatedAt:   now,
+						ID:            keyID2,
+						ProvisionerID: provID,
+						Reference:     ref,
+						AccountID:     "",
+						KeyBytes:      []byte{1, 3, 3, 7},
+						CreatedAt:     now,
 					},
 				},
 			}
 		},
-		"fail/db.List-error": func(t *testing.T) test {
+		"fail/db.Get-externalAccountKeysByProvisionerIDTable": func(t *testing.T) test {
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
-						assert.Equals(t, string(bucket), string(externalAccountKeyTable))
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						assert.Equals(t, string(bucket), string(externalAccountKeysByProvisionerIDTable))
 						return nil, errors.New("force")
 					},
 				},
-				err: errors.New("force"),
+				err: errors.New("error loading ACME EAB Key IDs for provisioner provID: force"),
 			}
 		},
-		"fail/unmarshal-error": func(t *testing.T) test {
+		"fail/db.getDBExternalAccountKey": func(t *testing.T) test {
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
-						assert.Equals(t, bucket, externalAccountKeyTable)
-						return []*nosqldb.Entry{
-							{
-								Bucket: bucket,
-								Key:    []byte(keyID1),
-								Value:  []byte("foo"),
-							},
-						}, nil
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						switch string(bucket) {
+						case string(externalAccountKeysByProvisionerIDTable):
+							keys := []string{keyID1, keyID2}
+							b, err := json.Marshal(keys)
+							assert.FatalError(t, err)
+							return b, nil
+						case string(externalAccountKeyTable):
+							return nil, errors.New("force")
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, errors.New("force bucket")
+						}
 					},
 				},
-				eaks: []*acme.ExternalAccountKey{},
-				err:  errors.Errorf("error unmarshaling external account key %s into ExternalAccountKey", keyID1),
+				err: errors.New("error retrieving ACME EAB Key for provisioner provID and keyID keyID1: error loading external account key keyID1: force"),
 			}
 		},
 	}
@@ -1203,7 +1247,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
-			if eaks, err := d.GetExternalAccountKeys(context.Background(), prov); err != nil {
+			if eaks, err := d.GetExternalAccountKeys(context.Background(), provID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -1215,7 +1259,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 					}
 				default:
 					if assert.NotNil(t, tc.err) {
-						assert.HasPrefix(t, err.Error(), tc.err.Error())
+						assert.Equals(t, tc.err.Error(), err.Error())
 					}
 				}
 			} else if assert.Nil(t, tc.err) {
@@ -1223,7 +1267,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 				for i, eak := range eaks {
 					assert.Equals(t, eak.ID, tc.eaks[i].ID)
 					assert.Equals(t, eak.KeyBytes, tc.eaks[i].KeyBytes)
-					assert.Equals(t, eak.Provisioner, tc.eaks[i].Provisioner)
+					assert.Equals(t, eak.ProvisionerID, tc.eaks[i].ProvisionerID)
 					assert.Equals(t, eak.Reference, tc.eaks[i].Reference)
 					assert.Equals(t, eak.CreatedAt, tc.eaks[i].CreatedAt)
 					assert.Equals(t, eak.AccountID, tc.eaks[i].AccountID)
@@ -1236,7 +1280,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 
 func TestDB_DeleteExternalAccountKey(t *testing.T) {
 	keyID := "keyID"
-	prov := "acmeProv"
+	provID := "provID"
 	ref := "ref"
 	type test struct {
 		db      nosql.DB
@@ -1247,12 +1291,12 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			now := clock.Now()
 			dbeak := &dbExternalAccountKey{
-				ID:          keyID,
-				Provisioner: prov,
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID,
+				ProvisionerID: provID,
+				Reference:     ref,
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			dbref := &dbExternalAccountKeyReference{
 				Reference:            ref,
@@ -1267,27 +1311,46 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 					MGet: func(bucket, key []byte) ([]byte, error) {
 						switch string(bucket) {
 						case string(externalAccountKeysByReferenceTable):
-							assert.Equals(t, string(key), ref)
+							assert.Equals(t, string(key), provID+"."+ref)
 							return dbrefBytes, nil
 						case string(externalAccountKeyTable):
 							assert.Equals(t, string(key), keyID)
 							return b, nil
+						case string(externalAccountKeysByProvisionerIDTable):
+							assert.Equals(t, provID, string(key))
+							b, err := json.Marshal([]string{keyID})
+							assert.FatalError(t, err)
+							return b, nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
-							return nil, errors.New("force")
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, errors.New("force default")
 						}
 					},
 					MDel: func(bucket, key []byte) error {
 						switch string(bucket) {
 						case string(externalAccountKeysByReferenceTable):
-							assert.Equals(t, string(key), ref)
+							assert.Equals(t, string(key), provID+"."+ref)
 							return nil
 						case string(externalAccountKeyTable):
 							assert.Equals(t, string(key), keyID)
 							return nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
-							return errors.New("force")
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return errors.New("force default")
+						}
+					},
+					MCmpAndSwap: func(bucket, key, old, new []byte) ([]byte, bool, error) {
+						fmt.Println(string(bucket))
+						switch string(bucket) {
+						case string(externalAccountKeysByReferenceTable):
+							assert.Equals(t, provID+"."+ref, string(key))
+							return nil, true, nil
+						case string(externalAccountKeysByProvisionerIDTable):
+							assert.Equals(t, provID, string(key))
+							return nil, true, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, false, errors.New("force default")
 						}
 					},
 				},
@@ -1302,18 +1365,18 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 						return nil, nosqldb.ErrNotFound
 					},
 				},
-				err: errors.New("error loading ACME EAB Key with Key ID keyID"),
+				err: errors.New("error loading ACME EAB Key with Key ID keyID: not found"),
 			}
 		},
 		"fail/non-matching-provisioner": func(t *testing.T) test {
 			now := clock.Now()
 			dbeak := &dbExternalAccountKey{
-				ID:          keyID,
-				Provisioner: "differentProvisioner",
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID,
+				ProvisionerID: "aDifferentProvID",
+				Reference:     ref,
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			b, err := json.Marshal(dbeak)
 			assert.FatalError(t, err)
@@ -1325,18 +1388,18 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 						return b, nil
 					},
 				},
-				err: errors.New("name of provisioner does not match provisioner for which the EAB key was created"),
+				err: errors.New("provisioner does not match provisioner for which the EAB key was created"),
 			}
 		},
 		"fail/delete-reference": func(t *testing.T) test {
 			now := clock.Now()
 			dbeak := &dbExternalAccountKey{
-				ID:          keyID,
-				Provisioner: prov,
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID,
+				ProvisionerID: provID,
+				Reference:     ref,
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			dbref := &dbExternalAccountKeyReference{
 				Reference:            ref,
@@ -1357,36 +1420,36 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 							assert.Equals(t, string(key), keyID)
 							return b, nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
-							return nil, errors.New("force")
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, errors.New("force default")
 						}
 					},
 					MDel: func(bucket, key []byte) error {
 						switch string(bucket) {
 						case string(externalAccountKeysByReferenceTable):
-							assert.Equals(t, string(key), ref)
+							assert.Equals(t, string(key), provID+"."+ref)
 							return errors.New("force")
 						case string(externalAccountKeyTable):
 							assert.Equals(t, string(key), keyID)
 							return nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
-							return errors.New("force")
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return errors.New("force default")
 						}
 					},
 				},
-				err: errors.New("error deleting ACME EAB Key Reference with Key ID keyID and reference ref"),
+				err: errors.New("error deleting ACME EAB Key reference with Key ID keyID and reference ref: force"),
 			}
 		},
 		"fail/delete-eak": func(t *testing.T) test {
 			now := clock.Now()
 			dbeak := &dbExternalAccountKey{
-				ID:          keyID,
-				Provisioner: prov,
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID,
+				ProvisionerID: provID,
+				Reference:     ref,
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			dbref := &dbExternalAccountKeyReference{
 				Reference:            ref,
@@ -1407,25 +1470,25 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 							assert.Equals(t, string(key), keyID)
 							return b, nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, errors.New("force")
 						}
 					},
 					MDel: func(bucket, key []byte) error {
 						switch string(bucket) {
 						case string(externalAccountKeysByReferenceTable):
-							assert.Equals(t, string(key), ref)
+							assert.Equals(t, string(key), provID+"."+ref)
 							return nil
 						case string(externalAccountKeyTable):
 							assert.Equals(t, string(key), keyID)
 							return errors.New("force")
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return errors.New("force")
 						}
 					},
 				},
-				err: errors.New("error deleting ACME EAB Key with Key ID keyID"),
+				err: errors.New("error deleting ACME EAB Key with Key ID keyID: force"),
 			}
 		},
 	}
@@ -1433,7 +1496,7 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
-			if err := d.DeleteExternalAccountKey(context.Background(), prov, keyID); err != nil {
+			if err := d.DeleteExternalAccountKey(context.Background(), provID, keyID); err != nil {
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -1445,7 +1508,7 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 					}
 				default:
 					if assert.NotNil(t, tc.err) {
-						assert.HasPrefix(t, err.Error(), tc.err.Error())
+						assert.Equals(t, err.Error(), tc.err.Error())
 					}
 				}
 			} else {
@@ -1457,7 +1520,7 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 
 func TestDB_CreateExternalAccountKey(t *testing.T) {
 	keyID := "keyID"
-	prov := "acmeProv"
+	provID := "provID"
 	ref := "ref"
 	type test struct {
 		db  nosql.DB
@@ -1473,30 +1536,38 @@ func TestDB_CreateExternalAccountKey(t *testing.T) {
 			)
 			now := clock.Now()
 			eak := &acme.ExternalAccountKey{
-				ID:          keyID,
-				Provisioner: prov,
-				Reference:   "ref",
-				AccountID:   "",
-				CreatedAt:   now,
+				ID:            keyID,
+				ProvisionerID: provID,
+				Reference:     "ref",
+				AccountID:     "",
+				CreatedAt:     now,
 			}
 			return test{
 				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						assert.Equals(t, string(bucket), string(externalAccountKeysByProvisionerIDTable))
+						assert.Equals(t, provID, string(key))
+						b, _ := json.Marshal([]string{})
+						return b, nil
+					},
 					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
-
 						switch string(bucket) {
+						case string(externalAccountKeysByProvisionerIDTable):
+							assert.Equals(t, provID, string(key))
+							return nu, true, nil
 						case string(externalAccountKeysByReferenceTable):
-							assert.Equals(t, string(key), ref)
-							assert.Equals(t, old, nil)
+							assert.Equals(t, provID+"."+ref, string(key))
+							assert.Equals(t, nil, old)
 							return nu, true, nil
 						case string(externalAccountKeyTable):
-							assert.Equals(t, old, nil)
+							assert.Equals(t, nil, old)
 
 							id = string(key)
 
 							dbeak := new(dbExternalAccountKey)
 							assert.FatalError(t, json.Unmarshal(nu, dbeak))
 							assert.Equals(t, string(key), dbeak.ID)
-							assert.Equals(t, eak.Provisioner, dbeak.Provisioner)
+							assert.Equals(t, eak.ProvisionerID, dbeak.ProvisionerID)
 							assert.Equals(t, eak.Reference, dbeak.Reference)
 							assert.Equals(t, 32, len(dbeak.KeyBytes))
 							assert.False(t, dbeak.CreatedAt.IsZero())
@@ -1504,8 +1575,8 @@ func TestDB_CreateExternalAccountKey(t *testing.T) {
 							assert.True(t, dbeak.BoundAt.IsZero())
 							return nu, true, nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
-							return nil, false, errors.New("force")
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
+							return nil, false, errors.New("force default")
 						}
 					},
 				},
@@ -1527,34 +1598,42 @@ func TestDB_CreateExternalAccountKey(t *testing.T) {
 							assert.Equals(t, old, nil)
 							return nu, true, errors.New("force")
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, false, errors.New("force")
 						}
 					},
 				},
-				err: errors.New("error saving acme external_account_key"),
+				err: errors.New("error saving acme external_account_key: force"),
 			}
 		},
 		"fail/externalAccountKeyReference-cmpAndSwap-error": func(t *testing.T) test {
 			return test{
 				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						assert.Equals(t, string(bucket), string(externalAccountKeysByProvisionerIDTable))
+						assert.Equals(t, provID, string(key))
+						b, _ := json.Marshal([]string{})
+						return b, nil
+					},
 					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
-
 						switch string(bucket) {
+						case string(externalAccountKeysByProvisionerIDTable):
+							assert.Equals(t, provID, string(key))
+							return nu, true, nil
 						case string(externalAccountKeysByReferenceTable):
-							assert.Equals(t, string(key), ref)
+							assert.Equals(t, provID+"."+ref, string(key))
 							assert.Equals(t, old, nil)
 							return nu, true, errors.New("force")
 						case string(externalAccountKeyTable):
 							assert.Equals(t, old, nil)
 							return nu, true, nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, false, errors.New("force")
 						}
 					},
 				},
-				err: errors.New("error saving acme external_account_key"),
+				err: errors.New("error saving acme external_account_key_reference: force"),
 			}
 		},
 	}
@@ -1562,14 +1641,15 @@ func TestDB_CreateExternalAccountKey(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
-			eak, err := d.CreateExternalAccountKey(context.Background(), prov, ref)
+			eak, err := d.CreateExternalAccountKey(context.Background(), provID, ref)
+			fmt.Println(name, err)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					assert.HasPrefix(t, err.Error(), tc.err.Error())
+					assert.Equals(t, err.Error(), tc.err.Error())
 				}
 			} else if assert.Nil(t, tc.err) {
 				assert.Equals(t, *tc._id, eak.ID)
-				assert.Equals(t, prov, eak.Provisioner)
+				assert.Equals(t, provID, eak.ProvisionerID)
 				assert.Equals(t, ref, eak.Reference)
 				assert.Equals(t, "", eak.AccountID)
 				assert.False(t, eak.CreatedAt.IsZero())
@@ -1582,16 +1662,16 @@ func TestDB_CreateExternalAccountKey(t *testing.T) {
 
 func TestDB_UpdateExternalAccountKey(t *testing.T) {
 	keyID := "keyID"
-	prov := "acmeProv"
+	provID := "provID"
 	ref := "ref"
 	now := clock.Now()
 	dbeak := &dbExternalAccountKey{
-		ID:          keyID,
-		Provisioner: prov,
-		Reference:   ref,
-		AccountID:   "",
-		KeyBytes:    []byte{1, 3, 3, 7},
-		CreatedAt:   now,
+		ID:            keyID,
+		ProvisionerID: provID,
+		Reference:     ref,
+		AccountID:     "",
+		KeyBytes:      []byte{1, 3, 3, 7},
+		CreatedAt:     now,
 	}
 	b, err := json.Marshal(dbeak)
 	assert.FatalError(t, err)
@@ -1604,12 +1684,12 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 
 		"ok": func(t *testing.T) test {
 			eak := &acme.ExternalAccountKey{
-				ID:          keyID,
-				Provisioner: prov,
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID,
+				ProvisionerID: provID,
+				Reference:     ref,
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			return test{
 				eak: eak,
@@ -1627,7 +1707,7 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 						dbNew := new(dbExternalAccountKey)
 						assert.FatalError(t, json.Unmarshal(nu, dbNew))
 						assert.Equals(t, dbNew.ID, dbeak.ID)
-						assert.Equals(t, dbNew.Provisioner, dbeak.Provisioner)
+						assert.Equals(t, dbNew.ProvisionerID, dbeak.ProvisionerID)
 						assert.Equals(t, dbNew.Reference, dbeak.Reference)
 						assert.Equals(t, dbNew.AccountID, dbeak.AccountID)
 						assert.Equals(t, dbNew.CreatedAt, dbeak.CreatedAt)
@@ -1640,12 +1720,12 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 		},
 		"fail/provisioner-mismatch": func(t *testing.T) test {
 			newDBEAK := &dbExternalAccountKey{
-				ID:          keyID,
-				Provisioner: "differentProvisioner",
-				Reference:   ref,
-				AccountID:   "",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				CreatedAt:   now,
+				ID:            keyID,
+				ProvisionerID: "aDifferentProvID",
+				Reference:     ref,
+				AccountID:     "",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     now,
 			}
 			b, err := json.Marshal(newDBEAK)
 			assert.FatalError(t, err)
@@ -1661,7 +1741,7 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 						return b, nil
 					},
 				},
-				err: errors.New("name of provisioner does not match provisioner for which the EAB key was created"),
+				err: errors.New("provisioner does not match provisioner for which the EAB key was created"),
 			}
 		},
 		"fail/db.Get-error": func(t *testing.T) test {
@@ -1685,13 +1765,13 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
-			if err := d.UpdateExternalAccountKey(context.Background(), prov, tc.eak); err != nil {
+			if err := d.UpdateExternalAccountKey(context.Background(), provID, tc.eak); err != nil {
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else if assert.Nil(t, tc.err) {
 				assert.Equals(t, dbeak.ID, tc.eak.ID)
-				assert.Equals(t, dbeak.Provisioner, tc.eak.Provisioner)
+				assert.Equals(t, dbeak.ProvisionerID, tc.eak.ProvisionerID)
 				assert.Equals(t, dbeak.Reference, tc.eak.Reference)
 				assert.Equals(t, dbeak.AccountID, tc.eak.AccountID)
 				assert.Equals(t, dbeak.CreatedAt, tc.eak.CreatedAt)

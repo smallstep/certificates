@@ -15,6 +15,11 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+const (
+	// provisionerContextKey provisioner key
+	provisionerContextKey = ContextKey("provisioner")
+)
+
 // CreateExternalAccountKeyRequest is the type for POST /admin/acme/eab requests
 type CreateExternalAccountKeyRequest struct {
 	Reference string `json:"reference"`
@@ -37,47 +42,63 @@ type GetExternalAccountKeysResponse struct {
 // before serving requests that act on ACME EAB credentials.
 func (h *Handler) requireEABEnabled(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		prov := chi.URLParam(r, "prov")
-		eabEnabled, err := h.provisionerHasEABEnabled(r.Context(), prov)
+		ctx := r.Context()
+		provName := chi.URLParam(r, "prov")
+		eabEnabled, prov, err := h.provisionerHasEABEnabled(ctx, provName)
 		if err != nil {
 			api.WriteError(w, err)
 			return
 		}
 		if !eabEnabled {
-			api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", prov))
+			api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", prov.GetName()))
 			return
 		}
-		next(w, r)
+		ctx = context.WithValue(ctx, provisionerContextKey, prov)
+		next(w, r.WithContext(ctx))
 	}
 }
 
 // provisionerHasEABEnabled determines if the "requireEAB" setting for an ACME
 // provisioner is set to true and thus has EAB enabled.
-func (h *Handler) provisionerHasEABEnabled(ctx context.Context, provisionerName string) (bool, error) {
+func (h *Handler) provisionerHasEABEnabled(ctx context.Context, provisionerName string) (bool, *linkedca.Provisioner, error) {
 	var (
 		p   provisioner.Interface
 		err error
 	)
 	if p, err = h.auth.LoadProvisionerByName(provisionerName); err != nil {
-		return false, admin.WrapErrorISE(err, "error loading provisioner %s", provisionerName)
+		return false, nil, admin.WrapErrorISE(err, "error loading provisioner %s", provisionerName)
 	}
 
 	prov, err := h.db.GetProvisioner(ctx, p.GetID())
 	if err != nil {
-		return false, admin.WrapErrorISE(err, "error getting provisioner with ID: %s", p.GetID())
+		return false, nil, admin.WrapErrorISE(err, "error getting provisioner with ID: %s", p.GetID())
 	}
 
 	details := prov.GetDetails()
 	if details == nil {
-		return false, admin.NewErrorISE("error getting details for provisioner with ID: %s", p.GetID())
+		return false, nil, admin.NewErrorISE("error getting details for provisioner with ID: %s", p.GetID())
 	}
 
 	acmeProvisioner := details.GetACME()
 	if acmeProvisioner == nil {
-		return false, admin.NewErrorISE("error getting ACME details for provisioner with ID: %s", p.GetID())
+		return false, nil, admin.NewErrorISE("error getting ACME details for provisioner with ID: %s", p.GetID())
 	}
 
-	return acmeProvisioner.GetRequireEab(), nil
+	return acmeProvisioner.GetRequireEab(), prov, nil
+}
+
+// provisionerFromContext searches the context for a provisioner. Returns the
+// provisioner or an error.
+func provisionerFromContext(ctx context.Context) (*linkedca.Provisioner, error) {
+	val := ctx.Value(provisionerContextKey)
+	if val == nil {
+		return nil, admin.NewErrorISE("provisioner expected in request context")
+	}
+	pval, ok := val.(*linkedca.Provisioner)
+	if !ok || pval == nil {
+		return nil, admin.NewErrorISE("provisioner in context is not a linkedca.Provisioner")
+	}
+	return pval, nil
 }
 
 // CreateExternalAccountKey creates a new External Account Binding key
@@ -93,12 +114,17 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	prov := chi.URLParam(r, "prov")
-	reference := body.Reference
+	ctx := r.Context()
+	prov, err := provisionerFromContext(ctx)
+	if err != nil {
+		api.WriteError(w, admin.WrapErrorISE(err, "error getting provisioner from context"))
+		return
+	}
 
 	// check if a key with the reference does not exist (only when a reference was in the request)
+	reference := body.Reference
 	if reference != "" {
-		k, err := h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference)
+		k, err := h.acmeDB.GetExternalAccountKeyByReference(ctx, prov.GetId(), reference)
 		// retrieving an EAB key from DB results in an error if it doesn't exist, which is what we're looking for,
 		// but other errors can also happen. Return early if that happens; continuing if it was acme.ErrNotFound.
 		if shouldWriteError := err != nil && !errors.Is(err, acme.ErrNotFound); shouldWriteError {
@@ -107,7 +133,7 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 		}
 		// if a key was found, return HTTP 409 conflict
 		if k != nil {
-			err := admin.NewError(admin.ErrorBadRequestType, "an ACME EAB key for provisioner %s with reference %s already exists", prov, reference)
+			err := admin.NewError(admin.ErrorBadRequestType, "an ACME EAB key for provisioner '%s' with reference '%s' already exists", prov.GetName(), reference)
 			err.Status = 409
 			api.WriteError(w, err)
 			return
@@ -115,9 +141,9 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 		// continue execution if no key was found for the reference
 	}
 
-	eak, err := h.acmeDB.CreateExternalAccountKey(r.Context(), prov, reference)
+	eak, err := h.acmeDB.CreateExternalAccountKey(ctx, prov.GetId(), reference)
 	if err != nil {
-		msg := fmt.Sprintf("error creating ACME EAB key for provisioner '%s'", prov)
+		msg := fmt.Sprintf("error creating ACME EAB key for provisioner '%s'", prov.GetName())
 		if reference != "" {
 			msg += fmt.Sprintf(" and reference '%s'", reference)
 		}
@@ -128,7 +154,7 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 	response := &linkedca.EABKey{
 		Id:          eak.ID,
 		HmacKey:     eak.KeyBytes,
-		Provisioner: eak.Provisioner,
+		Provisioner: prov.GetName(),
 		Reference:   eak.Reference,
 	}
 
@@ -137,10 +163,17 @@ func (h *Handler) CreateExternalAccountKey(w http.ResponseWriter, r *http.Reques
 
 // DeleteExternalAccountKey deletes an ACME External Account Key.
 func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Request) {
-	prov := chi.URLParam(r, "prov")
+
 	keyID := chi.URLParam(r, "id")
 
-	if err := h.acmeDB.DeleteExternalAccountKey(r.Context(), prov, keyID); err != nil {
+	ctx := r.Context()
+	prov, err := provisionerFromContext(ctx)
+	if err != nil {
+		api.WriteError(w, admin.WrapErrorISE(err, "error getting provisioner from context"))
+		return
+	}
+
+	if err := h.acmeDB.DeleteExternalAccountKey(ctx, prov.GetId(), keyID); err != nil {
 		api.WriteError(w, admin.WrapErrorISE(err, "error deleting ACME EAB Key '%s'", keyID))
 		return
 	}
@@ -152,8 +185,6 @@ func (h *Handler) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Reques
 // only the ExternalAccountKey with that reference is returned. Otherwise all
 // ExternalAccountKeys in the system for a specific provisioner are returned.
 func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request) {
-	prov := chi.URLParam(r, "prov")
-	reference := chi.URLParam(r, "ref")
 
 	var (
 		key  *acme.ExternalAccountKey
@@ -161,8 +192,16 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 		err  error
 	)
 
+	ctx := r.Context()
+	prov, err := provisionerFromContext(ctx)
+	if err != nil {
+		api.WriteError(w, admin.WrapErrorISE(err, "error getting provisioner from context"))
+		return
+	}
+
+	reference := chi.URLParam(r, "ref")
 	if reference != "" {
-		if key, err = h.acmeDB.GetExternalAccountKeyByReference(r.Context(), prov, reference); err != nil {
+		if key, err = h.acmeDB.GetExternalAccountKeyByReference(ctx, prov.GetId(), reference); err != nil {
 			api.WriteError(w, admin.WrapErrorISE(err, "error retrieving external account key with reference '%s'", reference))
 			return
 		}
@@ -170,18 +209,19 @@ func (h *Handler) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request)
 			keys = []*acme.ExternalAccountKey{key}
 		}
 	} else {
-		if keys, err = h.acmeDB.GetExternalAccountKeys(r.Context(), prov); err != nil {
+		if keys, err = h.acmeDB.GetExternalAccountKeys(ctx, prov.GetId()); err != nil {
 			api.WriteError(w, admin.WrapErrorISE(err, "error retrieving external account keys"))
 			return
 		}
 	}
 
+	provisionerName := prov.GetName()
 	eaks := make([]*linkedca.EABKey, len(keys))
 	for i, k := range keys {
 		eaks[i] = &linkedca.EABKey{
 			Id:          k.ID,
 			HmacKey:     []byte{},
-			Provisioner: k.Provisioner,
+			Provisioner: provisionerName,
 			Reference:   k.Reference,
 			Account:     k.AccountID,
 			CreatedAt:   timestamppb.New(k.CreatedAt),

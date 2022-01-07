@@ -144,7 +144,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 				api.WriteError(w, err)
 				return
 			}
-			if err := h.db.UpdateExternalAccountKey(ctx, prov.Name, eak); err != nil {
+			if err := h.db.UpdateExternalAccountKey(ctx, prov.ID, eak); err != nil {
 				api.WriteError(w, acme.WrapErrorISE(err, "error updating external account binding key"))
 				return
 			}
@@ -274,7 +274,7 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 		return nil, acmeErr
 	}
 
-	externalAccountKey, err := h.db.GetExternalAccountKey(ctx, acmeProv.Name, keyID)
+	externalAccountKey, err := h.db.GetExternalAccountKey(ctx, acmeProv.ID, keyID)
 	if err != nil {
 		if _, ok := err.(*acme.Error); ok {
 			return nil, acme.WrapError(acme.ErrorUnauthorizedType, err, "the field 'kid' references an unknown key")

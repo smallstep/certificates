@@ -92,10 +92,10 @@ func TestExternalAccountKey_BindTo(t *testing.T) {
 		{
 			name: "ok",
 			eak: &ExternalAccountKey{
-				ID:          "eakID",
-				Provisioner: "prov",
-				Reference:   "ref",
-				KeyBytes:    []byte{1, 3, 3, 7},
+				ID:            "eakID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				KeyBytes:      []byte{1, 3, 3, 7},
 			},
 			acct: &Account{
 				ID: "accountID",
@@ -105,12 +105,12 @@ func TestExternalAccountKey_BindTo(t *testing.T) {
 		{
 			name: "fail/already-bound",
 			eak: &ExternalAccountKey{
-				ID:          "eakID",
-				Provisioner: "prov",
-				Reference:   "ref",
-				KeyBytes:    []byte{1, 3, 3, 7},
-				AccountID:   "someAccountID",
-				BoundAt:     boundAt,
+				ID:            "eakID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				AccountID:     "someAccountID",
+				BoundAt:       boundAt,
 			},
 			acct: &Account{
 				ID: "accountID",

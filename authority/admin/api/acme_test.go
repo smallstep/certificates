@@ -368,12 +368,13 @@ func TestHandler_provisionerHasEABEnabled(t *testing.T) {
 				auth:   tc.auth,
 				acmeDB: nil,
 			}
-			got, err := h.provisionerHasEABEnabled(context.TODO(), tc.provisionerName)
+			got, prov, err := h.provisionerHasEABEnabled(context.TODO(), tc.provisionerName)
 			if (err != nil) != (tc.err != nil) {
 				t.Errorf("Handler.provisionerHasEABEnabled() error = %v, want err %v", err, tc.err)
 				return
 			}
 			if tc.err != nil {
+				assert.Type(t, &linkedca.Provisioner{}, prov)
 				assert.Type(t, &admin.Error{}, err)
 				adminError, _ := err.(*admin.Error)
 				assert.Equals(t, tc.err.Type, adminError.Type)
@@ -434,6 +435,10 @@ func TestCreateExternalAccountKeyRequest_Validate(t *testing.T) {
 }
 
 func TestHandler_CreateExternalAccountKey(t *testing.T) {
+	prov := &linkedca.Provisioner{
+		Id:   "provID",
+		Name: "provName",
+	}
 	type test struct {
 		ctx        context.Context
 		db         acme.DB
@@ -487,14 +492,15 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			req := CreateExternalAccountKeyRequest{
 				Reference: "an-external-key-reference",
 			}
 			body, err := json.Marshal(req)
 			assert.FatalError(t, err)
 			db := &acme.MockDB{
-				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "an-external-key-reference", reference)
 					return nil, errors.New("force")
 				},
@@ -517,22 +523,23 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			req := CreateExternalAccountKeyRequest{
 				Reference: "an-external-key-reference",
 			}
 			body, err := json.Marshal(req)
 			assert.FatalError(t, err)
 			db := &acme.MockDB{
-				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "an-external-key-reference", reference)
 					past := time.Now().Add(-24 * time.Hour)
 					return &acme.ExternalAccountKey{
-						ID:          "eakID",
-						Provisioner: "provName",
-						Reference:   "an-external-key-reference",
-						KeyBytes:    []byte{1, 3, 3, 7},
-						CreatedAt:   past,
+						ID:            "eakID",
+						ProvisionerID: "provID",
+						Reference:     "an-external-key-reference",
+						KeyBytes:      []byte{1, 3, 3, 7},
+						CreatedAt:     past,
 					}, nil
 				},
 			}
@@ -546,7 +553,7 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 					Type:    admin.ErrorBadRequestType.String(),
 					Status:  409,
 					Detail:  "bad request",
-					Message: "an ACME EAB key for provisioner provName with reference an-external-key-reference already exists",
+					Message: "an ACME EAB key for provisioner 'provName' with reference 'an-external-key-reference' already exists",
 				},
 			}
 		},
@@ -554,14 +561,15 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			req := CreateExternalAccountKeyRequest{
 				Reference: "",
 			}
 			body, err := json.Marshal(req)
 			assert.FatalError(t, err)
 			db := &acme.MockDB{
-				MockCreateExternalAccountKey: func(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockCreateExternalAccountKey: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "", reference)
 					return nil, errors.New("force")
 				},
@@ -583,19 +591,20 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			req := CreateExternalAccountKeyRequest{
 				Reference: "an-external-key-reference",
 			}
 			body, err := json.Marshal(req)
 			assert.FatalError(t, err)
 			db := &acme.MockDB{
-				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "an-external-key-reference", reference)
 					return nil, acme.ErrNotFound // simulating not found; skipping 409 conflict
 				},
-				MockCreateExternalAccountKey: func(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockCreateExternalAccountKey: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "an-external-key-reference", reference)
 					return nil, errors.New("force")
 				},
@@ -617,6 +626,7 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			req := CreateExternalAccountKeyRequest{
 				Reference: "",
 			}
@@ -624,15 +634,15 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 			assert.FatalError(t, err)
 			now := time.Now()
 			db := &acme.MockDB{
-				MockCreateExternalAccountKey: func(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockCreateExternalAccountKey: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "", reference)
 					return &acme.ExternalAccountKey{
-						ID:          "eakID",
-						Provisioner: "provName",
-						Reference:   "",
-						KeyBytes:    []byte{1, 3, 3, 7},
-						CreatedAt:   now,
+						ID:            "eakID",
+						ProvisionerID: "provID",
+						Reference:     "",
+						KeyBytes:      []byte{1, 3, 3, 7},
+						CreatedAt:     now,
 					}, nil
 				},
 			}
@@ -653,6 +663,7 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			req := CreateExternalAccountKeyRequest{
 				Reference: "an-external-key-reference",
 			}
@@ -660,20 +671,20 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 			assert.FatalError(t, err)
 			now := time.Now()
 			db := &acme.MockDB{
-				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "an-external-key-reference", reference)
 					return nil, acme.ErrNotFound // simulating not found; skipping 409 conflict
 				},
-				MockCreateExternalAccountKey: func(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockCreateExternalAccountKey: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "an-external-key-reference", reference)
 					return &acme.ExternalAccountKey{
-						ID:          "eakID",
-						Provisioner: "provName",
-						Reference:   "an-external-key-reference",
-						KeyBytes:    []byte{1, 3, 3, 7},
-						CreatedAt:   now,
+						ID:            "eakID",
+						ProvisionerID: "provID",
+						Reference:     "an-external-key-reference",
+						KeyBytes:      []byte{1, 3, 3, 7},
+						CreatedAt:     now,
 					}, nil
 				},
 			}
@@ -737,6 +748,10 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 }
 
 func TestHandler_DeleteExternalAccountKey(t *testing.T) {
+	prov := &linkedca.Provisioner{
+		Id:   "provID",
+		Name: "provName",
+	}
 	type test struct {
 		ctx        context.Context
 		db         acme.DB
@@ -749,9 +764,10 @@ func TestHandler_DeleteExternalAccountKey(t *testing.T) {
 			chiCtx.URLParams.Add("prov", "provName")
 			chiCtx.URLParams.Add("id", "keyID")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			db := &acme.MockDB{
-				MockDeleteExternalAccountKey: func(ctx context.Context, provisionerName, keyID string) error {
-					assert.Equals(t, "provName", provisionerName)
+				MockDeleteExternalAccountKey: func(ctx context.Context, provisionerID, keyID string) error {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "keyID", keyID)
 					return errors.New("force")
 				},
@@ -773,9 +789,10 @@ func TestHandler_DeleteExternalAccountKey(t *testing.T) {
 			chiCtx.URLParams.Add("prov", "provName")
 			chiCtx.URLParams.Add("id", "keyID")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			db := &acme.MockDB{
-				MockDeleteExternalAccountKey: func(ctx context.Context, provisionerName, keyID string) error {
-					assert.Equals(t, "provName", provisionerName)
+				MockDeleteExternalAccountKey: func(ctx context.Context, provisionerID, keyID string) error {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "keyID", keyID)
 					return nil
 				},
@@ -831,6 +848,10 @@ func TestHandler_DeleteExternalAccountKey(t *testing.T) {
 }
 
 func TestHandler_GetExternalAccountKeys(t *testing.T) {
+	prov := &linkedca.Provisioner{
+		Id:   "provID",
+		Name: "provName",
+	}
 	type test struct {
 		ctx        context.Context
 		db         acme.DB
@@ -846,9 +867,10 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			chiCtx.URLParams.Add("ref", "an-external-key-reference")
 			req := httptest.NewRequest("GET", "/foo", nil)
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			db := &acme.MockDB{
-				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "an-external-key-reference", reference)
 					return nil, errors.New("force")
 				},
@@ -871,9 +893,10 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			chiCtx.URLParams.Add("prov", "provName")
 			req := httptest.NewRequest("GET", "/foo", nil)
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			db := &acme.MockDB{
-				MockGetExternalAccountKeys: func(ctx context.Context, provisionerName string) ([]*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockGetExternalAccountKeys: func(ctx context.Context, provisionerID string) ([]*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					return nil, errors.New("force")
 				},
 			}
@@ -896,9 +919,10 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			chiCtx.URLParams.Add("ref", "an-external-key-reference")
 			req := httptest.NewRequest("GET", "/foo", nil)
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			db := &acme.MockDB{
-				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "an-external-key-reference", reference)
 					return nil, nil // returning nil; no key found
 				},
@@ -920,17 +944,18 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			chiCtx.URLParams.Add("ref", "an-external-key-reference")
 			req := httptest.NewRequest("GET", "/foo", nil)
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			createdAt := time.Now().Add(-24 * time.Hour)
 			var boundAt time.Time
 			db := &acme.MockDB{
-				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerName, reference string) (*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					assert.Equals(t, "an-external-key-reference", reference)
 					return &acme.ExternalAccountKey{
-						ID:          "eakID",
-						Provisioner: "provName",
-						Reference:   "an-external-key-reference",
-						CreatedAt:   createdAt,
+						ID:            "eakID",
+						ProvisionerID: "provID",
+						Reference:     "an-external-key-reference",
+						CreatedAt:     createdAt,
 					}, nil
 				},
 			}
@@ -958,107 +983,36 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			chiCtx.URLParams.Add("prov", "provName")
 			req := httptest.NewRequest("GET", "/foo", nil)
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
 			createdAt := time.Now().Add(-24 * time.Hour)
 			var boundAt time.Time
 			boundAtSet := time.Now().Add(-12 * time.Hour)
 			db := &acme.MockDB{
-				MockGetExternalAccountKeys: func(ctx context.Context, provisionerName string) ([]*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
+				MockGetExternalAccountKeys: func(ctx context.Context, provisionerID string) ([]*acme.ExternalAccountKey, error) {
+					assert.Equals(t, "provID", provisionerID)
 					return []*acme.ExternalAccountKey{
 						{
-							ID:          "eakID1",
-							Provisioner: "provName",
-							Reference:   "some-external-key-reference",
-							KeyBytes:    []byte{1, 3, 3, 7},
-							CreatedAt:   createdAt,
+							ID:            "eakID1",
+							ProvisionerID: "provID",
+							Reference:     "some-external-key-reference",
+							KeyBytes:      []byte{1, 3, 3, 7},
+							CreatedAt:     createdAt,
 						},
 						{
-							ID:          "eakID2",
-							Provisioner: "provName",
-							Reference:   "some-other-external-key-reference",
-							KeyBytes:    []byte{1, 3, 3, 7},
-							CreatedAt:   createdAt.Add(1 * time.Hour),
+							ID:            "eakID2",
+							ProvisionerID: "provID",
+							Reference:     "some-other-external-key-reference",
+							KeyBytes:      []byte{1, 3, 3, 7},
+							CreatedAt:     createdAt.Add(1 * time.Hour),
 						},
 						{
-							ID:          "eakID3",
-							Provisioner: "provName",
-							Reference:   "another-external-key-reference",
-							KeyBytes:    []byte{1, 3, 3, 7},
-							CreatedAt:   createdAt,
-							BoundAt:     boundAtSet,
-							AccountID:   "accountID",
-						},
-					}, nil
-				},
-			}
-			return test{
-				ctx:        ctx,
-				statusCode: 200,
-				req:        req,
-				resp: GetExternalAccountKeysResponse{
-					EAKs: []*linkedca.EABKey{
-						{
-							Id:          "eakID1",
-							Provisioner: "provName",
-							Reference:   "some-external-key-reference",
-							CreatedAt:   timestamppb.New(createdAt),
-							BoundAt:     timestamppb.New(boundAt),
-						},
-						{
-							Id:          "eakID2",
-							Provisioner: "provName",
-							Reference:   "some-other-external-key-reference",
-							CreatedAt:   timestamppb.New(createdAt.Add(1 * time.Hour)),
-							BoundAt:     timestamppb.New(boundAt),
-						},
-						{
-							Id:          "eakID3",
-							Provisioner: "provName",
-							Reference:   "another-external-key-reference",
-							CreatedAt:   timestamppb.New(createdAt),
-							BoundAt:     timestamppb.New(boundAtSet),
-							Account:     "accountID",
-						},
-					},
-				},
-				db:  db,
-				err: nil,
-			}
-		},
-		"ok/multiple-keys-with-cursor-and-limit": func(t *testing.T) test {
-			chiCtx := chi.NewRouteContext()
-			chiCtx.URLParams.Add("prov", "provName")
-			req := httptest.NewRequest("GET", "/foo?cursor=eakID1&limit=10", nil)
-			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			createdAt := time.Now().Add(-24 * time.Hour)
-			var boundAt time.Time
-			boundAtSet := time.Now().Add(-12 * time.Hour)
-			db := &acme.MockDB{
-				MockGetExternalAccountKeys: func(ctx context.Context, provisionerName string) ([]*acme.ExternalAccountKey, error) {
-					assert.Equals(t, "provName", provisionerName)
-					return []*acme.ExternalAccountKey{
-						{
-							ID:          "eakID1",
-							Provisioner: "provName",
-							Reference:   "some-external-key-reference",
-							KeyBytes:    []byte{1, 3, 3, 7},
-							CreatedAt:   createdAt,
-						},
-						{
-							ID:          "eakID2",
-							Provisioner: "provName",
-							Reference:   "some-other-external-key-reference",
-							KeyBytes:    []byte{1, 3, 3, 7},
-							CreatedAt:   createdAt.Add(1 * time.Hour),
-						},
-						{
-							ID:          "eakID3",
-							Provisioner: "provName",
-							Reference:   "another-external-key-reference",
-							KeyBytes:    []byte{1, 3, 3, 7},
-							CreatedAt:   createdAt,
-							BoundAt:     boundAtSet,
-							AccountID:   "accountID",
+							ID:            "eakID3",
+							ProvisionerID: "provID",
+							Reference:     "another-external-key-reference",
+							KeyBytes:      []byte{1, 3, 3, 7},
+							CreatedAt:     createdAt,
+							BoundAt:       boundAtSet,
+							AccountID:     "accountID",
 						},
 					}, nil
 				},
