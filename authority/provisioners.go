@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/json"
@@ -713,7 +714,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 	case *linkedca.ProvisionerDetails_Nebula:
 		var roots []byte
 		for i, root := range d.Nebula.GetRoots() {
-			if i > 0 {
+			if i > 0 && !bytes.HasSuffix(root, []byte{'\n'}) {
 				roots = append(roots, '\n')
 			}
 			roots = append(roots, root...)
