@@ -326,12 +326,12 @@ func (p *Nebula) authorizeToken(token string, audiences []string) (*nebula.Nebul
 		return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse nebula certificate: nebula header is not valid"))
 	}
 
-	// Validate nebula certificate against CA
+	// Validate nebula certificate against CAs
 	if valid, err := c.Verify(now(), p.caPool); !valid {
 		if err != nil {
-			return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("token is not valid: failed to unmarshal certificate"))
+			return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("token is not valid: failed to verify certificate against configured CA"))
 		}
-		return nil, nil, errs.Unauthorized("token is not valid: failed to unmarshal certificate")
+		return nil, nil, errs.Unauthorized("token is not valid: failed to verify certificate against configured CA")
 	}
 
 	var pub interface{}
