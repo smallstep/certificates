@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -122,6 +123,15 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		if _, ok := err.(*x509util.TemplateError); ok {
 			return nil, errs.ApplyOptions(
 				errs.BadRequestErr(err, err.Error()),
+				errs.WithKeyVal("csr", csr),
+				errs.WithKeyVal("signOptions", signOpts),
+			)
+		}
+		// explicitly check for unmarshaling errors, which are most probably caused by JSON template syntax errors
+		if strings.HasPrefix(err.Error(), "error unmarshaling certificate") {
+			msg := strings.TrimSpace(strings.TrimPrefix(err.Error(), "error unmarshaling certificate:"))
+			return nil, errs.ApplyOptions(
+				errs.InternalServer("authority.Sign: failed to apply certificate template: %s", msg),
 				errs.WithKeyVal("csr", csr),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
