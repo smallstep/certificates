@@ -396,7 +396,7 @@ ZYtQ9Ot36qc=
 				code:      http.StatusBadRequest,
 			}
 		},
-		"fail bad JSON template file": func(t *testing.T) *signTest {
+		"fail bad JSON syntax template file": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			testAuthority := testAuthority(t)
 			p, ok := testAuthority.provisioners.Load("step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
@@ -405,7 +405,7 @@ ZYtQ9Ot36qc=
 			}
 			p.(*provisioner.JWK).Options = &provisioner.Options{
 				X509: &provisioner.X509Options{
-					TemplateFile: "./testdata/templates/badjson.tpl",
+					TemplateFile: "./testdata/templates/badjsonsyntax.tpl",
 				},
 			}
 			testExtraOpts, err := testAuthority.Authorize(ctx, token)
@@ -421,7 +421,36 @@ ZYtQ9Ot36qc=
 				csr:       csr,
 				extraOpts: testExtraOpts,
 				signOpts:  signOpts,
-				err:       errors.New("error applying certificate template"),
+				err:       errors.New("error applying certificate template: invalid character"),
+				code:      http.StatusInternalServerError,
+			}
+		},
+		"fail bad JSON value template file": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			testAuthority := testAuthority(t)
+			p, ok := testAuthority.provisioners.Load("step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
+			if !ok {
+				t.Fatal("provisioner not found")
+			}
+			p.(*provisioner.JWK).Options = &provisioner.Options{
+				X509: &provisioner.X509Options{
+					TemplateFile: "./testdata/templates/badjsonvalue.tpl",
+				},
+			}
+			testExtraOpts, err := testAuthority.Authorize(ctx, token)
+			assert.FatalError(t, err)
+			testAuthority.db = &db.MockAuthDB{
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					return nil
+				},
+			}
+			return &signTest{
+				auth:      testAuthority,
+				csr:       csr,
+				extraOpts: testExtraOpts,
+				signOpts:  signOpts,
+				err:       errors.New("error applying certificate template: cannot unmarshal"),
 				code:      http.StatusInternalServerError,
 			}
 		},

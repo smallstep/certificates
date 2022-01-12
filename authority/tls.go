@@ -566,10 +566,17 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 // this to the error message.
 func templatingError(err error) error {
 	cause := errors.Cause(err)
-	var syntaxError *json.SyntaxError
+	var (
+		syntaxError *json.SyntaxError
+		typeError   *json.UnmarshalTypeError
+	)
 	if errors.As(err, &syntaxError) {
 		// offset is arguably not super clear to the user, but it's the best we can do here
 		cause = fmt.Errorf("%s at offset %d", cause.Error(), syntaxError.Offset)
+	}
+	if errors.As(err, &typeError) {
+		// slightly rewriting the default error message to include the offset
+		cause = fmt.Errorf("cannot unmarshal %s at offset %d into Go value of type %s", typeError.Value, typeError.Offset, typeError.Type)
 	}
 	return errors.Wrap(cause, "error applying certificate template")
 }
