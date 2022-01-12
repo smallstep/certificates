@@ -172,6 +172,14 @@ func TestAuthority_SignSSH(t *testing.T) {
 		SSH: &provisioner.SSHOptions{Template: `{{ fail "an error"}}`},
 	}, sshutil.CreateTemplateData(sshutil.UserCert, "key-id", []string{"user"}))
 	assert.FatalError(t, err)
+	userJSONSyntaxErrorTemplateFile, err := provisioner.TemplateSSHOptions(&provisioner.Options{
+		SSH: &provisioner.SSHOptions{TemplateFile: "./testdata/templates/badjsonsyntax.tpl"},
+	}, sshutil.CreateTemplateData(sshutil.UserCert, "key-id", []string{"user"}))
+	assert.FatalError(t, err)
+	userJSONValueErrorTemplateFile, err := provisioner.TemplateSSHOptions(&provisioner.Options{
+		SSH: &provisioner.SSHOptions{TemplateFile: "./testdata/templates/badjsonvalue.tpl"},
+	}, sshutil.CreateTemplateData(sshutil.UserCert, "key-id", []string{"user"}))
+	assert.FatalError(t, err)
 
 	now := time.Now()
 
@@ -222,6 +230,8 @@ func TestAuthority_SignSSH(t *testing.T) {
 		{"fail-no-host-key", fields{signer, nil}, args{pub, provisioner.SignSSHOptions{CertType: "host"}, []provisioner.SignOption{hostTemplate}}, want{}, true},
 		{"fail-bad-type", fields{signer, nil}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, sshTestModifier{CertType: 100}}}, want{}, true},
 		{"fail-custom-template", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userFailTemplate, userOptions}}, want{}, true},
+		{"fail-custom-template-syntax-error-file", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userJSONSyntaxErrorTemplateFile, userOptions}}, want{}, true},
+		{"fail-custom-template-syntax-value-file", fields{signer, signer}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userJSONValueErrorTemplateFile, userOptions}}, want{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
