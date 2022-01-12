@@ -978,6 +978,7 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 		}
 
 		if cfg.DB != nil {
+			os.MkdirAll(cfg.DB.DataSource, 0700)
 			ui.PrintSelected("Database folder", cfg.DB.DataSource)
 		}
 		if cfg.Templates != nil {
