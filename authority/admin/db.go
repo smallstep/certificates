@@ -44,6 +44,8 @@ func UnmarshalProvisionerDetails(typ linkedca.Provisioner_Type, data []byte) (*l
 		v.Data = new(linkedca.ProvisionerDetails_SSHPOP)
 	case linkedca.Provisioner_SCEP:
 		v.Data = new(linkedca.ProvisionerDetails_SCEP)
+	case linkedca.Provisioner_NEBULA:
+		v.Data = new(linkedca.ProvisionerDetails_Nebula)
 	default:
 		return nil, fmt.Errorf("unsupported provisioner type %s", typ)
 	}
