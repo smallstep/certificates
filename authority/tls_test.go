@@ -421,7 +421,7 @@ ZYtQ9Ot36qc=
 				csr:       csr,
 				extraOpts: testExtraOpts,
 				signOpts:  signOpts,
-				err:       errors.New("authority.Sign: failed to apply certificate template"),
+				err:       errors.New("error applying certificate template"),
 				code:      http.StatusInternalServerError,
 			}
 		},
