@@ -61,6 +61,9 @@ type Options struct {
 	CaPool     string `json:"-"`
 	CaPoolTier string `json:"-"`
 	GCSBucket  string `json:"-"`
+
+	// Generic structure to configure any CAS
+	Config map[string]interface{} `json:"config,omitempty"`
 }
 
 // CertificateIssuer contains the properties used to use the StepCAS certificate
