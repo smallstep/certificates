@@ -64,6 +64,7 @@ type Config struct {
 	TLS              *TLSOptions          `json:"tls,omitempty"`
 	Password         string               `json:"password,omitempty"`
 	Templates        *templates.Templates `json:"templates,omitempty"`
+	CommonName       string               `json:"commonName,omitempty"`
 }
 
 // ASN1DN contains ASN1.DN attributes that are used in Subject and Issuer
@@ -168,6 +169,9 @@ func (c *Config) Init() {
 	}
 	if c.AuthorityConfig == nil {
 		c.AuthorityConfig = &AuthConfig{}
+	}
+	if c.CommonName == "" {
+		c.CommonName = "Step Online CA"
 	}
 	c.AuthorityConfig.init()
 }
