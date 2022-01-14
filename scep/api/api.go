@@ -212,7 +212,7 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 // GetCACert returns the CA certificates in a SCEP response
 func (h *Handler) GetCACert(ctx context.Context) (SCEPResponse, error) {
 
-	certs, err := h.Auth.GetCACertificates()
+	certs, err := h.Auth.GetCACertificates(ctx)
 	if err != nil {
 		return SCEPResponse{}, err
 	}
@@ -289,20 +289,29 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 	// NOTE: at this point we have sufficient information for returning nicely signed CertReps
 	csr := msg.CSRReqMessage.CSR
 
-	if msg.MessageType == microscep.PKCSReq {
-
+	// NOTE: we're blocking the RenewalReq if the challenge does not match, because otherwise we don't have any authentication.
+	// The macOS SCEP client performs renewals using PKCSreq. The CertNanny SCEP client will use PKCSreq with challenge too, it seems,
+	// even if using the renewal flow as described in the README.md. MicroMDM SCEP client also only does PKCSreq by default, unless
+	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
+	// We'll have to see how it works out.
+	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
 		challengeMatches, err := h.Auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
 		if err != nil {
 			return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("error when checking password"))
 		}
-
 		if !challengeMatches {
 			// TODO: can this be returned safely to the client? In the end, if the password was correct, that gains a bit of info too.
 			return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("wrong password provided"))
 		}
 	}
 
-	// TODO: check if CN already exists, if renewal is allowed and if existing should be revoked; fail if not
+	// TODO: authorize renewal: we can authorize renewals with the challenge password (if reusable secrets are used).
+	// Renewals OPTIONALLY include the challenge if the existing cert is used as authentication, but client SHOULD omit the challenge.
+	// This means that for renewal requests we should check the certificate provided to be signed before by the CA. We could
+	// enforce use of the challenge if we want too. That way we could be more flexible in terms of authentication scheme (i.e. reusing
+	// tokens from other provisioners, calling a webhook, storing multiple secrets, allowing them to be multi-use, etc).
+	// Authentication by the (self-signed) certificate with an optional challenge is required; supporting renewals incl. verification
+	// of the client cert is not.
 
 	certRep, err := h.Auth.SignCSR(ctx, csr, msg)
 	if err != nil {

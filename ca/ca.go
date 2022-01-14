@@ -417,11 +417,6 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 		}
 	}
 
-	certPool := x509.NewCertPool()
-	for _, crt := range auth.GetRootCertificates() {
-		certPool.AddCert(crt)
-	}
-
 	// GetCertificate will only be called if the client supplies SNI
 	// information or if tlsConfig.Certificates is empty.
 	// When client requests are made using an IP address (as opposed to a domain
@@ -431,6 +426,23 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	// by which the server can find it's own leaf Certificate.
 	tlsConfig.Certificates = []tls.Certificate{}
 	tlsConfig.GetCertificate = ca.renewer.GetCertificateForCA
+
+	certPool := x509.NewCertPool()
+	for _, crt := range auth.GetRootCertificates() {
+		certPool.AddCert(crt)
+	}
+
+	// adding the intermediate CA to the pool will allow clients that
+	// fail to send the intermediate for chain building to connect to the CA
+	// successfully.
+	shouldAddIntermediateToClientCAPool := true // TODO(hs): make this into a configuration
+	if shouldAddIntermediateToClientCAPool {
+		cert, err := auth.GetIntermediateCertificate()
+		if err != nil {
+			return nil, err
+		}
+		certPool.AddCert(cert)
+	}
 
 	// Add support for mutual tls to renew certificates
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven

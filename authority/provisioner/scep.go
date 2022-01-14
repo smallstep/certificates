@@ -18,13 +18,20 @@ type SCEP struct {
 	ForceCN           bool     `json:"forceCN,omitempty"`
 	ChallengePassword string   `json:"challenge,omitempty"`
 	Capabilities      []string `json:"capabilities,omitempty"`
+	// IncludeRoots makes the provisioner return the CA root(s) in the GetCACerts response
+	IncludeRoots bool `json:"includeRoots,omitempty"`
 	// MinimumPublicKeyLength is the minimum length for public keys in CSRs
-	MinimumPublicKeyLength int      `json:"minimumPublicKeyLength,omitempty"`
-	Options                *Options `json:"options,omitempty"`
-	Claims                 *Claims  `json:"claims,omitempty"`
-	claimer                *Claimer
+	MinimumPublicKeyLength int `json:"minimumPublicKeyLength,omitempty"`
+	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
+	// at https://github.com/mozilla-services/pkcs7/blob/33d05740a3526e382af6395d3513e73d4e66d1cb/encrypt.go#L63
+	// Defaults to 2, being AES-256-CBC
+	EncryptionAlgorithmIdentifier *int     `json:"encryptionAlgorithmIdentifier,omitempty"`
+	Options                       *Options `json:"options,omitempty"`
+	Claims                        *Claims  `json:"claims,omitempty"`
+	claimer                       *Claimer
 
 	secretChallengePassword string
+	encryptionAlgorithm     int
 }
 
 // GetID returns the provisioner unique identifier.
@@ -100,6 +107,15 @@ func (s *SCEP) Init(config Config) (err error) {
 		return errors.Errorf("only minimum public keys exactly divisible by 8 are supported; %d is not exactly divisible by 8", s.MinimumPublicKeyLength)
 	}
 
+	s.encryptionAlgorithm = 2 // default to AES-256-CBC
+	if s.EncryptionAlgorithmIdentifier != nil {
+		value := *s.EncryptionAlgorithmIdentifier
+		if value < 0 || value > 4 {
+			return errors.Errorf("only encryption algorithm identifiers from 0 to 4 are valid")
+		}
+		s.encryptionAlgorithm = value
+	}
+
 	// TODO: add other, SCEP specific, options?
 
 	return err
@@ -128,4 +144,18 @@ func (s *SCEP) GetChallengePassword() string {
 // GetCapabilities returns the CA capabilities
 func (s *SCEP) GetCapabilities() []string {
 	return s.Capabilities
+}
+
+// ShouldIncludeRootsInChain indicates if the CA should
+// return its intermediate, which is currently used for
+// both signing and decryption, as well as the other certs
+// in its chain (usually a single root certificate).
+func (s *SCEP) ShouldIncludeRootsInChain() bool {
+	return s.IncludeRoots
+}
+
+// GetContentEncryptionAlgorithm returns the numeric identifier
+// for the pkcs7 package encryption algorithm to use.
+func (s *SCEP) GetContentEncryptionAlgorithm() int {
+	return s.encryptionAlgorithm
 }
