@@ -7,8 +7,11 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -124,6 +127,14 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("csr", csr),
 				errs.WithKeyVal("signOptions", signOpts),
+			)
+		}
+		// explicitly check for unmarshaling errors, which are most probably caused by JSON template (syntax) errors
+		if strings.HasPrefix(err.Error(), "error unmarshaling certificate") {
+			return nil, errs.InternalServerErr(templatingError(err),
+				errs.WithKeyVal("csr", csr),
+				errs.WithKeyVal("signOptions", signOpts),
+				errs.WithMessage("error applying certificate template"),
 			)
 		}
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign", opts...)
@@ -548,4 +559,23 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	// Set leaf certificate
 	tlsCrt.Leaf = resp.Certificate
 	return &tlsCrt, nil
+}
+
+// templatingError tries to extract more information about the cause of
+// an error related to (most probably) malformed template data and adds
+// this to the error message.
+func templatingError(err error) error {
+	cause := errors.Cause(err)
+	var (
+		syntaxError *json.SyntaxError
+		typeError   *json.UnmarshalTypeError
+	)
+	if errors.As(err, &syntaxError) {
+		// offset is arguably not super clear to the user, but it's the best we can do here
+		cause = fmt.Errorf("%s at offset %d", cause.Error(), syntaxError.Offset)
+	} else if errors.As(err, &typeError) {
+		// slightly rewriting the default error message to include the offset
+		cause = fmt.Errorf("cannot unmarshal %s at offset %d into Go value of type %s", typeError.Value, typeError.Offset, typeError.Type)
+	}
+	return errors.Wrap(cause, "error applying certificate template")
 }

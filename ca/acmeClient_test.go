@@ -109,6 +109,7 @@ func TestNewACMEClient(t *testing.T) {
 
 			i := 0
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
 				switch {
 				case i == 0:
 					api.JSONStatus(w, tc.r1, tc.rc1)
@@ -203,6 +204,7 @@ func TestACMEClient_GetNonce(t *testing.T) {
 			tc := run(t)
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				api.JSONStatus(w, tc.r1, tc.rc1)
 			})
@@ -309,6 +311,8 @@ func TestACMEClient_post(t *testing.T) {
 
 			i := 0
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
 					api.JSONStatus(w, tc.r1, tc.rc1)
@@ -447,6 +451,8 @@ func TestACMEClient_NewOrder(t *testing.T) {
 
 			i := 0
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
 					api.JSONStatus(w, tc.r1, tc.rc1)
@@ -567,6 +573,8 @@ func TestACMEClient_GetOrder(t *testing.T) {
 
 			i := 0
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
 					api.JSONStatus(w, tc.r1, tc.rc1)
@@ -687,6 +695,8 @@ func TestACMEClient_GetAuthz(t *testing.T) {
 
 			i := 0
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
 					api.JSONStatus(w, tc.r1, tc.rc1)
@@ -807,6 +817,8 @@ func TestACMEClient_GetChallenge(t *testing.T) {
 
 			i := 0
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
 					api.JSONStatus(w, tc.r1, tc.rc1)
@@ -928,6 +940,8 @@ func TestACMEClient_ValidateChallenge(t *testing.T) {
 
 			i := 0
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
 					api.JSONStatus(w, tc.r1, tc.rc1)
@@ -1053,6 +1067,8 @@ func TestACMEClient_FinalizeOrder(t *testing.T) {
 
 			i := 0
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
 					api.JSONStatus(w, tc.r1, tc.rc1)
@@ -1180,6 +1196,8 @@ func TestACMEClient_GetAccountOrders(t *testing.T) {
 
 			i := 0
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
 					api.JSONStatus(w, tc.r1, tc.rc1)
@@ -1309,6 +1327,8 @@ func TestACMEClient_GetCertificate(t *testing.T) {
 
 			i := 0
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
 					api.JSONStatus(w, tc.r1, tc.rc1)
