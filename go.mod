@@ -21,9 +21,13 @@ require (
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0
 	github.com/googleapis/gax-go/v2 v2.0.5
+	github.com/hashicorp/vault/api v1.3.1
+	github.com/hashicorp/vault/api/auth/approle v0.1.1
+	github.com/hashicorp/vault/sdk v0.3.0
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/micromdm/scep/v2 v2.1.0
+	github.com/mitchellh/mapstructure v1.4.2
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
@@ -40,7 +44,7 @@ require (
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
 	google.golang.org/api v0.47.0
 	google.golang.org/genproto v0.0.0-20210719143636-1d5a45f8e492
-	google.golang.org/grpc v1.39.0
+	google.golang.org/grpc v1.41.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/square/go-jose.v2 v2.6.0
 )

@@ -45,6 +45,8 @@ const (
 	CloudCAS = "cloudcas"
 	// StepCAS is a CertificateAuthorityService using another step-ca instance.
 	StepCAS = "stepcas"
+	// VaultCAS is a CertificateAuthorityService using Hasicorp Vault PKI.
+	VaultCAS = "vaultcas"
 )
 
 // String returns a string from the type. It will always return the lower case
