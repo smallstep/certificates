@@ -34,6 +34,7 @@ const (
 // https://signal.org/docs/specifications/xeddsa/#xeddsa and implemented by
 // go.step.sm/crypto/x25519.
 type Nebula struct {
+	*base
 	ID        string   `json:"-"`
 	Type      string   `json:"type"`
 	Name      string   `json:"name"`
@@ -47,6 +48,7 @@ type Nebula struct {
 
 // Init verifies and initializes the Nebula provisioner.
 func (p *Nebula) Init(config Config) error {
+	p.base = &base{} // prevent nil pointers
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -67,6 +69,16 @@ func (p *Nebula) Init(config Config) error {
 	}
 
 	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
+
+	// Initialize the x509 allow/deny policy engine
+	if p.x509PolicyEngine, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine
+	if p.sshPolicyEngine, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+		return err
+	}
 
 	return nil
 }
