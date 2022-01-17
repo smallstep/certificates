@@ -13,14 +13,14 @@ func newX509PolicyEngine(x509Opts *X509Options) (*x509policy.NamePolicyEngine, e
 	}
 
 	options := []x509policy.NamePolicyOption{
-		x509policy.WithEnableSubjectCommonNameVerification(), // enable x509 Subject Common Name validation by default
+		x509policy.WithSubjectCommonNameVerification(), // enable x509 Subject Common Name validation by default
 	}
 
 	allowed := x509Opts.GetAllowedNameOptions()
 	if allowed != nil && allowed.HasNames() {
 		options = append(options,
-			x509policy.WithPermittedDNSDomains(allowed.DNSDomains), // TODO(hs): be a bit more lenient w.r.t. the format of domains? I.e. allow "*.localhost" instead of the ".localhost", which is what Name Constraints do.
-			x509policy.WithPermittedCIDRs(allowed.IPRanges),        // TODO(hs): support IPs in addition to ranges
+			x509policy.WithPermittedDNSDomains(allowed.DNSDomains),
+			x509policy.WithPermittedCIDRs(allowed.IPRanges), // TODO(hs): support IPs in addition to ranges
 			x509policy.WithPermittedEmailAddresses(allowed.EmailAddresses),
 			x509policy.WithPermittedURIDomains(allowed.URIDomains),
 		)
@@ -29,8 +29,8 @@ func newX509PolicyEngine(x509Opts *X509Options) (*x509policy.NamePolicyEngine, e
 	denied := x509Opts.GetDeniedNameOptions()
 	if denied != nil && denied.HasNames() {
 		options = append(options,
-			x509policy.WithExcludedDNSDomains(denied.DNSDomains), // TODO(hs): be a bit more lenient w.r.t. the format of domains? I.e. allow "*.localhost" instead of the ".localhost", which is what Name Constraints do.
-			x509policy.WithExcludedCIDRs(denied.IPRanges),        // TODO(hs): support IPs in addition to ranges
+			x509policy.WithExcludedDNSDomains(denied.DNSDomains),
+			x509policy.WithExcludedCIDRs(denied.IPRanges), // TODO(hs): support IPs in addition to ranges
 			x509policy.WithExcludedEmailAddresses(denied.EmailAddresses),
 			x509policy.WithExcludedURIDomains(denied.URIDomains),
 		)

@@ -12,97 +12,120 @@ type NamePolicyOption func(e *NamePolicyEngine) error
 
 // TODO: wrap (more) errors; and prove a set of known (exported) errors
 
-func WithEnableSubjectCommonNameVerification() NamePolicyOption {
+func WithSubjectCommonNameVerification() NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		e.verifySubjectCommonName = true
 		return nil
 	}
 }
 
+func WithAllowLiteralWildcardNames() NamePolicyOption {
+	return func(e *NamePolicyEngine) error {
+		e.allowLiteralWildcardNames = true
+		return nil
+	}
+}
+
 func WithPermittedDNSDomains(domains []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, domain := range domains {
-			if err := validateDNSDomainConstraint(domain); err != nil {
+		normalizedDomains := make([]string, len(domains))
+		for i, domain := range domains {
+			normalizedDomain, err := normalizeAndValidateDNSDomainConstraint(domain)
+			if err != nil {
 				return errors.Errorf("cannot parse permitted domain constraint %q", domain)
 			}
+			normalizedDomains[i] = normalizedDomain
 		}
-		e.permittedDNSDomains = domains
+		e.permittedDNSDomains = normalizedDomains
 		return nil
 	}
 }
 
 func AddPermittedDNSDomains(domains []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, domain := range domains {
-			if err := validateDNSDomainConstraint(domain); err != nil {
+		normalizedDomains := make([]string, len(domains))
+		for i, domain := range domains {
+			normalizedDomain, err := normalizeAndValidateDNSDomainConstraint(domain)
+			if err != nil {
 				return errors.Errorf("cannot parse permitted domain constraint %q", domain)
 			}
+			normalizedDomains[i] = normalizedDomain
 		}
-		e.permittedDNSDomains = append(e.permittedDNSDomains, domains...)
+		e.permittedDNSDomains = append(e.permittedDNSDomains, normalizedDomains...)
 		return nil
 	}
 }
 
 func WithExcludedDNSDomains(domains []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, domain := range domains {
-			if err := validateDNSDomainConstraint(domain); err != nil {
-				return errors.Errorf("cannot parse excluded domain constraint %q", domain)
+		normalizedDomains := make([]string, len(domains))
+		for i, domain := range domains {
+			normalizedDomain, err := normalizeAndValidateDNSDomainConstraint(domain)
+			if err != nil {
+				return errors.Errorf("cannot parse permitted domain constraint %q", domain)
 			}
+			normalizedDomains[i] = normalizedDomain
 		}
-		e.excludedDNSDomains = domains
+		e.excludedDNSDomains = normalizedDomains
 		return nil
 	}
 }
 
 func AddExcludedDNSDomains(domains []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, domain := range domains {
-			if err := validateDNSDomainConstraint(domain); err != nil {
-				return errors.Errorf("cannot parse excluded domain constraint %q", domain)
+		normalizedDomains := make([]string, len(domains))
+		for i, domain := range domains {
+			normalizedDomain, err := normalizeAndValidateDNSDomainConstraint(domain)
+			if err != nil {
+				return errors.Errorf("cannot parse permitted domain constraint %q", domain)
 			}
+			normalizedDomains[i] = normalizedDomain
 		}
-		e.excludedDNSDomains = append(e.excludedDNSDomains, domains...)
+		e.excludedDNSDomains = append(e.excludedDNSDomains, normalizedDomains...)
 		return nil
 	}
 }
 
 func WithPermittedDNSDomain(domain string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateDNSDomainConstraint(domain); err != nil {
+		normalizedDomain, err := normalizeAndValidateDNSDomainConstraint(domain)
+		if err != nil {
 			return errors.Errorf("cannot parse permitted domain constraint %q", domain)
 		}
-		e.permittedDNSDomains = []string{domain}
+		e.permittedDNSDomains = []string{normalizedDomain}
 		return nil
 	}
 }
 
 func AddPermittedDNSDomain(domain string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateDNSDomainConstraint(domain); err != nil {
+		normalizedDomain, err := normalizeAndValidateDNSDomainConstraint(domain)
+		if err != nil {
 			return errors.Errorf("cannot parse permitted domain constraint %q", domain)
 		}
-		e.permittedDNSDomains = append(e.permittedDNSDomains, domain)
+		e.permittedDNSDomains = append(e.permittedDNSDomains, normalizedDomain)
 		return nil
 	}
 }
 
 func WithExcludedDNSDomain(domain string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateDNSDomainConstraint(domain); err != nil {
-			return errors.Errorf("cannot parse excluded domain constraint %q", domain)
+		normalizedDomain, err := normalizeAndValidateDNSDomainConstraint(domain)
+		if err != nil {
+			return errors.Errorf("cannot parse permitted domain constraint %q", domain)
 		}
-		e.excludedDNSDomains = []string{domain}
+		e.excludedDNSDomains = []string{normalizedDomain}
 		return nil
 	}
 }
 
 func AddExcludedDNSDomain(domain string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateDNSDomainConstraint(domain); err != nil {
-			return errors.Errorf("cannot parse excluded domain constraint %q", domain)
+		normalizedDomain, err := normalizeAndValidateDNSDomainConstraint(domain)
+		if err != nil {
+			return errors.Errorf("cannot parse permitted domain constraint %q", domain)
 		}
-		e.excludedDNSDomains = append(e.excludedDNSDomains, domain)
+		e.excludedDNSDomains = append(e.excludedDNSDomains, normalizedDomain)
 		return nil
 	}
 }
@@ -123,13 +146,13 @@ func AddPermittedIPRanges(ipRanges []*net.IPNet) NamePolicyOption {
 
 func WithPermittedCIDRs(cidrs []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		networks := []*net.IPNet{}
-		for _, cidr := range cidrs {
+		networks := make([]*net.IPNet, len(cidrs))
+		for i, cidr := range cidrs {
 			_, nw, err := net.ParseCIDR(cidr)
 			if err != nil {
 				return errors.Errorf("cannot parse permitted CIDR constraint %q", cidr)
 			}
-			networks = append(networks, nw)
+			networks[i] = nw
 		}
 		e.permittedIPRanges = networks
 		return nil
@@ -138,13 +161,13 @@ func WithPermittedCIDRs(cidrs []string) NamePolicyOption {
 
 func AddPermittedCIDRs(cidrs []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		networks := []*net.IPNet{}
-		for _, cidr := range cidrs {
+		networks := make([]*net.IPNet, len(cidrs))
+		for i, cidr := range cidrs {
 			_, nw, err := net.ParseCIDR(cidr)
 			if err != nil {
 				return errors.Errorf("cannot parse permitted CIDR constraint %q", cidr)
 			}
-			networks = append(networks, nw)
+			networks[i] = nw
 		}
 		e.permittedIPRanges = append(e.permittedIPRanges, networks...)
 		return nil
@@ -153,13 +176,13 @@ func AddPermittedCIDRs(cidrs []string) NamePolicyOption {
 
 func WithExcludedCIDRs(cidrs []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		networks := []*net.IPNet{}
-		for _, cidr := range cidrs {
+		networks := make([]*net.IPNet, len(cidrs))
+		for i, cidr := range cidrs {
 			_, nw, err := net.ParseCIDR(cidr)
 			if err != nil {
 				return errors.Errorf("cannot parse excluded CIDR constraint %q", cidr)
 			}
-			networks = append(networks, nw)
+			networks[i] = nw
 		}
 		e.excludedIPRanges = networks
 		return nil
@@ -168,13 +191,13 @@ func WithExcludedCIDRs(cidrs []string) NamePolicyOption {
 
 func AddExcludedCIDRs(cidrs []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		networks := []*net.IPNet{}
-		for _, cidr := range cidrs {
+		networks := make([]*net.IPNet, len(cidrs))
+		for i, cidr := range cidrs {
 			_, nw, err := net.ParseCIDR(cidr)
 			if err != nil {
 				return errors.Errorf("cannot parse excluded CIDR constraint %q", cidr)
 			}
-			networks = append(networks, nw)
+			networks[i] = nw
 		}
 		e.excludedIPRanges = append(e.excludedIPRanges, networks...)
 		return nil
@@ -309,205 +332,269 @@ func AddExcludedIP(ip net.IP) NamePolicyOption {
 
 func WithPermittedEmailAddresses(emailAddresses []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, email := range emailAddresses {
-			if err := validateEmailConstraint(email); err != nil {
+		normalizedEmailAddresses := make([]string, len(emailAddresses))
+		for i, email := range emailAddresses {
+			normalizedEmailAddress, err := normalizeAndValidateEmailConstraint(email)
+			if err != nil {
 				return err
 			}
+			normalizedEmailAddresses[i] = normalizedEmailAddress
 		}
-		e.permittedEmailAddresses = emailAddresses
+		e.permittedEmailAddresses = normalizedEmailAddresses
 		return nil
 	}
 }
 
 func AddPermittedEmailAddresses(emailAddresses []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, email := range emailAddresses {
-			if err := validateEmailConstraint(email); err != nil {
+		normalizedEmailAddresses := make([]string, len(emailAddresses))
+		for i, email := range emailAddresses {
+			normalizedEmailAddress, err := normalizeAndValidateEmailConstraint(email)
+			if err != nil {
 				return err
 			}
+			normalizedEmailAddresses[i] = normalizedEmailAddress
 		}
-		e.permittedEmailAddresses = append(e.permittedEmailAddresses, emailAddresses...)
+		e.permittedEmailAddresses = append(e.permittedEmailAddresses, normalizedEmailAddresses...)
 		return nil
 	}
 }
 
 func WithExcludedEmailAddresses(emailAddresses []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, email := range emailAddresses {
-			if err := validateEmailConstraint(email); err != nil {
+		normalizedEmailAddresses := make([]string, len(emailAddresses))
+		for i, email := range emailAddresses {
+			normalizedEmailAddress, err := normalizeAndValidateEmailConstraint(email)
+			if err != nil {
 				return err
 			}
+			normalizedEmailAddresses[i] = normalizedEmailAddress
 		}
-		e.excludedEmailAddresses = emailAddresses
+		e.excludedEmailAddresses = normalizedEmailAddresses
 		return nil
 	}
 }
 
 func AddExcludedEmailAddresses(emailAddresses []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, email := range emailAddresses {
-			if err := validateEmailConstraint(email); err != nil {
+		normalizedEmailAddresses := make([]string, len(emailAddresses))
+		for i, email := range emailAddresses {
+			normalizedEmailAddress, err := normalizeAndValidateEmailConstraint(email)
+			if err != nil {
 				return err
 			}
+			normalizedEmailAddresses[i] = normalizedEmailAddress
 		}
-		e.excludedEmailAddresses = append(e.excludedEmailAddresses, emailAddresses...)
+		e.excludedEmailAddresses = append(e.excludedEmailAddresses, normalizedEmailAddresses...)
 		return nil
 	}
 }
 
 func WithPermittedEmailAddress(emailAddress string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateEmailConstraint(emailAddress); err != nil {
+		normalizedEmailAddress, err := normalizeAndValidateEmailConstraint(emailAddress)
+		if err != nil {
 			return err
 		}
-		e.permittedEmailAddresses = []string{emailAddress}
+		e.permittedEmailAddresses = []string{normalizedEmailAddress}
 		return nil
 	}
 }
 
 func AddPermittedEmailAddress(emailAddress string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateEmailConstraint(emailAddress); err != nil {
+		normalizedEmailAddress, err := normalizeAndValidateEmailConstraint(emailAddress)
+		if err != nil {
 			return err
 		}
-		e.permittedEmailAddresses = append(e.permittedEmailAddresses, emailAddress)
+		e.permittedEmailAddresses = append(e.permittedEmailAddresses, normalizedEmailAddress)
 		return nil
 	}
 }
 
 func WithExcludedEmailAddress(emailAddress string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateEmailConstraint(emailAddress); err != nil {
+		normalizedEmailAddress, err := normalizeAndValidateEmailConstraint(emailAddress)
+		if err != nil {
 			return err
 		}
-		e.excludedEmailAddresses = []string{emailAddress}
+		e.excludedEmailAddresses = []string{normalizedEmailAddress}
 		return nil
 	}
 }
 
 func AddExcludedEmailAddress(emailAddress string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateEmailConstraint(emailAddress); err != nil {
+		normalizedEmailAddress, err := normalizeAndValidateEmailConstraint(emailAddress)
+		if err != nil {
 			return err
 		}
-		e.excludedEmailAddresses = append(e.excludedEmailAddresses, emailAddress)
+		e.excludedEmailAddresses = append(e.excludedEmailAddresses, normalizedEmailAddress)
 		return nil
 	}
 }
 
 func WithPermittedURIDomains(uriDomains []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, domain := range uriDomains {
-			if err := validateURIDomainConstraint(domain); err != nil {
+		normalizedURIDomains := make([]string, len(uriDomains))
+		for i, domain := range uriDomains {
+			normalizedURIDomain, err := normalizeAndValidateURIDomainConstraint(domain)
+			if err != nil {
 				return err
 			}
+			normalizedURIDomains[i] = normalizedURIDomain
 		}
-		e.permittedURIDomains = uriDomains
+		e.permittedURIDomains = normalizedURIDomains
 		return nil
 	}
 }
 
 func AddPermittedURIDomains(uriDomains []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, domain := range uriDomains {
-			if err := validateURIDomainConstraint(domain); err != nil {
+		normalizedURIDomains := make([]string, len(uriDomains))
+		for i, domain := range uriDomains {
+			normalizedURIDomain, err := normalizeAndValidateURIDomainConstraint(domain)
+			if err != nil {
 				return err
 			}
+			normalizedURIDomains[i] = normalizedURIDomain
 		}
-		e.permittedURIDomains = append(e.permittedURIDomains, uriDomains...)
+		e.permittedURIDomains = append(e.permittedURIDomains, normalizedURIDomains...)
 		return nil
 	}
 }
 
 func WithPermittedURIDomain(uriDomain string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateURIDomainConstraint(uriDomain); err != nil {
+		normalizedURIDomain, err := normalizeAndValidateURIDomainConstraint(uriDomain)
+		if err != nil {
 			return err
 		}
-		e.permittedURIDomains = []string{uriDomain}
+		e.permittedURIDomains = []string{normalizedURIDomain}
 		return nil
 	}
 }
 
 func AddPermittedURIDomain(uriDomain string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateURIDomainConstraint(uriDomain); err != nil {
+		normalizedURIDomain, err := normalizeAndValidateURIDomainConstraint(uriDomain)
+		if err != nil {
 			return err
 		}
-		e.permittedURIDomains = append(e.permittedURIDomains, uriDomain)
+		e.permittedURIDomains = append(e.permittedURIDomains, normalizedURIDomain)
 		return nil
 	}
 }
 
 func WithExcludedURIDomains(uriDomains []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, domain := range uriDomains {
-			if err := validateURIDomainConstraint(domain); err != nil {
+		normalizedURIDomains := make([]string, len(uriDomains))
+		for i, domain := range uriDomains {
+			normalizedURIDomain, err := normalizeAndValidateURIDomainConstraint(domain)
+			if err != nil {
 				return err
 			}
+			normalizedURIDomains[i] = normalizedURIDomain
 		}
-		e.excludedURIDomains = uriDomains
+		e.excludedURIDomains = normalizedURIDomains
 		return nil
 	}
 }
 
 func AddExcludedURIDomains(uriDomains []string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		for _, domain := range uriDomains {
-			if err := validateURIDomainConstraint(domain); err != nil {
+		normalizedURIDomains := make([]string, len(uriDomains))
+		for i, domain := range uriDomains {
+			normalizedURIDomain, err := normalizeAndValidateURIDomainConstraint(domain)
+			if err != nil {
 				return err
 			}
+			normalizedURIDomains[i] = normalizedURIDomain
 		}
-		e.excludedURIDomains = append(e.excludedURIDomains, uriDomains...)
+		e.excludedURIDomains = append(e.excludedURIDomains, normalizedURIDomains...)
 		return nil
 	}
 }
 
 func WithExcludedURIDomain(uriDomain string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateURIDomainConstraint(uriDomain); err != nil {
+		normalizedURIDomain, err := normalizeAndValidateURIDomainConstraint(uriDomain)
+		if err != nil {
 			return err
 		}
-		e.excludedURIDomains = []string{uriDomain}
+		e.excludedURIDomains = []string{normalizedURIDomain}
 		return nil
 	}
 }
 
 func AddExcludedURIDomain(uriDomain string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		if err := validateURIDomainConstraint(uriDomain); err != nil {
+		normalizedURIDomain, err := normalizeAndValidateURIDomainConstraint(uriDomain)
+		if err != nil {
 			return err
 		}
-		e.excludedURIDomains = append(e.excludedURIDomains, uriDomain)
+		e.excludedURIDomains = append(e.excludedURIDomains, normalizedURIDomain)
 		return nil
 	}
 }
 
-func validateDNSDomainConstraint(domain string) error {
-	if _, ok := domainToReverseLabels(domain); !ok {
-		return errors.Errorf("cannot parse permitted domain constraint %q", domain)
+func normalizeAndValidateDNSDomainConstraint(constraint string) (string, error) {
+	normalizedConstraint := strings.TrimSpace(constraint)
+	if strings.Contains(normalizedConstraint, "..") {
+		return "", errors.Errorf("domain constraint %q cannot have empty labels", constraint)
 	}
-	return nil
+	if strings.HasPrefix(normalizedConstraint, "*.") {
+		normalizedConstraint = normalizedConstraint[1:] // cut off wildcard character; keep the period
+	}
+	if strings.Contains(normalizedConstraint, "*") {
+		return "", errors.Errorf("domain constraint %q can only have wildcard as starting character", constraint)
+	}
+	if _, ok := domainToReverseLabels(normalizedConstraint); !ok {
+		return "", errors.Errorf("cannot parse permitted domain constraint %q", constraint)
+	}
+	return normalizedConstraint, nil
 }
 
-func validateEmailConstraint(constraint string) error {
-	if strings.Contains(constraint, "@") {
-		_, ok := parseRFC2821Mailbox(constraint)
-		if !ok {
-			return fmt.Errorf("cannot parse email constraint %q", constraint)
+func normalizeAndValidateEmailConstraint(constraint string) (string, error) {
+	normalizedConstraint := strings.TrimSpace(constraint)
+	if strings.Contains(normalizedConstraint, "*") {
+		return "", fmt.Errorf("email constraint %q cannot contain asterisk", constraint)
+	}
+	if strings.Count(normalizedConstraint, "@") > 1 {
+		return "", fmt.Errorf("email constraint %q contains too many @ characters", constraint)
+	}
+	if normalizedConstraint[0] == '@' {
+		normalizedConstraint = normalizedConstraint[1:] // remove the leading @ as wildcard for emails
+	}
+	if normalizedConstraint[0] == '.' {
+		return "", fmt.Errorf("email constraint %q cannot start with period", constraint)
+	}
+	if strings.Contains(normalizedConstraint, "@") {
+		if _, ok := parseRFC2821Mailbox(normalizedConstraint); !ok {
+			return "", fmt.Errorf("cannot parse email constraint %q", constraint)
 		}
 	}
-	_, ok := domainToReverseLabels(constraint)
-	if !ok {
-		return fmt.Errorf("cannot parse email domain constraint %q", constraint)
+	if _, ok := domainToReverseLabels(normalizedConstraint); !ok {
+		return "", fmt.Errorf("cannot parse email domain constraint %q", constraint)
 	}
-	return nil
+	return normalizedConstraint, nil
 }
 
-func validateURIDomainConstraint(constraint string) error {
-	_, ok := domainToReverseLabels(constraint)
-	if !ok {
-		return fmt.Errorf("cannot parse URI domain constraint %q", constraint)
+func normalizeAndValidateURIDomainConstraint(constraint string) (string, error) {
+	normalizedConstraint := strings.TrimSpace(constraint)
+	if strings.Contains(normalizedConstraint, "..") {
+		return "", errors.Errorf("URI domain constraint %q cannot have empty labels", constraint)
 	}
-	return nil
+	if strings.HasPrefix(normalizedConstraint, "*.") {
+		normalizedConstraint = normalizedConstraint[1:] // cut off wildcard character; keep the period
+	}
+	if strings.Contains(normalizedConstraint, "*") {
+		return "", errors.Errorf("URI domain constraint %q can only have wildcard as starting character", constraint)
+	}
+	// TODO(hs): block constraints that look like IPs too? Because hosts can't be matched to those.
+	_, ok := domainToReverseLabels(normalizedConstraint)
+	if !ok {
+		return "", fmt.Errorf("cannot parse URI domain constraint %q", constraint)
+	}
+	return normalizedConstraint, nil
 }

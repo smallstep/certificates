@@ -50,8 +50,13 @@ func (e CertificateInvalidError) Error() string {
 // TODO(hs): the x509 RFC also defines name checks on directory name; support that?
 // TODO(hs): implement Stringer interface: describe the contents of the NamePolicyEngine?
 type NamePolicyEngine struct {
-	options                 []NamePolicyOption
+
+	// verifySubjectCommonName is set when Subject Common Name must be verified
 	verifySubjectCommonName bool
+	// allowLiteralWildcardNames allows literal wildcard DNS domains
+	allowLiteralWildcardNames bool
+
+	// permitted and exluded constraints similar to x509 Name Constraints
 	permittedDNSDomains     []string
 	excludedDNSDomains      []string
 	permittedIPRanges       []*net.IPNet
@@ -60,20 +65,82 @@ type NamePolicyEngine struct {
 	excludedEmailAddresses  []string
 	permittedURIDomains     []string
 	excludedURIDomains      []string
+
+	// some internal counts for housekeeping
+	numberOfDNSDomainConstraints      int
+	numberOfIPRangeConstraints        int
+	numberOfEmailAddressConstraints   int
+	numberOfURIDomainConstraints      int
+	totalNumberOfPermittedConstraints int
+	totalNumberOfExcludedConstraints  int
+	totalNumberOfConstraints          int
 }
 
 // NewNamePolicyEngine creates a new NamePolicyEngine with NamePolicyOptions
 func New(opts ...NamePolicyOption) (*NamePolicyEngine, error) {
 
 	e := &NamePolicyEngine{}
-	e.options = append(e.options, opts...)
-	for _, option := range e.options {
+	for _, option := range opts {
 		if err := option(e); err != nil {
 			return nil, err
 		}
 	}
 
+	e.permittedDNSDomains = removeDuplicates(e.permittedDNSDomains)
+	e.permittedIPRanges = removeDuplicateIPRanges(e.permittedIPRanges)
+	e.permittedEmailAddresses = removeDuplicates(e.permittedEmailAddresses)
+	e.permittedURIDomains = removeDuplicates(e.permittedURIDomains)
+
+	e.excludedDNSDomains = removeDuplicates(e.excludedDNSDomains)
+	e.excludedIPRanges = removeDuplicateIPRanges(e.excludedIPRanges)
+	e.excludedEmailAddresses = removeDuplicates(e.excludedEmailAddresses)
+	e.excludedURIDomains = removeDuplicates(e.excludedURIDomains)
+
+	e.numberOfDNSDomainConstraints = len(e.permittedDNSDomains) + len(e.excludedDNSDomains)
+	e.numberOfIPRangeConstraints = len(e.permittedIPRanges) + len(e.excludedIPRanges)
+	e.numberOfEmailAddressConstraints = len(e.permittedEmailAddresses) + len(e.excludedEmailAddresses)
+	e.numberOfURIDomainConstraints = len(e.permittedURIDomains) + len(e.excludedURIDomains)
+
+	e.totalNumberOfPermittedConstraints = len(e.permittedDNSDomains) + len(e.permittedIPRanges) +
+		len(e.permittedEmailAddresses) + len(e.permittedURIDomains)
+
+	e.totalNumberOfExcludedConstraints = len(e.excludedDNSDomains) + len(e.excludedIPRanges) +
+		len(e.excludedEmailAddresses) + len(e.excludedURIDomains)
+
+	e.totalNumberOfConstraints = e.totalNumberOfPermittedConstraints + e.totalNumberOfExcludedConstraints
+
 	return e, nil
+}
+
+func removeDuplicates(strSlice []string) []string {
+	if len(strSlice) == 0 {
+		return nil
+	}
+	keys := make(map[string]bool)
+	result := []string{}
+	for _, item := range strSlice {
+		if _, value := keys[item]; !value {
+			keys[item] = true
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func removeDuplicateIPRanges(ipRanges []*net.IPNet) []*net.IPNet {
+	if len(ipRanges) == 0 {
+		return nil
+	}
+	keys := make(map[string]bool)
+	result := []*net.IPNet{}
+	for _, item := range ipRanges {
+		key := item.String()
+		if _, value := keys[key]; !value {
+			keys[key] = true
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 // AreCertificateNamesAllowed verifies that all SANs in a Certificate are allowed.
@@ -155,28 +222,51 @@ func appendSubjectCommonName(subject pkix.Name, dnsNames *[]string, ips *[]net.I
 // in https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
 func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailAddresses []string, uris []*url.URL) error {
 
-	// TODO: return our own type of error?
+	// nothing to compare against; return early
+	if e.totalNumberOfConstraints == 0 {
+		return nil
+	}
 
-	// TODO: set limit on total of all names? In x509 there's a limit on the number of comparisons
+	// TODO: return our own type(s) of error?
+	// TODO: implement check that requires at least a single name in all of the SANs + subject?
+
+	// TODO: set limit on total of all names validated? In x509 there's a limit on the number of comparisons
 	// that protects the CA from a DoS (i.e. many heavy comparisons). The x509 implementation takes
 	// this number as a total of all checks and keeps a (pointer to a) counter of the number of checks
 	// executed so far.
 
+	// TODO: implement matching URI schemes, paths, etc; not just the domain
+
 	// TODO: gather all errors, or return early? Currently we return early on the first wrong name; check might fail for multiple names.
 	// Perhaps make that an option?
 	for _, dns := range dnsNames {
+		// if there are DNS names to check, no DNS constraints set, but there are other permitted constraints,
+		// then return error, because DNS should be explicitly configured to be allowed in that case. In case there are
+		// (other) excluded constraints, we'll allow a DNS (implicit allow; currently).
+		if e.numberOfDNSDomainConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
+			return CertificateInvalidError{
+				Reason: x509.CANotAuthorizedForThisName,
+				Detail: fmt.Sprintf("dns %q is not permitted by any constraint", dns), // TODO(hs): change this error (message)
+			}
+		}
 		if _, ok := domainToReverseLabels(dns); !ok {
 			return errors.Errorf("cannot parse dns %q", dns)
 		}
 		if err := checkNameConstraints("dns", dns, dns,
 			func(parsedName, constraint interface{}) (bool, error) {
-				return matchDomainConstraint(parsedName.(string), constraint.(string))
+				return e.matchDomainConstraint(parsedName.(string), constraint.(string))
 			}, e.permittedDNSDomains, e.excludedDNSDomains); err != nil {
 			return err
 		}
 	}
 
 	for _, ip := range ips {
+		if e.numberOfIPRangeConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
+			return CertificateInvalidError{
+				Reason: x509.CANotAuthorizedForThisName,
+				Detail: fmt.Sprintf("ip %q is not permitted by any constraint", ip.String()),
+			}
+		}
 		if err := checkNameConstraints("ip", ip.String(), ip,
 			func(parsedName, constraint interface{}) (bool, error) {
 				return matchIPConstraint(parsedName.(net.IP), constraint.(*net.IPNet))
@@ -186,22 +276,34 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 	}
 
 	for _, email := range emailAddresses {
+		if e.numberOfEmailAddressConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
+			return CertificateInvalidError{
+				Reason: x509.CANotAuthorizedForThisName,
+				Detail: fmt.Sprintf("email %q is not permitted by any constraint", email),
+			}
+		}
 		mailbox, ok := parseRFC2821Mailbox(email)
 		if !ok {
 			return fmt.Errorf("cannot parse rfc822Name %q", mailbox)
 		}
 		if err := checkNameConstraints("email", email, mailbox,
 			func(parsedName, constraint interface{}) (bool, error) {
-				return matchEmailConstraint(parsedName.(rfc2821Mailbox), constraint.(string))
+				return e.matchEmailConstraint(parsedName.(rfc2821Mailbox), constraint.(string))
 			}, e.permittedEmailAddresses, e.excludedEmailAddresses); err != nil {
 			return err
 		}
 	}
 
 	for _, uri := range uris {
+		if e.numberOfURIDomainConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
+			return CertificateInvalidError{
+				Reason: x509.CANotAuthorizedForThisName,
+				Detail: fmt.Sprintf("uri %q is not permitted by any constraint", uri.String()),
+			}
+		}
 		if err := checkNameConstraints("uri", uri.String(), uri,
 			func(parsedName, constraint interface{}) (bool, error) {
-				return matchURIConstraint(parsedName.(*url.URL), constraint.(string))
+				return e.matchURIConstraint(parsedName.(*url.URL), constraint.(string))
 			}, e.permittedURIDomains, e.excludedURIDomains); err != nil {
 			return err
 		}
@@ -217,11 +319,10 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 	return nil
 }
 
-// checkNameConstraints checks that c permits a child certificate to claim the
-// given name, of type nameType. The argument parsedName contains the parsed
-// form of name, suitable for passing to the match function. The total number
-// of comparisons is tracked in the given count and should not exceed the given
-// limit.
+// checkNameConstraints checks that a name, of type nameType is permitted.
+// The argument parsedName contains the parsed form of name, suitable for passing
+// to the match function. The total number of comparisons is tracked in the given
+// count and should not exceed the given limit.
 // SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
 func checkNameConstraints(
 	nameType string,
@@ -476,11 +577,42 @@ func parseRFC2821Mailbox(in string) (mailbox rfc2821Mailbox, ok bool) {
 }
 
 // SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
-func matchDomainConstraint(domain, constraint string) (bool, error) {
+func (e *NamePolicyEngine) matchDomainConstraint(domain, constraint string) (bool, error) {
 	// The meaning of zero length constraints is not specified, but this
 	// code follows NSS and accepts them as matching everything.
 	if constraint == "" {
 		return true, nil
+	}
+
+	// A single whitespace seems to be considered a valid domain, but we don't allow it.
+	if domain == " " {
+		return false, nil
+	}
+
+	// Block domains that start with just a period
+	// TODO(hs): check if we should allow domains starting with "." at all; not sure if this is allowed in x509 names and certs.
+	if domain[0] == '.' {
+		return false, nil
+	}
+
+	// Block wildcard domains that don't start with exactly "*." (i.e. double wildcards and such)
+	if domain[0] == '*' && domain[1] != '.' {
+		return false, nil
+	}
+
+	// Check if the domain starts with a wildcard and return early if not allowed
+	if strings.HasPrefix(domain, "*.") && !e.allowLiteralWildcardNames {
+		return false, nil
+	}
+
+	// Only allow asterisk at the start of the domain; we don't allow them as part of a domain label or as a (sub)domain label (currently)
+	if strings.LastIndex(domain, "*") > 0 {
+		return false, nil
+	}
+
+	// Don't allow constraints with empty labels in any position
+	if strings.Contains(constraint, "..") {
+		return false, nil
 	}
 
 	domainLabels, ok := domainToReverseLabels(domain)
@@ -491,7 +623,9 @@ func matchDomainConstraint(domain, constraint string) (bool, error) {
 	// RFC 5280 says that a leading period in a domain name means that at
 	// least one label must be prepended, but only for URI and email
 	// constraints, not DNS constraints. The code also supports that
-	// behavior for DNS constraints.
+	// behavior for DNS constraints. In our adaptation of the original
+	// Go stdlib x509 Name Constraint implementation we look for exactly
+	// one subdomain, currently.
 
 	mustHaveSubdomains := false
 	if constraint[0] == '.' {
@@ -501,11 +635,22 @@ func matchDomainConstraint(domain, constraint string) (bool, error) {
 
 	constraintLabels, ok := domainToReverseLabels(constraint)
 	if !ok {
-		return false, fmt.Errorf("cannot parse domain %q", constraint)
+		return false, fmt.Errorf("cannot parse domain constraint %q", constraint)
 	}
 
-	if len(domainLabels) < len(constraintLabels) ||
-		(mustHaveSubdomains && len(domainLabels) == len(constraintLabels)) {
+	// fmt.Println(mustHaveSubdomains)
+	// fmt.Println(constraintLabels)
+	// fmt.Println(domainLabels)
+
+	expectedNumberOfLabels := len(constraintLabels)
+	if mustHaveSubdomains {
+		// we expect exactly one more label if it starts with the "canonical" x509 "wildcard": "."
+		// in the future we could extend this to support multiple additional labels and/or more
+		// complex matching.
+		expectedNumberOfLabels++
+	}
+
+	if len(domainLabels) != expectedNumberOfLabels {
 		return false, nil
 	}
 
@@ -552,8 +697,12 @@ func isIPv4(ip net.IP) bool {
 }
 
 // SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
-func matchEmailConstraint(mailbox rfc2821Mailbox, constraint string) (bool, error) {
-	// If the constraint contains an @, then it specifies an exact mailbox name.
+func (e *NamePolicyEngine) matchEmailConstraint(mailbox rfc2821Mailbox, constraint string) (bool, error) {
+	// TODO(hs): handle literal wildcard case for emails? Does that even make sense?
+	// If the constraint contains an @, then it specifies an exact mailbox name (currently)
+	if strings.Contains(constraint, "*") {
+		return false, fmt.Errorf("email constraint %q cannot contain asterisk", constraint)
+	}
 	if strings.Contains(constraint, "@") {
 		constraintMailbox, ok := parseRFC2821Mailbox(constraint)
 		if !ok {
@@ -564,11 +713,11 @@ func matchEmailConstraint(mailbox rfc2821Mailbox, constraint string) (bool, erro
 
 	// Otherwise the constraint is like a DNS constraint of the domain part
 	// of the mailbox.
-	return matchDomainConstraint(mailbox.domain, constraint)
+	return e.matchDomainConstraint(mailbox.domain, constraint)
 }
 
 // SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
-func matchURIConstraint(uri *url.URL, constraint string) (bool, error) {
+func (e *NamePolicyEngine) matchURIConstraint(uri *url.URL, constraint string) (bool, error) {
 	// From RFC 5280, Section 4.2.1.10:
 	// “a uniformResourceIdentifier that does not include an authority
 	// component with a host name specified as a fully qualified domain
@@ -582,6 +731,11 @@ func matchURIConstraint(uri *url.URL, constraint string) (bool, error) {
 		return false, fmt.Errorf("URI with empty host (%q) cannot be matched against constraints", uri.String())
 	}
 
+	// Block hosts with the wildcard character; no exceptions, also not when wildcards allowed.
+	if strings.Contains(host, "*") {
+		return false, fmt.Errorf("URI host %q cannot contain asterisk", uri.String())
+	}
+
 	if strings.Contains(host, ":") && !strings.HasSuffix(host, "]") {
 		var err error
 		host, _, err = net.SplitHostPort(uri.Host)
@@ -592,8 +746,10 @@ func matchURIConstraint(uri *url.URL, constraint string) (bool, error) {
 
 	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") ||
 		net.ParseIP(host) != nil {
-		return false, fmt.Errorf("URI with IP (%q) cannot be matched against constraints", uri.String())
+		return false, fmt.Errorf("URI with IP %q cannot be matched against constraints", uri.String())
 	}
 
-	return matchDomainConstraint(host, constraint)
+	// TODO(hs): add checks for scheme, path, etc.; either here, or in a different constraint matcher (to keep this one simple)
+
+	return e.matchDomainConstraint(host, constraint)
 }
