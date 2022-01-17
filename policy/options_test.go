@@ -1,4 +1,4 @@
-package x509policy
+package policy
 
 import (
 	"net"

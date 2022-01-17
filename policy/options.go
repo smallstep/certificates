@@ -1,4 +1,4 @@
-package x509policy
+package policy
 
 import (
 	"fmt"
@@ -534,6 +534,26 @@ func AddExcludedURIDomain(uriDomain string) NamePolicyOption {
 			return err
 		}
 		e.excludedURIDomains = append(e.excludedURIDomains, normalizedURIDomain)
+		return nil
+	}
+}
+
+func WithPermittedPrincipals(principals []string) NamePolicyOption {
+	return func(g *NamePolicyEngine) error {
+		// for _, principal := range principals {
+		// 	// TODO: validation?
+		// }
+		g.permittedPrincipals = principals
+		return nil
+	}
+}
+
+func WithExcludedPrincipals(principals []string) NamePolicyOption {
+	return func(g *NamePolicyEngine) error {
+		// for _, principal := range principals {
+		// 	// TODO: validation?
+		// }
+		g.excludedPrincipals = principals
 		return nil
 	}
 }

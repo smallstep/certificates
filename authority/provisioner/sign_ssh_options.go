@@ -10,7 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	sshpolicy "github.com/smallstep/certificates/policy/ssh"
+	"github.com/smallstep/certificates/policy"
 	"go.step.sm/crypto/keyutil"
 	"golang.org/x/crypto/ssh"
 )
@@ -448,11 +448,11 @@ func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, o SignSSHOpti
 // sshNamePolicyValidator validates that the certificate (to be signed)
 // contains only allowed principals.
 type sshNamePolicyValidator struct {
-	policyEngine *sshpolicy.NamePolicyEngine
+	policyEngine policy.SSHNamePolicyEngine
 }
 
 // newSSHNamePolicyValidator return a new SSH allow/deny validator.
-func newSSHNamePolicyValidator(engine *sshpolicy.NamePolicyEngine) *sshNamePolicyValidator {
+func newSSHNamePolicyValidator(engine policy.SSHNamePolicyEngine) *sshNamePolicyValidator {
 	return &sshNamePolicyValidator{
 		policyEngine: engine,
 	}

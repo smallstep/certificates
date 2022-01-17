@@ -1,4 +1,4 @@
-package x509policy
+package policy
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"go.step.sm/crypto/x509util"
+	"golang.org/x/crypto/ssh"
 )
 
 type CertificateInvalidError struct {
@@ -47,7 +48,7 @@ func (e CertificateInvalidError) Error() string {
 
 // NamePolicyEngine can be used to check that a CSR or Certificate meets all allowed and
 // denied names before a CA creates and/or signs the Certificate.
-// TODO(hs): the x509 RFC also defines name checks on directory name; support that?
+// TODO(hs): the X509 RFC also defines name checks on directory name; support that?
 // TODO(hs): implement Stringer interface: describe the contents of the NamePolicyEngine?
 type NamePolicyEngine struct {
 
@@ -65,12 +66,15 @@ type NamePolicyEngine struct {
 	excludedEmailAddresses  []string
 	permittedURIDomains     []string
 	excludedURIDomains      []string
+	permittedPrincipals     []string
+	excludedPrincipals      []string
 
 	// some internal counts for housekeeping
 	numberOfDNSDomainConstraints      int
 	numberOfIPRangeConstraints        int
 	numberOfEmailAddressConstraints   int
 	numberOfURIDomainConstraints      int
+	numberOfPrincipalConstraints      int
 	totalNumberOfPermittedConstraints int
 	totalNumberOfExcludedConstraints  int
 	totalNumberOfConstraints          int
@@ -90,22 +94,25 @@ func New(opts ...NamePolicyOption) (*NamePolicyEngine, error) {
 	e.permittedIPRanges = removeDuplicateIPRanges(e.permittedIPRanges)
 	e.permittedEmailAddresses = removeDuplicates(e.permittedEmailAddresses)
 	e.permittedURIDomains = removeDuplicates(e.permittedURIDomains)
+	e.permittedPrincipals = removeDuplicates(e.permittedPrincipals)
 
 	e.excludedDNSDomains = removeDuplicates(e.excludedDNSDomains)
 	e.excludedIPRanges = removeDuplicateIPRanges(e.excludedIPRanges)
 	e.excludedEmailAddresses = removeDuplicates(e.excludedEmailAddresses)
 	e.excludedURIDomains = removeDuplicates(e.excludedURIDomains)
+	e.excludedPrincipals = removeDuplicates(e.excludedPrincipals)
 
 	e.numberOfDNSDomainConstraints = len(e.permittedDNSDomains) + len(e.excludedDNSDomains)
 	e.numberOfIPRangeConstraints = len(e.permittedIPRanges) + len(e.excludedIPRanges)
 	e.numberOfEmailAddressConstraints = len(e.permittedEmailAddresses) + len(e.excludedEmailAddresses)
 	e.numberOfURIDomainConstraints = len(e.permittedURIDomains) + len(e.excludedURIDomains)
+	e.numberOfPrincipalConstraints = len(e.permittedPrincipals) + len(e.excludedPrincipals)
 
 	e.totalNumberOfPermittedConstraints = len(e.permittedDNSDomains) + len(e.permittedIPRanges) +
-		len(e.permittedEmailAddresses) + len(e.permittedURIDomains)
+		len(e.permittedEmailAddresses) + len(e.permittedURIDomains) + len(e.permittedPrincipals)
 
 	e.totalNumberOfExcludedConstraints = len(e.excludedDNSDomains) + len(e.excludedIPRanges) +
-		len(e.excludedEmailAddresses) + len(e.excludedURIDomains)
+		len(e.excludedEmailAddresses) + len(e.excludedURIDomains) + len(e.excludedPrincipals)
 
 	e.totalNumberOfConstraints = e.totalNumberOfPermittedConstraints + e.totalNumberOfExcludedConstraints
 
@@ -151,7 +158,7 @@ func (e *NamePolicyEngine) AreCertificateNamesAllowed(cert *x509.Certificate) (b
 	if e.verifySubjectCommonName {
 		appendSubjectCommonName(cert.Subject, &dnsNames, &ips, &emails, &uris)
 	}
-	if err := e.validateNames(dnsNames, ips, emails, uris); err != nil {
+	if err := e.validateNames(dnsNames, ips, emails, uris, []string{}); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -165,7 +172,7 @@ func (e *NamePolicyEngine) AreCSRNamesAllowed(csr *x509.CertificateRequest) (boo
 	if e.verifySubjectCommonName {
 		appendSubjectCommonName(csr.Subject, &dnsNames, &ips, &emails, &uris)
 	}
-	if err := e.validateNames(dnsNames, ips, emails, uris); err != nil {
+	if err := e.validateNames(dnsNames, ips, emails, uris, []string{}); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -175,7 +182,7 @@ func (e *NamePolicyEngine) AreCSRNamesAllowed(csr *x509.CertificateRequest) (boo
 // The SANs are first split into DNS names, IPs, email addresses and URIs.
 func (e *NamePolicyEngine) AreSANsAllowed(sans []string) (bool, error) {
 	dnsNames, ips, emails, uris := x509util.SplitSANs(sans)
-	if err := e.validateNames(dnsNames, ips, emails, uris); err != nil {
+	if err := e.validateNames(dnsNames, ips, emails, uris, []string{}); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -183,7 +190,7 @@ func (e *NamePolicyEngine) AreSANsAllowed(sans []string) (bool, error) {
 
 // IsDNSAllowed verifies a single DNS domain is allowed.
 func (e *NamePolicyEngine) IsDNSAllowed(dns string) (bool, error) {
-	if err := e.validateNames([]string{dns}, []net.IP{}, []string{}, []*url.URL{}); err != nil {
+	if err := e.validateNames([]string{dns}, []net.IP{}, []string{}, []*url.URL{}, []string{}); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -191,7 +198,16 @@ func (e *NamePolicyEngine) IsDNSAllowed(dns string) (bool, error) {
 
 // IsIPAllowed verifies a single IP domain is allowed.
 func (e *NamePolicyEngine) IsIPAllowed(ip net.IP) (bool, error) {
-	if err := e.validateNames([]string{}, []net.IP{ip}, []string{}, []*url.URL{}); err != nil {
+	if err := e.validateNames([]string{}, []net.IP{ip}, []string{}, []*url.URL{}, []string{}); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// ArePrincipalsAllowed verifies that all principals in an SSH certificate are allowed.
+func (e *NamePolicyEngine) ArePrincipalsAllowed(cert *ssh.Certificate) (bool, error) {
+	dnsNames, emails, usernames := splitPrincipals(cert.ValidPrincipals)
+	if err := e.validateNames(dnsNames, []net.IP{}, emails, []*url.URL{}, usernames); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -217,10 +233,27 @@ func appendSubjectCommonName(subject pkix.Name, dnsNames *[]string, ips *[]net.I
 	}
 }
 
+// splitPrincipals splits SSH certificate principals into DNS names, emails and user names.
+func splitPrincipals(principals []string) (dnsNames, emails, usernames []string) {
+	dnsNames = []string{}
+	emails = []string{}
+	usernames = []string{}
+	for _, principal := range principals {
+		if strings.Contains(principal, "@") {
+			emails = append(emails, principal)
+		} else if len(strings.Split(principal, ".")) > 1 {
+			dnsNames = append(dnsNames, principal)
+		} else {
+			usernames = append(usernames, principal)
+		}
+	}
+	return
+}
+
 // validateNames verifies that all names are allowed.
 // Its logic follows that of (a large part of) the (c *Certificate) isValid() function
 // in https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
-func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailAddresses []string, uris []*url.URL) error {
+func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailAddresses []string, uris []*url.URL, usernames []string) error {
 
 	// nothing to compare against; return early
 	if e.totalNumberOfConstraints == 0 {
@@ -305,6 +338,34 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 			func(parsedName, constraint interface{}) (bool, error) {
 				return e.matchURIConstraint(parsedName.(*url.URL), constraint.(string))
 			}, e.permittedURIDomains, e.excludedURIDomains); err != nil {
+			return err
+		}
+	}
+
+	//"dns": ["*.smallstep.com"],
+	//"email": ["@smallstep.com", "@google.com"],
+	//"principal": ["max", "mariano", "mike"]
+	/* No regexes for now. But if we ever implement them, they'd probably look like this */
+	/*"principal": ["foo.smallstep.com", "/^*\.smallstep\.com$/"]*/
+
+	// Principals can be single user names (mariano, max, mike, ...), hostnames/domains (*.smallstep.com, host.smallstep.com, ...) and "emails" (max@smallstep.com, @smallstep.com, ...)
+	// All ValidPrincipals can thus be any one of those, and they can be mixed (mike@smallstep.com, mike, ...); we need to split this?
+	// Should we assume a generic engine, or can we do it host vs. user based? If host vs. user based, then it becomes easier w.r.t. dns; hosts will only be DNS, right?
+	// If we assume generic, we _may_ have a harder time distinguishing host vs. user certs. We propose to use host + user specific provisioners, though...
+	// Perhaps we can do some heuristics on the principal names vs. hostnames (i.e. when only a single label and no dot, then it's a user principal)
+
+	for _, username := range usernames {
+		if e.numberOfPrincipalConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
+			return CertificateInvalidError{
+				Reason: x509.CANotAuthorizedForThisName,
+				Detail: fmt.Sprintf("username principal %q is not permitted by any constraint", username),
+			}
+		}
+		// TODO: some validation? I.e. allowed characters?
+		if err := checkNameConstraints("username", username, username,
+			func(parsedName, constraint interface{}) (bool, error) {
+				return matchUsernameConstraint(parsedName.(string), constraint.(string))
+			}, e.permittedPrincipals, e.excludedPrincipals); err != nil {
 			return err
 		}
 	}
@@ -752,4 +813,9 @@ func (e *NamePolicyEngine) matchURIConstraint(uri *url.URL, constraint string) (
 	// TODO(hs): add checks for scheme, path, etc.; either here, or in a different constraint matcher (to keep this one simple)
 
 	return e.matchDomainConstraint(host, constraint)
+}
+
+// matchUsernameConstraint performs a string literal match against a constraint.
+func matchUsernameConstraint(username, constraint string) (bool, error) {
+	return strings.EqualFold(username, constraint), nil
 }

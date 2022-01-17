@@ -16,7 +16,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	x509policy "github.com/smallstep/certificates/policy/x509"
+	"github.com/smallstep/certificates/policy"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
 )
@@ -408,11 +408,11 @@ func (v *validityValidator) Valid(cert *x509.Certificate, o SignOptions) error {
 // x509NamePolicyValidator validates that the certificate (to be signed)
 // contains only allowed SANs.
 type x509NamePolicyValidator struct {
-	policyEngine *x509policy.NamePolicyEngine
+	policyEngine policy.X509NamePolicyEngine
 }
 
 // newX509NamePolicyValidator return a new SANs allow/deny validator.
-func newX509NamePolicyValidator(engine *x509policy.NamePolicyEngine) *x509NamePolicyValidator {
+func newX509NamePolicyValidator(engine policy.X509NamePolicyEngine) *x509NamePolicyValidator {
 	return &x509NamePolicyValidator{
 		policyEngine: engine,
 	}
