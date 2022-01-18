@@ -166,8 +166,9 @@ func (a *Authority) GetCACertificates(ctx context.Context) ([]*x509.Certificate,
 	certs := []*x509.Certificate{}
 	certs = append(certs, a.caCerts[0])
 
-	// TODO(hs): we're adding the roots here, but they may be something different than what the RFC means. Clients are responsible to select the right cert(s) to use, though.
-	if p.ShouldIncludeRootsInChain() && len(a.caCerts) >= 2 {
+	// NOTE: we're adding the CA roots here, but they are (highly likely) different than what the RFC means.
+	// Clients are responsible to select the right cert(s) to use, though.
+	if p.ShouldIncludeRootsInChain() && len(a.caCerts) > 1 {
 		certs = append(certs, a.caCerts[1:]...)
 	}
 
@@ -304,7 +305,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	// apparently the pkcs7 library uses a global default setting for the content encryption
 	// algorithm to use when en- or decrypting data. We need to restore the current setting after
 	// the cryptographic operation, so that other usages of the library are not influenced by
-	// this call to Encrypt().
+	// this call to Encrypt(). We are not required to use the same algorithm the SCEP client uses.
 	encryptionAlgorithmToRestore := pkcs7.ContentEncryptionAlgorithm
 	pkcs7.ContentEncryptionAlgorithm = p.GetContentEncryptionAlgorithm()
 	e7, err := pkcs7.Encrypt(deg, msg.P7.Certificates)

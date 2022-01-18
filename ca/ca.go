@@ -432,17 +432,13 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 		certPool.AddCert(crt)
 	}
 
-	// adding the intermediate CA to the pool will allow clients that
-	// fail to send the intermediate for chain building to connect to the CA
-	// successfully.
-	shouldAddIntermediateToClientCAPool := true // TODO(hs): make this into a configuration
-	if shouldAddIntermediateToClientCAPool {
-		cert, err := auth.GetIntermediateCertificate()
-		if err != nil {
-			return nil, err
-		}
-		certPool.AddCert(cert)
+	// adding the intermediate CA to the pool will allow clients that do not
+	// send the intermediate for chain building to connect to the CA successfully.
+	cert, err := auth.GetIntermediateCertificate()
+	if err != nil {
+		return nil, err
 	}
+	certPool.AddCert(cert)
 
 	// Add support for mutual tls to renew certificates
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven

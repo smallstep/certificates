@@ -595,7 +595,7 @@ func (a *Authority) IsRevoked(sn string) (bool, error) {
 	return a.db.IsRevoked(sn)
 }
 
-// GetIntermediateCertificate returns the x509 CA intermediate
+// GetIntermediateCertificate returns the x509 intermediate CA
 // certificate.
 func (a *Authority) GetIntermediateCertificate() (*x509.Certificate, error) {
 	return pemutil.ReadCertificate(a.config.IntermediateCert)

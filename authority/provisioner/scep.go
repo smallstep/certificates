@@ -24,8 +24,8 @@ type SCEP struct {
 	MinimumPublicKeyLength int `json:"minimumPublicKeyLength,omitempty"`
 	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
 	// at https://github.com/mozilla-services/pkcs7/blob/33d05740a3526e382af6395d3513e73d4e66d1cb/encrypt.go#L63
-	// Defaults to 2, being AES-256-CBC
-	EncryptionAlgorithmIdentifier *int     `json:"encryptionAlgorithmIdentifier,omitempty"`
+	// Defaults to 0, being DES-CBC
+	EncryptionAlgorithmIdentifier int      `json:"encryptionAlgorithmIdentifier,omitempty"`
 	Options                       *Options `json:"options,omitempty"`
 	Claims                        *Claims  `json:"claims,omitempty"`
 	claimer                       *Claimer
@@ -104,16 +104,12 @@ func (s *SCEP) Init(config Config) (err error) {
 	}
 
 	if s.MinimumPublicKeyLength%8 != 0 {
-		return errors.Errorf("only minimum public keys exactly divisible by 8 are supported; %d is not exactly divisible by 8", s.MinimumPublicKeyLength)
+		return errors.Errorf("%d bits is not exactly divisible by 8", s.MinimumPublicKeyLength)
 	}
 
-	s.encryptionAlgorithm = 2 // default to AES-256-CBC
-	if s.EncryptionAlgorithmIdentifier != nil {
-		value := *s.EncryptionAlgorithmIdentifier
-		if value < 0 || value > 4 {
-			return errors.Errorf("only encryption algorithm identifiers from 0 to 4 are valid")
-		}
-		s.encryptionAlgorithm = value
+	s.encryptionAlgorithm = s.EncryptionAlgorithmIdentifier
+	if s.encryptionAlgorithm < 0 || s.encryptionAlgorithm > 4 {
+		return errors.New("only encryption algorithm identifiers from 0 to 4 are valid")
 	}
 
 	// TODO: add other, SCEP specific, options?
