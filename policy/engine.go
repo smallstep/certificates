@@ -31,8 +31,7 @@ type NamePolicyError struct {
 }
 
 func (e NamePolicyError) Error() string {
-	switch e.Reason {
-	case NotAuthorizedForThisName:
+	if e.Reason == NotAuthorizedForThisName {
 		return "not authorized to sign for this name: " + e.Detail
 	}
 	return "unknown error"
@@ -340,7 +339,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		if e.numberOfPrincipalConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
 			return NamePolicyError{
 				Reason: NotAuthorizedForThisName,
-				Detail: fmt.Sprintf("username principal %q is not explicity permitted by any constraint", username),
+				Detail: fmt.Sprintf("username principal %q is not explicitly permitted by any constraint", username),
 			}
 		}
 		// TODO: some validation? I.e. allowed characters?
