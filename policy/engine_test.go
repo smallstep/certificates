@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/smallstep/assert"
+	"golang.org/x/crypto/ssh"
 )
 
 // TODO(hs): the functionality in the policy engine is a nice candidate for trying fuzzing on
 // TODO(hs): more complex uses cases that combine multiple names and permitted/excluded entries
-// TODO(hs): check errors (reasons) are as expected
 
 func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 	tests := []struct {
@@ -136,6 +136,22 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 			wantErr:    false,
 		},
 		{
+			name:       "false/idna-internationalized-domain-name",
+			engine:     &NamePolicyEngine{},
+			domain:     "JP納豆.例.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
+			constraint: ".例.jp",
+			want:       false,
+			wantErr:    true,
+		},
+		{
+			name:       "false/idna-internationalized-domain-name-constraint",
+			engine:     &NamePolicyEngine{},
+			domain:     "xn--jp-cd2fp15c.xn--fsq.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
+			constraint: ".例.jp",
+			want:       false,
+			wantErr:    true,
+		},
+		{
 			name:       "ok/empty-constraint",
 			engine:     &NamePolicyEngine{},
 			domain:     "www.example.com",
@@ -166,6 +182,22 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 			engine:     &NamePolicyEngine{},
 			domain:     "www.example.com",
 			constraint: "www.example.com",
+			want:       true,
+			wantErr:    false,
+		},
+		{
+			name:       "ok/different-case",
+			engine:     &NamePolicyEngine{},
+			domain:     "WWW.EXAMPLE.com",
+			constraint: "www.example.com",
+			want:       true,
+			wantErr:    false,
+		},
+		{
+			name:       "ok/idna-internationalized-domain-name-punycode",
+			engine:     &NamePolicyEngine{},
+			domain:     "xn--jp-cd2fp15c.xn--fsq.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
+			constraint: ".xn--fsq.jp",
 			want:       true,
 			wantErr:    false,
 		},
@@ -413,6 +445,17 @@ func TestNamePolicyEngine_matchEmailConstraint(t *testing.T) {
 			want:       true,
 			wantErr:    false,
 		},
+		{
+			name:   "ok/different-case",
+			engine: &NamePolicyEngine{},
+			mailbox: rfc2821Mailbox{
+				local:  "mail",
+				domain: "EXAMPLE.com",
+			},
+			constraint: "example.com", // "wildcard" for 'example.com'
+			want:       true,
+			wantErr:    false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -558,6 +601,17 @@ func TestNamePolicyEngine_matchURIConstraint(t *testing.T) {
 			want:       true,
 			wantErr:    false,
 		},
+		{
+			name:   "ok/different-case",
+			engine: &NamePolicyEngine{},
+			uri: &url.URL{
+				Scheme: "https",
+				Host:   "www.EXAMPLE.local",
+			},
+			constraint: ".example.local", // using x509 period as the "wildcard"; expects a single subdomain
+			want:       true,
+			wantErr:    false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -573,7 +627,23 @@ func TestNamePolicyEngine_matchURIConstraint(t *testing.T) {
 	}
 }
 
-func TestNamePolicyEngine_AreCertificateNamesAllowed(t *testing.T) {
+func extractSANs(cert *x509.Certificate, includeSubject bool) []string {
+	sans := []string{}
+	sans = append(sans, cert.DNSNames...)
+	for _, ip := range cert.IPAddresses {
+		sans = append(sans, ip.String())
+	}
+	sans = append(sans, cert.EmailAddresses...)
+	for _, uri := range cert.URIs {
+		sans = append(sans, uri.String())
+	}
+	if includeSubject && cert.Subject.CommonName != "" {
+		sans = append(sans, cert.Subject.CommonName)
+	}
+	return sans
+}
+
+func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 	tests := []struct {
 		name    string
 		options []NamePolicyOption
@@ -2048,13 +2118,421 @@ func TestNamePolicyEngine_AreCertificateNamesAllowed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			engine, err := New(tt.options...)
 			assert.FatalError(t, err)
-			got, err := engine.AreCertificateNamesAllowed(tt.cert) // TODO: perform tests on CSR, sans, etc. too
+			got, err := engine.AreCertificateNamesAllowed(tt.cert)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NamePolicyEngine.AreCertificateNamesAllowed() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			if err != nil {
+				assert.NotEquals(t, "", err.Error()) // TODO(hs): implement a more specific error comparison?
+			}
 			if got != tt.want {
 				t.Errorf("NamePolicyEngine.AreCertificateNamesAllowed() = %v, want %v", got, tt.want)
+			}
+
+			// Perform the same tests for a CSR, which are similar to Certificates
+			csr := &x509.CertificateRequest{
+				Subject:        tt.cert.Subject,
+				DNSNames:       tt.cert.DNSNames,
+				EmailAddresses: tt.cert.EmailAddresses,
+				IPAddresses:    tt.cert.IPAddresses,
+				URIs:           tt.cert.URIs,
+			}
+			got, err = engine.AreCSRNamesAllowed(csr)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NamePolicyEngine.AreCSRNamesAllowed() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err != nil {
+				assert.NotEquals(t, "", err.Error())
+			}
+			if got != tt.want {
+				t.Errorf("NamePolicyEngine.AreCSRNamesAllowed() = %v, want %v", got, tt.want)
+			}
+
+			// Perform the same tests for a slice of SANs
+			includeSubject := engine.verifySubjectCommonName // copy behavior of the engine when Subject has to be included as a SAN
+			sans := extractSANs(tt.cert, includeSubject)
+			got, err = engine.AreSANsAllowed(sans)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NamePolicyEngine.AreSANsAllowed() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err != nil {
+				assert.NotEquals(t, "", err.Error())
+			}
+			if got != tt.want {
+				t.Errorf("NamePolicyEngine.AreSANsAllowed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
+	tests := []struct {
+		name    string
+		options []NamePolicyOption
+		cert    *ssh.Certificate
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "fail/with-permitted-dns-domain",
+			options: []NamePolicyOption{
+				WithPermittedDNSDomain("*.local"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"host.example.com",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/with-excluded-dns-domain",
+			options: []NamePolicyOption{
+				WithExcludedDNSDomain("*.local"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"host.local",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/with-permitted-ip",
+			options: []NamePolicyOption{
+				WithPermittedCIDR("127.0.0.1/24"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"192.168.0.22",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/with-excluded-ip",
+			options: []NamePolicyOption{
+				WithExcludedCIDR("127.0.0.1/24"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"127.0.0.0",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/with-permitted-email",
+			options: []NamePolicyOption{
+				WithPermittedEmailAddress("@example.com"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"mail@local",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/with-excluded-email",
+			options: []NamePolicyOption{
+				WithExcludedEmailAddress("@example.com"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"mail@example.com",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/with-permitted-principals",
+			options: []NamePolicyOption{
+				WithPermittedPrincipals([]string{"user"}),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"root",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/with-excluded-principals",
+			options: []NamePolicyOption{
+				WithExcludedPrincipals([]string{"user"}),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"user",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/with-permitted-principal-as-mail",
+			options: []NamePolicyOption{
+				WithPermittedPrincipals([]string{"ops"}),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"ops@work", // this is (currently) parsed as an email-like principal; not allowed with just "ops" as the permitted principal
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/principal-with-permitted-dns-domain", // when only DNS is permitted, username principals are not allowed.
+			options: []NamePolicyOption{
+				WithPermittedDNSDomain("*.local"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"user",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/principal-with-permitted-ip-range", // when only IPs are permitted, username principals are not allowed.
+			options: []NamePolicyOption{
+				WithPermittedCIDR("127.0.0.1/24"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"user",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/principal-with-permitted-email", // when only emails are permitted, username principals are not allowed.
+			options: []NamePolicyOption{
+				WithPermittedEmailAddress("@example.com"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"user",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/combined-user",
+			options: []NamePolicyOption{
+				WithPermittedEmailAddress("@smallstep.com"),
+				WithExcludedEmailAddress("root@smallstep.com"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"someone@smallstep.com",
+					"someone",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/combined-user-with-excluded-user-principal",
+			options: []NamePolicyOption{
+				WithPermittedEmailAddress("@smallstep.com"),
+				WithExcludedPrincipals([]string{"root"}),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"someone@smallstep.com",
+					"root",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "ok/with-permitted-dns-domain",
+			options: []NamePolicyOption{
+				WithPermittedDNSDomain("*.local"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"host.local",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/with-excluded-dns-domain",
+			options: []NamePolicyOption{
+				WithExcludedDNSDomain("*.example.com"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"host.local",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/with-permitted-ip",
+			options: []NamePolicyOption{
+				WithPermittedCIDR("127.0.0.1/24"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"127.0.0.33",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/with-excluded-ip",
+			options: []NamePolicyOption{
+				WithExcludedCIDR("127.0.0.1/24"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"192.168.0.35",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/with-permitted-email",
+			options: []NamePolicyOption{
+				WithPermittedEmailAddress("@example.com"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"mail@example.com",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/with-excluded-email",
+			options: []NamePolicyOption{
+				WithExcludedEmailAddress("@example.com"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"mail@local",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/with-permitted-principals",
+			options: []NamePolicyOption{
+				WithPermittedPrincipals([]string{"*"}),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"user",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/with-excluded-principals",
+			options: []NamePolicyOption{
+				WithExcludedPrincipals([]string{"user"}),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"root",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/combined-user",
+			options: []NamePolicyOption{
+				WithPermittedEmailAddress("@smallstep.com"),
+				WithPermittedPrincipals([]string{"*"}), // without specifying the wildcard, "someone" would not be allowed.
+				WithExcludedEmailAddress("root@smallstep.com"),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"someone@smallstep.com",
+					"someone",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/combined-user-with-excluded-user-principal",
+			options: []NamePolicyOption{
+				WithPermittedEmailAddress("@smallstep.com"),
+				WithExcludedEmailAddress("root@smallstep.com"),
+				WithExcludedPrincipals([]string{"root"}), // unlike the previous test, this implicitly allows any other username principal
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"someone@smallstep.com",
+					"someone",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/combined-simple-all",
+			options: []NamePolicyOption{
+				WithPermittedDNSDomain("*.local"),
+				WithPermittedCIDR("127.0.0.1/24"),
+				WithPermittedEmailAddress("@example.local"),
+				WithPermittedPrincipals([]string{"user"}),
+				WithExcludedDNSDomain("badhost.local"),
+				WithExcludedCIDR("127.0.0.128/25"),
+				WithExcludedEmailAddress("badmail@example.local"),
+				WithExcludedPrincipals([]string{"root"}),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"example.local",
+					"127.0.0.1",
+					"user@example.local",
+					"user",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine, err := New(tt.options...)
+			assert.FatalError(t, err)
+			got, err := engine.ArePrincipalsAllowed(tt.cert)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NamePolicyEngine.ArePrincipalsAllowed() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("NamePolicyEngine.ArePrincipalsAllowed() = %v, want %v", got, tt.want)
 			}
 		})
 	}

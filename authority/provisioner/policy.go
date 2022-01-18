@@ -19,7 +19,7 @@ func newX509PolicyEngine(x509Opts *X509Options) (policy.X509NamePolicyEngine, er
 	if allowed != nil && allowed.HasNames() {
 		options = append(options,
 			policy.WithPermittedDNSDomains(allowed.DNSDomains),
-			policy.WithPermittedCIDRs(allowed.IPRanges), // TODO(hs): support IPs in addition to ranges
+			policy.WithPermittedIPsOrCIDRs(allowed.IPRanges),
 			policy.WithPermittedEmailAddresses(allowed.EmailAddresses),
 			policy.WithPermittedURIDomains(allowed.URIDomains),
 		)
@@ -29,7 +29,7 @@ func newX509PolicyEngine(x509Opts *X509Options) (policy.X509NamePolicyEngine, er
 	if denied != nil && denied.HasNames() {
 		options = append(options,
 			policy.WithExcludedDNSDomains(denied.DNSDomains),
-			policy.WithExcludedCIDRs(denied.IPRanges), // TODO(hs): support IPs in addition to ranges
+			policy.WithExcludedIPsOrCIDRs(denied.IPRanges),
 			policy.WithExcludedEmailAddresses(denied.EmailAddresses),
 			policy.WithExcludedURIDomains(denied.URIDomains),
 		)

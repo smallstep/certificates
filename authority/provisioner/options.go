@@ -90,7 +90,7 @@ func (o *X509Options) GetDeniedNameOptions() *DeniedX509NameOptions {
 // AllowedX509NameOptions models the allowed names
 type AllowedX509NameOptions struct {
 	DNSDomains     []string `json:"dns,omitempty"`
-	IPRanges       []string `json:"ip,omitempty"` // TODO(hs): support IPs as well as ranges
+	IPRanges       []string `json:"ip,omitempty"`
 	EmailAddresses []string `json:"email,omitempty"`
 	URIDomains     []string `json:"uri,omitempty"`
 }
@@ -98,7 +98,7 @@ type AllowedX509NameOptions struct {
 // DeniedX509NameOptions models the denied names
 type DeniedX509NameOptions struct {
 	DNSDomains     []string `json:"dns,omitempty"`
-	IPRanges       []string `json:"ip,omitempty"` // TODO(hs): support IPs as well as ranges
+	IPRanges       []string `json:"ip,omitempty"`
 	EmailAddresses []string `json:"email,omitempty"`
 	URIDomains     []string `json:"uri,omitempty"`
 }

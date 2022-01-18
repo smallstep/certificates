@@ -15,33 +15,25 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type CertificateInvalidError struct {
-	Reason x509.InvalidReason
+type NamePolicyReason int
+
+const (
+	// NotAuthorizedForThisName results when an instance of
+	// NamePolicyEngine determines that there's a constraint which
+	// doesn't permit a DNS or another type of SAN to be signed
+	// (or otherwise used).
+	NotAuthorizedForThisName NamePolicyReason = iota
+)
+
+type NamePolicyError struct {
+	Reason NamePolicyReason
 	Detail string
 }
 
-func (e CertificateInvalidError) Error() string {
+func (e NamePolicyError) Error() string {
 	switch e.Reason {
-	// TODO: include logical errors for this package; exlude ones that don't make sense for its current use case?
-	// TODO: currently only CANotAuthorizedForThisName is used by this package; we're not checking the other things in CSRs in this package.
-	case x509.NotAuthorizedToSign:
-		return "not authorized to sign other certificates" // TODO: this one doesn't make sense for this pkg
-	case x509.Expired:
-		return "csr has expired or is not yet valid: " + e.Detail
-	case x509.CANotAuthorizedForThisName:
+	case NotAuthorizedForThisName:
 		return "not authorized to sign for this name: " + e.Detail
-	case x509.CANotAuthorizedForExtKeyUsage:
-		return "not authorized for an extended key usage: " + e.Detail
-	case x509.TooManyIntermediates:
-		return "too many intermediates for path length constraint"
-	case x509.IncompatibleUsage:
-		return "csr specifies an incompatible key usage"
-	case x509.NameMismatch:
-		return "issuer name does not match subject from issuing certificate"
-	case x509.NameConstraintsWithoutSANs:
-		return "issuer has name constraints but csr doesn't have a SAN extension"
-	case x509.UnconstrainedName:
-		return "issuer has name constraints but csr contains unknown or unconstrained name: " + e.Detail
 	}
 	return "unknown error"
 }
@@ -126,7 +118,7 @@ func removeDuplicates(strSlice []string) []string {
 	keys := make(map[string]bool)
 	result := []string{}
 	for _, item := range strSlice {
-		if _, value := keys[item]; !value {
+		if _, value := keys[item]; !value && item != "" { // skip empty constraints
 			keys[item] = true
 			result = append(result, item)
 		}
@@ -206,8 +198,8 @@ func (e *NamePolicyEngine) IsIPAllowed(ip net.IP) (bool, error) {
 
 // ArePrincipalsAllowed verifies that all principals in an SSH certificate are allowed.
 func (e *NamePolicyEngine) ArePrincipalsAllowed(cert *ssh.Certificate) (bool, error) {
-	dnsNames, emails, usernames := splitPrincipals(cert.ValidPrincipals)
-	if err := e.validateNames(dnsNames, []net.IP{}, emails, []*url.URL{}, usernames); err != nil {
+	dnsNames, ips, emails, usernames := splitPrincipals(cert.ValidPrincipals)
+	if err := e.validateNames(dnsNames, ips, emails, []*url.URL{}, usernames); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -233,14 +225,17 @@ func appendSubjectCommonName(subject pkix.Name, dnsNames *[]string, ips *[]net.I
 	}
 }
 
-// splitPrincipals splits SSH certificate principals into DNS names, emails and user names.
-func splitPrincipals(principals []string) (dnsNames, emails, usernames []string) {
+// splitPrincipals splits SSH certificate principals into DNS names, emails and usernames.
+func splitPrincipals(principals []string) (dnsNames []string, ips []net.IP, emails, usernames []string) {
 	dnsNames = []string{}
+	ips = []net.IP{}
 	emails = []string{}
 	usernames = []string{}
 	for _, principal := range principals {
 		if strings.Contains(principal, "@") {
 			emails = append(emails, principal)
+		} else if ip := net.ParseIP(principal); ip != nil {
+			ips = append(ips, ip)
 		} else if len(strings.Split(principal, ".")) > 1 {
 			dnsNames = append(dnsNames, principal)
 		} else {
@@ -260,7 +255,6 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		return nil
 	}
 
-	// TODO: return our own type(s) of error?
 	// TODO: implement check that requires at least a single name in all of the SANs + subject?
 
 	// TODO: set limit on total of all names validated? In x509 there's a limit on the number of comparisons
@@ -277,9 +271,9 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		// then return error, because DNS should be explicitly configured to be allowed in that case. In case there are
 		// (other) excluded constraints, we'll allow a DNS (implicit allow; currently).
 		if e.numberOfDNSDomainConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
-			return CertificateInvalidError{
-				Reason: x509.CANotAuthorizedForThisName,
-				Detail: fmt.Sprintf("dns %q is not permitted by any constraint", dns), // TODO(hs): change this error (message)
+			return NamePolicyError{
+				Reason: NotAuthorizedForThisName,
+				Detail: fmt.Sprintf("dns %q is not explicitly permitted by any constraint", dns),
 			}
 		}
 		if _, ok := domainToReverseLabels(dns); !ok {
@@ -295,9 +289,9 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 
 	for _, ip := range ips {
 		if e.numberOfIPRangeConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
-			return CertificateInvalidError{
-				Reason: x509.CANotAuthorizedForThisName,
-				Detail: fmt.Sprintf("ip %q is not permitted by any constraint", ip.String()),
+			return NamePolicyError{
+				Reason: NotAuthorizedForThisName,
+				Detail: fmt.Sprintf("ip %q is not explicitly permitted by any constraint", ip.String()),
 			}
 		}
 		if err := checkNameConstraints("ip", ip.String(), ip,
@@ -310,9 +304,9 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 
 	for _, email := range emailAddresses {
 		if e.numberOfEmailAddressConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
-			return CertificateInvalidError{
-				Reason: x509.CANotAuthorizedForThisName,
-				Detail: fmt.Sprintf("email %q is not permitted by any constraint", email),
+			return NamePolicyError{
+				Reason: NotAuthorizedForThisName,
+				Detail: fmt.Sprintf("email %q is not explicitly permitted by any constraint", email),
 			}
 		}
 		mailbox, ok := parseRFC2821Mailbox(email)
@@ -329,9 +323,9 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 
 	for _, uri := range uris {
 		if e.numberOfURIDomainConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
-			return CertificateInvalidError{
-				Reason: x509.CANotAuthorizedForThisName,
-				Detail: fmt.Sprintf("uri %q is not permitted by any constraint", uri.String()),
+			return NamePolicyError{
+				Reason: NotAuthorizedForThisName,
+				Detail: fmt.Sprintf("uri %q is not explicitly permitted by any constraint", uri.String()),
 			}
 		}
 		if err := checkNameConstraints("uri", uri.String(), uri,
@@ -342,23 +336,11 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		}
 	}
 
-	//"dns": ["*.smallstep.com"],
-	//"email": ["@smallstep.com", "@google.com"],
-	//"principal": ["max", "mariano", "mike"]
-	/* No regexes for now. But if we ever implement them, they'd probably look like this */
-	/*"principal": ["foo.smallstep.com", "/^*\.smallstep\.com$/"]*/
-
-	// Principals can be single user names (mariano, max, mike, ...), hostnames/domains (*.smallstep.com, host.smallstep.com, ...) and "emails" (max@smallstep.com, @smallstep.com, ...)
-	// All ValidPrincipals can thus be any one of those, and they can be mixed (mike@smallstep.com, mike, ...); we need to split this?
-	// Should we assume a generic engine, or can we do it host vs. user based? If host vs. user based, then it becomes easier w.r.t. dns; hosts will only be DNS, right?
-	// If we assume generic, we _may_ have a harder time distinguishing host vs. user certs. We propose to use host + user specific provisioners, though...
-	// Perhaps we can do some heuristics on the principal names vs. hostnames (i.e. when only a single label and no dot, then it's a user principal)
-
 	for _, username := range usernames {
 		if e.numberOfPrincipalConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
-			return CertificateInvalidError{
-				Reason: x509.CANotAuthorizedForThisName,
-				Detail: fmt.Sprintf("username principal %q is not permitted by any constraint", username),
+			return NamePolicyError{
+				Reason: NotAuthorizedForThisName,
+				Detail: fmt.Sprintf("username principal %q is not explicity permitted by any constraint", username),
 			}
 		}
 		// TODO: some validation? I.e. allowed characters?
@@ -370,7 +352,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		}
 	}
 
-	// TODO: when the error is not nil and returned up in the above, we can add
+	// TODO(hs): when the error is not nil and returned up in the above, we can add
 	// additional context to it (i.e. the cert or csr that was inspected).
 
 	// TODO(hs): validate other types of SANs? The Go std library skips those.
@@ -382,8 +364,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 
 // checkNameConstraints checks that a name, of type nameType is permitted.
 // The argument parsedName contains the parsed form of name, suitable for passing
-// to the match function. The total number of comparisons is tracked in the given
-// count and should not exceed the given limit.
+// to the match function.
 // SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
 func checkNameConstraints(
 	nameType string,
@@ -394,26 +375,19 @@ func checkNameConstraints(
 
 	excludedValue := reflect.ValueOf(excluded)
 
-	// *count += excludedValue.Len()
-	// if *count > maxConstraintComparisons {
-	// 	return x509.CertificateInvalidError{c, x509.TooManyConstraints, ""}
-	// }
-
-	// TODO: fix the errors; return our own, because we don't have cert ...
-
 	for i := 0; i < excludedValue.Len(); i++ {
 		constraint := excludedValue.Index(i).Interface()
 		match, err := match(parsedName, constraint)
 		if err != nil {
-			return CertificateInvalidError{
-				Reason: x509.CANotAuthorizedForThisName,
+			return NamePolicyError{
+				Reason: NotAuthorizedForThisName,
 				Detail: err.Error(),
 			}
 		}
 
 		if match {
-			return CertificateInvalidError{
-				Reason: x509.CANotAuthorizedForThisName,
+			return NamePolicyError{
+				Reason: NotAuthorizedForThisName,
 				Detail: fmt.Sprintf("%s %q is excluded by constraint %q", nameType, name, constraint),
 			}
 		}
@@ -421,18 +395,13 @@ func checkNameConstraints(
 
 	permittedValue := reflect.ValueOf(permitted)
 
-	// *count += permittedValue.Len()
-	// if *count > maxConstraintComparisons {
-	// 	return x509.CertificateInvalidError{c, x509.TooManyConstraints, ""}
-	// }
-
 	ok := true
 	for i := 0; i < permittedValue.Len(); i++ {
 		constraint := permittedValue.Index(i).Interface()
 		var err error
 		if ok, err = match(parsedName, constraint); err != nil {
-			return CertificateInvalidError{
-				Reason: x509.CANotAuthorizedForThisName,
+			return NamePolicyError{
+				Reason: NotAuthorizedForThisName,
 				Detail: err.Error(),
 			}
 		}
@@ -443,8 +412,8 @@ func checkNameConstraints(
 	}
 
 	if !ok {
-		return CertificateInvalidError{
-			Reason: x509.CANotAuthorizedForThisName,
+		return NamePolicyError{
+			Reason: NotAuthorizedForThisName,
 			Detail: fmt.Sprintf("%s %q is not permitted by any constraint", nameType, name),
 		}
 	}
@@ -651,7 +620,6 @@ func (e *NamePolicyEngine) matchDomainConstraint(domain, constraint string) (boo
 	}
 
 	// Block domains that start with just a period
-	// TODO(hs): check if we should allow domains starting with "." at all; not sure if this is allowed in x509 names and certs.
 	if domain[0] == '.' {
 		return false, nil
 	}
@@ -744,17 +712,9 @@ func matchIPConstraint(ip net.IP, constraint *net.IPNet) (bool, error) {
 	// 	}
 	// }
 
-	// if isIPv4(ip) != isIPv4(constraint.IP) { // TODO(hs): this check seems to do what the above intended to do?
-	// 	return false, nil
-	// }
-
 	contained := constraint.Contains(ip) // TODO(hs): validate that this is the correct behavior; also check IPv4-in-IPv6 (again)
 
 	return contained, nil
-}
-
-func isIPv4(ip net.IP) bool {
-	return ip.To4() != nil
 }
 
 // SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
@@ -817,5 +777,9 @@ func (e *NamePolicyEngine) matchURIConstraint(uri *url.URL, constraint string) (
 
 // matchUsernameConstraint performs a string literal match against a constraint.
 func matchUsernameConstraint(username, constraint string) (bool, error) {
+	// allow any plain principal username
+	if constraint == "*" {
+		return true, nil
+	}
 	return strings.EqualFold(username, constraint), nil
 }

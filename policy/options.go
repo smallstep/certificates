@@ -204,6 +204,42 @@ func AddExcludedCIDRs(cidrs []string) NamePolicyOption {
 	}
 }
 
+func WithPermittedIPsOrCIDRs(ipsOrCIDRs []string) NamePolicyOption {
+	return func(e *NamePolicyEngine) error {
+		networks := make([]*net.IPNet, len(ipsOrCIDRs))
+		for i, ipOrCIDR := range ipsOrCIDRs {
+			_, nw, err := net.ParseCIDR(ipOrCIDR)
+			if err == nil {
+				networks[i] = nw
+			} else if ip := net.ParseIP(ipOrCIDR); ip != nil {
+				networks[i] = networkFor(ip)
+			} else {
+				return errors.Errorf("cannot parse permitted constraint %q as IP nor CIDR", ipOrCIDR)
+			}
+		}
+		e.permittedIPRanges = networks
+		return nil
+	}
+}
+
+func WithExcludedIPsOrCIDRs(ipsOrCIDRs []string) NamePolicyOption {
+	return func(e *NamePolicyEngine) error {
+		networks := make([]*net.IPNet, len(ipsOrCIDRs))
+		for i, ipOrCIDR := range ipsOrCIDRs {
+			_, nw, err := net.ParseCIDR(ipOrCIDR)
+			if err == nil {
+				networks[i] = nw
+			} else if ip := net.ParseIP(ipOrCIDR); ip != nil {
+				networks[i] = networkFor(ip)
+			} else {
+				return errors.Errorf("cannot parse excluded constraint %q as IP nor CIDR", ipOrCIDR)
+			}
+		}
+		e.excludedIPRanges = networks
+		return nil
+	}
+}
+
 func WithPermittedCIDR(cidr string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		_, nw, err := net.ParseCIDR(cidr)
@@ -228,16 +264,7 @@ func AddPermittedCIDR(cidr string) NamePolicyOption {
 
 func WithPermittedIP(ip net.IP) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		var mask net.IPMask
-		if !isIPv4(ip) {
-			mask = net.CIDRMask(128, 128)
-		} else {
-			mask = net.CIDRMask(32, 32)
-		}
-		nw := &net.IPNet{
-			IP:   ip,
-			Mask: mask,
-		}
+		nw := networkFor(ip)
 		e.permittedIPRanges = []*net.IPNet{nw}
 		return nil
 	}
@@ -245,16 +272,7 @@ func WithPermittedIP(ip net.IP) NamePolicyOption {
 
 func AddPermittedIP(ip net.IP) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
-		var mask net.IPMask
-		if !isIPv4(ip) {
-			mask = net.CIDRMask(128, 128)
-		} else {
-			mask = net.CIDRMask(32, 32)
-		}
-		nw := &net.IPNet{
-			IP:   ip,
-			Mask: mask,
-		}
+		nw := networkFor(ip)
 		e.permittedIPRanges = append(e.permittedIPRanges, nw)
 		return nil
 	}
@@ -540,9 +558,7 @@ func AddExcludedURIDomain(uriDomain string) NamePolicyOption {
 
 func WithPermittedPrincipals(principals []string) NamePolicyOption {
 	return func(g *NamePolicyEngine) error {
-		// for _, principal := range principals {
-		// 	// TODO: validation?
-		// }
+		// TODO(hs): normalize and parse principal into the right type? Seems the safe thing to do.
 		g.permittedPrincipals = principals
 		return nil
 	}
@@ -550,16 +566,32 @@ func WithPermittedPrincipals(principals []string) NamePolicyOption {
 
 func WithExcludedPrincipals(principals []string) NamePolicyOption {
 	return func(g *NamePolicyEngine) error {
-		// for _, principal := range principals {
-		// 	// TODO: validation?
-		// }
+		// TODO(hs): normalize and parse principal into the right type? Seems the safe thing to do.
 		g.excludedPrincipals = principals
 		return nil
 	}
 }
 
+func networkFor(ip net.IP) *net.IPNet {
+	var mask net.IPMask
+	if !isIPv4(ip) {
+		mask = net.CIDRMask(128, 128)
+	} else {
+		mask = net.CIDRMask(32, 32)
+	}
+	nw := &net.IPNet{
+		IP:   ip,
+		Mask: mask,
+	}
+	return nw
+}
+
+func isIPv4(ip net.IP) bool {
+	return ip.To4() != nil
+}
+
 func normalizeAndValidateDNSDomainConstraint(constraint string) (string, error) {
-	normalizedConstraint := strings.TrimSpace(constraint)
+	normalizedConstraint := strings.ToLower(strings.TrimSpace(constraint))
 	if strings.Contains(normalizedConstraint, "..") {
 		return "", errors.Errorf("domain constraint %q cannot have empty labels", constraint)
 	}
@@ -576,7 +608,7 @@ func normalizeAndValidateDNSDomainConstraint(constraint string) (string, error) 
 }
 
 func normalizeAndValidateEmailConstraint(constraint string) (string, error) {
-	normalizedConstraint := strings.TrimSpace(constraint)
+	normalizedConstraint := strings.ToLower(strings.TrimSpace(constraint))
 	if strings.Contains(normalizedConstraint, "*") {
 		return "", fmt.Errorf("email constraint %q cannot contain asterisk", constraint)
 	}
@@ -601,7 +633,7 @@ func normalizeAndValidateEmailConstraint(constraint string) (string, error) {
 }
 
 func normalizeAndValidateURIDomainConstraint(constraint string) (string, error) {
-	normalizedConstraint := strings.TrimSpace(constraint)
+	normalizedConstraint := strings.ToLower(strings.TrimSpace(constraint))
 	if strings.Contains(normalizedConstraint, "..") {
 		return "", errors.Errorf("URI domain constraint %q cannot have empty labels", constraint)
 	}

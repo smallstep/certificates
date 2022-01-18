@@ -34,6 +34,18 @@ func Test_normalizeAndValidateDNSDomainConstraint(t *testing.T) {
 			wantErr:    true,
 		},
 		{
+			name:       "false/idna-internationalized-domain-name",
+			constraint: ".例.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "false/idna-internationalized-domain-name-constraint",
+			constraint: ".例.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
+			want:       "",
+			wantErr:    true,
+		},
+		{
 			name:       "ok/wildcard",
 			constraint: "*.local",
 			want:       ".local",
@@ -43,6 +55,12 @@ func Test_normalizeAndValidateDNSDomainConstraint(t *testing.T) {
 			name:       "ok/specific-domain",
 			constraint: "example.local",
 			want:       "example.local",
+			wantErr:    false,
+		},
+		{
+			name:       "ok/idna-internationalized-domain-name-punycode",
+			constraint: ".xn--fsq.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
+			want:       ".xn--fsq.jp",
 			wantErr:    false,
 		},
 	}
@@ -292,6 +310,42 @@ func TestNew(t *testing.T) {
 			return test{
 				options: []NamePolicyOption{
 					AddExcludedCIDRs([]string{"127.0.0.1//24"}),
+				},
+				want:    nil,
+				wantErr: true,
+			}
+		},
+		"fail/with-permitted-ipsOrCIDRs-cidr": func(t *testing.T) test {
+			return test{
+				options: []NamePolicyOption{
+					WithPermittedIPsOrCIDRs([]string{"127.0.0.1//24"}),
+				},
+				want:    nil,
+				wantErr: true,
+			}
+		},
+		"fail/with-permitted-ipsOrCIDRs-ip": func(t *testing.T) test {
+			return test{
+				options: []NamePolicyOption{
+					WithPermittedIPsOrCIDRs([]string{"127.0.0:1"}),
+				},
+				want:    nil,
+				wantErr: true,
+			}
+		},
+		"fail/with-excluded-ipsOrCIDRs-cidr": func(t *testing.T) test {
+			return test{
+				options: []NamePolicyOption{
+					WithExcludedIPsOrCIDRs([]string{"127.0.0.1//24"}),
+				},
+				want:    nil,
+				wantErr: true,
+			}
+		},
+		"fail/with-excluded-ipsOrCIDRs-ip": func(t *testing.T) test {
+			return test{
+				options: []NamePolicyOption{
+					WithExcludedIPsOrCIDRs([]string{"127.0.0:1"}),
 				},
 				want:    nil,
 				wantErr: true,
@@ -828,6 +882,48 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
+		"ok/with-permitted-ipsOrCIDRs-cidr": func(t *testing.T) test {
+			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
+			assert.FatalError(t, err)
+			_, nw2, err := net.ParseCIDR("192.168.0.31/32")
+			assert.FatalError(t, err)
+			options := []NamePolicyOption{
+				WithPermittedIPsOrCIDRs([]string{"127.0.0.1/24", "192.168.0.31"}),
+			}
+			return test{
+				options: options,
+				want: &NamePolicyEngine{
+					permittedIPRanges: []*net.IPNet{
+						nw1, nw2,
+					},
+					numberOfIPRangeConstraints:        2,
+					totalNumberOfPermittedConstraints: 2,
+					totalNumberOfConstraints:          2,
+				},
+				wantErr: false,
+			}
+		},
+		"ok/with-excluded-ipsOrCIDRs-cidr": func(t *testing.T) test {
+			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
+			assert.FatalError(t, err)
+			_, nw2, err := net.ParseCIDR("192.168.0.31/32")
+			assert.FatalError(t, err)
+			options := []NamePolicyOption{
+				WithExcludedIPsOrCIDRs([]string{"127.0.0.1/24", "192.168.0.31"}),
+			}
+			return test{
+				options: options,
+				want: &NamePolicyEngine{
+					excludedIPRanges: []*net.IPNet{
+						nw1, nw2,
+					},
+					numberOfIPRangeConstraints:       2,
+					totalNumberOfExcludedConstraints: 2,
+					totalNumberOfConstraints:         2,
+				},
+				wantErr: false,
+			}
+		},
 		"ok/with-permitted-cidr": func(t *testing.T) test {
 			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
 			assert.FatalError(t, err)
@@ -1316,6 +1412,36 @@ func TestNew(t *testing.T) {
 				want: &NamePolicyEngine{
 					excludedURIDomains:               []string{"host.local", ".example.com"},
 					numberOfURIDomainConstraints:     2,
+					totalNumberOfExcludedConstraints: 2,
+					totalNumberOfConstraints:         2,
+				},
+				wantErr: false,
+			}
+		},
+		"ok/with-permitted-principals": func(t *testing.T) test {
+			options := []NamePolicyOption{
+				WithPermittedPrincipals([]string{"root", "ops"}),
+			}
+			return test{
+				options: options,
+				want: &NamePolicyEngine{
+					permittedPrincipals:               []string{"root", "ops"},
+					numberOfPrincipalConstraints:      2,
+					totalNumberOfPermittedConstraints: 2,
+					totalNumberOfConstraints:          2,
+				},
+				wantErr: false,
+			}
+		},
+		"ok/with-excluded-principals": func(t *testing.T) test {
+			options := []NamePolicyOption{
+				WithExcludedPrincipals([]string{"root", "ops"}),
+			}
+			return test{
+				options: options,
+				want: &NamePolicyEngine{
+					excludedPrincipals:               []string{"root", "ops"},
+					numberOfPrincipalConstraints:     2,
 					totalNumberOfExcludedConstraints: 2,
 					totalNumberOfConstraints:         2,
 				},
