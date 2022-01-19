@@ -270,28 +270,36 @@ func (c *Config) GetAudiences() provisioner.Audiences {
 
 	for _, name := range c.DNSNames {
 		audiences.Sign = append(audiences.Sign,
-			fmt.Sprintf("https://%s/1.0/sign", name),
-			fmt.Sprintf("https://%s/sign", name),
-			fmt.Sprintf("https://%s/1.0/ssh/sign", name),
-			fmt.Sprintf("https://%s/ssh/sign", name))
+			fmt.Sprintf("https://%s/1.0/sign", toHostname(name)),
+			fmt.Sprintf("https://%s/sign", toHostname(name)),
+			fmt.Sprintf("https://%s/1.0/ssh/sign", toHostname(name)),
+			fmt.Sprintf("https://%s/ssh/sign", toHostname(name)))
 		audiences.Revoke = append(audiences.Revoke,
-			fmt.Sprintf("https://%s/1.0/revoke", name),
-			fmt.Sprintf("https://%s/revoke", name))
+			fmt.Sprintf("https://%s/1.0/revoke", toHostname(name)),
+			fmt.Sprintf("https://%s/revoke", toHostname(name)))
 		audiences.SSHSign = append(audiences.SSHSign,
-			fmt.Sprintf("https://%s/1.0/ssh/sign", name),
-			fmt.Sprintf("https://%s/ssh/sign", name),
-			fmt.Sprintf("https://%s/1.0/sign", name),
-			fmt.Sprintf("https://%s/sign", name))
+			fmt.Sprintf("https://%s/1.0/ssh/sign", toHostname(name)),
+			fmt.Sprintf("https://%s/ssh/sign", toHostname(name)),
+			fmt.Sprintf("https://%s/1.0/sign", toHostname(name)),
+			fmt.Sprintf("https://%s/sign", toHostname(name)))
 		audiences.SSHRevoke = append(audiences.SSHRevoke,
-			fmt.Sprintf("https://%s/1.0/ssh/revoke", name),
-			fmt.Sprintf("https://%s/ssh/revoke", name))
+			fmt.Sprintf("https://%s/1.0/ssh/revoke", toHostname(name)),
+			fmt.Sprintf("https://%s/ssh/revoke", toHostname(name)))
 		audiences.SSHRenew = append(audiences.SSHRenew,
-			fmt.Sprintf("https://%s/1.0/ssh/renew", name),
-			fmt.Sprintf("https://%s/ssh/renew", name))
+			fmt.Sprintf("https://%s/1.0/ssh/renew", toHostname(name)),
+			fmt.Sprintf("https://%s/ssh/renew", toHostname(name)))
 		audiences.SSHRekey = append(audiences.SSHRekey,
-			fmt.Sprintf("https://%s/1.0/ssh/rekey", name),
-			fmt.Sprintf("https://%s/ssh/rekey", name))
+			fmt.Sprintf("https://%s/1.0/ssh/rekey", toHostname(name)),
+			fmt.Sprintf("https://%s/ssh/rekey", toHostname(name)))
 	}
 
 	return audiences
+}
+
+func toHostname(name string) string {
+	// ensure an IPv6 address is represented with square brackets when used as hostname
+	if ip := net.ParseIP(name); ip != nil && ip.To4() == nil {
+		name = "[" + name + "]"
+	}
+	return name
 }

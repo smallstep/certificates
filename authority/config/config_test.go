@@ -7,9 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/crypto/jose"
-
 	_ "github.com/smallstep/certificates/cas"
+	"go.step.sm/crypto/jose"
 )
 
 func TestConfigValidate(t *testing.T) {
@@ -294,6 +293,26 @@ func TestAuthConfigValidate(t *testing.T) {
 				if assert.Nil(t, tc.err, fmt.Sprintf("expected error: %s, but got <nil>", tc.err)) {
 					assert.Equals(t, *tc.ac.Template, tc.asn1dn)
 				}
+			}
+		})
+	}
+}
+
+func Test_toHostname(t *testing.T) {
+	tests := []struct {
+		name string
+		want string
+	}{
+		{name: "localhost", want: "localhost"},
+		{name: "ca.smallstep.com", want: "ca.smallstep.com"},
+		{name: "127.0.0.1", want: "127.0.0.1"},
+		{name: "::1", want: "[::1]"},
+		{name: "[::1]", want: "[::1]"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := toHostname(tt.name); got != tt.want {
+				t.Errorf("toHostname() = %v, want %v", got, tt.want)
 			}
 		})
 	}
