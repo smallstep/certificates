@@ -18,8 +18,9 @@ type SCEP struct {
 	ForceCN           bool     `json:"forceCN,omitempty"`
 	ChallengePassword string   `json:"challenge,omitempty"`
 	Capabilities      []string `json:"capabilities,omitempty"`
-	// IncludeRoots makes the provisioner return the CA root(s) in the GetCACerts response
-	IncludeRoots bool `json:"includeRoots,omitempty"`
+	// IncludeRoot makes the provisioner return the CA root in addition to the
+	// intermediate in the GetCACerts response
+	IncludeRoot bool `json:"includeRoot,omitempty"`
 	// MinimumPublicKeyLength is the minimum length for public keys in CSRs
 	MinimumPublicKeyLength int `json:"minimumPublicKeyLength,omitempty"`
 	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
@@ -107,7 +108,7 @@ func (s *SCEP) Init(config Config) (err error) {
 		return errors.Errorf("%d bits is not exactly divisible by 8", s.MinimumPublicKeyLength)
 	}
 
-	s.encryptionAlgorithm = s.EncryptionAlgorithmIdentifier
+	s.encryptionAlgorithm = s.EncryptionAlgorithmIdentifier // TODO(hs): we might want to upgrade the default security to AES-CBC?
 	if s.encryptionAlgorithm < 0 || s.encryptionAlgorithm > 4 {
 		return errors.New("only encryption algorithm identifiers from 0 to 4 are valid")
 	}
@@ -142,12 +143,12 @@ func (s *SCEP) GetCapabilities() []string {
 	return s.Capabilities
 }
 
-// ShouldIncludeRootsInChain indicates if the CA should
+// ShouldIncludeRootInChain indicates if the CA should
 // return its intermediate, which is currently used for
-// both signing and decryption, as well as the other certs
-// in its chain (usually a single root certificate).
-func (s *SCEP) ShouldIncludeRootsInChain() bool {
-	return s.IncludeRoots
+// both signing and decryption, as well as the root in
+// its chain.
+func (s *SCEP) ShouldIncludeRootInChain() bool {
+	return s.IncludeRoot
 }
 
 // GetContentEncryptionAlgorithm returns the numeric identifier

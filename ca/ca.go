@@ -427,18 +427,23 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	tlsConfig.Certificates = []tls.Certificate{}
 	tlsConfig.GetCertificate = ca.renewer.GetCertificateForCA
 
+	// initialize a certificate pool with root CA certificates to trust when doing mTLS.
 	certPool := x509.NewCertPool()
 	for _, crt := range auth.GetRootCertificates() {
 		certPool.AddCert(crt)
 	}
 
-	// adding the intermediate CA to the pool will allow clients that do not
-	// send the intermediate for chain building to connect to the CA successfully.
-	cert, err := auth.GetIntermediateCertificate()
-	if err != nil {
-		return nil, err
+	// adding the intermediate CA certificates to the pool will allow clients that
+	// do mTLS but don't send an intermediate to successfully connect. The intermediates
+	// added here are used when building a certificate chain.
+	intermediates := tlsCrt.Certificate[1:]
+	for _, certBytes := range intermediates {
+		cert, err := x509.ParseCertificate(certBytes)
+		if err != nil {
+			return nil, err
+		}
+		certPool.AddCert(cert)
 	}
-	certPool.AddCert(cert)
 
 	// Add support for mutual tls to renew certificates
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven

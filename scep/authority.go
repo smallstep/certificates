@@ -168,8 +168,8 @@ func (a *Authority) GetCACertificates(ctx context.Context) ([]*x509.Certificate,
 
 	// NOTE: we're adding the CA roots here, but they are (highly likely) different than what the RFC means.
 	// Clients are responsible to select the right cert(s) to use, though.
-	if p.ShouldIncludeRootsInChain() && len(a.caCerts) > 1 {
-		certs = append(certs, a.caCerts[1:]...)
+	if p.ShouldIncludeRootInChain() && len(a.caCerts) > 1 {
+		certs = append(certs, a.caCerts[1])
 	}
 
 	return certs, nil

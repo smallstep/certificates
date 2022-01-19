@@ -595,12 +595,6 @@ func (a *Authority) IsRevoked(sn string) (bool, error) {
 	return a.db.IsRevoked(sn)
 }
 
-// GetIntermediateCertificate returns the x509 intermediate CA
-// certificate.
-func (a *Authority) GetIntermediateCertificate() (*x509.Certificate, error) {
-	return pemutil.ReadCertificate(a.config.IntermediateCert)
-}
-
 // requiresDecrypter returns whether the Authority
 // requires a KMS that provides a crypto.Decrypter
 // Currently this is only required when SCEP is

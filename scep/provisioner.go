@@ -16,6 +16,6 @@ type Provisioner interface {
 	GetOptions() *provisioner.Options
 	GetChallengePassword() string
 	GetCapabilities() []string
-	ShouldIncludeRootsInChain() bool
+	ShouldIncludeRootInChain() bool
 	GetContentEncryptionAlgorithm() int
 }
