@@ -4,14 +4,59 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	nosqlDB "github.com/smallstep/nosql"
 )
 
+// externalAccountKeyMutex for read/write locking of EAK operations.
+var externalAccountKeyMutex sync.RWMutex
+
+// referencesByProvisionerIndexMutex for locking referencesByProvisioner index operations.
+var referencesByProvisionerIndexMutex sync.Mutex
+
+type dbExternalAccountKey struct {
+	ID            string    `json:"id"`
+	ProvisionerID string    `json:"provisionerID"`
+	Reference     string    `json:"reference"`
+	AccountID     string    `json:"accountID,omitempty"`
+	KeyBytes      []byte    `json:"key"`
+	CreatedAt     time.Time `json:"createdAt"`
+	BoundAt       time.Time `json:"boundAt"`
+}
+
+type dbExternalAccountKeyReference struct {
+	Reference            string `json:"reference"`
+	ExternalAccountKeyID string `json:"externalAccountKeyID"`
+}
+
+// getDBExternalAccountKey retrieves and unmarshals dbExternalAccountKey.
+func (db *DB) getDBExternalAccountKey(ctx context.Context, id string) (*dbExternalAccountKey, error) {
+	data, err := db.db.Get(externalAccountKeyTable, []byte(id))
+	if err != nil {
+		if nosqlDB.IsErrNotFound(err) {
+			return nil, acme.ErrNotFound
+		}
+		return nil, errors.Wrapf(err, "error loading external account key %s", id)
+	}
+
+	dbeak := new(dbExternalAccountKey)
+	if err = json.Unmarshal(data, dbeak); err != nil {
+		return nil, errors.Wrapf(err, "error unmarshaling external account key %s into dbExternalAccountKey", id)
+	}
+
+	return dbeak, nil
+}
+
 // CreateExternalAccountKey creates a new External Account Binding key with a name
 func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+
+	externalAccountKeyMutex.Lock()
+	defer externalAccountKeyMutex.Unlock()
+
 	keyID, err := randID()
 	if err != nil {
 		return nil, err
@@ -62,6 +107,9 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerID, refer
 
 // GetExternalAccountKey retrieves an External Account Binding key by KeyID
 func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerID, keyID string) (*acme.ExternalAccountKey, error) {
+	externalAccountKeyMutex.RLock()
+	defer externalAccountKeyMutex.RUnlock()
+
 	dbeak, err := db.getDBExternalAccountKey(ctx, keyID)
 	if err != nil {
 		return nil, err
@@ -83,6 +131,9 @@ func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerID, keyID st
 }
 
 func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerID, keyID string) error {
+	externalAccountKeyMutex.Lock()
+	defer externalAccountKeyMutex.Unlock()
+
 	dbeak, err := db.getDBExternalAccountKey(ctx, keyID)
 	if err != nil {
 		return errors.Wrapf(err, "error loading ACME EAB Key with Key ID %s", keyID)
@@ -109,8 +160,8 @@ func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerID, keyID
 
 // GetExternalAccountKeys retrieves all External Account Binding keys for a provisioner
 func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerID string) ([]*acme.ExternalAccountKey, error) {
-
-	// TODO: mutex?
+	externalAccountKeyMutex.RLock()
+	defer externalAccountKeyMutex.RUnlock()
 
 	var eakIDs []string
 	r, err := db.db.Get(externalAccountKeyIDsByProvisionerIDTable, []byte(provisionerID))
@@ -152,6 +203,9 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerID string) 
 
 // GetExternalAccountKeyByReference retrieves an External Account Binding key with unique reference
 func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+	externalAccountKeyMutex.RLock()
+	defer externalAccountKeyMutex.RUnlock()
+
 	if reference == "" {
 		return nil, nil
 	}
@@ -171,6 +225,9 @@ func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerI
 }
 
 func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerID string, eak *acme.ExternalAccountKey) error {
+	externalAccountKeyMutex.Lock()
+	defer externalAccountKeyMutex.Unlock()
+
 	old, err := db.getDBExternalAccountKey(ctx, eak.ID)
 	if err != nil {
 		return err
@@ -202,8 +259,8 @@ func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerID string
 }
 
 func (db *DB) addEAKID(ctx context.Context, provisionerID, eakID string) error {
-	referencesByProvisionerIndexMux.Lock()
-	defer referencesByProvisionerIndexMux.Unlock()
+	referencesByProvisionerIndexMutex.Lock()
+	defer referencesByProvisionerIndexMutex.Unlock()
 
 	if eakID == "" {
 		return errors.Errorf("can't add empty eakID for provisioner %s", provisionerID)
@@ -245,8 +302,8 @@ func (db *DB) addEAKID(ctx context.Context, provisionerID, eakID string) error {
 }
 
 func (db *DB) deleteEAKID(ctx context.Context, provisionerID, eakID string) error {
-	referencesByProvisionerIndexMux.Lock()
-	defer referencesByProvisionerIndexMux.Unlock()
+	referencesByProvisionerIndexMutex.Lock()
+	defer referencesByProvisionerIndexMutex.Unlock()
 
 	var eakIDs []string
 	b, err := db.db.Get(externalAccountKeyIDsByProvisionerIDTable, []byte(provisionerID))

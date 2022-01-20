@@ -3,7 +3,6 @@ package nosql
 import (
 	"context"
 	"encoding/json"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -11,9 +10,6 @@ import (
 	nosqlDB "github.com/smallstep/nosql"
 	"go.step.sm/crypto/jose"
 )
-
-// Mutex for locking referencesByProvisioner index operations.
-var referencesByProvisionerIndexMux sync.Mutex
 
 // dbAccount represents an ACME account.
 type dbAccount struct {
@@ -28,21 +24,6 @@ type dbAccount struct {
 func (dba *dbAccount) clone() *dbAccount {
 	nu := *dba
 	return &nu
-}
-
-type dbExternalAccountKey struct {
-	ID            string    `json:"id"`
-	ProvisionerID string    `json:"provisionerID"`
-	Reference     string    `json:"reference"`
-	AccountID     string    `json:"accountID,omitempty"`
-	KeyBytes      []byte    `json:"key"`
-	CreatedAt     time.Time `json:"createdAt"`
-	BoundAt       time.Time `json:"boundAt"`
-}
-
-type dbExternalAccountKeyReference struct {
-	Reference            string `json:"reference"`
-	ExternalAccountKeyID string `json:"externalAccountKeyID"`
 }
 
 func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, error) {
@@ -71,24 +52,6 @@ func (db *DB) getDBAccount(ctx context.Context, id string) (*dbAccount, error) {
 		return nil, errors.Wrapf(err, "error unmarshaling account %s into dbAccount", id)
 	}
 	return dbacc, nil
-}
-
-// getDBExternalAccountKey retrieves and unmarshals dbExternalAccountKey.
-func (db *DB) getDBExternalAccountKey(ctx context.Context, id string) (*dbExternalAccountKey, error) {
-	data, err := db.db.Get(externalAccountKeyTable, []byte(id))
-	if err != nil {
-		if nosqlDB.IsErrNotFound(err) {
-			return nil, acme.ErrNotFound
-		}
-		return nil, errors.Wrapf(err, "error loading external account key %s", id)
-	}
-
-	dbeak := new(dbExternalAccountKey)
-	if err = json.Unmarshal(data, dbeak); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling external account key %s into dbExternalAccountKey", id)
-	}
-
-	return dbeak, nil
 }
 
 // GetAccount retrieves an ACME account by ID.
