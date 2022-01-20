@@ -3,6 +3,7 @@ package apiv1
 import (
 	"crypto"
 	"crypto/x509"
+	"encoding/json"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms"
@@ -64,7 +65,7 @@ type Options struct {
 	GCSBucket  string `json:"-"`
 
 	// Generic structure to configure any CAS
-	Config map[string]interface{} `json:"config,omitempty"`
+	Config json.RawMessage `json:"config,omitempty"`
 }
 
 // CertificateIssuer contains the properties used to use the StepCAS certificate

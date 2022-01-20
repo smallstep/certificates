@@ -2,9 +2,11 @@ package vaultcas
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
-	"strings"
+	"math/big"
 	"time"
 
 	"github.com/pkg/errors"
@@ -14,7 +16,6 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	auth "github.com/hashicorp/vault/api/auth/approle"
 	certutil "github.com/hashicorp/vault/sdk/helper/certutil"
-	mapstructure "github.com/mitchellh/mapstructure"
 )
 
 func init() {
@@ -24,15 +25,15 @@ func init() {
 }
 
 type VaultOptions struct {
-	PKI             string `json:"pki,omitempty"`
-	PKIRole         string `json:"pkiRole,omitempty`
-	PKIRoleRSA      string `json:"pkiRoleRSA,omitempty`
-	PKIRoleEC       string `json:"pkiRoleEC,omitempty`
-	PKIRoleED25519  string `json:"PKIRoleED25519,omitempty`
-	RoleID          string `json:"roleID,omitempty"`
-	SecretID        string `json:"secretID,omitempty"`
-	AppRole         string `json:"appRole,omitempty"`
-	IsWrappingToken bool   `json:"isWrappingToken,omitempty"`
+	PKI             string        `json:"pki,omitempty"`
+	PKIRole         string        `json:"pkiRole,omitempty"`
+	PKIRoleRSA      string        `json:"pkiRoleRSA,omitempty"`
+	PKIRoleEC       string        `json:"pkiRoleEC,omitempty"`
+	PKIRoleED25519  string        `json:"PKIRoleED25519,omitempty"`
+	RoleID          string        `json:"roleID,omitempty"`
+	SecretID        auth.SecretID `json:"secretID,omitempty"`
+	AppRole         string        `json:"appRole,omitempty"`
+	IsWrappingToken bool          `json:"isWrappingToken,omitempty"`
 }
 
 // VaultCAS implements a Certificate Authority Service using Hashicorp Vault.
@@ -42,10 +43,10 @@ type VaultCAS struct {
 	fingerprint string
 }
 
-func loadOptions(config map[string]interface{}) (vc VaultOptions, err error) {
-	err = mapstructure.Decode(config, &vc)
+func loadOptions(config json.RawMessage) (vc VaultOptions, err error) {
+	err = json.Unmarshal(config, &vc)
 	if err != nil {
-		return vc, err
+		return vc, errors.Wrap(err, "error decoding vaultCAS config")
 	}
 
 	if vc.PKI == "" {
@@ -54,12 +55,12 @@ func loadOptions(config map[string]interface{}) (vc VaultOptions, err error) {
 
 	// pkirole or per key type must be defined
 	if vc.PKIRole == "" && vc.PKIRoleRSA == "" && vc.PKIRoleEC == "" && vc.PKIRoleED25519 == "" {
-		return vc, errors.New("loadOptions you must define a pki role")
+		return vc, errors.New("vaultCAS config options must define `pkiRole`")
 	}
 
 	// if pkirole is empty all others keys must be set
 	if vc.PKIRole == "" && (vc.PKIRoleRSA == "" || vc.PKIRoleEC == "" || vc.PKIRoleED25519 == "") {
-		return vc, errors.New("loadOptions if 'pkiRole' is empty, PKIRoleRSA, PKIRoleEC and PKIRoleED25519 cannot be empty")
+		return vc, errors.New("vaultCAS config options must include a `pkiRole` or `pkiRoleRSA`, `pkiRoleEC` and `pkiRoleEd25519`")
 	}
 
 	// if pkirole is not empty, use it as default for unset keys
@@ -76,11 +77,15 @@ func loadOptions(config map[string]interface{}) (vc VaultOptions, err error) {
 	}
 
 	if vc.RoleID == "" {
-		return vc, errors.New("loadOptions 'roleID' cannot be empty")
+		return vc, errors.New("vaultCAS config options must define `roleID`")
 	}
 
-	if vc.SecretID == "" {
-		return vc, errors.New("loadOptions 'secretID' cannot be empty")
+	if vc.SecretID.FromEnv == "" && vc.SecretID.FromFile == "" && vc.SecretID.FromString == "" {
+		return vc, errors.New("vaultCAS config options must define `secretID` object with one of `FromEnv`, `FromFile` or `FromString`")
+	}
+
+	if vc.PKI == "" {
+		vc.PKI = "pki" // use default pki vault name
 	}
 
 	if vc.AppRole == "" {
@@ -108,11 +113,11 @@ func getCertificateAndChain(certb certutil.CertBundle) (*x509.Certificate, []*x5
 func parseCertificate(pemCert string) (*x509.Certificate, error) {
 	block, _ := pem.Decode([]byte(pemCert))
 	if block == nil {
-		return nil, errors.Errorf("parseCertificate: error decoding certificate: not a valid PEM encoded block '%v'", pemCert)
+		return nil, errors.Errorf("error decoding certificate: not a valid PEM encoded block, please verify\r\n%v", pemCert)
 	}
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "parseCertificate: error parsing certificate")
+		return nil, errors.Wrap(err, "error parsing certificate")
 	}
 	return cert, nil
 }
@@ -120,7 +125,7 @@ func parseCertificate(pemCert string) (*x509.Certificate, error) {
 func parseCertificateRequest(pemCsr string) (*x509.CertificateRequest, error) {
 	block, _ := pem.Decode([]byte(pemCsr))
 	if block == nil {
-		return nil, errors.New("error decoding certificate request: not a valid PEM encoded block")
+		return nil, errors.Errorf("error decoding certificate request: not a valid PEM encoded block, please verify\r\n%v", pemCsr)
 	}
 	cr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
@@ -130,21 +135,6 @@ func parseCertificateRequest(pemCsr string) (*x509.CertificateRequest, error) {
 }
 
 func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.Duration) (*x509.Certificate, []*x509.Certificate, error) {
-	sans := make([]string, 0, len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses)+len(cr.URIs))
-	sans = append(sans, cr.DNSNames...)
-	sans = append(sans, cr.EmailAddresses...)
-	for _, ip := range cr.IPAddresses {
-		sans = append(sans, ip.String())
-	}
-	for _, u := range cr.URIs {
-		sans = append(sans, u.String())
-	}
-
-	commonName := cr.Subject.CommonName
-	if commonName == "" && len(sans) > 0 {
-		commonName = sans[0]
-	}
-
 	var vaultPKIRole string
 	csr := api.CertificateRequest{CertificateRequest: cr}
 
@@ -180,7 +170,12 @@ func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.
 
 	var certBundle certutil.CertBundle
 
-	err = mapstructure.Decode(secret.Data, &certBundle)
+	secretData, err := json.Marshal(secret.Data)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = json.Unmarshal(secretData, &certBundle)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -214,17 +209,17 @@ func New(ctx context.Context, opts apiv1.Options) (*VaultCAS, error) {
 	}
 
 	var appRoleAuth *auth.AppRoleAuth
-	if vc.IsWrappingToken == true {
+	if vc.IsWrappingToken {
 		appRoleAuth, err = auth.NewAppRoleAuth(
 			vc.RoleID,
-			&auth.SecretID{FromString: vc.SecretID},
+			&vc.SecretID,
 			auth.WithWrappingToken(),
 			auth.WithMountPath(vc.AppRole),
 		)
 	} else {
 		appRoleAuth, err = auth.NewAppRoleAuth(
 			vc.RoleID,
-			&auth.SecretID{FromString: vc.SecretID},
+			&vc.SecretID,
 			auth.WithMountPath(vc.AppRole),
 		)
 	}
@@ -270,15 +265,20 @@ func (v *VaultCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv
 func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
 	secret, err := v.client.Logical().Read(v.config.PKI + "/cert/ca")
 	if err != nil {
-		return nil, errors.Wrap(err, "GetCertificateAuthority: unable to read root")
+		return nil, errors.Wrap(err, "unable to read root")
 	}
 	if secret == nil {
-		return nil, errors.New("GetCertificateAuthority: secret root is empty")
+		return nil, errors.New("secret root is empty")
 	}
 
 	var certBundle certutil.CertBundle
 
-	err = mapstructure.Decode(secret.Data, &certBundle)
+	secretData, err := json.Marshal(secret.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(secretData, &certBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -287,6 +287,13 @@ func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityReq
 	if err != nil {
 		return nil, err
 	}
+
+	sha256Sum := sha256.Sum256(cert.Raw)
+	expectedSum := certutil.GetHexFormatted(sha256Sum[:], "")
+	if expectedSum != v.fingerprint {
+		return nil, errors.Errorf("Vault Root CA fingerprint `%s` doesn't match config fingerprint `%v`", expectedSum, v.fingerprint)
+	}
+
 	return &apiv1.GetCertificateAuthorityResponse{
 		RootCertificate: cert,
 	}, nil
@@ -300,19 +307,28 @@ func (v *VaultCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.
 
 func (v *VaultCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {
 	if req.SerialNumber == "" && req.Certificate == nil {
-		return nil, errors.New("RevokeCertificate `serialNumber` or `certificate` are required")
+		return nil, errors.New("`serialNumber` or `certificate` are required")
 	}
 
-	serialNumber := req.SerialNumber
-	if req.Certificate != nil {
-		serialNumber = req.Certificate.SerialNumber.String()
+	var serialNumber []byte
+	if req.SerialNumber != "" {
+		// req.SerialNumber is a big.Int string representation
+		n := new(big.Int)
+		n, ok := n.SetString(req.SerialNumber, 10)
+		if !ok {
+			return nil, errors.Errorf("serialNumber `%v` can't be convert to big.Int", req.SerialNumber)
+		}
+		serialNumber = n.Bytes()
+	} else {
+		// req.Certificate.SerialNumber is a big.Int
+		serialNumber = req.Certificate.SerialNumber.Bytes()
 	}
 
-	serialNumberDash := strings.ReplaceAll(serialNumber, ":", "-")
+	serialNumberDash := certutil.GetHexFormatted(serialNumber, "-")
 
 	_, err := v.client.Logical().Write(v.config.PKI+"/revoke/"+serialNumberDash, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "RevokeCertificate unable to revoke certificate")
+		return nil, errors.Wrap(err, "unable to revoke certificate")
 	}
 
 	return &apiv1.RevokeCertificateResponse{

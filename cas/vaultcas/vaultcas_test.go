@@ -13,6 +13,7 @@ import (
 	"time"
 
 	vault "github.com/hashicorp/vault/api"
+	auth "github.com/hashicorp/vault/api/auth/approle"
 	"github.com/smallstep/certificates/cas/apiv1"
 )
 
@@ -148,13 +149,13 @@ func TestNew_register(t *testing.T) {
 	_, err := fn(context.Background(), apiv1.Options{
 		CertificateAuthority:            caURL.String(),
 		CertificateAuthorityFingerprint: testRootFingerprint,
-		Config: map[string]interface{}{
-			"PKI":             "pki",
-			"PKIRole":         "pki-role",
-			"RoleID":          "roleID",
-			"SecretID":        "secretID",
-			"IsWrappingToken": false,
-		},
+		Config: json.RawMessage(`{
+			"PKI": "pki",
+			"PKIRole": "pki-role",
+			"RoleID": "roleID",
+			"SecretID": {"FromString": "secretID"},
+			"IsWrappingToken": false
+		}`),
 	})
 
 	if err != nil {
@@ -173,7 +174,7 @@ func TestVaultCAS_CreateCertificate(t *testing.T) {
 		PKIRoleEC:       "ec",
 		PKIRoleED25519:  "ed25519",
 		RoleID:          "roleID",
-		SecretID:        "secretID",
+		SecretID:        auth.SecretID{FromString: "secretID"},
 		AppRole:         "approle",
 		IsWrappingToken: false,
 	}
