@@ -391,6 +391,54 @@ func TestHandler_provisionerHasEABEnabled(t *testing.T) {
 	}
 }
 
+func Test_provisionerFromContext(t *testing.T) {
+	prov := &linkedca.Provisioner{
+		Id:   "provID",
+		Name: "acmeProv",
+	}
+	tests := []struct {
+		name    string
+		ctx     context.Context
+		want    *linkedca.Provisioner
+		wantErr bool
+	}{
+		{
+			name:    "fail/no-provisioner",
+			ctx:     context.Background(),
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "fail/wrong-type",
+			ctx:     context.WithValue(context.Background(), provisionerContextKey, "prov"),
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "ok",
+			ctx:  context.WithValue(context.Background(), provisionerContextKey, prov),
+			want: &linkedca.Provisioner{
+				Id:   "provID",
+				Name: "acmeProv",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := provisionerFromContext(tt.ctx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("provisionerFromContext() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			opts := []cmp.Option{cmpopts.IgnoreUnexported(linkedca.Provisioner{})}
+			if !cmp.Equal(tt.want, got, opts...) {
+				t.Errorf("provisionerFromContext() diff =\n %s", cmp.Diff(tt.want, got, opts...))
+			}
+		})
+	}
+}
+
 func TestCreateExternalAccountKeyRequest_Validate(t *testing.T) {
 	type fields struct {
 		Reference string
@@ -485,6 +533,28 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 					Status:  400,
 					Detail:  "bad request",
 					Message: "error validating request body: reference length 257 exceeds the maximum (256)",
+				},
+			}
+		},
+		"fail/no-provisioner-in-context": func(t *testing.T) test {
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("prov", "provName")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			req := CreateExternalAccountKeyRequest{
+				Reference: "aRef",
+			}
+			body, err := json.Marshal(req)
+			assert.FatalError(t, err)
+			return test{
+				ctx:        ctx,
+				body:       body,
+				statusCode: 500,
+				eak:        nil,
+				err: &admin.Error{
+					Type:    admin.ErrorServerInternalType.String(),
+					Status:  500,
+					Detail:  "the server experienced an internal error",
+					Message: "error getting provisioner from context: provisioner expected in request context",
 				},
 			}
 		},
@@ -759,6 +829,21 @@ func TestHandler_DeleteExternalAccountKey(t *testing.T) {
 		err        *admin.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
+		"fail/no-provisioner-in-context": func(t *testing.T) test {
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("prov", "provName")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			return test{
+				ctx:        ctx,
+				statusCode: 500,
+				err: &admin.Error{
+					Type:    admin.ErrorServerInternalType.String(),
+					Status:  500,
+					Detail:  "the server experienced an internal error",
+					Message: "error getting provisioner from context: provisioner expected in request context",
+				},
+			}
+		},
 		"fail/acmeDB.DeleteExternalAccountKey": func(t *testing.T) test {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
@@ -861,6 +946,23 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 		err        *admin.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
+		"fail/no-provisioner-in-context": func(t *testing.T) test {
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("prov", "provName")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			req := httptest.NewRequest("GET", "/foo", nil)
+			return test{
+				ctx:        ctx,
+				statusCode: 500,
+				req:        req,
+				err: &admin.Error{
+					Type:    admin.ErrorServerInternalType.String(),
+					Status:  500,
+					Detail:  "the server experienced an internal error",
+					Message: "error getting provisioner from context: provisioner expected in request context",
+				},
+			}
+		},
 		"fail/acmeDB.GetExternalAccountKeyByReference": func(t *testing.T) test {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("prov", "provName")
