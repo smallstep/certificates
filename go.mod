@@ -21,23 +21,23 @@ require (
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0
 	github.com/googleapis/gax-go/v2 v2.0.5
-	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/micromdm/scep/v2 v2.1.0
 	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
-	github.com/sirupsen/logrus v1.4.2
+	github.com/sirupsen/logrus v1.8.1
+	github.com/slackhq/nebula v1.5.2
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/nosql v0.3.9
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.0
-	go.step.sm/crypto v0.13.0
-	go.step.sm/linkedca v0.8.0
-	golang.org/x/crypto v0.0.0-20210915214749-c084706c2272
-	golang.org/x/net v0.0.0-20210913180222-943fd674d43e
+	go.step.sm/crypto v0.14.0
+	go.step.sm/linkedca v0.9.0
+	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
+	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
 	google.golang.org/api v0.47.0
 	google.golang.org/genproto v0.0.0-20210719143636-1d5a45f8e492
 	google.golang.org/grpc v1.39.0
@@ -45,8 +45,7 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
-//replace github.com/smallstep/nosql => ../nosql
-
-//replace go.step.sm/crypto => ../crypto
-
-//replace go.step.sm/cli-utils => ../cli-utils
+// replace github.com/smallstep/nosql => ../nosql
+// replace go.step.sm/crypto => ../crypto
+// replace go.step.sm/cli-utils => ../cli-utils
+// replace go.step.sm/linkedca => ../linkedca

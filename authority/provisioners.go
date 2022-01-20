@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/json"
@@ -711,6 +712,22 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			Claims:                 claims,
 			Options:                options,
 		}, nil
+	case *linkedca.ProvisionerDetails_Nebula:
+		var roots []byte
+		for i, root := range d.Nebula.GetRoots() {
+			if i > 0 && !bytes.HasSuffix(root, []byte{'\n'}) {
+				roots = append(roots, '\n')
+			}
+			roots = append(roots, root...)
+		}
+		return &provisioner.Nebula{
+			ID:      p.Id,
+			Type:    p.Type.String(),
+			Name:    p.Name,
+			Roots:   roots,
+			Claims:  claims,
+			Options: options,
+		}, nil
 	default:
 		return nil, fmt.Errorf("provisioner %s not implemented", p.Type)
 	}
@@ -931,6 +948,26 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						Challenge:              p.GetChallengePassword(),
 						Capabilities:           p.Capabilities,
 						MinimumPublicKeyLength: int32(p.MinimumPublicKeyLength),
+					},
+				},
+			},
+			Claims:       claimsToLinkedca(p.Claims),
+			X509Template: x509Template,
+			SshTemplate:  sshTemplate,
+		}, nil
+	case *provisioner.Nebula:
+		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		if err != nil {
+			return nil, err
+		}
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_NEBULA,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_Nebula{
+					Nebula: &linkedca.NebulaProvisioner{
+						Roots: provisionerPEMToLinkedca(p.Roots),
 					},
 				},
 			},
