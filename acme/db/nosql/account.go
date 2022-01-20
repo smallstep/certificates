@@ -387,10 +387,6 @@ func (db *DB) addEAKID(ctx context.Context, provisionerID, eakID string) error {
 		_new interface{} = newEAKIDs
 	)
 
-	if len(eakIDs) == 0 {
-		_old = nil
-	}
-
 	if err = db.save(ctx, provisionerID, _new, _old, "externalAccountKeysByProvisionerID", externalAccountKeysByProvisionerIDTable); err != nil {
 		return errors.Wrapf(err, "error saving eakIDs index for provisioner %s", provisionerID)
 	}
@@ -419,13 +415,6 @@ func (db *DB) deleteEAKID(ctx context.Context, provisionerID, eakID string) erro
 		_old interface{} = eakIDs
 		_new interface{} = newEAKIDs
 	)
-
-	switch {
-	case len(eakIDs) == 0:
-		_old = nil
-	case len(newEAKIDs) == 0:
-		_new = nil
-	}
 
 	if err = db.save(ctx, provisionerID, _new, _old, "externalAccountKeysByProvisionerID", externalAccountKeysByProvisionerIDTable); err != nil {
 		return errors.Wrapf(err, "error saving referenceIDs index for provisioner %s", provisionerID)
