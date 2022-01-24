@@ -159,20 +159,22 @@ func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerID, keyID
 }
 
 // GetExternalAccountKeys retrieves all External Account Binding keys for a provisioner
-func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerID string) ([]*acme.ExternalAccountKey, error) {
+func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerID, cursor string, limit int) ([]*acme.ExternalAccountKey, string, error) {
 	externalAccountKeyMutex.RLock()
 	defer externalAccountKeyMutex.RUnlock()
+
+	// cursor and limit are ignored in open source, at least for now.
 
 	var eakIDs []string
 	r, err := db.db.Get(externalAccountKeyIDsByProvisionerIDTable, []byte(provisionerID))
 	if err != nil {
 		if !nosqlDB.IsErrNotFound(err) {
-			return nil, errors.Wrapf(err, "error loading ACME EAB Key IDs for provisioner %s", provisionerID)
+			return nil, "", errors.Wrapf(err, "error loading ACME EAB Key IDs for provisioner %s", provisionerID)
 		}
 		// it may happen that no record is found; we'll continue with an empty slice
 	} else {
 		if err := json.Unmarshal(r, &eakIDs); err != nil {
-			return nil, errors.Wrapf(err, "error unmarshaling ACME EAB Key IDs for provisioner %s", provisionerID)
+			return nil, "", errors.Wrapf(err, "error unmarshaling ACME EAB Key IDs for provisioner %s", provisionerID)
 		}
 	}
 
@@ -184,7 +186,7 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerID string) 
 		eak, err := db.getDBExternalAccountKey(ctx, eakID)
 		if err != nil {
 			if !nosqlDB.IsErrNotFound(err) {
-				return nil, errors.Wrapf(err, "error retrieving ACME EAB Key for provisioner %s and keyID %s", provisionerID, eakID)
+				return nil, "", errors.Wrapf(err, "error retrieving ACME EAB Key for provisioner %s and keyID %s", provisionerID, eakID)
 			}
 		}
 		keys = append(keys, &acme.ExternalAccountKey{
@@ -198,7 +200,7 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerID string) 
 		})
 	}
 
-	return keys, nil
+	return keys, "", nil
 }
 
 // GetExternalAccountKeyByReference retrieves an External Account Binding key with unique reference

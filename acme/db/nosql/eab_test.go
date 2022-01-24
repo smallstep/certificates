@@ -576,7 +576,9 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
-			if eaks, err := d.GetExternalAccountKeys(context.Background(), provID); err != nil {
+			cursor, limit := "", 0
+			if eaks, nextCursor, err := d.GetExternalAccountKeys(context.Background(), provID, cursor, limit); err != nil {
+				assert.Equals(t, "", nextCursor)
 				switch k := err.(type) {
 				case *acme.Error:
 					if assert.NotNil(t, tc.acmeErr) {
@@ -593,6 +595,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 				}
 			} else if assert.Nil(t, tc.err) {
 				assert.Equals(t, len(eaks), len(tc.eaks))
+				assert.Equals(t, "", nextCursor)
 				for i, eak := range eaks {
 					assert.Equals(t, eak.ID, tc.eaks[i].ID)
 					assert.Equals(t, eak.KeyBytes, tc.eaks[i].KeyBytes)
