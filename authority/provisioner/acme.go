@@ -8,19 +8,21 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/policy"
 )
 
 // ACME is the acme provisioner type, an entity that can authorize the ACME
 // provisioning flow.
 type ACME struct {
 	*base
-	ID      string   `json:"-"`
-	Type    string   `json:"type"`
-	Name    string   `json:"name"`
-	ForceCN bool     `json:"forceCN,omitempty"`
-	Claims  *Claims  `json:"claims,omitempty"`
-	Options *Options `json:"options,omitempty"`
-	claimer *Claimer
+	ID         string   `json:"-"`
+	Type       string   `json:"type"`
+	Name       string   `json:"name"`
+	ForceCN    bool     `json:"forceCN,omitempty"`
+	Claims     *Claims  `json:"claims,omitempty"`
+	Options    *Options `json:"options,omitempty"`
+	claimer    *Claimer
+	x509Policy policy.X509NamePolicyEngine
 }
 
 // GetID returns the provisioner unique identifier.
@@ -70,7 +72,6 @@ func (p *ACME) DefaultTLSCertDuration() time.Duration {
 
 // Init initializes and validates the fields of an ACME type.
 func (p *ACME) Init(config Config) (err error) {
-	p.base = &base{} // prevent nil pointers
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -86,7 +87,7 @@ func (p *ACME) Init(config Config) (err error) {
 	// Initialize the x509 allow/deny policy engine
 	// TODO(hs): ensure no race conditions happen when reloading settings and requesting certs?
 	// TODO(hs): implement memoization strategy, so that reloading is not required when no changes were made to allow/deny?
-	if p.x509PolicyEngine, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+	if p.x509Policy, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
 		return err
 	}
 
@@ -113,16 +114,16 @@ type ACMEIdentifier struct {
 // certificate for the Identifiers provided in an Order.
 func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier string) error {
 
-	if p.x509PolicyEngine == nil {
+	if p.x509Policy == nil {
 		return nil
 	}
 
 	// assuming only valid identifiers (IP or DNS) are provided
 	var err error
 	if ip := net.ParseIP(identifier); ip != nil {
-		_, err = p.x509PolicyEngine.IsIPAllowed(ip)
+		_, err = p.x509Policy.IsIPAllowed(ip)
 	} else {
-		_, err = p.x509PolicyEngine.IsDNSAllowed(identifier)
+		_, err = p.x509Policy.IsDNSAllowed(identifier)
 	}
 
 	return err
@@ -140,7 +141,7 @@ func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.x509PolicyEngine),
+		newX509NamePolicyValidator(p.x509Policy),
 	}
 
 	return opts, nil

@@ -177,7 +177,6 @@ func generateJWK() (*JWK, error) {
 		return nil, err
 	}
 	return &JWK{
-		base:         &base{},
 		Name:         name,
 		Type:         "JWK",
 		Key:          &public,
@@ -216,7 +215,6 @@ func generateK8sSA(inputPubKey interface{}) (*K8sSA, error) {
 	}
 
 	return &K8sSA{
-		base:      &base{},
 		Name:      K8sSAName,
 		Type:      "K8sSA",
 		Claims:    &globalProvisionerClaims,
@@ -254,7 +252,6 @@ func generateSSHPOP() (*SSHPOP, error) {
 	}
 
 	return &SSHPOP{
-		base:      &base{},
 		Name:      name,
 		Type:      "SSHPOP",
 		Claims:    &globalProvisionerClaims,
@@ -309,7 +306,6 @@ M46l92gdOozT
 		rootPool.AddCert(cert)
 	}
 	return &X5C{
-		base:      &base{},
 		Name:      name,
 		Type:      "X5C",
 		Roots:     root,
@@ -342,7 +338,6 @@ func generateOIDC() (*OIDC, error) {
 		return nil, err
 	}
 	return &OIDC{
-		base:                  &base{},
 		Name:                  name,
 		Type:                  "OIDC",
 		ClientID:              clientID,
@@ -378,7 +373,6 @@ func generateGCP() (*GCP, error) {
 		return nil, err
 	}
 	return &GCP{
-		base:            &base{},
 		Type:            "GCP",
 		Name:            name,
 		ServiceAccounts: []string{serviceAccount},
@@ -415,7 +409,6 @@ func generateAWS() (*AWS, error) {
 		return nil, errors.Wrap(err, "error parsing AWS certificate")
 	}
 	return &AWS{
-		base:         &base{},
 		Type:         "AWS",
 		Name:         name,
 		Accounts:     []string{accountID},
@@ -525,7 +518,6 @@ func generateAWSV1Only() (*AWS, error) {
 		return nil, errors.Wrap(err, "error parsing AWS certificate")
 	}
 	return &AWS{
-		base:         &base{},
 		Type:         "AWS",
 		Name:         name,
 		Accounts:     []string{accountID},
@@ -617,7 +609,6 @@ func generateAzure() (*Azure, error) {
 		return nil, err
 	}
 	return &Azure{
-		base:     &base{},
 		Type:     "Azure",
 		Name:     name,
 		TenantID: tenantID,

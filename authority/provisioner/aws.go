@@ -18,6 +18,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/policy"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
@@ -267,6 +268,8 @@ type AWS struct {
 	claimer                *Claimer
 	config                 *awsConfig
 	audiences              Audiences
+	x509Policy             policy.X509NamePolicyEngine
+	sshPolicy              policy.SSHNamePolicyEngine
 }
 
 // GetID returns the provisioner unique identifier.
@@ -392,7 +395,6 @@ func (p *AWS) GetIdentityToken(subject, caURL string) (string, error) {
 
 // Init validates and initializes the AWS provisioner.
 func (p *AWS) Init(config Config) (err error) {
-	p.base = &base{} // prevent nil pointers
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -427,12 +429,12 @@ func (p *AWS) Init(config Config) (err error) {
 	}
 
 	// Initialize the x509 allow/deny policy engine
-	if p.x509PolicyEngine, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+	if p.x509Policy, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine
-	if p.sshPolicyEngine, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	if p.sshPolicy, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -489,7 +491,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		defaultPublicKeyValidator{},
 		commonNameValidator(payload.Claims.Subject),
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.x509PolicyEngine),
+		newX509NamePolicyValidator(p.x509Policy),
 	), nil
 }
 
@@ -772,6 +774,6 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshPolicyEngine),
+		newSSHNamePolicyValidator(p.sshPolicy),
 	), nil
 }

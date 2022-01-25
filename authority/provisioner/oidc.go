@@ -13,6 +13,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/policy"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
@@ -94,6 +95,8 @@ type OIDC struct {
 	keyStore              *keyStore
 	claimer               *Claimer
 	getIdentityFunc       GetIdentityFunc
+	x509Policy            policy.X509NamePolicyEngine
+	sshPolicy             policy.SSHNamePolicyEngine
 }
 
 func sanitizeEmail(email string) string {
@@ -154,7 +157,6 @@ func (o *OIDC) GetEncryptedKey() (kid, key string, ok bool) {
 
 // Init validates and initializes the OIDC provider.
 func (o *OIDC) Init(config Config) (err error) {
-	o.base = &base{} // prevent nil pointers
 	switch {
 	case o.Type == "":
 		return errors.New("type cannot be empty")
@@ -210,12 +212,12 @@ func (o *OIDC) Init(config Config) (err error) {
 	}
 
 	// Initialize the x509 allow/deny policy engine
-	if o.x509PolicyEngine, err = newX509PolicyEngine(o.Options.GetX509Options()); err != nil {
+	if o.x509Policy, err = newX509PolicyEngine(o.Options.GetX509Options()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine
-	if o.sshPolicyEngine, err = newSSHPolicyEngine(o.Options.GetSSHOptions()); err != nil {
+	if o.sshPolicy, err = newSSHPolicyEngine(o.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -375,7 +377,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(o.x509PolicyEngine),
+		newX509NamePolicyValidator(o.x509Policy),
 	}, nil
 }
 
@@ -466,7 +468,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(o.sshPolicyEngine),
+		newSSHNamePolicyValidator(o.sshPolicy),
 	), nil
 }
 

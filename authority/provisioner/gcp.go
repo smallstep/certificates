@@ -15,6 +15,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/policy"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
@@ -92,6 +93,8 @@ type GCP struct {
 	config                 *gcpConfig
 	keyStore               *keyStore
 	audiences              Audiences
+	x509Policy             policy.X509NamePolicyEngine
+	sshPolicy              policy.SSHNamePolicyEngine
 }
 
 // GetID returns the provisioner unique identifier. The name should uniquely
@@ -195,7 +198,6 @@ func (p *GCP) GetIdentityToken(subject, caURL string) (string, error) {
 
 // Init validates and initializes the GCP provisioner.
 func (p *GCP) Init(config Config) error {
-	p.base = &base{} // prevent nil pointers
 	var err error
 	switch {
 	case p.Type == "":
@@ -218,12 +220,12 @@ func (p *GCP) Init(config Config) error {
 	}
 
 	// Initialize the x509 allow/deny policy engine
-	if p.x509PolicyEngine, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+	if p.x509Policy, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine
-	if p.sshPolicyEngine, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	if p.sshPolicy, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -284,7 +286,7 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.x509PolicyEngine),
+		newX509NamePolicyValidator(p.x509Policy),
 	), nil
 }
 
@@ -451,6 +453,6 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshPolicyEngine),
+		newSSHNamePolicyValidator(p.sshPolicy),
 	), nil
 }

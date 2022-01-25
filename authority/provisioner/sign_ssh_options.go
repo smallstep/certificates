@@ -454,7 +454,6 @@ type sshNamePolicyValidator struct {
 // newSSHNamePolicyValidator return a new SSH allow/deny validator.
 func newSSHNamePolicyValidator(engine policy.SSHNamePolicyEngine) *sshNamePolicyValidator {
 	return &sshNamePolicyValidator{
-		// TODO: should we use two engines, one for host certs; another for user certs?
 		policyEngine: engine,
 	}
 }
@@ -465,7 +464,6 @@ func (v *sshNamePolicyValidator) Valid(cert *ssh.Certificate, _ SignSSHOptions) 
 	if v.policyEngine == nil {
 		return nil
 	}
-
 	_, err := v.policyEngine.ArePrincipalsAllowed(cert)
 	return err
 }

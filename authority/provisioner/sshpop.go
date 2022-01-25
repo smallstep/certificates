@@ -84,7 +84,6 @@ func (p *SSHPOP) GetEncryptedKey() (string, string, bool) {
 
 // Init initializes and validates the fields of a SSHPOP type.
 func (p *SSHPOP) Init(config Config) error {
-	p.base = &base{} // prevent nil pointers
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
