@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/smallstep/assert"
 	"golang.org/x/crypto/ssh"
 )
@@ -2177,11 +2178,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "fail/with-permitted-dns-domain",
+			name: "fail/host-with-permitted-dns-domain",
 			options: []NamePolicyOption{
 				WithPermittedDNSDomain("*.local"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
 				ValidPrincipals: []string{
 					"host.example.com",
 				},
@@ -2190,11 +2192,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/with-excluded-dns-domain",
+			name: "fail/host-with-excluded-dns-domain",
 			options: []NamePolicyOption{
 				WithExcludedDNSDomain("*.local"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
 				ValidPrincipals: []string{
 					"host.local",
 				},
@@ -2203,11 +2206,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/with-permitted-ip",
+			name: "fail/host-with-permitted-ip",
 			options: []NamePolicyOption{
 				WithPermittedCIDR("127.0.0.1/24"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
 				ValidPrincipals: []string{
 					"192.168.0.22",
 				},
@@ -2216,11 +2220,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/with-excluded-ip",
+			name: "fail/host-with-excluded-ip",
 			options: []NamePolicyOption{
 				WithExcludedCIDR("127.0.0.1/24"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
 				ValidPrincipals: []string{
 					"127.0.0.0",
 				},
@@ -2229,11 +2234,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/with-permitted-email",
+			name: "fail/user-with-permitted-email",
 			options: []NamePolicyOption{
 				WithPermittedEmailAddress("@example.com"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"mail@local",
 				},
@@ -2242,11 +2248,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/with-excluded-email",
+			name: "fail/user-with-excluded-email",
 			options: []NamePolicyOption{
 				WithExcludedEmailAddress("@example.com"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"mail@example.com",
 				},
@@ -2255,11 +2262,39 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/with-permitted-principals",
+			name: "fail/host-with-permitted-principals",
+			options: []NamePolicyOption{
+				WithPermittedPrincipals([]string{"localhost"}),
+			},
+			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
+				ValidPrincipals: []string{
+					"host",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/host-with-excluded-principals",
+			options: []NamePolicyOption{
+				WithExcludedPrincipals([]string{"localhost"}),
+			},
+			cert: &ssh.Certificate{
+				ValidPrincipals: []string{
+					"localhost",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/user-with-permitted-principals",
 			options: []NamePolicyOption{
 				WithPermittedPrincipals([]string{"user"}),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"root",
 				},
@@ -2268,11 +2303,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/with-excluded-principals",
+			name: "fail/user-with-excluded-principals",
 			options: []NamePolicyOption{
 				WithExcludedPrincipals([]string{"user"}),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"user",
 				},
@@ -2281,11 +2317,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/with-permitted-principal-as-mail",
+			name: "fail/user-with-permitted-principal-as-mail",
 			options: []NamePolicyOption{
 				WithPermittedPrincipals([]string{"ops"}),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"ops@work", // this is (currently) parsed as an email-like principal; not allowed with just "ops" as the permitted principal
 				},
@@ -2294,11 +2331,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/principal-with-permitted-dns-domain", // when only DNS is permitted, username principals are not allowed.
+			name: "fail/host-principal-with-permitted-dns-domain", // when only DNS is permitted, username principals are not allowed.
 			options: []NamePolicyOption{
 				WithPermittedDNSDomain("*.local"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
 				ValidPrincipals: []string{
 					"user",
 				},
@@ -2307,11 +2345,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/principal-with-permitted-ip-range", // when only IPs are permitted, username principals are not allowed.
+			name: "fail/host-principal-with-permitted-ip-range", // when only IPs are permitted, username principals are not allowed.
 			options: []NamePolicyOption{
 				WithPermittedCIDR("127.0.0.1/24"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
 				ValidPrincipals: []string{
 					"user",
 				},
@@ -2320,11 +2359,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/principal-with-permitted-email", // when only emails are permitted, username principals are not allowed.
+			name: "fail/user-principal-with-permitted-email", // when only emails are permitted, username principals are not allowed.
 			options: []NamePolicyOption{
 				WithPermittedEmailAddress("@example.com"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"user",
 				},
@@ -2339,6 +2379,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 				WithExcludedEmailAddress("root@smallstep.com"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"someone@smallstep.com",
 					"someone",
@@ -2354,6 +2395,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 				WithExcludedPrincipals([]string{"root"}),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"someone@smallstep.com",
 					"root",
@@ -2363,11 +2405,40 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "ok/with-permitted-dns-domain",
+			name: "ok/host-with-permitted-user-principals",
+			options: []NamePolicyOption{
+				WithPermittedEmailAddress("@work"),
+			},
+			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
+				ValidPrincipals: []string{
+					"example.work",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "ok/user-with-permitted-user-principals",
 			options: []NamePolicyOption{
 				WithPermittedDNSDomain("*.local"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
+				ValidPrincipals: []string{
+					"herman@work",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "ok/host-with-permitted-dns-domain",
+			options: []NamePolicyOption{
+				WithPermittedDNSDomain("*.local"),
+			},
+			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
 				ValidPrincipals: []string{
 					"host.local",
 				},
@@ -2376,11 +2447,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ok/with-excluded-dns-domain",
+			name: "ok/host-with-excluded-dns-domain",
 			options: []NamePolicyOption{
 				WithExcludedDNSDomain("*.example.com"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
 				ValidPrincipals: []string{
 					"host.local",
 				},
@@ -2389,11 +2461,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ok/with-permitted-ip",
+			name: "ok/host-with-permitted-ip",
 			options: []NamePolicyOption{
 				WithPermittedCIDR("127.0.0.1/24"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
 				ValidPrincipals: []string{
 					"127.0.0.33",
 				},
@@ -2402,11 +2475,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ok/with-excluded-ip",
+			name: "ok/host-with-excluded-ip",
 			options: []NamePolicyOption{
 				WithExcludedCIDR("127.0.0.1/24"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
 				ValidPrincipals: []string{
 					"192.168.0.35",
 				},
@@ -2415,11 +2489,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ok/with-permitted-email",
+			name: "ok/user-with-permitted-email",
 			options: []NamePolicyOption{
 				WithPermittedEmailAddress("@example.com"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"mail@example.com",
 				},
@@ -2428,11 +2503,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ok/with-excluded-email",
+			name: "ok/user-with-excluded-email",
 			options: []NamePolicyOption{
 				WithExcludedEmailAddress("@example.com"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"mail@local",
 				},
@@ -2441,11 +2517,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ok/with-permitted-principals",
+			name: "ok/user-with-permitted-principals",
 			options: []NamePolicyOption{
 				WithPermittedPrincipals([]string{"*"}),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"user",
 				},
@@ -2454,11 +2531,12 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ok/with-excluded-principals",
+			name: "ok/user-with-excluded-principals",
 			options: []NamePolicyOption{
 				WithExcludedPrincipals([]string{"user"}),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"root",
 				},
@@ -2474,6 +2552,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 				WithExcludedEmailAddress("root@smallstep.com"),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"someone@smallstep.com",
 					"someone",
@@ -2490,6 +2569,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 				WithExcludedPrincipals([]string{"root"}), // unlike the previous test, this implicitly allows any other username principal
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.UserCert,
 				ValidPrincipals: []string{
 					"someone@smallstep.com",
 					"someone",
@@ -2499,23 +2579,18 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ok/combined-simple-all",
+			name: "ok/combined-host",
 			options: []NamePolicyOption{
 				WithPermittedDNSDomain("*.local"),
 				WithPermittedCIDR("127.0.0.1/24"),
-				WithPermittedEmailAddress("@example.local"),
-				WithPermittedPrincipals([]string{"user"}),
 				WithExcludedDNSDomain("badhost.local"),
 				WithExcludedCIDR("127.0.0.128/25"),
-				WithExcludedEmailAddress("badmail@example.local"),
-				WithExcludedPrincipals([]string{"root"}),
 			},
 			cert: &ssh.Certificate{
+				CertType: ssh.HostCert,
 				ValidPrincipals: []string{
 					"example.local",
-					"127.0.0.1",
-					"user@example.local",
-					"user",
+					"127.0.0.31",
 				},
 			},
 			want:    true,
@@ -2533,6 +2608,165 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("NamePolicyEngine.ArePrincipalsAllowed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+type result struct {
+	wantDNSNames  []string
+	wantIps       []net.IP
+	wantEmails    []string
+	wantUsernames []string
+}
+
+func emptyResult() result {
+	return result{
+		wantDNSNames:  []string{},
+		wantIps:       []net.IP{},
+		wantEmails:    []string{},
+		wantUsernames: []string{},
+	}
+}
+
+func Test_splitSSHPrincipals(t *testing.T) {
+	type test struct {
+		cert    *ssh.Certificate
+		r       result
+		wantErr bool
+	}
+	var tests = map[string]func(t *testing.T) test{
+		"fail/unexpected-cert-type": func(t *testing.T) test {
+			r := emptyResult()
+			return test{
+				cert: &ssh.Certificate{
+					CertType: uint32(0),
+				},
+				r:       r,
+				wantErr: true,
+			}
+		},
+		"fail/user-ip": func(t *testing.T) test {
+			r := emptyResult()
+			r.wantIps = []net.IP{net.ParseIP("127.0.0.1")} // this will still be in the result
+			return test{
+				cert: &ssh.Certificate{
+					CertType:        ssh.UserCert,
+					ValidPrincipals: []string{"127.0.0.1"},
+				},
+				r:       r,
+				wantErr: true,
+			}
+		},
+		"fail/user-uri": func(t *testing.T) test {
+			r := emptyResult()
+			return test{
+				cert: &ssh.Certificate{
+					CertType:        ssh.UserCert,
+					ValidPrincipals: []string{"https://host.local/"},
+				},
+				r:       r,
+				wantErr: true,
+			}
+		},
+		"fail/host-email": func(t *testing.T) test {
+			r := emptyResult()
+			r.wantEmails = []string{"ops@work"} // this will still be in the result
+			return test{
+				cert: &ssh.Certificate{
+					CertType:        ssh.HostCert,
+					ValidPrincipals: []string{"ops@work"},
+				},
+				r:       r,
+				wantErr: true,
+			}
+		},
+		"fail/host-uri": func(t *testing.T) test {
+			r := emptyResult()
+			return test{
+				cert: &ssh.Certificate{
+					CertType:        ssh.HostCert,
+					ValidPrincipals: []string{"https://host.local/"},
+				},
+				r:       r,
+				wantErr: true,
+			}
+		},
+		"ok/host-dns": func(t *testing.T) test {
+			r := emptyResult()
+			r.wantDNSNames = []string{"host.example.com"}
+			return test{
+				cert: &ssh.Certificate{
+					CertType:        ssh.HostCert,
+					ValidPrincipals: []string{"host.example.com"},
+				},
+				r: r,
+			}
+		},
+		"ok/host-ip": func(t *testing.T) test {
+			r := emptyResult()
+			r.wantIps = []net.IP{net.ParseIP("127.0.0.1")}
+			return test{
+				cert: &ssh.Certificate{
+					CertType:        ssh.HostCert,
+					ValidPrincipals: []string{"127.0.0.1"},
+				},
+				r: r,
+			}
+		},
+		"ok/user-localhost": func(t *testing.T) test {
+			r := emptyResult()
+			r.wantUsernames = []string{"localhost"} // when type is User cert, this is considered a username; not a DNS
+			return test{
+				cert: &ssh.Certificate{
+					CertType:        ssh.UserCert,
+					ValidPrincipals: []string{"localhost"},
+				},
+				r: r,
+			}
+		},
+		"ok/user-username-with-period": func(t *testing.T) test {
+			r := emptyResult()
+			r.wantUsernames = []string{"x.joe"}
+			return test{
+				cert: &ssh.Certificate{
+					CertType:        ssh.UserCert,
+					ValidPrincipals: []string{"x.joe"},
+				},
+				r: r,
+			}
+		},
+		"ok/user-maillike": func(t *testing.T) test {
+			r := emptyResult()
+			r.wantEmails = []string{"ops@work"}
+			return test{
+				cert: &ssh.Certificate{
+					CertType:        ssh.UserCert,
+					ValidPrincipals: []string{"ops@work"},
+				},
+				r: r,
+			}
+		},
+	}
+	for name, prep := range tests {
+		tt := prep(t)
+		t.Run(name, func(t *testing.T) {
+			gotDNSNames, gotIps, gotEmails, gotUsernames, err := splitSSHPrincipals(tt.cert)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("splitSSHPrincipals() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !cmp.Equal(tt.r.wantDNSNames, gotDNSNames) {
+				t.Errorf("splitSSHPrincipals() DNS names diff =\n%s", cmp.Diff(tt.r.wantDNSNames, gotDNSNames))
+			}
+			if !cmp.Equal(tt.r.wantIps, gotIps) {
+				t.Errorf("splitSSHPrincipals() IPs diff =\n%s", cmp.Diff(tt.r.wantIps, gotIps))
+			}
+			if !cmp.Equal(tt.r.wantEmails, gotEmails) {
+				t.Errorf("splitSSHPrincipals() Emails diff =\n%s", cmp.Diff(tt.r.wantEmails, gotEmails))
+			}
+			if !cmp.Equal(tt.r.wantUsernames, gotUsernames) {
+				t.Errorf("splitSSHPrincipals() Usernames diff =\n%s", cmp.Diff(tt.r.wantUsernames, gotUsernames))
 			}
 		})
 	}

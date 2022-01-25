@@ -58,10 +58,10 @@ type X509Options struct {
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
 
 	// AllowedNames contains the SANs the provisioner is authorized to sign
-	AllowedNames *AllowedX509NameOptions `json:"allow,omitempty"`
+	AllowedNames *X509NameOptions `json:"allow,omitempty"`
 
 	// DeniedNames contains the SANs the provisioner is not authorized to sign
-	DeniedNames *DeniedX509NameOptions `json:"deny,omitempty"`
+	DeniedNames *X509NameOptions `json:"deny,omitempty"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
@@ -71,7 +71,7 @@ func (o *X509Options) HasTemplate() bool {
 
 // GetAllowedNameOptions returns the AllowedNameOptions, which models the
 // SANs that a provisioner is authorized to sign x509 certificates for.
-func (o *X509Options) GetAllowedNameOptions() *AllowedX509NameOptions {
+func (o *X509Options) GetAllowedNameOptions() *X509NameOptions {
 	if o == nil {
 		return nil
 	}
@@ -80,23 +80,15 @@ func (o *X509Options) GetAllowedNameOptions() *AllowedX509NameOptions {
 
 // GetDeniedNameOptions returns the DeniedNameOptions, which models the
 // SANs that a provisioner is NOT authorized to sign x509 certificates for.
-func (o *X509Options) GetDeniedNameOptions() *DeniedX509NameOptions {
+func (o *X509Options) GetDeniedNameOptions() *X509NameOptions {
 	if o == nil {
 		return nil
 	}
 	return o.DeniedNames
 }
 
-// AllowedX509NameOptions models the allowed names
-type AllowedX509NameOptions struct {
-	DNSDomains     []string `json:"dns,omitempty"`
-	IPRanges       []string `json:"ip,omitempty"`
-	EmailAddresses []string `json:"email,omitempty"`
-	URIDomains     []string `json:"uri,omitempty"`
-}
-
-// DeniedX509NameOptions models the denied names
-type DeniedX509NameOptions struct {
+// X509NameOptions models the X509 name policy configuration.
+type X509NameOptions struct {
 	DNSDomains     []string `json:"dns,omitempty"`
 	IPRanges       []string `json:"ip,omitempty"`
 	EmailAddresses []string `json:"email,omitempty"`
@@ -105,16 +97,7 @@ type DeniedX509NameOptions struct {
 
 // HasNames checks if the AllowedNameOptions has one or more
 // names configured.
-func (o *AllowedX509NameOptions) HasNames() bool {
-	return len(o.DNSDomains) > 0 ||
-		len(o.IPRanges) > 0 ||
-		len(o.EmailAddresses) > 0 ||
-		len(o.URIDomains) > 0
-}
-
-// HasNames checks if the DeniedNameOptions has one or more
-// names configured.
-func (o *DeniedX509NameOptions) HasNames() bool {
+func (o *X509NameOptions) HasNames() bool {
 	return len(o.DNSDomains) > 0 ||
 		len(o.IPRanges) > 0 ||
 		len(o.EmailAddresses) > 0 ||

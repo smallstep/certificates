@@ -197,7 +197,10 @@ func (e *NamePolicyEngine) IsIPAllowed(ip net.IP) (bool, error) {
 
 // ArePrincipalsAllowed verifies that all principals in an SSH certificate are allowed.
 func (e *NamePolicyEngine) ArePrincipalsAllowed(cert *ssh.Certificate) (bool, error) {
-	dnsNames, ips, emails, usernames := splitPrincipals(cert.ValidPrincipals)
+	dnsNames, ips, emails, usernames, err := splitSSHPrincipals(cert)
+	if err != nil {
+		return false, err
+	}
 	if err := e.validateNames(dnsNames, ips, emails, []*url.URL{}, usernames); err != nil {
 		return false, err
 	}
@@ -213,34 +216,45 @@ func appendSubjectCommonName(subject pkix.Name, dnsNames *[]string, ips *[]net.I
 	if commonName == "" {
 		return
 	}
-	if ip := net.ParseIP(commonName); ip != nil {
-		*ips = append(*ips, ip)
-	} else if u, err := url.Parse(commonName); err == nil && u.Scheme != "" {
-		*uris = append(*uris, u)
-	} else if strings.Contains(commonName, "@") {
-		*emails = append(*emails, commonName)
-	} else {
-		*dnsNames = append(*dnsNames, commonName)
-	}
+	subjectDNSNames, subjectIPs, subjectEmails, subjectURIs := x509util.SplitSANs([]string{commonName})
+	*dnsNames = append(*dnsNames, subjectDNSNames...)
+	*ips = append(*ips, subjectIPs...)
+	*emails = append(*emails, subjectEmails...)
+	*uris = append(*uris, subjectURIs...)
 }
 
 // splitPrincipals splits SSH certificate principals into DNS names, emails and usernames.
-func splitPrincipals(principals []string) (dnsNames []string, ips []net.IP, emails, usernames []string) {
+func splitSSHPrincipals(cert *ssh.Certificate) (dnsNames []string, ips []net.IP, emails, usernames []string, err error) {
 	dnsNames = []string{}
 	ips = []net.IP{}
 	emails = []string{}
 	usernames = []string{}
-	for _, principal := range principals {
-		if strings.Contains(principal, "@") {
-			emails = append(emails, principal)
-		} else if ip := net.ParseIP(principal); ip != nil {
-			ips = append(ips, ip)
-		} else if len(strings.Split(principal, ".")) > 1 {
-			dnsNames = append(dnsNames, principal)
-		} else {
-			usernames = append(usernames, principal)
+	var uris []*url.URL
+	switch cert.CertType {
+	case ssh.HostCert:
+		dnsNames, ips, emails, uris = x509util.SplitSANs(cert.ValidPrincipals)
+		switch {
+		case len(emails) > 0:
+			err = fmt.Errorf("Email(-like) principals %v not expected in SSH Host certificate ", emails)
+		case len(uris) > 0:
+			err = fmt.Errorf("URL principals %v not expected in SSH Host certificate ", uris)
 		}
+	case ssh.UserCert:
+		// re-using SplitSANs results in anything that can't be parsed as an IP, URI or email
+		// to be considered a username. This allows usernames like h.slatman to be present
+		// in the SSH certificate. We're exluding IPs and URIs, because they can be confusing
+		// when used in a SSH user certificate.
+		usernames, ips, emails, uris = x509util.SplitSANs(cert.ValidPrincipals)
+		switch {
+		case len(ips) > 0:
+			err = fmt.Errorf("IP principals %v not expected in SSH User certificate ", ips)
+		case len(uris) > 0:
+			err = fmt.Errorf("URL principals %v not expected in SSH User certificate ", uris)
+		}
+	default:
+		err = fmt.Errorf("unexpected SSH certificate type %d", cert.CertType)
 	}
+
 	return
 }
 

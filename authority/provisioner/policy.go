@@ -50,7 +50,8 @@ func newSSHPolicyEngine(sshOpts *SSHOptions) (policy.SSHNamePolicyEngine, error)
 	allowed := sshOpts.GetAllowedNameOptions()
 	if allowed != nil && allowed.HasNames() {
 		options = append(options,
-			policy.WithPermittedDNSDomains(allowed.DNSDomains), // TODO(hs): be a bit more lenient w.r.t. the format of domains? I.e. allow "*.localhost" instead of the ".localhost", which is what Name Constraints do.
+			policy.WithPermittedDNSDomains(allowed.DNSDomains),
+			policy.WithPermittedIPsOrCIDRs(allowed.IPRanges),
 			policy.WithPermittedEmailAddresses(allowed.EmailAddresses),
 			policy.WithPermittedPrincipals(allowed.Principals),
 		)
@@ -59,7 +60,8 @@ func newSSHPolicyEngine(sshOpts *SSHOptions) (policy.SSHNamePolicyEngine, error)
 	denied := sshOpts.GetDeniedNameOptions()
 	if denied != nil && denied.HasNames() {
 		options = append(options,
-			policy.WithExcludedDNSDomains(denied.DNSDomains), // TODO(hs): be a bit more lenient w.r.t. the format of domains? I.e. allow "*.localhost" instead of the ".localhost", which is what Name Constraints do.
+			policy.WithExcludedDNSDomains(denied.DNSDomains),
+			policy.WithExcludedIPsOrCIDRs(denied.IPRanges),
 			policy.WithExcludedEmailAddresses(denied.EmailAddresses),
 			policy.WithExcludedPrincipals(denied.Principals),
 		)

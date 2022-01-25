@@ -454,6 +454,7 @@ type sshNamePolicyValidator struct {
 // newSSHNamePolicyValidator return a new SSH allow/deny validator.
 func newSSHNamePolicyValidator(engine policy.SSHNamePolicyEngine) *sshNamePolicyValidator {
 	return &sshNamePolicyValidator{
+		// TODO: should we use two engines, one for host certs; another for user certs?
 		policyEngine: engine,
 	}
 }
@@ -464,14 +465,9 @@ func (v *sshNamePolicyValidator) Valid(cert *ssh.Certificate, _ SignSSHOptions) 
 	if v.policyEngine == nil {
 		return nil
 	}
-	// TODO(hs): should this perform checks only for hosts vs. user certs depending on context?
-	// The current best practice is to have separate provisioners for hosts and users, and thus
-	// separate policy engines for the principals that are allowed.
+
 	_, err := v.policyEngine.ArePrincipalsAllowed(cert)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // sshCertTypeUInt32

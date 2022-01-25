@@ -602,7 +602,7 @@ func normalizeAndValidateDNSDomainConstraint(constraint string) (string, error) 
 		return "", errors.Errorf("domain constraint %q can only have wildcard as starting character", constraint)
 	}
 	if _, ok := domainToReverseLabels(normalizedConstraint); !ok {
-		return "", errors.Errorf("cannot parse permitted domain constraint %q", constraint)
+		return "", errors.Errorf("cannot parse domain constraint %q", constraint)
 	}
 	return normalizedConstraint, nil
 }

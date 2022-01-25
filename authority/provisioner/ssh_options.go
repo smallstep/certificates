@@ -35,22 +35,16 @@ type SSHOptions struct {
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
 
 	// AllowedNames contains the names the provisioner is authorized to sign
-	AllowedNames *AllowedSSHNameOptions `json:"allow,omitempty"`
+	AllowedNames *SSHNameOptions `json:"allow,omitempty"`
 
 	// DeniedNames contains the names the provisioner is not authorized to sign
-	DeniedNames *DeniedSSHNameOptions `json:"deny,omitempty"`
+	DeniedNames *SSHNameOptions `json:"deny,omitempty"`
 }
 
-// AllowedSSHNameOptions models the allowed names
-type AllowedSSHNameOptions struct {
+// SSHNameOptions models the SSH name policy configuration.
+type SSHNameOptions struct {
 	DNSDomains     []string `json:"dns,omitempty"`
-	EmailAddresses []string `json:"email,omitempty"`
-	Principals     []string `json:"principal,omitempty"`
-}
-
-// DeniedSSHNameOptions models the denied names
-type DeniedSSHNameOptions struct {
-	DNSDomains     []string `json:"dns,omitempty"`
+	IPRanges       []string `json:"ip,omitempty"`
 	EmailAddresses []string `json:"email,omitempty"`
 	Principals     []string `json:"principal,omitempty"`
 }
@@ -62,7 +56,7 @@ func (o *SSHOptions) HasTemplate() bool {
 
 // GetAllowedNameOptions returns the AllowedSSHNameOptions, which models the
 // names that a provisioner is authorized to sign SSH certificates for.
-func (o *SSHOptions) GetAllowedNameOptions() *AllowedSSHNameOptions {
+func (o *SSHOptions) GetAllowedNameOptions() *SSHNameOptions {
 	if o == nil {
 		return nil
 	}
@@ -71,24 +65,16 @@ func (o *SSHOptions) GetAllowedNameOptions() *AllowedSSHNameOptions {
 
 // GetDeniedNameOptions returns the DeniedSSHNameOptions, which models the
 // names that a provisioner is NOT authorized to sign SSH certificates for.
-func (o *SSHOptions) GetDeniedNameOptions() *DeniedSSHNameOptions {
+func (o *SSHOptions) GetDeniedNameOptions() *SSHNameOptions {
 	if o == nil {
 		return nil
 	}
 	return o.DeniedNames
 }
 
-// HasNames checks if the AllowedSSHNameOptions has one or more
+// HasNames checks if the SSHNameOptions has one or more
 // names configured.
-func (o *AllowedSSHNameOptions) HasNames() bool {
-	return len(o.DNSDomains) > 0 ||
-		len(o.EmailAddresses) > 0 ||
-		len(o.Principals) > 0
-}
-
-// HasNames checks if the DeniedSSHNameOptions has one or more
-// names configured.
-func (o *DeniedSSHNameOptions) HasNames() bool {
+func (o *SSHNameOptions) HasNames() bool {
 	return len(o.DNSDomains) > 0 ||
 		len(o.EmailAddresses) > 0 ||
 		len(o.Principals) > 0
