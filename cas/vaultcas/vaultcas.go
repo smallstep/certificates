@@ -29,7 +29,7 @@ type VaultOptions struct {
 	PKIRole         string        `json:"pkiRole,omitempty"`
 	PKIRoleRSA      string        `json:"pkiRoleRSA,omitempty"`
 	PKIRoleEC       string        `json:"pkiRoleEC,omitempty"`
-	PKIRoleED25519  string        `json:"PKIRoleED25519,omitempty"`
+	PKIRoleEd25519  string        `json:"PKIRoleEd25519,omitempty"`
 	RoleID          string        `json:"roleID,omitempty"`
 	SecretID        auth.SecretID `json:"secretID,omitempty"`
 	AppRole         string        `json:"appRole,omitempty"`
@@ -54,13 +54,13 @@ func loadOptions(config json.RawMessage) (vc VaultOptions, err error) {
 	}
 
 	// pkirole or per key type must be defined
-	if vc.PKIRole == "" && vc.PKIRoleRSA == "" && vc.PKIRoleEC == "" && vc.PKIRoleED25519 == "" {
+	if vc.PKIRole == "" && vc.PKIRoleRSA == "" && vc.PKIRoleEC == "" && vc.PKIRoleEd25519 == "" {
 		return vc, errors.New("vaultCAS config options must define `pkiRole`")
 	}
 
 	// if pkirole is empty all others keys must be set
-	if vc.PKIRole == "" && (vc.PKIRoleRSA == "" || vc.PKIRoleEC == "" || vc.PKIRoleED25519 == "") {
-		return vc, errors.New("vaultCAS config options must include a `pkiRole` or `pkiRoleRSA`, `pkiRoleEC` and `pkiRoleEd25519`")
+	if vc.PKIRole == "" && (vc.PKIRoleRSA == "" || vc.PKIRoleEC == "" || vc.PKIRoleEd25519 == "") {
+		return vc, errors.New("vaultCAS config options must include a `pkiRole` or `pkiRoleRSA`, `pkiRoleEC` and `PKIRoleEd25519`")
 	}
 
 	// if pkirole is not empty, use it as default for unset keys
@@ -71,8 +71,8 @@ func loadOptions(config json.RawMessage) (vc VaultOptions, err error) {
 		if vc.PKIRoleEC == "" {
 			vc.PKIRoleEC = vc.PKIRole
 		}
-		if vc.PKIRoleED25519 == "" {
-			vc.PKIRoleED25519 = vc.PKIRole
+		if vc.PKIRoleEd25519 == "" {
+			vc.PKIRoleEd25519 = vc.PKIRole
 		}
 	}
 
@@ -144,7 +144,7 @@ func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.
 	case csr.PublicKeyAlgorithm == x509.ECDSA:
 		vaultPKIRole = v.config.PKIRoleEC
 	case csr.PublicKeyAlgorithm == x509.Ed25519:
-		vaultPKIRole = v.config.PKIRoleED25519
+		vaultPKIRole = v.config.PKIRoleEd25519
 	default:
 		return nil, nil, errors.Errorf("createCertificate: Unsupported public key algorithm '%v'", csr.PublicKeyAlgorithm)
 	}

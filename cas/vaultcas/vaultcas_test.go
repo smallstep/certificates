@@ -172,7 +172,7 @@ func TestVaultCAS_CreateCertificate(t *testing.T) {
 		PKIRole:         "role",
 		PKIRoleRSA:      "rsa",
 		PKIRoleEC:       "ec",
-		PKIRoleED25519:  "ed25519",
+		PKIRoleEd25519:  "ed25519",
 		RoleID:          "roleID",
 		SecretID:        auth.SecretID{FromString: "secretID"},
 		AppRole:         "approle",
