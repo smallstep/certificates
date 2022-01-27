@@ -21,7 +21,6 @@ import (
 // Interface is the SCEP authority interface.
 type Interface interface {
 	LoadProvisionerByName(string) (provisioner.Interface, error)
-	LoadProvisionerByID(string) (provisioner.Interface, error)
 	GetLinkExplicit(provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
 
 	GetCACertificates(ctx context.Context) ([]*x509.Certificate, error)
@@ -58,7 +57,6 @@ type AuthorityOptions struct {
 // SignAuthority is the interface for a signing authority
 type SignAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
-	LoadProvisionerByID(string) (provisioner.Interface, error)
 	LoadProvisionerByName(string) (provisioner.Interface, error)
 }
 
@@ -96,12 +94,6 @@ var (
 		"POSTPKIOperation",
 	}
 )
-
-// LoadProvisionerByID calls out to the SignAuthority interface to load a
-// provisioner by ID.
-func (a *Authority) LoadProvisionerByID(id string) (provisioner.Interface, error) {
-	return a.signAuth.LoadProvisionerByID(id)
-}
 
 // LoadProvisionerByName calls out to the SignAuthority interface to load a
 // provisioner by name.
@@ -285,11 +277,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 		return nil, errors.Wrap(err, "error retrieving authorization options from SCEP provisioner")
 	}
 
-	opts := provisioner.SignOptions{
-		// NotBefore: provisioner.NewTimeDuration(o.NotBefore),
-		// NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
-	}
-
+	opts := provisioner.SignOptions{}
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating template options from SCEP provisioner")
