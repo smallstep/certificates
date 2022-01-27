@@ -26,7 +26,7 @@ func init() {
 
 type VaultOptions struct {
 	PKI             string        `json:"pki,omitempty"`
-	PKIRole         string        `json:"pkiRole,omitempty"`
+	PKIRoleDefault  string        `json:"PKIRoleDefault,omitempty"`
 	PKIRoleRSA      string        `json:"pkiRoleRSA,omitempty"`
 	PKIRoleEC       string        `json:"pkiRoleEC,omitempty"`
 	PKIRoleEd25519  string        `json:"PKIRoleEd25519,omitempty"`
@@ -43,45 +43,38 @@ type VaultCAS struct {
 	fingerprint string
 }
 
-func loadOptions(config json.RawMessage) (vc VaultOptions, err error) {
-	err = json.Unmarshal(config, &vc)
+func loadOptions(config json.RawMessage) (*VaultOptions, error) {
+	var vc *VaultOptions
+
+	err := json.Unmarshal(config, &vc)
 	if err != nil {
-		return vc, errors.Wrap(err, "error decoding vaultCAS config")
+		return nil, errors.Wrap(err, "error decoding vaultCAS config")
 	}
 
 	if vc.PKI == "" {
 		vc.PKI = "pki" // use default pki vault name
 	}
 
-	// pkirole or per key type must be defined
-	if vc.PKIRole == "" && vc.PKIRoleRSA == "" && vc.PKIRoleEC == "" && vc.PKIRoleEd25519 == "" {
-		return vc, errors.New("vaultCAS config options must define `pkiRole`")
+	if vc.PKIRoleDefault == "" {
+		vc.PKIRoleDefault = "default" // use default pki role name
 	}
 
-	// if pkirole is empty all others keys must be set
-	if vc.PKIRole == "" && (vc.PKIRoleRSA == "" || vc.PKIRoleEC == "" || vc.PKIRoleEd25519 == "") {
-		return vc, errors.New("vaultCAS config options must include a `pkiRole` or `pkiRoleRSA`, `pkiRoleEC` and `PKIRoleEd25519`")
+	if vc.PKIRoleRSA == "" {
+		vc.PKIRoleRSA = vc.PKIRoleDefault
 	}
-
-	// if pkirole is not empty, use it as default for unset keys
-	if vc.PKIRole != "" {
-		if vc.PKIRoleRSA == "" {
-			vc.PKIRoleRSA = vc.PKIRole
-		}
-		if vc.PKIRoleEC == "" {
-			vc.PKIRoleEC = vc.PKIRole
-		}
-		if vc.PKIRoleEd25519 == "" {
-			vc.PKIRoleEd25519 = vc.PKIRole
-		}
+	if vc.PKIRoleEC == "" {
+		vc.PKIRoleEC = vc.PKIRoleDefault
+	}
+	if vc.PKIRoleEd25519 == "" {
+		vc.PKIRoleEd25519 = vc.PKIRoleDefault
 	}
 
 	if vc.RoleID == "" {
-		return vc, errors.New("vaultCAS config options must define `roleID`")
+		return nil, errors.New("vaultCAS config options must define `roleID`")
 	}
 
 	if vc.SecretID.FromEnv == "" && vc.SecretID.FromFile == "" && vc.SecretID.FromString == "" {
-		return vc, errors.New("vaultCAS config options must define `secretID` object with one of `FromEnv`, `FromFile` or `FromString`")
+		return nil, errors.New("vaultCAS config options must define `secretID` object with one of `FromEnv`, `FromFile` or `FromString`")
 	}
 
 	if vc.PKI == "" {
@@ -237,7 +230,7 @@ func New(ctx context.Context, opts apiv1.Options) (*VaultCAS, error) {
 
 	return &VaultCAS{
 		client:      client,
-		config:      vc,
+		config:      *vc,
 		fingerprint: opts.CertificateAuthorityFingerprint,
 	}, nil
 }
@@ -326,7 +319,11 @@ func (v *VaultCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv
 
 	serialNumberDash := certutil.GetHexFormatted(serialNumber, "-")
 
-	_, err := v.client.Logical().Write(v.config.PKI+"/revoke/"+serialNumberDash, nil)
+	y := map[string]interface{}{
+		"serial_number": serialNumberDash,
+	}
+
+	_, err := v.client.Logical().Write(v.config.PKI+"/revoke/", y)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to revoke certificate")
 	}

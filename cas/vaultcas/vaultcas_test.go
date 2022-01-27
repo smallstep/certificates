@@ -1,6 +1,7 @@
 package vaultcas
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/json"
@@ -60,7 +61,17 @@ pV/v53oR/ewbtrkHZQkN/amFMLagITAfBgkqhkiG9w0BCQ4xEjAQMA4GA1UdEQQH
 MAWCA09LUDAFBgMrZXADQQDJi47MAgl/WKAz+V/kDu1k/zbKk1nrHHAUonbofHUW
 M6ihSD43+awq3BPeyPbToeH5orSH9l3MuTfbxPb5BVEH
 -----END CERTIFICATE REQUEST-----`
-	testRootFingerprint = `e7678acf0d8de731262bce2fe792c48f19547285f5976805125a40867c77464e`
+	testRootCertificate = `-----BEGIN CERTIFICATE-----
+MIIBeDCCAR+gAwIBAgIQcXWWjtSZ/PAyH8D1Ou4L9jAKBggqhkjOPQQDAjAbMRkw
+FwYDVQQDExBDbG91ZENBUyBSb290IENBMB4XDTIwMTAyNzIyNTM1NFoXDTMwMTAy
+NzIyNTM1NFowGzEZMBcGA1UEAxMQQ2xvdWRDQVMgUm9vdCBDQTBZMBMGByqGSM49
+AgEGCCqGSM49AwEHA0IABIySHA4b78Yu4LuGhZIlv/PhNwXz4ZoV1OUZQ0LrK3vj
+B13O12DLZC5uj1z3kxdQzXUttSbtRv49clMpBiTpsZKjRTBDMA4GA1UdDwEB/wQE
+AwIBBjASBgNVHRMBAf8ECDAGAQH/AgEBMB0GA1UdDgQWBBSZ+t9RMHbFTl5BatM3
+5bJlHPOu3DAKBggqhkjOPQQDAgNHADBEAiASah6gg0tVM3WI0meCQ4SEKk7Mjhbv
++SmhuZHWV1QlXQIgRXNyWcpVUrAoG6Uy1KQg07LDpF5dFeK9InrDxSJAkVo=
+-----END CERTIFICATE-----`
+	testRootFingerprint = `62e816cbac5c501b7705e18415503852798dfbcd67062f06bcb4af67c290e3c8`
 )
 
 func mustParseCertificate(t *testing.T, pemCert string) *x509.Certificate {
@@ -112,6 +123,30 @@ func testCAHelper(t *testing.T) (*url.URL, *vault.Client) {
 			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testCertificateSigned}}
 			writeJSON(w, cert)
 			return
+		case r.RequestURI == "/v1/pki/cert/ca":
+			w.WriteHeader(http.StatusOK)
+			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testRootCertificate}}
+			writeJSON(w, cert)
+			return
+		case r.RequestURI == "/v1/pki/revoke":
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(r.Body)
+			m := make(map[string]string)
+			json.Unmarshal(buf.Bytes(), &m)
+			switch {
+			case m["serial_number"] == "1c-71-6e-18-cc-f4-70-29-5f-75-ee-64-a8-fe-69-ad":
+				w.WriteHeader(http.StatusOK)
+				return
+			case m["serial_number"] == "01-e2-40":
+				w.WriteHeader(http.StatusOK)
+				return
+			// both
+			case m["serial_number"] == "01-34-3e":
+				w.WriteHeader(http.StatusOK)
+				return
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			fmt.Fprintf(w, `{"error":"not found"}`)
@@ -151,7 +186,7 @@ func TestNew_register(t *testing.T) {
 		CertificateAuthorityFingerprint: testRootFingerprint,
 		Config: json.RawMessage(`{
 			"PKI": "pki",
-			"PKIRole": "pki-role",
+			"PKIRoleDefault": "pki-role",
 			"RoleID": "roleID",
 			"SecretID": {"FromString": "secretID"},
 			"IsWrappingToken": false
@@ -169,7 +204,7 @@ func TestVaultCAS_CreateCertificate(t *testing.T) {
 
 	options := VaultOptions{
 		PKI:             "pki",
-		PKIRole:         "role",
+		PKIRoleDefault:  "role",
 		PKIRoleRSA:      "rsa",
 		PKIRoleEC:       "ec",
 		PKIRoleEd25519:  "ed25519",
@@ -216,6 +251,14 @@ func TestVaultCAS_CreateCertificate(t *testing.T) {
 			Certificate:      mustParseCertificate(t, testCertificateSigned),
 			CertificateChain: []*x509.Certificate{},
 		}, false},
+		{"fail CSR", fields{client, options}, args{&apiv1.CreateCertificateRequest{
+			CSR:      nil,
+			Lifetime: time.Hour,
+		}}, nil, true},
+		{"fail lifetime", fields{client, options}, args{&apiv1.CreateCertificateRequest{
+			CSR:      mustParseCertificateRequest(t, testCertificateCsrEc),
+			Lifetime: 0,
+		}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -230,6 +273,404 @@ func TestVaultCAS_CreateCertificate(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("VaultCAS.CreateCertificate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestVaultCAS_GetCertificateAuthority(t *testing.T) {
+	caURL, client := testCAHelper(t)
+
+	type fields struct {
+		client      *vault.Client
+		options     VaultOptions
+		fingerprint string
+	}
+
+	type args struct {
+		req *apiv1.GetCertificateAuthorityRequest
+	}
+
+	options := VaultOptions{
+		PKI: "pki",
+	}
+
+	rootCert, _ := parseCertificate(testRootCertificate)
+
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *apiv1.GetCertificateAuthorityResponse
+		wantErr bool
+	}{
+		{"ok", fields{client, options, testRootFingerprint}, args{&apiv1.GetCertificateAuthorityRequest{
+			Name: caURL.String(),
+		}}, &apiv1.GetCertificateAuthorityResponse{
+			RootCertificate: rootCert,
+		}, false},
+		{"fail fingerprint", fields{client, options, "fail"}, args{&apiv1.GetCertificateAuthorityRequest{
+			Name: caURL.String(),
+		}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &VaultCAS{
+				client:      tt.fields.client,
+				fingerprint: tt.fields.fingerprint,
+				config:      tt.fields.options,
+			}
+			got, err := s.GetCertificateAuthority(tt.args.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("VaultCAS.GetCertificateAuthority() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("VaultCAS.GetCertificateAuthority() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestVaultCAS_RevokeCertificate(t *testing.T) {
+	_, client := testCAHelper(t)
+
+	options := VaultOptions{
+		PKI:             "pki",
+		PKIRoleDefault:  "role",
+		PKIRoleRSA:      "rsa",
+		PKIRoleEC:       "ec",
+		PKIRoleEd25519:  "ed25519",
+		RoleID:          "roleID",
+		SecretID:        auth.SecretID{FromString: "secretID"},
+		AppRole:         "approle",
+		IsWrappingToken: false,
+	}
+
+	type fields struct {
+		client  *vault.Client
+		options VaultOptions
+	}
+
+	type args struct {
+		req *apiv1.RevokeCertificateRequest
+	}
+
+	testCrt, _ := parseCertificate(testCertificateSigned)
+
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *apiv1.RevokeCertificateResponse
+		wantErr bool
+	}{
+		{"ok serial number", fields{client, options}, args{&apiv1.RevokeCertificateRequest{
+			SerialNumber: "123456",
+			Certificate:  nil,
+		}}, &apiv1.RevokeCertificateResponse{}, false},
+		{"ok certificate", fields{client, options}, args{&apiv1.RevokeCertificateRequest{
+			SerialNumber: "",
+			Certificate:  testCrt,
+		}}, &apiv1.RevokeCertificateResponse{
+			Certificate: testCrt,
+		}, false},
+		{"ok both", fields{client, options}, args{&apiv1.RevokeCertificateRequest{
+			SerialNumber: "78910",
+			Certificate:  testCrt,
+		}}, &apiv1.RevokeCertificateResponse{
+			Certificate: testCrt,
+		}, false},
+		{"fail serial string", fields{client, options}, args{&apiv1.RevokeCertificateRequest{
+			SerialNumber: "fail",
+			Certificate:  nil,
+		}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &VaultCAS{
+				client: tt.fields.client,
+				config: tt.fields.options,
+			}
+			got, err := s.RevokeCertificate(tt.args.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("VaultCAS.RevokeCertificate() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("VaultCAS.RevokeCertificate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestVaultCAS_RenewCertificate(t *testing.T) {
+	_, client := testCAHelper(t)
+
+	options := VaultOptions{
+		PKI:             "pki",
+		PKIRoleDefault:  "role",
+		PKIRoleRSA:      "rsa",
+		PKIRoleEC:       "ec",
+		PKIRoleEd25519:  "ed25519",
+		RoleID:          "roleID",
+		SecretID:        auth.SecretID{FromString: "secretID"},
+		AppRole:         "approle",
+		IsWrappingToken: false,
+	}
+
+	type fields struct {
+		client  *vault.Client
+		options VaultOptions
+	}
+
+	type args struct {
+		req *apiv1.RenewCertificateRequest
+	}
+
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *apiv1.RenewCertificateResponse
+		wantErr bool
+	}{
+		{"not implemented", fields{client, options}, args{&apiv1.RenewCertificateRequest{
+			CSR:      mustParseCertificateRequest(t, testCertificateCsrEc),
+			Lifetime: time.Hour,
+		}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &VaultCAS{
+				client: tt.fields.client,
+				config: tt.fields.options,
+			}
+			got, err := s.RenewCertificate(tt.args.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("VaultCAS.RenewCertificate() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("VaultCAS.RenewCertificate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestVaultCAS_loadOptions(t *testing.T) {
+	tests := []struct {
+		name    string
+		raw     string
+		want    *VaultOptions
+		wantErr bool
+	}{
+		{
+			"ok mandatory with SecretID FromString",
+			`{"RoleID": "roleID", "SecretID": {"FromString": "secretID"}}`,
+			&VaultOptions{
+				PKI:             "pki",
+				PKIRoleDefault:  "default",
+				PKIRoleRSA:      "default",
+				PKIRoleEC:       "default",
+				PKIRoleEd25519:  "default",
+				RoleID:          "roleID",
+				SecretID:        auth.SecretID{FromString: "secretID"},
+				AppRole:         "auth/approle",
+				IsWrappingToken: false,
+			},
+			false,
+		},
+		{
+			"ok mandatory with SecretID FromFile",
+			`{"RoleID": "roleID", "SecretID": {"FromFile": "secretID"}}`,
+			&VaultOptions{
+				PKI:             "pki",
+				PKIRoleDefault:  "default",
+				PKIRoleRSA:      "default",
+				PKIRoleEC:       "default",
+				PKIRoleEd25519:  "default",
+				RoleID:          "roleID",
+				SecretID:        auth.SecretID{FromFile: "secretID"},
+				AppRole:         "auth/approle",
+				IsWrappingToken: false,
+			},
+			false,
+		},
+		{
+			"ok mandatory with SecretID FromEnv",
+			`{"RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
+			&VaultOptions{
+				PKI:             "pki",
+				PKIRoleDefault:  "default",
+				PKIRoleRSA:      "default",
+				PKIRoleEC:       "default",
+				PKIRoleEd25519:  "default",
+				RoleID:          "roleID",
+				SecretID:        auth.SecretID{FromEnv: "secretID"},
+				AppRole:         "auth/approle",
+				IsWrappingToken: false,
+			},
+			false,
+		},
+		{
+			"ok mandatory PKIRole PKIRoleEd25519",
+			`{"PKIRoleDefault": "role", "PKIRoleEd25519": "ed25519" , "RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
+			&VaultOptions{
+				PKI:             "pki",
+				PKIRoleDefault:  "role",
+				PKIRoleRSA:      "role",
+				PKIRoleEC:       "role",
+				PKIRoleEd25519:  "ed25519",
+				RoleID:          "roleID",
+				SecretID:        auth.SecretID{FromEnv: "secretID"},
+				AppRole:         "auth/approle",
+				IsWrappingToken: false,
+			},
+			false,
+		},
+		{
+			"ok mandatory PKIRole PKIRoleEC",
+			`{"PKIRoleDefault": "role", "PKIRoleEC": "ec" , "RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
+			&VaultOptions{
+				PKI:             "pki",
+				PKIRoleDefault:  "role",
+				PKIRoleRSA:      "role",
+				PKIRoleEC:       "ec",
+				PKIRoleEd25519:  "role",
+				RoleID:          "roleID",
+				SecretID:        auth.SecretID{FromEnv: "secretID"},
+				AppRole:         "auth/approle",
+				IsWrappingToken: false,
+			},
+			false,
+		},
+		{
+			"ok mandatory PKIRole PKIRoleRSA",
+			`{"PKIRoleDefault": "role", "PKIRoleRSA": "rsa" , "RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
+			&VaultOptions{
+				PKI:             "pki",
+				PKIRoleDefault:  "role",
+				PKIRoleRSA:      "rsa",
+				PKIRoleEC:       "role",
+				PKIRoleEd25519:  "role",
+				RoleID:          "roleID",
+				SecretID:        auth.SecretID{FromEnv: "secretID"},
+				AppRole:         "auth/approle",
+				IsWrappingToken: false,
+			},
+			false,
+		},
+		{
+			"ok mandatory PKIRoleRSA PKIRoleEC PKIRoleEd25519",
+			`{"PKIRoleRSA": "rsa", "PKIRoleEC": "ec", "PKIRoleEd25519": "ed25519", "RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
+			&VaultOptions{
+				PKI:             "pki",
+				PKIRoleDefault:  "default",
+				PKIRoleRSA:      "rsa",
+				PKIRoleEC:       "ec",
+				PKIRoleEd25519:  "ed25519",
+				RoleID:          "roleID",
+				SecretID:        auth.SecretID{FromEnv: "secretID"},
+				AppRole:         "auth/approle",
+				IsWrappingToken: false,
+			},
+			false,
+		},
+		{
+			"ok mandatory PKIRoleRSA PKIRoleEC PKIRoleEd25519 with useless PKIRoleDefault",
+			`{"PKIRoleDefault": "role", "PKIRoleRSA": "rsa", "PKIRoleEC": "ec", "PKIRoleEd25519": "ed25519", "RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
+			&VaultOptions{
+				PKI:             "pki",
+				PKIRoleDefault:  "role",
+				PKIRoleRSA:      "rsa",
+				PKIRoleEC:       "ec",
+				PKIRoleEd25519:  "ed25519",
+				RoleID:          "roleID",
+				SecretID:        auth.SecretID{FromEnv: "secretID"},
+				AppRole:         "auth/approle",
+				IsWrappingToken: false,
+			},
+			false,
+		},
+		{
+			"ok mandatory with AppRole",
+			`{"AppRole": "test", "RoleID": "roleID", "SecretID": {"FromString": "secretID"}}`,
+			&VaultOptions{
+				PKI:             "pki",
+				PKIRoleDefault:  "default",
+				PKIRoleRSA:      "default",
+				PKIRoleEC:       "default",
+				PKIRoleEd25519:  "default",
+				RoleID:          "roleID",
+				SecretID:        auth.SecretID{FromString: "secretID"},
+				AppRole:         "test",
+				IsWrappingToken: false,
+			},
+			false,
+		},
+		{
+			"ok mandatory with IsWrappingToken",
+			`{"IsWrappingToken": true, "RoleID": "roleID", "SecretID": {"FromString": "secretID"}}`,
+			&VaultOptions{
+				PKI:             "pki",
+				PKIRoleDefault:  "default",
+				PKIRoleRSA:      "default",
+				PKIRoleEC:       "default",
+				PKIRoleEd25519:  "default",
+				RoleID:          "roleID",
+				SecretID:        auth.SecretID{FromString: "secretID"},
+				AppRole:         "auth/approle",
+				IsWrappingToken: true,
+			},
+			false,
+		},
+		{
+			"fail with SecretID FromFail",
+			`{"RoleID": "roleID", "SecretID": {"FromFail": "secretID"}}`,
+			nil,
+			true,
+		},
+		{
+			"fail with SecretID empty FromEnv",
+			`{"RoleID": "roleID", "SecretID": {"FromEnv": ""}}`,
+			nil,
+			true,
+		},
+		{
+			"fail with SecretID empty FromFile",
+			`{"RoleID": "roleID", "SecretID": {"FromFile": ""}}`,
+			nil,
+			true,
+		},
+		{
+			"fail with SecretID empty FromString",
+			`{"RoleID": "roleID", "SecretID": {"FromString": ""}}`,
+			nil,
+			true,
+		},
+		{
+			"fail mandatory with SecretID FromFail",
+			`{"RoleID": "roleID", "SecretID": {"FromFail": "secretID"}}`,
+			nil,
+			true,
+		},
+		{
+			"fail missing RoleID",
+			`{"SecretID": {"FromString": "secretID"}}`,
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := loadOptions(json.RawMessage(tt.raw))
+			if (err != nil) != tt.wantErr {
+				t.Errorf("VaultCAS.loadOptions() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("VaultCAS.loadOptions() = %v, want %v", got, tt.want)
 			}
 		})
 	}
