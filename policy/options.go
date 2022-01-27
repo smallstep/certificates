@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"golang.org/x/net/idna"
 )
 
 type NamePolicyOption func(e *NamePolicyEngine) error
@@ -592,14 +593,24 @@ func isIPv4(ip net.IP) bool {
 
 func normalizeAndValidateDNSDomainConstraint(constraint string) (string, error) {
 	normalizedConstraint := strings.ToLower(strings.TrimSpace(constraint))
+	if normalizedConstraint == "" {
+		return "", errors.Errorf("contraint %q can not be empty or white space string", constraint)
+	}
 	if strings.Contains(normalizedConstraint, "..") {
 		return "", errors.Errorf("domain constraint %q cannot have empty labels", constraint)
+	}
+	if normalizedConstraint[0] == '*' && normalizedConstraint[1] != '.' {
+		return "", errors.Errorf("wildcard character in domain constraint %q can only be used to match (full) labels", constraint)
+	}
+	if strings.LastIndex(normalizedConstraint, "*") > 0 {
+		return "", errors.Errorf("domain constraint %q can only have wildcard as starting character", constraint)
 	}
 	if strings.HasPrefix(normalizedConstraint, "*.") {
 		normalizedConstraint = normalizedConstraint[1:] // cut off wildcard character; keep the period
 	}
-	if strings.Contains(normalizedConstraint, "*") {
-		return "", errors.Errorf("domain constraint %q can only have wildcard as starting character", constraint)
+	normalizedConstraint, err := idna.Lookup.ToASCII(normalizedConstraint)
+	if err != nil {
+		return "", errors.Wrapf(err, "domain constraint %q can not be converted to ASCII", constraint)
 	}
 	if _, ok := domainToReverseLabels(normalizedConstraint); !ok {
 		return "", errors.Errorf("cannot parse domain constraint %q", constraint)
@@ -609,8 +620,11 @@ func normalizeAndValidateDNSDomainConstraint(constraint string) (string, error) 
 
 func normalizeAndValidateEmailConstraint(constraint string) (string, error) {
 	normalizedConstraint := strings.ToLower(strings.TrimSpace(constraint))
+	if normalizedConstraint == "" {
+		return "", errors.Errorf("email contraint %q can not be empty or white space string", constraint)
+	}
 	if strings.Contains(normalizedConstraint, "*") {
-		return "", fmt.Errorf("email constraint %q cannot contain asterisk", constraint)
+		return "", fmt.Errorf("email constraint %q cannot contain asterisk wildcard", constraint)
 	}
 	if strings.Count(normalizedConstraint, "@") > 1 {
 		return "", fmt.Errorf("email constraint %q contains too many @ characters", constraint)
@@ -622,8 +636,23 @@ func normalizeAndValidateEmailConstraint(constraint string) (string, error) {
 		return "", fmt.Errorf("email constraint %q cannot start with period", constraint)
 	}
 	if strings.Contains(normalizedConstraint, "@") {
-		if _, ok := parseRFC2821Mailbox(normalizedConstraint); !ok {
-			return "", fmt.Errorf("cannot parse email constraint %q", constraint)
+		mailbox, ok := parseRFC2821Mailbox(normalizedConstraint)
+		if !ok {
+			return "", fmt.Errorf("cannot parse email constraint %q as RFC 2821 mailbox", constraint)
+		}
+		// According to RFC 5280, section 7.5, emails are considered to match if the local part is
+		// an exact match and the host (domain) part matches the ASCII representation (case-insensitive):
+		// https://datatracker.ietf.org/doc/html/rfc5280#section-7.5
+		domainASCII, err := idna.Lookup.ToASCII(mailbox.domain)
+		if err != nil {
+			return "", errors.Wrapf(err, "email constraint %q domain part %q cannot be converted to ASCII", constraint, mailbox.domain)
+		}
+		normalizedConstraint = mailbox.local + "@" + domainASCII
+	} else {
+		var err error
+		normalizedConstraint, err = idna.Lookup.ToASCII(normalizedConstraint)
+		if err != nil {
+			return "", errors.Wrapf(err, "email constraint %q cannot be converted to ASCII", constraint)
 		}
 	}
 	if _, ok := domainToReverseLabels(normalizedConstraint); !ok {
@@ -634,6 +663,9 @@ func normalizeAndValidateEmailConstraint(constraint string) (string, error) {
 
 func normalizeAndValidateURIDomainConstraint(constraint string) (string, error) {
 	normalizedConstraint := strings.ToLower(strings.TrimSpace(constraint))
+	if normalizedConstraint == "" {
+		return "", errors.Errorf("URI domain contraint %q cannot be empty or white space string", constraint)
+	}
 	if strings.Contains(normalizedConstraint, "..") {
 		return "", errors.Errorf("URI domain constraint %q cannot have empty labels", constraint)
 	}
@@ -643,7 +675,23 @@ func normalizeAndValidateURIDomainConstraint(constraint string) (string, error) 
 	if strings.Contains(normalizedConstraint, "*") {
 		return "", errors.Errorf("URI domain constraint %q can only have wildcard as starting character", constraint)
 	}
-	// TODO(hs): block constraints that look like IPs too? Because hosts can't be matched to those.
+	// we're being strict with square brackets in domains; we don't allow them, no matter what
+	if strings.Contains(normalizedConstraint, "[") || strings.Contains(normalizedConstraint, "]") {
+		return "", errors.Errorf("URI domain constraint %q contains invalid square brackets", constraint)
+	}
+	if _, _, err := net.SplitHostPort(normalizedConstraint); err == nil {
+		// a successful split (likely) with host and port; we don't currently allow ports in the config
+		return "", errors.Errorf("URI domain constraint %q cannot contain port", constraint)
+	}
+	// check if the host part of the URI domain constraint is an IP
+	if net.ParseIP(normalizedConstraint) != nil {
+		return "", errors.Errorf("URI domain constraint %q cannot be an IP", constraint)
+	}
+	// TODO(hs): verify that this is OK for URI (IRI) domains too
+	normalizedConstraint, err := idna.Lookup.ToASCII(normalizedConstraint)
+	if err != nil {
+		return "", errors.Wrapf(err, "URI domain constraint %q cannot be converted to ASCII", constraint)
+	}
 	_, ok := domainToReverseLabels(normalizedConstraint)
 	if !ok {
 		return "", fmt.Errorf("cannot parse URI domain constraint %q", constraint)

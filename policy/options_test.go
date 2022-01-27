@@ -16,8 +16,20 @@ func Test_normalizeAndValidateDNSDomainConstraint(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name:       "fail/too-many-asterisks",
-			constraint: "**.local",
+			name:       "fail/empty-constraint",
+			constraint: "",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "fail/wildcard-partial-label",
+			constraint: "*xxxx.local",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "fail/wildcard-in-the-middle",
+			constraint: "x.*.local",
 			want:       "",
 			wantErr:    true,
 		},
@@ -34,14 +46,8 @@ func Test_normalizeAndValidateDNSDomainConstraint(t *testing.T) {
 			wantErr:    true,
 		},
 		{
-			name:       "false/idna-internationalized-domain-name",
-			constraint: ".例.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
-			want:       "",
-			wantErr:    true,
-		},
-		{
-			name:       "false/idna-internationalized-domain-name-constraint",
-			constraint: ".例.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
+			name:       "fail/idna-internationalized-domain-name-lookup",
+			constraint: `\00.local`, // invalid IDNA ASCII character
 			want:       "",
 			wantErr:    true,
 		},
@@ -63,13 +69,18 @@ func Test_normalizeAndValidateDNSDomainConstraint(t *testing.T) {
 			want:       ".xn--fsq.jp",
 			wantErr:    false,
 		},
+		{
+			name:       "ok/idna-internationalized-domain-name-lookup-transformed",
+			constraint: ".例.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
+			want:       ".xn--fsq.jp",
+			wantErr:    false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := normalizeAndValidateDNSDomainConstraint(tt.constraint)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("normalizeAndValidateDNSDomainConstraint() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 			if got != tt.want {
 				t.Errorf("normalizeAndValidateDNSDomainConstraint() = %v, want %v", got, tt.want)
@@ -85,6 +96,12 @@ func Test_normalizeAndValidateEmailConstraint(t *testing.T) {
 		want       string
 		wantErr    bool
 	}{
+		{
+			name:       "fail/empty-constraint",
+			constraint: "",
+			want:       "",
+			wantErr:    true,
+		},
 		{
 			name:       "fail/asterisk",
 			constraint: "*.local",
@@ -111,13 +128,25 @@ func Test_normalizeAndValidateEmailConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/parse-mailbox",
-			constraint: "mail@example.com" + string([]byte{0}),
+			constraint: "mail@example.com" + string(byte(0)),
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "fail/idna-internationalized-domain",
+			constraint: `mail@xn--bla.local`,
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "fail/idna-internationalized-domain-name-lookup",
+			constraint: `\00local`,
 			want:       "",
 			wantErr:    true,
 		},
 		{
 			name:       "fail/parse-domain",
-			constraint: "example.com" + string([]byte{0}),
+			constraint: "x..example.com",
 			want:       "",
 			wantErr:    true,
 		},
@@ -133,13 +162,19 @@ func Test_normalizeAndValidateEmailConstraint(t *testing.T) {
 			want:       "mail@local",
 			wantErr:    false,
 		},
+		// TODO(hs): fix the below; doesn't get past parseRFC2821Mailbox; I think it should be allowed.
+		// {
+		// 	name:       "ok/idna-internationalized-local",
+		// 	constraint: `bücher@local`,
+		// 	want:       "bücher@local",
+		// 	wantErr:    false,
+		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := normalizeAndValidateEmailConstraint(tt.constraint)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("normalizeAndValidateEmailConstraint() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 			if got != tt.want {
 				t.Errorf("normalizeAndValidateEmailConstraint() = %v, want %v", got, tt.want)
@@ -156,6 +191,12 @@ func Test_normalizeAndValidateURIDomainConstraint(t *testing.T) {
 		wantErr    bool
 	}{
 		{
+			name:       "fail/empty-constraint",
+			constraint: "",
+			want:       "",
+			wantErr:    true,
+		},
+		{
 			name:       "fail/too-many-asterisks",
 			constraint: "**.local",
 			want:       "",
@@ -170,6 +211,42 @@ func Test_normalizeAndValidateURIDomainConstraint(t *testing.T) {
 		{
 			name:       "fail/empty-reverse",
 			constraint: ".",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "fail/domain-with-port",
+			constraint: "host.local:8443",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "fail/ipv4",
+			constraint: "127.0.0.1",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "fail/ipv6-brackets",
+			constraint: "[::1]",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "fail/ipv6-no-brackets",
+			constraint: "::1",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "fail/ipv6-no-brackets",
+			constraint: "[::1",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "fail/idna-internationalized-domain-name-lookup",
+			constraint: `\00local`,
 			want:       "",
 			wantErr:    true,
 		},
@@ -191,7 +268,6 @@ func Test_normalizeAndValidateURIDomainConstraint(t *testing.T) {
 			got, err := normalizeAndValidateURIDomainConstraint(tt.constraint)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("normalizeAndValidateURIDomainConstraint() error = %v, wantErr %v", err, tt.wantErr)
-				return
 			}
 			if got != tt.want {
 				t.Errorf("normalizeAndValidateURIDomainConstraint() = %v, want %v", got, tt.want)

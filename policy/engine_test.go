@@ -17,16 +17,15 @@ import (
 
 func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 	tests := []struct {
-		name       string
-		engine     *NamePolicyEngine
-		domain     string
-		constraint string
-		want       bool
-		wantErr    bool
+		name                      string
+		allowLiteralWildcardNames bool
+		domain                    string
+		constraint                string
+		want                      bool
+		wantErr                   bool
 	}{
 		{
 			name:       "fail/wildcard",
-			engine:     &NamePolicyEngine{},
 			domain:     "host.local",
 			constraint: ".example.com", // internally we're using the x509 period prefix as the indicator for exactly one subdomain
 			want:       false,
@@ -34,7 +33,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/wildcard-literal",
-			engine:     &NamePolicyEngine{},
 			domain:     "*.example.com",
 			constraint: ".example.com", // internally we're using the x509 period prefix as the indicator for exactly one subdomain
 			want:       false,
@@ -42,7 +40,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/specific-domain",
-			engine:     &NamePolicyEngine{},
 			domain:     "www.example.com",
 			constraint: "host.example.com",
 			want:       false,
@@ -50,7 +47,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/single-whitespace-domain",
-			engine:     &NamePolicyEngine{},
 			domain:     " ",
 			constraint: "host.example.com",
 			want:       false,
@@ -58,7 +54,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/period-domain",
-			engine:     &NamePolicyEngine{},
 			domain:     ".host.example.com",
 			constraint: ".example.com",
 			want:       false,
@@ -66,7 +61,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/wrong-asterisk-prefix",
-			engine:     &NamePolicyEngine{},
 			domain:     "*Xexample.com",
 			constraint: ".example.com",
 			want:       false,
@@ -74,7 +68,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/asterisk-in-domain",
-			engine:     &NamePolicyEngine{},
 			domain:     "e*ample.com",
 			constraint: ".com",
 			want:       false,
@@ -82,7 +75,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/asterisk-label",
-			engine:     &NamePolicyEngine{},
 			domain:     "example.*.local",
 			constraint: ".local",
 			want:       false,
@@ -90,7 +82,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/multiple-periods",
-			engine:     &NamePolicyEngine{},
 			domain:     "example.local",
 			constraint: "..local",
 			want:       false,
@@ -98,23 +89,20 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/error-parsing-domain",
-			engine:     &NamePolicyEngine{},
-			domain:     string([]byte{0}),
+			domain:     string(byte(0)),
 			constraint: ".local",
 			want:       false,
 			wantErr:    true,
 		},
 		{
 			name:       "fail/error-parsing-constraint",
-			engine:     &NamePolicyEngine{},
 			domain:     "example.local",
-			constraint: string([]byte{0}),
+			constraint: string(byte(0)),
 			want:       false,
 			wantErr:    true,
 		},
 		{
 			name:       "fail/no-subdomain",
-			engine:     &NamePolicyEngine{},
 			domain:     "local",
 			constraint: ".local",
 			want:       false,
@@ -122,7 +110,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/too-many-subdomains",
-			engine:     &NamePolicyEngine{},
 			domain:     "www.example.local",
 			constraint: ".local",
 			want:       false,
@@ -130,7 +117,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/wrong-domain",
-			engine:     &NamePolicyEngine{},
 			domain:     "example.notlocal",
 			constraint: ".local",
 			want:       false,
@@ -138,7 +124,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "false/idna-internationalized-domain-name",
-			engine:     &NamePolicyEngine{},
 			domain:     "JP納豆.例.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
 			constraint: ".例.jp",
 			want:       false,
@@ -146,7 +131,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "false/idna-internationalized-domain-name-constraint",
-			engine:     &NamePolicyEngine{},
 			domain:     "xn--jp-cd2fp15c.xn--fsq.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
 			constraint: ".例.jp",
 			want:       false,
@@ -154,7 +138,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "ok/empty-constraint",
-			engine:     &NamePolicyEngine{},
 			domain:     "www.example.com",
 			constraint: "",
 			want:       true,
@@ -162,25 +145,21 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "ok/wildcard",
-			engine:     &NamePolicyEngine{},
 			domain:     "www.example.com",
 			constraint: ".example.com", // internally we're using the x509 period prefix as the indicator for exactly one subdomain
 			want:       true,
 			wantErr:    false,
 		},
 		{
-			name: "ok/wildcard-literal",
-			engine: &NamePolicyEngine{
-				allowLiteralWildcardNames: true,
-			},
-			domain:     "*.example.com", // specifically allowed using an option on the NamePolicyEngine
-			constraint: ".example.com",  // internally we're using the x509 period prefix as the indicator for exactly one subdomain
-			want:       true,
-			wantErr:    false,
+			name:                      "ok/wildcard-literal",
+			allowLiteralWildcardNames: true,
+			domain:                    "*.example.com", // specifically allowed using an option on the NamePolicyEngine
+			constraint:                ".example.com",  // internally we're using the x509 period prefix as the indicator for exactly one subdomain
+			want:                      true,
+			wantErr:                   false,
 		},
 		{
 			name:       "ok/specific-domain",
-			engine:     &NamePolicyEngine{},
 			domain:     "www.example.com",
 			constraint: "www.example.com",
 			want:       true,
@@ -188,7 +167,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "ok/different-case",
-			engine:     &NamePolicyEngine{},
 			domain:     "WWW.EXAMPLE.com",
 			constraint: "www.example.com",
 			want:       true,
@@ -196,7 +174,6 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "ok/idna-internationalized-domain-name-punycode",
-			engine:     &NamePolicyEngine{},
 			domain:     "xn--jp-cd2fp15c.xn--fsq.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
 			constraint: ".xn--fsq.jp",
 			want:       true,
@@ -205,7 +182,10 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.engine.matchDomainConstraint(tt.domain, tt.constraint)
+			engine := NamePolicyEngine{
+				allowLiteralWildcardNames: tt.allowLiteralWildcardNames,
+			}
+			got, err := engine.matchDomainConstraint(tt.domain, tt.constraint)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NamePolicyEngine.matchDomainConstraint() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -750,6 +730,19 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "fail/dns-permitted-idna-internationalized-domain",
+			options: []NamePolicyOption{
+				AddPermittedDNSDomain("*.豆.jp"),
+			},
+			cert: &x509.Certificate{
+				DNSNames: []string{
+					string(byte(0)) + ".例.jp",
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
 			name: "fail/ipv4-permitted",
 			options: []NamePolicyOption{
 				AddPermittedIPRanges(
@@ -833,6 +826,39 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 				EmailAddresses: []string{
 					"test@sub.example.com",
 				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/mail-permitted-idna-internationalized-domain",
+			options: []NamePolicyOption{
+				AddPermittedEmailAddress("@例.jp"),
+			},
+			cert: &x509.Certificate{
+				EmailAddresses: []string{"bücher@例.jp"},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/mail-permitted-idna-internationalized-domain-rfc822",
+			options: []NamePolicyOption{
+				AddPermittedEmailAddress("@例.jp"),
+			},
+			cert: &x509.Certificate{
+				EmailAddresses: []string{"bücher@例.jp" + string(byte(0))},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/mail-permitted-idna-internationalized-domain-ascii",
+			options: []NamePolicyOption{
+				AddPermittedEmailAddress("@例.jp"),
+			},
+			cert: &x509.Certificate{
+				EmailAddresses: []string{"mail@xn---bla.jp"},
 			},
 			want:    false,
 			wantErr: true,
@@ -1454,17 +1480,6 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ok/empty-dns-constraint",
-			options: []NamePolicyOption{
-				AddPermittedDNSDomain(""),
-			},
-			cert: &x509.Certificate{
-				DNSNames: []string{"example.local"},
-			},
-			want:    true,
-			wantErr: false,
-		},
-		{
 			name: "ok/dns-permitted-wildcard-literal",
 			options: []NamePolicyOption{
 				AddPermittedDNSDomain("*.local"),
@@ -1492,6 +1507,19 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 					"example.local",
 					"example.x509local",
 					"host.example.com",
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/dns-permitted-idna-internationalized-domain",
+			options: []NamePolicyOption{
+				AddPermittedDNSDomain("*.例.jp"),
+			},
+			cert: &x509.Certificate{
+				DNSNames: []string{
+					"JP納豆.例.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
 				},
 			},
 			want:    true,
@@ -1554,6 +1582,17 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 				EmailAddresses: []string{
 					"test@local.com",
 				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/mail-permitted-idna-internationalized-domain",
+			options: []NamePolicyOption{
+				AddPermittedEmailAddress("@例.jp"),
+			},
+			cert: &x509.Certificate{
+				EmailAddresses: []string{},
 			},
 			want:    true,
 			wantErr: false,

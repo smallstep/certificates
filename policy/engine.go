@@ -10,9 +10,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/pkg/errors"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/net/idna"
 )
 
 type NamePolicyReason int
@@ -23,6 +23,15 @@ const (
 	// doesn't permit a DNS or another type of SAN to be signed
 	// (or otherwise used).
 	NotAuthorizedForThisName NamePolicyReason = iota
+	// CannotParseDomain is returned when an error occurs
+	// when parsing the domain part of SAN or subject.
+	CannotParseDomain
+	// CannotParseRFC822Name is returned when an error
+	// occurs when parsing an email address.
+	CannotParseRFC822Name
+	// CannotMatch is the type of error returned when
+	// an error happens when matching SAN types.
+	CannotMatchNameToConstraint
 )
 
 type NamePolicyError struct {
@@ -31,16 +40,26 @@ type NamePolicyError struct {
 }
 
 func (e NamePolicyError) Error() string {
-	if e.Reason == NotAuthorizedForThisName {
+	switch e.Reason {
+	case NotAuthorizedForThisName:
 		return "not authorized to sign for this name: " + e.Detail
+	case CannotParseDomain:
+		return "cannot parse domain: " + e.Detail
+	case CannotParseRFC822Name:
+		return "cannot parse rfc822Name: " + e.Detail
+	case CannotMatchNameToConstraint:
+		return "error matching name to constraint: " + e.Detail
+	default:
+		return "unknown error: " + e.Detail
 	}
-	return "unknown error"
 }
 
 // NamePolicyEngine can be used to check that a CSR or Certificate meets all allowed and
 // denied names before a CA creates and/or signs the Certificate.
 // TODO(hs): the X509 RFC also defines name checks on directory name; support that?
 // TODO(hs): implement Stringer interface: describe the contents of the NamePolicyEngine?
+// TODO(hs): implement matching URI schemes, paths, etc; not just the domain part of URI domains
+
 type NamePolicyEngine struct {
 
 	// verifySubjectCommonName is set when Subject Common Name must be verified
@@ -275,8 +294,6 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 	// this number as a total of all checks and keeps a (pointer to a) counter of the number of checks
 	// executed so far.
 
-	// TODO: implement matching URI schemes, paths, etc; not just the domain
-
 	// TODO: gather all errors, or return early? Currently we return early on the first wrong name; check might fail for multiple names.
 	// Perhaps make that an option?
 	for _, dns := range dnsNames {
@@ -289,10 +306,28 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 				Detail: fmt.Sprintf("dns %q is not explicitly permitted by any constraint", dns),
 			}
 		}
-		if _, ok := domainToReverseLabels(dns); !ok {
-			return errors.Errorf("cannot parse dns %q", dns)
+		didCutWildcard := false
+		if strings.HasPrefix(dns, "*.") {
+			dns = dns[1:]
+			didCutWildcard = true
 		}
-		if err := checkNameConstraints("dns", dns, dns,
+		parsedDNS, err := idna.Lookup.ToASCII(dns)
+		if err != nil {
+			return NamePolicyError{
+				Reason: CannotParseDomain,
+				Detail: fmt.Sprintf("dns %q cannot be converted to ASCII", dns),
+			}
+		}
+		if didCutWildcard {
+			parsedDNS = "*" + parsedDNS
+		}
+		if _, ok := domainToReverseLabels(parsedDNS); !ok {
+			return NamePolicyError{
+				Reason: CannotParseDomain,
+				Detail: fmt.Sprintf("cannot parse dns %q", dns),
+			}
+		}
+		if err := checkNameConstraints("dns", dns, parsedDNS,
 			func(parsedName, constraint interface{}) (bool, error) {
 				return e.matchDomainConstraint(parsedName.(string), constraint.(string))
 			}, e.permittedDNSDomains, e.excludedDNSDomains); err != nil {
@@ -324,8 +359,22 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		}
 		mailbox, ok := parseRFC2821Mailbox(email)
 		if !ok {
-			return fmt.Errorf("cannot parse rfc822Name %q", mailbox)
+			return NamePolicyError{
+				Reason: CannotParseRFC822Name,
+				Detail: fmt.Sprintf("invalid rfc822Name %q", mailbox),
+			}
 		}
+		// According to RFC 5280, section 7.5, emails are considered to match if the local part is
+		// an exact match and the host (domain) part matches the ASCII representation (case-insensitive):
+		// https://datatracker.ietf.org/doc/html/rfc5280#section-7.5
+		domainASCII, err := idna.ToASCII(mailbox.domain)
+		if err != nil {
+			return NamePolicyError{
+				Reason: CannotParseDomain,
+				Detail: fmt.Sprintf("cannot parse email domain %q", email),
+			}
+		}
+		mailbox.domain = domainASCII
 		if err := checkNameConstraints("email", email, mailbox,
 			func(parsedName, constraint interface{}) (bool, error) {
 				return e.matchEmailConstraint(parsedName.(rfc2821Mailbox), constraint.(string))
@@ -333,6 +382,8 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 			return err
 		}
 	}
+
+	// TODO(hs): fix internationalization for URIs (IRIs)
 
 	for _, uri := range uris {
 		if e.numberOfURIDomainConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
@@ -365,12 +416,6 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		}
 	}
 
-	// TODO(hs): when the error is not nil and returned up in the above, we can add
-	// additional context to it (i.e. the cert or csr that was inspected).
-
-	// TODO(hs): validate other types of SANs? The Go std library skips those.
-	// These could be custom checkers.
-
 	// if all checks out, all SANs are allowed
 	return nil
 }
@@ -393,7 +438,7 @@ func checkNameConstraints(
 		match, err := match(parsedName, constraint)
 		if err != nil {
 			return NamePolicyError{
-				Reason: NotAuthorizedForThisName,
+				Reason: CannotMatchNameToConstraint,
 				Detail: err.Error(),
 			}
 		}
@@ -414,7 +459,7 @@ func checkNameConstraints(
 		var err error
 		if ok, err = match(parsedName, constraint); err != nil {
 			return NamePolicyError{
-				Reason: NotAuthorizedForThisName,
+				Reason: CannotMatchNameToConstraint,
 				Detail: err.Error(),
 			}
 		}

@@ -35,7 +35,6 @@ const (
 // https://signal.org/docs/specifications/xeddsa/#xeddsa and implemented by
 // go.step.sm/crypto/x25519.
 type Nebula struct {
-	*base
 	ID         string   `json:"-"`
 	Type       string   `json:"type"`
 	Name       string   `json:"name"`
