@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/cas/apiv1"
 
 	vault "github.com/hashicorp/vault/api"
@@ -129,22 +128,21 @@ func parseCertificateRequest(pemCsr string) (*x509.CertificateRequest, error) {
 
 func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.Duration) (*x509.Certificate, []*x509.Certificate, error) {
 	var vaultPKIRole string
-	csr := api.CertificateRequest{CertificateRequest: cr}
 
 	switch {
-	case csr.PublicKeyAlgorithm == x509.RSA:
+	case cr.PublicKeyAlgorithm == x509.RSA:
 		vaultPKIRole = v.config.PKIRoleRSA
-	case csr.PublicKeyAlgorithm == x509.ECDSA:
+	case cr.PublicKeyAlgorithm == x509.ECDSA:
 		vaultPKIRole = v.config.PKIRoleEC
-	case csr.PublicKeyAlgorithm == x509.Ed25519:
+	case cr.PublicKeyAlgorithm == x509.Ed25519:
 		vaultPKIRole = v.config.PKIRoleEd25519
 	default:
-		return nil, nil, errors.Errorf("createCertificate: Unsupported public key algorithm '%v'", csr.PublicKeyAlgorithm)
+		return nil, nil, errors.Errorf("createCertificate: Unsupported public key algorithm '%v'", cr.PublicKeyAlgorithm)
 	}
 
-	certPemBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csr.Raw})
+	certPemBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: cr.Raw})
 	if certPemBytes == nil {
-		return nil, nil, errors.Errorf("createCertificate: Failed to encode pem '%v'", csr.Raw)
+		return nil, nil, errors.Errorf("createCertificate: Failed to encode pem '%v'", cr.Raw)
 	}
 
 	y := map[string]interface{}{
