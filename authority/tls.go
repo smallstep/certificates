@@ -116,7 +116,10 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 			certEnforcers = append(certEnforcers, k)
 
 		default:
-			return nil, errs.InternalServer("authority.Sign; invalid extra option type %T", append([]interface{}{k}, opts...)...)
+			return nil, errs.ApplyOptions(
+				errs.Internal("invalid extra SignOption of type %T", k),
+				opts...,
+			)
 		}
 	}
 

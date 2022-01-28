@@ -177,7 +177,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 			}
 
 		default:
-			return nil, errs.InternalServer("authority.SignSSH: invalid extra option type %T", o)
+			return nil, errs.Internal("invalid extra SignOption of type %T", o)
 		}
 	}
 
@@ -238,7 +238,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		}
 		signer = a.sshCAHostCertSignKey
 	default:
-		return nil, errs.InternalServer("authority.SignSSH: unexpected ssh certificate type: %d", certTpl.CertType)
+		return nil, errs.Internal("invalid ssh certificate of type '%d'", certTpl.CertType)
 	}
 
 	// Sign certificate.
@@ -304,7 +304,7 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 		}
 		signer = a.sshCAHostCertSignKey
 	default:
-		return nil, errs.InternalServer("renewSSH: unexpected ssh certificate type: %d", certTpl.CertType)
+		return nil, errs.Internal("invalid ssh certificate of type '%d'", certTpl.CertType)
 	}
 
 	// Sign certificate.
@@ -330,7 +330,7 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 		case provisioner.SSHCertValidator:
 			validators = append(validators, o)
 		default:
-			return nil, errs.InternalServer("rekeySSH; invalid extra option type %T", o)
+			return nil, errs.Internal("invalid extra SignOption of type %T", o)
 		}
 	}
 

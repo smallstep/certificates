@@ -172,9 +172,11 @@ func StatusCodeError(code int, e error, opts ...Option) error {
 		opts = append(opts, withDefaultMessage(ForbiddenDefaultMsg))
 		return NewErr(http.StatusForbidden, e, opts...)
 	case http.StatusInternalServerError:
-		return InternalServerErr(e, opts...)
+		opts = append(opts, withDefaultMessage(InternalServerErrorDefaultMsg))
+		return NewErr(http.StatusInternalServerError, e, opts...)
 	case http.StatusNotImplemented:
-		return NotImplementedErr(e, opts...)
+		opts = append(opts, withDefaultMessage(NotImplementedDefaultMsg))
+		return NewErr(http.StatusNotImplemented, e, opts...)
 	default:
 		return UnexpectedErr(code, e, opts...)
 	}
@@ -201,9 +203,13 @@ var (
 	// directly sent to the cli.
 	BadRequestPrefix = "The request could not be completed: "
 
-	// ForbiddenPrefix is the prefix added to the forbidden messates that are
+	// ForbiddenPrefix is the prefix added to the forbidden messages that are
 	// sent to the cli.
 	ForbiddenPrefix = "The request was forbidden by the certificate authority: "
+
+	// InternalServerPrefix is the prefix added to the internal server error
+	// messages that are sent to the cli.
+	InternalServerPrefix = "The certificate authority encountered an Internal Server Error: "
 )
 
 func formatMessage(status int, msg string) string {
@@ -212,6 +218,8 @@ func formatMessage(status int, msg string) string {
 		return BadRequestPrefix + msg + "."
 	case http.StatusForbidden:
 		return ForbiddenPrefix + msg + "."
+	case http.StatusInternalServerError:
+		return InternalServerPrefix + msg + "."
 	default:
 		return msg
 	}
@@ -315,16 +323,26 @@ func ApplyOptions(err error, opts ...interface{}) error {
 	return err
 }
 
+// Internal creates a generic 500 error message with the a formatted error in
+// the logs.
+func Internal(format string, args ...interface{}) error {
+	return InternalErr(fmt.Errorf(format, args...))
+}
+
+// Internal creates a generic 500 error message with the given error in the
+// logs.
+func InternalErr(err error) error {
+	return NewError(http.StatusInternalServerError, err, InternalServerErrorDefaultMsg)
+}
+
 // InternalServer creates a 500 error with the given format and arguments.
 func InternalServer(format string, args ...interface{}) error {
-	args = append(args, withDefaultMessage(InternalServerErrorDefaultMsg))
-	return Errorf(http.StatusInternalServerError, format, args...)
+	return New(http.StatusInternalServerError, format, args...)
 }
 
 // InternalServerErr returns a 500 error with the given error.
-func InternalServerErr(err error, opts ...Option) error {
-	opts = append(opts, withDefaultMessage(InternalServerErrorDefaultMsg))
-	return NewErr(http.StatusInternalServerError, err, opts...)
+func InternalServerErr(err error, format string, args ...interface{}) error {
+	return NewError(http.StatusInternalServerError, err, format, args...)
 }
 
 // NotImplemented creates a 501 error with the given format and arguments.

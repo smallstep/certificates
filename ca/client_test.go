@@ -163,7 +163,7 @@ func TestClient_Version(t *testing.T) {
 		expectedErr  error
 	}{
 		{"ok", ok, 200, false, nil},
-		{"500", errs.InternalServer("force"), 500, true, errors.New(errs.InternalServerErrorDefaultMsg)},
+		{"500", errs.InternalServer("force"), 500, true, errors.New(errs.InternalServerPrefix)},
 		{"404", errs.NotFound("force"), 404, true, errors.New(errs.NotFoundDefaultMsg)},
 	}
 
@@ -193,7 +193,7 @@ func TestClient_Version(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.Version() = %v, want nil", got)
 				}
-				assert.HasPrefix(t, tt.expectedErr.Error(), err.Error())
+				assert.HasPrefix(t, err.Error(), tt.expectedErr.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.Version() = %v, want %v", got, tt.response)
@@ -214,7 +214,7 @@ func TestClient_Health(t *testing.T) {
 		expectedErr  error
 	}{
 		{"ok", ok, 200, false, nil},
-		{"not ok", errs.InternalServer("force"), 500, true, errors.New(errs.InternalServerErrorDefaultMsg)},
+		{"not ok", errs.InternalServer("force"), 500, true, errors.New(errs.InternalServerPrefix)},
 	}
 
 	srv := httptest.NewServer(nil)
@@ -244,7 +244,7 @@ func TestClient_Health(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.Health() = %v, want nil", got)
 				}
-				assert.HasPrefix(t, tt.expectedErr.Error(), err.Error())
+				assert.HasPrefix(t, err.Error(), tt.expectedErr.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.Health() = %v, want %v", got, tt.response)
@@ -648,7 +648,7 @@ func TestClient_Provisioners(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.Provisioners() = %v, want nil", got)
 				}
-				assert.HasPrefix(t, errs.InternalServerErrorDefaultMsg, err.Error())
+				assert.HasPrefix(t, err.Error(), errs.InternalServerPrefix)
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.Provisioners() = %v, want %v", got, tt.response)

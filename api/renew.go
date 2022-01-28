@@ -16,7 +16,7 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 
 	certChain, err := h.Authority.Renew(r.TLS.PeerCertificates[0])
 	if err != nil {
-		WriteError(w, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Renew"))
+		WriteError(w, errs.InternalServerErr(err, "error renewing certificate"))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)

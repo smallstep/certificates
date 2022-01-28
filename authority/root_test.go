@@ -22,7 +22,7 @@ func TestRoot(t *testing.T) {
 		code int
 	}{
 		"not-found":                  {"foo", errors.New("certificate with fingerprint foo was not found"), http.StatusNotFound},
-		"invalid-stored-certificate": {"invaliddata", errors.New("stored value is not a *x509.Certificate"), http.StatusInternalServerError},
+		"invalid-stored-certificate": {"invaliddata", errors.New(errs.InternalServerErrorDefaultMsg), http.StatusInternalServerError},
 		"success":                    {"189f573cfa159251e445530847ef80b1b62a3a380ee670dcb49e33ed34da0616", nil, http.StatusOK},
 	}
 

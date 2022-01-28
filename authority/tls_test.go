@@ -268,7 +268,7 @@ func TestAuthority_Sign(t *testing.T) {
 				csr:       csr,
 				extraOpts: append(extraOpts, "42"),
 				signOpts:  signOpts,
-				err:       errors.New("authority.Sign; invalid extra option type string"),
+				err:       errors.New(errs.InternalServerErrorDefaultMsg),
 				code:      http.StatusInternalServerError,
 			}
 		},

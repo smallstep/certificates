@@ -722,7 +722,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), 15),
-				err:   errors.New("authority.Authorize; method 15 is not supported"),
+				err:   errors.New("method 15 is not supported"),
 				code:  http.StatusInternalServerError,
 			}
 		},
