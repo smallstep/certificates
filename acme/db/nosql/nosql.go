@@ -21,7 +21,7 @@ var (
 	certTable                                 = []byte("acme_certs")
 	certBySerialTable                         = []byte("acme_serial_certs_index")
 	externalAccountKeyTable                   = []byte("acme_external_account_keys")
-	externalAccountKeysByReferenceTable       = []byte("acme_external_account_key_reference_index")
+	externalAccountKeyIDsByReferenceTable     = []byte("acme_external_account_keyID_reference_index")
 	externalAccountKeyIDsByProvisionerIDTable = []byte("acme_external_account_keyID_provisionerID_index")
 )
 
@@ -35,7 +35,7 @@ func New(db nosqlDB.DB) (*DB, error) {
 	tables := [][]byte{accountTable, accountByKeyIDTable, authzTable,
 		challengeTable, nonceTable, orderTable, ordersByAccountIDTable,
 		certTable, certBySerialTable, externalAccountKeyTable,
-		externalAccountKeysByReferenceTable, externalAccountKeyIDsByProvisionerIDTable,
+		externalAccountKeyIDsByReferenceTable, externalAccountKeyIDsByProvisionerIDTable,
 	}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {

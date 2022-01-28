@@ -89,7 +89,7 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerID, refer
 			Reference:            dbeak.Reference,
 			ExternalAccountKeyID: dbeak.ID,
 		}
-		if err := db.save(ctx, referenceKey(provisionerID, dbeak.Reference), dbExternalAccountKeyReference, nil, "external_account_key_reference", externalAccountKeysByReferenceTable); err != nil {
+		if err := db.save(ctx, referenceKey(provisionerID, dbeak.Reference), dbExternalAccountKeyReference, nil, "external_account_key_reference", externalAccountKeyIDsByReferenceTable); err != nil {
 			return nil, err
 		}
 	}
@@ -144,7 +144,7 @@ func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerID, keyID
 	}
 
 	if dbeak.Reference != "" {
-		if err := db.db.Del(externalAccountKeysByReferenceTable, []byte(referenceKey(provisionerID, dbeak.Reference))); err != nil {
+		if err := db.db.Del(externalAccountKeyIDsByReferenceTable, []byte(referenceKey(provisionerID, dbeak.Reference))); err != nil {
 			return errors.Wrapf(err, "error deleting ACME EAB Key reference with Key ID %s and reference %s", keyID, dbeak.Reference)
 		}
 	}
@@ -212,7 +212,7 @@ func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerI
 		return nil, nil
 	}
 
-	k, err := db.db.Get(externalAccountKeysByReferenceTable, []byte(referenceKey(provisionerID, reference)))
+	k, err := db.db.Get(externalAccountKeyIDsByReferenceTable, []byte(referenceKey(provisionerID, reference)))
 	if nosqlDB.IsErrNotFound(err) {
 		return nil, acme.ErrNotFound
 	} else if err != nil {
@@ -291,10 +291,18 @@ func (db *DB) addEAKID(ctx context.Context, provisionerID, eakID string) error {
 	var newEAKIDs []string
 	newEAKIDs = append(newEAKIDs, eakIDs...)
 	newEAKIDs = append(newEAKIDs, eakID)
+
 	var (
 		_old interface{} = eakIDs
 		_new interface{} = newEAKIDs
 	)
+
+	// ensure that the DB gets the expected value when the slice is empty; otherwise
+	// it'll return with an error that indicates that the DBs view of the data is
+	// different from the last read (i.e. _old is different from what the DB has).
+	if len(eakIDs) == 0 {
+		_old = nil
+	}
 
 	if err = db.save(ctx, provisionerID, _new, _old, "externalAccountKeyIDsByProvisionerID", externalAccountKeyIDsByProvisionerIDTable); err != nil {
 		return errors.Wrapf(err, "error saving eakIDs index for provisioner %s", provisionerID)
@@ -325,6 +333,13 @@ func (db *DB) deleteEAKID(ctx context.Context, provisionerID, eakID string) erro
 		_old interface{} = eakIDs
 		_new interface{} = newEAKIDs
 	)
+
+	// ensure that the DB gets the expected value when the slice is empty; otherwise
+	// it'll return with an error that indicates that the DBs view of the data is
+	// different from the last read (i.e. _old is different from what the DB has).
+	if len(eakIDs) == 0 {
+		_old = nil
+	}
 
 	if err = db.save(ctx, provisionerID, _new, _old, "externalAccountKeyIDsByProvisionerID", externalAccountKeyIDsByProvisionerIDTable); err != nil {
 		return errors.Wrapf(err, "error saving eakIDs index for provisioner %s", provisionerID)
