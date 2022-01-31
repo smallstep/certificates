@@ -307,7 +307,7 @@ func TestDB_GetAccountByKeyID(t *testing.T) {
 							assert.Equals(t, string(key), accID)
 							return nil, errors.New("force")
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, errors.New("force")
 						}
 					},
@@ -340,7 +340,7 @@ func TestDB_GetAccountByKeyID(t *testing.T) {
 							assert.Equals(t, string(key), accID)
 							return b, nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, errors.New("force")
 						}
 					},
@@ -462,7 +462,7 @@ func TestDB_CreateAccount(t *testing.T) {
 							assert.True(t, dbacc.DeactivatedAt.IsZero())
 							return nil, false, errors.New("force")
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, false, errors.New("force")
 						}
 					},
@@ -506,7 +506,7 @@ func TestDB_CreateAccount(t *testing.T) {
 							assert.True(t, dbacc.DeactivatedAt.IsZero())
 							return nu, true, nil
 						default:
-							assert.FatalError(t, errors.Errorf("unrecognized bucket %s", string(bucket)))
+							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
 							return nil, false, errors.New("force")
 						}
 					},
