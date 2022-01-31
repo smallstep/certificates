@@ -638,12 +638,13 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 	case *linkedca.ProvisionerDetails_ACME:
 		cfg := d.ACME
 		return &provisioner.ACME{
-			ID:      p.Id,
-			Type:    p.Type.String(),
-			Name:    p.Name,
-			ForceCN: cfg.ForceCn,
-			Claims:  claims,
-			Options: options,
+			ID:         p.Id,
+			Type:       p.Type.String(),
+			Name:       p.Name,
+			ForceCN:    cfg.ForceCn,
+			RequireEAB: cfg.RequireEab,
+			Claims:     claims,
+			Options:    options,
 		}, nil
 	case *linkedca.ProvisionerDetails_OIDC:
 		cfg := d.OIDC

@@ -560,7 +560,115 @@ retry:
 	return nil
 }
 
+// GetExternalAccountKeysPaginate returns a page from the GET /admin/acme/eab request to the CA.
+func (c *AdminClient) GetExternalAccountKeysPaginate(provisionerName, reference string, opts ...AdminOption) (*adminAPI.GetExternalAccountKeysResponse, error) {
+	var retried bool
+	o := new(adminOptions)
+	if err := o.apply(opts); err != nil {
+		return nil, err
+	}
+	p := path.Join(adminURLPrefix, "acme/eab", provisionerName)
+	if reference != "" {
+		p = path.Join(p, "/", reference)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{
+		Path:     p,
+		RawQuery: o.rawQuery(),
+	})
+	tok, err := c.generateAdminToken(u.Path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error generating admin token")
+	}
+	req, err := http.NewRequest("GET", u.String(), http.NoBody)
+	if err != nil {
+		return nil, errors.Wrapf(err, "create GET %s request failed", u)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "client GET %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var body = new(adminAPI.GetExternalAccountKeysResponse)
+	if err := readJSON(resp.Body, body); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return body, nil
+}
+
+// CreateExternalAccountKey performs the POST /admin/acme/eab request to the CA.
+func (c *AdminClient) CreateExternalAccountKey(provisionerName string, eakRequest *adminAPI.CreateExternalAccountKeyRequest) (*linkedca.EABKey, error) {
+	var retried bool
+	body, err := json.Marshal(eakRequest)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab/", provisionerName)})
+	tok, err := c.generateAdminToken(u.Path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error generating admin token")
+	}
+	req, err := http.NewRequest("POST", u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.Wrapf(err, "create POST %s request failed", u)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var eabKey = new(linkedca.EABKey)
+	if err := readProtoJSON(resp.Body, eabKey); err != nil {
+		return nil, errors.Wrapf(err, "error reading %s", u)
+	}
+	return eabKey, nil
+}
+
+// RemoveExternalAccountKey performs the DELETE /admin/acme/eab/{prov}/{key_id} request to the CA.
+func (c *AdminClient) RemoveExternalAccountKey(provisionerName, keyID string) error {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab", provisionerName, "/", keyID)})
+	tok, err := c.generateAdminToken(u.Path)
+	if err != nil {
+		return errors.Wrapf(err, "error generating admin token")
+	}
+	req, err := http.NewRequest("DELETE", u.String(), http.NoBody)
+	if err != nil {
+		return errors.Wrapf(err, "create DELETE %s request failed", u)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return errors.Wrapf(err, "client DELETE %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return readAdminError(resp.Body)
+	}
+	return nil
+}
+
 func readAdminError(r io.ReadCloser) error {
+	// TODO: not all errors can be read (i.e. 404); seems to be a bigger issue
 	defer r.Close()
 	adminErr := new(admin.Error)
 	if err := json.NewDecoder(r).Decode(adminErr); err != nil {

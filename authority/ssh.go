@@ -198,6 +198,13 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 				errs.WithKeyVal("signOptions", signOpts),
 			)
 		}
+		// explicitly check for unmarshaling errors, which are most probably caused by JSON template syntax errors
+		if strings.HasPrefix(err.Error(), "error unmarshaling certificate") {
+			return nil, errs.InternalServerErr(templatingError(err),
+				errs.WithKeyVal("signOptions", signOpts),
+				errs.WithMessage("error applying certificate template"),
+			)
+		}
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH")
 	}
 

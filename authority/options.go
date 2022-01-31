@@ -101,8 +101,8 @@ func WithSSHBastionFunc(fn func(ctx context.Context, user, host string) (*config
 	}
 }
 
-// WithSSHGetHosts sets a custom function to get the bastion for a
-// given user-host pair.
+// WithSSHGetHosts sets a custom function to return a list of step ssh enabled
+// hosts.
 func WithSSHGetHosts(fn func(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)) Option {
 	return func(a *Authority) error {
 		a.sshGetHostsFunc = fn
