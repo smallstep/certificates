@@ -666,6 +666,9 @@ func normalizeAndValidateURIDomainConstraint(constraint string) (string, error) 
 	if normalizedConstraint == "" {
 		return "", errors.Errorf("URI domain contraint %q cannot be empty or white space string", constraint)
 	}
+	if strings.Contains(normalizedConstraint, "://") {
+		return "", errors.Errorf("URI domain constraint %q contains scheme (not supported yet)", constraint)
+	}
 	if strings.Contains(normalizedConstraint, "..") {
 		return "", errors.Errorf("URI domain constraint %q cannot have empty labels", constraint)
 	}
@@ -687,7 +690,6 @@ func normalizeAndValidateURIDomainConstraint(constraint string) (string, error) 
 	if net.ParseIP(normalizedConstraint) != nil {
 		return "", errors.Errorf("URI domain constraint %q cannot be an IP", constraint)
 	}
-	// TODO(hs): verify that this is OK for URI (IRI) domains too
 	normalizedConstraint, err := idna.Lookup.ToASCII(normalizedConstraint)
 	if err != nil {
 		return "", errors.Wrapf(err, "URI domain constraint %q cannot be converted to ASCII", constraint)

@@ -197,6 +197,12 @@ func Test_normalizeAndValidateURIDomainConstraint(t *testing.T) {
 			wantErr:    true,
 		},
 		{
+			name:       "fail/scheme-https",
+			constraint: `https://*.local`,
+			want:       "",
+			wantErr:    true,
+		},
+		{
 			name:       "fail/too-many-asterisks",
 			constraint: "**.local",
 			want:       "",
@@ -260,6 +266,18 @@ func Test_normalizeAndValidateURIDomainConstraint(t *testing.T) {
 			name:       "ok/specific-domain",
 			constraint: "example.local",
 			want:       "example.local",
+			wantErr:    false,
+		},
+		{
+			name:       "ok/idna-internationalized-domain-name-lookup",
+			constraint: `*.bücher.example.com`,
+			want:       ".xn--bcher-kva.example.com",
+			wantErr:    false,
+		},
+		{
+			name:       "ok/idna-internationalized-domain-name-lookup-deviation",
+			constraint: `*.faß.de`,
+			want:       ".fass.de", // IDNA2003 vs. 2008 deviation: https://unicode.org/reports/tr46/#Deviations
 			wantErr:    false,
 		},
 	}
@@ -1440,6 +1458,21 @@ func TestNew(t *testing.T) {
 				options: options,
 				want: &NamePolicyEngine{
 					permittedURIDomains:               []string{"host.local"},
+					numberOfURIDomainConstraints:      1,
+					totalNumberOfPermittedConstraints: 1,
+					totalNumberOfConstraints:          1,
+				},
+				wantErr: false,
+			}
+		},
+		"ok/with-permitted-uri-idna": func(t *testing.T) test {
+			options := []NamePolicyOption{
+				WithPermittedURIDomain("*.bücher.example.com"),
+			}
+			return test{
+				options: options,
+				want: &NamePolicyEngine{
+					permittedURIDomains:               []string{".xn--bcher-kva.example.com"},
 					numberOfURIDomainConstraints:      1,
 					totalNumberOfPermittedConstraints: 1,
 					totalNumberOfConstraints:          1,

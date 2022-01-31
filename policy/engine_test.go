@@ -864,7 +864,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/permitted-uri-domain-wildcard",
+			name: "fail/uri-permitted-domain-wildcard",
 			options: []NamePolicyOption{
 				AddPermittedURIDomain("*.local"),
 			},
@@ -880,7 +880,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/permitted-uri",
+			name: "fail/uri-permitted",
 			options: []NamePolicyOption{
 				AddPermittedURIDomain("test.local"),
 			},
@@ -896,7 +896,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/permitted-uri-with-literal-wildcard", // don't allow literal wildcard in URI, e.g. xxxx://*.domain.tld
+			name: "fail/uri-permitted-with-literal-wildcard", // don't allow literal wildcard in URI, e.g. xxxx://*.domain.tld
 			options: []NamePolicyOption{
 				AddPermittedURIDomain("*.local"),
 			},
@@ -905,6 +905,22 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 					{
 						Scheme: "https",
 						Host:   "*.local",
+					},
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/uri-permitted-idna-internationalized-domain",
+			options: []NamePolicyOption{
+				AddPermittedURIDomain("*.bücher.example.com"),
+			},
+			cert: &x509.Certificate{
+				URIs: []*url.URL{
+					{
+						Scheme: "https",
+						Host:   "abc.bücher.example.com",
 					},
 				},
 			},
@@ -991,6 +1007,22 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 					{
 						Scheme: "https",
 						Host:   "www.example.com",
+					},
+				},
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "fail/uri-excluded-with-literal-wildcard", // don't allow literal wildcard in URI, e.g. xxxx://*.domain.tld
+			options: []NamePolicyOption{
+				AddExcludedURIDomain("*.local"),
+			},
+			cert: &x509.Certificate{
+				URIs: []*url.URL{
+					{
+						Scheme: "https",
+						Host:   "*.local",
 					},
 				},
 			},
@@ -1639,6 +1671,38 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 					{
 						Scheme: "https",
 						Host:   "www.example.com:8080",
+					},
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/uri-permitted-idna-internationalized-domain",
+			options: []NamePolicyOption{
+				AddPermittedURIDomain("*.bücher.example.com"),
+			},
+			cert: &x509.Certificate{
+				URIs: []*url.URL{
+					{
+						Scheme: "https",
+						Host:   "abc.xn--bcher-kva.example.com",
+					},
+				},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "ok/uri-permitted-idna-internationalized-domain",
+			options: []NamePolicyOption{
+				AddPermittedURIDomain("bücher.example.com"),
+			},
+			cert: &x509.Certificate{
+				URIs: []*url.URL{
+					{
+						Scheme: "https",
+						Host:   "xn--bcher-kva.example.com",
 					},
 				},
 			},
