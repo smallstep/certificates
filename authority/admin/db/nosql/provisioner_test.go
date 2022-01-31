@@ -11,7 +11,7 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/nosql"
-	"github.com/smallstep/nosql/database"
+	nosqldb "github.com/smallstep/nosql/database"
 	"go.step.sm/linkedca"
 )
 
@@ -30,7 +30,7 @@ func TestDB_getDBProvisionerBytes(t *testing.T) {
 						assert.Equals(t, bucket, provisionersTable)
 						assert.Equals(t, string(key), provID)
 
-						return nil, database.ErrNotFound
+						return nil, nosqldb.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "provisioner provID not found"),
@@ -104,7 +104,7 @@ func TestDB_getDBProvisioner(t *testing.T) {
 						assert.Equals(t, bucket, provisionersTable)
 						assert.Equals(t, string(key), provID)
 
-						return nil, database.ErrNotFound
+						return nil, nosqldb.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "provisioner provID not found"),
@@ -444,7 +444,7 @@ func TestDB_GetProvisioner(t *testing.T) {
 						assert.Equals(t, bucket, provisionersTable)
 						assert.Equals(t, string(key), provID)
 
-						return nil, database.ErrNotFound
+						return nil, nosqldb.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "provisioner provID not found"),
@@ -581,7 +581,7 @@ func TestDB_DeleteProvisioner(t *testing.T) {
 						assert.Equals(t, bucket, provisionersTable)
 						assert.Equals(t, string(key), provID)
 
-						return nil, database.ErrNotFound
+						return nil, nosqldb.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "provisioner provID not found"),
@@ -735,7 +735,7 @@ func TestDB_GetProvisioners(t *testing.T) {
 		"fail/db.List-error": func(t *testing.T) test {
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*database.Entry, error) {
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
 						assert.Equals(t, bucket, provisionersTable)
 
 						return nil, errors.New("force")
@@ -745,14 +745,14 @@ func TestDB_GetProvisioners(t *testing.T) {
 			}
 		},
 		"fail/unmarshal-error": func(t *testing.T) test {
-			ret := []*database.Entry{
+			ret := []*nosqldb.Entry{
 				{Bucket: provisionersTable, Key: []byte("foo"), Value: foob},
 				{Bucket: provisionersTable, Key: []byte("bar"), Value: barb},
 				{Bucket: provisionersTable, Key: []byte("zap"), Value: []byte("zap")},
 			}
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*database.Entry, error) {
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
 						assert.Equals(t, bucket, provisionersTable)
 
 						return ret, nil
@@ -762,10 +762,10 @@ func TestDB_GetProvisioners(t *testing.T) {
 			}
 		},
 		"ok/none": func(t *testing.T) test {
-			ret := []*database.Entry{}
+			ret := []*nosqldb.Entry{}
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*database.Entry, error) {
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
 						assert.Equals(t, bucket, provisionersTable)
 
 						return ret, nil
@@ -777,13 +777,13 @@ func TestDB_GetProvisioners(t *testing.T) {
 			}
 		},
 		"ok/only-invalid": func(t *testing.T) test {
-			ret := []*database.Entry{
+			ret := []*nosqldb.Entry{
 				{Bucket: provisionersTable, Key: []byte("bar"), Value: barb},
 				{Bucket: provisionersTable, Key: []byte("baz"), Value: bazb},
 			}
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*database.Entry, error) {
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
 						assert.Equals(t, bucket, provisionersTable)
 
 						return ret, nil
@@ -795,7 +795,7 @@ func TestDB_GetProvisioners(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) test {
-			ret := []*database.Entry{
+			ret := []*nosqldb.Entry{
 				{Bucket: provisionersTable, Key: []byte("foo"), Value: foob},
 				{Bucket: provisionersTable, Key: []byte("bar"), Value: barb},
 				{Bucket: provisionersTable, Key: []byte("baz"), Value: bazb},
@@ -803,7 +803,7 @@ func TestDB_GetProvisioners(t *testing.T) {
 			}
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*database.Entry, error) {
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
 						assert.Equals(t, bucket, provisionersTable)
 
 						return ret, nil
@@ -988,7 +988,7 @@ func TestDB_UpdateProvisioner(t *testing.T) {
 						assert.Equals(t, bucket, provisionersTable)
 						assert.Equals(t, string(key), provID)
 
-						return nil, database.ErrNotFound
+						return nil, nosqldb.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "provisioner provID not found"),

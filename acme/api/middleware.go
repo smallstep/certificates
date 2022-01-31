@@ -507,6 +507,20 @@ func provisionerFromContext(ctx context.Context) (acme.Provisioner, error) {
 	return pval, nil
 }
 
+// acmeProvisionerFromContext searches the context for an ACME provisioner. Returns
+// pointer to an ACME provisioner or an error.
+func acmeProvisionerFromContext(ctx context.Context) (*provisioner.ACME, error) {
+	prov, err := provisionerFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	acmeProv, ok := prov.(*provisioner.ACME)
+	if !ok || acmeProv == nil {
+		return nil, acme.NewErrorISE("provisioner in context is not an ACME provisioner")
+	}
+	return acmeProv, nil
+}
+
 // payloadFromContext searches the context for a payload. Returns the payload
 // or an error.
 func payloadFromContext(ctx context.Context) (*payloadInfo, error) {

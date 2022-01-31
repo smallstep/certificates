@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased - 0.18.1] - DATE
 ### Added
 - Support for ACME revocation.
+- Replace hash function with an RSA SSH CA to "rsa-sha2-256".
 ### Changed
 ### Deprecated
 ### Removed

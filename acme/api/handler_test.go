@@ -15,9 +15,11 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 )
@@ -51,28 +53,76 @@ func TestHandler_GetNonce(t *testing.T) {
 
 func TestHandler_GetDirectory(t *testing.T) {
 	linker := NewLinker("ca.smallstep.com", "acme")
-
-	prov := newProv()
-	provName := url.PathEscape(prov.GetName())
-	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
-	ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-
-	expDir := Directory{
-		NewNonce:   fmt.Sprintf("%s/acme/%s/new-nonce", baseURL.String(), provName),
-		NewAccount: fmt.Sprintf("%s/acme/%s/new-account", baseURL.String(), provName),
-		NewOrder:   fmt.Sprintf("%s/acme/%s/new-order", baseURL.String(), provName),
-		RevokeCert: fmt.Sprintf("%s/acme/%s/revoke-cert", baseURL.String(), provName),
-		KeyChange:  fmt.Sprintf("%s/acme/%s/key-change", baseURL.String(), provName),
-	}
-
 	type test struct {
+		ctx        context.Context
 		statusCode int
+		dir        Directory
 		err        *acme.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
-		"ok": func(t *testing.T) test {
+		"fail/no-provisioner": func(t *testing.T) test {
+			baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+			ctx := context.WithValue(context.Background(), provisionerContextKey, nil)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
+				ctx:        ctx,
+				statusCode: 500,
+				err:        acme.NewErrorISE("provisioner in context is not an ACME provisioner"),
+			}
+		},
+		"fail/different-provisioner": func(t *testing.T) test {
+			prov := &provisioner.SCEP{
+				Type: "SCEP",
+				Name: "test@scep-<test>provisioner.com",
+			}
+			baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			return test{
+				ctx:        ctx,
+				statusCode: 500,
+				err:        acme.NewErrorISE("provisioner in context is not an ACME provisioner"),
+			}
+		},
+		"ok": func(t *testing.T) test {
+			prov := newProv()
+			provName := url.PathEscape(prov.GetName())
+			baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			expDir := Directory{
+				NewNonce:   fmt.Sprintf("%s/acme/%s/new-nonce", baseURL.String(), provName),
+				NewAccount: fmt.Sprintf("%s/acme/%s/new-account", baseURL.String(), provName),
+				NewOrder:   fmt.Sprintf("%s/acme/%s/new-order", baseURL.String(), provName),
+				RevokeCert: fmt.Sprintf("%s/acme/%s/revoke-cert", baseURL.String(), provName),
+				KeyChange:  fmt.Sprintf("%s/acme/%s/key-change", baseURL.String(), provName),
+			}
+			return test{
+				ctx:        ctx,
+				dir:        expDir,
+				statusCode: 200,
+			}
+		},
+		"ok/eab-required": func(t *testing.T) test {
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			provName := url.PathEscape(prov.GetName())
+			baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			expDir := Directory{
+				NewNonce:   fmt.Sprintf("%s/acme/%s/new-nonce", baseURL.String(), provName),
+				NewAccount: fmt.Sprintf("%s/acme/%s/new-account", baseURL.String(), provName),
+				NewOrder:   fmt.Sprintf("%s/acme/%s/new-order", baseURL.String(), provName),
+				RevokeCert: fmt.Sprintf("%s/acme/%s/revoke-cert", baseURL.String(), provName),
+				KeyChange:  fmt.Sprintf("%s/acme/%s/key-change", baseURL.String(), provName),
+				Meta: Meta{
+					ExternalAccountRequired: true,
+				},
+			}
+			return test{
+				ctx:        ctx,
+				dir:        expDir,
 				statusCode: 200,
 			}
 		},
@@ -82,7 +132,7 @@ func TestHandler_GetDirectory(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{linker: linker}
 			req := httptest.NewRequest("GET", "/foo/bar", nil)
-			req = req.WithContext(ctx)
+			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.GetDirectory(w, req)
 			res := w.Result()
@@ -105,7 +155,9 @@ func TestHandler_GetDirectory(t *testing.T) {
 			} else {
 				var dir Directory
 				json.Unmarshal(bytes.TrimSpace(body), &dir)
-				assert.Equals(t, dir, expDir)
+				if !cmp.Equal(tc.dir, dir) {
+					t.Errorf("GetDirectory() diff =\n%s", cmp.Diff(tc.dir, dir))
+				}
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
 		})

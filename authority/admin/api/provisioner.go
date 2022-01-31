@@ -54,7 +54,7 @@ func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 	cursor, limit, err := api.ParseCursor(r)
 	if err != nil {
 		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err,
-			"error parsing cursor & limit query params"))
+			"error parsing cursor and limit from query params"))
 		return
 	}
 
