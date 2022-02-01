@@ -1,0 +1,44 @@
+
+- name: "Ensure provisioners directories exist"
+  file:
+    path: "/etc/ssl/smallstep/provisioners/{{ item.context }}/{{ item.provisioner_name }}"
+    state: directory
+    mode: 0600
+    owner: root
+    group: root
+  with_items: "{{ smallstep_leaf_certs }}"
+  no_log: true
+
+- name: "Ensure provisioner passwords are up to date"
+  copy:
+    dest: "/etc/ssl/smallstep/provisioners/{{ item.context }}/{{ item.provisioner_name }}/provisioner-pass.txt"
+    content: "{{ item.provisioner_password }}"
+    mode: 0700
+    owner: root
+    group: root
+  with_items: "{{ smallstep_leaf_certs }}"
+  no_log: true
+
+- name: "Get root certs for CAs"
+  command:
+    cmd: "step ca bootstrap --context {{ item.context }} --ca-url {{ item.ca_url }} --fingerprint {{ item.ca_fingerprint }}"
+  with_items: "{{ smallstep_root_certs }}"
+  no_log: true
+
+- name: "Get leaf certs"
+  command:
+    cmd: "step ca certificate --context {{ item.context }} {{ item.cert_subject }} {{ item.cert_path }} {{ item.key_path }} --force --console --provisioner {{ item.provisioner_name }} --provisioner-password-file /etc/ssl/smallstep/provisioners/{{ item.context }}/{{ item.provisioner_name }}/provisioner-pass.txt"
+  with_items: "{{ smallstep_leaf_certs }}"
+  no_log: true
+
+- name: Ensure cron to renew leaf certs is up to date
+  cron:
+    user: "root"
+    name: "renew leaf cert {{ item.cert_subject }}"
+    cron_file: smallstep
+    job: "step ca renew --context {{ item.context }} {{ item.cert_path }} {{ item.key_path }} --expires-in 6h --force >> /var/log/smallstep-{{ item.cert_subject }}.log 2>&1"
+    state: present
+    minute: "*/30"
+  with_items: "{{ smallstep_leaf_certs }}"
+  when: "{{ item.cron_renew }}"
+  no_log: true
