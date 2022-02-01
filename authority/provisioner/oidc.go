@@ -13,7 +13,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/policy"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
@@ -95,8 +94,9 @@ type OIDC struct {
 	keyStore              *keyStore
 	claimer               *Claimer
 	getIdentityFunc       GetIdentityFunc
-	x509Policy            policy.X509NamePolicyEngine
-	sshPolicy             policy.SSHNamePolicyEngine
+	x509Policy            x509PolicyEngine
+	sshHostPolicy         *hostPolicyEngine
+	sshUserPolicy         *userPolicyEngine
 }
 
 func sanitizeEmail(email string) string {
@@ -216,8 +216,13 @@ func (o *OIDC) Init(config Config) (err error) {
 		return err
 	}
 
-	// Initialize the SSH allow/deny policy engine
-	if o.sshPolicy, err = newSSHPolicyEngine(o.Options.GetSSHOptions()); err != nil {
+	// Initialize the SSH allow/deny policy engine for user certificates
+	if o.sshUserPolicy, err = newSSHUserPolicyEngine(o.Options.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine for host certificates
+	if o.sshHostPolicy, err = newSSHHostPolicyEngine(o.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -468,7 +473,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(o.sshPolicy),
+		newSSHNamePolicyValidator(o.sshHostPolicy, o.sshUserPolicy),
 	), nil
 }
 

@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/policy"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
@@ -29,17 +28,18 @@ type stepPayload struct {
 // signature requests.
 type JWK struct {
 	*base
-	ID           string           `json:"-"`
-	Type         string           `json:"type"`
-	Name         string           `json:"name"`
-	Key          *jose.JSONWebKey `json:"key"`
-	EncryptedKey string           `json:"encryptedKey,omitempty"`
-	Claims       *Claims          `json:"claims,omitempty"`
-	Options      *Options         `json:"options,omitempty"`
-	claimer      *Claimer
-	audiences    Audiences
-	x509Policy   policy.X509NamePolicyEngine
-	sshPolicy    policy.SSHNamePolicyEngine
+	ID            string           `json:"-"`
+	Type          string           `json:"type"`
+	Name          string           `json:"name"`
+	Key           *jose.JSONWebKey `json:"key"`
+	EncryptedKey  string           `json:"encryptedKey,omitempty"`
+	Claims        *Claims          `json:"claims,omitempty"`
+	Options       *Options         `json:"options,omitempty"`
+	claimer       *Claimer
+	audiences     Audiences
+	x509Policy    x509PolicyEngine
+	sshHostPolicy *hostPolicyEngine
+	sshUserPolicy *userPolicyEngine
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -111,8 +111,13 @@ func (p *JWK) Init(config Config) (err error) {
 		return err
 	}
 
-	// Initialize the SSH allow/deny policy engine
-	if p.sshPolicy, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	// Initialize the SSH allow/deny policy engine for user certificates
+	if p.sshUserPolicy, err = newSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine for host certificates
+	if p.sshHostPolicy, err = newSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -294,7 +299,7 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Require and validate all the default fields in the SSH certificate.
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshPolicy),
+		newSSHNamePolicyValidator(p.sshHostPolicy, p.sshUserPolicy),
 	), nil
 }
 

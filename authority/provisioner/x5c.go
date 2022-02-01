@@ -9,7 +9,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/policy"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
@@ -27,17 +26,18 @@ type x5cPayload struct {
 // signature requests.
 type X5C struct {
 	*base
-	ID         string   `json:"-"`
-	Type       string   `json:"type"`
-	Name       string   `json:"name"`
-	Roots      []byte   `json:"roots"`
-	Claims     *Claims  `json:"claims,omitempty"`
-	Options    *Options `json:"options,omitempty"`
-	claimer    *Claimer
-	audiences  Audiences
-	rootPool   *x509.CertPool
-	x509Policy policy.X509NamePolicyEngine
-	sshPolicy  policy.SSHNamePolicyEngine
+	ID            string   `json:"-"`
+	Type          string   `json:"type"`
+	Name          string   `json:"name"`
+	Roots         []byte   `json:"roots"`
+	Claims        *Claims  `json:"claims,omitempty"`
+	Options       *Options `json:"options,omitempty"`
+	claimer       *Claimer
+	audiences     Audiences
+	rootPool      *x509.CertPool
+	x509Policy    x509PolicyEngine
+	sshHostPolicy *hostPolicyEngine
+	sshUserPolicy *userPolicyEngine
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -133,8 +133,13 @@ func (p *X5C) Init(config Config) error {
 		return err
 	}
 
-	// Initialize the SSH allow/deny policy engine
-	if p.sshPolicy, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	// Initialize the SSH allow/deny policy engine for user certificates
+	if p.sshUserPolicy, err = newSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine for host certificates
+	if p.sshHostPolicy, err = newSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -326,6 +331,6 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshPolicy),
+		newSSHNamePolicyValidator(p.sshHostPolicy, p.sshUserPolicy),
 	), nil
 }

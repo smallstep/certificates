@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	nebula "github.com/slackhq/nebula/cert"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/policy"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x25519"
@@ -35,17 +34,18 @@ const (
 // https://signal.org/docs/specifications/xeddsa/#xeddsa and implemented by
 // go.step.sm/crypto/x25519.
 type Nebula struct {
-	ID         string   `json:"-"`
-	Type       string   `json:"type"`
-	Name       string   `json:"name"`
-	Roots      []byte   `json:"roots"`
-	Claims     *Claims  `json:"claims,omitempty"`
-	Options    *Options `json:"options,omitempty"`
-	claimer    *Claimer
-	caPool     *nebula.NebulaCAPool
-	audiences  Audiences
-	x509Policy policy.X509NamePolicyEngine
-	sshPolicy  policy.SSHNamePolicyEngine
+	ID            string   `json:"-"`
+	Type          string   `json:"type"`
+	Name          string   `json:"name"`
+	Roots         []byte   `json:"roots"`
+	Claims        *Claims  `json:"claims,omitempty"`
+	Options       *Options `json:"options,omitempty"`
+	claimer       *Claimer
+	caPool        *nebula.NebulaCAPool
+	audiences     Audiences
+	x509Policy    x509PolicyEngine
+	sshHostPolicy *hostPolicyEngine
+	sshUserPolicy *userPolicyEngine
 }
 
 // Init verifies and initializes the Nebula provisioner.
@@ -76,8 +76,13 @@ func (p *Nebula) Init(config Config) error {
 		return err
 	}
 
-	// Initialize the SSH allow/deny policy engine
-	if p.sshPolicy, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	// Initialize the SSH allow/deny policy engine for user certificates
+	if p.sshUserPolicy, err = newSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine for host certificates
+	if p.sshHostPolicy, err = newSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -275,7 +280,7 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshPolicy),
+		newSSHNamePolicyValidator(p.sshHostPolicy, p.sshUserPolicy),
 	), nil
 }
 

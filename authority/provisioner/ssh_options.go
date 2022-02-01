@@ -34,12 +34,26 @@ type SSHOptions struct {
 	// templates.
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
 
+	// User contains SSH user certificate options.
+	User *SSHUserCertificateOptions `json:"user,omitempty"`
+
+	// Host contains SSH host certificate options.
+	Host *SSHHostCertificateOptions `json:"host,omitempty"`
+}
+
+// SSHUserCertificateOptions is a collection of SSH user certificate options.
+type SSHUserCertificateOptions struct {
 	// AllowedNames contains the names the provisioner is authorized to sign
 	AllowedNames *SSHNameOptions `json:"allow,omitempty"`
 
 	// DeniedNames contains the names the provisioner is not authorized to sign
 	DeniedNames *SSHNameOptions `json:"deny,omitempty"`
 }
+
+// SSHHostCertificateOptions is a collection of SSH host certificate options.
+// It's an alias of SSHUserCertificateOptions, as the options are the same
+// for both types of certificates.
+type SSHHostCertificateOptions SSHUserCertificateOptions
 
 // SSHNameOptions models the SSH name policy configuration.
 type SSHNameOptions struct {
@@ -56,7 +70,7 @@ func (o *SSHOptions) HasTemplate() bool {
 
 // GetAllowedNameOptions returns the AllowedSSHNameOptions, which models the
 // names that a provisioner is authorized to sign SSH certificates for.
-func (o *SSHOptions) GetAllowedNameOptions() *SSHNameOptions {
+func (o *SSHUserCertificateOptions) GetAllowedNameOptions() *SSHNameOptions {
 	if o == nil {
 		return nil
 	}
@@ -65,7 +79,7 @@ func (o *SSHOptions) GetAllowedNameOptions() *SSHNameOptions {
 
 // GetDeniedNameOptions returns the DeniedSSHNameOptions, which models the
 // names that a provisioner is NOT authorized to sign SSH certificates for.
-func (o *SSHOptions) GetDeniedNameOptions() *SSHNameOptions {
+func (o *SSHUserCertificateOptions) GetDeniedNameOptions() *SSHNameOptions {
 	if o == nil {
 		return nil
 	}

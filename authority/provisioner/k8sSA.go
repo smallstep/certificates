@@ -11,7 +11,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/policy"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/sshutil"
@@ -52,9 +51,10 @@ type K8sSA struct {
 	claimer   *Claimer
 	audiences Audiences
 	//kauthn    kauthn.AuthenticationV1Interface
-	pubKeys    []interface{}
-	x509Policy policy.X509NamePolicyEngine
-	sshPolicy  policy.SSHNamePolicyEngine
+	pubKeys       []interface{}
+	x509Policy    x509PolicyEngine
+	sshHostPolicy *hostPolicyEngine
+	sshUserPolicy *userPolicyEngine
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -152,8 +152,13 @@ func (p *K8sSA) Init(config Config) (err error) {
 		return err
 	}
 
-	// Initialize the SSH allow/deny policy engine
-	if p.sshPolicy, err = newSSHPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	// Initialize the SSH allow/deny policy engine for user certificates
+	if p.sshUserPolicy, err = newSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	// Initialize the SSH allow/deny policy engine for host certificates
+	if p.sshHostPolicy, err = newSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -305,7 +310,7 @@ func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		// Require and validate all the default fields in the SSH certificate.
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshPolicy),
+		newSSHNamePolicyValidator(p.sshHostPolicy, p.sshUserPolicy),
 	), nil
 }
 

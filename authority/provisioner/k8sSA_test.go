@@ -371,7 +371,8 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 							case *sshDefaultDuration:
 								assert.Equals(t, v.Claimer, tc.p.claimer)
 							case *sshNamePolicyValidator:
-								assert.Equals(t, nil, v.policyEngine)
+								assert.Equals(t, nil, v.userPolicyEngine)
+								assert.Equals(t, nil, v.hostPolicyEngine)
 							default:
 								assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
 							}

@@ -2749,36 +2749,12 @@ func Test_splitSSHPrincipals(t *testing.T) {
 				wantErr: true,
 			}
 		},
-		"fail/user-ip": func(t *testing.T) test {
-			r := emptyResult()
-			r.wantIps = []net.IP{net.ParseIP("127.0.0.1")} // this will still be in the result
-			return test{
-				cert: &ssh.Certificate{
-					CertType:        ssh.UserCert,
-					ValidPrincipals: []string{"127.0.0.1"},
-				},
-				r:       r,
-				wantErr: true,
-			}
-		},
 		"fail/user-uri": func(t *testing.T) test {
 			r := emptyResult()
 			return test{
 				cert: &ssh.Certificate{
 					CertType:        ssh.UserCert,
 					ValidPrincipals: []string{"https://host.local/"},
-				},
-				r:       r,
-				wantErr: true,
-			}
-		},
-		"fail/host-email": func(t *testing.T) test {
-			r := emptyResult()
-			r.wantEmails = []string{"ops@work"} // this will still be in the result
-			return test{
-				cert: &ssh.Certificate{
-					CertType:        ssh.HostCert,
-					ValidPrincipals: []string{"ops@work"},
 				},
 				r:       r,
 				wantErr: true,
@@ -2817,6 +2793,18 @@ func Test_splitSSHPrincipals(t *testing.T) {
 				r: r,
 			}
 		},
+		"ok/host-email": func(t *testing.T) test {
+			r := emptyResult()
+			r.wantEmails = []string{"ops@work"}
+			return test{
+				cert: &ssh.Certificate{
+					CertType:        ssh.HostCert,
+					ValidPrincipals: []string{"ops@work"},
+				},
+				r:       r,
+				wantErr: false,
+			}
+		},
 		"ok/user-localhost": func(t *testing.T) test {
 			r := emptyResult()
 			r.wantUsernames = []string{"localhost"} // when type is User cert, this is considered a username; not a DNS
@@ -2837,6 +2825,18 @@ func Test_splitSSHPrincipals(t *testing.T) {
 					ValidPrincipals: []string{"x.joe"},
 				},
 				r: r,
+			}
+		},
+		"ok/user-ip": func(t *testing.T) test {
+			r := emptyResult()
+			r.wantIps = []net.IP{net.ParseIP("127.0.0.1")}
+			return test{
+				cert: &ssh.Certificate{
+					CertType:        ssh.UserCert,
+					ValidPrincipals: []string{"127.0.0.1"},
+				},
+				r:       r,
+				wantErr: false,
 			}
 		},
 		"ok/user-maillike": func(t *testing.T) test {

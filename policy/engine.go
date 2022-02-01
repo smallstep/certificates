@@ -216,11 +216,11 @@ func (e *NamePolicyEngine) IsIPAllowed(ip net.IP) (bool, error) {
 
 // ArePrincipalsAllowed verifies that all principals in an SSH certificate are allowed.
 func (e *NamePolicyEngine) ArePrincipalsAllowed(cert *ssh.Certificate) (bool, error) {
-	dnsNames, ips, emails, usernames, err := splitSSHPrincipals(cert)
+	dnsNames, ips, emails, principals, err := splitSSHPrincipals(cert)
 	if err != nil {
 		return false, err
 	}
-	if err := e.validateNames(dnsNames, ips, emails, []*url.URL{}, usernames); err != nil {
+	if err := e.validateNames(dnsNames, ips, emails, []*url.URL{}, principals); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -243,32 +243,26 @@ func appendSubjectCommonName(subject pkix.Name, dnsNames *[]string, ips *[]net.I
 }
 
 // splitPrincipals splits SSH certificate principals into DNS names, emails and usernames.
-func splitSSHPrincipals(cert *ssh.Certificate) (dnsNames []string, ips []net.IP, emails, usernames []string, err error) {
+func splitSSHPrincipals(cert *ssh.Certificate) (dnsNames []string, ips []net.IP, emails, principals []string, err error) {
 	dnsNames = []string{}
 	ips = []net.IP{}
 	emails = []string{}
-	usernames = []string{}
+	principals = []string{}
 	var uris []*url.URL
 	switch cert.CertType {
 	case ssh.HostCert:
 		dnsNames, ips, emails, uris = x509util.SplitSANs(cert.ValidPrincipals)
-		switch {
-		case len(emails) > 0:
-			err = fmt.Errorf("Email(-like) principals %v not expected in SSH Host certificate ", emails)
-		case len(uris) > 0:
-			err = fmt.Errorf("URL principals %v not expected in SSH Host certificate ", uris)
+		if len(uris) > 0 {
+			err = fmt.Errorf("URL principals %v not expected in SSH host certificate ", uris)
 		}
 	case ssh.UserCert:
 		// re-using SplitSANs results in anything that can't be parsed as an IP, URI or email
-		// to be considered a username. This allows usernames like h.slatman to be present
+		// to be considered a username principal. This allows usernames like h.slatman to be present
 		// in the SSH certificate. We're exluding IPs and URIs, because they can be confusing
 		// when used in a SSH user certificate.
-		usernames, ips, emails, uris = x509util.SplitSANs(cert.ValidPrincipals)
-		switch {
-		case len(ips) > 0:
-			err = fmt.Errorf("IP principals %v not expected in SSH User certificate ", ips)
-		case len(uris) > 0:
-			err = fmt.Errorf("URL principals %v not expected in SSH User certificate ", uris)
+		principals, ips, emails, uris = x509util.SplitSANs(cert.ValidPrincipals)
+		if len(uris) > 0 {
+			err = fmt.Errorf("URL principals %v not expected in SSH user certificate ", uris)
 		}
 	default:
 		err = fmt.Errorf("unexpected SSH certificate type %d", cert.CertType)
@@ -280,7 +274,7 @@ func splitSSHPrincipals(cert *ssh.Certificate) (dnsNames []string, ips []net.IP,
 // validateNames verifies that all names are allowed.
 // Its logic follows that of (a large part of) the (c *Certificate) isValid() function
 // in https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
-func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailAddresses []string, uris []*url.URL, usernames []string) error {
+func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailAddresses []string, uris []*url.URL, principals []string) error {
 
 	// nothing to compare against; return early
 	if e.totalNumberOfConstraints == 0 {
@@ -400,15 +394,15 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		}
 	}
 
-	for _, username := range usernames {
+	for _, principal := range principals {
 		if e.numberOfPrincipalConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
 			return NamePolicyError{
 				Reason: NotAuthorizedForThisName,
-				Detail: fmt.Sprintf("username principal %q is not explicitly permitted by any constraint", username),
+				Detail: fmt.Sprintf("username principal %q is not explicitly permitted by any constraint", principal),
 			}
 		}
 		// TODO: some validation? I.e. allowed characters?
-		if err := checkNameConstraints("username", username, username,
+		if err := checkNameConstraints("principal", principal, principal,
 			func(parsedName, constraint interface{}) (bool, error) {
 				return matchUsernameConstraint(parsedName.(string), constraint.(string))
 			}, e.permittedPrincipals, e.excludedPrincipals); err != nil {

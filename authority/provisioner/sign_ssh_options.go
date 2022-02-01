@@ -4,13 +4,13 @@ import (
 	"crypto/rsa"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/policy"
 	"go.step.sm/crypto/keyutil"
 	"golang.org/x/crypto/ssh"
 )
@@ -448,24 +448,55 @@ func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, o SignSSHOpti
 // sshNamePolicyValidator validates that the certificate (to be signed)
 // contains only allowed principals.
 type sshNamePolicyValidator struct {
-	policyEngine policy.SSHNamePolicyEngine
+	hostPolicyEngine *hostPolicyEngine
+	userPolicyEngine *userPolicyEngine
 }
 
 // newSSHNamePolicyValidator return a new SSH allow/deny validator.
-func newSSHNamePolicyValidator(engine policy.SSHNamePolicyEngine) *sshNamePolicyValidator {
+func newSSHNamePolicyValidator(host *hostPolicyEngine, user *userPolicyEngine) *sshNamePolicyValidator {
 	return &sshNamePolicyValidator{
-		policyEngine: engine,
+		hostPolicyEngine: host,
+		userPolicyEngine: user,
 	}
 }
 
 // Valid validates validates that the certificate (to be signed)
 // contains only allowed principals.
 func (v *sshNamePolicyValidator) Valid(cert *ssh.Certificate, _ SignSSHOptions) error {
-	if v.policyEngine == nil {
+	if v.hostPolicyEngine == nil && v.userPolicyEngine == nil {
+		// no policy configured at all; allow anything
 		return nil
 	}
-	_, err := v.policyEngine.ArePrincipalsAllowed(cert)
-	return err
+
+	// Check the policy type to execute based on type of the certificate.
+	// We don't allow user certs if only a host policy engine is configured and
+	// the same for host certs: if only a user policy engine is configured, host
+	// certs are denied. When both policy engines are configured, the type of
+	// cert determines which policy engine is used.
+	policyType, ok := certTypeToPolicyEngineType[cert.CertType]
+	if !ok {
+		return fmt.Errorf("unexpected SSH cert type %d", cert.CertType)
+	}
+	switch policyType {
+	case hostPolicyEngineType:
+		// when no host policy engine is configured, but a user policy engine is
+		// configured, we don't allow the host certificate.
+		if v.hostPolicyEngine == nil && v.userPolicyEngine != nil {
+			return errors.New("SSH host certificate not authorized") // TODO: include principals in message?
+		}
+		_, err := v.hostPolicyEngine.ArePrincipalsAllowed(cert)
+		return err
+	case userPolicyEngineType:
+		// when no user policy engine is configured, but a host policy engine is
+		// configured, we don't allow the user certificate.
+		if v.userPolicyEngine == nil && v.hostPolicyEngine != nil {
+			return errors.New("SSH user certificate not authorized") // TODO: include principals in message?
+		}
+		_, err := v.userPolicyEngine.ArePrincipalsAllowed(cert)
+		return err
+	default:
+		return fmt.Errorf("unexpected policy engine type %q", policyType) // satisfy return; shouldn't happen
+	}
 }
 
 // sshCertTypeUInt32
