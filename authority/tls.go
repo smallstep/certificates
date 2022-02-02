@@ -180,6 +180,17 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
+	// Process injected modifiers after validation
+	for _, m := range a.x509Enforcers {
+		if err := m.Enforce(leaf); err != nil {
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(err, "error creating certificate"),
+				opts...,
+			)
+		}
+	}
+
+	// Sign certificate
 	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
 		Template: leaf,

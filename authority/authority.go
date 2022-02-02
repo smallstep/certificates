@@ -50,6 +50,7 @@ type Authority struct {
 	rootX509CertPool   *x509.CertPool
 	federatedX509Certs []*x509.Certificate
 	certificates       *sync.Map
+	x509Enforcers      []provisioner.CertificateEnforcer
 
 	// SCEP CA
 	scepService *scep.Service
