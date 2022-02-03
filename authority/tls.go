@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -508,8 +509,19 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 		return fatal(errors.New("private key is not a crypto.Signer"))
 	}
 
+	// prepare the sans: IPv6 DNS hostname representations are converted to their IP representation
+	sans := make([]string, len(a.config.DNSNames))
+	for i, san := range a.config.DNSNames {
+		if strings.HasPrefix(san, "[") && strings.HasSuffix(san, "]") {
+			if ip := net.ParseIP(san[1 : len(san)-1]); ip != nil {
+				san = ip.String()
+			}
+		}
+		sans[i] = san
+	}
+
 	// Create initial certificate request.
-	cr, err := x509util.CreateCertificateRequest("Step Online CA", a.config.DNSNames, signer)
+	cr, err := x509util.CreateCertificateRequest("Step Online CA", sans, signer)
 	if err != nil {
 		return fatal(err)
 	}
