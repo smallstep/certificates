@@ -31,6 +31,86 @@ func TestLinker_GetUnescapedPathSuffix(t *testing.T) {
 	assert.Equals(t, getPath(CertificateLinkType, "{provisionerID}", "{certID}"), "/{provisionerID}/certificate/{certID}")
 }
 
+func TestLinker_DNS(t *testing.T) {
+	prov := newProv()
+	escProvName := url.PathEscape(prov.GetName())
+	ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+	type test struct {
+		name                  string
+		dns                   string
+		prefix                string
+		expectedDirectoryLink string
+	}
+	tests := []test{
+		{
+			name:                  "domain",
+			dns:                   "ca.smallstep.com",
+			prefix:                "acme",
+			expectedDirectoryLink: fmt.Sprintf("https://ca.smallstep.com/acme/%s/directory", escProvName),
+		},
+		{
+			name:                  "domain-port",
+			dns:                   "ca.smallstep.com:8443",
+			prefix:                "acme",
+			expectedDirectoryLink: fmt.Sprintf("https://ca.smallstep.com:8443/acme/%s/directory", escProvName),
+		},
+		{
+			name:                  "ipv4",
+			dns:                   "127.0.0.1",
+			prefix:                "acme",
+			expectedDirectoryLink: fmt.Sprintf("https://127.0.0.1/acme/%s/directory", escProvName),
+		},
+		{
+			name:                  "ipv4-port",
+			dns:                   "127.0.0.1:8443",
+			prefix:                "acme",
+			expectedDirectoryLink: fmt.Sprintf("https://127.0.0.1:8443/acme/%s/directory", escProvName),
+		},
+		{
+			name:                  "ipv6",
+			dns:                   "[::1]",
+			prefix:                "acme",
+			expectedDirectoryLink: fmt.Sprintf("https://[::1]/acme/%s/directory", escProvName),
+		},
+		{
+			name:                  "ipv6-port",
+			dns:                   "[::1]:8443",
+			prefix:                "acme",
+			expectedDirectoryLink: fmt.Sprintf("https://[::1]:8443/acme/%s/directory", escProvName),
+		},
+		{
+			name:                  "ipv6-no-brackets",
+			dns:                   "::1",
+			prefix:                "acme",
+			expectedDirectoryLink: fmt.Sprintf("https://[::1]/acme/%s/directory", escProvName),
+		},
+		{
+			name:                  "ipv6-port-no-brackets",
+			dns:                   "::1:8443",
+			prefix:                "acme",
+			expectedDirectoryLink: fmt.Sprintf("https://[::1]:8443/acme/%s/directory", escProvName),
+		},
+		{
+			name:                  "ipv6-long-no-brackets",
+			dns:                   "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+			prefix:                "acme",
+			expectedDirectoryLink: fmt.Sprintf("https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]/acme/%s/directory", escProvName),
+		},
+		{
+			name:                  "ipv6-long-port-no-brackets",
+			dns:                   "2001:0db8:85a3:0000:0000:8a2e:0370:7334:8443",
+			prefix:                "acme",
+			expectedDirectoryLink: fmt.Sprintf("https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8443/acme/%s/directory", escProvName),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			linker := NewLinker(tt.dns, tt.prefix)
+			assert.Equals(t, tt.expectedDirectoryLink, linker.GetLink(ctx, DirectoryLinkType))
+		})
+	}
+}
+
 func TestLinker_GetLink(t *testing.T) {
 	dns := "ca.smallstep.com"
 	prefix := "acme"
