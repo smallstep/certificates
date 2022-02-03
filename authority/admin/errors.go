@@ -104,7 +104,7 @@ var (
 	}
 )
 
-// Error represents an Admin
+// Error represents an Admin error
 type Error struct {
 	Type    string `json:"type"`
 	Detail  string `json:"detail"`

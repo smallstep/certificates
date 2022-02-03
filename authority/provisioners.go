@@ -638,12 +638,13 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 	case *linkedca.ProvisionerDetails_ACME:
 		cfg := d.ACME
 		return &provisioner.ACME{
-			ID:      p.Id,
-			Type:    p.Type.String(),
-			Name:    p.Name,
-			ForceCN: cfg.ForceCn,
-			Claims:  claims,
-			Options: options,
+			ID:         p.Id,
+			Type:       p.Type.String(),
+			Name:       p.Name,
+			ForceCN:    cfg.ForceCn,
+			RequireEAB: cfg.RequireEab,
+			Claims:     claims,
+			Options:    options,
 		}, nil
 	case *linkedca.ProvisionerDetails_OIDC:
 		cfg := d.OIDC
@@ -710,6 +711,21 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			DisableTrustOnFirstUse: cfg.DisableTrustOnFirstUse,
 			Claims:                 claims,
 			Options:                options,
+		}, nil
+	case *linkedca.ProvisionerDetails_SCEP:
+		cfg := d.SCEP
+		return &provisioner.SCEP{
+			ID:                            p.Id,
+			Type:                          p.Type.String(),
+			Name:                          p.Name,
+			ForceCN:                       cfg.ForceCn,
+			ChallengePassword:             cfg.Challenge,
+			Capabilities:                  cfg.Capabilities,
+			IncludeRoot:                   cfg.IncludeRoot,
+			MinimumPublicKeyLength:        int(cfg.MinimumPublicKeyLength),
+			EncryptionAlgorithmIdentifier: int(cfg.EncryptionAlgorithmIdentifier),
+			Claims:                        claims,
+			Options:                       options,
 		}, nil
 	case *linkedca.ProvisionerDetails_Nebula:
 		var roots []byte
@@ -943,10 +959,12 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Details: &linkedca.ProvisionerDetails{
 				Data: &linkedca.ProvisionerDetails_SCEP{
 					SCEP: &linkedca.SCEPProvisioner{
-						ForceCn:                p.ForceCN,
-						Challenge:              p.GetChallengePassword(),
-						Capabilities:           p.Capabilities,
-						MinimumPublicKeyLength: int32(p.MinimumPublicKeyLength),
+						ForceCn:                       p.ForceCN,
+						Challenge:                     p.GetChallengePassword(),
+						Capabilities:                  p.Capabilities,
+						MinimumPublicKeyLength:        int32(p.MinimumPublicKeyLength),
+						IncludeRoot:                   p.IncludeRoot,
+						EncryptionAlgorithmIdentifier: int32(p.EncryptionAlgorithmIdentifier),
 					},
 				},
 			},

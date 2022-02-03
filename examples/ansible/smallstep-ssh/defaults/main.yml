@@ -1,0 +1,8 @@
+# If this host is behind a bastion this variable should contain the hostname of the bastion
+smallstep_ssh_host_behind_bastion_name: ""
+smallstep_ssh_host_is_bastion: false
+smallstep_ssh_ca_url: "https://ssh.mycompany.ca.smallstep.com"
+smallstep_ssh_ca_fingerprint: "XXXXXXXXXXXXXXX"
+
+# Whether or not to reinitialize the host even if it's already been installed
+smallstep_ssh_force_reinit: true

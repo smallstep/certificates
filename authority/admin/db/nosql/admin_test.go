@@ -11,7 +11,7 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/nosql"
-	"github.com/smallstep/nosql/database"
+	nosqldb "github.com/smallstep/nosql/database"
 	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -31,7 +31,7 @@ func TestDB_getDBAdminBytes(t *testing.T) {
 						assert.Equals(t, bucket, adminsTable)
 						assert.Equals(t, string(key), adminID)
 
-						return nil, database.ErrNotFound
+						return nil, nosqldb.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "admin adminID not found"),
@@ -105,7 +105,7 @@ func TestDB_getDBAdmin(t *testing.T) {
 						assert.Equals(t, bucket, adminsTable)
 						assert.Equals(t, string(key), adminID)
 
-						return nil, database.ErrNotFound
+						return nil, nosqldb.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "admin adminID not found"),
@@ -398,7 +398,7 @@ func TestDB_GetAdmin(t *testing.T) {
 						assert.Equals(t, bucket, adminsTable)
 						assert.Equals(t, string(key), adminID)
 
-						return nil, database.ErrNotFound
+						return nil, nosqldb.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "admin adminID not found"),
@@ -551,7 +551,7 @@ func TestDB_DeleteAdmin(t *testing.T) {
 						assert.Equals(t, bucket, adminsTable)
 						assert.Equals(t, string(key), adminID)
 
-						return nil, database.ErrNotFound
+						return nil, nosqldb.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "admin adminID not found"),
@@ -697,7 +697,7 @@ func TestDB_UpdateAdmin(t *testing.T) {
 						assert.Equals(t, bucket, adminsTable)
 						assert.Equals(t, string(key), adminID)
 
-						return nil, database.ErrNotFound
+						return nil, nosqldb.ErrNotFound
 					},
 				},
 				adminErr: admin.NewError(admin.ErrorNotFoundType, "admin adminID not found"),
@@ -985,7 +985,7 @@ func TestDB_GetAdmins(t *testing.T) {
 		"fail/db.List-error": func(t *testing.T) test {
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*database.Entry, error) {
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
 						assert.Equals(t, bucket, adminsTable)
 
 						return nil, errors.New("force")
@@ -995,14 +995,14 @@ func TestDB_GetAdmins(t *testing.T) {
 			}
 		},
 		"fail/unmarshal-error": func(t *testing.T) test {
-			ret := []*database.Entry{
+			ret := []*nosqldb.Entry{
 				{Bucket: adminsTable, Key: []byte("foo"), Value: foob},
 				{Bucket: adminsTable, Key: []byte("bar"), Value: barb},
 				{Bucket: adminsTable, Key: []byte("zap"), Value: []byte("zap")},
 			}
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*database.Entry, error) {
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
 						assert.Equals(t, bucket, adminsTable)
 
 						return ret, nil
@@ -1012,10 +1012,10 @@ func TestDB_GetAdmins(t *testing.T) {
 			}
 		},
 		"ok/none": func(t *testing.T) test {
-			ret := []*database.Entry{}
+			ret := []*nosqldb.Entry{}
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*database.Entry, error) {
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
 						assert.Equals(t, bucket, adminsTable)
 
 						return ret, nil
@@ -1027,13 +1027,13 @@ func TestDB_GetAdmins(t *testing.T) {
 			}
 		},
 		"ok/only-invalid": func(t *testing.T) test {
-			ret := []*database.Entry{
+			ret := []*nosqldb.Entry{
 				{Bucket: adminsTable, Key: []byte("bar"), Value: barb},
 				{Bucket: adminsTable, Key: []byte("baz"), Value: bazb},
 			}
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*database.Entry, error) {
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
 						assert.Equals(t, bucket, adminsTable)
 
 						return ret, nil
@@ -1045,7 +1045,7 @@ func TestDB_GetAdmins(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) test {
-			ret := []*database.Entry{
+			ret := []*nosqldb.Entry{
 				{Bucket: adminsTable, Key: []byte("foo"), Value: foob},
 				{Bucket: adminsTable, Key: []byte("bar"), Value: barb},
 				{Bucket: adminsTable, Key: []byte("baz"), Value: bazb},
@@ -1053,7 +1053,7 @@ func TestDB_GetAdmins(t *testing.T) {
 			}
 			return test{
 				db: &db.MockNoSQLDB{
-					MList: func(bucket []byte) ([]*database.Entry, error) {
+					MList: func(bucket []byte) ([]*nosqldb.Entry, error) {
 						assert.Equals(t, bucket, adminsTable)
 
 						return ret, nil

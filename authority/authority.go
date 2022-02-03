@@ -437,13 +437,6 @@ func (a *Authority) init() error {
 		}
 	}
 
-	// Check if a KMS with decryption capability is required and available
-	if a.requiresDecrypter() {
-		if _, ok := a.keyManager.(kmsapi.Decrypter); !ok {
-			return errors.New("keymanager doesn't provide crypto.Decrypter")
-		}
-	}
-
 	// TODO: decide if this is a good approach for providing the SCEP functionality
 	// It currently mirrors the logic for the x509CAService
 	if a.requiresSCEPService() && a.scepService == nil {
@@ -454,6 +447,7 @@ func (a *Authority) init() error {
 		if err != nil {
 			return err
 		}
+		options.CertificateChain = append(options.CertificateChain, a.rootX509Certs...)
 		options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 			SigningKey: a.config.IntermediateKey,
 			Password:   []byte(a.password),

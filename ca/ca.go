@@ -207,7 +207,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	if cfg.AuthorityConfig.EnableAdmin {
 		adminDB := auth.GetAdminDatabase()
 		if adminDB != nil {
-			adminHandler := adminAPI.NewHandler(auth)
+			adminHandler := adminAPI.NewHandler(auth, adminDB, acmeDB)
 			mux.Route("/admin", func(r chi.Router) {
 				adminHandler.Route(r)
 			})
@@ -417,11 +417,6 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 		}
 	}
 
-	certPool := x509.NewCertPool()
-	for _, crt := range auth.GetRootCertificates() {
-		certPool.AddCert(crt)
-	}
-
 	// GetCertificate will only be called if the client supplies SNI
 	// information or if tlsConfig.Certificates is empty.
 	// When client requests are made using an IP address (as opposed to a domain
@@ -431,6 +426,24 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	// by which the server can find it's own leaf Certificate.
 	tlsConfig.Certificates = []tls.Certificate{}
 	tlsConfig.GetCertificate = ca.renewer.GetCertificateForCA
+
+	// initialize a certificate pool with root CA certificates to trust when doing mTLS.
+	certPool := x509.NewCertPool()
+	for _, crt := range auth.GetRootCertificates() {
+		certPool.AddCert(crt)
+	}
+
+	// adding the intermediate CA certificates to the pool will allow clients that
+	// do mTLS but don't send an intermediate to successfully connect. The intermediates
+	// added here are used when building a certificate chain.
+	intermediates := tlsCrt.Certificate[1:]
+	for _, certBytes := range intermediates {
+		cert, err := x509.ParseCertificate(certBytes)
+		if err != nil {
+			return nil, err
+		}
+		certPool.AddCert(cert)
+	}
 
 	// Add support for mutual tls to renew certificates
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
