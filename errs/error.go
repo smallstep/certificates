@@ -142,7 +142,7 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	e.Status = er.Status
-	e.Err = fmt.Errorf(er.Message)
+	e.Err = errors.New(er.Message)
 	return nil
 }
 

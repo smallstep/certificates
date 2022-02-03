@@ -57,7 +57,7 @@ func (m sshTestCertModifier) Modify(cert *ssh.Certificate, opts provisioner.Sign
 	if m == "" {
 		return nil
 	}
-	return fmt.Errorf(string(m))
+	return errors.New(string(m))
 }
 
 type sshTestCertValidator string
@@ -66,7 +66,7 @@ func (v sshTestCertValidator) Valid(crt *ssh.Certificate, opts provisioner.SignS
 	if v == "" {
 		return nil
 	}
-	return fmt.Errorf(string(v))
+	return errors.New(string(v))
 }
 
 type sshTestOptionsValidator string
@@ -75,7 +75,7 @@ func (v sshTestOptionsValidator) Valid(opts provisioner.SignSSHOptions) error {
 	if v == "" {
 		return nil
 	}
-	return fmt.Errorf(string(v))
+	return errors.New(string(v))
 }
 
 type sshTestOptionsModifier string
@@ -84,7 +84,7 @@ func (m sshTestOptionsModifier) Modify(cert *ssh.Certificate, opts provisioner.S
 	if m == "" {
 		return nil
 	}
-	return fmt.Errorf(string(m))
+	return errors.New(string(m))
 }
 
 func TestAuthority_initHostOnly(t *testing.T) {
