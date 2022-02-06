@@ -248,14 +248,14 @@ func TestVaultCAS_CreateCertificate(t *testing.T) {
 			Certificate:      mustParseCertificate(t, testCertificateSigned),
 			CertificateChain: []*x509.Certificate{},
 		}, false},
-		// {"fail CSR", fields{client, options}, args{&apiv1.CreateCertificateRequest{
-		// 	CSR:      nil,
-		// 	Lifetime: time.Hour,
-		// }}, nil, true},
-		// {"fail lifetime", fields{client, options}, args{&apiv1.CreateCertificateRequest{
-		// 	CSR:      mustParseCertificateRequest(t, testCertificateCsrEc),
-		// 	Lifetime: 0,
-		// }}, nil, true},
+		{"fail CSR", fields{client, options}, args{&apiv1.CreateCertificateRequest{
+			CSR:      nil,
+			Lifetime: time.Hour,
+		}}, nil, true},
+		{"fail lifetime", fields{client, options}, args{&apiv1.CreateCertificateRequest{
+			CSR:      mustParseCertificateRequest(t, testCertificateCsrEc),
+			Lifetime: 0,
+		}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
