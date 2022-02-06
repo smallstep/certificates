@@ -1,6 +1,7 @@
 package vaultcas
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/x509"
@@ -40,6 +41,12 @@ type VaultCAS struct {
 	client      *vault.Client
 	config      VaultOptions
 	fingerprint string
+}
+
+type Certificate struct {
+	leaf          *x509.Certificate
+	intermediates []*x509.Certificate
+	root          *x509.Certificate
 }
 
 func loadOptions(config json.RawMessage) (*VaultOptions, error) {
@@ -87,31 +94,94 @@ func loadOptions(config json.RawMessage) (*VaultOptions, error) {
 	return vc, nil
 }
 
-func getCertificateAndChain(certb certutil.CertBundle) (*x509.Certificate, []*x509.Certificate, error) {
-	cert, err := parseCertificate(certb.Certificate)
-	if err != nil {
-		return nil, nil, err
-	}
-	chain := make([]*x509.Certificate, len(certb.CAChain))
-	for i := range certb.CAChain {
-		chain[i], err = parseCertificate(certb.CAChain[i])
-		if err != nil {
-			return nil, nil, err
+func certificateSort(n []*x509.Certificate) bool {
+	// sort all cert using bubble sort
+	isSorted := false
+	s := 0
+	maxSwap := len(n) * (len(n) - 1) / 2
+	for s <= maxSwap && !isSorted {
+		isSorted = true
+		var i = 0
+		for i < len(n)-1 {
+			if !isSignedBy(n[i], n[i+1]) {
+				// swap
+				n[i], n[i+1] = n[i+1], n[i]
+				isSorted = false
+			}
+			i++
 		}
+		s++
 	}
-	return cert, chain, nil
+	return isSorted
 }
 
-func parseCertificate(pemCert string) (*x509.Certificate, error) {
-	block, _ := pem.Decode([]byte(pemCert))
-	if block == nil {
-		return nil, errors.Errorf("error decoding certificate: not a valid PEM encoded block, please verify\r\n%v", pemCert)
+func isSignedBy(i *x509.Certificate, j *x509.Certificate) bool {
+	signer := x509.NewCertPool()
+	signer.AddCert(j)
+
+	opts := x509.VerifyOptions{
+		Roots:         signer,
+		Intermediates: x509.NewCertPool(), // set empty to avoid using system CA
 	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "error parsing certificate")
+	_, err := i.Verify(opts)
+	return err == nil
+}
+
+func parseCertificates(pemCert string) []*x509.Certificate {
+	var certs []*x509.Certificate
+	rest := []byte(pemCert)
+	var block *pem.Block
+	for {
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			break
+		}
+		certs = append(certs, cert)
 	}
-	return cert, nil
+	return certs
+}
+
+func getCertificateAndChain(certb certutil.CertBundle) (*Certificate, error) {
+	// certutil.CertBundle contains CAChain and Certificate.
+	// Both could have a common part or different and we are not sure
+	// how user define their chain inside vault.
+	// We will create an array of certificate with all parsed certificates
+	// then sort the array to create a consistent chain
+	var root *x509.Certificate
+	var leaf *x509.Certificate
+	intermediates := make([]*x509.Certificate, 0)
+	used := make(map[string]bool) // ensure that intermediate are uniq
+	chains := append(certb.CAChain, []string{certb.Certificate}...)
+	for _, chain := range chains {
+		for _, cert := range parseCertificates(chain) {
+			if used[cert.SerialNumber.String()] == true {
+				continue
+			}
+			used[cert.SerialNumber.String()] = true
+			if cert.IsCA && bytes.Equal(cert.RawIssuer, cert.RawSubject) {
+				root = cert
+			} else if !cert.IsCA {
+				leaf = cert
+			} else {
+				intermediates = append(intermediates, cert)
+			}
+		}
+	}
+	if ok := certificateSort(intermediates); !ok {
+		return nil, errors.Errorf("failed to sort certificate, probably one of cert is not part of the chain")
+	}
+
+	certificate := &Certificate{
+		root:          root,
+		leaf:          leaf,
+		intermediates: intermediates,
+	}
+
+	return certificate, nil
 }
 
 func parseCertificateRequest(pemCsr string) (*x509.CertificateRequest, error) {
@@ -119,6 +189,7 @@ func parseCertificateRequest(pemCsr string) (*x509.CertificateRequest, error) {
 	if block == nil {
 		return nil, errors.Errorf("error decoding certificate request: not a valid PEM encoded block, please verify\r\n%v", pemCsr)
 	}
+
 	cr, err := x509.ParseCertificateRequest(block.Bytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing certificate request")
@@ -171,8 +242,13 @@ func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.
 		return nil, nil, err
 	}
 
+	cert, err := getCertificateAndChain(certBundle)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// Return certificate and certificate chain
-	return getCertificateAndChain(certBundle)
+	return cert.leaf, cert.intermediates, nil
 }
 
 // New creates a new CertificateAuthorityService implementation
@@ -254,7 +330,7 @@ func (v *VaultCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv
 }
 
 func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
-	secret, err := v.client.Logical().Read(v.config.PKI + "/cert/ca")
+	secret, err := v.client.Logical().Read(v.config.PKI + "/cert/ca_chain")
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to read root")
 	}
@@ -274,19 +350,19 @@ func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityReq
 		return nil, err
 	}
 
-	cert, _, err := getCertificateAndChain(certBundle)
+	cert, err := getCertificateAndChain(certBundle)
 	if err != nil {
 		return nil, err
 	}
 
-	sha256Sum := sha256.Sum256(cert.Raw)
+	sha256Sum := sha256.Sum256(cert.root.Raw)
 	expectedSum := certutil.GetHexFormatted(sha256Sum[:], "")
 	if expectedSum != v.fingerprint {
 		return nil, errors.Errorf("Vault Root CA fingerprint `%s` doesn't match config fingerprint `%v`", expectedSum, v.fingerprint)
 	}
 
 	return &apiv1.GetCertificateAuthorityResponse{
-		RootCertificate: cert,
+		RootCertificate: cert.root,
 	}, nil
 }
 
