@@ -200,6 +200,102 @@ func TestProvisioner_Token(t *testing.T) {
 	}
 }
 
+func TestProvisioner_IPv6Token(t *testing.T) {
+	p := getTestProvisioner(t, "https://[::1]:9000")
+	sha := "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7"
+
+	type fields struct {
+		name          string
+		kid           string
+		fingerprint   string
+		jwk           *jose.JSONWebKey
+		tokenLifetime time.Duration
+	}
+	type args struct {
+		subject string
+		sans    []string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"ok", fields{p.name, p.kid, sha, p.jwk, p.tokenLifetime}, args{"subject", nil}, false},
+		{"ok-with-san", fields{p.name, p.kid, sha, p.jwk, p.tokenLifetime}, args{"subject", []string{"foo.smallstep.com"}}, false},
+		{"ok-with-sans", fields{p.name, p.kid, sha, p.jwk, p.tokenLifetime}, args{"subject", []string{"foo.smallstep.com", "127.0.0.1"}}, false},
+		{"fail-no-subject", fields{p.name, p.kid, sha, p.jwk, p.tokenLifetime}, args{"", []string{"foo.smallstep.com"}}, true},
+		{"fail-no-key", fields{p.name, p.kid, sha, &jose.JSONWebKey{}, p.tokenLifetime}, args{"subject", nil}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &Provisioner{
+				name:          tt.fields.name,
+				kid:           tt.fields.kid,
+				audience:      "https://[::1]:9000/1.0/sign",
+				fingerprint:   tt.fields.fingerprint,
+				jwk:           tt.fields.jwk,
+				tokenLifetime: tt.fields.tokenLifetime,
+			}
+			got, err := p.Token(tt.args.subject, tt.args.sans...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Provisioner.Token() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr == false {
+				jwt, err := jose.ParseSigned(got)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				var claims jose.Claims
+				if err := jwt.Claims(tt.fields.jwk.Public(), &claims); err != nil {
+					t.Error(err)
+					return
+				}
+				if err := claims.ValidateWithLeeway(jose.Expected{
+					Audience: []string{"https://[::1]:9000/1.0/sign"},
+					Issuer:   tt.fields.name,
+					Subject:  tt.args.subject,
+					Time:     time.Now().UTC(),
+				}, time.Minute); err != nil {
+					t.Error(err)
+					return
+				}
+				lifetime := claims.Expiry.Time().Sub(claims.NotBefore.Time())
+				if lifetime != tt.fields.tokenLifetime {
+					t.Errorf("Claims token life time = %s, want %s", lifetime, tt.fields.tokenLifetime)
+				}
+				allClaims := make(map[string]interface{})
+				if err := jwt.Claims(tt.fields.jwk.Public(), &allClaims); err != nil {
+					t.Error(err)
+					return
+				}
+				if v, ok := allClaims["sha"].(string); !ok || v != sha {
+					t.Errorf("Claim sha = %s, want %s", v, sha)
+				}
+				if len(tt.args.sans) == 0 {
+					if v, ok := allClaims["sans"].([]interface{}); !ok || !reflect.DeepEqual(v, []interface{}{tt.args.subject}) {
+						t.Errorf("Claim sans = %s, want %s", v, []interface{}{tt.args.subject})
+					}
+				} else {
+					want := []interface{}{}
+					for _, s := range tt.args.sans {
+						want = append(want, s)
+					}
+					if v, ok := allClaims["sans"].([]interface{}); !ok || !reflect.DeepEqual(v, want) {
+						t.Errorf("Claim sans = %s, want %s", v, want)
+					}
+				}
+				if v, ok := allClaims["jti"].(string); !ok || v == "" {
+					t.Errorf("Claim jti = %s, want not blank", v)
+				}
+			}
+		})
+	}
+}
+
 func TestProvisioner_SSHToken(t *testing.T) {
 	p := getTestProvisioner(t, "https://127.0.0.1:9000")
 	sha := "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7"
