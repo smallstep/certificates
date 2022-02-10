@@ -101,15 +101,15 @@ func NewACMEAdminResponder() *ACMEAdminResponder {
 
 // GetExternalAccountKeys writes the response for the EAB keys GET endpoint
 func (h *ACMEAdminResponder) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request) {
-	api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://smallstep.com/signup?product=cm"))
+	api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm"))
 }
 
 // CreateExternalAccountKey writes the response for the EAB key POST endpoint
 func (h *ACMEAdminResponder) CreateExternalAccountKey(w http.ResponseWriter, r *http.Request) {
-	api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://smallstep.com/signup?product=cm"))
+	api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm"))
 }
 
 // DeleteExternalAccountKey writes the response for the EAB key DELETE endpoint
 func (h *ACMEAdminResponder) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Request) {
-	api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://smallstep.com/signup?product=cm"))
+	api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm"))
 }

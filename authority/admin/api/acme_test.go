@@ -445,7 +445,7 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 				err: &admin.Error{
 					Type:    admin.ErrorNotImplementedType.String(),
 					Status:  http.StatusNotImplemented,
-					Message: "this functionality is currently only available in Certificate Manager: https://smallstep.com/signup?product=cm",
+					Message: "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm",
 					Detail:  "not implemented",
 				},
 			}
@@ -498,7 +498,7 @@ func TestHandler_DeleteExternalAccountKey(t *testing.T) {
 				err: &admin.Error{
 					Type:    admin.ErrorNotImplementedType.String(),
 					Status:  http.StatusNotImplemented,
-					Message: "this functionality is currently only available in Certificate Manager: https://smallstep.com/signup?product=cm",
+					Message: "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm",
 					Detail:  "not implemented",
 				},
 			}
@@ -552,7 +552,7 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 				err: &admin.Error{
 					Type:    admin.ErrorNotImplementedType.String(),
 					Status:  http.StatusNotImplemented,
-					Message: "this functionality is currently only available in Certificate Manager: https://smallstep.com/signup?product=cm",
+					Message: "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm",
 					Detail:  "not implemented",
 				},
 			}
