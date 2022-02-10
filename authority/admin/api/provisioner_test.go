@@ -26,7 +26,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 	type test struct {
 		ctx        context.Context
 		auth       adminAuthority
-		db         admin.DB
+		adminDB    admin.DB
 		req        *http.Request
 		statusCode int
 		err        *admin.Error
@@ -104,7 +104,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 				ctx:        ctx,
 				req:        req,
 				auth:       auth,
-				db:         db,
+				adminDB:    db,
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    admin.ErrorServerInternalType.String(),
@@ -143,7 +143,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 				ctx:        ctx,
 				req:        req,
 				auth:       auth,
-				db:         db,
+				adminDB:    db,
 				statusCode: 200,
 				err:        nil,
 				prov:       prov,
@@ -154,8 +154,8 @@ func TestHandler_GetProvisioner(t *testing.T) {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{
-				auth: tc.auth,
-				db:   tc.db,
+				auth:    tc.auth,
+				adminDB: tc.adminDB,
 			}
 			req := tc.req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
@@ -605,7 +605,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 		ctx        context.Context
 		auth       adminAuthority
 		body       []byte
-		db         admin.DB
+		adminDB    admin.DB
 		statusCode int
 		err        *admin.Error
 		prov       *linkedca.Provisioner
@@ -685,7 +685,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				ctx:        ctx,
 				body:       body,
 				auth:       auth,
-				db:         db,
+				adminDB:    db,
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    admin.ErrorServerInternalType.String(),
@@ -728,7 +728,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				ctx:        ctx,
 				body:       body,
 				auth:       auth,
-				db:         db,
+				adminDB:    db,
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    admin.ErrorServerInternalType.String(),
@@ -772,7 +772,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				ctx:        ctx,
 				body:       body,
 				auth:       auth,
-				db:         db,
+				adminDB:    db,
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    admin.ErrorServerInternalType.String(),
@@ -818,7 +818,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				ctx:        ctx,
 				body:       body,
 				auth:       auth,
-				db:         db,
+				adminDB:    db,
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    admin.ErrorServerInternalType.String(),
@@ -867,7 +867,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				ctx:        ctx,
 				body:       body,
 				auth:       auth,
-				db:         db,
+				adminDB:    db,
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    admin.ErrorServerInternalType.String(),
@@ -919,7 +919,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				ctx:        ctx,
 				body:       body,
 				auth:       auth,
-				db:         db,
+				adminDB:    db,
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    admin.ErrorServerInternalType.String(),
@@ -978,7 +978,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				ctx:        ctx,
 				body:       body,
 				auth:       auth,
-				db:         db,
+				adminDB:    db,
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    "", // TODO(hs): this error can be improved
@@ -1043,7 +1043,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				ctx:        ctx,
 				body:       body,
 				auth:       auth,
-				db:         db,
+				adminDB:    db,
 				statusCode: 200,
 				prov:       prov,
 			}
@@ -1053,8 +1053,8 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
 			h := &Handler{
-				auth: tc.auth,
-				db:   tc.db,
+				auth:    tc.auth,
+				adminDB: tc.adminDB,
 			}
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
