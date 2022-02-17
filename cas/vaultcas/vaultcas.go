@@ -114,7 +114,7 @@ func certificateSort(n []*x509.Certificate) bool {
 	return isSorted
 }
 
-func isSignedBy(i *x509.Certificate, j *x509.Certificate) bool {
+func isSignedBy(i, j *x509.Certificate) bool {
 	signer := x509.NewCertPool()
 	signer.AddCert(j)
 
@@ -154,18 +154,18 @@ func getCertificateAndChain(certb certutil.CertBundle) (*Certificate, error) {
 	var leaf *x509.Certificate
 	intermediates := make([]*x509.Certificate, 0)
 	used := make(map[string]bool) // ensure that intermediate are uniq
-	chains := append(certb.CAChain, []string{certb.Certificate}...)
-	for _, chain := range chains {
+	for _, chain := range append(certb.CAChain, certb.Certificate) {
 		for _, cert := range parseCertificates(chain) {
 			if used[cert.SerialNumber.String()] {
 				continue
 			}
 			used[cert.SerialNumber.String()] = true
-			if isRoot(cert) {
+			switch {
+			case isRoot(cert):
 				root = cert
-			} else if cert.BasicConstraintsValid && cert.IsCA {
+			case cert.BasicConstraintsValid && cert.IsCA:
 				intermediates = append(intermediates, cert)
-			} else {
+			default:
 				leaf = cert
 			}
 		}
