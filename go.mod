@@ -37,13 +37,14 @@ require (
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.0
-	go.step.sm/crypto v0.14.0
-	go.step.sm/linkedca v0.9.0
+	go.step.sm/crypto v0.15.0
+	go.step.sm/linkedca v0.9.2
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
-	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
+	golang.org/x/net v0.0.0-20220114011407-0dd24b26b47d
+	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
 	google.golang.org/api v0.47.0
-	google.golang.org/genproto v0.0.0-20210719143636-1d5a45f8e492
-	google.golang.org/grpc v1.41.0
+	google.golang.org/genproto v0.0.0-20220118154757-00ab72f36ad5
+	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/square/go-jose.v2 v2.6.0
 )

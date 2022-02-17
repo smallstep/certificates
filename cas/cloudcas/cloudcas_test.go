@@ -31,6 +31,7 @@ import (
 	longrunningpb "google.golang.org/genproto/googleapis/longrunning"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -852,7 +853,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 	defer srv.Stop()
 
 	// Create fake privateca client
-	conn, err := grpc.DialContext(context.Background(), "", grpc.WithInsecure(),
+	conn, err := grpc.DialContext(context.Background(), "", grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return lis.Dial()
 		}))

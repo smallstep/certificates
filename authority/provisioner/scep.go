@@ -18,13 +18,21 @@ type SCEP struct {
 	ForceCN           bool     `json:"forceCN,omitempty"`
 	ChallengePassword string   `json:"challenge,omitempty"`
 	Capabilities      []string `json:"capabilities,omitempty"`
+	// IncludeRoot makes the provisioner return the CA root in addition to the
+	// intermediate in the GetCACerts response
+	IncludeRoot bool `json:"includeRoot,omitempty"`
 	// MinimumPublicKeyLength is the minimum length for public keys in CSRs
-	MinimumPublicKeyLength int      `json:"minimumPublicKeyLength,omitempty"`
-	Options                *Options `json:"options,omitempty"`
-	Claims                 *Claims  `json:"claims,omitempty"`
-	claimer                *Claimer
+	MinimumPublicKeyLength int `json:"minimumPublicKeyLength,omitempty"`
+	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
+	// at https://github.com/mozilla-services/pkcs7/blob/33d05740a3526e382af6395d3513e73d4e66d1cb/encrypt.go#L63
+	// Defaults to 0, being DES-CBC
+	EncryptionAlgorithmIdentifier int      `json:"encryptionAlgorithmIdentifier,omitempty"`
+	Options                       *Options `json:"options,omitempty"`
+	Claims                        *Claims  `json:"claims,omitempty"`
+	claimer                       *Claimer
 
 	secretChallengePassword string
+	encryptionAlgorithm     int
 }
 
 // GetID returns the provisioner unique identifier.
@@ -97,7 +105,12 @@ func (s *SCEP) Init(config Config) (err error) {
 	}
 
 	if s.MinimumPublicKeyLength%8 != 0 {
-		return errors.Errorf("only minimum public keys exactly divisible by 8 are supported; %d is not exactly divisible by 8", s.MinimumPublicKeyLength)
+		return errors.Errorf("%d bits is not exactly divisible by 8", s.MinimumPublicKeyLength)
+	}
+
+	s.encryptionAlgorithm = s.EncryptionAlgorithmIdentifier // TODO(hs): we might want to upgrade the default security to AES-CBC?
+	if s.encryptionAlgorithm < 0 || s.encryptionAlgorithm > 4 {
+		return errors.New("only encryption algorithm identifiers from 0 to 4 are valid")
 	}
 
 	// TODO: add other, SCEP specific, options?
@@ -128,4 +141,18 @@ func (s *SCEP) GetChallengePassword() string {
 // GetCapabilities returns the CA capabilities
 func (s *SCEP) GetCapabilities() []string {
 	return s.Capabilities
+}
+
+// ShouldIncludeRootInChain indicates if the CA should
+// return its intermediate, which is currently used for
+// both signing and decryption, as well as the root in
+// its chain.
+func (s *SCEP) ShouldIncludeRootInChain() bool {
+	return s.IncludeRoot
+}
+
+// GetContentEncryptionAlgorithm returns the numeric identifier
+// for the pkcs7 package encryption algorithm to use.
+func (s *SCEP) GetContentEncryptionAlgorithm() int {
+	return s.encryptionAlgorithm
 }

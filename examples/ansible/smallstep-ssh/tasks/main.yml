@@ -1,0 +1,41 @@
+
+# These steps automate the installation guide here:
+#  https://smallstep.com/docs/sso-ssh/hosts/
+
+# TODO: Figure out how to make this idempotent instead of reinstalling on each run
+
+- name: Bootstrap node to connect to CA
+  command: "step ca bootstrap --context ssh --ca-url {{ smallstep_ssh_ca_url }} --fingerprint {{ smallstep_ssh_ca_fingerprint }} --force"
+#  when: smallstep_ssh_installed.changed or smallstep_ssh_force_reinit
+
+- name: Get a host SSH certificate
+  command: "step ssh certificate --context ssh {{ inventory_hostname }} /etc/ssh/ssh_host_ecdsa_key.pub --host --sign --provisioner=\"Service Account\" --token=\"{{ smallstep_ssh_enrollment_token }}\" --force"
+#  when: smallstep_ssh_installed.changed or smallstep_ssh_force_reinit
+
+- name: Configure SSHD (will be overwriten by the sshd template in Ansible later)
+  command: "step ssh config --context ssh --host --set Certificate=ssh_host_ecdsa_key-cert.pub --set Key=ssh_host_ecdsa_key"
+#  when: smallstep_ssh_installed.changed or smallstep_ssh_force_reinit
+
+- name: Activate SmallStep PAM/NSS modules and nohup sshd
+  command: "step-ssh activate {{ inventory_hostname }}"
+#  when: smallstep_ssh_installed.changed or smallstep_ssh_force_reinit
+
+- name: Generate host tags list
+  set_fact:
+    smallstep_ssh_host_tags_string: "{{ smallstep_ssh_host_tags | to_json | regex_replace('\\:\\ ','=') | regex_replace('\\{\\\"|,\\ \\\"', ' --tag \"') | regex_replace('[\\[\\]{}]') }}"
+
+- name: Generate command to register
+  set_fact:
+    smallstep_ssh_register_string: |
+          step-ssh-ctl register
+                --hostname {{ inventory_hostname }}
+                {% if not smallstep_ssh_host_is_bastion %}--bastion '{{ smallstep_ssh_host_behind_bastion_name|default("") }}'{% endif %}
+                {% if smallstep_ssh_host_is_bastion %}--is-bastion{% endif %}
+                {{ smallstep_ssh_host_tags_string }}
+
+- debug: var=smallstep_ssh_register_string
+
+- name: Register host with smallstep
+  command: "{{ smallstep_ssh_register_string }}"
+#  when: smallstep_ssh_installed.changed or smallstep_ssh_force_reinit
+

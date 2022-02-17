@@ -12,9 +12,10 @@ import (
 
 // NewAccountRequest represents the payload for a new account request.
 type NewAccountRequest struct {
-	Contact              []string `json:"contact"`
-	OnlyReturnExisting   bool     `json:"onlyReturnExisting"`
-	TermsOfServiceAgreed bool     `json:"termsOfServiceAgreed"`
+	Contact                []string                `json:"contact"`
+	OnlyReturnExisting     bool                    `json:"onlyReturnExisting"`
+	TermsOfServiceAgreed   bool                    `json:"termsOfServiceAgreed"`
+	ExternalAccountBinding *ExternalAccountBinding `json:"externalAccountBinding,omitempty"`
 }
 
 func validateContacts(cs []string) error {
@@ -83,8 +84,14 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	prov, err := acmeProvisionerFromContext(ctx)
+	if err != nil {
+		api.WriteError(w, err)
+		return
+	}
+
 	httpStatus := http.StatusCreated
-	acc, err := accountFromContext(r.Context())
+	acc, err := accountFromContext(ctx)
 	if err != nil {
 		acmeErr, ok := err.(*acme.Error)
 		if !ok || acmeErr.Status != http.StatusBadRequest {
@@ -99,7 +106,14 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 				"account does not exist"))
 			return
 		}
+
 		jwk, err := jwkFromContext(ctx)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+
+		eak, err := h.validateExternalAccountBinding(ctx, &nar)
 		if err != nil {
 			api.WriteError(w, err)
 			return
@@ -114,8 +128,21 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, acme.WrapErrorISE(err, "error creating account"))
 			return
 		}
+
+		if eak != nil { // means that we have a (valid) External Account Binding key that should be bound, updated and sent in the response
+			err := eak.BindTo(acc)
+			if err != nil {
+				api.WriteError(w, err)
+				return
+			}
+			if err := h.db.UpdateExternalAccountKey(ctx, prov.ID, eak); err != nil {
+				api.WriteError(w, acme.WrapErrorISE(err, "error updating external account binding key"))
+				return
+			}
+			acc.ExternalAccountBinding = nar.ExternalAccountBinding
+		}
 	} else {
-		// Account exists //
+		// Account exists
 		httpStatus = http.StatusOK
 	}
 

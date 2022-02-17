@@ -1,0 +1,29 @@
+
+# These steps automate the installation guide here:
+#  https://smallstep.com/docs/sso-ssh/hosts/
+
+- name: Download step binary
+  get_url:
+    url: "https://files.smallstep.com/step-linux-{{ smallstep_install_step_version }}"
+    dest: "/usr/local/bin/step-{{ smallstep_install_step_version }}"
+    mode: '0755'
+
+- name: Link binaries to correct version
+  file:
+    src: "/usr/local/bin/step-{{ smallstep_install_step_version }}"
+    dest: "{{ item }}"
+    state: link
+  with_items:
+    - /usr/bin/step
+    - /usr/local/bin/step
+
+- name: Link /usr/local/bin/step to correct binary version
+  file:
+    src: "/usr/local/bin/step-{{ smallstep_install_step_version }}"
+    dest: /usr/local/bin/step
+    state: link
+
+- name: Ensure step-ssh is installed
+  apt:
+    deb: "https://files.smallstep.com/step-ssh_{{ smallstep_install_step_ssh_version }}_amd64.deb"
+    state: present

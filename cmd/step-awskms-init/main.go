@@ -75,10 +75,11 @@ This tool is experimental and in the future it will be integrated in step cli.
 OPTIONS`)
 	fmt.Fprintln(os.Stderr)
 	flag.PrintDefaults()
-	fmt.Fprintln(os.Stderr, `
+	fmt.Fprintf(os.Stderr, `
 COPYRIGHT
 
-  (c) 2018-2020 Smallstep Labs, Inc.`)
+  (c) 2018-%d Smallstep Labs, Inc.
+`, time.Now().Year())
 	os.Exit(1)
 }
 

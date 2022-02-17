@@ -1,28 +1,37 @@
 package api
 
 import (
+	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"
 )
 
-// Handler is the ACME API request handler.
+// Handler is the Admin API request handler.
 type Handler struct {
-	db   admin.DB
-	auth *authority.Authority
+	adminDB       admin.DB
+	auth          adminAuthority
+	acmeDB        acme.DB
+	acmeResponder acmeAdminResponderInterface
 }
 
 // NewHandler returns a new Authority Config Handler.
-func NewHandler(auth *authority.Authority) api.RouterHandler {
-	h := &Handler{db: auth.GetAdminDatabase(), auth: auth}
-
-	return h
+func NewHandler(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB, acmeResponder acmeAdminResponderInterface) api.RouterHandler {
+	return &Handler{
+		auth:          auth,
+		adminDB:       adminDB,
+		acmeDB:        acmeDB,
+		acmeResponder: acmeResponder,
+	}
 }
 
 // Route traffic and implement the Router interface.
 func (h *Handler) Route(r api.Router) {
 	authnz := func(next nextHTTP) nextHTTP {
 		return h.extractAuthorizeTokenAdmin(h.requireAPIEnabled(next))
+	}
+
+	requireEABEnabled := func(next nextHTTP) nextHTTP {
+		return h.requireEABEnabled(next)
 	}
 
 	// Provisioners
@@ -38,4 +47,10 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("POST", "/admins", authnz(h.CreateAdmin))
 	r.MethodFunc("PATCH", "/admins/{id}", authnz(h.UpdateAdmin))
 	r.MethodFunc("DELETE", "/admins/{id}", authnz(h.DeleteAdmin))
+
+	// ACME External Account Binding Keys
+	r.MethodFunc("GET", "/acme/eab/{provisionerName}/{reference}", authnz(requireEABEnabled(h.acmeResponder.GetExternalAccountKeys)))
+	r.MethodFunc("GET", "/acme/eab/{provisionerName}", authnz(requireEABEnabled(h.acmeResponder.GetExternalAccountKeys)))
+	r.MethodFunc("POST", "/acme/eab/{provisionerName}", authnz(requireEABEnabled(h.acmeResponder.CreateExternalAccountKey)))
+	r.MethodFunc("DELETE", "/acme/eab/{provisionerName}/{id}", authnz(requireEABEnabled(h.acmeResponder.DeleteExternalAccountKey)))
 }

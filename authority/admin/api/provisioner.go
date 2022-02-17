@@ -41,7 +41,7 @@ func (h *Handler) GetProvisioner(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	prov, err := h.db.GetProvisioner(ctx, p.GetID())
+	prov, err := h.adminDB.GetProvisioner(ctx, p.GetID())
 	if err != nil {
 		api.WriteError(w, err)
 		return
@@ -54,7 +54,7 @@ func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 	cursor, limit, err := api.ParseCursor(r)
 	if err != nil {
 		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err,
-			"error parsing cursor & limit query params"))
+			"error parsing cursor and limit from query params"))
 		return
 	}
 
@@ -134,7 +134,7 @@ func (h *Handler) UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	old, err := h.db.GetProvisioner(r.Context(), _old.GetID())
+	old, err := h.adminDB.GetProvisioner(r.Context(), _old.GetID())
 	if err != nil {
 		api.WriteError(w, admin.WrapErrorISE(err, "error loading provisioner from db '%s'", _old.GetID()))
 		return

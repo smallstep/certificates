@@ -241,6 +241,15 @@ func WithLinkedCAToken(token string) Option {
 	}
 }
 
+// WithX509Enforcers is an option that allows to define custom certificate
+// modifiers that will be processed just before the signing of the certificate.
+func WithX509Enforcers(ces ...provisioner.CertificateEnforcer) Option {
+	return func(a *Authority) error {
+		a.x509Enforcers = ces
+		return nil
+	}
+}
+
 func readCertificateBundle(pemCerts []byte) ([]*x509.Certificate, error) {
 	var block *pem.Block
 	var certs []*x509.Certificate
