@@ -158,7 +158,7 @@ func getCertificateAndChain(certb certutil.CertBundle) (*Certificate, error) {
 	chains := append(certb.CAChain, []string{certb.Certificate}...)
 	for _, chain := range chains {
 		for _, cert := range parseCertificates(chain) {
-			if used[cert.SerialNumber.String()] == true {
+			if used[cert.SerialNumber.String()] {
 				continue
 			}
 			used[cert.SerialNumber.String()] = true
@@ -231,15 +231,8 @@ func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.
 	}
 
 	var certBundle certutil.CertBundle
-
-	secretData, err := json.Marshal(secret.Data)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = json.Unmarshal(secretData, &certBundle)
-	if err != nil {
-		return nil, nil, err
+	if err := unmarshalMap(secret.Data, &certBundle); err != nil {
+		return nil, nil, errors.Wrap(err, "error unmarshaling cert bundle")
 	}
 
 	cert, err := getCertificateAndChain(certBundle)
@@ -339,15 +332,8 @@ func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityReq
 	}
 
 	var certBundle certutil.CertBundle
-
-	secretData, err := json.Marshal(secret.Data)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(secretData, &certBundle)
-	if err != nil {
-		return nil, err
+	if err := unmarshalMap(secret.Data, &certBundle); err != nil {
+		return nil, errors.Wrap(err, "error unmarshaling cert bundle")
 	}
 
 	cert, err := getCertificateAndChain(certBundle)
@@ -406,4 +392,13 @@ func (v *VaultCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv
 		Certificate:      req.Certificate,
 		CertificateChain: nil,
 	}, nil
+}
+
+func unmarshalMap(m map[string]interface{}, v interface{}) error {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(b, v)
 }
