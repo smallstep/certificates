@@ -1,7 +1,6 @@
 package vaultcas
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/x509"
@@ -162,12 +161,12 @@ func getCertificateAndChain(certb certutil.CertBundle) (*Certificate, error) {
 				continue
 			}
 			used[cert.SerialNumber.String()] = true
-			if cert.IsCA && bytes.Equal(cert.RawIssuer, cert.RawSubject) {
+			if isRoot(cert) {
 				root = cert
-			} else if !cert.IsCA {
-				leaf = cert
-			} else {
+			} else if cert.BasicConstraintsValid && cert.IsCA {
 				intermediates = append(intermediates, cert)
+			} else {
+				leaf = cert
 			}
 		}
 	}
@@ -401,4 +400,12 @@ func unmarshalMap(m map[string]interface{}, v interface{}) error {
 	}
 
 	return json.Unmarshal(b, v)
+}
+
+// isRoot returns true if the given certificate is a root certificate.
+func isRoot(cert *x509.Certificate) bool {
+	if cert.BasicConstraintsValid && cert.IsCA {
+		return cert.CheckSignatureFrom(cert) == nil
+	}
+	return false
 }
