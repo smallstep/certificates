@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 - IPv6 addresses are normalized as IP addresses instead of hostnames.
 - More descriptive JWK decryption error message.
+- Make the X5C leaf certificate available to the templates using `{{ .AuthorizationCrt }}`.
 ### Deprecated
 ### Removed
 ### Fixed
