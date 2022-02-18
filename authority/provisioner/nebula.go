@@ -139,9 +139,9 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 		data.SetToken(v)
 	}
 
-	// The Nebula certificate will be available using the template variable Crt.
-	// For example {{ .AuthorizationCrt.Details.Groups }} can be used to get all
-	// the groups.
+	// The Nebula certificate will be available using the template variable
+	// AuthorizationCrt. For example {{ .AuthorizationCrt.Details.Groups }} can
+	// be used to get all the groups.
 	data.SetAuthorizationCertificate(crt)
 
 	templateOptions, err := TemplateOptions(p.Options, data)
