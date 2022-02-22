@@ -58,7 +58,7 @@ func TestError_UnmarshalJSON(t *testing.T) {
 				t.Errorf("Error.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !reflect.DeepEqual(tt.expected, e) {
-				t.Errorf("Error.UnmarshalJSON() wants = %v, got %v", tt.expected, e)
+				t.Errorf("Error.UnmarshalJSON() wants = %+v, got %+v", tt.expected, e)
 			}
 		})
 	}

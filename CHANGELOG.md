@@ -4,15 +4,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased - 0.18.1] - DATE
+## [Unreleased - 0.18.2] - DATE
 ### Added
-- Support for ACME revocation.
-- Replace hash function with an RSA SSH CA to "rsa-sha2-256".
 ### Changed
+- IPv6 addresses are normalized as IP addresses instead of hostnames.
+- More descriptive JWK decryption error message.
+- Make the X5C leaf certificate available to the templates using `{{ .AuthorizationCrt }}`.
 ### Deprecated
 ### Removed
 ### Fixed
 ### Security
+
+## [0.18.1] - 2022-02-03
+### Added
+- Support for ACME revocation.
+- Replace hash function with an RSA SSH CA to "rsa-sha2-256".
+- Support Nebula provisioners.
+- Example Ansible configurations.
+- Support PKCS#11 as a decrypter, as used by SCEP.
+### Changed
+- Automatically create database directory on `step ca init`.
+- Slightly improve errors reported when a template has invalid content.
+- Error reporting in logs and to clients.
+### Fixed
+- SCEP renewal using HTTPS on macOS.
 
 ## [0.18.0] - 2021-11-17
 ### Added

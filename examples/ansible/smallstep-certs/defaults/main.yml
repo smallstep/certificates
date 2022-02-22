@@ -1,0 +1,18 @@
+
+
+
+# Root cert for each will be saved in /etc/ssl/smallstep/ca/{{ ca_name }}/certs/root_ca.crt
+smallstep_root_certs: []
+#  -
+#    ca_name: your_ca
+#    ca_url: "https://certs.your_ca.ca.smallstep.com"
+#    ca_fingerprint: "56092...2200"
+
+# Each leaf cert will be saved in /etc/ssl/smallstep/leaf/{{ cert_subject }}/{{ cert_subject }}.crt|key
+smallstep_leaf_certs: []
+#  -
+#    ca_name: your_ca
+#    cert_subject: "{{ inventory_hostname }}"
+#    provisioner_name: "admin"
+#    provisioner_password: "{{ smallstep_ssh_provisioner_password }}"
+

@@ -144,7 +144,7 @@ $ step-ca $STEPPATH/config/ca.json --password-file ./password.txt
 '''`
 	app.Flags = append(app.Flags, commands.AppCommand.Flags...)
 	app.Flags = append(app.Flags, cli.HelpFlag)
-	app.Copyright = "(c) 2018-2020 Smallstep Labs, Inc."
+	app.Copyright = fmt.Sprintf("(c) 2018-%d Smallstep Labs, Inc.", time.Now().Year())
 
 	// All non-successful output should be written to stderr
 	app.Writer = os.Stdout

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/admin"
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
@@ -38,6 +37,19 @@ type AdminClient struct {
 	x5cCert     *x509.Certificate
 	x5cIssuer   string
 	x5cSubject  string
+}
+
+// AdminClientError is the client side representation of an
+// AdminError returned by the CA.
+type AdminClientError struct {
+	Type    string `json:"type"`
+	Detail  string `json:"detail"`
+	Message string `json:"message"`
+}
+
+// Error returns the AdminClientError message as the error message
+func (e *AdminClientError) Error() string {
+	return e.Message
 }
 
 // NewAdminClient creates a new AdminClient with the given endpoint and options.
@@ -670,9 +682,9 @@ retry:
 func readAdminError(r io.ReadCloser) error {
 	// TODO: not all errors can be read (i.e. 404); seems to be a bigger issue
 	defer r.Close()
-	adminErr := new(admin.Error)
+	adminErr := new(AdminClientError)
 	if err := json.NewDecoder(r).Decode(adminErr); err != nil {
 		return err
 	}
-	return errors.New(adminErr.Message)
+	return adminErr
 }

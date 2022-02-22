@@ -155,11 +155,11 @@ func (p *Provisioner) SSHToken(certType, keyID string, principals []string) (str
 func decryptProvisionerJWK(encryptedKey string, password []byte) (*jose.JSONWebKey, error) {
 	enc, err := jose.ParseEncrypted(encryptedKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error parsing provisioner encrypted key")
 	}
 	data, err := enc.Decrypt(password)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error decrypting provisioner key with provided password")
 	}
 	jwk := new(jose.JSONWebKey)
 	if err := json.Unmarshal(data, jwk); err != nil {
