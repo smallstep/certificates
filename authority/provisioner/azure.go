@@ -89,6 +89,8 @@ type Azure struct {
 	Name                   string   `json:"name"`
 	TenantID               string   `json:"tenantID"`
 	ResourceGroups         []string `json:"resourceGroups"`
+	SubscriptionIDs        []string `json:"subscriptionIDs"`
+	AadObjectIDs           []string `json:"aadObjectIDs"`
 	Audience               string   `json:"audience,omitempty"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
@@ -224,14 +226,14 @@ func (p *Azure) Init(config Config) (err error) {
 	return nil
 }
 
-// authorizeToken returns the claims, name, group, error.
-func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, error) {
+// authorizeToken returns the claims, name, group, subscription, identityObjectID, error.
+func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, string, string, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
-		return nil, "", "", errs.Wrap(http.StatusUnauthorized, err, "azure.authorizeToken; error parsing azure token")
+		return nil, "", "", "", "", errs.Wrap(http.StatusUnauthorized, err, "azure.authorizeToken; error parsing azure token")
 	}
 	if len(jwt.Headers) == 0 {
-		return nil, "", "", errs.Unauthorized("azure.authorizeToken; azure token missing header")
+		return nil, "", "", "", "", errs.Unauthorized("azure.authorizeToken; azure token missing header")
 	}
 
 	var found bool
@@ -244,7 +246,7 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, err
 		}
 	}
 	if !found {
-		return nil, "", "", errs.Unauthorized("azure.authorizeToken; cannot validate azure token")
+		return nil, "", "", "", "", errs.Unauthorized("azure.authorizeToken; cannot validate azure token")
 	}
 
 	if err := claims.ValidateWithLeeway(jose.Expected{
@@ -252,26 +254,27 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, err
 		Issuer:   p.oidcConfig.Issuer,
 		Time:     time.Now(),
 	}, 1*time.Minute); err != nil {
-		return nil, "", "", errs.Wrap(http.StatusUnauthorized, err, "azure.authorizeToken; failed to validate azure token payload")
+		return nil, "", "", "", "", errs.Wrap(http.StatusUnauthorized, err, "azure.authorizeToken; failed to validate azure token payload")
 	}
 
 	// Validate TenantID
 	if claims.TenantID != p.TenantID {
-		return nil, "", "", errs.Unauthorized("azure.authorizeToken; azure token validation failed - invalid tenant id claim (tid)")
+		return nil, "", "", "", "", errs.Unauthorized("azure.authorizeToken; azure token validation failed - invalid tenant id claim (tid)")
 	}
 
 	re := azureXMSMirIDRegExp.FindStringSubmatch(claims.XMSMirID)
 	if len(re) != 4 {
-		return nil, "", "", errs.Unauthorized("azure.authorizeToken; error parsing xms_mirid claim - %s", claims.XMSMirID)
+		return nil, "", "", "", "", errs.Unauthorized("azure.authorizeToken; error parsing xms_mirid claim - %s", claims.XMSMirID)
 	}
-	group, name := re[2], re[3]
-	return &claims, name, group, nil
+	identityObjectID := claims.ObjectID
+	subscription, group, name := re[1], re[2], re[3]
+	return &claims, name, group, subscription, identityObjectID, nil
 }
 
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
 func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	_, name, group, err := p.authorizeToken(token)
+	_, name, group, subscription, identityObjectID, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSign")
 	}
@@ -287,6 +290,34 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		}
 		if !found {
 			return nil, errs.Unauthorized("azure.AuthorizeSign; azure token validation failed - invalid resource group")
+		}
+	}
+
+	// Filter by subscription id
+	if len(p.SubscriptionIDs) > 0 {
+		var found bool
+		for _, s := range p.SubscriptionIDs {
+			if s == subscription {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, errs.Unauthorized("azure.AuthorizeSign; azure token validation failed - invalid subscription id")
+		}
+	}
+
+	// Filter by Azure AD identity object id
+	if len(p.AadObjectIDs) > 0 {
+		var found bool
+		for _, i := range p.AadObjectIDs {
+			if i == identityObjectID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, errs.Unauthorized("azure.AuthorizeSign; azure token validation failed - invalid identity object id")
 		}
 	}
 
@@ -348,7 +379,7 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		return nil, errs.Unauthorized("azure.AuthorizeSSHSign; sshCA is disabled for provisioner '%s'", p.GetName())
 	}
 
-	_, name, _, err := p.authorizeToken(token)
+	_, name, _, _, _, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSSHSign")
 	}
