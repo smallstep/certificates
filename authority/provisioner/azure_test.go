@@ -403,7 +403,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	p7, err := generateAzure()
 	assert.FatalError(t, err)
 	p7.TenantID = p1.TenantID
-	p7.AadObjectIDs = []string{"the-oid"}
+	p7.ObjectIDs = []string{"the-oid"}
 	p7.config = p1.config
 	p7.oidcConfig = p1.oidcConfig
 	p7.keyStore = p1.keyStore
@@ -411,7 +411,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	p8, err := generateAzure()
 	assert.FatalError(t, err)
 	p8.TenantID = p1.TenantID
-	p8.AadObjectIDs = []string{"foobarzar"}
+	p8.ObjectIDs = []string{"foobarzar"}
 	p8.config = p1.config
 	p8.oidcConfig = p1.oidcConfig
 	p8.keyStore = p1.keyStore

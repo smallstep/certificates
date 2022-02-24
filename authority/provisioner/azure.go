@@ -90,7 +90,7 @@ type Azure struct {
 	TenantID               string   `json:"tenantID"`
 	ResourceGroups         []string `json:"resourceGroups"`
 	SubscriptionIDs        []string `json:"subscriptionIDs"`
-	AadObjectIDs           []string `json:"aadObjectIDs"`
+	ObjectIDs              []string `json:"ObjectIDs"`
 	Audience               string   `json:"audience,omitempty"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
@@ -308,9 +308,9 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	}
 
 	// Filter by Azure AD identity object id
-	if len(p.AadObjectIDs) > 0 {
+	if len(p.ObjectIDs) > 0 {
 		var found bool
-		for _, i := range p.AadObjectIDs {
+		for _, i := range p.ObjectIDs {
 			if i == identityObjectID {
 				found = true
 				break
