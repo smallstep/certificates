@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Deprecated
 ### Removed
 ### Fixed
+- During provisioner add - validate provisioner configuration before storing to DB.
 ### Security
 
 ## [0.18.1] - 2022-02-03
