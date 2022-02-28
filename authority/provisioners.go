@@ -133,9 +133,18 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 			"provisioner with token ID %s already exists", certProv.GetIDForToken())
 	}
 
+	provisionerConfig, err := a.generateProvisionerConfig(ctx)
+	if err != nil {
+		return admin.WrapErrorISE(err, "error generating provisioner config")
+	}
+
+	if err := certProv.Init(*provisionerConfig); err != nil {
+		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %s", prov.Name)
+	}
+
 	// Store to database -- this will set the ID.
 	if err := a.adminDB.CreateProvisioner(ctx, prov); err != nil {
-		return admin.WrapErrorISE(err, "error creating admin")
+		return admin.WrapErrorISE(err, "error creating provisioner")
 	}
 
 	// We need a new conversion that has the newly set ID.
@@ -143,11 +152,6 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 	if err != nil {
 		return admin.WrapErrorISE(err,
 			"error converting to certificates provisioner from linkedca provisioner")
-	}
-
-	provisionerConfig, err := a.generateProvisionerConfig(ctx)
-	if err != nil {
-		return admin.WrapErrorISE(err, "error generating provisioner config")
 	}
 
 	if err := certProv.Init(*provisionerConfig); err != nil {
