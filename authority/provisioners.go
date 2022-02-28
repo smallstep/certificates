@@ -87,20 +87,20 @@ func (a *Authority) LoadProvisionerByName(name string) (provisioner.Interface, e
 	return p, nil
 }
 
-func (a *Authority) generateProvisionerConfig(ctx context.Context) (*provisioner.Config, error) {
+func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.Config, error) {
 	// Merge global and configuration claims
 	claimer, err := provisioner.NewClaimer(a.config.AuthorityConfig.Claims, config.GlobalProvisionerClaims)
 	if err != nil {
-		return nil, err
+		return provisioner.Config{}, err
 	}
 	// TODO: should we also be combining the ssh federated roots here?
 	// If we rotate ssh roots keys, sshpop provisioner will lose ability to
 	// validate old SSH certificates, unless they are added as federated certs.
 	sshKeys, err := a.GetSSHRoots(ctx)
 	if err != nil {
-		return nil, err
+		return provisioner.Config{}, err
 	}
-	return &provisioner.Config{
+	return provisioner.Config{
 		Claims:    claimer.Claims(),
 		Audiences: a.config.GetAudiences(),
 		DB:        a.db,
@@ -138,7 +138,7 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 		return admin.WrapErrorISE(err, "error generating provisioner config")
 	}
 
-	if err := certProv.Init(*provisionerConfig); err != nil {
+	if err := certProv.Init(provisionerConfig); err != nil {
 		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %s", prov.Name)
 	}
 
@@ -154,7 +154,7 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 			"error converting to certificates provisioner from linkedca provisioner")
 	}
 
-	if err := certProv.Init(*provisionerConfig); err != nil {
+	if err := certProv.Init(provisionerConfig); err != nil {
 		return admin.WrapErrorISE(err, "error initializing provisioner %s", prov.Name)
 	}
 
@@ -183,7 +183,7 @@ func (a *Authority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisio
 		return admin.WrapErrorISE(err, "error generating provisioner config")
 	}
 
-	if err := certProv.Init(*provisionerConfig); err != nil {
+	if err := certProv.Init(provisionerConfig); err != nil {
 		return admin.WrapErrorISE(err, "error initializing provisioner %s", nu.Name)
 	}
 

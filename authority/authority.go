@@ -175,7 +175,7 @@ func (a *Authority) reloadAdminResources(ctx context.Context) error {
 	// Create provisioner collection.
 	provClxn := provisioner.NewCollection(provisionerConfig.Audiences)
 	for _, p := range provList {
-		if err := p.Init(*provisionerConfig); err != nil {
+		if err := p.Init(provisionerConfig); err != nil {
 			return err
 		}
 		if err := provClxn.Store(p); err != nil {
