@@ -90,7 +90,7 @@ type Azure struct {
 	TenantID               string   `json:"tenantID"`
 	ResourceGroups         []string `json:"resourceGroups"`
 	SubscriptionIDs        []string `json:"subscriptionIDs"`
-	ObjectIDs              []string `json:"ObjectIDs"`
+	ObjectIDs              []string `json:"objectIDs"`
 	Audience               string   `json:"audience,omitempty"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`

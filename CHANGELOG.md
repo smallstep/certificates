@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased - 0.18.2] - DATE
 ### Added
+- Added `subscriptionIDs` and `objectIDs` filters to the Azure provisioner.
 ### Changed
 - IPv6 addresses are normalized as IP addresses instead of hostnames.
 - More descriptive JWK decryption error message.
