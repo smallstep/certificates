@@ -4,18 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased - 0.18.2] - DATE
+## [Unreleased - 0.18.3] - DATE
+### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+### Security
+
+## [0.18.2] - 2022-03-01
 ### Added
 - Added `subscriptionIDs` and `objectIDs` filters to the Azure provisioner.
 ### Changed
 - IPv6 addresses are normalized as IP addresses instead of hostnames.
 - More descriptive JWK decryption error message.
 - Make the X5C leaf certificate available to the templates using `{{ .AuthorizationCrt }}`.
-### Deprecated
-### Removed
 ### Fixed
 - During provisioner add - validate provisioner configuration before storing to DB.
-### Security
 
 ## [0.18.1] - 2022-02-03
 ### Added
