@@ -119,7 +119,8 @@ func main() {
 	app.Usage = "an online certificate authority for secure automated certificate management"
 	app.UsageText = `**step-ca** <config> [**--password-file**=<file>]
 [**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]
-[**--issuer-password-file**=<file>] [**--resolver**=<addr>] [**--help**] [**--version**]`
+[**--issuer-password-file**=<file>] [**--resolver**=<addr>] [**--help**]
+[**--version**] [**--context**=<name>]`
 	app.Description = `**step-ca** runs the Step Online Certificate Authority
 (Step CA) using the given configuration.
 See the README.md for more detailed configuration documentation.
@@ -167,6 +168,8 @@ $ step-ca $STEPPATH/config/ca.json --password-file ./password.txt
 		ctx := cli.NewContext(app, set, nil)
 		return commands.AppCommand.Run(ctx)
 	}
+
+	step.SetEnvVar(&commands.AppCommand)
 
 	if err := app.Run(os.Args); err != nil {
 		if os.Getenv("STEPDEBUG") == "1" {

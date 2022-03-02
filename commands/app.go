@@ -15,16 +15,19 @@ import (
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/pki"
 	"github.com/urfave/cli"
+	"go.step.sm/cli-utils/command"
 	"go.step.sm/cli-utils/errs"
+	"go.step.sm/cli-utils/step"
 )
 
 // AppCommand is the action used as the top action.
 var AppCommand = cli.Command{
 	Name:   "start",
-	Action: appAction,
+	Action: command.ActionFunc(appAction),
 	UsageText: `**step-ca** <config> [**--password-file**=<file>]
 [**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]
-[**--issuer-password-file**=<file>] [**--resolver**=<addr>]`,
+[**--issuer-password-file**=<file>] [**--resolver**=<addr>]
+[**--token**=<string>] [**--context**=<name>]`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name: "password-file",
@@ -57,6 +60,10 @@ certificate issuer private key used in the RA mode.`,
 			Usage:  "token used to enable the linked ca.",
 			EnvVar: "STEP_CA_TOKEN",
 		},
+		cli.StringFlag{
+			Name:  "context",
+			Usage: "the context <name> to apply for the given command.",
+		},
 	},
 }
 
@@ -69,15 +76,22 @@ func appAction(ctx *cli.Context) error {
 	resolver := ctx.String("resolver")
 	token := ctx.String("token")
 
-	// If zero cmd line args show help, if >1 cmd line args show error.
-	if ctx.NArg() == 0 {
-		return cli.ShowAppHelp(ctx)
-	}
-	if err := errs.NumberOfArguments(ctx, 1); err != nil {
-		return err
+	var configFile string
+
+	if ctx.IsSet("context") {
+		configFile = step.CaConfigFile()
+	} else {
+		// If zero cmd line args show help, if >1 cmd line args show error.
+		switch ctx.NArg() {
+		case 0:
+			configFile = step.CaConfigFile()
+		case 1:
+			configFile = ctx.Args().Get(0)
+		default:
+			return errs.TooManyArguments(ctx)
+		}
 	}
 
-	configFile := ctx.Args().Get(0)
 	cfg, err := config.LoadConfiguration(configFile)
 	if err != nil {
 		fatal(err)
