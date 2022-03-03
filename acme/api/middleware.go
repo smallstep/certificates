@@ -283,7 +283,7 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 }
 
 // lookupProvisioner loads the provisioner associated with the request.
-// Responsds 404 if the provisioner does not exist.
+// Responds 404 if the provisioner does not exist.
 func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -319,7 +319,7 @@ func (h *Handler) checkPrerequisites(next nextHTTP) nextHTTP {
 			return
 		}
 		if !ok {
-			api.WriteError(w, acme.NewErrorISE("acme provisioner configuration lacks prerequisites"))
+			api.WriteError(w, acme.NewError(acme.ErrorNotImplementedType, "acme provisioner configuration lacks prerequisites"))
 			return
 		}
 		next(w, r.WithContext(ctx))
