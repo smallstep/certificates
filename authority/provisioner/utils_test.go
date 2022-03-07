@@ -994,7 +994,7 @@ func generateAWSToken(p *AWS, sub, iss, aud, accountID, instanceID, privateIP, r
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }
 
-func generateAzureToken(sub, iss, aud, tenantID, subscriptionID, resourceGroup, resourceName string, resourceType string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
+func generateAzureToken(sub, iss, aud, tenantID, subscriptionID, resourceGroup, resourceName, resourceType string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
 	sig, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
 		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID),
