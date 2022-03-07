@@ -30,7 +30,7 @@ const azureDefaultAudience = "https://management.azure.com/"
 
 // azureXMSMirIDRegExp is the regular expression used to parse the xms_mirid claim.
 // Using case insensitive as resourceGroups appears as resourcegroups.
-var azureXMSMirIDRegExp = regexp.MustCompile(`(?i)^/subscriptions/([^/]+)/resourceGroups/([^/]+)/providers/Microsoft.Compute/virtualMachines/([^/]+)$`)
+var azureXMSMirIDRegExp = regexp.MustCompile(`(?i)^/subscriptions/([^/]+)/resourceGroups/([^/]+)/providers/Microsoft.(Compute/virtualMachines|ManagedIdentity/userAssignedIdentities)/([^/]+)$`)
 
 type azureConfig struct {
 	oidcDiscoveryURL string
@@ -260,11 +260,19 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, str
 	}
 
 	re := azureXMSMirIDRegExp.FindStringSubmatch(claims.XMSMirID)
-	if len(re) != 4 {
+	if len(re) != 5 {
 		return nil, "", "", "", "", errs.Unauthorized("azure.authorizeToken; error parsing xms_mirid claim - %s", claims.XMSMirID)
 	}
+
+	var subscription, group, name string
 	identityObjectID := claims.ObjectID
-	subscription, group, name := re[1], re[2], re[3]
+
+	if strings.Contains(claims.XMSMirID, "virtualMachines") {
+		subscription, group, name = re[1], re[2], re[4]
+	} else {
+		// This is not a VM resource ID so we don't have the VM name so set that to the empty string
+		subscription, group, name = re[1], re[2], ""
+	}
 	return &claims, name, group, subscription, identityObjectID, nil
 }
 

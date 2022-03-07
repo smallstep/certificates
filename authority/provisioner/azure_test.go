@@ -95,7 +95,7 @@ func TestAzure_GetIdentityToken(t *testing.T) {
 	assert.FatalError(t, err)
 
 	t1, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 
@@ -237,7 +237,7 @@ func TestAzure_authorizeToken(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			tok, err := generateAzureToken("subject", p.oidcConfig.Issuer, azureDefaultAudience,
-				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 				time.Now(), jwk)
 			assert.FatalError(t, err)
 			return test{
@@ -252,7 +252,7 @@ func TestAzure_authorizeToken(t *testing.T) {
 			assert.FatalError(t, err)
 			defer srv.Close()
 			tok, err := generateAzureToken("subject", "bad-issuer", azureDefaultAudience,
-				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 				time.Now(), &p.keyStore.keySet.Keys[0])
 			assert.FatalError(t, err)
 			return test{
@@ -267,7 +267,7 @@ func TestAzure_authorizeToken(t *testing.T) {
 			assert.FatalError(t, err)
 			defer srv.Close()
 			tok, err := generateAzureToken("subject", p.oidcConfig.Issuer, azureDefaultAudience,
-				"foo", "subscriptionID", "resourceGroup", "virtualMachine",
+				"foo", "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 				time.Now(), &p.keyStore.keySet.Keys[0])
 			assert.FatalError(t, err)
 			return test{
@@ -321,7 +321,7 @@ func TestAzure_authorizeToken(t *testing.T) {
 			assert.FatalError(t, err)
 			defer srv.Close()
 			tok, err := generateAzureToken("subject", p.oidcConfig.Issuer, azureDefaultAudience,
-				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 				time.Now(), &p.keyStore.keySet.Keys[0])
 			assert.FatalError(t, err)
 			return test{
@@ -437,28 +437,28 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	assert.FatalError(t, err)
 
 	t11, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 
 	failIssuer, err := generateAzureToken("subject", "bad-issuer", azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 	failAudience, err := generateAzureToken("subject", p1.oidcConfig.Issuer, "bad-audience",
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 	failExp, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now().Add(-360*time.Second), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 	failNbf, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now().Add(360*time.Second), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 	failKey, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now(), badKey)
 	assert.FatalError(t, err)
 
