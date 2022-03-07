@@ -66,7 +66,9 @@ func New(scepAuth scep.Interface) api.RouterHandler {
 // Route traffic and implement the Router interface.
 func (h *Handler) Route(r api.Router) {
 	getLink := h.Auth.GetLinkExplicit
+	r.MethodFunc(http.MethodGet, getLink("{provisionerName}/{customPath}*", false, nil), h.lookupProvisioner(h.Get))
 	r.MethodFunc(http.MethodGet, getLink("{provisionerName}", false, nil), h.lookupProvisioner(h.Get))
+	r.MethodFunc(http.MethodPost, getLink("{provisionerName}/{customPath}*", false, nil), h.lookupProvisioner(h.Post))
 	r.MethodFunc(http.MethodPost, getLink("{provisionerName}", false, nil), h.lookupProvisioner(h.Post))
 }
 
@@ -191,6 +193,13 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 			return
 		}
 
+		customPathParam := chi.URLParam(r, "customPath")
+		customPath, err := url.PathUnescape(customPathParam)
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+
 		p, err := h.Auth.LoadProvisionerByName(provisionerName)
 		if err != nil {
 			api.WriteError(w, err)
@@ -200,6 +209,12 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 		prov, ok := p.(*provisioner.SCEP)
 		if !ok {
 			api.WriteError(w, errors.New("provisioner must be of type SCEP"))
+			return
+		}
+
+		configuredCustomPath := strings.Trim(prov.CustomPath, "/")
+		if customPath != configuredCustomPath {
+			api.WriteError(w, errors.Errorf("custom path requested '%s' is not the expected path '%s'", customPath, configuredCustomPath))
 			return
 		}
 

@@ -26,10 +26,18 @@ type SCEP struct {
 	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
 	// at https://github.com/mozilla-services/pkcs7/blob/33d05740a3526e382af6395d3513e73d4e66d1cb/encrypt.go#L63
 	// Defaults to 0, being DES-CBC
-	EncryptionAlgorithmIdentifier int      `json:"encryptionAlgorithmIdentifier,omitempty"`
-	Options                       *Options `json:"options,omitempty"`
-	Claims                        *Claims  `json:"claims,omitempty"`
-	claimer                       *Claimer
+	EncryptionAlgorithmIdentifier int `json:"encryptionAlgorithmIdentifier,omitempty"`
+	// CustomPath is used to specify a custom path on which the SCEP provisioner will be made
+	// available. By default a SCEP provisioner is available at
+	// https://<address>:<port>/scep/<provisionerName> and requests performed looking similar
+	// to https://<address>:<port>/scep/<provisionerName>?operations=GetCACert. When CustomPath
+	// is set, the SCEP URL will be https://<address>:<port>/scep/<provisionerName>/<customPath>,
+	// resulting in SCEP clients that expect a specific path, such as "/pkiclient.exe", to be
+	// able to interact with the SCEP provisioner.
+	CustomPath string   `json:"customPath,omitempty"`
+	Options    *Options `json:"options,omitempty"`
+	Claims     *Claims  `json:"claims,omitempty"`
+	claimer    *Claimer
 
 	secretChallengePassword string
 	encryptionAlgorithm     int
