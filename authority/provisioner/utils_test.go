@@ -671,7 +671,7 @@ func generateAzureWithServer() (*Azure, *httptest.Server, error) {
 			w.Header().Add("Cache-Control", "max-age=5")
 			writeJSON(w, getPublic(az.keyStore.keySet))
 		case "/metadata/identity/oauth2/token":
-			tok, err := generateAzureToken("subject", issuer, "https://management.azure.com/", az.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", time.Now(), &az.keyStore.keySet.Keys[0])
+			tok, err := generateAzureToken("subject", issuer, "https://management.azure.com/", az.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm", time.Now(), &az.keyStore.keySet.Keys[0])
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			} else {
@@ -1009,13 +1009,19 @@ func generateAWSToken(p *AWS, sub, iss, aud, accountID, instanceID, privateIP, r
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }
 
-func generateAzureToken(sub, iss, aud, tenantID, subscriptionID, resourceGroup, virtualMachine string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
+func generateAzureToken(sub, iss, aud, tenantID, subscriptionID, resourceGroup, resourceName string, resourceType string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
 	sig, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
 		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID),
 	)
 	if err != nil {
 		return "", err
+	}
+	var xmsMirID string
+	if resourceType == "vm" {
+		xmsMirID = fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s", subscriptionID, resourceGroup, resourceName)
+	} else if resourceType == "uai" {
+		xmsMirID = fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s", subscriptionID, resourceGroup, resourceName)
 	}
 
 	claims := azurePayload{
@@ -1034,7 +1040,7 @@ func generateAzureToken(sub, iss, aud, tenantID, subscriptionID, resourceGroup, 
 		ObjectID:         "the-oid",
 		TenantID:         tenantID,
 		Version:          "the-version",
-		XMSMirID:         fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s", subscriptionID, resourceGroup, virtualMachine),
+		XMSMirID:         xmsMirID,
 	}
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }
