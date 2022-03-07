@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -43,6 +44,7 @@ type Handler struct {
 	ca                       acme.CertificateAuthority
 	linker                   Linker
 	validateChallengeOptions *acme.ValidateChallengeOptions
+	prerequisitesChecker     func(ctx context.Context) (bool, error)
 }
 
 // HandlerOptions required to create a new ACME API request handler.
@@ -60,6 +62,9 @@ type HandlerOptions struct {
 	// "acme" is the prefix from which the ACME api is accessed.
 	Prefix string
 	CA     acme.CertificateAuthority
+	// PrerequisitesChecker checks if all prerequisites for serving ACME are
+	// met by the CA configuration.
+	PrerequisitesChecker func(ctx context.Context) (bool, error)
 }
 
 // NewHandler returns a new ACME API handler.
@@ -76,6 +81,13 @@ func NewHandler(ops HandlerOptions) api.RouterHandler {
 	dialer := &net.Dialer{
 		Timeout: 30 * time.Second,
 	}
+	prerequisitesChecker := func(ctx context.Context) (bool, error) {
+		// by default all prerequisites are met
+		return true, nil
+	}
+	if ops.PrerequisitesChecker != nil {
+		prerequisitesChecker = ops.PrerequisitesChecker
+	}
 	return &Handler{
 		ca:       ops.CA,
 		db:       ops.DB,
@@ -88,6 +100,7 @@ func NewHandler(ops HandlerOptions) api.RouterHandler {
 				return tls.DialWithDialer(dialer, network, addr, config)
 			},
 		},
+		prerequisitesChecker: prerequisitesChecker,
 	}
 }
 
@@ -95,13 +108,13 @@ func NewHandler(ops HandlerOptions) api.RouterHandler {
 func (h *Handler) Route(r api.Router) {
 	getPath := h.linker.GetUnescapedPathSuffix
 	// Standard ACME API
-	r.MethodFunc("GET", getPath(NewNonceLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.GetNonce)))))
-	r.MethodFunc("HEAD", getPath(NewNonceLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.GetNonce)))))
-	r.MethodFunc("GET", getPath(DirectoryLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.GetDirectory)))
-	r.MethodFunc("HEAD", getPath(DirectoryLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.GetDirectory)))
+	r.MethodFunc("GET", getPath(NewNonceLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.checkPrerequisites(h.addNonce(h.addDirLink(h.GetNonce))))))
+	r.MethodFunc("HEAD", getPath(NewNonceLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.checkPrerequisites(h.addNonce(h.addDirLink(h.GetNonce))))))
+	r.MethodFunc("GET", getPath(DirectoryLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.checkPrerequisites(h.GetDirectory))))
+	r.MethodFunc("HEAD", getPath(DirectoryLinkType, "{provisionerID}"), h.baseURLFromRequest(h.lookupProvisioner(h.checkPrerequisites(h.GetDirectory))))
 
 	validatingMiddleware := func(next nextHTTP) nextHTTP {
-		return h.baseURLFromRequest(h.lookupProvisioner(h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(h.validateJWS(next)))))))
+		return h.baseURLFromRequest(h.lookupProvisioner(h.checkPrerequisites(h.addNonce(h.addDirLink(h.verifyContentType(h.parseJWS(h.validateJWS(next))))))))
 	}
 	extractPayloadByJWK := func(next nextHTTP) nextHTTP {
 		return validatingMiddleware(h.extractJWK(h.verifyAndExtractJWSPayload(next)))

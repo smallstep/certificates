@@ -287,7 +287,6 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-
 		nameEscaped := chi.URLParam(r, "provisionerID")
 		name, err := url.PathUnescape(nameEscaped)
 		if err != nil {
@@ -305,6 +304,24 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 			return
 		}
 		ctx = context.WithValue(ctx, provisionerContextKey, acme.Provisioner(acmeProv))
+		next(w, r.WithContext(ctx))
+	}
+}
+
+// checkPrerequisites checks if all prerequisites for serving ACME
+// are met by the CA configuration.
+func (h *Handler) checkPrerequisites(next nextHTTP) nextHTTP {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		ok, err := h.prerequisitesChecker(ctx)
+		if err != nil {
+			api.WriteError(w, acme.WrapErrorISE(err, "error checking acme provisioner prerequisites"))
+			return
+		}
+		if !ok {
+			api.WriteError(w, acme.NewError(acme.ErrorNotImplementedType, "acme provisioner configuration lacks prerequisites"))
+			return
+		}
 		next(w, r.WithContext(ctx))
 	}
 }

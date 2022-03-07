@@ -333,7 +333,7 @@ func TestAzure_authorizeToken(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if claims, name, group, err := tc.p.authorizeToken(tc.token); err != nil {
+			if claims, name, group, subscriptionID, objectID, err := tc.p.authorizeToken(tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
 					sc, ok := err.(errs.StatusCoder)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
@@ -348,6 +348,8 @@ func TestAzure_authorizeToken(t *testing.T) {
 
 					assert.Equals(t, name, "virtualMachine")
 					assert.Equals(t, group, "resourceGroup")
+					assert.Equals(t, subscriptionID, "subscriptionID")
+					assert.Equals(t, objectID, "the-oid")
 				}
 			}
 		})
@@ -382,6 +384,38 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	p4.oidcConfig = p1.oidcConfig
 	p4.keyStore = p1.keyStore
 
+	p5, err := generateAzure()
+	assert.FatalError(t, err)
+	p5.TenantID = p1.TenantID
+	p5.SubscriptionIDs = []string{"subscriptionID"}
+	p5.config = p1.config
+	p5.oidcConfig = p1.oidcConfig
+	p5.keyStore = p1.keyStore
+
+	p6, err := generateAzure()
+	assert.FatalError(t, err)
+	p6.TenantID = p1.TenantID
+	p6.SubscriptionIDs = []string{"foobarzar"}
+	p6.config = p1.config
+	p6.oidcConfig = p1.oidcConfig
+	p6.keyStore = p1.keyStore
+
+	p7, err := generateAzure()
+	assert.FatalError(t, err)
+	p7.TenantID = p1.TenantID
+	p7.ObjectIDs = []string{"the-oid"}
+	p7.config = p1.config
+	p7.oidcConfig = p1.oidcConfig
+	p7.keyStore = p1.keyStore
+
+	p8, err := generateAzure()
+	assert.FatalError(t, err)
+	p8.TenantID = p1.TenantID
+	p8.ObjectIDs = []string{"foobarzar"}
+	p8.config = p1.config
+	p8.oidcConfig = p1.oidcConfig
+	p8.keyStore = p1.keyStore
+
 	badKey, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 
@@ -392,6 +426,14 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	t3, err := p3.GetIdentityToken("subject", "caURL")
 	assert.FatalError(t, err)
 	t4, err := p4.GetIdentityToken("subject", "caURL")
+	assert.FatalError(t, err)
+	t5, err := p5.GetIdentityToken("subject", "caURL")
+	assert.FatalError(t, err)
+	t6, err := p6.GetIdentityToken("subject", "caURL")
+	assert.FatalError(t, err)
+	t7, err := p6.GetIdentityToken("subject", "caURL")
+	assert.FatalError(t, err)
+	t8, err := p6.GetIdentityToken("subject", "caURL")
 	assert.FatalError(t, err)
 
 	t11, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
@@ -434,8 +476,12 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 		{"ok", p1, args{t1}, 6, http.StatusOK, false},
 		{"ok", p2, args{t2}, 11, http.StatusOK, false},
 		{"ok", p1, args{t11}, 6, http.StatusOK, false},
+		{"ok", p5, args{t5}, 6, http.StatusOK, false},
+		{"ok", p7, args{t7}, 6, http.StatusOK, false},
 		{"fail tenant", p3, args{t3}, 0, http.StatusUnauthorized, true},
 		{"fail resource group", p4, args{t4}, 0, http.StatusUnauthorized, true},
+		{"fail subscription", p6, args{t6}, 0, http.StatusUnauthorized, true},
+		{"fail object id", p8, args{t8}, 0, http.StatusUnauthorized, true},
 		{"fail token", p1, args{"token"}, 0, http.StatusUnauthorized, true},
 		{"fail issuer", p1, args{failIssuer}, 0, http.StatusUnauthorized, true},
 		{"fail audience", p1, args{failAudience}, 0, http.StatusUnauthorized, true},
