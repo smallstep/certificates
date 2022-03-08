@@ -90,8 +90,6 @@ func (p *ACME) Init(config Config) (err error) {
 	}
 
 	// Initialize the x509 allow/deny policy engine
-	// TODO(hs): ensure no race conditions happen when reloading settings and requesting certs?
-	// TODO(hs): implement memoization strategy, so that reloading is not required when no changes were made to allow/deny?
 	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
 		return err
 	}
@@ -115,20 +113,22 @@ type ACMEIdentifier struct {
 	Value string
 }
 
-// AuthorizeOrderIdentifiers verifies the provisioner is authorized to issue a
-// certificate for the Identifiers provided in an Order.
-func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier string) error {
+// AuthorizeOrderIdentifier verifies the provisioner is allowed to issue a
+// certificate for an ACME Order Identifier.
+func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIdentifier) error {
 
+	// identifier is allowed if no policy is configured
 	if p.x509Policy == nil {
 		return nil
 	}
 
 	// assuming only valid identifiers (IP or DNS) are provided
 	var err error
-	if ip := net.ParseIP(identifier); ip != nil {
-		_, err = p.x509Policy.IsIPAllowed(ip)
-	} else {
-		_, err = p.x509Policy.IsDNSAllowed(identifier)
+	switch identifier.Type {
+	case IP:
+		_, err = p.x509Policy.IsIPAllowed(net.ParseIP(identifier.Value))
+	case DNS:
+		_, err = p.x509Policy.IsDNSAllowed(identifier.Value)
 	}
 
 	return err

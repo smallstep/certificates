@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/randutil"
 )
 
@@ -107,7 +108,8 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 
 	for _, identifier := range nor.Identifiers {
 		// TODO: gather all errors, so that we can build subproblems; include the nor.Validate() error here too, like in example?
-		err = prov.AuthorizeOrderIdentifier(ctx, identifier.Value)
+		orderIdentifier := provisioner.ACMEIdentifier{Type: provisioner.ACMEIdentifierType(identifier.Type), Value: identifier.Value}
+		err = prov.AuthorizeOrderIdentifier(ctx, orderIdentifier)
 		if err != nil {
 			api.WriteError(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return

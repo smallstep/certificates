@@ -30,7 +30,7 @@ var clock Clock
 // Provisioner is an interface that implements a subset of the provisioner.Interface --
 // only those methods required by the ACME api/authority.
 type Provisioner interface {
-	AuthorizeOrderIdentifier(ctx context.Context, identifier string) error
+	AuthorizeOrderIdentifier(ctx context.Context, identifier provisioner.ACMEIdentifier) error
 	AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error)
 	AuthorizeRevoke(ctx context.Context, token string) error
 	GetID() string
@@ -45,7 +45,7 @@ type MockProvisioner struct {
 	Merr                      error
 	MgetID                    func() string
 	MgetName                  func() string
-	MauthorizeOrderIdentifier func(ctx context.Context, identifier string) error
+	MauthorizeOrderIdentifier func(ctx context.Context, identifier provisioner.ACMEIdentifier) error
 	MauthorizeSign            func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	MauthorizeRevoke          func(ctx context.Context, token string) error
 	MdefaultTLSCertDuration   func() time.Duration
@@ -61,7 +61,7 @@ func (m *MockProvisioner) GetName() string {
 }
 
 // AuthorizeOrderIdentifiers mock
-func (m *MockProvisioner) AuthorizeOrderIdentifier(ctx context.Context, identifier string) error {
+func (m *MockProvisioner) AuthorizeOrderIdentifier(ctx context.Context, identifier provisioner.ACMEIdentifier) error {
 	if m.MauthorizeOrderIdentifier != nil {
 		return m.MauthorizeOrderIdentifier(ctx, identifier)
 	}
