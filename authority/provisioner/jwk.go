@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
@@ -37,9 +38,9 @@ type JWK struct {
 	Options       *Options         `json:"options,omitempty"`
 	claimer       *Claimer
 	audiences     Audiences
-	x509Policy    x509PolicyEngine
-	sshHostPolicy *hostPolicyEngine
-	sshUserPolicy *userPolicyEngine
+	x509Policy    policy.X509Policy
+	sshHostPolicy policy.HostPolicy
+	sshUserPolicy policy.UserPolicy
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -107,17 +108,17 @@ func (p *JWK) Init(config Config) (err error) {
 	}
 
 	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine for user certificates
-	if p.sshUserPolicy, err = newSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	if p.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine for host certificates
-	if p.sshHostPolicy, err = newSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	if p.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 

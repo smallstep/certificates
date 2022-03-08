@@ -191,6 +191,25 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
+	// If a policy is configured, perform allow/deny policy check on authority level
+	if a.x509Policy != nil {
+		allowed, err := a.x509Policy.AreCertificateNamesAllowed(leaf)
+		if err != nil {
+			return nil, errs.InternalServerErr(err,
+				errs.WithKeyVal("csr", csr),
+				errs.WithKeyVal("signOptions", signOpts),
+				errs.WithMessage("error creating certificate"),
+			)
+		}
+		if !allowed {
+			// TODO: include SANs in error message?
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(errors.New("authority not allowed to sign"), "error creating certificate"),
+				opts...,
+			)
+		}
+	}
+
 	// Sign certificate
 	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{

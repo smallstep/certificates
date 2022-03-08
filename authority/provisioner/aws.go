@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
@@ -267,8 +268,8 @@ type AWS struct {
 	claimer                *Claimer
 	config                 *awsConfig
 	audiences              Audiences
-	x509Policy             x509PolicyEngine
-	sshHostPolicy          *hostPolicyEngine
+	x509Policy             policy.X509Policy
+	sshHostPolicy          policy.HostPolicy
 }
 
 // GetID returns the provisioner unique identifier.
@@ -428,12 +429,12 @@ func (p *AWS) Init(config Config) (err error) {
 	}
 
 	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine for host certificates
-	if p.sshHostPolicy, err = newSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	if p.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 

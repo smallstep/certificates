@@ -16,6 +16,7 @@ import (
 	adminDBNosql "github.com/smallstep/certificates/authority/admin/db/nosql"
 	"github.com/smallstep/certificates/authority/administrator"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
@@ -74,6 +75,11 @@ type Authority struct {
 	sshCheckHostFunc func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
 	sshGetHostsFunc  func(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)
 	getIdentityFunc  provisioner.GetIdentityFunc
+
+	// Policy engines
+	x509Policy    policy.X509Policy
+	sshUserPolicy policy.UserPolicy
+	sshHostPolicy policy.HostPolicy
 
 	adminMutex sync.RWMutex
 }
@@ -537,6 +543,21 @@ func (a *Authority) init() error {
 			a.templates.Data = make(map[string]interface{})
 		}
 		a.templates.Data["Step"] = tmplVars
+	}
+
+	// Initialize the x509 allow/deny policy engine
+	if a.x509Policy, err = policy.NewX509PolicyEngine(a.config.AuthorityConfig.Policy.GetX509Options()); err != nil {
+		return err
+	}
+
+	// // Initialize the SSH allow/deny policy engine for host certificates
+	if a.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(a.config.AuthorityConfig.Policy.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	// // Initialize the SSH allow/deny policy engine for user certificates
+	if a.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(a.config.AuthorityConfig.Policy.GetSSHOptions()); err != nil {
+		return err
 	}
 
 	// JWT numeric dates are seconds.

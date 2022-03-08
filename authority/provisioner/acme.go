@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/policy"
 )
 
 // ACME is the acme provisioner type, an entity that can authorize the ACME
@@ -27,7 +27,7 @@ type ACME struct {
 	Claims     *Claims  `json:"claims,omitempty"`
 	Options    *Options `json:"options,omitempty"`
 	claimer    *Claimer
-	x509Policy policy.X509NamePolicyEngine
+	x509Policy policy.X509Policy
 }
 
 // GetID returns the provisioner unique identifier.
@@ -92,7 +92,7 @@ func (p *ACME) Init(config Config) (err error) {
 	// Initialize the x509 allow/deny policy engine
 	// TODO(hs): ensure no race conditions happen when reloading settings and requesting certs?
 	// TODO(hs): implement memoization strategy, so that reloading is not required when no changes were made to allow/deny?
-	if p.x509Policy, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
 		return err
 	}
 

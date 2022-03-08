@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
@@ -94,9 +95,9 @@ type OIDC struct {
 	keyStore              *keyStore
 	claimer               *Claimer
 	getIdentityFunc       GetIdentityFunc
-	x509Policy            x509PolicyEngine
-	sshHostPolicy         *hostPolicyEngine
-	sshUserPolicy         *userPolicyEngine
+	x509Policy            policy.X509Policy
+	sshHostPolicy         policy.HostPolicy
+	sshUserPolicy         policy.UserPolicy
 }
 
 func sanitizeEmail(email string) string {
@@ -212,17 +213,17 @@ func (o *OIDC) Init(config Config) (err error) {
 	}
 
 	// Initialize the x509 allow/deny policy engine
-	if o.x509Policy, err = newX509PolicyEngine(o.Options.GetX509Options()); err != nil {
+	if o.x509Policy, err = policy.NewX509PolicyEngine(o.Options.GetX509Options()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine for user certificates
-	if o.sshUserPolicy, err = newSSHUserPolicyEngine(o.Options.GetSSHOptions()); err != nil {
+	if o.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(o.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine for host certificates
-	if o.sshHostPolicy, err = newSSHHostPolicyEngine(o.Options.GetSSHOptions()); err != nil {
+	if o.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(o.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 

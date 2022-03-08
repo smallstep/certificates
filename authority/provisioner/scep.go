@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/policy"
+	"github.com/smallstep/certificates/authority/policy"
 )
 
 // SCEP is the SCEP provisioner type, an entity that can authorize the
@@ -31,7 +31,7 @@ type SCEP struct {
 	Options                       *Options `json:"options,omitempty"`
 	Claims                        *Claims  `json:"claims,omitempty"`
 	claimer                       *Claimer
-	x509Policy                    policy.X509NamePolicyEngine
+	x509Policy                    policy.X509Policy
 	secretChallengePassword       string
 	encryptionAlgorithm           int
 }
@@ -116,7 +116,7 @@ func (s *SCEP) Init(config Config) (err error) {
 	// TODO: add other, SCEP specific, options?
 
 	// Initialize the x509 allow/deny policy engine
-	if s.x509Policy, err = newX509PolicyEngine(s.Options.GetX509Options()); err != nil {
+	if s.x509Policy, err = policy.NewX509PolicyEngine(s.Options.GetX509Options()); err != nil {
 		return err
 	}
 
