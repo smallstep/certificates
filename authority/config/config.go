@@ -26,23 +26,26 @@ var (
 	DefaultBackdate = time.Minute
 	// DefaultDisableRenewal disables renewals per provisioner.
 	DefaultDisableRenewal = false
+	// DefaultEnableRenewAfterExpiry enables renewals even when the certificate is expired.
+	DefaultEnableRenewAfterExpiry = false
 	// DefaultEnableSSHCA enable SSH CA features per provisioner or globally
 	// for all provisioners.
 	DefaultEnableSSHCA = false
 	// GlobalProvisionerClaims default claims for the Authority. Can be overridden
 	// by provisioner specific claims.
 	GlobalProvisionerClaims = provisioner.Claims{
-		MinTLSDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
-		MaxTLSDur:         &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultTLSDur:     &provisioner.Duration{Duration: 24 * time.Hour},
-		DisableRenewal:    &DefaultDisableRenewal,
-		MinUserSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
-		MaxUserSSHDur:     &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultUserSSHDur: &provisioner.Duration{Duration: 16 * time.Hour},
-		MinHostSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
-		MaxHostSSHDur:     &provisioner.Duration{Duration: 30 * 24 * time.Hour},
-		DefaultHostSSHDur: &provisioner.Duration{Duration: 30 * 24 * time.Hour},
-		EnableSSHCA:       &DefaultEnableSSHCA,
+		MinTLSDur:              &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
+		MaxTLSDur:              &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:          &provisioner.Duration{Duration: 24 * time.Hour},
+		MinUserSSHDur:          &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:          &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur:      &provisioner.Duration{Duration: 16 * time.Hour},
+		MinHostSSHDur:          &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:          &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur:      &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:            &DefaultEnableSSHCA,
+		DisableRenewal:         &DefaultDisableRenewal,
+		EnableRenewAfterExpiry: &DefaultEnableRenewAfterExpiry,
 	}
 )
 
