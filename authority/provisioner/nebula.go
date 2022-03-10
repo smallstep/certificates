@@ -260,10 +260,7 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 
 // AuthorizeRenew returns an error if the renewal is disabled.
 func (p *Nebula) AuthorizeRenew(ctx context.Context, crt *x509.Certificate) error {
-	if p.ctl.Claimer.IsDisableRenewal() {
-		return errs.Unauthorized("renew is disabled for nebula provisioner '%s'", p.GetName())
-	}
-	return nil
+	return p.ctl.AuthorizeRenew(ctx, crt)
 }
 
 // AuthorizeRevoke returns an error if the token is not valid.

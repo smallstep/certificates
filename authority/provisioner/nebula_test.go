@@ -549,6 +549,8 @@ func TestNebula_AuthorizeSSHSign(t *testing.T) {
 
 func TestNebula_AuthorizeRenew(t *testing.T) {
 	ctx := context.TODO()
+	now := time.Now().Truncate(time.Second)
+
 	// Ok provisioner
 	p, _, _ := mustNebulaProvisioner(t)
 
@@ -567,8 +569,14 @@ func TestNebula_AuthorizeRenew(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", p, args{ctx, &x509.Certificate{}}, false},
-		{"fail disabled", pDisabled, args{ctx, &x509.Certificate{}}, true},
+		{"ok", p, args{ctx, &x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, false},
+		{"fail disabled", pDisabled, args{ctx, &x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
