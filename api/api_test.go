@@ -13,6 +13,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -34,6 +35,7 @@ import (
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/templates"
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -920,32 +922,104 @@ func Test_caHandler_Renew(t *testing.T) {
 	cs := &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{parseCertificate(certPEM)},
 	}
+
+	// Prepare root and leaf for renew after expiry test.
+	now := time.Now()
+	rootPub, rootPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafPub, leafPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := &x509.Certificate{
+		Subject:               pkix.Name{CommonName: "Test Root CA"},
+		PublicKey:             rootPub,
+		KeyUsage:              x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		NotBefore:             now.Add(-2 * time.Hour),
+		NotAfter:              now.Add(time.Hour),
+	}
+	root, err = x509util.CreateCertificate(root, root, rootPub, rootPriv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expiredLeaf := &x509.Certificate{
+		Subject:        pkix.Name{CommonName: "Leaf certificate"},
+		PublicKey:      leafPub,
+		KeyUsage:       x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:    []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		NotBefore:      now.Add(-time.Hour),
+		NotAfter:       now.Add(-time.Minute),
+		EmailAddresses: []string{"test@example.org"},
+	}
+	expiredLeaf, err = x509util.CreateCertificate(expiredLeaf, root, leafPub, rootPriv)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate renew after expiry token
+	so := new(jose.SignerOptions)
+	so.WithType("JWT")
+	so.WithHeader("x5cInsecure", []string{base64.StdEncoding.EncodeToString(expiredLeaf.Raw)})
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.EdDSA, Key: leafPriv}, so)
+	if err != nil {
+		t.Fatal(err)
+	}
+	generateX5cToken := func(claims jose.Claims) string {
+		s, err := jose.Signed(sig).Claims(claims).CompactSerialize()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+
 	tests := []struct {
 		name       string
 		tls        *tls.ConnectionState
+		header     http.Header
 		cert       *x509.Certificate
 		root       *x509.Certificate
 		err        error
 		statusCode int
 	}{
-		{"ok", cs, parseCertificate(certPEM), parseCertificate(rootPEM), nil, http.StatusCreated},
-		{"no tls", nil, nil, nil, nil, http.StatusBadRequest},
-		{"no peer certificates", &tls.ConnectionState{}, nil, nil, nil, http.StatusBadRequest},
-		{"renew error", cs, nil, nil, errs.Forbidden("an error"), http.StatusForbidden},
+		{"ok", cs, nil, parseCertificate(certPEM), parseCertificate(rootPEM), nil, http.StatusCreated},
+		{"ok renew after expiry", &tls.ConnectionState{}, http.Header{
+			"Authorization": []string{"Bearer " + generateX5cToken(jose.Claims{
+				NotBefore: jose.NewNumericDate(now), Expiry: jose.NewNumericDate(now.Add(5 * time.Minute)),
+			})},
+		}, expiredLeaf, root, nil, http.StatusCreated},
+		{"no tls", nil, nil, nil, nil, nil, http.StatusBadRequest},
+		{"no peer certificates", &tls.ConnectionState{}, nil, nil, nil, nil, http.StatusBadRequest},
+		{"renew error", cs, nil, nil, nil, errs.Forbidden("an error"), http.StatusForbidden},
+		{"fail expired token", &tls.ConnectionState{}, http.Header{
+			"Authorization": []string{"Bearer " + generateX5cToken(jose.Claims{
+				NotBefore: jose.NewNumericDate(now.Add(-time.Hour)), Expiry: jose.NewNumericDate(now.Add(-time.Minute)),
+			})},
+		}, expiredLeaf, root, errs.Forbidden("an error"), http.StatusUnauthorized},
+		{"fail invalid root", &tls.ConnectionState{}, http.Header{
+			"Authorization": []string{"Bearer " + generateX5cToken(jose.Claims{
+				NotBefore: jose.NewNumericDate(now.Add(-time.Hour)), Expiry: jose.NewNumericDate(now.Add(-time.Minute)),
+			})},
+		}, expiredLeaf, parseCertificate(rootPEM), errs.Forbidden("an error"), http.StatusUnauthorized},
 	}
-
-	expected := []byte(`{"crt":"` + strings.ReplaceAll(certPEM, "\n", `\n`) + `\n","ca":"` + strings.ReplaceAll(rootPEM, "\n", `\n`) + `\n","certChain":["` + strings.ReplaceAll(certPEM, "\n", `\n`) + `\n","` + strings.ReplaceAll(rootPEM, "\n", `\n`) + `\n"]}`)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.err,
+				getRoots: func() ([]*x509.Certificate, error) {
+					return []*x509.Certificate{tt.root}, nil
+				},
 				getTLSOptions: func() *authority.TLSOptions {
 					return nil
 				},
 			}).(*caHandler)
 			req := httptest.NewRequest("POST", "http://example.com/renew", nil)
 			req.TLS = tt.tls
+			req.Header = tt.header
 			w := httptest.NewRecorder()
 			h.Renew(logging.NewResponseLogger(w), req)
 			res := w.Result()
@@ -960,8 +1034,14 @@ func Test_caHandler_Renew(t *testing.T) {
 				t.Errorf("caHandler.Renew unexpected error = %v", err)
 			}
 			if tt.statusCode < http.StatusBadRequest {
+				expected := []byte(`{"crt":"` + strings.ReplaceAll(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: tt.cert.Raw})), "\n", `\n`) + `",` +
+					`"ca":"` + strings.ReplaceAll(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: tt.root.Raw})), "\n", `\n`) + `",` +
+					`"certChain":["` +
+					strings.ReplaceAll(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: tt.cert.Raw})), "\n", `\n`) + `","` +
+					strings.ReplaceAll(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: tt.root.Raw})), "\n", `\n`) + `"]}`)
+
 				if !bytes.Equal(bytes.TrimSpace(body), expected) {
-					t.Errorf("caHandler.Root Body = %s, wants %s", body, expected)
+					t.Errorf("caHandler.Root Body = \n%s, wants \n%s", body, expected)
 				}
 			}
 		})

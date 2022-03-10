@@ -43,7 +43,7 @@ type Authority interface {
 	GetProvisioners(cursor string, limit int) (provisioner.List, string, error)
 	Revoke(context.Context, *authority.RevokeOptions) error
 	GetEncryptedKey(kid string) (string, error)
-	GetRoots() (federation []*x509.Certificate, err error)
+	GetRoots() ([]*x509.Certificate, error)
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
 }
