@@ -753,6 +753,7 @@ func TestAuthority_Authorize(t *testing.T) {
 
 func TestAuthority_authorizeRenew(t *testing.T) {
 	fooCrt, err := pemutil.ReadCertificate("testdata/certs/foo.crt")
+	fooCrt.NotAfter = time.Now().Add(time.Hour)
 	assert.FatalError(t, err)
 
 	renewDisabledCrt, err := pemutil.ReadCertificate("testdata/certs/renew-disabled.crt")
@@ -822,7 +823,7 @@ func TestAuthority_authorizeRenew(t *testing.T) {
 			return &authorizeTest{
 				auth: a,
 				cert: renewDisabledCrt,
-				err:  errors.New("authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner 'renew_disabled'"),
+				err:  errors.New("authority.authorizeRenew: renew is disabled for provisioner 'renew_disabled'"),
 				code: http.StatusUnauthorized,
 			}
 		},
@@ -909,6 +910,7 @@ func generateSSHToken(sub, iss, aud string, iat time.Time, sshOpts *provisioner.
 }
 
 func createSSHCert(cert *ssh.Certificate, signer ssh.Signer) (*ssh.Certificate, *jose.JSONWebKey, error) {
+	now := time.Now()
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "foo", 0)
 	if err != nil {
 		return nil, nil, err
@@ -916,6 +918,12 @@ func createSSHCert(cert *ssh.Certificate, signer ssh.Signer) (*ssh.Certificate, 
 	cert.Key, err = ssh.NewPublicKey(jwk.Public().Key)
 	if err != nil {
 		return nil, nil, err
+	}
+	if cert.ValidAfter == 0 {
+		cert.ValidAfter = uint64(now.Unix())
+	}
+	if cert.ValidBefore == 0 {
+		cert.ValidBefore = uint64(now.Add(time.Hour).Unix())
 	}
 	if err := cert.SignCert(rand.Reader, signer); err != nil {
 		return nil, nil, err

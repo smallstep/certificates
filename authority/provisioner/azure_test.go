@@ -511,13 +511,13 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, v.CredentialID, tt.azure.TenantID)
 						assert.Len(t, 0, v.KeyValuePairs)
 					case profileDefaultDuration:
-						assert.Equals(t, time.Duration(v), tt.azure.claimer.DefaultTLSCertDuration())
+						assert.Equals(t, time.Duration(v), tt.azure.ctl.Claimer.DefaultTLSCertDuration())
 					case commonNameValidator:
 						assert.Equals(t, string(v), "virtualMachine")
 					case defaultPublicKeyValidator:
 					case *validityValidator:
-						assert.Equals(t, v.min, tt.azure.claimer.MinTLSCertDuration())
-						assert.Equals(t, v.max, tt.azure.claimer.MaxTLSCertDuration())
+						assert.Equals(t, v.min, tt.azure.ctl.Claimer.MinTLSCertDuration())
+						assert.Equals(t, v.max, tt.azure.ctl.Claimer.MaxTLSCertDuration())
 					case ipAddressesValidator:
 						assert.Equals(t, v, nil)
 					case emailAddressesValidator:
@@ -536,6 +536,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 }
 
 func TestAzure_AuthorizeRenew(t *testing.T) {
+	now := time.Now()
 	p1, err := generateAzure()
 	assert.FatalError(t, err)
 	p2, err := generateAzure()
@@ -544,7 +545,7 @@ func TestAzure_AuthorizeRenew(t *testing.T) {
 	// disable renewal
 	disable := true
 	p2.Claims = &Claims{DisableRenewal: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p2.ctl.Claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	type args struct {
@@ -557,8 +558,14 @@ func TestAzure_AuthorizeRenew(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{nil}, http.StatusOK, false},
-		{"fail/renew-disabled", p2, args{nil}, http.StatusUnauthorized, true},
+		{"ok", p1, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusOK, false},
+		{"fail/renew-disabled", p2, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -595,7 +602,7 @@ func TestAzure_AuthorizeSSHSign(t *testing.T) {
 	// disable sshCA
 	disable := false
 	p3.Claims = &Claims{EnableSSHCA: &disable}
-	p3.claimer, err = NewClaimer(p3.Claims, globalProvisionerClaims)
+	p3.ctl.Claimer, err = NewClaimer(p3.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	t1, err := p1.GetIdentityToken("subject", "caURL")
@@ -616,7 +623,7 @@ func TestAzure_AuthorizeSSHSign(t *testing.T) {
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 
-	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	hostDuration := p1.ctl.Claimer.DefaultHostSSHCertDuration()
 	expectedHostOptions := &SignSSHOptions{
 		CertType: "host", Principals: []string{"virtualMachine"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),

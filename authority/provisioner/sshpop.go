@@ -29,8 +29,7 @@ type SSHPOP struct {
 	Type       string  `json:"type"`
 	Name       string  `json:"name"`
 	Claims     *Claims `json:"claims,omitempty"`
-	claimer    *Claimer
-	audiences  Audiences
+	ctl        *Controller
 	sshPubKeys *SSHKeys
 }
 
@@ -83,7 +82,7 @@ func (p *SSHPOP) GetEncryptedKey() (string, string, bool) {
 }
 
 // Init initializes and validates the fields of a SSHPOP type.
-func (p *SSHPOP) Init(config Config) error {
+func (p *SSHPOP) Init(config Config) (err error) {
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -93,15 +92,11 @@ func (p *SSHPOP) Init(config Config) error {
 		return errors.New("provisioner public SSH validation keys cannot be empty")
 	}
 
-	// Update claims with global ones
-	var err error
-	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
-		return err
-	}
-
-	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
 	p.sshPubKeys = config.SSHKeys
-	return nil
+
+	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
+	p.ctl, err = NewController(p, p.Claims, config)
+	return
 }
 
 // authorizeToken performs common jwt authorization actions and returns the
@@ -186,7 +181,7 @@ func (p *SSHPOP) authorizeToken(token string, audiences []string) (*sshPOPPayloa
 // AuthorizeSSHRevoke validates the authorization token and extracts/validates
 // the SSH certificate from the ssh-pop header.
 func (p *SSHPOP) AuthorizeSSHRevoke(ctx context.Context, token string) error {
-	claims, err := p.authorizeToken(token, p.audiences.SSHRevoke)
+	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHRevoke)
 	if err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRevoke")
 	}
@@ -199,22 +194,20 @@ func (p *SSHPOP) AuthorizeSSHRevoke(ctx context.Context, token string) error {
 // AuthorizeSSHRenew validates the authorization token and extracts/validates
 // the SSH certificate from the ssh-pop header.
 func (p *SSHPOP) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {
-	claims, err := p.authorizeToken(token, p.audiences.SSHRenew)
+	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHRenew)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRenew")
 	}
 	if claims.sshCert.CertType != ssh.HostCert {
 		return nil, errs.BadRequest("sshpop certificate must be a host ssh certificate")
 	}
-
-	return claims.sshCert, nil
-
+	return claims.sshCert, p.ctl.AuthorizeSSHRenew(ctx, claims.sshCert)
 }
 
 // AuthorizeSSHRekey validates the authorization token and extracts/validates
 // the SSH certificate from the ssh-pop header.
 func (p *SSHPOP) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error) {
-	claims, err := p.authorizeToken(token, p.audiences.SSHRekey)
+	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHRekey)
 	if err != nil {
 		return nil, nil, errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRekey")
 	}
@@ -225,7 +218,7 @@ func (p *SSHPOP) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Cert
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.ctl.Claimer},
 		// Require and validate all the default fields in the SSH certificate.
 		&sshCertDefaultValidator{},
 	}, nil

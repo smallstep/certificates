@@ -757,7 +757,7 @@ func TestAuthority_Renew(t *testing.T) {
 
 	now := time.Now().UTC()
 	nb1 := now.Add(-time.Minute * 7)
-	na1 := now
+	na1 := now.Add(time.Hour)
 	so := &provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(nb1),
 		NotAfter:  provisioner.NewTimeDuration(na1),
@@ -798,7 +798,7 @@ func TestAuthority_Renew(t *testing.T) {
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner 'dev'"),
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -856,7 +856,7 @@ func TestAuthority_Renew(t *testing.T) {
 
 					expiry := now.Add(time.Minute * 7)
 					assert.True(t, leaf.NotAfter.After(expiry.Add(-2*time.Minute)))
-					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Minute)))
+					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Hour)))
 
 					tmplt := a.config.AuthorityConfig.Template
 					assert.Equals(t, leaf.Subject.String(),
@@ -956,7 +956,7 @@ func TestAuthority_Rekey(t *testing.T) {
 
 	now := time.Now().UTC()
 	nb1 := now.Add(-time.Minute * 7)
-	na1 := now
+	na1 := now.Add(time.Hour)
 	so := &provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(nb1),
 		NotAfter:  provisioner.NewTimeDuration(na1),
@@ -998,7 +998,7 @@ func TestAuthority_Rekey(t *testing.T) {
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner 'dev'"),
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -1063,7 +1063,7 @@ func TestAuthority_Rekey(t *testing.T) {
 
 					expiry := now.Add(time.Minute * 7)
 					assert.True(t, leaf.NotAfter.After(expiry.Add(-2*time.Minute)))
-					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Minute)))
+					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Hour)))
 
 					tmplt := a.config.AuthorityConfig.Template
 					assert.Equals(t, leaf.Subject.String(),

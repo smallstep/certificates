@@ -76,13 +76,13 @@ func TestJWK_Init(t *testing.T) {
 		},
 		"fail-bad-claims": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}, audiences: testAudiences, Claims: &Claims{DefaultTLSDur: &Duration{0}}},
+				p:   &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}, Claims: &Claims{DefaultTLSDur: &Duration{0}}},
 				err: errors.New("claims: MinTLSCertDuration must be greater than 0"),
 			}
 		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p: &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}, audiences: testAudiences},
+				p: &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
 			}
 		},
 	}
@@ -305,13 +305,13 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 							assert.Equals(t, v.CredentialID, tt.prov.Key.KeyID)
 							assert.Len(t, 0, v.KeyValuePairs)
 						case profileDefaultDuration:
-							assert.Equals(t, time.Duration(v), tt.prov.claimer.DefaultTLSCertDuration())
+							assert.Equals(t, time.Duration(v), tt.prov.ctl.Claimer.DefaultTLSCertDuration())
 						case commonNameValidator:
 							assert.Equals(t, string(v), "subject")
 						case defaultPublicKeyValidator:
 						case *validityValidator:
-							assert.Equals(t, v.min, tt.prov.claimer.MinTLSCertDuration())
-							assert.Equals(t, v.max, tt.prov.claimer.MaxTLSCertDuration())
+							assert.Equals(t, v.min, tt.prov.ctl.Claimer.MinTLSCertDuration())
+							assert.Equals(t, v.max, tt.prov.ctl.Claimer.MaxTLSCertDuration())
 						case defaultSANsValidator:
 							assert.Equals(t, []string(v), tt.sans)
 						default:
@@ -325,6 +325,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 }
 
 func TestJWK_AuthorizeRenew(t *testing.T) {
+	now := time.Now()
 	p1, err := generateJWK()
 	assert.FatalError(t, err)
 	p2, err := generateJWK()
@@ -333,7 +334,7 @@ func TestJWK_AuthorizeRenew(t *testing.T) {
 	// disable renewal
 	disable := true
 	p2.Claims = &Claims{DisableRenewal: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p2.ctl.Claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	type args struct {
@@ -346,8 +347,14 @@ func TestJWK_AuthorizeRenew(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{nil}, http.StatusOK, false},
-		{"fail/renew-disabled", p2, args{nil}, http.StatusUnauthorized, true},
+		{"ok", p1, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusOK, false},
+		{"fail/renew-disabled", p2, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -373,7 +380,7 @@ func TestJWK_AuthorizeSSHSign(t *testing.T) {
 	// disable sshCA
 	disable := false
 	p2.Claims = &Claims{EnableSSHCA: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p2.ctl.Claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	jwk, err := decryptJSONWebKey(p1.EncryptedKey)
@@ -402,8 +409,8 @@ func TestJWK_AuthorizeSSHSign(t *testing.T) {
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 
-	userDuration := p1.claimer.DefaultUserSSHCertDuration()
-	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	userDuration := p1.ctl.Claimer.DefaultUserSSHCertDuration()
+	hostDuration := p1.ctl.Claimer.DefaultHostSSHCertDuration()
 	expectedUserOptions := &SignSSHOptions{
 		CertType: "user", Principals: []string{"name"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
@@ -485,8 +492,8 @@ func TestJWK_AuthorizeSign_SSHOptions(t *testing.T) {
 	signer, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 
-	userDuration := p1.claimer.DefaultUserSSHCertDuration()
-	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	userDuration := p1.ctl.Claimer.DefaultUserSSHCertDuration()
+	hostDuration := p1.ctl.Claimer.DefaultHostSSHCertDuration()
 	expectedUserOptions := &SignSSHOptions{
 		CertType: "user", Principals: []string{"name"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),

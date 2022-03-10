@@ -685,7 +685,7 @@ func Test_sshCertDefaultValidator_Valid(t *testing.T) {
 func Test_sshCertValidityValidator(t *testing.T) {
 	p, err := generateX5C(nil)
 	assert.FatalError(t, err)
-	v := sshCertValidityValidator{p.claimer}
+	v := sshCertValidityValidator{p.ctl.Claimer}
 	n := now()
 	tests := []struct {
 		name string
@@ -806,7 +806,7 @@ func Test_sshValidityModifier(t *testing.T) {
 	tests := map[string]func() test{
 		"fail/type-not-set": func() test {
 			return test{
-				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(6 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.ctl.Claimer, NotAfter: n.Add(6 * time.Hour)},
 				cert: &ssh.Certificate{
 					ValidAfter:  uint64(n.Unix()),
 					ValidBefore: uint64(n.Add(8 * time.Hour).Unix()),
@@ -816,7 +816,7 @@ func Test_sshValidityModifier(t *testing.T) {
 		},
 		"fail/type-not-recognized": func() test {
 			return test{
-				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(6 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.ctl.Claimer, NotAfter: n.Add(6 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:    4,
 					ValidAfter:  uint64(n.Unix()),
@@ -827,7 +827,7 @@ func Test_sshValidityModifier(t *testing.T) {
 		},
 		"fail/requested-validAfter-after-limit": func() test {
 			return test{
-				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(1 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.ctl.Claimer, NotAfter: n.Add(1 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:    1,
 					ValidAfter:  uint64(n.Add(2 * time.Hour).Unix()),
@@ -838,7 +838,7 @@ func Test_sshValidityModifier(t *testing.T) {
 		},
 		"fail/requested-validBefore-after-limit": func() test {
 			return test{
-				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(1 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.ctl.Claimer, NotAfter: n.Add(1 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:    1,
 					ValidAfter:  uint64(n.Unix()),
@@ -850,7 +850,7 @@ func Test_sshValidityModifier(t *testing.T) {
 		"ok/no-limit": func() test {
 			va, vb := uint64(n.Unix()), uint64(n.Add(16*time.Hour).Unix())
 			return test{
-				svm: &sshLimitDuration{Claimer: p.claimer},
+				svm: &sshLimitDuration{Claimer: p.ctl.Claimer},
 				cert: &ssh.Certificate{
 					CertType: 1,
 				},
@@ -863,7 +863,7 @@ func Test_sshValidityModifier(t *testing.T) {
 		"ok/defaults": func() test {
 			va, vb := uint64(n.Unix()), uint64(n.Add(16*time.Hour).Unix())
 			return test{
-				svm: &sshLimitDuration{Claimer: p.claimer},
+				svm: &sshLimitDuration{Claimer: p.ctl.Claimer},
 				cert: &ssh.Certificate{
 					CertType: 1,
 				},
@@ -876,7 +876,7 @@ func Test_sshValidityModifier(t *testing.T) {
 		"ok/valid-requested-validBefore": func() test {
 			va, vb := uint64(n.Unix()), uint64(n.Add(2*time.Hour).Unix())
 			return test{
-				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(3 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.ctl.Claimer, NotAfter: n.Add(3 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:    1,
 					ValidAfter:  va,
@@ -891,7 +891,7 @@ func Test_sshValidityModifier(t *testing.T) {
 		"ok/empty-requested-validBefore-limit-after-default": func() test {
 			va := uint64(n.Unix())
 			return test{
-				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(24 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.ctl.Claimer, NotAfter: n.Add(24 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:   1,
 					ValidAfter: va,
@@ -905,7 +905,7 @@ func Test_sshValidityModifier(t *testing.T) {
 		"ok/empty-requested-validBefore-limit-before-default": func() test {
 			va := uint64(n.Unix())
 			return test{
-				svm: &sshLimitDuration{Claimer: p.claimer, NotAfter: n.Add(3 * time.Hour)},
+				svm: &sshLimitDuration{Claimer: p.ctl.Claimer, NotAfter: n.Add(3 * time.Hour)},
 				cert: &ssh.Certificate{
 					CertType:   1,
 					ValidAfter: va,

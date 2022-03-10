@@ -38,6 +38,7 @@ func TestSSHPOP_Getters(t *testing.T) {
 }
 
 func createSSHCert(cert *ssh.Certificate, signer ssh.Signer) (*ssh.Certificate, *jose.JSONWebKey, error) {
+	now := time.Now()
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "foo", 0)
 	if err != nil {
 		return nil, nil, err
@@ -45,6 +46,12 @@ func createSSHCert(cert *ssh.Certificate, signer ssh.Signer) (*ssh.Certificate, 
 	cert.Key, err = ssh.NewPublicKey(jwk.Public().Key)
 	if err != nil {
 		return nil, nil, err
+	}
+	if cert.ValidAfter == 0 {
+		cert.ValidAfter = uint64(now.Unix())
+	}
+	if cert.ValidBefore == 0 {
+		cert.ValidBefore = uint64(now.Add(time.Hour).Unix())
 	}
 	if err := cert.SignCert(rand.Reader, signer); err != nil {
 		return nil, nil, err
@@ -455,7 +462,7 @@ func TestSSHPOP_AuthorizeSSHRekey(t *testing.T) {
 						case *sshDefaultPublicKeyValidator:
 						case *sshCertDefaultValidator:
 						case *sshCertValidityValidator:
-							assert.Equals(t, v.Claimer, tc.p.claimer)
+							assert.Equals(t, v.Claimer, tc.p.ctl.Claimer)
 						default:
 							assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
 						}

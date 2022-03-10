@@ -276,6 +276,7 @@ func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
 func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 	serial := cert.SerialNumber.String()
 	var opts = []interface{}{errs.WithKeyVal("serialNumber", serial)}
+
 	isRevoked, err := a.IsRevoked(serial)
 	if err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
@@ -283,7 +284,6 @@ func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 	if isRevoked {
 		return errs.Unauthorized("authority.authorizeRenew: certificate has been revoked", opts...)
 	}
-
 	p, ok := a.provisioners.LoadByCertificate(cert)
 	if !ok {
 		return errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
