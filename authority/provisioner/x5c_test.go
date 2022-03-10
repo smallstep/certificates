@@ -552,7 +552,7 @@ func TestX5C_AuthorizeRevoke(t *testing.T) {
 }
 
 func TestX5C_AuthorizeRenew(t *testing.T) {
-	now := time.Now()
+	now := time.Now().Truncate(time.Second)
 	type test struct {
 		p    *X5C
 		code int

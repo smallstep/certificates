@@ -91,7 +91,7 @@ func TestACME_Init(t *testing.T) {
 }
 
 func TestACME_AuthorizeRenew(t *testing.T) {
-	now := time.Now()
+	now := time.Now().Truncate(time.Second)
 	type test struct {
 		p    *ACME
 		cert *x509.Certificate

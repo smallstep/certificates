@@ -824,7 +824,7 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 }
 
 func TestAWS_AuthorizeRenew(t *testing.T) {
-	now := time.Now()
+	now := time.Now().Truncate(time.Second)
 	p1, err := generateAWS()
 	assert.FatalError(t, err)
 	p2, err := generateAWS()

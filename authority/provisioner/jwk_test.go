@@ -325,7 +325,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 }
 
 func TestJWK_AuthorizeRenew(t *testing.T) {
-	now := time.Now()
+	now := time.Now().Truncate(time.Second)
 	p1, err := generateJWK()
 	assert.FatalError(t, err)
 	p2, err := generateJWK()

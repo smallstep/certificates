@@ -122,7 +122,7 @@ func DefaultAuthorizeRenew(ctx context.Context, p *Controller, cert *x509.Certif
 
 	now := time.Now().Truncate(time.Second)
 	if now.Before(cert.NotBefore) {
-		return errs.Unauthorized("certificate is not yet valid")
+		return errs.Unauthorized("certificate is not yet valid" + " " + now.UTC().Format(time.RFC3339Nano) + " vs " + cert.NotBefore.Format(time.RFC3339Nano))
 	}
 	if now.After(cert.NotAfter) && !p.Claimer.IsRenewAfterExpiry() {
 		return errs.Unauthorized("certificate has expired")

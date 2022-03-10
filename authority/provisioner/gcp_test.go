@@ -698,7 +698,7 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 }
 
 func TestGCP_AuthorizeRenew(t *testing.T) {
-	now := time.Now()
+	now := time.Now().Truncate(time.Second)
 	p1, err := generateGCP()
 	assert.FatalError(t, err)
 	p2, err := generateGCP()

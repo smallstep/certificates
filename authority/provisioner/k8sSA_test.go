@@ -179,7 +179,7 @@ func TestK8sSA_AuthorizeRevoke(t *testing.T) {
 }
 
 func TestK8sSA_AuthorizeRenew(t *testing.T) {
-	now := time.Now()
+	now := time.Now().Truncate(time.Second)
 	type test struct {
 		p    *K8sSA
 		cert *x509.Certificate

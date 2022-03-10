@@ -411,7 +411,7 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 }
 
 func TestOIDC_AuthorizeRenew(t *testing.T) {
-	now := time.Now()
+	now := time.Now().Truncate(time.Second)
 	p1, err := generateOIDC()
 	assert.FatalError(t, err)
 	p2, err := generateOIDC()

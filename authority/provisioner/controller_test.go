@@ -134,7 +134,7 @@ func TestController_GetIdentity(t *testing.T) {
 
 func TestController_AuthorizeRenew(t *testing.T) {
 	ctx := context.Background()
-	now := time.Now()
+	now := time.Now().Truncate(time.Second)
 	type fields struct {
 		Interface          Interface
 		Claimer            *Claimer
@@ -276,7 +276,7 @@ func TestController_AuthorizeSSHRenew(t *testing.T) {
 
 func TestDefaultAuthorizeRenew(t *testing.T) {
 	ctx := context.Background()
-	now := time.Now()
+	now := time.Now().Truncate(time.Second)
 	type args struct {
 		ctx  context.Context
 		p    *Controller
