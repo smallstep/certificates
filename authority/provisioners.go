@@ -108,7 +108,9 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 			UserKeys: sshKeys.UserKeys,
 			HostKeys: sshKeys.HostKeys,
 		},
-		GetIdentityFunc: a.getIdentityFunc,
+		GetIdentityFunc:       a.getIdentityFunc,
+		AuthorizeRenewFunc:    a.authorizeRenewFunc,
+		AuthorizeSSHRenewFunc: a.authorizeSSHRenewFunc,
 	}, nil
 
 }

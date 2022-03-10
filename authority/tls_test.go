@@ -802,6 +802,19 @@ func TestAuthority_Renew(t *testing.T) {
 				code: http.StatusUnauthorized,
 			}, nil
 		},
+		"fail/WithAuthorizeRenewFunc": func() (*renewTest, error) {
+			aa := testAuthority(t, WithAuthorizeRenewFunc(func(ctx context.Context, p *provisioner.Controller, cert *x509.Certificate) error {
+				return errs.Unauthorized("not authorized")
+			}))
+			aa.x509CAService = a.x509CAService
+			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			return &renewTest{
+				auth: aa,
+				cert: cert,
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: not authorized"),
+				code: http.StatusUnauthorized,
+			}, nil
+		},
 		"ok": func() (*renewTest, error) {
 			return &renewTest{
 				auth: a,
@@ -817,6 +830,17 @@ func TestAuthority_Renew(t *testing.T) {
 			_a.x509CAService.(*softcas.SoftCAS).Signer = intSigner
 			return &renewTest{
 				auth: _a,
+				cert: cert,
+			}, nil
+		},
+		"ok/WithAuthorizeRenewFunc": func() (*renewTest, error) {
+			aa := testAuthority(t, WithAuthorizeRenewFunc(func(ctx context.Context, p *provisioner.Controller, cert *x509.Certificate) error {
+				return nil
+			}))
+			aa.x509CAService = a.x509CAService
+			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			return &renewTest{
+				auth: aa,
 				cert: cert,
 			}, nil
 		},

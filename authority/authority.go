@@ -70,10 +70,12 @@ type Authority struct {
 	startTime time.Time
 
 	// Custom functions
-	sshBastionFunc   func(ctx context.Context, user, hostname string) (*config.Bastion, error)
-	sshCheckHostFunc func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
-	sshGetHostsFunc  func(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)
-	getIdentityFunc  provisioner.GetIdentityFunc
+	sshBastionFunc        func(ctx context.Context, user, hostname string) (*config.Bastion, error)
+	sshCheckHostFunc      func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
+	sshGetHostsFunc       func(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)
+	getIdentityFunc       provisioner.GetIdentityFunc
+	authorizeRenewFunc    provisioner.AuthorizeRenewFunc
+	authorizeSSHRenewFunc provisioner.AuthorizeSSHRenewFunc
 
 	adminMutex sync.RWMutex
 }

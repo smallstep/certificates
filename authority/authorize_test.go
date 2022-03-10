@@ -1011,6 +1011,23 @@ func TestAuthority_authorizeSSHSign(t *testing.T) {
 }
 
 func TestAuthority_authorizeSSHRenew(t *testing.T) {
+	now := time.Now().UTC()
+	sshpop := func(a *Authority) (*ssh.Certificate, string) {
+		p, ok := a.provisioners.Load("sshpop/sshpop")
+		assert.Fatal(t, ok, "sshpop provisioner not found in test authority")
+		key, err := pemutil.Read("./testdata/secrets/ssh_host_ca_key")
+		assert.FatalError(t, err)
+		signer, ok := key.(crypto.Signer)
+		assert.Fatal(t, ok, "could not cast ssh signing key to crypto signer")
+		sshSigner, err := ssh.NewSignerFromSigner(signer)
+		assert.FatalError(t, err)
+		cert, jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
+		assert.FatalError(t, err)
+		token, err := generateToken("foo", p.GetName(), testAudiences.SSHRenew[0]+"#sshpop/sshpop", []string{"foo.smallstep.com"}, now, jwk, withSSHPOPFile(cert))
+		assert.FatalError(t, err)
+		return cert, token
+	}
+
 	a := testAuthority(t)
 
 	jwk, err := jose.ReadKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
@@ -1019,8 +1036,6 @@ func TestAuthority_authorizeSSHRenew(t *testing.T) {
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
 		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", jwk.KeyID))
 	assert.FatalError(t, err)
-
-	now := time.Now().UTC()
 
 	validIssuer := "step-cli"
 
@@ -1058,27 +1073,34 @@ func TestAuthority_authorizeSSHRenew(t *testing.T) {
 				code:  http.StatusUnauthorized,
 			}
 		},
+		"fail/WithAuthorizeSSHRenewFunc": func(t *testing.T) *authorizeTest {
+			aa := testAuthority(t, WithAuthorizeSSHRenewFunc(func(ctx context.Context, p *provisioner.Controller, cert *ssh.Certificate) error {
+				return errs.Forbidden("forbidden")
+			}))
+			_, token := sshpop(aa)
+			return &authorizeTest{
+				auth:  aa,
+				token: token,
+				err:   errors.New("authority.authorizeSSHRenew: forbidden"),
+				code:  http.StatusForbidden,
+			}
+		},
 		"ok": func(t *testing.T) *authorizeTest {
-			key, err := pemutil.Read("./testdata/secrets/ssh_host_ca_key")
-			assert.FatalError(t, err)
-			signer, ok := key.(crypto.Signer)
-			assert.Fatal(t, ok, "could not cast ssh signing key to crypto signer")
-			sshSigner, err := ssh.NewSignerFromSigner(signer)
-			assert.FatalError(t, err)
-
-			cert, _jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
-			assert.FatalError(t, err)
-
-			p, ok := a.provisioners.Load("sshpop/sshpop")
-			assert.Fatal(t, ok, "sshpop provisioner not found in test authority")
-
-			tok, err := generateToken("foo", p.GetName(), testAudiences.SSHRenew[0]+"#sshpop/sshpop",
-				[]string{"foo.smallstep.com"}, now, _jwk, withSSHPOPFile(cert))
-			assert.FatalError(t, err)
-
+			cert, token := sshpop(a)
 			return &authorizeTest{
 				auth:  a,
-				token: tok,
+				token: token,
+				cert:  cert,
+			}
+		},
+		"ok/WithAuthorizeSSHRenewFunc": func(t *testing.T) *authorizeTest {
+			aa := testAuthority(t, WithAuthorizeSSHRenewFunc(func(ctx context.Context, p *provisioner.Controller, cert *ssh.Certificate) error {
+				return nil
+			}))
+			cert, token := sshpop(aa)
+			return &authorizeTest{
+				auth:  aa,
+				token: token,
 				cert:  cert,
 			}
 		},
