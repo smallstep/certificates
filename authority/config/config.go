@@ -272,28 +272,32 @@ func (c *Config) GetAudiences() provisioner.Audiences {
 	}
 
 	for _, name := range c.DNSNames {
+		hostname := toHostname(name)
 		audiences.Sign = append(audiences.Sign,
-			fmt.Sprintf("https://%s/1.0/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/1.0/ssh/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/ssh/sign", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/sign", hostname),
+			fmt.Sprintf("https://%s/sign", hostname),
+			fmt.Sprintf("https://%s/1.0/ssh/sign", hostname),
+			fmt.Sprintf("https://%s/ssh/sign", hostname))
+		audiences.Renew = append(audiences.Renew,
+			fmt.Sprintf("https://%s/1.0/renew", hostname),
+			fmt.Sprintf("https://%s/renew", hostname))
 		audiences.Revoke = append(audiences.Revoke,
-			fmt.Sprintf("https://%s/1.0/revoke", toHostname(name)),
-			fmt.Sprintf("https://%s/revoke", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/revoke", hostname),
+			fmt.Sprintf("https://%s/revoke", hostname))
 		audiences.SSHSign = append(audiences.SSHSign,
-			fmt.Sprintf("https://%s/1.0/ssh/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/ssh/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/1.0/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/sign", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/ssh/sign", hostname),
+			fmt.Sprintf("https://%s/ssh/sign", hostname),
+			fmt.Sprintf("https://%s/1.0/sign", hostname),
+			fmt.Sprintf("https://%s/sign", hostname))
 		audiences.SSHRevoke = append(audiences.SSHRevoke,
-			fmt.Sprintf("https://%s/1.0/ssh/revoke", toHostname(name)),
-			fmt.Sprintf("https://%s/ssh/revoke", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/ssh/revoke", hostname),
+			fmt.Sprintf("https://%s/ssh/revoke", hostname))
 		audiences.SSHRenew = append(audiences.SSHRenew,
-			fmt.Sprintf("https://%s/1.0/ssh/renew", toHostname(name)),
-			fmt.Sprintf("https://%s/ssh/renew", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/ssh/renew", hostname),
+			fmt.Sprintf("https://%s/ssh/renew", hostname))
 		audiences.SSHRekey = append(audiences.SSHRekey,
-			fmt.Sprintf("https://%s/1.0/ssh/rekey", toHostname(name)),
-			fmt.Sprintf("https://%s/ssh/rekey", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/ssh/rekey", hostname),
+			fmt.Sprintf("https://%s/ssh/rekey", hostname))
 	}
 
 	return audiences

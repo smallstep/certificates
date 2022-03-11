@@ -723,6 +723,36 @@ retry:
 	return &sign, nil
 }
 
+// RenewWithToken performs the renew request to the CA with the given
+// authorization token and returns the api.SignResponse struct. This method is
+// generally used to renew an expired certificate.
+func (c *Client) RenewWithToken(token string) (*api.SignResponse, error) {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/renew"})
+	req, err := http.NewRequest("POST", u.String(), http.NoBody)
+	if err != nil {
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.RenewWithToken; error creating request")
+	}
+	req.Header.Add("Authorization", "Bearer "+token)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.RenewWithToken; client POST %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readError(resp.Body)
+	}
+	var sign api.SignResponse
+	if err := readJSON(resp.Body, &sign); err != nil {
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.RenewWithToken; error reading %s", u)
+	}
+	return &sign, nil
+}
+
 // Rekey performs the rekey request to the CA and returns the api.SignResponse
 // struct.
 func (c *Client) Rekey(req *api.RekeyRequest, tr http.RoundTripper) (*api.SignResponse, error) {

@@ -3,11 +3,15 @@ package authority
 import (
 	"context"
 	"crypto"
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -20,6 +24,7 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/randutil"
+	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -1316,6 +1321,286 @@ func TestAuthority_authorizeSSHRekey(t *testing.T) {
 					assert.Equals(t, tc.cert.Serial, cert.Serial)
 					assert.Len(t, 3, signOpts)
 				}
+			}
+		})
+	}
+}
+
+func TestAuthority_AuthorizeRenewToken(t *testing.T) {
+	ctx := context.Background()
+	type stepProvisionerASN1 struct {
+		Type          int
+		Name          []byte
+		CredentialID  []byte
+		KeyValuePairs []string `asn1:"optional,omitempty"`
+	}
+
+	_, signer, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	csr, err := x509util.CreateCertificateRequest("test.example.com", []string{"test.example.com"}, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, otherSigner, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	generateX5cToken := func(a *Authority, key crypto.Signer, claims jose.Claims, opts ...provisioner.SignOption) (string, *x509.Certificate) {
+		chain, err := a.Sign(csr, provisioner.SignOptions{}, opts...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var x5c []string
+		for _, c := range chain {
+			x5c = append(x5c, base64.StdEncoding.EncodeToString(c.Raw))
+		}
+
+		so := new(jose.SignerOptions)
+		so.WithType("JWT")
+		so.WithHeader("x5cInsecure", x5c)
+		sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.EdDSA, Key: key}, so)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, err := jose.Signed(sig).Claims(claims).CompactSerialize()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s, chain[0]
+	}
+
+	now := time.Now()
+	a1 := testAuthority(t)
+	t1, c1 := generateX5cToken(a1, signer, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/renew"},
+		Subject:   "test.example.com",
+		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	t2, c2 := generateX5cToken(a1, signer, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/renew"},
+		Subject:   "test.example.com",
+		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+		IssuedAt:  jose.NewNumericDate(now),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now.Add(-time.Hour)
+		cert.NotAfter = now.Add(-time.Minute)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	badSigner, _ := generateX5cToken(a1, otherSigner, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/renew"},
+		Subject:   "test.example.com",
+		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("foobar"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	badProvisioner, _ := generateX5cToken(a1, signer, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/renew"},
+		Subject:   "test.example.com",
+		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("foobar"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	badIssuer, _ := generateX5cToken(a1, signer, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/renew"},
+		Subject:   "test.example.com",
+		Issuer:    "bad-issuer",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	badSubject, _ := generateX5cToken(a1, signer, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/renew"},
+		Subject:   "bad-subject",
+		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	badNotBefore, _ := generateX5cToken(a1, signer, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/sign"},
+		Subject:   "test.example.com",
+		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now.Add(5 * time.Minute)),
+		Expiry:    jose.NewNumericDate(now.Add(10 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	badExpiry, _ := generateX5cToken(a1, signer, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/sign"},
+		Subject:   "test.example.com",
+		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now.Add(-5 * time.Minute)),
+		Expiry:    jose.NewNumericDate(now.Add(-time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	badIssuedAt, _ := generateX5cToken(a1, signer, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/sign"},
+		Subject:   "test.example.com",
+		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+		IssuedAt:  jose.NewNumericDate(now.Add(5 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	badAudience, _ := generateX5cToken(a1, signer, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/sign"},
+		Subject:   "test.example.com",
+		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+
+	type args struct {
+		ctx context.Context
+		ott string
+	}
+	tests := []struct {
+		name      string
+		authority *Authority
+		args      args
+		want      *x509.Certificate
+		wantErr   bool
+	}{
+		{"ok", a1, args{ctx, t1}, c1, false},
+		{"ok expired cert", a1, args{ctx, t2}, c2, false},
+		{"fail token", a1, args{ctx, "not.a.token"}, nil, true},
+		{"fail token reuse", a1, args{ctx, t1}, nil, true},
+		{"fail token signature", a1, args{ctx, badSigner}, nil, true},
+		{"fail token provisioner", a1, args{ctx, badProvisioner}, nil, true},
+		{"fail token iss", a1, args{ctx, badIssuer}, nil, true},
+		{"fail token sub", a1, args{ctx, badSubject}, nil, true},
+		{"fail token iat", a1, args{ctx, badNotBefore}, nil, true},
+		{"fail token iat", a1, args{ctx, badExpiry}, nil, true},
+		{"fail token iat", a1, args{ctx, badIssuedAt}, nil, true},
+		{"fail token aud", a1, args{ctx, badAudience}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.authority.AuthorizeRenewToken(tt.args.ctx, tt.args.ott)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Authority.AuthorizeRenewToken() error = %+v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Authority.AuthorizeRenewToken() = %v, want %v", got, tt.want)
 			}
 		})
 	}

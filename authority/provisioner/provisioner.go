@@ -46,6 +46,7 @@ var ErrAllowTokenReuse = stderrors.New("allow token reuse")
 // Audiences stores all supported audiences by request type.
 type Audiences struct {
 	Sign      []string
+	Renew     []string
 	Revoke    []string
 	SSHSign   []string
 	SSHRevoke []string
@@ -56,6 +57,7 @@ type Audiences struct {
 // All returns all supported audiences across all request types in one list.
 func (a Audiences) All() (auds []string) {
 	auds = a.Sign
+	auds = append(auds, a.Renew...)
 	auds = append(auds, a.Revoke...)
 	auds = append(auds, a.SSHSign...)
 	auds = append(auds, a.SSHRevoke...)
@@ -69,6 +71,7 @@ func (a Audiences) All() (auds []string) {
 func (a Audiences) WithFragment(fragment string) Audiences {
 	ret := Audiences{
 		Sign:      make([]string, len(a.Sign)),
+		Renew:     make([]string, len(a.Renew)),
 		Revoke:    make([]string, len(a.Revoke)),
 		SSHSign:   make([]string, len(a.SSHSign)),
 		SSHRevoke: make([]string, len(a.SSHRevoke)),
@@ -80,6 +83,13 @@ func (a Audiences) WithFragment(fragment string) Audiences {
 			ret.Sign[i] = u.ResolveReference(&url.URL{Fragment: fragment}).String()
 		} else {
 			ret.Sign[i] = s
+		}
+	}
+	for i, s := range a.Renew {
+		if u, err := url.Parse(s); err == nil {
+			ret.Renew[i] = u.ResolveReference(&url.URL{Fragment: fragment}).String()
+		} else {
+			ret.Renew[i] = s
 		}
 	}
 	for i, s := range a.Revoke {

@@ -35,9 +35,7 @@ type JWK struct {
 	EncryptedKey string           `json:"encryptedKey,omitempty"`
 	Claims       *Claims          `json:"claims,omitempty"`
 	Options      *Options         `json:"options,omitempty"`
-	// claimer      *Claimer
-	// audiences    Audiences
-	ctl *Controller
+	ctl          *Controller
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id

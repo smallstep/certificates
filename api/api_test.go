@@ -173,6 +173,7 @@ type mockAuthority struct {
 	ret1, ret2                   interface{}
 	err                          error
 	authorizeSign                func(ott string) ([]provisioner.SignOption, error)
+	authorizeRenewToken          func(ctx context.Context, ott string) (*x509.Certificate, error)
 	getTLSOptions                func() *authority.TLSOptions
 	root                         func(shasum string) (*x509.Certificate, error)
 	sign                         func(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
@@ -208,6 +209,13 @@ func (m *mockAuthority) AuthorizeSign(ott string) ([]provisioner.SignOption, err
 		return m.authorizeSign(ott)
 	}
 	return m.ret1.([]provisioner.SignOption), m.err
+}
+
+func (m *mockAuthority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.Certificate, error) {
+	if m.authorizeRenewToken != nil {
+		return m.authorizeRenewToken(ctx, ott)
+	}
+	return m.ret1.(*x509.Certificate), m.err
 }
 
 func (m *mockAuthority) GetTLSOptions() *authority.TLSOptions {
@@ -1010,8 +1018,21 @@ func Test_caHandler_Renew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.err,
-				getRoots: func() ([]*x509.Certificate, error) {
-					return []*x509.Certificate{tt.root}, nil
+				authorizeRenewToken: func(ctx context.Context, ott string) (*x509.Certificate, error) {
+					jwt, chain, err := jose.ParseX5cInsecure(ott, []*x509.Certificate{tt.root})
+					if err != nil {
+						return nil, errs.Unauthorized(err.Error())
+					}
+					var claims jose.Claims
+					if err := jwt.Claims(chain[0][0].PublicKey, &claims); err != nil {
+						return nil, errs.Unauthorized(err.Error())
+					}
+					if err := claims.ValidateWithLeeway(jose.Expected{
+						Time: now,
+					}, time.Minute); err != nil {
+						return nil, errs.Unauthorized(err.Error())
+					}
+					return chain[0][0], nil
 				},
 				getTLSOptions: func() *authority.TLSOptions {
 					return nil
@@ -1022,17 +1043,19 @@ func Test_caHandler_Renew(t *testing.T) {
 			req.Header = tt.header
 			w := httptest.NewRecorder()
 			h.Renew(logging.NewResponseLogger(w), req)
-			res := w.Result()
 
-			if res.StatusCode != tt.statusCode {
-				t.Errorf("caHandler.Renew StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
-			}
+			res := w.Result()
+			defer res.Body.Close()
 
 			body, err := io.ReadAll(res.Body)
-			res.Body.Close()
 			if err != nil {
 				t.Errorf("caHandler.Renew unexpected error = %v", err)
 			}
+			if res.StatusCode != tt.statusCode {
+				t.Errorf("caHandler.Renew StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
+				t.Errorf("%s", body)
+			}
+
 			if tt.statusCode < http.StatusBadRequest {
 				expected := []byte(`{"crt":"` + strings.ReplaceAll(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: tt.cert.Raw})), "\n", `\n`) + `",` +
 					`"ca":"` + strings.ReplaceAll(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: tt.root.Raw})), "\n", `\n`) + `",` +
