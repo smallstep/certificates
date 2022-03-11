@@ -549,7 +549,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 					switch v := o.(type) {
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
-						assert.Equals(t, v.Type, int(TypeGCP))
+						assert.Equals(t, v.Type, TypeGCP)
 						assert.Equals(t, v.Name, tt.gcp.GetName())
 						assert.Equals(t, v.CredentialID, tt.gcp.ServiceAccounts[0])
 						assert.Len(t, 4, v.KeyValuePairs)

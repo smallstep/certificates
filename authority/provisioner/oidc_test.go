@@ -327,7 +327,7 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 					switch v := o.(type) {
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
-						assert.Equals(t, v.Type, int(TypeOIDC))
+						assert.Equals(t, v.Type, TypeOIDC)
 						assert.Equals(t, v.Name, tt.prov.GetName())
 						assert.Equals(t, v.CredentialID, tt.prov.ClientID)
 						assert.Len(t, 0, v.KeyValuePairs)

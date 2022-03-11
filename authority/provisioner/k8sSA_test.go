@@ -283,7 +283,7 @@ func TestK8sSA_AuthorizeSign(t *testing.T) {
 							switch v := o.(type) {
 							case certificateOptionsFunc:
 							case *provisionerExtensionOption:
-								assert.Equals(t, v.Type, int(TypeK8sSA))
+								assert.Equals(t, v.Type, TypeK8sSA)
 								assert.Equals(t, v.Name, tc.p.GetName())
 								assert.Equals(t, v.CredentialID, "")
 								assert.Len(t, 0, v.KeyValuePairs)

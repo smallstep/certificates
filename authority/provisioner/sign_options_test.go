@@ -636,18 +636,18 @@ func Test_newProvisionerExtension_Option(t *testing.T) {
 				valid: func(cert *x509.Certificate) {
 					if assert.Len(t, 1, cert.ExtraExtensions) {
 						ext := cert.ExtraExtensions[0]
-						assert.Equals(t, ext.Id, stepOIDProvisioner)
+						assert.Equals(t, ext.Id, StepOIDProvisioner)
 					}
 				},
 			}
 		},
 		"ok/prepend": func() test {
 			return test{
-				cert: &x509.Certificate{ExtraExtensions: []pkix.Extension{{Id: stepOIDProvisioner, Critical: true}, {Id: []int{1, 2, 3}}}},
+				cert: &x509.Certificate{ExtraExtensions: []pkix.Extension{{Id: StepOIDProvisioner, Critical: true}, {Id: []int{1, 2, 3}}}},
 				valid: func(cert *x509.Certificate) {
 					if assert.Len(t, 3, cert.ExtraExtensions) {
 						ext := cert.ExtraExtensions[0]
-						assert.Equals(t, ext.Id, stepOIDProvisioner)
+						assert.Equals(t, ext.Id, StepOIDProvisioner)
 						assert.False(t, ext.Critical)
 					}
 				},

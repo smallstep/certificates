@@ -677,7 +677,7 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 					switch v := o.(type) {
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
-						assert.Equals(t, v.Type, int(TypeAWS))
+						assert.Equals(t, v.Type, TypeAWS)
 						assert.Equals(t, v.Name, tt.aws.GetName())
 						assert.Equals(t, v.CredentialID, tt.aws.Accounts[0])
 						assert.Len(t, 2, v.KeyValuePairs)

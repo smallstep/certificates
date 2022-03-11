@@ -506,7 +506,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 					switch v := o.(type) {
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
-						assert.Equals(t, v.Type, int(TypeAzure))
+						assert.Equals(t, v.Type, TypeAzure)
 						assert.Equals(t, v.Name, tt.azure.GetName())
 						assert.Equals(t, v.CredentialID, tt.azure.TenantID)
 						assert.Len(t, 0, v.KeyValuePairs)

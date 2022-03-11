@@ -147,6 +147,17 @@ func TestCollection_LoadByToken(t *testing.T) {
 }
 
 func TestCollection_LoadByCertificate(t *testing.T) {
+	mustExtension := func(typ Type, name, credentialID string) pkix.Extension {
+		e := Extension{
+			Type: typ, Name: name, CredentialID: credentialID,
+		}
+		ext, err := e.ToExtension()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ext
+	}
+
 	p1, err := generateJWK()
 	assert.FatalError(t, err)
 	p2, err := generateOIDC()
@@ -159,30 +170,21 @@ func TestCollection_LoadByCertificate(t *testing.T) {
 	byName.Store(p2.GetName(), p2)
 	byName.Store(p3.GetName(), p3)
 
-	ok1Ext, err := createProvisionerExtension(1, p1.Name, p1.Key.KeyID)
-	assert.FatalError(t, err)
-	ok2Ext, err := createProvisionerExtension(2, p2.Name, p2.ClientID)
-	assert.FatalError(t, err)
-	ok3Ext, err := createProvisionerExtension(int(TypeACME), p3.Name, "")
-	assert.FatalError(t, err)
-	notFoundExt, err := createProvisionerExtension(1, "foo", "bar")
-	assert.FatalError(t, err)
-
 	ok1Cert := &x509.Certificate{
-		Extensions: []pkix.Extension{ok1Ext},
+		Extensions: []pkix.Extension{mustExtension(1, p1.Name, p1.Key.KeyID)},
 	}
 	ok2Cert := &x509.Certificate{
-		Extensions: []pkix.Extension{ok2Ext},
+		Extensions: []pkix.Extension{mustExtension(2, p2.Name, p2.ClientID)},
 	}
 	ok3Cert := &x509.Certificate{
-		Extensions: []pkix.Extension{ok3Ext},
+		Extensions: []pkix.Extension{mustExtension(TypeACME, p3.Name, "")},
 	}
 	notFoundCert := &x509.Certificate{
-		Extensions: []pkix.Extension{notFoundExt},
+		Extensions: []pkix.Extension{mustExtension(1, "foo", "bar")},
 	}
 	badCert := &x509.Certificate{
 		Extensions: []pkix.Extension{
-			{Id: stepOIDProvisioner, Critical: false, Value: []byte("foobar")},
+			{Id: StepOIDProvisioner, Critical: false, Value: []byte("foobar")},
 		},
 	}
 

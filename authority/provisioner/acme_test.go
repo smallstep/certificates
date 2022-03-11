@@ -179,7 +179,7 @@ func TestACME_AuthorizeSign(t *testing.T) {
 					for _, o := range opts {
 						switch v := o.(type) {
 						case *provisionerExtensionOption:
-							assert.Equals(t, v.Type, int(TypeACME))
+							assert.Equals(t, v.Type, TypeACME)
 							assert.Equals(t, v.Name, tc.p.GetName())
 							assert.Equals(t, v.CredentialID, "")
 							assert.Len(t, 0, v.KeyValuePairs)

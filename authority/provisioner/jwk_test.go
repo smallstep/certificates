@@ -300,7 +300,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 						switch v := o.(type) {
 						case certificateOptionsFunc:
 						case *provisionerExtensionOption:
-							assert.Equals(t, v.Type, int(TypeJWK))
+							assert.Equals(t, v.Type, TypeJWK)
 							assert.Equals(t, v.Name, tt.prov.GetName())
 							assert.Equals(t, v.CredentialID, tt.prov.Key.KeyID)
 							assert.Len(t, 0, v.KeyValuePairs)
