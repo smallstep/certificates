@@ -1128,3 +1128,28 @@ func TestClient_SSHBastion(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_GetCaURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		caURL string
+		want  string
+	}{
+		{"ok", "https://ca.com", "https://ca.com"},
+		{"ok no schema", "ca.com", "https://ca.com"},
+		{"ok with port", "https://ca.com:9000", "https://ca.com:9000"},
+		{"ok with version", "https://ca.com/1.0", "https://ca.com/1.0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(tt.caURL)
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+			if got := c.GetCaURL(); got != tt.want {
+				t.Errorf("Client.GetCaURL() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
