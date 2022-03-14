@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased - 0.18.3] - DATE
 ### Added
-- Added support for renew after expiry using the claim `enableRenewAfterExpiry`.
+- Added support for renew after expiry using the claim `allowRenewAfterExpiry`.
 ### Changed
 ### Deprecated
 ### Removed

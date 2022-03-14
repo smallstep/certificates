@@ -24,8 +24,8 @@ type Claims struct {
 	EnableSSHCA       *bool     `json:"enableSSHCA,omitempty"`
 
 	// Renewal properties
-	DisableRenewal         *bool `json:"disableRenewal,omitempty"`
-	EnableRenewAfterExpiry *bool `json:"enableRenewAfterExpiry,omitempty"`
+	DisableRenewal        *bool `json:"disableRenewal,omitempty"`
+	AllowRenewAfterExpiry *bool `json:"allowRenewAfterExpiry,omitempty"`
 }
 
 // Claimer is the type that controls claims. It provides an interface around the
@@ -44,22 +44,22 @@ func NewClaimer(claims *Claims, global Claims) (*Claimer, error) {
 // Claims returns the merge of the inner and global claims.
 func (c *Claimer) Claims() Claims {
 	disableRenewal := c.IsDisableRenewal()
-	enablerenewAfterExpiry := c.IsRenewAfterExpiry()
+	allowRenewAfterExpiry := c.AllowRenewAfterExpiry()
 	enableSSHCA := c.IsSSHCAEnabled()
 
 	return Claims{
-		MinTLSDur:              &Duration{c.MinTLSCertDuration()},
-		MaxTLSDur:              &Duration{c.MaxTLSCertDuration()},
-		DefaultTLSDur:          &Duration{c.DefaultTLSCertDuration()},
-		MinUserSSHDur:          &Duration{c.MinUserSSHCertDuration()},
-		MaxUserSSHDur:          &Duration{c.MaxUserSSHCertDuration()},
-		DefaultUserSSHDur:      &Duration{c.DefaultUserSSHCertDuration()},
-		MinHostSSHDur:          &Duration{c.MinHostSSHCertDuration()},
-		MaxHostSSHDur:          &Duration{c.MaxHostSSHCertDuration()},
-		DefaultHostSSHDur:      &Duration{c.DefaultHostSSHCertDuration()},
-		EnableSSHCA:            &enableSSHCA,
-		DisableRenewal:         &disableRenewal,
-		EnableRenewAfterExpiry: &enablerenewAfterExpiry,
+		MinTLSDur:             &Duration{c.MinTLSCertDuration()},
+		MaxTLSDur:             &Duration{c.MaxTLSCertDuration()},
+		DefaultTLSDur:         &Duration{c.DefaultTLSCertDuration()},
+		MinUserSSHDur:         &Duration{c.MinUserSSHCertDuration()},
+		MaxUserSSHDur:         &Duration{c.MaxUserSSHCertDuration()},
+		DefaultUserSSHDur:     &Duration{c.DefaultUserSSHCertDuration()},
+		MinHostSSHDur:         &Duration{c.MinHostSSHCertDuration()},
+		MaxHostSSHDur:         &Duration{c.MaxHostSSHCertDuration()},
+		DefaultHostSSHDur:     &Duration{c.DefaultHostSSHCertDuration()},
+		EnableSSHCA:           &enableSSHCA,
+		DisableRenewal:        &disableRenewal,
+		AllowRenewAfterExpiry: &allowRenewAfterExpiry,
 	}
 }
 
@@ -109,14 +109,14 @@ func (c *Claimer) IsDisableRenewal() bool {
 	return *c.claims.DisableRenewal
 }
 
-// IsRenewAfterExpiry returns if the renewal flow is authorized even if the
+// AllowRenewAfterExpiry returns if the renewal flow is authorized if the
 // certificate is expired. If the property is not set within the provisioner
 // then the global value from the authority configuration will be used.
-func (c *Claimer) IsRenewAfterExpiry() bool {
-	if c.claims == nil || c.claims.EnableRenewAfterExpiry == nil {
-		return *c.global.EnableRenewAfterExpiry
+func (c *Claimer) AllowRenewAfterExpiry() bool {
+	if c.claims == nil || c.claims.AllowRenewAfterExpiry == nil {
+		return *c.global.AllowRenewAfterExpiry
 	}
-	return *c.claims.EnableRenewAfterExpiry
+	return *c.claims.AllowRenewAfterExpiry
 }
 
 // DefaultSSHCertDuration returns the default SSH certificate duration for the

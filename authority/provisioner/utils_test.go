@@ -24,22 +24,22 @@ import (
 )
 
 var (
-	defaultDisableRenewal         = false
-	defaultEnableRenewAfterExpiry = false
-	defaultEnableSSHCA            = true
-	globalProvisionerClaims       = Claims{
-		MinTLSDur:              &Duration{5 * time.Minute},
-		MaxTLSDur:              &Duration{24 * time.Hour},
-		DefaultTLSDur:          &Duration{24 * time.Hour},
-		MinUserSSHDur:          &Duration{Duration: 5 * time.Minute}, // User SSH certs
-		MaxUserSSHDur:          &Duration{Duration: 24 * time.Hour},
-		DefaultUserSSHDur:      &Duration{Duration: 16 * time.Hour},
-		MinHostSSHDur:          &Duration{Duration: 5 * time.Minute}, // Host SSH certs
-		MaxHostSSHDur:          &Duration{Duration: 30 * 24 * time.Hour},
-		DefaultHostSSHDur:      &Duration{Duration: 30 * 24 * time.Hour},
-		EnableSSHCA:            &defaultEnableSSHCA,
-		DisableRenewal:         &defaultDisableRenewal,
-		EnableRenewAfterExpiry: &defaultEnableRenewAfterExpiry,
+	defaultDisableRenewal        = false
+	defaultAllowRenewAfterExpiry = false
+	defaultEnableSSHCA           = true
+	globalProvisionerClaims      = Claims{
+		MinTLSDur:             &Duration{5 * time.Minute},
+		MaxTLSDur:             &Duration{24 * time.Hour},
+		DefaultTLSDur:         &Duration{24 * time.Hour},
+		MinUserSSHDur:         &Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:         &Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur:     &Duration{Duration: 16 * time.Hour},
+		MinHostSSHDur:         &Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:         &Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur:     &Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:           &defaultEnableSSHCA,
+		DisableRenewal:        &defaultDisableRenewal,
+		AllowRenewAfterExpiry: &defaultAllowRenewAfterExpiry,
 	}
 	testAudiences = Audiences{
 		Sign:      []string{"https://ca.smallstep.com/1.0/sign", "https://ca.smallstep.com/sign"},
