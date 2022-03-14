@@ -16,6 +16,7 @@ import (
 	"github.com/smallstep/certificates/pki"
 	"github.com/urfave/cli"
 	"go.step.sm/cli-utils/errs"
+	"go.step.sm/cli-utils/step"
 )
 
 // AppCommand is the action used as the top action.
@@ -57,6 +58,11 @@ certificate issuer private key used in the RA mode.`,
 			Usage:  "token used to enable the linked ca.",
 			EnvVar: "STEP_CA_TOKEN",
 		},
+		cli.StringFlag{
+			Name:   "context",
+			Usage:  "The name of the authority's context.",
+			EnvVar: "STEP_CA_CONTEXT",
+		},
 	},
 }
 
@@ -69,15 +75,15 @@ func appAction(ctx *cli.Context) error {
 	resolver := ctx.String("resolver")
 	token := ctx.String("token")
 
-	// If zero cmd line args show help, if >1 cmd line args show error.
-	if ctx.NArg() == 0 {
-		return cli.ShowAppHelp(ctx)
+	if ctx.NArg() > 1 {
+		return errs.TooManyArguments(ctx)
 	}
-	if err := errs.NumberOfArguments(ctx, 1); err != nil {
+
+	configFile, err := pathToConfigFile(ctx)
+	if err != nil {
 		return err
 	}
 
-	configFile := ctx.Args().Get(0)
 	cfg, err := config.LoadConfiguration(configFile)
 	if err != nil {
 		fatal(err)
@@ -151,6 +157,23 @@ To get a linked authority token:
 		fatal(err)
 	}
 	return nil
+}
+
+func pathToConfigFile(ctx *cli.Context) (string, error) {
+	if !ctx.IsSet("context") {
+		// no context specified; make sure the user has specified config file
+		if ctx.NArg() == 0 {
+			return "", cli.ShowAppHelp(ctx)
+		}
+
+		return ctx.Args().Get(0), nil
+	}
+
+	if ctx.NArg() > 0 {
+		return "", errors.New("either the context flag or a config file may be specified but not both")
+	}
+
+	return step.CaConfigFile(), nil
 }
 
 // fatal writes the passed error on the standard error and exits with the exit
