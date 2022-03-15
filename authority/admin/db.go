@@ -69,6 +69,11 @@ type DB interface {
 	GetAdmins(ctx context.Context) ([]*linkedca.Admin, error)
 	UpdateAdmin(ctx context.Context, admin *linkedca.Admin) error
 	DeleteAdmin(ctx context.Context, id string) error
+
+	CreateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error
+	GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error)
+	UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error
+	DeleteAuthorityPolicy(ctx context.Context) error
 }
 
 // MockDB is an implementation of the DB interface that should only be used as
@@ -85,6 +90,11 @@ type MockDB struct {
 	MockGetAdmins   func(ctx context.Context) ([]*linkedca.Admin, error)
 	MockUpdateAdmin func(ctx context.Context, adm *linkedca.Admin) error
 	MockDeleteAdmin func(ctx context.Context, id string) error
+
+	MockCreateAuthorityPolicy func(ctx context.Context, policy *linkedca.Policy) error
+	MockGetAuthorityPolicy    func(ctx context.Context) (*linkedca.Policy, error)
+	MockUpdateAuthorityPolicy func(ctx context.Context, policy *linkedca.Policy) error
+	MockDeleteAuthorityPolicy func(ctx context.Context) error
 
 	MockError error
 	MockRet1  interface{}
@@ -176,6 +186,33 @@ func (m *MockDB) UpdateAdmin(ctx context.Context, adm *linkedca.Admin) error {
 func (m *MockDB) DeleteAdmin(ctx context.Context, id string) error {
 	if m.MockDeleteAdmin != nil {
 		return m.MockDeleteAdmin(ctx, id)
+	}
+	return m.MockError
+}
+
+func (m *MockDB) CreateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+	if m.MockCreateAuthorityPolicy != nil {
+		return m.MockCreateAuthorityPolicy(ctx, policy)
+	}
+	return m.MockError
+}
+func (m *MockDB) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
+	if m.MockGetAuthorityPolicy != nil {
+		return m.MockGetAuthorityPolicy(ctx)
+	}
+	return m.MockRet1.(*linkedca.Policy), m.MockError
+}
+
+func (m *MockDB) UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+	if m.MockUpdateAuthorityPolicy != nil {
+		return m.MockUpdateAuthorityPolicy(ctx, policy)
+	}
+	return m.MockError
+}
+
+func (m *MockDB) DeleteAuthorityPolicy(ctx context.Context) error {
+	if m.MockDeleteAuthorityPolicy != nil {
+		return m.MockDeleteAuthorityPolicy(ctx)
 	}
 	return m.MockError
 }

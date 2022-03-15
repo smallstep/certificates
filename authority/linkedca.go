@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/db"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
@@ -33,6 +34,9 @@ type linkedCaClient struct {
 	client      linkedca.MajordomoClient
 	authorityID string
 }
+
+// interface guard
+var _ admin.DB = (*linkedCaClient)(nil)
 
 type linkedCAClaims struct {
 	jose.Claims
@@ -308,6 +312,22 @@ func (c *linkedCaClient) IsSSHRevoked(serial string) (bool, error) {
 		return false, errors.Wrap(err, "error getting certificate status")
 	}
 	return resp.Status != linkedca.RevocationStatus_ACTIVE, nil
+}
+
+func (c *linkedCaClient) CreateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+	return errors.New("not implemented yet")
+}
+
+func (c *linkedCaClient) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
+	return nil, errors.New("not implemented yet")
+}
+
+func (c *linkedCaClient) UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+	return errors.New("not implemented yet")
+}
+
+func (c *linkedCaClient) DeleteAuthorityPolicy(ctx context.Context) error {
+	return errors.New("not implemented yet")
 }
 
 func serializeCertificate(crt *x509.Certificate) string {

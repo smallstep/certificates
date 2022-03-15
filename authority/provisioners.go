@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/cli-utils/step"
@@ -394,6 +395,58 @@ func optionsToCertificates(p *linkedca.Provisioner) *provisioner.Options {
 	if p.SshTemplate != nil {
 		ops.SSH.Template = string(p.SshTemplate.Template)
 		ops.SSH.TemplateData = p.SshTemplate.Data
+	}
+	if p.Policy != nil {
+		if p.Policy.X509 != nil {
+			if p.Policy.X509.Allow != nil {
+				ops.X509.AllowedNames = &policy.X509NameOptions{
+					DNSDomains:     p.Policy.X509.Allow.Dns,
+					IPRanges:       p.Policy.X509.Allow.Ips,
+					EmailAddresses: p.Policy.X509.Allow.Emails,
+					URIDomains:     p.Policy.X509.Allow.Uris,
+				}
+			}
+			if p.Policy.X509.Deny != nil {
+				ops.X509.DeniedNames = &policy.X509NameOptions{
+					DNSDomains:     p.Policy.X509.Deny.Dns,
+					IPRanges:       p.Policy.X509.Deny.Ips,
+					EmailAddresses: p.Policy.X509.Deny.Emails,
+					URIDomains:     p.Policy.X509.Deny.Uris,
+				}
+			}
+		}
+		if p.Policy.Ssh != nil {
+			if p.Policy.Ssh.Host != nil {
+				ops.SSH.Host = &policy.SSHHostCertificateOptions{}
+				if p.Policy.Ssh.Host.Allow != nil {
+					ops.SSH.Host.AllowedNames = &policy.SSHNameOptions{
+						DNSDomains: p.Policy.Ssh.Host.Allow.Dns,
+						IPRanges:   p.Policy.Ssh.Host.Allow.Ips,
+					}
+				}
+				if p.Policy.Ssh.Host.Deny != nil {
+					ops.SSH.Host.DeniedNames = &policy.SSHNameOptions{
+						DNSDomains: p.Policy.Ssh.Host.Deny.Dns,
+						IPRanges:   p.Policy.Ssh.Host.Deny.Ips,
+					}
+				}
+			}
+			if p.Policy.Ssh.User != nil {
+				ops.SSH.User = &policy.SSHUserCertificateOptions{}
+				if p.Policy.Ssh.User.Allow != nil {
+					ops.SSH.User.AllowedNames = &policy.SSHNameOptions{
+						EmailAddresses: p.Policy.Ssh.User.Allow.Emails,
+						Principals:     p.Policy.Ssh.User.Allow.Principals,
+					}
+				}
+				if p.Policy.Ssh.User.Deny != nil {
+					ops.SSH.User.DeniedNames = &policy.SSHNameOptions{
+						EmailAddresses: p.Policy.Ssh.User.Deny.Emails,
+						Principals:     p.Policy.Ssh.User.Deny.Principals,
+					}
+				}
+			}
+		}
 	}
 	return ops
 }

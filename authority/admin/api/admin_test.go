@@ -37,6 +37,11 @@ type mockAdminAuthority struct {
 	MockLoadProvisionerByID   func(id string) (provisioner.Interface, error)
 	MockUpdateProvisioner     func(ctx context.Context, nu *linkedca.Provisioner) error
 	MockRemoveProvisioner     func(ctx context.Context, id string) error
+
+	MockGetAuthorityPolicy    func(ctx context.Context) (*linkedca.Policy, error)
+	MockStoreAuthorityPolicy  func(ctx context.Context, policy *linkedca.Policy) error
+	MockUpdateAuthorityPolicy func(ctx context.Context, policy *linkedca.Policy) error
+	MockRemoveAuthorityPolicy func(ctx context.Context) error
 }
 
 func (m *mockAdminAuthority) IsAdminAPIEnabled() bool {
@@ -128,6 +133,22 @@ func (m *mockAdminAuthority) RemoveProvisioner(ctx context.Context, id string) e
 		return m.MockRemoveProvisioner(ctx, id)
 	}
 	return m.MockErr
+}
+
+func (m *mockAdminAuthority) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
+	return nil, errors.New("not implemented yet")
+}
+
+func (m *mockAdminAuthority) StoreAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+	return errors.New("not implemented yet")
+}
+
+func (m *mockAdminAuthority) UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+	return errors.New("not implemented yet")
+}
+
+func (m *mockAdminAuthority) RemoveAuthorityPolicy(ctx context.Context) error {
+	return errors.New("not implemented yet")
 }
 
 func TestCreateAdminRequest_Validate(t *testing.T) {

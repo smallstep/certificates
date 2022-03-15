@@ -66,6 +66,13 @@ func JSONStatus(w http.ResponseWriter, v interface{}, status int) {
 	LogEnabledResponse(w, v)
 }
 
+// JSONNotFound writes a HTTP Not Found response with empty body.
+func JSONNotFound(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNotFound)
+	LogEnabledResponse(w, nil)
+}
+
 // ProtoJSON writes the passed value into the http.ResponseWriter.
 func ProtoJSON(w http.ResponseWriter, m proto.Message) {
 	ProtoJSONStatus(w, m, http.StatusOK)

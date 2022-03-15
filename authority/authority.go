@@ -205,6 +205,47 @@ func (a *Authority) reloadAdminResources(ctx context.Context) error {
 	a.provisioners = provClxn
 	a.config.AuthorityConfig.Admins = adminList
 	a.admins = adminClxn
+
+	return nil
+}
+
+// reloadPolicyEngines reloads x509 and SSH policy engines using
+// configuration stored in the DB or from the configuration file.
+func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
+	var (
+		err           error
+		policyOptions *policy.Options
+	)
+	if a.config.AuthorityConfig.EnableAdmin {
+		linkedPolicy, err := a.adminDB.GetAuthorityPolicy(ctx)
+		if err != nil {
+			return admin.WrapErrorISE(err, "error getting policy to initialize authority")
+		}
+		policyOptions = policyToCertificates(linkedPolicy)
+	} else {
+		policyOptions = a.config.AuthorityConfig.Policy
+	}
+
+	// return early if no policy options set
+	if policyOptions == nil {
+		return nil
+	}
+
+	// Initialize the x509 allow/deny policy engine
+	if a.x509Policy, err = policy.NewX509PolicyEngine(policyOptions.GetX509Options()); err != nil {
+		return err
+	}
+
+	// // Initialize the SSH allow/deny policy engine for host certificates
+	if a.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(policyOptions.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	// // Initialize the SSH allow/deny policy engine for user certificates
+	if a.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(policyOptions.GetSSHOptions()); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -533,6 +574,11 @@ func (a *Authority) init() error {
 		return err
 	}
 
+	// Load Policy Engines
+	if err := a.reloadPolicyEngines(context.Background()); err != nil {
+		return err
+	}
+
 	// Configure templates, currently only ssh templates are supported.
 	if a.sshCAHostCertSignKey != nil || a.sshCAUserCertSignKey != nil {
 		a.templates = a.config.Templates
@@ -543,21 +589,6 @@ func (a *Authority) init() error {
 			a.templates.Data = make(map[string]interface{})
 		}
 		a.templates.Data["Step"] = tmplVars
-	}
-
-	// Initialize the x509 allow/deny policy engine
-	if a.x509Policy, err = policy.NewX509PolicyEngine(a.config.AuthorityConfig.Policy.GetX509Options()); err != nil {
-		return err
-	}
-
-	// // Initialize the SSH allow/deny policy engine for host certificates
-	if a.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(a.config.AuthorityConfig.Policy.GetSSHOptions()); err != nil {
-		return err
-	}
-
-	// // Initialize the SSH allow/deny policy engine for user certificates
-	if a.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(a.config.AuthorityConfig.Policy.GetSSHOptions()); err != nil {
-		return err
 	}
 
 	// JWT numeric dates are seconds.

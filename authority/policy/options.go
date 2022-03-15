@@ -1,10 +1,14 @@
 package policy
 
+// Options is a container for authority level x509 and SSH
+// policy configuration.
 type Options struct {
 	X509 *X509PolicyOptions `json:"x509,omitempty"`
 	SSH  *SSHPolicyOptions  `json:"ssh,omitempty"`
 }
 
+// GetX509Options returns the x509 authority level policy
+// configuration
 func (o *Options) GetX509Options() *X509PolicyOptions {
 	if o == nil {
 		return nil
@@ -12,6 +16,8 @@ func (o *Options) GetX509Options() *X509PolicyOptions {
 	return o.X509
 }
 
+// GetSSHOptions returns the SSH authority level policy
+// configuration
 func (o *Options) GetSSHOptions() *SSHPolicyOptions {
 	if o == nil {
 		return nil
@@ -19,16 +25,19 @@ func (o *Options) GetSSHOptions() *SSHPolicyOptions {
 	return o.SSH
 }
 
+// X509PolicyOptionsInterface is an interface for providers
+// of x509 allowed and denied names.
 type X509PolicyOptionsInterface interface {
 	GetAllowedNameOptions() *X509NameOptions
 	GetDeniedNameOptions() *X509NameOptions
 }
 
+// X509PolicyOptions is a container for x509 allowed and denied
+// names.
 type X509PolicyOptions struct {
-	// AllowedNames ...
+	// AllowedNames contains the x509 allowed names
 	AllowedNames *X509NameOptions `json:"allow,omitempty"`
-
-	// DeniedNames ...
+	// DeniedNames contains the x509 denied names
 	DeniedNames *X509NameOptions `json:"deny,omitempty"`
 }
 
@@ -49,6 +58,8 @@ func (o *X509NameOptions) HasNames() bool {
 		len(o.URIDomains) > 0
 }
 
+// SSHPolicyOptionsInterface is an interface for providers of
+// SSH user and host name policy configuration.
 type SSHPolicyOptionsInterface interface {
 	GetAllowedUserNameOptions() *SSHNameOptions
 	GetDeniedUserNameOptions() *SSHNameOptions
@@ -56,16 +67,16 @@ type SSHPolicyOptionsInterface interface {
 	GetDeniedHostNameOptions() *SSHNameOptions
 }
 
+// SSHPolicyOptions is a container for SSH user and host policy
+// configuration
 type SSHPolicyOptions struct {
 	// User contains SSH user certificate options.
 	User *SSHUserCertificateOptions `json:"user,omitempty"`
-
 	// Host contains SSH host certificate options.
 	Host *SSHHostCertificateOptions `json:"host,omitempty"`
 }
 
-// GetAllowedNameOptions returns AllowedNames, which models the
-// SANs that ...
+// GetAllowedNameOptions returns x509 allowed name policy configuration
 func (o *X509PolicyOptions) GetAllowedNameOptions() *X509NameOptions {
 	if o == nil {
 		return nil
@@ -73,8 +84,7 @@ func (o *X509PolicyOptions) GetAllowedNameOptions() *X509NameOptions {
 	return o.AllowedNames
 }
 
-// GetDeniedNameOptions returns the DeniedNames, which models the
-// SANs that ...
+// GetDeniedNameOptions returns the x509 denied name policy configuration
 func (o *X509PolicyOptions) GetDeniedNameOptions() *X509NameOptions {
 	if o == nil {
 		return nil
@@ -82,6 +92,8 @@ func (o *X509PolicyOptions) GetDeniedNameOptions() *X509NameOptions {
 	return o.DeniedNames
 }
 
+// GetAllowedUserNameOptions returns the SSH allowed user name policy
+// configuration.
 func (o *SSHPolicyOptions) GetAllowedUserNameOptions() *SSHNameOptions {
 	if o == nil {
 		return nil
@@ -92,6 +104,8 @@ func (o *SSHPolicyOptions) GetAllowedUserNameOptions() *SSHNameOptions {
 	return o.User.AllowedNames
 }
 
+// GetDeniedUserNameOptions returns the SSH denied user name policy
+// configuration.
 func (o *SSHPolicyOptions) GetDeniedUserNameOptions() *SSHNameOptions {
 	if o == nil {
 		return nil
@@ -102,6 +116,8 @@ func (o *SSHPolicyOptions) GetDeniedUserNameOptions() *SSHNameOptions {
 	return o.User.DeniedNames
 }
 
+// GetAllowedHostNameOptions returns the SSH allowed host name policy
+// configuration.
 func (o *SSHPolicyOptions) GetAllowedHostNameOptions() *SSHNameOptions {
 	if o == nil {
 		return nil
@@ -112,6 +128,8 @@ func (o *SSHPolicyOptions) GetAllowedHostNameOptions() *SSHNameOptions {
 	return o.Host.AllowedNames
 }
 
+// GetDeniedHostNameOptions returns the SSH denied host name policy
+// configuration.
 func (o *SSHPolicyOptions) GetDeniedHostNameOptions() *SSHNameOptions {
 	if o == nil {
 		return nil

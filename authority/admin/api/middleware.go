@@ -6,6 +6,7 @@ import (
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/admin/db/nosql"
 )
 
 type nextHTTP = func(http.ResponseWriter, *http.Request)
@@ -41,6 +42,28 @@ func (h *Handler) extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
 
 		ctx := context.WithValue(r.Context(), adminContextKey, adm)
 		next(w, r.WithContext(ctx))
+	}
+}
+
+// checkAction checks if an action is supported in standalone or not
+func (h *Handler) checkAction(next nextHTTP, supportedInStandalone bool) nextHTTP {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// actions allowed in standalone mode are always allowed
+		if supportedInStandalone {
+			next(w, r)
+			return
+		}
+
+		// when in standalone mode, actions are not supported
+		if _, ok := h.adminDB.(*nosql.DB); ok {
+			api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType,
+				"operation not supported in standalone mode"))
+			return
+		}
+
+		// continue to next http handler
+		next(w, r)
 	}
 }
 

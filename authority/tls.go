@@ -192,7 +192,10 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	// If a policy is configured, perform allow/deny policy check on authority level
-	if a.x509Policy != nil {
+	// TODO: policy currently also applies to admin token certs; how to circumvent?
+	// Allow any name of an admin in the DB? Or in the admin collection?
+	todoRemoveThis := false
+	if todoRemoveThis && a.x509Policy != nil {
 		allowed, err := a.x509Policy.AreCertificateNamesAllowed(leaf)
 		if err != nil {
 			return nil, errs.InternalServerErr(err,
