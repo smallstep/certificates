@@ -66,7 +66,9 @@ func New(scepAuth scep.Interface) api.RouterHandler {
 // Route traffic and implement the Router interface.
 func (h *Handler) Route(r api.Router) {
 	getLink := h.Auth.GetLinkExplicit
+	r.MethodFunc(http.MethodGet, getLink("{provisionerName}/*", false, nil), h.lookupProvisioner(h.Get))
 	r.MethodFunc(http.MethodGet, getLink("{provisionerName}", false, nil), h.lookupProvisioner(h.Get))
+	r.MethodFunc(http.MethodPost, getLink("{provisionerName}/*", false, nil), h.lookupProvisioner(h.Post))
 	r.MethodFunc(http.MethodPost, getLink("{provisionerName}", false, nil), h.lookupProvisioner(h.Post))
 }
 
