@@ -214,7 +214,7 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if claims, err := tc.p.authorizeToken(tc.token, testAudiences.Sign); err != nil {
+			if claims, err := tc.p.authorizeToken(tc.token, testAudiences.Sign, true); err != nil {
 				sc, ok := err.(errs.StatusCoder)
 				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 				assert.Equals(t, sc.StatusCode(), tc.code)

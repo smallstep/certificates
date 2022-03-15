@@ -104,7 +104,7 @@ func (p *SSHPOP) Init(config Config) (err error) {
 // e.g. a Sign request will auth/validate different fields than a Revoke request.
 //
 // Checking for certificate revocation has been moved to the authority package.
-func (p *SSHPOP) authorizeToken(token string, audiences []string) (*sshPOPPayload, error) {
+func (p *SSHPOP) authorizeToken(token string, audiences []string, checkValidity bool) (*sshPOPPayload, error) {
 	sshCert, jwt, err := ExtractSSHPOPCert(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusUnauthorized, err,
@@ -112,13 +112,18 @@ func (p *SSHPOP) authorizeToken(token string, audiences []string) (*sshPOPPayloa
 	}
 
 	// Check validity period of the certificate.
-	n := time.Now()
-	if sshCert.ValidAfter != 0 && time.Unix(int64(sshCert.ValidAfter), 0).After(n) {
-		return nil, errs.Unauthorized("sshpop.authorizeToken; sshpop certificate validAfter is in the future")
+	//
+	// Controller.AuthorizeSSHRenew will validate this on the renewal flow.
+	if checkValidity {
+		unixNow := time.Now().Unix()
+		if after := int64(sshCert.ValidAfter); after < 0 || unixNow < int64(sshCert.ValidAfter) {
+			return nil, errs.Unauthorized("sshpop.authorizeToken; sshpop certificate validAfter is in the future")
+		}
+		if before := int64(sshCert.ValidBefore); sshCert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) {
+			return nil, errs.Unauthorized("sshpop.authorizeToken; sshpop certificate validBefore is in the past")
+		}
 	}
-	if sshCert.ValidBefore != 0 && time.Unix(int64(sshCert.ValidBefore), 0).Before(n) {
-		return nil, errs.Unauthorized("sshpop.authorizeToken; sshpop certificate validBefore is in the past")
-	}
+
 	sshCryptoPubKey, ok := sshCert.Key.(ssh.CryptoPublicKey)
 	if !ok {
 		return nil, errs.InternalServer("sshpop.authorizeToken; sshpop public key could not be cast to ssh CryptoPublicKey")
@@ -181,7 +186,7 @@ func (p *SSHPOP) authorizeToken(token string, audiences []string) (*sshPOPPayloa
 // AuthorizeSSHRevoke validates the authorization token and extracts/validates
 // the SSH certificate from the ssh-pop header.
 func (p *SSHPOP) AuthorizeSSHRevoke(ctx context.Context, token string) error {
-	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHRevoke)
+	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHRevoke, true)
 	if err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRevoke")
 	}
@@ -194,7 +199,7 @@ func (p *SSHPOP) AuthorizeSSHRevoke(ctx context.Context, token string) error {
 // AuthorizeSSHRenew validates the authorization token and extracts/validates
 // the SSH certificate from the ssh-pop header.
 func (p *SSHPOP) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {
-	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHRenew)
+	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHRenew, false)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRenew")
 	}
@@ -207,7 +212,7 @@ func (p *SSHPOP) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Cert
 // AuthorizeSSHRekey validates the authorization token and extracts/validates
 // the SSH certificate from the ssh-pop header.
 func (p *SSHPOP) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error) {
-	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHRekey)
+	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHRekey, true)
 	if err != nil {
 		return nil, nil, errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRekey")
 	}
@@ -222,7 +227,6 @@ func (p *SSHPOP) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Cert
 		// Require and validate all the default fields in the SSH certificate.
 		&sshCertDefaultValidator{},
 	}, nil
-
 }
 
 // ExtractSSHPOPCert parses a JWT and extracts and loads the SSH Certificate
