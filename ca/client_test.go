@@ -1142,7 +1142,7 @@ func TestClient_GetCaURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := NewClient(tt.caURL)
+			c, err := NewClient(tt.caURL, WithTransport(http.DefaultTransport))
 			if err != nil {
 				t.Errorf("NewClient() error = %v", err)
 				return
