@@ -17,8 +17,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api"
