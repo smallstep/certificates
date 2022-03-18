@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/smallstep/certificates/api/log"
 	"github.com/smallstep/certificates/logging"
 )
 
@@ -28,7 +29,7 @@ func TestLogError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			LogError(tt.args.rw, tt.args.err)
+			log.Error(tt.args.rw, tt.args.err)
 			if tt.withFields {
 				if rl, ok := tt.args.rw.(logging.ResponseLogger); ok {
 					fields := rl.Fields()
