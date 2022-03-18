@@ -7,7 +7,6 @@ import (
 	"github.com/go-chi/chi"
 
 	"github.com/smallstep/certificates/acme"
-	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/logging"
 )
@@ -72,23 +71,23 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	var nar NewAccountRequest
 	if err := json.Unmarshal(payload.value, &nar); err != nil {
-		api.WriteError(w, acme.WrapError(acme.ErrorMalformedType, err,
+		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
 			"failed to unmarshal new-account request payload"))
 		return
 	}
 	if err := nar.Validate(); err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	prov, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
@@ -98,26 +97,26 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 		acmeErr, ok := err.(*acme.Error)
 		if !ok || acmeErr.Status != http.StatusBadRequest {
 			// Something went wrong ...
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 
 		// Account does not exist //
 		if nar.OnlyReturnExisting {
-			api.WriteError(w, acme.NewError(acme.ErrorAccountDoesNotExistType,
+			render.Error(w, acme.NewError(acme.ErrorAccountDoesNotExistType,
 				"account does not exist"))
 			return
 		}
 
 		jwk, err := jwkFromContext(ctx)
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 
 		eak, err := h.validateExternalAccountBinding(ctx, &nar)
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 
@@ -127,18 +126,18 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			Status:  acme.StatusValid,
 		}
 		if err := h.db.CreateAccount(ctx, acc); err != nil {
-			api.WriteError(w, acme.WrapErrorISE(err, "error creating account"))
+			render.Error(w, acme.WrapErrorISE(err, "error creating account"))
 			return
 		}
 
 		if eak != nil { // means that we have a (valid) External Account Binding key that should be bound, updated and sent in the response
 			err := eak.BindTo(acc)
 			if err != nil {
-				api.WriteError(w, err)
+				render.Error(w, err)
 				return
 			}
 			if err := h.db.UpdateExternalAccountKey(ctx, prov.ID, eak); err != nil {
-				api.WriteError(w, acme.WrapErrorISE(err, "error updating external account binding key"))
+				render.Error(w, acme.WrapErrorISE(err, "error updating external account binding key"))
 				return
 			}
 			acc.ExternalAccountBinding = nar.ExternalAccountBinding
@@ -159,12 +158,12 @@ func (h *Handler) GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
@@ -173,12 +172,12 @@ func (h *Handler) GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	if !payload.isPostAsGet {
 		var uar UpdateAccountRequest
 		if err := json.Unmarshal(payload.value, &uar); err != nil {
-			api.WriteError(w, acme.WrapError(acme.ErrorMalformedType, err,
+			render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
 				"failed to unmarshal new-account request payload"))
 			return
 		}
 		if err := uar.Validate(); err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 		if len(uar.Status) > 0 || len(uar.Contact) > 0 {
@@ -189,7 +188,7 @@ func (h *Handler) GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if err := h.db.UpdateAccount(ctx, acc); err != nil {
-				api.WriteError(w, acme.WrapErrorISE(err, "error updating account"))
+				render.Error(w, acme.WrapErrorISE(err, "error updating account"))
 				return
 			}
 		}
@@ -215,17 +214,17 @@ func (h *Handler) GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	accID := chi.URLParam(r, "accID")
 	if acc.ID != accID {
-		api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType, "account ID '%s' does not match url param '%s'", acc.ID, accID))
+		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType, "account ID '%s' does not match url param '%s'", acc.ID, accID))
 		return
 	}
 	orders, err := h.db.GetOrdersByAccountID(ctx, acc.ID)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
