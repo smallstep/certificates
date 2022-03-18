@@ -1,3 +1,4 @@
+// Package log implements API-related logging helpers.
 package log
 
 import (
