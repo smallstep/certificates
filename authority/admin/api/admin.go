@@ -10,6 +10,7 @@ import (
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
@@ -89,7 +90,7 @@ func (h *Handler) GetAdmin(w http.ResponseWriter, r *http.Request) {
 			"admin %s not found", id))
 		return
 	}
-	api.ProtoJSON(w, adm)
+	render.ProtoJSON(w, adm)
 }
 
 // GetAdmins returns a segment of admins associated with the authority.
@@ -106,7 +107,7 @@ func (h *Handler) GetAdmins(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, admin.WrapErrorISE(err, "error retrieving paginated admins"))
 		return
 	}
-	api.JSON(w, &GetAdminsResponse{
+	render.JSON(w, &GetAdminsResponse{
 		Admins:     admins,
 		NextCursor: nextCursor,
 	})
@@ -141,7 +142,7 @@ func (h *Handler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.ProtoJSONStatus(w, adm, http.StatusCreated)
+	render.ProtoJSONStatus(w, adm, http.StatusCreated)
 }
 
 // DeleteAdmin deletes admin.
@@ -153,7 +154,7 @@ func (h *Handler) DeleteAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.JSON(w, &DeleteResponse{Status: "ok"})
+	render.JSON(w, &DeleteResponse{Status: "ok"})
 }
 
 // UpdateAdmin updates an existing admin.
@@ -177,5 +178,5 @@ func (h *Handler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.ProtoJSON(w, adm)
+	render.ProtoJSON(w, adm)
 }
