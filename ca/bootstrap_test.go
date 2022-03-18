@@ -14,11 +14,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/randutil"
+
+	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/errs"
 )
 
 func newLocalListener() net.Listener {
@@ -79,7 +82,7 @@ func startCAServer(configFile string) (*CA, string, error) {
 func mTLSMiddleware(next http.Handler, nonAuthenticatedPaths ...string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/version" {
-			api.JSON(w, api.VersionResponse{
+			render.JSON(w, api.VersionResponse{
 				Version:                     "test",
 				RequireClientAuthentication: true,
 			})
