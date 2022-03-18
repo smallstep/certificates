@@ -17,13 +17,15 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"go.step.sm/crypto/x509util"
+	"golang.org/x/crypto/ssh"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
-	"go.step.sm/crypto/x509util"
-	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -354,7 +356,7 @@ func TestClient_Sign(t *testing.T) {
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				body := new(api.SignRequest)
-				if err := api.ReadJSON(req.Body, body); err != nil {
+				if err := read.JSON(req.Body, body); err != nil {
 					e, ok := tt.response.(error)
 					assert.Fatal(t, ok, "response expected to be error type")
 					api.WriteError(w, e)
@@ -426,7 +428,7 @@ func TestClient_Revoke(t *testing.T) {
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				body := new(api.RevokeRequest)
-				if err := api.ReadJSON(req.Body, body); err != nil {
+				if err := read.JSON(req.Body, body); err != nil {
 					e, ok := tt.response.(error)
 					assert.Fatal(t, ok, "response expected to be error type")
 					api.WriteError(w, e)
