@@ -35,19 +35,19 @@ func (h *Handler) GetProvisioner(w http.ResponseWriter, r *http.Request) {
 	)
 	if len(id) > 0 {
 		if p, err = h.auth.LoadProvisionerByID(id); err != nil {
-			api.WriteError(w, admin.WrapErrorISE(err, "error loading provisioner %s", id))
+			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", id))
 			return
 		}
 	} else {
 		if p, err = h.auth.LoadProvisionerByName(name); err != nil {
-			api.WriteError(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
+			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
 			return
 		}
 	}
 
 	prov, err := h.adminDB.GetProvisioner(ctx, p.GetID())
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	render.ProtoJSON(w, prov)
@@ -57,14 +57,14 @@ func (h *Handler) GetProvisioner(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 	cursor, limit, err := api.ParseCursor(r)
 	if err != nil {
-		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err,
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err,
 			"error parsing cursor and limit from query params"))
 		return
 	}
 
 	p, next, err := h.auth.GetProvisioners(cursor, limit)
 	if err != nil {
-		api.WriteError(w, errs.InternalServerErr(err))
+		render.Error(w, errs.InternalServerErr(err))
 		return
 	}
 	render.JSON(w, &GetProvisionersResponse{
@@ -77,18 +77,18 @@ func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 	var prov = new(linkedca.Provisioner)
 	if err := read.ProtoJSON(r.Body, prov); err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	// TODO: Validate inputs
 	if err := authority.ValidateClaims(prov.Claims); err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	if err := h.auth.StoreProvisioner(r.Context(), prov); err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error storing provisioner %s", prov.Name))
+		render.Error(w, admin.WrapErrorISE(err, "error storing provisioner %s", prov.Name))
 		return
 	}
 	render.ProtoJSONStatus(w, prov, http.StatusCreated)
@@ -105,18 +105,18 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 	)
 	if len(id) > 0 {
 		if p, err = h.auth.LoadProvisionerByID(id); err != nil {
-			api.WriteError(w, admin.WrapErrorISE(err, "error loading provisioner %s", id))
+			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", id))
 			return
 		}
 	} else {
 		if p, err = h.auth.LoadProvisionerByName(name); err != nil {
-			api.WriteError(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
+			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
 			return
 		}
 	}
 
 	if err := h.auth.RemoveProvisioner(r.Context(), p.GetID()); err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error removing provisioner %s", p.GetName()))
+		render.Error(w, admin.WrapErrorISE(err, "error removing provisioner %s", p.GetName()))
 		return
 	}
 
@@ -127,52 +127,52 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 	var nu = new(linkedca.Provisioner)
 	if err := read.ProtoJSON(r.Body, nu); err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	name := chi.URLParam(r, "name")
 	_old, err := h.auth.LoadProvisionerByName(name)
 	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error loading provisioner from cached configuration '%s'", name))
+		render.Error(w, admin.WrapErrorISE(err, "error loading provisioner from cached configuration '%s'", name))
 		return
 	}
 
 	old, err := h.adminDB.GetProvisioner(r.Context(), _old.GetID())
 	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error loading provisioner from db '%s'", _old.GetID()))
+		render.Error(w, admin.WrapErrorISE(err, "error loading provisioner from db '%s'", _old.GetID()))
 		return
 	}
 
 	if nu.Id != old.Id {
-		api.WriteError(w, admin.NewErrorISE("cannot change provisioner ID"))
+		render.Error(w, admin.NewErrorISE("cannot change provisioner ID"))
 		return
 	}
 	if nu.Type != old.Type {
-		api.WriteError(w, admin.NewErrorISE("cannot change provisioner type"))
+		render.Error(w, admin.NewErrorISE("cannot change provisioner type"))
 		return
 	}
 	if nu.AuthorityId != old.AuthorityId {
-		api.WriteError(w, admin.NewErrorISE("cannot change provisioner authorityID"))
+		render.Error(w, admin.NewErrorISE("cannot change provisioner authorityID"))
 		return
 	}
 	if !nu.CreatedAt.AsTime().Equal(old.CreatedAt.AsTime()) {
-		api.WriteError(w, admin.NewErrorISE("cannot change provisioner createdAt"))
+		render.Error(w, admin.NewErrorISE("cannot change provisioner createdAt"))
 		return
 	}
 	if !nu.DeletedAt.AsTime().Equal(old.DeletedAt.AsTime()) {
-		api.WriteError(w, admin.NewErrorISE("cannot change provisioner deletedAt"))
+		render.Error(w, admin.NewErrorISE("cannot change provisioner deletedAt"))
 		return
 	}
 
 	// TODO: Validate inputs
 	if err := authority.ValidateClaims(nu.Claims); err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	if err := h.auth.UpdateProvisioner(r.Context(), nu); err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	render.ProtoJSON(w, nu)
