@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/pemutil"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
-	"github.com/smallstep/certificates/api"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/pemutil"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func TestNewACMEClient(t *testing.T) {
@@ -112,15 +113,15 @@ func TestNewACMEClient(t *testing.T) {
 				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
 				switch {
 				case i == 0:
-					api.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, tc.r1, tc.rc1)
 					i++
 				case i == 1:
 					w.Header().Set("Replay-Nonce", "abc123")
-					api.JSONStatus(w, []byte{}, 200)
+					render.JSONStatus(w, []byte{}, 200)
 					i++
 				default:
 					w.Header().Set("Location", accLocation)
-					api.JSONStatus(w, tc.r2, tc.rc2)
+					render.JSONStatus(w, tc.r2, tc.rc2)
 				}
 			})
 
@@ -206,7 +207,7 @@ func TestACMEClient_GetNonce(t *testing.T) {
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
 				w.Header().Set("Replay-Nonce", expectedNonce)
-				api.JSONStatus(w, tc.r1, tc.rc1)
+				render.JSONStatus(w, tc.r1, tc.rc1)
 			})
 
 			if nonce, err := ac.GetNonce(); err != nil {
@@ -315,7 +316,7 @@ func TestACMEClient_post(t *testing.T) {
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					api.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, tc.r1, tc.rc1)
 					i++
 					return
 				}
@@ -338,7 +339,7 @@ func TestACMEClient_post(t *testing.T) {
 					assert.Equals(t, hdr.KeyID, ac.kid)
 				}
 
-				api.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, tc.r2, tc.rc2)
 			})
 
 			if resp, err := tc.client.post(tc.payload, url, tc.ops...); err != nil {
@@ -455,7 +456,7 @@ func TestACMEClient_NewOrder(t *testing.T) {
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					api.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, tc.r1, tc.rc1)
 					i++
 					return
 				}
@@ -477,7 +478,7 @@ func TestACMEClient_NewOrder(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, payload, norb)
 
-				api.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, tc.r2, tc.rc2)
 			})
 
 			if res, err := ac.NewOrder(norb); err != nil {
@@ -577,7 +578,7 @@ func TestACMEClient_GetOrder(t *testing.T) {
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					api.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, tc.r1, tc.rc1)
 					i++
 					return
 				}
@@ -599,7 +600,7 @@ func TestACMEClient_GetOrder(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, len(payload), 0)
 
-				api.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, tc.r2, tc.rc2)
 			})
 
 			if res, err := ac.GetOrder(url); err != nil {
@@ -699,7 +700,7 @@ func TestACMEClient_GetAuthz(t *testing.T) {
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					api.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, tc.r1, tc.rc1)
 					i++
 					return
 				}
@@ -721,7 +722,7 @@ func TestACMEClient_GetAuthz(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, len(payload), 0)
 
-				api.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, tc.r2, tc.rc2)
 			})
 
 			if res, err := ac.GetAuthz(url); err != nil {
@@ -821,7 +822,7 @@ func TestACMEClient_GetChallenge(t *testing.T) {
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					api.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, tc.r1, tc.rc1)
 					i++
 					return
 				}
@@ -844,7 +845,7 @@ func TestACMEClient_GetChallenge(t *testing.T) {
 
 				assert.Equals(t, len(payload), 0)
 
-				api.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, tc.r2, tc.rc2)
 			})
 
 			if res, err := ac.GetChallenge(url); err != nil {
@@ -944,7 +945,7 @@ func TestACMEClient_ValidateChallenge(t *testing.T) {
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					api.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, tc.r1, tc.rc1)
 					i++
 					return
 				}
@@ -967,7 +968,7 @@ func TestACMEClient_ValidateChallenge(t *testing.T) {
 
 				assert.Equals(t, payload, []byte("{}"))
 
-				api.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, tc.r2, tc.rc2)
 			})
 
 			if err := ac.ValidateChallenge(url); err != nil {
@@ -1071,7 +1072,7 @@ func TestACMEClient_FinalizeOrder(t *testing.T) {
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					api.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, tc.r1, tc.rc1)
 					i++
 					return
 				}
@@ -1093,7 +1094,7 @@ func TestACMEClient_FinalizeOrder(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, payload, frb)
 
-				api.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, tc.r2, tc.rc2)
 			})
 
 			if err := ac.FinalizeOrder(url, csr); err != nil {
@@ -1200,7 +1201,7 @@ func TestACMEClient_GetAccountOrders(t *testing.T) {
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					api.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, tc.r1, tc.rc1)
 					i++
 					return
 				}
@@ -1222,7 +1223,7 @@ func TestACMEClient_GetAccountOrders(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, len(payload), 0)
 
-				api.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, tc.r2, tc.rc2)
 			})
 
 			if res, err := tc.client.GetAccountOrders(); err != nil {
@@ -1331,7 +1332,7 @@ func TestACMEClient_GetCertificate(t *testing.T) {
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					api.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, tc.r1, tc.rc1)
 					i++
 					return
 				}
@@ -1356,7 +1357,7 @@ func TestACMEClient_GetCertificate(t *testing.T) {
 				if tc.certBytes != nil {
 					w.Write(tc.certBytes)
 				} else {
-					api.JSONStatus(w, tc.r2, tc.rc2)
+					render.JSONStatus(w, tc.r2, tc.rc2)
 				}
 			})
 
