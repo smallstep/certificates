@@ -96,7 +96,7 @@ func mTLSMiddleware(next http.Handler, nonAuthenticatedPaths ...string) http.Han
 		}
 		isMTLS := r.TLS != nil && len(r.TLS.PeerCertificates) > 0
 		if !isMTLS {
-			api.WriteError(w, errs.Unauthorized("missing peer certificate"))
+			render.Error(w, errs.Unauthorized("missing peer certificate"))
 		} else {
 			next.ServeHTTP(w, r)
 		}

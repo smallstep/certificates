@@ -361,7 +361,7 @@ func TestClient_Sign(t *testing.T) {
 				if err := read.JSON(req.Body, body); err != nil {
 					e, ok := tt.response.(error)
 					assert.Fatal(t, ok, "response expected to be error type")
-					api.WriteError(w, e)
+					render.Error(w, e)
 					return
 				} else if !equalJSON(t, body, tt.request) {
 					if tt.request == nil {
@@ -433,7 +433,7 @@ func TestClient_Revoke(t *testing.T) {
 				if err := read.JSON(req.Body, body); err != nil {
 					e, ok := tt.response.(error)
 					assert.Fatal(t, ok, "response expected to be error type")
-					api.WriteError(w, e)
+					render.Error(w, e)
 					return
 				} else if !equalJSON(t, body, tt.request) {
 					if tt.request == nil {
