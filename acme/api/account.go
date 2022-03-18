@@ -5,8 +5,10 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
+
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/logging"
 )
 
@@ -149,7 +151,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 	h.linker.LinkAccount(ctx, acc)
 
 	w.Header().Set("Location", h.linker.GetLink(r.Context(), AccountLinkType, acc.ID))
-	api.JSONStatus(w, acc, httpStatus)
+	render.JSONStatus(w, acc, httpStatus)
 }
 
 // GetOrUpdateAccount is the api for updating an ACME account.
@@ -196,7 +198,7 @@ func (h *Handler) GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	h.linker.LinkAccount(ctx, acc)
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, AccountLinkType, acc.ID))
-	api.JSON(w, acc)
+	render.JSON(w, acc)
 }
 
 func logOrdersByAccount(w http.ResponseWriter, oids []string) {
@@ -229,6 +231,6 @@ func (h *Handler) GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 
 	h.linker.LinkOrdersByAccountID(ctx, orders)
 
-	api.JSON(w, orders)
+	render.JSON(w, orders)
 	logOrdersByAccount(w, orders)
 }

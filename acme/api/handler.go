@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
 
@@ -185,7 +187,7 @@ func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.JSON(w, &Directory{
+	render.JSON(w, &Directory{
 		NewNonce:   h.linker.GetLink(ctx, NewNonceLinkType),
 		NewAccount: h.linker.GetLink(ctx, NewAccountLinkType),
 		NewOrder:   h.linker.GetLink(ctx, NewOrderLinkType),
@@ -229,7 +231,7 @@ func (h *Handler) GetAuthorization(w http.ResponseWriter, r *http.Request) {
 	h.linker.LinkAuthorization(ctx, az)
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, AuthzLinkType, az.ID))
-	api.JSON(w, az)
+	render.JSON(w, az)
 }
 
 // GetChallenge ACME api for retrieving a Challenge.
@@ -280,7 +282,7 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Link", link(h.linker.GetLink(ctx, AuthzLinkType, azID), "up"))
 	w.Header().Set("Location", h.linker.GetLink(ctx, ChallengeLinkType, azID, ch.ID))
-	api.JSON(w, ch)
+	render.JSON(w, ch)
 }
 
 // GetCertificate ACME api for retrieving a Certificate.
