@@ -52,13 +52,13 @@ type SignResponse struct {
 func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 	var body SignRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
@@ -70,13 +70,13 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 
 	signOpts, err := h.Authority.AuthorizeSign(body.OTT)
 	if err != nil {
-		WriteError(w, errs.UnauthorizedErr(err))
+		render.Error(w, errs.UnauthorizedErr(err))
 		return
 	}
 
 	certChain, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, opts, signOpts...)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error signing certificate"))
+		render.Error(w, errs.ForbiddenErr(err, "error signing certificate"))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)

@@ -253,19 +253,19 @@ type SSHBastionResponse struct {
 func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	var body SSHSignRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	publicKey, err := ssh.ParsePublicKey(body.PublicKey)
 	if err != nil {
-		WriteError(w, errs.BadRequestErr(err, "error parsing publicKey"))
+		render.Error(w, errs.BadRequestErr(err, "error parsing publicKey"))
 		return
 	}
 
@@ -273,7 +273,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	if body.AddUserPublicKey != nil {
 		addUserPublicKey, err = ssh.ParsePublicKey(body.AddUserPublicKey)
 		if err != nil {
-			WriteError(w, errs.BadRequestErr(err, "error parsing addUserPublicKey"))
+			render.Error(w, errs.BadRequestErr(err, "error parsing addUserPublicKey"))
 			return
 		}
 	}
@@ -290,13 +290,13 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHSignMethod)
 	signOpts, err := h.Authority.Authorize(ctx, body.OTT)
 	if err != nil {
-		WriteError(w, errs.UnauthorizedErr(err))
+		render.Error(w, errs.UnauthorizedErr(err))
 		return
 	}
 
 	cert, err := h.Authority.SignSSH(ctx, publicKey, opts, signOpts...)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
+		render.Error(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
 		return
 	}
 
@@ -304,7 +304,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	if addUserPublicKey != nil && authority.IsValidForAddUser(cert) == nil {
 		addUserCert, err := h.Authority.SignSSHAddUser(ctx, addUserPublicKey, cert)
 		if err != nil {
-			WriteError(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
+			render.Error(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
 			return
 		}
 		addUserCertificate = &SSHCertificate{addUserCert}
@@ -317,7 +317,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 		ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 		signOpts, err := h.Authority.Authorize(ctx, body.OTT)
 		if err != nil {
-			WriteError(w, errs.UnauthorizedErr(err))
+			render.Error(w, errs.UnauthorizedErr(err))
 			return
 		}
 
@@ -329,7 +329,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 
 		certChain, err := h.Authority.Sign(cr, provisioner.SignOptions{}, signOpts...)
 		if err != nil {
-			WriteError(w, errs.ForbiddenErr(err, "error signing identity certificate"))
+			render.Error(w, errs.ForbiddenErr(err, "error signing identity certificate"))
 			return
 		}
 		identityCertificate = certChainToPEM(certChain)
@@ -347,12 +347,12 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHRoots(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.Authority.GetSSHRoots(r.Context())
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		render.Error(w, errs.InternalServerErr(err))
 		return
 	}
 
 	if len(keys.HostKeys) == 0 && len(keys.UserKeys) == 0 {
-		WriteError(w, errs.NotFound("no keys found"))
+		render.Error(w, errs.NotFound("no keys found"))
 		return
 	}
 
@@ -372,12 +372,12 @@ func (h *caHandler) SSHRoots(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.Authority.GetSSHFederation(r.Context())
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		render.Error(w, errs.InternalServerErr(err))
 		return
 	}
 
 	if len(keys.HostKeys) == 0 && len(keys.UserKeys) == 0 {
-		WriteError(w, errs.NotFound("no keys found"))
+		render.Error(w, errs.NotFound("no keys found"))
 		return
 	}
 
@@ -397,17 +397,17 @@ func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 	var body SSHConfigRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	ts, err := h.Authority.GetSSHConfig(r.Context(), body.Type, body.Data)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		render.Error(w, errs.InternalServerErr(err))
 		return
 	}
 
@@ -418,7 +418,7 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 	case provisioner.SSHHostCert:
 		cfg.HostTemplates = ts
 	default:
-		WriteError(w, errs.InternalServer("it should hot get here"))
+		render.Error(w, errs.InternalServer("it should hot get here"))
 		return
 	}
 
@@ -429,17 +429,17 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 	var body SSHCheckPrincipalRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	exists, err := h.Authority.CheckSSHHost(r.Context(), body.Principal, body.Token)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		render.Error(w, errs.InternalServerErr(err))
 		return
 	}
 	render.JSON(w, &SSHCheckPrincipalResponse{
@@ -456,7 +456,7 @@ func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 
 	hosts, err := h.Authority.GetSSHHosts(r.Context(), cert)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		render.Error(w, errs.InternalServerErr(err))
 		return
 	}
 	render.JSON(w, &SSHGetHostsResponse{
@@ -468,17 +468,17 @@ func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) SSHBastion(w http.ResponseWriter, r *http.Request) {
 	var body SSHBastionRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	bastion, err := h.Authority.GetSSHBastion(r.Context(), body.User, body.Hostname)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		render.Error(w, errs.InternalServerErr(err))
 		return
 	}
 

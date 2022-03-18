@@ -29,24 +29,24 @@ func (s *RekeyRequest) Validate() error {
 // Rekey is similar to renew except that the certificate will be renewed with new key from csr.
 func (h *caHandler) Rekey(w http.ResponseWriter, r *http.Request) {
 	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-		WriteError(w, errs.BadRequest("missing client certificate"))
+		render.Error(w, errs.BadRequest("missing client certificate"))
 		return
 	}
 
 	var body RekeyRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	certChain, err := h.Authority.Rekey(r.TLS.PeerCertificates[0], body.CsrPEM.CertificateRequest.PublicKey)
 	if err != nil {
-		WriteError(w, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Rekey"))
+		render.Error(w, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Rekey"))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)
