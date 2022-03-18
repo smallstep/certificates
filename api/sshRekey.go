@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 )
@@ -84,7 +85,7 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	JSONStatus(w, &SSHRekeyResponse{
+	render.JSONStatus(w, &SSHRekeyResponse{
 		Certificate:         SSHCertificate{newCert},
 		IdentityCertificate: identity,
 	}, http.StatusCreated)

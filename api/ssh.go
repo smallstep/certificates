@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -334,7 +335,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 		identityCertificate = certChainToPEM(certChain)
 	}
 
-	JSONStatus(w, &SSHSignResponse{
+	render.JSONStatus(w, &SSHSignResponse{
 		Certificate:         SSHCertificate{cert},
 		AddUserCertificate:  addUserCertificate,
 		IdentityCertificate: identityCertificate,
@@ -363,7 +364,7 @@ func (h *caHandler) SSHRoots(w http.ResponseWriter, r *http.Request) {
 		resp.UserKeys = append(resp.UserKeys, SSHPublicKey{PublicKey: k})
 	}
 
-	JSON(w, resp)
+	render.JSON(w, resp)
 }
 
 // SSHFederation is an HTTP handler that returns the federated SSH public keys
@@ -388,7 +389,7 @@ func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
 		resp.UserKeys = append(resp.UserKeys, SSHPublicKey{PublicKey: k})
 	}
 
-	JSON(w, resp)
+	render.JSON(w, resp)
 }
 
 // SSHConfig is an HTTP handler that returns rendered templates for ssh clients
@@ -421,7 +422,7 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	JSON(w, cfg)
+	render.JSON(w, cfg)
 }
 
 // SSHCheckHost is the HTTP handler that returns if a hosts certificate exists or not.
@@ -441,7 +442,7 @@ func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, errs.InternalServerErr(err))
 		return
 	}
-	JSON(w, &SSHCheckPrincipalResponse{
+	render.JSON(w, &SSHCheckPrincipalResponse{
 		Exists: exists,
 	})
 }
@@ -458,7 +459,7 @@ func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, errs.InternalServerErr(err))
 		return
 	}
-	JSON(w, &SSHGetHostsResponse{
+	render.JSON(w, &SSHGetHostsResponse{
 		Hosts: hosts,
 	})
 }
@@ -481,7 +482,7 @@ func (h *caHandler) SSHBastion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	JSON(w, &SSHBastionResponse{
+	render.JSON(w, &SSHBastionResponse{
 		Hostname: body.Hostname,
 		Bastion:  bastion,
 	})

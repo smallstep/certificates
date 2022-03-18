@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -34,7 +35,7 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	LogCertificate(w, certChain[0])
-	JSONStatus(w, &SignResponse{
+	render.JSONStatus(w, &SignResponse{
 		ServerPEM:    certChainPEM[0],
 		CaPEM:        caPEM,
 		CertChainPEM: certChainPEM,

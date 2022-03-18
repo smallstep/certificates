@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/ocsp"
 
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
@@ -103,7 +104,7 @@ func (h *caHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logRevoke(w, opts)
-	JSON(w, &RevokeResponse{Status: "ok"})
+	render.JSON(w, &RevokeResponse{Status: "ok"})
 }
 
 func logRevoke(w http.ResponseWriter, ri *authority.RevokeOptions) {

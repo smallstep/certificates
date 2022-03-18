@@ -6,6 +6,7 @@ import (
 	"golang.org/x/crypto/ocsp"
 
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
@@ -82,7 +83,7 @@ func (h *caHandler) SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logSSHRevoke(w, opts)
-	JSON(w, &SSHRevokeResponse{Status: "ok"})
+	render.JSON(w, &SSHRevokeResponse{Status: "ok"})
 }
 
 func logSSHRevoke(w http.ResponseWriter, ri *authority.RevokeOptions) {
