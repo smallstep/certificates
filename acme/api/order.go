@@ -11,9 +11,12 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+
+	"go.step.sm/crypto/randutil"
+
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
-	"go.step.sm/crypto/randutil"
+	"github.com/smallstep/certificates/api/render"
 )
 
 // NewOrderRequest represents the body for a NewOrder request.
@@ -142,7 +145,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	h.linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
-	api.JSONStatus(w, o, http.StatusCreated)
+	render.JSONStatus(w, o, http.StatusCreated)
 }
 
 func (h *Handler) newAuthorization(ctx context.Context, az *acme.Authorization) error {
@@ -217,7 +220,7 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	h.linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
-	api.JSON(w, o)
+	render.JSON(w, o)
 }
 
 // FinalizeOrder attemptst to finalize an order and create a certificate.
@@ -272,7 +275,7 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	h.linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
-	api.JSON(w, o)
+	render.JSON(w, o)
 }
 
 // challengeTypes determines the types of challenges that should be used
