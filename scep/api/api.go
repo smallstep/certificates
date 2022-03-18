@@ -16,6 +16,7 @@ import (
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/log"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/scep"
 )
@@ -189,19 +190,19 @@ func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 		name := chi.URLParam(r, "provisionerName")
 		provisionerName, err := url.PathUnescape(name)
 		if err != nil {
-			api.WriteError(w, errors.Errorf("error url unescaping provisioner name '%s'", name))
+			render.Error(w, errors.Errorf("error url unescaping provisioner name '%s'", name))
 			return
 		}
 
 		p, err := h.Auth.LoadProvisionerByName(provisionerName)
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 
 		prov, ok := p.(*provisioner.SCEP)
 		if !ok {
-			api.WriteError(w, errors.New("provisioner must be of type SCEP"))
+			render.Error(w, errors.New("provisioner must be of type SCEP"))
 			return
 		}
 
@@ -356,7 +357,7 @@ func writeError(w http.ResponseWriter, err error) {
 		Message: err.Error(),
 		Status:  http.StatusInternalServerError, // TODO: make this a param?
 	}
-	api.WriteError(w, scepError)
+	render.Error(w, scepError)
 }
 
 func (h *Handler) createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (SCEPResponse, error) {
