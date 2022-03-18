@@ -4,10 +4,12 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
+
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -48,7 +50,7 @@ func (h *Handler) GetProvisioner(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, err)
 		return
 	}
-	api.ProtoJSON(w, prov)
+	render.ProtoJSON(w, prov)
 }
 
 // GetProvisioners returns the given segment of  provisioners associated with the authority.
@@ -65,7 +67,7 @@ func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, errs.InternalServerErr(err))
 		return
 	}
-	api.JSON(w, &GetProvisionersResponse{
+	render.JSON(w, &GetProvisionersResponse{
 		Provisioners: p,
 		NextCursor:   next,
 	})
@@ -89,7 +91,7 @@ func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, admin.WrapErrorISE(err, "error storing provisioner %s", prov.Name))
 		return
 	}
-	api.ProtoJSONStatus(w, prov, http.StatusCreated)
+	render.ProtoJSONStatus(w, prov, http.StatusCreated)
 }
 
 // DeleteProvisioner deletes a provisioner.
@@ -118,7 +120,7 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.JSON(w, &DeleteResponse{Status: "ok"})
+	render.JSON(w, &DeleteResponse{Status: "ok"})
 }
 
 // UpdateProvisioner updates an existing prov.
@@ -173,5 +175,5 @@ func (h *Handler) UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 		api.WriteError(w, err)
 		return
 	}
-	api.ProtoJSON(w, nu)
+	render.ProtoJSON(w, nu)
 }
