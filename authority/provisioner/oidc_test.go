@@ -327,16 +327,16 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 					switch v := o.(type) {
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
-						assert.Equals(t, v.Type, int(TypeOIDC))
+						assert.Equals(t, v.Type, TypeOIDC)
 						assert.Equals(t, v.Name, tt.prov.GetName())
 						assert.Equals(t, v.CredentialID, tt.prov.ClientID)
 						assert.Len(t, 0, v.KeyValuePairs)
 					case profileDefaultDuration:
-						assert.Equals(t, time.Duration(v), tt.prov.claimer.DefaultTLSCertDuration())
+						assert.Equals(t, time.Duration(v), tt.prov.ctl.Claimer.DefaultTLSCertDuration())
 					case defaultPublicKeyValidator:
 					case *validityValidator:
-						assert.Equals(t, v.min, tt.prov.claimer.MinTLSCertDuration())
-						assert.Equals(t, v.max, tt.prov.claimer.MaxTLSCertDuration())
+						assert.Equals(t, v.min, tt.prov.ctl.Claimer.MinTLSCertDuration())
+						assert.Equals(t, v.max, tt.prov.ctl.Claimer.MaxTLSCertDuration())
 					case emailOnlyIdentity:
 						assert.Equals(t, string(v), "name@smallstep.com")
 					default:
@@ -411,6 +411,7 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 }
 
 func TestOIDC_AuthorizeRenew(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
 	p1, err := generateOIDC()
 	assert.FatalError(t, err)
 	p2, err := generateOIDC()
@@ -419,7 +420,7 @@ func TestOIDC_AuthorizeRenew(t *testing.T) {
 	// disable renewal
 	disable := true
 	p2.Claims = &Claims{DisableRenewal: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p2.ctl.Claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	type args struct {
@@ -432,8 +433,14 @@ func TestOIDC_AuthorizeRenew(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{nil}, http.StatusOK, false},
-		{"fail/renew-disabled", p2, args{nil}, http.StatusUnauthorized, true},
+		{"ok", p1, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusOK, false},
+		{"fail/renew-disabled", p2, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -478,7 +485,7 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	// disable sshCA
 	disable := false
 	p6.Claims = &Claims{EnableSSHCA: &disable}
-	p6.claimer, err = NewClaimer(p6.Claims, globalProvisionerClaims)
+	p6.ctl.Claimer, err = NewClaimer(p6.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	// Update configuration endpoints and initialize
@@ -494,10 +501,10 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	assert.FatalError(t, p4.Init(config))
 	assert.FatalError(t, p5.Init(config))
 
-	p4.getIdentityFunc = func(ctx context.Context, p Interface, email string) (*Identity, error) {
+	p4.ctl.IdentityFunc = func(ctx context.Context, p Interface, email string) (*Identity, error) {
 		return &Identity{Usernames: []string{"max", "mariano"}}, nil
 	}
-	p5.getIdentityFunc = func(ctx context.Context, p Interface, email string) (*Identity, error) {
+	p5.ctl.IdentityFunc = func(ctx context.Context, p Interface, email string) (*Identity, error) {
 		return nil, errors.New("force")
 	}
 	// Additional test needed for empty usernames and duplicate email and usernames
@@ -527,8 +534,8 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 
-	userDuration := p1.claimer.DefaultUserSSHCertDuration()
-	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	userDuration := p1.ctl.Claimer.DefaultUserSSHCertDuration()
+	hostDuration := p1.ctl.Claimer.DefaultHostSSHCertDuration()
 	expectedUserOptions := &SignSSHOptions{
 		CertType: "user", Principals: []string{"name", "name@smallstep.com"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),

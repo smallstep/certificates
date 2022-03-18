@@ -24,20 +24,22 @@ import (
 )
 
 var (
-	defaultDisableRenewal   = false
-	defaultEnableSSHCA      = true
-	globalProvisionerClaims = Claims{
-		MinTLSDur:         &Duration{5 * time.Minute},
-		MaxTLSDur:         &Duration{24 * time.Hour},
-		DefaultTLSDur:     &Duration{24 * time.Hour},
-		DisableRenewal:    &defaultDisableRenewal,
-		MinUserSSHDur:     &Duration{Duration: 5 * time.Minute}, // User SSH certs
-		MaxUserSSHDur:     &Duration{Duration: 24 * time.Hour},
-		DefaultUserSSHDur: &Duration{Duration: 16 * time.Hour},
-		MinHostSSHDur:     &Duration{Duration: 5 * time.Minute}, // Host SSH certs
-		MaxHostSSHDur:     &Duration{Duration: 30 * 24 * time.Hour},
-		DefaultHostSSHDur: &Duration{Duration: 30 * 24 * time.Hour},
-		EnableSSHCA:       &defaultEnableSSHCA,
+	defaultDisableRenewal        = false
+	defaultAllowRenewAfterExpiry = false
+	defaultEnableSSHCA           = true
+	globalProvisionerClaims      = Claims{
+		MinTLSDur:             &Duration{5 * time.Minute},
+		MaxTLSDur:             &Duration{24 * time.Hour},
+		DefaultTLSDur:         &Duration{24 * time.Hour},
+		MinUserSSHDur:         &Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:         &Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur:     &Duration{Duration: 16 * time.Hour},
+		MinHostSSHDur:         &Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:         &Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur:     &Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:           &defaultEnableSSHCA,
+		DisableRenewal:        &defaultDisableRenewal,
+		AllowRenewAfterExpiry: &defaultAllowRenewAfterExpiry,
 	}
 	testAudiences = Audiences{
 		Sign:      []string{"https://ca.smallstep.com/1.0/sign", "https://ca.smallstep.com/sign"},
@@ -172,19 +174,18 @@ func generateJWK() (*JWK, error) {
 	if err != nil {
 		return nil, err
 	}
-	claimer, err := NewClaimer(nil, globalProvisionerClaims)
-	if err != nil {
-		return nil, err
-	}
-	return &JWK{
+
+	p := &JWK{
 		Name:         name,
 		Type:         "JWK",
 		Key:          &public,
 		EncryptedKey: encrypted,
 		Claims:       &globalProvisionerClaims,
-		audiences:    testAudiences,
-		claimer:      claimer,
-	}, nil
+	}
+	p.ctl, err = NewController(p, p.Claims, Config{
+		Audiences: testAudiences,
+	})
+	return p, err
 }
 
 func generateK8sSA(inputPubKey interface{}) (*K8sSA, error) {
@@ -205,23 +206,21 @@ func generateK8sSA(inputPubKey interface{}) (*K8sSA, error) {
 		return nil, err
 	}
 
-	claimer, err := NewClaimer(nil, globalProvisionerClaims)
-	if err != nil {
-		return nil, err
-	}
 	pubKeys := []interface{}{fooPub, barPub}
 	if inputPubKey != nil {
 		pubKeys = append(pubKeys, inputPubKey)
 	}
 
-	return &K8sSA{
-		Name:      K8sSAName,
-		Type:      "K8sSA",
-		Claims:    &globalProvisionerClaims,
-		audiences: testAudiences,
-		claimer:   claimer,
-		pubKeys:   pubKeys,
-	}, nil
+	p := &K8sSA{
+		Name:    K8sSAName,
+		Type:    "K8sSA",
+		Claims:  &globalProvisionerClaims,
+		pubKeys: pubKeys,
+	}
+	p.ctl, err = NewController(p, p.Claims, Config{
+		Audiences: testAudiences,
+	})
+	return p, err
 }
 
 func generateSSHPOP() (*SSHPOP, error) {
@@ -229,11 +228,6 @@ func generateSSHPOP() (*SSHPOP, error) {
 	if err != nil {
 		return nil, err
 	}
-	claimer, err := NewClaimer(nil, globalProvisionerClaims)
-	if err != nil {
-		return nil, err
-	}
-
 	userB, err := os.ReadFile("./testdata/certs/ssh_user_ca_key.pub")
 	if err != nil {
 		return nil, err
@@ -251,17 +245,19 @@ func generateSSHPOP() (*SSHPOP, error) {
 		return nil, err
 	}
 
-	return &SSHPOP{
-		Name:      name,
-		Type:      "SSHPOP",
-		Claims:    &globalProvisionerClaims,
-		audiences: testAudiences,
-		claimer:   claimer,
+	p := &SSHPOP{
+		Name:   name,
+		Type:   "SSHPOP",
+		Claims: &globalProvisionerClaims,
 		sshPubKeys: &SSHKeys{
 			UserKeys: []ssh.PublicKey{userKey},
 			HostKeys: []ssh.PublicKey{hostKey},
 		},
-	}, nil
+	}
+	p.ctl, err = NewController(p, p.Claims, Config{
+		Audiences: testAudiences,
+	})
+	return p, err
 }
 
 func generateX5C(root []byte) (*X5C, error) {
@@ -283,11 +279,6 @@ M46l92gdOozT
 	if err != nil {
 		return nil, err
 	}
-	claimer, err := NewClaimer(nil, globalProvisionerClaims)
-	if err != nil {
-		return nil, err
-	}
-
 	rootPool := x509.NewCertPool()
 
 	var (
@@ -305,15 +296,17 @@ M46l92gdOozT
 		}
 		rootPool.AddCert(cert)
 	}
-	return &X5C{
-		Name:      name,
-		Type:      "X5C",
-		Roots:     root,
-		Claims:    &globalProvisionerClaims,
-		audiences: testAudiences,
-		claimer:   claimer,
-		rootPool:  rootPool,
-	}, nil
+	p := &X5C{
+		Name:     name,
+		Type:     "X5C",
+		Roots:    root,
+		Claims:   &globalProvisionerClaims,
+		rootPool: rootPool,
+	}
+	p.ctl, err = NewController(p, p.Claims, Config{
+		Audiences: testAudiences,
+	})
+	return p, err
 }
 
 func generateOIDC() (*OIDC, error) {
@@ -333,11 +326,7 @@ func generateOIDC() (*OIDC, error) {
 	if err != nil {
 		return nil, err
 	}
-	claimer, err := NewClaimer(nil, globalProvisionerClaims)
-	if err != nil {
-		return nil, err
-	}
-	return &OIDC{
+	p := &OIDC{
 		Name:                  name,
 		Type:                  "OIDC",
 		ClientID:              clientID,
@@ -351,8 +340,11 @@ func generateOIDC() (*OIDC, error) {
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
-		claimer: claimer,
-	}, nil
+	}
+	p.ctl, err = NewController(p, p.Claims, Config{
+		Audiences: testAudiences,
+	})
+	return p, err
 }
 
 func generateGCP() (*GCP, error) {
@@ -368,23 +360,21 @@ func generateGCP() (*GCP, error) {
 	if err != nil {
 		return nil, err
 	}
-	claimer, err := NewClaimer(nil, globalProvisionerClaims)
-	if err != nil {
-		return nil, err
-	}
-	return &GCP{
+	p := &GCP{
 		Type:            "GCP",
 		Name:            name,
 		ServiceAccounts: []string{serviceAccount},
 		Claims:          &globalProvisionerClaims,
-		claimer:         claimer,
 		config:          newGCPConfig(),
 		keyStore: &keyStore{
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
-		audiences: testAudiences.WithFragment("gcp/" + name),
-	}, nil
+	}
+	p.ctl, err = NewController(p, p.Claims, Config{
+		Audiences: testAudiences.WithFragment("gcp/" + name),
+	})
+	return p, err
 }
 
 func generateAWS() (*AWS, error) {
@@ -396,10 +386,6 @@ func generateAWS() (*AWS, error) {
 	if err != nil {
 		return nil, err
 	}
-	claimer, err := NewClaimer(nil, globalProvisionerClaims)
-	if err != nil {
-		return nil, err
-	}
 	block, _ := pem.Decode([]byte(awsTestCertificate))
 	if block == nil || block.Type != "CERTIFICATE" {
 		return nil, errors.New("error decoding AWS certificate")
@@ -408,13 +394,12 @@ func generateAWS() (*AWS, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing AWS certificate")
 	}
-	return &AWS{
+	p := &AWS{
 		Type:         "AWS",
 		Name:         name,
 		Accounts:     []string{accountID},
 		Claims:       &globalProvisionerClaims,
 		IMDSVersions: []string{"v2", "v1"},
-		claimer:      claimer,
 		config: &awsConfig{
 			identityURL:        awsIdentityURL,
 			signatureURL:       awsSignatureURL,
@@ -423,8 +408,11 @@ func generateAWS() (*AWS, error) {
 			certificates:       []*x509.Certificate{cert},
 			signatureAlgorithm: awsSignatureAlgorithm,
 		},
-		audiences: testAudiences.WithFragment("aws/" + name),
-	}, nil
+	}
+	p.ctl, err = NewController(p, p.Claims, Config{
+		Audiences: testAudiences.WithFragment("aws/" + name),
+	})
+	return p, err
 }
 
 func generateAWSWithServer() (*AWS, *httptest.Server, error) {
@@ -505,10 +493,6 @@ func generateAWSV1Only() (*AWS, error) {
 	if err != nil {
 		return nil, err
 	}
-	claimer, err := NewClaimer(nil, globalProvisionerClaims)
-	if err != nil {
-		return nil, err
-	}
 	block, _ := pem.Decode([]byte(awsTestCertificate))
 	if block == nil || block.Type != "CERTIFICATE" {
 		return nil, errors.New("error decoding AWS certificate")
@@ -517,13 +501,12 @@ func generateAWSV1Only() (*AWS, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing AWS certificate")
 	}
-	return &AWS{
+	p := &AWS{
 		Type:         "AWS",
 		Name:         name,
 		Accounts:     []string{accountID},
 		Claims:       &globalProvisionerClaims,
 		IMDSVersions: []string{"v1"},
-		claimer:      claimer,
 		config: &awsConfig{
 			identityURL:        awsIdentityURL,
 			signatureURL:       awsSignatureURL,
@@ -532,8 +515,11 @@ func generateAWSV1Only() (*AWS, error) {
 			certificates:       []*x509.Certificate{cert},
 			signatureAlgorithm: awsSignatureAlgorithm,
 		},
-		audiences: testAudiences.WithFragment("aws/" + name),
-	}, nil
+	}
+	p.ctl, err = NewController(p, p.Claims, Config{
+		Audiences: testAudiences.WithFragment("aws/" + name),
+	})
+	return p, err
 }
 
 func generateAWSWithServerV1Only() (*AWS, *httptest.Server, error) {
@@ -600,21 +586,16 @@ func generateAzure() (*Azure, error) {
 	if err != nil {
 		return nil, err
 	}
-	claimer, err := NewClaimer(nil, globalProvisionerClaims)
-	if err != nil {
-		return nil, err
-	}
 	jwk, err := generateJSONWebKey()
 	if err != nil {
 		return nil, err
 	}
-	return &Azure{
+	p := &Azure{
 		Type:     "Azure",
 		Name:     name,
 		TenantID: tenantID,
 		Audience: azureDefaultAudience,
 		Claims:   &globalProvisionerClaims,
-		claimer:  claimer,
 		config:   newAzureConfig(tenantID),
 		oidcConfig: openIDConfiguration{
 			Issuer:    "https://sts.windows.net/" + tenantID + "/",
@@ -624,7 +605,11 @@ func generateAzure() (*Azure, error) {
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
-	}, nil
+	}
+	p.ctl, err = NewController(p, p.Claims, Config{
+		Audiences: testAudiences,
+	})
+	return p, err
 }
 
 func generateAzureWithServer() (*Azure, *httptest.Server, error) {

@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -276,6 +277,7 @@ func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
 func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 	serial := cert.SerialNumber.String()
 	var opts = []interface{}{errs.WithKeyVal("serialNumber", serial)}
+
 	isRevoked, err := a.IsRevoked(serial)
 	if err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
@@ -283,7 +285,6 @@ func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 	if isRevoked {
 		return errs.Unauthorized("authority.authorizeRenew: certificate has been revoked", opts...)
 	}
-
 	p, ok := a.provisioners.LoadByCertificate(cert)
 	if !ok {
 		return errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
@@ -370,4 +371,81 @@ func (a *Authority) authorizeSSHRevoke(ctx context.Context, token string) error 
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeSSHRevoke")
 	}
 	return nil
+}
+
+// AuthorizeRenewToken validates the renew token and returns the leaf
+// certificate in the x5cInsecure header.
+func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.Certificate, error) {
+	var claims jose.Claims
+	jwt, chain, err := jose.ParseX5cInsecure(ott, a.rootX509Certs)
+	if err != nil {
+		return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token"))
+	}
+	leaf := chain[0][0]
+	if err := jwt.Claims(leaf.PublicKey, &claims); err != nil {
+		return nil, errs.InternalServerErr(err, errs.WithMessage("error validating renew token"))
+	}
+
+	p, ok := a.provisioners.LoadByCertificate(leaf)
+	if !ok {
+		return nil, errs.Unauthorized("error validating renew token: cannot get provisioner from certificate")
+	}
+	if err := a.UseToken(ott, p); err != nil {
+		return nil, err
+	}
+
+	if err := claims.ValidateWithLeeway(jose.Expected{
+		Issuer:  p.GetName(),
+		Subject: leaf.Subject.CommonName,
+		Time:    time.Now().UTC(),
+	}, time.Minute); err != nil {
+		switch err {
+		case jose.ErrInvalidIssuer:
+			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: invalid issuer claim (iss)"))
+		case jose.ErrInvalidSubject:
+			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: invalid subject claim (sub)"))
+		case jose.ErrNotValidYet:
+			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: token not valid yet (nbf)"))
+		case jose.ErrExpired:
+			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: token is expired (exp)"))
+		case jose.ErrIssuedInTheFuture:
+			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: token issued in the future (iat)"))
+		default:
+			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token"))
+		}
+	}
+
+	audiences := a.config.GetAudiences().Renew
+	if !matchesAudience(claims.Audience, audiences) {
+		return nil, errs.InternalServerErr(err, errs.WithMessage("error validating renew token: invalid audience claim (aud)"))
+	}
+
+	return leaf, nil
+}
+
+// matchesAudience returns true if A and B share at least one element.
+func matchesAudience(as, bs []string) bool {
+	if len(bs) == 0 || len(as) == 0 {
+		return false
+	}
+
+	for _, b := range bs {
+		for _, a := range as {
+			if b == a || stripPort(a) == stripPort(b) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// stripPort attempts to strip the port from the given url. If parsing the url
+// produces errors it will just return the passed argument.
+func stripPort(rawurl string) string {
+	u, err := url.Parse(rawurl)
+	if err != nil {
+		return rawurl
+	}
+	u.Host = u.Hostname()
+	return u.String()
 }

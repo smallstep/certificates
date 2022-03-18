@@ -408,6 +408,7 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 		server.ServeTLS(listener, "", "")
 	}()
 	defer server.Close()
+	time.Sleep(1 * time.Second)
 
 	// Create bootstrap client
 	token = generateBootstrapToken(caURL, "client", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
@@ -419,7 +420,6 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 
 	// doTest does a request that requires mTLS
 	doTest := func(client *http.Client) error {
-		time.Sleep(1 * time.Second)
 		// test with ca
 		resp, err := client.Post(caURL+"/renew", "application/json", http.NoBody)
 		if err != nil {

@@ -96,10 +96,10 @@ type Azure struct {
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
 	Claims                 *Claims  `json:"claims,omitempty"`
 	Options                *Options `json:"options,omitempty"`
-	claimer                *Claimer
 	config                 *azureConfig
 	oidcConfig             openIDConfiguration
 	keyStore               *keyStore
+	ctl                    *Controller
 }
 
 // GetID returns the provisioner unique identifier.
@@ -203,27 +203,24 @@ func (p *Azure) Init(config Config) (err error) {
 	case p.Audience == "": // use default audience
 		p.Audience = azureDefaultAudience
 	}
+
 	// Initialize config
 	p.assertConfig()
 
-	// Update claims with global ones
-	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
-		return err
-	}
-
 	// Decode and validate openid-configuration endpoint
-	if err := getAndDecode(p.config.oidcDiscoveryURL, &p.oidcConfig); err != nil {
-		return err
+	if err = getAndDecode(p.config.oidcDiscoveryURL, &p.oidcConfig); err != nil {
+		return
 	}
 	if err := p.oidcConfig.Validate(); err != nil {
 		return errors.Wrapf(err, "error parsing %s", p.config.oidcDiscoveryURL)
 	}
 	// Get JWK key set
 	if p.keyStore, err = newKeyStore(p.oidcConfig.JWKSetURI); err != nil {
-		return err
+		return
 	}
 
-	return nil
+	p.ctl, err = NewController(p, p.Claims, config)
+	return
 }
 
 // authorizeToken returns the claims, name, group, subscription, identityObjectID, error.
@@ -355,10 +352,10 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID),
-		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 	), nil
 }
 
@@ -367,15 +364,12 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 // revocation status. Just confirms that the provisioner that created the
 // certificate was configured to allow renewals.
 func (p *Azure) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
-	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("azure.AuthorizeRenew; renew is disabled for azure provisioner '%s'", p.GetName())
-	}
-	return nil
+	return p.ctl.AuthorizeRenew(ctx, cert)
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
-	if !p.claimer.IsSSHCAEnabled() {
+	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("azure.AuthorizeSSHSign; sshCA is disabled for provisioner '%s'", p.GetName())
 	}
 
@@ -420,11 +414,11 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		// Validate user SignSSHOptions.
 		sshCertOptionsValidator(defaults),
 		// Set the validity bounds if not set.
-		&sshDefaultDuration{p.claimer},
+		&sshDefaultDuration{p.ctl.Claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.ctl.Claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 	), nil
