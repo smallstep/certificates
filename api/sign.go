@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
@@ -84,7 +85,7 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		caPEM = certChainPEM[1]
 	}
 	LogCertificate(w, certChain[0])
-	JSONStatus(w, &SignResponse{
+	render.JSONStatus(w, &SignResponse{
 		ServerPEM:    certChainPEM[0],
 		CaPEM:        caPEM,
 		CertChainPEM: certChainPEM,

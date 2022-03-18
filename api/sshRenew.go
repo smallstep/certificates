@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 )
@@ -76,7 +77,7 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	JSONStatus(w, &SSHSignResponse{
+	render.JSONStatus(w, &SSHSignResponse{
 		Certificate:         SSHCertificate{newCert},
 		IdentityCertificate: identity,
 	}, http.StatusCreated)
