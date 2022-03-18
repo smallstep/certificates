@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
 )
@@ -104,7 +106,7 @@ func TestReadJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ReadJSON(tt.args.r, &tt.args.v)
+			err := read.JSON(tt.args.r, &tt.args.v)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}

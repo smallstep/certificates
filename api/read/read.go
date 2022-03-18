@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/smallstep/certificates/errs"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 // JSON reads JSON from the request body and stores it in the value

@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"

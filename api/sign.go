@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
@@ -49,7 +50,7 @@ type SignResponse struct {
 // information in the certificate request.
 func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 	var body SignRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}

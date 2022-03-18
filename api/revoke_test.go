@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"

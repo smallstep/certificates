@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 )
@@ -36,7 +38,7 @@ type SSHRenewResponse struct {
 // the request.
 func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 	var body SSHRenewRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
