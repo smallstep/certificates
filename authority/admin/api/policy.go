@@ -87,8 +87,14 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 		return
 	}
 
-	if err := par.auth.StoreAuthorityPolicy(ctx, newPolicy); err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error storing authority policy"))
+	adm, err := adminFromContext(ctx)
+	if err != nil {
+		api.WriteError(w, admin.WrapErrorISE(err, "error retrieving admin from context"))
+		return
+	}
+
+	if err := par.auth.StoreAuthorityPolicy(ctx, adm, newPolicy); err != nil {
+		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error storing authority policy"))
 		return
 	}
 
@@ -103,25 +109,49 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 
 // UpdateAuthorityPolicy handles the PUT /admin/authority/policy request
 func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
-	var policy = new(linkedca.Policy)
-	if err := api.ReadProtoJSON(r.Body, policy); err != nil {
+
+	ctx := r.Context()
+	policy, err := par.auth.GetAuthorityPolicy(ctx)
+
+	shouldWriteError := false
+	if ae, ok := err.(*admin.Error); ok {
+		shouldWriteError = !ae.IsType(admin.ErrorNotFoundType)
+	}
+
+	if shouldWriteError {
+		api.WriteError(w, admin.WrapErrorISE(err, "error retrieving authority policy"))
+		return
+	}
+
+	if policy == nil {
+		api.JSONNotFound(w)
+		return
+	}
+
+	var newPolicy = new(linkedca.Policy)
+	if err := api.ReadProtoJSON(r.Body, newPolicy); err != nil {
 		api.WriteError(w, err)
 		return
 	}
 
-	ctx := r.Context()
-	if err := par.auth.UpdateAuthorityPolicy(ctx, policy); err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error updating authority policy"))
+	adm, err := adminFromContext(ctx)
+	if err != nil {
+		api.WriteError(w, admin.WrapErrorISE(err, "error retrieving admin from context"))
 		return
 	}
 
-	newPolicy, err := par.auth.GetAuthorityPolicy(ctx)
+	if err := par.auth.UpdateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
+		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating authority policy"))
+		return
+	}
+
+	newlyStoredPolicy, err := par.auth.GetAuthorityPolicy(ctx)
 	if err != nil {
 		api.WriteError(w, admin.WrapErrorISE(err, "error retrieving authority policy after updating"))
 		return
 	}
 
-	api.ProtoJSONStatus(w, newPolicy, http.StatusOK)
+	api.ProtoJSONStatus(w, newlyStoredPolicy, http.StatusOK)
 }
 
 // DeleteAuthorityPolicy handles the DELETE /admin/authority/policy request

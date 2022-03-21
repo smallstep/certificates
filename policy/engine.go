@@ -10,9 +10,10 @@ import (
 	"reflect"
 	"strings"
 
-	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/idna"
+
+	"go.step.sm/crypto/x509util"
 )
 
 type NamePolicyReason int
@@ -39,7 +40,7 @@ type NamePolicyError struct {
 	Detail string
 }
 
-func (e NamePolicyError) Error() string {
+func (e *NamePolicyError) Error() string {
 	switch e.Reason {
 	case NotAuthorizedForThisName:
 		return "not authorized to sign for this name: " + e.Detail
@@ -295,7 +296,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		// then return error, because DNS should be explicitly configured to be allowed in that case. In case there are
 		// (other) excluded constraints, we'll allow a DNS (implicit allow; currently).
 		if e.numberOfDNSDomainConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: NotAuthorizedForThisName,
 				Detail: fmt.Sprintf("dns %q is not explicitly permitted by any constraint", dns),
 			}
@@ -307,7 +308,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		}
 		parsedDNS, err := idna.Lookup.ToASCII(dns)
 		if err != nil {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: CannotParseDomain,
 				Detail: fmt.Sprintf("dns %q cannot be converted to ASCII", dns),
 			}
@@ -316,7 +317,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 			parsedDNS = "*" + parsedDNS
 		}
 		if _, ok := domainToReverseLabels(parsedDNS); !ok {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: CannotParseDomain,
 				Detail: fmt.Sprintf("cannot parse dns %q", dns),
 			}
@@ -331,7 +332,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 
 	for _, ip := range ips {
 		if e.numberOfIPRangeConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: NotAuthorizedForThisName,
 				Detail: fmt.Sprintf("ip %q is not explicitly permitted by any constraint", ip.String()),
 			}
@@ -346,14 +347,14 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 
 	for _, email := range emailAddresses {
 		if e.numberOfEmailAddressConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: NotAuthorizedForThisName,
 				Detail: fmt.Sprintf("email %q is not explicitly permitted by any constraint", email),
 			}
 		}
 		mailbox, ok := parseRFC2821Mailbox(email)
 		if !ok {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: CannotParseRFC822Name,
 				Detail: fmt.Sprintf("invalid rfc822Name %q", mailbox),
 			}
@@ -363,7 +364,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		// https://datatracker.ietf.org/doc/html/rfc5280#section-7.5
 		domainASCII, err := idna.ToASCII(mailbox.domain)
 		if err != nil {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: CannotParseDomain,
 				Detail: fmt.Sprintf("cannot parse email domain %q", email),
 			}
@@ -381,7 +382,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 
 	for _, uri := range uris {
 		if e.numberOfURIDomainConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: NotAuthorizedForThisName,
 				Detail: fmt.Sprintf("uri %q is not explicitly permitted by any constraint", uri.String()),
 			}
@@ -396,7 +397,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 
 	for _, principal := range principals {
 		if e.numberOfPrincipalConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: NotAuthorizedForThisName,
 				Detail: fmt.Sprintf("username principal %q is not explicitly permitted by any constraint", principal),
 			}
@@ -431,14 +432,14 @@ func checkNameConstraints(
 		constraint := excludedValue.Index(i).Interface()
 		match, err := match(parsedName, constraint)
 		if err != nil {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: CannotMatchNameToConstraint,
 				Detail: err.Error(),
 			}
 		}
 
 		if match {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: NotAuthorizedForThisName,
 				Detail: fmt.Sprintf("%s %q is excluded by constraint %q", nameType, name, constraint),
 			}
@@ -452,7 +453,7 @@ func checkNameConstraints(
 		constraint := permittedValue.Index(i).Interface()
 		var err error
 		if ok, err = match(parsedName, constraint); err != nil {
-			return NamePolicyError{
+			return &NamePolicyError{
 				Reason: CannotMatchNameToConstraint,
 				Detail: err.Error(),
 			}
@@ -464,7 +465,7 @@ func checkNameConstraints(
 	}
 
 	if !ok {
-		return NamePolicyError{
+		return &NamePolicyError{
 			Reason: NotAuthorizedForThisName,
 			Detail: fmt.Sprintf("%s %q is not permitted by any constraint", nameType, name),
 		}

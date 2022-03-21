@@ -2,10 +2,15 @@ package authority
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/pkg/errors"
+
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/admin"
-	"github.com/smallstep/certificates/authority/policy"
-	"go.step.sm/linkedca"
+	authPolicy "github.com/smallstep/certificates/authority/policy"
+	policy "github.com/smallstep/certificates/policy"
 )
 
 func (a *Authority) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
@@ -20,31 +25,39 @@ func (a *Authority) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, e
 	return policy, nil
 }
 
-func (a *Authority) StoreAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+func (a *Authority) StoreAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) error {
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
+
+	if err := a.checkPolicy(ctx, adm, policy); err != nil {
+		return err
+	}
 
 	if err := a.adminDB.CreateAuthorityPolicy(ctx, policy); err != nil {
 		return err
 	}
 
 	if err := a.reloadPolicyEngines(ctx); err != nil {
-		return admin.WrapErrorISE(err, "error reloading admin resources when creating authority policy")
+		return admin.WrapErrorISE(err, "error reloading policy engines when creating authority policy")
 	}
 
 	return nil
 }
 
-func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) error {
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
+
+	if err := a.checkPolicy(ctx, adm, policy); err != nil {
+		return err
+	}
 
 	if err := a.adminDB.UpdateAuthorityPolicy(ctx, policy); err != nil {
 		return err
 	}
 
 	if err := a.reloadPolicyEngines(ctx); err != nil {
-		return admin.WrapErrorISE(err, "error reloading admin resources when updating authority policy")
+		return admin.WrapErrorISE(err, "error reloading policy engines when updating authority policy")
 	}
 
 	return nil
@@ -59,34 +72,84 @@ func (a *Authority) RemoveAuthorityPolicy(ctx context.Context) error {
 	}
 
 	if err := a.reloadPolicyEngines(ctx); err != nil {
-		return admin.WrapErrorISE(err, "error reloading admin resources when deleting authority policy")
+		return admin.WrapErrorISE(err, "error reloading policy engines when deleting authority policy")
 	}
 
 	return nil
 }
 
-func policyToCertificates(p *linkedca.Policy) *policy.Options {
+func (a *Authority) checkPolicy(ctx context.Context, adm *linkedca.Admin, p *linkedca.Policy) error {
+
+	// convert the policy; return early if nil
+	policyOptions := policyToCertificates(p)
+	if policyOptions == nil {
+		return nil
+	}
+
+	engine, err := authPolicy.NewX509PolicyEngine(policyOptions.GetX509Options())
+	if err != nil {
+		return admin.WrapErrorISE(err, "error creating temporary policy engine")
+	}
+
+	// TODO(hs): Provide option to force the policy, even when the admin subject would be locked out?
+
+	sans := []string{adm.Subject}
+	if err := isAllowed(engine, sans); err != nil {
+		return err
+	}
+
+	// TODO(hs): perform the check for other admin subjects too?
+	// What logic to use for that: do all admins need access? Only super admins? At least one?
+
+	return nil
+}
+
+func isAllowed(engine authPolicy.X509Policy, sans []string) error {
+	var (
+		allowed bool
+		err     error
+	)
+	if allowed, err = engine.AreSANsAllowed(sans); err != nil {
+		var policyErr *policy.NamePolicyError
+		if errors.As(err, &policyErr); policyErr.Reason == policy.NotAuthorizedForThisName {
+			return fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans)
+		} else {
+			return err
+		}
+	}
+
+	if !allowed {
+		return fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans)
+	}
+
+	return nil
+}
+
+func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
+
 	// return early
 	if p == nil {
 		return nil
 	}
+
 	// prepare full policy struct
-	opts := &policy.Options{
-		X509: &policy.X509PolicyOptions{
-			AllowedNames: &policy.X509NameOptions{},
-			DeniedNames:  &policy.X509NameOptions{},
+	opts := &authPolicy.Options{
+		X509: &authPolicy.X509PolicyOptions{
+			AllowedNames: &authPolicy.X509NameOptions{},
+			DeniedNames:  &authPolicy.X509NameOptions{},
 		},
-		SSH: &policy.SSHPolicyOptions{
-			Host: &policy.SSHHostCertificateOptions{
-				AllowedNames: &policy.SSHNameOptions{},
-				DeniedNames:  &policy.SSHNameOptions{},
+		SSH: &authPolicy.SSHPolicyOptions{
+			Host: &authPolicy.SSHHostCertificateOptions{
+				AllowedNames: &authPolicy.SSHNameOptions{},
+				DeniedNames:  &authPolicy.SSHNameOptions{},
 			},
-			User: &policy.SSHUserCertificateOptions{
-				AllowedNames: &policy.SSHNameOptions{},
-				DeniedNames:  &policy.SSHNameOptions{},
+			User: &authPolicy.SSHUserCertificateOptions{
+				AllowedNames: &authPolicy.SSHNameOptions{},
+				DeniedNames:  &authPolicy.SSHNameOptions{},
 			},
 		},
 	}
+
 	// fill x509 policy configuration
 	if p.X509 != nil {
 		if p.X509.Allow != nil {
@@ -102,6 +165,7 @@ func policyToCertificates(p *linkedca.Policy) *policy.Options {
 			opts.X509.DeniedNames.URIDomains = p.X509.Deny.Uris
 		}
 	}
+
 	// fill ssh policy configuration
 	if p.Ssh != nil {
 		if p.Ssh.Host != nil {

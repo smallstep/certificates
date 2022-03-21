@@ -26,8 +26,8 @@ type adminAuthority interface {
 	UpdateProvisioner(ctx context.Context, nu *linkedca.Provisioner) error
 	RemoveProvisioner(ctx context.Context, id string) error
 	GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error)
-	StoreAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error
-	UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error
+	StoreAuthorityPolicy(ctx context.Context, admin *linkedca.Admin, policy *linkedca.Policy) error
+	UpdateAuthorityPolicy(ctx context.Context, admin *linkedca.Admin, policy *linkedca.Policy) error
 	RemoveAuthorityPolicy(ctx context.Context) error
 }
 

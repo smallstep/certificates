@@ -191,26 +191,20 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
-	// If a policy is configured, perform allow/deny policy check on authority level
-	// TODO: policy currently also applies to admin token certs; how to circumvent?
-	// Allow any name of an admin in the DB? Or in the admin collection?
-	todoRemoveThis := false
-	if todoRemoveThis && a.x509Policy != nil {
-		allowed, err := a.x509Policy.AreCertificateNamesAllowed(leaf)
-		if err != nil {
-			return nil, errs.InternalServerErr(err,
-				errs.WithKeyVal("csr", csr),
-				errs.WithKeyVal("signOptions", signOpts),
-				errs.WithMessage("error creating certificate"),
-			)
-		}
-		if !allowed {
-			// TODO: include SANs in error message?
-			return nil, errs.ApplyOptions(
-				errs.ForbiddenErr(errors.New("authority not allowed to sign"), "error creating certificate"),
-				opts...,
-			)
-		}
+	// Check if authority is allowed to sign the certificate
+	var allowedToSign bool
+	if allowedToSign, err = a.isAllowedToSign(leaf); err != nil {
+		return nil, errs.InternalServerErr(err,
+			errs.WithKeyVal("csr", csr),
+			errs.WithKeyVal("signOptions", signOpts),
+			errs.WithMessage("error creating certificate"),
+		)
+	}
+	if !allowedToSign {
+		return nil, errs.ApplyOptions(
+			errs.ForbiddenErr(errors.New("authority not allowed to sign"), "error creating certificate"),
+			opts...,
+		)
 	}
 
 	// Sign certificate
@@ -234,6 +228,61 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	return fullchain, nil
+}
+
+// isAllowedToSign checks if the Authority is allowed to sign the X.509 certificate.
+// It first checks if the certificate contains an admin subject that exists in the
+// collection of admins. The CA is always allowed to sign those. If the cert contains
+// different names and a policy is configured, the policy will be executed against
+// the cert to see if the CA is allowed to sign it.
+func (a *Authority) isAllowedToSign(cert *x509.Certificate) (bool, error) {
+
+	// // check if certificate is an admin identity token certificate and the admin subject exists
+	// b := isAdminIdentityTokenCertificate(cert)
+	// _ = b
+
+	// if isAdminIdentityTokenCertificate(cert) && a.admins.HasSubject(cert.Subject.CommonName) {
+	// 	return true, nil
+	// }
+
+	// if no policy is configured, the cert is implicitly allowed
+	if a.x509Policy == nil {
+		return true, nil
+	}
+
+	return a.x509Policy.AreCertificateNamesAllowed(cert)
+}
+
+func isAdminIdentityTokenCertificate(cert *x509.Certificate) bool {
+
+	// TODO: remove this check
+
+	if cert.Issuer.CommonName != "" {
+		return false
+	}
+
+	subject := cert.Subject.CommonName
+	if subject == "" {
+		return false
+	}
+
+	dnsNames := cert.DNSNames
+	if len(dnsNames) != 1 {
+		return false
+	}
+
+	if dnsNames[0] != subject {
+		return false
+	}
+
+	extras := cert.ExtraExtensions
+	if len(extras) != 1 {
+		return false
+	}
+
+	extra := extras[0]
+
+	return extra.Id.Equal(asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1})
 }
 
 // Renew creates a new Certificate identical to the old certificate, except

@@ -139,11 +139,11 @@ func (m *mockAdminAuthority) GetAuthorityPolicy(ctx context.Context) (*linkedca.
 	return nil, errors.New("not implemented yet")
 }
 
-func (m *mockAdminAuthority) StoreAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+func (m *mockAdminAuthority) StoreAuthorityPolicy(ctx context.Context, admin *linkedca.Admin, policy *linkedca.Policy) error {
 	return errors.New("not implemented yet")
 }
 
-func (m *mockAdminAuthority) UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+func (m *mockAdminAuthority) UpdateAuthorityPolicy(ctx context.Context, admin *linkedca.Admin, policy *linkedca.Policy) error {
 	return errors.New("not implemented yet")
 }
 

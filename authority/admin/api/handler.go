@@ -30,8 +30,7 @@ func NewHandler(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB, acmeRespo
 func (h *Handler) Route(r api.Router) {
 
 	authnz := func(next nextHTTP) nextHTTP {
-		//return h.extractAuthorizeTokenAdmin(h.requireAPIEnabled(next))
-		return h.requireAPIEnabled(next) // TODO(hs): remove this; temporarily no auth checks for simple testing...
+		return h.extractAuthorizeTokenAdmin(h.requireAPIEnabled(next))
 	}
 
 	requireEABEnabled := func(next nextHTTP) nextHTTP {

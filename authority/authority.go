@@ -219,15 +219,19 @@ func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
 	if a.config.AuthorityConfig.EnableAdmin {
 		linkedPolicy, err := a.adminDB.GetAuthorityPolicy(ctx)
 		if err != nil {
-			return admin.WrapErrorISE(err, "error getting policy to initialize authority")
+			return admin.WrapErrorISE(err, "error getting policy to (re)load policy engines")
 		}
 		policyOptions = policyToCertificates(linkedPolicy)
 	} else {
 		policyOptions = a.config.AuthorityConfig.Policy
 	}
 
-	// return early if no policy options set
+	// if no new or updated policy option is set, clear policy engines that (may have)
+	// been configured before and return early
 	if policyOptions == nil {
+		a.x509Policy = nil
+		a.sshHostPolicy = nil
+		a.sshUserPolicy = nil
 		return nil
 	}
 
@@ -574,7 +578,7 @@ func (a *Authority) init() error {
 		return err
 	}
 
-	// Load Policy Engines
+	// Load x509 and SSH Policy Engines
 	if err := a.reloadPolicyEngines(context.Background()); err != nil {
 		return err
 	}

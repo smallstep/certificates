@@ -152,7 +152,7 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 			req.Header["Authorization"] = []string{"token"}
 			createdAt := time.Now()
 			var deletedAt time.Time
-			admin := &linkedca.Admin{
+			adm := &linkedca.Admin{
 				Id:            "adminID",
 				AuthorityId:   "authorityID",
 				Subject:       "admin",
@@ -164,20 +164,20 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 			auth := &mockAdminAuthority{
 				MockAuthorizeAdminToken: func(r *http.Request, token string) (*linkedca.Admin, error) {
 					assert.Equals(t, "token", token)
-					return admin, nil
+					return adm, nil
 				},
 			}
 			next := func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
-				a := ctx.Value(adminContextKey) // verifying that the context now has a linkedca.Admin
+				a := ctx.Value(admin.AdminContextKey) // verifying that the context now has a linkedca.Admin
 				adm, ok := a.(*linkedca.Admin)
 				if !ok {
 					t.Errorf("expected *linkedca.Admin; got %T", a)
 					return
 				}
 				opts := []cmp.Option{cmpopts.IgnoreUnexported(linkedca.Admin{}, timestamppb.Timestamp{})}
-				if !cmp.Equal(admin, adm, opts...) {
-					t.Errorf("linkedca.Admin diff =\n%s", cmp.Diff(admin, adm, opts...))
+				if !cmp.Equal(adm, adm, opts...) {
+					t.Errorf("linkedca.Admin diff =\n%s", cmp.Diff(adm, adm, opts...))
 				}
 				w.Write(nil) // mock response with status 200
 			}

@@ -7,6 +7,7 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/admin/db/nosql"
+	"go.step.sm/linkedca"
 )
 
 type nextHTTP = func(http.ResponseWriter, *http.Request)
@@ -27,6 +28,7 @@ func (h *Handler) requireAPIEnabled(next nextHTTP) nextHTTP {
 // extractAuthorizeTokenAdmin is a middleware that extracts and caches the bearer token.
 func (h *Handler) extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
+
 		tok := r.Header.Get("Authorization")
 		if tok == "" {
 			api.WriteError(w, admin.NewError(admin.ErrorUnauthorizedType,
@@ -40,7 +42,7 @@ func (h *Handler) extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), adminContextKey, adm)
+		ctx := context.WithValue(r.Context(), admin.AdminContextKey, adm)
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -49,13 +51,14 @@ func (h *Handler) extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
 func (h *Handler) checkAction(next nextHTTP, supportedInStandalone bool) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		// actions allowed in standalone mode are always allowed
+		// actions allowed in standalone mode are always supported
 		if supportedInStandalone {
 			next(w, r)
 			return
 		}
 
-		// when in standalone mode, actions are not supported
+		// when not in standalone mode and using a nosql.DB backend,
+		// actions are not supported
 		if _, ok := h.adminDB.(*nosql.DB); ok {
 			api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType,
 				"operation not supported in standalone mode"))
@@ -67,11 +70,12 @@ func (h *Handler) checkAction(next nextHTTP, supportedInStandalone bool) nextHTT
 	}
 }
 
-// ContextKey is the key type for storing and searching for ACME request
-// essentials in the context of a request.
-type ContextKey string
-
-const (
-	// adminContextKey account key
-	adminContextKey = ContextKey("admin")
-)
+// adminFromContext searches the context for a *linkedca.Admin.
+// Returns the admin or an error.
+func adminFromContext(ctx context.Context) (*linkedca.Admin, error) {
+	val, ok := ctx.Value(admin.AdminContextKey).(*linkedca.Admin)
+	if !ok || val == nil {
+		return nil, admin.NewError(admin.ErrorBadRequestType, "admin not in context")
+	}
+	return val, nil
+}
