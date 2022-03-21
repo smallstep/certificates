@@ -147,11 +147,16 @@ Run the Step CA for the context named _mybiz_ and prompt for password:
 '''
 $ step-ca --context=mybiz
 '''
+Run the Step CA for the context named _mybiz_ and an alternate ca.json file:
+'''
+$ step-ca --context=mybiz other-ca.json
+'''
 Run the Step CA for the context named _mybiz_ and read the password from a file - this is useful for
 automating deployment:
 '''
 $ step-ca --context=mybiz --password-file ./password.txt
-'''`
+'''
+`
 	app.Flags = append(app.Flags, commands.AppCommand.Flags...)
 	app.Flags = append(app.Flags, cli.HelpFlag)
 	app.Copyright = fmt.Sprintf("(c) 2018-%d Smallstep Labs, Inc.", time.Now().Year())
