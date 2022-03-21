@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/templates"
-	"golang.org/x/crypto/ssh"
 )
 
 // SSHAuthority is the interface implemented by a SSH CA authority.
@@ -249,7 +251,7 @@ type SSHBastionResponse struct {
 // the request.
 func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	var body SSHSignRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
@@ -393,7 +395,7 @@ func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
 // and servers.
 func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 	var body SSHConfigRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
@@ -425,7 +427,7 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 // SSHCheckHost is the HTTP handler that returns if a hosts certificate exists or not.
 func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 	var body SSHCheckPrincipalRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
@@ -464,7 +466,7 @@ func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 // SSHBastion provides returns the bastion configured if any.
 func (h *caHandler) SSHBastion(w http.ResponseWriter, r *http.Request) {
 	var body SSHBastionRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}

@@ -28,15 +28,17 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/x509util"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/templates"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/x509util"
-	"golang.org/x/crypto/ssh"
 )
 
 const (

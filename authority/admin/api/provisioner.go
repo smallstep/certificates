@@ -4,12 +4,14 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
-	"go.step.sm/linkedca"
 )
 
 // GetProvisionersResponse is the type for GET /admin/provisioners responses.
@@ -72,7 +74,7 @@ func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 // CreateProvisioner creates a new prov.
 func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 	var prov = new(linkedca.Provisioner)
-	if err := api.ReadProtoJSON(r.Body, prov); err != nil {
+	if err := read.ProtoJSON(r.Body, prov); err != nil {
 		api.WriteError(w, err)
 		return
 	}
@@ -122,7 +124,7 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 // UpdateProvisioner updates an existing prov.
 func (h *Handler) UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 	var nu = new(linkedca.Provisioner)
-	if err := api.ReadProtoJSON(r.Body, nu); err != nil {
+	if err := read.ProtoJSON(r.Body, nu); err != nil {
 		api.WriteError(w, err)
 		return
 	}

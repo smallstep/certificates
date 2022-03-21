@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/errs"

@@ -2,14 +2,13 @@ package api
 
 import (
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 
-	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/logging"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/smallstep/certificates/logging"
 )
 
 // EnableLogger is an interface that enables response logging for an object.
@@ -87,23 +86,4 @@ func ProtoJSONStatus(w http.ResponseWriter, m proto.Message, status int) {
 		return
 	}
 	//LogEnabledResponse(w, v)
-}
-
-// ReadJSON reads JSON from the request body and stores it in the value
-// pointed by v.
-func ReadJSON(r io.Reader, v interface{}) error {
-	if err := json.NewDecoder(r).Decode(v); err != nil {
-		return errs.BadRequestErr(err, "error decoding json")
-	}
-	return nil
-}
-
-// ReadProtoJSON reads JSON from the request body and stores it in the value
-// pointed by v.
-func ReadProtoJSON(r io.Reader, m proto.Message) error {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return errs.BadRequestErr(err, "error reading request body")
-	}
-	return protojson.Unmarshal(data, m)
 }
