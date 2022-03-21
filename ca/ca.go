@@ -289,6 +289,7 @@ func (ca *CA) Run() error {
 	errs := make(chan error, 1)
 
 	log.Printf("Documentation: https://u.step.sm/docs/ca")
+	log.Printf("Community Discord: https://u.step.sm/discord")
 	log.Printf("Config File: %s", ca.opts.configFile)
 
 	if ca.insecureSrv != nil {
