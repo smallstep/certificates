@@ -79,9 +79,17 @@ func appAction(ctx *cli.Context) error {
 		return errs.TooManyArguments(ctx)
 	}
 
-	configFile, err := pathToConfigFile(ctx)
-	if err != nil {
-		return err
+	if caCtx := ctx.String("context"); caCtx != "" {
+		if err := step.Contexts().SetCurrent(caCtx); err != nil {
+			return err
+		}
+	}
+
+	var configFile string
+	if ctx.NArg() > 0 {
+		configFile = ctx.Args().Get(0)
+	} else {
+		configFile = step.CaConfigFile()
 	}
 
 	cfg, err := config.LoadConfiguration(configFile)
@@ -157,23 +165,6 @@ To get a linked authority token:
 		fatal(err)
 	}
 	return nil
-}
-
-func pathToConfigFile(ctx *cli.Context) (string, error) {
-	if !ctx.IsSet("context") {
-		// no context specified; make sure the user has specified config file
-		if ctx.NArg() == 0 {
-			return "", cli.ShowAppHelp(ctx)
-		}
-
-		return ctx.Args().Get(0), nil
-	}
-
-	if ctx.NArg() > 0 {
-		return "", errors.New("either the context flag or a config file may be specified but not both")
-	}
-
-	return step.CaConfigFile(), nil
 }
 
 // fatal writes the passed error on the standard error and exits with the exit
