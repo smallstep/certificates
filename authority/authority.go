@@ -294,8 +294,6 @@ func (a *Authority) init() error {
 				return err
 			}
 			a.rootX509Certs = append(a.rootX509Certs, resp.RootCertificate)
-			sum := sha256.Sum256(resp.RootCertificate.Raw)
-			log.Printf("Using root fingerprint '%s'", hex.EncodeToString(sum[:]))
 		}
 	}
 
@@ -313,6 +311,7 @@ func (a *Authority) init() error {
 	for _, crt := range a.rootX509Certs {
 		sum := sha256.Sum256(crt.Raw)
 		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
+		log.Printf("X.509 Root Fingerprint: %s", hex.EncodeToString(sum[:]))
 	}
 
 	a.rootX509CertPool = x509.NewCertPool()
@@ -539,6 +538,13 @@ func (a *Authority) init() error {
 			a.templates.Data = make(map[string]interface{})
 		}
 		a.templates.Data["Step"] = tmplVars
+	}
+
+	if tmplVars.SSH.HostKey != nil {
+		log.Printf("SSH Host CA Key: %s\n", ssh.MarshalAuthorizedKey(tmplVars.SSH.HostKey))
+	}
+	if tmplVars.SSH.HostKey != nil {
+		log.Printf("SSH User CA Key: %s\n", ssh.MarshalAuthorizedKey(tmplVars.SSH.UserKey))
 	}
 
 	// JWT numeric dates are seconds.

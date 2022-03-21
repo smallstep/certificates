@@ -288,6 +288,9 @@ func (ca *CA) Run() error {
 	var wg sync.WaitGroup
 	errs := make(chan error, 1)
 
+	log.Printf("Documentation: https://u.step.sm/docs/ca")
+	log.Printf("Config File: %s", ca.opts.configFile)
+
 	if ca.insecureSrv != nil {
 		wg.Add(1)
 		go func() {
