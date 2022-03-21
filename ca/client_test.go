@@ -569,9 +569,9 @@ func TestClient_RenewWithToken(t *testing.T) {
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if req.Header.Get("Authorization") != "Bearer token" {
-					api.JSONStatus(w, errs.InternalServer("force"), 500)
+					render.JSONStatus(w, errs.InternalServer("force"), 500)
 				} else {
-					api.JSONStatus(w, tt.response, tt.responseCode)
+					render.JSONStatus(w, tt.response, tt.responseCode)
 				}
 			})
 
