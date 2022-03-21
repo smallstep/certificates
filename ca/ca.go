@@ -450,9 +450,6 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
 	tlsConfig.ClientCAs = certPool
 
-	// Use server's most preferred ciphersuite
-	tlsConfig.PreferServerCipherSuites = true
-
 	return tlsConfig, nil
 }
 

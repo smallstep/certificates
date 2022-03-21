@@ -100,6 +100,7 @@ func (p *X5C) Init(config Config) (err error) {
 	var (
 		block *pem.Block
 		rest  = p.Roots
+		count int
 	)
 	for rest != nil {
 		block, rest = pem.Decode(rest)
@@ -110,11 +111,12 @@ func (p *X5C) Init(config Config) (err error) {
 		if err != nil {
 			return errors.Wrap(err, "error parsing x509 certificate from PEM block")
 		}
+		count++
 		p.rootPool.AddCert(cert)
 	}
 
 	// Verify that at least one root was found.
-	if len(p.rootPool.Subjects()) == 0 {
+	if count == 0 {
 		return errors.Errorf("no x509 certificates found in roots attribute for provisioner '%s'", p.GetName())
 	}
 

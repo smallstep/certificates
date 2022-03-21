@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -196,7 +197,7 @@ func TestLoadClient(t *testing.T) {
 				switch {
 				case gotTransport.TLSClientConfig.GetClientCertificate == nil:
 					t.Error("LoadClient() transport does not define GetClientCertificate")
-				case !reflect.DeepEqual(got.CaURL, tt.want.CaURL) || !reflect.DeepEqual(gotTransport.TLSClientConfig.RootCAs.Subjects(), wantTransport.TLSClientConfig.RootCAs.Subjects()):
+				case !reflect.DeepEqual(got.CaURL, tt.want.CaURL) || !equalPools(gotTransport.TLSClientConfig.RootCAs, wantTransport.TLSClientConfig.RootCAs):
 					t.Errorf("LoadClient() = %#v, want %#v", got, tt.want)
 				default:
 					crt, err := gotTransport.TLSClientConfig.GetClientCertificate(nil)
@@ -237,4 +238,24 @@ func Test_defaultsConfig_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// nolint:staticcheck,gocritic
+func equalPools(a, b *x509.CertPool) bool {
+	if reflect.DeepEqual(a, b) {
+		return true
+	}
+	subjects := a.Subjects()
+	sA := make([]string, len(subjects))
+	for i := range subjects {
+		sA[i] = string(subjects[i])
+	}
+	subjects = b.Subjects()
+	sB := make([]string, len(subjects))
+	for i := range subjects {
+		sB[i] = string(subjects[i])
+	}
+	sort.Strings(sA)
+	sort.Strings(sB)
+	return reflect.DeepEqual(sA, sB)
 }
