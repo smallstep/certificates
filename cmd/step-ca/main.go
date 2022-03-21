@@ -117,7 +117,7 @@ func main() {
 	app.HelpName = "step-ca"
 	app.Version = step.Version()
 	app.Usage = "an online certificate authority for secure automated certificate management"
-	app.UsageText = `**step-ca** [config] [**--context**=name] [**--password-file**=<file>]
+	app.UsageText = `**step-ca** [config] [**--context**=<name>] [**--password-file**=<file>]
 [**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]
 [**--issuer-password-file**=<file>] [**--resolver**=<addr>] [**--help**] [**--version**]`
 	app.Description = `**step-ca** runs the Step Online Certificate Authority
