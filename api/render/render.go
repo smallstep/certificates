@@ -116,11 +116,17 @@ func Error(w http.ResponseWriter, err error) {
 
 // BadRequest renders the JSON representation of err into w and sets its
 // status code to http.StatusBadRequest.
+//
+// In case err is nil, a default error message will be used in its place.
 func BadRequest(w http.ResponseWriter, err error) {
 	codedError(w, http.StatusBadRequest, err)
 }
 
 func codedError(w http.ResponseWriter, code int, err error) {
+	if err == nil {
+		err = errors.New(http.StatusText(code))
+	}
+
 	var wrapper = struct {
 		Status  int    `json:"status"`
 		Message string `json:"message"`

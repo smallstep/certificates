@@ -69,6 +69,11 @@ func TestErrors(t *testing.T) {
 			code: http.StatusBadRequest,
 			body: `{"status":400,"message":"assert.AnError general error for testing"}`,
 		},
+		1: {
+			fn:   BadRequest,
+			code: http.StatusBadRequest,
+			body: `{"status":400,"message":"Bad Request"}`,
+		},
 	}
 
 	for caseIndex := range cases {
