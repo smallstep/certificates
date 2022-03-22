@@ -76,8 +76,7 @@ func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 // CreateProvisioner creates a new prov.
 func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 	var prov = new(linkedca.Provisioner)
-	if err := read.ProtoJSON(r.Body, prov); err != nil {
-		render.Error(w, err)
+	if !read.ProtoJSON(w, r, prov) {
 		return
 	}
 
@@ -126,8 +125,7 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 // UpdateProvisioner updates an existing prov.
 func (h *Handler) UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 	var nu = new(linkedca.Provisioner)
-	if err := read.ProtoJSON(r.Body, nu); err != nil {
-		render.Error(w, err)
+	if !read.ProtoJSON(w, r, nu) {
 		return
 	}
 

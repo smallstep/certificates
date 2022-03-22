@@ -116,8 +116,7 @@ func (h *Handler) GetAdmins(w http.ResponseWriter, r *http.Request) {
 // CreateAdmin creates a new admin.
 func (h *Handler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 	var body CreateAdminRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error reading request body"))
+	if !read.AdminJSON(w, r, &body) {
 		return
 	}
 
@@ -160,8 +159,7 @@ func (h *Handler) DeleteAdmin(w http.ResponseWriter, r *http.Request) {
 // UpdateAdmin updates an existing admin.
 func (h *Handler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
 	var body UpdateAdminRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error reading request body"))
+	if !read.AdminJSON(w, r, &body) {
 		return
 	}
 
