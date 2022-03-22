@@ -10,14 +10,14 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi"
-	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/scep"
+	microscep "github.com/micromdm/scep/v2/scep"
+	"github.com/pkg/errors"
 	"go.mozilla.org/pkcs7"
 
-	"github.com/pkg/errors"
-
-	microscep "github.com/micromdm/scep/v2/scep"
+	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/log"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/scep"
 )
 
 const (
@@ -337,7 +337,7 @@ func formatCapabilities(caps []string) []byte {
 func writeSCEPResponse(w http.ResponseWriter, response SCEPResponse) {
 
 	if response.Error != nil {
-		api.LogError(w, response.Error)
+		log.Error(w, response.Error)
 	}
 
 	if response.Certificate != nil {
