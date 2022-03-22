@@ -2,45 +2,56 @@ package read
 
 import (
 	"io"
-	"reflect"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
+	"testing/iotest"
 
-	"github.com/smallstep/certificates/errs"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestJSON(t *testing.T) {
-	type args struct {
-		r io.Reader
-		v interface{}
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+	cases := []struct {
+		src  io.Reader
+		exp  interface{}
+		ok   bool
+		code int
 	}{
-		{"ok", args{strings.NewReader(`{"foo":"bar"}`), make(map[string]interface{})}, false},
-		{"fail", args{strings.NewReader(`{"foo"}`), make(map[string]interface{})}, true},
+		0: {
+			src:  strings.NewReader(`{"foo":"bar"}`),
+			exp:  map[string]interface{}{"foo": "bar"},
+			ok:   true,
+			code: http.StatusOK,
+		},
+		1: {
+			src:  strings.NewReader(`{"foo"}`),
+			code: http.StatusBadRequest,
+		},
+		2: {
+			src: io.MultiReader(
+				strings.NewReader(`{`),
+				iotest.ErrReader(assert.AnError),
+				strings.NewReader(`"foo":"bar"}`),
+			),
+			code: http.StatusBadRequest,
+		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := JSON(tt.args.r, &tt.args.v)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("JSON() error = %v, wantErr %v", err, tt.wantErr)
-			}
 
-			if tt.wantErr {
-				e, ok := err.(*errs.Error)
-				if ok {
-					if code := e.StatusCode(); code != 400 {
-						t.Errorf("error.StatusCode() = %v, wants 400", code)
-					}
-				} else {
-					t.Errorf("error type = %T, wants *Error", err)
-				}
-			} else if !reflect.DeepEqual(tt.args.v, map[string]interface{}{"foo": "bar"}) {
-				t.Errorf("JSON value = %v, wants %v", tt.args.v, map[string]interface{}{"foo": "bar"})
-			}
+	for caseIndex := range cases {
+		kase := cases[caseIndex]
+
+		t.Run(strconv.Itoa(caseIndex), func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", kase.src)
+			rec := httptest.NewRecorder()
+
+			var body interface{}
+			got := JSON(rec, req, &body)
+
+			assert.Equal(t, kase.ok, got)
+			assert.Equal(t, kase.code, rec.Result().StatusCode)
+			assert.Equal(t, kase.exp, body)
 		})
 	}
 }
