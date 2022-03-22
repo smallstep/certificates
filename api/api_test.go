@@ -1344,6 +1344,53 @@ func Test_caHandler_Roots(t *testing.T) {
 	}
 }
 
+func Test_caHandler_RootsPEM(t *testing.T) {
+	cs := &tls.ConnectionState{
+		PeerCertificates: []*x509.Certificate{parseCertificate(certPEM)},
+	}
+	parsedRoot := parseCertificate(rootPEM)
+	tests := []struct {
+		name       string
+		tls        *tls.ConnectionState
+		cert       *x509.Certificate
+		roots      []*x509.Certificate
+		err        error
+		statusCode int
+		expect     string
+	}{
+		{"one root", cs, parseCertificate(certPEM), []*x509.Certificate{parsedRoot}, nil, http.StatusOK, rootPEM},
+		{"two roots", cs, parseCertificate(certPEM), []*x509.Certificate{parsedRoot, parsedRoot}, nil, http.StatusOK, rootPEM + "\n" + rootPEM},
+		{"no peer certificates", &tls.ConnectionState{}, parseCertificate(certPEM), []*x509.Certificate{parsedRoot}, nil, http.StatusOK, rootPEM},
+		{"fail", cs, nil, nil, fmt.Errorf("an error"), http.StatusForbidden, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := New(&mockAuthority{ret1: tt.roots, err: tt.err}).(*caHandler)
+			req := httptest.NewRequest("GET", "http://example.com/roots", nil)
+			req.TLS = tt.tls
+			w := httptest.NewRecorder()
+			h.RootsPEM(w, req)
+			res := w.Result()
+
+			if res.StatusCode != tt.statusCode {
+				t.Errorf("caHandler.RootsPEM StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
+			}
+
+			body, err := io.ReadAll(res.Body)
+			res.Body.Close()
+			if err != nil {
+				t.Errorf("caHandler.RootsPEM unexpected error = %v", err)
+			}
+			if tt.statusCode < http.StatusBadRequest {
+				if !bytes.Equal(bytes.TrimSpace(body), []byte(tt.expect)) {
+					t.Errorf("caHandler.RootsPEM Body = %s, wants %s", body, tt.expect)
+				}
+			}
+		})
+	}
+}
+
 func Test_caHandler_Federation(t *testing.T) {
 	cs := &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{parseCertificate(certPEM)},
