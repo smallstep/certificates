@@ -34,8 +34,7 @@ func (h *caHandler) Rekey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body RekeyRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+	if !read.JSON(w, r, &body) {
 		return
 	}
 

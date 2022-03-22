@@ -41,8 +41,7 @@ type SSHRekeyResponse struct {
 // the request.
 func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 	var body SSHRekeyRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+	if !read.JSON(w, r, &body) {
 		return
 	}
 

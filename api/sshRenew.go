@@ -39,8 +39,7 @@ type SSHRenewResponse struct {
 // the request.
 func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 	var body SSHRenewRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+	if read.JSON(w, r, &body) {
 		return
 	}
 

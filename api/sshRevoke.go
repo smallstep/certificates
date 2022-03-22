@@ -50,8 +50,7 @@ func (r *SSHRevokeRequest) Validate() (err error) {
 // NOTE: currently only Passive revocation is supported.
 func (h *caHandler) SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	var body SSHRevokeRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+	if !read.JSON(w, r, &body) {
 		return
 	}
 

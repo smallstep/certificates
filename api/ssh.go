@@ -252,8 +252,7 @@ type SSHBastionResponse struct {
 // the request.
 func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	var body SSHSignRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+	if !read.JSON(w, r, &body) {
 		return
 	}
 
@@ -396,8 +395,7 @@ func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
 // and servers.
 func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 	var body SSHConfigRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+	if !read.JSON(w, r, &body) {
 		return
 	}
 	if err := body.Validate(); err != nil {
@@ -428,8 +426,7 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 // SSHCheckHost is the HTTP handler that returns if a hosts certificate exists or not.
 func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 	var body SSHCheckPrincipalRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+	if !read.JSON(w, r, &body) {
 		return
 	}
 	if err := body.Validate(); err != nil {
@@ -467,8 +464,7 @@ func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 // SSHBastion provides returns the bastion configured if any.
 func (h *caHandler) SSHBastion(w http.ResponseWriter, r *http.Request) {
 	var body SSHBastionRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+	if !read.JSON(w, r, &body) {
 		return
 	}
 	if err := body.Validate(); err != nil {
