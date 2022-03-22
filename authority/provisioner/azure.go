@@ -266,13 +266,8 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, str
 
 	var subscription, group, name string
 	identityObjectID := claims.ObjectID
+	subscription, group, name = re[1], re[2], re[4]
 
-	if strings.Contains(claims.XMSMirID, "virtualMachines") {
-		subscription, group, name = re[1], re[2], re[4]
-	} else {
-		// This is not a VM resource ID so we don't have the VM name so set that to the empty string
-		subscription, group, name = re[1], re[2], ""
-	}
 	return &claims, name, group, subscription, identityObjectID, nil
 }
 
