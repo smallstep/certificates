@@ -543,7 +543,7 @@ func (a *Authority) init() error {
 	if tmplVars.SSH.HostKey != nil {
 		log.Printf("SSH Host CA Key: %s\n", ssh.MarshalAuthorizedKey(tmplVars.SSH.HostKey))
 	}
-	if tmplVars.SSH.HostKey != nil {
+	if tmplVars.SSH.UserKey != nil {
 		log.Printf("SSH User CA Key: %s\n", ssh.MarshalAuthorizedKey(tmplVars.SSH.UserKey))
 	}
 
