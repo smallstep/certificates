@@ -31,6 +31,7 @@ import (
 type options struct {
 	configFile      string
 	linkedCAToken   string
+	quiet           bool
 	password        []byte
 	issuerPassword  []byte
 	sshHostPassword []byte
@@ -100,6 +101,14 @@ func WithLinkedCAToken(token string) Option {
 		o.linkedCAToken = token
 	}
 }
+
+// WithQuiet sets the quiet flag.
+func WithQuiet(quiet bool) Option {
+	return func(o *options) {
+		o.quiet = quiet
+	}
+}
+
 
 // CA is the type used to build the complete certificate authority. It builds
 // the HTTP server, set ups the middlewares and the HTTP handlers.
@@ -288,9 +297,11 @@ func (ca *CA) Run() error {
 	var wg sync.WaitGroup
 	errs := make(chan error, 1)
 
-	log.Printf("Documentation: https://u.step.sm/docs/ca")
-	log.Printf("Community Discord: https://u.step.sm/discord")
-	log.Printf("Config File: %s", ca.opts.configFile)
+	if !ca.opts.quiet {
+		log.Printf("Documentation: https://u.step.sm/docs/ca")
+		log.Printf("Community Discord: https://u.step.sm/discord")
+		log.Printf("Config File: %s", ca.opts.configFile)
+	}
 
 	if ca.insecureSrv != nil {
 		wg.Add(1)
@@ -359,6 +370,7 @@ func (ca *CA) Reload() error {
 		WithSSHUserPassword(ca.opts.sshUserPassword),
 		WithIssuerPassword(ca.opts.issuerPassword),
 		WithLinkedCAToken(ca.opts.linkedCAToken),
+		WithQuiet(ca.opts.quiet),
 		WithConfigFile(ca.opts.configFile),
 		WithDatabase(ca.auth.GetDatabase()),
 	)

@@ -57,6 +57,10 @@ certificate issuer private key used in the RA mode.`,
 			Usage:  "token used to enable the linked ca.",
 			EnvVar: "STEP_CA_TOKEN",
 		},
+		cli.BoolFlag{
+			Name: "quiet",
+			Usage: "disable startup information",
+		},
 	},
 }
 
@@ -68,6 +72,7 @@ func appAction(ctx *cli.Context) error {
 	issuerPassFile := ctx.String("issuer-password-file")
 	resolver := ctx.String("resolver")
 	token := ctx.String("token")
+	quiet := ctx.Bool("quiet")
 
 	// If zero cmd line args show help, if >1 cmd line args show error.
 	if ctx.NArg() == 0 {
@@ -141,7 +146,8 @@ To get a linked authority token:
 		ca.WithSSHHostPassword(sshHostPassword),
 		ca.WithSSHUserPassword(sshUserPassword),
 		ca.WithIssuerPassword(issuerPassword),
-		ca.WithLinkedCAToken(token))
+		ca.WithLinkedCAToken(token),
+		ca.WithQuiet(quiet))
 	if err != nil {
 		fatal(err)
 	}
