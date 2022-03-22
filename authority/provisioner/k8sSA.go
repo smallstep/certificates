@@ -231,6 +231,7 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	}
 
 	return []SignOption{
+		p,
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeK8sSA, p.Name, ""),
