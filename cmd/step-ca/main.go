@@ -156,6 +156,11 @@ automating deployment:
 '''
 $ step-ca --context=mybiz --password-file ./password.txt
 '''
+Run the Step CA for the context that's been selected with step and with a custom password file:
+'''
+$ step context select ssh
+$ step-ca --password-file ./password.txt
+'''
 `
 	app.Flags = append(app.Flags, commands.AppCommand.Flags...)
 	app.Flags = append(app.Flags, cli.HelpFlag)
