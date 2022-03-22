@@ -51,8 +51,7 @@ func (r *RevokeRequest) Validate() (err error) {
 // TODO: Add CRL and OCSP support.
 func (h *caHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 	var body RevokeRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+	if !read.JSON(w, r, &body) {
 		return
 	}
 

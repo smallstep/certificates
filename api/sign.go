@@ -51,8 +51,7 @@ type SignResponse struct {
 // information in the certificate request.
 func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 	var body SignRequest
-	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+	if !read.JSON(w, r, &body) {
 		return
 	}
 
