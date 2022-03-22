@@ -58,7 +58,7 @@ certificate issuer private key used in the RA mode.`,
 			EnvVar: "STEP_CA_TOKEN",
 		},
 		cli.BoolFlag{
-			Name: "quiet",
+			Name:  "quiet",
 			Usage: "disable startup information",
 		},
 	},

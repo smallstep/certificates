@@ -109,7 +109,6 @@ func WithQuiet(quiet bool) Option {
 	}
 }
 
-
 // CA is the type used to build the complete certificate authority. It builds
 // the HTTP server, set ups the middlewares and the HTTP handlers.
 type CA struct {
