@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,7 +13,7 @@ import (
 
 	"github.com/go-chi/chi"
 	microscep "github.com/micromdm/scep/v2/scep"
-	"github.com/pkg/errors"
+
 	"go.mozilla.org/pkcs7"
 
 	"github.com/smallstep/certificates/api"
@@ -75,7 +77,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	request, err := decodeRequest(r)
 	if err != nil {
-		fail(w, errors.Wrap(err, "invalid scep get request"))
+		fail(w, fmt.Errorf("invalid scep get request: %w", err))
 		return
 	}
 
@@ -90,11 +92,11 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	case opnPKIOperation:
 		// TODO: implement the GET for PKI operation? Default CACAPS doesn't specify this is in use, though
 	default:
-		err = errors.Errorf("unknown operation: %s", request.Operation)
+		err = fmt.Errorf("unknown operation: %s", request.Operation)
 	}
 
 	if err != nil {
-		fail(w, errors.Wrap(err, "scep get request failed"))
+		fail(w, fmt.Errorf("scep get request failed: %w", err))
 		return
 	}
 
@@ -106,7 +108,7 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 
 	request, err := decodeRequest(r)
 	if err != nil {
-		fail(w, errors.Wrap(err, "invalid scep post request"))
+		fail(w, fmt.Errorf("invalid scep post request: %w", err))
 		return
 	}
 
@@ -117,11 +119,11 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	case opnPKIOperation:
 		response, err = h.PKIOperation(ctx, request)
 	default:
-		err = errors.Errorf("unknown operation: %s", request.Operation)
+		err = fmt.Errorf("unknown operation: %s", request.Operation)
 	}
 
 	if err != nil {
-		fail(w, errors.Wrap(err, "scep post request failed"))
+		fail(w, fmt.Errorf("scep post request failed: %w", err))
 		return
 	}
 
@@ -163,7 +165,7 @@ func decodeRequest(r *http.Request) (SCEPRequest, error) {
 				Message:   decodedMessage,
 			}, nil
 		default:
-			return SCEPRequest{}, errors.Errorf("unsupported operation: %s", operation)
+			return SCEPRequest{}, fmt.Errorf("unsupported operation: %s", operation)
 		}
 	case http.MethodPost:
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxPayloadSize))
@@ -175,7 +177,7 @@ func decodeRequest(r *http.Request) (SCEPRequest, error) {
 			Message:   body,
 		}, nil
 	default:
-		return SCEPRequest{}, errors.Errorf("unsupported method: %s", method)
+		return SCEPRequest{}, fmt.Errorf("unsupported method: %s", method)
 	}
 }
 
@@ -187,7 +189,7 @@ func (h *Handler) lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 		name := chi.URLParam(r, "provisionerName")
 		provisionerName, err := url.PathUnescape(name)
 		if err != nil {
-			fail(w, errors.Errorf("error url unescaping provisioner name '%s'", name))
+			fail(w, fmt.Errorf("error url unescaping provisioner name '%s'", name))
 			return
 		}
 
@@ -315,7 +317,7 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 
 	certRep, err := h.Auth.SignCSR(ctx, csr, msg)
 	if err != nil {
-		return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.Wrap(err, "error when signing new certificate"))
+		return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
 	}
 
 	response := SCEPResponse{
@@ -343,10 +345,7 @@ func writeResponse(w http.ResponseWriter, response SCEPResponse) {
 	}
 
 	w.Header().Set("Content-Type", contentHeader(response))
-	_, err := w.Write(response.Data)
-	if err != nil {
-		fail(w, errors.Wrap(err, "error when writing scep response")) // This could end up as an error again
-	}
+	_, _ = w.Write(response.Data)
 }
 
 func fail(w http.ResponseWriter, err error) {
