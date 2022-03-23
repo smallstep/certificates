@@ -143,6 +143,11 @@ automating deployment:
 '''
 $ step-ca $STEPPATH/config/ca.json --password-file ./password.txt
 '''
+Run the Step CA for the context selected with step and a custom password file:
+'''
+$ step context select ssh
+$ step-ca --password-file ./password.txt
+'''
 Run the Step CA for the context named _mybiz_ and prompt for password:
 '''
 $ step-ca --context=mybiz
@@ -155,11 +160,6 @@ Run the Step CA for the context named _mybiz_ and read the password from a file 
 automating deployment:
 '''
 $ step-ca --context=mybiz --password-file ./password.txt
-'''
-Run the Step CA for the context that's been selected with step and with a custom password file:
-'''
-$ step context select ssh
-$ step-ca --password-file ./password.txt
 '''
 `
 	app.Flags = append(app.Flags, commands.AppCommand.Flags...)
