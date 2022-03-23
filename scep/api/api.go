@@ -30,8 +30,6 @@ const (
 
 const maxPayloadSize = 2 << 20
 
-type nextHTTP = func(http.ResponseWriter, *http.Request)
-
 const (
 	certChainHeader    = "application/x-x509-ca-ra-cert"
 	leafHeader         = "application/x-x509-ca-cert"
@@ -183,7 +181,7 @@ func decodeSCEPRequest(r *http.Request) (SCEPRequest, error) {
 
 // lookupProvisioner loads the provisioner associated with the request.
 // Responds 404 if the provisioner does not exist.
-func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
+func (h *Handler) lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		name := chi.URLParam(r, "provisionerName")
