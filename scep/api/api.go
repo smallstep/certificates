@@ -75,7 +75,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	request, err := decodeRequest(r)
 	if err != nil {
-		writeError(w, errors.Wrap(err, "invalid scep get request"))
+		fail(w, errors.Wrap(err, "invalid scep get request"))
 		return
 	}
 
@@ -94,7 +94,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		writeError(w, errors.Wrap(err, "scep get request failed"))
+		fail(w, errors.Wrap(err, "scep get request failed"))
 		return
 	}
 
@@ -106,7 +106,7 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 
 	request, err := decodeRequest(r)
 	if err != nil {
-		writeError(w, errors.Wrap(err, "invalid scep post request"))
+		fail(w, errors.Wrap(err, "invalid scep post request"))
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		writeError(w, errors.Wrap(err, "scep post request failed"))
+		fail(w, errors.Wrap(err, "scep post request failed"))
 		return
 	}
 
@@ -187,19 +187,19 @@ func (h *Handler) lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 		name := chi.URLParam(r, "provisionerName")
 		provisionerName, err := url.PathUnescape(name)
 		if err != nil {
-			api.WriteError(w, errors.Errorf("error url unescaping provisioner name '%s'", name))
+			fail(w, errors.Errorf("error url unescaping provisioner name '%s'", name))
 			return
 		}
 
 		p, err := h.Auth.LoadProvisionerByName(provisionerName)
 		if err != nil {
-			api.WriteError(w, err)
+			fail(w, err)
 			return
 		}
 
 		prov, ok := p.(*provisioner.SCEP)
 		if !ok {
-			api.WriteError(w, errors.New("provisioner must be of type SCEP"))
+			fail(w, errors.New("provisioner must be of type SCEP"))
 			return
 		}
 
@@ -345,11 +345,11 @@ func writeResponse(w http.ResponseWriter, response SCEPResponse) {
 	w.Header().Set("Content-Type", contentHeader(response))
 	_, err := w.Write(response.Data)
 	if err != nil {
-		writeError(w, errors.Wrap(err, "error when writing scep response")) // This could end up as an error again
+		fail(w, errors.Wrap(err, "error when writing scep response")) // This could end up as an error again
 	}
 }
 
-func writeError(w http.ResponseWriter, err error) {
+func fail(w http.ResponseWriter, err error) {
 	log.Error(w, err)
 
 	http.Error(w, err.Error(), http.StatusInternalServerError)
