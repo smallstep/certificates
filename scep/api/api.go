@@ -352,11 +352,9 @@ func writeSCEPResponse(w http.ResponseWriter, response SCEPResponse) {
 }
 
 func writeError(w http.ResponseWriter, err error) {
-	scepError := &scep.Error{
-		Message: err.Error(),
-		Status:  http.StatusInternalServerError, // TODO: make this a param?
-	}
-	api.WriteError(w, scepError)
+	log.Error(w, err)
+
+	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
 func (h *Handler) createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (SCEPResponse, error) {
