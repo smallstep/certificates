@@ -98,7 +98,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeSCEPResponse(w, response)
+	writeResponse(w, response)
 }
 
 // Post handles all SCEP POST requests
@@ -125,7 +125,7 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeSCEPResponse(w, response)
+	writeResponse(w, response)
 }
 
 func decodeSCEPRequest(r *http.Request) (SCEPRequest, error) {
@@ -331,8 +331,8 @@ func formatCapabilities(caps []string) []byte {
 	return []byte(strings.Join(caps, "\r\n"))
 }
 
-// writeSCEPResponse writes a SCEP response back to the SCEP client.
-func writeSCEPResponse(w http.ResponseWriter, response SCEPResponse) {
+// writeResponse writes a SCEP response back to the SCEP client.
+func writeResponse(w http.ResponseWriter, response SCEPResponse) {
 
 	if response.Error != nil {
 		log.Error(w, response.Error)
