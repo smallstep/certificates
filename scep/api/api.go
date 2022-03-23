@@ -73,7 +73,7 @@ func (h *Handler) Route(r api.Router) {
 // Get handles all SCEP GET requests
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
-	request, err := decodeSCEPRequest(r)
+	request, err := decodeRequest(r)
 	if err != nil {
 		writeError(w, errors.Wrap(err, "invalid scep get request"))
 		return
@@ -104,7 +104,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 // Post handles all SCEP POST requests
 func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 
-	request, err := decodeSCEPRequest(r)
+	request, err := decodeRequest(r)
 	if err != nil {
 		writeError(w, errors.Wrap(err, "invalid scep post request"))
 		return
@@ -128,7 +128,7 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response)
 }
 
-func decodeSCEPRequest(r *http.Request) (SCEPRequest, error) {
+func decodeRequest(r *http.Request) (SCEPRequest, error) {
 
 	defer r.Body.Close()
 
