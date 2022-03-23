@@ -13,7 +13,6 @@ import (
 
 	"github.com/go-chi/chi"
 	microscep "github.com/micromdm/scep/v2/scep"
-
 	"go.mozilla.org/pkcs7"
 
 	"github.com/smallstep/certificates/api"
