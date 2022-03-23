@@ -37,14 +37,14 @@ const (
 	pkiOperationHeader = "application/x-pki-message"
 )
 
-// SCEPRequest is a SCEP server request.
-type SCEPRequest struct {
+// request is a SCEP server request.
+type request struct {
 	Operation string
 	Message   []byte
 }
 
-// SCEPResponse is a SCEP server response.
-type SCEPResponse struct {
+// response is a SCEP server response.
+type response struct {
 	Operation   string
 	CACertNum   int
 	Data        []byte
@@ -74,24 +74,24 @@ func (h *Handler) Route(r api.Router) {
 // Get handles all SCEP GET requests
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
-	request, err := decodeRequest(r)
+	req, err := decodeRequest(r)
 	if err != nil {
 		fail(w, fmt.Errorf("invalid scep get request: %w", err))
 		return
 	}
 
 	ctx := r.Context()
-	var response SCEPResponse
+	var res response
 
-	switch request.Operation {
+	switch req.Operation {
 	case opnGetCACert:
-		response, err = h.GetCACert(ctx)
+		res, err = h.GetCACert(ctx)
 	case opnGetCACaps:
-		response, err = h.GetCACaps(ctx)
+		res, err = h.GetCACaps(ctx)
 	case opnPKIOperation:
 		// TODO: implement the GET for PKI operation? Default CACAPS doesn't specify this is in use, though
 	default:
-		err = fmt.Errorf("unknown operation: %s", request.Operation)
+		err = fmt.Errorf("unknown operation: %s", req.Operation)
 	}
 
 	if err != nil {
@@ -99,26 +99,26 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeResponse(w, response)
+	writeResponse(w, res)
 }
 
 // Post handles all SCEP POST requests
 func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 
-	request, err := decodeRequest(r)
+	req, err := decodeRequest(r)
 	if err != nil {
 		fail(w, fmt.Errorf("invalid scep post request: %w", err))
 		return
 	}
 
 	ctx := r.Context()
-	var response SCEPResponse
+	var res response
 
-	switch request.Operation {
+	switch req.Operation {
 	case opnPKIOperation:
-		response, err = h.PKIOperation(ctx, request)
+		res, err = h.PKIOperation(ctx, req)
 	default:
-		err = fmt.Errorf("unknown operation: %s", request.Operation)
+		err = fmt.Errorf("unknown operation: %s", req.Operation)
 	}
 
 	if err != nil {
@@ -126,10 +126,10 @@ func (h *Handler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeResponse(w, response)
+	writeResponse(w, res)
 }
 
-func decodeRequest(r *http.Request) (SCEPRequest, error) {
+func decodeRequest(r *http.Request) (request, error) {
 
 	defer r.Body.Close()
 
@@ -145,7 +145,7 @@ func decodeRequest(r *http.Request) (SCEPRequest, error) {
 	case http.MethodGet:
 		switch operation {
 		case opnGetCACert, opnGetCACaps:
-			return SCEPRequest{
+			return request{
 				Operation: operation,
 				Message:   []byte{},
 			}, nil
@@ -157,26 +157,26 @@ func decodeRequest(r *http.Request) (SCEPRequest, error) {
 			// TODO: verify this; it seems like it should be StdEncoding instead of URLEncoding
 			decodedMessage, err := base64.URLEncoding.DecodeString(message)
 			if err != nil {
-				return SCEPRequest{}, err
+				return request{}, err
 			}
-			return SCEPRequest{
+			return request{
 				Operation: operation,
 				Message:   decodedMessage,
 			}, nil
 		default:
-			return SCEPRequest{}, fmt.Errorf("unsupported operation: %s", operation)
+			return request{}, fmt.Errorf("unsupported operation: %s", operation)
 		}
 	case http.MethodPost:
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxPayloadSize))
 		if err != nil {
-			return SCEPRequest{}, err
+			return request{}, err
 		}
-		return SCEPRequest{
+		return request{
 			Operation: operation,
 			Message:   body,
 		}, nil
 	default:
-		return SCEPRequest{}, fmt.Errorf("unsupported method: %s", method)
+		return request{}, fmt.Errorf("unsupported method: %s", method)
 	}
 }
 
@@ -211,59 +211,59 @@ func (h *Handler) lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // GetCACert returns the CA certificates in a SCEP response
-func (h *Handler) GetCACert(ctx context.Context) (SCEPResponse, error) {
+func (h *Handler) GetCACert(ctx context.Context) (response, error) {
 
 	certs, err := h.Auth.GetCACertificates(ctx)
 	if err != nil {
-		return SCEPResponse{}, err
+		return response{}, err
 	}
 
 	if len(certs) == 0 {
-		return SCEPResponse{}, errors.New("missing CA cert")
+		return response{}, errors.New("missing CA cert")
 	}
 
-	response := SCEPResponse{
+	res := response{
 		Operation: opnGetCACert,
 		CACertNum: len(certs),
 	}
 
 	if len(certs) == 1 {
-		response.Data = certs[0].Raw
+		res.Data = certs[0].Raw
 	} else {
 		// create degenerate pkcs7 certificate structure, according to
 		// https://tools.ietf.org/html/rfc8894#section-4.2.1.2, because
 		// not signed or encrypted data has to be returned.
 		data, err := microscep.DegenerateCertificates(certs)
 		if err != nil {
-			return SCEPResponse{}, err
+			return response{}, err
 		}
-		response.Data = data
+		res.Data = data
 	}
 
-	return response, nil
+	return res, nil
 }
 
 // GetCACaps returns the CA capabilities in a SCEP response
-func (h *Handler) GetCACaps(ctx context.Context) (SCEPResponse, error) {
+func (h *Handler) GetCACaps(ctx context.Context) (response, error) {
 
 	caps := h.Auth.GetCACaps(ctx)
 
-	response := SCEPResponse{
+	res := response{
 		Operation: opnGetCACaps,
 		Data:      formatCapabilities(caps),
 	}
 
-	return response, nil
+	return res, nil
 }
 
 // PKIOperation performs PKI operations and returns a SCEP response
-func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPResponse, error) {
+func (h *Handler) PKIOperation(ctx context.Context, req request) (response, error) {
 
 	// parse the message using microscep implementation
-	microMsg, err := microscep.ParsePKIMessage(request.Message)
+	microMsg, err := microscep.ParsePKIMessage(req.Message)
 	if err != nil {
 		// return the error, because we can't use the msg for creating a CertRep
-		return SCEPResponse{}, err
+		return response{}, err
 	}
 
 	// this is essentially doing the same as microscep.ParsePKIMessage, but
@@ -271,7 +271,7 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 	// wrapper for the microscep implementation.
 	p7, err := pkcs7.Parse(microMsg.Raw)
 	if err != nil {
-		return SCEPResponse{}, err
+		return response{}, err
 	}
 
 	// copy over properties to our internal PKIMessage
@@ -284,7 +284,7 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 	}
 
 	if err := h.Auth.DecryptPKIEnvelope(ctx, msg); err != nil {
-		return SCEPResponse{}, err
+		return response{}, err
 	}
 
 	// NOTE: at this point we have sufficient information for returning nicely signed CertReps
@@ -319,13 +319,13 @@ func (h *Handler) PKIOperation(ctx context.Context, request SCEPRequest) (SCEPRe
 		return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
 	}
 
-	response := SCEPResponse{
+	res := response{
 		Operation:   opnPKIOperation,
 		Data:        certRep.Raw,
 		Certificate: certRep.Certificate,
 	}
 
-	return response, nil
+	return res, nil
 }
 
 func formatCapabilities(caps []string) []byte {
@@ -333,18 +333,18 @@ func formatCapabilities(caps []string) []byte {
 }
 
 // writeResponse writes a SCEP response back to the SCEP client.
-func writeResponse(w http.ResponseWriter, response SCEPResponse) {
+func writeResponse(w http.ResponseWriter, res response) {
 
-	if response.Error != nil {
-		log.Error(w, response.Error)
+	if res.Error != nil {
+		log.Error(w, res.Error)
 	}
 
-	if response.Certificate != nil {
-		api.LogCertificate(w, response.Certificate)
+	if res.Certificate != nil {
+		api.LogCertificate(w, res.Certificate)
 	}
 
-	w.Header().Set("Content-Type", contentHeader(response))
-	_, _ = w.Write(response.Data)
+	w.Header().Set("Content-Type", contentHeader(res))
+	_, _ = w.Write(res.Data)
 }
 
 func fail(w http.ResponseWriter, err error) {
@@ -353,19 +353,19 @@ func fail(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
-func (h *Handler) createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (SCEPResponse, error) {
+func (h *Handler) createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (response, error) {
 	certRepMsg, err := h.Auth.CreateFailureResponse(ctx, csr, msg, scep.FailInfoName(info), failError.Error())
 	if err != nil {
-		return SCEPResponse{}, err
+		return response{}, err
 	}
-	return SCEPResponse{
+	return response{
 		Operation: opnPKIOperation,
 		Data:      certRepMsg.Raw,
 		Error:     failError,
 	}, nil
 }
 
-func contentHeader(r SCEPResponse) string {
+func contentHeader(r response) string {
 	switch r.Operation {
 	case opnGetCACert:
 		if r.CACertNum > 1 {
