@@ -1345,30 +1345,24 @@ func Test_caHandler_Roots(t *testing.T) {
 }
 
 func Test_caHandler_RootsPEM(t *testing.T) {
-	cs := &tls.ConnectionState{
-		PeerCertificates: []*x509.Certificate{parseCertificate(certPEM)},
-	}
 	parsedRoot := parseCertificate(rootPEM)
 	tests := []struct {
 		name       string
-		tls        *tls.ConnectionState
-		cert       *x509.Certificate
 		roots      []*x509.Certificate
 		err        error
 		statusCode int
 		expect     string
 	}{
-		{"one root", cs, parseCertificate(certPEM), []*x509.Certificate{parsedRoot}, nil, http.StatusOK, rootPEM},
-		{"two roots", cs, parseCertificate(certPEM), []*x509.Certificate{parsedRoot, parsedRoot}, nil, http.StatusOK, rootPEM + "\n" + rootPEM},
-		{"no peer certificates", &tls.ConnectionState{}, parseCertificate(certPEM), []*x509.Certificate{parsedRoot}, nil, http.StatusOK, rootPEM},
-		{"fail", cs, nil, nil, fmt.Errorf("an error"), http.StatusForbidden, ""},
+		{"one root", []*x509.Certificate{parsedRoot}, nil, http.StatusOK, rootPEM},
+		{"two roots", []*x509.Certificate{parsedRoot, parsedRoot}, nil, http.StatusOK, rootPEM + "\n" + rootPEM},
+		{"no peer certificates", []*x509.Certificate{parsedRoot}, nil, http.StatusOK, rootPEM},
+		{"fail", nil, errors.New("an error"), http.StatusInternalServerError, ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := New(&mockAuthority{ret1: tt.roots, err: tt.err}).(*caHandler)
-			req := httptest.NewRequest("GET", "http://example.com/roots", nil)
-			req.TLS = tt.tls
+			req := httptest.NewRequest("GET", "https://example.com/roots", nil)
 			w := httptest.NewRecorder()
 			h.RootsPEM(w, req)
 			res := w.Result()

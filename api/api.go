@@ -370,7 +370,7 @@ func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) RootsPEM(w http.ResponseWriter, r *http.Request) {
 	roots, err := h.Authority.GetRoots()
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error getting roots"))
+		WriteError(w, errs.InternalServerErr(err))
 		return
 	}
 
