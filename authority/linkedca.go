@@ -152,13 +152,21 @@ func (c *linkedCaClient) GetProvisioner(ctx context.Context, id string) (*linked
 }
 
 func (c *linkedCaClient) GetProvisioners(ctx context.Context) ([]*linkedca.Provisioner, error) {
+	resp, err := c.GetConfiguration(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Provisioners, nil
+}
+
+func (c *linkedCaClient) GetConfiguration(ctx context.Context) (*linkedca.ConfigurationResponse, error) {
 	resp, err := c.client.GetConfiguration(ctx, &linkedca.ConfigurationRequest{
 		AuthorityId: c.authorityID,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "error getting provisioners")
+		return nil, errors.Wrap(err, "error getting configuration")
 	}
-	return resp.Provisioners, nil
+	return resp, nil
 }
 
 func (c *linkedCaClient) UpdateProvisioner(ctx context.Context, prov *linkedca.Provisioner) error {
@@ -205,11 +213,9 @@ func (c *linkedCaClient) GetAdmin(ctx context.Context, id string) (*linkedca.Adm
 }
 
 func (c *linkedCaClient) GetAdmins(ctx context.Context) ([]*linkedca.Admin, error) {
-	resp, err := c.client.GetConfiguration(ctx, &linkedca.ConfigurationRequest{
-		AuthorityId: c.authorityID,
-	})
+	resp, err := c.GetConfiguration(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "error getting admins")
+		return nil, err
 	}
 	return resp.Admins, nil
 }
