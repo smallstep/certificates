@@ -1355,7 +1355,6 @@ func Test_caHandler_RootsPEM(t *testing.T) {
 	}{
 		{"one root", []*x509.Certificate{parsedRoot}, nil, http.StatusOK, rootPEM},
 		{"two roots", []*x509.Certificate{parsedRoot, parsedRoot}, nil, http.StatusOK, rootPEM + "\n" + rootPEM},
-		{"no peer certificates", []*x509.Certificate{parsedRoot}, nil, http.StatusOK, rootPEM},
 		{"fail", nil, errors.New("an error"), http.StatusInternalServerError, ""},
 	}
 
