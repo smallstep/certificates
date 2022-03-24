@@ -4,32 +4,18 @@ import (
 	"context"
 	"crypto/subtle"
 	"crypto/x509"
+	"errors"
+	"fmt"
 	"net/url"
-
-	"github.com/smallstep/certificates/authority/provisioner"
 
 	microx509util "github.com/micromdm/scep/v2/cryptoutil/x509util"
 	microscep "github.com/micromdm/scep/v2/scep"
-
-	"github.com/pkg/errors"
-
 	"go.mozilla.org/pkcs7"
 
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/authority/provisioner"
 )
-
-// Interface is the SCEP authority interface.
-type Interface interface {
-	LoadProvisionerByName(string) (provisioner.Interface, error)
-	GetLinkExplicit(provName string, absoluteLink bool, baseURL *url.URL, inputs ...string) string
-
-	GetCACertificates(ctx context.Context) ([]*x509.Certificate, error)
-	DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error
-	SignCSR(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage) (*PKIMessage, error)
-	CreateFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage, info FailInfoName, infoText string) (*PKIMessage, error)
-	MatchChallengePassword(ctx context.Context, password string) (bool, error)
-	GetCACaps(ctx context.Context) []string
-}
 
 // Authority is the layer that handles all SCEP interactions.
 type Authority struct {
@@ -180,12 +166,12 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 
 	p7c, err := pkcs7.Parse(msg.P7.Content)
 	if err != nil {
-		return errors.Wrap(err, "error parsing pkcs7 content")
+		return fmt.Errorf("error parsing pkcs7 content: %w", err)
 	}
 
 	envelope, err := p7c.Decrypt(a.intermediateCertificate, a.service.decrypter)
 	if err != nil {
-		return errors.Wrap(err, "error decrypting encrypted pkcs7 content")
+		return fmt.Errorf("error decrypting encrypted pkcs7 content: %w", err)
 	}
 
 	msg.pkiEnvelope = envelope
@@ -194,19 +180,19 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 	case microscep.CertRep:
 		certs, err := microscep.CACerts(msg.pkiEnvelope)
 		if err != nil {
-			return errors.Wrap(err, "error extracting CA certs from pkcs7 degenerate data")
+			return fmt.Errorf("error extracting CA certs from pkcs7 degenerate data: %w", err)
 		}
 		msg.CertRepMessage.Certificate = certs[0]
 		return nil
 	case microscep.PKCSReq, microscep.UpdateReq, microscep.RenewalReq:
 		csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
 		if err != nil {
-			return errors.Wrap(err, "parse CSR from pkiEnvelope")
+			return fmt.Errorf("parse CSR from pkiEnvelope: %w", err)
 		}
 		// check for challengePassword
 		cp, err := microx509util.ParseChallengePassword(msg.pkiEnvelope)
 		if err != nil {
-			return errors.Wrap(err, "parse challenge password in pkiEnvelope")
+			return fmt.Errorf("parse challenge password in pkiEnvelope: %w", err)
 		}
 		msg.CSRReqMessage = &microscep.CSRReqMessage{
 			RawDecrypted:      msg.pkiEnvelope,
@@ -215,7 +201,7 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 		}
 		return nil
 	case microscep.GetCRL, microscep.GetCert, microscep.CertPoll:
-		return errors.Errorf("not implemented")
+		return errors.New("not implemented")
 	}
 
 	return nil
@@ -274,19 +260,19 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 	signOps, err := p.AuthorizeSign(ctx, "")
 	if err != nil {
-		return nil, errors.Wrap(err, "error retrieving authorization options from SCEP provisioner")
+		return nil, fmt.Errorf("error retrieving authorization options from SCEP provisioner: %w", err)
 	}
 
 	opts := provisioner.SignOptions{}
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating template options from SCEP provisioner")
+		return nil, fmt.Errorf("error creating template options from SCEP provisioner: %w", err)
 	}
 	signOps = append(signOps, templateOptions)
 
 	certChain, err := a.signAuth.Sign(csr, opts, signOps...)
 	if err != nil {
-		return nil, errors.Wrap(err, "error generating certificate for order")
+		return nil, fmt.Errorf("error generating certificate for order: %w", err)
 	}
 
 	// take the issued certificate (only); https://tools.ietf.org/html/rfc8894#section-3.3.2
