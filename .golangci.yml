@@ -73,4 +73,3 @@ issues:
     - error strings should not be capitalized or end with punctuation or a newline
     - Wrapf call needs 1 arg but has 2 args
     - cs.NegotiatedProtocolIsMutual is deprecated
-    - rewrite if-else to switch statement

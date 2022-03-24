@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+
+	"go.step.sm/crypto/randutil"
+
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/crypto/randutil"
 )
 
 // NewOrderRequest represents the body for a NewOrder request.
@@ -36,8 +38,8 @@ func (n *NewOrderRequest) Validate() error {
 		if id.Type == acme.IP && net.ParseIP(id.Value) == nil {
 			return acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", id.Value)
 		}
-		// TODO: add some validations for DNS domains?
-		// TODO: combine the errors from this with allow/deny policy, like example error in https://datatracker.ietf.org/doc/html/rfc8555#section-6.7.1
+		// TODO(hs): add some validations for DNS domains?
+		// TODO(hs): combine the errors from this with allow/deny policy, like example error in https://datatracker.ietf.org/doc/html/rfc8555#section-6.7.1
 	}
 	return nil
 }
@@ -99,19 +101,25 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO(hs): this should also verify rules set in the Account (i.e. allowed/denied
-	// DNS and IPs; it's probably good to connect those to the EAB credentials and management? Or
+	// TODO(hs): the policy evaluation below should also verify rules set in the Account (i.e. allowed/denied
+	// DNS and IPs). It's probably good to connect those to the EAB credentials and management? Or
 	// should we do it fully properly and connect them to the Account directly? The latter would allow
 	// management of allowed/denied names based on just the name, without having bound to EAB. Still,
 	// EAB is not illogical, because that's the way Accounts are connected to an external system and
 	// thus make sense to also set the allowed/denied names based on that info.
-	// TODO: also perform check on the authority level here already, so that challenges are not performed
-	// and after that the CA fails to sign it. (i.e. h.ca function?)
+	// TODO(hs): gather all errors, so that we can build one response with subproblems; include the nor.Validate()
+	// error here too, like in example?
 
 	for _, identifier := range nor.Identifiers {
-		// TODO: gather all errors, so that we can build subproblems; include the nor.Validate() error here too, like in example?
+		// evaluate the provisioner level policy
 		orderIdentifier := provisioner.ACMEIdentifier{Type: provisioner.ACMEIdentifierType(identifier.Type), Value: identifier.Value}
 		err = prov.AuthorizeOrderIdentifier(ctx, orderIdentifier)
+		if err != nil {
+			api.WriteError(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			return
+		}
+		// evaluate the authority level policy
+		err = h.ca.AreSANsAllowed(ctx, []string{identifier.Value})
 		if err != nil {
 			api.WriteError(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return

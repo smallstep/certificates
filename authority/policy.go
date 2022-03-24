@@ -2,9 +2,8 @@ package authority
 
 import (
 	"context"
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	"go.step.sm/linkedca"
 
