@@ -25,42 +25,42 @@ func (a *Authority) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, e
 	return policy, nil
 }
 
-func (a *Authority) StoreAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) error {
+func (a *Authority) CreateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error) {
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
 
 	if err := a.checkPolicy(ctx, adm, policy); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := a.adminDB.CreateAuthorityPolicy(ctx, policy); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := a.reloadPolicyEngines(ctx); err != nil {
-		return admin.WrapErrorISE(err, "error reloading policy engines when creating authority policy")
+		return nil, admin.WrapErrorISE(err, "error reloading policy engines when creating authority policy")
 	}
 
-	return nil
+	return policy, nil // TODO: return the newly stored policy
 }
 
-func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) error {
+func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error) {
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
 
 	if err := a.checkPolicy(ctx, adm, policy); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := a.adminDB.UpdateAuthorityPolicy(ctx, policy); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := a.reloadPolicyEngines(ctx); err != nil {
-		return admin.WrapErrorISE(err, "error reloading policy engines when updating authority policy")
+		return nil, admin.WrapErrorISE(err, "error reloading policy engines when updating authority policy")
 	}
 
-	return nil
+	return policy, nil // TODO: return the updated stored policy
 }
 
 func (a *Authority) RemoveAuthorityPolicy(ctx context.Context) error {

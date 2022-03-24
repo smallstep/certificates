@@ -4,10 +4,11 @@ import (
 	"context"
 	"net/http"
 
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/admin/db/nosql"
-	"go.step.sm/linkedca"
 )
 
 type nextHTTP = func(http.ResponseWriter, *http.Request)
@@ -42,7 +43,7 @@ func (h *Handler) extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), admin.AdminContextKey, adm)
+		ctx := linkedca.WithAdmin(r.Context(), adm)
 		next(w, r.WithContext(ctx))
 	}
 }

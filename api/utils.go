@@ -2,14 +2,16 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
 
-	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/logging"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/logging"
 )
 
 // EnableLogger is an interface that enables response logging for an object.
@@ -113,4 +115,50 @@ func ReadProtoJSON(r io.Reader, m proto.Message) error {
 		return errs.BadRequestErr(err, "error reading request body")
 	}
 	return protojson.Unmarshal(data, m)
+}
+
+// ReadProtoJSONWithCheck reads JSON from the request body and stores it in the value
+// pointed by v. TODO(hs): move this to and integrate with render package.
+func ReadProtoJSONWithCheck(w http.ResponseWriter, r io.Reader, m proto.Message) bool {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		var wrapper = struct {
+			Status  int    `json:"code"`
+			Message string `json:"message"`
+		}{
+			Status:  http.StatusBadRequest,
+			Message: err.Error(),
+		}
+		data, err := json.Marshal(wrapper) // TODO(hs): handle err; even though it's very unlikely to fail
+		if err != nil {
+			panic(err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(data)
+		return false
+	}
+	if err := protojson.Unmarshal(data, m); err != nil {
+		if errors.Is(err, proto.Error) {
+			var wrapper = struct {
+				Message string `json:"message"`
+			}{
+				Message: err.Error(),
+			}
+			data, err := json.Marshal(wrapper) // TODO(hs): handle err; even though it's very unlikely to fail
+			if err != nil {
+				panic(err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write(data)
+			return false
+		}
+
+		// fallback to the default error writer
+		WriteError(w, err)
+		return false
+	}
+
+	return true
 }

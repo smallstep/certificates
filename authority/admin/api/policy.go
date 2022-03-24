@@ -4,10 +4,12 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
+
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
 )
 
 type policyAdminResponderInterface interface {
@@ -82,29 +84,19 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if err := api.ReadProtoJSON(r.Body, newPolicy); err != nil {
-		api.WriteError(w, err)
+	if !api.ReadProtoJSONWithCheck(w, r.Body, newPolicy) {
 		return
 	}
 
-	adm, err := adminFromContext(ctx)
-	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error retrieving admin from context"))
-		return
-	}
+	adm := linkedca.AdminFromContext(ctx)
 
-	if err := par.auth.StoreAuthorityPolicy(ctx, adm, newPolicy); err != nil {
+	var createdPolicy *linkedca.Policy
+	if createdPolicy, err = par.auth.CreateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
 		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error storing authority policy"))
 		return
 	}
 
-	storedPolicy, err := par.auth.GetAuthorityPolicy(ctx)
-	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error retrieving authority policy after updating"))
-		return
-	}
-
-	api.JSONStatus(w, storedPolicy, http.StatusCreated)
+	api.JSONStatus(w, createdPolicy, http.StatusCreated)
 }
 
 // UpdateAuthorityPolicy handles the PUT /admin/authority/policy request
@@ -134,24 +126,15 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 		return
 	}
 
-	adm, err := adminFromContext(ctx)
-	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error retrieving admin from context"))
-		return
-	}
+	adm := linkedca.AdminFromContext(ctx)
 
-	if err := par.auth.UpdateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
+	var updatedPolicy *linkedca.Policy
+	if updatedPolicy, err = par.auth.UpdateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
 		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating authority policy"))
 		return
 	}
 
-	newlyStoredPolicy, err := par.auth.GetAuthorityPolicy(ctx)
-	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error retrieving authority policy after updating"))
-		return
-	}
-
-	api.ProtoJSONStatus(w, newlyStoredPolicy, http.StatusOK)
+	api.ProtoJSONStatus(w, updatedPolicy, http.StatusOK)
 }
 
 // DeleteAuthorityPolicy handles the DELETE /admin/authority/policy request
