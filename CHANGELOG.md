@@ -6,7 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased - 0.18.3] - DATE
 ### Added
+- Added support for renew after expiry using the claim `allowRenewAfterExpiry`.
 ### Changed
+- Made SCEP CA URL paths dynamic
+- Support two latest versions of Go (1.17, 1.18)
 ### Deprecated
 ### Removed
 ### Fixed
@@ -15,6 +18,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [0.18.2] - 2022-03-01
 ### Added
 - Added `subscriptionIDs` and `objectIDs` filters to the Azure provisioner.
+- [NoSQL](https://github.com/smallstep/nosql/pull/21) package allows filtering
+  out database drivers using Go tags. For example, using the Go flag
+  `--tags=nobadger,nobbolt,nomysql` will only compile `step-ca` with the pgx
+  driver for PostgreSQL.
 ### Changed
 - IPv6 addresses are normalized as IP addresses instead of hostnames.
 - More descriptive JWK decryption error message.

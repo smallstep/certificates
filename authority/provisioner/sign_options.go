@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/asn1"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -14,10 +13,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/errs"
 )
 
 // DefaultCertValidity is the default validity for a certificate if none is specified.
@@ -407,18 +407,17 @@ func (v *validityValidator) Valid(cert *x509.Certificate, o SignOptions) error {
 // x509NamePolicyValidator validates that the certificate (to be signed)
 // contains only allowed SANs.
 type x509NamePolicyValidator struct {
-	policyEngine x509PolicyEngine
+	policyEngine policy.X509Policy
 }
 
 // newX509NamePolicyValidator return a new SANs allow/deny validator.
-func newX509NamePolicyValidator(engine x509PolicyEngine) *x509NamePolicyValidator {
+func newX509NamePolicyValidator(engine policy.X509Policy) *x509NamePolicyValidator {
 	return &x509NamePolicyValidator{
 		policyEngine: engine,
 	}
 }
 
-// Valid validates validates that the certificate (to be signed)
-// contains only allowed SANs.
+// Valid validates that the certificate (to be signed) contains only allowed SANs.
 func (v *x509NamePolicyValidator) Valid(cert *x509.Certificate, _ SignOptions) error {
 	if v.policyEngine == nil {
 		return nil
@@ -427,17 +426,17 @@ func (v *x509NamePolicyValidator) Valid(cert *x509.Certificate, _ SignOptions) e
 	return err
 }
 
-var (
-	stepOIDRoot        = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
-	stepOIDProvisioner = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
-)
+// var (
+// 	stepOIDRoot = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
+// 	stepOIDProvisioner = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
+// )
 
-type stepProvisionerASN1 struct {
-	Type          int
-	Name          []byte
-	CredentialID  []byte
-	KeyValuePairs []string `asn1:"optional,omitempty"`
-}
+// type stepProvisionerASN1 struct {
+// 	Type          int
+// 	Name          []byte
+// 	CredentialID  []byte
+// 	KeyValuePairs []string `asn1:"optional,omitempty"`
+// }
 
 type forceCNOption struct {
 	ForceCN bool
@@ -464,23 +463,22 @@ func (o *forceCNOption) Modify(cert *x509.Certificate, _ SignOptions) error {
 }
 
 type provisionerExtensionOption struct {
-	Type          int
-	Name          string
-	CredentialID  string
-	KeyValuePairs []string
+	Extension
 }
 
 func newProvisionerExtensionOption(typ Type, name, credentialID string, keyValuePairs ...string) *provisionerExtensionOption {
 	return &provisionerExtensionOption{
-		Type:          int(typ),
-		Name:          name,
-		CredentialID:  credentialID,
-		KeyValuePairs: keyValuePairs,
+		Extension: Extension{
+			Type:          typ,
+			Name:          name,
+			CredentialID:  credentialID,
+			KeyValuePairs: keyValuePairs,
+		},
 	}
 }
 
 func (o *provisionerExtensionOption) Modify(cert *x509.Certificate, _ SignOptions) error {
-	ext, err := createProvisionerExtension(o.Type, o.Name, o.CredentialID, o.KeyValuePairs...)
+	ext, err := o.ToExtension()
 	if err != nil {
 		return errs.NewError(http.StatusInternalServerError, err, "error creating certificate")
 	}
@@ -493,21 +491,4 @@ func (o *provisionerExtensionOption) Modify(cert *x509.Certificate, _ SignOption
 	// contain the malicious extension, rather than the one applied by step-ca.
 	cert.ExtraExtensions = append([]pkix.Extension{ext}, cert.ExtraExtensions...)
 	return nil
-}
-
-func createProvisionerExtension(typ int, name, credentialID string, keyValuePairs ...string) (pkix.Extension, error) {
-	b, err := asn1.Marshal(stepProvisionerASN1{
-		Type:          typ,
-		Name:          []byte(name),
-		CredentialID:  []byte(credentialID),
-		KeyValuePairs: keyValuePairs,
-	})
-	if err != nil {
-		return pkix.Extension{}, errors.Wrap(err, "error marshaling provisioner extension")
-	}
-	return pkix.Extension{
-		Id:       stepOIDProvisioner,
-		Critical: false,
-		Value:    b,
-	}, nil
 }

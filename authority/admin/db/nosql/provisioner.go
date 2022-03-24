@@ -19,6 +19,7 @@ type dbProvisioner struct {
 	Type         linkedca.Provisioner_Type `json:"type"`
 	Name         string                    `json:"name"`
 	Claims       *linkedca.Claims          `json:"claims"`
+	Policy       *linkedca.Policy          `json:"policy"`
 	Details      []byte                    `json:"details"`
 	X509Template *linkedca.Template        `json:"x509Template"`
 	SSHTemplate  *linkedca.Template        `json:"sshTemplate"`
@@ -43,6 +44,7 @@ func (dbp *dbProvisioner) convert2linkedca() (*linkedca.Provisioner, error) {
 		Type:         dbp.Type,
 		Name:         dbp.Name,
 		Claims:       dbp.Claims,
+		Policy:       dbp.Policy,
 		Details:      details,
 		X509Template: dbp.X509Template,
 		SshTemplate:  dbp.SSHTemplate,
@@ -160,6 +162,7 @@ func (db *DB) CreateProvisioner(ctx context.Context, prov *linkedca.Provisioner)
 		Type:         prov.Type,
 		Name:         prov.Name,
 		Claims:       prov.Claims,
+		Policy:       prov.Policy,
 		Details:      details,
 		X509Template: prov.X509Template,
 		SSHTemplate:  prov.SshTemplate,
@@ -187,6 +190,7 @@ func (db *DB) UpdateProvisioner(ctx context.Context, prov *linkedca.Provisioner)
 	}
 	nu.Name = prov.Name
 	nu.Claims = prov.Claims
+	nu.Policy = prov.Policy
 	nu.Details, err = json.Marshal(prov.Details.GetData())
 	if err != nil {
 		return admin.WrapErrorISE(err, "error marshaling details when updating provisioner %s", prov.Name)

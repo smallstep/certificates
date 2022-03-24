@@ -5,10 +5,13 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
+
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
 )
 
 type adminAuthority interface {
@@ -25,6 +28,10 @@ type adminAuthority interface {
 	LoadProvisionerByID(id string) (provisioner.Interface, error)
 	UpdateProvisioner(ctx context.Context, nu *linkedca.Provisioner) error
 	RemoveProvisioner(ctx context.Context, id string) error
+	GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error)
+	CreateAuthorityPolicy(ctx context.Context, admin *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
+	UpdateAuthorityPolicy(ctx context.Context, admin *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
+	RemoveAuthorityPolicy(ctx context.Context) error
 }
 
 // CreateAdminRequest represents the body for a CreateAdmin request.
@@ -112,7 +119,7 @@ func (h *Handler) GetAdmins(w http.ResponseWriter, r *http.Request) {
 // CreateAdmin creates a new admin.
 func (h *Handler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 	var body CreateAdminRequest
-	if err := api.ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error reading request body"))
 		return
 	}
@@ -156,7 +163,7 @@ func (h *Handler) DeleteAdmin(w http.ResponseWriter, r *http.Request) {
 // UpdateAdmin updates an existing admin.
 func (h *Handler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
 	var body UpdateAdminRequest
-	if err := api.ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error reading request body"))
 		return
 	}

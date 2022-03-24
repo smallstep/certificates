@@ -16,6 +16,7 @@ import (
 	adminDBNosql "github.com/smallstep/certificates/authority/admin/db/nosql"
 	"github.com/smallstep/certificates/authority/administrator"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
@@ -70,10 +71,17 @@ type Authority struct {
 	startTime time.Time
 
 	// Custom functions
-	sshBastionFunc   func(ctx context.Context, user, hostname string) (*config.Bastion, error)
-	sshCheckHostFunc func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
-	sshGetHostsFunc  func(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)
-	getIdentityFunc  provisioner.GetIdentityFunc
+	sshBastionFunc        func(ctx context.Context, user, hostname string) (*config.Bastion, error)
+	sshCheckHostFunc      func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
+	sshGetHostsFunc       func(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)
+	getIdentityFunc       provisioner.GetIdentityFunc
+	authorizeRenewFunc    provisioner.AuthorizeRenewFunc
+	authorizeSSHRenewFunc provisioner.AuthorizeSSHRenewFunc
+
+	// Policy engines
+	x509Policy    policy.X509Policy
+	sshUserPolicy policy.UserPolicy
+	sshHostPolicy policy.HostPolicy
 
 	adminMutex sync.RWMutex
 }
@@ -199,6 +207,51 @@ func (a *Authority) reloadAdminResources(ctx context.Context) error {
 	a.provisioners = provClxn
 	a.config.AuthorityConfig.Admins = adminList
 	a.admins = adminClxn
+
+	return nil
+}
+
+// reloadPolicyEngines reloads x509 and SSH policy engines using
+// configuration stored in the DB or from the configuration file.
+func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
+	var (
+		err           error
+		policyOptions *policy.Options
+	)
+	if a.config.AuthorityConfig.EnableAdmin {
+		linkedPolicy, err := a.adminDB.GetAuthorityPolicy(ctx)
+		if err != nil {
+			return admin.WrapErrorISE(err, "error getting policy to (re)load policy engines")
+		}
+		policyOptions = policyToCertificates(linkedPolicy)
+	} else {
+		policyOptions = a.config.AuthorityConfig.Policy
+	}
+
+	// if no new or updated policy option is set, clear policy engines that (may have)
+	// been configured before and return early
+	if policyOptions == nil {
+		a.x509Policy = nil
+		a.sshHostPolicy = nil
+		a.sshUserPolicy = nil
+		return nil
+	}
+
+	// Initialize the x509 allow/deny policy engine
+	if a.x509Policy, err = policy.NewX509PolicyEngine(policyOptions.GetX509Options()); err != nil {
+		return err
+	}
+
+	// // Initialize the SSH allow/deny policy engine for host certificates
+	if a.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(policyOptions.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	// // Initialize the SSH allow/deny policy engine for user certificates
+	if a.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(policyOptions.GetSSHOptions()); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -524,6 +577,11 @@ func (a *Authority) init() error {
 
 	// Load Provisioners and Admins
 	if err := a.reloadAdminResources(context.Background()); err != nil {
+		return err
+	}
+
+	// Load x509 and SSH Policy Engines
+	if err := a.reloadPolicyEngines(context.Background()); err != nil {
 		return err
 	}
 

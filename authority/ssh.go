@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
@@ -237,6 +238,45 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 			return nil, errs.NotImplemented("authority.SignSSH: host certificate signing is not enabled")
 		}
 		signer = a.sshCAHostCertSignKey
+	default:
+		return nil, errs.InternalServer("authority.SignSSH: unexpected ssh certificate type: %d", certTpl.CertType)
+	}
+
+	switch certTpl.CertType {
+	case ssh.UserCert:
+		// when no user policy engine is configured, but a host policy engine is
+		// configured, the user certificate is denied.
+		if a.sshUserPolicy == nil && a.sshHostPolicy != nil {
+			return nil, errs.ForbiddenErr(errors.New("authority not allowed to sign ssh user certificates"), "authority.SignSSH: error creating ssh user certificate")
+		}
+		if a.sshUserPolicy != nil {
+			allowed, err := a.sshUserPolicy.ArePrincipalsAllowed(certTpl)
+			if err != nil {
+				return nil, errs.InternalServerErr(err,
+					errs.WithMessage("authority.SignSSH: error creating ssh user certificate"),
+				)
+			}
+			if !allowed {
+				return nil, errs.ForbiddenErr(errors.New("authority not allowed to sign"), "authority.SignSSH: error creating ssh user certificate")
+			}
+		}
+	case ssh.HostCert:
+		// when no host policy engine is configured, but a user policy engine is
+		// configured, the host certificate is denied.
+		if a.sshHostPolicy == nil && a.sshUserPolicy != nil {
+			return nil, errs.ForbiddenErr(errors.New("authority not allowed to sign ssh host certificates"), "authority.SignSSH: error creating ssh user certificate")
+		}
+		if a.sshHostPolicy != nil {
+			allowed, err := a.sshHostPolicy.ArePrincipalsAllowed(certTpl)
+			if err != nil {
+				return nil, errs.InternalServerErr(err,
+					errs.WithMessage("authority.SignSSH: error creating ssh host certificate"),
+				)
+			}
+			if !allowed {
+				return nil, errs.ForbiddenErr(errors.New("authority not allowed to sign"), "authority.SignSSH: error creating ssh host certificate")
+			}
+		}
 	default:
 		return nil, errs.InternalServer("authority.SignSSH: unexpected ssh certificate type: %d", certTpl.CertType)
 	}

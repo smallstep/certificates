@@ -13,10 +13,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/errs"
 )
 
 // azureOIDCBaseURL is the base discovery url for Microsoft Azure tokens.
@@ -30,7 +33,7 @@ const azureDefaultAudience = "https://management.azure.com/"
 
 // azureXMSMirIDRegExp is the regular expression used to parse the xms_mirid claim.
 // Using case insensitive as resourceGroups appears as resourcegroups.
-var azureXMSMirIDRegExp = regexp.MustCompile(`(?i)^/subscriptions/([^/]+)/resourceGroups/([^/]+)/providers/Microsoft.Compute/virtualMachines/([^/]+)$`)
+var azureXMSMirIDRegExp = regexp.MustCompile(`(?i)^/subscriptions/([^/]+)/resourceGroups/([^/]+)/providers/Microsoft.(Compute/virtualMachines|ManagedIdentity/userAssignedIdentities)/([^/]+)$`)
 
 type azureConfig struct {
 	oidcDiscoveryURL string
@@ -96,12 +99,12 @@ type Azure struct {
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
 	Claims                 *Claims  `json:"claims,omitempty"`
 	Options                *Options `json:"options,omitempty"`
-	claimer                *Claimer
 	config                 *azureConfig
 	oidcConfig             openIDConfiguration
 	keyStore               *keyStore
-	x509Policy             x509PolicyEngine
-	sshHostPolicy          *hostPolicyEngine
+	ctl                    *Controller
+	x509Policy             policy.X509Policy
+	sshHostPolicy          policy.HostPolicy
 }
 
 // GetID returns the provisioner unique identifier.
@@ -205,37 +208,34 @@ func (p *Azure) Init(config Config) (err error) {
 	case p.Audience == "": // use default audience
 		p.Audience = azureDefaultAudience
 	}
+
 	// Initialize config
 	p.assertConfig()
 
-	// Update claims with global ones
-	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
-		return err
-	}
-
 	// Decode and validate openid-configuration endpoint
-	if err := getAndDecode(p.config.oidcDiscoveryURL, &p.oidcConfig); err != nil {
-		return err
+	if err = getAndDecode(p.config.oidcDiscoveryURL, &p.oidcConfig); err != nil {
+		return
 	}
 	if err := p.oidcConfig.Validate(); err != nil {
 		return errors.Wrapf(err, "error parsing %s", p.config.oidcDiscoveryURL)
 	}
 	// Get JWK key set
 	if p.keyStore, err = newKeyStore(p.oidcConfig.JWKSetURI); err != nil {
-		return err
+		return
 	}
 
 	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine for host certificates
-	if p.sshHostPolicy, err = newSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	if p.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
-	return nil
+	p.ctl, err = NewController(p, p.Claims, config)
+	return
 }
 
 // authorizeToken returns the claims, name, group, subscription, identityObjectID, error.
@@ -275,11 +275,14 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, str
 	}
 
 	re := azureXMSMirIDRegExp.FindStringSubmatch(claims.XMSMirID)
-	if len(re) != 4 {
+	if len(re) != 5 {
 		return nil, "", "", "", "", errs.Unauthorized("azure.authorizeToken; error parsing xms_mirid claim - %s", claims.XMSMirID)
 	}
+
+	var subscription, group, name string
 	identityObjectID := claims.ObjectID
-	subscription, group, name := re[1], re[2], re[3]
+	subscription, group, name = re[1], re[2], re[4]
+
 	return &claims, name, group, subscription, identityObjectID, nil
 }
 
@@ -367,10 +370,10 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID),
-		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.x509Policy),
 	), nil
 }
@@ -380,15 +383,12 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 // revocation status. Just confirms that the provisioner that created the
 // certificate was configured to allow renewals.
 func (p *Azure) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
-	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("azure.AuthorizeRenew; renew is disabled for azure provisioner '%s'", p.GetName())
-	}
-	return nil
+	return p.ctl.AuthorizeRenew(ctx, cert)
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
-	if !p.claimer.IsSSHCAEnabled() {
+	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("azure.AuthorizeSSHSign; sshCA is disabled for provisioner '%s'", p.GetName())
 	}
 
@@ -433,11 +433,11 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		// Validate user SignSSHOptions.
 		sshCertOptionsValidator(defaults),
 		// Set the validity bounds if not set.
-		&sshDefaultDuration{p.claimer},
+		&sshDefaultDuration{p.ctl.Claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.ctl.Claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed

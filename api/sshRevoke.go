@@ -3,11 +3,13 @@ package api
 import (
 	"net/http"
 
+	"golang.org/x/crypto/ocsp"
+
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
-	"golang.org/x/crypto/ocsp"
 )
 
 // SSHRevokeResponse is the response object that returns the health of the server.
@@ -47,7 +49,7 @@ func (r *SSHRevokeRequest) Validate() (err error) {
 // NOTE: currently only Passive revocation is supported.
 func (h *caHandler) SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	var body SSHRevokeRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}

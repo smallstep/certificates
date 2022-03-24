@@ -78,7 +78,7 @@ func (c *Collection) LoadByProvisioner(provName string) ([]*linkedca.Admin, bool
 }
 
 // Store adds an admin to the collection and enforces the uniqueness of
-// admin IDs and amdin subject <-> provisioner name combos.
+// admin IDs and admin subject <-> provisioner name combos.
 func (c *Collection) Store(adm *linkedca.Admin, prov provisioner.Interface) error {
 	// Input validation.
 	if adm.ProvisionerId != prov.GetID() {

@@ -208,7 +208,8 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		adminDB := auth.GetAdminDatabase()
 		if adminDB != nil {
 			acmeAdminResponder := adminAPI.NewACMEAdminResponder()
-			adminHandler := adminAPI.NewHandler(auth, adminDB, acmeDB, acmeAdminResponder)
+			policyAdminResponder := adminAPI.NewPolicyAdminResponder(auth, adminDB)
+			adminHandler := adminAPI.NewHandler(auth, adminDB, acmeDB, acmeAdminResponder, policyAdminResponder)
 			mux.Route("/admin", func(r chi.Router) {
 				adminHandler.Route(r)
 			})
@@ -449,9 +450,6 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	// Add support for mutual tls to renew certificates
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
 	tlsConfig.ClientCAs = certPool
-
-	// Use server's most preferred ciphersuite
-	tlsConfig.PreferServerCipherSuites = true
 
 	return tlsConfig, nil
 }

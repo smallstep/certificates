@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/policy"
+
+	"github.com/smallstep/certificates/authority/policy"
 )
 
 // ACME is the acme provisioner type, an entity that can authorize the ACME
@@ -26,8 +26,9 @@ type ACME struct {
 	RequireEAB bool     `json:"requireEAB,omitempty"`
 	Claims     *Claims  `json:"claims,omitempty"`
 	Options    *Options `json:"options,omitempty"`
-	claimer    *Claimer
-	x509Policy policy.X509NamePolicyEngine
+
+	ctl        *Controller
+	x509Policy policy.X509Policy
 }
 
 // GetID returns the provisioner unique identifier.
@@ -72,7 +73,7 @@ func (p *ACME) GetOptions() *Options {
 // DefaultTLSCertDuration returns the default TLS cert duration enforced by
 // the provisioner.
 func (p *ACME) DefaultTLSCertDuration() time.Duration {
-	return p.claimer.DefaultTLSCertDuration()
+	return p.ctl.Claimer.DefaultTLSCertDuration()
 }
 
 // Init initializes and validates the fields of an ACME type.
@@ -84,19 +85,13 @@ func (p *ACME) Init(config Config) (err error) {
 		return errors.New("provisioner name cannot be empty")
 	}
 
-	// Update claims with global ones
-	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
-		return err
-	}
-
 	// Initialize the x509 allow/deny policy engine
-	// TODO(hs): ensure no race conditions happen when reloading settings and requesting certs?
-	// TODO(hs): implement memoization strategy, so that reloading is not required when no changes were made to allow/deny?
-	if p.x509Policy, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
 		return err
 	}
 
-	return nil
+	p.ctl, err = NewController(p, p.Claims, config)
+	return
 }
 
 // ACMEIdentifierType encodes ACME Identifier types
@@ -115,20 +110,22 @@ type ACMEIdentifier struct {
 	Value string
 }
 
-// AuthorizeOrderIdentifiers verifies the provisioner is authorized to issue a
-// certificate for the Identifiers provided in an Order.
-func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier string) error {
+// AuthorizeOrderIdentifier verifies the provisioner is allowed to issue a
+// certificate for an ACME Order Identifier.
+func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIdentifier) error {
 
+	// identifier is allowed if no policy is configured
 	if p.x509Policy == nil {
 		return nil
 	}
 
 	// assuming only valid identifiers (IP or DNS) are provided
 	var err error
-	if ip := net.ParseIP(identifier); ip != nil {
-		_, err = p.x509Policy.IsIPAllowed(ip)
-	} else {
-		_, err = p.x509Policy.IsDNSAllowed(identifier)
+	switch identifier.Type {
+	case IP:
+		_, err = p.x509Policy.IsIPAllowed(net.ParseIP(identifier.Value))
+	case DNS:
+		_, err = p.x509Policy.IsDNSAllowed(identifier.Value)
 	}
 
 	return err
@@ -142,10 +139,10 @@ func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeACME, p.Name, ""),
 		newForceCNOption(p.ForceCN),
-		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.x509Policy),
 	}
 
@@ -166,8 +163,5 @@ func (p *ACME) AuthorizeRevoke(ctx context.Context, token string) error {
 // revocation status. Just confirms that the provisioner that created the
 // certificate was configured to allow renewals.
 func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
-	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("acme.AuthorizeRenew; renew is disabled for acme provisioner '%s'", p.GetName())
-	}
-	return nil
+	return p.ctl.AuthorizeRenew(ctx, cert)
 }

@@ -18,12 +18,13 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/templates"
-	"golang.org/x/crypto/ssh"
 )
 
 var (

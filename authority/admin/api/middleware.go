@@ -1,11 +1,13 @@
 package api
 
 import (
-	"context"
 	"net/http"
+
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/admin/db/nosql"
 )
 
 type nextHTTP = func(http.ResponseWriter, *http.Request)
@@ -26,6 +28,7 @@ func (h *Handler) requireAPIEnabled(next nextHTTP) nextHTTP {
 // extractAuthorizeTokenAdmin is a middleware that extracts and caches the bearer token.
 func (h *Handler) extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
+
 		tok := r.Header.Get("Authorization")
 		if tok == "" {
 			api.WriteError(w, admin.NewError(admin.ErrorUnauthorizedType,
@@ -39,16 +42,30 @@ func (h *Handler) extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), adminContextKey, adm)
+		ctx := linkedca.WithAdmin(r.Context(), adm)
 		next(w, r.WithContext(ctx))
 	}
 }
 
-// ContextKey is the key type for storing and searching for ACME request
-// essentials in the context of a request.
-type ContextKey string
+// checkAction checks if an action is supported in standalone or not
+func (h *Handler) checkAction(next nextHTTP, supportedInStandalone bool) nextHTTP {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-const (
-	// adminContextKey account key
-	adminContextKey = ContextKey("admin")
-)
+		// actions allowed in standalone mode are always supported
+		if supportedInStandalone {
+			next(w, r)
+			return
+		}
+
+		// when not in standalone mode and using a nosql.DB backend,
+		// actions are not supported
+		if _, ok := h.adminDB.(*nosql.DB); ok {
+			api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType,
+				"operation not supported in standalone mode"))
+			return
+		}
+
+		// continue to next http handler
+		next(w, r)
+	}
+}

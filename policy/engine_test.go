@@ -8,12 +8,13 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/smallstep/assert"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/assert"
 )
 
 // TODO(hs): the functionality in the policy engine is a nice candidate for trying fuzzing on
-// TODO(hs): more complex uses cases that combine multiple names and permitted/excluded entries
+// TODO(hs): more complex use cases that combine multiple names and permitted/excluded entries
 
 func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 	tests := []struct {

@@ -14,11 +14,13 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type mockAdminAuthority struct {
@@ -37,6 +39,11 @@ type mockAdminAuthority struct {
 	MockLoadProvisionerByID   func(id string) (provisioner.Interface, error)
 	MockUpdateProvisioner     func(ctx context.Context, nu *linkedca.Provisioner) error
 	MockRemoveProvisioner     func(ctx context.Context, id string) error
+
+	MockGetAuthorityPolicy    func(ctx context.Context) (*linkedca.Policy, error)
+	MockCreateAuthorityPolicy func(ctx context.Context, policy *linkedca.Policy) (*linkedca.Policy, error)
+	MockUpdateAuthorityPolicy func(ctx context.Context, policy *linkedca.Policy) error
+	MockRemoveAuthorityPolicy func(ctx context.Context) error
 }
 
 func (m *mockAdminAuthority) IsAdminAPIEnabled() bool {
@@ -128,6 +135,22 @@ func (m *mockAdminAuthority) RemoveProvisioner(ctx context.Context, id string) e
 		return m.MockRemoveProvisioner(ctx, id)
 	}
 	return m.MockErr
+}
+
+func (m *mockAdminAuthority) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
+	return nil, errors.New("not implemented yet")
+}
+
+func (m *mockAdminAuthority) CreateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error) {
+	return nil, errors.New("not implemented yet")
+}
+
+func (m *mockAdminAuthority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error) {
+	return nil, errors.New("not implemented yet")
+}
+
+func (m *mockAdminAuthority) RemoveAuthorityPolicy(ctx context.Context) error {
+	return errors.New("not implemented yet")
 }
 
 func TestCreateAdminRequest_Validate(t *testing.T) {

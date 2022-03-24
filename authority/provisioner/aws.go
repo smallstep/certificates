@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
@@ -264,11 +265,10 @@ type AWS struct {
 	IIDRoots               string   `json:"iidRoots,omitempty"`
 	Claims                 *Claims  `json:"claims,omitempty"`
 	Options                *Options `json:"options,omitempty"`
-	claimer                *Claimer
 	config                 *awsConfig
-	audiences              Audiences
-	x509Policy             x509PolicyEngine
-	sshHostPolicy          *hostPolicyEngine
+	ctl                    *Controller
+	x509Policy             policy.X509Policy
+	sshHostPolicy          policy.HostPolicy
 }
 
 // GetID returns the provisioner unique identifier.
@@ -402,15 +402,11 @@ func (p *AWS) Init(config Config) (err error) {
 	case p.InstanceAge.Value() < 0:
 		return errors.New("provisioner instanceAge cannot be negative")
 	}
-	// Update claims with global ones
-	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
-		return err
-	}
+
 	// Add default config
 	if p.config, err = newAWSConfig(p.IIDRoots); err != nil {
 		return err
 	}
-	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
 
 	// validate IMDS versions
 	if len(p.IMDSVersions) == 0 {
@@ -428,16 +424,18 @@ func (p *AWS) Init(config Config) (err error) {
 	}
 
 	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine for host certificates
-	if p.sshHostPolicy, err = newSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	if p.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
-	return nil
+	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
+	p.ctl, err = NewController(p, p.Claims, config)
+	return
 }
 
 // AuthorizeSign validates the given token and returns the sign options that
@@ -485,11 +483,11 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeAWS, p.Name, doc.AccountID, "InstanceID", doc.InstanceID),
-		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
 		commonNameValidator(payload.Claims.Subject),
-		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.x509Policy),
 	), nil
 }
@@ -499,10 +497,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // revocation status. Just confirms that the provisioner that created the
 // certificate was configured to allow renewals.
 func (p *AWS) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
-	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("aws.AuthorizeRenew; renew is disabled for aws provisioner '%s'", p.GetName())
-	}
-	return nil
+	return p.ctl.AuthorizeRenew(ctx, cert)
 }
 
 // assertConfig initializes the config if it has not been initialized
@@ -561,7 +556,7 @@ func (p *AWS) readURL(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("Request for metadata returned non-successful status code %d",
+	return nil, fmt.Errorf("request for metadata returned non-successful status code %d",
 		resp.StatusCode)
 }
 
@@ -594,7 +589,7 @@ func (p *AWS) readURLv2(url string) (*http.Response, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("Request for API token returned non-successful status code %d", resp.StatusCode)
+		return nil, fmt.Errorf("request for API token returned non-successful status code %d", resp.StatusCode)
 	}
 	token, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -677,7 +672,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 	}
 
 	// validate audiences with the defaults
-	if !matchesAudience(payload.Audience, p.audiences.Sign) {
+	if !matchesAudience(payload.Audience, p.ctl.Audiences.Sign) {
 		return nil, errs.Unauthorized("aws.authorizeToken; invalid token - invalid audience claim (aud)")
 	}
 
@@ -717,7 +712,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
-	if !p.claimer.IsSSHCAEnabled() {
+	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("aws.AuthorizeSSHSign; ssh ca is disabled for aws provisioner '%s'", p.GetName())
 	}
 	claims, err := p.authorizeToken(token)
@@ -765,11 +760,11 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Validate user SignSSHOptions.
 		sshCertOptionsValidator(defaults),
 		// Set the validity bounds if not set.
-		&sshDefaultDuration{p.claimer},
+		&sshDefaultDuration{p.ctl.Claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.ctl.Claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed

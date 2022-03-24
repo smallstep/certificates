@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"context"
+	"crypto/x509"
 	"net/http"
 	"testing"
 	"time"
@@ -69,7 +70,7 @@ func TestX5C_Init(t *testing.T) {
 		},
 		"fail/no-valid-root-certs": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &X5C{Name: "foo", Type: "bar", Roots: []byte("foo"), audiences: testAudiences},
+				p:   &X5C{Name: "foo", Type: "bar", Roots: []byte("foo")},
 				err: errors.Errorf("no x509 certificates found in roots attribute for provisioner 'foo'"),
 			}
 		},
@@ -117,6 +118,8 @@ M46l92gdOozT
 			return ProvisionerValidateTest{
 				p: p,
 				extraValid: func(p *X5C) error {
+					// nolint:staticcheck // We don't have a different way to
+					// check the number of certificates in the pool.
 					numCerts := len(p.rootPool.Subjects())
 					if numCerts != 2 {
 						return errors.Errorf("unexpected number of certs: want 2, but got %d", numCerts)
@@ -141,7 +144,7 @@ M46l92gdOozT
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, tc.p.audiences, config.Audiences.WithFragment(tc.p.GetID()))
+					assert.Equals(t, *tc.p.ctl.Audiences, config.Audiences.WithFragment(tc.p.GetID()))
 					if tc.extraValid != nil {
 						assert.Nil(t, tc.extraValid(tc.p))
 					}
@@ -468,13 +471,13 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 							switch v := o.(type) {
 							case certificateOptionsFunc:
 							case *provisionerExtensionOption:
-								assert.Equals(t, v.Type, int(TypeX5C))
+								assert.Equals(t, v.Type, TypeX5C)
 								assert.Equals(t, v.Name, tc.p.GetName())
 								assert.Equals(t, v.CredentialID, "")
 								assert.Len(t, 0, v.KeyValuePairs)
 							case profileLimitDuration:
-								assert.Equals(t, v.def, tc.p.claimer.DefaultTLSCertDuration())
-								claims, err := tc.p.authorizeToken(tc.token, tc.p.audiences.Sign)
+								assert.Equals(t, v.def, tc.p.ctl.Claimer.DefaultTLSCertDuration())
+								claims, err := tc.p.authorizeToken(tc.token, tc.p.ctl.Audiences.Sign)
 								assert.FatalError(t, err)
 								assert.Equals(t, v.notAfter, claims.chains[0][0].NotAfter)
 							case commonNameValidator:
@@ -483,8 +486,8 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 							case defaultSANsValidator:
 								assert.Equals(t, []string(v), tc.sans)
 							case *validityValidator:
-								assert.Equals(t, v.min, tc.p.claimer.MinTLSCertDuration())
-								assert.Equals(t, v.max, tc.p.claimer.MaxTLSCertDuration())
+								assert.Equals(t, v.min, tc.p.ctl.Claimer.MinTLSCertDuration())
+								assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
 							case *x509NamePolicyValidator:
 								assert.Equals(t, nil, v.policyEngine)
 							default:
@@ -552,6 +555,7 @@ func TestX5C_AuthorizeRevoke(t *testing.T) {
 }
 
 func TestX5C_AuthorizeRenew(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
 	type test struct {
 		p    *X5C
 		code int
@@ -564,12 +568,12 @@ func TestX5C_AuthorizeRenew(t *testing.T) {
 			// disable renewal
 			disable := true
 			p.Claims = &Claims{DisableRenewal: &disable}
-			p.claimer, err = NewClaimer(p.Claims, globalProvisionerClaims)
+			p.ctl.Claimer, err = NewClaimer(p.Claims, globalProvisionerClaims)
 			assert.FatalError(t, err)
 			return test{
 				p:    p,
 				code: http.StatusUnauthorized,
-				err:  errors.Errorf("x5c.AuthorizeRenew; renew is disabled for x5c provisioner '%s'", p.GetName()),
+				err:  errors.Errorf("renew is disabled for provisioner '%s'", p.GetName()),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -583,7 +587,10 @@ func TestX5C_AuthorizeRenew(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if err := tc.p.AuthorizeRenew(context.Background(), nil); err != nil {
+			if err := tc.p.AuthorizeRenew(context.Background(), &x509.Certificate{
+				NotBefore: now,
+				NotAfter:  now.Add(time.Hour),
+			}); err != nil {
 				if assert.NotNil(t, tc.err) {
 					sc, ok := err.(errs.StatusCoder)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
@@ -619,7 +626,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 			// disable sshCA
 			enable := false
 			p.Claims = &Claims{EnableSSHCA: &enable}
-			p.claimer, err = NewClaimer(p.Claims, globalProvisionerClaims)
+			p.ctl.Claimer, err = NewClaimer(p.Claims, globalProvisionerClaims)
 			assert.FatalError(t, err)
 			return test{
 				p:     p,
@@ -775,10 +782,10 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 							case sshCertDefaultsModifier:
 								assert.Equals(t, SignSSHOptions(v), SignSSHOptions{CertType: SSHUserCert})
 							case *sshLimitDuration:
-								assert.Equals(t, v.Claimer, tc.p.claimer)
+								assert.Equals(t, v.Claimer, tc.p.ctl.Claimer)
 								assert.Equals(t, v.NotAfter, x5cCerts[0].NotAfter)
 							case *sshCertValidityValidator:
-								assert.Equals(t, v.Claimer, tc.p.claimer)
+								assert.Equals(t, v.Claimer, tc.p.ctl.Claimer)
 							case *sshNamePolicyValidator:
 								assert.Equals(t, nil, v.userPolicyEngine)
 								assert.Equals(t, nil, v.hostPolicyEngine)

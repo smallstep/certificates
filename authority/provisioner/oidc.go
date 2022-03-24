@@ -12,10 +12,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/errs"
 )
 
 // openIDConfiguration contains the necessary properties in the
@@ -92,11 +95,11 @@ type OIDC struct {
 	Options               *Options `json:"options,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
-	claimer               *Claimer
 	getIdentityFunc       GetIdentityFunc
-	x509Policy            x509PolicyEngine
-	sshHostPolicy         *hostPolicyEngine
-	sshUserPolicy         *userPolicyEngine
+	ctl                   *Controller
+	x509Policy            policy.X509Policy
+	sshHostPolicy         policy.HostPolicy
+	sshUserPolicy         policy.UserPolicy
 }
 
 func sanitizeEmail(email string) string {
@@ -175,11 +178,6 @@ func (o *OIDC) Init(config Config) (err error) {
 		}
 	}
 
-	// Update claims with global ones
-	if o.claimer, err = NewClaimer(o.Claims, config.Claims); err != nil {
-		return err
-	}
-
 	// Decode and validate openid-configuration endpoint
 	u, err := url.Parse(o.ConfigurationEndpoint)
 	if err != nil {
@@ -212,21 +210,22 @@ func (o *OIDC) Init(config Config) (err error) {
 	}
 
 	// Initialize the x509 allow/deny policy engine
-	if o.x509Policy, err = newX509PolicyEngine(o.Options.GetX509Options()); err != nil {
+	if o.x509Policy, err = policy.NewX509PolicyEngine(o.Options.GetX509Options()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine for user certificates
-	if o.sshUserPolicy, err = newSSHUserPolicyEngine(o.Options.GetSSHOptions()); err != nil {
+	if o.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(o.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine for host certificates
-	if o.sshHostPolicy, err = newSSHHostPolicyEngine(o.Options.GetSSHOptions()); err != nil {
+	if o.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(o.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
-	return nil
+	o.ctl, err = NewController(o, o.Claims, config)
+	return
 }
 
 // ValidatePayload validates the given token payload.
@@ -378,10 +377,10 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
-		profileDefaultDuration(o.claimer.DefaultTLSCertDuration()),
+		profileDefaultDuration(o.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		newValidityValidator(o.claimer.MinTLSCertDuration(), o.claimer.MaxTLSCertDuration()),
+		newValidityValidator(o.ctl.Claimer.MinTLSCertDuration(), o.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(o.x509Policy),
 	}, nil
 }
@@ -391,15 +390,12 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 // revocation status. Just confirms that the provisioner that created the
 // certificate was configured to allow renewals.
 func (o *OIDC) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
-	if o.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("oidc.AuthorizeRenew; renew is disabled for oidc provisioner '%s'", o.GetName())
-	}
-	return nil
+	return o.ctl.AuthorizeRenew(ctx, cert)
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
-	if !o.claimer.IsSSHCAEnabled() {
+	if !o.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("oidc.AuthorizeSSHSign; sshCA is disabled for oidc provisioner '%s'", o.GetName())
 	}
 	claims, err := o.authorizeToken(token)
@@ -414,7 +410,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	// Get the identity using either the default identityFunc or one injected
 	// externally. Note that the PreferredUsername might be empty.
 	// TBD: Would preferred_username present a safety issue here?
-	iden, err := o.getIdentityFunc(ctx, o, claims.Email)
+	iden, err := o.ctl.GetIdentity(ctx, claims.Email)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "oidc.AuthorizeSSHSign")
 	}
@@ -465,11 +461,11 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 
 	return append(signOptions,
 		// Set the validity bounds if not set.
-		&sshDefaultDuration{o.claimer},
+		&sshDefaultDuration{o.ctl.Claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertValidityValidator{o.claimer},
+		&sshCertValidityValidator{o.ctl.Claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed

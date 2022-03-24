@@ -10,11 +10,14 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/errs"
 )
 
 // NOTE: There can be at most one kubernetes service account provisioner configured
@@ -42,19 +45,18 @@ type k8sSAPayload struct {
 // entity trusted to make signature requests.
 type K8sSA struct {
 	*base
-	ID        string   `json:"-"`
-	Type      string   `json:"type"`
-	Name      string   `json:"name"`
-	PubKeys   []byte   `json:"publicKeys,omitempty"`
-	Claims    *Claims  `json:"claims,omitempty"`
-	Options   *Options `json:"options,omitempty"`
-	claimer   *Claimer
-	audiences Audiences
+	ID      string   `json:"-"`
+	Type    string   `json:"type"`
+	Name    string   `json:"name"`
+	PubKeys []byte   `json:"publicKeys,omitempty"`
+	Claims  *Claims  `json:"claims,omitempty"`
+	Options *Options `json:"options,omitempty"`
 	//kauthn    kauthn.AuthenticationV1Interface
 	pubKeys       []interface{}
-	x509Policy    x509PolicyEngine
-	sshHostPolicy *hostPolicyEngine
-	sshUserPolicy *userPolicyEngine
+	ctl           *Controller
+	x509Policy    policy.X509Policy
+	sshHostPolicy policy.HostPolicy
+	sshUserPolicy policy.UserPolicy
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -142,28 +144,23 @@ func (p *K8sSA) Init(config Config) (err error) {
 		p.kauthn = k8s.AuthenticationV1()
 	*/
 
-	// Update claims with global ones
-	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
-		return err
-	}
-
 	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = newX509PolicyEngine(p.Options.GetX509Options()); err != nil {
+	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine for user certificates
-	if p.sshUserPolicy, err = newSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	if p.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
 	// Initialize the SSH allow/deny policy engine for host certificates
-	if p.sshHostPolicy, err = newSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
+	if p.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
-	p.audiences = config.Audiences
-	return err
+	p.ctl, err = NewController(p, p.Claims, config)
+	return
 }
 
 // authorizeToken performs common jwt authorization actions and returns the
@@ -230,13 +227,13 @@ func (p *K8sSA) authorizeToken(token string, audiences []string) (*k8sSAPayload,
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke the certificate with serial number in the `sub` property.
 func (p *K8sSA) AuthorizeRevoke(ctx context.Context, token string) error {
-	_, err := p.authorizeToken(token, p.audiences.Revoke)
+	_, err := p.authorizeToken(token, p.ctl.Audiences.Revoke)
 	return errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeRevoke")
 }
 
 // AuthorizeSign validates the given token.
 func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	claims, err := p.authorizeToken(token, p.audiences.Sign)
+	claims, err := p.authorizeToken(token, p.ctl.Audiences.Sign)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSign")
 	}
@@ -259,28 +256,25 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeK8sSA, p.Name, ""),
-		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.x509Policy),
 	}, nil
 }
 
 // AuthorizeRenew returns an error if the renewal is disabled.
 func (p *K8sSA) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
-	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("k8ssa.AuthorizeRenew; renew is disabled for k8sSA provisioner '%s'", p.GetName())
-	}
-	return nil
+	return p.ctl.AuthorizeRenew(ctx, cert)
 }
 
 // AuthorizeSSHSign validates an request for an SSH certificate.
 func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
-	if !p.claimer.IsSSHCAEnabled() {
+	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("k8ssa.AuthorizeSSHSign; sshCA is disabled for k8sSA provisioner '%s'", p.GetName())
 	}
-	claims, err := p.authorizeToken(token, p.audiences.SSHSign)
+	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHSign)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSSHSign")
 	}
@@ -302,11 +296,11 @@ func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		// Require type, key-id and principals in the SignSSHOptions.
 		&sshCertOptionsRequireValidator{CertType: true, KeyID: true, Principals: true},
 		// Set the validity bounds if not set.
-		&sshDefaultDuration{p.claimer},
+		&sshDefaultDuration{p.ctl.Claimer},
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.ctl.Claimer},
 		// Require and validate all the default fields in the SSH certificate.
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed

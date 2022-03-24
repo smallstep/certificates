@@ -6,6 +6,8 @@ import (
 
 	"github.com/pkg/errors"
 	"go.step.sm/crypto/sshutil"
+
+	"github.com/smallstep/certificates/authority/policy"
 )
 
 // SSHCertificateOptions is an interface that returns a list of options passed when
@@ -35,63 +37,63 @@ type SSHOptions struct {
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
 
 	// User contains SSH user certificate options.
-	User *SSHUserCertificateOptions `json:"user,omitempty"`
+	User *policy.SSHUserCertificateOptions
 
 	// Host contains SSH host certificate options.
-	Host *SSHHostCertificateOptions `json:"host,omitempty"`
+	Host *policy.SSHHostCertificateOptions
 }
 
-// SSHUserCertificateOptions is a collection of SSH user certificate options.
-type SSHUserCertificateOptions struct {
-	// AllowedNames contains the names the provisioner is authorized to sign
-	AllowedNames *SSHNameOptions `json:"allow,omitempty"`
-
-	// DeniedNames contains the names the provisioner is not authorized to sign
-	DeniedNames *SSHNameOptions `json:"deny,omitempty"`
+// GetAllowedUserNameOptions returns the SSHNameOptions that are
+// allowed when SSH User certificates are requested.
+func (o *SSHOptions) GetAllowedUserNameOptions() *policy.SSHNameOptions {
+	if o == nil {
+		return nil
+	}
+	if o.User == nil {
+		return nil
+	}
+	return o.User.AllowedNames
 }
 
-// SSHHostCertificateOptions is a collection of SSH host certificate options.
-// It's an alias of SSHUserCertificateOptions, as the options are the same
-// for both types of certificates.
-type SSHHostCertificateOptions SSHUserCertificateOptions
+// GetDeniedUserNameOptions returns the SSHNameOptions that are
+// denied when SSH user certificates are requested.
+func (o *SSHOptions) GetDeniedUserNameOptions() *policy.SSHNameOptions {
+	if o == nil {
+		return nil
+	}
+	if o.User == nil {
+		return nil
+	}
+	return o.User.DeniedNames
+}
 
-// SSHNameOptions models the SSH name policy configuration.
-type SSHNameOptions struct {
-	DNSDomains     []string `json:"dns,omitempty"`
-	IPRanges       []string `json:"ip,omitempty"`
-	EmailAddresses []string `json:"email,omitempty"`
-	Principals     []string `json:"principal,omitempty"`
+// GetAllowedHostNameOptions returns the SSHNameOptions that are
+// allowed when SSH host certificates are requested.
+func (o *SSHOptions) GetAllowedHostNameOptions() *policy.SSHNameOptions {
+	if o == nil {
+		return nil
+	}
+	if o.Host == nil {
+		return nil
+	}
+	return o.Host.AllowedNames
+}
+
+// GetDeniedHostNameOptions returns the SSHNameOptions that are
+// denied when SSH host certificates are requested.
+func (o *SSHOptions) GetDeniedHostNameOptions() *policy.SSHNameOptions {
+	if o == nil {
+		return nil
+	}
+	if o.Host == nil {
+		return nil
+	}
+	return o.Host.DeniedNames
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
 func (o *SSHOptions) HasTemplate() bool {
 	return o != nil && (o.Template != "" || o.TemplateFile != "")
-}
-
-// GetAllowedNameOptions returns the AllowedSSHNameOptions, which models the
-// names that a provisioner is authorized to sign SSH certificates for.
-func (o *SSHUserCertificateOptions) GetAllowedNameOptions() *SSHNameOptions {
-	if o == nil {
-		return nil
-	}
-	return o.AllowedNames
-}
-
-// GetDeniedNameOptions returns the DeniedSSHNameOptions, which models the
-// names that a provisioner is NOT authorized to sign SSH certificates for.
-func (o *SSHUserCertificateOptions) GetDeniedNameOptions() *SSHNameOptions {
-	if o == nil {
-		return nil
-	}
-	return o.DeniedNames
-}
-
-// HasNames checks if the SSHNameOptions has one or more
-// names configured.
-func (o *SSHNameOptions) HasNames() bool {
-	return len(o.DNSDomains) > 0 ||
-		len(o.EmailAddresses) > 0 ||
-		len(o.Principals) > 0
 }
 
 // TemplateSSHOptions generates a SSHCertificateOptions with the template and

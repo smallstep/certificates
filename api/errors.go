@@ -7,7 +7,9 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+
 	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/api/log"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/logging"
@@ -59,6 +61,6 @@ func WriteError(w http.ResponseWriter, err error) {
 	}
 
 	if err := json.NewEncoder(w).Encode(err); err != nil {
-		LogError(w, err)
+		log.Error(w, err)
 	}
 }

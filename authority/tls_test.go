@@ -757,7 +757,7 @@ func TestAuthority_Renew(t *testing.T) {
 
 	now := time.Now().UTC()
 	nb1 := now.Add(-time.Minute * 7)
-	na1 := now
+	na1 := now.Add(time.Hour)
 	so := &provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(nb1),
 		NotAfter:  provisioner.NewTimeDuration(na1),
@@ -798,7 +798,20 @@ func TestAuthority_Renew(t *testing.T) {
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner 'dev'"),
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
+				code: http.StatusUnauthorized,
+			}, nil
+		},
+		"fail/WithAuthorizeRenewFunc": func() (*renewTest, error) {
+			aa := testAuthority(t, WithAuthorizeRenewFunc(func(ctx context.Context, p *provisioner.Controller, cert *x509.Certificate) error {
+				return errs.Unauthorized("not authorized")
+			}))
+			aa.x509CAService = a.x509CAService
+			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			return &renewTest{
+				auth: aa,
+				cert: cert,
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: not authorized"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -817,6 +830,17 @@ func TestAuthority_Renew(t *testing.T) {
 			_a.x509CAService.(*softcas.SoftCAS).Signer = intSigner
 			return &renewTest{
 				auth: _a,
+				cert: cert,
+			}, nil
+		},
+		"ok/WithAuthorizeRenewFunc": func() (*renewTest, error) {
+			aa := testAuthority(t, WithAuthorizeRenewFunc(func(ctx context.Context, p *provisioner.Controller, cert *x509.Certificate) error {
+				return nil
+			}))
+			aa.x509CAService = a.x509CAService
+			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			return &renewTest{
+				auth: aa,
 				cert: cert,
 			}, nil
 		},
@@ -856,7 +880,7 @@ func TestAuthority_Renew(t *testing.T) {
 
 					expiry := now.Add(time.Minute * 7)
 					assert.True(t, leaf.NotAfter.After(expiry.Add(-2*time.Minute)))
-					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Minute)))
+					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Hour)))
 
 					tmplt := a.config.AuthorityConfig.Template
 					assert.Equals(t, leaf.Subject.String(),
@@ -956,7 +980,7 @@ func TestAuthority_Rekey(t *testing.T) {
 
 	now := time.Now().UTC()
 	nb1 := now.Add(-time.Minute * 7)
-	na1 := now
+	na1 := now.Add(time.Hour)
 	so := &provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(nb1),
 		NotAfter:  provisioner.NewTimeDuration(na1),
@@ -998,7 +1022,7 @@ func TestAuthority_Rekey(t *testing.T) {
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: jwk.AuthorizeRenew; renew is disabled for jwk provisioner 'dev'"),
+				err:  errors.New("authority.Rekey: authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -1063,7 +1087,7 @@ func TestAuthority_Rekey(t *testing.T) {
 
 					expiry := now.Add(time.Minute * 7)
 					assert.True(t, leaf.NotAfter.After(expiry.Add(-2*time.Minute)))
-					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Minute)))
+					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Hour)))
 
 					tmplt := a.config.AuthorityConfig.Template
 					assert.Equals(t, leaf.Subject.String(),

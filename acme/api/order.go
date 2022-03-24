@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/randutil"
 )
 
@@ -104,10 +105,13 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	// management of allowed/denied names based on just the name, without having bound to EAB. Still,
 	// EAB is not illogical, because that's the way Accounts are connected to an external system and
 	// thus make sense to also set the allowed/denied names based on that info.
+	// TODO: also perform check on the authority level here already, so that challenges are not performed
+	// and after that the CA fails to sign it. (i.e. h.ca function?)
 
 	for _, identifier := range nor.Identifiers {
 		// TODO: gather all errors, so that we can build subproblems; include the nor.Validate() error here too, like in example?
-		err = prov.AuthorizeOrderIdentifier(ctx, identifier.Value)
+		orderIdentifier := provisioner.ACMEIdentifier{Type: provisioner.ACMEIdentifierType(identifier.Type), Value: identifier.Value}
+		err = prov.AuthorizeOrderIdentifier(ctx, orderIdentifier)
 		if err != nil {
 			api.WriteError(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return

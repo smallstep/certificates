@@ -152,8 +152,8 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 // proper id to load the provisioner.
 func (c *Collection) LoadByCertificate(cert *x509.Certificate) (Interface, bool) {
 	for _, e := range cert.Extensions {
-		if e.Id.Equal(stepOIDProvisioner) {
-			var provisioner stepProvisionerASN1
+		if e.Id.Equal(StepOIDProvisioner) {
+			var provisioner extensionASN1
 			if _, err := asn1.Unmarshal(e.Value, &provisioner); err != nil {
 				return nil, false
 			}

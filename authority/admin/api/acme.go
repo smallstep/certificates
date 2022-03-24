@@ -14,7 +14,7 @@ import (
 
 const (
 	// provisionerContextKey provisioner key
-	provisionerContextKey = ContextKey("provisioner")
+	provisionerContextKey = admin.ContextKey("provisioner")
 )
 
 // CreateExternalAccountKeyRequest is the type for POST /admin/acme/eab requests

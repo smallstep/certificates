@@ -191,6 +191,22 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
+	// Check if authority is allowed to sign the certificate
+	var allowedToSign bool
+	if allowedToSign, err = a.isAllowedToSign(leaf); err != nil {
+		return nil, errs.InternalServerErr(err,
+			errs.WithKeyVal("csr", csr),
+			errs.WithKeyVal("signOptions", signOpts),
+			errs.WithMessage("error creating certificate"),
+		)
+	}
+	if !allowedToSign {
+		return nil, errs.ApplyOptions(
+			errs.ForbiddenErr(errors.New("authority not allowed to sign"), "error creating certificate"),
+			opts...,
+		)
+	}
+
 	// Sign certificate
 	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
@@ -212,6 +228,21 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	return fullchain, nil
+}
+
+// isAllowedToSign checks if the Authority is allowed to sign the X.509 certificate.
+// It first checks if the certificate contains an admin subject that exists in the
+// collection of admins. The CA is always allowed to sign those. If the cert contains
+// different names and a policy is configured, the policy will be executed against
+// the cert to see if the CA is allowed to sign it.
+func (a *Authority) isAllowedToSign(cert *x509.Certificate) (bool, error) {
+
+	// if no policy is configured, the cert is implicitly allowed
+	if a.x509Policy == nil {
+		return true, nil
+	}
+
+	return a.x509Policy.AreCertificateNamesAllowed(cert)
 }
 
 // Renew creates a new Certificate identical to the old certificate, except

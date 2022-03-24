@@ -5,8 +5,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/authority/policy"
 )
 
 // CertificateOptions is an interface that returns a list of options passed when
@@ -58,10 +61,10 @@ type X509Options struct {
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
 
 	// AllowedNames contains the SANs the provisioner is authorized to sign
-	AllowedNames *X509NameOptions `json:"allow,omitempty"`
+	AllowedNames *policy.X509NameOptions
 
 	// DeniedNames contains the SANs the provisioner is not authorized to sign
-	DeniedNames *X509NameOptions `json:"deny,omitempty"`
+	DeniedNames *policy.X509NameOptions
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
@@ -69,39 +72,22 @@ func (o *X509Options) HasTemplate() bool {
 	return o != nil && (o.Template != "" || o.TemplateFile != "")
 }
 
-// GetAllowedNameOptions returns the AllowedNameOptions, which models the
+// GetAllowedNameOptions returns the AllowedNames, which models the
 // SANs that a provisioner is authorized to sign x509 certificates for.
-func (o *X509Options) GetAllowedNameOptions() *X509NameOptions {
+func (o *X509Options) GetAllowedNameOptions() *policy.X509NameOptions {
 	if o == nil {
 		return nil
 	}
 	return o.AllowedNames
 }
 
-// GetDeniedNameOptions returns the DeniedNameOptions, which models the
+// GetDeniedNameOptions returns the DeniedNames, which models the
 // SANs that a provisioner is NOT authorized to sign x509 certificates for.
-func (o *X509Options) GetDeniedNameOptions() *X509NameOptions {
+func (o *X509Options) GetDeniedNameOptions() *policy.X509NameOptions {
 	if o == nil {
 		return nil
 	}
 	return o.DeniedNames
-}
-
-// X509NameOptions models the X509 name policy configuration.
-type X509NameOptions struct {
-	DNSDomains     []string `json:"dns,omitempty"`
-	IPRanges       []string `json:"ip,omitempty"`
-	EmailAddresses []string `json:"email,omitempty"`
-	URIDomains     []string `json:"uri,omitempty"`
-}
-
-// HasNames checks if the AllowedNameOptions has one or more
-// names configured.
-func (o *X509NameOptions) HasNames() bool {
-	return len(o.DNSDomains) > 0 ||
-		len(o.IPRanges) > 0 ||
-		len(o.EmailAddresses) > 0 ||
-		len(o.URIDomains) > 0
 }
 
 // TemplateOptions generates a CertificateOptions with the template and data
