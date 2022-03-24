@@ -169,12 +169,7 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 			}
 			next := func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
-				a := ctx.Value(admin.AdminContextKey) // verifying that the context now has a linkedca.Admin
-				adm, ok := a.(*linkedca.Admin)
-				if !ok {
-					t.Errorf("expected *linkedca.Admin; got %T", a)
-					return
-				}
+				adm := linkedca.AdminFromContext(ctx) // verifying that the context now has a linkedca.Admin
 				opts := []cmp.Option{cmpopts.IgnoreUnexported(linkedca.Admin{}, timestamppb.Timestamp{})}
 				if !cmp.Equal(adm, adm, opts...) {
 					t.Errorf("linkedca.Admin diff =\n%s", cmp.Diff(adm, adm, opts...))

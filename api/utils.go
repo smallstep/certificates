@@ -83,13 +83,13 @@ func ReadProtoJSONWithCheck(w http.ResponseWriter, r io.Reader, m proto.Message)
 			Status:  http.StatusBadRequest,
 			Message: err.Error(),
 		}
-		data, err := json.Marshal(wrapper) // TODO(hs): handle err; even though it's very unlikely to fail
+		errData, err := json.Marshal(wrapper)
 		if err != nil {
 			panic(err)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write(data)
+		w.Write(errData)
 		return false
 	}
 	if err := protojson.Unmarshal(data, m); err != nil {
@@ -99,13 +99,13 @@ func ReadProtoJSONWithCheck(w http.ResponseWriter, r io.Reader, m proto.Message)
 			}{
 				Message: err.Error(),
 			}
-			data, err := json.Marshal(wrapper) // TODO(hs): handle err; even though it's very unlikely to fail
+			errData, err := json.Marshal(wrapper)
 			if err != nil {
 				panic(err)
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write(data)
+			w.Write(errData)
 			return false
 		}
 

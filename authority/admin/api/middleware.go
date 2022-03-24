@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"net/http"
 
 	"go.step.sm/linkedca"
@@ -69,14 +68,4 @@ func (h *Handler) checkAction(next nextHTTP, supportedInStandalone bool) nextHTT
 		// continue to next http handler
 		next(w, r)
 	}
-}
-
-// adminFromContext searches the context for a *linkedca.Admin.
-// Returns the admin or an error.
-func adminFromContext(ctx context.Context) (*linkedca.Admin, error) {
-	val, ok := ctx.Value(admin.AdminContextKey).(*linkedca.Admin)
-	if !ok || val == nil {
-		return nil, admin.NewError(admin.ErrorBadRequestType, "admin not in context")
-	}
-	return val, nil
 }

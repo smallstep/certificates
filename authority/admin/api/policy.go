@@ -8,6 +8,7 @@ import (
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
@@ -121,7 +122,7 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if err := api.ReadProtoJSON(r.Body, newPolicy); err != nil {
+	if err := read.ProtoJSON(r.Body, newPolicy); err != nil {
 		api.WriteError(w, err)
 		return
 	}
@@ -220,7 +221,7 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if err := api.ReadProtoJSON(r.Body, newPolicy); err != nil {
+	if err := read.ProtoJSON(r.Body, newPolicy); err != nil {
 		api.WriteError(w, err)
 		return
 	}
@@ -256,7 +257,7 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 	}
 
 	var policy = new(linkedca.Policy)
-	if err := api.ReadProtoJSON(r.Body, policy); err != nil {
+	if err := read.ProtoJSON(r.Body, policy); err != nil {
 		api.WriteError(w, err)
 		return
 	}
@@ -271,7 +272,7 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 	api.ProtoJSONStatus(w, policy, http.StatusOK)
 }
 
-// DeleteProvisionerPolicy ...
+// DeleteProvisionerPolicy handles the DELETE /admin/provisioners/{name}/policy request
 func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
@@ -308,7 +309,6 @@ func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, 
 	api.JSON(w, &DeleteResponse{Status: "ok"})
 }
 
-// GetACMEAccountPolicy ...
 func (par *PolicyAdminResponder) GetACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
 	api.JSON(w, "ok")
 }

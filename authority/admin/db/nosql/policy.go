@@ -63,13 +63,13 @@ func (db *DB) getDBAuthorityPolicy(ctx context.Context, authorityID string) (*db
 	return dbap, nil
 }
 
-func (db *DB) unmarshalAuthorityPolicy(data []byte, authorityID string) (*linkedca.Policy, error) {
-	dbap, err := db.unmarshalDBAuthorityPolicy(data, authorityID)
-	if err != nil {
-		return nil, err
-	}
-	return dbap.convert(), nil
-}
+// func (db *DB) unmarshalAuthorityPolicy(data []byte, authorityID string) (*linkedca.Policy, error) {
+// 	dbap, err := db.unmarshalDBAuthorityPolicy(data, authorityID)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return dbap.convert(), nil
+// }
 
 func (db *DB) CreateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
 

@@ -17,23 +17,23 @@ func (a *Authority) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, e
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
 
-	policy, err := a.adminDB.GetAuthorityPolicy(ctx)
+	p, err := a.adminDB.GetAuthorityPolicy(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return policy, nil
+	return p, nil
 }
 
-func (a *Authority) CreateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error) {
+func (a *Authority) CreateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, p *linkedca.Policy) (*linkedca.Policy, error) {
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
 
-	if err := a.checkPolicy(ctx, adm, policy); err != nil {
+	if err := a.checkPolicy(ctx, adm, p); err != nil {
 		return nil, err
 	}
 
-	if err := a.adminDB.CreateAuthorityPolicy(ctx, policy); err != nil {
+	if err := a.adminDB.CreateAuthorityPolicy(ctx, p); err != nil {
 		return nil, err
 	}
 
@@ -41,18 +41,18 @@ func (a *Authority) CreateAuthorityPolicy(ctx context.Context, adm *linkedca.Adm
 		return nil, admin.WrapErrorISE(err, "error reloading policy engines when creating authority policy")
 	}
 
-	return policy, nil // TODO: return the newly stored policy
+	return p, nil // TODO: return the newly stored policy
 }
 
-func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error) {
+func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, p *linkedca.Policy) (*linkedca.Policy, error) {
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
 
-	if err := a.checkPolicy(ctx, adm, policy); err != nil {
+	if err := a.checkPolicy(ctx, adm, p); err != nil {
 		return nil, err
 	}
 
-	if err := a.adminDB.UpdateAuthorityPolicy(ctx, policy); err != nil {
+	if err := a.adminDB.UpdateAuthorityPolicy(ctx, p); err != nil {
 		return nil, err
 	}
 
@@ -60,7 +60,7 @@ func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Adm
 		return nil, admin.WrapErrorISE(err, "error reloading policy engines when updating authority policy")
 	}
 
-	return policy, nil // TODO: return the updated stored policy
+	return p, nil // TODO: return the updated stored policy
 }
 
 func (a *Authority) RemoveAuthorityPolicy(ctx context.Context) error {
@@ -111,11 +111,10 @@ func isAllowed(engine authPolicy.X509Policy, sans []string) error {
 	)
 	if allowed, err = engine.AreSANsAllowed(sans); err != nil {
 		var policyErr *policy.NamePolicyError
-		if errors.As(err, &policyErr); policyErr.Reason == policy.NotAuthorizedForThisName {
+		if isPolicyErr := errors.As(err, &policyErr); isPolicyErr && policyErr.Reason == policy.NotAuthorizedForThisName {
 			return fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans)
-		} else {
-			return err
 		}
+		return err
 	}
 
 	if !allowed {

@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
 	"reflect"
@@ -40,30 +38,6 @@ const (
 type NamePolicyError struct {
 	Reason NamePolicyReason
 	Detail string
-}
-
-type NameError struct {
-	error
-	Reason NamePolicyReason
-}
-
-func a() {
-	err := io.EOF
-	var ne *NameError
-	errors.As(err, ne)
-	errors.Is(err, ne)
-}
-
-func newPolicyError(reason NamePolicyReason, err error) error {
-	return &NameError{
-		error:  err,
-		Reason: reason,
-	}
-}
-
-func newPolicyErrorf(reason NamePolicyReason, format string, args ...interface{}) error {
-	err := fmt.Errorf(format, args...)
-	return newPolicyError(reason, err)
 }
 
 func (e *NamePolicyError) Error() string {
