@@ -327,7 +327,7 @@ func TestNebula_GetIDForToken(t *testing.T) {
 func TestNebula_GetTokenID(t *testing.T) {
 	p, ca, signer := mustNebulaProvisioner(t)
 	c1, priv := mustNebulaCert(t, "test.lan", mustNebulaIPNet(t, "10.1.0.1/16"), []string{"group"}, ca, signer)
-	t1 := mustNebulaToken(t, "test.lan", p.Name, p.audiences.Sign[0], now(), []string{"test.lan", "10.1.0.1"}, c1, priv)
+	t1 := mustNebulaToken(t, "test.lan", p.Name, p.ctl.Audiences.Sign[0], now(), []string{"test.lan", "10.1.0.1"}, c1, priv)
 	_, claims, err := parseToken(t1)
 	if err != nil {
 		t.Fatal(err)
@@ -441,8 +441,8 @@ func TestNebula_AuthorizeSign(t *testing.T) {
 	ctx := context.TODO()
 	p, ca, signer := mustNebulaProvisioner(t)
 	crt, priv := mustNebulaCert(t, "test.lan", mustNebulaIPNet(t, "10.1.0.1/16"), []string{"test"}, ca, signer)
-	ok := mustNebulaToken(t, "test.lan", p.Name, p.audiences.Sign[0], now(), []string{"test.lan", "10.1.0.1"}, crt, priv)
-	okNoSANs := mustNebulaToken(t, "test.lan", p.Name, p.audiences.Sign[0], now(), nil, crt, priv)
+	ok := mustNebulaToken(t, "test.lan", p.Name, p.ctl.Audiences.Sign[0], now(), []string{"test.lan", "10.1.0.1"}, crt, priv)
+	okNoSANs := mustNebulaToken(t, "test.lan", p.Name, p.ctl.Audiences.Sign[0], now(), nil, crt, priv)
 
 	pBadOptions, _, _ := mustNebulaProvisioner(t)
 	pBadOptions.caPool = p.caPool
@@ -483,20 +483,20 @@ func TestNebula_AuthorizeSSHSign(t *testing.T) {
 	// Ok provisioner
 	p, ca, signer := mustNebulaProvisioner(t)
 	crt, priv := mustNebulaCert(t, "test.lan", mustNebulaIPNet(t, "10.1.0.1/16"), []string{"test"}, ca, signer)
-	ok := mustNebulaSSHToken(t, "test.lan", p.Name, p.audiences.SSHSign[0], now(), &SignSSHOptions{
+	ok := mustNebulaSSHToken(t, "test.lan", p.Name, p.ctl.Audiences.SSHSign[0], now(), &SignSSHOptions{
 		CertType:   "host",
 		KeyID:      "test.lan",
 		Principals: []string{"test.lan", "10.1.0.1"},
 	}, crt, priv)
-	okNoOptions := mustNebulaSSHToken(t, "test.lan", p.Name, p.audiences.SSHSign[0], now(), nil, crt, priv)
-	okWithValidity := mustNebulaSSHToken(t, "test.lan", p.Name, p.audiences.SSHSign[0], now(), &SignSSHOptions{
+	okNoOptions := mustNebulaSSHToken(t, "test.lan", p.Name, p.ctl.Audiences.SSHSign[0], now(), nil, crt, priv)
+	okWithValidity := mustNebulaSSHToken(t, "test.lan", p.Name, p.ctl.Audiences.SSHSign[0], now(), &SignSSHOptions{
 		ValidAfter:  NewTimeDuration(now().Add(1 * time.Hour)),
 		ValidBefore: NewTimeDuration(now().Add(10 * time.Hour)),
 	}, crt, priv)
-	failUserCert := mustNebulaSSHToken(t, "test.lan", p.Name, p.audiences.SSHSign[0], now(), &SignSSHOptions{
+	failUserCert := mustNebulaSSHToken(t, "test.lan", p.Name, p.ctl.Audiences.SSHSign[0], now(), &SignSSHOptions{
 		CertType: "user",
 	}, crt, priv)
-	failPrincipals := mustNebulaSSHToken(t, "test.lan", p.Name, p.audiences.SSHSign[0], now(), &SignSSHOptions{
+	failPrincipals := mustNebulaSSHToken(t, "test.lan", p.Name, p.ctl.Audiences.SSHSign[0], now(), &SignSSHOptions{
 		CertType:   "host",
 		KeyID:      "test.lan",
 		Principals: []string{"test.lan", "10.1.0.1", "foo.bar"},
@@ -549,6 +549,8 @@ func TestNebula_AuthorizeSSHSign(t *testing.T) {
 
 func TestNebula_AuthorizeRenew(t *testing.T) {
 	ctx := context.TODO()
+	now := time.Now().Truncate(time.Second)
+
 	// Ok provisioner
 	p, _, _ := mustNebulaProvisioner(t)
 
@@ -567,8 +569,14 @@ func TestNebula_AuthorizeRenew(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", p, args{ctx, &x509.Certificate{}}, false},
-		{"fail disabled", pDisabled, args{ctx, &x509.Certificate{}}, true},
+		{"ok", p, args{ctx, &x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, false},
+		{"fail disabled", pDisabled, args{ctx, &x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -584,12 +592,12 @@ func TestNebula_AuthorizeRevoke(t *testing.T) {
 	// Ok provisioner
 	p, ca, signer := mustNebulaProvisioner(t)
 	crt, priv := mustNebulaCert(t, "test.lan", mustNebulaIPNet(t, "10.1.0.1/16"), []string{"test"}, ca, signer)
-	ok := mustNebulaToken(t, "test.lan", p.Name, p.audiences.Revoke[0], now(), nil, crt, priv)
+	ok := mustNebulaToken(t, "test.lan", p.Name, p.ctl.Audiences.Revoke[0], now(), nil, crt, priv)
 
 	// Fail different CA
 	nc, signer := mustNebulaCA(t)
 	crt, priv = mustNebulaCert(t, "test.lan", mustNebulaIPNet(t, "10.1.0.1/16"), []string{"test"}, nc, signer)
-	failToken := mustNebulaToken(t, "test.lan", p.Name, p.audiences.Revoke[0], now(), nil, crt, priv)
+	failToken := mustNebulaToken(t, "test.lan", p.Name, p.ctl.Audiences.Revoke[0], now(), nil, crt, priv)
 
 	type args struct {
 		ctx   context.Context
@@ -618,12 +626,12 @@ func TestNebula_AuthorizeSSHRevoke(t *testing.T) {
 	// Ok provisioner
 	p, ca, signer := mustNebulaProvisioner(t)
 	crt, priv := mustNebulaCert(t, "test.lan", mustNebulaIPNet(t, "10.1.0.1/16"), []string{"test"}, ca, signer)
-	ok := mustNebulaSSHToken(t, "test.lan", p.Name, p.audiences.SSHRevoke[0], now(), nil, crt, priv)
+	ok := mustNebulaSSHToken(t, "test.lan", p.Name, p.ctl.Audiences.SSHRevoke[0], now(), nil, crt, priv)
 
 	// Fail different CA
 	nc, signer := mustNebulaCA(t)
 	crt, priv = mustNebulaCert(t, "test.lan", mustNebulaIPNet(t, "10.1.0.1/16"), []string{"test"}, nc, signer)
-	failToken := mustNebulaSSHToken(t, "test.lan", p.Name, p.audiences.SSHRevoke[0], now(), nil, crt, priv)
+	failToken := mustNebulaSSHToken(t, "test.lan", p.Name, p.ctl.Audiences.SSHRevoke[0], now(), nil, crt, priv)
 
 	// Provisioner with SSH disabled
 	var bFalse bool
@@ -657,7 +665,7 @@ func TestNebula_AuthorizeSSHRevoke(t *testing.T) {
 func TestNebula_AuthorizeSSHRenew(t *testing.T) {
 	p, ca, signer := mustNebulaProvisioner(t)
 	crt, priv := mustNebulaCert(t, "test.lan", mustNebulaIPNet(t, "10.1.0.1/16"), []string{"test"}, ca, signer)
-	t1 := mustNebulaSSHToken(t, "test.lan", p.Name, p.audiences.SSHRenew[0], now(), nil, crt, priv)
+	t1 := mustNebulaSSHToken(t, "test.lan", p.Name, p.ctl.Audiences.SSHRenew[0], now(), nil, crt, priv)
 
 	type args struct {
 		ctx   context.Context
@@ -689,7 +697,7 @@ func TestNebula_AuthorizeSSHRenew(t *testing.T) {
 func TestNebula_AuthorizeSSHRekey(t *testing.T) {
 	p, ca, signer := mustNebulaProvisioner(t)
 	crt, priv := mustNebulaCert(t, "test.lan", mustNebulaIPNet(t, "10.1.0.1/16"), []string{"test"}, ca, signer)
-	t1 := mustNebulaSSHToken(t, "test.lan", p.Name, p.audiences.SSHRekey[0], now(), nil, crt, priv)
+	t1 := mustNebulaSSHToken(t, "test.lan", p.Name, p.ctl.Audiences.SSHRekey[0], now(), nil, crt, priv)
 
 	type args struct {
 		ctx   context.Context
@@ -726,20 +734,20 @@ func TestNebula_authorizeToken(t *testing.T) {
 	t1 := now()
 	p, ca, signer := mustNebulaProvisioner(t)
 	crt, priv := mustNebulaCert(t, "test.lan", mustNebulaIPNet(t, "10.1.0.1/16"), []string{"test"}, ca, signer)
-	ok := mustNebulaToken(t, "test.lan", p.Name, p.audiences.Sign[0], t1, []string{"10.1.0.1"}, crt, priv)
-	okNoSANs := mustNebulaToken(t, "test.lan", p.Name, p.audiences.Sign[0], t1, nil, crt, priv)
-	okSSH := mustNebulaSSHToken(t, "test.lan", p.Name, p.audiences.SSHSign[0], t1, &SignSSHOptions{
+	ok := mustNebulaToken(t, "test.lan", p.Name, p.ctl.Audiences.Sign[0], t1, []string{"10.1.0.1"}, crt, priv)
+	okNoSANs := mustNebulaToken(t, "test.lan", p.Name, p.ctl.Audiences.Sign[0], t1, nil, crt, priv)
+	okSSH := mustNebulaSSHToken(t, "test.lan", p.Name, p.ctl.Audiences.SSHSign[0], t1, &SignSSHOptions{
 		CertType:   "host",
 		KeyID:      "test.lan",
 		Principals: []string{"test.lan"},
 	}, crt, priv)
-	okSSHNoOptions := mustNebulaSSHToken(t, "test.lan", p.Name, p.audiences.SSHSign[0], t1, nil, crt, priv)
+	okSSHNoOptions := mustNebulaSSHToken(t, "test.lan", p.Name, p.ctl.Audiences.SSHSign[0], t1, nil, crt, priv)
 
 	// Token with errors
-	failNotBefore := mustNebulaToken(t, "test.lan", p.Name, p.audiences.Sign[0], t1.Add(1*time.Hour), []string{"10.1.0.1"}, crt, priv)
-	failIssuer := mustNebulaToken(t, "test.lan", "foo", p.audiences.Sign[0], t1, []string{"10.1.0.1"}, crt, priv)
+	failNotBefore := mustNebulaToken(t, "test.lan", p.Name, p.ctl.Audiences.Sign[0], t1.Add(1*time.Hour), []string{"10.1.0.1"}, crt, priv)
+	failIssuer := mustNebulaToken(t, "test.lan", "foo", p.ctl.Audiences.Sign[0], t1, []string{"10.1.0.1"}, crt, priv)
 	failAudience := mustNebulaToken(t, "test.lan", p.Name, "foo", t1, []string{"10.1.0.1"}, crt, priv)
-	failSubject := mustNebulaToken(t, "", p.Name, p.audiences.Sign[0], t1, []string{"10.1.0.1"}, crt, priv)
+	failSubject := mustNebulaToken(t, "", p.Name, p.ctl.Audiences.Sign[0], t1, []string{"10.1.0.1"}, crt, priv)
 
 	// Not a nebula token
 	jwk, err := generateJSONWebKey()
@@ -761,7 +769,7 @@ func TestNebula_authorizeToken(t *testing.T) {
 		IssuedAt:  jose.NewNumericDate(t1),
 		NotBefore: jose.NewNumericDate(t1),
 		Expiry:    jose.NewNumericDate(t1.Add(5 * time.Minute)),
-		Audience:  []string{p.audiences.Sign[0]},
+		Audience:  []string{p.ctl.Audiences.Sign[0]},
 	}
 	sshClaims := jose.Claims{
 		ID:        "[REPLACEME]",
@@ -770,7 +778,7 @@ func TestNebula_authorizeToken(t *testing.T) {
 		IssuedAt:  jose.NewNumericDate(t1),
 		NotBefore: jose.NewNumericDate(t1),
 		Expiry:    jose.NewNumericDate(t1.Add(5 * time.Minute)),
-		Audience:  []string{p.audiences.SSHSign[0]},
+		Audience:  []string{p.ctl.Audiences.SSHSign[0]},
 	}
 
 	type args struct {
@@ -785,14 +793,14 @@ func TestNebula_authorizeToken(t *testing.T) {
 		want1   *jwtPayload
 		wantErr bool
 	}{
-		{"ok x509", p, args{ok, p.audiences.Sign}, crt, &jwtPayload{
+		{"ok x509", p, args{ok, p.ctl.Audiences.Sign}, crt, &jwtPayload{
 			Claims: x509Claims,
 			SANs:   []string{"10.1.0.1"},
 		}, false},
-		{"ok x509 no sans", p, args{okNoSANs, p.audiences.Sign}, crt, &jwtPayload{
+		{"ok x509 no sans", p, args{okNoSANs, p.ctl.Audiences.Sign}, crt, &jwtPayload{
 			Claims: x509Claims,
 		}, false},
-		{"ok ssh", p, args{okSSH, p.audiences.SSHSign}, crt, &jwtPayload{
+		{"ok ssh", p, args{okSSH, p.ctl.Audiences.SSHSign}, crt, &jwtPayload{
 			Claims: sshClaims,
 			Step: &stepPayload{
 				SSH: &SignSSHOptions{
@@ -802,16 +810,16 @@ func TestNebula_authorizeToken(t *testing.T) {
 				},
 			},
 		}, false},
-		{"ok ssh no principals", p, args{okSSHNoOptions, p.audiences.SSHSign}, crt, &jwtPayload{
+		{"ok ssh no principals", p, args{okSSHNoOptions, p.ctl.Audiences.SSHSign}, crt, &jwtPayload{
 			Claims: sshClaims,
 		}, false},
-		{"fail parse", p, args{"bad.token", p.audiences.Sign}, nil, nil, true},
-		{"fail header", p, args{simpleToken, p.audiences.Sign}, nil, nil, true},
-		{"fail verify", p2, args{ok, p.audiences.Sign}, nil, nil, true},
-		{"fail claims nbf", p, args{failNotBefore, p.audiences.Sign}, nil, nil, true},
-		{"fail claims iss", p, args{failIssuer, p.audiences.Sign}, nil, nil, true},
-		{"fail claims aud", p, args{failAudience, p.audiences.Sign}, nil, nil, true},
-		{"fail claims sub", p, args{failSubject, p.audiences.Sign}, nil, nil, true},
+		{"fail parse", p, args{"bad.token", p.ctl.Audiences.Sign}, nil, nil, true},
+		{"fail header", p, args{simpleToken, p.ctl.Audiences.Sign}, nil, nil, true},
+		{"fail verify", p2, args{ok, p.ctl.Audiences.Sign}, nil, nil, true},
+		{"fail claims nbf", p, args{failNotBefore, p.ctl.Audiences.Sign}, nil, nil, true},
+		{"fail claims iss", p, args{failIssuer, p.ctl.Audiences.Sign}, nil, nil, true},
+		{"fail claims aud", p, args{failAudience, p.ctl.Audiences.Sign}, nil, nil, true},
+		{"fail claims sub", p, args{failSubject, p.ctl.Audiences.Sign}, nil, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

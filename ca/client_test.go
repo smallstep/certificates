@@ -17,13 +17,16 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/x509util"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
-	"go.step.sm/crypto/x509util"
-	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -354,7 +357,7 @@ func TestClient_Sign(t *testing.T) {
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				body := new(api.SignRequest)
-				if err := api.ReadJSON(req.Body, body); err != nil {
+				if err := read.JSON(req.Body, body); err != nil {
 					e, ok := tt.response.(error)
 					assert.Fatal(t, ok, "response expected to be error type")
 					api.WriteError(w, e)
@@ -426,7 +429,7 @@ func TestClient_Revoke(t *testing.T) {
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				body := new(api.RevokeRequest)
-				if err := api.ReadJSON(req.Body, body); err != nil {
+				if err := read.JSON(req.Body, body); err != nil {
 					e, ok := tt.response.(error)
 					assert.Fatal(t, ok, "response expected to be error type")
 					api.WriteError(w, e)
@@ -523,6 +526,74 @@ func TestClient_Renew(t *testing.T) {
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.Renew() = %v, want %v", got, tt.response)
+				}
+			}
+		})
+	}
+}
+
+func TestClient_RenewWithToken(t *testing.T) {
+	ok := &api.SignResponse{
+		ServerPEM: api.Certificate{Certificate: parseCertificate(certPEM)},
+		CaPEM:     api.Certificate{Certificate: parseCertificate(rootPEM)},
+		CertChainPEM: []api.Certificate{
+			{Certificate: parseCertificate(certPEM)},
+			{Certificate: parseCertificate(rootPEM)},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		response     interface{}
+		responseCode int
+		wantErr      bool
+		err          error
+	}{
+		{"ok", ok, 200, false, nil},
+		{"unauthorized", errs.Unauthorized("force"), 401, true, errors.New(errs.UnauthorizedDefaultMsg)},
+		{"empty request", errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestPrefix)},
+		{"nil request", errs.BadRequest("force"), 400, true, errors.New(errs.BadRequestPrefix)},
+	}
+
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if req.Header.Get("Authorization") != "Bearer token" {
+					api.JSONStatus(w, errs.InternalServer("force"), 500)
+				} else {
+					api.JSONStatus(w, tt.response, tt.responseCode)
+				}
+			})
+
+			got, err := c.RenewWithToken("token")
+			if (err != nil) != tt.wantErr {
+				fmt.Printf("%+v", err)
+				t.Errorf("Client.RenewWithToken() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			switch {
+			case err != nil:
+				if got != nil {
+					t.Errorf("Client.RenewWithToken() = %v, want nil", got)
+				}
+
+				sc, ok := err.(errs.StatusCoder)
+				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				assert.HasPrefix(t, err.Error(), tt.err.Error())
+			default:
+				if !reflect.DeepEqual(got, tt.response) {
+					t.Errorf("Client.RenewWithToken() = %v, want %v", got, tt.response)
 				}
 			}
 		})
@@ -1056,6 +1127,31 @@ func TestClient_SSHBastion(t *testing.T) {
 				if !reflect.DeepEqual(got, tt.response) {
 					t.Errorf("Client.SSHBastion() = %v, want %v", got, tt.response)
 				}
+			}
+		})
+	}
+}
+
+func TestClient_GetCaURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		caURL string
+		want  string
+	}{
+		{"ok", "https://ca.com", "https://ca.com"},
+		{"ok no schema", "ca.com", "https://ca.com"},
+		{"ok with port", "https://ca.com:9000", "https://ca.com:9000"},
+		{"ok with version", "https://ca.com/1.0", "https://ca.com/1.0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(tt.caURL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+			if got := c.GetCaURL(); got != tt.want {
+				t.Errorf("Client.GetCaURL() = %v, want %v", got, tt.want)
 			}
 		})
 	}

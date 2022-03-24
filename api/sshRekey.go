@@ -4,9 +4,11 @@ import (
 	"net/http"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
-	"golang.org/x/crypto/ssh"
 )
 
 // SSHRekeyRequest is the request body of an SSH certificate request.
@@ -38,7 +40,7 @@ type SSHRekeyResponse struct {
 // the request.
 func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 	var body SSHRekeyRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}

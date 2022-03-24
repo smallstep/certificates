@@ -5,10 +5,13 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
+
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
 )
 
 type adminAuthority interface {
@@ -116,7 +119,7 @@ func (h *Handler) GetAdmins(w http.ResponseWriter, r *http.Request) {
 // CreateAdmin creates a new admin.
 func (h *Handler) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 	var body CreateAdminRequest
-	if err := api.ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error reading request body"))
 		return
 	}
@@ -160,7 +163,7 @@ func (h *Handler) DeleteAdmin(w http.ResponseWriter, r *http.Request) {
 // UpdateAdmin updates an existing admin.
 func (h *Handler) UpdateAdmin(w http.ResponseWriter, r *http.Request) {
 	var body UpdateAdminRequest
-	if err := api.ReadJSON(r.Body, &body); err != nil {
+	if err := read.JSON(r.Body, &body); err != nil {
 		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error reading request body"))
 		return
 	}

@@ -179,6 +179,7 @@ func TestK8sSA_AuthorizeRevoke(t *testing.T) {
 }
 
 func TestK8sSA_AuthorizeRenew(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
 	type test struct {
 		p    *K8sSA
 		cert *x509.Certificate
@@ -192,21 +193,27 @@ func TestK8sSA_AuthorizeRenew(t *testing.T) {
 			// disable renewal
 			disable := true
 			p.Claims = &Claims{DisableRenewal: &disable}
-			p.claimer, err = NewClaimer(p.Claims, globalProvisionerClaims)
+			p.ctl.Claimer, err = NewClaimer(p.Claims, globalProvisionerClaims)
 			assert.FatalError(t, err)
 			return test{
-				p:    p,
-				cert: &x509.Certificate{},
+				p: p,
+				cert: &x509.Certificate{
+					NotBefore: now,
+					NotAfter:  now.Add(time.Hour),
+				},
 				code: http.StatusUnauthorized,
-				err:  errors.Errorf("k8ssa.AuthorizeRenew; renew is disabled for k8sSA provisioner '%s'", p.GetName()),
+				err:  errors.Errorf("renew is disabled for provisioner '%s'", p.GetName()),
 			}
 		},
 		"ok": func(t *testing.T) test {
 			p, err := generateK8sSA(nil)
 			assert.FatalError(t, err)
 			return test{
-				p:    p,
-				cert: &x509.Certificate{},
+				p: p,
+				cert: &x509.Certificate{
+					NotBefore: now,
+					NotAfter:  now.Add(time.Hour),
+				},
 			}
 		},
 	}
@@ -275,16 +282,16 @@ func TestK8sSA_AuthorizeSign(t *testing.T) {
 							switch v := o.(type) {
 							case certificateOptionsFunc:
 							case *provisionerExtensionOption:
-								assert.Equals(t, v.Type, int(TypeK8sSA))
+								assert.Equals(t, v.Type, TypeK8sSA)
 								assert.Equals(t, v.Name, tc.p.GetName())
 								assert.Equals(t, v.CredentialID, "")
 								assert.Len(t, 0, v.KeyValuePairs)
 							case profileDefaultDuration:
-								assert.Equals(t, time.Duration(v), tc.p.claimer.DefaultTLSCertDuration())
+								assert.Equals(t, time.Duration(v), tc.p.ctl.Claimer.DefaultTLSCertDuration())
 							case defaultPublicKeyValidator:
 							case *validityValidator:
-								assert.Equals(t, v.min, tc.p.claimer.MinTLSCertDuration())
-								assert.Equals(t, v.max, tc.p.claimer.MaxTLSCertDuration())
+								assert.Equals(t, v.min, tc.p.ctl.Claimer.MinTLSCertDuration())
+								assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
 							case *x509NamePolicyValidator:
 								assert.Equals(t, nil, v.policyEngine)
 							default:
@@ -313,7 +320,7 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 			// disable sshCA
 			disable := false
 			p.Claims = &Claims{EnableSSHCA: &disable}
-			p.claimer, err = NewClaimer(p.Claims, globalProvisionerClaims)
+			p.ctl.Claimer, err = NewClaimer(p.Claims, globalProvisionerClaims)
 			assert.FatalError(t, err)
 			return test{
 				p:     p,
@@ -365,11 +372,11 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 							case *sshCertOptionsRequireValidator:
 								assert.Equals(t, v, &sshCertOptionsRequireValidator{CertType: true, KeyID: true, Principals: true})
 							case *sshCertValidityValidator:
-								assert.Equals(t, v.Claimer, tc.p.claimer)
+								assert.Equals(t, v.Claimer, tc.p.ctl.Claimer)
 							case *sshDefaultPublicKeyValidator:
 							case *sshCertDefaultValidator:
 							case *sshDefaultDuration:
-								assert.Equals(t, v.Claimer, tc.p.claimer)
+								assert.Equals(t, v.Claimer, tc.p.ctl.Claimer)
 							case *sshNamePolicyValidator:
 								assert.Equals(t, nil, v.userPolicyEngine)
 								assert.Equals(t, nil, v.hostPolicyEngine)

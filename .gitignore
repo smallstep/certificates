@@ -19,3 +19,4 @@ coverage.txt
 output
 vendor
 .idea
+.envrc

@@ -109,7 +109,9 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 			UserKeys: sshKeys.UserKeys,
 			HostKeys: sshKeys.HostKeys,
 		},
-		GetIdentityFunc: a.getIdentityFunc,
+		GetIdentityFunc:       a.getIdentityFunc,
+		AuthorizeRenewFunc:    a.authorizeRenewFunc,
+		AuthorizeSSHRenewFunc: a.authorizeSSHRenewFunc,
 	}, nil
 
 }
@@ -488,7 +490,8 @@ func claimsToCertificates(c *linkedca.Claims) (*provisioner.Claims, error) {
 	}
 
 	pc := &provisioner.Claims{
-		DisableRenewal: &c.DisableRenewal,
+		DisableRenewal:        &c.DisableRenewal,
+		AllowRenewAfterExpiry: &c.AllowRenewAfterExpiry,
 	}
 
 	var err error
@@ -526,12 +529,18 @@ func claimsToLinkedca(c *provisioner.Claims) *linkedca.Claims {
 	}
 
 	disableRenewal := config.DefaultDisableRenewal
+	allowRenewAfterExpiry := config.DefaultAllowRenewAfterExpiry
+
 	if c.DisableRenewal != nil {
 		disableRenewal = *c.DisableRenewal
 	}
+	if c.AllowRenewAfterExpiry != nil {
+		allowRenewAfterExpiry = *c.AllowRenewAfterExpiry
+	}
 
 	lc := &linkedca.Claims{
-		DisableRenewal: disableRenewal,
+		DisableRenewal:        disableRenewal,
+		AllowRenewAfterExpiry: allowRenewAfterExpiry,
 	}
 
 	if c.DefaultTLSDur != nil || c.MinTLSDur != nil || c.MaxTLSDur != nil {

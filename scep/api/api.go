@@ -10,14 +10,14 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi"
-	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/scep"
+	microscep "github.com/micromdm/scep/v2/scep"
+	"github.com/pkg/errors"
 	"go.mozilla.org/pkcs7"
 
-	"github.com/pkg/errors"
-
-	microscep "github.com/micromdm/scep/v2/scep"
+	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/log"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/scep"
 )
 
 const (
@@ -66,7 +66,9 @@ func New(scepAuth scep.Interface) api.RouterHandler {
 // Route traffic and implement the Router interface.
 func (h *Handler) Route(r api.Router) {
 	getLink := h.Auth.GetLinkExplicit
+	r.MethodFunc(http.MethodGet, getLink("{provisionerName}/*", false, nil), h.lookupProvisioner(h.Get))
 	r.MethodFunc(http.MethodGet, getLink("{provisionerName}", false, nil), h.lookupProvisioner(h.Get))
+	r.MethodFunc(http.MethodPost, getLink("{provisionerName}/*", false, nil), h.lookupProvisioner(h.Post))
 	r.MethodFunc(http.MethodPost, getLink("{provisionerName}", false, nil), h.lookupProvisioner(h.Post))
 }
 
@@ -335,7 +337,7 @@ func formatCapabilities(caps []string) []byte {
 func writeSCEPResponse(w http.ResponseWriter, response SCEPResponse) {
 
 	if response.Error != nil {
-		api.LogError(w, response.Error)
+		log.Error(w, response.Error)
 	}
 
 	if response.Certificate != nil {
