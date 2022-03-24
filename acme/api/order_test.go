@@ -667,6 +667,7 @@ func TestHandler_NewOrder(t *testing.T) {
 		baseURL.String(), escProvName)
 
 	type test struct {
+		ca         acme.CertificateAuthority
 		db         acme.DB
 		ctx        context.Context
 		nor        *NewOrderRequest
@@ -771,6 +772,7 @@ func TestHandler_NewOrder(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				statusCode: 500,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						assert.Equals(t, ch.AccountID, "accID")
@@ -804,6 +806,7 @@ func TestHandler_NewOrder(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				statusCode: 500,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -876,6 +879,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch chCount {
@@ -991,6 +995,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -1083,6 +1088,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -1174,6 +1180,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -1266,6 +1273,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -1334,7 +1342,7 @@ func TestHandler_NewOrder(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db}
+			h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db, ca: tc.ca}
 			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()

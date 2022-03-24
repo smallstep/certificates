@@ -34,9 +34,9 @@ type SCEP struct {
 	Options                       *Options `json:"options,omitempty"`
 	Claims                        *Claims  `json:"claims,omitempty"`
 	ctl                           *Controller
-	x509Policy                    policy.X509Policy
 	secretChallengePassword       string
 	encryptionAlgorithm           int
+	x509Policy                    policy.X509Policy
 }
 
 // GetID returns the provisioner unique identifier.

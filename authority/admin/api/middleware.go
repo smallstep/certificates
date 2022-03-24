@@ -42,7 +42,7 @@ func (h *Handler) extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
 			return
 		}
 
-		ctx := linkedca.WithAdmin(r.Context(), adm)
+		ctx := linkedca.NewContextWithAdmin(r.Context(), adm)
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -57,8 +57,8 @@ func (h *Handler) checkAction(next nextHTTP, supportedInStandalone bool) nextHTT
 			return
 		}
 
-		// when not in standalone mode and using a nosql.DB backend,
-		// actions are not supported
+		// when an action is not supported in standalone mode and when
+		// using a nosql.DB backend, actions are not supported
 		if _, ok := h.adminDB.(*nosql.DB); ok {
 			api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType,
 				"operation not supported in standalone mode"))

@@ -231,10 +231,6 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 }
 
 // isAllowedToSign checks if the Authority is allowed to sign the X.509 certificate.
-// It first checks if the certificate contains an admin subject that exists in the
-// collection of admins. The CA is always allowed to sign those. If the cert contains
-// different names and a policy is configured, the policy will be executed against
-// the cert to see if the CA is allowed to sign it.
 func (a *Authority) isAllowedToSign(cert *x509.Certificate) (bool, error) {
 
 	// if no policy is configured, the cert is implicitly allowed

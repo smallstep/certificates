@@ -6,15 +6,12 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
+
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
-)
-
-const (
-	// provisionerContextKey provisioner key
-	provisionerContextKey = admin.ContextKey("provisioner")
 )
 
 // CreateExternalAccountKeyRequest is the type for POST /admin/acme/eab requests
@@ -51,7 +48,7 @@ func (h *Handler) requireEABEnabled(next nextHTTP) nextHTTP {
 			api.WriteError(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", prov.GetName()))
 			return
 		}
-		ctx = context.WithValue(ctx, provisionerContextKey, prov)
+		ctx = linkedca.NewContextWithProvisioner(ctx, prov)
 		next(w, r.WithContext(ctx))
 	}
 }
