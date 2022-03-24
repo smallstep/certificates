@@ -245,6 +245,22 @@ func (a *Authority) isAllowedToSign(cert *x509.Certificate) (bool, error) {
 	return a.x509Policy.AreCertificateNamesAllowed(cert)
 }
 
+// AreSANsAllowed evaluates the provided sans against the
+// authority X.509 policy.
+func (a *Authority) AreSANsAllowed(ctx context.Context, sans []string) error {
+
+	// no policy configured; return early
+	if a.x509Policy == nil {
+		return nil
+	}
+
+	// evaluate the X.509 policy for the provided sans
+	var err error
+	_, err = a.x509Policy.AreSANsAllowed(sans)
+
+	return err
+}
+
 // Renew creates a new Certificate identical to the old certificate, except
 // with a validity window that begins 'now'.
 func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error) {

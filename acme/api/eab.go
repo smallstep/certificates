@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/smallstep/certificates/acme"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/certificates/acme"
 )
 
 // ExternalAccountBinding represents the ACME externalAccountBinding JWS

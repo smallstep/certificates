@@ -282,6 +282,10 @@ func (m *mockCA) Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions,
 	return nil, nil
 }
 
+func (m *mockCA) AreSANsAllowed(ctx context.Context, sans []string) error {
+	return nil
+}
+
 func (m *mockCA) IsRevoked(sn string) (bool, error) {
 	if m.MockIsRevoked != nil {
 		return m.MockIsRevoked(sn)

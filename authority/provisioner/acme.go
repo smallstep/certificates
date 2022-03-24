@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"time"
 
@@ -126,6 +127,8 @@ func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIden
 		_, err = p.x509Policy.IsIPAllowed(net.ParseIP(identifier.Value))
 	case DNS:
 		_, err = p.x509Policy.IsDNSAllowed(identifier.Value)
+	default:
+		err = fmt.Errorf("invalid ACME identifier type '%s' provided", identifier.Type)
 	}
 
 	return err

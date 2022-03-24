@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"go.step.sm/crypto/jose"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/crypto/jose"
 )
 
 func Test_keysAreEqual(t *testing.T) {
