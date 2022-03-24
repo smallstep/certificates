@@ -1,3 +1,4 @@
+// Package scep implements Simple Certificate Enrollment Protocol related functionality.
 package scep
 
 import (
@@ -5,9 +6,6 @@ import (
 	"encoding/asn1"
 
 	microscep "github.com/micromdm/scep/v2/scep"
-
-	//"github.com/smallstep/certificates/scep/pkcs7"
-
 	"go.mozilla.org/pkcs7"
 )
 
