@@ -95,7 +95,6 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	// Note that with GetClientCertificate tlsConfig.Certificates is not used.
 	// Without tlsConfig.Certificates there's not need to use tlsConfig.BuildNameToCertificate()
 	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
-	tlsConfig.PreferServerCipherSuites = true
 
 	// Apply options and initialize mutable tls.Config
 	tlsCtx := newTLSOptionCtx(c, tlsConfig, sign)
@@ -137,7 +136,6 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	// Without tlsConfig.Certificates there's not need to use tlsConfig.BuildNameToCertificate()
 	tlsConfig.GetCertificate = renewer.GetCertificate
 	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
-	tlsConfig.PreferServerCipherSuites = true
 	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
 
 	// Apply options and initialize mutable tls.Config
