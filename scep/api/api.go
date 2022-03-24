@@ -1,3 +1,4 @@
+// Package api implements a SCEP HTTP server.
 package api
 
 import (
