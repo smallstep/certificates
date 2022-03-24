@@ -31,12 +31,6 @@ const (
 
 const maxPayloadSize = 2 << 20
 
-const (
-	certChainHeader    = "application/x-x509-ca-ra-cert"
-	leafHeader         = "application/x-x509-ca-cert"
-	pkiOperationHeader = "application/x-pki-message"
-)
-
 // request is a SCEP server request.
 type request struct {
 	Operation string
@@ -54,17 +48,19 @@ type response struct {
 
 // handler is the SCEP request handler.
 type handler struct {
-	Auth scep.Interface
+	auth *scep.Authority
 }
 
 // New returns a new SCEP API router.
-func New(scepAuth scep.Interface) api.RouterHandler {
-	return &handler{scepAuth}
+func New(auth *scep.Authority) api.RouterHandler {
+	return &handler{
+		auth: auth,
+	}
 }
 
 // Route traffic and implement the Router interface.
 func (h *handler) Route(r api.Router) {
-	getLink := h.Auth.GetLinkExplicit
+	getLink := h.auth.GetLinkExplicit
 	r.MethodFunc(http.MethodGet, getLink("{provisionerName}/*", false, nil), h.lookupProvisioner(h.Get))
 	r.MethodFunc(http.MethodGet, getLink("{provisionerName}", false, nil), h.lookupProvisioner(h.Get))
 	r.MethodFunc(http.MethodPost, getLink("{provisionerName}/*", false, nil), h.lookupProvisioner(h.Post))
@@ -192,7 +188,7 @@ func (h *handler) lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		p, err := h.Auth.LoadProvisionerByName(provisionerName)
+		p, err := h.auth.LoadProvisionerByName(provisionerName)
 		if err != nil {
 			fail(w, err)
 			return
@@ -213,7 +209,7 @@ func (h *handler) lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 // GetCACert returns the CA certificates in a SCEP response
 func (h *handler) GetCACert(ctx context.Context) (response, error) {
 
-	certs, err := h.Auth.GetCACertificates(ctx)
+	certs, err := h.auth.GetCACertificates(ctx)
 	if err != nil {
 		return response{}, err
 	}
@@ -246,7 +242,7 @@ func (h *handler) GetCACert(ctx context.Context) (response, error) {
 // GetCACaps returns the CA capabilities in a SCEP response
 func (h *handler) GetCACaps(ctx context.Context) (response, error) {
 
-	caps := h.Auth.GetCACaps(ctx)
+	caps := h.auth.GetCACaps(ctx)
 
 	res := response{
 		Operation: opnGetCACaps,
@@ -283,7 +279,7 @@ func (h *handler) PKIOperation(ctx context.Context, req request) (response, erro
 		P7:            p7,
 	}
 
-	if err := h.Auth.DecryptPKIEnvelope(ctx, msg); err != nil {
+	if err := h.auth.DecryptPKIEnvelope(ctx, msg); err != nil {
 		return response{}, err
 	}
 
@@ -296,7 +292,7 @@ func (h *handler) PKIOperation(ctx context.Context, req request) (response, erro
 	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
 	// We'll have to see how it works out.
 	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
-		challengeMatches, err := h.Auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
+		challengeMatches, err := h.auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
 		if err != nil {
 			return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("error when checking password"))
 		}
@@ -314,7 +310,7 @@ func (h *handler) PKIOperation(ctx context.Context, req request) (response, erro
 	// Authentication by the (self-signed) certificate with an optional challenge is required; supporting renewals incl. verification
 	// of the client cert is not.
 
-	certRep, err := h.Auth.SignCSR(ctx, csr, msg)
+	certRep, err := h.auth.SignCSR(ctx, csr, msg)
 	if err != nil {
 		return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
 	}
@@ -354,7 +350,7 @@ func fail(w http.ResponseWriter, err error) {
 }
 
 func (h *handler) createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (response, error) {
-	certRepMsg, err := h.Auth.CreateFailureResponse(ctx, csr, msg, scep.FailInfoName(info), failError.Error())
+	certRepMsg, err := h.auth.CreateFailureResponse(ctx, csr, msg, scep.FailInfoName(info), failError.Error())
 	if err != nil {
 		return response{}, err
 	}
@@ -367,14 +363,14 @@ func (h *handler) createFailureResponse(ctx context.Context, csr *x509.Certifica
 
 func contentHeader(r response) string {
 	switch r.Operation {
-	case opnGetCACert:
-		if r.CACertNum > 1 {
-			return certChainHeader
-		}
-		return leafHeader
-	case opnPKIOperation:
-		return pkiOperationHeader
 	default:
 		return "text/plain"
+	case opnGetCACert:
+		if r.CACertNum > 1 {
+			return "application/x-x509-ca-ra-cert"
+		}
+		return "application/x-x509-ca-cert"
+	case opnPKIOperation:
+		return "application/x-pki-message"
 	}
 }
