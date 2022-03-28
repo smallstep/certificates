@@ -21,6 +21,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
 
+	"github.com/smallstep/certificates/api/log"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -259,6 +260,7 @@ func (h *caHandler) Route(r Router) {
 	r.MethodFunc("GET", "/provisioners", h.Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", h.ProvisionerKey)
 	r.MethodFunc("GET", "/roots", h.Roots)
+	r.MethodFunc("GET", "/roots.pem", h.RootsPEM)
 	r.MethodFunc("GET", "/federation", h.Federation)
 	// SSH CA
 	r.MethodFunc("POST", "/ssh/sign", h.SSHSign)
@@ -362,6 +364,29 @@ func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 	JSONStatus(w, &RootsResponse{
 		Certificates: certs,
 	}, http.StatusCreated)
+}
+
+// RootsPEM returns all the root certificates for the CA in PEM format.
+func (h *caHandler) RootsPEM(w http.ResponseWriter, r *http.Request) {
+	roots, err := h.Authority.GetRoots()
+	if err != nil {
+		WriteError(w, errs.InternalServerErr(err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-pem-file")
+
+	for _, root := range roots {
+		block := pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: root.Raw,
+		})
+
+		if _, err := w.Write(block); err != nil {
+			log.Error(w, err)
+			return
+		}
+	}
 }
 
 // Federation returns all the public certificates in the federation.
