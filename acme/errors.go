@@ -351,7 +351,7 @@ func (e *Error) ToLog() (interface{}, error) {
 }
 
 // Render implements render.RenderableError for Error.
-func (err *Error) Render(w http.ResponseWriter) {
+func (e *Error) Render(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/problem+json")
-	render.JSONStatus(w, err, err.StatusCode())
+	render.JSONStatus(w, e, e.StatusCode())
 }

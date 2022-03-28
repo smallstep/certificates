@@ -195,8 +195,8 @@ func (e *Error) ToLog() (interface{}, error) {
 }
 
 // Render implements render.RenderableError for Error.
-func (err *Error) Render(w http.ResponseWriter) {
-	err.Message = err.Err.Error()
+func (e *Error) Render(w http.ResponseWriter) {
+	e.Message = e.Err.Error()
 
-	render.JSONStatus(w, err, err.StatusCode())
+	render.JSONStatus(w, e, e.StatusCode())
 }
