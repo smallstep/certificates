@@ -1,6 +1,8 @@
 package render
 
 import (
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -30,28 +32,28 @@ func TestJSONPanics(t *testing.T) {
 	})
 }
 
-type renderableTestError struct {
+type renderableError struct {
 	Code    int    `json:"-"`
 	Message string `json:"message"`
 }
 
-func (err renderableTestError) Error() string {
+func (err renderableError) Error() string {
 	return err.Message
 }
 
-func (err renderableTestError) Render(w http.ResponseWriter) {
+func (err renderableError) Render(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "something/custom")
 
 	JSONStatus(w, err, err.Code)
 }
 
-type codedTestError struct {
+type statusedError struct {
 	Contents string
 }
 
-func (err codedTestError) Error() string { return err.Contents }
+func (err statusedError) Error() string { return err.Contents }
 
-func (codedTestError) StatusCode() int { return 432 }
+func (statusedError) StatusCode() int { return 432 }
 
 func TestError(t *testing.T) {
 	cases := []struct {
@@ -61,13 +63,13 @@ func TestError(t *testing.T) {
 		header string
 	}{
 		0: {
-			err:    renderableTestError{532, "some string"},
+			err:    renderableError{532, "some string"},
 			code:   532,
 			body:   "{\"message\":\"some string\"}\n",
 			header: "something/custom",
 		},
 		1: {
-			err:    codedTestError{"123"},
+			err:    statusedError{"123"},
 			code:   432,
 			body:   "{\"Contents\":\"123\"}\n",
 			header: "application/json",
@@ -86,5 +88,28 @@ func TestError(t *testing.T) {
 			assert.Equal(t, kase.body, rec.Body.String())
 			assert.Equal(t, kase.header, rec.Header().Get("Content-Type"))
 		})
+	}
+}
+
+type causedError struct {
+	cause error
+}
+
+func (err causedError) Error() string { return fmt.Sprintf("cause: %s", err.cause) }
+func (err causedError) Cause() error  { return err.cause }
+
+func TestStatusCodeFromError(t *testing.T) {
+	cases := []struct {
+		err error
+		exp int
+	}{
+		0: {nil, http.StatusInternalServerError},
+		1: {io.EOF, http.StatusInternalServerError},
+		2: {statusedError{"123"}, 432},
+		3: {causedError{statusedError{"432"}}, 432},
+	}
+
+	for caseIndex, kase := range cases {
+		assert.Equal(t, kase.exp, statusCodeFromError(kase.err), "case: %d", caseIndex)
 	}
 }

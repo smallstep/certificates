@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -85,12 +84,36 @@ func Error(w http.ResponseWriter, err error) {
 		return
 	}
 
-	code := http.StatusInternalServerError
+	JSONStatus(w, err, statusCodeFromError(err))
+}
+
+func statusCodeFromError(err error) (code int) {
+	code = http.StatusInternalServerError
+
+	// if the error implements err
 	if sc, ok := err.(errs.StatusCoder); ok {
 		code = sc.StatusCode()
-	} else if sc, ok := errors.Cause(err).(errs.StatusCoder); ok {
-		code = sc.StatusCode()
+
+		return
 	}
 
-	JSONStatus(w, err, code)
+	type causer interface {
+		Cause() error
+	}
+
+	for err != nil {
+		cause, ok := err.(causer)
+		if !ok {
+			break
+		}
+		err = cause.Cause()
+
+		if sc, ok := err.(errs.StatusCoder); ok {
+			code = sc.StatusCode()
+
+			break
+		}
+	}
+
+	return
 }
