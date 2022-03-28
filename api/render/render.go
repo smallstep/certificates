@@ -6,13 +6,11 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api/log"
-	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -66,16 +64,24 @@ func setContentTypeUnlessPresent(w http.ResponseWriter, contentType string) {
 	}
 }
 
-// Error encodes the JSON representation of err to w.
+// RenderableError is the set of errors that implement the basic Render method.
+//
+// Errors that implement this interface will use their own Render method when
+// being rendered into responses.
+type RenderableError interface {
+	error
+
+	Render(http.ResponseWriter)
+}
+
+// Error marshals the JSON representation of err to w. In case err implements
+// RenderableError its own Render method will be called instead.
 func Error(w http.ResponseWriter, err error) {
 	log.Error(w, err)
 
-	switch k := err.(type) {
-	case *acme.Error:
-		acme.WriteError(w, k)
-		return
-	case *admin.Error:
-		admin.WriteError(w, k)
+	if e, ok := err.(RenderableError); ok {
+		e.Render(w)
+
 		return
 	}
 
