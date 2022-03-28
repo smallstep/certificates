@@ -515,9 +515,9 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 5, http.StatusOK, false},
-		{"ok", p2, args{t2}, 10, http.StatusOK, false},
-		{"ok", p3, args{t3}, 5, http.StatusOK, false},
+		{"ok", p1, args{t1}, 6, http.StatusOK, false},
+		{"ok", p2, args{t2}, 11, http.StatusOK, false},
+		{"ok", p3, args{t3}, 6, http.StatusOK, false},
 		{"fail token", p1, args{"token"}, 0, http.StatusUnauthorized, true},
 		{"fail key", p1, args{failKey}, 0, http.StatusUnauthorized, true},
 		{"fail iss", p1, args{failIss}, 0, http.StatusUnauthorized, true},
@@ -547,6 +547,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 				assert.Len(t, tt.wantLen, got)
 				for _, o := range got {
 					switch v := o.(type) {
+					case *GCP:
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
 						assert.Equals(t, v.Type, TypeGCP)

@@ -488,7 +488,7 @@ func TestAuthority_authorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Len(t, 7, got)
+					assert.Len(t, 8, got)
 				}
 			}
 		})

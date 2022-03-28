@@ -641,11 +641,11 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1, "foo.local"}, 6, http.StatusOK, false},
-		{"ok", p2, args{t2, "instance-id"}, 10, http.StatusOK, false},
-		{"ok", p2, args{t2Hostname, "ip-127-0-0-1.us-west-1.compute.internal"}, 10, http.StatusOK, false},
-		{"ok", p2, args{t2PrivateIP, "127.0.0.1"}, 10, http.StatusOK, false},
-		{"ok", p1, args{t4, "instance-id"}, 6, http.StatusOK, false},
+		{"ok", p1, args{t1, "foo.local"}, 7, http.StatusOK, false},
+		{"ok", p2, args{t2, "instance-id"}, 11, http.StatusOK, false},
+		{"ok", p2, args{t2Hostname, "ip-127-0-0-1.us-west-1.compute.internal"}, 11, http.StatusOK, false},
+		{"ok", p2, args{t2PrivateIP, "127.0.0.1"}, 11, http.StatusOK, false},
+		{"ok", p1, args{t4, "instance-id"}, 7, http.StatusOK, false},
 		{"fail account", p3, args{token: t3}, 0, http.StatusUnauthorized, true},
 		{"fail token", p1, args{token: "token"}, 0, http.StatusUnauthorized, true},
 		{"fail subject", p1, args{token: failSubject}, 0, http.StatusUnauthorized, true},
@@ -675,6 +675,7 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 				assert.Len(t, tt.wantLen, got)
 				for _, o := range got {
 					switch v := o.(type) {
+					case *AWS:
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
 						assert.Equals(t, v.Type, TypeAWS)
