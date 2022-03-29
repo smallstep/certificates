@@ -163,6 +163,22 @@ func WithX509Signer(crt *x509.Certificate, s crypto.Signer) Option {
 	}
 }
 
+// WithX509SignerFunc defines the function used to get the chain of certificates
+// and signer used when we sign X.509 certificates.
+func WithX509SignerFunc(fn func() ([]*x509.Certificate, crypto.Signer, error)) Option {
+	return func(a *Authority) error {
+		srv, err := cas.New(context.Background(), casapi.Options{
+			Type:              casapi.SoftCAS,
+			CertificateSigner: fn,
+		})
+		if err != nil {
+			return err
+		}
+		a.x509CAService = srv
+		return nil
+	}
+}
+
 // WithSSHUserSigner defines the signer used to sign SSH user certificates.
 func WithSSHUserSigner(s crypto.Signer) Option {
 	return func(a *Authority) error {
