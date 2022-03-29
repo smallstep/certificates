@@ -526,12 +526,12 @@ func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateIn
 // error if the underlying AuthDB does not support CRLs
 func (a *Authority) GetCertificateRevocationList() ([]byte, error) {
 	if a.config.CRL == nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, errors.Errorf("Certificate Revocation Lists are not enabled"), "authority.GetCertificateRevocationList")
+		return nil, errs.Wrap(http.StatusNotFound, errors.Errorf("Certificate Revocation Lists are not enabled"), "authority.GetCertificateRevocationList")
 	}
 
 	crlDB, ok := a.db.(db.CertificateRevocationListDB)
 	if !ok {
-		return nil, errs.Wrap(http.StatusInternalServerError, errors.Errorf("Database does not support Certificate Revocation Lists"), "authority.GetCertificateRevocationList")
+		return nil, errs.Wrap(http.StatusNotImplemented, errors.Errorf("Database does not support Certificate Revocation Lists"), "authority.GetCertificateRevocationList")
 	}
 
 	crlInfo, err := crlDB.GetCRL()

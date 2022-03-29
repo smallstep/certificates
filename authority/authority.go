@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"strings"
 	"sync"
@@ -662,57 +663,43 @@ func (a *Authority) GetSCEPService() *scep.Service {
 
 func (a *Authority) startCRLGenerator() error {
 
-	if a.config.CRL.CacheDuration.Duration > time.Duration(0) {
-		// Check that there is a valid CRL in the DB right now. If it doesnt exist
-		// or is expired, generated one now
-		crlDB, ok := a.db.(db.CertificateRevocationListDB)
-		if !ok {
-			return errors.Errorf("CRL Generation requested, but database does not support CRL generation")
-		}
+	if a.config.CRL.CacheDuration.Duration <= 0 {
+		return nil
+	}
 
-		crlInfo, err := crlDB.GetCRL()
-		if err != nil {
-			return errors.Wrap(err, "could not retrieve CRL from database")
-		}
+	// Check that there is a valid CRL in the DB right now. If it doesn't exist
+	// or is expired, generate one now
+	_, ok := a.db.(db.CertificateRevocationListDB)
+	if !ok {
+		return errors.Errorf("CRL Generation requested, but database does not support CRL generation")
+	}
 
-		if crlInfo == nil {
-			log.Println("No CRL exists in the DB, generating one now")
-			err = a.GenerateCertificateRevocationList()
-			if err != nil {
-				return errors.Wrap(err, "could not generate a CRL")
-			}
-		}
+	// Always create a new CRL on startup in case the CA has been down and the time to next expected CRL
+	// update is less than the cache duration.
+	err := a.GenerateCertificateRevocationList()
+	if err != nil {
+		return errors.Wrap(err, "could not generate a CRL")
+	}
 
-		if crlInfo.ExpiresAt.Before(time.Now().UTC()) {
-			log.Printf("Existing CRL has expired (at %v), generating a new one", crlInfo.ExpiresAt)
-			err = a.GenerateCertificateRevocationList()
-			if err != nil {
-				return errors.Wrap(err, "could not generate a CRL")
-			}
-		}
+	log.Printf("CRL will be auto-generated every %v", a.config.CRL.CacheDuration)
+	tickerDuration := a.config.CRL.CacheDuration.Duration - time.Minute // generate the new CRL 1 minute before it expires
+	if tickerDuration <= 0 {
+		panic(fmt.Sprintf("ERROR: Addition of jitter to CRL generation time %v creates a negative duration (%v). Use a CRL generation time of longer than 1 minute.", a.config.CRL.CacheDuration, tickerDuration))
+	}
+	crlTicker := time.NewTicker(tickerDuration)
 
-		log.Printf("CRL will be auto-generated every %v", a.config.CRL.CacheDuration)
-		tickerDuration := a.config.CRL.CacheDuration.Duration - time.Minute // generate the new CRL 1 minute before it expires
-		if tickerDuration <= 0 {
-			log.Printf("WARNING: Addition of jitter to CRL generation time %v creates a negative duration (%v). Using 1 minute cacheDuration", a.config.CRL.CacheDuration, tickerDuration)
-			tickerDuration = time.Minute
-		}
-		crlTicker := time.NewTicker(tickerDuration)
-
-		go func() {
-			for {
-				select {
-				case <-crlTicker.C:
-					log.Println("Regenerating CRL")
-					err := a.GenerateCertificateRevocationList()
-					if err != nil {
-						// TODO: log or panic here?
-						panic(errors.Wrap(err, "authority.crlGenerator encountered an error"))
-					}
+	go func() {
+		for {
+			select {
+			case <-crlTicker.C:
+				log.Println("Regenerating CRL")
+				err := a.GenerateCertificateRevocationList()
+				if err != nil {
+					log.Printf("ERROR: authority.crlGenerator encountered an error when regenerating the CRL: %v", err)
 				}
 			}
-		}()
-	}
+		}
+	}()
 
 	return nil
 }

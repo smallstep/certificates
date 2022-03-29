@@ -45,8 +45,6 @@ func (h *caHandler) CRL(w http.ResponseWriter, r *http.Request) {
 		_, err = w.Write(crlBytes)
 	}
 
-	w.WriteHeader(200)
-
 	if err != nil {
 		panic(errors.Wrap(err, "error writing http response"))
 	}
