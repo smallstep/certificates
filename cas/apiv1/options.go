@@ -32,13 +32,13 @@ type Options struct {
 	CredentialsFile string `json:"credentialsFile,omitempty"`
 
 	// CertificateChain contains the issuer certificate, along with any other
-	// bundled certificates to be returned in the chain for consumers. It is
-	// used used in SoftCAS, and is configured in the crt property of the
-	// ca.json.
+	// bundled certificates to be returned in the chain to consumers. It is used
+	// used in SoftCAS and it is configured in the crt property of the ca.json.
 	CertificateChain []*x509.Certificate `json:"-"`
 
-	// Signer is the private key or a KMS signer for the issuer certificate. It is used in
-	// SoftCAS and it is configured in the key property of the ca.json.
+	// Signer is the private key or a KMS signer for the issuer certificate. It
+	// is used in SoftCAS and it is configured in the key property of the
+	// ca.json.
 	Signer crypto.Signer `json:"-"`
 
 	// CertificateSigner combines CertificateChain and Signer in a callback that
