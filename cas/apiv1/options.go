@@ -31,12 +31,15 @@ type Options struct {
 	// https://cloud.google.com/docs/authentication.
 	CredentialsFile string `json:"credentialsFile,omitempty"`
 
-	// CertificateChain and Signer are the issuer certificate, along with any
-	// other bundled certificates to be returned in the chain for consumers, and
-	// signer used in SoftCAS. They are configured in ca.json crt and key
-	// properties.
+	// CertificateChain contains the issuer certificate, along with any other
+	// bundled certificates to be returned in the chain for consumers. It is
+	// used used in SoftCAS, and is configured in the crt property of the
+	// ca.json.
 	CertificateChain []*x509.Certificate `json:"-"`
-	Signer           crypto.Signer       `json:"-"`
+
+	// Signer is the private key or a KMS signer for the issuer certificate. It is used in
+	// SoftCAS and it is configured in the key property of the ca.json.
+	Signer crypto.Signer `json:"-"`
 
 	// CertificateSigner combines CertificateChain and Signer in a callback that
 	// returns the chain of certificate and signer used to sign X.509
