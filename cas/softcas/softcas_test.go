@@ -73,6 +73,12 @@ var (
 	testSignedTemplate             = mustSign(testTemplate, testIssuer, testNow, testNow.Add(24*time.Hour))
 	testSignedRootTemplate         = mustSign(testRootTemplate, testRootTemplate, testNow, testNow.Add(24*time.Hour))
 	testSignedIntermediateTemplate = mustSign(testIntermediateTemplate, testSignedRootTemplate, testNow, testNow.Add(24*time.Hour))
+	testCertificateSigner          = func() ([]*x509.Certificate, crypto.Signer, error) {
+		return []*x509.Certificate{testIssuer}, testSigner, nil
+	}
+	testFailCertificateSigner = func() ([]*x509.Certificate, crypto.Signer, error) {
+		return nil, nil, errTest
+	}
 )
 
 type signatureAlgorithmSigner struct {
@@ -186,6 +192,10 @@ func setTeeReader(t *testing.T, w *bytes.Buffer) {
 }
 
 func TestNew(t *testing.T) {
+	assertEqual := func(x, y interface{}) bool {
+		return reflect.DeepEqual(x, y) || fmt.Sprintf("%#v", x) == fmt.Sprintf("%#v", y)
+	}
+
 	type args struct {
 		ctx  context.Context
 		opts apiv1.Options
@@ -197,6 +207,7 @@ func TestNew(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", args{context.Background(), apiv1.Options{CertificateChain: []*x509.Certificate{testIssuer}, Signer: testSigner}}, &SoftCAS{CertificateChain: []*x509.Certificate{testIssuer}, Signer: testSigner}, false},
+		{"ok with callback", args{context.Background(), apiv1.Options{CertificateSigner: testCertificateSigner}}, &SoftCAS{CertificateSigner: testCertificateSigner}, false},
 		{"fail no issuer", args{context.Background(), apiv1.Options{Signer: testSigner}}, nil, true},
 		{"fail no signer", args{context.Background(), apiv1.Options{CertificateChain: []*x509.Certificate{testIssuer}}}, nil, true},
 	}
@@ -207,7 +218,7 @@ func TestNew(t *testing.T) {
 				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !assertEqual(got, tt.want) {
 				t.Errorf("New() = %v, want %v", got, tt.want)
 			}
 		})
@@ -265,8 +276,9 @@ func TestSoftCAS_CreateCertificate(t *testing.T) {
 	}
 
 	type fields struct {
-		Issuer *x509.Certificate
-		Signer crypto.Signer
+		Issuer            *x509.Certificate
+		Signer            crypto.Signer
+		CertificateSigner func() ([]*x509.Certificate, crypto.Signer, error)
 	}
 	type args struct {
 		req *apiv1.CreateCertificateRequest
@@ -278,43 +290,53 @@ func TestSoftCAS_CreateCertificate(t *testing.T) {
 		want    *apiv1.CreateCertificateResponse
 		wantErr bool
 	}{
-		{"ok", fields{testIssuer, testSigner}, args{&apiv1.CreateCertificateRequest{
+		{"ok", fields{testIssuer, testSigner, nil}, args{&apiv1.CreateCertificateRequest{
 			Template: testTemplate, Lifetime: 24 * time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      testSignedTemplate,
 			CertificateChain: []*x509.Certificate{testIssuer},
 		}, false},
-		{"ok signature algorithm", fields{testIssuer, saSigner}, args{&apiv1.CreateCertificateRequest{
+		{"ok signature algorithm", fields{testIssuer, saSigner, nil}, args{&apiv1.CreateCertificateRequest{
 			Template: &saTemplate, Lifetime: 24 * time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      testSignedTemplate,
 			CertificateChain: []*x509.Certificate{testIssuer},
 		}, false},
-		{"ok with notBefore", fields{testIssuer, testSigner}, args{&apiv1.CreateCertificateRequest{
+		{"ok with notBefore", fields{testIssuer, testSigner, nil}, args{&apiv1.CreateCertificateRequest{
 			Template: &tmplNotBefore, Lifetime: 24 * time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      testSignedTemplate,
 			CertificateChain: []*x509.Certificate{testIssuer},
 		}, false},
-		{"ok with notBefore+notAfter", fields{testIssuer, testSigner}, args{&apiv1.CreateCertificateRequest{
+		{"ok with notBefore+notAfter", fields{testIssuer, testSigner, nil}, args{&apiv1.CreateCertificateRequest{
 			Template: &tmplWithLifetime, Lifetime: 24 * time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      testSignedTemplate,
 			CertificateChain: []*x509.Certificate{testIssuer},
 		}, false},
-		{"fail template", fields{testIssuer, testSigner}, args{&apiv1.CreateCertificateRequest{Lifetime: 24 * time.Hour}}, nil, true},
-		{"fail lifetime", fields{testIssuer, testSigner}, args{&apiv1.CreateCertificateRequest{Template: testTemplate}}, nil, true},
-		{"fail CreateCertificate", fields{testIssuer, testSigner}, args{&apiv1.CreateCertificateRequest{
+		{"ok with callback", fields{nil, nil, testCertificateSigner}, args{&apiv1.CreateCertificateRequest{
+			Template: testTemplate, Lifetime: 24 * time.Hour,
+		}}, &apiv1.CreateCertificateResponse{
+			Certificate:      testSignedTemplate,
+			CertificateChain: []*x509.Certificate{testIssuer},
+		}, false},
+		{"fail template", fields{testIssuer, testSigner, nil}, args{&apiv1.CreateCertificateRequest{Lifetime: 24 * time.Hour}}, nil, true},
+		{"fail lifetime", fields{testIssuer, testSigner, nil}, args{&apiv1.CreateCertificateRequest{Template: testTemplate}}, nil, true},
+		{"fail CreateCertificate", fields{testIssuer, testSigner, nil}, args{&apiv1.CreateCertificateRequest{
 			Template: &tmplNoSerial,
 			Lifetime: 24 * time.Hour,
+		}}, nil, true},
+		{"fail with callback", fields{nil, nil, testFailCertificateSigner}, args{&apiv1.CreateCertificateRequest{
+			Template: testTemplate, Lifetime: 24 * time.Hour,
 		}}, nil, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &SoftCAS{
-				CertificateChain: []*x509.Certificate{tt.fields.Issuer},
-				Signer:           tt.fields.Signer,
+				CertificateChain:  []*x509.Certificate{tt.fields.Issuer},
+				Signer:            tt.fields.Signer,
+				CertificateSigner: tt.fields.CertificateSigner,
 			}
 			got, err := c.CreateCertificate(tt.args.req)
 			if (err != nil) != tt.wantErr {
@@ -345,8 +367,9 @@ func TestSoftCAS_RenewCertificate(t *testing.T) {
 	}
 
 	type fields struct {
-		Issuer *x509.Certificate
-		Signer crypto.Signer
+		Issuer            *x509.Certificate
+		Signer            crypto.Signer
+		CertificateSigner func() ([]*x509.Certificate, crypto.Signer, error)
 	}
 	type args struct {
 		req *apiv1.RenewCertificateRequest
@@ -358,30 +381,40 @@ func TestSoftCAS_RenewCertificate(t *testing.T) {
 		want    *apiv1.RenewCertificateResponse
 		wantErr bool
 	}{
-		{"ok", fields{testIssuer, testSigner}, args{&apiv1.RenewCertificateRequest{
+		{"ok", fields{testIssuer, testSigner, nil}, args{&apiv1.RenewCertificateRequest{
 			Template: testTemplate, Lifetime: 24 * time.Hour,
 		}}, &apiv1.RenewCertificateResponse{
 			Certificate:      testSignedTemplate,
 			CertificateChain: []*x509.Certificate{testIssuer},
 		}, false},
-		{"ok signature algorithm", fields{testIssuer, saSigner}, args{&apiv1.RenewCertificateRequest{
+		{"ok signature algorithm", fields{testIssuer, saSigner, nil}, args{&apiv1.RenewCertificateRequest{
 			Template: testTemplate, Lifetime: 24 * time.Hour,
 		}}, &apiv1.RenewCertificateResponse{
 			Certificate:      testSignedTemplate,
 			CertificateChain: []*x509.Certificate{testIssuer},
 		}, false},
-		{"fail template", fields{testIssuer, testSigner}, args{&apiv1.RenewCertificateRequest{Lifetime: 24 * time.Hour}}, nil, true},
-		{"fail lifetime", fields{testIssuer, testSigner}, args{&apiv1.RenewCertificateRequest{Template: testTemplate}}, nil, true},
-		{"fail CreateCertificate", fields{testIssuer, testSigner}, args{&apiv1.RenewCertificateRequest{
+		{"ok with callback", fields{nil, nil, testCertificateSigner}, args{&apiv1.RenewCertificateRequest{
+			Template: testTemplate, Lifetime: 24 * time.Hour,
+		}}, &apiv1.RenewCertificateResponse{
+			Certificate:      testSignedTemplate,
+			CertificateChain: []*x509.Certificate{testIssuer},
+		}, false},
+		{"fail template", fields{testIssuer, testSigner, nil}, args{&apiv1.RenewCertificateRequest{Lifetime: 24 * time.Hour}}, nil, true},
+		{"fail lifetime", fields{testIssuer, testSigner, nil}, args{&apiv1.RenewCertificateRequest{Template: testTemplate}}, nil, true},
+		{"fail CreateCertificate", fields{testIssuer, testSigner, nil}, args{&apiv1.RenewCertificateRequest{
 			Template: &tmplNoSerial,
 			Lifetime: 24 * time.Hour,
+		}}, nil, true},
+		{"fail with callback", fields{nil, nil, testFailCertificateSigner}, args{&apiv1.RenewCertificateRequest{
+			Template: testTemplate, Lifetime: 24 * time.Hour,
 		}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &SoftCAS{
-				CertificateChain: []*x509.Certificate{tt.fields.Issuer},
-				Signer:           tt.fields.Signer,
+				CertificateChain:  []*x509.Certificate{tt.fields.Issuer},
+				Signer:            tt.fields.Signer,
+				CertificateSigner: tt.fields.CertificateSigner,
 			}
 			got, err := c.RenewCertificate(tt.args.req)
 			if (err != nil) != tt.wantErr {
@@ -397,8 +430,9 @@ func TestSoftCAS_RenewCertificate(t *testing.T) {
 
 func TestSoftCAS_RevokeCertificate(t *testing.T) {
 	type fields struct {
-		Issuer *x509.Certificate
-		Signer crypto.Signer
+		Issuer            *x509.Certificate
+		Signer            crypto.Signer
+		CertificateSigner func() ([]*x509.Certificate, crypto.Signer, error)
 	}
 	type args struct {
 		req *apiv1.RevokeCertificateRequest
@@ -410,7 +444,7 @@ func TestSoftCAS_RevokeCertificate(t *testing.T) {
 		want    *apiv1.RevokeCertificateResponse
 		wantErr bool
 	}{
-		{"ok", fields{testIssuer, testSigner}, args{&apiv1.RevokeCertificateRequest{
+		{"ok", fields{testIssuer, testSigner, nil}, args{&apiv1.RevokeCertificateRequest{
 			Certificate: &x509.Certificate{Subject: pkix.Name{CommonName: "fake"}},
 			Reason:      "test reason",
 			ReasonCode:  1,
@@ -418,23 +452,37 @@ func TestSoftCAS_RevokeCertificate(t *testing.T) {
 			Certificate:      &x509.Certificate{Subject: pkix.Name{CommonName: "fake"}},
 			CertificateChain: []*x509.Certificate{testIssuer},
 		}, false},
-		{"ok no cert", fields{testIssuer, testSigner}, args{&apiv1.RevokeCertificateRequest{
+		{"ok no cert", fields{testIssuer, testSigner, nil}, args{&apiv1.RevokeCertificateRequest{
 			Reason:     "test reason",
 			ReasonCode: 1,
 		}}, &apiv1.RevokeCertificateResponse{
 			Certificate:      nil,
 			CertificateChain: []*x509.Certificate{testIssuer},
 		}, false},
-		{"ok empty", fields{testIssuer, testSigner}, args{&apiv1.RevokeCertificateRequest{}}, &apiv1.RevokeCertificateResponse{
+		{"ok empty", fields{testIssuer, testSigner, nil}, args{&apiv1.RevokeCertificateRequest{}}, &apiv1.RevokeCertificateResponse{
 			Certificate:      nil,
 			CertificateChain: []*x509.Certificate{testIssuer},
 		}, false},
+		{"ok with callback", fields{nil, nil, testCertificateSigner}, args{&apiv1.RevokeCertificateRequest{
+			Certificate: &x509.Certificate{Subject: pkix.Name{CommonName: "fake"}},
+			Reason:      "test reason",
+			ReasonCode:  1,
+		}}, &apiv1.RevokeCertificateResponse{
+			Certificate:      &x509.Certificate{Subject: pkix.Name{CommonName: "fake"}},
+			CertificateChain: []*x509.Certificate{testIssuer},
+		}, false},
+		{"fail with callback", fields{nil, nil, testFailCertificateSigner}, args{&apiv1.RevokeCertificateRequest{
+			Certificate: &x509.Certificate{Subject: pkix.Name{CommonName: "fake"}},
+			Reason:      "test reason",
+			ReasonCode:  1,
+		}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &SoftCAS{
-				CertificateChain: []*x509.Certificate{tt.fields.Issuer},
-				Signer:           tt.fields.Signer,
+				CertificateChain:  []*x509.Certificate{tt.fields.Issuer},
+				Signer:            tt.fields.Signer,
+				CertificateSigner: tt.fields.CertificateSigner,
 			}
 			got, err := c.RevokeCertificate(tt.args.req)
 			if (err != nil) != tt.wantErr {
@@ -605,6 +653,59 @@ func TestSoftCAS_CreateCertificateAuthority(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("SoftCAS.CreateCertificateAuthority() = \n%#v, want \n%#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSoftCAS_defaultKeyManager(t *testing.T) {
+	mockNow(t)
+	type args struct {
+		req *apiv1.CreateCertificateAuthorityRequest
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"ok root", args{&apiv1.CreateCertificateAuthorityRequest{
+			Type: apiv1.RootCA,
+			Template: &x509.Certificate{
+				Subject:               pkix.Name{CommonName: "Test Root CA"},
+				KeyUsage:              x509.KeyUsageCRLSign | x509.KeyUsageCertSign,
+				BasicConstraintsValid: true,
+				IsCA:                  true,
+				MaxPathLen:            1,
+				SerialNumber:          big.NewInt(1234),
+			},
+			Lifetime: 24 * time.Hour,
+		}}, false},
+		{"ok intermediate", args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: testIntermediateTemplate,
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Certificate: testSignedRootTemplate,
+				Signer:      testSigner,
+			},
+		}}, false},
+		{"fail with default key manager", args{&apiv1.CreateCertificateAuthorityRequest{
+			Type:     apiv1.IntermediateCA,
+			Template: testIntermediateTemplate,
+			Lifetime: 24 * time.Hour,
+			Parent: &apiv1.CreateCertificateAuthorityResponse{
+				Certificate: testSignedRootTemplate,
+				Signer:      &badSigner{},
+			},
+		}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &SoftCAS{}
+			_, err := c.CreateCertificateAuthority(tt.args.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SoftCAS.CreateCertificateAuthority() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 		})
 	}

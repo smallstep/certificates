@@ -31,12 +31,17 @@ type Options struct {
 	// https://cloud.google.com/docs/authentication.
 	CredentialsFile string `json:"credentialsFile,omitempty"`
 
-	// Certificate and signer are the issuer certificate, along with any other
-	// bundled certificates to be returned in the chain for consumers, and
+	// CertificateChain and Signer are the issuer certificate, along with any
+	// other bundled certificates to be returned in the chain for consumers, and
 	// signer used in SoftCAS. They are configured in ca.json crt and key
 	// properties.
 	CertificateChain []*x509.Certificate `json:"-"`
 	Signer           crypto.Signer       `json:"-"`
+
+	// CertificateSigner combines CertificateChain and Signer in a callback that
+	// returns the chain of certificate and signer used to sign X.509
+	// certificates in SoftCAS.
+	CertificateSigner func() ([]*x509.Certificate, crypto.Signer, error) `json:"-"`
 
 	// IsCreator is set to true when we're creating a certificate authority. It
 	// is used to skip some validations when initializing a
