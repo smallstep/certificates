@@ -1,13 +1,13 @@
 package authority
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/errs"
 )
 
 func TestGetEncryptedKey(t *testing.T) {
@@ -49,8 +49,8 @@ func TestGetEncryptedKey(t *testing.T) {
 			ek, err := tc.a.GetEncryptedKey(tc.kid)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -90,8 +90,8 @@ func TestGetProvisioners(t *testing.T) {
 			ps, next, err := tc.a.GetProvisioners("", 0)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}

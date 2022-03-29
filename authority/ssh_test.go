@@ -7,21 +7,22 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/templates"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/templates"
 )
 
 type sshTestModifier ssh.Certificate
@@ -716,8 +717,8 @@ func TestAuthority_GetSSHBastion(t *testing.T) {
 				t.Errorf("Authority.GetSSHBastion() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			} else if err != nil {
-				_, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				_, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Authority.GetSSHBastion() = %v, want %v", got, tt.want)
@@ -806,8 +807,8 @@ func TestAuthority_GetSSHHosts(t *testing.T) {
 			hosts, err := auth.GetSSHHosts(context.Background(), tc.cert)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -1033,8 +1034,8 @@ func TestAuthority_RekeySSH(t *testing.T) {
 			cert, err := auth.RekeySSH(context.Background(), tc.cert, tc.key, tc.signOpts...)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}

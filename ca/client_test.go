@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,10 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"golang.org/x/crypto/ssh"
-
 	"go.step.sm/crypto/x509util"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api"
@@ -520,8 +519,8 @@ func TestClient_Renew(t *testing.T) {
 					t.Errorf("Client.Renew() = %v, want nil", got)
 				}
 
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
@@ -588,8 +587,8 @@ func TestClient_RenewWithToken(t *testing.T) {
 					t.Errorf("Client.RenewWithToken() = %v, want nil", got)
 				}
 
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
@@ -657,8 +656,8 @@ func TestClient_Rekey(t *testing.T) {
 					t.Errorf("Client.Renew() = %v, want nil", got)
 				}
 
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
@@ -778,8 +777,8 @@ func TestClient_ProvisionerKey(t *testing.T) {
 					t.Errorf("Client.ProvisionerKey() = %v, want nil", got)
 				}
 
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, tt.err.Error(), err.Error())
 			default:
@@ -837,8 +836,8 @@ func TestClient_Roots(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.Roots() = %v, want nil", got)
 				}
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
@@ -895,8 +894,8 @@ func TestClient_Federation(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.Federation() = %v, want nil", got)
 				}
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, tt.err.Error(), err.Error())
 			default:
@@ -957,8 +956,8 @@ func TestClient_SSHRoots(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.SSHKeys() = %v, want nil", got)
 				}
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, tt.err.Error(), err.Error())
 			default:
@@ -1119,8 +1118,8 @@ func TestClient_SSHBastion(t *testing.T) {
 					t.Errorf("Client.SSHBastion() = %v, want nil", got)
 				}
 				if tt.responseCode != 200 {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tt.responseCode)
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}

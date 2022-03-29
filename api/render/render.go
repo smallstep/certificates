@@ -10,7 +10,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smallstep/certificates/api/log"
-	"github.com/smallstep/certificates/errs"
 )
 
 // JSON is shorthand for JSONStatus(w, v, http.StatusOK).
@@ -87,32 +86,36 @@ func Error(w http.ResponseWriter, err error) {
 	JSONStatus(w, err, statusCodeFromError(err))
 }
 
+// StatusCodedError is the set of errors that implement the basic StatusCode
+// function.
+//
+// Errors that implement this interface will use the code reported by StatusCode
+// as the HTTP response code when being rendered by this package.
+type StatusCodedError interface {
+	error
+
+	StatusCode() int
+}
+
 func statusCodeFromError(err error) (code int) {
 	code = http.StatusInternalServerError
-
-	// if the error implements err
-	if sc, ok := err.(errs.StatusCoder); ok {
-		code = sc.StatusCode()
-
-		return
-	}
 
 	type causer interface {
 		Cause() error
 	}
 
 	for err != nil {
+		if sc, ok := err.(StatusCodedError); ok {
+			code = sc.StatusCode()
+
+			break
+		}
+
 		cause, ok := err.(causer)
 		if !ok {
 			break
 		}
 		err = cause.Cause()
-
-		if sc, ok := err.(errs.StatusCoder); ok {
-			code = sc.StatusCode()
-
-			break
-		}
 	}
 
 	return

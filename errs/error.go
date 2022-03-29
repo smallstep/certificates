@@ -6,17 +6,10 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
+
+	"github.com/smallstep/certificates/api/log"
+	"github.com/smallstep/certificates/api/render"
 )
-
-// StatusCoder interface is used by errors that returns the HTTP response code.
-type StatusCoder interface {
-	StatusCode() int
-}
-
-// StackTracer must be by those errors that return an stack trace.
-type StackTracer interface {
-	StackTrace() errors.StackTrace
-}
 
 // Option modifies the Error type.
 type Option func(e *Error) error
@@ -257,7 +250,7 @@ func NewError(status int, err error, format string, args ...interface{}) error {
 		return err
 	}
 	msg := fmt.Sprintf(format, args...)
-	if _, ok := err.(StackTracer); !ok {
+	if _, ok := err.(log.StackTracedError); !ok {
 		err = errors.Wrap(err, msg)
 	}
 	return &Error{
@@ -275,11 +268,11 @@ func NewErr(status int, err error, opts ...Option) error {
 		ok bool
 	)
 	if e, ok = err.(*Error); !ok {
-		if sc, ok := err.(StatusCoder); ok {
+		if sc, ok := err.(render.StatusCodedError); ok {
 			e = &Error{Status: sc.StatusCode(), Err: err}
 		} else {
 			cause := errors.Cause(err)
-			if sc, ok := cause.(StatusCoder); ok {
+			if sc, ok := cause.(render.StatusCodedError); ok {
 				e = &Error{Status: sc.StatusCode(), Err: err}
 			} else {
 				e = &Error{Status: status, Err: err}
