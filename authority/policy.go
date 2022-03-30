@@ -100,13 +100,32 @@ func (a *Authority) checkPolicy(ctx context.Context, adm *linkedca.Admin, p *lin
 
 	// TODO(hs): Provide option to force the policy, even when the admin subject would be locked out?
 
+	// check if the admin user that instructed the authority policy to be
+	// created or updated, would still be allowed when the provided policy
+	// would be applied to the authority.
 	sans := []string{adm.GetSubject()}
 	if err := isAllowed(engine, sans); err != nil {
 		return err
 	}
 
-	// TODO(hs): perform the check for other admin subjects too?
-	// What logic to use for that: do all admins need access? Only super admins? At least one?
+	// get all current admins from the database
+	admins, err := a.adminDB.GetAdmins(ctx)
+	if err != nil {
+		return err
+	}
+
+	// loop through admins to verify that none of them would be
+	// locked out when the new policy were to be applied. Returns
+	// an error with a message that includes the admin subject that
+	// would be locked out
+	for _, adm := range admins {
+		sans = []string{adm.GetSubject()}
+		if err := isAllowed(engine, sans); err != nil {
+			return err
+		}
+	}
+
+	// TODO(hs): mask the error message for non-super admins?
 
 	return nil
 }
