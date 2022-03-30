@@ -83,8 +83,8 @@ type Authority struct {
 type AuthorityInfo struct {
 	StartTime time.Time
 	RootX509Certs           []*x509.Certificate
-	SSHCAUserCerts          []ssh.PublicKey
-	SSHCAHostCerts          []ssh.PublicKey
+	SSHCAUserPublicKey      []byte
+	SSHCAHostPublicKey      []byte
 }
 
 
@@ -568,13 +568,17 @@ func (a *Authority) GetAdminDatabase() admin.DB {
 }
 
 func (a *Authority) GetAuthorityInfo() *AuthorityInfo {
-	return &AuthorityInfo{
+	ai := &AuthorityInfo{
 		StartTime: a.startTime,
 		RootX509Certs: a.rootX509Certs,
-		SSHCAUserCerts: a.sshCAUserCerts,
-		SSHCAHostCerts: a.sshCAHostCerts,
 	}
-
+	if a.sshCAUserCertSignKey != nil {
+		ai.SSHCAUserPublicKey = ssh.MarshalAuthorizedKey(a.sshCAUserCertSignKey.PublicKey())
+	}
+	if a.sshCAHostCertSignKey != nil {
+		ai.SSHCAHostPublicKey = ssh.MarshalAuthorizedKey(a.sshCAHostCertSignKey.PublicKey())
+	}
+	return ai
 }
 
 // IsAdminAPIEnabled returns a boolean indicating whether the Admin API has

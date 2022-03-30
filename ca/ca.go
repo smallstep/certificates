@@ -305,11 +305,11 @@ func (ca *CA) Run() error {
 			 sum := sha256.Sum256(crt.Raw)
 			 log.Printf("X.509 Root Fingerprint: %s", hex.EncodeToString(sum[:]))
 		}
-		if ca.config.SSH != nil {
-			log.Printf("SSH Host CA Key: %s\n", ca.config.SSH.HostKey)
+		if authorityInfo.SSHCAHostPublicKey != nil {
+			log.Printf("SSH Host CA Key: %s\n", authorityInfo.SSHCAHostPublicKey)
 		}
-		if ca.config.SSH != nil {
-			log.Printf("SSH User CA Key: %s\n", ca.config.SSH.UserKey)
+		if authorityInfo.SSHCAUserPublicKey != nil {
+			log.Printf("SSH User CA Key: %s\n", authorityInfo.SSHCAUserPublicKey)
 		}
 		log.Printf("Documentation: https://u.step.sm/docs/ca")
 		log.Printf("Community Discord: https://u.step.sm/discord")
