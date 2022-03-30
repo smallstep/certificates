@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 )
@@ -41,36 +42,37 @@ type SSHRekeyResponse struct {
 func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 	var body SSHRekeyRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	publicKey, err := ssh.ParsePublicKey(body.PublicKey)
 	if err != nil {
-		WriteError(w, errs.BadRequestErr(err, "error parsing publicKey"))
+		render.Error(w, errs.BadRequestErr(err, "error parsing publicKey"))
 		return
 	}
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRekeyMethod)
 	signOpts, err := h.Authority.Authorize(ctx, body.OTT)
 	if err != nil {
-		WriteError(w, errs.UnauthorizedErr(err))
+		render.Error(w, errs.UnauthorizedErr(err))
 		return
 	}
 	oldCert, _, err := provisioner.ExtractSSHPOPCert(body.OTT)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		render.Error(w, errs.InternalServerErr(err))
+		return
 	}
 
 	newCert, err := h.Authority.RekeySSH(ctx, oldCert, publicKey, signOpts...)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error rekeying ssh certificate"))
+		render.Error(w, errs.ForbiddenErr(err, "error rekeying ssh certificate"))
 		return
 	}
 
@@ -80,11 +82,11 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 
 	identity, err := h.renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error renewing identity certificate"))
+		render.Error(w, errs.ForbiddenErr(err, "error renewing identity certificate"))
 		return
 	}
 
-	JSONStatus(w, &SSHRekeyResponse{
+	render.JSONStatus(w, &SSHRekeyResponse{
 		Certificate:         SSHCertificate{newCert},
 		IdentityCertificate: identity,
 	}, http.StatusCreated)

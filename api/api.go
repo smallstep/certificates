@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smallstep/certificates/api/log"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -284,7 +285,7 @@ func (h *caHandler) Route(r Router) {
 // Version is an HTTP handler that returns the version of the server.
 func (h *caHandler) Version(w http.ResponseWriter, r *http.Request) {
 	v := h.Authority.Version()
-	JSON(w, VersionResponse{
+	render.JSON(w, VersionResponse{
 		Version:                     v.Version,
 		RequireClientAuthentication: v.RequireClientAuthentication,
 	})
@@ -292,7 +293,7 @@ func (h *caHandler) Version(w http.ResponseWriter, r *http.Request) {
 
 // Health is an HTTP handler that returns the status of the server.
 func (h *caHandler) Health(w http.ResponseWriter, r *http.Request) {
-	JSON(w, HealthResponse{Status: "ok"})
+	render.JSON(w, HealthResponse{Status: "ok"})
 }
 
 // Root is an HTTP handler that using the SHA256 from the URL, returns the root
@@ -303,11 +304,11 @@ func (h *caHandler) Root(w http.ResponseWriter, r *http.Request) {
 	// Load root certificate with the
 	cert, err := h.Authority.Root(sum)
 	if err != nil {
-		WriteError(w, errs.Wrapf(http.StatusNotFound, err, "%s was not found", r.RequestURI))
+		render.Error(w, errs.Wrapf(http.StatusNotFound, err, "%s was not found", r.RequestURI))
 		return
 	}
 
-	JSON(w, &RootResponse{RootPEM: Certificate{cert}})
+	render.JSON(w, &RootResponse{RootPEM: Certificate{cert}})
 }
 
 func certChainToPEM(certChain []*x509.Certificate) []Certificate {
@@ -322,16 +323,16 @@ func certChainToPEM(certChain []*x509.Certificate) []Certificate {
 func (h *caHandler) Provisioners(w http.ResponseWriter, r *http.Request) {
 	cursor, limit, err := ParseCursor(r)
 	if err != nil {
-		WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	p, next, err := h.Authority.GetProvisioners(cursor, limit)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		render.Error(w, errs.InternalServerErr(err))
 		return
 	}
-	JSON(w, &ProvisionersResponse{
+	render.JSON(w, &ProvisionersResponse{
 		Provisioners: p,
 		NextCursor:   next,
 	})
@@ -342,17 +343,17 @@ func (h *caHandler) ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 	kid := chi.URLParam(r, "kid")
 	key, err := h.Authority.GetEncryptedKey(kid)
 	if err != nil {
-		WriteError(w, errs.NotFoundErr(err))
+		render.Error(w, errs.NotFoundErr(err))
 		return
 	}
-	JSON(w, &ProvisionerKeyResponse{key})
+	render.JSON(w, &ProvisionerKeyResponse{key})
 }
 
 // Roots returns all the root certificates for the CA.
 func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 	roots, err := h.Authority.GetRoots()
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error getting roots"))
+		render.Error(w, errs.ForbiddenErr(err, "error getting roots"))
 		return
 	}
 
@@ -361,7 +362,7 @@ func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 		certs[i] = Certificate{roots[i]}
 	}
 
-	JSONStatus(w, &RootsResponse{
+	render.JSONStatus(w, &RootsResponse{
 		Certificates: certs,
 	}, http.StatusCreated)
 }
@@ -370,7 +371,7 @@ func (h *caHandler) Roots(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) RootsPEM(w http.ResponseWriter, r *http.Request) {
 	roots, err := h.Authority.GetRoots()
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		render.Error(w, errs.InternalServerErr(err))
 		return
 	}
 
@@ -393,7 +394,7 @@ func (h *caHandler) RootsPEM(w http.ResponseWriter, r *http.Request) {
 func (h *caHandler) Federation(w http.ResponseWriter, r *http.Request) {
 	federated, err := h.Authority.GetFederation()
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error getting federated roots"))
+		render.Error(w, errs.ForbiddenErr(err, "error getting federated roots"))
 		return
 	}
 
@@ -402,7 +403,7 @@ func (h *caHandler) Federation(w http.ResponseWriter, r *http.Request) {
 		certs[i] = Certificate{federated[i]}
 	}
 
-	JSONStatus(w, &FederationResponse{
+	render.JSONStatus(w, &FederationResponse{
 		Certificates: certs,
 	}, http.StatusCreated)
 }
