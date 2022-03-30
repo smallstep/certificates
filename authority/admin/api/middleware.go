@@ -59,6 +59,8 @@ func (h *Handler) loadProvisionerByName(next http.HandlerFunc) http.HandlerFunc 
 			p   provisioner.Interface
 			err error
 		)
+
+		// TODO(hs): distinguish 404 vs. 500
 		if p, err = h.auth.LoadProvisionerByName(name); err != nil {
 			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
 			return
@@ -66,7 +68,7 @@ func (h *Handler) loadProvisionerByName(next http.HandlerFunc) http.HandlerFunc 
 
 		prov, err := h.adminDB.GetProvisioner(ctx, p.GetID())
 		if err != nil {
-			render.Error(w, err)
+			render.Error(w, admin.WrapErrorISE(err, "error retrieving provisioner %s", name))
 			return
 		}
 

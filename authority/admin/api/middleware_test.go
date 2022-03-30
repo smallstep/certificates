@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -18,6 +20,7 @@ import (
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 func TestHandler_requireAPIEnabled(t *testing.T) {
@@ -198,6 +201,139 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 			req := tc.req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.extractAuthorizeTokenAdmin(tc.next)(w, req)
+			res := w.Result()
+
+			assert.Equals(t, tc.statusCode, res.StatusCode)
+
+			body, err := io.ReadAll(res.Body)
+			res.Body.Close()
+			assert.FatalError(t, err)
+
+			if res.StatusCode >= 400 {
+				err := admin.Error{}
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &err))
+
+				assert.Equals(t, tc.err.Type, err.Type)
+				assert.Equals(t, tc.err.Message, err.Message)
+				assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
+				assert.Equals(t, tc.err.Detail, err.Detail)
+				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+				return
+			}
+		})
+	}
+}
+
+func TestHandler_loadProvisionerByName(t *testing.T) {
+	type test struct {
+		adminDB    admin.DB
+		auth       adminAuthority
+		ctx        context.Context
+		next       http.HandlerFunc
+		err        *admin.Error
+		statusCode int
+	}
+	var tests = map[string]func(t *testing.T) test{
+		"fail/auth.LoadProvisionerByName": func(t *testing.T) test {
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("provisionerName", "provName")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			auth := &mockAdminAuthority{
+				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
+					assert.Equals(t, "provName", name)
+					return nil, errors.New("force")
+				},
+			}
+			err := admin.WrapErrorISE(errors.New("force"), "error loading provisioner provName")
+			err.Message = "error loading provisioner provName: force"
+			return test{
+				ctx:        ctx,
+				auth:       auth,
+				statusCode: 500,
+				err:        err,
+			}
+		},
+		"fail/db.GetProvisioner": func(t *testing.T) test {
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("provisionerName", "provName")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			auth := &mockAdminAuthority{
+				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
+					assert.Equals(t, "provName", name)
+					return &provisioner.MockProvisioner{
+						MgetID: func() string {
+							return "provID"
+						},
+					}, nil
+				},
+			}
+			db := &admin.MockDB{
+				MockGetProvisioner: func(ctx context.Context, id string) (*linkedca.Provisioner, error) {
+					assert.Equals(t, "provID", id)
+					return nil, errors.New("force")
+				},
+			}
+			err := admin.WrapErrorISE(errors.New("force"), "error retrieving provisioner provName")
+			err.Message = "error retrieving provisioner provName: force"
+			return test{
+				ctx:        ctx,
+				auth:       auth,
+				adminDB:    db,
+				statusCode: 500,
+				err:        err,
+			}
+		},
+		"ok": func(t *testing.T) test {
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("provisionerName", "provName")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			auth := &mockAdminAuthority{
+				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
+					assert.Equals(t, "provName", name)
+					return &provisioner.MockProvisioner{
+						MgetID: func() string {
+							return "provID"
+						},
+					}, nil
+				},
+			}
+			db := &admin.MockDB{
+				MockGetProvisioner: func(ctx context.Context, id string) (*linkedca.Provisioner, error) {
+					assert.Equals(t, "provID", id)
+					return &linkedca.Provisioner{
+						Id:   "provID",
+						Name: "provName",
+					}, nil
+				},
+			}
+			return test{
+				ctx:        ctx,
+				auth:       auth,
+				adminDB:    db,
+				statusCode: 200,
+				next: func(w http.ResponseWriter, r *http.Request) {
+					prov := linkedca.ProvisionerFromContext(r.Context())
+					assert.NotNil(t, prov)
+					assert.Equals(t, "provID", prov.GetId())
+					assert.Equals(t, "provName", prov.GetName())
+					w.Write(nil) // mock response with status 200
+				},
+			}
+		},
+	}
+	for name, prep := range tests {
+		tc := prep(t)
+		t.Run(name, func(t *testing.T) {
+			h := &Handler{
+				auth:    tc.auth,
+				adminDB: tc.adminDB,
+			}
+
+			req := httptest.NewRequest("GET", "/foo", nil) // chi routing is prepared in test setup
+			req = req.WithContext(tc.ctx)
+
+			w := httptest.NewRecorder()
+			h.loadProvisionerByName(tc.next)(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)

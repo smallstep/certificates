@@ -1,17 +1,13 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"net/http"
-
-	"github.com/go-chi/chi"
 
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/admin"
-	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 // CreateExternalAccountKeyRequest is the type for POST /admin/acme/eab requests
@@ -38,48 +34,27 @@ type GetExternalAccountKeysResponse struct {
 func (h *Handler) requireEABEnabled(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		provName := chi.URLParam(r, "provisionerName")
-		eabEnabled, prov, err := h.provisionerHasEABEnabled(ctx, provName)
-		if err != nil {
-			render.Error(w, err)
+		prov := linkedca.ProvisionerFromContext(ctx)
+
+		details := prov.GetDetails()
+		if details == nil {
+			render.Error(w, admin.NewErrorISE("error getting details for provisioner '%s'", prov.GetName()))
 			return
 		}
-		if !eabEnabled {
-			render.Error(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner %s", prov.GetName()))
+
+		acmeProvisioner := details.GetACME()
+		if acmeProvisioner == nil {
+			render.Error(w, admin.NewErrorISE("error getting ACME details for provisioner '%s'", prov.GetName()))
 			return
 		}
-		ctx = linkedca.NewContextWithProvisioner(ctx, prov)
+
+		if !acmeProvisioner.RequireEab {
+			render.Error(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner '%s'", prov.GetName()))
+			return
+		}
+
 		next(w, r.WithContext(ctx))
 	}
-}
-
-// provisionerHasEABEnabled determines if the "requireEAB" setting for an ACME
-// provisioner is set to true and thus has EAB enabled.
-func (h *Handler) provisionerHasEABEnabled(ctx context.Context, provisionerName string) (bool, *linkedca.Provisioner, error) {
-	var (
-		p   provisioner.Interface
-		err error
-	)
-	if p, err = h.auth.LoadProvisionerByName(provisionerName); err != nil {
-		return false, nil, admin.WrapErrorISE(err, "error loading provisioner %s", provisionerName)
-	}
-
-	prov, err := h.adminDB.GetProvisioner(ctx, p.GetID())
-	if err != nil {
-		return false, nil, admin.WrapErrorISE(err, "error getting provisioner with ID: %s", p.GetID())
-	}
-
-	details := prov.GetDetails()
-	if details == nil {
-		return false, nil, admin.NewErrorISE("error getting details for provisioner with ID: %s", p.GetID())
-	}
-
-	acmeProvisioner := details.GetACME()
-	if acmeProvisioner == nil {
-		return false, nil, admin.NewErrorISE("error getting ACME details for provisioner with ID: %s", p.GetID())
-	}
-
-	return acmeProvisioner.GetRequireEab(), prov, nil
 }
 
 type acmeAdminResponderInterface interface {
