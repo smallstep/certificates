@@ -80,6 +80,14 @@ type Authority struct {
 	adminMutex sync.RWMutex
 }
 
+type AuthorityInfo struct {
+	StartTime time.Time
+	RootX509Certs           []*x509.Certificate
+	SSHCAUserCerts          []ssh.PublicKey
+	SSHCAHostCerts          []ssh.PublicKey
+}
+
+
 // New creates and initiates a new Authority type.
 func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 	err := cfg.Validate()
@@ -311,7 +319,6 @@ func (a *Authority) init() error {
 	for _, crt := range a.rootX509Certs {
 		sum := sha256.Sum256(crt.Raw)
 		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
-		log.Printf("X.509 Root Fingerprint: %s", hex.EncodeToString(sum[:]))
 	}
 
 	a.rootX509CertPool = x509.NewCertPool()
@@ -540,13 +547,6 @@ func (a *Authority) init() error {
 		a.templates.Data["Step"] = tmplVars
 	}
 
-	if tmplVars.SSH.HostKey != nil {
-		log.Printf("SSH Host CA Key: %s\n", ssh.MarshalAuthorizedKey(tmplVars.SSH.HostKey))
-	}
-	if tmplVars.SSH.UserKey != nil {
-		log.Printf("SSH User CA Key: %s\n", ssh.MarshalAuthorizedKey(tmplVars.SSH.UserKey))
-	}
-
 	// JWT numeric dates are seconds.
 	a.startTime = time.Now().Truncate(time.Second)
 	// Set flag indicating that initialization has been completed, and should
@@ -565,6 +565,16 @@ func (a *Authority) GetDatabase() db.AuthDB {
 // GetAdminDatabase returns the admin database, if one exists.
 func (a *Authority) GetAdminDatabase() admin.DB {
 	return a.adminDB
+}
+
+func (a *Authority) GetAuthorityInfo() *AuthorityInfo {
+	return &AuthorityInfo{
+		StartTime: a.startTime,
+		RootX509Certs: a.rootX509Certs,
+		SSHCAUserCerts: a.sshCAUserCerts,
+		SSHCAHostCerts: a.sshCAHostCerts,
+	}
+
 }
 
 // IsAdminAPIEnabled returns a boolean indicating whether the Admin API has

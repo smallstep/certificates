@@ -3,6 +3,8 @@ package ca
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -297,6 +299,18 @@ func (ca *CA) Run() error {
 	errs := make(chan error, 1)
 
 	if !ca.opts.quiet {
+		authorityInfo := ca.auth.GetAuthorityInfo()
+		log.Printf("Address: %s", ca.config.Address)
+		for _, crt := range authorityInfo.RootX509Certs {
+			 sum := sha256.Sum256(crt.Raw)
+			 log.Printf("X.509 Root Fingerprint: %s", hex.EncodeToString(sum[:]))
+		}
+		if ca.config.SSH != nil {
+			log.Printf("SSH Host CA Key: %s\n", ca.config.SSH.HostKey)
+		}
+		if ca.config.SSH != nil {
+			log.Printf("SSH User CA Key: %s\n", ca.config.SSH.UserKey)
+		}
 		log.Printf("Documentation: https://u.step.sm/docs/ca")
 		log.Printf("Community Discord: https://u.step.sm/discord")
 		log.Printf("Config File: %s", ca.opts.configFile)
