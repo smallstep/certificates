@@ -61,10 +61,10 @@ type X509Options struct {
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
 
 	// AllowedNames contains the SANs the provisioner is authorized to sign
-	AllowedNames *policy.X509NameOptions
+	AllowedNames *policy.X509NameOptions `json:"-"`
 
 	// DeniedNames contains the SANs the provisioner is not authorized to sign
-	DeniedNames *policy.X509NameOptions
+	DeniedNames *policy.X509NameOptions `json:"-"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.

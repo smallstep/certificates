@@ -37,10 +37,10 @@ type SSHOptions struct {
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
 
 	// User contains SSH user certificate options.
-	User *policy.SSHUserCertificateOptions
+	User *policy.SSHUserCertificateOptions `json:"-"`
 
 	// Host contains SSH host certificate options.
-	Host *policy.SSHHostCertificateOptions
+	Host *policy.SSHHostCertificateOptions `json:"-"`
 }
 
 // GetAllowedUserNameOptions returns the SSHNameOptions that are

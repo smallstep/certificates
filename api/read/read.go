@@ -34,7 +34,7 @@ func ProtoJSON(r io.Reader, m proto.Message) error {
 }
 
 // ProtoJSONWithCheck reads JSON from the request body and stores it in the value
-// pointed to by v.
+// pointed to by v. Returns false if an error was written; true if not.
 func ProtoJSONWithCheck(w http.ResponseWriter, r io.Reader, m proto.Message) bool {
 	data, err := io.ReadAll(r)
 	if err != nil {
