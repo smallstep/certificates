@@ -1,9 +1,9 @@
 package ca
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -302,8 +302,8 @@ func (ca *CA) Run() error {
 		authorityInfo := ca.auth.GetInfo()
 		log.Printf("Address: %s", ca.config.Address)
 		for _, crt := range authorityInfo.RootX509Certs {
-			 sum := sha256.Sum256(crt.Raw)
-			 log.Printf("X.509 Root Fingerprint: %s", hex.EncodeToString(sum[:]))
+			sum := sha256.Sum256(crt.Raw)
+			log.Printf("X.509 Root Fingerprint: %s", hex.EncodeToString(sum[:]))
 		}
 		if authorityInfo.SSHCAHostPublicKey != nil {
 			log.Printf("SSH Host CA Key: %s\n", authorityInfo.SSHCAHostPublicKey)

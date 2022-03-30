@@ -81,12 +81,11 @@ type Authority struct {
 }
 
 type AuthorityInfo struct {
-	StartTime time.Time
-	RootX509Certs           []*x509.Certificate
-	SSHCAUserPublicKey      []byte
-	SSHCAHostPublicKey      []byte
+	StartTime          time.Time
+	RootX509Certs      []*x509.Certificate
+	SSHCAUserPublicKey []byte
+	SSHCAHostPublicKey []byte
 }
-
 
 // New creates and initiates a new Authority type.
 func New(cfg *config.Config, opts ...Option) (*Authority, error) {
@@ -569,7 +568,7 @@ func (a *Authority) GetAdminDatabase() admin.DB {
 
 func (a *Authority) GetInfo() AuthorityInfo {
 	ai := AuthorityInfo{
-		StartTime: a.startTime,
+		StartTime:     a.startTime,
 		RootX509Certs: a.rootX509Certs,
 	}
 	if a.sshCAUserCertSignKey != nil {
