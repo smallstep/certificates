@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -668,6 +669,134 @@ retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return errors.Wrapf(err, "client DELETE %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return readAdminError(resp.Body)
+	}
+	return nil
+}
+
+func (c *AdminClient) GetAuthorityPolicy() (*linkedca.Policy, error) {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
+	tok, err := c.generateAdminToken(u.Path)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodGet, u.String(), http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("creating GET %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client GET %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) CreateAuthorityPolicy(p *linkedca.Policy) (*linkedca.Policy, error) {
+	var retried bool
+	body, err := protojson.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
+	tok, err := c.generateAdminToken(u.Path)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating POST %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client POST %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) UpdateAuthorityPolicy(p *linkedca.Policy) (*linkedca.Policy, error) {
+	var retried bool
+	body, err := protojson.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
+	tok, err := c.generateAdminToken(u.Path)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPut, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating PUT %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client PUT %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) RemoveAuthorityPolicy() error {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
+	tok, err := c.generateAdminToken(u.Path)
+	if err != nil {
+		return fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodDelete, u.String(), http.NoBody)
+	if err != nil {
+		return fmt.Errorf("creating DELETE %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("client DELETE %s failed: %w", u, err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {

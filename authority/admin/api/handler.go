@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority/admin"
@@ -29,19 +31,19 @@ func NewHandler(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB, acmeRespo
 // Route traffic and implement the Router interface.
 func (h *Handler) Route(r api.Router) {
 
-	authnz := func(next nextHTTP) nextHTTP {
+	authnz := func(next http.HandlerFunc) http.HandlerFunc {
 		return h.extractAuthorizeTokenAdmin(h.requireAPIEnabled(next))
 	}
 
-	requireEABEnabled := func(next nextHTTP) nextHTTP {
+	requireEABEnabled := func(next http.HandlerFunc) http.HandlerFunc {
 		return h.requireEABEnabled(next)
 	}
 
-	enabledInStandalone := func(next nextHTTP) nextHTTP {
+	enabledInStandalone := func(next http.HandlerFunc) http.HandlerFunc {
 		return h.checkAction(next, true)
 	}
 
-	disabledInStandalone := func(next nextHTTP) nextHTTP {
+	disabledInStandalone := func(next http.HandlerFunc) http.HandlerFunc {
 		return h.checkAction(next, false)
 	}
 
@@ -73,10 +75,10 @@ func (h *Handler) Route(r api.Router) {
 
 	// Policy - Provisioner
 	//r.MethodFunc("GET", "/provisioners/{name}/policy", noauth(h.policyResponder.GetProvisionerPolicy))
-	r.MethodFunc("GET", "/provisioners/{name}/policy", authnz(disabledInStandalone(h.policyResponder.GetProvisionerPolicy)))
-	r.MethodFunc("POST", "/provisioners/{name}/policy", authnz(disabledInStandalone(h.policyResponder.CreateProvisionerPolicy)))
-	r.MethodFunc("PUT", "/provisioners/{name}/policy", authnz(disabledInStandalone(h.policyResponder.UpdateProvisionerPolicy)))
-	r.MethodFunc("DELETE", "/provisioners/{name}/policy", authnz(disabledInStandalone(h.policyResponder.DeleteProvisionerPolicy)))
+	r.MethodFunc("GET", "/provisioners/{provisionerName}/policy", authnz(disabledInStandalone(h.loadProvisionerByName(h.policyResponder.GetProvisionerPolicy))))
+	r.MethodFunc("POST", "/provisioners/{provisionerName}/policy", authnz(disabledInStandalone(h.loadProvisionerByName(h.policyResponder.CreateProvisionerPolicy))))
+	r.MethodFunc("PUT", "/provisioners/{provisionerName}/policy", authnz(disabledInStandalone(h.loadProvisionerByName(h.policyResponder.UpdateProvisionerPolicy))))
+	r.MethodFunc("DELETE", "/provisioners/{provisionerName}/policy", authnz(disabledInStandalone(h.loadProvisionerByName(h.policyResponder.DeleteProvisionerPolicy))))
 
 	// Policy - ACME Account
 	// TODO: ensure we don't clash with eab; might want to change eab paths slightly (as long as we don't have it released completely; needs changes in adminClient too)

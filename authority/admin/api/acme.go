@@ -35,7 +35,7 @@ type GetExternalAccountKeysResponse struct {
 
 // requireEABEnabled is a middleware that ensures ACME EAB is enabled
 // before serving requests that act on ACME EAB credentials.
-func (h *Handler) requireEABEnabled(next nextHTTP) nextHTTP {
+func (h *Handler) requireEABEnabled(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		provName := chi.URLParam(r, "provisionerName")

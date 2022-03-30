@@ -12,12 +12,15 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi"
+
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 func readProtoJSON(r io.ReadCloser, m proto.Message) error {
@@ -34,7 +37,7 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 		ctx        context.Context
 		adminDB    admin.DB
 		auth       adminAuthority
-		next       nextHTTP
+		next       http.HandlerFunc
 		err        *admin.Error
 		statusCode int
 	}

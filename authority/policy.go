@@ -77,6 +77,8 @@ func (a *Authority) RemoveAuthorityPolicy(ctx context.Context) error {
 	return nil
 }
 
+// checkPolicy checks if a new or updated policy configuration results in the user
+// locking themselves or other admins out of the CA.
 func (a *Authority) checkPolicy(ctx context.Context, adm *linkedca.Admin, p *linkedca.Policy) error {
 
 	// convert the policy; return early if nil
@@ -90,9 +92,15 @@ func (a *Authority) checkPolicy(ctx context.Context, adm *linkedca.Admin, p *lin
 		return admin.WrapErrorISE(err, "error creating temporary policy engine")
 	}
 
+	// when an empty policy is provided, the resulting engine is nil
+	// and there's no policy to evaluate.
+	if engine == nil {
+		return nil
+	}
+
 	// TODO(hs): Provide option to force the policy, even when the admin subject would be locked out?
 
-	sans := []string{adm.Subject}
+	sans := []string{adm.GetSubject()}
 	if err := isAllowed(engine, sans); err != nil {
 		return err
 	}
@@ -151,16 +159,32 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 	// fill x509 policy configuration
 	if p.X509 != nil {
 		if p.X509.Allow != nil {
-			opts.X509.AllowedNames.DNSDomains = p.X509.Allow.Dns
-			opts.X509.AllowedNames.IPRanges = p.X509.Allow.Ips
-			opts.X509.AllowedNames.EmailAddresses = p.X509.Allow.Emails
-			opts.X509.AllowedNames.URIDomains = p.X509.Allow.Uris
+			if p.X509.Allow.Dns != nil {
+				opts.X509.AllowedNames.DNSDomains = p.X509.Allow.Dns
+			}
+			if p.X509.Allow.Ips != nil {
+				opts.X509.AllowedNames.IPRanges = p.X509.Allow.Ips
+			}
+			if p.X509.Allow.Emails != nil {
+				opts.X509.AllowedNames.EmailAddresses = p.X509.Allow.Emails
+			}
+			if p.X509.Allow.Uris != nil {
+				opts.X509.AllowedNames.URIDomains = p.X509.Allow.Uris
+			}
 		}
 		if p.X509.Deny != nil {
-			opts.X509.DeniedNames.DNSDomains = p.X509.Deny.Dns
-			opts.X509.DeniedNames.IPRanges = p.X509.Deny.Ips
-			opts.X509.DeniedNames.EmailAddresses = p.X509.Deny.Emails
-			opts.X509.DeniedNames.URIDomains = p.X509.Deny.Uris
+			if p.X509.Deny.Dns != nil {
+				opts.X509.DeniedNames.DNSDomains = p.X509.Deny.Dns
+			}
+			if p.X509.Deny.Ips != nil {
+				opts.X509.DeniedNames.IPRanges = p.X509.Deny.Ips
+			}
+			if p.X509.Deny.Emails != nil {
+				opts.X509.DeniedNames.EmailAddresses = p.X509.Deny.Emails
+			}
+			if p.X509.Deny.Uris != nil {
+				opts.X509.DeniedNames.URIDomains = p.X509.Deny.Uris
+			}
 		}
 	}
 
@@ -168,24 +192,44 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 	if p.Ssh != nil {
 		if p.Ssh.Host != nil {
 			if p.Ssh.Host.Allow != nil {
-				opts.SSH.Host.AllowedNames.DNSDomains = p.Ssh.Host.Allow.Dns
-				opts.SSH.Host.AllowedNames.IPRanges = p.Ssh.Host.Allow.Ips
-				opts.SSH.Host.AllowedNames.EmailAddresses = p.Ssh.Host.Allow.Principals
+				if p.Ssh.Host.Allow.Dns != nil {
+					opts.SSH.Host.AllowedNames.DNSDomains = p.Ssh.Host.Allow.Dns
+				}
+				if p.Ssh.Host.Allow.Ips != nil {
+					opts.SSH.Host.AllowedNames.IPRanges = p.Ssh.Host.Allow.Ips
+				}
+				if p.Ssh.Host.Allow.Principals != nil {
+					opts.SSH.Host.AllowedNames.Principals = p.Ssh.Host.Allow.Principals
+				}
 			}
 			if p.Ssh.Host.Deny != nil {
-				opts.SSH.Host.DeniedNames.DNSDomains = p.Ssh.Host.Deny.Dns
-				opts.SSH.Host.DeniedNames.IPRanges = p.Ssh.Host.Deny.Ips
-				opts.SSH.Host.DeniedNames.Principals = p.Ssh.Host.Deny.Principals
+				if p.Ssh.Host.Deny.Dns != nil {
+					opts.SSH.Host.DeniedNames.DNSDomains = p.Ssh.Host.Deny.Dns
+				}
+				if p.Ssh.Host.Deny.Ips != nil {
+					opts.SSH.Host.DeniedNames.IPRanges = p.Ssh.Host.Deny.Ips
+				}
+				if p.Ssh.Host.Deny.Principals != nil {
+					opts.SSH.Host.DeniedNames.Principals = p.Ssh.Host.Deny.Principals
+				}
 			}
 		}
 		if p.Ssh.User != nil {
 			if p.Ssh.User.Allow != nil {
-				opts.SSH.User.AllowedNames.EmailAddresses = p.Ssh.User.Allow.Emails
-				opts.SSH.User.AllowedNames.Principals = p.Ssh.User.Allow.Principals
+				if p.Ssh.User.Allow.Emails != nil {
+					opts.SSH.User.AllowedNames.EmailAddresses = p.Ssh.User.Allow.Emails
+				}
+				if p.Ssh.User.Allow.Principals != nil {
+					opts.SSH.User.AllowedNames.Principals = p.Ssh.User.Allow.Principals
+				}
 			}
 			if p.Ssh.User.Deny != nil {
-				opts.SSH.User.DeniedNames.EmailAddresses = p.Ssh.User.Deny.Emails
-				opts.SSH.User.DeniedNames.Principals = p.Ssh.User.Deny.Principals
+				if p.Ssh.User.Deny.Emails != nil {
+					opts.SSH.User.DeniedNames.EmailAddresses = p.Ssh.User.Deny.Emails
+				}
+				if p.Ssh.User.Deny.Principals != nil {
+					opts.SSH.User.DeniedNames.Principals = p.Ssh.User.Deny.Principals
+				}
 			}
 		}
 	}

@@ -12,17 +12,19 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/admin"
-	"go.step.sm/linkedca"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestHandler_requireAPIEnabled(t *testing.T) {
 	type test struct {
 		ctx        context.Context
 		auth       adminAuthority
-		next       nextHTTP
+		next       http.HandlerFunc
 		err        *admin.Error
 		statusCode int
 	}
@@ -102,7 +104,7 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 		ctx        context.Context
 		auth       adminAuthority
 		req        *http.Request
-		next       nextHTTP
+		next       http.HandlerFunc
 		err        *admin.Error
 		statusCode int
 	}
