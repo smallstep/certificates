@@ -5,8 +5,8 @@ import (
 
 	"go.step.sm/linkedca"
 
-	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/admin"
 )
 
@@ -45,17 +45,17 @@ func (par *PolicyAdminResponder) GetAuthorityPolicy(w http.ResponseWriter, r *ht
 	policy, err := par.auth.GetAuthorityPolicy(r.Context())
 	if ae, ok := err.(*admin.Error); ok {
 		if !ae.IsType(admin.ErrorNotFoundType) {
-			api.WriteError(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
+			render.Error(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
 			return
 		}
 	}
 
 	if policy == nil {
-		api.WriteError(w, admin.NewError(admin.ErrorNotFoundType, "authority policy does not exist"))
+		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "authority policy does not exist"))
 		return
 	}
 
-	api.ProtoJSONStatus(w, policy, http.StatusOK)
+	render.ProtoJSONStatus(w, policy, http.StatusOK)
 }
 
 // CreateAuthorityPolicy handles the POST /admin/authority/policy request
@@ -70,19 +70,19 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 	}
 
 	if shouldWriteError {
-		api.WriteError(w, admin.WrapErrorISE(err, "error retrieving authority policy"))
+		render.Error(w, admin.WrapErrorISE(err, "error retrieving authority policy"))
 		return
 	}
 
 	if policy != nil {
 		adminErr := admin.NewError(admin.ErrorBadRequestType, "authority already has a policy")
 		adminErr.Status = http.StatusConflict
-		api.WriteError(w, adminErr)
+		render.Error(w, adminErr)
 		return
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if !api.ReadProtoJSONWithCheck(w, r.Body, newPolicy) {
+	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
 		return
 	}
 
@@ -90,11 +90,11 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 
 	var createdPolicy *linkedca.Policy
 	if createdPolicy, err = par.auth.CreateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
-		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error storing authority policy"))
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error storing authority policy"))
 		return
 	}
 
-	api.JSONStatus(w, createdPolicy, http.StatusCreated)
+	render.JSONStatus(w, createdPolicy, http.StatusCreated)
 }
 
 // UpdateAuthorityPolicy handles the PUT /admin/authority/policy request
@@ -109,18 +109,18 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 	}
 
 	if shouldWriteError {
-		api.WriteError(w, admin.WrapErrorISE(err, "error retrieving authority policy"))
+		render.Error(w, admin.WrapErrorISE(err, "error retrieving authority policy"))
 		return
 	}
 
 	if policy == nil {
-		api.WriteError(w, admin.NewError(admin.ErrorNotFoundType, "authority policy does not exist"))
+		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "authority policy does not exist"))
 		return
 	}
 
 	var newPolicy = new(linkedca.Policy)
 	if err := read.ProtoJSON(r.Body, newPolicy); err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
@@ -128,11 +128,11 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 
 	var updatedPolicy *linkedca.Policy
 	if updatedPolicy, err = par.auth.UpdateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
-		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating authority policy"))
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating authority policy"))
 		return
 	}
 
-	api.ProtoJSONStatus(w, updatedPolicy, http.StatusOK)
+	render.ProtoJSONStatus(w, updatedPolicy, http.StatusOK)
 }
 
 // DeleteAuthorityPolicy handles the DELETE /admin/authority/policy request
@@ -143,23 +143,23 @@ func (par *PolicyAdminResponder) DeleteAuthorityPolicy(w http.ResponseWriter, r 
 
 	if ae, ok := err.(*admin.Error); ok {
 		if !ae.IsType(admin.ErrorNotFoundType) {
-			api.WriteError(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
+			render.Error(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
 			return
 		}
 	}
 
 	if policy == nil {
-		api.WriteError(w, admin.NewError(admin.ErrorNotFoundType, "authority policy does not exist"))
+		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "authority policy does not exist"))
 		return
 	}
 
 	err = par.auth.RemoveAuthorityPolicy(ctx)
 	if err != nil {
-		api.WriteError(w, admin.WrapErrorISE(err, "error deleting authority policy"))
+		render.Error(w, admin.WrapErrorISE(err, "error deleting authority policy"))
 		return
 	}
 
-	api.JSONStatus(w, DeleteResponse{Status: "ok"}, http.StatusOK)
+	render.JSONStatus(w, DeleteResponse{Status: "ok"}, http.StatusOK)
 }
 
 // GetProvisionerPolicy handles the GET /admin/provisioners/{name}/policy request
@@ -169,11 +169,11 @@ func (par *PolicyAdminResponder) GetProvisionerPolicy(w http.ResponseWriter, r *
 
 	policy := prov.GetPolicy()
 	if policy == nil {
-		api.WriteError(w, admin.NewError(admin.ErrorNotFoundType, "provisioner policy does not exist"))
+		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "provisioner policy does not exist"))
 		return
 	}
 
-	api.ProtoJSONStatus(w, policy, http.StatusOK)
+	render.ProtoJSONStatus(w, policy, http.StatusOK)
 }
 
 // CreateProvisionerPolicy handles the POST /admin/provisioners/{name}/policy request
@@ -186,12 +186,12 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 	if policy != nil {
 		adminErr := admin.NewError(admin.ErrorBadRequestType, "provisioner %s already has a policy", prov.Name)
 		adminErr.Status = http.StatusConflict
-		api.WriteError(w, adminErr)
+		render.Error(w, adminErr)
 		return
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if !api.ReadProtoJSONWithCheck(w, r.Body, newPolicy) {
+	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
 		return
 	}
 
@@ -199,11 +199,11 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 
 	err := par.auth.UpdateProvisioner(ctx, prov)
 	if err != nil {
-		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error creating provisioner policy"))
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error creating provisioner policy"))
 		return
 	}
 
-	api.ProtoJSONStatus(w, newPolicy, http.StatusCreated)
+	render.ProtoJSONStatus(w, newPolicy, http.StatusCreated)
 }
 
 // UpdateProvisionerPolicy handles the PUT /admin/provisioners/{name}/policy request
@@ -213,23 +213,23 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 	prov := linkedca.ProvisionerFromContext(ctx)
 
 	if prov.Policy == nil {
-		api.WriteError(w, admin.NewError(admin.ErrorNotFoundType, "provisioner policy does not exist"))
+		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "provisioner policy does not exist"))
 		return
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if !api.ReadProtoJSONWithCheck(w, r.Body, newPolicy) {
+	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
 		return
 	}
 
 	prov.Policy = newPolicy
 	err := par.auth.UpdateProvisioner(ctx, prov)
 	if err != nil {
-		api.WriteError(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating provisioner policy"))
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating provisioner policy"))
 		return
 	}
 
-	api.ProtoJSONStatus(w, newPolicy, http.StatusOK)
+	render.ProtoJSONStatus(w, newPolicy, http.StatusOK)
 }
 
 // DeleteProvisionerPolicy handles the DELETE /admin/provisioners/{name}/policy request
@@ -239,7 +239,7 @@ func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, 
 	prov := linkedca.ProvisionerFromContext(ctx)
 
 	if prov.Policy == nil {
-		api.WriteError(w, admin.NewError(admin.ErrorNotFoundType, "provisioner policy does not exist"))
+		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "provisioner policy does not exist"))
 		return
 	}
 
@@ -248,25 +248,25 @@ func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, 
 
 	err := par.auth.UpdateProvisioner(ctx, prov)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
-	api.JSONStatus(w, DeleteResponse{Status: "ok"}, http.StatusOK)
+	render.JSONStatus(w, DeleteResponse{Status: "ok"}, http.StatusOK)
 }
 
 func (par *PolicyAdminResponder) GetACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	api.JSON(w, "not implemented yet")
+	render.JSON(w, "not implemented yet")
 }
 
 func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	api.JSON(w, "not implemented yet")
+	render.JSON(w, "not implemented yet")
 }
 
 func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	api.JSON(w, "not implemented yet")
+	render.JSON(w, "not implemented yet")
 }
 
 func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	api.JSON(w, "not implemented yet")
+	render.JSON(w, "not implemented yet")
 }

@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
 
@@ -181,11 +183,11 @@ func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acmeProv, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
-	api.JSON(w, &Directory{
+	render.JSON(w, &Directory{
 		NewNonce:   h.linker.GetLink(ctx, NewNonceLinkType),
 		NewAccount: h.linker.GetLink(ctx, NewAccountLinkType),
 		NewOrder:   h.linker.GetLink(ctx, NewOrderLinkType),
@@ -200,7 +202,7 @@ func (h *Handler) GetDirectory(w http.ResponseWriter, r *http.Request) {
 // NotImplemented returns a 501 and is generally a placeholder for functionality which
 // MAY be added at some point in the future but is not in any way a guarantee of such.
 func (h *Handler) NotImplemented(w http.ResponseWriter, r *http.Request) {
-	api.WriteError(w, acme.NewError(acme.ErrorNotImplementedType, "this API is not implemented"))
+	render.Error(w, acme.NewError(acme.ErrorNotImplementedType, "this API is not implemented"))
 }
 
 // GetAuthorization ACME api for retrieving an Authz.
@@ -208,28 +210,28 @@ func (h *Handler) GetAuthorization(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	az, err := h.db.GetAuthorization(ctx, chi.URLParam(r, "authzID"))
 	if err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error retrieving authorization"))
+		render.Error(w, acme.WrapErrorISE(err, "error retrieving authorization"))
 		return
 	}
 	if acc.ID != az.AccountID {
-		api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own authorization '%s'", acc.ID, az.ID))
 		return
 	}
 	if err = az.UpdateStatus(ctx, h.db); err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error updating authorization status"))
+		render.Error(w, acme.WrapErrorISE(err, "error updating authorization status"))
 		return
 	}
 
 	h.linker.LinkAuthorization(ctx, az)
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, AuthzLinkType, az.ID))
-	api.JSON(w, az)
+	render.JSON(w, az)
 }
 
 // GetChallenge ACME api for retrieving a Challenge.
@@ -237,14 +239,14 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	// Just verify that the payload was set, since we're not strictly adhering
 	// to ACME V2 spec for reasons specified below.
 	_, err = payloadFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
@@ -257,22 +259,22 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 	azID := chi.URLParam(r, "authzID")
 	ch, err := h.db.GetChallenge(ctx, chi.URLParam(r, "chID"), azID)
 	if err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error retrieving challenge"))
+		render.Error(w, acme.WrapErrorISE(err, "error retrieving challenge"))
 		return
 	}
 	ch.AuthorizationID = azID
 	if acc.ID != ch.AccountID {
-		api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own challenge '%s'", acc.ID, ch.ID))
 		return
 	}
 	jwk, err := jwkFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	if err = ch.Validate(ctx, h.db, jwk, h.validateChallengeOptions); err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error validating challenge"))
+		render.Error(w, acme.WrapErrorISE(err, "error validating challenge"))
 		return
 	}
 
@@ -280,7 +282,7 @@ func (h *Handler) GetChallenge(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Link", link(h.linker.GetLink(ctx, AuthzLinkType, azID), "up"))
 	w.Header().Set("Location", h.linker.GetLink(ctx, ChallengeLinkType, azID, ch.ID))
-	api.JSON(w, ch)
+	render.JSON(w, ch)
 }
 
 // GetCertificate ACME api for retrieving a Certificate.
@@ -288,18 +290,18 @@ func (h *Handler) GetCertificate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	certID := chi.URLParam(r, "certID")
 
 	cert, err := h.db.GetCertificate(ctx, certID)
 	if err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error retrieving certificate"))
+		render.Error(w, acme.WrapErrorISE(err, "error retrieving certificate"))
 		return
 	}
 	if cert.AccountID != acc.ID {
-		api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own certificate '%s'", acc.ID, certID))
 		return
 	}

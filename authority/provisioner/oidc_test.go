@@ -6,16 +6,17 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func Test_openIDConfiguration_Validate(t *testing.T) {
@@ -246,8 +247,8 @@ func TestOIDC_authorizeToken(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else {
@@ -317,8 +318,8 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
@@ -342,7 +343,7 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 					case *x509NamePolicyValidator:
 						assert.Equals(t, nil, v.policyEngine)
 					default:
-						assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+						assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 					}
 				}
 			}
@@ -404,8 +405,8 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			} else if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})
@@ -450,8 +451,8 @@ func TestOIDC_AuthorizeRenew(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})
@@ -606,8 +607,8 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
@@ -674,8 +675,8 @@ func TestOIDC_AuthorizeSSHRevoke(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.AuthorizeSSHRevoke() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})

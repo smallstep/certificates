@@ -3,11 +3,11 @@ package api
 import (
 	"net/http"
 
-	"go.step.sm/linkedca"
-
 	"github.com/go-chi/chi"
 
-	"github.com/smallstep/certificates/api"
+	"go.step.sm/linkedca"
+
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/admin/db/nosql"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -18,7 +18,7 @@ import (
 func (h *Handler) requireAPIEnabled(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !h.auth.IsAdminAPIEnabled() {
-			api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType,
+			render.Error(w, admin.NewError(admin.ErrorNotImplementedType,
 				"administration API not enabled"))
 			return
 		}
@@ -32,14 +32,14 @@ func (h *Handler) extractAuthorizeTokenAdmin(next http.HandlerFunc) http.Handler
 
 		tok := r.Header.Get("Authorization")
 		if tok == "" {
-			api.WriteError(w, admin.NewError(admin.ErrorUnauthorizedType,
+			render.Error(w, admin.NewError(admin.ErrorUnauthorizedType,
 				"missing authorization header token"))
 			return
 		}
 
 		adm, err := h.auth.AuthorizeAdminToken(r, tok)
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 
@@ -60,13 +60,13 @@ func (h *Handler) loadProvisionerByName(next http.HandlerFunc) http.HandlerFunc 
 			err error
 		)
 		if p, err = h.auth.LoadProvisionerByName(name); err != nil {
-			api.WriteError(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
+			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
 			return
 		}
 
 		prov, err := h.adminDB.GetProvisioner(ctx, p.GetID())
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 
@@ -88,7 +88,7 @@ func (h *Handler) checkAction(next http.HandlerFunc, supportedInStandalone bool)
 		// when an action is not supported in standalone mode and when
 		// using a nosql.DB backend, actions are not supported
 		if _, ok := h.adminDB.(*nosql.DB); ok {
-			api.WriteError(w, admin.NewError(admin.ErrorNotImplementedType,
+			render.Error(w, admin.NewError(admin.ErrorNotImplementedType,
 				"operation not supported in standalone mode"))
 			return
 		}

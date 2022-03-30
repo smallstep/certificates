@@ -3,13 +3,14 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func TestACME_Getters(t *testing.T) {
@@ -114,7 +115,7 @@ func TestACME_AuthorizeRenew(t *testing.T) {
 					NotAfter:  now.Add(time.Hour),
 				},
 				code: http.StatusUnauthorized,
-				err:  errors.Errorf("renew is disabled for provisioner '%s'", p.GetName()),
+				err:  fmt.Errorf("renew is disabled for provisioner '%s'", p.GetName()),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -133,8 +134,8 @@ func TestACME_AuthorizeRenew(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
 			if err := tc.p.AuthorizeRenew(context.Background(), tc.cert); err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tc.code)
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -168,8 +169,8 @@ func TestACME_AuthorizeSign(t *testing.T) {
 			tc := tt(t)
 			if opts, err := tc.p.AuthorizeSign(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -194,7 +195,7 @@ func TestACME_AuthorizeSign(t *testing.T) {
 						case *x509NamePolicyValidator:
 							assert.Equals(t, nil, v.policyEngine)
 						default:
-							assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}
 					}
 				}

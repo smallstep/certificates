@@ -9,6 +9,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -16,16 +17,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/certificates/errs"
+	"golang.org/x/crypto/ssh"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"
-	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/errs"
 )
 
 var testAudiences = provisioner.Audiences{
@@ -310,8 +313,8 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			p, err := tc.auth.authorizeToken(context.Background(), tc.token)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -396,8 +399,8 @@ func TestAuthority_authorizeRevoke(t *testing.T) {
 
 			if err := tc.auth.authorizeRevoke(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -481,8 +484,8 @@ func TestAuthority_authorizeSign(t *testing.T) {
 			got, err := tc.auth.authorizeSign(context.Background(), tc.token)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -740,8 +743,8 @@ func TestAuthority_Authorize(t *testing.T) {
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, got)
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
@@ -853,7 +856,7 @@ func TestAuthority_authorizeRenew(t *testing.T) {
 			err := tc.auth.authorizeRenew(tc.cert)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
+					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -1001,8 +1004,8 @@ func TestAuthority_authorizeSSHSign(t *testing.T) {
 			got, err := tc.auth.authorizeSSHSign(context.Background(), tc.token)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -1118,8 +1121,8 @@ func TestAuthority_authorizeSSHRenew(t *testing.T) {
 			got, err := tc.auth.authorizeSSHRenew(context.Background(), tc.token)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -1218,8 +1221,8 @@ func TestAuthority_authorizeSSHRevoke(t *testing.T) {
 
 			if err := tc.auth.authorizeSSHRevoke(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -1311,8 +1314,8 @@ func TestAuthority_authorizeSSHRekey(t *testing.T) {
 			cert, signOpts, err := tc.auth.authorizeSSHRekey(context.Background(), tc.token)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
