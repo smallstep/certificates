@@ -299,7 +299,7 @@ func (ca *CA) Run() error {
 	errs := make(chan error, 1)
 
 	if !ca.opts.quiet {
-		authorityInfo := ca.auth.GetAuthorityInfo()
+		authorityInfo := ca.auth.GetInfo()
 		log.Printf("Address: %s", ca.config.Address)
 		for _, crt := range authorityInfo.RootX509Certs {
 			 sum := sha256.Sum256(crt.Raw)

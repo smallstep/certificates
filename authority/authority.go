@@ -567,8 +567,8 @@ func (a *Authority) GetAdminDatabase() admin.DB {
 	return a.adminDB
 }
 
-func (a *Authority) GetAuthorityInfo() *AuthorityInfo {
-	ai := &AuthorityInfo{
+func (a *Authority) GetInfo() AuthorityInfo {
+	ai := AuthorityInfo{
 		StartTime: a.startTime,
 		RootX509Certs: a.rootX509Certs,
 	}
