@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased - 0.18.3] - DATE
 ### Added
 - Added support for renew after expiry using the claim `allowRenewAfterExpiry`.
+- Added support for `extraNames` in X.509 templates.
 ### Changed
 - Made SCEP CA URL paths dynamic
 - Support two latest versions of Go (1.17, 1.18)
