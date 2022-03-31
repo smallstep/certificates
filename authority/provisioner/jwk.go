@@ -210,22 +210,9 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 // revocation status. Just confirms that the provisioner that created the
 // certificate was configured to allow renewals.
 func (p *JWK) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
-	// if p.claimer.IsDisableRenewal() {
-	// 	return errs.Unauthorized("jwk.AuthorizeRenew; renew is disabled for jwk provisioner '%s'", p.GetName())
-	// }
 	// TODO(hs): authorize the SANs using x509 name policy allow/deny rules (also for other provisioners with AuthorizeRewew and AuthorizeSSHRenew)
-	//return p.authorizeRenew(cert)
-	// return nil
 	return p.ctl.AuthorizeRenew(ctx, cert)
 }
-
-// func (p *JWK) authorizeRenew(cert *x509.Certificate) error {
-// 	if p.x509PolicyEngine == nil {
-// 		return nil
-// 	}
-// 	_, err := p.x509PolicyEngine.AreCertificateNamesAllowed(cert)
-// 	return err
-// }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {

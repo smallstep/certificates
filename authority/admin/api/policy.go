@@ -64,12 +64,7 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 	ctx := r.Context()
 	policy, err := par.auth.GetAuthorityPolicy(ctx)
 
-	shouldWriteError := false
-	if ae, ok := err.(*admin.Error); ok {
-		shouldWriteError = !ae.IsType(admin.ErrorNotFoundType)
-	}
-
-	if shouldWriteError {
+	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
 		render.Error(w, admin.WrapErrorISE(err, "error retrieving authority policy"))
 		return
 	}
@@ -103,12 +98,7 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 	ctx := r.Context()
 	policy, err := par.auth.GetAuthorityPolicy(ctx)
 
-	shouldWriteError := false
-	if ae, ok := err.(*admin.Error); ok {
-		shouldWriteError = !ae.IsType(admin.ErrorNotFoundType)
-	}
-
-	if shouldWriteError {
+	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
 		render.Error(w, admin.WrapErrorISE(err, "error retrieving authority policy"))
 		return
 	}
@@ -256,17 +246,17 @@ func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, 
 }
 
 func (par *PolicyAdminResponder) GetACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	render.JSON(w, "not implemented yet")
+	render.JSONStatus(w, "not implemented yet", http.StatusNotImplemented)
 }
 
 func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	render.JSON(w, "not implemented yet")
+	render.JSONStatus(w, "not implemented yet", http.StatusNotImplemented)
 }
 
 func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	render.JSON(w, "not implemented yet")
+	render.JSONStatus(w, "not implemented yet", http.StatusNotImplemented)
 }
 
 func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	render.JSON(w, "not implemented yet")
+	render.JSONStatus(w, "not implemented yet", http.StatusNotImplemented)
 }

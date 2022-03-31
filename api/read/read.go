@@ -34,7 +34,7 @@ func ProtoJSON(r io.Reader, m proto.Message) error {
 }
 
 // ProtoJSONWithCheck reads JSON from the request body and stores it in the value
-// pointed to by v. Returns false if an error was written; true if not.
+// pointed to by m. Returns false if an error was written; true if not.
 func ProtoJSONWithCheck(w http.ResponseWriter, r io.Reader, m proto.Message) bool {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -57,6 +57,7 @@ func ProtoJSONWithCheck(w http.ResponseWriter, r io.Reader, m proto.Message) boo
 	if err := protojson.Unmarshal(data, m); err != nil {
 		if errors.Is(err, proto.Error) {
 			var wrapper = struct {
+				// TODO(hs): more properties in the error response?
 				Message string `json:"message"`
 			}{
 				Message: err.Error(),

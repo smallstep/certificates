@@ -183,6 +183,7 @@ func (o *SSHUserCertificateOptions) GetDeniedNameOptions() *SSHNameOptions {
 // names configured.
 func (o *SSHNameOptions) HasNames() bool {
 	return len(o.DNSDomains) > 0 ||
+		len(o.IPRanges) > 0 ||
 		len(o.EmailAddresses) > 0 ||
 		len(o.Principals) > 0
 }

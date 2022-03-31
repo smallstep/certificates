@@ -2223,16 +2223,16 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			engine, err := New(tt.options...)
 			assert.FatalError(t, err)
-			got, err := engine.AreCertificateNamesAllowed(tt.cert)
+			got, err := engine.IsX509CertificateAllowed(tt.cert)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NamePolicyEngine.AreCertificateNamesAllowed() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NamePolicyEngine.IsX509CertificateAllowed() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if err != nil {
 				assert.NotEquals(t, "", err.Error()) // TODO(hs): implement a more specific error comparison?
 			}
 			if got != tt.want {
-				t.Errorf("NamePolicyEngine.AreCertificateNamesAllowed() = %v, want %v", got, tt.want)
+				t.Errorf("NamePolicyEngine.IsX509CertificateAllowed() = %v, want %v", got, tt.want)
 			}
 
 			// Perform the same tests for a CSR, which are similar to Certificates
@@ -2243,7 +2243,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 				IPAddresses:    tt.cert.IPAddresses,
 				URIs:           tt.cert.URIs,
 			}
-			got, err = engine.AreCSRNamesAllowed(csr)
+			got, err = engine.IsX509CertificateRequestAllowed(csr)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NamePolicyEngine.AreCSRNamesAllowed() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -2705,13 +2705,13 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			engine, err := New(tt.options...)
 			assert.FatalError(t, err)
-			got, err := engine.ArePrincipalsAllowed(tt.cert)
+			got, err := engine.IsSSHCertificateAllowed(tt.cert)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NamePolicyEngine.ArePrincipalsAllowed() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NamePolicyEngine.IsSSHCertificateAllowed() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("NamePolicyEngine.ArePrincipalsAllowed() = %v, want %v", got, tt.want)
+				t.Errorf("NamePolicyEngine.IsSSHCertificateAllowed() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -5,11 +5,11 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/binary"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
@@ -250,7 +250,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 			return nil, errs.ForbiddenErr(errors.New("authority not allowed to sign ssh user certificates"), "authority.SignSSH: error creating ssh user certificate")
 		}
 		if a.sshUserPolicy != nil {
-			allowed, err := a.sshUserPolicy.ArePrincipalsAllowed(certTpl)
+			allowed, err := a.sshUserPolicy.IsSSHCertificateAllowed(certTpl)
 			if err != nil {
 				return nil, errs.InternalServerErr(err,
 					errs.WithMessage("authority.SignSSH: error creating ssh user certificate"),
@@ -267,7 +267,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 			return nil, errs.ForbiddenErr(errors.New("authority not allowed to sign ssh host certificates"), "authority.SignSSH: error creating ssh user certificate")
 		}
 		if a.sshHostPolicy != nil {
-			allowed, err := a.sshHostPolicy.ArePrincipalsAllowed(certTpl)
+			allowed, err := a.sshHostPolicy.IsSSHCertificateAllowed(certTpl)
 			if err != nil {
 				return nil, errs.InternalServerErr(err,
 					errs.WithMessage("authority.SignSSH: error creating ssh host certificate"),

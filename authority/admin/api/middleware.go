@@ -48,7 +48,7 @@ func (h *Handler) extractAuthorizeTokenAdmin(next http.HandlerFunc) http.Handler
 	}
 }
 
-// loadProvisioner is a middleware that searches for a provisioner
+// loadProvisionerByName is a middleware that searches for a provisioner
 // by name and stores it in the context.
 func (h *Handler) loadProvisionerByName(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +80,13 @@ func (h *Handler) loadProvisionerByName(next http.HandlerFunc) http.HandlerFunc 
 // checkAction checks if an action is supported in standalone or not
 func (h *Handler) checkAction(next http.HandlerFunc, supportedInStandalone bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		// temporarily only support the admin nosql DB
+		if _, ok := h.adminDB.(*nosql.DB); !ok {
+			render.Error(w, admin.NewError(admin.ErrorNotImplementedType,
+				"operation not supported"))
+			return
+		}
 
 		// actions allowed in standalone mode are always supported
 		if supportedInStandalone {

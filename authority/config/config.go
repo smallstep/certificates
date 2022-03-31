@@ -8,13 +8,15 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	cas "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	kms "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/templates"
-	"go.step.sm/linkedca"
 )
 
 const (

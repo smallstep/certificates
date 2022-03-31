@@ -97,8 +97,6 @@ func (p *SSHPOP) Init(config Config) (err error) {
 	p.sshPubKeys = config.SSHKeys
 
 	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
-
-	// Update claims with global ones
 	p.ctl, err = NewController(p, p.Claims, config)
 	return
 }

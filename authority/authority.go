@@ -12,6 +12,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/authority/admin"
 	adminDBNosql "github.com/smallstep/certificates/authority/admin/db/nosql"
 	"github.com/smallstep/certificates/authority/administrator"
@@ -27,9 +32,6 @@ import (
 	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/nosql"
-	"go.step.sm/crypto/pemutil"
-	"go.step.sm/linkedca"
-	"golang.org/x/crypto/ssh"
 )
 
 // Authority implements the Certificate Authority internal interface.
@@ -220,6 +222,17 @@ func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
 	)
 	// if admin API is enabled, the CA is running in linked mode
 	if a.config.AuthorityConfig.EnableAdmin {
+
+		// temporarily disable policy loading when LinkedCA is in use
+		if _, ok := a.adminDB.(*linkedCaClient); ok {
+			return nil
+		}
+
+		// temporarily only support the admin nosql DB
+		if _, ok := a.adminDB.(*adminDBNosql.DB); !ok {
+			return nil
+		}
+
 		linkedPolicy, err := a.adminDB.GetAuthorityPolicy(ctx)
 		if err != nil {
 			return admin.WrapErrorISE(err, "error getting policy to (re)load policy engines")

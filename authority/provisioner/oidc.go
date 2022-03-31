@@ -95,7 +95,6 @@ type OIDC struct {
 	Options               *Options `json:"options,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
-	getIdentityFunc       GetIdentityFunc
 	ctl                   *Controller
 	x509Policy            policy.X509Policy
 	sshHostPolicy         policy.HostPolicy
@@ -200,13 +199,6 @@ func (o *OIDC) Init(config Config) (err error) {
 	o.keyStore, err = newKeyStore(o.configuration.JWKSetURI)
 	if err != nil {
 		return err
-	}
-
-	// Set the identity getter if it exists, otherwise use the default.
-	if config.GetIdentityFunc == nil {
-		o.getIdentityFunc = DefaultIdentityFunc
-	} else {
-		o.getIdentityFunc = config.GetIdentityFunc
 	}
 
 	// Initialize the x509 allow/deny policy engine

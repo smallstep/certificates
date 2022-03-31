@@ -15,16 +15,18 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/admin"
-	"github.com/smallstep/certificates/db"
+	"golang.org/x/crypto/ssh"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/tlsutil"
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
-	"golang.org/x/crypto/ssh"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+
+	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/db"
 )
 
 const uuidPattern = "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"

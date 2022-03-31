@@ -45,7 +45,6 @@ type Nebula struct {
 	ctl           *Controller
 	x509Policy    policy.X509Policy
 	sshHostPolicy policy.HostPolicy
-	sshUserPolicy policy.UserPolicy
 }
 
 // Init verifies and initializes the Nebula provisioner.
@@ -66,11 +65,6 @@ func (p *Nebula) Init(config Config) (err error) {
 
 	// Initialize the x509 allow/deny policy engine
 	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for user certificates
-	if p.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
 		return err
 	}
 
@@ -276,7 +270,7 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshHostPolicy, p.sshUserPolicy),
+		newSSHNamePolicyValidator(p.sshHostPolicy, nil),
 	), nil
 }
 

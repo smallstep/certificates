@@ -238,7 +238,7 @@ func (a *Authority) isAllowedToSign(cert *x509.Certificate) (bool, error) {
 		return true, nil
 	}
 
-	return a.x509Policy.AreCertificateNamesAllowed(cert)
+	return a.x509Policy.IsX509CertificateAllowed(cert)
 }
 
 // AreSANsAllowed evaluates the provided sans against the

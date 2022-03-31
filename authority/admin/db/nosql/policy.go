@@ -41,9 +41,6 @@ func (db *DB) unmarshalDBAuthorityPolicy(data []byte, authorityID string) (*dbAu
 	if err := json.Unmarshal(data, dba); err != nil {
 		return nil, errors.Wrapf(err, "error unmarshaling admin %s into dbAdmin", authorityID)
 	}
-	// if !dba.DeletedAt.IsZero() {
-	// 	return nil, admin.NewError(admin.ErrorDeletedType, "admin %s is deleted", authorityID)
-	// }
 	if dba.AuthorityID != db.authorityID {
 		return nil, admin.NewError(admin.ErrorAuthorityMismatchType,
 			"admin %s is not owned by authority %s", dba.ID, db.authorityID)
@@ -63,14 +60,6 @@ func (db *DB) getDBAuthorityPolicy(ctx context.Context, authorityID string) (*db
 	return dbap, nil
 }
 
-// func (db *DB) unmarshalAuthorityPolicy(data []byte, authorityID string) (*linkedca.Policy, error) {
-// 	dbap, err := db.unmarshalDBAuthorityPolicy(data, authorityID)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return dbap.convert(), nil
-// }
-
 func (db *DB) CreateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
 
 	dbap := &dbAuthorityPolicy{
@@ -88,27 +77,6 @@ func (db *DB) CreateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy
 }
 
 func (db *DB) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
-	// policy := &linkedca.Policy{
-	// 	X509: &linkedca.X509Policy{
-	// 		Allow: &linkedca.X509Names{
-	// 			Dns: []string{".localhost"},
-	// 		},
-	// 		Deny: &linkedca.X509Names{
-	// 			Dns: []string{"denied.localhost"},
-	// 		},
-	// 	},
-	// 	Ssh: &linkedca.SSHPolicy{
-	// 		User: &linkedca.SSHUserPolicy{
-	// 			Allow: &linkedca.SSHUserNames{},
-	// 			Deny:  &linkedca.SSHUserNames{},
-	// 		},
-	// 		Host: &linkedca.SSHHostPolicy{
-	// 			Allow: &linkedca.SSHHostNames{},
-	// 			Deny:  &linkedca.SSHHostNames{},
-	// 		},
-	// 	},
-	// }
-
 	dbap, err := db.getDBAuthorityPolicy(ctx, db.authorityID)
 	if err != nil {
 		return nil, err

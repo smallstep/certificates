@@ -35,16 +35,28 @@ func (h *Handler) Route(r api.Router) {
 		return h.extractAuthorizeTokenAdmin(h.requireAPIEnabled(next))
 	}
 
-	requireEABEnabled := func(next http.HandlerFunc) http.HandlerFunc {
-		return h.requireEABEnabled(next)
-	}
-
 	enabledInStandalone := func(next http.HandlerFunc) http.HandlerFunc {
 		return h.checkAction(next, true)
 	}
 
 	disabledInStandalone := func(next http.HandlerFunc) http.HandlerFunc {
 		return h.checkAction(next, false)
+	}
+
+	acmeEABMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+		return authnz(h.loadProvisionerByName(h.requireEABEnabled(next)))
+	}
+
+	authorityPolicyMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+		return authnz(enabledInStandalone(next))
+	}
+
+	provisionerPolicyMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+		return authnz(disabledInStandalone(h.loadProvisionerByName(next)))
+	}
+
+	acmePolicyMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+		return authnz(disabledInStandalone(h.loadProvisionerByName(h.requireEABEnabled(next))))
 	}
 
 	// Provisioners
@@ -62,26 +74,26 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("DELETE", "/admins/{id}", authnz(h.DeleteAdmin))
 
 	// ACME External Account Binding Keys
-	r.MethodFunc("GET", "/acme/eab/{provisionerName}/{reference}", authnz(h.loadProvisionerByName(requireEABEnabled(h.acmeResponder.GetExternalAccountKeys))))
-	r.MethodFunc("GET", "/acme/eab/{provisionerName}", authnz(h.loadProvisionerByName(requireEABEnabled(h.acmeResponder.GetExternalAccountKeys))))
-	r.MethodFunc("POST", "/acme/eab/{provisionerName}", authnz(h.loadProvisionerByName(requireEABEnabled(h.acmeResponder.CreateExternalAccountKey))))
-	r.MethodFunc("DELETE", "/acme/eab/{provisionerName}/{id}", authnz(h.loadProvisionerByName(requireEABEnabled(h.acmeResponder.DeleteExternalAccountKey))))
+	r.MethodFunc("GET", "/acme/eab/{provisionerName}/{reference}", acmeEABMiddleware(h.acmeResponder.GetExternalAccountKeys))
+	r.MethodFunc("GET", "/acme/eab/{provisionerName}", acmeEABMiddleware(h.acmeResponder.GetExternalAccountKeys))
+	r.MethodFunc("POST", "/acme/eab/{provisionerName}", acmeEABMiddleware(h.acmeResponder.CreateExternalAccountKey))
+	r.MethodFunc("DELETE", "/acme/eab/{provisionerName}/{id}", acmeEABMiddleware(h.acmeResponder.DeleteExternalAccountKey))
 
 	// Policy - Authority
-	r.MethodFunc("GET", "/policy", authnz(enabledInStandalone(h.policyResponder.GetAuthorityPolicy)))
-	r.MethodFunc("POST", "/policy", authnz(enabledInStandalone(h.policyResponder.CreateAuthorityPolicy)))
-	r.MethodFunc("PUT", "/policy", authnz(enabledInStandalone(h.policyResponder.UpdateAuthorityPolicy)))
-	r.MethodFunc("DELETE", "/policy", authnz(enabledInStandalone(h.policyResponder.DeleteAuthorityPolicy)))
+	r.MethodFunc("GET", "/policy", authorityPolicyMiddleware(h.policyResponder.GetAuthorityPolicy))
+	r.MethodFunc("POST", "/policy", authorityPolicyMiddleware(h.policyResponder.CreateAuthorityPolicy))
+	r.MethodFunc("PUT", "/policy", authorityPolicyMiddleware(h.policyResponder.UpdateAuthorityPolicy))
+	r.MethodFunc("DELETE", "/policy", authorityPolicyMiddleware(h.policyResponder.DeleteAuthorityPolicy))
 
 	// Policy - Provisioner
-	r.MethodFunc("GET", "/provisioners/{provisionerName}/policy", authnz(disabledInStandalone(h.loadProvisionerByName(h.policyResponder.GetProvisionerPolicy))))
-	r.MethodFunc("POST", "/provisioners/{provisionerName}/policy", authnz(disabledInStandalone(h.loadProvisionerByName(h.policyResponder.CreateProvisionerPolicy))))
-	r.MethodFunc("PUT", "/provisioners/{provisionerName}/policy", authnz(disabledInStandalone(h.loadProvisionerByName(h.policyResponder.UpdateProvisionerPolicy))))
-	r.MethodFunc("DELETE", "/provisioners/{provisionerName}/policy", authnz(disabledInStandalone(h.loadProvisionerByName(h.policyResponder.DeleteProvisionerPolicy))))
+	r.MethodFunc("GET", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(h.policyResponder.GetProvisionerPolicy))
+	r.MethodFunc("POST", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(h.policyResponder.CreateProvisionerPolicy))
+	r.MethodFunc("PUT", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(h.policyResponder.UpdateProvisionerPolicy))
+	r.MethodFunc("DELETE", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(h.policyResponder.DeleteProvisionerPolicy))
 
 	// Policy - ACME Account
-	r.MethodFunc("GET", "/acme/policy/{provisionerName}/{accountID}", authnz(disabledInStandalone(h.loadProvisionerByName(h.requireEABEnabled(h.policyResponder.GetACMEAccountPolicy)))))
-	r.MethodFunc("POST", "/acme/policy/{provisionerName}/{accountID}", authnz(disabledInStandalone(h.loadProvisionerByName(h.requireEABEnabled(h.policyResponder.CreateACMEAccountPolicy)))))
-	r.MethodFunc("PUT", "/acme/policy/{provisionerName}/{accountID}", authnz(disabledInStandalone(h.loadProvisionerByName(h.requireEABEnabled(h.policyResponder.UpdateACMEAccountPolicy)))))
-	r.MethodFunc("DELETE", "/acme/policy/{provisionerName}/{accountID}", authnz(disabledInStandalone(h.loadProvisionerByName(h.requireEABEnabled(h.policyResponder.DeleteACMEAccountPolicy)))))
+	r.MethodFunc("GET", "/acme/policy/{provisionerName}/{accountID}", acmePolicyMiddleware(h.policyResponder.GetACMEAccountPolicy))
+	r.MethodFunc("POST", "/acme/policy/{provisionerName}/{accountID}", acmePolicyMiddleware(h.policyResponder.CreateACMEAccountPolicy))
+	r.MethodFunc("PUT", "/acme/policy/{provisionerName}/{accountID}", acmePolicyMiddleware(h.policyResponder.UpdateACMEAccountPolicy))
+	r.MethodFunc("DELETE", "/acme/policy/{provisionerName}/{accountID}", acmePolicyMiddleware(h.policyResponder.DeleteACMEAccountPolicy))
 }

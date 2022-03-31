@@ -53,7 +53,7 @@ func (h *Handler) requireEABEnabled(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		next(w, r.WithContext(ctx))
+		next(w, r)
 	}
 }
 
