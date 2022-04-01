@@ -135,7 +135,7 @@ func Test_normalizeAndValidateEmailConstraint(t *testing.T) {
 		},
 		{
 			name:       "fail/idna-internationalized-domain",
-			constraint: `mail@xn--bla.local`,
+			constraint: "mail@xn--bla.local",
 			want:       "",
 			wantErr:    true,
 		},
