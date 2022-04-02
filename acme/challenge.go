@@ -31,6 +31,8 @@ const (
 	DNS01 ChallengeType = "dns-01"
 	// TLSALPN01 is the tls-alpn-01 ACME challenge type
 	TLSALPN01 ChallengeType = "tls-alpn-01"
+	// DEVICEATTEST01 is the device-attest-01 ACME challenge type
+	DEVICEATTEST01 ChallengeType = "device-attest-01"
 )
 
 // Challenge represents an ACME response Challenge type.
@@ -60,7 +62,7 @@ func (ch *Challenge) ToLog() (interface{}, error) {
 // type using the DB interface.
 // satisfactorily validated, the 'status' and 'validated' attributes are
 // updated.
-func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey) error {
+func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, payload []byte) error {
 	// If already valid or invalid then return without performing validation.
 	if ch.Status != StatusPending {
 		return nil
@@ -72,6 +74,8 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey) 
 		return dns01Validate(ctx, ch, db, jwk)
 	case TLSALPN01:
 		return tlsalpn01Validate(ctx, ch, db, jwk)
+	case DEVICEATTEST01:
+		return deviceAttest01Validate(ctx, ch, db, jwk, payload)
 	default:
 		return NewErrorISE("unexpected challenge type '%s'", ch.Type)
 	}
@@ -292,6 +296,22 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
 
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
+		return WrapErrorISE(err, "error updating challenge")
+	}
+	return nil
+}
+
+func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
+	if string(payload) != "\"fake_device_attestation_statement\"" {
+		return errors.New("string(payload) != \"fake_device_attestation_statement\"")
+	}
+
+	// Update and store the challenge.
+	ch.Status = StatusValid
+	ch.Error = nil
+	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
+
+	if err := db.UpdateChallenge(ctx, ch); err != nil {
 		return WrapErrorISE(err, "error updating challenge")
 	}
 	return nil

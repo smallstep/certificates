@@ -291,7 +291,7 @@ func GetChallenge(w http.ResponseWriter, r *http.Request) {
 	}
 	// Just verify that the payload was set, since we're not strictly adhering
 	// to ACME V2 spec for reasons specified below.
-	_, err = payloadFromContext(ctx)
+	payload, err := payloadFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
 		return
@@ -320,7 +320,7 @@ func GetChallenge(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, err)
 		return
 	}
-	if err = ch.Validate(ctx, db, jwk); err != nil {
+	if err = ch.Validate(ctx, db, jwk, payload.value); err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error validating challenge"))
 		return
 	}
