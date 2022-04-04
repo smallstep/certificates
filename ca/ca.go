@@ -302,8 +302,7 @@ func (ca *CA) Run() error {
 		authorityInfo := ca.auth.GetInfo()
 		log.Printf("Address: %s", ca.config.Address)
 		for _, crt := range authorityInfo.RootX509Certs {
-			sum := sha256.Sum256(crt.Raw)
-			log.Printf("X.509 Root Fingerprint: %s", hex.EncodeToString(sum[:]))
+			log.Printf("X.509 Root Fingerprint: %s", x509util.Fingerprint(crt))
 		}
 		if authorityInfo.SSHCAHostPublicKey != nil {
 			log.Printf("SSH Host CA Key: %s\n", authorityInfo.SSHCAHostPublicKey)
