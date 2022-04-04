@@ -1,12 +1,14 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"
 )
 
@@ -43,11 +45,9 @@ func NewPolicyAdminResponder(auth adminAuthority, adminDB admin.DB) *PolicyAdmin
 func (par *PolicyAdminResponder) GetAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
 
 	policy, err := par.auth.GetAuthorityPolicy(r.Context())
-	if ae, ok := err.(*admin.Error); ok {
-		if !ae.IsType(admin.ErrorNotFoundType) {
-			render.Error(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
-			return
-		}
+	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
+		render.Error(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
+		return
 	}
 
 	if policy == nil {
@@ -85,7 +85,14 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 
 	var createdPolicy *linkedca.Policy
 	if createdPolicy, err = par.auth.CreateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
-		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error storing authority policy"))
+		var pe *authority.PolicyError
+
+		if errors.As(err, &pe); pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure {
+			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, pe, "error storing authority policy"))
+			return
+		}
+
+		render.Error(w, admin.WrapErrorISE(err, "error storing authority policy"))
 		return
 	}
 
@@ -118,7 +125,13 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 
 	var updatedPolicy *linkedca.Policy
 	if updatedPolicy, err = par.auth.UpdateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
-		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating authority policy"))
+		var pe *authority.PolicyError
+		if errors.As(err, &pe); pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure {
+			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, pe, "error updating authority policy"))
+			return
+		}
+
+		render.Error(w, admin.WrapErrorISE(err, "error updating authority policy"))
 		return
 	}
 
@@ -131,11 +144,9 @@ func (par *PolicyAdminResponder) DeleteAuthorityPolicy(w http.ResponseWriter, r 
 	ctx := r.Context()
 	policy, err := par.auth.GetAuthorityPolicy(ctx)
 
-	if ae, ok := err.(*admin.Error); ok {
-		if !ae.IsType(admin.ErrorNotFoundType) {
-			render.Error(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
-			return
-		}
+	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
+		render.Error(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
+		return
 	}
 
 	if policy == nil {
@@ -189,7 +200,13 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 
 	err := par.auth.UpdateProvisioner(ctx, prov)
 	if err != nil {
-		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error creating provisioner policy"))
+		var pe *authority.PolicyError
+		if errors.As(err, &pe); pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure {
+			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, pe, "error creating provisioner policy"))
+			return
+		}
+
+		render.Error(w, admin.WrapErrorISE(err, "error creating provisioner policy"))
 		return
 	}
 
@@ -215,6 +232,12 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 	prov.Policy = newPolicy
 	err := par.auth.UpdateProvisioner(ctx, prov)
 	if err != nil {
+		var pe *authority.PolicyError
+		if errors.As(err, &pe); pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure {
+			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, pe, "error updating provisioner policy"))
+			return
+		}
+
 		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating provisioner policy"))
 		return
 	}
@@ -238,7 +261,7 @@ func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, 
 
 	err := par.auth.UpdateProvisioner(ctx, prov)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, admin.WrapErrorISE(err, "error deleting provisioner policy"))
 		return
 	}
 

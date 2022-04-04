@@ -7,10 +7,30 @@ import (
 
 	"go.step.sm/linkedca"
 
-	"github.com/smallstep/certificates/authority/admin"
 	authPolicy "github.com/smallstep/certificates/authority/policy"
 	policy "github.com/smallstep/certificates/policy"
 )
+
+type policyErrorType int
+
+const (
+	_ policyErrorType = iota
+	AdminLockOut
+	StoreFailure
+	ReloadFailure
+	ConfigurationFailure
+	EvaluationFailure
+	InternalFailure
+)
+
+type PolicyError struct {
+	Typ policyErrorType
+	err error
+}
+
+func (p *PolicyError) Error() string {
+	return p.err.Error()
+}
 
 func (a *Authority) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
 	a.adminMutex.Lock()
@@ -28,16 +48,25 @@ func (a *Authority) CreateAuthorityPolicy(ctx context.Context, adm *linkedca.Adm
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
 
-	if err := a.checkPolicy(ctx, adm, p); err != nil {
-		return nil, err
+	if err := a.checkAuthorityPolicy(ctx, adm, p); err != nil {
+		return nil, &PolicyError{
+			Typ: AdminLockOut,
+			err: err,
+		}
 	}
 
 	if err := a.adminDB.CreateAuthorityPolicy(ctx, p); err != nil {
-		return nil, err
+		return nil, &PolicyError{
+			Typ: StoreFailure,
+			err: err,
+		}
 	}
 
 	if err := a.reloadPolicyEngines(ctx); err != nil {
-		return nil, admin.WrapErrorISE(err, "error reloading policy engines when creating authority policy")
+		return nil, &PolicyError{
+			Typ: ReloadFailure,
+			err: fmt.Errorf("error reloading policy engines when creating authority policy: %w", err),
+		}
 	}
 
 	return p, nil // TODO: return the newly stored policy
@@ -47,16 +76,22 @@ func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Adm
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
 
-	if err := a.checkPolicy(ctx, adm, p); err != nil {
+	if err := a.checkAuthorityPolicy(ctx, adm, p); err != nil {
 		return nil, err
 	}
 
 	if err := a.adminDB.UpdateAuthorityPolicy(ctx, p); err != nil {
-		return nil, err
+		return nil, &PolicyError{
+			Typ: StoreFailure,
+			err: err,
+		}
 	}
 
 	if err := a.reloadPolicyEngines(ctx); err != nil {
-		return nil, admin.WrapErrorISE(err, "error reloading policy engines when updating authority policy")
+		return nil, &PolicyError{
+			Typ: ReloadFailure,
+			err: fmt.Errorf("error reloading policy engines when updating authority policy %w", err),
+		}
 	}
 
 	return p, nil // TODO: return the updated stored policy
@@ -67,19 +102,63 @@ func (a *Authority) RemoveAuthorityPolicy(ctx context.Context) error {
 	defer a.adminMutex.Unlock()
 
 	if err := a.adminDB.DeleteAuthorityPolicy(ctx); err != nil {
-		return err
+		return &PolicyError{
+			Typ: StoreFailure,
+			err: err,
+		}
 	}
 
 	if err := a.reloadPolicyEngines(ctx); err != nil {
-		return admin.WrapErrorISE(err, "error reloading policy engines when deleting authority policy")
+		return &PolicyError{
+			Typ: ReloadFailure,
+			err: fmt.Errorf("error reloading policy engines when deleting authority policy %w", err),
+		}
 	}
 
 	return nil
 }
 
+func (a *Authority) checkAuthorityPolicy(ctx context.Context, currentAdmin *linkedca.Admin, p *linkedca.Policy) error {
+
+	// no policy and thus nothing to evaluate; return early
+	if p == nil {
+		return nil
+	}
+
+	// get all current admins from the database
+	allAdmins, err := a.adminDB.GetAdmins(ctx)
+	if err != nil {
+		return &PolicyError{
+			Typ: InternalFailure,
+			err: fmt.Errorf("error retrieving admins: %w", err),
+		}
+	}
+
+	return a.checkPolicy(ctx, currentAdmin, allAdmins, p)
+}
+
+func (a *Authority) checkProvisionerPolicy(ctx context.Context, currentAdmin *linkedca.Admin, provName string, p *linkedca.Policy) error {
+
+	// no policy and thus nothing to evaluate; return early
+	if p == nil {
+		return nil
+	}
+
+	// get all admins for the provisioner
+	allProvisionerAdmins, ok := a.admins.LoadByProvisioner(provName)
+	if !ok {
+		return &PolicyError{
+			Typ: InternalFailure,
+			err: errors.New("error retrieving admins by provisioner"),
+		}
+	}
+
+	return a.checkPolicy(ctx, currentAdmin, allProvisionerAdmins, p)
+}
+
 // checkPolicy checks if a new or updated policy configuration results in the user
 // locking themselves or other admins out of the CA.
-func (a *Authority) checkPolicy(ctx context.Context, adm *linkedca.Admin, p *linkedca.Policy) error {
+func (a *Authority) checkPolicy(ctx context.Context, currentAdmin *linkedca.Admin, otherAdmins []*linkedca.Admin, p *linkedca.Policy) error {
 
 	// convert the policy; return early if nil
 	policyOptions := policyToCertificates(p)
@@ -89,10 +168,13 @@ func (a *Authority) checkPolicy(ctx context.Context, adm *linkedca.Admin, p *lin
 
 	engine, err := authPolicy.NewX509PolicyEngine(policyOptions.GetX509Options())
 	if err != nil {
-		return admin.WrapErrorISE(err, "error creating temporary policy engine")
+		return &PolicyError{
+			Typ: ConfigurationFailure,
+			err: fmt.Errorf("error creating temporary policy engine: %w", err),
+		}
 	}
 
-	// when an empty policy is provided, the resulting engine is nil
+	// when an empty X.509 policy is provided, the resulting engine is nil
 	// and there's no policy to evaluate.
 	if engine == nil {
 		return nil
@@ -102,23 +184,17 @@ func (a *Authority) checkPolicy(ctx context.Context, adm *linkedca.Admin, p *lin
 
 	// check if the admin user that instructed the authority policy to be
 	// created or updated, would still be allowed when the provided policy
-	// would be applied to the authority.
-	sans := []string{adm.GetSubject()}
+	// would be applied.
+	sans := []string{currentAdmin.GetSubject()}
 	if err := isAllowed(engine, sans); err != nil {
-		return err
-	}
-
-	// get all current admins from the database
-	admins, err := a.adminDB.GetAdmins(ctx)
-	if err != nil {
 		return err
 	}
 
 	// loop through admins to verify that none of them would be
 	// locked out when the new policy were to be applied. Returns
 	// an error with a message that includes the admin subject that
-	// would be locked out
-	for _, adm := range admins {
+	// would be locked out.
+	for _, adm := range otherAdmins {
 		sans = []string{adm.GetSubject()}
 		if err := isAllowed(engine, sans); err != nil {
 			return err
@@ -137,14 +213,23 @@ func isAllowed(engine authPolicy.X509Policy, sans []string) error {
 	)
 	if allowed, err = engine.AreSANsAllowed(sans); err != nil {
 		var policyErr *policy.NamePolicyError
-		if isPolicyErr := errors.As(err, &policyErr); isPolicyErr && policyErr.Reason == policy.NotAuthorizedForThisName {
-			return fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans)
+		if errors.As(err, &policyErr); policyErr.Reason == policy.NotAuthorizedForThisName {
+			return &PolicyError{
+				Typ: AdminLockOut,
+				err: fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans),
+			}
 		}
-		return err
+		return &PolicyError{
+			Typ: EvaluationFailure,
+			err: err,
+		}
 	}
 
 	if !allowed {
-		return fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans)
+		return &PolicyError{
+			Typ: AdminLockOut,
+			err: fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans),
+		}
 	}
 
 	return nil

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"strings"
 	"sync"
@@ -235,7 +236,7 @@ func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
 
 		linkedPolicy, err := a.adminDB.GetAuthorityPolicy(ctx)
 		if err != nil {
-			return admin.WrapErrorISE(err, "error getting policy to (re)load policy engines")
+			return fmt.Errorf("error getting policy to (re)load policy engines: %w", err)
 		}
 		policyOptions = policyToCertificates(linkedPolicy)
 	} else {

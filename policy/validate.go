@@ -1,6 +1,9 @@
 // Copyright 2011 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+//
+// The code in this file is an adapted version of the code in
+// https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
 package policy
 
 import (
@@ -15,8 +18,6 @@ import (
 )
 
 // validateNames verifies that all names are allowed.
-// Its logic follows that of (a large part of) the (c *Certificate) isValid() function
-// in https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
 func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailAddresses []string, uris []*url.URL, principals []string) error {
 
 	// nothing to compare against; return early
@@ -160,7 +161,6 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 // checkNameConstraints checks that a name, of type nameType is permitted.
 // The argument parsedName contains the parsed form of name, suitable for passing
 // to the match function.
-// SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
 func checkNameConstraints(
 	nameType string,
 	name string,
@@ -218,7 +218,6 @@ func checkNameConstraints(
 
 // domainToReverseLabels converts a textual domain name like foo.example.com to
 // the list of labels in reverse order, e.g. ["com", "example", "foo"].
-// SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
 func domainToReverseLabels(domain string) (reverseLabels []string, ok bool) {
 	for len(domain) > 0 {
 		if i := strings.LastIndexByte(domain, '.'); i == -1 {
@@ -255,7 +254,6 @@ func domainToReverseLabels(domain string) (reverseLabels []string, ok bool) {
 // rfc2821Mailbox represents a “mailbox” (which is an email address to most
 // people) by breaking it into the “local” (i.e. before the '@') and “domain”
 // parts.
-// SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
 type rfc2821Mailbox struct {
 	local, domain string
 }
@@ -264,7 +262,6 @@ type rfc2821Mailbox struct {
 // based on the ABNF for a “Mailbox” from RFC 2821. According to RFC 5280,
 // Section 4.2.1.6 that's correct for an rfc822Name from a certificate: “The
 // format of an rfc822Name is a "Mailbox" as defined in RFC 2821, Section 4.1.2”.
-// SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
 func parseRFC2821Mailbox(in string) (mailbox rfc2821Mailbox, ok bool) {
 	if in == "" {
 		return mailbox, false
@@ -401,7 +398,7 @@ func parseRFC2821Mailbox(in string) (mailbox rfc2821Mailbox, ok bool) {
 	return mailbox, true
 }
 
-// SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
+// matchDomainConstraint matches a domain agains the given constraint
 func (e *NamePolicyEngine) matchDomainConstraint(domain, constraint string) (bool, error) {
 	// The meaning of zero length constraints is not specified, but this
 	// code follows NSS and accepts them as matching everything.
@@ -461,10 +458,6 @@ func (e *NamePolicyEngine) matchDomainConstraint(domain, constraint string) (boo
 	if !ok {
 		return false, fmt.Errorf("cannot parse domain constraint %q", constraint)
 	}
-
-	// fmt.Println(mustHaveSubdomains)
-	// fmt.Println(constraintLabels)
-	// fmt.Println(domainLabels)
 
 	expectedNumberOfLabels := len(constraintLabels)
 	if mustHaveSubdomains {
@@ -532,7 +525,7 @@ func (e *NamePolicyEngine) matchEmailConstraint(mailbox rfc2821Mailbox, constrai
 	return e.matchDomainConstraint(mailbox.domain, constraint)
 }
 
-// SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
+// matchURIConstraint matches an URL against a constraint
 func (e *NamePolicyEngine) matchURIConstraint(uri *url.URL, constraint string) (bool, error) {
 	// From RFC 5280, Section 4.2.1.10:
 	// “a uniformResourceIdentifier that does not include an authority

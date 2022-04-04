@@ -141,6 +141,12 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 		return admin.WrapErrorISE(err, "error generating provisioner config")
 	}
 
+	adm := linkedca.AdminFromContext(ctx)
+
+	if err := a.checkProvisionerPolicy(ctx, adm, prov.Name, prov.Policy); err != nil {
+		return err
+	}
+
 	if err := certProv.Init(provisionerConfig); err != nil {
 		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %s", prov.Name)
 	}
@@ -184,6 +190,12 @@ func (a *Authority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisio
 	provisionerConfig, err := a.generateProvisionerConfig(ctx)
 	if err != nil {
 		return admin.WrapErrorISE(err, "error generating provisioner config")
+	}
+
+	adm := linkedca.AdminFromContext(ctx)
+
+	if err := a.checkProvisionerPolicy(ctx, adm, nu.Name, nu.Policy); err != nil {
+		return err
 	}
 
 	if err := certProv.Init(provisionerConfig); err != nil {
@@ -424,12 +436,14 @@ func optionsToCertificates(p *linkedca.Provisioner) *provisioner.Options {
 					ops.SSH.Host.AllowedNames = &policy.SSHNameOptions{
 						DNSDomains: p.Policy.Ssh.Host.Allow.Dns,
 						IPRanges:   p.Policy.Ssh.Host.Allow.Ips,
+						Principals: p.Policy.Ssh.Host.Allow.Principals,
 					}
 				}
 				if p.Policy.Ssh.Host.Deny != nil {
 					ops.SSH.Host.DeniedNames = &policy.SSHNameOptions{
 						DNSDomains: p.Policy.Ssh.Host.Deny.Dns,
 						IPRanges:   p.Policy.Ssh.Host.Deny.Ips,
+						Principals: p.Policy.Ssh.Host.Deny.Principals,
 					}
 				}
 			}
