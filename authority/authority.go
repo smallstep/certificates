@@ -85,6 +85,7 @@ type AuthorityInfo struct {
 	RootX509Certs      []*x509.Certificate
 	SSHCAUserPublicKey []byte
 	SSHCAHostPublicKey []byte
+	DNSNames           []string
 }
 
 // New creates and initiates a new Authority type.
@@ -570,6 +571,7 @@ func (a *Authority) GetInfo() AuthorityInfo {
 	ai := AuthorityInfo{
 		StartTime:     a.startTime,
 		RootX509Certs: a.rootX509Certs,
+		DNSNames:      a.config.DNSNames,
 	}
 	if a.sshCAUserCertSignKey != nil {
 		ai.SSHCAUserPublicKey = ssh.MarshalAuthorizedKey(a.sshCAUserCertSignKey.PublicKey())

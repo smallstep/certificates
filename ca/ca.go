@@ -1,15 +1,14 @@
 package ca
 
 import (
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/go-chi/chi"
@@ -28,6 +27,7 @@ import (
 	scepAPI "github.com/smallstep/certificates/scep/api"
 	"github.com/smallstep/certificates/server"
 	"github.com/smallstep/nosql"
+	"go.step.sm/crypto/x509util"
 )
 
 type options struct {
@@ -300,12 +300,19 @@ func (ca *CA) Run() error {
 
 	if !ca.opts.quiet {
 		authorityInfo := ca.auth.GetInfo()
-		log.Printf("Address: %s", ca.config.Address)
+		log.Printf("Welcome to step-ca.")
+		log.Printf("The primary server URL is https://%s%s",
+			authorityInfo.DNSNames[0],
+			ca.config.Address[strings.LastIndex(ca.config.Address, ":"):])
+		if len(authorityInfo.DNSNames) > 1 {
+			log.Printf("Additional configured hostnames: %s",
+				strings.Join(authorityInfo.DNSNames[1:], ", "))
+		}
 		for _, crt := range authorityInfo.RootX509Certs {
 			log.Printf("X.509 Root Fingerprint: %s", x509util.Fingerprint(crt))
 		}
 		if authorityInfo.SSHCAHostPublicKey != nil {
-			log.Printf("SSH Host CA Key: %s\n", authorityInfo.SSHCAHostPublicKey)
+			log.Printf("SSH Host CA Key is %s\n", authorityInfo.SSHCAHostPublicKey)
 		}
 		if authorityInfo.SSHCAUserPublicKey != nil {
 			log.Printf("SSH User CA Key: %s\n", authorityInfo.SSHCAUserPublicKey)
