@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 
 	"go.step.sm/linkedca"
 
-	"github.com/smallstep/assert"
 	authPolicy "github.com/smallstep/certificates/authority/policy"
 )
 
@@ -34,7 +34,7 @@ func TestAuthority_checkPolicy(t *testing.T) {
 				},
 				err: &PolicyError{
 					Typ: ConfigurationFailure,
-					err: errors.New("error creating temporary policy engine: cannot parse permitted domain constraint \"**.local\""),
+					err: errors.New("cannot parse permitted domain constraint \"**.local\": domain constraint \"**.local\" can only have wildcard as starting character"),
 				},
 			}
 		},
@@ -46,7 +46,7 @@ func TestAuthority_checkPolicy(t *testing.T) {
 				policy: &linkedca.Policy{
 					X509: &linkedca.X509Policy{
 						Allow: &linkedca.X509Names{
-							Dns: []string{".local"},
+							Dns: []string{"*.local"},
 						},
 					},
 				},
@@ -68,7 +68,7 @@ func TestAuthority_checkPolicy(t *testing.T) {
 				policy: &linkedca.Policy{
 					X509: &linkedca.X509Policy{
 						Allow: &linkedca.X509Names{
-							Dns: []string{".local"},
+							Dns: []string{"*.local"},
 						},
 					},
 				},
@@ -177,13 +177,13 @@ func TestAuthority_checkPolicy(t *testing.T) {
 			if tc.err == nil {
 				assert.Nil(t, err)
 			} else {
-				assert.Type(t, &PolicyError{}, err)
+				assert.IsType(t, &PolicyError{}, err)
 
 				pe, ok := err.(*PolicyError)
-				assert.Fatal(t, ok)
+				assert.True(t, ok)
 
-				assert.Equals(t, tc.err.Typ, pe.Typ)
-				assert.Equals(t, tc.err.Error(), pe.Error())
+				assert.Equal(t, tc.err.Typ, pe.Typ)
+				assert.Equal(t, tc.err.Error(), pe.Error())
 			}
 		})
 	}

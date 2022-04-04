@@ -1500,7 +1500,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/dns-permitted-wildcard",
 			options: []NamePolicyOption{
 				AddPermittedDNSDomain("*.local"),
-				AddPermittedDNSDomain(".x509local"),
+				AddPermittedDNSDomain("*.x509local"),
 				WithAllowLiteralWildcardNames(),
 			},
 			cert: &x509.Certificate{
@@ -1665,7 +1665,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/uri-permitted-with-port",
 			options: []NamePolicyOption{
-				AddPermittedURIDomain(".example.com"),
+				AddPermittedURIDomain("*.example.com"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{

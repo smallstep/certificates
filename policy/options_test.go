@@ -47,6 +47,12 @@ func Test_normalizeAndValidateDNSDomainConstraint(t *testing.T) {
 			wantErr:    true,
 		},
 		{
+			name:       "fail/no-asterisk",
+			constraint: ".example.com",
+			want:       "",
+			wantErr:    true,
+		},
+		{
 			name:       "fail/idna-internationalized-domain-name-lookup",
 			constraint: `\00.local`, // invalid IDNA ASCII character
 			want:       "",
@@ -66,13 +72,13 @@ func Test_normalizeAndValidateDNSDomainConstraint(t *testing.T) {
 		},
 		{
 			name:       "ok/idna-internationalized-domain-name-punycode",
-			constraint: ".xn--fsq.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
+			constraint: "*.xn--fsq.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
 			want:       ".xn--fsq.jp",
 			wantErr:    false,
 		},
 		{
 			name:       "ok/idna-internationalized-domain-name-lookup-transformed",
-			constraint: ".例.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
+			constraint: "*.例.jp", // Example value from https://www.w3.org/International/articles/idn-and-iri/
 			want:       ".xn--fsq.jp",
 			wantErr:    false,
 		},

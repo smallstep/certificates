@@ -170,7 +170,7 @@ func (a *Authority) checkPolicy(ctx context.Context, currentAdmin *linkedca.Admi
 	if err != nil {
 		return &PolicyError{
 			Typ: ConfigurationFailure,
-			err: fmt.Errorf("error creating temporary policy engine: %w", err),
+			err: err,
 		}
 	}
 
@@ -213,7 +213,8 @@ func isAllowed(engine authPolicy.X509Policy, sans []string) error {
 	)
 	if allowed, err = engine.AreSANsAllowed(sans); err != nil {
 		var policyErr *policy.NamePolicyError
-		if errors.As(err, &policyErr); policyErr.Reason == policy.NotAuthorizedForThisName {
+		isNamePolicyError := errors.As(err, &policyErr)
+		if isNamePolicyError && policyErr.Reason == policy.NotAuthorizedForThisName {
 			return &PolicyError{
 				Typ: AdminLockOut,
 				err: fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans),

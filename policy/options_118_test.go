@@ -49,6 +49,12 @@ func Test_normalizeAndValidateURIDomainConstraint(t *testing.T) {
 			wantErr:    true,
 		},
 		{
+			name:       "fail/no-asterisk",
+			constraint: ".example.com",
+			want:       "",
+			wantErr:    true,
+		},
+		{
 			name:       "fail/ipv4",
 			constraint: "127.0.0.1",
 			want:       "",

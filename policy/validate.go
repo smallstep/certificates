@@ -398,7 +398,7 @@ func parseRFC2821Mailbox(in string) (mailbox rfc2821Mailbox, ok bool) {
 	return mailbox, true
 }
 
-// matchDomainConstraint matches a domain agains the given constraint
+// matchDomainConstraint matches a domain against the given constraint
 func (e *NamePolicyEngine) matchDomainConstraint(domain, constraint string) (bool, error) {
 	// The meaning of zero length constraints is not specified, but this
 	// code follows NSS and accepts them as matching everything.

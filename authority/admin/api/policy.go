@@ -86,8 +86,9 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 	var createdPolicy *linkedca.Policy
 	if createdPolicy, err = par.auth.CreateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
 		var pe *authority.PolicyError
+		isPolicyError := errors.As(err, &pe)
 
-		if errors.As(err, &pe); pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure {
+		if isPolicyError && pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure || pe.Typ == authority.ConfigurationFailure {
 			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, pe, "error storing authority policy"))
 			return
 		}
@@ -126,7 +127,8 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 	var updatedPolicy *linkedca.Policy
 	if updatedPolicy, err = par.auth.UpdateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
 		var pe *authority.PolicyError
-		if errors.As(err, &pe); pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure {
+		isPolicyError := errors.As(err, &pe)
+		if isPolicyError && pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure || pe.Typ == authority.ConfigurationFailure {
 			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, pe, "error updating authority policy"))
 			return
 		}
@@ -201,7 +203,8 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 	err := par.auth.UpdateProvisioner(ctx, prov)
 	if err != nil {
 		var pe *authority.PolicyError
-		if errors.As(err, &pe); pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure {
+		isPolicyError := errors.As(err, &pe)
+		if isPolicyError && pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure || pe.Typ == authority.ConfigurationFailure {
 			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, pe, "error creating provisioner policy"))
 			return
 		}
@@ -233,7 +236,8 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 	err := par.auth.UpdateProvisioner(ctx, prov)
 	if err != nil {
 		var pe *authority.PolicyError
-		if errors.As(err, &pe); pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure {
+		isPolicyError := errors.As(err, &pe)
+		if isPolicyError && pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure || pe.Typ == authority.ConfigurationFailure {
 			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, pe, "error updating provisioner policy"))
 			return
 		}
