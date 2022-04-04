@@ -27,6 +27,7 @@ import (
 	scepAPI "github.com/smallstep/certificates/scep/api"
 	"github.com/smallstep/certificates/server"
 	"github.com/smallstep/nosql"
+	"go.step.sm/cli-utils/step"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -301,6 +302,10 @@ func (ca *CA) Run() error {
 	if !ca.opts.quiet {
 		authorityInfo := ca.auth.GetInfo()
 		log.Printf("Welcome to step-ca.")
+		log.Printf("Documentation: https://u.step.sm/docs/ca")
+		log.Printf("Community Discord: https://u.step.sm/discord")
+		log.Printf("Current context: %s", step.Contexts().GetCurrent().Name)
+		log.Printf("Config file: %s", ca.opts.configFile)
 		log.Printf("The primary server URL is https://%s%s",
 			authorityInfo.DNSNames[0],
 			ca.config.Address[strings.LastIndex(ca.config.Address, ":"):])
@@ -317,9 +322,6 @@ func (ca *CA) Run() error {
 		if authorityInfo.SSHCAUserPublicKey != nil {
 			log.Printf("SSH User CA Key: %s\n", authorityInfo.SSHCAUserPublicKey)
 		}
-		log.Printf("Documentation: https://u.step.sm/docs/ca")
-		log.Printf("Community Discord: https://u.step.sm/discord")
-		log.Printf("Config File: %s", ca.opts.configFile)
 	}
 
 	if ca.insecureSrv != nil {
