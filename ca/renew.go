@@ -60,7 +60,10 @@ func NewTLSRenewer(cert *tls.Certificate, fn RenewFunc, opts ...tlsRenewerOption
 		}
 	}
 
-	period := cert.Leaf.NotAfter.Sub(cert.Leaf.NotBefore)
+	// Use the current time to calculate the initial period. Using a notBefore
+	// in the past might set a renewBefore too large, causing continuous
+	// renewals due to the negative values in nextRenewDuration.
+	period := cert.Leaf.NotAfter.Sub(time.Now().Truncate(time.Second))
 	if period < minCertDuration {
 		return nil, errors.Errorf("period must be greater than or equal to %s, but got %v.", minCertDuration, period)
 	}
@@ -181,7 +184,7 @@ func (r *TLSRenewer) renewCertificate() {
 }
 
 func (r *TLSRenewer) nextRenewDuration(notAfter time.Time) time.Duration {
-	d := time.Until(notAfter) - r.renewBefore
+	d := time.Until(notAfter).Truncate(time.Second) - r.renewBefore
 	n := rand.Int63n(int64(r.renewJitter))
 	d -= time.Duration(n)
 	if d < 0 {

@@ -2,14 +2,15 @@ package authority
 
 import (
 	"crypto/x509"
+	"errors"
 	"net/http"
 	"reflect"
 	"testing"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/pemutil"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func TestRoot(t *testing.T) {
@@ -31,7 +32,7 @@ func TestRoot(t *testing.T) {
 			crt, err := a.Root(tc.sum)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
+					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())

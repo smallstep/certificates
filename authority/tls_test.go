@@ -11,24 +11,26 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/smallstep/certificates/cas/softcas"
+	"gopkg.in/square/go-jose.v2/jwt"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
-	"gopkg.in/square/go-jose.v2/jwt"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/cas/softcas"
+	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/errs"
 )
 
 var (
@@ -187,14 +189,14 @@ func setExtraExtsCSR(exts []pkix.Extension) func(*x509.CertificateRequest) {
 func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
 	b, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
-		return nil, errors.Wrap(err, "error marshaling public key")
+		return nil, fmt.Errorf("error marshaling public key: %w", err)
 	}
 	info := struct {
 		Algorithm        pkix.AlgorithmIdentifier
 		SubjectPublicKey asn1.BitString
 	}{}
 	if _, err = asn1.Unmarshal(b, &info); err != nil {
-		return nil, errors.Wrap(err, "error unmarshaling public key")
+		return nil, fmt.Errorf("error unmarshaling public key: %w", err)
 	}
 	hash := sha1.Sum(info.SubjectPublicKey.Bytes)
 	return hash[:], nil
@@ -661,8 +663,8 @@ ZYtQ9Ot36qc=
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, certChain)
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
@@ -860,8 +862,8 @@ func TestAuthority_Renew(t *testing.T) {
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, certChain)
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
@@ -1067,8 +1069,8 @@ func TestAuthority_Rekey(t *testing.T) {
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, certChain)
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
@@ -1456,8 +1458,8 @@ func TestAuthority_Revoke(t *testing.T) {
 			ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.RevokeMethod)
 			if err := tc.auth.Revoke(ctx, tc.opts); err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 

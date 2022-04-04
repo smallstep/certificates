@@ -16,6 +16,7 @@ import (
 	"github.com/smallstep/certificates/pki"
 	"github.com/urfave/cli"
 	"go.step.sm/cli-utils/errs"
+	"go.step.sm/cli-utils/step"
 )
 
 // AppCommand is the action used as the top action.
@@ -61,6 +62,11 @@ certificate issuer private key used in the RA mode.`,
 			Name:  "quiet",
 			Usage: "disable startup information",
 		},
+		cli.StringFlag{
+			Name:   "context",
+			Usage:  "The name of the authority's context.",
+			EnvVar: "STEP_CA_CONTEXT",
+		},
 	},
 }
 
@@ -74,15 +80,23 @@ func appAction(ctx *cli.Context) error {
 	token := ctx.String("token")
 	quiet := ctx.Bool("quiet")
 
-	// If zero cmd line args show help, if >1 cmd line args show error.
-	if ctx.NArg() == 0 {
-		return cli.ShowAppHelp(ctx)
-	}
-	if err := errs.NumberOfArguments(ctx, 1); err != nil {
-		return err
+	if ctx.NArg() > 1 {
+		return errs.TooManyArguments(ctx)
 	}
 
-	configFile := ctx.Args().Get(0)
+	if caCtx := ctx.String("context"); caCtx != "" {
+		if err := step.Contexts().SetCurrent(caCtx); err != nil {
+			return err
+		}
+	}
+
+	var configFile string
+	if ctx.NArg() > 0 {
+		configFile = ctx.Args().Get(0)
+	} else {
+		configFile = step.CaConfigFile()
+	}
+
 	cfg, err := config.LoadConfiguration(configFile)
 	if err != nil {
 		fatal(err)
