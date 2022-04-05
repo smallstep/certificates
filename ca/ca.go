@@ -301,14 +301,18 @@ func (ca *CA) Run() error {
 
 	if !ca.opts.quiet {
 		authorityInfo := ca.auth.GetInfo()
-		log.Printf("Welcome to step-ca.")
+		log.Printf("Starting %s", step.Version())
 		log.Printf("Documentation: https://u.step.sm/docs/ca")
 		log.Printf("Community Discord: https://u.step.sm/discord")
-		log.Printf("Current context: %s", step.Contexts().GetCurrent().Name)
+		if step.Contexts().GetCurrent() != nil {
+			log.Printf("Current context: %s", step.Contexts().GetCurrent().Name)
+		}
 		log.Printf("Config file: %s", ca.opts.configFile)
-		log.Printf("The primary server URL is https://%s%s",
+		baseURL := fmt.Sprintf("https://%s%s",
 			authorityInfo.DNSNames[0],
 			ca.config.Address[strings.LastIndex(ca.config.Address, ":"):])
+		log.Printf("The primary server URL is %s", baseURL)
+		log.Printf("Root certificates are available at %s/roots.pem", baseURL)
 		if len(authorityInfo.DNSNames) > 1 {
 			log.Printf("Additional configured hostnames: %s",
 				strings.Join(authorityInfo.DNSNames[1:], ", "))

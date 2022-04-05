@@ -80,7 +80,7 @@ type Authority struct {
 	adminMutex sync.RWMutex
 }
 
-type AuthorityInfo struct {
+type Info struct {
 	StartTime          time.Time
 	RootX509Certs      []*x509.Certificate
 	SSHCAUserPublicKey []byte
@@ -567,8 +567,8 @@ func (a *Authority) GetAdminDatabase() admin.DB {
 	return a.adminDB
 }
 
-func (a *Authority) GetInfo() AuthorityInfo {
-	ai := AuthorityInfo{
+func (a *Authority) GetInfo() Info {
+	ai := Info{
 		StartTime:     a.startTime,
 		RootX509Certs: a.rootX509Certs,
 		DNSNames:      a.config.DNSNames,
