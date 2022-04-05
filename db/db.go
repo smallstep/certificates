@@ -215,13 +215,15 @@ func (db *DB) GetRevokedCertificates() (*[]RevokedCertificateInfo, error) {
 		return nil, err
 	}
 	var revokedCerts []RevokedCertificateInfo
+	now := time.Now().UTC()
+
 	for _, e := range entries {
 		var data RevokedCertificateInfo
 		if err := json.Unmarshal(e.Value, &data); err != nil {
 			return nil, err
 		}
 
-		if !data.ExpiresAt.IsZero() && data.ExpiresAt.After(time.Now().UTC()) {
+		if !data.ExpiresAt.IsZero() && data.ExpiresAt.After(now) {
 			revokedCerts = append(revokedCerts, data)
 		} else if data.ExpiresAt.IsZero() {
 			cert, err := db.GetCertificate(data.Serial)
@@ -232,7 +234,7 @@ func (db *DB) GetRevokedCertificates() (*[]RevokedCertificateInfo, error) {
 				continue
 			}
 
-			if cert.NotAfter.After(time.Now().UTC()) {
+			if cert.NotAfter.After(now) {
 				revokedCerts = append(revokedCerts, data)
 			}
 		}

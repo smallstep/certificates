@@ -365,13 +365,15 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		err error
 	)
 
-	// Attempt to get the certificate expiry using the serial number.
-	cert, err := a.db.GetCertificate(revokeOpts.Serial)
+	if revokeOpts.Crt == nil {
+		// Attempt to get the certificate expiry using the serial number.
+		cert, err := a.db.GetCertificate(revokeOpts.Serial)
 
-	// Revocation of a certificate not in the database may be requested, so fill in the expiry only
-	// if we can
-	if err == nil {
-		rci.ExpiresAt = cert.NotAfter
+		// Revocation of a certificate not in the database may be requested, so fill in the expiry only
+		// if we can
+		if err == nil {
+			rci.ExpiresAt = cert.NotAfter
+		}
 	}
 
 	// If not mTLS then get the TokenID of the token.

@@ -580,7 +580,7 @@ type mockAuthority struct {
 	version                      func() authority.Version
 }
 
-func (m *mockAuthority) GenerateCertificateRevocationList(force bool) ([]byte, error) {
+func (m *mockAuthority) GetCertificateRevocationList() ([]byte, error) {
 	panic("implement me")
 }
 

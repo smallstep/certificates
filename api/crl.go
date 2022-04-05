@@ -4,6 +4,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/errs"
 	"net/http"
 )
 
@@ -14,17 +15,16 @@ func (h *caHandler) CRL(w http.ResponseWriter, r *http.Request) {
 	_, formatAsPEM := r.URL.Query()["pem"]
 
 	if err != nil {
+
+		caErr, isCaErr := err.(*errs.Error)
+
+		if isCaErr {
+			http.Error(w, caErr.Msg, caErr.Status)
+			return
+		}
+
 		w.WriteHeader(500)
 		_, err = fmt.Fprintf(w, "%v\n", err)
-		if err != nil {
-			panic(errors.Wrap(err, "error writing http response"))
-		}
-		return
-	}
-
-	if crlBytes == nil {
-		w.WriteHeader(404)
-		_, err = fmt.Fprintln(w, "No CRL available")
 		if err != nil {
 			panic(errors.Wrap(err, "error writing http response"))
 		}
