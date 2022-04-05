@@ -67,7 +67,7 @@ type Authority struct {
 	sshCAHostFederatedCerts []ssh.PublicKey
 
 	// CRL vars
-	crlChannel chan int
+	crlTicker *time.Ticker
 
 	// Do not re-initialize
 	initOnce  bool
@@ -604,6 +604,10 @@ func (a *Authority) IsAdminAPIEnabled() bool {
 
 // Shutdown safely shuts down any clients, databases, etc. held by the Authority.
 func (a *Authority) Shutdown() error {
+	if a.crlTicker != nil {
+		a.crlTicker.Stop()
+	}
+
 	if err := a.keyManager.Close(); err != nil {
 		log.Printf("error closing the key manager: %v", err)
 	}
@@ -612,6 +616,11 @@ func (a *Authority) Shutdown() error {
 
 // CloseForReload closes internal services, to allow a safe reload.
 func (a *Authority) CloseForReload() {
+
+	if a.crlTicker != nil {
+		a.crlTicker.Stop()
+	}
+
 	if err := a.keyManager.Close(); err != nil {
 		log.Printf("error closing the key manager: %v", err)
 	}
@@ -686,12 +695,12 @@ func (a *Authority) startCRLGenerator() error {
 	if tickerDuration <= 0 {
 		panic(fmt.Sprintf("ERROR: Addition of jitter to CRL generation time %v creates a negative duration (%v). Use a CRL generation time of longer than 1 minute.", a.config.CRL.CacheDuration, tickerDuration))
 	}
-	crlTicker := time.NewTicker(tickerDuration)
+	a.crlTicker = time.NewTicker(tickerDuration)
 
 	go func() {
 		for {
 			select {
-			case <-crlTicker.C:
+			case <-a.crlTicker.C:
 				log.Println("Regenerating CRL")
 				err := a.GenerateCertificateRevocationList()
 				if err != nil {

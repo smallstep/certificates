@@ -50,7 +50,6 @@ type Authority interface {
 	GetRoots() ([]*x509.Certificate, error)
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
-	GenerateCertificateRevocationList() error
 	GetCertificateRevocationList() ([]byte, error)
 }
 
