@@ -103,7 +103,6 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 	return provisioner.Config{
 		Claims:    claimer.Claims(),
 		Audiences: a.config.GetAudiences(),
-		DB:        a.db,
 		SSHKeys: &provisioner.SSHKeys{
 			UserKeys: sshKeys.UserKeys,
 			HostKeys: sshKeys.HostKeys,
