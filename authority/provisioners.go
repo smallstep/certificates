@@ -13,6 +13,7 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
@@ -44,13 +45,36 @@ func (a *Authority) GetProvisioners(cursor string, limit int) (provisioner.List,
 // LoadProvisionerByCertificate returns an interface to the provisioner that
 // provisioned the certificate.
 func (a *Authority) LoadProvisionerByCertificate(crt *x509.Certificate) (provisioner.Interface, error) {
+	// Default implementation looks at the provisioner extension.
+	loadProvisioner := func() (provisioner.Interface, error) {
+		p, ok := a.provisioners.LoadByCertificate(crt)
+		if !ok {
+			return nil, admin.NewError(admin.ErrorNotFoundType, "unable to load provisioner from certificate")
+		}
+		return p, nil
+	}
+
+	// Attempt to load the provisioner using the linked db
+	// TODO:(mariano)
+
+	// Attempt to load the provisioner from the db
+	if db, ok := a.db.(interface {
+		GetCertificateData(string) (*db.CertificateData, error)
+	}); ok {
+		if data, err := db.GetCertificateData(crt.SerialNumber.String()); err == nil && data.Provisioner != nil {
+			loadProvisioner = func() (provisioner.Interface, error) {
+				p, ok := a.provisioners.Load(data.Provisioner.ID)
+				if !ok {
+					return nil, admin.NewError(admin.ErrorNotFoundType, "unable to load provisioner from certificate")
+				}
+				return p, nil
+			}
+		}
+	}
+
 	a.adminMutex.RLock()
 	defer a.adminMutex.RUnlock()
-	p, ok := a.provisioners.LoadByCertificate(crt)
-	if !ok {
-		return nil, admin.NewError(admin.ErrorNotFoundType, "unable to load provisioner from certificate")
-	}
-	return p, nil
+	return loadProvisioner()
 }
 
 // LoadProvisionerByToken returns an interface to the provisioner that
