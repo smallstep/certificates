@@ -21,6 +21,20 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
+// Provisioners is the interface used by the provisioners collection.
+type Provisioners interface {
+	Load(id string) (provisioner.Interface, bool)
+	Store(p provisioner.Interface) error
+	Update(p provisioner.Interface) error
+	Remove(id string) error
+	LoadByName(name string) (provisioner.Interface, bool)
+	LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) (provisioner.Interface, bool)
+	LoadByTokenID(tokenProvisionerID string) (provisioner.Interface, bool)
+	LoadByCertificate(cert *x509.Certificate) (provisioner.Interface, bool)
+	Find(cursor string, limit int) (provisioner.List, string)
+	LoadEncryptedKey(keyID string) (string, bool)
+}
+
 // GetEncryptedKey returns the JWE key corresponding to the given kid argument.
 func (a *Authority) GetEncryptedKey(kid string) (string, error) {
 	a.adminMutex.RLock()

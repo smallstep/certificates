@@ -8,6 +8,19 @@ import (
 	"go.step.sm/linkedca"
 )
 
+// Admins is the interface used by the admin collection.
+type Admins interface {
+	Store(adm *linkedca.Admin, prov provisioner.Interface) error
+	Update(id string, nu *linkedca.Admin) (*linkedca.Admin, error)
+	Remove(id string) error
+	LoadByID(id string) (*linkedca.Admin, bool)
+	LoadBySubProv(sub, provName string) (*linkedca.Admin, bool)
+	LoadByProvisioner(provName string) ([]*linkedca.Admin, bool)
+	Find(cursor string, limit int) ([]*linkedca.Admin, string)
+	SuperCount() int
+	SuperCountByProvisioner(provName string) int
+}
+
 // LoadAdminByID returns an *linkedca.Admin with the given ID.
 func (a *Authority) LoadAdminByID(id string) (*linkedca.Admin, bool) {
 	a.adminMutex.RLock()
