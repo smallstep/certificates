@@ -8,20 +8,22 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/nosql"
 	"github.com/smallstep/nosql/database"
 	"golang.org/x/crypto/ssh"
 )
 
 var (
-	certsTable             = []byte("x509_certs")
-	revokedCertsTable      = []byte("revoked_x509_certs")
-	revokedSSHCertsTable   = []byte("revoked_ssh_certs")
-	usedOTTTable           = []byte("used_ott")
-	sshCertsTable          = []byte("ssh_certs")
-	sshHostsTable          = []byte("ssh_hosts")
-	sshUsersTable          = []byte("ssh_users")
-	sshHostPrincipalsTable = []byte("ssh_host_principals")
+	certsTable              = []byte("x509_certs")
+	certsToProvisionerTable = []byte("x509_certs_provisioner")
+	revokedCertsTable       = []byte("revoked_x509_certs")
+	revokedSSHCertsTable    = []byte("revoked_ssh_certs")
+	usedOTTTable            = []byte("used_ott")
+	sshCertsTable           = []byte("ssh_certs")
+	sshHostsTable           = []byte("ssh_hosts")
+	sshUsersTable           = []byte("ssh_users")
+	sshHostPrincipalsTable  = []byte("ssh_host_principals")
 )
 
 // ErrAlreadyExists can be returned if the DB attempts to set a key that has
@@ -82,7 +84,7 @@ func New(c *Config) (AuthDB, error) {
 	tables := [][]byte{
 		revokedCertsTable, certsTable, usedOTTTable,
 		sshCertsTable, sshHostsTable, sshHostPrincipalsTable, sshUsersTable,
-		revokedSSHCertsTable,
+		revokedSSHCertsTable, certsToProvisionerTable,
 	}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
@@ -206,6 +208,36 @@ func (db *DB) GetCertificate(serialNumber string) (*x509.Certificate, error) {
 func (db *DB) StoreCertificate(crt *x509.Certificate) error {
 	if err := db.Set(certsTable, []byte(crt.SerialNumber.String()), crt.Raw); err != nil {
 		return errors.Wrap(err, "database Set error")
+	}
+	return nil
+}
+
+type certsToProvionersData struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// StoreCertificateChain stores the leaf certificate and the provisioner that
+// authorized the certificate.
+func (d *DB) StoreCertificateChain(p provisioner.Interface, chain ...*x509.Certificate) error {
+	leaf := chain[0]
+	if err := d.StoreCertificate(leaf); err != nil {
+		return err
+	}
+	if p != nil {
+		b, err := json.Marshal(certsToProvionersData{
+			ID:   p.GetID(),
+			Name: p.GetName(),
+			Type: p.GetType().String(),
+		})
+		if err != nil {
+			return errors.Wrap(err, "error marshaling json")
+		}
+
+		if err := d.Set(certsToProvisionerTable, []byte(leaf.SerialNumber.String()), b); err != nil {
+			return errors.Wrap(err, "database Set error")
+		}
 	}
 	return nil
 }

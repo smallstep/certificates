@@ -1,10 +1,14 @@
 package db
 
 import (
+	"crypto/x509"
 	"errors"
+	"math/big"
 	"testing"
 
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/nosql"
 	"github.com/smallstep/nosql/database"
 )
 
@@ -154,6 +158,90 @@ func TestUseToken(t *testing.T) {
 				assert.True(t, tc.want.ok)
 			default:
 				assert.False(t, tc.want.ok)
+			}
+		})
+	}
+}
+
+func TestDB_StoreCertificateChain(t *testing.T) {
+	p := &provisioner.JWK{
+		ID:   "some-id",
+		Name: "admin",
+		Type: "JWK",
+	}
+	chain := []*x509.Certificate{
+		{Raw: []byte("the certificate"), SerialNumber: big.NewInt(1234)},
+	}
+	type fields struct {
+		DB   nosql.DB
+		isUp bool
+	}
+	type args struct {
+		p     provisioner.Interface
+		chain []*x509.Certificate
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"ok", fields{&MockNoSQLDB{
+			MSet: func(bucket, key, value []byte) error {
+				switch string(bucket) {
+				case "x509_certs":
+					assert.Equals(t, key, []byte("1234"))
+					assert.Equals(t, value, []byte("the certificate"))
+				case "x509_certs_provisioner":
+					assert.Equals(t, key, []byte("1234"))
+					assert.Equals(t, value, []byte(`{"id":"some-id","name":"admin","type":"JWK"}`))
+				default:
+					t.Errorf("unexpected bucket %s", bucket)
+				}
+				return nil
+			},
+		}, true}, args{p, chain}, false},
+		{"ok no provisioner", fields{&MockNoSQLDB{
+			MSet: func(bucket, key, value []byte) error {
+				switch string(bucket) {
+				case "x509_certs":
+					assert.Equals(t, key, []byte("1234"))
+					assert.Equals(t, value, []byte("the certificate"))
+				default:
+					t.Errorf("unexpected bucket %s", bucket)
+				}
+				return nil
+			},
+		}, true}, args{nil, chain}, false},
+		{"fail store certificate", fields{&MockNoSQLDB{
+			MSet: func(bucket, key, value []byte) error {
+				switch string(bucket) {
+				case "x509_certs":
+					return errors.New("test error")
+				default:
+					return nil
+				}
+			},
+		}, true}, args{p, chain}, true},
+		{"fail store provisioner", fields{&MockNoSQLDB{
+			MSet: func(bucket, key, value []byte) error {
+				switch string(bucket) {
+				case "x509_certs_provisioner":
+					return errors.New("test error")
+				default:
+					return nil
+				}
+			},
+		}, true}, args{p, chain}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := &DB{
+				DB:   tt.fields.DB,
+				isUp: tt.fields.isUp,
+			}
+			if err := d.StoreCertificateChain(tt.args.p, tt.args.chain...); (err != nil) != tt.wantErr {
+				t.Errorf("DB.StoreCertificateChain() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
