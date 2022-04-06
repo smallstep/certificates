@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/smallstep/assert"
@@ -192,9 +193,9 @@ func TestDB_StoreCertificateChain(t *testing.T) {
 				case "x509_certs":
 					assert.Equals(t, key, []byte("1234"))
 					assert.Equals(t, value, []byte("the certificate"))
-				case "x509_certs_provisioner":
+				case "x509_certs_data":
 					assert.Equals(t, key, []byte("1234"))
-					assert.Equals(t, value, []byte(`{"id":"some-id","name":"admin","type":"JWK"}`))
+					assert.Equals(t, value, []byte(`{"provisioner":{"id":"some-id","name":"admin","type":"JWK"}}`))
 				default:
 					t.Errorf("unexpected bucket %s", bucket)
 				}
@@ -207,6 +208,9 @@ func TestDB_StoreCertificateChain(t *testing.T) {
 				case "x509_certs":
 					assert.Equals(t, key, []byte("1234"))
 					assert.Equals(t, value, []byte("the certificate"))
+				case "x509_certs_data":
+					assert.Equals(t, key, []byte("1234"))
+					assert.Equals(t, value, []byte(`{}`))
 				default:
 					t.Errorf("unexpected bucket %s", bucket)
 				}
@@ -226,7 +230,7 @@ func TestDB_StoreCertificateChain(t *testing.T) {
 		{"fail store provisioner", fields{&MockNoSQLDB{
 			MSet: func(bucket, key, value []byte) error {
 				switch string(bucket) {
-				case "x509_certs_provisioner":
+				case "x509_certs_data":
 					return errors.New("test error")
 				default:
 					return nil
@@ -242,6 +246,66 @@ func TestDB_StoreCertificateChain(t *testing.T) {
 			}
 			if err := d.StoreCertificateChain(tt.args.p, tt.args.chain...); (err != nil) != tt.wantErr {
 				t.Errorf("DB.StoreCertificateChain() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestDB_GetCertificateData(t *testing.T) {
+	type fields struct {
+		DB   nosql.DB
+		isUp bool
+	}
+	type args struct {
+		serialNumber string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *CertificateData
+		wantErr bool
+	}{
+		{"ok", fields{&MockNoSQLDB{
+			MGet: func(bucket, key []byte) ([]byte, error) {
+				assert.Equals(t, bucket, []byte("x509_certs_data"))
+				assert.Equals(t, key, []byte("1234"))
+				return []byte(`{"provisioner":{"id":"some-id","name":"admin","type":"JWK"}}`), nil
+			},
+		}, true}, args{"1234"}, &CertificateData{
+			Provisioner: &ProvisionerData{
+				ID: "some-id", Name: "admin", Type: "JWK",
+			},
+		}, false},
+		{"fail not found", fields{&MockNoSQLDB{
+			MGet: func(bucket, key []byte) ([]byte, error) {
+				return nil, database.ErrNotFound
+			},
+		}, true}, args{"1234"}, nil, true},
+		{"fail db", fields{&MockNoSQLDB{
+			MGet: func(bucket, key []byte) ([]byte, error) {
+				return nil, errors.New("an error")
+			},
+		}, true}, args{"1234"}, nil, true},
+		{"fail unmarshal", fields{&MockNoSQLDB{
+			MGet: func(bucket, key []byte) ([]byte, error) {
+				return []byte(`{"bad-json"}`), nil
+			},
+		}, true}, args{"1234"}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := &DB{
+				DB:   tt.fields.DB,
+				isUp: tt.fields.isUp,
+			}
+			got, err := db.GetCertificateData(tt.args.serialNumber)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DB.GetCertificateData() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DB.GetCertificateData() = %v, want %v", got, tt.want)
 			}
 		})
 	}

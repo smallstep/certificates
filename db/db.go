@@ -15,15 +15,15 @@ import (
 )
 
 var (
-	certsTable              = []byte("x509_certs")
-	certsToProvisionerTable = []byte("x509_certs_provisioner")
-	revokedCertsTable       = []byte("revoked_x509_certs")
-	revokedSSHCertsTable    = []byte("revoked_ssh_certs")
-	usedOTTTable            = []byte("used_ott")
-	sshCertsTable           = []byte("ssh_certs")
-	sshHostsTable           = []byte("ssh_hosts")
-	sshUsersTable           = []byte("ssh_users")
-	sshHostPrincipalsTable  = []byte("ssh_host_principals")
+	certsTable             = []byte("x509_certs")
+	certsDataTable         = []byte("x509_certs_data")
+	revokedCertsTable      = []byte("revoked_x509_certs")
+	revokedSSHCertsTable   = []byte("revoked_ssh_certs")
+	usedOTTTable           = []byte("used_ott")
+	sshCertsTable          = []byte("ssh_certs")
+	sshHostsTable          = []byte("ssh_hosts")
+	sshUsersTable          = []byte("ssh_users")
+	sshHostPrincipalsTable = []byte("ssh_host_principals")
 )
 
 // ErrAlreadyExists can be returned if the DB attempts to set a key that has
@@ -84,7 +84,7 @@ func New(c *Config) (AuthDB, error) {
 	tables := [][]byte{
 		revokedCertsTable, certsTable, usedOTTTable,
 		sshCertsTable, sshHostsTable, sshHostPrincipalsTable, sshUsersTable,
-		revokedSSHCertsTable, certsToProvisionerTable,
+		revokedSSHCertsTable, certsDataTable,
 	}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
@@ -204,6 +204,19 @@ func (db *DB) GetCertificate(serialNumber string) (*x509.Certificate, error) {
 	return cert, nil
 }
 
+// GetCertificateData returns the data stored for a provisioner
+func (db *DB) GetCertificateData(serialNumber string) (*CertificateData, error) {
+	b, err := db.Get(certsDataTable, []byte(serialNumber))
+	if err != nil {
+		return nil, errors.Wrap(err, "database Get error")
+	}
+	var data CertificateData
+	if err := json.Unmarshal(b, &data); err != nil {
+		return nil, errors.Wrap(err, "error unmarshaling json")
+	}
+	return &data, nil
+}
+
 // StoreCertificate stores a certificate PEM.
 func (db *DB) StoreCertificate(crt *x509.Certificate) error {
 	if err := db.Set(certsTable, []byte(crt.SerialNumber.String()), crt.Raw); err != nil {
@@ -212,7 +225,15 @@ func (db *DB) StoreCertificate(crt *x509.Certificate) error {
 	return nil
 }
 
-type certsToProvionersData struct {
+// CertificateData is the JSON representation of the data stored in
+// x509_certs_data table.
+type CertificateData struct {
+	Provisioner *ProvisionerData `json:"provisioner,omitempty"`
+}
+
+// ProvisionerData is the JSON representation of the provisioner stored in the
+// x509_certs_data table.
+type ProvisionerData struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Type string `json:"type"`
@@ -220,24 +241,26 @@ type certsToProvionersData struct {
 
 // StoreCertificateChain stores the leaf certificate and the provisioner that
 // authorized the certificate.
-func (d *DB) StoreCertificateChain(p provisioner.Interface, chain ...*x509.Certificate) error {
+func (db *DB) StoreCertificateChain(p provisioner.Interface, chain ...*x509.Certificate) error {
 	leaf := chain[0]
-	if err := d.StoreCertificate(leaf); err != nil {
+	if err := db.StoreCertificate(leaf); err != nil {
 		return err
 	}
+	data := &CertificateData{}
 	if p != nil {
-		b, err := json.Marshal(certsToProvionersData{
+		data.Provisioner = &ProvisionerData{
 			ID:   p.GetID(),
 			Name: p.GetName(),
 			Type: p.GetType().String(),
-		})
-		if err != nil {
-			return errors.Wrap(err, "error marshaling json")
 		}
+	}
 
-		if err := d.Set(certsToProvisionerTable, []byte(leaf.SerialNumber.String()), b); err != nil {
-			return errors.Wrap(err, "database Set error")
-		}
+	b, err := json.Marshal(data)
+	if err != nil {
+		return errors.Wrap(err, "error marshaling json")
+	}
+	if err := db.Set(certsDataTable, []byte(leaf.SerialNumber.String()), b); err != nil {
+		return errors.Wrap(err, "database Set error")
 	}
 	return nil
 }
