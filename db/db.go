@@ -127,14 +127,6 @@ type CertificateRevocationListInfo struct {
 	DER       []byte
 }
 
-// CertificateRevocationListInfo contains a CRL in DER format and associated
-// metadata to allow a decision on whether to regenerate the CRL or not easier
-type CertificateRevocationListInfo struct {
-	Number    int64
-	ExpiresAt time.Time
-	DER       []byte
-}
-
 // IsRevoked returns whether or not a certificate with the given identifier
 // has been revoked.
 // In the case of an X509 Certificate the `id` should be the Serial Number of
@@ -224,7 +216,7 @@ func (db *DB) GetRevokedCertificates() (*[]RevokedCertificateInfo, error) {
 		return nil, err
 	}
 	var revokedCerts []RevokedCertificateInfo
-	now := time.Now().UTC()
+	now := time.Now().Truncate(time.Second)
 
 	for _, e := range entries {
 		var data RevokedCertificateInfo

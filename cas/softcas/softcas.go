@@ -133,7 +133,11 @@ func (c *SoftCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1
 // CreateCRL will create a new CRL based on the RevocationList passed to it
 func (c *SoftCAS) CreateCRL(req *apiv1.CreateCRLRequest) (*apiv1.CreateCRLResponse, error) {
 
-	revocationListBytes, err := x509.CreateRevocationList(rand.Reader, req.RevocationList, c.CertificateChain[0], c.Signer)
+	certChain, signer, err := c.getCertSigner()
+	if err != nil {
+		return nil, err
+	}
+	revocationListBytes, err := x509.CreateRevocationList(rand.Reader, req.RevocationList, certChain[0], signer)
 	if err != nil {
 		return nil, err
 	}
