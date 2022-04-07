@@ -13,6 +13,7 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -23,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/assert"
 )
 
 func Test_storeError(t *testing.T) {
@@ -2346,6 +2347,37 @@ func Test_serverName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := serverName(tt.args.ch); got != tt.want {
 				t.Errorf("serverName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_http01ChallengeHost(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{
+			name:  "dns",
+			value: "www.example.com",
+			want:  "www.example.com",
+		},
+		{
+			name:  "ipv4",
+			value: "127.0.0.1",
+			want:  "127.0.0.1",
+		},
+		{
+			name:  "ipv6",
+			value: "::1",
+			want:  "[::1]",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := http01ChallengeHost(tt.value); got != tt.want {
+				t.Errorf("http01ChallengeHost() = %v, want %v", got, tt.want)
 			}
 		})
 	}
