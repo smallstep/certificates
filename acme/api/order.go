@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -109,6 +110,9 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	// thus make sense to also set the allowed/denied names based on that info.
 	// TODO(hs): gather all errors, so that we can build one response with subproblems; include the nor.Validate()
 	// error here too, like in example?
+
+	eak, err := h.db.GetExternalAccountKeyByAccountID(ctx, prov.GetID(), acc.ID)
+	fmt.Println("EAK: ", eak, err)
 
 	for _, identifier := range nor.Identifiers {
 		// evaluate the provisioner level policy

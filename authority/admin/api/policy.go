@@ -6,6 +6,7 @@ import (
 
 	"go.step.sm/linkedca"
 
+	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
@@ -31,13 +32,15 @@ type policyAdminResponderInterface interface {
 type PolicyAdminResponder struct {
 	auth    adminAuthority
 	adminDB admin.DB
+	acmeDB  acme.DB
 }
 
 // NewACMEAdminResponder returns a new ACMEAdminResponder
-func NewPolicyAdminResponder(auth adminAuthority, adminDB admin.DB) *PolicyAdminResponder {
+func NewPolicyAdminResponder(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB) *PolicyAdminResponder {
 	return &PolicyAdminResponder{
 		auth:    auth,
 		adminDB: adminDB,
+		acmeDB:  acmeDB,
 	}
 }
 
@@ -156,8 +159,7 @@ func (par *PolicyAdminResponder) DeleteAuthorityPolicy(w http.ResponseWriter, r 
 		return
 	}
 
-	err = par.auth.RemoveAuthorityPolicy(ctx)
-	if err != nil {
+	if err := par.auth.RemoveAuthorityPolicy(ctx); err != nil {
 		render.Error(w, admin.WrapErrorISE(err, "error deleting authority policy"))
 		return
 	}
@@ -200,8 +202,7 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 
 	prov.Policy = newPolicy
 
-	err := par.auth.UpdateProvisioner(ctx, prov)
-	if err != nil {
+	if err := par.auth.UpdateProvisioner(ctx, prov); err != nil {
 		var pe *authority.PolicyError
 		isPolicyError := errors.As(err, &pe)
 		if isPolicyError && pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure || pe.Typ == authority.ConfigurationFailure {
@@ -233,8 +234,7 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 	}
 
 	prov.Policy = newPolicy
-	err := par.auth.UpdateProvisioner(ctx, prov)
-	if err != nil {
+	if err := par.auth.UpdateProvisioner(ctx, prov); err != nil {
 		var pe *authority.PolicyError
 		isPolicyError := errors.As(err, &pe)
 		if isPolicyError && pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure || pe.Typ == authority.ConfigurationFailure {
@@ -263,8 +263,7 @@ func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, 
 	// remove the policy
 	prov.Policy = nil
 
-	err := par.auth.UpdateProvisioner(ctx, prov)
-	if err != nil {
+	if err := par.auth.UpdateProvisioner(ctx, prov); err != nil {
 		render.Error(w, admin.WrapErrorISE(err, "error deleting provisioner policy"))
 		return
 	}
@@ -273,17 +272,92 @@ func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, 
 }
 
 func (par *PolicyAdminResponder) GetACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	render.JSONStatus(w, "not implemented yet", http.StatusNotImplemented)
+	ctx := r.Context()
+	eak := linkedca.ExternalAccountKeyFromContext(ctx)
+
+	policy := eak.GetPolicy()
+	if policy == nil {
+		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME EAK policy does not exist"))
+		return
+	}
+
+	render.ProtoJSONStatus(w, policy, http.StatusOK)
 }
 
 func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	render.JSONStatus(w, "not implemented yet", http.StatusNotImplemented)
+	ctx := r.Context()
+	prov := linkedca.ProvisionerFromContext(ctx)
+	eak := linkedca.ExternalAccountKeyFromContext(ctx)
+
+	policy := eak.GetPolicy()
+	if policy != nil {
+		adminErr := admin.NewError(admin.ErrorBadRequestType, "ACME EAK %s already has a policy", eak.Id)
+		adminErr.Status = http.StatusConflict
+		render.Error(w, adminErr)
+		return
+	}
+
+	var newPolicy = new(linkedca.Policy)
+	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
+		return
+	}
+
+	eak.Policy = newPolicy
+
+	acmeEAK := linkedEAKToCertificates(eak)
+	if err := par.acmeDB.UpdateExternalAccountKey(ctx, prov.GetId(), acmeEAK); err != nil {
+		render.Error(w, admin.WrapErrorISE(err, "error creating ACME EAK policy"))
+		return
+	}
+
+	render.ProtoJSONStatus(w, newPolicy, http.StatusCreated)
 }
 
 func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	render.JSONStatus(w, "not implemented yet", http.StatusNotImplemented)
+	ctx := r.Context()
+	prov := linkedca.ProvisionerFromContext(ctx)
+	eak := linkedca.ExternalAccountKeyFromContext(ctx)
+
+	policy := eak.GetPolicy()
+	if policy == nil {
+		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME EAK policy does not exist"))
+		return
+	}
+
+	var newPolicy = new(linkedca.Policy)
+	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
+		return
+	}
+
+	eak.Policy = newPolicy
+	acmeEAK := linkedEAKToCertificates(eak)
+	if err := par.acmeDB.UpdateExternalAccountKey(ctx, prov.GetId(), acmeEAK); err != nil {
+		render.Error(w, admin.WrapErrorISE(err, "error updating ACME EAK policy"))
+		return
+	}
+
+	render.ProtoJSONStatus(w, newPolicy, http.StatusOK)
 }
 
 func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-	render.JSONStatus(w, "not implemented yet", http.StatusNotImplemented)
+	ctx := r.Context()
+	prov := linkedca.ProvisionerFromContext(ctx)
+	eak := linkedca.ExternalAccountKeyFromContext(ctx)
+
+	policy := eak.GetPolicy()
+	if policy == nil {
+		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME EAK policy does not exist"))
+		return
+	}
+
+	// remove the policy
+	eak.Policy = nil
+
+	acmeEAK := linkedEAKToCertificates(eak)
+	if err := par.acmeDB.UpdateExternalAccountKey(ctx, prov.GetId(), acmeEAK); err != nil {
+		render.Error(w, admin.WrapErrorISE(err, "error deleting ACME EAK policy"))
+		return
+	}
+
+	render.JSONStatus(w, DeleteResponse{Status: "ok"}, http.StatusOK)
 }

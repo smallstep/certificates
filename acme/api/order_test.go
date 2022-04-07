@@ -782,6 +782,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, ch.Value, "zap.internal")
 						return errors.New("force")
 					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
+					},
 				},
 				err: acme.NewErrorISE("error creating challenge: force"),
 			}
@@ -851,6 +856,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.Identifiers, fr.Identifiers)
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
 						return errors.New("force")
+					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
 					},
 				},
 				err: acme.NewErrorISE("error creating order: force"),
@@ -949,6 +959,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID, *az2ID})
 						return nil
 					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
+					},
 				},
 				vr: func(t *testing.T, o *acme.Order) {
 					now := clock.Now()
@@ -1041,6 +1056,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.Identifiers, nor.Identifiers)
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
 						return nil
+					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
 					},
 				},
 				vr: func(t *testing.T, o *acme.Order) {
@@ -1135,6 +1155,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
 						return nil
 					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
+					},
 				},
 				vr: func(t *testing.T, o *acme.Order) {
 					now := clock.Now()
@@ -1226,6 +1251,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.Identifiers, nor.Identifiers)
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
 						return nil
+					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
 					},
 				},
 				vr: func(t *testing.T, o *acme.Order) {
@@ -1319,6 +1349,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.Identifiers, nor.Identifiers)
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
 						return nil
+					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
 					},
 				},
 				vr: func(t *testing.T, o *acme.Order) {

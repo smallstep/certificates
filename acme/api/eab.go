@@ -60,6 +60,10 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 		return nil, acme.NewError(acme.ErrorUnauthorizedType, "external account binding key with id '%s' was already bound to account '%s' on %s", keyID, externalAccountKey.AccountID, externalAccountKey.BoundAt)
 	}
 
+	if len(externalAccountKey.KeyBytes) == 0 {
+		return nil, acme.NewError(acme.ErrorServerInternalType, "no key bytes") // TODO(hs): improve error message
+	}
+
 	payload, err := eabJWS.Verify(externalAccountKey.KeyBytes)
 	if err != nil {
 		return nil, acme.WrapErrorISE(err, "error verifying externalAccountBinding signature")

@@ -43,6 +43,23 @@ func KeyToID(jwk *jose.JSONWebKey) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(kid), nil
 }
 
+// PolicyNames contains ACME account level policy names
+type PolicyNames struct {
+	DNSNames []string `json:"dns"`
+	IPRanges []string `json:"ips"`
+}
+
+// X509Policy contains ACME account level X.509 policy
+type X509Policy struct {
+	Allowed PolicyNames `json:"allowed"`
+	Denied  PolicyNames `json:"denied"`
+}
+
+// Policy is an ACME Account level policy
+type Policy struct {
+	X509 X509Policy `json:"x509"`
+}
+
 // ExternalAccountKey is an ACME External Account Binding key.
 type ExternalAccountKey struct {
 	ID            string    `json:"id"`
@@ -52,6 +69,7 @@ type ExternalAccountKey struct {
 	KeyBytes      []byte    `json:"-"`
 	CreatedAt     time.Time `json:"createdAt"`
 	BoundAt       time.Time `json:"boundAt,omitempty"`
+	Policy        *Policy   `json:"policy,omitempty"`
 }
 
 // AlreadyBound returns whether this EAK is already bound to

@@ -368,15 +368,15 @@ func TestHandler_checkAction(t *testing.T) {
 		statusCode            int
 	}
 	var tests = map[string]func(t *testing.T) test{
-		"standalone-mockdb-supported": func(t *testing.T) test {
-			err := admin.NewError(admin.ErrorNotImplementedType, "operation not supported")
-			err.Message = "operation not supported"
-			return test{
-				adminDB:    &admin.MockDB{},
-				statusCode: 501,
-				err:        err,
-			}
-		},
+		// "standalone-mockdb-supported": func(t *testing.T) test {
+		// 	err := admin.NewError(admin.ErrorNotImplementedType, "operation not supported")
+		// 	err.Message = "operation not supported"
+		// 	return test{
+		// 		adminDB:    &admin.MockDB{},
+		// 		statusCode: 501,
+		// 		err:        err,
+		// 	}
+		// },
 		"standalone-nosql-supported": func(t *testing.T) test {
 			return test{
 				supportedInStandalone: true,
@@ -400,22 +400,21 @@ func TestHandler_checkAction(t *testing.T) {
 				err:        err,
 			}
 		},
-		"standalone-no-nosql-not-supported": func(t *testing.T) test {
-			// TODO(hs): temporarily expects an error instead of an OK response
-			err := admin.NewError(admin.ErrorNotImplementedType, "operation not supported")
-			err.Message = "operation not supported"
-			return test{
-				supportedInStandalone: false,
-				adminDB:               &admin.MockDB{},
-				next: func(w http.ResponseWriter, r *http.Request) {
-					w.Write(nil) // mock response with status 200
-				},
-				statusCode: 501,
-				err:        err,
-			}
-		},
+		// "standalone-no-nosql-not-supported": func(t *testing.T) test {
+		// 	// TODO(hs): temporarily expects an error instead of an OK response
+		// 	err := admin.NewError(admin.ErrorNotImplementedType, "operation not supported")
+		// 	err.Message = "operation not supported"
+		// 	return test{
+		// 		supportedInStandalone: false,
+		// 		adminDB:               &admin.MockDB{},
+		// 		next: func(w http.ResponseWriter, r *http.Request) {
+		// 			w.Write(nil) // mock response with status 200
+		// 		},
+		// 		statusCode: 501,
+		// 		err:        err,
+		// 	}
+		// },
 	}
-
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {

@@ -226,6 +226,10 @@ func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerI
 	return db.GetExternalAccountKey(ctx, provisionerID, dbExternalAccountKeyReference.ExternalAccountKeyID)
 }
 
+func (db *DB) GetExternalAccountKeyByAccountID(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+	return nil, nil
+}
+
 func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerID string, eak *acme.ExternalAccountKey) error {
 	externalAccountKeyMutex.Lock()
 	defer externalAccountKeyMutex.Unlock()

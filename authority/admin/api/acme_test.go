@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi"
-
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 

@@ -56,7 +56,7 @@ func (h *Handler) Route(r api.Router) {
 	}
 
 	acmePolicyMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
-		return authnz(disabledInStandalone(h.loadProvisionerByName(h.requireEABEnabled(next))))
+		return authnz(disabledInStandalone(h.loadProvisionerByName(h.requireEABEnabled(h.loadExternalAccountKey(next)))))
 	}
 
 	// Provisioners
@@ -92,8 +92,13 @@ func (h *Handler) Route(r api.Router) {
 	r.MethodFunc("DELETE", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(h.policyResponder.DeleteProvisionerPolicy))
 
 	// Policy - ACME Account
-	r.MethodFunc("GET", "/acme/policy/{provisionerName}/{accountID}", acmePolicyMiddleware(h.policyResponder.GetACMEAccountPolicy))
-	r.MethodFunc("POST", "/acme/policy/{provisionerName}/{accountID}", acmePolicyMiddleware(h.policyResponder.CreateACMEAccountPolicy))
-	r.MethodFunc("PUT", "/acme/policy/{provisionerName}/{accountID}", acmePolicyMiddleware(h.policyResponder.UpdateACMEAccountPolicy))
-	r.MethodFunc("DELETE", "/acme/policy/{provisionerName}/{accountID}", acmePolicyMiddleware(h.policyResponder.DeleteACMEAccountPolicy))
+	r.MethodFunc("GET", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(h.policyResponder.GetACMEAccountPolicy))
+	r.MethodFunc("GET", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(h.policyResponder.GetACMEAccountPolicy))
+	r.MethodFunc("POST", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(h.policyResponder.CreateACMEAccountPolicy))
+	r.MethodFunc("POST", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(h.policyResponder.CreateACMEAccountPolicy))
+	r.MethodFunc("PUT", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(h.policyResponder.UpdateACMEAccountPolicy))
+	r.MethodFunc("PUT", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(h.policyResponder.UpdateACMEAccountPolicy))
+	r.MethodFunc("DELETE", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(h.policyResponder.DeleteACMEAccountPolicy))
+	r.MethodFunc("DELETE", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(h.policyResponder.DeleteACMEAccountPolicy))
+
 }
