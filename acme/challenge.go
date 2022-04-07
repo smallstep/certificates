@@ -79,7 +79,7 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 }
 
 func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, vo *ValidateChallengeOptions) error {
-	u := &url.URL{Scheme: "http", Host: ch.Value, Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
+	u := &url.URL{Scheme: "http", Host: http01ChallengeHost(ch.Value), Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
 
 	resp, err := vo.HTTPGet(u.String())
 	if err != nil {
@@ -117,6 +117,17 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 		return WrapErrorISE(err, "error updating challenge")
 	}
 	return nil
+}
+
+// http01ChallengeHost checks if a Challenge value is an IPv6 address
+// and adds square brackets if that's the case, so that it can be used
+// as a hostname. Returns the original Challenge value as the host to
+// use in other cases.
+func http01ChallengeHost(value string) string {
+	if ip := net.ParseIP(value); ip != nil && ip.To4() == nil {
+		value = "[" + value + "]"
+	}
+	return value
 }
 
 func tlsAlert(err error) uint8 {
