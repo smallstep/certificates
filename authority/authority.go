@@ -89,6 +89,14 @@ type Authority struct {
 	adminMutex sync.RWMutex
 }
 
+type Info struct {
+	StartTime          time.Time
+	RootX509Certs      []*x509.Certificate
+	SSHCAUserPublicKey []byte
+	SSHCAHostPublicKey []byte
+	DNSNames           []string
+}
+
 // New creates and initiates a new Authority type.
 func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 	err := cfg.Validate()
@@ -360,8 +368,6 @@ func (a *Authority) init() error {
 				return err
 			}
 			a.rootX509Certs = append(a.rootX509Certs, resp.RootCertificate)
-			sum := sha256.Sum256(resp.RootCertificate.Raw)
-			log.Printf("Using root fingerprint '%s'", hex.EncodeToString(sum[:]))
 		}
 	}
 
@@ -630,6 +636,21 @@ func (a *Authority) GetDatabase() db.AuthDB {
 // GetAdminDatabase returns the admin database, if one exists.
 func (a *Authority) GetAdminDatabase() admin.DB {
 	return a.adminDB
+}
+
+func (a *Authority) GetInfo() Info {
+	ai := Info{
+		StartTime:     a.startTime,
+		RootX509Certs: a.rootX509Certs,
+		DNSNames:      a.config.DNSNames,
+	}
+	if a.sshCAUserCertSignKey != nil {
+		ai.SSHCAUserPublicKey = ssh.MarshalAuthorizedKey(a.sshCAUserCertSignKey.PublicKey())
+	}
+	if a.sshCAHostCertSignKey != nil {
+		ai.SSHCAHostPublicKey = ssh.MarshalAuthorizedKey(a.sshCAHostCertSignKey.PublicKey())
+	}
+	return ai
 }
 
 // IsAdminAPIEnabled returns a boolean indicating whether the Admin API has
