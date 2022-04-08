@@ -16,6 +16,7 @@ require (
 	github.com/ThalesIgnite/crypto11 v1.2.4
 	github.com/aws/aws-sdk-go v1.37.0
 	github.com/dgraph-io/ristretto v0.0.4-0.20200906165740-41ebdbffecfd // indirect
+	github.com/fxamacker/cbor/v2 v2.4.0
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/go-piv/piv-go v1.7.0
 	github.com/golang/mock v1.6.0

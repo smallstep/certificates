@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
@@ -19,6 +21,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
+	"github.com/google/go-attestation/attest"
+	"github.com/google/go-attestation/oid"
+	x509ext "github.com/google/go-attestation/x509"
 	"go.step.sm/crypto/jose"
 )
 
@@ -301,9 +307,84 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	return nil
 }
 
+type Payload struct {
+	AttStmt []byte `json:"attStmt"`
+}
+
+type AttestationObject struct {
+	Format       string                 `json:"fmt"`
+	AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+}
+
+// TODO(bweeks): move attestation verification to a shared package.
+// TODO(bweeks): define new error type for failed attestation validation.
 func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
-	if string(payload) != "\"fake_device_attestation_statement\"" {
-		return errors.New("string(payload) != \"fake_device_attestation_statement\"")
+	var p Payload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return WrapErrorISE(err, "error unmarshalling JSON")
+	}
+
+	att := AttestationObject{}
+	if err := cbor.Unmarshal(p.AttStmt, &att); err != nil {
+		return WrapErrorISE(err, "error unmarshalling CBOR")
+	}
+
+	// TODO(bweeks): move verification code to a shared package.
+	// begin TPM key certification verification
+	params := &attest.CertificationParameters{
+		Public:            att.AttStatement["pubArea"].([]byte),
+		CreateAttestation: att.AttStatement["certInfo"].([]byte),
+		CreateSignature:   att.AttStatement["sig"].([]byte),
+	}
+	// end TPM key certification verification
+
+	x5c, x509present := att.AttStatement["x5c"].([]interface{})
+	if !x509present {
+		return errors.New("x5c not present")
+	}
+
+	akCertBytes, valid := x5c[0].([]byte)
+	if !valid {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"error getting certificate from x5c cert chain"))
+	}
+
+	akCert, err := x509.ParseCertificate(akCertBytes)
+	if err != nil {
+		return WrapErrorISE(err, "error parsing AK certificate")
+	}
+
+	if err := params.Verify(attest.VerifyOpts{Public: akCert.PublicKey, Hash: crypto.SHA256}); err != nil {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"params.Verify failed: %v", err))
+	}
+
+	var sanExt pkix.Extension
+	for _, ext := range akCert.Extensions {
+		if ext.Id.Equal(oid.SubjectAltName) {
+			sanExt = ext
+		}
+	}
+	if sanExt.Value == nil {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"akCert missing subjectAltName"))
+	}
+
+	san, err := x509ext.ParseSubjectAltName(sanExt)
+	if err != nil {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"failed to parse subjectAltName"))
+	}
+
+	if len(san.PermanentIdentifiers) != 1 {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"subjectAltName doesn't contain a PermanentIdentifier"))
+	}
+
+	wantPermID := san.PermanentIdentifiers[0]
+	if wantPermID.IdentifierValue != ch.Value {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"identifier from certificate and challenge do not match"))
 	}
 
 	// Update and store the challenge.
