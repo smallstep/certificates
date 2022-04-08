@@ -847,6 +847,29 @@ func TestAuthority_authorizeRenew(t *testing.T) {
 				cert: fooCrt,
 			}
 		},
+		"ok/from db": func(t *testing.T) *authorizeTest {
+			a := testAuthority(t)
+			a.db = &db.MockAuthDB{
+				MIsRevoked: func(key string) (bool, error) {
+					return false, nil
+				},
+				MGetCertificateData: func(serialNumber string) (*db.CertificateData, error) {
+					p, ok := a.provisioners.LoadByName("step-cli")
+					if !ok {
+						t.Fatal("provisioner step-cli not found")
+					}
+					return &db.CertificateData{
+						Provisioner: &db.ProvisionerData{
+							ID: p.GetID(),
+						},
+					}, nil
+				},
+			}
+			return &authorizeTest{
+				auth: a,
+				cert: fooCrt,
+			}
+		},
 	}
 
 	for name, genTestCase := range tests {

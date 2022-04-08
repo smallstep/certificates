@@ -282,8 +282,8 @@ func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 	if isRevoked {
 		return errs.Unauthorized("authority.authorizeRenew: certificate has been revoked", opts...)
 	}
-	p, ok := a.provisioners.LoadByCertificate(cert)
-	if !ok {
+	p, err := a.LoadProvisionerByCertificate(cert)
+	if err != nil {
 		return errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
 	}
 	if err := p.AuthorizeRenew(context.Background(), cert); err != nil {
@@ -383,8 +383,8 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 		return nil, errs.InternalServerErr(err, errs.WithMessage("error validating renew token"))
 	}
 
-	p, ok := a.provisioners.LoadByCertificate(leaf)
-	if !ok {
+	p, err := a.LoadProvisionerByCertificate(leaf)
+	if err != nil {
 		return nil, errs.Unauthorized("error validating renew token: cannot get provisioner from certificate")
 	}
 	if err := a.UseToken(ott, p); err != nil {
