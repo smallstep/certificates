@@ -275,7 +275,7 @@ func (a *Authority) RemoveProvisioner(ctx context.Context, id string) error {
 
 // CreateFirstProvisioner creates and stores the first provisioner when using
 // admin database provisioner storage.
-func CreateFirstProvisioner(ctx context.Context, db admin.DB, password string) (*linkedca.Provisioner, error) {
+func CreateFirstProvisioner(ctx context.Context, adminDB admin.DB, password string) (*linkedca.Provisioner, error) {
 	if password == "" {
 		pass, err := ui.PromptPasswordGenerate("Please enter the password to encrypt your first provisioner, leave empty and we'll generate one")
 		if err != nil {
@@ -318,7 +318,7 @@ func CreateFirstProvisioner(ctx context.Context, db admin.DB, password string) (
 			},
 		},
 	}
-	if err := db.CreateProvisioner(ctx, p); err != nil {
+	if err := adminDB.CreateProvisioner(ctx, p); err != nil {
 		return nil, admin.WrapErrorISE(err, "error creating provisioner")
 	}
 	return p, nil

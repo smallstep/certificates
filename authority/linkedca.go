@@ -246,14 +246,14 @@ func (c *linkedCaClient) GetCertificateData(serial string) (*db.CertificateData,
 		return nil, err
 	}
 
-	var provisioner *db.ProvisionerData
+	var pd *db.ProvisionerData
 	if p := resp.Provisioner; p != nil {
-		provisioner = &db.ProvisionerData{
+		pd = &db.ProvisionerData{
 			ID: p.Id, Name: p.Name, Type: p.Type.String(),
 		}
 	}
 	return &db.CertificateData{
-		Provisioner: provisioner,
+		Provisioner: pd,
 	}, nil
 }
 
