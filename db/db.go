@@ -359,6 +359,7 @@ type MockAuthDB struct {
 	MRevoke               func(rci *RevokedCertificateInfo) error
 	MRevokeSSH            func(rci *RevokedCertificateInfo) error
 	MGetCertificate       func(serialNumber string) (*x509.Certificate, error)
+	MGetCertificateData   func(serialNumber string) (*CertificateData, error)
 	MStoreCertificate     func(crt *x509.Certificate) error
 	MUseToken             func(id, tok string) (bool, error)
 	MIsSSHHost            func(principal string) (bool, error)
@@ -416,6 +417,17 @@ func (m *MockAuthDB) GetCertificate(serialNumber string) (*x509.Certificate, err
 		return m.MGetCertificate(serialNumber)
 	}
 	return m.Ret1.(*x509.Certificate), m.Err
+}
+
+// GetCertificateData mock.
+func (m *MockAuthDB) GetCertificateData(serialNumber string) (*CertificateData, error) {
+	if m.MGetCertificateData != nil {
+		return m.MGetCertificateData(serialNumber)
+	}
+	if cd, ok := m.Ret1.(*CertificateData); ok {
+		return cd, m.Err
+	}
+	return nil, m.Err
 }
 
 // StoreCertificate mock.

@@ -45,41 +45,43 @@ func (a *Authority) GetProvisioners(cursor string, limit int) (provisioner.List,
 // LoadProvisionerByCertificate returns an interface to the provisioner that
 // provisioned the certificate.
 func (a *Authority) LoadProvisionerByCertificate(crt *x509.Certificate) (provisioner.Interface, error) {
-	// Default implementation looks at the provisioner extension.
-	loadProvisioner := func() (provisioner.Interface, error) {
-		p, ok := a.provisioners.LoadByCertificate(crt)
-		if !ok {
-			return nil, admin.NewError(admin.ErrorNotFoundType, "unable to load provisioner from certificate")
-		}
+	a.adminMutex.RLock()
+	defer a.adminMutex.RUnlock()
+	if p, err := a.unsafeLoadProvisionerFromDatabase(crt); err == nil {
 		return p, nil
 	}
+	return a.unsafeLoadProvisionerFromExtension(crt)
+}
 
+func (a *Authority) unsafeLoadProvisionerFromExtension(crt *x509.Certificate) (provisioner.Interface, error) {
+	p, ok := a.provisioners.LoadByCertificate(crt)
+	if !ok || p.GetType() == 0 {
+		return nil, admin.NewError(admin.ErrorNotFoundType, "unable to load provisioner from certificate")
+	}
+	return p, nil
+}
+
+func (a *Authority) unsafeLoadProvisionerFromDatabase(crt *x509.Certificate) (provisioner.Interface, error) {
 	// certificateDataGetter is an interface that can be use to retrieve the
 	// provisioner from a db or a linked ca.
 	type certificateDataGetter interface {
 		GetCertificateData(string) (*db.CertificateData, error)
 	}
-	var cdg certificateDataGetter
-	if getter, ok := a.adminDB.(certificateDataGetter); ok {
-		cdg = getter
-	} else if getter, ok := a.db.(certificateDataGetter); ok {
-		cdg = getter
+
+	var err error
+	var data *db.CertificateData
+
+	if cdg, ok := a.adminDB.(certificateDataGetter); ok {
+		data, err = cdg.GetCertificateData(crt.SerialNumber.String())
+	} else if cdg, ok := a.db.(certificateDataGetter); ok {
+		data, err = cdg.GetCertificateData(crt.SerialNumber.String())
 	}
-	if cdg != nil {
-		if data, err := cdg.GetCertificateData(crt.SerialNumber.String()); err == nil && data.Provisioner != nil {
-			loadProvisioner = func() (provisioner.Interface, error) {
-				p, ok := a.provisioners.Load(data.Provisioner.ID)
-				if !ok {
-					return nil, admin.NewError(admin.ErrorNotFoundType, "unable to load provisioner from certificate")
-				}
-				return p, nil
-			}
+	if err == nil && data != nil && data.Provisioner != nil {
+		if p, ok := a.provisioners.Load(data.Provisioner.ID); ok {
+			return p, nil
 		}
 	}
-
-	a.adminMutex.RLock()
-	defer a.adminMutex.RUnlock()
-	return loadProvisioner()
+	return nil, admin.NewError(admin.ErrorNotFoundType, "unable to load provisioner from certificate")
 }
 
 // LoadProvisionerByToken returns an interface to the provisioner that
