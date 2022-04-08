@@ -6,15 +6,17 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func TestJWK_Getters(t *testing.T) {
@@ -183,8 +185,8 @@ func TestJWK_authorizeToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got, err := tt.prov.authorizeToken(tt.args.token, testAudiences.Sign); err != nil {
 				if assert.NotNil(t, tt.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tt.code)
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -223,8 +225,8 @@ func TestJWK_AuthorizeRevoke(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.prov.AuthorizeRevoke(context.Background(), tt.args.token); err != nil {
 				if assert.NotNil(t, tt.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tt.code)
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -288,8 +290,8 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 			ctx := NewContextWithMethod(context.Background(), SignMethod)
 			if got, err := tt.prov.AuthorizeSign(ctx, tt.args.token); err != nil {
 				if assert.NotNil(t, tt.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tt.code)
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -316,7 +318,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 						case defaultSANsValidator:
 							assert.Equals(t, []string(v), tt.sans)
 						default:
-							assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}
 					}
 				}
@@ -362,8 +364,8 @@ func TestJWK_AuthorizeRenew(t *testing.T) {
 			if err := tt.prov.AuthorizeRenew(context.Background(), tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("JWK.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})
@@ -456,8 +458,8 @@ func TestJWK_AuthorizeSSHSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
@@ -621,8 +623,8 @@ func TestJWK_AuthorizeSSHRevoke(t *testing.T) {
 			tc := tt(t)
 			if err := tc.p.AuthorizeSSHRevoke(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}

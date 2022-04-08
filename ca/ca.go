@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/go-chi/chi"
@@ -26,11 +27,14 @@ import (
 	scepAPI "github.com/smallstep/certificates/scep/api"
 	"github.com/smallstep/certificates/server"
 	"github.com/smallstep/nosql"
+	"go.step.sm/cli-utils/step"
+	"go.step.sm/crypto/x509util"
 )
 
 type options struct {
 	configFile      string
 	linkedCAToken   string
+	quiet           bool
 	password        []byte
 	issuerPassword  []byte
 	sshHostPassword []byte
@@ -98,6 +102,13 @@ func WithDatabase(d db.AuthDB) Option {
 func WithLinkedCAToken(token string) Option {
 	return func(o *options) {
 		o.linkedCAToken = token
+	}
+}
+
+// WithQuiet sets the quiet flag.
+func WithQuiet(quiet bool) Option {
+	return func(o *options) {
+		o.quiet = quiet
 	}
 }
 
@@ -288,6 +299,35 @@ func (ca *CA) Run() error {
 	var wg sync.WaitGroup
 	errs := make(chan error, 1)
 
+	if !ca.opts.quiet {
+		authorityInfo := ca.auth.GetInfo()
+		log.Printf("Starting %s", step.Version())
+		log.Printf("Documentation: https://u.step.sm/docs/ca")
+		log.Printf("Community Discord: https://u.step.sm/discord")
+		if step.Contexts().GetCurrent() != nil {
+			log.Printf("Current context: %s", step.Contexts().GetCurrent().Name)
+		}
+		log.Printf("Config file: %s", ca.opts.configFile)
+		baseURL := fmt.Sprintf("https://%s%s",
+			authorityInfo.DNSNames[0],
+			ca.config.Address[strings.LastIndex(ca.config.Address, ":"):])
+		log.Printf("The primary server URL is %s", baseURL)
+		log.Printf("Root certificates are available at %s/roots.pem", baseURL)
+		if len(authorityInfo.DNSNames) > 1 {
+			log.Printf("Additional configured hostnames: %s",
+				strings.Join(authorityInfo.DNSNames[1:], ", "))
+		}
+		for _, crt := range authorityInfo.RootX509Certs {
+			log.Printf("X.509 Root Fingerprint: %s", x509util.Fingerprint(crt))
+		}
+		if authorityInfo.SSHCAHostPublicKey != nil {
+			log.Printf("SSH Host CA Key is %s\n", authorityInfo.SSHCAHostPublicKey)
+		}
+		if authorityInfo.SSHCAUserPublicKey != nil {
+			log.Printf("SSH User CA Key: %s\n", authorityInfo.SSHCAUserPublicKey)
+		}
+	}
+
 	if ca.insecureSrv != nil {
 		wg.Add(1)
 		go func() {
@@ -355,6 +395,7 @@ func (ca *CA) Reload() error {
 		WithSSHUserPassword(ca.opts.sshUserPassword),
 		WithIssuerPassword(ca.opts.issuerPassword),
 		WithLinkedCAToken(ca.opts.linkedCAToken),
+		WithQuiet(ca.opts.quiet),
 		WithConfigFile(ca.opts.configFile),
 		WithDatabase(ca.auth.GetDatabase()),
 	)

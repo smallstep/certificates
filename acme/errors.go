@@ -3,13 +3,10 @@ package acme
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/logging"
+	"github.com/smallstep/certificates/api/render"
 )
 
 // ProblemType is the type of the ACME problem.
@@ -353,26 +350,8 @@ func (e *Error) ToLog() (interface{}, error) {
 	return string(b), nil
 }
 
-// WriteError writes to w a JSON representation of the given error.
-func WriteError(w http.ResponseWriter, err *Error) {
+// Render implements render.RenderableError for Error.
+func (e *Error) Render(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(err.StatusCode())
-
-	// Write errors in the response writer
-	if rl, ok := w.(logging.ResponseLogger); ok {
-		rl.WithFields(map[string]interface{}{
-			"error": err.Err,
-		})
-		if os.Getenv("STEPDEBUG") == "1" {
-			if e, ok := err.Err.(errs.StackTracer); ok {
-				rl.WithFields(map[string]interface{}{
-					"stack-trace": fmt.Sprintf("%+v", e),
-				})
-			}
-		}
-	}
-
-	if err := json.NewEncoder(w).Encode(err); err != nil {
-		log.Println(err)
-	}
+	render.JSONStatus(w, e, e.StatusCode())
 }

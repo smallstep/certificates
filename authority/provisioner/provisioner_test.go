@@ -2,13 +2,14 @@ package provisioner
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/errs"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func TestType_String(t *testing.T) {
@@ -240,8 +241,8 @@ func TestUnimplementedMethods(t *testing.T) {
 			default:
 				t.Errorf("unexpected method %s", tt.method)
 			}
-			sc, ok := err.(errs.StatusCoder)
-			assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+			sc, ok := err.(render.StatusCodedError)
+			assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 			assert.Equals(t, sc.StatusCode(), http.StatusUnauthorized)
 			assert.Equals(t, err.Error(), msg)
 		})
