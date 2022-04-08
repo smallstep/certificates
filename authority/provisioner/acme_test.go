@@ -176,9 +176,10 @@ func TestACME_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) && assert.NotNil(t, opts) {
-					assert.Len(t, 5, opts)
+					assert.Len(t, 6, opts)
 					for _, o := range opts {
 						switch v := o.(type) {
+						case *ACME:
 						case *provisionerExtensionOption:
 							assert.Equals(t, v.Type, TypeACME)
 							assert.Equals(t, v.Name, tc.p.GetName())

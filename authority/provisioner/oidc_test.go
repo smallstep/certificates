@@ -323,9 +323,10 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
-				assert.Len(t, 5, got)
+				assert.Len(t, 6, got)
 				for _, o := range got {
 					switch v := o.(type) {
+					case *OIDC:
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
 						assert.Equals(t, v.Type, TypeOIDC)

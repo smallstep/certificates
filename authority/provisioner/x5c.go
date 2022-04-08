@@ -220,6 +220,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}
 
 	return []SignOption{
+		p,
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeX5C, p.Name, ""),

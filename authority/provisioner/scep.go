@@ -121,6 +121,7 @@ func (s *SCEP) Init(config Config) (err error) {
 // on the resulting certificate.
 func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	return []SignOption{
+		s,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeSCEP, s.Name, ""),
 		newForceCNOption(s.ForceCN),

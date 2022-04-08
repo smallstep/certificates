@@ -89,6 +89,7 @@ func (p *ACME) Init(config Config) (err error) {
 // on the resulting certificate.
 func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	return []SignOption{
+		p,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeACME, p.Name, ""),
 		newForceCNOption(p.ForceCN),

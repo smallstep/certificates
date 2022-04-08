@@ -170,6 +170,7 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}
 
 	return []SignOption{
+		p,
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),

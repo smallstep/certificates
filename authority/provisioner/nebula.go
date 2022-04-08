@@ -144,6 +144,7 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 	}
 
 	return []SignOption{
+		p,
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeNebula, p.Name, ""),

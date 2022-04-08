@@ -468,9 +468,10 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
-						assert.Equals(t, len(opts), 7)
+						assert.Equals(t, len(opts), 8)
 						for _, o := range opts {
 							switch v := o.(type) {
+							case *X5C:
 							case certificateOptionsFunc:
 							case *provisionerExtensionOption:
 								assert.Equals(t, v.Type, TypeX5C)
