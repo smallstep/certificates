@@ -282,6 +282,7 @@ func TestK8sSA_AuthorizeSign(t *testing.T) {
 					if assert.NotNil(t, opts) {
 						for _, o := range opts {
 							switch v := o.(type) {
+							case *K8sSA:
 							case certificateOptionsFunc:
 							case *provisionerExtensionOption:
 								assert.Equals(t, v.Type, TypeK8sSA)
@@ -300,7 +301,7 @@ func TestK8sSA_AuthorizeSign(t *testing.T) {
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
 						}
-						assert.Len(t, 6, opts)
+						assert.Equals(t, 7, len(opts))
 					}
 				}
 			}

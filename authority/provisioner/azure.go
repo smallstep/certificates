@@ -367,6 +367,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	}
 
 	return append(so,
+		p,
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID),

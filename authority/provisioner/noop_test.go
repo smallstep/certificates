@@ -24,6 +24,6 @@ func Test_noop(t *testing.T) {
 
 	ctx := NewContextWithMethod(context.Background(), SignMethod)
 	sigOptions, err := p.AuthorizeSign(ctx, "foo")
-	assert.Equals(t, []SignOption{}, sigOptions)
+	assert.Equals(t, []SignOption{&p}, sigOptions)
 	assert.Equals(t, nil, err)
 }

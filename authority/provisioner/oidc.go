@@ -366,6 +366,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	}
 
 	return []SignOption{
+		o,
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),

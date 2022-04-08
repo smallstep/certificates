@@ -297,9 +297,10 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.NotNil(t, got) {
-					assert.Len(t, 8, got)
+					assert.Equals(t, 9, len(got))
 					for _, o := range got {
 						switch v := o.(type) {
+						case *JWK:
 						case certificateOptionsFunc:
 						case *provisionerExtensionOption:
 							assert.Equals(t, v.Type, TypeJWK)

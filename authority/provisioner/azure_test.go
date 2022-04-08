@@ -474,11 +474,11 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 6, http.StatusOK, false},
-		{"ok", p2, args{t2}, 11, http.StatusOK, false},
-		{"ok", p1, args{t11}, 6, http.StatusOK, false},
-		{"ok", p5, args{t5}, 6, http.StatusOK, false},
-		{"ok", p7, args{t7}, 6, http.StatusOK, false},
+		{"ok", p1, args{t1}, 7, http.StatusOK, false},
+		{"ok", p2, args{t2}, 12, http.StatusOK, false},
+		{"ok", p1, args{t11}, 7, http.StatusOK, false},
+		{"ok", p5, args{t5}, 7, http.StatusOK, false},
+		{"ok", p7, args{t7}, 7, http.StatusOK, false},
 		{"fail tenant", p3, args{t3}, 0, http.StatusUnauthorized, true},
 		{"fail resource group", p4, args{t4}, 0, http.StatusUnauthorized, true},
 		{"fail subscription", p6, args{t6}, 0, http.StatusUnauthorized, true},
@@ -502,9 +502,10 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			default:
-				assert.Len(t, tt.wantLen, got)
+				assert.Equals(t, tt.wantLen, len(got))
 				for _, o := range got {
 					switch v := o.(type) {
+					case *Azure:
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
 						assert.Equals(t, v.Type, TypeAzure)

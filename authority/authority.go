@@ -327,11 +327,42 @@ func (a *Authority) init() error {
 		}
 	}
 
+	// Initialize linkedca client if necessary. On a linked RA, the issuer
+	// configuration might come from majordomo.
+	var linkedcaClient *linkedCaClient
+	if a.config.AuthorityConfig.EnableAdmin && a.linkedCAToken != "" && a.adminDB == nil {
+		linkedcaClient, err = newLinkedCAClient(a.linkedCAToken)
+		if err != nil {
+			return err
+		}
+		// If authorityId is configured make sure it matches the one in the token
+		if id := a.config.AuthorityConfig.AuthorityID; id != "" && !strings.EqualFold(id, linkedcaClient.authorityID) {
+			return errors.New("error initializing linkedca: token authority and configured authority do not match")
+		}
+		linkedcaClient.Run()
+	}
+
 	// Initialize the X.509 CA Service if it has not been set in the options.
 	if a.x509CAService == nil {
 		var options casapi.Options
 		if a.config.AuthorityConfig.Options != nil {
 			options = *a.config.AuthorityConfig.Options
+		}
+
+		// Configure linked RA
+		if linkedcaClient != nil && options.CertificateAuthority == "" {
+			conf, err := linkedcaClient.GetConfiguration(context.Background())
+			if err != nil {
+				return err
+			}
+			if conf.RaConfig != nil {
+				options.CertificateAuthority = conf.RaConfig.CaUrl
+				options.CertificateAuthorityFingerprint = conf.RaConfig.Fingerprint
+				options.CertificateIssuer = &casapi.CertificateIssuer{
+					Type:        conf.RaConfig.Provisioner.Type.String(),
+					Provisioner: conf.RaConfig.Provisioner.Name,
+				}
+			}
 		}
 
 		// Set the issuer password if passed in the flags.
@@ -553,24 +584,13 @@ func (a *Authority) init() error {
 		// Initialize step-ca Admin Database if it's not already initialized using
 		// WithAdminDB.
 		if a.adminDB == nil {
-			if a.linkedCAToken == "" {
-				// Check if AuthConfig already exists
+			if linkedcaClient != nil {
+				a.adminDB = linkedcaClient
+			} else {
 				a.adminDB, err = adminDBNosql.New(a.db.(nosql.DB), admin.DefaultAuthorityID)
 				if err != nil {
 					return err
 				}
-			} else {
-				// Use the linkedca client as the admindb.
-				client, err := newLinkedCAClient(a.linkedCAToken)
-				if err != nil {
-					return err
-				}
-				// If authorityId is configured make sure it matches the one in the token
-				if id := a.config.AuthorityConfig.AuthorityID; id != "" && !strings.EqualFold(id, client.authorityID) {
-					return errors.New("error initializing linkedca: token authority and configured authority do not match")
-				}
-				client.Run()
-				a.adminDB = client
 			}
 		}
 
