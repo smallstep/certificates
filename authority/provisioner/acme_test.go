@@ -176,7 +176,7 @@ func TestACME_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) && assert.NotNil(t, opts) {
-					assert.Len(t, 6, opts) // number of SignOptions returned
+					assert.Equals(t, 7, len(opts)) // number of SignOptions returned
 					for _, o := range opts {
 						switch v := o.(type) {
 						case *ACME:
