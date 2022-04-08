@@ -7,13 +7,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased - 0.18.3] - DATE
 ### Added
 - Added support for renew after expiry using the claim `allowRenewAfterExpiry`.
-- Added support for `extraNames` in X.509 templates.
+- Added initial support for `extraNames` in X.509 templates.
+- Added initial support for automatic configuration of linked RAs.
 ### Changed
 - Made SCEP CA URL paths dynamic
 - Support two latest versions of Go (1.17, 1.18)
 ### Deprecated
 ### Removed
 ### Fixed
+- Fixed admin credentials on RAs.
 ### Security
 
 ## [0.18.2] - 2022-03-01
