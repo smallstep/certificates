@@ -6,6 +6,7 @@ import (
 	"golang.org/x/crypto/ocsp"
 
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
@@ -50,12 +51,12 @@ func (r *SSHRevokeRequest) Validate() (err error) {
 func (h *caHandler) SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	var body SSHRevokeRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
@@ -71,18 +72,18 @@ func (h *caHandler) SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	// otherwise it is assumed that the certificate is revoking itself over mTLS.
 	logOtt(w, body.OTT)
 	if _, err := h.Authority.Authorize(ctx, body.OTT); err != nil {
-		WriteError(w, errs.UnauthorizedErr(err))
+		render.Error(w, errs.UnauthorizedErr(err))
 		return
 	}
 	opts.OTT = body.OTT
 
 	if err := h.Authority.Revoke(ctx, opts); err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error revoking ssh certificate"))
+		render.Error(w, errs.ForbiddenErr(err, "error revoking ssh certificate"))
 		return
 	}
 
 	logSSHRevoke(w, opts)
-	JSON(w, &SSHRevokeResponse{Status: "ok"})
+	render.JSON(w, &SSHRevokeResponse{Status: "ok"})
 }
 
 func logSSHRevoke(w http.ResponseWriter, ri *authority.RevokeOptions) {

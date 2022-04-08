@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
-	"github.com/smallstep/certificates/acme"
-	"github.com/smallstep/certificates/api"
+
 	"go.step.sm/crypto/randutil"
+
+	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/api/render"
 )
 
 // NewOrderRequest represents the body for a NewOrder request.
@@ -70,28 +72,28 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	prov, err := provisionerFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	var nor NewOrderRequest
 	if err := json.Unmarshal(payload.value, &nor); err != nil {
-		api.WriteError(w, acme.WrapError(acme.ErrorMalformedType, err,
+		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
 			"failed to unmarshal new-order request payload"))
 		return
 	}
 
 	if err := nor.Validate(); err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
@@ -116,7 +118,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 			Status:     acme.StatusPending,
 		}
 		if err := h.newAuthorization(ctx, az); err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 		o.AuthorizationIDs[i] = az.ID
@@ -135,14 +137,14 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.db.CreateOrder(ctx, o); err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error creating order"))
+		render.Error(w, acme.WrapErrorISE(err, "error creating order"))
 		return
 	}
 
 	h.linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
-	api.JSONStatus(w, o, http.StatusCreated)
+	render.JSONStatus(w, o, http.StatusCreated)
 }
 
 func (h *Handler) newAuthorization(ctx context.Context, az *acme.Authorization) error {
@@ -186,38 +188,38 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	prov, err := provisionerFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	o, err := h.db.GetOrder(ctx, chi.URLParam(r, "ordID"))
 	if err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error retrieving order"))
+		render.Error(w, acme.WrapErrorISE(err, "error retrieving order"))
 		return
 	}
 	if acc.ID != o.AccountID {
-		api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own order '%s'", acc.ID, o.ID))
 		return
 	}
 	if prov.GetID() != o.ProvisionerID {
-		api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
 			"provisioner '%s' does not own order '%s'", prov.GetID(), o.ID))
 		return
 	}
 	if err = o.UpdateStatus(ctx, h.db); err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error updating order status"))
+		render.Error(w, acme.WrapErrorISE(err, "error updating order status"))
 		return
 	}
 
 	h.linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
-	api.JSON(w, o)
+	render.JSON(w, o)
 }
 
 // FinalizeOrder attemptst to finalize an order and create a certificate.
@@ -225,54 +227,54 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	prov, err := provisionerFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 	var fr FinalizeRequest
 	if err := json.Unmarshal(payload.value, &fr); err != nil {
-		api.WriteError(w, acme.WrapError(acme.ErrorMalformedType, err,
+		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
 			"failed to unmarshal finalize-order request payload"))
 		return
 	}
 	if err := fr.Validate(); err != nil {
-		api.WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	o, err := h.db.GetOrder(ctx, chi.URLParam(r, "ordID"))
 	if err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error retrieving order"))
+		render.Error(w, acme.WrapErrorISE(err, "error retrieving order"))
 		return
 	}
 	if acc.ID != o.AccountID {
-		api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own order '%s'", acc.ID, o.ID))
 		return
 	}
 	if prov.GetID() != o.ProvisionerID {
-		api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
 			"provisioner '%s' does not own order '%s'", prov.GetID(), o.ID))
 		return
 	}
 	if err = o.Finalize(ctx, h.db, fr.csr, h.ca, prov); err != nil {
-		api.WriteError(w, acme.WrapErrorISE(err, "error finalizing order"))
+		render.Error(w, acme.WrapErrorISE(err, "error finalizing order"))
 		return
 	}
 
 	h.linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
-	api.JSON(w, o)
+	render.JSON(w, o)
 }
 
 // challengeTypes determines the types of challenges that should be used

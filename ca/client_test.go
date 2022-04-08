@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,14 +17,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"golang.org/x/crypto/ssh"
-
 	"go.step.sm/crypto/x509util"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
@@ -182,7 +182,7 @@ func TestClient_Version(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Version()
@@ -232,7 +232,7 @@ func TestClient_Health(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Health()
@@ -290,7 +290,7 @@ func TestClient_Root(t *testing.T) {
 				if req.RequestURI != expected {
 					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
 				}
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Root(tt.shasum)
@@ -360,7 +360,7 @@ func TestClient_Sign(t *testing.T) {
 				if err := read.JSON(req.Body, body); err != nil {
 					e, ok := tt.response.(error)
 					assert.Fatal(t, ok, "response expected to be error type")
-					api.WriteError(w, e)
+					render.Error(w, e)
 					return
 				} else if !equalJSON(t, body, tt.request) {
 					if tt.request == nil {
@@ -371,7 +371,7 @@ func TestClient_Sign(t *testing.T) {
 						t.Errorf("Client.Sign() request = %v, wants %v", body, tt.request)
 					}
 				}
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Sign(tt.request)
@@ -432,7 +432,7 @@ func TestClient_Revoke(t *testing.T) {
 				if err := read.JSON(req.Body, body); err != nil {
 					e, ok := tt.response.(error)
 					assert.Fatal(t, ok, "response expected to be error type")
-					api.WriteError(w, e)
+					render.Error(w, e)
 					return
 				} else if !equalJSON(t, body, tt.request) {
 					if tt.request == nil {
@@ -443,7 +443,7 @@ func TestClient_Revoke(t *testing.T) {
 						t.Errorf("Client.Revoke() request = %v, wants %v", body, tt.request)
 					}
 				}
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Revoke(tt.request, nil)
@@ -503,7 +503,7 @@ func TestClient_Renew(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Renew(nil)
@@ -519,8 +519,8 @@ func TestClient_Renew(t *testing.T) {
 					t.Errorf("Client.Renew() = %v, want nil", got)
 				}
 
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
@@ -568,9 +568,9 @@ func TestClient_RenewWithToken(t *testing.T) {
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if req.Header.Get("Authorization") != "Bearer token" {
-					api.JSONStatus(w, errs.InternalServer("force"), 500)
+					render.JSONStatus(w, errs.InternalServer("force"), 500)
 				} else {
-					api.JSONStatus(w, tt.response, tt.responseCode)
+					render.JSONStatus(w, tt.response, tt.responseCode)
 				}
 			})
 
@@ -587,8 +587,8 @@ func TestClient_RenewWithToken(t *testing.T) {
 					t.Errorf("Client.RenewWithToken() = %v, want nil", got)
 				}
 
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
@@ -640,7 +640,7 @@ func TestClient_Rekey(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Rekey(tt.request, nil)
@@ -656,8 +656,8 @@ func TestClient_Rekey(t *testing.T) {
 					t.Errorf("Client.Renew() = %v, want nil", got)
 				}
 
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
@@ -705,7 +705,7 @@ func TestClient_Provisioners(t *testing.T) {
 				if req.RequestURI != tt.expectedURI {
 					t.Errorf("RequestURI = %s, want %s", req.RequestURI, tt.expectedURI)
 				}
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Provisioners(tt.args...)
@@ -762,7 +762,7 @@ func TestClient_ProvisionerKey(t *testing.T) {
 				if req.RequestURI != expected {
 					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
 				}
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.ProvisionerKey(tt.kid)
@@ -777,8 +777,8 @@ func TestClient_ProvisionerKey(t *testing.T) {
 					t.Errorf("Client.ProvisionerKey() = %v, want nil", got)
 				}
 
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, tt.err.Error(), err.Error())
 			default:
@@ -821,7 +821,7 @@ func TestClient_Roots(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Roots()
@@ -836,8 +836,8 @@ func TestClient_Roots(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.Roots() = %v, want nil", got)
 				}
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
@@ -879,7 +879,7 @@ func TestClient_Federation(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Federation()
@@ -894,8 +894,8 @@ func TestClient_Federation(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.Federation() = %v, want nil", got)
 				}
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, tt.err.Error(), err.Error())
 			default:
@@ -941,7 +941,7 @@ func TestClient_SSHRoots(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.SSHRoots()
@@ -956,8 +956,8 @@ func TestClient_SSHRoots(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.SSHKeys() = %v, want nil", got)
 				}
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.responseCode)
 				assert.HasPrefix(t, tt.err.Error(), err.Error())
 			default:
@@ -1041,7 +1041,7 @@ func TestClient_RootFingerprint(t *testing.T) {
 			}
 
 			tt.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.RootFingerprint()
@@ -1102,7 +1102,7 @@ func TestClient_SSHBastion(t *testing.T) {
 			}
 
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				api.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, tt.response, tt.responseCode)
 			})
 
 			got, err := c.SSHBastion(tt.request)
@@ -1118,8 +1118,8 @@ func TestClient_SSHBastion(t *testing.T) {
 					t.Errorf("Client.SSHBastion() = %v, want nil", got)
 				}
 				if tt.responseCode != 200 {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tt.responseCode)
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}

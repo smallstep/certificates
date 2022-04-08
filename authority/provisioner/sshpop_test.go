@@ -5,16 +5,19 @@ import (
 	"crypto"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/errs"
+	"golang.org/x/crypto/ssh"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
-	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func TestSSHPOP_Getters(t *testing.T) {
@@ -215,8 +218,8 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
 			if claims, err := tc.p.authorizeToken(tc.token, testAudiences.Sign, true); err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tc.code)
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -286,8 +289,8 @@ func TestSSHPOP_AuthorizeSSHRevoke(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
 			if err := tc.p.AuthorizeSSHRevoke(context.Background(), tc.token); err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tc.code)
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -367,8 +370,8 @@ func TestSSHPOP_AuthorizeSSHRenew(t *testing.T) {
 			tc := tt(t)
 			if cert, err := tc.p.AuthorizeSSHRenew(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -449,8 +452,8 @@ func TestSSHPOP_AuthorizeSSHRekey(t *testing.T) {
 			tc := tt(t)
 			if cert, opts, err := tc.p.AuthorizeSSHRekey(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -464,7 +467,7 @@ func TestSSHPOP_AuthorizeSSHRekey(t *testing.T) {
 						case *sshCertValidityValidator:
 							assert.Equals(t, v.Claimer, tc.p.ctl.Claimer)
 						default:
-							assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}
 					}
 					assert.Equals(t, tc.cert.Nonce, cert.Nonce)

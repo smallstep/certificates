@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -18,13 +19,13 @@ const (
 func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	cert, err := h.getPeerCertificate(r)
 	if err != nil {
-		WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	certChain, err := h.Authority.Renew(cert)
 	if err != nil {
-		WriteError(w, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Renew"))
+		render.Error(w, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Renew"))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)
@@ -34,7 +35,7 @@ func (h *caHandler) Renew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	LogCertificate(w, certChain[0])
-	JSONStatus(w, &SignResponse{
+	render.JSONStatus(w, &SignResponse{
 		ServerPEM:    certChainPEM[0],
 		CaPEM:        caPEM,
 		CertChainPEM: certChainPEM,
