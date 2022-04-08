@@ -130,22 +130,19 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
 	// more than a few minutes.
 	if err := claims.ValidateWithLeeway(jose.Expected{
-		Issuer: prov.GetName(),
+		Issuer: "step-admin-client/1.0",
 		Time:   time.Now().UTC(),
 	}, time.Minute); err != nil {
 		return nil, admin.WrapError(admin.ErrorUnauthorizedType, err, "x5c.authorizeToken; invalid x5c claims")
 	}
 
 	// validate audience: path matches the current path
-	if r.URL.Path != claims.Audience[0] {
-		return nil, admin.NewError(admin.ErrorUnauthorizedType,
-			"x5c.authorizeToken; x5c token has invalid audience "+
-				"claim (aud); expected %s, but got %s", r.URL.Path, claims.Audience)
+	if !matchesAudience(claims.Audience, a.config.Audience(r.URL.Path)) {
+		return nil, admin.NewError(admin.ErrorUnauthorizedType, "x5c.authorizeToken; x5c token has invalid audience claim (aud)")
 	}
 
 	if claims.Subject == "" {
-		return nil, admin.NewError(admin.ErrorUnauthorizedType,
-			"x5c.authorizeToken; x5c token subject cannot be empty")
+		return nil, admin.NewError(admin.ErrorUnauthorizedType, "x5c.authorizeToken; x5c token subject cannot be empty")
 	}
 
 	var (
@@ -156,7 +153,7 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 	adminSANs := append([]string{leaf.Subject.CommonName}, leaf.DNSNames...)
 	adminSANs = append(adminSANs, leaf.EmailAddresses...)
 	for _, san := range adminSANs {
-		if adm, ok = a.LoadAdminBySubProv(san, claims.Issuer); ok {
+		if adm, ok = a.LoadAdminBySubProv(san, prov.GetName()); ok {
 			adminFound = true
 			break
 		}

@@ -54,14 +54,19 @@ func (a *Authority) LoadProvisionerByCertificate(crt *x509.Certificate) (provisi
 		return p, nil
 	}
 
-	// Attempt to load the provisioner using the linked db
-	// TODO:(mariano)
-
-	// Attempt to load the provisioner from the db
-	if db, ok := a.db.(interface {
+	// certificateDataGetter is an interface that can be use to retrieve the
+	// provisioner from a db or a linked ca.
+	type certificateDataGetter interface {
 		GetCertificateData(string) (*db.CertificateData, error)
-	}); ok {
-		if data, err := db.GetCertificateData(crt.SerialNumber.String()); err == nil && data.Provisioner != nil {
+	}
+	var cdg certificateDataGetter
+	if getter, ok := a.adminDB.(certificateDataGetter); ok {
+		cdg = getter
+	} else if getter, ok := a.db.(certificateDataGetter); ok {
+		cdg = getter
+	}
+	if cdg != nil {
+		if data, err := cdg.GetCertificateData(crt.SerialNumber.String()); err == nil && data.Provisioner != nil {
 			loadProvisioner = func() (provisioner.Interface, error) {
 				p, ok := a.provisioners.Load(data.Provisioner.ID)
 				if !ok {

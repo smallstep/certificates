@@ -116,7 +116,6 @@ type clientOptions struct {
 	x5cCertFile          string
 	x5cCertStrs          []string
 	x5cCert              *x509.Certificate
-	x5cIssuer            string
 	x5cSubject           string
 }
 
@@ -332,19 +331,13 @@ func WithAdminX5C(certs []*x509.Certificate, key interface{}, passwordFile strin
 		}
 
 		o.x5cCert = certs[0]
-		o.x5cSubject = o.x5cCert.Subject.CommonName
-
-		for _, e := range o.x5cCert.Extensions {
-			if e.Id.Equal(stepOIDProvisioner) {
-				var prov stepProvisionerASN1
-				if _, err := asn1.Unmarshal(e.Value, &prov); err != nil {
-					return errors.Wrap(err, "error unmarshaling provisioner OID from certificate")
-				}
-				o.x5cIssuer = string(prov.Name)
-			}
-		}
-		if o.x5cIssuer == "" {
-			return errors.New("provisioner extension not found in certificate")
+		switch leaf := certs[0]; {
+		case leaf.Subject.CommonName != "":
+			o.x5cSubject = leaf.Subject.CommonName
+		case len(leaf.DNSNames) > 0:
+			o.x5cSubject = leaf.DNSNames[0]
+		case len(leaf.EmailAddresses) > 0:
+			o.x5cSubject = leaf.EmailAddresses[0]
 		}
 
 		return nil

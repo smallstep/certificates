@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -313,6 +314,41 @@ func Test_toHostname(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := toHostname(tt.name); got != tt.want {
 				t.Errorf("toHostname() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfig_Audience(t *testing.T) {
+	type fields struct {
+		DNSNames []string
+	}
+	type args struct {
+		path string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []string
+	}{
+		{"ok", fields{[]string{
+			"ca", "ca.example.com", "127.0.0.1", "::1",
+		}}, args{"/path"}, []string{
+			"https://ca/path",
+			"https://ca.example.com/path",
+			"https://127.0.0.1/path",
+			"https://[::1]/path",
+			"/path",
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Config{
+				DNSNames: tt.fields.DNSNames,
+			}
+			if got := c.Audience(tt.args.path); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Config.Audience() = %v, want %v", got, tt.want)
 			}
 		})
 	}
