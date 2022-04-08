@@ -10,7 +10,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/asn1"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -291,18 +290,6 @@ func WithCertificate(cert tls.Certificate) ClientOption {
 		o.certificate = cert
 		return nil
 	}
-}
-
-var (
-	stepOIDRoot        = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
-	stepOIDProvisioner = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
-)
-
-type stepProvisionerASN1 struct {
-	Type          int
-	Name          []byte
-	CredentialID  []byte
-	KeyValuePairs []string `asn1:"optional,omitempty"`
 }
 
 // WithAdminX5C will set the given file as the X5C certificate for use
