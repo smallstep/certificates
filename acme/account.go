@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/certificates/authority/policy"
 )
 
 // Account is a subset of the internal account type containing only those
@@ -58,6 +60,25 @@ type X509Policy struct {
 // Policy is an ACME Account level policy
 type Policy struct {
 	X509 X509Policy `json:"x509"`
+}
+
+func (p *Policy) GetAllowedNameOptions() *policy.X509NameOptions {
+	if p == nil {
+		return nil
+	}
+	return &policy.X509NameOptions{
+		DNSDomains: p.X509.Allowed.DNSNames,
+		IPRanges:   p.X509.Allowed.IPRanges,
+	}
+}
+func (p *Policy) GetDeniedNameOptions() *policy.X509NameOptions {
+	if p == nil {
+		return nil
+	}
+	return &policy.X509NameOptions{
+		DNSDomains: p.X509.Denied.DNSNames,
+		IPRanges:   p.X509.Denied.IPRanges,
+	}
 }
 
 // ExternalAccountKey is an ACME External Account Binding key.

@@ -13,10 +13,12 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+
+	"go.step.sm/crypto/jose"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/crypto/jose"
 )
 
 var (
@@ -34,6 +36,19 @@ func newProv() acme.Provisioner {
 	p := &provisioner.ACME{
 		Type: "ACME",
 		Name: "test@acme-<test>provisioner.com",
+	}
+	if err := p.Init(provisioner.Config{Claims: globalProvisionerClaims}); err != nil {
+		fmt.Printf("%v", err)
+	}
+	return p
+}
+
+func newProvWithOptions(options *provisioner.Options) acme.Provisioner {
+	// Initialize provisioners
+	p := &provisioner.ACME{
+		Type:    "ACME",
+		Name:    "test@acme-<test>provisioner.com",
+		Options: options,
 	}
 	if err := p.Init(provisioner.Config{Claims: globalProvisionerClaims}); err != nil {
 		fmt.Printf("%v", err)

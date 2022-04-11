@@ -17,6 +17,7 @@ import (
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
 
@@ -102,29 +103,35 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO(hs): the policy evaluation below should also verify rules set in the Account (i.e. allowed/denied
-	// DNS and IPs). It's probably good to connect those to the EAB credentials and management? Or
-	// should we do it fully properly and connect them to the Account directly? The latter would allow
-	// management of allowed/denied names based on just the name, without having bound to EAB. Still,
-	// EAB is not illogical, because that's the way Accounts are connected to an external system and
-	// thus make sense to also set the allowed/denied names based on that info.
 	// TODO(hs): gather all errors, so that we can build one response with subproblems; include the nor.Validate()
 	// error here too, like in example?
 
 	eak, err := h.db.GetExternalAccountKeyByAccountID(ctx, prov.GetID(), acc.ID)
-	fmt.Println("EAK: ", eak, err)
+	if err != nil {
+		render.Error(w, acme.WrapErrorISE(err, "error retrieving external account binding key"))
+		return
+	}
+
+	acmePolicy, err := newACMEPolicyEngine(eak)
+	if err != nil {
+		render.Error(w, acme.WrapErrorISE(err, "error creating ACME policy engine"))
+		return
+	}
 
 	for _, identifier := range nor.Identifiers {
+		// evalue the ACME account level policy
+		if err = isIdentifierAllowed(acmePolicy, identifier); err != nil {
+			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			return
+		}
 		// evaluate the provisioner level policy
 		orderIdentifier := provisioner.ACMEIdentifier{Type: provisioner.ACMEIdentifierType(identifier.Type), Value: identifier.Value}
-		err = prov.AuthorizeOrderIdentifier(ctx, orderIdentifier)
-		if err != nil {
+		if err = prov.AuthorizeOrderIdentifier(ctx, orderIdentifier); err != nil {
 			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return
 		}
 		// evaluate the authority level policy
-		err = h.ca.AreSANsAllowed(ctx, []string{identifier.Value})
-		if err != nil {
+		if err = h.ca.AreSANsAllowed(ctx, []string{identifier.Value}); err != nil {
 			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return
 		}
@@ -178,6 +185,27 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
 	render.JSONStatus(w, o, http.StatusCreated)
+}
+
+func isIdentifierAllowed(acmePolicy policy.X509Policy, identifier acme.Identifier) error {
+	if acmePolicy == nil {
+		return nil
+	}
+	allowed, err := acmePolicy.AreSANsAllowed([]string{identifier.Value})
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return fmt.Errorf("acme identifier '%s' not allowed", identifier.Value)
+	}
+	return nil
+}
+
+func newACMEPolicyEngine(eak *acme.ExternalAccountKey) (policy.X509Policy, error) {
+	if eak == nil {
+		return nil, nil
+	}
+	return policy.NewX509PolicyEngine(eak.Policy)
 }
 
 func (h *Handler) newAuthorization(ctx context.Context, az *acme.Authorization) error {

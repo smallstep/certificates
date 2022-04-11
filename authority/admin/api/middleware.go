@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"go.step.sm/linkedca"
 
@@ -147,79 +146,4 @@ func (h *Handler) loadExternalAccountKey(next http.HandlerFunc) http.HandlerFunc
 
 		next(w, r.WithContext(ctx))
 	}
-}
-
-func eakToLinked(k *acme.ExternalAccountKey) *linkedca.EABKey {
-
-	if k == nil {
-		return nil
-	}
-
-	eak := &linkedca.EABKey{
-		Id:          k.ID,
-		HmacKey:     k.KeyBytes,
-		Provisioner: k.ProvisionerID,
-		Reference:   k.Reference,
-		Account:     k.AccountID,
-		CreatedAt:   timestamppb.New(k.CreatedAt),
-		BoundAt:     timestamppb.New(k.BoundAt),
-	}
-
-	if k.Policy != nil {
-		eak.Policy = &linkedca.Policy{
-			X509: &linkedca.X509Policy{
-				Allow: &linkedca.X509Names{},
-				Deny:  &linkedca.X509Names{},
-			},
-		}
-		eak.Policy.X509.Allow.Dns = k.Policy.X509.Allowed.DNSNames
-		eak.Policy.X509.Allow.Ips = k.Policy.X509.Allowed.IPRanges
-		eak.Policy.X509.Deny.Dns = k.Policy.X509.Denied.DNSNames
-		eak.Policy.X509.Deny.Ips = k.Policy.X509.Denied.IPRanges
-	}
-
-	return eak
-}
-
-func linkedEAKToCertificates(k *linkedca.EABKey) *acme.ExternalAccountKey {
-	if k == nil {
-		return nil
-	}
-
-	eak := &acme.ExternalAccountKey{
-		ID:            k.Id,
-		ProvisionerID: k.Provisioner,
-		Reference:     k.Reference,
-		AccountID:     k.Account,
-		KeyBytes:      k.HmacKey,
-		CreatedAt:     k.CreatedAt.AsTime(),
-		BoundAt:       k.BoundAt.AsTime(),
-	}
-
-	if k.Policy == nil {
-		return eak
-	}
-
-	eak.Policy = &acme.Policy{}
-
-	if k.Policy.X509 == nil {
-		return eak
-	}
-
-	eak.Policy.X509 = acme.X509Policy{
-		Allowed: acme.PolicyNames{},
-		Denied:  acme.PolicyNames{},
-	}
-
-	if k.Policy.X509.Allow != nil {
-		eak.Policy.X509.Allowed.DNSNames = k.Policy.X509.Allow.Dns
-		eak.Policy.X509.Allowed.IPRanges = k.Policy.X509.Allow.Ips
-	}
-
-	if k.Policy.X509.Deny != nil {
-		eak.Policy.X509.Denied.DNSNames = k.Policy.X509.Deny.Dns
-		eak.Policy.X509.Denied.IPRanges = k.Policy.X509.Deny.Ips
-	}
-
-	return eak
 }

@@ -428,6 +428,114 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 				err: acme.NewErrorISE("error retrieving external account key"),
 			}
 		},
+		"fail/db.GetExternalAccountKey-nil": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(rawEABJWS, &eab)
+			assert.FatalError(t, err)
+			nar := &NewAccountRequest{
+				Contact:                []string{"foo", "bar"},
+				ExternalAccountBinding: eab,
+			}
+			payloadBytes, err := json.Marshal(nar)
+			assert.FatalError(t, err)
+			so := new(jose.SignerOptions)
+			so.WithHeader("alg", jose.SignatureAlgorithm(jwk.Algorithm))
+			so.WithHeader("url", url)
+			signer, err := jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(jwk.Algorithm),
+				Key:       jwk.Key,
+			}, so)
+			assert.FatalError(t, err)
+			jws, err := signer.Sign(payloadBytes)
+			assert.FatalError(t, err)
+			raw, err := jws.CompactSerialize()
+			assert.FatalError(t, err)
+			parsedJWS, err := jose.ParseJWS(raw)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
+			return test{
+				db: &acme.MockDB{
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName, keyID string) (*acme.ExternalAccountKey, error) {
+						return nil, nil
+					},
+				},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: nil,
+				err: acme.NewError(acme.ErrorUnauthorizedType, "the field 'kid' references an unknown key"),
+			}
+		},
+		"fail/db.GetExternalAccountKey-no-keybytes": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(rawEABJWS, &eab)
+			assert.FatalError(t, err)
+			nar := &NewAccountRequest{
+				Contact:                []string{"foo", "bar"},
+				ExternalAccountBinding: eab,
+			}
+			payloadBytes, err := json.Marshal(nar)
+			assert.FatalError(t, err)
+			so := new(jose.SignerOptions)
+			so.WithHeader("alg", jose.SignatureAlgorithm(jwk.Algorithm))
+			so.WithHeader("url", url)
+			signer, err := jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(jwk.Algorithm),
+				Key:       jwk.Key,
+			}, so)
+			assert.FatalError(t, err)
+			jws, err := signer.Sign(payloadBytes)
+			assert.FatalError(t, err)
+			raw, err := jws.CompactSerialize()
+			assert.FatalError(t, err)
+			parsedJWS, err := jose.ParseJWS(raw)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
+			createdAt := time.Now()
+			return test{
+				db: &acme.MockDB{
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName, keyID string) (*acme.ExternalAccountKey, error) {
+						return &acme.ExternalAccountKey{
+							ID:            "eakID",
+							ProvisionerID: provID,
+							Reference:     "testeak",
+							CreatedAt:     createdAt,
+							AccountID:     "some-account-id",
+							KeyBytes:      []byte{},
+						}, nil
+					},
+				},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: nil,
+				err: acme.NewError(acme.ErrorServerInternalType, "external account binding key with id 'eakID' does not have secret bytes"),
+			}
+		},
 		"fail/db.GetExternalAccountKey-wrong-provisioner": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
@@ -522,6 +630,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							Reference:     "testeak",
 							CreatedAt:     createdAt,
 							AccountID:     "some-account-id",
+							KeyBytes:      []byte{1, 3, 3, 7},
 							BoundAt:       boundAt,
 						}, nil
 					},

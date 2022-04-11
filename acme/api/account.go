@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -131,14 +130,11 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fmt.Println("BEFORE EAK BINDING")
-
 		if eak != nil { // means that we have a (valid) External Account Binding key that should be bound, updated and sent in the response
 			if err := eak.BindTo(acc); err != nil {
 				render.Error(w, err)
 				return
 			}
-			fmt.Println("AFTER EAK BINDING")
 			if err := h.db.UpdateExternalAccountKey(ctx, prov.ID, eak); err != nil {
 				render.Error(w, acme.WrapErrorISE(err, "error updating external account binding key"))
 				return
