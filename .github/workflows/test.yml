@@ -61,6 +61,7 @@ jobs:
         if: matrix.go == '1.18'
         uses: codecov/codecov-action@v2
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.out # optional
           name: codecov-umbrella # optional
           fail_ci_if_error: true # optional (default = false)
