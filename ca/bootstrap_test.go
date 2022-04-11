@@ -92,6 +92,7 @@ func mTLSMiddleware(next http.Handler, nonAuthenticatedPaths ...string) http.Han
 		for _, s := range nonAuthenticatedPaths {
 			if strings.HasPrefix(r.URL.Path, s) || strings.HasPrefix(r.URL.Path, "/1.0"+s) {
 				next.ServeHTTP(w, r)
+				return
 			}
 		}
 		isMTLS := r.TLS != nil && len(r.TLS.PeerCertificates) > 0
