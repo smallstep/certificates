@@ -284,7 +284,13 @@ func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 	}
 	p, err := a.LoadProvisionerByCertificate(cert)
 	if err != nil {
-		return errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
+		var ok bool
+		// For backward compatibility this method will also succeed if the
+		// provisioner does not have an extension. LoadByCertificate returns the
+		// noop provisioner if this happens, and it allow certificate renewals.
+		if p, ok = a.provisioners.LoadByCertificate(cert); !ok {
+			return errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
+		}
 	}
 	if err := p.AuthorizeRenew(context.Background(), cert); err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
