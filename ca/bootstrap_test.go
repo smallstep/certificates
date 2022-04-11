@@ -14,11 +14,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/randutil"
+
+	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/errs"
 )
 
 func newLocalListener() net.Listener {
@@ -79,7 +82,7 @@ func startCAServer(configFile string) (*CA, string, error) {
 func mTLSMiddleware(next http.Handler, nonAuthenticatedPaths ...string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/version" {
-			api.JSON(w, api.VersionResponse{
+			render.JSON(w, api.VersionResponse{
 				Version:                     "test",
 				RequireClientAuthentication: true,
 			})
@@ -93,7 +96,7 @@ func mTLSMiddleware(next http.Handler, nonAuthenticatedPaths ...string) http.Han
 		}
 		isMTLS := r.TLS != nil && len(r.TLS.PeerCertificates) > 0
 		if !isMTLS {
-			api.WriteError(w, errs.Unauthorized("missing peer certificate"))
+			render.Error(w, errs.Unauthorized("missing peer certificate"))
 		} else {
 			next.ServeHTTP(w, r)
 		}
@@ -408,6 +411,7 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 		server.ServeTLS(listener, "", "")
 	}()
 	defer server.Close()
+	time.Sleep(1 * time.Second)
 
 	// Create bootstrap client
 	token = generateBootstrapToken(caURL, "client", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
@@ -419,7 +423,6 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 
 	// doTest does a request that requires mTLS
 	doTest := func(client *http.Client) error {
-		time.Sleep(1 * time.Second)
 		// test with ca
 		resp, err := client.Post(caURL+"/renew", "application/json", http.NoBody)
 		if err != nil {

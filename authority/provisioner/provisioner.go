@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -47,6 +46,7 @@ var ErrAllowTokenReuse = stderrors.New("allow token reuse")
 // Audiences stores all supported audiences by request type.
 type Audiences struct {
 	Sign      []string
+	Renew     []string
 	Revoke    []string
 	SSHSign   []string
 	SSHRevoke []string
@@ -57,6 +57,7 @@ type Audiences struct {
 // All returns all supported audiences across all request types in one list.
 func (a Audiences) All() (auds []string) {
 	auds = a.Sign
+	auds = append(auds, a.Renew...)
 	auds = append(auds, a.Revoke...)
 	auds = append(auds, a.SSHSign...)
 	auds = append(auds, a.SSHRevoke...)
@@ -70,6 +71,7 @@ func (a Audiences) All() (auds []string) {
 func (a Audiences) WithFragment(fragment string) Audiences {
 	ret := Audiences{
 		Sign:      make([]string, len(a.Sign)),
+		Renew:     make([]string, len(a.Renew)),
 		Revoke:    make([]string, len(a.Revoke)),
 		SSHSign:   make([]string, len(a.SSHSign)),
 		SSHRevoke: make([]string, len(a.SSHRevoke)),
@@ -81,6 +83,13 @@ func (a Audiences) WithFragment(fragment string) Audiences {
 			ret.Sign[i] = u.ResolveReference(&url.URL{Fragment: fragment}).String()
 		} else {
 			ret.Sign[i] = s
+		}
+	}
+	for i, s := range a.Renew {
+		if u, err := url.Parse(s); err == nil {
+			ret.Renew[i] = u.ResolveReference(&url.URL{Fragment: fragment}).String()
+		} else {
+			ret.Renew[i] = s
 		}
 	}
 	for i, s := range a.Revoke {
@@ -210,6 +219,12 @@ type Config struct {
 	// GetIdentityFunc is a function that returns an identity that will be
 	// used by the provisioner to populate certificate attributes.
 	GetIdentityFunc GetIdentityFunc
+	// AuthorizeRenewFunc is a function that returns nil if a given X.509
+	// certificate can be renewed.
+	AuthorizeRenewFunc AuthorizeRenewFunc
+	// AuthorizeSSHRenewFunc is a function that returns nil if a given SSH
+	// certificate can be renewed.
+	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
 }
 
 type provisioner struct {
@@ -278,32 +293,6 @@ func (l *List) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-var sshUserRegex = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
-
-// SanitizeSSHUserPrincipal grabs an email or a string with the format
-// local@domain and returns a sanitized version of the local, valid to be used
-// as a user name. If the email starts with a letter between a and z, the
-// resulting string will match the regular expression `^[a-z][-a-z0-9_]*$`.
-func SanitizeSSHUserPrincipal(email string) string {
-	if i := strings.LastIndex(email, "@"); i >= 0 {
-		email = email[:i]
-	}
-	return strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z':
-			return r
-		case r >= '0' && r <= '9':
-			return r
-		case r == '-':
-			return '-'
-		case r == '.': // drop dots
-			return -1
-		default:
-			return '_'
-		}
-	}, strings.ToLower(email))
-}
-
 type base struct{}
 
 // AuthorizeSign returns an unimplemented error. Provisioners should overwrite
@@ -348,64 +337,10 @@ func (b *base) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certif
 	return nil, nil, errs.Unauthorized("provisioner.AuthorizeSSHRekey not implemented")
 }
 
-// Identity is the type representing an externally supplied identity that is used
-// by provisioners to populate certificate fields.
-type Identity struct {
-	Usernames   []string `json:"usernames"`
-	Permissions `json:"permissions"`
-}
-
 // Permissions defines extra extensions and critical options to grant to an SSH certificate.
 type Permissions struct {
 	Extensions      map[string]string `json:"extensions"`
 	CriticalOptions map[string]string `json:"criticalOptions"`
-}
-
-// GetIdentityFunc is a function that returns an identity.
-type GetIdentityFunc func(ctx context.Context, p Interface, email string) (*Identity, error)
-
-// DefaultIdentityFunc return a default identity depending on the provisioner
-// type. For OIDC email is always present and the usernames might
-// contain empty strings.
-func DefaultIdentityFunc(ctx context.Context, p Interface, email string) (*Identity, error) {
-	switch k := p.(type) {
-	case *OIDC:
-		// OIDC principals would be:
-		// ~~1. Preferred usernames.~~ Note: Under discussion, currently disabled
-		// 2. Sanitized local.
-		// 3. Raw local (if different).
-		// 4. Email address.
-		name := SanitizeSSHUserPrincipal(email)
-		if !sshUserRegex.MatchString(name) {
-			return nil, errors.Errorf("invalid principal '%s' from email '%s'", name, email)
-		}
-		usernames := []string{name}
-		if i := strings.LastIndex(email, "@"); i >= 0 {
-			usernames = append(usernames, email[:i])
-		}
-		usernames = append(usernames, email)
-		return &Identity{
-			Usernames: SanitizeStringSlices(usernames),
-		}, nil
-	default:
-		return nil, errors.Errorf("provisioner type '%T' not supported by identity function", k)
-	}
-}
-
-// SanitizeStringSlices removes duplicated an empty strings.
-func SanitizeStringSlices(original []string) []string {
-	output := []string{}
-	seen := make(map[string]struct{})
-	for _, entry := range original {
-		if entry == "" {
-			continue
-		}
-		if _, value := seen[entry]; !value {
-			seen[entry] = struct{}{}
-			output = append(output, entry)
-		}
-	}
-	return output
 }
 
 // MockProvisioner for testing

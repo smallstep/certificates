@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
 )
 
 // ACME is the acme provisioner type, an entity that can authorize the ACME
@@ -24,7 +23,7 @@ type ACME struct {
 	RequireEAB bool     `json:"requireEAB,omitempty"`
 	Claims     *Claims  `json:"claims,omitempty"`
 	Options    *Options `json:"options,omitempty"`
-	claimer    *Claimer
+	ctl        *Controller
 }
 
 // GetID returns the provisioner unique identifier.
@@ -69,7 +68,7 @@ func (p *ACME) GetOptions() *Options {
 // DefaultTLSCertDuration returns the default TLS cert duration enforced by
 // the provisioner.
 func (p *ACME) DefaultTLSCertDuration() time.Duration {
-	return p.claimer.DefaultTLSCertDuration()
+	return p.ctl.Claimer.DefaultTLSCertDuration()
 }
 
 // Init initializes and validates the fields of a JWK type.
@@ -81,12 +80,8 @@ func (p *ACME) Init(config Config) (err error) {
 		return errors.New("provisioner name cannot be empty")
 	}
 
-	// Update claims with global ones
-	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
-		return err
-	}
-
-	return err
+	p.ctl, err = NewController(p, p.Claims, config)
+	return
 }
 
 // AuthorizeSign does not do any validation, because all validation is handled
@@ -94,13 +89,14 @@ func (p *ACME) Init(config Config) (err error) {
 // on the resulting certificate.
 func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	return []SignOption{
+		p,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeACME, p.Name, ""),
 		newForceCNOption(p.ForceCN),
-		profileDefaultDuration(p.claimer.DefaultTLSCertDuration()),
+		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
-		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 	}, nil
 }
 
@@ -118,8 +114,5 @@ func (p *ACME) AuthorizeRevoke(ctx context.Context, token string) error {
 // revocation status. Just confirms that the provisioner that created the
 // certificate was configured to allow renewals.
 func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
-	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("acme.AuthorizeRenew; renew is disabled for acme provisioner '%s'", p.GetName())
-	}
-	return nil
+	return p.ctl.AuthorizeRenew(ctx, cert)
 }

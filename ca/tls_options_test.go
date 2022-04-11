@@ -542,6 +542,7 @@ func TestAddFederationToCAs(t *testing.T) {
 	}
 }
 
+// nolint:staticcheck,gocritic
 func equalPools(a, b *x509.CertPool) bool {
 	if reflect.DeepEqual(a, b) {
 		return true

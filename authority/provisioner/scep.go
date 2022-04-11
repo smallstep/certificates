@@ -11,28 +11,30 @@ import (
 // SCEP provisioning flow
 type SCEP struct {
 	*base
-	ID   string `json:"-"`
-	Type string `json:"type"`
-	Name string `json:"name"`
-
+	ID                string   `json:"-"`
+	Type              string   `json:"type"`
+	Name              string   `json:"name"`
 	ForceCN           bool     `json:"forceCN,omitempty"`
 	ChallengePassword string   `json:"challenge,omitempty"`
 	Capabilities      []string `json:"capabilities,omitempty"`
+
 	// IncludeRoot makes the provisioner return the CA root in addition to the
 	// intermediate in the GetCACerts response
 	IncludeRoot bool `json:"includeRoot,omitempty"`
+
 	// MinimumPublicKeyLength is the minimum length for public keys in CSRs
 	MinimumPublicKeyLength int `json:"minimumPublicKeyLength,omitempty"`
+
 	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
 	// at https://github.com/mozilla-services/pkcs7/blob/33d05740a3526e382af6395d3513e73d4e66d1cb/encrypt.go#L63
 	// Defaults to 0, being DES-CBC
-	EncryptionAlgorithmIdentifier int      `json:"encryptionAlgorithmIdentifier,omitempty"`
-	Options                       *Options `json:"options,omitempty"`
-	Claims                        *Claims  `json:"claims,omitempty"`
-	claimer                       *Claimer
+	EncryptionAlgorithmIdentifier int `json:"encryptionAlgorithmIdentifier,omitempty"`
 
+	Options                 *Options `json:"options,omitempty"`
+	Claims                  *Claims  `json:"claims,omitempty"`
 	secretChallengePassword string
 	encryptionAlgorithm     int
+	ctl                     *Controller
 }
 
 // GetID returns the provisioner unique identifier.
@@ -77,7 +79,7 @@ func (s *SCEP) GetOptions() *Options {
 // DefaultTLSCertDuration returns the default TLS cert duration enforced by
 // the provisioner.
 func (s *SCEP) DefaultTLSCertDuration() time.Duration {
-	return s.claimer.DefaultTLSCertDuration()
+	return s.ctl.Claimer.DefaultTLSCertDuration()
 }
 
 // Init initializes and validates the fields of a SCEP type.
@@ -88,11 +90,6 @@ func (s *SCEP) Init(config Config) (err error) {
 		return errors.New("provisioner type cannot be empty")
 	case s.Name == "":
 		return errors.New("provisioner name cannot be empty")
-	}
-
-	// Update claims with global ones
-	if s.claimer, err = NewClaimer(s.Claims, config.Claims); err != nil {
-		return err
 	}
 
 	// Mask the actual challenge value, so it won't be marshaled
@@ -115,7 +112,8 @@ func (s *SCEP) Init(config Config) (err error) {
 
 	// TODO: add other, SCEP specific, options?
 
-	return err
+	s.ctl, err = NewController(s, s.Claims, config)
+	return
 }
 
 // AuthorizeSign does not do any verification, because all verification is handled
@@ -123,13 +121,14 @@ func (s *SCEP) Init(config Config) (err error) {
 // on the resulting certificate.
 func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	return []SignOption{
+		s,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeSCEP, s.Name, ""),
 		newForceCNOption(s.ForceCN),
-		profileDefaultDuration(s.claimer.DefaultTLSCertDuration()),
+		profileDefaultDuration(s.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		newPublicKeyMinimumLengthValidator(s.MinimumPublicKeyLength),
-		newValidityValidator(s.claimer.MinTLSCertDuration(), s.claimer.MaxTLSCertDuration()),
+		newValidityValidator(s.ctl.Claimer.MinTLSCertDuration(), s.ctl.Claimer.MaxTLSCertDuration()),
 	}, nil
 }
 

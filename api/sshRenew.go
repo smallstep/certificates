@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"github.com/smallstep/certificates/api/read"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 )
@@ -36,31 +39,32 @@ type SSHRenewResponse struct {
 // the request.
 func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 	var body SSHRenewRequest
-	if err := ReadJSON(r.Body, &body); err != nil {
-		WriteError(w, errs.BadRequestErr(err, "error reading request body"))
+	if err := read.JSON(r.Body, &body); err != nil {
+		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		render.Error(w, err)
 		return
 	}
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRenewMethod)
 	_, err := h.Authority.Authorize(ctx, body.OTT)
 	if err != nil {
-		WriteError(w, errs.UnauthorizedErr(err))
+		render.Error(w, errs.UnauthorizedErr(err))
 		return
 	}
 	oldCert, _, err := provisioner.ExtractSSHPOPCert(body.OTT)
 	if err != nil {
-		WriteError(w, errs.InternalServerErr(err))
+		render.Error(w, errs.InternalServerErr(err))
+		return
 	}
 
 	newCert, err := h.Authority.RenewSSH(ctx, oldCert)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error renewing ssh certificate"))
+		render.Error(w, errs.ForbiddenErr(err, "error renewing ssh certificate"))
 		return
 	}
 
@@ -70,11 +74,11 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 
 	identity, err := h.renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
-		WriteError(w, errs.ForbiddenErr(err, "error renewing identity certificate"))
+		render.Error(w, errs.ForbiddenErr(err, "error renewing identity certificate"))
 		return
 	}
 
-	JSONStatus(w, &SSHSignResponse{
+	render.JSONStatus(w, &SSHSignResponse{
 		Certificate:         SSHCertificate{newCert},
 		IdentityCertificate: identity,
 	}, http.StatusCreated)

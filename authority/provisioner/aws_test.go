@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -17,10 +18,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func TestAWS_Getters(t *testing.T) {
@@ -521,8 +522,8 @@ func TestAWS_authorizeToken(t *testing.T) {
 			tc := tt(t)
 			if claims, err := tc.p.authorizeToken(tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -641,11 +642,11 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1, "foo.local"}, 6, http.StatusOK, false},
-		{"ok", p2, args{t2, "instance-id"}, 10, http.StatusOK, false},
-		{"ok", p2, args{t2Hostname, "ip-127-0-0-1.us-west-1.compute.internal"}, 10, http.StatusOK, false},
-		{"ok", p2, args{t2PrivateIP, "127.0.0.1"}, 10, http.StatusOK, false},
-		{"ok", p1, args{t4, "instance-id"}, 6, http.StatusOK, false},
+		{"ok", p1, args{t1, "foo.local"}, 7, http.StatusOK, false},
+		{"ok", p2, args{t2, "instance-id"}, 11, http.StatusOK, false},
+		{"ok", p2, args{t2Hostname, "ip-127-0-0-1.us-west-1.compute.internal"}, 11, http.StatusOK, false},
+		{"ok", p2, args{t2PrivateIP, "127.0.0.1"}, 11, http.StatusOK, false},
+		{"ok", p1, args{t4, "instance-id"}, 7, http.StatusOK, false},
 		{"fail account", p3, args{token: t3}, 0, http.StatusUnauthorized, true},
 		{"fail token", p1, args{token: "token"}, 0, http.StatusUnauthorized, true},
 		{"fail subject", p1, args{token: failSubject}, 0, http.StatusUnauthorized, true},
@@ -668,27 +669,28 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 				t.Errorf("AWS.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			case err != nil:
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			default:
 				assert.Len(t, tt.wantLen, got)
 				for _, o := range got {
 					switch v := o.(type) {
+					case *AWS:
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
-						assert.Equals(t, v.Type, int(TypeAWS))
+						assert.Equals(t, v.Type, TypeAWS)
 						assert.Equals(t, v.Name, tt.aws.GetName())
 						assert.Equals(t, v.CredentialID, tt.aws.Accounts[0])
 						assert.Len(t, 2, v.KeyValuePairs)
 					case profileDefaultDuration:
-						assert.Equals(t, time.Duration(v), tt.aws.claimer.DefaultTLSCertDuration())
+						assert.Equals(t, time.Duration(v), tt.aws.ctl.Claimer.DefaultTLSCertDuration())
 					case commonNameValidator:
 						assert.Equals(t, string(v), tt.args.cn)
 					case defaultPublicKeyValidator:
 					case *validityValidator:
-						assert.Equals(t, v.min, tt.aws.claimer.MinTLSCertDuration())
-						assert.Equals(t, v.max, tt.aws.claimer.MaxTLSCertDuration())
+						assert.Equals(t, v.min, tt.aws.ctl.Claimer.MinTLSCertDuration())
+						assert.Equals(t, v.max, tt.aws.ctl.Claimer.MaxTLSCertDuration())
 					case ipAddressesValidator:
 						assert.Equals(t, []net.IP(v), []net.IP{net.ParseIP("127.0.0.1")})
 					case emailAddressesValidator:
@@ -698,7 +700,7 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 					case dnsNamesValidator:
 						assert.Equals(t, []string(v), []string{"ip-127-0-0-1.us-west-1.compute.internal"})
 					default:
-						assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+						assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 					}
 				}
 			}
@@ -726,7 +728,7 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 	// disable sshCA
 	disable := false
 	p3.Claims = &Claims{EnableSSHCA: &disable}
-	p3.claimer, err = NewClaimer(p3.Claims, globalProvisionerClaims)
+	p3.ctl.Claimer, err = NewClaimer(p3.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	t1, err := p1.GetIdentityToken("127.0.0.1", "https://ca.smallstep.com")
@@ -747,7 +749,7 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 
-	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	hostDuration := p1.ctl.Claimer.DefaultHostSSHCertDuration()
 	expectedHostOptions := &SignSSHOptions{
 		CertType: "host", Principals: []string{"127.0.0.1", "ip-127-0-0-1.us-west-1.compute.internal"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
@@ -802,8 +804,8 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
@@ -824,6 +826,7 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 }
 
 func TestAWS_AuthorizeRenew(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
 	p1, err := generateAWS()
 	assert.FatalError(t, err)
 	p2, err := generateAWS()
@@ -832,7 +835,7 @@ func TestAWS_AuthorizeRenew(t *testing.T) {
 	// disable renewal
 	disable := true
 	p2.Claims = &Claims{DisableRenewal: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p2.ctl.Claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	type args struct {
@@ -845,16 +848,22 @@ func TestAWS_AuthorizeRenew(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{nil}, http.StatusOK, false},
-		{"fail/renew-disabled", p2, args{nil}, http.StatusUnauthorized, true},
+		{"ok", p1, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusOK, false},
+		{"fail/renew-disabled", p2, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.aws.AuthorizeRenew(context.Background(), tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("AWS.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})

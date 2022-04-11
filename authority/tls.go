@@ -89,8 +89,13 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	// Set backdate with the configured value
 	signOpts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
+	var prov provisioner.Interface
 	for _, op := range extraOpts {
 		switch k := op.(type) {
+		// Capture current provisioner
+		case provisioner.Interface:
+			prov = k
+
 		// Adds new options to NewCertificate
 		case provisioner.CertificateOptions:
 			certOptions = append(certOptions, k.Options(signOpts)...)
@@ -204,7 +209,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
-	if err = a.storeCertificate(fullchain); err != nil {
+	if err = a.storeCertificate(prov, fullchain); err != nil {
 		if err != db.ErrNotImplemented {
 			return nil, errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Sign; error storing certificate in db", opts...)
@@ -325,19 +330,28 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 // TODO: at some point we should replace the db.AuthDB interface to implement
 // `StoreCertificate(...*x509.Certificate) error` instead of just
 // `StoreCertificate(*x509.Certificate) error`.
-func (a *Authority) storeCertificate(fullchain []*x509.Certificate) error {
+func (a *Authority) storeCertificate(prov provisioner.Interface, fullchain []*x509.Certificate) error {
+	type linkedChainStorer interface {
+		StoreCertificateChain(provisioner.Interface, ...*x509.Certificate) error
+	}
 	type certificateChainStorer interface {
 		StoreCertificateChain(...*x509.Certificate) error
 	}
 	// Store certificate in linkedca
-	if s, ok := a.adminDB.(certificateChainStorer); ok {
+	switch s := a.adminDB.(type) {
+	case linkedChainStorer:
+		return s.StoreCertificateChain(prov, fullchain...)
+	case certificateChainStorer:
 		return s.StoreCertificateChain(fullchain...)
 	}
+
 	// Store certificate in local db
-	if s, ok := a.db.(certificateChainStorer); ok {
+	switch s := a.db.(type) {
+	case certificateChainStorer:
 		return s.StoreCertificateChain(fullchain...)
+	default:
+		return a.db.StoreCertificate(fullchain[0])
 	}
-	return a.db.StoreCertificate(fullchain[0])
 }
 
 // storeRenewedCertificate allows to use an extension of the db.AuthDB interface

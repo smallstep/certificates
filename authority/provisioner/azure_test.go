@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -15,10 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func TestAzure_Getters(t *testing.T) {
@@ -95,7 +96,7 @@ func TestAzure_GetIdentityToken(t *testing.T) {
 	assert.FatalError(t, err)
 
 	t1, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 
@@ -237,7 +238,7 @@ func TestAzure_authorizeToken(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			tok, err := generateAzureToken("subject", p.oidcConfig.Issuer, azureDefaultAudience,
-				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 				time.Now(), jwk)
 			assert.FatalError(t, err)
 			return test{
@@ -252,7 +253,7 @@ func TestAzure_authorizeToken(t *testing.T) {
 			assert.FatalError(t, err)
 			defer srv.Close()
 			tok, err := generateAzureToken("subject", "bad-issuer", azureDefaultAudience,
-				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 				time.Now(), &p.keyStore.keySet.Keys[0])
 			assert.FatalError(t, err)
 			return test{
@@ -267,7 +268,7 @@ func TestAzure_authorizeToken(t *testing.T) {
 			assert.FatalError(t, err)
 			defer srv.Close()
 			tok, err := generateAzureToken("subject", p.oidcConfig.Issuer, azureDefaultAudience,
-				"foo", "subscriptionID", "resourceGroup", "virtualMachine",
+				"foo", "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 				time.Now(), &p.keyStore.keySet.Keys[0])
 			assert.FatalError(t, err)
 			return test{
@@ -321,7 +322,7 @@ func TestAzure_authorizeToken(t *testing.T) {
 			assert.FatalError(t, err)
 			defer srv.Close()
 			tok, err := generateAzureToken("subject", p.oidcConfig.Issuer, azureDefaultAudience,
-				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+				p.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 				time.Now(), &p.keyStore.keySet.Keys[0])
 			assert.FatalError(t, err)
 			return test{
@@ -333,10 +334,10 @@ func TestAzure_authorizeToken(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if claims, name, group, err := tc.p.authorizeToken(tc.token); err != nil {
+			if claims, name, group, subscriptionID, objectID, err := tc.p.authorizeToken(tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -348,6 +349,8 @@ func TestAzure_authorizeToken(t *testing.T) {
 
 					assert.Equals(t, name, "virtualMachine")
 					assert.Equals(t, group, "resourceGroup")
+					assert.Equals(t, subscriptionID, "subscriptionID")
+					assert.Equals(t, objectID, "the-oid")
 				}
 			}
 		})
@@ -382,6 +385,38 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	p4.oidcConfig = p1.oidcConfig
 	p4.keyStore = p1.keyStore
 
+	p5, err := generateAzure()
+	assert.FatalError(t, err)
+	p5.TenantID = p1.TenantID
+	p5.SubscriptionIDs = []string{"subscriptionID"}
+	p5.config = p1.config
+	p5.oidcConfig = p1.oidcConfig
+	p5.keyStore = p1.keyStore
+
+	p6, err := generateAzure()
+	assert.FatalError(t, err)
+	p6.TenantID = p1.TenantID
+	p6.SubscriptionIDs = []string{"foobarzar"}
+	p6.config = p1.config
+	p6.oidcConfig = p1.oidcConfig
+	p6.keyStore = p1.keyStore
+
+	p7, err := generateAzure()
+	assert.FatalError(t, err)
+	p7.TenantID = p1.TenantID
+	p7.ObjectIDs = []string{"the-oid"}
+	p7.config = p1.config
+	p7.oidcConfig = p1.oidcConfig
+	p7.keyStore = p1.keyStore
+
+	p8, err := generateAzure()
+	assert.FatalError(t, err)
+	p8.TenantID = p1.TenantID
+	p8.ObjectIDs = []string{"foobarzar"}
+	p8.config = p1.config
+	p8.oidcConfig = p1.oidcConfig
+	p8.keyStore = p1.keyStore
+
 	badKey, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 
@@ -393,30 +428,38 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 	assert.FatalError(t, err)
 	t4, err := p4.GetIdentityToken("subject", "caURL")
 	assert.FatalError(t, err)
+	t5, err := p5.GetIdentityToken("subject", "caURL")
+	assert.FatalError(t, err)
+	t6, err := p6.GetIdentityToken("subject", "caURL")
+	assert.FatalError(t, err)
+	t7, err := p6.GetIdentityToken("subject", "caURL")
+	assert.FatalError(t, err)
+	t8, err := p6.GetIdentityToken("subject", "caURL")
+	assert.FatalError(t, err)
 
 	t11, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 
 	failIssuer, err := generateAzureToken("subject", "bad-issuer", azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 	failAudience, err := generateAzureToken("subject", p1.oidcConfig.Issuer, "bad-audience",
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now(), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 	failExp, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now().Add(-360*time.Second), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 	failNbf, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now().Add(360*time.Second), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 	failKey, err := generateAzureToken("subject", p1.oidcConfig.Issuer, azureDefaultAudience,
-		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine",
+		p1.TenantID, "subscriptionID", "resourceGroup", "virtualMachine", "vm",
 		time.Now(), badKey)
 	assert.FatalError(t, err)
 
@@ -431,11 +474,15 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 5, http.StatusOK, false},
-		{"ok", p2, args{t2}, 10, http.StatusOK, false},
-		{"ok", p1, args{t11}, 5, http.StatusOK, false},
+		{"ok", p1, args{t1}, 6, http.StatusOK, false},
+		{"ok", p2, args{t2}, 11, http.StatusOK, false},
+		{"ok", p1, args{t11}, 6, http.StatusOK, false},
+		{"ok", p5, args{t5}, 6, http.StatusOK, false},
+		{"ok", p7, args{t7}, 6, http.StatusOK, false},
 		{"fail tenant", p3, args{t3}, 0, http.StatusUnauthorized, true},
 		{"fail resource group", p4, args{t4}, 0, http.StatusUnauthorized, true},
+		{"fail subscription", p6, args{t6}, 0, http.StatusUnauthorized, true},
+		{"fail object id", p8, args{t8}, 0, http.StatusUnauthorized, true},
 		{"fail token", p1, args{"token"}, 0, http.StatusUnauthorized, true},
 		{"fail issuer", p1, args{failIssuer}, 0, http.StatusUnauthorized, true},
 		{"fail audience", p1, args{failAudience}, 0, http.StatusUnauthorized, true},
@@ -451,27 +498,28 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 				t.Errorf("Azure.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			case err != nil:
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			default:
 				assert.Len(t, tt.wantLen, got)
 				for _, o := range got {
 					switch v := o.(type) {
+					case *Azure:
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
-						assert.Equals(t, v.Type, int(TypeAzure))
+						assert.Equals(t, v.Type, TypeAzure)
 						assert.Equals(t, v.Name, tt.azure.GetName())
 						assert.Equals(t, v.CredentialID, tt.azure.TenantID)
 						assert.Len(t, 0, v.KeyValuePairs)
 					case profileDefaultDuration:
-						assert.Equals(t, time.Duration(v), tt.azure.claimer.DefaultTLSCertDuration())
+						assert.Equals(t, time.Duration(v), tt.azure.ctl.Claimer.DefaultTLSCertDuration())
 					case commonNameValidator:
 						assert.Equals(t, string(v), "virtualMachine")
 					case defaultPublicKeyValidator:
 					case *validityValidator:
-						assert.Equals(t, v.min, tt.azure.claimer.MinTLSCertDuration())
-						assert.Equals(t, v.max, tt.azure.claimer.MaxTLSCertDuration())
+						assert.Equals(t, v.min, tt.azure.ctl.Claimer.MinTLSCertDuration())
+						assert.Equals(t, v.max, tt.azure.ctl.Claimer.MaxTLSCertDuration())
 					case ipAddressesValidator:
 						assert.Equals(t, v, nil)
 					case emailAddressesValidator:
@@ -481,7 +529,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 					case dnsNamesValidator:
 						assert.Equals(t, []string(v), []string{"virtualMachine"})
 					default:
-						assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+						assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 					}
 				}
 			}
@@ -490,6 +538,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 }
 
 func TestAzure_AuthorizeRenew(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
 	p1, err := generateAzure()
 	assert.FatalError(t, err)
 	p2, err := generateAzure()
@@ -498,7 +547,7 @@ func TestAzure_AuthorizeRenew(t *testing.T) {
 	// disable renewal
 	disable := true
 	p2.Claims = &Claims{DisableRenewal: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p2.ctl.Claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	type args struct {
@@ -511,16 +560,22 @@ func TestAzure_AuthorizeRenew(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{nil}, http.StatusOK, false},
-		{"fail/renew-disabled", p2, args{nil}, http.StatusUnauthorized, true},
+		{"ok", p1, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusOK, false},
+		{"fail/renew-disabled", p2, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.azure.AuthorizeRenew(context.Background(), tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("Azure.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})
@@ -549,7 +604,7 @@ func TestAzure_AuthorizeSSHSign(t *testing.T) {
 	// disable sshCA
 	disable := false
 	p3.Claims = &Claims{EnableSSHCA: &disable}
-	p3.claimer, err = NewClaimer(p3.Claims, globalProvisionerClaims)
+	p3.ctl.Claimer, err = NewClaimer(p3.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	t1, err := p1.GetIdentityToken("subject", "caURL")
@@ -570,7 +625,7 @@ func TestAzure_AuthorizeSSHSign(t *testing.T) {
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 
-	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	hostDuration := p1.ctl.Claimer.DefaultHostSSHCertDuration()
 	expectedHostOptions := &SignSSHOptions{
 		CertType: "host", Principals: []string{"virtualMachine"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
@@ -615,8 +670,8 @@ func TestAzure_AuthorizeSSHSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {

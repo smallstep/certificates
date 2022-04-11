@@ -26,23 +26,27 @@ var (
 	DefaultBackdate = time.Minute
 	// DefaultDisableRenewal disables renewals per provisioner.
 	DefaultDisableRenewal = false
+	// DefaultAllowRenewAfterExpiry allows renewals even if the certificate is
+	// expired.
+	DefaultAllowRenewAfterExpiry = false
 	// DefaultEnableSSHCA enable SSH CA features per provisioner or globally
 	// for all provisioners.
 	DefaultEnableSSHCA = false
 	// GlobalProvisionerClaims default claims for the Authority. Can be overridden
 	// by provisioner specific claims.
 	GlobalProvisionerClaims = provisioner.Claims{
-		MinTLSDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
-		MaxTLSDur:         &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultTLSDur:     &provisioner.Duration{Duration: 24 * time.Hour},
-		DisableRenewal:    &DefaultDisableRenewal,
-		MinUserSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
-		MaxUserSSHDur:     &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultUserSSHDur: &provisioner.Duration{Duration: 16 * time.Hour},
-		MinHostSSHDur:     &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
-		MaxHostSSHDur:     &provisioner.Duration{Duration: 30 * 24 * time.Hour},
-		DefaultHostSSHDur: &provisioner.Duration{Duration: 30 * 24 * time.Hour},
-		EnableSSHCA:       &DefaultEnableSSHCA,
+		MinTLSDur:             &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
+		MaxTLSDur:             &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:         &provisioner.Duration{Duration: 24 * time.Hour},
+		MinUserSSHDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:         &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur:     &provisioner.Duration{Duration: 16 * time.Hour},
+		MinHostSSHDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:         &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur:     &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:           &DefaultEnableSSHCA,
+		DisableRenewal:        &DefaultDisableRenewal,
+		AllowRenewAfterExpiry: &DefaultAllowRenewAfterExpiry,
 	}
 )
 
@@ -273,28 +277,32 @@ func (c *Config) GetAudiences() provisioner.Audiences {
 	}
 
 	for _, name := range c.DNSNames {
+		hostname := toHostname(name)
 		audiences.Sign = append(audiences.Sign,
-			fmt.Sprintf("https://%s/1.0/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/1.0/ssh/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/ssh/sign", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/sign", hostname),
+			fmt.Sprintf("https://%s/sign", hostname),
+			fmt.Sprintf("https://%s/1.0/ssh/sign", hostname),
+			fmt.Sprintf("https://%s/ssh/sign", hostname))
+		audiences.Renew = append(audiences.Renew,
+			fmt.Sprintf("https://%s/1.0/renew", hostname),
+			fmt.Sprintf("https://%s/renew", hostname))
 		audiences.Revoke = append(audiences.Revoke,
-			fmt.Sprintf("https://%s/1.0/revoke", toHostname(name)),
-			fmt.Sprintf("https://%s/revoke", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/revoke", hostname),
+			fmt.Sprintf("https://%s/revoke", hostname))
 		audiences.SSHSign = append(audiences.SSHSign,
-			fmt.Sprintf("https://%s/1.0/ssh/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/ssh/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/1.0/sign", toHostname(name)),
-			fmt.Sprintf("https://%s/sign", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/ssh/sign", hostname),
+			fmt.Sprintf("https://%s/ssh/sign", hostname),
+			fmt.Sprintf("https://%s/1.0/sign", hostname),
+			fmt.Sprintf("https://%s/sign", hostname))
 		audiences.SSHRevoke = append(audiences.SSHRevoke,
-			fmt.Sprintf("https://%s/1.0/ssh/revoke", toHostname(name)),
-			fmt.Sprintf("https://%s/ssh/revoke", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/ssh/revoke", hostname),
+			fmt.Sprintf("https://%s/ssh/revoke", hostname))
 		audiences.SSHRenew = append(audiences.SSHRenew,
-			fmt.Sprintf("https://%s/1.0/ssh/renew", toHostname(name)),
-			fmt.Sprintf("https://%s/ssh/renew", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/ssh/renew", hostname),
+			fmt.Sprintf("https://%s/ssh/renew", hostname))
 		audiences.SSHRekey = append(audiences.SSHRekey,
-			fmt.Sprintf("https://%s/1.0/ssh/rekey", toHostname(name)),
-			fmt.Sprintf("https://%s/ssh/rekey", toHostname(name)))
+			fmt.Sprintf("https://%s/1.0/ssh/rekey", hostname),
+			fmt.Sprintf("https://%s/ssh/rekey", hostname))
 	}
 
 	return audiences

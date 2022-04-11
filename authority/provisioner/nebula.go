@@ -34,19 +34,18 @@ const (
 // https://signal.org/docs/specifications/xeddsa/#xeddsa and implemented by
 // go.step.sm/crypto/x25519.
 type Nebula struct {
-	ID        string   `json:"-"`
-	Type      string   `json:"type"`
-	Name      string   `json:"name"`
-	Roots     []byte   `json:"roots"`
-	Claims    *Claims  `json:"claims,omitempty"`
-	Options   *Options `json:"options,omitempty"`
-	claimer   *Claimer
-	caPool    *nebula.NebulaCAPool
-	audiences Audiences
+	ID      string   `json:"-"`
+	Type    string   `json:"type"`
+	Name    string   `json:"name"`
+	Roots   []byte   `json:"roots"`
+	Claims  *Claims  `json:"claims,omitempty"`
+	Options *Options `json:"options,omitempty"`
+	caPool  *nebula.NebulaCAPool
+	ctl     *Controller
 }
 
 // Init verifies and initializes the Nebula provisioner.
-func (p *Nebula) Init(config Config) error {
+func (p *Nebula) Init(config Config) (err error) {
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -56,19 +55,14 @@ func (p *Nebula) Init(config Config) error {
 		return errors.New("provisioner root(s) cannot be empty")
 	}
 
-	var err error
-	if p.claimer, err = NewClaimer(p.Claims, config.Claims); err != nil {
-		return err
-	}
-
 	p.caPool, err = nebula.NewCAPoolFromBytes(p.Roots)
 	if err != nil {
 		return errs.InternalServer("failed to create ca pool: %v", err)
 	}
 
-	p.audiences = config.Audiences.WithFragment(p.GetIDForToken())
-
-	return nil
+	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
+	p.ctl, err = NewController(p, p.Claims, config)
+	return
 }
 
 // GetID returns the provisioner id.
@@ -120,7 +114,7 @@ func (p *Nebula) GetEncryptedKey() (kid, key string, ok bool) {
 
 // AuthorizeSign returns the list of SignOption for a Sign request.
 func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	crt, claims, err := p.authorizeToken(token, p.audiences.Sign)
+	crt, claims, err := p.authorizeToken(token, p.ctl.Audiences.Sign)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +133,9 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 		data.SetToken(v)
 	}
 
-	// The Nebula certificate will be available using the template variable Crt.
-	// For example {{ .Crt.Details.Groups }} can be used to get all the groups.
+	// The Nebula certificate will be available using the template variable
+	// AuthorizationCrt. For example {{ .AuthorizationCrt.Details.Groups }} can
+	// be used to get all the groups.
 	data.SetAuthorizationCertificate(crt)
 
 	templateOptions, err := TemplateOptions(p.Options, data)
@@ -149,11 +144,12 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 	}
 
 	return []SignOption{
+		p,
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeNebula, p.Name, ""),
 		profileLimitDuration{
-			def:       p.claimer.DefaultTLSCertDuration(),
+			def:       p.ctl.Claimer.DefaultTLSCertDuration(),
 			notBefore: crt.Details.NotBefore,
 			notAfter:  crt.Details.NotAfter,
 		},
@@ -164,18 +160,18 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 			IPs:  crt.Details.Ips,
 		},
 		defaultPublicKeyValidator{},
-		newValidityValidator(p.claimer.MinTLSCertDuration(), p.claimer.MaxTLSCertDuration()),
+		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 	}, nil
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 // Currently the Nebula provisioner only grants host SSH certificates.
 func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
-	if !p.claimer.IsSSHCAEnabled() {
+	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("ssh is disabled for nebula provisioner '%s'", p.Name)
 	}
 
-	crt, claims, err := p.authorizeToken(token, p.audiences.SSHSign)
+	crt, claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHSign)
 	if err != nil {
 		return nil, err
 	}
@@ -253,11 +249,11 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 	return append(signOptions,
 		templateOptions,
 		// Checks the validity bounds, and set the validity if has not been set.
-		&sshLimitDuration{p.claimer, crt.Details.NotAfter},
+		&sshLimitDuration{p.ctl.Claimer, crt.Details.NotAfter},
 		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
-		&sshCertValidityValidator{p.claimer},
+		&sshCertValidityValidator{p.ctl.Claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 	), nil
@@ -265,23 +261,20 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 
 // AuthorizeRenew returns an error if the renewal is disabled.
 func (p *Nebula) AuthorizeRenew(ctx context.Context, crt *x509.Certificate) error {
-	if p.claimer.IsDisableRenewal() {
-		return errs.Unauthorized("renew is disabled for nebula provisioner '%s'", p.GetName())
-	}
-	return nil
+	return p.ctl.AuthorizeRenew(ctx, crt)
 }
 
 // AuthorizeRevoke returns an error if the token is not valid.
 func (p *Nebula) AuthorizeRevoke(ctx context.Context, token string) error {
-	return p.validateToken(token, p.audiences.Revoke)
+	return p.validateToken(token, p.ctl.Audiences.Revoke)
 }
 
 // AuthorizeSSHRevoke returns an error if SSH is disabled or the token is invalid.
 func (p *Nebula) AuthorizeSSHRevoke(ctx context.Context, token string) error {
-	if !p.claimer.IsSSHCAEnabled() {
+	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return errs.Unauthorized("ssh is disabled for nebula provisioner '%s'", p.Name)
 	}
-	if _, _, err := p.authorizeToken(token, p.audiences.SSHRevoke); err != nil {
+	if _, _, err := p.authorizeToken(token, p.ctl.Audiences.SSHRevoke); err != nil {
 		return err
 	}
 	return nil

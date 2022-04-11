@@ -70,12 +70,22 @@ type Authority struct {
 	startTime time.Time
 
 	// Custom functions
-	sshBastionFunc   func(ctx context.Context, user, hostname string) (*config.Bastion, error)
-	sshCheckHostFunc func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
-	sshGetHostsFunc  func(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)
-	getIdentityFunc  provisioner.GetIdentityFunc
+	sshBastionFunc        func(ctx context.Context, user, hostname string) (*config.Bastion, error)
+	sshCheckHostFunc      func(ctx context.Context, principal string, tok string, roots []*x509.Certificate) (bool, error)
+	sshGetHostsFunc       func(ctx context.Context, cert *x509.Certificate) ([]config.Host, error)
+	getIdentityFunc       provisioner.GetIdentityFunc
+	authorizeRenewFunc    provisioner.AuthorizeRenewFunc
+	authorizeSSHRenewFunc provisioner.AuthorizeSSHRenewFunc
 
 	adminMutex sync.RWMutex
+}
+
+type Info struct {
+	StartTime          time.Time
+	RootX509Certs      []*x509.Certificate
+	SSHCAUserPublicKey []byte
+	SSHCAHostPublicKey []byte
+	DNSNames           []string
 }
 
 // New creates and initiates a new Authority type.
@@ -175,7 +185,7 @@ func (a *Authority) reloadAdminResources(ctx context.Context) error {
 	// Create provisioner collection.
 	provClxn := provisioner.NewCollection(provisionerConfig.Audiences)
 	for _, p := range provList {
-		if err := p.Init(*provisionerConfig); err != nil {
+		if err := p.Init(provisionerConfig); err != nil {
 			return err
 		}
 		if err := provClxn.Store(p); err != nil {
@@ -251,11 +261,42 @@ func (a *Authority) init() error {
 		}
 	}
 
+	// Initialize linkedca client if necessary. On a linked RA, the issuer
+	// configuration might come from majordomo.
+	var linkedcaClient *linkedCaClient
+	if a.config.AuthorityConfig.EnableAdmin && a.linkedCAToken != "" && a.adminDB == nil {
+		linkedcaClient, err = newLinkedCAClient(a.linkedCAToken)
+		if err != nil {
+			return err
+		}
+		// If authorityId is configured make sure it matches the one in the token
+		if id := a.config.AuthorityConfig.AuthorityID; id != "" && !strings.EqualFold(id, linkedcaClient.authorityID) {
+			return errors.New("error initializing linkedca: token authority and configured authority do not match")
+		}
+		linkedcaClient.Run()
+	}
+
 	// Initialize the X.509 CA Service if it has not been set in the options.
 	if a.x509CAService == nil {
 		var options casapi.Options
 		if a.config.AuthorityConfig.Options != nil {
 			options = *a.config.AuthorityConfig.Options
+		}
+
+		// Configure linked RA
+		if linkedcaClient != nil && options.CertificateAuthority == "" {
+			conf, err := linkedcaClient.GetConfiguration(context.Background())
+			if err != nil {
+				return err
+			}
+			if conf.RaConfig != nil {
+				options.CertificateAuthority = conf.RaConfig.CaUrl
+				options.CertificateAuthorityFingerprint = conf.RaConfig.Fingerprint
+				options.CertificateIssuer = &casapi.CertificateIssuer{
+					Type:        conf.RaConfig.Provisioner.Type.String(),
+					Provisioner: conf.RaConfig.Provisioner.Name,
+				}
+			}
 		}
 
 		// Set the issuer password if passed in the flags.
@@ -292,8 +333,6 @@ func (a *Authority) init() error {
 				return err
 			}
 			a.rootX509Certs = append(a.rootX509Certs, resp.RootCertificate)
-			sum := sha256.Sum256(resp.RootCertificate.Raw)
-			log.Printf("Using root fingerprint '%s'", hex.EncodeToString(sum[:]))
 		}
 	}
 
@@ -479,24 +518,13 @@ func (a *Authority) init() error {
 		// Initialize step-ca Admin Database if it's not already initialized using
 		// WithAdminDB.
 		if a.adminDB == nil {
-			if a.linkedCAToken == "" {
-				// Check if AuthConfig already exists
+			if linkedcaClient != nil {
+				a.adminDB = linkedcaClient
+			} else {
 				a.adminDB, err = adminDBNosql.New(a.db.(nosql.DB), admin.DefaultAuthorityID)
 				if err != nil {
 					return err
 				}
-			} else {
-				// Use the linkedca client as the admindb.
-				client, err := newLinkedCAClient(a.linkedCAToken)
-				if err != nil {
-					return err
-				}
-				// If authorityId is configured make sure it matches the one in the token
-				if id := a.config.AuthorityConfig.AuthorityID; id != "" && !strings.EqualFold(id, client.authorityID) {
-					return errors.New("error initializing linkedca: token authority and configured authority do not match")
-				}
-				client.Run()
-				a.adminDB = client
 			}
 		}
 
@@ -557,6 +585,21 @@ func (a *Authority) GetDatabase() db.AuthDB {
 // GetAdminDatabase returns the admin database, if one exists.
 func (a *Authority) GetAdminDatabase() admin.DB {
 	return a.adminDB
+}
+
+func (a *Authority) GetInfo() Info {
+	ai := Info{
+		StartTime:     a.startTime,
+		RootX509Certs: a.rootX509Certs,
+		DNSNames:      a.config.DNSNames,
+	}
+	if a.sshCAUserCertSignKey != nil {
+		ai.SSHCAUserPublicKey = ssh.MarshalAuthorizedKey(a.sshCAUserCertSignKey.PublicKey())
+	}
+	if a.sshCAHostCertSignKey != nil {
+		ai.SSHCAHostPublicKey = ssh.MarshalAuthorizedKey(a.sshCAHostCertSignKey.PublicKey())
+	}
+	return ai
 }
 
 // IsAdminAPIEnabled returns a boolean indicating whether the Admin API has

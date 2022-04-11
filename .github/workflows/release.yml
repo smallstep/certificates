@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        go: [ '1.15', '1.16', '1.17' ]
+        go: [ '1.17', '1.18' ]
     outputs:
       is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
     steps:
@@ -33,7 +33,7 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
-          version: 'v1.44.0'
+          version: 'v1.45.0'
 
           # Optional: working directory, useful for monorepos
           # working-directory: somedir
@@ -106,7 +106,7 @@ jobs:
         name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18
       -
         name: APT Install
         id: aptInstall
@@ -159,7 +159,7 @@ jobs:
         name: Setup Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.17'
+          go-version: '1.18'
       -
         name: Install cosign
         uses: sigstore/cosign-installer@v1.1.0

@@ -6,15 +6,17 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func TestJWK_Getters(t *testing.T) {
@@ -76,13 +78,13 @@ func TestJWK_Init(t *testing.T) {
 		},
 		"fail-bad-claims": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}, audiences: testAudiences, Claims: &Claims{DefaultTLSDur: &Duration{0}}},
+				p:   &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}, Claims: &Claims{DefaultTLSDur: &Duration{0}}},
 				err: errors.New("claims: MinTLSCertDuration must be greater than 0"),
 			}
 		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p: &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}, audiences: testAudiences},
+				p: &JWK{Name: "foo", Type: "bar", Key: &jose.JSONWebKey{}},
 			}
 		},
 	}
@@ -183,8 +185,8 @@ func TestJWK_authorizeToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got, err := tt.prov.authorizeToken(tt.args.token, testAudiences.Sign); err != nil {
 				if assert.NotNil(t, tt.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tt.code)
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -223,8 +225,8 @@ func TestJWK_AuthorizeRevoke(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.prov.AuthorizeRevoke(context.Background(), tt.args.token); err != nil {
 				if assert.NotNil(t, tt.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tt.code)
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
@@ -288,34 +290,35 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 			ctx := NewContextWithMethod(context.Background(), SignMethod)
 			if got, err := tt.prov.AuthorizeSign(ctx, tt.args.token); err != nil {
 				if assert.NotNil(t, tt.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tt.code)
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
 			} else {
 				if assert.NotNil(t, got) {
-					assert.Len(t, 7, got)
+					assert.Len(t, 8, got)
 					for _, o := range got {
 						switch v := o.(type) {
+						case *JWK:
 						case certificateOptionsFunc:
 						case *provisionerExtensionOption:
-							assert.Equals(t, v.Type, int(TypeJWK))
+							assert.Equals(t, v.Type, TypeJWK)
 							assert.Equals(t, v.Name, tt.prov.GetName())
 							assert.Equals(t, v.CredentialID, tt.prov.Key.KeyID)
 							assert.Len(t, 0, v.KeyValuePairs)
 						case profileDefaultDuration:
-							assert.Equals(t, time.Duration(v), tt.prov.claimer.DefaultTLSCertDuration())
+							assert.Equals(t, time.Duration(v), tt.prov.ctl.Claimer.DefaultTLSCertDuration())
 						case commonNameValidator:
 							assert.Equals(t, string(v), "subject")
 						case defaultPublicKeyValidator:
 						case *validityValidator:
-							assert.Equals(t, v.min, tt.prov.claimer.MinTLSCertDuration())
-							assert.Equals(t, v.max, tt.prov.claimer.MaxTLSCertDuration())
+							assert.Equals(t, v.min, tt.prov.ctl.Claimer.MinTLSCertDuration())
+							assert.Equals(t, v.max, tt.prov.ctl.Claimer.MaxTLSCertDuration())
 						case defaultSANsValidator:
 							assert.Equals(t, []string(v), tt.sans)
 						default:
-							assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}
 					}
 				}
@@ -325,6 +328,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 }
 
 func TestJWK_AuthorizeRenew(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
 	p1, err := generateJWK()
 	assert.FatalError(t, err)
 	p2, err := generateJWK()
@@ -333,7 +337,7 @@ func TestJWK_AuthorizeRenew(t *testing.T) {
 	// disable renewal
 	disable := true
 	p2.Claims = &Claims{DisableRenewal: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p2.ctl.Claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	type args struct {
@@ -346,16 +350,22 @@ func TestJWK_AuthorizeRenew(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{nil}, http.StatusOK, false},
-		{"fail/renew-disabled", p2, args{nil}, http.StatusUnauthorized, true},
+		{"ok", p1, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusOK, false},
+		{"fail/renew-disabled", p2, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.prov.AuthorizeRenew(context.Background(), tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("JWK.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})
@@ -373,7 +383,7 @@ func TestJWK_AuthorizeSSHSign(t *testing.T) {
 	// disable sshCA
 	disable := false
 	p2.Claims = &Claims{EnableSSHCA: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p2.ctl.Claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	jwk, err := decryptJSONWebKey(p1.EncryptedKey)
@@ -402,8 +412,8 @@ func TestJWK_AuthorizeSSHSign(t *testing.T) {
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 
-	userDuration := p1.claimer.DefaultUserSSHCertDuration()
-	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	userDuration := p1.ctl.Claimer.DefaultUserSSHCertDuration()
+	hostDuration := p1.ctl.Claimer.DefaultHostSSHCertDuration()
 	expectedUserOptions := &SignSSHOptions{
 		CertType: "user", Principals: []string{"name"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
@@ -448,8 +458,8 @@ func TestJWK_AuthorizeSSHSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
@@ -485,8 +495,8 @@ func TestJWK_AuthorizeSign_SSHOptions(t *testing.T) {
 	signer, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 
-	userDuration := p1.claimer.DefaultUserSSHCertDuration()
-	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	userDuration := p1.ctl.Claimer.DefaultUserSSHCertDuration()
+	hostDuration := p1.ctl.Claimer.DefaultHostSSHCertDuration()
 	expectedUserOptions := &SignSSHOptions{
 		CertType: "user", Principals: []string{"name"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
@@ -613,8 +623,8 @@ func TestJWK_AuthorizeSSHRevoke(t *testing.T) {
 			tc := tt(t)
 			if err := tc.p.AuthorizeSSHRevoke(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}

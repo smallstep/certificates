@@ -87,20 +87,20 @@ func (a *Authority) LoadProvisionerByName(name string) (provisioner.Interface, e
 	return p, nil
 }
 
-func (a *Authority) generateProvisionerConfig(ctx context.Context) (*provisioner.Config, error) {
+func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.Config, error) {
 	// Merge global and configuration claims
 	claimer, err := provisioner.NewClaimer(a.config.AuthorityConfig.Claims, config.GlobalProvisionerClaims)
 	if err != nil {
-		return nil, err
+		return provisioner.Config{}, err
 	}
 	// TODO: should we also be combining the ssh federated roots here?
 	// If we rotate ssh roots keys, sshpop provisioner will lose ability to
 	// validate old SSH certificates, unless they are added as federated certs.
 	sshKeys, err := a.GetSSHRoots(ctx)
 	if err != nil {
-		return nil, err
+		return provisioner.Config{}, err
 	}
-	return &provisioner.Config{
+	return provisioner.Config{
 		Claims:    claimer.Claims(),
 		Audiences: a.config.GetAudiences(),
 		DB:        a.db,
@@ -108,7 +108,9 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (*provisioner
 			UserKeys: sshKeys.UserKeys,
 			HostKeys: sshKeys.HostKeys,
 		},
-		GetIdentityFunc: a.getIdentityFunc,
+		GetIdentityFunc:       a.getIdentityFunc,
+		AuthorizeRenewFunc:    a.authorizeRenewFunc,
+		AuthorizeSSHRenewFunc: a.authorizeSSHRenewFunc,
 	}, nil
 
 }
@@ -133,9 +135,18 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 			"provisioner with token ID %s already exists", certProv.GetIDForToken())
 	}
 
+	provisionerConfig, err := a.generateProvisionerConfig(ctx)
+	if err != nil {
+		return admin.WrapErrorISE(err, "error generating provisioner config")
+	}
+
+	if err := certProv.Init(provisionerConfig); err != nil {
+		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %s", prov.Name)
+	}
+
 	// Store to database -- this will set the ID.
 	if err := a.adminDB.CreateProvisioner(ctx, prov); err != nil {
-		return admin.WrapErrorISE(err, "error creating admin")
+		return admin.WrapErrorISE(err, "error creating provisioner")
 	}
 
 	// We need a new conversion that has the newly set ID.
@@ -145,12 +156,7 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 			"error converting to certificates provisioner from linkedca provisioner")
 	}
 
-	provisionerConfig, err := a.generateProvisionerConfig(ctx)
-	if err != nil {
-		return admin.WrapErrorISE(err, "error generating provisioner config")
-	}
-
-	if err := certProv.Init(*provisionerConfig); err != nil {
+	if err := certProv.Init(provisionerConfig); err != nil {
 		return admin.WrapErrorISE(err, "error initializing provisioner %s", prov.Name)
 	}
 
@@ -179,7 +185,7 @@ func (a *Authority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisio
 		return admin.WrapErrorISE(err, "error generating provisioner config")
 	}
 
-	if err := certProv.Init(*provisionerConfig); err != nil {
+	if err := certProv.Init(provisionerConfig); err != nil {
 		return admin.WrapErrorISE(err, "error initializing provisioner %s", nu.Name)
 	}
 
@@ -431,7 +437,8 @@ func claimsToCertificates(c *linkedca.Claims) (*provisioner.Claims, error) {
 	}
 
 	pc := &provisioner.Claims{
-		DisableRenewal: &c.DisableRenewal,
+		DisableRenewal:        &c.DisableRenewal,
+		AllowRenewAfterExpiry: &c.AllowRenewAfterExpiry,
 	}
 
 	var err error
@@ -469,12 +476,18 @@ func claimsToLinkedca(c *provisioner.Claims) *linkedca.Claims {
 	}
 
 	disableRenewal := config.DefaultDisableRenewal
+	allowRenewAfterExpiry := config.DefaultAllowRenewAfterExpiry
+
 	if c.DisableRenewal != nil {
 		disableRenewal = *c.DisableRenewal
 	}
+	if c.AllowRenewAfterExpiry != nil {
+		allowRenewAfterExpiry = *c.AllowRenewAfterExpiry
+	}
 
 	lc := &linkedca.Claims{
-		DisableRenewal: disableRenewal,
+		DisableRenewal:        disableRenewal,
+		AllowRenewAfterExpiry: allowRenewAfterExpiry,
 	}
 
 	if c.DefaultTLSDur != nil || c.MinTLSDur != nil || c.MaxTLSDur != nil {
@@ -706,6 +719,8 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			Name:                   p.Name,
 			TenantID:               cfg.TenantId,
 			ResourceGroups:         cfg.ResourceGroups,
+			SubscriptionIDs:        cfg.SubscriptionIds,
+			ObjectIDs:              cfg.ObjectIds,
 			Audience:               cfg.Audience,
 			DisableCustomSANs:      cfg.DisableCustomSans,
 			DisableTrustOnFirstUse: cfg.DisableTrustOnFirstUse,
@@ -865,6 +880,8 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 					Azure: &linkedca.AzureProvisioner{
 						TenantId:               p.TenantID,
 						ResourceGroups:         p.ResourceGroups,
+						SubscriptionIds:        p.SubscriptionIDs,
+						ObjectIds:              p.ObjectIDs,
 						Audience:               p.Audience,
 						DisableCustomSans:      p.DisableCustomSANs,
 						DisableTrustOnFirstUse: p.DisableTrustOnFirstUse,

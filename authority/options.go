@@ -92,6 +92,24 @@ func WithGetIdentityFunc(fn func(ctx context.Context, p provisioner.Interface, e
 	}
 }
 
+// WithAuthorizeRenewFunc sets a custom function that authorizes the renewal of
+// an X.509 certificate.
+func WithAuthorizeRenewFunc(fn func(ctx context.Context, p *provisioner.Controller, cert *x509.Certificate) error) Option {
+	return func(a *Authority) error {
+		a.authorizeRenewFunc = fn
+		return nil
+	}
+}
+
+// WithAuthorizeSSHRenewFunc sets a custom function that authorizes the renewal
+// of a SSH certificate.
+func WithAuthorizeSSHRenewFunc(fn func(ctx context.Context, p *provisioner.Controller, cert *ssh.Certificate) error) Option {
+	return func(a *Authority) error {
+		a.authorizeSSHRenewFunc = fn
+		return nil
+	}
+}
+
 // WithSSHBastionFunc sets a custom function to get the bastion for a
 // given user-host pair.
 func WithSSHBastionFunc(fn func(ctx context.Context, user, host string) (*config.Bastion, error)) Option {
@@ -136,6 +154,22 @@ func WithX509Signer(crt *x509.Certificate, s crypto.Signer) Option {
 			Type:             casapi.SoftCAS,
 			Signer:           s,
 			CertificateChain: []*x509.Certificate{crt},
+		})
+		if err != nil {
+			return err
+		}
+		a.x509CAService = srv
+		return nil
+	}
+}
+
+// WithX509SignerFunc defines the function used to get the chain of certificates
+// and signer used when we sign X.509 certificates.
+func WithX509SignerFunc(fn func() ([]*x509.Certificate, crypto.Signer, error)) Option {
+	return func(a *Authority) error {
+		srv, err := cas.New(context.Background(), casapi.Options{
+			Type:              casapi.SoftCAS,
+			CertificateSigner: fn,
 		})
 		if err != nil {
 			return err

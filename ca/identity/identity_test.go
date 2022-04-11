@@ -346,6 +346,8 @@ func TestIdentity_GetCertPool(t *testing.T) {
 				return
 			}
 			if got != nil {
+				// nolint:staticcheck // we don't have a different way to check
+				// the certificates in the pool.
 				subjects := got.Subjects()
 				if !reflect.DeepEqual(subjects, tt.wantSubjects) {
 					t.Errorf("Identity.GetCertPool() = %x, want %x", subjects, tt.wantSubjects)

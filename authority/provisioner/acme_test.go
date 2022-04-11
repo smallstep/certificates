@@ -3,13 +3,14 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func TestACME_Getters(t *testing.T) {
@@ -91,6 +92,7 @@ func TestACME_Init(t *testing.T) {
 }
 
 func TestACME_AuthorizeRenew(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
 	type test struct {
 		p    *ACME
 		cert *x509.Certificate
@@ -104,21 +106,27 @@ func TestACME_AuthorizeRenew(t *testing.T) {
 			// disable renewal
 			disable := true
 			p.Claims = &Claims{DisableRenewal: &disable}
-			p.claimer, err = NewClaimer(p.Claims, globalProvisionerClaims)
+			p.ctl.Claimer, err = NewClaimer(p.Claims, globalProvisionerClaims)
 			assert.FatalError(t, err)
 			return test{
-				p:    p,
-				cert: &x509.Certificate{},
+				p: p,
+				cert: &x509.Certificate{
+					NotBefore: now,
+					NotAfter:  now.Add(time.Hour),
+				},
 				code: http.StatusUnauthorized,
-				err:  errors.Errorf("acme.AuthorizeRenew; renew is disabled for acme provisioner '%s'", p.GetName()),
+				err:  fmt.Errorf("renew is disabled for provisioner '%s'", p.GetName()),
 			}
 		},
 		"ok": func(t *testing.T) test {
 			p, err := generateACME()
 			assert.FatalError(t, err)
 			return test{
-				p:    p,
-				cert: &x509.Certificate{},
+				p: p,
+				cert: &x509.Certificate{
+					NotBefore: now,
+					NotAfter:  now.Add(time.Hour),
+				},
 			}
 		},
 	}
@@ -126,8 +134,8 @@ func TestACME_AuthorizeRenew(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
 			if err := tc.p.AuthorizeRenew(context.Background(), tc.cert); err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tc.code)
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -161,31 +169,32 @@ func TestACME_AuthorizeSign(t *testing.T) {
 			tc := tt(t)
 			if opts, err := tc.p.AuthorizeSign(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(errs.StatusCoder)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					sc, ok := err.(render.StatusCodedError)
+					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
 				if assert.Nil(t, tc.err) && assert.NotNil(t, opts) {
-					assert.Len(t, 5, opts)
+					assert.Len(t, 6, opts)
 					for _, o := range opts {
 						switch v := o.(type) {
+						case *ACME:
 						case *provisionerExtensionOption:
-							assert.Equals(t, v.Type, int(TypeACME))
+							assert.Equals(t, v.Type, TypeACME)
 							assert.Equals(t, v.Name, tc.p.GetName())
 							assert.Equals(t, v.CredentialID, "")
 							assert.Len(t, 0, v.KeyValuePairs)
 						case *forceCNOption:
 							assert.Equals(t, v.ForceCN, tc.p.ForceCN)
 						case profileDefaultDuration:
-							assert.Equals(t, time.Duration(v), tc.p.claimer.DefaultTLSCertDuration())
+							assert.Equals(t, time.Duration(v), tc.p.ctl.Claimer.DefaultTLSCertDuration())
 						case defaultPublicKeyValidator:
 						case *validityValidator:
-							assert.Equals(t, v.min, tc.p.claimer.MinTLSCertDuration())
-							assert.Equals(t, v.max, tc.p.claimer.MaxTLSCertDuration())
+							assert.Equals(t, v.min, tc.p.ctl.Claimer.MinTLSCertDuration())
+							assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
 						default:
-							assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}
 					}
 				}

@@ -6,16 +6,17 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/api/render"
 )
 
 func Test_openIDConfiguration_Validate(t *testing.T) {
@@ -246,8 +247,8 @@ func TestOIDC_authorizeToken(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else {
@@ -317,30 +318,31 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
-				assert.Len(t, 5, got)
+				assert.Len(t, 6, got)
 				for _, o := range got {
 					switch v := o.(type) {
+					case *OIDC:
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
-						assert.Equals(t, v.Type, int(TypeOIDC))
+						assert.Equals(t, v.Type, TypeOIDC)
 						assert.Equals(t, v.Name, tt.prov.GetName())
 						assert.Equals(t, v.CredentialID, tt.prov.ClientID)
 						assert.Len(t, 0, v.KeyValuePairs)
 					case profileDefaultDuration:
-						assert.Equals(t, time.Duration(v), tt.prov.claimer.DefaultTLSCertDuration())
+						assert.Equals(t, time.Duration(v), tt.prov.ctl.Claimer.DefaultTLSCertDuration())
 					case defaultPublicKeyValidator:
 					case *validityValidator:
-						assert.Equals(t, v.min, tt.prov.claimer.MinTLSCertDuration())
-						assert.Equals(t, v.max, tt.prov.claimer.MaxTLSCertDuration())
+						assert.Equals(t, v.min, tt.prov.ctl.Claimer.MinTLSCertDuration())
+						assert.Equals(t, v.max, tt.prov.ctl.Claimer.MaxTLSCertDuration())
 					case emailOnlyIdentity:
 						assert.Equals(t, string(v), "name@smallstep.com")
 					default:
-						assert.FatalError(t, errors.Errorf("unexpected sign option of type %T", v))
+						assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 					}
 				}
 			}
@@ -402,8 +404,8 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			} else if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})
@@ -411,6 +413,7 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 }
 
 func TestOIDC_AuthorizeRenew(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
 	p1, err := generateOIDC()
 	assert.FatalError(t, err)
 	p2, err := generateOIDC()
@@ -419,7 +422,7 @@ func TestOIDC_AuthorizeRenew(t *testing.T) {
 	// disable renewal
 	disable := true
 	p2.Claims = &Claims{DisableRenewal: &disable}
-	p2.claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
+	p2.ctl.Claimer, err = NewClaimer(p2.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	type args struct {
@@ -432,8 +435,14 @@ func TestOIDC_AuthorizeRenew(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{nil}, http.StatusOK, false},
-		{"fail/renew-disabled", p2, args{nil}, http.StatusUnauthorized, true},
+		{"ok", p1, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusOK, false},
+		{"fail/renew-disabled", p2, args{&x509.Certificate{
+			NotBefore: now,
+			NotAfter:  now.Add(time.Hour),
+		}}, http.StatusUnauthorized, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -441,8 +450,8 @@ func TestOIDC_AuthorizeRenew(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})
@@ -478,7 +487,7 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	// disable sshCA
 	disable := false
 	p6.Claims = &Claims{EnableSSHCA: &disable}
-	p6.claimer, err = NewClaimer(p6.Claims, globalProvisionerClaims)
+	p6.ctl.Claimer, err = NewClaimer(p6.Claims, globalProvisionerClaims)
 	assert.FatalError(t, err)
 
 	// Update configuration endpoints and initialize
@@ -494,10 +503,10 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	assert.FatalError(t, p4.Init(config))
 	assert.FatalError(t, p5.Init(config))
 
-	p4.getIdentityFunc = func(ctx context.Context, p Interface, email string) (*Identity, error) {
+	p4.ctl.IdentityFunc = func(ctx context.Context, p Interface, email string) (*Identity, error) {
 		return &Identity{Usernames: []string{"max", "mariano"}}, nil
 	}
-	p5.getIdentityFunc = func(ctx context.Context, p Interface, email string) (*Identity, error) {
+	p5.ctl.IdentityFunc = func(ctx context.Context, p Interface, email string) (*Identity, error) {
 		return nil, errors.New("force")
 	}
 	// Additional test needed for empty usernames and duplicate email and usernames
@@ -527,8 +536,8 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 
-	userDuration := p1.claimer.DefaultUserSSHCertDuration()
-	hostDuration := p1.claimer.DefaultHostSSHCertDuration()
+	userDuration := p1.ctl.Claimer.DefaultUserSSHCertDuration()
+	hostDuration := p1.ctl.Claimer.DefaultHostSSHCertDuration()
 	expectedUserOptions := &SignSSHOptions{
 		CertType: "user", Principals: []string{"name", "name@smallstep.com"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration)),
@@ -597,8 +606,8 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
@@ -665,8 +674,8 @@ func TestOIDC_AuthorizeSSHRevoke(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.AuthorizeSSHRevoke() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(errs.StatusCoder)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				sc, ok := err.(render.StatusCodedError)
+				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})

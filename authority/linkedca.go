@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
@@ -151,13 +152,21 @@ func (c *linkedCaClient) GetProvisioner(ctx context.Context, id string) (*linked
 }
 
 func (c *linkedCaClient) GetProvisioners(ctx context.Context) ([]*linkedca.Provisioner, error) {
+	resp, err := c.GetConfiguration(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Provisioners, nil
+}
+
+func (c *linkedCaClient) GetConfiguration(ctx context.Context) (*linkedca.ConfigurationResponse, error) {
 	resp, err := c.client.GetConfiguration(ctx, &linkedca.ConfigurationRequest{
 		AuthorityId: c.authorityID,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "error getting provisioners")
+		return nil, errors.Wrap(err, "error getting configuration")
 	}
-	return resp.Provisioners, nil
+	return resp, nil
 }
 
 func (c *linkedCaClient) UpdateProvisioner(ctx context.Context, prov *linkedca.Provisioner) error {
@@ -204,11 +213,9 @@ func (c *linkedCaClient) GetAdmin(ctx context.Context, id string) (*linkedca.Adm
 }
 
 func (c *linkedCaClient) GetAdmins(ctx context.Context) ([]*linkedca.Admin, error) {
-	resp, err := c.client.GetConfiguration(ctx, &linkedca.ConfigurationRequest{
-		AuthorityId: c.authorityID,
-	})
+	resp, err := c.GetConfiguration(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "error getting admins")
+		return nil, err
 	}
 	return resp.Admins, nil
 }
@@ -228,12 +235,13 @@ func (c *linkedCaClient) DeleteAdmin(ctx context.Context, id string) error {
 	return errors.Wrap(err, "error deleting admin")
 }
 
-func (c *linkedCaClient) StoreCertificateChain(fullchain ...*x509.Certificate) error {
+func (c *linkedCaClient) StoreCertificateChain(prov provisioner.Interface, fullchain ...*x509.Certificate) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err := c.client.PostCertificate(ctx, &linkedca.CertificateRequest{
 		PemCertificate:      serializeCertificateChain(fullchain[0]),
 		PemCertificateChain: serializeCertificateChain(fullchain[1:]...),
+		Provisioner:         createProvisionerIdentity(prov),
 	})
 	return errors.Wrap(err, "error posting certificate")
 }
@@ -308,6 +316,17 @@ func (c *linkedCaClient) IsSSHRevoked(serial string) (bool, error) {
 		return false, errors.Wrap(err, "error getting certificate status")
 	}
 	return resp.Status != linkedca.RevocationStatus_ACTIVE, nil
+}
+
+func createProvisionerIdentity(prov provisioner.Interface) *linkedca.ProvisionerIdentity {
+	if prov == nil {
+		return nil
+	}
+	return &linkedca.ProvisionerIdentity{
+		Id:   prov.GetID(),
+		Type: linkedca.Provisioner_Type(prov.GetType()),
+		Name: prov.GetName(),
+	}
 }
 
 func serializeCertificate(crt *x509.Certificate) string {

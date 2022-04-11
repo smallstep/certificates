@@ -10,13 +10,14 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
+
 	"github.com/smallstep/certificates/acme"
-	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/nosql"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/keyutil"
 )
 
 type nextHTTP = func(http.ResponseWriter, *http.Request)
@@ -64,7 +65,7 @@ func (h *Handler) addNonce(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		nonce, err := h.db.CreateNonce(r.Context())
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 		w.Header().Set("Replay-Nonce", string(nonce))
@@ -90,7 +91,7 @@ func (h *Handler) verifyContentType(next nextHTTP) nextHTTP {
 		var expected []string
 		p, err := provisionerFromContext(r.Context())
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 
@@ -110,7 +111,7 @@ func (h *Handler) verifyContentType(next nextHTTP) nextHTTP {
 				return
 			}
 		}
-		api.WriteError(w, acme.NewError(acme.ErrorMalformedType,
+		render.Error(w, acme.NewError(acme.ErrorMalformedType,
 			"expected content-type to be in %s, but got %s", expected, ct))
 	}
 }
@@ -120,12 +121,12 @@ func (h *Handler) parseJWS(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			api.WriteError(w, acme.WrapErrorISE(err, "failed to read request body"))
+			render.Error(w, acme.WrapErrorISE(err, "failed to read request body"))
 			return
 		}
 		jws, err := jose.ParseJWS(string(body))
 		if err != nil {
-			api.WriteError(w, acme.WrapError(acme.ErrorMalformedType, err, "failed to parse JWS from request body"))
+			render.Error(w, acme.WrapError(acme.ErrorMalformedType, err, "failed to parse JWS from request body"))
 			return
 		}
 		ctx := context.WithValue(r.Context(), jwsContextKey, jws)
@@ -153,15 +154,15 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 		ctx := r.Context()
 		jws, err := jwsFromContext(r.Context())
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 		if len(jws.Signatures) == 0 {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "request body does not contain a signature"))
+			render.Error(w, acme.NewError(acme.ErrorMalformedType, "request body does not contain a signature"))
 			return
 		}
 		if len(jws.Signatures) > 1 {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "request body contains more than one signature"))
+			render.Error(w, acme.NewError(acme.ErrorMalformedType, "request body contains more than one signature"))
 			return
 		}
 
@@ -172,7 +173,7 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 			len(uh.Algorithm) > 0 ||
 			len(uh.Nonce) > 0 ||
 			len(uh.ExtraHeaders) > 0 {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "unprotected header must not be used"))
+			render.Error(w, acme.NewError(acme.ErrorMalformedType, "unprotected header must not be used"))
 			return
 		}
 		hdr := sig.Protected
@@ -182,13 +183,13 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 				switch k := hdr.JSONWebKey.Key.(type) {
 				case *rsa.PublicKey:
 					if k.Size() < keyutil.MinRSAKeyBytes {
-						api.WriteError(w, acme.NewError(acme.ErrorMalformedType,
+						render.Error(w, acme.NewError(acme.ErrorMalformedType,
 							"rsa keys must be at least %d bits (%d bytes) in size",
 							8*keyutil.MinRSAKeyBytes, keyutil.MinRSAKeyBytes))
 						return
 					}
 				default:
-					api.WriteError(w, acme.NewError(acme.ErrorMalformedType,
+					render.Error(w, acme.NewError(acme.ErrorMalformedType,
 						"jws key type and algorithm do not match"))
 					return
 				}
@@ -196,35 +197,35 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 		case jose.ES256, jose.ES384, jose.ES512, jose.EdDSA:
 			// we good
 		default:
-			api.WriteError(w, acme.NewError(acme.ErrorBadSignatureAlgorithmType, "unsuitable algorithm: %s", hdr.Algorithm))
+			render.Error(w, acme.NewError(acme.ErrorBadSignatureAlgorithmType, "unsuitable algorithm: %s", hdr.Algorithm))
 			return
 		}
 
 		// Check the validity/freshness of the Nonce.
 		if err := h.db.DeleteNonce(ctx, acme.Nonce(hdr.Nonce)); err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 
 		// Check that the JWS url matches the requested url.
 		jwsURL, ok := hdr.ExtraHeaders["url"].(string)
 		if !ok {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "jws missing url protected header"))
+			render.Error(w, acme.NewError(acme.ErrorMalformedType, "jws missing url protected header"))
 			return
 		}
 		reqURL := &url.URL{Scheme: "https", Host: r.Host, Path: r.URL.Path}
 		if jwsURL != reqURL.String() {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType,
+			render.Error(w, acme.NewError(acme.ErrorMalformedType,
 				"url header in JWS (%s) does not match request url (%s)", jwsURL, reqURL))
 			return
 		}
 
 		if hdr.JSONWebKey != nil && len(hdr.KeyID) > 0 {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "jwk and kid are mutually exclusive"))
+			render.Error(w, acme.NewError(acme.ErrorMalformedType, "jwk and kid are mutually exclusive"))
 			return
 		}
 		if hdr.JSONWebKey == nil && hdr.KeyID == "" {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "either jwk or kid must be defined in jws protected header"))
+			render.Error(w, acme.NewError(acme.ErrorMalformedType, "either jwk or kid must be defined in jws protected header"))
 			return
 		}
 		next(w, r)
@@ -239,23 +240,23 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 		ctx := r.Context()
 		jws, err := jwsFromContext(r.Context())
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 		jwk := jws.Signatures[0].Protected.JSONWebKey
 		if jwk == nil {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "jwk expected in protected header"))
+			render.Error(w, acme.NewError(acme.ErrorMalformedType, "jwk expected in protected header"))
 			return
 		}
 		if !jwk.Valid() {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "invalid jwk in protected header"))
+			render.Error(w, acme.NewError(acme.ErrorMalformedType, "invalid jwk in protected header"))
 			return
 		}
 
 		// Overwrite KeyID with the JWK thumbprint.
 		jwk.KeyID, err = acme.KeyToID(jwk)
 		if err != nil {
-			api.WriteError(w, acme.WrapErrorISE(err, "error getting KeyID from JWK"))
+			render.Error(w, acme.WrapErrorISE(err, "error getting KeyID from JWK"))
 			return
 		}
 
@@ -269,11 +270,11 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 			// For NewAccount and Revoke requests ...
 			break
 		case err != nil:
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		default:
 			if !acc.IsValid() {
-				api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType, "account is not active"))
+				render.Error(w, acme.NewError(acme.ErrorUnauthorizedType, "account is not active"))
 				return
 			}
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -283,28 +284,45 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 }
 
 // lookupProvisioner loads the provisioner associated with the request.
-// Responsds 404 if the provisioner does not exist.
+// Responds 404 if the provisioner does not exist.
 func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-
 		nameEscaped := chi.URLParam(r, "provisionerID")
 		name, err := url.PathUnescape(nameEscaped)
 		if err != nil {
-			api.WriteError(w, acme.WrapErrorISE(err, "error url unescaping provisioner name '%s'", nameEscaped))
+			render.Error(w, acme.WrapErrorISE(err, "error url unescaping provisioner name '%s'", nameEscaped))
 			return
 		}
 		p, err := h.ca.LoadProvisionerByName(name)
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 		acmeProv, ok := p.(*provisioner.ACME)
 		if !ok {
-			api.WriteError(w, acme.NewError(acme.ErrorAccountDoesNotExistType, "provisioner must be of type ACME"))
+			render.Error(w, acme.NewError(acme.ErrorAccountDoesNotExistType, "provisioner must be of type ACME"))
 			return
 		}
 		ctx = context.WithValue(ctx, provisionerContextKey, acme.Provisioner(acmeProv))
+		next(w, r.WithContext(ctx))
+	}
+}
+
+// checkPrerequisites checks if all prerequisites for serving ACME
+// are met by the CA configuration.
+func (h *Handler) checkPrerequisites(next nextHTTP) nextHTTP {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		ok, err := h.prerequisitesChecker(ctx)
+		if err != nil {
+			render.Error(w, acme.WrapErrorISE(err, "error checking acme provisioner prerequisites"))
+			return
+		}
+		if !ok {
+			render.Error(w, acme.NewError(acme.ErrorNotImplementedType, "acme provisioner configuration lacks prerequisites"))
+			return
+		}
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -317,14 +335,14 @@ func (h *Handler) lookupJWK(next nextHTTP) nextHTTP {
 		ctx := r.Context()
 		jws, err := jwsFromContext(ctx)
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 
 		kidPrefix := h.linker.GetLink(ctx, AccountLinkType, "")
 		kid := jws.Signatures[0].Protected.KeyID
 		if !strings.HasPrefix(kid, kidPrefix) {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType,
+			render.Error(w, acme.NewError(acme.ErrorMalformedType,
 				"kid does not have required prefix; expected %s, but got %s",
 				kidPrefix, kid))
 			return
@@ -334,14 +352,14 @@ func (h *Handler) lookupJWK(next nextHTTP) nextHTTP {
 		acc, err := h.db.GetAccount(ctx, accID)
 		switch {
 		case nosql.IsErrNotFound(err):
-			api.WriteError(w, acme.NewError(acme.ErrorAccountDoesNotExistType, "account with ID '%s' not found", accID))
+			render.Error(w, acme.NewError(acme.ErrorAccountDoesNotExistType, "account with ID '%s' not found", accID))
 			return
 		case err != nil:
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		default:
 			if !acc.IsValid() {
-				api.WriteError(w, acme.NewError(acme.ErrorUnauthorizedType, "account is not active"))
+				render.Error(w, acme.NewError(acme.ErrorUnauthorizedType, "account is not active"))
 				return
 			}
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -359,7 +377,7 @@ func (h *Handler) extractOrLookupJWK(next nextHTTP) nextHTTP {
 		ctx := r.Context()
 		jws, err := jwsFromContext(ctx)
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 
@@ -395,21 +413,21 @@ func (h *Handler) verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 		ctx := r.Context()
 		jws, err := jwsFromContext(ctx)
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 		jwk, err := jwkFromContext(ctx)
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 		if jwk.Algorithm != "" && jwk.Algorithm != jws.Signatures[0].Protected.Algorithm {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "verifier and signature algorithm do not match"))
+			render.Error(w, acme.NewError(acme.ErrorMalformedType, "verifier and signature algorithm do not match"))
 			return
 		}
 		payload, err := jws.Verify(jwk)
 		if err != nil {
-			api.WriteError(w, acme.WrapError(acme.ErrorMalformedType, err, "error verifying jws"))
+			render.Error(w, acme.WrapError(acme.ErrorMalformedType, err, "error verifying jws"))
 			return
 		}
 		ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{
@@ -426,11 +444,11 @@ func (h *Handler) isPostAsGet(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		payload, err := payloadFromContext(r.Context())
 		if err != nil {
-			api.WriteError(w, err)
+			render.Error(w, err)
 			return
 		}
 		if !payload.isPostAsGet {
-			api.WriteError(w, acme.NewError(acme.ErrorMalformedType, "expected POST-as-GET"))
+			render.Error(w, acme.NewError(acme.ErrorMalformedType, "expected POST-as-GET"))
 			return
 		}
 		next(w, r)
