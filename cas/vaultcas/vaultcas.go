@@ -25,6 +25,8 @@ func init() {
 	})
 }
 
+// VaultOptions defines the configuration options added using the
+// apiv1.Options.Config field.
 type VaultOptions struct {
 	PKI             string        `json:"pki,omitempty"`
 	PKIRoleDefault  string        `json:"pkiRoleDefault,omitempty"`
@@ -128,6 +130,8 @@ func (v *VaultCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv
 	}, nil
 }
 
+// GetCertificateAuthority returns the root certificate of the certificate
+// authority using the configured fingerprint.
 func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
 	secret, err := v.client.Logical().Read(v.config.PKI + "/cert/ca_chain")
 	if err != nil {
