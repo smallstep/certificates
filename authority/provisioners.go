@@ -62,7 +62,7 @@ func (a *Authority) unsafeLoadProvisionerFromExtension(crt *x509.Certificate) (p
 }
 
 func (a *Authority) unsafeLoadProvisionerFromDatabase(crt *x509.Certificate) (provisioner.Interface, error) {
-	// certificateDataGetter is an interface that can be use to retrieve the
+	// certificateDataGetter is an interface that can be used to retrieve the
 	// provisioner from a db or a linked ca.
 	type certificateDataGetter interface {
 		GetCertificateData(string) (*db.CertificateData, error)

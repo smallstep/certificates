@@ -287,7 +287,7 @@ func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 		var ok bool
 		// For backward compatibility this method will also succeed if the
 		// provisioner does not have an extension. LoadByCertificate returns the
-		// noop provisioner if this happens, and it allow certificate renewals.
+		// noop provisioner if this happens, and it allows certificate renewals.
 		if p, ok = a.provisioners.LoadByCertificate(cert); !ok {
 			return errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
 		}
