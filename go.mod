@@ -25,7 +25,6 @@ require (
 	github.com/googleapis/gax-go/v2 v2.1.1
 	github.com/hashicorp/vault/api v1.3.1
 	github.com/hashicorp/vault/api/auth/approle v0.1.1
-	github.com/hashicorp/vault/sdk v0.3.0
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/micromdm/scep/v2 v2.1.0
