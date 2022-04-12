@@ -16,6 +16,7 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	auth "github.com/hashicorp/vault/api/auth/approle"
 	"github.com/smallstep/certificates/cas/apiv1"
+	"go.step.sm/crypto/pemutil"
 )
 
 var (
@@ -80,13 +81,13 @@ func mustParseCertificate(t *testing.T, pemCert string) *x509.Certificate {
 	return crt
 }
 
-func mustParseCertificateRequest(t *testing.T, pemCert string) *x509.CertificateRequest {
+func mustParseCertificateRequest(t *testing.T, pemData string) *x509.CertificateRequest {
 	t.Helper()
-	crt, err := parseCertificateRequest(pemCert)
+	csr, err := pemutil.ParseCertificateRequest([]byte(pemData))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return crt
+	return csr
 }
 
 func testCAHelper(t *testing.T) (*url.URL, *vault.Client) {
@@ -107,17 +108,17 @@ func testCAHelper(t *testing.T) (*url.URL, *vault.Client) {
 				}`)
 		case r.RequestURI == "/v1/pki/sign/ec":
 			w.WriteHeader(http.StatusOK)
-			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testCertificateSigned}}
+			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testCertificateSigned + "\n" + testRootCertificate}}
 			writeJSON(w, cert)
 			return
 		case r.RequestURI == "/v1/pki/sign/rsa":
 			w.WriteHeader(http.StatusOK)
-			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testCertificateSigned}}
+			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testCertificateSigned + "\n" + testRootCertificate}}
 			writeJSON(w, cert)
 			return
 		case r.RequestURI == "/v1/pki/sign/ed25519":
 			w.WriteHeader(http.StatusOK)
-			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testCertificateSigned}}
+			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testCertificateSigned + "\n" + testRootCertificate}}
 			writeJSON(w, cert)
 			return
 		case r.RequestURI == "/v1/pki/cert/ca_chain":
@@ -232,21 +233,21 @@ func TestVaultCAS_CreateCertificate(t *testing.T) {
 			Lifetime: time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      mustParseCertificate(t, testCertificateSigned),
-			CertificateChain: []*x509.Certificate{},
+			CertificateChain: nil,
 		}, false},
 		{"ok rsa", fields{client, options}, args{&apiv1.CreateCertificateRequest{
 			CSR:      mustParseCertificateRequest(t, testCertificateCsrRsa),
 			Lifetime: time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      mustParseCertificate(t, testCertificateSigned),
-			CertificateChain: []*x509.Certificate{},
+			CertificateChain: nil,
 		}, false},
 		{"ok ed25519", fields{client, options}, args{&apiv1.CreateCertificateRequest{
 			CSR:      mustParseCertificateRequest(t, testCertificateCsrEd25519),
 			Lifetime: time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      mustParseCertificate(t, testCertificateSigned),
-			CertificateChain: []*x509.Certificate{},
+			CertificateChain: nil,
 		}, false},
 		{"fail CSR", fields{client, options}, args{&apiv1.CreateCertificateRequest{
 			CSR:      nil,
