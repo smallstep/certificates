@@ -8,11 +8,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
 
 	vault "github.com/hashicorp/vault/api"
@@ -73,7 +74,7 @@ func New(ctx context.Context, opts apiv1.Options) (*VaultCAS, error) {
 
 	client, err := vault.NewClient(config)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to initialize vault client")
+		return nil, fmt.Errorf("unable to initialize vault client: %w", err)
 	}
 
 	var appRoleAuth *auth.AppRoleAuth
@@ -92,12 +93,12 @@ func New(ctx context.Context, opts apiv1.Options) (*VaultCAS, error) {
 		)
 	}
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to initialize AppRole auth method")
+		return nil, fmt.Errorf("unable to initialize AppRole auth method: %w", err)
 	}
 
 	authInfo, err := client.Auth().Login(ctx, appRoleAuth)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to login to AppRole auth method")
+		return nil, fmt.Errorf("unable to login to AppRole auth method: %w", err)
 	}
 	if authInfo == nil {
 		return nil, errors.New("no auth info was returned after login")
@@ -135,7 +136,7 @@ func (v *VaultCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv
 func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
 	secret, err := v.client.Logical().Read(v.config.PKI + "/cert/ca_chain")
 	if err != nil {
-		return nil, errors.Wrap(err, "error reading ca chain")
+		return nil, fmt.Errorf("error reading ca chain: %w", err)
 	}
 	if secret == nil {
 		return nil, errors.New("error reading ca chain: response is empty")
@@ -180,7 +181,7 @@ func (v *VaultCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv
 	if req.SerialNumber != "" {
 		var ok bool
 		if sn, ok = new(big.Int).SetString(req.SerialNumber, 10); !ok {
-			return nil, errors.Errorf("error parsing serialNumber: %v cannot be converted to big.Int", req.SerialNumber)
+			return nil, fmt.Errorf("error parsing serialNumber: %v cannot be converted to big.Int", req.SerialNumber)
 		}
 	} else {
 		sn = req.Certificate.SerialNumber
@@ -191,7 +192,7 @@ func (v *VaultCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv
 	}
 	_, err := v.client.Logical().Write(v.config.PKI+"/revoke/", vaultReq)
 	if err != nil {
-		return nil, errors.Wrap(err, "error revoking certificate")
+		return nil, fmt.Errorf("error revoking certificate: %w", err)
 	}
 
 	return &apiv1.RevokeCertificateResponse{
@@ -211,7 +212,7 @@ func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.
 	case cr.PublicKeyAlgorithm == x509.Ed25519:
 		vaultPKIRole = v.config.PKIRoleEd25519
 	default:
-		return nil, nil, errors.Errorf("unsupported public key algorithm '%v'", cr.PublicKeyAlgorithm)
+		return nil, nil, fmt.Errorf("unsupported public key algorithm %v", cr.PublicKeyAlgorithm)
 	}
 
 	vaultReq := map[string]interface{}{
@@ -225,7 +226,7 @@ func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.
 
 	secret, err := v.client.Logical().Write(v.config.PKI+"/sign/"+vaultPKIRole, vaultReq)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "error signing certificate")
+		return nil, nil, fmt.Errorf("error signing certificate: %w", err)
 	}
 	if secret == nil {
 		return nil, nil, errors.New("error signing certificate: response is empty")
@@ -250,7 +251,7 @@ func loadOptions(config json.RawMessage) (*VaultOptions, error) {
 
 	err := json.Unmarshal(config, &vc)
 	if err != nil {
-		return nil, errors.Wrap(err, "error decoding vaultCAS config")
+		return nil, fmt.Errorf("error decoding vaultCAS config: %w", err)
 	}
 
 	if vc.PKI == "" {
