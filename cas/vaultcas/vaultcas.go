@@ -27,7 +27,7 @@ func init() {
 
 type VaultOptions struct {
 	PKI             string        `json:"pki,omitempty"`
-	PKIRoleDefault  string        `json:"PKIRoleDefault,omitempty"`
+	PKIRoleDefault  string        `json:"pKIRoleDefault,omitempty"`
 	PKIRoleRSA      string        `json:"pkiRoleRSA,omitempty"`
 	PKIRoleEC       string        `json:"pkiRoleEC,omitempty"`
 	PKIRoleEd25519  string        `json:"pkiRoleEd25519,omitempty"`
