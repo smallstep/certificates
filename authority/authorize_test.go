@@ -1404,7 +1404,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	t1, c1 := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1423,7 +1423,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	t2, c2 := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 		IssuedAt:  jose.NewNumericDate(now),
@@ -1443,7 +1443,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badSigner, _ := generateX5cToken(a1, otherSigner, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1462,7 +1462,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badProvisioner, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1500,7 +1500,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badSubject, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "bad-subject",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1519,7 +1519,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badNotBefore, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now.Add(5 * time.Minute)),
 		Expiry:    jose.NewNumericDate(now.Add(10 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1538,7 +1538,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badExpiry, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now.Add(-5 * time.Minute)),
 		Expiry:    jose.NewNumericDate(now.Add(-time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1557,7 +1557,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badIssuedAt, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 		IssuedAt:  jose.NewNumericDate(now.Add(5 * time.Minute)),
@@ -1577,7 +1577,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badAudience, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
