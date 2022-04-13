@@ -1,19 +1,25 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/sha1"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net/url"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/cache"
 	"go.step.sm/crypto/jose"
+	"go.step.sm/linkedca"
+	"google.golang.org/protobuf/proto"
 )
 
 // DefaultProvisionersLimit is the default limit for listing provisioners.
@@ -33,6 +39,10 @@ func (p provisionerSlice) Len() int           { return len(p) }
 func (p provisionerSlice) Less(i, j int) bool { return p[i].uid < p[j].uid }
 func (p provisionerSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
+func defaultContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 5*time.Second)
+}
+
 // loadByTokenPayload is a payload used to extract the id used to load the
 // provisioner.
 type loadByTokenPayload struct {
@@ -50,22 +60,53 @@ type Collection struct {
 	byTokenID *sync.Map
 	sorted    provisionerSlice
 	audiences Audiences
+
+	// new
+	byIDCache   cache.Cache
+	byNameCache cache.Cache
 }
 
 // NewCollection initializes a collection of provisioners. The given list of
 // audiences are the audiences used by the JWT provisioner.
-func NewCollection(audiences Audiences) *Collection {
+func NewCollection(config Config) *Collection {
+	byID := config.CachePool.New("provisioner_by_id", cache.GetterFunc(func(ctx context.Context, id string) ([]byte, error) {
+		p, err := config.AdminDB.GetProvisioner(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		return proto.Marshal(p)
+	}))
+	// byName maps a name with a provisioner id, we will manually fill this cache.
+	byName := config.CachePool.New("provisioner_by_name", cache.GetterFunc(func(ctx context.Context, name string) ([]byte, error) {
+		return nil, cache.ErrNotFound
+	}))
+
 	return &Collection{
-		byID:      new(sync.Map),
-		byKey:     new(sync.Map),
-		byName:    new(sync.Map),
-		byTokenID: new(sync.Map),
-		audiences: audiences,
+		byID:        new(sync.Map),
+		byKey:       new(sync.Map),
+		byName:      new(sync.Map),
+		byTokenID:   new(sync.Map),
+		audiences:   config.Audiences,
+		byIDCache:   byID,
+		byNameCache: byName,
 	}
 }
 
 // Load a provisioner by the ID.
 func (c *Collection) Load(id string) (Interface, bool) {
+	ctx, cancel := defaultContext()
+	defer cancel()
+
+	b, err := c.byIDCache.Get(ctx, id)
+	if err != nil {
+		return nil, false
+	}
+
+	var p linkedca.Provisioner
+	if err := proto.Unmarshal(b, &p); err != nil {
+		return nil, false
+	}
+	log.Printf("Provisioner.Load(%s): %v", id, p)
 	return loadProvisioner(c.byID, id)
 }
 
@@ -180,6 +221,7 @@ func (c *Collection) LoadEncryptedKey(keyID string) (string, bool) {
 // Store adds a provisioner to the collection and enforces the uniqueness of
 // provisioner IDs.
 func (c *Collection) Store(p Interface) error {
+
 	// Store provisioner always in byID. ID must be unique.
 	if _, loaded := c.byID.LoadOrStore(p.GetID(), p); loaded {
 		return admin.NewError(admin.ErrorBadRequestType,

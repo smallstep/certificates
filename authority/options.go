@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/cache"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas"
@@ -280,6 +281,14 @@ func WithLinkedCAToken(token string) Option {
 func WithX509Enforcers(ces ...provisioner.CertificateEnforcer) Option {
 	return func(a *Authority) error {
 		a.x509Enforcers = ces
+		return nil
+	}
+}
+
+// WithCachePool is an options that allows to define a custom cache pool.
+func WithCachePool(pool cache.Pool) Option {
+	return func(a *Authority) error {
+		a.cachePool = pool
 		return nil
 	}
 }

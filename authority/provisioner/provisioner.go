@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/cache"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
 	"golang.org/x/crypto/ssh"
@@ -214,6 +216,8 @@ type Config struct {
 	Audiences Audiences
 	// DB is the interface to the authority DB client.
 	DB db.AuthDB
+	// AdminDB is the interface to the administration DB client.
+	AdminDB admin.DB
 	// SSHKeys are the root SSH public keys
 	SSHKeys *SSHKeys
 	// GetIdentityFunc is a function that returns an identity that will be
@@ -225,6 +229,8 @@ type Config struct {
 	// AuthorizeSSHRenewFunc is a function that returns nil if a given SSH
 	// certificate can be renewed.
 	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
+	// CachePool is a type that allows to create new caches.
+	CachePool cache.Pool
 }
 
 type provisioner struct {

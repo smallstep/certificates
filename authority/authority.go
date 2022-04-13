@@ -15,6 +15,7 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 	adminDBNosql "github.com/smallstep/certificates/authority/admin/db/nosql"
 	"github.com/smallstep/certificates/authority/administrator"
+	"github.com/smallstep/certificates/authority/cache"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas"
@@ -35,8 +36,8 @@ import (
 type Authority struct {
 	config        *config.Config
 	keyManager    kms.KeyManager
-	provisioners  *provisioner.Collection
-	admins        *administrator.Collection
+	provisioners  Provisioners
+	admins        Admins
 	db            db.AuthDB
 	adminDB       admin.DB
 	templates     *templates.Templates
@@ -76,6 +77,7 @@ type Authority struct {
 	getIdentityFunc       provisioner.GetIdentityFunc
 	authorizeRenewFunc    provisioner.AuthorizeRenewFunc
 	authorizeSSHRenewFunc provisioner.AuthorizeSSHRenewFunc
+	cachePool             cache.Pool
 
 	adminMutex sync.RWMutex
 }
@@ -183,7 +185,7 @@ func (a *Authority) reloadAdminResources(ctx context.Context) error {
 	}
 
 	// Create provisioner collection.
-	provClxn := provisioner.NewCollection(provisionerConfig.Audiences)
+	provClxn := provisioner.NewCollection(provisionerConfig)
 	for _, p := range provList {
 		if err := p.Init(provisionerConfig); err != nil {
 			return err
@@ -526,6 +528,11 @@ func (a *Authority) init() error {
 					return err
 				}
 			}
+		}
+
+		// Initialize the default cache pool.
+		if a.cachePool == nil {
+			a.cachePool = cache.DefaultPool()
 		}
 
 		provs, err := a.adminDB.GetProvisioners(context.Background())
