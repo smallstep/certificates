@@ -130,8 +130,7 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
 	// more than a few minutes.
 	if err := claims.ValidateWithLeeway(jose.Expected{
-		Issuer: "step-admin-client/1.0",
-		Time:   time.Now().UTC(),
+		Time: time.Now().UTC(),
 	}, time.Minute); err != nil {
 		return nil, admin.WrapError(admin.ErrorUnauthorizedType, err, "x5c.authorizeToken; invalid x5c claims")
 	}
@@ -139,6 +138,12 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 	// validate audience: path matches the current path
 	if !matchesAudience(claims.Audience, a.config.Audience(r.URL.Path)) {
 		return nil, admin.NewError(admin.ErrorUnauthorizedType, "x5c.authorizeToken; x5c token has invalid audience claim (aud)")
+	}
+
+	// validate issuer: old versions used the provisioner name, new version uses
+	// 'step-admin-client/1.0'
+	if claims.Issuer != "step-admin-client/1.0" && claims.Issuer != prov.GetName() {
+		return nil, admin.NewError(admin.ErrorUnauthorizedType, "x5c.authorizeToken; x5c token has invalid issuer claim (iss)")
 	}
 
 	if claims.Subject == "" {
