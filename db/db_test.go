@@ -188,53 +188,36 @@ func TestDB_StoreCertificateChain(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", fields{&MockNoSQLDB{
-			MSet: func(bucket, key, value []byte) error {
-				switch string(bucket) {
-				case "x509_certs":
-					assert.Equals(t, key, []byte("1234"))
-					assert.Equals(t, value, []byte("the certificate"))
-				case "x509_certs_data":
-					assert.Equals(t, key, []byte("1234"))
-					assert.Equals(t, value, []byte(`{"provisioner":{"id":"some-id","name":"admin","type":"JWK"}}`))
-				default:
-					t.Errorf("unexpected bucket %s", bucket)
+			MUpdate: func(tx *database.Tx) error {
+				if len(tx.Operations) != 2 {
+					t.Fatal("unexpected number of operations")
 				}
+				assert.Equals(t, []byte("x509_certs"), tx.Operations[0].Bucket)
+				assert.Equals(t, []byte("1234"), tx.Operations[0].Key)
+				assert.Equals(t, []byte("the certificate"), tx.Operations[0].Value)
+				assert.Equals(t, []byte("x509_certs_data"), tx.Operations[1].Bucket)
+				assert.Equals(t, []byte("1234"), tx.Operations[1].Key)
+				assert.Equals(t, []byte(`{"provisioner":{"id":"some-id","name":"admin","type":"JWK"}}`), tx.Operations[1].Value)
 				return nil
 			},
 		}, true}, args{p, chain}, false},
 		{"ok no provisioner", fields{&MockNoSQLDB{
-			MSet: func(bucket, key, value []byte) error {
-				switch string(bucket) {
-				case "x509_certs":
-					assert.Equals(t, key, []byte("1234"))
-					assert.Equals(t, value, []byte("the certificate"))
-				case "x509_certs_data":
-					assert.Equals(t, key, []byte("1234"))
-					assert.Equals(t, value, []byte(`{}`))
-				default:
-					t.Errorf("unexpected bucket %s", bucket)
+			MUpdate: func(tx *database.Tx) error {
+				if len(tx.Operations) != 2 {
+					t.Fatal("unexpected number of operations")
 				}
+				assert.Equals(t, []byte("x509_certs"), tx.Operations[0].Bucket)
+				assert.Equals(t, []byte("1234"), tx.Operations[0].Key)
+				assert.Equals(t, []byte("the certificate"), tx.Operations[0].Value)
+				assert.Equals(t, []byte("x509_certs_data"), tx.Operations[1].Bucket)
+				assert.Equals(t, []byte("1234"), tx.Operations[1].Key)
+				assert.Equals(t, []byte(`{}`), tx.Operations[1].Value)
 				return nil
 			},
 		}, true}, args{nil, chain}, false},
 		{"fail store certificate", fields{&MockNoSQLDB{
-			MSet: func(bucket, key, value []byte) error {
-				switch string(bucket) {
-				case "x509_certs":
-					return errors.New("test error")
-				default:
-					return nil
-				}
-			},
-		}, true}, args{p, chain}, true},
-		{"fail store provisioner", fields{&MockNoSQLDB{
-			MSet: func(bucket, key, value []byte) error {
-				switch string(bucket) {
-				case "x509_certs_data":
-					return errors.New("test error")
-				default:
-					return nil
-				}
+			MUpdate: func(tx *database.Tx) error {
+				return errors.New("test error")
 			},
 		}, true}, args{p, chain}, true},
 	}

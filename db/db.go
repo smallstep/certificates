@@ -243,9 +243,7 @@ type ProvisionerData struct {
 // authorized the certificate.
 func (db *DB) StoreCertificateChain(p provisioner.Interface, chain ...*x509.Certificate) error {
 	leaf := chain[0]
-	if err := db.StoreCertificate(leaf); err != nil {
-		return err
-	}
+	serialNumber := []byte(leaf.SerialNumber.String())
 	data := &CertificateData{}
 	if p != nil {
 		data.Provisioner = &ProvisionerData{
@@ -254,13 +252,16 @@ func (db *DB) StoreCertificateChain(p provisioner.Interface, chain ...*x509.Cert
 			Type: p.GetType().String(),
 		}
 	}
-
 	b, err := json.Marshal(data)
 	if err != nil {
 		return errors.Wrap(err, "error marshaling json")
 	}
-	if err := db.Set(certsDataTable, []byte(leaf.SerialNumber.String()), b); err != nil {
-		return errors.Wrap(err, "database Set error")
+	// Add certificate and certificate data in one transaction.
+	tx := new(database.Tx)
+	tx.Set(certsTable, serialNumber, leaf.Raw)
+	tx.Set(certsDataTable, serialNumber, b)
+	if err := db.Update(tx); err != nil {
+		return errors.Wrap(err, "database Update error")
 	}
 	return nil
 }
