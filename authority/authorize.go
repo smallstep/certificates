@@ -399,7 +399,7 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 	}
 
 	if err := claims.ValidateWithLeeway(jose.Expected{
-		Issuer:  p.GetName(),
+		Issuer:  "step-ca-client/1.0",
 		Subject: leaf.Subject.CommonName,
 		Time:    time.Now().UTC(),
 	}, time.Minute); err != nil {
