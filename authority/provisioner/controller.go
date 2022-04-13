@@ -124,7 +124,7 @@ func DefaultAuthorizeRenew(ctx context.Context, p *Controller, cert *x509.Certif
 	if now.Before(cert.NotBefore) {
 		return errs.Unauthorized("certificate is not yet valid" + " " + now.UTC().Format(time.RFC3339Nano) + " vs " + cert.NotBefore.Format(time.RFC3339Nano))
 	}
-	if now.After(cert.NotAfter) && !p.Claimer.AllowRenewAfterExpiry() {
+	if now.After(cert.NotAfter) && !p.Claimer.AllowRenewalAfterExpiry() {
 		return errs.Unauthorized("certificate has expired")
 	}
 
@@ -144,7 +144,7 @@ func DefaultAuthorizeSSHRenew(ctx context.Context, p *Controller, cert *ssh.Cert
 	if after := int64(cert.ValidAfter); after < 0 || unixNow < int64(cert.ValidAfter) {
 		return errs.Unauthorized("certificate is not yet valid")
 	}
-	if before := int64(cert.ValidBefore); cert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) && !p.Claimer.AllowRenewAfterExpiry() {
+	if before := int64(cert.ValidBefore); cert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) && !p.Claimer.AllowRenewalAfterExpiry() {
 		return errs.Unauthorized("certificate has expired")
 	}
 
