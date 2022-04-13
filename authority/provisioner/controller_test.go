@@ -160,13 +160,13 @@ func TestController_AuthorizeRenew(t *testing.T) {
 			NotBefore: now,
 			NotAfter:  now.Add(time.Hour),
 		}}, false},
-		{"ok custom disabled", fields{&JWK{}, mustClaimer(t, &Claims{AllowRenewAfterExpiry: &trueValue}, globalProvisionerClaims), func(ctx context.Context, p *Controller, cert *x509.Certificate) error {
+		{"ok custom disabled", fields{&JWK{}, mustClaimer(t, &Claims{AllowRenewalAfterExpiry: &trueValue}, globalProvisionerClaims), func(ctx context.Context, p *Controller, cert *x509.Certificate) error {
 			return nil
 		}}, args{ctx, &x509.Certificate{
 			NotBefore: now,
 			NotAfter:  now.Add(time.Hour),
 		}}, false},
-		{"ok renew after expiry", fields{&JWK{}, mustClaimer(t, &Claims{AllowRenewAfterExpiry: &trueValue}, globalProvisionerClaims), nil}, args{ctx, &x509.Certificate{
+		{"ok renew after expiry", fields{&JWK{}, mustClaimer(t, &Claims{AllowRenewalAfterExpiry: &trueValue}, globalProvisionerClaims), nil}, args{ctx, &x509.Certificate{
 			NotBefore: now.Add(-time.Hour),
 			NotAfter:  now.Add(-time.Minute),
 		}}, false},
@@ -231,13 +231,13 @@ func TestController_AuthorizeSSHRenew(t *testing.T) {
 			ValidAfter:  uint64(now.Unix()),
 			ValidBefore: uint64(now.Add(time.Hour).Unix()),
 		}}, false},
-		{"ok custom disabled", fields{&JWK{}, mustClaimer(t, &Claims{AllowRenewAfterExpiry: &trueValue}, globalProvisionerClaims), func(ctx context.Context, p *Controller, cert *ssh.Certificate) error {
+		{"ok custom disabled", fields{&JWK{}, mustClaimer(t, &Claims{AllowRenewalAfterExpiry: &trueValue}, globalProvisionerClaims), func(ctx context.Context, p *Controller, cert *ssh.Certificate) error {
 			return nil
 		}}, args{ctx, &ssh.Certificate{
 			ValidAfter:  uint64(now.Unix()),
 			ValidBefore: uint64(now.Add(time.Hour).Unix()),
 		}}, false},
-		{"ok renew after expiry", fields{&JWK{}, mustClaimer(t, &Claims{AllowRenewAfterExpiry: &trueValue}, globalProvisionerClaims), nil}, args{ctx, &ssh.Certificate{
+		{"ok renew after expiry", fields{&JWK{}, mustClaimer(t, &Claims{AllowRenewalAfterExpiry: &trueValue}, globalProvisionerClaims), nil}, args{ctx, &ssh.Certificate{
 			ValidAfter:  uint64(now.Add(-time.Hour).Unix()),
 			ValidBefore: uint64(now.Add(-time.Minute).Unix()),
 		}}, false},
@@ -296,7 +296,7 @@ func TestDefaultAuthorizeRenew(t *testing.T) {
 		}}, false},
 		{"ok renew after expiry", args{ctx, &Controller{
 			Interface: &JWK{},
-			Claimer:   mustClaimer(t, &Claims{AllowRenewAfterExpiry: &trueValue}, globalProvisionerClaims),
+			Claimer:   mustClaimer(t, &Claims{AllowRenewalAfterExpiry: &trueValue}, globalProvisionerClaims),
 		}, &x509.Certificate{
 			NotBefore: now.Add(-time.Hour),
 			NotAfter:  now.Add(-time.Minute),
@@ -354,7 +354,7 @@ func TestDefaultAuthorizeSSHRenew(t *testing.T) {
 		}}, false},
 		{"ok renew after expiry", args{ctx, &Controller{
 			Interface: &JWK{},
-			Claimer:   mustClaimer(t, &Claims{AllowRenewAfterExpiry: &trueValue}, globalProvisionerClaims),
+			Claimer:   mustClaimer(t, &Claims{AllowRenewalAfterExpiry: &trueValue}, globalProvisionerClaims),
 		}, &ssh.Certificate{
 			ValidAfter:  uint64(now.Add(-time.Hour).Unix()),
 			ValidBefore: uint64(now.Add(-time.Minute).Unix()),
