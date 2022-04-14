@@ -467,8 +467,8 @@ func claimsToCertificates(c *linkedca.Claims) (*provisioner.Claims, error) {
 	}
 
 	pc := &provisioner.Claims{
-		DisableRenewal:        &c.DisableRenewal,
-		AllowRenewAfterExpiry: &c.AllowRenewAfterExpiry,
+		DisableRenewal:          &c.DisableRenewal,
+		AllowRenewalAfterExpiry: &c.AllowRenewalAfterExpiry,
 	}
 
 	var err error
@@ -506,18 +506,18 @@ func claimsToLinkedca(c *provisioner.Claims) *linkedca.Claims {
 	}
 
 	disableRenewal := config.DefaultDisableRenewal
-	allowRenewAfterExpiry := config.DefaultAllowRenewAfterExpiry
+	allowRenewalAfterExpiry := config.DefaultAllowRenewalAfterExpiry
 
 	if c.DisableRenewal != nil {
 		disableRenewal = *c.DisableRenewal
 	}
-	if c.AllowRenewAfterExpiry != nil {
-		allowRenewAfterExpiry = *c.AllowRenewAfterExpiry
+	if c.AllowRenewalAfterExpiry != nil {
+		allowRenewalAfterExpiry = *c.AllowRenewalAfterExpiry
 	}
 
 	lc := &linkedca.Claims{
-		DisableRenewal:        disableRenewal,
-		AllowRenewAfterExpiry: allowRenewAfterExpiry,
+		DisableRenewal:          disableRenewal,
+		AllowRenewalAfterExpiry: allowRenewalAfterExpiry,
 	}
 
 	if c.DefaultTLSDur != nil || c.MinTLSDur != nil || c.MaxTLSDur != nil {
