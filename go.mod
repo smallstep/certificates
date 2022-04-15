@@ -38,7 +38,7 @@ require (
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.0
 	go.step.sm/crypto v0.16.1
-	go.step.sm/linkedca v0.12.1-0.20220405095509-878e3e5f78a3
+	go.step.sm/linkedca v0.15.0
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20220403103023-749bd193bc2b
 	golang.org/x/sys v0.0.0-20220405052023-b1e9470b6e64 // indirect
