@@ -119,7 +119,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, identifier := range nor.Identifiers {
-		// evalue the ACME account level policy
+		// evaluate the ACME account level policy
 		if err = isIdentifierAllowed(acmePolicy, identifier); err != nil {
 			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return

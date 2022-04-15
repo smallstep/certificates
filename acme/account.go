@@ -53,8 +53,8 @@ type PolicyNames struct {
 
 // X509Policy contains ACME account level X.509 policy
 type X509Policy struct {
-	Allowed PolicyNames `json:"allowed"`
-	Denied  PolicyNames `json:"denied"`
+	Allowed PolicyNames `json:"allow"`
+	Denied  PolicyNames `json:"deny"`
 }
 
 // Policy is an ACME Account level policy
