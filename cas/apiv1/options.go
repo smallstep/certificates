@@ -16,9 +16,9 @@ type Options struct {
 	Type string `json:"type"`
 
 	// CertificateAuthority reference:
-	// In StepCAS the value is the CA url, e.g. "https://ca.smallstep.com:9000".
+	// In StepCAS the value is the CA url, e.g., "https://ca.smallstep.com:9000".
 	// In CloudCAS the format is "projects/*/locations/*/certificateAuthorities/*".
-	// In VaultCAS the value is the url, e.g. "https://vault.smallstep.com".
+	// In VaultCAS the value is the url, e.g., "https://vault.smallstep.com".
 	CertificateAuthority string `json:"certificateAuthority,omitempty"`
 
 	// CertificateAuthorityFingerprint is the root fingerprint used to
