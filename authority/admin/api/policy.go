@@ -120,8 +120,7 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if err := read.ProtoJSON(r.Body, newPolicy); err != nil {
-		render.Error(w, err)
+	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
 		return
 	}
 
@@ -242,7 +241,7 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 			return
 		}
 
-		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating provisioner policy"))
+		render.Error(w, admin.WrapErrorISE(err, "error updating provisioner policy"))
 		return
 	}
 

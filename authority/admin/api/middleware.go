@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -82,13 +83,6 @@ func (h *Handler) loadProvisionerByName(next http.HandlerFunc) http.HandlerFunc 
 func (h *Handler) checkAction(next http.HandlerFunc, supportedInStandalone bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		// // temporarily only support the admin nosql DB
-		// if _, ok := h.adminDB.(*nosql.DB); !ok {
-		// 	render.Error(w, admin.NewError(admin.ErrorNotImplementedType,
-		// 		"operation not supported"))
-		// 	return
-		// }
-
 		// actions allowed in standalone mode are always supported
 		if supportedInStandalone {
 			next(w, r)
@@ -130,13 +124,16 @@ func (h *Handler) loadExternalAccountKey(next http.HandlerFunc) http.HandlerFunc
 		}
 
 		if err != nil {
-			// TODO: handle error; not found vs. some internal server error
-			render.Error(w, admin.WrapErrorISE(err, "error retrieving ACME External Account key"))
+			if errors.Is(err, acme.ErrNotFound) {
+				render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found"))
+				return
+			}
+			render.Error(w, admin.WrapErrorISE(err, "error retrieving ACME External Account Key"))
 			return
 		}
 
 		if eak == nil {
-			render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key does not exist"))
+			render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found"))
 			return
 		}
 

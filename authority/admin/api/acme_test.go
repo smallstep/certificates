@@ -7,17 +7,19 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi"
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/authority/admin"
+	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-
-	"go.step.sm/linkedca"
-
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/authority/admin"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func readProtoJSON(r io.ReadCloser, m proto.Message) error {
@@ -338,6 +340,207 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
 			assert.Equals(t, tc.err.Detail, adminErr.Detail)
 			assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+		})
+	}
+}
+
+func Test_eakToLinked(t *testing.T) {
+	tests := []struct {
+		name string
+		k    *acme.ExternalAccountKey
+		want *linkedca.EABKey
+	}{
+		{
+			name: "no-key",
+			k:    nil,
+			want: nil,
+		},
+		{
+			name: "no-policy",
+			k: &acme.ExternalAccountKey{
+				ID:            "keyID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				AccountID:     "accID",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour),
+				BoundAt:       time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC),
+				Policy:        nil,
+			},
+			want: &linkedca.EABKey{
+				Id:          "keyID",
+				Provisioner: "provID",
+				HmacKey:     []byte{1, 3, 3, 7},
+				Reference:   "ref",
+				Account:     "accID",
+				CreatedAt:   timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour)),
+				BoundAt:     timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC)),
+				Policy:      nil,
+			},
+		},
+		{
+			name: "with-policy",
+			k: &acme.ExternalAccountKey{
+				ID:            "keyID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				AccountID:     "accID",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour),
+				BoundAt:       time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC),
+				Policy: &acme.Policy{
+					X509: acme.X509Policy{
+						Allowed: acme.PolicyNames{
+							DNSNames: []string{"*.local"},
+							IPRanges: []string{"10.0.0.0/24"},
+						},
+						Denied: acme.PolicyNames{
+							DNSNames: []string{"badhost.local"},
+							IPRanges: []string{"10.0.0.30"},
+						},
+					},
+				},
+			},
+			want: &linkedca.EABKey{
+				Id:          "keyID",
+				Provisioner: "provID",
+				HmacKey:     []byte{1, 3, 3, 7},
+				Reference:   "ref",
+				Account:     "accID",
+				CreatedAt:   timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour)),
+				BoundAt:     timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC)),
+				Policy: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns: []string{"*.local"},
+							Ips: []string{"10.0.0.0/24"},
+						},
+						Deny: &linkedca.X509Names{
+							Dns: []string{"badhost.local"},
+							Ips: []string{"10.0.0.30"},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := eakToLinked(tt.k); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("eakToLinked() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_linkedEAKToCertificates(t *testing.T) {
+	tests := []struct {
+		name string
+		k    *linkedca.EABKey
+		want *acme.ExternalAccountKey
+	}{
+		{
+			name: "no-key",
+			k:    nil,
+			want: nil,
+		},
+		{
+			name: "no-policy",
+			k: &linkedca.EABKey{
+				Id:          "keyID",
+				Provisioner: "provID",
+				HmacKey:     []byte{1, 3, 3, 7},
+				Reference:   "ref",
+				Account:     "accID",
+				CreatedAt:   timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour)),
+				BoundAt:     timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC)),
+				Policy:      nil,
+			},
+			want: &acme.ExternalAccountKey{
+				ID:            "keyID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				AccountID:     "accID",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour),
+				BoundAt:       time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC),
+				Policy:        nil,
+			},
+		},
+		{
+			name: "no-x509-policy",
+			k: &linkedca.EABKey{
+				Id:          "keyID",
+				Provisioner: "provID",
+				HmacKey:     []byte{1, 3, 3, 7},
+				Reference:   "ref",
+				Account:     "accID",
+				CreatedAt:   timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour)),
+				BoundAt:     timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC)),
+				Policy:      &linkedca.Policy{},
+			},
+			want: &acme.ExternalAccountKey{
+				ID:            "keyID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				AccountID:     "accID",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour),
+				BoundAt:       time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC),
+				Policy:        &acme.Policy{},
+			},
+		},
+		{
+			name: "with-x509-policy",
+			k: &linkedca.EABKey{
+				Id:          "keyID",
+				Provisioner: "provID",
+				HmacKey:     []byte{1, 3, 3, 7},
+				Reference:   "ref",
+				Account:     "accID",
+				CreatedAt:   timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour)),
+				BoundAt:     timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC)),
+				Policy: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns: []string{"*.local"},
+							Ips: []string{"10.0.0.0/24"},
+						},
+						Deny: &linkedca.X509Names{
+							Dns: []string{"badhost.local"},
+							Ips: []string{"10.0.0.30"},
+						},
+					},
+				},
+			},
+			want: &acme.ExternalAccountKey{
+				ID:            "keyID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				AccountID:     "accID",
+				KeyBytes:      []byte{1, 3, 3, 7},
+				CreatedAt:     time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour),
+				BoundAt:       time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC),
+				Policy: &acme.Policy{
+					X509: acme.X509Policy{
+						Allowed: acme.PolicyNames{
+							DNSNames: []string{"*.local"},
+							IPRanges: []string{"10.0.0.0/24"},
+						},
+						Denied: acme.PolicyNames{
+							DNSNames: []string{"badhost.local"},
+							IPRanges: []string{"10.0.0.30"},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := linkedEAKToCertificates(tt.k); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("linkedEAKToCertificates() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

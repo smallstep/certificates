@@ -41,8 +41,8 @@ type mockAdminAuthority struct {
 	MockRemoveProvisioner     func(ctx context.Context, id string) error
 
 	MockGetAuthorityPolicy    func(ctx context.Context) (*linkedca.Policy, error)
-	MockCreateAuthorityPolicy func(ctx context.Context, policy *linkedca.Policy) (*linkedca.Policy, error)
-	MockUpdateAuthorityPolicy func(ctx context.Context, policy *linkedca.Policy) error
+	MockCreateAuthorityPolicy func(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
+	MockUpdateAuthorityPolicy func(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
 	MockRemoveAuthorityPolicy func(ctx context.Context) error
 }
 
@@ -138,19 +138,31 @@ func (m *mockAdminAuthority) RemoveProvisioner(ctx context.Context, id string) e
 }
 
 func (m *mockAdminAuthority) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
-	return nil, errors.New("not implemented yet")
+	if m.MockGetAuthorityPolicy != nil {
+		return m.MockGetAuthorityPolicy(ctx)
+	}
+	return m.MockRet1.(*linkedca.Policy), m.MockErr
 }
 
 func (m *mockAdminAuthority) CreateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error) {
-	return nil, errors.New("not implemented yet")
+	if m.MockCreateAuthorityPolicy != nil {
+		return m.MockCreateAuthorityPolicy(ctx, adm, policy)
+	}
+	return m.MockRet1.(*linkedca.Policy), m.MockErr
 }
 
 func (m *mockAdminAuthority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error) {
-	return nil, errors.New("not implemented yet")
+	if m.MockUpdateAuthorityPolicy != nil {
+		return m.MockUpdateAuthorityPolicy(ctx, adm, policy)
+	}
+	return m.MockRet1.(*linkedca.Policy), m.MockErr
 }
 
 func (m *mockAdminAuthority) RemoveAuthorityPolicy(ctx context.Context) error {
-	return errors.New("not implemented yet")
+	if m.MockRemoveAuthorityPolicy != nil {
+		return m.MockRemoveAuthorityPolicy(ctx)
+	}
+	return m.MockErr
 }
 
 func TestCreateAdminRequest_Validate(t *testing.T) {

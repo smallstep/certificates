@@ -19,6 +19,7 @@ import (
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/admin/db/nosql"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -359,7 +360,6 @@ func TestHandler_loadProvisionerByName(t *testing.T) {
 }
 
 func TestHandler_checkAction(t *testing.T) {
-
 	type test struct {
 		adminDB               admin.DB
 		next                  http.HandlerFunc
@@ -368,15 +368,6 @@ func TestHandler_checkAction(t *testing.T) {
 		statusCode            int
 	}
 	var tests = map[string]func(t *testing.T) test{
-		// "standalone-mockdb-supported": func(t *testing.T) test {
-		// 	err := admin.NewError(admin.ErrorNotImplementedType, "operation not supported")
-		// 	err.Message = "operation not supported"
-		// 	return test{
-		// 		adminDB:    &admin.MockDB{},
-		// 		statusCode: 501,
-		// 		err:        err,
-		// 	}
-		// },
 		"standalone-nosql-supported": func(t *testing.T) test {
 			return test{
 				supportedInStandalone: true,
@@ -393,27 +384,23 @@ func TestHandler_checkAction(t *testing.T) {
 			return test{
 				supportedInStandalone: false,
 				adminDB:               &nosql.DB{},
+				statusCode:            501,
+				err:                   err,
+			}
+		},
+		"standalone-no-nosql-not-supported": func(t *testing.T) test {
+			err := admin.NewError(admin.ErrorNotImplementedType, "operation not supported")
+			err.Message = "operation not supported"
+			return test{
+				supportedInStandalone: false,
+				adminDB:               &admin.MockDB{},
 				next: func(w http.ResponseWriter, r *http.Request) {
 					w.Write(nil) // mock response with status 200
 				},
-				statusCode: 501,
+				statusCode: 200,
 				err:        err,
 			}
 		},
-		// "standalone-no-nosql-not-supported": func(t *testing.T) test {
-		// 	// TODO(hs): temporarily expects an error instead of an OK response
-		// 	err := admin.NewError(admin.ErrorNotImplementedType, "operation not supported")
-		// 	err.Message = "operation not supported"
-		// 	return test{
-		// 		supportedInStandalone: false,
-		// 		adminDB:               &admin.MockDB{},
-		// 		next: func(w http.ResponseWriter, r *http.Request) {
-		// 			w.Write(nil) // mock response with status 200
-		// 		},
-		// 		statusCode: 501,
-		// 		err:        err,
-		// 	}
-		// },
 	}
 	for name, prep := range tests {
 		tc := prep(t)
@@ -426,6 +413,254 @@ func TestHandler_checkAction(t *testing.T) {
 			req := httptest.NewRequest("GET", "/foo", nil)
 			w := httptest.NewRecorder()
 			h.checkAction(tc.next, tc.supportedInStandalone)(w, req)
+			res := w.Result()
+
+			assert.Equals(t, tc.statusCode, res.StatusCode)
+
+			body, err := io.ReadAll(res.Body)
+			res.Body.Close()
+			assert.FatalError(t, err)
+
+			if res.StatusCode >= 400 {
+				err := admin.Error{}
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &err))
+
+				assert.Equals(t, tc.err.Type, err.Type)
+				assert.Equals(t, tc.err.Message, err.Message)
+				assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
+				assert.Equals(t, tc.err.Detail, err.Detail)
+				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+				return
+			}
+		})
+	}
+}
+
+func TestHandler_loadExternalAccountKey(t *testing.T) {
+	type test struct {
+		ctx        context.Context
+		acmeDB     acme.DB
+		next       http.HandlerFunc
+		err        *admin.Error
+		statusCode int
+	}
+	var tests = map[string]func(t *testing.T) test{
+		"fail/keyID-not-found-error": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Id: "provID",
+			}
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("keyID", "key")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = linkedca.NewContextWithProvisioner(ctx, prov)
+			err := admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found")
+			err.Message = "ACME External Account Key not found"
+			return test{
+				ctx: ctx,
+				acmeDB: &acme.MockDB{
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerID, keyID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, "provID", provisionerID)
+						assert.Equals(t, "key", keyID)
+						return nil, acme.ErrNotFound
+					},
+				},
+				err:        err,
+				statusCode: 404,
+			}
+		},
+		"fail/keyID-error": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Id: "provID",
+			}
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("keyID", "key")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = linkedca.NewContextWithProvisioner(ctx, prov)
+			err := admin.WrapErrorISE(errors.New("force"), "error retrieving ACME External Account Key")
+			err.Message = "error retrieving ACME External Account Key: force"
+			return test{
+				ctx: ctx,
+				acmeDB: &acme.MockDB{
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerID, keyID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, "provID", provisionerID)
+						assert.Equals(t, "key", keyID)
+						return nil, errors.New("force")
+					},
+				},
+				err:        err,
+				statusCode: 500,
+			}
+		},
+		"fail/reference-not-found-error": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Id: "provID",
+			}
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("reference", "ref")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = linkedca.NewContextWithProvisioner(ctx, prov)
+			err := admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found")
+			err.Message = "ACME External Account Key not found"
+			return test{
+				ctx: ctx,
+				acmeDB: &acme.MockDB{
+					MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, "provID", provisionerID)
+						assert.Equals(t, "ref", reference)
+						return nil, acme.ErrNotFound
+					},
+				},
+				err:        err,
+				statusCode: 404,
+			}
+		},
+		"fail/reference-error": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Id: "provID",
+			}
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("reference", "ref")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = linkedca.NewContextWithProvisioner(ctx, prov)
+			err := admin.WrapErrorISE(errors.New("force"), "error retrieving ACME External Account Key")
+			err.Message = "error retrieving ACME External Account Key: force"
+			return test{
+				ctx: ctx,
+				acmeDB: &acme.MockDB{
+					MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, "provID", provisionerID)
+						assert.Equals(t, "ref", reference)
+						return nil, errors.New("force")
+					},
+				},
+				err:        err,
+				statusCode: 500,
+			}
+		},
+		"fail/no-key": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Id: "provID",
+			}
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("reference", "ref")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = linkedca.NewContextWithProvisioner(ctx, prov)
+			err := admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found")
+			err.Message = "ACME External Account Key not found"
+			return test{
+				ctx: ctx,
+				acmeDB: &acme.MockDB{
+					MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, "provID", provisionerID)
+						assert.Equals(t, "ref", reference)
+						return nil, nil
+					},
+				},
+				err:        err,
+				statusCode: 404,
+			}
+		},
+		"ok/keyID": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Id: "provID",
+			}
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("keyID", "eakID")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = linkedca.NewContextWithProvisioner(ctx, prov)
+			err := admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found")
+			err.Message = "ACME External Account Key not found"
+			createdAt := time.Now().Add(-1 * time.Hour)
+			var boundAt time.Time
+			eak := &acme.ExternalAccountKey{
+				ID:            "eakID",
+				ProvisionerID: "provID",
+				CreatedAt:     createdAt,
+				BoundAt:       boundAt,
+			}
+			return test{
+				ctx: ctx,
+				acmeDB: &acme.MockDB{
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerID, keyID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, "provID", provisionerID)
+						assert.Equals(t, "eakID", keyID)
+						return eak, nil
+					},
+				},
+				next: func(w http.ResponseWriter, r *http.Request) {
+					contextEAK := linkedca.ExternalAccountKeyFromContext(r.Context())
+					assert.NotNil(t, eak)
+					exp := &linkedca.EABKey{
+						Id:          "eakID",
+						Provisioner: "provID",
+						CreatedAt:   timestamppb.New(createdAt),
+						BoundAt:     timestamppb.New(boundAt),
+					}
+					assert.Equals(t, exp, contextEAK)
+					w.Write(nil) // mock response with status 200
+				},
+				err:        nil,
+				statusCode: 200,
+			}
+		},
+		"ok/reference": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Id: "provID",
+			}
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("reference", "ref")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = linkedca.NewContextWithProvisioner(ctx, prov)
+			err := admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found")
+			err.Message = "ACME External Account Key not found"
+			createdAt := time.Now().Add(-1 * time.Hour)
+			var boundAt time.Time
+			eak := &acme.ExternalAccountKey{
+				ID:            "eakID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				CreatedAt:     createdAt,
+				BoundAt:       boundAt,
+			}
+			return test{
+				ctx: ctx,
+				acmeDB: &acme.MockDB{
+					MockGetExternalAccountKeyByReference: func(ctx context.Context, provisionerID, reference string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, "provID", provisionerID)
+						assert.Equals(t, "ref", reference)
+						return eak, nil
+					},
+				},
+				next: func(w http.ResponseWriter, r *http.Request) {
+					contextEAK := linkedca.ExternalAccountKeyFromContext(r.Context())
+					assert.NotNil(t, eak)
+					exp := &linkedca.EABKey{
+						Id:          "eakID",
+						Provisioner: "provID",
+						Reference:   "ref",
+						CreatedAt:   timestamppb.New(createdAt),
+						BoundAt:     timestamppb.New(boundAt),
+					}
+					assert.Equals(t, exp, contextEAK)
+					w.Write(nil) // mock response with status 200
+				},
+				err:        nil,
+				statusCode: 200,
+			}
+		},
+	}
+
+	for name, prep := range tests {
+		tc := prep(t)
+		t.Run(name, func(t *testing.T) {
+			h := &Handler{
+				acmeDB: tc.acmeDB,
+			}
+
+			req := httptest.NewRequest("GET", "/foo", nil)
+			req = req.WithContext(tc.ctx)
+			w := httptest.NewRecorder()
+			h.loadExternalAccountKey(tc.next)(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)

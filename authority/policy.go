@@ -25,11 +25,11 @@ const (
 
 type PolicyError struct {
 	Typ policyErrorType
-	err error
+	Err error
 }
 
 func (p *PolicyError) Error() string {
-	return p.err.Error()
+	return p.Err.Error()
 }
 
 func (a *Authority) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
@@ -51,21 +51,21 @@ func (a *Authority) CreateAuthorityPolicy(ctx context.Context, adm *linkedca.Adm
 	if err := a.checkAuthorityPolicy(ctx, adm, p); err != nil {
 		return nil, &PolicyError{
 			Typ: AdminLockOut,
-			err: err,
+			Err: err,
 		}
 	}
 
 	if err := a.adminDB.CreateAuthorityPolicy(ctx, p); err != nil {
 		return nil, &PolicyError{
 			Typ: StoreFailure,
-			err: err,
+			Err: err,
 		}
 	}
 
 	if err := a.reloadPolicyEngines(ctx); err != nil {
 		return nil, &PolicyError{
 			Typ: ReloadFailure,
-			err: fmt.Errorf("error reloading policy engines when creating authority policy: %w", err),
+			Err: fmt.Errorf("error reloading policy engines when creating authority policy: %w", err),
 		}
 	}
 
@@ -83,14 +83,14 @@ func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Adm
 	if err := a.adminDB.UpdateAuthorityPolicy(ctx, p); err != nil {
 		return nil, &PolicyError{
 			Typ: StoreFailure,
-			err: err,
+			Err: err,
 		}
 	}
 
 	if err := a.reloadPolicyEngines(ctx); err != nil {
 		return nil, &PolicyError{
 			Typ: ReloadFailure,
-			err: fmt.Errorf("error reloading policy engines when updating authority policy %w", err),
+			Err: fmt.Errorf("error reloading policy engines when updating authority policy %w", err),
 		}
 	}
 
@@ -104,14 +104,14 @@ func (a *Authority) RemoveAuthorityPolicy(ctx context.Context) error {
 	if err := a.adminDB.DeleteAuthorityPolicy(ctx); err != nil {
 		return &PolicyError{
 			Typ: StoreFailure,
-			err: err,
+			Err: err,
 		}
 	}
 
 	if err := a.reloadPolicyEngines(ctx); err != nil {
 		return &PolicyError{
 			Typ: ReloadFailure,
-			err: fmt.Errorf("error reloading policy engines when deleting authority policy %w", err),
+			Err: fmt.Errorf("error reloading policy engines when deleting authority policy %w", err),
 		}
 	}
 
@@ -130,7 +130,7 @@ func (a *Authority) checkAuthorityPolicy(ctx context.Context, currentAdmin *link
 	if err != nil {
 		return &PolicyError{
 			Typ: InternalFailure,
-			err: fmt.Errorf("error retrieving admins: %w", err),
+			Err: fmt.Errorf("error retrieving admins: %w", err),
 		}
 	}
 
@@ -149,7 +149,7 @@ func (a *Authority) checkProvisionerPolicy(ctx context.Context, currentAdmin *li
 	if !ok {
 		return &PolicyError{
 			Typ: InternalFailure,
-			err: errors.New("error retrieving admins by provisioner"),
+			Err: errors.New("error retrieving admins by provisioner"),
 		}
 	}
 
@@ -170,7 +170,7 @@ func (a *Authority) checkPolicy(ctx context.Context, currentAdmin *linkedca.Admi
 	if err != nil {
 		return &PolicyError{
 			Typ: ConfigurationFailure,
-			err: err,
+			Err: err,
 		}
 	}
 
@@ -217,19 +217,19 @@ func isAllowed(engine authPolicy.X509Policy, sans []string) error {
 		if isNamePolicyError && policyErr.Reason == policy.NotAuthorizedForThisName {
 			return &PolicyError{
 				Typ: AdminLockOut,
-				err: fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans),
+				Err: fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans),
 			}
 		}
 		return &PolicyError{
 			Typ: EvaluationFailure,
-			err: err,
+			Err: err,
 		}
 	}
 
 	if !allowed {
 		return &PolicyError{
 			Typ: AdminLockOut,
-			err: fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans),
+			Err: fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans),
 		}
 	}
 

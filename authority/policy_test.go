@@ -34,7 +34,7 @@ func TestAuthority_checkPolicy(t *testing.T) {
 				},
 				err: &PolicyError{
 					Typ: ConfigurationFailure,
-					err: errors.New("cannot parse permitted domain constraint \"**.local\": domain constraint \"**.local\" can only have wildcard as starting character"),
+					Err: errors.New("cannot parse permitted domain constraint \"**.local\": domain constraint \"**.local\" can only have wildcard as starting character"),
 				},
 			}
 		},
@@ -52,7 +52,7 @@ func TestAuthority_checkPolicy(t *testing.T) {
 				},
 				err: &PolicyError{
 					Typ: EvaluationFailure,
-					err: errors.New("cannot parse domain: dns \"*\" cannot be converted to ASCII"),
+					Err: errors.New("cannot parse domain: dns \"*\" cannot be converted to ASCII"),
 				},
 			}
 		},
@@ -74,7 +74,7 @@ func TestAuthority_checkPolicy(t *testing.T) {
 				},
 				err: &PolicyError{
 					Typ: AdminLockOut,
-					err: errors.New("the provided policy would lock out [step] from the CA. Please update your policy to include [step] as an allowed name"),
+					Err: errors.New("the provided policy would lock out [step] from the CA. Please update your policy to include [step] as an allowed name"),
 				},
 			}
 		},
@@ -99,7 +99,7 @@ func TestAuthority_checkPolicy(t *testing.T) {
 				},
 				err: &PolicyError{
 					Typ: EvaluationFailure,
-					err: errors.New("cannot parse domain: dns \"**\" cannot be converted to ASCII"),
+					Err: errors.New("cannot parse domain: dns \"**\" cannot be converted to ASCII"),
 				},
 			}
 		},
@@ -121,7 +121,7 @@ func TestAuthority_checkPolicy(t *testing.T) {
 				},
 				err: &PolicyError{
 					Typ: AdminLockOut,
-					err: errors.New("the provided policy would lock out [otherAdmin] from the CA. Please update your policy to include [otherAdmin] as an allowed name"),
+					Err: errors.New("the provided policy would lock out [otherAdmin] from the CA. Please update your policy to include [otherAdmin] as an allowed name"),
 				},
 			}
 		},
