@@ -14,6 +14,7 @@ import (
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
@@ -47,11 +48,41 @@ func (a *Authority) GetProvisioners(cursor string, limit int) (provisioner.List,
 func (a *Authority) LoadProvisionerByCertificate(crt *x509.Certificate) (provisioner.Interface, error) {
 	a.adminMutex.RLock()
 	defer a.adminMutex.RUnlock()
+	if p, err := a.unsafeLoadProvisionerFromDatabase(crt); err == nil {
+		return p, nil
+	}
+	return a.unsafeLoadProvisionerFromExtension(crt)
+}
+
+func (a *Authority) unsafeLoadProvisionerFromExtension(crt *x509.Certificate) (provisioner.Interface, error) {
 	p, ok := a.provisioners.LoadByCertificate(crt)
-	if !ok {
+	if !ok || p.GetType() == 0 {
 		return nil, admin.NewError(admin.ErrorNotFoundType, "unable to load provisioner from certificate")
 	}
 	return p, nil
+}
+
+func (a *Authority) unsafeLoadProvisionerFromDatabase(crt *x509.Certificate) (provisioner.Interface, error) {
+	// certificateDataGetter is an interface that can be used to retrieve the
+	// provisioner from a db or a linked ca.
+	type certificateDataGetter interface {
+		GetCertificateData(string) (*db.CertificateData, error)
+	}
+
+	var err error
+	var data *db.CertificateData
+
+	if cdg, ok := a.adminDB.(certificateDataGetter); ok {
+		data, err = cdg.GetCertificateData(crt.SerialNumber.String())
+	} else if cdg, ok := a.db.(certificateDataGetter); ok {
+		data, err = cdg.GetCertificateData(crt.SerialNumber.String())
+	}
+	if err == nil && data != nil && data.Provisioner != nil {
+		if p, ok := a.provisioners.Load(data.Provisioner.ID); ok {
+			return p, nil
+		}
+	}
+	return nil, admin.NewError(admin.ErrorNotFoundType, "unable to load provisioner from certificate")
 }
 
 // LoadProvisionerByToken returns an interface to the provisioner that
@@ -104,7 +135,6 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 	return provisioner.Config{
 		Claims:    claimer.Claims(),
 		Audiences: a.config.GetAudiences(),
-		DB:        a.db,
 		SSHKeys: &provisioner.SSHKeys{
 			UserKeys: sshKeys.UserKeys,
 			HostKeys: sshKeys.HostKeys,
@@ -260,7 +290,7 @@ func (a *Authority) RemoveProvisioner(ctx context.Context, id string) error {
 
 // CreateFirstProvisioner creates and stores the first provisioner when using
 // admin database provisioner storage.
-func CreateFirstProvisioner(ctx context.Context, db admin.DB, password string) (*linkedca.Provisioner, error) {
+func CreateFirstProvisioner(ctx context.Context, adminDB admin.DB, password string) (*linkedca.Provisioner, error) {
 	if password == "" {
 		pass, err := ui.PromptPasswordGenerate("Please enter the password to encrypt your first provisioner, leave empty and we'll generate one")
 		if err != nil {
@@ -303,7 +333,7 @@ func CreateFirstProvisioner(ctx context.Context, db admin.DB, password string) (
 			},
 		},
 	}
-	if err := db.CreateProvisioner(ctx, p); err != nil {
+	if err := adminDB.CreateProvisioner(ctx, p); err != nil {
 		return nil, admin.WrapErrorISE(err, "error creating provisioner")
 	}
 	return p, nil

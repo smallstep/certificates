@@ -241,6 +241,28 @@ func (c *linkedCaClient) DeleteAdmin(ctx context.Context, id string) error {
 	return errors.Wrap(err, "error deleting admin")
 }
 
+func (c *linkedCaClient) GetCertificateData(serial string) (*db.CertificateData, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	resp, err := c.client.GetCertificate(ctx, &linkedca.GetCertificateRequest{
+		Serial: serial,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var pd *db.ProvisionerData
+	if p := resp.Provisioner; p != nil {
+		pd = &db.ProvisionerData{
+			ID: p.Id, Name: p.Name, Type: p.Type.String(),
+		}
+	}
+	return &db.CertificateData{
+		Provisioner: pd,
+	}, nil
+}
+
 func (c *linkedCaClient) StoreCertificateChain(prov provisioner.Interface, fullchain ...*x509.Certificate) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

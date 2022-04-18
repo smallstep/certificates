@@ -308,6 +308,18 @@ func (c *Config) GetAudiences() provisioner.Audiences {
 	return audiences
 }
 
+// Audience returns the list of audiences for a given path.
+func (c *Config) Audience(path string) []string {
+	audiences := make([]string, len(c.DNSNames)+1)
+	for i, name := range c.DNSNames {
+		hostname := toHostname(name)
+		audiences[i] = "https://" + hostname + path
+	}
+	// For backward compatibility
+	audiences[len(c.DNSNames)] = path
+	return audiences
+}
+
 func toHostname(name string) string {
 	// ensure an IPv6 address is represented with square brackets when used as hostname
 	if ip := net.ParseIP(name); ip != nil && ip.To4() == nil {
