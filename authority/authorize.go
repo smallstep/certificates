@@ -130,22 +130,24 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no
 	// more than a few minutes.
 	if err := claims.ValidateWithLeeway(jose.Expected{
-		Issuer: prov.GetName(),
-		Time:   time.Now().UTC(),
+		Time: time.Now().UTC(),
 	}, time.Minute); err != nil {
 		return nil, admin.WrapError(admin.ErrorUnauthorizedType, err, "x5c.authorizeToken; invalid x5c claims")
 	}
 
 	// validate audience: path matches the current path
-	if r.URL.Path != claims.Audience[0] {
-		return nil, admin.NewError(admin.ErrorUnauthorizedType,
-			"x5c.authorizeToken; x5c token has invalid audience "+
-				"claim (aud); expected %s, but got %s", r.URL.Path, claims.Audience)
+	if !matchesAudience(claims.Audience, a.config.Audience(r.URL.Path)) {
+		return nil, admin.NewError(admin.ErrorUnauthorizedType, "x5c.authorizeToken; x5c token has invalid audience claim (aud)")
+	}
+
+	// validate issuer: old versions used the provisioner name, new version uses
+	// 'step-admin-client/1.0'
+	if claims.Issuer != "step-admin-client/1.0" && claims.Issuer != prov.GetName() {
+		return nil, admin.NewError(admin.ErrorUnauthorizedType, "x5c.authorizeToken; x5c token has invalid issuer claim (iss)")
 	}
 
 	if claims.Subject == "" {
-		return nil, admin.NewError(admin.ErrorUnauthorizedType,
-			"x5c.authorizeToken; x5c token subject cannot be empty")
+		return nil, admin.NewError(admin.ErrorUnauthorizedType, "x5c.authorizeToken; x5c token subject cannot be empty")
 	}
 
 	var (
@@ -156,7 +158,7 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 	adminSANs := append([]string{leaf.Subject.CommonName}, leaf.DNSNames...)
 	adminSANs = append(adminSANs, leaf.EmailAddresses...)
 	for _, san := range adminSANs {
-		if adm, ok = a.LoadAdminBySubProv(san, claims.Issuer); ok {
+		if adm, ok = a.LoadAdminBySubProv(san, prov.GetName()); ok {
 			adminFound = true
 			break
 		}
@@ -285,9 +287,16 @@ func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 	if isRevoked {
 		return errs.Unauthorized("authority.authorizeRenew: certificate has been revoked", opts...)
 	}
-	p, ok := a.provisioners.LoadByCertificate(cert)
-	if !ok {
-		return errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
+	p, err := a.LoadProvisionerByCertificate(cert)
+	if err != nil {
+		var ok bool
+		// For backward compatibility this method will also succeed if the
+		// certificate does not have a provisioner extension. LoadByCertificate
+		// returns the noop provisioner if this happens, and it allows
+		// certificate renewals.
+		if p, ok = a.provisioners.LoadByCertificate(cert); !ok {
+			return errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
+		}
 	}
 	if err := p.AuthorizeRenew(context.Background(), cert); err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
@@ -386,8 +395,8 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 		return nil, errs.InternalServerErr(err, errs.WithMessage("error validating renew token"))
 	}
 
-	p, ok := a.provisioners.LoadByCertificate(leaf)
-	if !ok {
+	p, err := a.LoadProvisionerByCertificate(leaf)
+	if err != nil {
 		return nil, errs.Unauthorized("error validating renew token: cannot get provisioner from certificate")
 	}
 	if err := a.UseToken(ott, p); err != nil {
@@ -395,7 +404,6 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 	}
 
 	if err := claims.ValidateWithLeeway(jose.Expected{
-		Issuer:  p.GetName(),
 		Subject: leaf.Subject.CommonName,
 		Time:    time.Now().UTC(),
 	}, time.Minute); err != nil {
@@ -418,6 +426,12 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 	audiences := a.config.GetAudiences().Renew
 	if !matchesAudience(claims.Audience, audiences) {
 		return nil, errs.InternalServerErr(err, errs.WithMessage("error validating renew token: invalid audience claim (aud)"))
+	}
+
+	// validate issuer: old versions used the provisioner name, new version uses
+	// 'step-ca-client/1.0'
+	if claims.Issuer != "step-ca-client/1.0" && claims.Issuer != p.GetName() {
+		return nil, admin.NewError(admin.ErrorUnauthorizedType, "error validating renew token: invalid issuer claim (iss)")
 	}
 
 	return leaf, nil
