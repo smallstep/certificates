@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -342,10 +343,19 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
 
 				assert.Equals(t, tc.err.Type, ae.Type)
-				assert.Equals(t, tc.err.Message, ae.Message)
 				assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
 				assert.Equals(t, tc.err.Detail, ae.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+				// when the error message starts with "proto", we expect it to have
+				// a syntax error (in the tests). If the message doesn't start with "proto",
+				// we expect a full string match.
+				if strings.HasPrefix(tc.err.Message, "proto:") {
+					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+				} else {
+					assert.Equals(t, tc.err.Message, ae.Message)
+				}
+
 				return
 			}
 
@@ -583,10 +593,19 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
 
 				assert.Equals(t, tc.err.Type, ae.Type)
-				assert.Equals(t, tc.err.Message, ae.Message)
 				assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
 				assert.Equals(t, tc.err.Detail, ae.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+				// when the error message starts with "proto", we expect it to have
+				// a syntax error (in the tests). If the message doesn't start with "proto",
+				// we expect a full string match.
+				if strings.HasPrefix(tc.err.Message, "proto:") {
+					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+				} else {
+					assert.Equals(t, tc.err.Message, ae.Message)
+				}
+
 				return
 			}
 
@@ -994,10 +1013,19 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
 
 				assert.Equals(t, tc.err.Type, ae.Type)
-				assert.Equals(t, tc.err.Message, ae.Message)
 				assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
 				assert.Equals(t, tc.err.Detail, ae.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+				// when the error message starts with "proto", we expect it to have
+				// a syntax error (in the tests). If the message doesn't start with "proto",
+				// we expect a full string match.
+				if strings.HasPrefix(tc.err.Message, "proto:") {
+					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+				} else {
+					assert.Equals(t, tc.err.Message, ae.Message)
+				}
+
 				return
 			}
 
@@ -1185,10 +1213,19 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
 
 				assert.Equals(t, tc.err.Type, ae.Type)
-				assert.Equals(t, tc.err.Message, ae.Message)
 				assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
 				assert.Equals(t, tc.err.Detail, ae.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+				// when the error message starts with "proto", we expect it to have
+				// a syntax error (in the tests). If the message doesn't start with "proto",
+				// we expect a full string match.
+				if strings.HasPrefix(tc.err.Message, "proto:") {
+					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+				} else {
+					assert.Equals(t, tc.err.Message, ae.Message)
+				}
+
 				return
 			}
 
@@ -1549,10 +1586,19 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
 
 				assert.Equals(t, tc.err.Type, ae.Type)
-				assert.Equals(t, tc.err.Message, ae.Message)
 				assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
 				assert.Equals(t, tc.err.Detail, ae.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+				// when the error message starts with "proto", we expect it to have
+				// a syntax error (in the tests). If the message doesn't start with "proto",
+				// we expect a full string match.
+				if strings.HasPrefix(tc.err.Message, "proto:") {
+					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+				} else {
+					assert.Equals(t, tc.err.Message, ae.Message)
+				}
+
 				return
 			}
 
@@ -1715,10 +1761,19 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
 
 				assert.Equals(t, tc.err.Type, ae.Type)
-				assert.Equals(t, tc.err.Message, ae.Message)
 				assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
 				assert.Equals(t, tc.err.Detail, ae.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+				// when the error message starts with "proto", we expect it to have
+				// a syntax error (in the tests). If the message doesn't start with "proto",
+				// we expect a full string match.
+				if strings.HasPrefix(tc.err.Message, "proto:") {
+					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+				} else {
+					assert.Equals(t, tc.err.Message, ae.Message)
+				}
+
 				return
 			}
 
