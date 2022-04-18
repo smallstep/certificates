@@ -23,7 +23,10 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-var adminURLPrefix = "admin"
+const (
+	adminURLPrefix = "admin"
+	adminIssuer    = "step-admin-client/1.0"
+)
 
 // AdminClient implements an HTTP client for the CA server.
 type AdminClient struct {
@@ -35,7 +38,6 @@ type AdminClient struct {
 	x5cCertFile string
 	x5cCertStrs []string
 	x5cCert     *x509.Certificate
-	x5cIssuer   string
 	x5cSubject  string
 }
 
@@ -77,24 +79,30 @@ func NewAdminClient(endpoint string, opts ...ClientOption) (*AdminClient, error)
 		x5cCertFile: o.x5cCertFile,
 		x5cCertStrs: o.x5cCertStrs,
 		x5cCert:     o.x5cCert,
-		x5cIssuer:   o.x5cIssuer,
 		x5cSubject:  o.x5cSubject,
 	}, nil
 }
 
-func (c *AdminClient) generateAdminToken(urlPath string) (string, error) {
+func (c *AdminClient) generateAdminToken(aud *url.URL) (string, error) {
 	// A random jwt id will be used to identify duplicated tokens
 	jwtID, err := randutil.Hex(64) // 256 bits
 	if err != nil {
 		return "", err
 	}
 
+	// Drop any query string parameter from the token audience
+	aud = &url.URL{
+		Scheme: aud.Scheme,
+		Host:   aud.Host,
+		Path:   aud.Path,
+	}
+
 	now := time.Now()
 	tokOptions := []token.Options{
 		token.WithJWTID(jwtID),
 		token.WithKid(c.x5cJWK.KeyID),
-		token.WithIssuer(c.x5cIssuer),
-		token.WithAudience(urlPath),
+		token.WithIssuer(adminIssuer),
+		token.WithAudience(aud.String()),
 		token.WithValidity(now, now.Add(token.DefaultValidity)),
 		token.WithX5CCerts(c.x5cCertStrs),
 	}
@@ -205,7 +213,7 @@ func (c *AdminClient) GetAdminsPaginate(opts ...AdminOption) (*adminAPI.GetAdmin
 		Path:     "/admin/admins",
 		RawQuery: o.rawQuery(),
 	})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -260,7 +268,7 @@ func (c *AdminClient) CreateAdmin(createAdminRequest *adminAPI.CreateAdminReques
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/admin/admins"})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -292,7 +300,7 @@ retry:
 func (c *AdminClient) RemoveAdmin(id string) error {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "admins", id)})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")
 	}
@@ -324,7 +332,7 @@ func (c *AdminClient) UpdateAdmin(id string, uar *adminAPI.UpdateAdminRequest) (
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "admins", id)})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -371,7 +379,7 @@ func (c *AdminClient) GetProvisioner(opts ...ProvisionerOption) (*linkedca.Provi
 	default:
 		return nil, errors.New("must set either name or id in method options")
 	}
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -410,7 +418,7 @@ func (c *AdminClient) GetProvisionersPaginate(opts ...ProvisionerOption) (*admin
 		Path:     "/admin/provisioners",
 		RawQuery: o.rawQuery(),
 	})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -480,7 +488,7 @@ func (c *AdminClient) RemoveProvisioner(opts ...ProvisionerOption) error {
 	default:
 		return errors.New("must set either name or id in method options")
 	}
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")
 	}
@@ -512,7 +520,7 @@ func (c *AdminClient) CreateProvisioner(prov *linkedca.Provisioner) (*linkedca.P
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners")})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -548,7 +556,7 @@ func (c *AdminClient) UpdateProvisioner(name string, prov *linkedca.Provisioner)
 		return errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", name)})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")
 	}
@@ -587,7 +595,7 @@ func (c *AdminClient) GetExternalAccountKeysPaginate(provisionerName, reference 
 		Path:     p,
 		RawQuery: o.rawQuery(),
 	})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -623,7 +631,7 @@ func (c *AdminClient) CreateExternalAccountKey(provisionerName string, eakReques
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab/", provisionerName)})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -655,7 +663,7 @@ retry:
 func (c *AdminClient) RemoveExternalAccountKey(provisionerName, keyID string) error {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab", provisionerName, "/", keyID)})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")
 	}

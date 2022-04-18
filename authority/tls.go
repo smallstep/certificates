@@ -347,6 +347,8 @@ func (a *Authority) storeCertificate(prov provisioner.Interface, fullchain []*x5
 
 	// Store certificate in local db
 	switch s := a.db.(type) {
+	case linkedChainStorer:
+		return s.StoreCertificateChain(prov, fullchain...)
 	case certificateChainStorer:
 		return s.StoreCertificateChain(fullchain...)
 	default:

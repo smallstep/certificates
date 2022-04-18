@@ -26,27 +26,27 @@ var (
 	DefaultBackdate = time.Minute
 	// DefaultDisableRenewal disables renewals per provisioner.
 	DefaultDisableRenewal = false
-	// DefaultAllowRenewAfterExpiry allows renewals even if the certificate is
+	// DefaultAllowRenewalAfterExpiry allows renewals even if the certificate is
 	// expired.
-	DefaultAllowRenewAfterExpiry = false
+	DefaultAllowRenewalAfterExpiry = false
 	// DefaultEnableSSHCA enable SSH CA features per provisioner or globally
 	// for all provisioners.
 	DefaultEnableSSHCA = false
 	// GlobalProvisionerClaims default claims for the Authority. Can be overridden
 	// by provisioner specific claims.
 	GlobalProvisionerClaims = provisioner.Claims{
-		MinTLSDur:             &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
-		MaxTLSDur:             &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultTLSDur:         &provisioner.Duration{Duration: 24 * time.Hour},
-		MinUserSSHDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
-		MaxUserSSHDur:         &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultUserSSHDur:     &provisioner.Duration{Duration: 16 * time.Hour},
-		MinHostSSHDur:         &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
-		MaxHostSSHDur:         &provisioner.Duration{Duration: 30 * 24 * time.Hour},
-		DefaultHostSSHDur:     &provisioner.Duration{Duration: 30 * 24 * time.Hour},
-		EnableSSHCA:           &DefaultEnableSSHCA,
-		DisableRenewal:        &DefaultDisableRenewal,
-		AllowRenewAfterExpiry: &DefaultAllowRenewAfterExpiry,
+		MinTLSDur:               &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
+		MaxTLSDur:               &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:           &provisioner.Duration{Duration: 24 * time.Hour},
+		MinUserSSHDur:           &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:           &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur:       &provisioner.Duration{Duration: 16 * time.Hour},
+		MinHostSSHDur:           &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:           &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur:       &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:             &DefaultEnableSSHCA,
+		DisableRenewal:          &DefaultDisableRenewal,
+		AllowRenewalAfterExpiry: &DefaultAllowRenewalAfterExpiry,
 	}
 )
 
@@ -305,6 +305,18 @@ func (c *Config) GetAudiences() provisioner.Audiences {
 			fmt.Sprintf("https://%s/ssh/rekey", hostname))
 	}
 
+	return audiences
+}
+
+// Audience returns the list of audiences for a given path.
+func (c *Config) Audience(path string) []string {
+	audiences := make([]string, len(c.DNSNames)+1)
+	for i, name := range c.DNSNames {
+		hostname := toHostname(name)
+		audiences[i] = "https://" + hostname + path
+	}
+	// For backward compatibility
+	audiences[len(c.DNSNames)] = path
 	return audiences
 }
 

@@ -847,6 +847,29 @@ func TestAuthority_authorizeRenew(t *testing.T) {
 				cert: fooCrt,
 			}
 		},
+		"ok/from db": func(t *testing.T) *authorizeTest {
+			a := testAuthority(t)
+			a.db = &db.MockAuthDB{
+				MIsRevoked: func(key string) (bool, error) {
+					return false, nil
+				},
+				MGetCertificateData: func(serialNumber string) (*db.CertificateData, error) {
+					p, ok := a.provisioners.LoadByName("step-cli")
+					if !ok {
+						t.Fatal("provisioner step-cli not found")
+					}
+					return &db.CertificateData{
+						Provisioner: &db.ProvisionerData{
+							ID: p.GetID(),
+						},
+					}, nil
+				},
+			}
+			return &authorizeTest{
+				auth: a,
+				cert: fooCrt,
+			}
+		},
 	}
 
 	for name, genTestCase := range tests {
@@ -1381,7 +1404,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	t1, c1 := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1400,7 +1423,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	t2, c2 := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 		IssuedAt:  jose.NewNumericDate(now),
@@ -1417,10 +1440,29 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 		})
 		return nil
 	}))
-	badSigner, _ := generateX5cToken(a1, otherSigner, jose.Claims{
+	t3, c3 := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
 		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	badSigner, _ := generateX5cToken(a1, otherSigner, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/renew"},
+		Subject:   "test.example.com",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1439,7 +1481,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badProvisioner, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1477,7 +1519,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badSubject, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "bad-subject",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1496,7 +1538,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badNotBefore, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now.Add(5 * time.Minute)),
 		Expiry:    jose.NewNumericDate(now.Add(10 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1515,7 +1557,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badExpiry, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now.Add(-5 * time.Minute)),
 		Expiry:    jose.NewNumericDate(now.Add(-time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1534,7 +1576,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badIssuedAt, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 		IssuedAt:  jose.NewNumericDate(now.Add(5 * time.Minute)),
@@ -1554,7 +1596,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badAudience, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1584,6 +1626,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	}{
 		{"ok", a1, args{ctx, t1}, c1, false},
 		{"ok expired cert", a1, args{ctx, t2}, c2, false},
+		{"ok provisioner issuer", a1, args{ctx, t3}, c3, false},
 		{"fail token", a1, args{ctx, "not.a.token"}, nil, true},
 		{"fail token reuse", a1, args{ctx, t1}, nil, true},
 		{"fail token signature", a1, args{ctx, badSigner}, nil, true},
