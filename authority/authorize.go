@@ -404,7 +404,6 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 	}
 
 	if err := claims.ValidateWithLeeway(jose.Expected{
-		Issuer:  "step-ca-client/1.0",
 		Subject: leaf.Subject.CommonName,
 		Time:    time.Now().UTC(),
 	}, time.Minute); err != nil {
@@ -427,6 +426,12 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 	audiences := a.config.GetAudiences().Renew
 	if !matchesAudience(claims.Audience, audiences) {
 		return nil, errs.InternalServerErr(err, errs.WithMessage("error validating renew token: invalid audience claim (aud)"))
+	}
+
+	// validate issuer: old versions used the provisioner name, new version uses
+	// 'step-ca-client/1.0'
+	if claims.Issuer != "step-ca-client/1.0" && claims.Issuer != p.GetName() {
+		return nil, admin.NewError(admin.ErrorUnauthorizedType, "error validating renew token: invalid issuer claim (iss)")
 	}
 
 	return leaf, nil
