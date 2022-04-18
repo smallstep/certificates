@@ -684,7 +684,7 @@ retry:
 func (c *AdminClient) GetAuthorityPolicy() (*linkedca.Policy, error) {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
 	}
@@ -719,7 +719,7 @@ func (c *AdminClient) CreateAuthorityPolicy(p *linkedca.Policy) (*linkedca.Polic
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
 	}
@@ -754,7 +754,7 @@ func (c *AdminClient) UpdateAuthorityPolicy(p *linkedca.Policy) (*linkedca.Polic
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
 	}
@@ -785,7 +785,7 @@ retry:
 func (c *AdminClient) RemoveAuthorityPolicy() error {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return fmt.Errorf("error generating admin token: %w", err)
 	}
@@ -812,7 +812,7 @@ retry:
 func (c *AdminClient) GetProvisionerPolicy(provisionerName string) (*linkedca.Policy, error) {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioner", provisionerName, "policy")})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
 	}
@@ -847,7 +847,7 @@ func (c *AdminClient) CreateProvisionerPolicy(provisionerName string, p *linkedc
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioner", provisionerName, "policy")})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
 	}
@@ -882,7 +882,7 @@ func (c *AdminClient) UpdateProvisionerPolicy(provisionerName string, p *linkedc
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioner", provisionerName, "policy")})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
 	}
@@ -913,7 +913,7 @@ retry:
 func (c *AdminClient) RemoveProvisionerPolicy(provisionerName string) error {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioner", provisionerName, "policy")})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return fmt.Errorf("error generating admin token: %w", err)
 	}
@@ -947,7 +947,7 @@ func (c *AdminClient) GetACMEPolicy(provisionerName, reference, keyID string) (*
 		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "reference", reference)
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: urlPath})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
 	}
@@ -989,7 +989,7 @@ func (c *AdminClient) CreateACMEPolicy(provisionerName, reference, keyID string,
 		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "reference", reference)
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: urlPath})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
 	}
@@ -1031,7 +1031,7 @@ func (c *AdminClient) UpdateACMEPolicy(provisionerName, reference, keyID string,
 		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "reference", reference)
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: urlPath})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
 	}
@@ -1069,7 +1069,7 @@ func (c *AdminClient) RemoveACMEPolicy(provisionerName, reference, keyID string)
 		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "reference", reference)
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: urlPath})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return fmt.Errorf("error generating admin token: %w", err)
 	}
