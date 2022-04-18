@@ -205,7 +205,9 @@ func TestDB_getDBAuthorityPolicy(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
-			if dbp, err := d.getDBAuthorityPolicy(tc.ctx, tc.authorityID); err != nil {
+			dbp, err := d.getDBAuthorityPolicy(tc.ctx, tc.authorityID)
+			switch {
+			case err != nil:
 				switch k := err.(type) {
 				case *admin.Error:
 					if assert.NotNil(t, tc.adminErr) {
@@ -220,9 +222,9 @@ func TestDB_getDBAuthorityPolicy(t *testing.T) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
 				}
-			} else if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) && tc.dbap == nil {
+			case assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) && tc.dbap == nil:
 				assert.Nil(t, dbp)
-			} else if assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr) {
+			case assert.Nil(t, tc.err) && assert.Nil(t, tc.adminErr):
 				assert.Equals(t, dbp.ID, "ID")
 				assert.Equals(t, dbp.AuthorityID, tc.dbap.AuthorityID)
 				assert.Equals(t, dbp.Policy, tc.dbap.Policy)
