@@ -69,7 +69,7 @@ func (a *Authority) CreateAuthorityPolicy(ctx context.Context, adm *linkedca.Adm
 		}
 	}
 
-	return p, nil // TODO: return the newly stored policy
+	return p, nil
 }
 
 func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, p *linkedca.Policy) (*linkedca.Policy, error) {
@@ -94,7 +94,7 @@ func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Adm
 		}
 	}
 
-	return p, nil // TODO: return the updated stored policy
+	return p, nil
 }
 
 func (a *Authority) RemoveAuthorityPolicy(ctx context.Context) error {
@@ -111,7 +111,7 @@ func (a *Authority) RemoveAuthorityPolicy(ctx context.Context) error {
 	if err := a.reloadPolicyEngines(ctx); err != nil {
 		return &PolicyError{
 			Typ: ReloadFailure,
-			Err: fmt.Errorf("error reloading policy engines when deleting authority policy %w", err),
+			Err: fmt.Errorf("error reloading policy engines when deleting authority policy: %w", err),
 		}
 	}
 
