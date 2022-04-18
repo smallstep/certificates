@@ -10,7 +10,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -24,62 +23,55 @@ func JSON(r io.Reader, v interface{}) error {
 }
 
 // ProtoJSON reads JSON from the request body and stores it in the value
-// pointed by v.
+// pointed to by v.
 func ProtoJSON(r io.Reader, m proto.Message) error {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return errs.BadRequestErr(err, "error reading request body")
 	}
-	return protojson.Unmarshal(data, m)
-}
-
-// ProtoJSONWithCheck reads JSON from the request body and stores it in the value
-// pointed to by m. Returns false if an error was written; true if not.
-// TODO(hs): refactor this after the API flow changes are in (or before if that works)
-func ProtoJSONWithCheck(w http.ResponseWriter, r io.Reader, m proto.Message) bool {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		var wrapper = struct {
-			Status  int    `json:"code"`
-			Message string `json:"message"`
-		}{
-			Status:  http.StatusBadRequest,
-			Message: err.Error(),
-		}
-		errData, err := json.Marshal(wrapper)
-		if err != nil {
-			panic(err)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write(errData)
-		return false
-	}
 	if err := protojson.Unmarshal(data, m); err != nil {
 		if errors.Is(err, proto.Error) {
-			var wrapper = struct {
-				Type    string `json:"type"`
-				Detail  string `json:"detail"`
-				Message string `json:"message"`
-			}{
-				Type:    "badRequest",
-				Detail:  "bad request",
-				Message: err.Error(),
-			}
-			errData, err := json.Marshal(wrapper)
-			if err != nil {
-				panic(err)
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write(errData)
-			return false
+			return newBadProtoJSONError(err)
 		}
+	}
+	return err
+}
 
-		// fallback to the default error writer
-		render.Error(w, err)
-		return false
+// BadProtoJSONError is an error type that is used when a proto
+// message cannot be unmarshaled. Usually this is caused by an error
+// in the request body.
+type BadProtoJSONError struct {
+	err     error
+	Type    string `json:"type"`
+	Detail  string `json:"detail"`
+	Message string `json:"message"`
+}
+
+// newBadProtoJSONError returns a new instance of BadProtoJSONError
+// This error type is always caused by an error in the request body.
+func newBadProtoJSONError(err error) *BadProtoJSONError {
+	return &BadProtoJSONError{
+		err:     err,
+		Type:    "badRequest",
+		Detail:  "bad request",
+		Message: err.Error(),
+	}
+}
+
+// Error implements the error interface
+func (e *BadProtoJSONError) Error() string {
+	return e.err.Error()
+}
+
+// Render implements render.RenderableError for BadProtoError
+func (e *BadProtoJSONError) Render(w http.ResponseWriter) {
+
+	errData, err := json.Marshal(e)
+	if err != nil {
+		panic(err)
 	}
 
-	return true
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	w.Write(errData)
 }

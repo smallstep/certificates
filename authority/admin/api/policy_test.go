@@ -167,7 +167,7 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 				statusCode: 409,
 			}
 		},
-		"fail/read.ProtoJSONWithCheck": func(t *testing.T) test {
+		"fail/read.ProtoJSON": func(t *testing.T) test {
 			ctx := context.Background()
 			adminErr := admin.NewError(admin.ErrorBadRequestType, "proto: syntax error (line 1:2): invalid value ?")
 			adminErr.Message = "proto: syntax error (line 1:2): invalid value ?"
@@ -410,7 +410,7 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 				statusCode: 404,
 			}
 		},
-		"fail/read.ProtoJSONWithCheck": func(t *testing.T) test {
+		"fail/read.ProtoJSON": func(t *testing.T) test {
 			policy := &linkedca.Policy{
 				X509: &linkedca.X509Policy{
 					Allow: &linkedca.X509Names{
@@ -871,7 +871,7 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 				statusCode: 409,
 			}
 		},
-		"fail/read.ProtoJSONWithCheck": func(t *testing.T) test {
+		"fail/read.ProtoJSON": func(t *testing.T) test {
 			prov := &linkedca.Provisioner{
 				Name: "provName",
 			}
@@ -1060,7 +1060,7 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 				statusCode: 404,
 			}
 		},
-		"fail/read.ProtoJSONWithCheck": func(t *testing.T) test {
+		"fail/read.ProtoJSON": func(t *testing.T) test {
 			policy := &linkedca.Policy{
 				X509: &linkedca.X509Policy{
 					Allow: &linkedca.X509Names{
@@ -1472,7 +1472,7 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 				statusCode: 409,
 			}
 		},
-		"fail/read.ProtoJSONWithCheck": func(t *testing.T) test {
+		"fail/read.ProtoJSON": func(t *testing.T) test {
 			prov := &linkedca.Provisioner{
 				Name: "provName",
 			}
@@ -1637,7 +1637,7 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 				statusCode: 404,
 			}
 		},
-		"fail/read.ProtoJSONWithCheck": func(t *testing.T) test {
+		"fail/read.ProtoJSON": func(t *testing.T) test {
 			policy := &linkedca.Policy{
 				X509: &linkedca.X509Policy{
 					Allow: &linkedca.X509Names{

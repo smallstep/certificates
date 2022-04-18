@@ -80,7 +80,8 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
+	if err := read.ProtoJSON(r.Body, newPolicy); err != nil {
+		render.Error(w, err)
 		return
 	}
 
@@ -120,7 +121,8 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
+	if err := read.ProtoJSON(r.Body, newPolicy); err != nil {
+		render.Error(w, err)
 		return
 	}
 
@@ -195,7 +197,8 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
+	if err := read.ProtoJSON(r.Body, newPolicy); err != nil {
+		render.Error(w, err)
 		return
 	}
 
@@ -228,7 +231,8 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
+	if err := read.ProtoJSON(r.Body, newPolicy); err != nil {
+		render.Error(w, err)
 		return
 	}
 
@@ -297,7 +301,8 @@ func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, 
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
+	if err := read.ProtoJSON(r.Body, newPolicy); err != nil {
+		render.Error(w, err)
 		return
 	}
 
@@ -324,7 +329,8 @@ func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, 
 	}
 
 	var newPolicy = new(linkedca.Policy)
-	if !read.ProtoJSONWithCheck(w, r.Body, newPolicy) {
+	if err := read.ProtoJSON(r.Body, newPolicy); err != nil {
+		render.Error(w, err)
 		return
 	}
 
