@@ -206,28 +206,10 @@ func TestNew(t *testing.T) {
 				wantErr: true,
 			}
 		},
-		"fail/add-permitted-dns-domains": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddPermittedDNSDomains([]string{"**.local"}),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
 		"fail/with-excluded-dns-domains": func(t *testing.T) test {
 			return test{
 				options: []NamePolicyOption{
 					WithExcludedDNSDomains([]string{"**.local"}),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
-		"fail/add-excluded-dns-domains": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddExcludedDNSDomains([]string{"**.local"}),
 				},
 				want:    nil,
 				wantErr: true,
@@ -242,28 +224,10 @@ func TestNew(t *testing.T) {
 				wantErr: true,
 			}
 		},
-		"fail/add-permitted-dns-domain": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddPermittedDNSDomain("**.local"),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
 		"fail/with-excluded-dns-domain": func(t *testing.T) test {
 			return test{
 				options: []NamePolicyOption{
 					WithExcludedDNSDomain("**.local"),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
-		"fail/add-excluded-dns-domain": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddExcludedDNSDomain("**.local"),
 				},
 				want:    nil,
 				wantErr: true,
@@ -278,28 +242,10 @@ func TestNew(t *testing.T) {
 				wantErr: true,
 			}
 		},
-		"fail/add-permitted-cidrs": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddPermittedCIDRs([]string{"127.0.0.1//24"}),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
 		"fail/with-excluded-cidrs": func(t *testing.T) test {
 			return test{
 				options: []NamePolicyOption{
 					WithExcludedCIDRs([]string{"127.0.0.1//24"}),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
-		"fail/add-excluded-cidrs": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddExcludedCIDRs([]string{"127.0.0.1//24"}),
 				},
 				want:    nil,
 				wantErr: true,
@@ -350,28 +296,10 @@ func TestNew(t *testing.T) {
 				wantErr: true,
 			}
 		},
-		"fail/add-permitted-cidr": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddPermittedCIDR("127.0.0.1//24"),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
 		"fail/with-excluded-cidr": func(t *testing.T) test {
 			return test{
 				options: []NamePolicyOption{
 					WithExcludedCIDR("127.0.0.1//24"),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
-		"fail/add-excluded-cidr": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddExcludedCIDR("127.0.0.1//24"),
 				},
 				want:    nil,
 				wantErr: true,
@@ -386,28 +314,10 @@ func TestNew(t *testing.T) {
 				wantErr: true,
 			}
 		},
-		"fail/add-permitted-emails": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddPermittedEmailAddresses([]string{"*.local"}),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
 		"fail/with-excluded-emails": func(t *testing.T) test {
 			return test{
 				options: []NamePolicyOption{
 					WithExcludedEmailAddresses([]string{"*.local"}),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
-		"fail/add-excluded-emails": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddExcludedEmailAddresses([]string{"*.local"}),
 				},
 				want:    nil,
 				wantErr: true,
@@ -422,28 +332,10 @@ func TestNew(t *testing.T) {
 				wantErr: true,
 			}
 		},
-		"fail/add-permitted-email": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddPermittedEmailAddress("*.local"),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
 		"fail/with-excluded-email": func(t *testing.T) test {
 			return test{
 				options: []NamePolicyOption{
 					WithExcludedEmailAddress("*.local"),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
-		"fail/add-excluded-email": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddExcludedEmailAddress("*.local"),
 				},
 				want:    nil,
 				wantErr: true,
@@ -458,28 +350,10 @@ func TestNew(t *testing.T) {
 				wantErr: true,
 			}
 		},
-		"fail/add-permitted-uris": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddPermittedURIDomains([]string{"**.local"}),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
 		"fail/with-excluded-uris": func(t *testing.T) test {
 			return test{
 				options: []NamePolicyOption{
 					WithExcludedURIDomains([]string{"**.local"}),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
-		"fail/add-excluded-uris": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddExcludedURIDomains([]string{"**.local"}),
 				},
 				want:    nil,
 				wantErr: true,
@@ -494,28 +368,10 @@ func TestNew(t *testing.T) {
 				wantErr: true,
 			}
 		},
-		"fail/add-permitted-uri": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddPermittedURIDomain("**.local"),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
 		"fail/with-excluded-uri": func(t *testing.T) test {
 			return test{
 				options: []NamePolicyOption{
 					WithExcludedURIDomain("**.local"),
-				},
-				want:    nil,
-				wantErr: true,
-			}
-		},
-		"fail/add-excluded-uri": func(t *testing.T) test {
-			return test{
-				options: []NamePolicyOption{
-					AddExcludedURIDomain("**.local"),
 				},
 				want:    nil,
 				wantErr: true,
@@ -567,41 +423,9 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-permitted-dns-wildcard-domains": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithPermittedDNSDomains([]string{"*.local"}),
-				AddPermittedDNSDomains([]string{"*.example.com", "*.local"}),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedDNSDomains:               []string{".local", ".example.com"},
-					numberOfDNSDomainConstraints:      2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-excluded-dns-domains": func(t *testing.T) test {
 			options := []NamePolicyOption{
 				WithExcludedDNSDomains([]string{"*.local", "*.example.com"}),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					excludedDNSDomains:               []string{".local", ".example.com"},
-					numberOfDNSDomainConstraints:     2,
-					totalNumberOfExcludedConstraints: 2,
-					totalNumberOfConstraints:         2,
-				},
-				wantErr: false,
-			}
-		},
-		"ok/add-excluded-dns-domains": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithExcludedDNSDomains([]string{"*.local"}),
-				AddExcludedDNSDomains([]string{"*.local", "*.example.com"}),
 			}
 			return test{
 				options: options,
@@ -629,22 +453,6 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-permitted-dns-wildcard-domain": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithPermittedDNSDomain("*.example.com"),
-				AddPermittedDNSDomain("*.local"),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedDNSDomains:               []string{".example.com", ".local"},
-					numberOfDNSDomainConstraints:      2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-permitted-dns-domain": func(t *testing.T) test {
 			options := []NamePolicyOption{
 				WithPermittedDNSDomain("www.example.com"),
@@ -660,22 +468,6 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-permitted-dns-domain": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithPermittedDNSDomain("www.example.com"),
-				AddPermittedDNSDomain("host.local"),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedDNSDomains:               []string{"www.example.com", "host.local"},
-					numberOfDNSDomainConstraints:      2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-permitted-ip-ranges": func(t *testing.T) test {
 			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
 			assert.FatalError(t, err)
@@ -683,36 +475,6 @@ func TestNew(t *testing.T) {
 			assert.FatalError(t, err)
 			options := []NamePolicyOption{
 				WithPermittedIPRanges(
-					[]*net.IPNet{
-						nw1, nw2,
-					},
-				),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedIPRanges: []*net.IPNet{
-						nw1, nw2,
-					},
-					numberOfIPRangeConstraints:        2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
-				},
-				wantErr: false,
-			}
-		},
-		"ok/add-permitted-ip-ranges": func(t *testing.T) test {
-			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
-			_, nw2, err := net.ParseCIDR("192.168.0.1/24")
-			assert.FatalError(t, err)
-			options := []NamePolicyOption{
-				WithPermittedIPRanges(
-					[]*net.IPNet{
-						nw1,
-					},
-				),
-				AddPermittedIPRanges(
 					[]*net.IPNet{
 						nw1, nw2,
 					},
@@ -756,36 +518,6 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-excluded-ip-ranges": func(t *testing.T) test {
-			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
-			_, nw2, err := net.ParseCIDR("192.168.0.1/24")
-			assert.FatalError(t, err)
-			options := []NamePolicyOption{
-				WithExcludedIPRanges(
-					[]*net.IPNet{
-						nw1,
-					},
-				),
-				AddExcludedIPRanges(
-					[]*net.IPNet{
-						nw1, nw2,
-					},
-				),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					excludedIPRanges: []*net.IPNet{
-						nw1, nw2,
-					},
-					numberOfIPRangeConstraints:       2,
-					totalNumberOfExcludedConstraints: 2,
-					totalNumberOfConstraints:         2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-permitted-cidrs": func(t *testing.T) test {
 			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
 			assert.FatalError(t, err)
@@ -807,28 +539,6 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-permitted-cidrs": func(t *testing.T) test {
-			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
-			_, nw2, err := net.ParseCIDR("192.168.0.1/24")
-			assert.FatalError(t, err)
-			options := []NamePolicyOption{
-				WithPermittedCIDRs([]string{"127.0.0.1/24"}),
-				AddPermittedCIDRs([]string{"127.0.0.1/24", "192.168.0.1/24"}),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedIPRanges: []*net.IPNet{
-						nw1, nw2,
-					},
-					numberOfIPRangeConstraints:        2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-excluded-cidrs": func(t *testing.T) test {
 			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
 			assert.FatalError(t, err)
@@ -836,28 +546,6 @@ func TestNew(t *testing.T) {
 			assert.FatalError(t, err)
 			options := []NamePolicyOption{
 				WithExcludedCIDRs([]string{"127.0.0.1/24", "192.168.0.1/24"}),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					excludedIPRanges: []*net.IPNet{
-						nw1, nw2,
-					},
-					numberOfIPRangeConstraints:       2,
-					totalNumberOfExcludedConstraints: 2,
-					totalNumberOfConstraints:         2,
-				},
-				wantErr: false,
-			}
-		},
-		"ok/add-excluded-cidrs": func(t *testing.T) test {
-			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
-			_, nw2, err := net.ParseCIDR("192.168.0.1/24")
-			assert.FatalError(t, err)
-			options := []NamePolicyOption{
-				WithExcludedCIDRs([]string{"127.0.0.1/24"}),
-				AddExcludedCIDRs([]string{"127.0.0.1/24", "192.168.0.1/24"}),
 			}
 			return test{
 				options: options,
@@ -933,28 +621,6 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-permitted-cidr": func(t *testing.T) test {
-			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
-			_, nw2, err := net.ParseCIDR("192.168.0.1/24")
-			assert.FatalError(t, err)
-			options := []NamePolicyOption{
-				WithPermittedCIDR("127.0.0.1/24"),
-				AddPermittedCIDR("192.168.0.1/24"),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedIPRanges: []*net.IPNet{
-						nw1, nw2,
-					},
-					numberOfIPRangeConstraints:        2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-excluded-cidr": func(t *testing.T) test {
 			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
 			assert.FatalError(t, err)
@@ -970,28 +636,6 @@ func TestNew(t *testing.T) {
 					numberOfIPRangeConstraints:       1,
 					totalNumberOfExcludedConstraints: 1,
 					totalNumberOfConstraints:         1,
-				},
-				wantErr: false,
-			}
-		},
-		"ok/add-excluded-cidr": func(t *testing.T) test {
-			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
-			_, nw2, err := net.ParseCIDR("192.168.0.1/24")
-			assert.FatalError(t, err)
-			options := []NamePolicyOption{
-				WithExcludedCIDR("127.0.0.1/24"),
-				AddExcludedCIDR("192.168.0.1/24"),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					excludedIPRanges: []*net.IPNet{
-						nw1, nw2,
-					},
-					numberOfIPRangeConstraints:       2,
-					totalNumberOfExcludedConstraints: 2,
-					totalNumberOfConstraints:         2,
 				},
 				wantErr: false,
 			}
@@ -1015,28 +659,6 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-permitted-ipv4": func(t *testing.T) test {
-			ip1, nw1, err := net.ParseCIDR("127.0.0.45/32")
-			assert.FatalError(t, err)
-			ip2, nw2, err := net.ParseCIDR("192.168.0.55/32")
-			assert.FatalError(t, err)
-			options := []NamePolicyOption{
-				WithPermittedIP(ip1),
-				AddPermittedIP(ip2),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedIPRanges: []*net.IPNet{
-						nw1, nw2,
-					},
-					numberOfIPRangeConstraints:        2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-excluded-ipv4": func(t *testing.T) test {
 			ip1, nw1, err := net.ParseCIDR("127.0.0.15/32")
 			assert.FatalError(t, err)
@@ -1052,28 +674,6 @@ func TestNew(t *testing.T) {
 					numberOfIPRangeConstraints:       1,
 					totalNumberOfExcludedConstraints: 1,
 					totalNumberOfConstraints:         1,
-				},
-				wantErr: false,
-			}
-		},
-		"ok/add-excluded-ipv4": func(t *testing.T) test {
-			ip1, nw1, err := net.ParseCIDR("127.0.0.45/32")
-			assert.FatalError(t, err)
-			ip2, nw2, err := net.ParseCIDR("192.168.0.55/32")
-			assert.FatalError(t, err)
-			options := []NamePolicyOption{
-				WithExcludedIP(ip1),
-				AddExcludedIP(ip2),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					excludedIPRanges: []*net.IPNet{
-						nw1, nw2,
-					},
-					numberOfIPRangeConstraints:       2,
-					totalNumberOfExcludedConstraints: 2,
-					totalNumberOfConstraints:         2,
 				},
 				wantErr: false,
 			}
@@ -1097,28 +697,6 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-permitted-ipv6": func(t *testing.T) test {
-			ip1, nw1, err := net.ParseCIDR("127.0.0.10/32")
-			assert.FatalError(t, err)
-			ip2, nw2, err := net.ParseCIDR("2001:0db8:85a3:0000:0000:8a2e:0370:7334/128")
-			assert.FatalError(t, err)
-			options := []NamePolicyOption{
-				WithPermittedIP(ip1),
-				AddPermittedIP(ip2),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedIPRanges: []*net.IPNet{
-						nw1, nw2,
-					},
-					numberOfIPRangeConstraints:        2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-excluded-ipv6": func(t *testing.T) test {
 			ip1, nw1, err := net.ParseCIDR("2001:0db8:85a3:0000:0000:8a2e:0370:7334/128")
 			assert.FatalError(t, err)
@@ -1138,47 +716,9 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-excluded-ipv6": func(t *testing.T) test {
-			ip1, nw1, err := net.ParseCIDR("127.0.0.10/32")
-			assert.FatalError(t, err)
-			ip2, nw2, err := net.ParseCIDR("2001:0db8:85a3:0000:0000:8a2e:0370:7334/128")
-			assert.FatalError(t, err)
-			options := []NamePolicyOption{
-				WithExcludedIP(ip1),
-				AddExcludedIP(ip2),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					excludedIPRanges: []*net.IPNet{
-						nw1, nw2,
-					},
-					numberOfIPRangeConstraints:       2,
-					totalNumberOfExcludedConstraints: 2,
-					totalNumberOfConstraints:         2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-permitted-emails": func(t *testing.T) test {
 			options := []NamePolicyOption{
 				WithPermittedEmailAddresses([]string{"mail@local", "@example.com"}),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedEmailAddresses:           []string{"mail@local", "example.com"},
-					numberOfEmailAddressConstraints:   2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
-				},
-				wantErr: false,
-			}
-		},
-		"ok/add-permitted-emails": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithPermittedEmailAddresses([]string{"mail@local"}),
-				AddPermittedEmailAddresses([]string{"@example.com", "mail@local"}),
 			}
 			return test{
 				options: options,
@@ -1206,22 +746,6 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-excluded-emails": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithExcludedEmailAddresses([]string{"mail@local"}),
-				AddExcludedEmailAddresses([]string{"@example.com", "mail@local"}),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					excludedEmailAddresses:           []string{"mail@local", "example.com"},
-					numberOfEmailAddressConstraints:  2,
-					totalNumberOfExcludedConstraints: 2,
-					totalNumberOfConstraints:         2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-permitted-email": func(t *testing.T) test {
 			options := []NamePolicyOption{
 				WithPermittedEmailAddress("mail@local"),
@@ -1233,22 +757,6 @@ func TestNew(t *testing.T) {
 					numberOfEmailAddressConstraints:   1,
 					totalNumberOfPermittedConstraints: 1,
 					totalNumberOfConstraints:          1,
-				},
-				wantErr: false,
-			}
-		},
-		"ok/add-permitted-email": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithPermittedEmailAddress("mail@local"),
-				AddPermittedEmailAddress("@example.com"),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedEmailAddresses:           []string{"mail@local", "example.com"},
-					numberOfEmailAddressConstraints:   2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
 				},
 				wantErr: false,
 			}
@@ -1268,22 +776,6 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-excluded-email": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithExcludedEmailAddress("mail@local"),
-				AddExcludedEmailAddress("@example.com"),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					excludedEmailAddresses:           []string{"mail@local", "example.com"},
-					numberOfEmailAddressConstraints:  2,
-					totalNumberOfExcludedConstraints: 2,
-					totalNumberOfConstraints:         2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-permitted-uris": func(t *testing.T) test {
 			options := []NamePolicyOption{
 				WithPermittedURIDomains([]string{"host.local", "*.example.com"}),
@@ -1299,41 +791,9 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-permitted-uris": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithPermittedURIDomains([]string{"host.local"}),
-				AddPermittedURIDomains([]string{"*.example.com", "host.local"}),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedURIDomains:               []string{"host.local", ".example.com"},
-					numberOfURIDomainConstraints:      2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-excluded-uris": func(t *testing.T) test {
 			options := []NamePolicyOption{
 				WithExcludedURIDomains([]string{"host.local", "*.example.com"}),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					excludedURIDomains:               []string{"host.local", ".example.com"},
-					numberOfURIDomainConstraints:     2,
-					totalNumberOfExcludedConstraints: 2,
-					totalNumberOfConstraints:         2,
-				},
-				wantErr: false,
-			}
-		},
-		"ok/add-excluded-uris": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithExcludedURIDomains([]string{"host.local"}),
-				AddExcludedURIDomains([]string{"*.example.com", "host.local"}),
 			}
 			return test{
 				options: options,
@@ -1376,22 +836,6 @@ func TestNew(t *testing.T) {
 				wantErr: false,
 			}
 		},
-		"ok/add-permitted-uri": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithPermittedURIDomain("host.local"),
-				AddPermittedURIDomain("*.example.com"),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					permittedURIDomains:               []string{"host.local", ".example.com"},
-					numberOfURIDomainConstraints:      2,
-					totalNumberOfPermittedConstraints: 2,
-					totalNumberOfConstraints:          2,
-				},
-				wantErr: false,
-			}
-		},
 		"ok/with-excluded-uri": func(t *testing.T) test {
 			options := []NamePolicyOption{
 				WithExcludedURIDomain("host.local"),
@@ -1403,22 +847,6 @@ func TestNew(t *testing.T) {
 					numberOfURIDomainConstraints:     1,
 					totalNumberOfExcludedConstraints: 1,
 					totalNumberOfConstraints:         1,
-				},
-				wantErr: false,
-			}
-		},
-		"ok/add-excluded-uri": func(t *testing.T) test {
-			options := []NamePolicyOption{
-				WithExcludedURIDomain("host.local"),
-				AddExcludedURIDomain("*.example.com"),
-			}
-			return test{
-				options: options,
-				want: &NamePolicyEngine{
-					excludedURIDomains:               []string{"host.local", ".example.com"},
-					numberOfURIDomainConstraints:     2,
-					totalNumberOfExcludedConstraints: 2,
-					totalNumberOfConstraints:         2,
 				},
 				wantErr: false,
 			}
