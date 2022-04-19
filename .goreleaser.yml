@@ -29,6 +29,7 @@ builds:
     binary: bin/step-ca
     ldflags:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
+    goamd64: v1
   -
     id: step-cloudkms-init
     env:
@@ -50,6 +51,7 @@ builds:
     binary: bin/step-cloudkms-init
     ldflags:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
+    goamd64: v1
   -
     id: step-awskms-init
     env:
@@ -71,6 +73,7 @@ builds:
     binary: bin/step-awskms-init
     ldflags:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
+    goamd64: v1
 
 archives:
   -
@@ -231,41 +234,4 @@ scoop:
   # Default is empty.
   license: "Apache-2.0"
 
-  #dockers:
-  #  - dockerfile: docker/Dockerfile
-  #    goos: linux
-  #    goarch: amd64
-  #    use_buildx: true
-  #    image_templates:
-  #    - "smallstep/step-cli:latest"
-  #    - "smallstep/step-cli:{{ .Tag }}"
-  #    build_flag_templates:
-  #    - "--platform=linux/amd64"
-  #  - dockerfile: docker/Dockerfile
-  #    goos: linux
-  #    goarch: 386
-  #    use_buildx: true
-  #    image_templates:
-  #    - "smallstep/step-cli:latest"
-  #    - "smallstep/step-cli:{{ .Tag }}"
-  #    build_flag_templates:
-  #    - "--platform=linux/386"
-  #  - dockerfile: docker/Dockerfile
-  #    goos: linux
-  #    goarch: arm
-  #    goarm: 7
-  #    use_buildx: true
-  #    image_templates:
-  #    - "smallstep/step-cli:latest"
-  #    - "smallstep/step-cli:{{ .Tag }}"
-  #    build_flag_templates:
-  #    - "--platform=linux/arm/v7"
-  #  - dockerfile: docker/Dockerfile
-  #    goos: linux
-  #    goarch: arm64
-  #    use_buildx: true
-  #    image_templates:
-  #    - "smallstep/step-cli:latest"
-  #    - "smallstep/step-cli:{{ .Tag }}"
-  #    build_flag_templates:
-  #    - "--platform=linux/arm64/v8"
+  goamd64: v1
