@@ -91,6 +91,13 @@ func (c *AdminClient) generateAdminToken(aud *url.URL) (string, error) {
 		return "", err
 	}
 
+	// Drop any query string parameter from the token audience
+	aud = &url.URL{
+		Scheme: aud.Scheme,
+		Host:   aud.Host,
+		Path:   aud.Path,
+	}
+
 	now := time.Now()
 	tokOptions := []token.Options{
 		token.WithJWTID(jwtID),

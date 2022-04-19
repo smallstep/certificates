@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Added support for certificate renewals after expiry using the claim `allowRenewalAfterExpiry`.
 - Added support for `extraNames` in X.509 templates.
+- Added RA support using a Vault instance as the CA.
 - Added support for automatic configuration of linked RAs.
 ### Changed
 - Made SCEP CA URL paths dynamic
