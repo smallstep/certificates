@@ -3,6 +3,7 @@ package apiv1
 import (
 	"crypto"
 	"crypto/x509"
+	"encoding/json"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/kms"
@@ -15,8 +16,9 @@ type Options struct {
 	Type string `json:"type"`
 
 	// CertificateAuthority reference:
-	// In StepCAS the value is the CA url, e.g. "https://ca.smallstep.com:9000".
+	// In StepCAS the value is the CA url, e.g., "https://ca.smallstep.com:9000".
 	// In CloudCAS the format is "projects/*/locations/*/certificateAuthorities/*".
+	// In VaultCAS the value is the url, e.g., "https://vault.smallstep.com".
 	CertificateAuthority string `json:"certificateAuthority,omitempty"`
 
 	// CertificateAuthorityFingerprint is the root fingerprint used to
@@ -69,6 +71,9 @@ type Options struct {
 	CaPool     string `json:"-"`
 	CaPoolTier string `json:"-"`
 	GCSBucket  string `json:"-"`
+
+	// Generic structure to configure any CAS
+	Config json.RawMessage `json:"config,omitempty"`
 }
 
 // CertificateIssuer contains the properties used to use the StepCAS certificate

@@ -591,7 +591,7 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	}
 
 	// Create initial certificate request.
-	cr, err := x509util.CreateCertificateRequest("Step Online CA", sans, signer)
+	cr, err := x509util.CreateCertificateRequest(a.config.CommonName, sans, signer)
 	if err != nil {
 		return fatal(err)
 	}
