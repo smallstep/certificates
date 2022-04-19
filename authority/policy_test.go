@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"go.step.sm/linkedca"
 
@@ -190,15 +191,43 @@ func TestAuthority_checkPolicy(t *testing.T) {
 }
 
 func Test_policyToCertificates(t *testing.T) {
+	trueValue := true
+	falseValue := false
 	tests := []struct {
 		name   string
 		policy *linkedca.Policy
 		want   *authPolicy.Options
 	}{
 		{
-			name:   "no-policy",
+			name:   "nil",
 			policy: nil,
 			want:   nil,
+		},
+		{
+			name:   "no-policy",
+			policy: &linkedca.Policy{},
+			want:   nil,
+		},
+		{
+			name: "partial-policy",
+			policy: &linkedca.Policy{
+				X509: &linkedca.X509Policy{
+					Allow: &linkedca.X509Names{
+						Dns: []string{"*.local"},
+					},
+					AllowWildcardLiteral:    &wrapperspb.BoolValue{Value: false},
+					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
+				},
+			},
+			want: &authPolicy.Options{
+				X509: &authPolicy.X509PolicyOptions{
+					AllowedNames: &authPolicy.X509NameOptions{
+						DNSDomains: []string{"*.local"},
+					},
+					AllowWildcardLiteral:    &falseValue,
+					VerifySubjectCommonName: &trueValue,
+				},
+			},
 		},
 		{
 			name: "full-policy",
@@ -216,6 +245,8 @@ func Test_policyToCertificates(t *testing.T) {
 						Emails: []string{"badhost.example.com"},
 						Uris:   []string{"https://badhost.local"},
 					},
+					AllowWildcardLiteral:    &wrapperspb.BoolValue{Value: true},
+					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
 				},
 				Ssh: &linkedca.SSHPolicy{
 					Host: &linkedca.SSHHostPolicy{
@@ -256,6 +287,8 @@ func Test_policyToCertificates(t *testing.T) {
 						EmailAddresses: []string{"badhost.example.com"},
 						URIDomains:     []string{"https://badhost.local"},
 					},
+					AllowWildcardLiteral:    &trueValue,
+					VerifySubjectCommonName: &trueValue,
 				},
 				SSH: &authPolicy.SSHPolicyOptions{
 					Host: &authPolicy.SSHHostCertificateOptions{

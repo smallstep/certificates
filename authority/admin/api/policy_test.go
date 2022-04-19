@@ -286,6 +286,7 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 					Allow: &linkedca.X509Names{
 						Dns: []string{"*.local"},
 					},
+					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
 				},
 			}
 			body, err := protojson.Marshal(policy)
@@ -971,6 +972,7 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 					Allow: &linkedca.X509Names{
 						Dns: []string{"*.local"},
 					},
+					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
 				},
 			}
 			body, err := protojson.Marshal(policy)

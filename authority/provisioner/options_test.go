@@ -287,3 +287,91 @@ func Test_unsafeParseSigned(t *testing.T) {
 		})
 	}
 }
+
+func TestX509Options_IsWildcardLiteralAllowed(t *testing.T) {
+	trueValue := true
+	falseValue := false
+	tests := []struct {
+		name    string
+		options *X509Options
+		want    bool
+	}{
+		{
+			name:    "nil-options",
+			options: nil,
+			want:    true,
+		},
+		{
+			name: "nil",
+			options: &X509Options{
+				AllowWildcardLiteral: nil,
+			},
+			want: false,
+		},
+		{
+			name: "set-true",
+			options: &X509Options{
+				AllowWildcardLiteral: &trueValue,
+			},
+			want: true,
+		},
+		{
+			name: "set-false",
+			options: &X509Options{
+				AllowWildcardLiteral: &falseValue,
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.options.IsWildcardLiteralAllowed(); got != tt.want {
+				t.Errorf("X509PolicyOptions.IsWildcardLiteralAllowed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestX509Options_ShouldVerifySubjectCommonName(t *testing.T) {
+	trueValue := true
+	falseValue := false
+	tests := []struct {
+		name    string
+		options *X509Options
+		want    bool
+	}{
+		{
+			name:    "nil-options",
+			options: nil,
+			want:    false,
+		},
+		{
+			name: "nil",
+			options: &X509Options{
+				VerifySubjectCommonName: nil,
+			},
+			want: true,
+		},
+		{
+			name: "set-true",
+			options: &X509Options{
+				VerifySubjectCommonName: &trueValue,
+			},
+			want: true,
+		},
+		{
+			name: "set-false",
+			options: &X509Options{
+				VerifySubjectCommonName: &falseValue,
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.options.ShouldVerifySubjectCommonName(); got != tt.want {
+				t.Errorf("X509PolicyOptions.ShouldVerifySubjectCommonName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

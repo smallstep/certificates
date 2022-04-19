@@ -243,97 +243,108 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 		return nil
 	}
 
-	// prepare full policy struct
-	opts := &authPolicy.Options{
-		X509: &authPolicy.X509PolicyOptions{
-			AllowedNames: &authPolicy.X509NameOptions{},
-			DeniedNames:  &authPolicy.X509NameOptions{},
-		},
-		SSH: &authPolicy.SSHPolicyOptions{
-			Host: &authPolicy.SSHHostCertificateOptions{
-				AllowedNames: &authPolicy.SSHNameOptions{},
-				DeniedNames:  &authPolicy.SSHNameOptions{},
-			},
-			User: &authPolicy.SSHUserCertificateOptions{
-				AllowedNames: &authPolicy.SSHNameOptions{},
-				DeniedNames:  &authPolicy.SSHNameOptions{},
-			},
-		},
+	// return early if x509 nor SSH is set
+	if p.GetX509() == nil && p.GetSsh() == nil {
+		return nil
 	}
 
+	opts := &authPolicy.Options{}
+
 	// fill x509 policy configuration
-	if p.X509 != nil {
-		if p.X509.Allow != nil {
-			if p.X509.Allow.Dns != nil {
-				opts.X509.AllowedNames.DNSDomains = p.X509.Allow.Dns
+	if p.GetX509() != nil {
+		opts.X509 = &authPolicy.X509PolicyOptions{}
+		if p.GetX509().GetAllow() != nil {
+			opts.X509.AllowedNames = &authPolicy.X509NameOptions{}
+			allow := p.GetX509().GetAllow()
+			if allow.Dns != nil {
+				opts.X509.AllowedNames.DNSDomains = allow.Dns
 			}
-			if p.X509.Allow.Ips != nil {
-				opts.X509.AllowedNames.IPRanges = p.X509.Allow.Ips
+			if allow.Ips != nil {
+				opts.X509.AllowedNames.IPRanges = allow.Ips
 			}
-			if p.X509.Allow.Emails != nil {
-				opts.X509.AllowedNames.EmailAddresses = p.X509.Allow.Emails
+			if allow.Emails != nil {
+				opts.X509.AllowedNames.EmailAddresses = allow.Emails
 			}
-			if p.X509.Allow.Uris != nil {
-				opts.X509.AllowedNames.URIDomains = p.X509.Allow.Uris
+			if allow.Uris != nil {
+				opts.X509.AllowedNames.URIDomains = allow.Uris
 			}
 		}
-		if p.X509.Deny != nil {
-			if p.X509.Deny.Dns != nil {
-				opts.X509.DeniedNames.DNSDomains = p.X509.Deny.Dns
+		if p.GetX509().GetDeny() != nil {
+			opts.X509.DeniedNames = &authPolicy.X509NameOptions{}
+			deny := p.GetX509().GetDeny()
+			if deny.Dns != nil {
+				opts.X509.DeniedNames.DNSDomains = deny.Dns
 			}
-			if p.X509.Deny.Ips != nil {
-				opts.X509.DeniedNames.IPRanges = p.X509.Deny.Ips
+			if deny.Ips != nil {
+				opts.X509.DeniedNames.IPRanges = deny.Ips
 			}
-			if p.X509.Deny.Emails != nil {
-				opts.X509.DeniedNames.EmailAddresses = p.X509.Deny.Emails
+			if deny.Emails != nil {
+				opts.X509.DeniedNames.EmailAddresses = deny.Emails
 			}
-			if p.X509.Deny.Uris != nil {
-				opts.X509.DeniedNames.URIDomains = p.X509.Deny.Uris
+			if deny.Uris != nil {
+				opts.X509.DeniedNames.URIDomains = deny.Uris
 			}
+		}
+		if p.GetX509().GetAllowWildcardLiteral() != nil {
+			opts.X509.AllowWildcardLiteral = &p.GetX509().GetAllowWildcardLiteral().Value
+		}
+		if p.GetX509().GetVerifySubjectCommonName() != nil {
+			opts.X509.VerifySubjectCommonName = &p.GetX509().VerifySubjectCommonName.Value
 		}
 	}
 
 	// fill ssh policy configuration
-	if p.Ssh != nil {
-		if p.Ssh.Host != nil {
-			if p.Ssh.Host.Allow != nil {
-				if p.Ssh.Host.Allow.Dns != nil {
-					opts.SSH.Host.AllowedNames.DNSDomains = p.Ssh.Host.Allow.Dns
+	if p.GetSsh() != nil {
+		opts.SSH = &authPolicy.SSHPolicyOptions{}
+		if p.GetSsh().GetHost() != nil {
+			opts.SSH.Host = &authPolicy.SSHHostCertificateOptions{}
+			if p.GetSsh().GetHost().GetAllow() != nil {
+				opts.SSH.Host.AllowedNames = &authPolicy.SSHNameOptions{}
+				allow := p.GetSsh().GetHost().GetAllow()
+				if allow.Dns != nil {
+					opts.SSH.Host.AllowedNames.DNSDomains = allow.Dns
 				}
-				if p.Ssh.Host.Allow.Ips != nil {
-					opts.SSH.Host.AllowedNames.IPRanges = p.Ssh.Host.Allow.Ips
+				if allow.Ips != nil {
+					opts.SSH.Host.AllowedNames.IPRanges = allow.Ips
 				}
-				if p.Ssh.Host.Allow.Principals != nil {
-					opts.SSH.Host.AllowedNames.Principals = p.Ssh.Host.Allow.Principals
+				if allow.Principals != nil {
+					opts.SSH.Host.AllowedNames.Principals = allow.Principals
 				}
 			}
-			if p.Ssh.Host.Deny != nil {
-				if p.Ssh.Host.Deny.Dns != nil {
-					opts.SSH.Host.DeniedNames.DNSDomains = p.Ssh.Host.Deny.Dns
+			if p.GetSsh().GetHost().GetDeny() != nil {
+				opts.SSH.Host.DeniedNames = &authPolicy.SSHNameOptions{}
+				deny := p.GetSsh().GetHost().GetDeny()
+				if deny.Dns != nil {
+					opts.SSH.Host.DeniedNames.DNSDomains = deny.Dns
 				}
-				if p.Ssh.Host.Deny.Ips != nil {
-					opts.SSH.Host.DeniedNames.IPRanges = p.Ssh.Host.Deny.Ips
+				if deny.Ips != nil {
+					opts.SSH.Host.DeniedNames.IPRanges = deny.Ips
 				}
-				if p.Ssh.Host.Deny.Principals != nil {
-					opts.SSH.Host.DeniedNames.Principals = p.Ssh.Host.Deny.Principals
+				if deny.Principals != nil {
+					opts.SSH.Host.DeniedNames.Principals = deny.Principals
 				}
 			}
 		}
-		if p.Ssh.User != nil {
-			if p.Ssh.User.Allow != nil {
-				if p.Ssh.User.Allow.Emails != nil {
-					opts.SSH.User.AllowedNames.EmailAddresses = p.Ssh.User.Allow.Emails
+		if p.GetSsh().GetUser() != nil {
+			opts.SSH.User = &authPolicy.SSHUserCertificateOptions{}
+			if p.GetSsh().GetUser().GetAllow() != nil {
+				opts.SSH.User.AllowedNames = &authPolicy.SSHNameOptions{}
+				allow := p.GetSsh().GetUser().GetAllow()
+				if allow.Emails != nil {
+					opts.SSH.User.AllowedNames.EmailAddresses = allow.Emails
 				}
-				if p.Ssh.User.Allow.Principals != nil {
-					opts.SSH.User.AllowedNames.Principals = p.Ssh.User.Allow.Principals
+				if allow.Principals != nil {
+					opts.SSH.User.AllowedNames.Principals = allow.Principals
 				}
 			}
-			if p.Ssh.User.Deny != nil {
-				if p.Ssh.User.Deny.Emails != nil {
-					opts.SSH.User.DeniedNames.EmailAddresses = p.Ssh.User.Deny.Emails
+			if p.GetSsh().GetUser().GetDeny() != nil {
+				opts.SSH.User.DeniedNames = &authPolicy.SSHNameOptions{}
+				deny := p.GetSsh().GetUser().GetDeny()
+				if deny.Emails != nil {
+					opts.SSH.User.DeniedNames.EmailAddresses = deny.Emails
 				}
-				if p.Ssh.User.Deny.Principals != nil {
-					opts.SSH.User.DeniedNames.Principals = p.Ssh.User.Deny.Principals
+				if deny.Principals != nil {
+					opts.SSH.User.DeniedNames.Principals = deny.Principals
 				}
 			}
 		}

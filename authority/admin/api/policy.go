@@ -390,7 +390,7 @@ func applyConditionalDefaults(p *linkedca.Policy) {
 	if p.GetX509() == nil {
 		return
 	}
-	if p.GetX509().VerifySubjectCommonName == nil {
+	if p.GetX509().GetVerifySubjectCommonName() == nil {
 		p.X509.VerifySubjectCommonName = &wrapperspb.BoolValue{Value: true}
 	}
 }
