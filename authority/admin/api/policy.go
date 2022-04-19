@@ -2,9 +2,11 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"go.step.sm/linkedca"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api/read"
@@ -84,6 +86,10 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 		render.Error(w, err)
 		return
 	}
+
+	fmt.Println("before: ", newPolicy)
+	applyDefaults(newPolicy)
+	fmt.Println("after: ", newPolicy)
 
 	adm := linkedca.AdminFromContext(ctx)
 
@@ -201,6 +207,8 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 		render.Error(w, err)
 		return
 	}
+
+	applyDefaults(newPolicy)
 
 	prov.Policy = newPolicy
 
@@ -365,4 +373,14 @@ func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, 
 	}
 
 	render.JSONStatus(w, DeleteResponse{Status: "ok"}, http.StatusOK)
+}
+
+func applyDefaults(p *linkedca.Policy) {
+	if p.GetX509() == nil {
+		return
+	}
+	if p.GetX509().VerifySubjectCommonName == nil {
+		p.X509.VerifySubjectCommonName = &wrapperspb.BoolValue{Value: true}
+	}
+	return
 }

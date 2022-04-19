@@ -50,8 +50,13 @@ func NewX509PolicyEngine(policyOptions X509PolicyOptionsInterface) (X509Policy, 
 		return nil, nil
 	}
 
-	// enable x509 Subject Common Name validation by default
-	options = append(options, policy.WithSubjectCommonNameVerification())
+	if policyOptions.ShouldVerifySubjectCommonName() {
+		options = append(options, policy.WithSubjectCommonNameVerification())
+	}
+
+	if policyOptions.IsWildcardLiteralAllowed() {
+		options = append(options, policy.WithAllowLiteralWildcardNames())
+	}
 
 	return policy.New(options...)
 }

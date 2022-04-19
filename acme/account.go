@@ -81,6 +81,20 @@ func (p *Policy) GetDeniedNameOptions() *policy.X509NameOptions {
 	}
 }
 
+// IsWildcardLiteralAllowed returns true by default for
+// ACME account policies, as authorization is performed on DNS
+// level.
+func (p *Policy) IsWildcardLiteralAllowed() bool {
+	return true
+}
+
+// ShouldVerifySubjectCommonName returns true by default
+// for ACME account policies, as this is embedded in the
+// protocol.
+func (p *Policy) ShouldVerifySubjectCommonName() bool {
+	return true
+}
+
 // ExternalAccountKey is an ACME External Account Binding key.
 type ExternalAccountKey struct {
 	ID            string    `json:"id"`

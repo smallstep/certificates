@@ -20,6 +20,7 @@ require (
 	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-piv/piv-go v1.7.0
 	github.com/golang/mock v1.6.0
+	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.7
 	github.com/google/uuid v1.3.0
 	github.com/googleapis/gax-go/v2 v2.1.1
@@ -52,4 +53,4 @@ require (
 // replace github.com/smallstep/nosql => ../nosql
 // replace go.step.sm/crypto => ../crypto
 // replace go.step.sm/cli-utils => ../cli-utils
-// replace go.step.sm/linkedca => ../linkedca
+replace go.step.sm/linkedca => ../linkedca

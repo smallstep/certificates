@@ -30,6 +30,8 @@ func (o *Options) GetSSHOptions() *SSHPolicyOptions {
 type X509PolicyOptionsInterface interface {
 	GetAllowedNameOptions() *X509NameOptions
 	GetDeniedNameOptions() *X509NameOptions
+	IsWildcardLiteralAllowed() bool
+	ShouldVerifySubjectCommonName() bool
 }
 
 // X509PolicyOptions is a container for x509 allowed and denied
@@ -39,6 +41,13 @@ type X509PolicyOptions struct {
 	AllowedNames *X509NameOptions `json:"allow,omitempty"`
 	// DeniedNames contains the x509 denied names
 	DeniedNames *X509NameOptions `json:"deny,omitempty"`
+	// AllowWildcardLiteral indicates if literal wildcard names
+	// such as *.example.com and @example.com are allowed. Defaults
+	// to false.
+	AllowWildcardLiteral *bool `json:"allow_wildcard_literal,omitempty"`
+	// VerifySubjectCommonName indicates if the Subject Common Name
+	// is verified in addition to the SANs. Defaults to true.
+	VerifySubjectCommonName *bool `json:"verify_subject_common_name,omitempty"`
 }
 
 // X509NameOptions models the X509 name policy configuration.
@@ -56,6 +65,43 @@ func (o *X509NameOptions) HasNames() bool {
 		len(o.IPRanges) > 0 ||
 		len(o.EmailAddresses) > 0 ||
 		len(o.URIDomains) > 0
+}
+
+// GetDeniedNameOptions returns the x509 denied name policy configuration
+func (o *X509PolicyOptions) GetDeniedNameOptions() *X509NameOptions {
+	if o == nil {
+		return nil
+	}
+	return o.DeniedNames
+}
+
+// GetAllowedUserNameOptions returns the SSH allowed user name policy
+// configuration.
+func (o *SSHPolicyOptions) GetAllowedUserNameOptions() *SSHNameOptions {
+	if o == nil {
+		return nil
+	}
+	if o.User == nil {
+		return nil
+	}
+	return o.User.AllowedNames
+}
+
+func (o *X509PolicyOptions) IsWildcardLiteralAllowed() bool {
+	if o == nil {
+		return true
+	}
+	return o.AllowWildcardLiteral != nil && *o.AllowWildcardLiteral
+}
+
+func (o *X509PolicyOptions) ShouldVerifySubjectCommonName() bool {
+	if o == nil {
+		return false
+	}
+	if o.VerifySubjectCommonName == nil {
+		return true
+	}
+	return *o.VerifySubjectCommonName
 }
 
 // SSHPolicyOptionsInterface is an interface for providers of
@@ -82,26 +128,6 @@ func (o *X509PolicyOptions) GetAllowedNameOptions() *X509NameOptions {
 		return nil
 	}
 	return o.AllowedNames
-}
-
-// GetDeniedNameOptions returns the x509 denied name policy configuration
-func (o *X509PolicyOptions) GetDeniedNameOptions() *X509NameOptions {
-	if o == nil {
-		return nil
-	}
-	return o.DeniedNames
-}
-
-// GetAllowedUserNameOptions returns the SSH allowed user name policy
-// configuration.
-func (o *SSHPolicyOptions) GetAllowedUserNameOptions() *SSHNameOptions {
-	if o == nil {
-		return nil
-	}
-	if o.User == nil {
-		return nil
-	}
-	return o.User.AllowedNames
 }
 
 // GetDeniedUserNameOptions returns the SSH denied user name policy
