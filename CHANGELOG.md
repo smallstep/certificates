@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added support for Azure `Managed Identity` tokens.
 - Added support for automatic configuration of linked RAs.
 - Added support for the `--context` flag. It's now possible to start the 
-  CA with `step --context=abc` to use the configuration from context `abc`.
+  CA with `step-ca --context=abc` to use the configuration from context `abc`.
   When a context has been configured and no configuration file is provided
   on startup, the configuration for the current context is used.
 - Added startup info logging and option to skip it (`--quiet`).
