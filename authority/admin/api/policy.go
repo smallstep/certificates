@@ -88,6 +88,8 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 
 	applyConditionalDefaults(newPolicy)
 
+	newPolicy.Deduplicate()
+
 	adm := linkedca.AdminFromContext(ctx)
 
 	var createdPolicy *linkedca.Policy
@@ -128,6 +130,8 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 		render.Error(w, err)
 		return
 	}
+
+	newPolicy.Deduplicate()
 
 	adm := linkedca.AdminFromContext(ctx)
 
@@ -207,6 +211,8 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 
 	applyConditionalDefaults(newPolicy)
 
+	newPolicy.Deduplicate()
+
 	prov.Policy = newPolicy
 
 	if err := par.auth.UpdateProvisioner(ctx, prov); err != nil {
@@ -240,6 +246,8 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 		render.Error(w, err)
 		return
 	}
+
+	newPolicy.Deduplicate()
 
 	prov.Policy = newPolicy
 	if err := par.auth.UpdateProvisioner(ctx, prov); err != nil {
@@ -311,6 +319,8 @@ func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, 
 		return
 	}
 
+	newPolicy.Deduplicate()
+
 	eak.Policy = newPolicy
 
 	acmeEAK := linkedEAKToCertificates(eak)
@@ -338,6 +348,8 @@ func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, 
 		render.Error(w, err)
 		return
 	}
+
+	newPolicy.Deduplicate()
 
 	eak.Policy = newPolicy
 	acmeEAK := linkedEAKToCertificates(eak)
