@@ -11,7 +11,9 @@ import (
 
 	"go.step.sm/linkedca"
 
-	authPolicy "github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/policy"
 )
 
 func TestAuthority_checkPolicy(t *testing.T) {
@@ -196,7 +198,7 @@ func Test_policyToCertificates(t *testing.T) {
 	tests := []struct {
 		name   string
 		policy *linkedca.Policy
-		want   *authPolicy.Options
+		want   *policy.Options
 	}{
 		{
 			name:   "nil",
@@ -219,9 +221,9 @@ func Test_policyToCertificates(t *testing.T) {
 					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
 				},
 			},
-			want: &authPolicy.Options{
-				X509: &authPolicy.X509PolicyOptions{
-					AllowedNames: &authPolicy.X509NameOptions{
+			want: &policy.Options{
+				X509: &policy.X509PolicyOptions{
+					AllowedNames: &policy.X509NameOptions{
 						DNSDomains: []string{"*.local"},
 					},
 					AllowWildcardLiteral:    &falseValue,
@@ -273,15 +275,15 @@ func Test_policyToCertificates(t *testing.T) {
 					},
 				},
 			},
-			want: &authPolicy.Options{
-				X509: &authPolicy.X509PolicyOptions{
-					AllowedNames: &authPolicy.X509NameOptions{
+			want: &policy.Options{
+				X509: &policy.X509PolicyOptions{
+					AllowedNames: &policy.X509NameOptions{
 						DNSDomains:     []string{"step"},
 						IPRanges:       []string{"127.0.0.1/24"},
 						EmailAddresses: []string{"*.example.com"},
 						URIDomains:     []string{"https://*.local"},
 					},
-					DeniedNames: &authPolicy.X509NameOptions{
+					DeniedNames: &policy.X509NameOptions{
 						DNSDomains:     []string{"bad"},
 						IPRanges:       []string{"127.0.0.30"},
 						EmailAddresses: []string{"badhost.example.com"},
@@ -290,25 +292,25 @@ func Test_policyToCertificates(t *testing.T) {
 					AllowWildcardLiteral:    &trueValue,
 					VerifySubjectCommonName: &trueValue,
 				},
-				SSH: &authPolicy.SSHPolicyOptions{
-					Host: &authPolicy.SSHHostCertificateOptions{
-						AllowedNames: &authPolicy.SSHNameOptions{
+				SSH: &policy.SSHPolicyOptions{
+					Host: &policy.SSHHostCertificateOptions{
+						AllowedNames: &policy.SSHNameOptions{
 							DNSDomains: []string{"*.localhost"},
 							IPRanges:   []string{"127.0.0.1/24"},
 							Principals: []string{"user"},
 						},
-						DeniedNames: &authPolicy.SSHNameOptions{
+						DeniedNames: &policy.SSHNameOptions{
 							DNSDomains: []string{"badhost.localhost"},
 							IPRanges:   []string{"127.0.0.40"},
 							Principals: []string{"root"},
 						},
 					},
-					User: &authPolicy.SSHUserCertificateOptions{
-						AllowedNames: &authPolicy.SSHNameOptions{
+					User: &policy.SSHUserCertificateOptions{
+						AllowedNames: &policy.SSHNameOptions{
 							EmailAddresses: []string{"@work"},
 							Principals:     []string{"user"},
 						},
-						DeniedNames: &authPolicy.SSHNameOptions{
+						DeniedNames: &policy.SSHNameOptions{
 							EmailAddresses: []string{"root@work"},
 							Principals:     []string{"root"},
 						},
@@ -322,6 +324,553 @@ func Test_policyToCertificates(t *testing.T) {
 			got := policyToCertificates(tt.policy)
 			if !cmp.Equal(tt.want, got) {
 				t.Errorf("policyToCertificates() diff=\n%s", cmp.Diff(tt.want, got))
+			}
+		})
+	}
+}
+
+func TestAuthority_reloadPolicyEngines(t *testing.T) {
+	type exp struct {
+		x509Policy    bool
+		sshUserPolicy bool
+		sshHostPolicy bool
+	}
+	trueValue := true
+	tests := []struct {
+		name     string
+		config   *config.Config
+		adminDB  admin.DB
+		ctx      context.Context
+		expected *exp
+		wantErr  bool
+	}{
+		{
+			name: "fail/standalone-x509-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: false,
+					Policy: &policy.Options{
+						X509: &policy.X509PolicyOptions{
+							AllowedNames: &policy.X509NameOptions{
+								DNSDomains: []string{"**.local"},
+							},
+						},
+					},
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: true,
+		},
+		{
+			name: "fail/standalone-ssh-host-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: false,
+					Policy: &policy.Options{
+						SSH: &policy.SSHPolicyOptions{
+							Host: &policy.SSHHostCertificateOptions{
+								AllowedNames: &policy.SSHNameOptions{
+									DNSDomains: []string{"**.local"},
+								},
+							},
+						},
+					},
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: true,
+		},
+		{
+			name: "fail/standalone-ssh-user-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: false,
+					Policy: &policy.Options{
+						SSH: &policy.SSHPolicyOptions{
+							User: &policy.SSHUserCertificateOptions{
+								AllowedNames: &policy.SSHNameOptions{
+									EmailAddresses: []string{"**example.com"},
+								},
+							},
+						},
+					},
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: true,
+		},
+		{
+			name: "fail/adminDB.GetAuthorityPolicy-error",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: true,
+				},
+			},
+			adminDB: &admin.MockDB{
+				MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+					return nil, errors.New("force")
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: true,
+		},
+		{
+			name: "fail/admin-x509-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: true,
+				},
+			},
+			adminDB: &admin.MockDB{
+				MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+					return &linkedca.Policy{
+						X509: &linkedca.X509Policy{
+							Allow: &linkedca.X509Names{
+								Dns: []string{"**.local"},
+							},
+						},
+					}, nil
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: true,
+		},
+		{
+			name: "fail/admin-ssh-host-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: true,
+				},
+			},
+			adminDB: &admin.MockDB{
+				MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+					return &linkedca.Policy{
+						Ssh: &linkedca.SSHPolicy{
+							Host: &linkedca.SSHHostPolicy{
+								Allow: &linkedca.SSHHostNames{
+									Dns: []string{"**.local"},
+								},
+							},
+						},
+					}, nil
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: true,
+		},
+		{
+			name: "fail/admin-ssh-user-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: true,
+				},
+			},
+			adminDB: &admin.MockDB{
+				MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+					return &linkedca.Policy{
+						Ssh: &linkedca.SSHPolicy{
+							User: &linkedca.SSHUserPolicy{
+								Allow: &linkedca.SSHUserNames{
+									Emails: []string{"@@example.com"},
+								},
+							},
+						},
+					}, nil
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: true,
+		},
+		{
+			name: "ok/linkedca-unsupported",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: true,
+				},
+			},
+			adminDB: &linkedCaClient{},
+			ctx:     context.Background(),
+			wantErr: false,
+		},
+		{
+			name: "ok/standalone-no-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: false,
+					Policy:      nil,
+				},
+			},
+			ctx:      context.Background(),
+			wantErr:  false,
+			expected: nil,
+		},
+		{
+			name: "ok/standalone-x509-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: false,
+					Policy: &policy.Options{
+						X509: &policy.X509PolicyOptions{
+							AllowedNames: &policy.X509NameOptions{
+								DNSDomains: []string{"*.local"},
+							},
+							DeniedNames: &policy.X509NameOptions{
+								DNSDomains: []string{"badhost.local"},
+							},
+							AllowWildcardLiteral:    &trueValue,
+							VerifySubjectCommonName: &trueValue,
+						},
+					},
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			expected: &exp{
+				// expect only the X.509 policy to exist
+				x509Policy:    true,
+				sshHostPolicy: false,
+				sshUserPolicy: false,
+			},
+		},
+		{
+			name: "ok/standalone-ssh-host-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: false,
+					Policy: &policy.Options{
+						SSH: &policy.SSHPolicyOptions{
+							Host: &policy.SSHHostCertificateOptions{
+								AllowedNames: &policy.SSHNameOptions{
+									DNSDomains: []string{"*.local"},
+								},
+								DeniedNames: &policy.SSHNameOptions{
+									DNSDomains: []string{"badhost.local"},
+								},
+							},
+						},
+					},
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			expected: &exp{
+				// expect only the SSH host policy to exist
+				x509Policy:    false,
+				sshHostPolicy: true,
+				sshUserPolicy: false,
+			},
+		},
+		{
+			name: "ok/standalone-ssh-user-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: false,
+					Policy: &policy.Options{
+						SSH: &policy.SSHPolicyOptions{
+							User: &policy.SSHUserCertificateOptions{
+								AllowedNames: &policy.SSHNameOptions{
+									Principals: []string{"*"},
+								},
+								DeniedNames: &policy.SSHNameOptions{
+									Principals: []string{"root"},
+								},
+							},
+						},
+					},
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			expected: &exp{
+				// expect only the SSH user policy to exist
+				x509Policy:    false,
+				sshHostPolicy: false,
+				sshUserPolicy: true,
+			},
+		},
+		{
+			name: "ok/standalone-ssh-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: false,
+					Policy: &policy.Options{
+						SSH: &policy.SSHPolicyOptions{
+							Host: &policy.SSHHostCertificateOptions{
+								AllowedNames: &policy.SSHNameOptions{
+									DNSDomains: []string{"*.local"},
+								},
+								DeniedNames: &policy.SSHNameOptions{
+									DNSDomains: []string{"badhost.local"},
+								},
+							},
+							User: &policy.SSHUserCertificateOptions{
+								AllowedNames: &policy.SSHNameOptions{
+									Principals: []string{"*"},
+								},
+								DeniedNames: &policy.SSHNameOptions{
+									Principals: []string{"root"},
+								},
+							},
+						},
+					},
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			expected: &exp{
+				// expect only the SSH policy engines to exist
+				x509Policy:    false,
+				sshHostPolicy: true,
+				sshUserPolicy: true,
+			},
+		},
+		{
+			name: "ok/standalone-full-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: false,
+					Policy: &policy.Options{
+						X509: &policy.X509PolicyOptions{
+							AllowedNames: &policy.X509NameOptions{
+								DNSDomains: []string{"*.local"},
+							},
+							DeniedNames: &policy.X509NameOptions{
+								DNSDomains: []string{"badhost.local"},
+							},
+							AllowWildcardLiteral:    &trueValue,
+							VerifySubjectCommonName: &trueValue,
+						},
+						SSH: &policy.SSHPolicyOptions{
+							Host: &policy.SSHHostCertificateOptions{
+								AllowedNames: &policy.SSHNameOptions{
+									DNSDomains: []string{"*.local"},
+								},
+								DeniedNames: &policy.SSHNameOptions{
+									DNSDomains: []string{"badhost.local"},
+								},
+							},
+							User: &policy.SSHUserCertificateOptions{
+								AllowedNames: &policy.SSHNameOptions{
+									Principals: []string{"*"},
+								},
+								DeniedNames: &policy.SSHNameOptions{
+									Principals: []string{"root"},
+								},
+							},
+						},
+					},
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			expected: &exp{
+				// expect all three policy engines to exist
+				x509Policy:    true,
+				sshHostPolicy: true,
+				sshUserPolicy: true,
+			},
+		},
+		{
+			name: "ok/admin-x509-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: true,
+				},
+			},
+			adminDB: &admin.MockDB{
+				MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+					return &linkedca.Policy{
+						X509: &linkedca.X509Policy{
+							Allow: &linkedca.X509Names{
+								Dns: []string{"*.local"},
+							},
+						},
+					}, nil
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			expected: &exp{
+				x509Policy:    true,
+				sshHostPolicy: false,
+				sshUserPolicy: false,
+			},
+		},
+		{
+			name: "ok/admin-ssh-host-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: true,
+				},
+			},
+			adminDB: &admin.MockDB{
+				MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+					return &linkedca.Policy{
+						Ssh: &linkedca.SSHPolicy{
+							Host: &linkedca.SSHHostPolicy{
+								Allow: &linkedca.SSHHostNames{
+									Dns: []string{"*.local"},
+								},
+							},
+						},
+					}, nil
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			expected: &exp{
+				x509Policy:    false,
+				sshHostPolicy: true,
+				sshUserPolicy: false,
+			},
+		},
+		{
+			name: "ok/admin-ssh-user-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: true,
+				},
+			},
+			adminDB: &admin.MockDB{
+				MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+					return &linkedca.Policy{
+						Ssh: &linkedca.SSHPolicy{
+							User: &linkedca.SSHUserPolicy{
+								Allow: &linkedca.SSHUserNames{
+									Emails: []string{"@example.com"},
+								},
+							},
+						},
+					}, nil
+				},
+			},
+			ctx:     context.Background(),
+			wantErr: false,
+			expected: &exp{
+				x509Policy:    false,
+				sshHostPolicy: false,
+				sshUserPolicy: true,
+			},
+		},
+		{
+			name: "ok/admin-full-policy",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: true,
+				},
+			},
+			ctx: context.Background(),
+			adminDB: &admin.MockDB{
+				MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+					return &linkedca.Policy{
+						X509: &linkedca.X509Policy{
+							Allow: &linkedca.X509Names{
+								Dns: []string{"*.local"},
+							},
+							Deny: &linkedca.X509Names{
+								Dns: []string{"badhost.local"},
+							},
+							AllowWildcardLiteral:    &wrapperspb.BoolValue{Value: true},
+							VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
+						},
+						Ssh: &linkedca.SSHPolicy{
+							Host: &linkedca.SSHHostPolicy{
+								Allow: &linkedca.SSHHostNames{
+									Dns: []string{"*.local"},
+								},
+							},
+							User: &linkedca.SSHUserPolicy{
+								Allow: &linkedca.SSHUserNames{
+									Emails: []string{"@example.com"},
+								},
+							},
+						},
+					}, nil
+				},
+			},
+			wantErr: false,
+			expected: &exp{
+				// expect all three policy engines to exist
+				x509Policy:    true,
+				sshHostPolicy: true,
+				sshUserPolicy: true,
+			},
+		},
+		{
+			// both DB and JSON config; DB config is taken if Admin API is enabled
+			name: "ok/admin-over-standalone",
+			config: &config.Config{
+				AuthorityConfig: &config.AuthConfig{
+					EnableAdmin: true,
+					Policy: &policy.Options{
+						SSH: &policy.SSHPolicyOptions{
+							Host: &policy.SSHHostCertificateOptions{
+								AllowedNames: &policy.SSHNameOptions{
+									DNSDomains: []string{"*.local"},
+								},
+								DeniedNames: &policy.SSHNameOptions{
+									DNSDomains: []string{"badhost.local"},
+								},
+							},
+							User: &policy.SSHUserCertificateOptions{
+								AllowedNames: &policy.SSHNameOptions{
+									Principals: []string{"*"},
+								},
+								DeniedNames: &policy.SSHNameOptions{
+									Principals: []string{"root"},
+								},
+							},
+						},
+					},
+				},
+			},
+			ctx: context.Background(),
+			adminDB: &admin.MockDB{
+				MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+					return &linkedca.Policy{
+						X509: &linkedca.X509Policy{
+							Allow: &linkedca.X509Names{
+								Dns: []string{"*.local"},
+							},
+							Deny: &linkedca.X509Names{
+								Dns: []string{"badhost.local"},
+							},
+							AllowWildcardLiteral:    &wrapperspb.BoolValue{Value: true},
+							VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
+						},
+					}, nil
+				},
+			},
+			wantErr: false,
+			expected: &exp{
+				// expect all three policy engines to exist
+				x509Policy:    true,
+				sshHostPolicy: false,
+				sshUserPolicy: false,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &Authority{
+				config:  tt.config,
+				adminDB: tt.adminDB,
+			}
+			if err := a.reloadPolicyEngines(tt.ctx); (err != nil) != tt.wantErr {
+				t.Errorf("Authority.reloadPolicyEngines() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			// if expected value is set, check existence of the policy engines
+			// Check that they're always nil if the expected value is not set,
+			// which happens on errors.
+			if tt.expected != nil {
+				assert.Equal(t, tt.expected.x509Policy, a.x509Policy != nil)
+				assert.Equal(t, tt.expected.sshHostPolicy, a.sshHostPolicy != nil)
+				assert.Equal(t, tt.expected.sshUserPolicy, a.sshUserPolicy != nil)
+			} else {
+				assert.Nil(t, a.x509Policy)
+				assert.Nil(t, a.sshHostPolicy)
+				assert.Nil(t, a.sshUserPolicy)
 			}
 		})
 	}

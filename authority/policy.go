@@ -206,6 +206,73 @@ func (a *Authority) checkPolicy(ctx context.Context, currentAdmin *linkedca.Admi
 	return nil
 }
 
+// reloadPolicyEngines reloads x509 and SSH policy engines using
+// configuration stored in the DB or from the configuration file.
+func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
+	var (
+		err           error
+		policyOptions *authPolicy.Options
+	)
+	// if admin API is enabled, the CA is running in linked mode
+	if a.config.AuthorityConfig.EnableAdmin {
+
+		// temporarily disable policy loading when LinkedCA is in use
+		if _, ok := a.adminDB.(*linkedCaClient); ok {
+			return nil
+		}
+
+		// // temporarily only support the admin nosql DB
+		// if _, ok := a.adminDB.(*adminDBNosql.DB); !ok {
+		// 	return nil
+		// }
+
+		linkedPolicy, err := a.adminDB.GetAuthorityPolicy(ctx)
+		if err != nil {
+			return fmt.Errorf("error getting policy to (re)load policy engines: %w", err)
+		}
+		policyOptions = policyToCertificates(linkedPolicy)
+	} else {
+		policyOptions = a.config.AuthorityConfig.Policy
+	}
+
+	// if no new or updated policy option is set, clear policy engines that (may have)
+	// been configured before and return early
+	if policyOptions == nil {
+		a.x509Policy = nil
+		a.sshHostPolicy = nil
+		a.sshUserPolicy = nil
+		return nil
+	}
+
+	var (
+		x509Policy    authPolicy.X509Policy
+		sshHostPolicy authPolicy.HostPolicy
+		sshUserPolicy authPolicy.UserPolicy
+	)
+
+	// initialize the x509 allow/deny policy engine
+	if x509Policy, err = authPolicy.NewX509PolicyEngine(policyOptions.GetX509Options()); err != nil {
+		return err
+	}
+
+	// initialize the SSH allow/deny policy engine for host certificates
+	if sshHostPolicy, err = authPolicy.NewSSHHostPolicyEngine(policyOptions.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	// initialize the SSH allow/deny policy engine for user certificates
+	if sshUserPolicy, err = authPolicy.NewSSHUserPolicyEngine(policyOptions.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	// set all policy engines; all or nothing
+	a.x509Policy = x509Policy
+	a.sshHostPolicy = sshHostPolicy
+	a.sshUserPolicy = sshUserPolicy
+
+	return nil
+}
+
 func isAllowed(engine authPolicy.X509Policy, sans []string) error {
 	var (
 		allowed bool

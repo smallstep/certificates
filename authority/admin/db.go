@@ -190,12 +190,15 @@ func (m *MockDB) DeleteAdmin(ctx context.Context, id string) error {
 	return m.MockError
 }
 
+// CreateAuthorityPolicy mock
 func (m *MockDB) CreateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
 	if m.MockCreateAuthorityPolicy != nil {
 		return m.MockCreateAuthorityPolicy(ctx, policy)
 	}
 	return m.MockError
 }
+
+// GetAuthorityPolicy mock
 func (m *MockDB) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
 	if m.MockGetAuthorityPolicy != nil {
 		return m.MockGetAuthorityPolicy(ctx)
@@ -203,6 +206,7 @@ func (m *MockDB) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, erro
 	return m.MockRet1.(*linkedca.Policy), m.MockError
 }
 
+// UpdateAuthorityPolicy mock
 func (m *MockDB) UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
 	if m.MockUpdateAuthorityPolicy != nil {
 		return m.MockUpdateAuthorityPolicy(ctx, policy)
@@ -210,6 +214,7 @@ func (m *MockDB) UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Pol
 	return m.MockError
 }
 
+// DeleteAuthorityPolicy mock
 func (m *MockDB) DeleteAuthorityPolicy(ctx context.Context) error {
 	if m.MockDeleteAuthorityPolicy != nil {
 		return m.MockDeleteAuthorityPolicy(ctx)
