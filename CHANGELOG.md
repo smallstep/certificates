@@ -4,19 +4,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased - 0.18.3] - DATE
+## [Unreleased - 0.19.1] - DATE
 ### Added
-- Added support for certificate renewals after expiry using the claim `allowRenewalAfterExpiry`.
-- Added support for `extraNames` in X.509 templates.
-- Added RA support using a Vault instance as the CA.
-- Added support for automatic configuration of linked RAs.
 ### Changed
-- Made SCEP CA URL paths dynamic
-- Support two latest versions of Go (1.17, 1.18)
 ### Deprecated
 ### Removed
 ### Fixed
+### Security
+
+## [0.19.0] - 2022-04-19
+### Added
+- Added support for certificate renewals after expiry using the claim `allowRenewalAfterExpiry`.
+- Added support for `extraNames` in X.509 templates.
+- Added `armv5` builds.
+- Added RA support using a Vault instance as the CA.
+- Added `WithX509SignerFunc` authority option.
+- Added a new `/roots.pem` endpoint to download the CA roots in PEM format.
+- Added support for Azure `Managed Identity` tokens.
+- Added support for automatic configuration of linked RAs.
+- Added support for the `--context` flag. It's now possible to start the 
+  CA with `step --context=abc` to use the configuration from context `abc`.
+  When a context has been configured and no configuration file is provided
+  on startup, the configuration for the current context is used.
+- Added startup info logging and option to skip it (`--quiet`).
+### Changed
+- Made SCEP CA URL paths dynamic.
+- Support two latest versions of Go (1.17, 1.18).
+- Upgrade go.step.sm/crypto to v0.16.1.
+- Upgrade go.step.sm/linkedca to v0.15.0.
+### Deprecated
+- Go 1.16 support.
+### Removed
+### Fixed
 - Fixed admin credentials on RAs.
+- Fixed ACME HTTP-01 challenges for IPv6 identifiers.
+- Various improvements under the hood.
 ### Security
 
 ## [0.18.2] - 2022-03-01
@@ -52,7 +74,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Support for multiple certificate authority contexts.
 - Support for generating extractable keys and certificates on a pkcs#11 module.
 ### Changed
-- Support two latest versions of golang (1.16, 1.17)
+- Support two latest versions of Go (1.16, 1.17)
 ### Deprecated
 - go 1.15 support
 
