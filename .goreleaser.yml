@@ -29,8 +29,6 @@ builds:
     binary: bin/step-ca
     ldflags:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
-    goamd64:
-      - v1
   -
     id: step-cloudkms-init
     env:
@@ -52,8 +50,6 @@ builds:
     binary: bin/step-cloudkms-init
     ldflags:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
-    goamd64:
-      - v1
   -
     id: step-awskms-init
     env:
@@ -75,8 +71,6 @@ builds:
     binary: bin/step-awskms-init
     ldflags:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
-    goamd64:
-      - v1
 
 archives:
   -
@@ -236,5 +230,3 @@ scoop:
   # Your app's license
   # Default is empty.
   license: "Apache-2.0"
-
-  goamd64: v1
