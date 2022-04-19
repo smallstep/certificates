@@ -2,7 +2,6 @@ package api
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"go.step.sm/linkedca"
@@ -87,9 +86,7 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 		return
 	}
 
-	fmt.Println("before: ", newPolicy)
-	applyDefaults(newPolicy)
-	fmt.Println("after: ", newPolicy)
+	applyConditionalDefaults(newPolicy)
 
 	adm := linkedca.AdminFromContext(ctx)
 
@@ -107,7 +104,7 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 		return
 	}
 
-	render.JSONStatus(w, createdPolicy, http.StatusCreated)
+	render.ProtoJSONStatus(w, createdPolicy, http.StatusCreated)
 }
 
 // UpdateAuthorityPolicy handles the PUT /admin/authority/policy request
@@ -208,7 +205,7 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 		return
 	}
 
-	applyDefaults(newPolicy)
+	applyConditionalDefaults(newPolicy)
 
 	prov.Policy = newPolicy
 
@@ -375,12 +372,13 @@ func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, 
 	render.JSONStatus(w, DeleteResponse{Status: "ok"}, http.StatusOK)
 }
 
-func applyDefaults(p *linkedca.Policy) {
+// applyConditionalDefaults applies default settings in case they're not provided
+// in the request body.
+func applyConditionalDefaults(p *linkedca.Policy) {
 	if p.GetX509() == nil {
 		return
 	}
 	if p.GetX509().VerifySubjectCommonName == nil {
 		p.X509.VerifySubjectCommonName = &wrapperspb.BoolValue{Value: true}
 	}
-	return
 }
