@@ -38,11 +38,6 @@ case $arch in
   armv7*) arch="armv7" ;;
 esac
 
-if [ "$arch" = "armv5" ]; then
-  echo "This script doesn't work on armv5 machines"
-  exit 1
-fi
-
 if ! hash jq &> /dev/null; then
   echo "This script requires the jq commmand; please install it."
   exit 1
