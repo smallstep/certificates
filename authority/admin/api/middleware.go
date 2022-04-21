@@ -103,7 +103,7 @@ func (h *Handler) checkAction(next http.HandlerFunc, supportedInStandalone bool)
 }
 
 // loadExternalAccountKey is a middleware that searches for an ACME
-// External Account Key by accountID, keyID or reference and stores it in the context.
+// External Account Key by reference or keyID and stores it in the context.
 func (h *Handler) loadExternalAccountKey(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

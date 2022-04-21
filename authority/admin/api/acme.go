@@ -129,29 +129,21 @@ func linkedEAKToCertificates(k *linkedca.EABKey) *acme.ExternalAccountKey {
 		BoundAt:       k.BoundAt.AsTime(),
 	}
 
-	if k.Policy == nil {
-		return eak
-	}
-
-	eak.Policy = &acme.Policy{}
-
-	if k.Policy.X509 == nil {
-		return eak
-	}
-
-	eak.Policy.X509 = acme.X509Policy{
-		Allowed: acme.PolicyNames{},
-		Denied:  acme.PolicyNames{},
-	}
-
-	if k.Policy.X509.Allow != nil {
-		eak.Policy.X509.Allowed.DNSNames = k.Policy.X509.Allow.Dns
-		eak.Policy.X509.Allowed.IPRanges = k.Policy.X509.Allow.Ips
-	}
-
-	if k.Policy.X509.Deny != nil {
-		eak.Policy.X509.Denied.DNSNames = k.Policy.X509.Deny.Dns
-		eak.Policy.X509.Denied.IPRanges = k.Policy.X509.Deny.Ips
+	if policy := k.GetPolicy(); policy != nil {
+		eak.Policy = &acme.Policy{}
+		if x509 := policy.GetX509(); x509 != nil {
+			eak.Policy.X509 = acme.X509Policy{}
+			if allow := x509.GetAllow(); allow != nil {
+				eak.Policy.X509.Allowed = acme.PolicyNames{}
+				eak.Policy.X509.Allowed.DNSNames = allow.Dns
+				eak.Policy.X509.Allowed.IPRanges = allow.Ips
+			}
+			if deny := x509.GetDeny(); deny != nil {
+				eak.Policy.X509.Denied = acme.PolicyNames{}
+				eak.Policy.X509.Denied.DNSNames = deny.Dns
+				eak.Policy.X509.Denied.IPRanges = deny.Ips
+			}
+		}
 	}
 
 	return eak

@@ -31,22 +31,29 @@ type policyAdminResponderInterface interface {
 
 // PolicyAdminResponder is responsible for writing ACME admin responses
 type PolicyAdminResponder struct {
-	auth    adminAuthority
-	adminDB admin.DB
-	acmeDB  acme.DB
+	auth           adminAuthority
+	adminDB        admin.DB
+	acmeDB         acme.DB
+	deploymentType string
 }
 
 // NewACMEAdminResponder returns a new ACMEAdminResponder
-func NewPolicyAdminResponder(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB) *PolicyAdminResponder {
+func NewPolicyAdminResponder(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB, deploymentType string) *PolicyAdminResponder {
 	return &PolicyAdminResponder{
-		auth:    auth,
-		adminDB: adminDB,
-		acmeDB:  acmeDB,
+		auth:           auth,
+		adminDB:        adminDB,
+		acmeDB:         acmeDB,
+		deploymentType: deploymentType,
 	}
 }
 
 // GetAuthorityPolicy handles the GET /admin/authority/policy request
 func (par *PolicyAdminResponder) GetAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
+
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
 
 	policy, err := par.auth.GetAuthorityPolicy(r.Context())
 	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
@@ -64,6 +71,11 @@ func (par *PolicyAdminResponder) GetAuthorityPolicy(w http.ResponseWriter, r *ht
 
 // CreateAuthorityPolicy handles the POST /admin/authority/policy request
 func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
+
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
 
 	ctx := r.Context()
 	policy, err := par.auth.GetAuthorityPolicy(ctx)
@@ -111,6 +123,11 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 // UpdateAuthorityPolicy handles the PUT /admin/authority/policy request
 func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
 
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
+
 	ctx := r.Context()
 	policy, err := par.auth.GetAuthorityPolicy(ctx)
 
@@ -153,6 +170,11 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 // DeleteAuthorityPolicy handles the DELETE /admin/authority/policy request
 func (par *PolicyAdminResponder) DeleteAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
 
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
+
 	ctx := r.Context()
 	policy, err := par.auth.GetAuthorityPolicy(ctx)
 
@@ -177,6 +199,11 @@ func (par *PolicyAdminResponder) DeleteAuthorityPolicy(w http.ResponseWriter, r 
 // GetProvisionerPolicy handles the GET /admin/provisioners/{name}/policy request
 func (par *PolicyAdminResponder) GetProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
 
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
+
 	prov := linkedca.ProvisionerFromContext(r.Context())
 
 	policy := prov.GetPolicy()
@@ -190,6 +217,11 @@ func (par *PolicyAdminResponder) GetProvisionerPolicy(w http.ResponseWriter, r *
 
 // CreateProvisionerPolicy handles the POST /admin/provisioners/{name}/policy request
 func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
+
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
 
 	ctx := r.Context()
 	prov := linkedca.ProvisionerFromContext(ctx)
@@ -231,6 +263,11 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 // UpdateProvisionerPolicy handles the PUT /admin/provisioners/{name}/policy request
 func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
 
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
+
 	ctx := r.Context()
 	prov := linkedca.ProvisionerFromContext(ctx)
 
@@ -266,6 +303,11 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 // DeleteProvisionerPolicy handles the DELETE /admin/provisioners/{name}/policy request
 func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
 
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
+
 	ctx := r.Context()
 	prov := linkedca.ProvisionerFromContext(ctx)
 
@@ -286,6 +328,12 @@ func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, 
 }
 
 func (par *PolicyAdminResponder) GetACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
+
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
+
 	ctx := r.Context()
 	eak := linkedca.ExternalAccountKeyFromContext(ctx)
 
@@ -299,6 +347,12 @@ func (par *PolicyAdminResponder) GetACMEAccountPolicy(w http.ResponseWriter, r *
 }
 
 func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
+
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
+
 	ctx := r.Context()
 	prov := linkedca.ProvisionerFromContext(ctx)
 	eak := linkedca.ExternalAccountKeyFromContext(ctx)
@@ -330,6 +384,12 @@ func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, 
 }
 
 func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
+
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
+
 	ctx := r.Context()
 	prov := linkedca.ProvisionerFromContext(ctx)
 	eak := linkedca.ExternalAccountKeyFromContext(ctx)
@@ -359,6 +419,12 @@ func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, 
 }
 
 func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
+
+	if err := par.blockLinkedCA(); err != nil {
+		render.Error(w, err)
+		return
+	}
+
 	ctx := r.Context()
 	prov := linkedca.ProvisionerFromContext(ctx)
 	eak := linkedca.ExternalAccountKeyFromContext(ctx)
@@ -379,6 +445,15 @@ func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, 
 	}
 
 	render.JSONStatus(w, DeleteResponse{Status: "ok"}, http.StatusOK)
+}
+
+// blockLinkedCA blocks all API operations on linked deployments
+func (par *PolicyAdminResponder) blockLinkedCA() error {
+	// temporary blocking linked deployments based on string comparison (preventing import cycle)
+	if par.deploymentType == "linked" {
+		return admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
+	}
+	return nil
 }
 
 // applyConditionalDefaults applies default settings in case they're not provided

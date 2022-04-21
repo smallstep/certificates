@@ -219,7 +219,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		adminDB := auth.GetAdminDatabase()
 		if adminDB != nil {
 			acmeAdminResponder := adminAPI.NewACMEAdminResponder()
-			policyAdminResponder := adminAPI.NewPolicyAdminResponder(auth, adminDB, acmeDB)
+			policyAdminResponder := adminAPI.NewPolicyAdminResponder(auth, adminDB, acmeDB, cfg.AuthorityConfig.DeploymentType)
 			adminHandler := adminAPI.NewHandler(auth, adminDB, acmeDB, acmeAdminResponder, policyAdminResponder)
 			mux.Route("/admin", func(r chi.Router) {
 				adminHandler.Route(r)
