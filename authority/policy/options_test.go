@@ -5,8 +5,6 @@ import (
 )
 
 func TestX509PolicyOptions_IsWildcardLiteralAllowed(t *testing.T) {
-	trueValue := true
-	falseValue := false
 	tests := []struct {
 		name    string
 		options *X509PolicyOptions
@@ -18,23 +16,21 @@ func TestX509PolicyOptions_IsWildcardLiteralAllowed(t *testing.T) {
 			want:    true,
 		},
 		{
-			name: "nil",
-			options: &X509PolicyOptions{
-				AllowWildcardLiteral: nil,
-			},
-			want: false,
+			name:    "not-set",
+			options: &X509PolicyOptions{},
+			want:    false,
 		},
 		{
 			name: "set-true",
 			options: &X509PolicyOptions{
-				AllowWildcardLiteral: &trueValue,
+				AllowWildcardLiteral: true,
 			},
 			want: true,
 		},
 		{
 			name: "set-false",
 			options: &X509PolicyOptions{
-				AllowWildcardLiteral: &falseValue,
+				AllowWildcardLiteral: false,
 			},
 			want: false,
 		},
@@ -49,8 +45,6 @@ func TestX509PolicyOptions_IsWildcardLiteralAllowed(t *testing.T) {
 }
 
 func TestX509PolicyOptions_ShouldVerifySubjectCommonName(t *testing.T) {
-	trueValue := true
-	falseValue := false
 	tests := []struct {
 		name    string
 		options *X509PolicyOptions
@@ -62,25 +56,23 @@ func TestX509PolicyOptions_ShouldVerifySubjectCommonName(t *testing.T) {
 			want:    false,
 		},
 		{
-			name: "nil",
-			options: &X509PolicyOptions{
-				VerifySubjectCommonName: nil,
-			},
-			want: true,
+			name:    "not-set",
+			options: &X509PolicyOptions{},
+			want:    true,
 		},
 		{
 			name: "set-true",
 			options: &X509PolicyOptions{
-				VerifySubjectCommonName: &trueValue,
+				DisableSubjectCommonNameVerification: true,
 			},
-			want: true,
+			want: false,
 		},
 		{
 			name: "set-false",
 			options: &X509PolicyOptions{
-				VerifySubjectCommonName: &falseValue,
+				DisableSubjectCommonNameVerification: false,
 			},
-			want: false,
+			want: true,
 		},
 	}
 	for _, tt := range tests {

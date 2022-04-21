@@ -44,10 +44,10 @@ type X509PolicyOptions struct {
 	// AllowWildcardLiteral indicates if literal wildcard names
 	// such as *.example.com and @example.com are allowed. Defaults
 	// to false.
-	AllowWildcardLiteral *bool `json:"allow_wildcard_literal,omitempty"`
-	// VerifySubjectCommonName indicates if the Subject Common Name
-	// is verified in addition to the SANs. Defaults to true.
-	VerifySubjectCommonName *bool `json:"verify_subject_common_name,omitempty"`
+	AllowWildcardLiteral bool `json:"allow_wildcard_literal,omitempty"`
+	// DisableSubjectCommonNameVerification indicates if the Subject Common Name
+	// is verified in addition to the SANs. Defaults to false.
+	DisableSubjectCommonNameVerification bool `json:"disable_subject_common_name_verification,omitempty"`
 }
 
 // X509NameOptions models the X509 name policy configuration.
@@ -83,21 +83,22 @@ func (o *X509PolicyOptions) GetDeniedNameOptions() *X509NameOptions {
 	return o.DeniedNames
 }
 
+// IsWildcardLiteralAllowed returns whether the authority allows
+// literal wildcard domains and other names to be signed.
 func (o *X509PolicyOptions) IsWildcardLiteralAllowed() bool {
 	if o == nil {
 		return true
 	}
-	return o.AllowWildcardLiteral != nil && *o.AllowWildcardLiteral
+	return o.AllowWildcardLiteral
 }
 
+// ShouldVerifySubjectCommonName returns whether the authority
+// should verify the Subject Common Name in addition to the SANs.
 func (o *X509PolicyOptions) ShouldVerifySubjectCommonName() bool {
 	if o == nil {
 		return false
 	}
-	if o.VerifySubjectCommonName == nil {
-		return true
-	}
-	return *o.VerifySubjectCommonName
+	return !o.DisableSubjectCommonNameVerification
 }
 
 // SSHPolicyOptionsInterface is an interface for providers of

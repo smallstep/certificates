@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"go.step.sm/linkedca"
 
@@ -193,8 +192,6 @@ func TestAuthority_checkPolicy(t *testing.T) {
 }
 
 func Test_policyToCertificates(t *testing.T) {
-	trueValue := true
-	falseValue := false
 	tests := []struct {
 		name   string
 		policy *linkedca.Policy
@@ -217,8 +214,8 @@ func Test_policyToCertificates(t *testing.T) {
 					Allow: &linkedca.X509Names{
 						Dns: []string{"*.local"},
 					},
-					AllowWildcardLiteral:    &wrapperspb.BoolValue{Value: false},
-					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
+					AllowWildcardLiteral:                 false,
+					DisableSubjectCommonNameVerification: false,
 				},
 			},
 			want: &policy.Options{
@@ -226,8 +223,8 @@ func Test_policyToCertificates(t *testing.T) {
 					AllowedNames: &policy.X509NameOptions{
 						DNSDomains: []string{"*.local"},
 					},
-					AllowWildcardLiteral:    &falseValue,
-					VerifySubjectCommonName: &trueValue,
+					AllowWildcardLiteral:                 false,
+					DisableSubjectCommonNameVerification: false,
 				},
 			},
 		},
@@ -247,8 +244,8 @@ func Test_policyToCertificates(t *testing.T) {
 						Emails: []string{"badhost.example.com"},
 						Uris:   []string{"https://badhost.local"},
 					},
-					AllowWildcardLiteral:    &wrapperspb.BoolValue{Value: true},
-					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
+					AllowWildcardLiteral:                 true,
+					DisableSubjectCommonNameVerification: false,
 				},
 				Ssh: &linkedca.SSHPolicy{
 					Host: &linkedca.SSHHostPolicy{
@@ -289,8 +286,8 @@ func Test_policyToCertificates(t *testing.T) {
 						EmailAddresses: []string{"badhost.example.com"},
 						URIDomains:     []string{"https://badhost.local"},
 					},
-					AllowWildcardLiteral:    &trueValue,
-					VerifySubjectCommonName: &trueValue,
+					AllowWildcardLiteral:                 true,
+					DisableSubjectCommonNameVerification: false,
 				},
 				SSH: &policy.SSHPolicyOptions{
 					Host: &policy.SSHHostCertificateOptions{
@@ -335,7 +332,6 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 		sshUserPolicy bool
 		sshHostPolicy bool
 	}
-	trueValue := true
 	tests := []struct {
 		name     string
 		config   *config.Config
@@ -517,8 +513,8 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							DeniedNames: &policy.X509NameOptions{
 								DNSDomains: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral:    &trueValue,
-							VerifySubjectCommonName: &trueValue,
+							AllowWildcardLiteral:                 true,
+							DisableSubjectCommonNameVerification: false,
 						},
 					},
 				},
@@ -637,8 +633,8 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							DeniedNames: &policy.X509NameOptions{
 								DNSDomains: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral:    &trueValue,
-							VerifySubjectCommonName: &trueValue,
+							AllowWildcardLiteral:                 true,
+							DisableSubjectCommonNameVerification: false,
 						},
 						SSH: &policy.SSHPolicyOptions{
 							Host: &policy.SSHHostCertificateOptions{
@@ -770,8 +766,8 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							Deny: &linkedca.X509Names{
 								Dns: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral:    &wrapperspb.BoolValue{Value: true},
-							VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
+							AllowWildcardLiteral:                 true,
+							DisableSubjectCommonNameVerification: false,
 						},
 						Ssh: &linkedca.SSHPolicy{
 							Host: &linkedca.SSHHostPolicy{
@@ -835,8 +831,8 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							Deny: &linkedca.X509Names{
 								Dns: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral:    &wrapperspb.BoolValue{Value: true},
-							VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
+							AllowWildcardLiteral:                 true,
+							DisableSubjectCommonNameVerification: false,
 						},
 					}, nil
 				},

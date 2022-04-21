@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"go.step.sm/linkedca"
 
@@ -310,7 +309,7 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 					Allow: &linkedca.X509Names{
 						Dns: []string{"*.local"},
 					},
-					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
+					DisableSubjectCommonNameVerification: false,
 				},
 			}
 			body, err := protojson.Marshal(policy)
@@ -1047,7 +1046,7 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 					Allow: &linkedca.X509Names{
 						Dns: []string{"*.local"},
 					},
-					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
+					DisableSubjectCommonNameVerification: false,
 				},
 			}
 			body, err := protojson.Marshal(policy)
@@ -2073,86 +2072,6 @@ func TestPolicyAdminResponder_DeleteACMEAccountPolicy(t *testing.T) {
 			assert.Equals(t, "ok", response.Status)
 			assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
 
-		})
-	}
-}
-
-func Test_applyConditionalDefaults(t *testing.T) {
-	tests := []struct {
-		name     string
-		policy   *linkedca.Policy
-		expected *linkedca.Policy
-	}{
-		{
-			name: "no-x509",
-			policy: &linkedca.Policy{
-				Ssh: &linkedca.SSHPolicy{},
-			},
-			expected: &linkedca.Policy{
-				Ssh: &linkedca.SSHPolicy{},
-			},
-		},
-		{
-			name: "with-x509-verify-subject-common-name",
-			policy: &linkedca.Policy{
-				X509: &linkedca.X509Policy{
-					Allow: &linkedca.X509Names{
-						Dns: []string{"*.local"},
-					},
-					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
-				},
-			},
-			expected: &linkedca.Policy{
-				X509: &linkedca.X509Policy{
-					Allow: &linkedca.X509Names{
-						Dns: []string{"*.local"},
-					},
-					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
-				},
-			},
-		},
-		{
-			name: "without-x509-verify-subject-common-name",
-			policy: &linkedca.Policy{
-				X509: &linkedca.X509Policy{
-					Allow: &linkedca.X509Names{
-						Dns: []string{"*.local"},
-					},
-					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: false},
-				},
-			},
-			expected: &linkedca.Policy{
-				X509: &linkedca.X509Policy{
-					Allow: &linkedca.X509Names{
-						Dns: []string{"*.local"},
-					},
-					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: false},
-				},
-			},
-		},
-		{
-			name: "no-x509-verify-subject-common-name",
-			policy: &linkedca.Policy{
-				X509: &linkedca.X509Policy{
-					Allow: &linkedca.X509Names{
-						Dns: []string{"*.local"},
-					},
-				},
-			},
-			expected: &linkedca.Policy{
-				X509: &linkedca.X509Policy{
-					Allow: &linkedca.X509Names{
-						Dns: []string{"*.local"},
-					},
-					VerifySubjectCommonName: &wrapperspb.BoolValue{Value: true},
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			applyConditionalDefaults(tt.policy)
-			assert.Equals(t, tt.expected, tt.policy)
 		})
 	}
 }

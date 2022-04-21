@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"go.step.sm/linkedca"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api/read"
@@ -96,8 +95,6 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 		render.Error(w, err)
 		return
 	}
-
-	applyConditionalDefaults(newPolicy)
 
 	newPolicy.Deduplicate()
 
@@ -233,8 +230,6 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 		render.Error(w, err)
 		return
 	}
-
-	applyConditionalDefaults(newPolicy)
 
 	newPolicy.Deduplicate()
 
@@ -453,15 +448,4 @@ func isBadRequest(err error) bool {
 	var pe *authority.PolicyError
 	isPolicyError := errors.As(err, &pe)
 	return isPolicyError && (pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure || pe.Typ == authority.ConfigurationFailure)
-}
-
-// applyConditionalDefaults applies default settings in case they're not provided
-// in the request body.
-func applyConditionalDefaults(p *linkedca.Policy) {
-	if p.GetX509() == nil {
-		return
-	}
-	if p.GetX509().GetVerifySubjectCommonName() == nil {
-		p.X509.VerifySubjectCommonName = &wrapperspb.BoolValue{Value: true}
-	}
 }

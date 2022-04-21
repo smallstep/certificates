@@ -350,12 +350,9 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 				opts.X509.DeniedNames.URIDomains = deny.Uris
 			}
 		}
-		if v := x509.GetAllowWildcardLiteral(); v != nil {
-			opts.X509.AllowWildcardLiteral = &v.Value
-		}
-		if v := x509.GetVerifySubjectCommonName(); v != nil {
-			opts.X509.VerifySubjectCommonName = &v.Value
-		}
+
+		opts.X509.AllowWildcardLiteral = x509.AllowWildcardLiteral
+		opts.X509.DisableSubjectCommonNameVerification = x509.DisableSubjectCommonNameVerification
 	}
 
 	// fill ssh policy configuration
