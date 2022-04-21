@@ -761,7 +761,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				err:        acme.NewError(acme.ErrorMalformedType, "identifiers list cannot be empty"),
 			}
 		},
-		"fail/db.GetExternalAccountKeyByAccountID-error": func(t *testing.T) test {
+		"fail/acmeProvisionerFromContext-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
 			fr := &NewOrderRequest{
 				Identifiers: []acme.Identifier{
@@ -770,7 +770,35 @@ func TestHandler_NewOrder(t *testing.T) {
 			}
 			b, err := json.Marshal(fr)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, &acme.MockProvisioner{})
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			return test{
+				ctx:        ctx,
+				statusCode: 500,
+				ca:         &mockCA{},
+				db: &acme.MockDB{
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, errors.New("force")
+					},
+				},
+				err: acme.NewErrorISE("error retrieving external account binding key: force"),
+			}
+		},
+		"fail/db.GetExternalAccountKeyByAccountID-error": func(t *testing.T) test {
+			acmeProv := newACMEProv(t)
+			acmeProv.RequireEAB = true
+			acc := &acme.Account{ID: "accID"}
+			fr := &NewOrderRequest{
+				Identifiers: []acme.Identifier{
+					{Type: "dns", Value: "zap.internal"},
+				},
+			}
+			b, err := json.Marshal(fr)
+			assert.FatalError(t, err)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, acmeProv)
 			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			return test{
@@ -788,6 +816,8 @@ func TestHandler_NewOrder(t *testing.T) {
 			}
 		},
 		"fail/newACMEPolicyEngine-error": func(t *testing.T) test {
+			acmeProv := newACMEProv(t)
+			acmeProv.RequireEAB = true
 			acc := &acme.Account{ID: "accID"}
 			fr := &NewOrderRequest{
 				Identifiers: []acme.Identifier{
@@ -796,7 +826,7 @@ func TestHandler_NewOrder(t *testing.T) {
 			}
 			b, err := json.Marshal(fr)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, acmeProv)
 			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			return test{
@@ -822,6 +852,8 @@ func TestHandler_NewOrder(t *testing.T) {
 			}
 		},
 		"fail/isIdentifierAllowed-error": func(t *testing.T) test {
+			acmeProv := newACMEProv(t)
+			acmeProv.RequireEAB = true
 			acc := &acme.Account{ID: "accID"}
 			fr := &NewOrderRequest{
 				Identifiers: []acme.Identifier{
@@ -830,7 +862,7 @@ func TestHandler_NewOrder(t *testing.T) {
 			}
 			b, err := json.Marshal(fr)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, acmeProv)
 			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			return test{
@@ -863,7 +895,8 @@ func TestHandler_NewOrder(t *testing.T) {
 					},
 				},
 			}
-			provWithPolicy := newProvWithOptions(options)
+			provWithPolicy := newACMEProvWithOptions(t, options)
+			provWithPolicy.RequireEAB = true
 			acc := &acme.Account{ID: "accID"}
 			fr := &NewOrderRequest{
 				Identifiers: []acme.Identifier{
@@ -905,7 +938,8 @@ func TestHandler_NewOrder(t *testing.T) {
 					},
 				},
 			}
-			provWithPolicy := newProvWithOptions(options)
+			provWithPolicy := newACMEProvWithOptions(t, options)
+			provWithPolicy.RequireEAB = true
 			acc := &acme.Account{ID: "accID"}
 			fr := &NewOrderRequest{
 				Identifiers: []acme.Identifier{
@@ -1567,7 +1601,8 @@ func TestHandler_NewOrder(t *testing.T) {
 					},
 				},
 			}
-			provWithPolicy := newProvWithOptions(options)
+			provWithPolicy := newACMEProvWithOptions(t, options)
+			provWithPolicy.RequireEAB = true
 			acc := &acme.Account{ID: "accID"}
 			nor := &NewOrderRequest{
 				Identifiers: []acme.Identifier{

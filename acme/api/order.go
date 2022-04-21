@@ -103,13 +103,21 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO(hs): gather all errors, so that we can build one response with subproblems; include the nor.Validate()
-	// error here too, like in example?
+	// TODO(hs): gather all errors, so that we can build one response with ACME subproblems
+	// include the nor.Validate() error here too, like in the example in the ACME RFC?
 
-	eak, err := h.db.GetExternalAccountKeyByAccountID(ctx, prov.GetID(), acc.ID)
+	acmeProv, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error retrieving external account binding key"))
+		render.Error(w, err)
 		return
+	}
+
+	var eak *acme.ExternalAccountKey
+	if acmeProv.RequireEAB {
+		if eak, err = h.db.GetExternalAccountKeyByAccountID(ctx, prov.GetID(), acc.ID); err != nil {
+			render.Error(w, acme.WrapErrorISE(err, "error retrieving external account binding key"))
+			return
+		}
 	}
 
 	acmePolicy, err := newACMEPolicyEngine(eak)

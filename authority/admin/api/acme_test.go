@@ -13,13 +13,15 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/acme"
-	"github.com/smallstep/certificates/authority/admin"
-	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"go.step.sm/linkedca"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/authority/admin"
 )
 
 func readProtoJSON(r io.ReadCloser, m proto.Message) error {
@@ -45,15 +47,15 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 				Name: "provName",
 			}
 			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
-			err := admin.NewErrorISE("error getting details for provisioner 'provName'")
-			err.Message = "error getting details for provisioner 'provName'"
+			err := admin.NewErrorISE("error getting ACME details for provisioner 'provName'")
+			err.Message = "error getting ACME details for provisioner 'provName'"
 			return test{
 				ctx:        ctx,
 				err:        err,
 				statusCode: 500,
 			}
 		},
-		"fail/details.GetACME": func(t *testing.T) test {
+		"fail/prov.GetDetails.GetACME": func(t *testing.T) test {
 			prov := &linkedca.Provisioner{
 				Id:      "provID",
 				Name:    "provName",

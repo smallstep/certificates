@@ -65,6 +65,15 @@ func newACMEProv(t *testing.T) *provisioner.ACME {
 	return a
 }
 
+func newACMEProvWithOptions(t *testing.T, options *provisioner.Options) *provisioner.ACME {
+	p := newProvWithOptions(options)
+	a, ok := p.(*provisioner.ACME)
+	if !ok {
+		t.Fatal("not a valid ACME provisioner")
+	}
+	return a
+}
+
 func createEABJWS(jwk *jose.JSONWebKey, hmacKey []byte, keyID, u string) (*jose.JSONWebSignature, error) {
 	signer, err := jose.NewSigner(
 		jose.SigningKey{

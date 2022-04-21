@@ -38,13 +38,7 @@ func (h *Handler) requireEABEnabled(next http.HandlerFunc) http.HandlerFunc {
 		ctx := r.Context()
 		prov := linkedca.ProvisionerFromContext(ctx)
 
-		details := prov.GetDetails()
-		if details == nil {
-			render.Error(w, admin.NewErrorISE("error getting details for provisioner '%s'", prov.GetName()))
-			return
-		}
-
-		acmeProvisioner := details.GetACME()
+		acmeProvisioner := prov.GetDetails().GetACME()
 		if acmeProvisioner == nil {
 			render.Error(w, admin.NewErrorISE("error getting ACME details for provisioner '%s'", prov.GetName()))
 			return
