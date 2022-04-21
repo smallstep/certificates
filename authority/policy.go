@@ -318,11 +318,10 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 	opts := &authPolicy.Options{}
 
 	// fill x509 policy configuration
-	if p.GetX509() != nil {
+	if x509 := p.GetX509(); x509 != nil {
 		opts.X509 = &authPolicy.X509PolicyOptions{}
-		if p.GetX509().GetAllow() != nil {
+		if allow := x509.GetAllow(); allow != nil {
 			opts.X509.AllowedNames = &authPolicy.X509NameOptions{}
-			allow := p.GetX509().GetAllow()
 			if allow.Dns != nil {
 				opts.X509.AllowedNames.DNSDomains = allow.Dns
 			}
@@ -336,9 +335,8 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 				opts.X509.AllowedNames.URIDomains = allow.Uris
 			}
 		}
-		if p.GetX509().GetDeny() != nil {
+		if deny := x509.GetDeny(); deny != nil {
 			opts.X509.DeniedNames = &authPolicy.X509NameOptions{}
-			deny := p.GetX509().GetDeny()
 			if deny.Dns != nil {
 				opts.X509.DeniedNames.DNSDomains = deny.Dns
 			}
@@ -352,22 +350,21 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 				opts.X509.DeniedNames.URIDomains = deny.Uris
 			}
 		}
-		if p.GetX509().GetAllowWildcardLiteral() != nil {
-			opts.X509.AllowWildcardLiteral = &p.GetX509().GetAllowWildcardLiteral().Value
+		if v := x509.GetAllowWildcardLiteral(); v != nil {
+			opts.X509.AllowWildcardLiteral = &v.Value
 		}
-		if p.GetX509().GetVerifySubjectCommonName() != nil {
-			opts.X509.VerifySubjectCommonName = &p.GetX509().VerifySubjectCommonName.Value
+		if v := x509.GetVerifySubjectCommonName(); v != nil {
+			opts.X509.VerifySubjectCommonName = &v.Value
 		}
 	}
 
 	// fill ssh policy configuration
-	if p.GetSsh() != nil {
+	if ssh := p.GetSsh(); ssh != nil {
 		opts.SSH = &authPolicy.SSHPolicyOptions{}
-		if p.GetSsh().GetHost() != nil {
+		if host := ssh.GetHost(); host != nil {
 			opts.SSH.Host = &authPolicy.SSHHostCertificateOptions{}
-			if p.GetSsh().GetHost().GetAllow() != nil {
+			if allow := host.GetAllow(); allow != nil {
 				opts.SSH.Host.AllowedNames = &authPolicy.SSHNameOptions{}
-				allow := p.GetSsh().GetHost().GetAllow()
 				if allow.Dns != nil {
 					opts.SSH.Host.AllowedNames.DNSDomains = allow.Dns
 				}
@@ -378,9 +375,8 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 					opts.SSH.Host.AllowedNames.Principals = allow.Principals
 				}
 			}
-			if p.GetSsh().GetHost().GetDeny() != nil {
+			if deny := host.GetDeny(); deny != nil {
 				opts.SSH.Host.DeniedNames = &authPolicy.SSHNameOptions{}
-				deny := p.GetSsh().GetHost().GetDeny()
 				if deny.Dns != nil {
 					opts.SSH.Host.DeniedNames.DNSDomains = deny.Dns
 				}
@@ -392,11 +388,10 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 				}
 			}
 		}
-		if p.GetSsh().GetUser() != nil {
+		if user := ssh.GetUser(); user != nil {
 			opts.SSH.User = &authPolicy.SSHUserCertificateOptions{}
-			if p.GetSsh().GetUser().GetAllow() != nil {
+			if allow := user.GetAllow(); allow != nil {
 				opts.SSH.User.AllowedNames = &authPolicy.SSHNameOptions{}
-				allow := p.GetSsh().GetUser().GetAllow()
 				if allow.Emails != nil {
 					opts.SSH.User.AllowedNames.EmailAddresses = allow.Emails
 				}
@@ -404,9 +399,8 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 					opts.SSH.User.AllowedNames.Principals = allow.Principals
 				}
 			}
-			if p.GetSsh().GetUser().GetDeny() != nil {
+			if deny := user.GetDeny(); deny != nil {
 				opts.SSH.User.DeniedNames = &authPolicy.SSHNameOptions{}
-				deny := p.GetSsh().GetUser().GetDeny()
 				if deny.Emails != nil {
 					opts.SSH.User.DeniedNames.EmailAddresses = deny.Emails
 				}

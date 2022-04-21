@@ -637,7 +637,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"www.example.com"},
@@ -648,7 +648,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted-wildcard-literal-x509",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.x509local"),
+				WithPermittedDNSDomains("*.x509local"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{
@@ -661,7 +661,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted-single-host",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("host.local"),
+				WithPermittedDNSDomains("host.local"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"differenthost.local"},
@@ -672,7 +672,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted-no-label",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"local"},
@@ -683,7 +683,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted-empty-label",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"www..local"},
@@ -694,7 +694,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted-dot-domain",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{
@@ -707,7 +707,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted-wildcard-multiple-subdomains",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{
@@ -720,7 +720,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted-wildcard-literal",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{
@@ -733,7 +733,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted-idna-internationalized-domain",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.豆.jp"),
+				WithPermittedDNSDomains("*.豆.jp"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{
@@ -747,11 +747,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/ipv4-permitted",
 			options: []NamePolicyOption{
 				WithPermittedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("127.0.0.1"),
-							Mask: net.IPv4Mask(255, 255, 255, 0),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("127.0.0.1"),
+						Mask: net.IPv4Mask(255, 255, 255, 0),
 					},
 				),
 			},
@@ -765,11 +763,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/ipv6-permitted",
 			options: []NamePolicyOption{
 				WithPermittedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
-							Mask: net.CIDRMask(120, 128),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+						Mask: net.CIDRMask(120, 128),
 					},
 				),
 			},
@@ -782,7 +778,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/mail-permitted-wildcard",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@example.com"),
+				WithPermittedEmailAddresses("@example.com"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{
@@ -795,7 +791,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/mail-permitted-wildcard-x509",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("example.com"),
+				WithPermittedEmailAddresses("example.com"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{
@@ -808,7 +804,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/mail-permitted-specific-mailbox",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("test@local.com"),
+				WithPermittedEmailAddresses("test@local.com"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{
@@ -821,7 +817,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/mail-permitted-wildcard-subdomain",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@example.com"),
+				WithPermittedEmailAddresses("@example.com"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{
@@ -834,7 +830,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/mail-permitted-idna-internationalized-domain",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@例.jp"),
+				WithPermittedEmailAddresses("@例.jp"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{"bücher@例.jp"},
@@ -845,7 +841,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/mail-permitted-idna-internationalized-domain-rfc822",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@例.jp"),
+				WithPermittedEmailAddresses("@例.jp"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{"bücher@例.jp" + string(byte(0))},
@@ -856,7 +852,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/mail-permitted-idna-internationalized-domain-ascii",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@例.jp"),
+				WithPermittedEmailAddresses("@例.jp"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{"mail@xn---bla.jp"},
@@ -867,7 +863,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/uri-permitted-domain-wildcard",
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("*.local"),
+				WithPermittedURIDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -883,7 +879,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/uri-permitted",
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("test.local"),
+				WithPermittedURIDomains("test.local"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -899,7 +895,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/uri-permitted-with-literal-wildcard", // don't allow literal wildcard in URI, e.g. xxxx://*.domain.tld
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("*.local"),
+				WithPermittedURIDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -915,7 +911,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/uri-permitted-idna-internationalized-domain",
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("*.bücher.example.com"),
+				WithPermittedURIDomains("*.bücher.example.com"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -932,7 +928,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-excluded",
 			options: []NamePolicyOption{
-				WithExcludedDNSDomain("*.example.com"),
+				WithExcludedDNSDomains("*.example.com"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"www.example.com"},
@@ -943,7 +939,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-excluded-single-host",
 			options: []NamePolicyOption{
-				WithExcludedDNSDomain("host.example.com"),
+				WithExcludedDNSDomains("host.example.com"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"host.example.com"},
@@ -955,11 +951,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/ipv4-excluded",
 			options: []NamePolicyOption{
 				WithExcludedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("127.0.0.1"),
-							Mask: net.IPv4Mask(255, 255, 255, 0),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("127.0.0.1"),
+						Mask: net.IPv4Mask(255, 255, 255, 0),
 					},
 				),
 			},
@@ -973,11 +967,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/ipv6-excluded",
 			options: []NamePolicyOption{
 				WithExcludedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
-							Mask: net.CIDRMask(120, 128),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+						Mask: net.CIDRMask(120, 128),
 					},
 				),
 			},
@@ -990,7 +982,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/mail-excluded",
 			options: []NamePolicyOption{
-				WithExcludedEmailAddress("@example.com"),
+				WithExcludedEmailAddresses("@example.com"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{"mail@example.com"},
@@ -1001,7 +993,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/uri-excluded",
 			options: []NamePolicyOption{
-				WithExcludedURIDomain("*.example.com"),
+				WithExcludedURIDomains("*.example.com"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -1017,7 +1009,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/uri-excluded-with-literal-wildcard", // don't allow literal wildcard in URI, e.g. xxxx://*.domain.tld
 			options: []NamePolicyOption{
-				WithExcludedURIDomain("*.local"),
+				WithExcludedURIDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -1035,7 +1027,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/subject-dns-permitted",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1049,7 +1041,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/subject-dns-excluded",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithExcludedDNSDomain("*.local"),
+				WithExcludedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1064,11 +1056,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
 				WithPermittedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("127.0.0.1"),
-							Mask: net.IPv4Mask(255, 255, 255, 0),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("127.0.0.1"),
+						Mask: net.IPv4Mask(255, 255, 255, 0),
 					},
 				),
 			},
@@ -1085,11 +1075,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
 				WithExcludedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("127.0.0.1"),
-							Mask: net.IPv4Mask(255, 255, 255, 0),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("127.0.0.1"),
+						Mask: net.IPv4Mask(255, 255, 255, 0),
 					},
 				),
 			},
@@ -1106,11 +1094,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
 				WithPermittedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
-							Mask: net.CIDRMask(120, 128),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+						Mask: net.CIDRMask(120, 128),
 					},
 				),
 			},
@@ -1127,11 +1113,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
 				WithExcludedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
-							Mask: net.CIDRMask(120, 128),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+						Mask: net.CIDRMask(120, 128),
 					},
 				),
 			},
@@ -1147,7 +1131,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/subject-email-permitted",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithPermittedEmailAddress("@example.local"),
+				WithPermittedEmailAddresses("@example.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1161,7 +1145,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/subject-email-excluded",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithExcludedEmailAddress("@example.local"),
+				WithExcludedEmailAddresses("@example.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1175,7 +1159,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/subject-uri-permitted",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithPermittedURIDomain("*.example.com"),
+				WithPermittedURIDomains("*.example.com"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1189,7 +1173,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/subject-uri-excluded",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithExcludedURIDomain("*.example.com"),
+				WithExcludedURIDomains("*.example.com"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1203,7 +1187,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted-with-ip-name", // when only DNS is permitted, IPs are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
@@ -1214,7 +1198,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted-with-mail", // when only DNS is permitted, mails are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{"mail@smallstep.com"},
@@ -1225,7 +1209,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/dns-permitted-with-uri", // when only DNS is permitted, URIs are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -1242,11 +1226,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/ip-permitted-with-dns-name", // when only IP is permitted, DNS names are not allowed.
 			options: []NamePolicyOption{
 				WithPermittedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("127.0.0.1"),
-							Mask: net.IPv4Mask(255, 255, 255, 0),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("127.0.0.1"),
+						Mask: net.IPv4Mask(255, 255, 255, 0),
 					},
 				),
 			},
@@ -1260,11 +1242,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/ip-permitted-with-mail", // when only IP is permitted, mails are not allowed.
 			options: []NamePolicyOption{
 				WithPermittedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("127.0.0.1"),
-							Mask: net.IPv4Mask(255, 255, 255, 0),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("127.0.0.1"),
+						Mask: net.IPv4Mask(255, 255, 255, 0),
 					},
 				),
 			},
@@ -1278,11 +1258,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/ip-permitted-with-uri", // when only IP is permitted, URIs are not allowed.
 			options: []NamePolicyOption{
 				WithPermittedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("127.0.0.1"),
-							Mask: net.IPv4Mask(255, 255, 255, 0),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("127.0.0.1"),
+						Mask: net.IPv4Mask(255, 255, 255, 0),
 					},
 				),
 			},
@@ -1300,7 +1278,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/mail-permitted-with-dns-name", // when only mail is permitted, DNS names are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@example.com"),
+				WithPermittedEmailAddresses("@example.com"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"www.example.com"},
@@ -1311,7 +1289,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/mail-permitted-with-ip", // when only mail is permitted, IPs are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@example.com"),
+				WithPermittedEmailAddresses("@example.com"),
 			},
 			cert: &x509.Certificate{
 				IPAddresses: []net.IP{
@@ -1324,7 +1302,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/mail-permitted-with-uri", // when only mail is permitted, URIs are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@example.com"),
+				WithPermittedEmailAddresses("@example.com"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -1340,7 +1318,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/uri-permitted-with-dns-name", // when only URI is permitted, DNS names are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("*.local"),
+				WithPermittedURIDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"host.local"},
@@ -1351,7 +1329,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/uri-permitted-with-ip-name", // when only URI is permitted, IPs are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("*.local"),
+				WithPermittedURIDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				IPAddresses: []net.IP{
@@ -1364,7 +1342,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "fail/uri-permitted-with-ip-name", // when only URI is permitted, mails are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("*.local"),
+				WithPermittedURIDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{"mail@smallstep.com"},
@@ -1377,14 +1355,14 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "fail/combined-simple-all-badhost.local",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithPermittedDNSDomain("*.local"),
-				WithPermittedCIDR("127.0.0.1/24"),
-				WithPermittedEmailAddress("@example.local"),
-				WithPermittedURIDomain("*.example.local"),
-				WithExcludedDNSDomain("badhost.local"),
-				WithExcludedCIDR("127.0.0.128/25"),
-				WithExcludedEmailAddress("badmail@example.local"),
-				WithExcludedURIDomain("badwww.example.local"),
+				WithPermittedDNSDomains("*.local"),
+				WithPermittedCIDRs("127.0.0.1/24"),
+				WithPermittedEmailAddresses("@example.local"),
+				WithPermittedURIDomains("*.example.local"),
+				WithExcludedDNSDomains("badhost.local"),
+				WithExcludedCIDRs("127.0.0.128/25"),
+				WithExcludedEmailAddresses("badmail@example.local"),
+				WithExcludedURIDomains("badwww.example.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1488,7 +1466,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/dns-permitted",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"example.local"},
@@ -1499,7 +1477,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/dns-permitted-wildcard",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomains([]string{"*.local", "*.x509local"}),
+				WithPermittedDNSDomains("*.local", "*.x509local"),
 				WithAllowLiteralWildcardNames(),
 			},
 			cert: &x509.Certificate{
@@ -1514,7 +1492,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/dns-permitted-wildcard-literal",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomains([]string{"*.local", "*.x509local"}),
+				WithPermittedDNSDomains("*.local", "*.x509local"),
 				WithAllowLiteralWildcardNames(),
 			},
 			cert: &x509.Certificate{
@@ -1529,7 +1507,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/dns-permitted-combined",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomains([]string{"*.local", "*.x509local", "host.example.com"}),
+				WithPermittedDNSDomains("*.local", "*.x509local", "host.example.com"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{
@@ -1544,7 +1522,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/dns-permitted-idna-internationalized-domain",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.例.jp"),
+				WithPermittedDNSDomains("*.例.jp"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{
@@ -1557,7 +1535,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/ipv4-permitted",
 			options: []NamePolicyOption{
-				WithPermittedCIDR("127.0.0.1/24"),
+				WithPermittedCIDRs("127.0.0.1/24"),
 			},
 			cert: &x509.Certificate{
 				IPAddresses: []net.IP{net.ParseIP("127.0.0.20")},
@@ -1568,7 +1546,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/ipv6-permitted",
 			options: []NamePolicyOption{
-				WithPermittedCIDR("2001:0db8:85a3:0000:0000:8a2e:0370:7334/120"),
+				WithPermittedCIDRs("2001:0db8:85a3:0000:0000:8a2e:0370:7334/120"),
 			},
 			cert: &x509.Certificate{
 				IPAddresses: []net.IP{net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7339")},
@@ -1579,7 +1557,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/mail-permitted-wildcard",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@example.com"),
+				WithPermittedEmailAddresses("@example.com"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{
@@ -1592,7 +1570,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/mail-permitted-plain-domain",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("example.com"),
+				WithPermittedEmailAddresses("example.com"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{
@@ -1605,7 +1583,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/mail-permitted-specific-mailbox",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("test@local.com"),
+				WithPermittedEmailAddresses("test@local.com"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{
@@ -1618,7 +1596,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/mail-permitted-idna-internationalized-domain",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@例.jp"),
+				WithPermittedEmailAddresses("@例.jp"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{},
@@ -1629,7 +1607,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/uri-permitted-domain-wildcard",
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("*.local"),
+				WithPermittedURIDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -1645,7 +1623,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/uri-permitted-specific-uri",
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("test.local"),
+				WithPermittedURIDomains("test.local"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -1661,7 +1639,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/uri-permitted-with-port",
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("*.example.com"),
+				WithPermittedURIDomains("*.example.com"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -1677,7 +1655,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/uri-permitted-idna-internationalized-domain",
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("*.bücher.example.com"),
+				WithPermittedURIDomains("*.bücher.example.com"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -1693,7 +1671,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/uri-permitted-idna-internationalized-domain",
 			options: []NamePolicyOption{
-				WithPermittedURIDomain("bücher.example.com"),
+				WithPermittedURIDomains("bücher.example.com"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -1710,7 +1688,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/dns-excluded",
 			options: []NamePolicyOption{
-				WithExcludedDNSDomain("*.notlocal"),
+				WithExcludedDNSDomains("*.notlocal"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"example.local"},
@@ -1722,11 +1700,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/ipv4-excluded",
 			options: []NamePolicyOption{
 				WithExcludedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("127.0.0.1"),
-							Mask: net.IPv4Mask(255, 255, 255, 0),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("127.0.0.1"),
+						Mask: net.IPv4Mask(255, 255, 255, 0),
 					},
 				),
 			},
@@ -1739,7 +1715,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/ipv6-excluded",
 			options: []NamePolicyOption{
-				WithExcludedCIDR("2001:0db8:85a3:0000:0000:8a2e:0370:7334/120"),
+				WithExcludedCIDRs("2001:0db8:85a3:0000:0000:8a2e:0370:7334/120"),
 			},
 			cert: &x509.Certificate{
 				IPAddresses: []net.IP{net.ParseIP("2003:0db8:85a3:0000:0000:8a2e:0370:7334")},
@@ -1750,7 +1726,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/mail-excluded",
 			options: []NamePolicyOption{
-				WithExcludedEmailAddress("@notlocal"),
+				WithExcludedEmailAddresses("@notlocal"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{"mail@local"},
@@ -1761,7 +1737,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/mail-excluded-with-subdomain",
 			options: []NamePolicyOption{
-				WithExcludedEmailAddress("@local"),
+				WithExcludedEmailAddresses("@local"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{"mail@example.local"},
@@ -1772,7 +1748,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/uri-excluded",
 			options: []NamePolicyOption{
-				WithExcludedURIDomain("*.google.com"),
+				WithExcludedURIDomains("*.google.com"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -1790,7 +1766,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/subject-empty",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1805,7 +1781,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/subject-dns-permitted",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1819,7 +1795,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/subject-dns-excluded",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithExcludedDNSDomain("*.notlocal"),
+				WithExcludedDNSDomains("*.notlocal"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1834,11 +1810,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
 				WithPermittedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("127.0.0.1"),
-							Mask: net.IPv4Mask(255, 255, 255, 0),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("127.0.0.1"),
+						Mask: net.IPv4Mask(255, 255, 255, 0),
 					},
 				),
 			},
@@ -1855,11 +1829,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
 				WithExcludedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("128.0.0.1"),
-							Mask: net.IPv4Mask(255, 255, 255, 0),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("128.0.0.1"),
+						Mask: net.IPv4Mask(255, 255, 255, 0),
 					},
 				),
 			},
@@ -1876,11 +1848,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
 				WithPermittedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
-							Mask: net.CIDRMask(120, 128),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+						Mask: net.CIDRMask(120, 128),
 					},
 				),
 			},
@@ -1897,11 +1867,9 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
 				WithExcludedIPRanges(
-					[]*net.IPNet{
-						{
-							IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
-							Mask: net.CIDRMask(120, 128),
-						},
+					&net.IPNet{
+						IP:   net.ParseIP("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+						Mask: net.CIDRMask(120, 128),
 					},
 				),
 			},
@@ -1917,7 +1885,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/subject-email-permitted",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithPermittedEmailAddress("@example.local"),
+				WithPermittedEmailAddresses("@example.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1931,7 +1899,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/subject-email-excluded",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithExcludedEmailAddress("@example.notlocal"),
+				WithExcludedEmailAddresses("@example.notlocal"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1945,7 +1913,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/subject-uri-permitted",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithPermittedURIDomain("*.example.com"),
+				WithPermittedURIDomains("*.example.com"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1959,7 +1927,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/subject-uri-excluded",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithExcludedURIDomain("*.smallstep.com"),
+				WithExcludedURIDomains("*.smallstep.com"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -1973,7 +1941,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/dns-excluded-with-ip-name", // when only DNS is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedDNSDomain("*.local"),
+				WithExcludedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
@@ -1984,7 +1952,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/dns-excluded-with-mail", // when only DNS is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedDNSDomain("*.local"),
+				WithExcludedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{"mail@example.com"},
@@ -1995,7 +1963,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/dns-excluded-with-mail", // when only DNS is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedDNSDomain("*.local"),
+				WithExcludedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -2011,7 +1979,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/ip-excluded-with-dns", // when only IP is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedCIDR("127.0.0.1/24"),
+				WithExcludedCIDRs("127.0.0.1/24"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"test.local"},
@@ -2022,7 +1990,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/ip-excluded-with-mail", // when only IP is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedCIDR("127.0.0.1/24"),
+				WithExcludedCIDRs("127.0.0.1/24"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{"mail@example.com"},
@@ -2033,7 +2001,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/ip-excluded-with-mail", // when only IP is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedCIDR("127.0.0.1/24"),
+				WithExcludedCIDRs("127.0.0.1/24"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -2049,7 +2017,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/mail-excluded-with-dns", // when only mail is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedEmailAddress("@example.com"),
+				WithExcludedEmailAddresses("@example.com"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"test.local"},
@@ -2060,7 +2028,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/mail-excluded-with-ip", // when only mail is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedEmailAddress("@example.com"),
+				WithExcludedEmailAddresses("@example.com"),
 			},
 			cert: &x509.Certificate{
 				IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
@@ -2071,7 +2039,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/mail-excluded-with-uri", // when only mail is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedEmailAddress("@example.com"),
+				WithExcludedEmailAddresses("@example.com"),
 			},
 			cert: &x509.Certificate{
 				URIs: []*url.URL{
@@ -2087,7 +2055,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/uri-excluded-with-dns", // when only URI is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedURIDomain("*.example.local"),
+				WithExcludedURIDomains("*.example.local"),
 			},
 			cert: &x509.Certificate{
 				DNSNames: []string{"test.example.local"},
@@ -2098,7 +2066,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/uri-excluded-with-dns", // when only URI is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedURIDomain("*.example.local"),
+				WithExcludedURIDomains("*.example.local"),
 			},
 			cert: &x509.Certificate{
 				IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
@@ -2109,7 +2077,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/uri-excluded-with-mail", // when only URI is exluded, we allow anything else
 			options: []NamePolicyOption{
-				WithExcludedURIDomain("*.example.local"),
+				WithExcludedURIDomains("*.example.local"),
 			},
 			cert: &x509.Certificate{
 				EmailAddresses: []string{"mail@example.local"},
@@ -2121,7 +2089,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/dns-excluded-with-subject-ip-name", // when only DNS is exluded, we allow anything else
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithExcludedDNSDomain("*.local"),
+				WithExcludedDNSDomains("*.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -2137,10 +2105,10 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/combined-simple-permitted",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithPermittedDNSDomain("*.local"),
-				WithPermittedCIDR("127.0.0.1/24"),
-				WithPermittedEmailAddress("@example.local"),
-				WithPermittedURIDomain("*.example.local"),
+				WithPermittedDNSDomains("*.local"),
+				WithPermittedCIDRs("127.0.0.1/24"),
+				WithPermittedEmailAddresses("@example.local"),
+				WithPermittedURIDomains("*.example.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -2162,10 +2130,10 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		{
 			name: "ok/combined-simple-permitted-without-subject-verification",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
-				WithPermittedCIDR("127.0.0.1/24"),
-				WithPermittedEmailAddress("@example.local"),
-				WithPermittedURIDomain("*.example.local"),
+				WithPermittedDNSDomains("*.local"),
+				WithPermittedCIDRs("127.0.0.1/24"),
+				WithPermittedEmailAddresses("@example.local"),
+				WithPermittedURIDomains("*.example.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -2188,14 +2156,14 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			name: "ok/combined-simple-all",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
-				WithPermittedDNSDomain("*.local"),
-				WithPermittedCIDR("127.0.0.1/24"),
-				WithPermittedEmailAddress("@example.local"),
-				WithPermittedURIDomain("*.example.local"),
-				WithExcludedDNSDomain("badhost.local"),
-				WithExcludedCIDR("127.0.0.128/25"),
-				WithExcludedEmailAddress("badmail@example.local"),
-				WithExcludedURIDomain("badwww.example.local"),
+				WithPermittedDNSDomains("*.local"),
+				WithPermittedCIDRs("127.0.0.1/24"),
+				WithPermittedEmailAddresses("@example.local"),
+				WithPermittedURIDomains("*.example.local"),
+				WithExcludedDNSDomains("badhost.local"),
+				WithExcludedCIDRs("127.0.0.128/25"),
+				WithExcludedEmailAddresses("badmail@example.local"),
+				WithExcludedURIDomains("badwww.example.local"),
 			},
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
@@ -2280,7 +2248,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/host-with-permitted-dns-domain",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2294,7 +2262,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/host-with-excluded-dns-domain",
 			options: []NamePolicyOption{
-				WithExcludedDNSDomain("*.local"),
+				WithExcludedDNSDomains("*.local"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2306,9 +2274,9 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/host-with-permitted-ip",
+			name: "fail/host-with-permitted-cidr",
 			options: []NamePolicyOption{
-				WithPermittedCIDR("127.0.0.1/24"),
+				WithPermittedCIDRs("127.0.0.1/24"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2320,9 +2288,9 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/host-with-excluded-ip",
+			name: "fail/host-with-excluded-cidr",
 			options: []NamePolicyOption{
-				WithExcludedCIDR("127.0.0.1/24"),
+				WithExcludedCIDRs("127.0.0.1/24"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2336,7 +2304,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/user-with-permitted-email",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@example.com"),
+				WithPermittedEmailAddresses("@example.com"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2350,7 +2318,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/user-with-excluded-email",
 			options: []NamePolicyOption{
-				WithExcludedEmailAddress("@example.com"),
+				WithExcludedEmailAddresses("@example.com"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2364,7 +2332,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/host-with-permitted-principals",
 			options: []NamePolicyOption{
-				WithPermittedPrincipals([]string{"localhost"}),
+				WithPermittedPrincipals("localhost"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2378,7 +2346,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/host-with-excluded-principals",
 			options: []NamePolicyOption{
-				WithExcludedPrincipals([]string{"localhost"}),
+				WithExcludedPrincipals("localhost"),
 			},
 			cert: &ssh.Certificate{
 				ValidPrincipals: []string{
@@ -2391,7 +2359,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/user-with-permitted-principals",
 			options: []NamePolicyOption{
-				WithPermittedPrincipals([]string{"user"}),
+				WithPermittedPrincipals("user"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2405,7 +2373,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/user-with-excluded-principals",
 			options: []NamePolicyOption{
-				WithExcludedPrincipals([]string{"user"}),
+				WithExcludedPrincipals("user"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2419,7 +2387,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/user-with-permitted-principal-as-mail",
 			options: []NamePolicyOption{
-				WithPermittedPrincipals([]string{"ops"}),
+				WithPermittedPrincipals("ops"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2433,7 +2401,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/host-principal-with-permitted-dns-domain", // when only DNS is permitted, username principals are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2447,7 +2415,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/host-principal-with-permitted-ip-range", // when only IPs are permitted, username principals are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedCIDR("127.0.0.1/24"),
+				WithPermittedCIDRs("127.0.0.1/24"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2461,7 +2429,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/user-principal-with-permitted-email", // when only emails are permitted, username principals are not allowed.
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@example.com"),
+				WithPermittedEmailAddresses("@example.com"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2475,8 +2443,8 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/combined-user",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@smallstep.com"),
-				WithExcludedEmailAddress("root@smallstep.com"),
+				WithPermittedEmailAddresses("@smallstep.com"),
+				WithExcludedEmailAddresses("root@smallstep.com"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2491,8 +2459,8 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "fail/combined-user-with-excluded-user-principal",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@smallstep.com"),
-				WithExcludedPrincipals([]string{"root"}),
+				WithPermittedEmailAddresses("@smallstep.com"),
+				WithExcludedPrincipals("root"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2507,7 +2475,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/host-with-permitted-user-principals",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@work"),
+				WithPermittedEmailAddresses("@work"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2521,7 +2489,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/user-with-permitted-user-principals",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2535,7 +2503,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/host-with-permitted-dns-domain",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
+				WithPermittedDNSDomains("*.local"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2549,7 +2517,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/host-with-excluded-dns-domain",
 			options: []NamePolicyOption{
-				WithExcludedDNSDomain("*.example.com"),
+				WithExcludedDNSDomains("*.example.com"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2563,7 +2531,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/host-with-permitted-ip",
 			options: []NamePolicyOption{
-				WithPermittedCIDR("127.0.0.1/24"),
+				WithPermittedCIDRs("127.0.0.1/24"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2577,7 +2545,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/host-with-excluded-ip",
 			options: []NamePolicyOption{
-				WithExcludedCIDR("127.0.0.1/24"),
+				WithExcludedCIDRs("127.0.0.1/24"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,
@@ -2591,7 +2559,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/user-with-permitted-email",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@example.com"),
+				WithPermittedEmailAddresses("@example.com"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2605,7 +2573,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/user-with-excluded-email",
 			options: []NamePolicyOption{
-				WithExcludedEmailAddress("@example.com"),
+				WithExcludedEmailAddresses("@example.com"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2619,7 +2587,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/user-with-permitted-principals",
 			options: []NamePolicyOption{
-				WithPermittedPrincipals([]string{"*"}),
+				WithPermittedPrincipals("*"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2633,7 +2601,7 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/user-with-excluded-principals",
 			options: []NamePolicyOption{
-				WithExcludedPrincipals([]string{"user"}),
+				WithExcludedPrincipals("user"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2647,9 +2615,9 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/combined-user",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@smallstep.com"),
-				WithPermittedPrincipals([]string{"*"}), // without specifying the wildcard, "someone" would not be allowed.
-				WithExcludedEmailAddress("root@smallstep.com"),
+				WithPermittedEmailAddresses("@smallstep.com"),
+				WithPermittedPrincipals("*"), // without specifying the wildcard, "someone" would not be allowed.
+				WithExcludedEmailAddresses("root@smallstep.com"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2664,9 +2632,9 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/combined-user-with-excluded-user-principal",
 			options: []NamePolicyOption{
-				WithPermittedEmailAddress("@smallstep.com"),
-				WithExcludedEmailAddress("root@smallstep.com"),
-				WithExcludedPrincipals([]string{"root"}), // unlike the previous test, this implicitly allows any other username principal
+				WithPermittedEmailAddresses("@smallstep.com"),
+				WithExcludedEmailAddresses("root@smallstep.com"),
+				WithExcludedPrincipals("root"), // unlike the previous test, this implicitly allows any other username principal
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.UserCert,
@@ -2681,10 +2649,10 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		{
 			name: "ok/combined-host",
 			options: []NamePolicyOption{
-				WithPermittedDNSDomain("*.local"),
-				WithPermittedCIDR("127.0.0.1/24"),
-				WithExcludedDNSDomain("badhost.local"),
-				WithExcludedCIDR("127.0.0.128/25"),
+				WithPermittedDNSDomains("*.local"),
+				WithPermittedCIDRs("127.0.0.1/24"),
+				WithExcludedDNSDomains("badhost.local"),
+				WithExcludedCIDRs("127.0.0.128/25"),
 			},
 			cert: &ssh.Certificate{
 				CertType: ssh.HostCert,

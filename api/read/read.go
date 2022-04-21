@@ -24,7 +24,7 @@ func JSON(r io.Reader, v interface{}) error {
 }
 
 // ProtoJSON reads JSON from the request body and stores it in the value
-// pointed to by v.
+// pointed to by m.
 func ProtoJSON(r io.Reader, m proto.Message) error {
 	data, err := io.ReadAll(r)
 	if err != nil {

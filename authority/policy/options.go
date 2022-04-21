@@ -67,24 +67,20 @@ func (o *X509NameOptions) HasNames() bool {
 		len(o.URIDomains) > 0
 }
 
+// GetAllowedNameOptions returns x509 allowed name policy configuration
+func (o *X509PolicyOptions) GetAllowedNameOptions() *X509NameOptions {
+	if o == nil {
+		return nil
+	}
+	return o.AllowedNames
+}
+
 // GetDeniedNameOptions returns the x509 denied name policy configuration
 func (o *X509PolicyOptions) GetDeniedNameOptions() *X509NameOptions {
 	if o == nil {
 		return nil
 	}
 	return o.DeniedNames
-}
-
-// GetAllowedUserNameOptions returns the SSH allowed user name policy
-// configuration.
-func (o *SSHPolicyOptions) GetAllowedUserNameOptions() *SSHNameOptions {
-	if o == nil {
-		return nil
-	}
-	if o.User == nil {
-		return nil
-	}
-	return o.User.AllowedNames
 }
 
 func (o *X509PolicyOptions) IsWildcardLiteralAllowed() bool {
@@ -122,21 +118,19 @@ type SSHPolicyOptions struct {
 	Host *SSHHostCertificateOptions `json:"host,omitempty"`
 }
 
-// GetAllowedNameOptions returns x509 allowed name policy configuration
-func (o *X509PolicyOptions) GetAllowedNameOptions() *X509NameOptions {
-	if o == nil {
+// GetAllowedUserNameOptions returns the SSH allowed user name policy
+// configuration.
+func (o *SSHPolicyOptions) GetAllowedUserNameOptions() *SSHNameOptions {
+	if o == nil || o.User == nil {
 		return nil
 	}
-	return o.AllowedNames
+	return o.User.AllowedNames
 }
 
 // GetDeniedUserNameOptions returns the SSH denied user name policy
 // configuration.
 func (o *SSHPolicyOptions) GetDeniedUserNameOptions() *SSHNameOptions {
-	if o == nil {
-		return nil
-	}
-	if o.User == nil {
+	if o == nil || o.User == nil {
 		return nil
 	}
 	return o.User.DeniedNames
@@ -145,10 +139,7 @@ func (o *SSHPolicyOptions) GetDeniedUserNameOptions() *SSHNameOptions {
 // GetAllowedHostNameOptions returns the SSH allowed host name policy
 // configuration.
 func (o *SSHPolicyOptions) GetAllowedHostNameOptions() *SSHNameOptions {
-	if o == nil {
-		return nil
-	}
-	if o.Host == nil {
+	if o == nil || o.Host == nil {
 		return nil
 	}
 	return o.Host.AllowedNames
@@ -157,10 +148,7 @@ func (o *SSHPolicyOptions) GetAllowedHostNameOptions() *SSHNameOptions {
 // GetDeniedHostNameOptions returns the SSH denied host name policy
 // configuration.
 func (o *SSHPolicyOptions) GetDeniedHostNameOptions() *SSHNameOptions {
-	if o == nil {
-		return nil
-	}
-	if o.Host == nil {
+	if o == nil || o.Host == nil {
 		return nil
 	}
 	return o.Host.DeniedNames

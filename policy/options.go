@@ -26,7 +26,7 @@ func WithAllowLiteralWildcardNames() NamePolicyOption {
 	}
 }
 
-func WithPermittedDNSDomains(domains []string) NamePolicyOption {
+func WithPermittedDNSDomains(domains ...string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		normalizedDomains := make([]string, len(domains))
 		for i, domain := range domains {
@@ -41,7 +41,7 @@ func WithPermittedDNSDomains(domains []string) NamePolicyOption {
 	}
 }
 
-func WithExcludedDNSDomains(domains []string) NamePolicyOption {
+func WithExcludedDNSDomains(domains ...string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		normalizedDomains := make([]string, len(domains))
 		for i, domain := range domains {
@@ -56,36 +56,14 @@ func WithExcludedDNSDomains(domains []string) NamePolicyOption {
 	}
 }
 
-func WithPermittedDNSDomain(domain string) NamePolicyOption {
-	return func(e *NamePolicyEngine) error {
-		normalizedDomain, err := normalizeAndValidateDNSDomainConstraint(domain)
-		if err != nil {
-			return fmt.Errorf("cannot parse permitted domain constraint %q: %w", domain, err)
-		}
-		e.permittedDNSDomains = []string{normalizedDomain}
-		return nil
-	}
-}
-
-func WithExcludedDNSDomain(domain string) NamePolicyOption {
-	return func(e *NamePolicyEngine) error {
-		normalizedDomain, err := normalizeAndValidateDNSDomainConstraint(domain)
-		if err != nil {
-			return fmt.Errorf("cannot parse excluded domain constraint %q: %w", domain, err)
-		}
-		e.excludedDNSDomains = []string{normalizedDomain}
-		return nil
-	}
-}
-
-func WithPermittedIPRanges(ipRanges []*net.IPNet) NamePolicyOption {
+func WithPermittedIPRanges(ipRanges ...*net.IPNet) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		e.permittedIPRanges = ipRanges
 		return nil
 	}
 }
 
-func WithPermittedCIDRs(cidrs []string) NamePolicyOption {
+func WithPermittedCIDRs(cidrs ...string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		networks := make([]*net.IPNet, len(cidrs))
 		for i, cidr := range cidrs {
@@ -100,7 +78,7 @@ func WithPermittedCIDRs(cidrs []string) NamePolicyOption {
 	}
 }
 
-func WithExcludedCIDRs(cidrs []string) NamePolicyOption {
+func WithExcludedCIDRs(cidrs ...string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		networks := make([]*net.IPNet, len(cidrs))
 		for i, cidr := range cidrs {
@@ -115,7 +93,7 @@ func WithExcludedCIDRs(cidrs []string) NamePolicyOption {
 	}
 }
 
-func WithPermittedIPsOrCIDRs(ipsOrCIDRs []string) NamePolicyOption {
+func WithPermittedIPsOrCIDRs(ipsOrCIDRs ...string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		networks := make([]*net.IPNet, len(ipsOrCIDRs))
 		for i, ipOrCIDR := range ipsOrCIDRs {
@@ -133,7 +111,7 @@ func WithPermittedIPsOrCIDRs(ipsOrCIDRs []string) NamePolicyOption {
 	}
 }
 
-func WithExcludedIPsOrCIDRs(ipsOrCIDRs []string) NamePolicyOption {
+func WithExcludedIPsOrCIDRs(ipsOrCIDRs ...string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		networks := make([]*net.IPNet, len(ipsOrCIDRs))
 		for i, ipOrCIDR := range ipsOrCIDRs {
@@ -151,61 +129,14 @@ func WithExcludedIPsOrCIDRs(ipsOrCIDRs []string) NamePolicyOption {
 	}
 }
 
-func WithPermittedCIDR(cidr string) NamePolicyOption {
-	return func(e *NamePolicyEngine) error {
-		_, nw, err := net.ParseCIDR(cidr)
-		if err != nil {
-			return fmt.Errorf("cannot parse permitted CIDR constraint %q", cidr)
-		}
-		e.permittedIPRanges = []*net.IPNet{nw}
-		return nil
-	}
-}
-
-func WithPermittedIP(ip net.IP) NamePolicyOption {
-	return func(e *NamePolicyEngine) error {
-		nw := networkFor(ip)
-		e.permittedIPRanges = []*net.IPNet{nw}
-		return nil
-	}
-}
-
-func WithExcludedIPRanges(ipRanges []*net.IPNet) NamePolicyOption {
+func WithExcludedIPRanges(ipRanges ...*net.IPNet) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		e.excludedIPRanges = ipRanges
 		return nil
 	}
 }
 
-func WithExcludedCIDR(cidr string) NamePolicyOption {
-	return func(e *NamePolicyEngine) error {
-		_, nw, err := net.ParseCIDR(cidr)
-		if err != nil {
-			return fmt.Errorf("cannot parse excluded CIDR constraint %q", cidr)
-		}
-		e.excludedIPRanges = []*net.IPNet{nw}
-		return nil
-	}
-}
-
-func WithExcludedIP(ip net.IP) NamePolicyOption {
-	return func(e *NamePolicyEngine) error {
-		var mask net.IPMask
-		if !isIPv4(ip) {
-			mask = net.CIDRMask(128, 128)
-		} else {
-			mask = net.CIDRMask(32, 32)
-		}
-		nw := &net.IPNet{
-			IP:   ip,
-			Mask: mask,
-		}
-		e.excludedIPRanges = []*net.IPNet{nw}
-		return nil
-	}
-}
-
-func WithPermittedEmailAddresses(emailAddresses []string) NamePolicyOption {
+func WithPermittedEmailAddresses(emailAddresses ...string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		normalizedEmailAddresses := make([]string, len(emailAddresses))
 		for i, email := range emailAddresses {
@@ -220,7 +151,7 @@ func WithPermittedEmailAddresses(emailAddresses []string) NamePolicyOption {
 	}
 }
 
-func WithExcludedEmailAddresses(emailAddresses []string) NamePolicyOption {
+func WithExcludedEmailAddresses(emailAddresses ...string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		normalizedEmailAddresses := make([]string, len(emailAddresses))
 		for i, email := range emailAddresses {
@@ -235,29 +166,7 @@ func WithExcludedEmailAddresses(emailAddresses []string) NamePolicyOption {
 	}
 }
 
-func WithPermittedEmailAddress(emailAddress string) NamePolicyOption {
-	return func(e *NamePolicyEngine) error {
-		normalizedEmailAddress, err := normalizeAndValidateEmailConstraint(emailAddress)
-		if err != nil {
-			return fmt.Errorf("cannot parse permitted email constraint %q: %w", emailAddress, err)
-		}
-		e.permittedEmailAddresses = []string{normalizedEmailAddress}
-		return nil
-	}
-}
-
-func WithExcludedEmailAddress(emailAddress string) NamePolicyOption {
-	return func(e *NamePolicyEngine) error {
-		normalizedEmailAddress, err := normalizeAndValidateEmailConstraint(emailAddress)
-		if err != nil {
-			return fmt.Errorf("cannot parse excluded email constraint %q: %w", emailAddress, err)
-		}
-		e.excludedEmailAddresses = []string{normalizedEmailAddress}
-		return nil
-	}
-}
-
-func WithPermittedURIDomains(uriDomains []string) NamePolicyOption {
+func WithPermittedURIDomains(uriDomains ...string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		normalizedURIDomains := make([]string, len(uriDomains))
 		for i, domain := range uriDomains {
@@ -272,18 +181,7 @@ func WithPermittedURIDomains(uriDomains []string) NamePolicyOption {
 	}
 }
 
-func WithPermittedURIDomain(domain string) NamePolicyOption {
-	return func(e *NamePolicyEngine) error {
-		normalizedURIDomain, err := normalizeAndValidateURIDomainConstraint(domain)
-		if err != nil {
-			return fmt.Errorf("cannot parse permitted URI domain constraint %q: %w", domain, err)
-		}
-		e.permittedURIDomains = []string{normalizedURIDomain}
-		return nil
-	}
-}
-
-func WithExcludedURIDomains(domains []string) NamePolicyOption {
+func WithExcludedURIDomains(domains ...string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		normalizedURIDomains := make([]string, len(domains))
 		for i, domain := range domains {
@@ -298,18 +196,7 @@ func WithExcludedURIDomains(domains []string) NamePolicyOption {
 	}
 }
 
-func WithExcludedURIDomain(domain string) NamePolicyOption {
-	return func(e *NamePolicyEngine) error {
-		normalizedURIDomain, err := normalizeAndValidateURIDomainConstraint(domain)
-		if err != nil {
-			return fmt.Errorf("cannot parse excluded URI domain constraint %q: %w", domain, err)
-		}
-		e.excludedURIDomains = []string{normalizedURIDomain}
-		return nil
-	}
-}
-
-func WithPermittedPrincipals(principals []string) NamePolicyOption {
+func WithPermittedPrincipals(principals ...string) NamePolicyOption {
 	return func(g *NamePolicyEngine) error {
 		// TODO(hs): normalize and parse principal into the right type? Seems the safe thing to do.
 		g.permittedPrincipals = principals
@@ -317,7 +204,7 @@ func WithPermittedPrincipals(principals []string) NamePolicyOption {
 	}
 }
 
-func WithExcludedPrincipals(principals []string) NamePolicyOption {
+func WithExcludedPrincipals(principals ...string) NamePolicyOption {
 	return func(g *NamePolicyEngine) error {
 		// TODO(hs): normalize and parse principal into the right type? Seems the safe thing to do.
 		g.excludedPrincipals = principals
@@ -357,7 +244,7 @@ func normalizeAndValidateDNSDomainConstraint(constraint string) (string, error) 
 	if strings.LastIndex(normalizedConstraint, "*") > 0 {
 		return "", fmt.Errorf("domain constraint %q can only have wildcard as starting character", constraint)
 	}
-	if normalizedConstraint[0] == '*' && normalizedConstraint[1] != '.' {
+	if len(normalizedConstraint) >= 2 && normalizedConstraint[0] == '*' && normalizedConstraint[1] != '.' {
 		return "", fmt.Errorf("wildcard character in domain constraint %q can only be used to match (full) labels", constraint)
 	}
 	if strings.HasPrefix(normalizedConstraint, "*.") {

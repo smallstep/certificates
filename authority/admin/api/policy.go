@@ -74,8 +74,7 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 	}
 
 	if policy != nil {
-		adminErr := admin.NewError(admin.ErrorBadRequestType, "authority already has a policy")
-		adminErr.Status = http.StatusConflict
+		adminErr := admin.NewError(admin.ErrorConflictType, "authority already has a policy")
 		render.Error(w, adminErr)
 		return
 	}
@@ -197,8 +196,7 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 
 	policy := prov.GetPolicy()
 	if policy != nil {
-		adminErr := admin.NewError(admin.ErrorBadRequestType, "provisioner %s already has a policy", prov.Name)
-		adminErr.Status = http.StatusConflict
+		adminErr := admin.NewError(admin.ErrorConflictType, "provisioner %s already has a policy", prov.Name)
 		render.Error(w, adminErr)
 		return
 	}
@@ -307,8 +305,7 @@ func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, 
 
 	policy := eak.GetPolicy()
 	if policy != nil {
-		adminErr := admin.NewError(admin.ErrorBadRequestType, "ACME EAK %s already has a policy", eak.Id)
-		adminErr.Status = http.StatusConflict
+		adminErr := admin.NewError(admin.ErrorConflictType, "ACME EAK %s already has a policy", eak.Id)
 		render.Error(w, adminErr)
 		return
 	}

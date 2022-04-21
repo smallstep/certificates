@@ -154,9 +154,8 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 		},
 		"fail/existing-policy": func(t *testing.T) test {
 			ctx := context.Background()
-			err := admin.NewError(admin.ErrorBadRequestType, "authority already has a policy")
+			err := admin.NewError(admin.ErrorConflictType, "authority already has a policy")
 			err.Message = "authority already has a policy"
-			err.Status = http.StatusConflict
 			return test{
 				ctx: ctx,
 				auth: &mockAdminAuthority{
@@ -864,9 +863,8 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 				Policy: policy,
 			}
 			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
-			err := admin.NewError(admin.ErrorBadRequestType, "provisioner provName already has a policy")
+			err := admin.NewError(admin.ErrorConflictType, "provisioner provName already has a policy")
 			err.Message = "provisioner provName already has a policy"
-			err.Status = http.StatusConflict
 			return test{
 				ctx:        ctx,
 				err:        err,
@@ -1466,9 +1464,8 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 			}
 			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
 			ctx = linkedca.NewContextWithExternalAccountKey(ctx, eak)
-			err := admin.NewError(admin.ErrorBadRequestType, "ACME EAK eakID already has a policy")
+			err := admin.NewError(admin.ErrorConflictType, "ACME EAK eakID already has a policy")
 			err.Message = "ACME EAK eakID already has a policy"
-			err.Status = http.StatusConflict
 			return test{
 				ctx:        ctx,
 				err:        err,

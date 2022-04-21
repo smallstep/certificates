@@ -10,17 +10,19 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"gopkg.in/square/go-jose.v2/jwt"
+
+	"go.step.sm/cli-utils/step"
+	"go.step.sm/cli-utils/ui"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"go.step.sm/cli-utils/step"
-	"go.step.sm/cli-utils/ui"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/linkedca"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // GetEncryptedKey returns the JWE key corresponding to the given kid argument.
@@ -440,55 +442,55 @@ func optionsToCertificates(p *linkedca.Provisioner) *provisioner.Options {
 		ops.SSH.Template = string(p.SshTemplate.Template)
 		ops.SSH.TemplateData = p.SshTemplate.Data
 	}
-	if p.Policy != nil {
-		if p.Policy.X509 != nil {
-			if p.Policy.X509.Allow != nil {
+	if pol := p.GetPolicy(); pol != nil {
+		if x := pol.GetX509(); x != nil {
+			if allow := x.GetAllow(); allow != nil {
 				ops.X509.AllowedNames = &policy.X509NameOptions{
-					DNSDomains:     p.Policy.X509.Allow.Dns,
-					IPRanges:       p.Policy.X509.Allow.Ips,
-					EmailAddresses: p.Policy.X509.Allow.Emails,
-					URIDomains:     p.Policy.X509.Allow.Uris,
+					DNSDomains:     allow.Dns,
+					IPRanges:       allow.Ips,
+					EmailAddresses: allow.Emails,
+					URIDomains:     allow.Uris,
 				}
 			}
-			if p.Policy.X509.Deny != nil {
+			if deny := x.GetDeny(); deny != nil {
 				ops.X509.DeniedNames = &policy.X509NameOptions{
-					DNSDomains:     p.Policy.X509.Deny.Dns,
-					IPRanges:       p.Policy.X509.Deny.Ips,
-					EmailAddresses: p.Policy.X509.Deny.Emails,
-					URIDomains:     p.Policy.X509.Deny.Uris,
+					DNSDomains:     deny.Dns,
+					IPRanges:       deny.Ips,
+					EmailAddresses: deny.Emails,
+					URIDomains:     deny.Uris,
 				}
 			}
 		}
-		if p.Policy.Ssh != nil {
-			if p.Policy.Ssh.Host != nil {
+		if ssh := pol.GetSsh(); ssh != nil {
+			if host := ssh.GetHost(); host != nil {
 				ops.SSH.Host = &policy.SSHHostCertificateOptions{}
-				if p.Policy.Ssh.Host.Allow != nil {
+				if allow := host.GetAllow(); allow != nil {
 					ops.SSH.Host.AllowedNames = &policy.SSHNameOptions{
-						DNSDomains: p.Policy.Ssh.Host.Allow.Dns,
-						IPRanges:   p.Policy.Ssh.Host.Allow.Ips,
-						Principals: p.Policy.Ssh.Host.Allow.Principals,
+						DNSDomains: allow.Dns,
+						IPRanges:   allow.Ips,
+						Principals: allow.Principals,
 					}
 				}
-				if p.Policy.Ssh.Host.Deny != nil {
+				if deny := host.GetDeny(); deny != nil {
 					ops.SSH.Host.DeniedNames = &policy.SSHNameOptions{
-						DNSDomains: p.Policy.Ssh.Host.Deny.Dns,
-						IPRanges:   p.Policy.Ssh.Host.Deny.Ips,
-						Principals: p.Policy.Ssh.Host.Deny.Principals,
+						DNSDomains: deny.Dns,
+						IPRanges:   deny.Ips,
+						Principals: deny.Principals,
 					}
 				}
 			}
-			if p.Policy.Ssh.User != nil {
+			if user := ssh.GetUser(); user != nil {
 				ops.SSH.User = &policy.SSHUserCertificateOptions{}
-				if p.Policy.Ssh.User.Allow != nil {
+				if allow := user.GetAllow(); allow != nil {
 					ops.SSH.User.AllowedNames = &policy.SSHNameOptions{
-						EmailAddresses: p.Policy.Ssh.User.Allow.Emails,
-						Principals:     p.Policy.Ssh.User.Allow.Principals,
+						EmailAddresses: allow.Emails,
+						Principals:     allow.Principals,
 					}
 				}
-				if p.Policy.Ssh.User.Deny != nil {
+				if deny := user.GetDeny(); deny != nil {
 					ops.SSH.User.DeniedNames = &policy.SSHNameOptions{
-						EmailAddresses: p.Policy.Ssh.User.Deny.Emails,
-						Principals:     p.Policy.Ssh.User.Deny.Principals,
+						EmailAddresses: deny.Emails,
+						Principals:     deny.Principals,
 					}
 				}
 			}

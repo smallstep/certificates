@@ -28,20 +28,20 @@ func NewX509PolicyEngine(policyOptions X509PolicyOptionsInterface) (X509Policy, 
 	allowed := policyOptions.GetAllowedNameOptions()
 	if allowed != nil && allowed.HasNames() {
 		options = append(options,
-			policy.WithPermittedDNSDomains(allowed.DNSDomains),
-			policy.WithPermittedIPsOrCIDRs(allowed.IPRanges),
-			policy.WithPermittedEmailAddresses(allowed.EmailAddresses),
-			policy.WithPermittedURIDomains(allowed.URIDomains),
+			policy.WithPermittedDNSDomains(allowed.DNSDomains...),
+			policy.WithPermittedIPsOrCIDRs(allowed.IPRanges...),
+			policy.WithPermittedEmailAddresses(allowed.EmailAddresses...),
+			policy.WithPermittedURIDomains(allowed.URIDomains...),
 		)
 	}
 
 	denied := policyOptions.GetDeniedNameOptions()
 	if denied != nil && denied.HasNames() {
 		options = append(options,
-			policy.WithExcludedDNSDomains(denied.DNSDomains),
-			policy.WithExcludedIPsOrCIDRs(denied.IPRanges),
-			policy.WithExcludedEmailAddresses(denied.EmailAddresses),
-			policy.WithExcludedURIDomains(denied.URIDomains),
+			policy.WithExcludedDNSDomains(denied.DNSDomains...),
+			policy.WithExcludedIPsOrCIDRs(denied.IPRanges...),
+			policy.WithExcludedEmailAddresses(denied.EmailAddresses...),
+			policy.WithExcludedURIDomains(denied.URIDomains...),
 		)
 	}
 
@@ -114,19 +114,19 @@ func newSSHPolicyEngine(policyOptions SSHPolicyOptionsInterface, typ sshPolicyEn
 
 	if allowed != nil && allowed.HasNames() {
 		options = append(options,
-			policy.WithPermittedDNSDomains(allowed.DNSDomains),
-			policy.WithPermittedIPsOrCIDRs(allowed.IPRanges),
-			policy.WithPermittedEmailAddresses(allowed.EmailAddresses),
-			policy.WithPermittedPrincipals(allowed.Principals),
+			policy.WithPermittedDNSDomains(allowed.DNSDomains...),
+			policy.WithPermittedIPsOrCIDRs(allowed.IPRanges...),
+			policy.WithPermittedEmailAddresses(allowed.EmailAddresses...),
+			policy.WithPermittedPrincipals(allowed.Principals...),
 		)
 	}
 
 	if denied != nil && denied.HasNames() {
 		options = append(options,
-			policy.WithExcludedDNSDomains(denied.DNSDomains),
-			policy.WithExcludedIPsOrCIDRs(denied.IPRanges),
-			policy.WithExcludedEmailAddresses(denied.EmailAddresses),
-			policy.WithExcludedPrincipals(denied.Principals),
+			policy.WithExcludedDNSDomains(denied.DNSDomains...),
+			policy.WithExcludedIPsOrCIDRs(denied.IPRanges...),
+			policy.WithExcludedEmailAddresses(denied.EmailAddresses...),
+			policy.WithExcludedPrincipals(denied.Principals...),
 		)
 	}
 
