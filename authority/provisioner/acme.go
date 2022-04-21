@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
-	"github.com/smallstep/certificates/authority/policy"
 )
 
 // ACME is the acme provisioner type, an entity that can authorize the ACME
@@ -28,8 +26,7 @@ type ACME struct {
 	Claims     *Claims  `json:"claims,omitempty"`
 	Options    *Options `json:"options,omitempty"`
 
-	ctl        *Controller
-	x509Policy policy.X509Policy
+	ctl *Controller
 }
 
 // GetID returns the provisioner unique identifier.
@@ -86,12 +83,7 @@ func (p *ACME) Init(config Config) (err error) {
 		return errors.New("provisioner name cannot be empty")
 	}
 
-	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
-		return err
-	}
-
-	p.ctl, err = NewController(p, p.Claims, config)
+	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
@@ -115,8 +107,10 @@ type ACMEIdentifier struct {
 // certificate for an ACME Order Identifier.
 func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIdentifier) error {
 
+	x509Policy := p.ctl.GetPolicy().GetX509()
+
 	// identifier is allowed if no policy is configured
-	if p.x509Policy == nil {
+	if x509Policy == nil {
 		return nil
 	}
 
@@ -124,9 +118,9 @@ func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIden
 	var err error
 	switch identifier.Type {
 	case IP:
-		_, err = p.x509Policy.IsIPAllowed(net.ParseIP(identifier.Value))
+		_, err = x509Policy.IsIPAllowed(net.ParseIP(identifier.Value))
 	case DNS:
-		_, err = p.x509Policy.IsDNSAllowed(identifier.Value)
+		_, err = x509Policy.IsDNSAllowed(identifier.Value)
 	default:
 		err = fmt.Errorf("invalid ACME identifier type '%s' provided", identifier.Type)
 	}
@@ -147,7 +141,7 @@ func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.x509Policy),
+		newX509NamePolicyValidator(p.ctl.GetPolicy().GetX509()),
 	}
 
 	return opts, nil

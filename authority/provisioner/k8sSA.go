@@ -16,7 +16,6 @@ import (
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 
-	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -52,11 +51,8 @@ type K8sSA struct {
 	Claims  *Claims  `json:"claims,omitempty"`
 	Options *Options `json:"options,omitempty"`
 	//kauthn    kauthn.AuthenticationV1Interface
-	pubKeys       []interface{}
-	ctl           *Controller
-	x509Policy    policy.X509Policy
-	sshHostPolicy policy.HostPolicy
-	sshUserPolicy policy.UserPolicy
+	pubKeys []interface{}
+	ctl     *Controller
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -144,22 +140,7 @@ func (p *K8sSA) Init(config Config) (err error) {
 		p.kauthn = k8s.AuthenticationV1()
 	*/
 
-	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for user certificates
-	if p.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for host certificates
-	if p.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
-		return err
-	}
-
-	p.ctl, err = NewController(p, p.Claims, config)
+	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
@@ -261,7 +242,7 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.x509Policy),
+		newX509NamePolicyValidator(p.ctl.GetPolicy().GetX509()),
 	}, nil
 }
 
@@ -305,7 +286,7 @@ func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		// Require and validate all the default fields in the SSH certificate.
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshHostPolicy, p.sshUserPolicy),
+		newSSHNamePolicyValidator(p.ctl.GetPolicy().GetSSHHost(), p.ctl.GetPolicy().GetSSHUser()),
 	), nil
 }
 

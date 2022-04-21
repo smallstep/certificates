@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
-	"github.com/smallstep/certificates/authority/policy"
 )
 
 // SCEP is the SCEP provisioner type, an entity that can authorize the
@@ -36,7 +34,6 @@ type SCEP struct {
 	ctl                           *Controller
 	secretChallengePassword       string
 	encryptionAlgorithm           int
-	x509Policy                    policy.X509Policy
 }
 
 // GetID returns the provisioner unique identifier.
@@ -113,12 +110,7 @@ func (s *SCEP) Init(config Config) (err error) {
 
 	// TODO: add other, SCEP specific, options?
 
-	// Initialize the x509 allow/deny policy engine
-	if s.x509Policy, err = policy.NewX509PolicyEngine(s.Options.GetX509Options()); err != nil {
-		return err
-	}
-
-	s.ctl, err = NewController(s, s.Claims, config)
+	s.ctl, err = NewController(s, s.Claims, config, s.Options)
 	return
 }
 
@@ -135,7 +127,7 @@ func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		newPublicKeyMinimumLengthValidator(s.MinimumPublicKeyLength),
 		newValidityValidator(s.ctl.Claimer.MinTLSCertDuration(), s.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(s.x509Policy),
+		newX509NamePolicyValidator(s.ctl.GetPolicy().GetX509()),
 	}, nil
 }
 

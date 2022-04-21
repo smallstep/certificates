@@ -7,6 +7,7 @@ import (
 
 	"go.step.sm/linkedca"
 
+	"github.com/smallstep/certificates/authority/admin"
 	authPolicy "github.com/smallstep/certificates/authority/policy"
 	policy "github.com/smallstep/certificates/policy"
 )
@@ -228,7 +229,10 @@ func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
 
 		linkedPolicy, err := a.adminDB.GetAuthorityPolicy(ctx)
 		if err != nil {
-			return fmt.Errorf("error getting policy to (re)load policy engines: %w", err)
+			var ae *admin.Error
+			if isAdminError := errors.As(err, &ae); (isAdminError && ae.Type != admin.ErrorNotFoundType.String()) || !isAdminError {
+				return fmt.Errorf("error getting policy to (re)load policy engines: %w", err)
+			}
 		}
 		policyOptions = policyToCertificates(linkedPolicy)
 	} else {

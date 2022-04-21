@@ -18,7 +18,6 @@ import (
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 
-	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -103,8 +102,6 @@ type Azure struct {
 	oidcConfig             openIDConfiguration
 	keyStore               *keyStore
 	ctl                    *Controller
-	x509Policy             policy.X509Policy
-	sshHostPolicy          policy.HostPolicy
 }
 
 // GetID returns the provisioner unique identifier.
@@ -224,17 +221,7 @@ func (p *Azure) Init(config Config) (err error) {
 		return
 	}
 
-	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for host certificates
-	if p.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
-		return err
-	}
-
-	p.ctl, err = NewController(p, p.Claims, config)
+	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
@@ -375,7 +362,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.x509Policy),
+		newX509NamePolicyValidator(p.ctl.GetPolicy().GetX509()),
 	), nil
 }
 
@@ -442,7 +429,7 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshHostPolicy, nil),
+		newSSHNamePolicyValidator(p.ctl.GetPolicy().GetSSHHost(), nil),
 	), nil
 }
 

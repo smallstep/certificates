@@ -12,7 +12,6 @@ import (
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 
-	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -31,17 +30,14 @@ type stepPayload struct {
 // signature requests.
 type JWK struct {
 	*base
-	ID            string           `json:"-"`
-	Type          string           `json:"type"`
-	Name          string           `json:"name"`
-	Key           *jose.JSONWebKey `json:"key"`
-	EncryptedKey  string           `json:"encryptedKey,omitempty"`
-	Claims        *Claims          `json:"claims,omitempty"`
-	Options       *Options         `json:"options,omitempty"`
-	ctl           *Controller
-	x509Policy    policy.X509Policy
-	sshHostPolicy policy.HostPolicy
-	sshUserPolicy policy.UserPolicy
+	ID           string           `json:"-"`
+	Type         string           `json:"type"`
+	Name         string           `json:"name"`
+	Key          *jose.JSONWebKey `json:"key"`
+	EncryptedKey string           `json:"encryptedKey,omitempty"`
+	Claims       *Claims          `json:"claims,omitempty"`
+	Options      *Options         `json:"options,omitempty"`
+	ctl          *Controller
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -103,22 +99,7 @@ func (p *JWK) Init(config Config) (err error) {
 		return errors.New("provisioner key cannot be empty")
 	}
 
-	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for user certificates
-	if p.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for host certificates
-	if p.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
-		return err
-	}
-
-	p.ctl, err = NewController(p, p.Claims, config)
+	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
@@ -202,7 +183,7 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		defaultPublicKeyValidator{},
 		defaultSANsValidator(claims.SANs),
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.x509Policy),
+		newX509NamePolicyValidator(p.ctl.GetPolicy().GetX509()),
 	}, nil
 }
 
@@ -285,7 +266,7 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Require and validate all the default fields in the SSH certificate.
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshHostPolicy, p.sshUserPolicy),
+		newSSHNamePolicyValidator(p.ctl.GetPolicy().GetSSHHost(), p.ctl.GetPolicy().GetSSHUser()),
 	), nil
 }
 

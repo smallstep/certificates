@@ -17,7 +17,6 @@ import (
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 
-	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -96,9 +95,6 @@ type OIDC struct {
 	configuration         openIDConfiguration
 	keyStore              *keyStore
 	ctl                   *Controller
-	x509Policy            policy.X509Policy
-	sshHostPolicy         policy.HostPolicy
-	sshUserPolicy         policy.UserPolicy
 }
 
 func sanitizeEmail(email string) string {
@@ -201,22 +197,7 @@ func (o *OIDC) Init(config Config) (err error) {
 		return err
 	}
 
-	// Initialize the x509 allow/deny policy engine
-	if o.x509Policy, err = policy.NewX509PolicyEngine(o.Options.GetX509Options()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for user certificates
-	if o.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(o.Options.GetSSHOptions()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for host certificates
-	if o.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(o.Options.GetSSHOptions()); err != nil {
-		return err
-	}
-
-	o.ctl, err = NewController(o, o.Claims, config)
+	o.ctl, err = NewController(o, o.Claims, config, o.Options)
 	return
 }
 
@@ -374,7 +355,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(o.ctl.Claimer.MinTLSCertDuration(), o.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(o.x509Policy),
+		newX509NamePolicyValidator(o.ctl.GetPolicy().GetX509()),
 	}, nil
 }
 
@@ -462,7 +443,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(o.sshHostPolicy, o.sshUserPolicy),
+		newSSHNamePolicyValidator(o.ctl.GetPolicy().GetSSHHost(), o.ctl.GetPolicy().GetSSHUser()),
 	), nil
 }
 

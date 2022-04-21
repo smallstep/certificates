@@ -10,13 +10,14 @@ import (
 
 	"github.com/pkg/errors"
 	nebula "github.com/slackhq/nebula/cert"
-	"github.com/smallstep/certificates/authority/policy"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x25519"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 const (
@@ -35,16 +36,14 @@ const (
 // https://signal.org/docs/specifications/xeddsa/#xeddsa and implemented by
 // go.step.sm/crypto/x25519.
 type Nebula struct {
-	ID            string   `json:"-"`
-	Type          string   `json:"type"`
-	Name          string   `json:"name"`
-	Roots         []byte   `json:"roots"`
-	Claims        *Claims  `json:"claims,omitempty"`
-	Options       *Options `json:"options,omitempty"`
-	caPool        *nebula.NebulaCAPool
-	ctl           *Controller
-	x509Policy    policy.X509Policy
-	sshHostPolicy policy.HostPolicy
+	ID      string   `json:"-"`
+	Type    string   `json:"type"`
+	Name    string   `json:"name"`
+	Roots   []byte   `json:"roots"`
+	Claims  *Claims  `json:"claims,omitempty"`
+	Options *Options `json:"options,omitempty"`
+	caPool  *nebula.NebulaCAPool
+	ctl     *Controller
 }
 
 // Init verifies and initializes the Nebula provisioner.
@@ -63,18 +62,8 @@ func (p *Nebula) Init(config Config) (err error) {
 		return errs.InternalServer("failed to create ca pool: %v", err)
 	}
 
-	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for host certificates
-	if p.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
-		return err
-	}
-
 	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
-	p.ctl, err = NewController(p, p.Claims, config)
+	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
@@ -174,7 +163,7 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 		},
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.x509Policy),
+		newX509NamePolicyValidator(p.ctl.GetPolicy().GetX509()),
 	}, nil
 }
 
@@ -271,7 +260,7 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshHostPolicy, nil),
+		newSSHNamePolicyValidator(p.ctl.GetPolicy().GetSSHHost(), nil),
 	), nil
 }
 

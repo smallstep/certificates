@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/certificates/authority/policy"
 )
 
 var trueValue = true
@@ -30,11 +32,40 @@ func mustDuration(t *testing.T, s string) *Duration {
 	return d
 }
 
+func mustNewPolicyEngine(t *testing.T, options *Options) *policyEngine {
+	t.Helper()
+	c, err := newPolicyEngine(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
 func TestNewController(t *testing.T) {
+	options := &Options{
+		X509: &X509Options{
+			AllowedNames: &policy.X509NameOptions{
+				DNSDomains: []string{"*.local"},
+			},
+		},
+		SSH: &SSHOptions{
+			Host: &policy.SSHHostCertificateOptions{
+				AllowedNames: &policy.SSHNameOptions{
+					DNSDomains: []string{"*.local"},
+				},
+			},
+			User: &policy.SSHUserCertificateOptions{
+				AllowedNames: &policy.SSHNameOptions{
+					EmailAddresses: []string{"@example.com"},
+				},
+			},
+		},
+	}
 	type args struct {
-		p      Interface
-		claims *Claims
-		config Config
+		p       Interface
+		claims  *Claims
+		config  Config
+		options *Options
 	}
 	tests := []struct {
 		name    string
@@ -45,7 +76,7 @@ func TestNewController(t *testing.T) {
 		{"ok", args{&JWK{}, nil, Config{
 			Claims:    globalProvisionerClaims,
 			Audiences: testAudiences,
-		}}, &Controller{
+		}, nil}, &Controller{
 			Interface: &JWK{},
 			Audiences: &testAudiences,
 			Claimer:   mustClaimer(t, nil, globalProvisionerClaims),
@@ -55,12 +86,25 @@ func TestNewController(t *testing.T) {
 		}, Config{
 			Claims:    globalProvisionerClaims,
 			Audiences: testAudiences,
-		}}, &Controller{
+		}, nil}, &Controller{
 			Interface: &JWK{},
 			Audiences: &testAudiences,
 			Claimer: mustClaimer(t, &Claims{
 				DisableRenewal: &defaultDisableRenewal,
 			}, globalProvisionerClaims),
+		}, false},
+		{"ok with claims and options", args{&JWK{}, &Claims{
+			DisableRenewal: &defaultDisableRenewal,
+		}, Config{
+			Claims:    globalProvisionerClaims,
+			Audiences: testAudiences,
+		}, options}, &Controller{
+			Interface: &JWK{},
+			Audiences: &testAudiences,
+			Claimer: mustClaimer(t, &Claims{
+				DisableRenewal: &defaultDisableRenewal,
+			}, globalProvisionerClaims),
+			policy: mustNewPolicyEngine(t, options),
 		}, false},
 		{"fail claimer", args{&JWK{}, &Claims{
 			MinTLSDur: mustDuration(t, "24h"),
@@ -68,11 +112,23 @@ func TestNewController(t *testing.T) {
 		}, Config{
 			Claims:    globalProvisionerClaims,
 			Audiences: testAudiences,
+		}, nil}, nil, true},
+		{"fail options", args{&JWK{}, &Claims{
+			DisableRenewal: &defaultDisableRenewal,
+		}, Config{
+			Claims:    globalProvisionerClaims,
+			Audiences: testAudiences,
+		}, &Options{
+			X509: &X509Options{
+				AllowedNames: &policy.X509NameOptions{
+					DNSDomains: []string{"**.local"},
+				},
+			},
 		}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewController(tt.args.p, tt.args.claims, tt.args.config)
+			got, err := NewController(tt.args.p, tt.args.claims, tt.args.config, tt.args.options)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewController() error = %v, wantErr %v", err, tt.wantErr)
 				return

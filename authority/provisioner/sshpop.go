@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
-	"go.step.sm/crypto/jose"
 	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 // sshPOPPayload extends jwt.Claims with step attributes.
@@ -92,12 +94,10 @@ func (p *SSHPOP) Init(config Config) (err error) {
 		return errors.New("provisioner public SSH validation keys cannot be empty")
 	}
 
-	// TODO(hs): initialize the policy engine and add it as an SSH cert validator
-
 	p.sshPubKeys = config.SSHKeys
 
 	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
-	p.ctl, err = NewController(p, p.Claims, config)
+	p.ctl, err = NewController(p, p.Claims, config, nil)
 	return
 }
 

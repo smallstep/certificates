@@ -14,11 +14,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/policy"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 // gcpCertsURL is the url that serves Google OAuth2 public keys.
@@ -92,8 +93,6 @@ type GCP struct {
 	config                 *gcpConfig
 	keyStore               *keyStore
 	ctl                    *Controller
-	x509Policy             policy.X509Policy
-	sshHostPolicy          policy.HostPolicy
 }
 
 // GetID returns the provisioner unique identifier. The name should uniquely
@@ -214,18 +213,8 @@ func (p *GCP) Init(config Config) (err error) {
 		return
 	}
 
-	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for host certificates
-	if p.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
-		return err
-	}
-
 	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
-	p.ctl, err = NewController(p, p.Claims, config)
+	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
@@ -283,7 +272,7 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.x509Policy),
+		newX509NamePolicyValidator(p.ctl.GetPolicy().GetX509()),
 	), nil
 }
 
@@ -447,6 +436,6 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshHostPolicy, nil),
+		newSSHNamePolicyValidator(p.ctl.GetPolicy().GetSSHHost(), nil),
 	), nil
 }

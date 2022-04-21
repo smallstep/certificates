@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/policy"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 // x5cPayload extends jwt.Claims with step attributes.
@@ -27,17 +28,14 @@ type x5cPayload struct {
 // signature requests.
 type X5C struct {
 	*base
-	ID            string   `json:"-"`
-	Type          string   `json:"type"`
-	Name          string   `json:"name"`
-	Roots         []byte   `json:"roots"`
-	Claims        *Claims  `json:"claims,omitempty"`
-	Options       *Options `json:"options,omitempty"`
-	ctl           *Controller
-	rootPool      *x509.CertPool
-	x509Policy    policy.X509Policy
-	sshHostPolicy policy.HostPolicy
-	sshUserPolicy policy.UserPolicy
+	ID       string   `json:"-"`
+	Type     string   `json:"type"`
+	Name     string   `json:"name"`
+	Roots    []byte   `json:"roots"`
+	Claims   *Claims  `json:"claims,omitempty"`
+	Options  *Options `json:"options,omitempty"`
+	ctl      *Controller
+	rootPool *x509.CertPool
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -124,23 +122,8 @@ func (p *X5C) Init(config Config) (err error) {
 		return errors.Errorf("no x509 certificates found in roots attribute for provisioner '%s'", p.GetName())
 	}
 
-	// Initialize the x509 allow/deny policy engine
-	if p.x509Policy, err = policy.NewX509PolicyEngine(p.Options.GetX509Options()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for user certificates
-	if p.sshUserPolicy, err = policy.NewSSHUserPolicyEngine(p.Options.GetSSHOptions()); err != nil {
-		return err
-	}
-
-	// Initialize the SSH allow/deny policy engine for host certificates
-	if p.sshHostPolicy, err = policy.NewSSHHostPolicyEngine(p.Options.GetSSHOptions()); err != nil {
-		return err
-	}
-
 	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
-	p.ctl, err = NewController(p, p.Claims, config)
+	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
@@ -252,7 +235,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		defaultSANsValidator(claims.SANs),
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.x509Policy),
+		newX509NamePolicyValidator(p.ctl.GetPolicy().GetX509()),
 	}, nil
 }
 
@@ -338,6 +321,6 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.sshHostPolicy, p.sshUserPolicy),
+		newSSHNamePolicyValidator(p.ctl.GetPolicy().GetSSHHost(), p.ctl.GetPolicy().GetSSHUser()),
 	), nil
 }
