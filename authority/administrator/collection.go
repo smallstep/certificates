@@ -59,12 +59,12 @@ func newSubProv(subject, prov string) subProv {
 	return subProv{subject, prov}
 }
 
-// LoadBySubProv a admin by the subject and provisioner name.
+// LoadBySubProv loads an admin by subject and provisioner name.
 func (c *Collection) LoadBySubProv(sub, provName string) (*linkedca.Admin, bool) {
 	return loadAdmin(c.bySubProv, newSubProv(sub, provName))
 }
 
-// LoadByProvisioner a admin by the subject and provisioner name.
+// LoadByProvisioner loads admins by provisioner name.
 func (c *Collection) LoadByProvisioner(provName string) ([]*linkedca.Admin, bool) {
 	val, ok := c.byProv.Load(provName)
 	if !ok {

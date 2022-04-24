@@ -39,7 +39,10 @@ func (a *Authority) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, e
 
 	p, err := a.adminDB.GetAuthorityPolicy(ctx)
 	if err != nil {
-		return nil, err
+		return nil, &PolicyError{
+			Typ: InternalFailure,
+			Err: err,
+		}
 	}
 
 	return p, nil
@@ -50,10 +53,7 @@ func (a *Authority) CreateAuthorityPolicy(ctx context.Context, adm *linkedca.Adm
 	defer a.adminMutex.Unlock()
 
 	if err := a.checkAuthorityPolicy(ctx, adm, p); err != nil {
-		return nil, &PolicyError{
-			Typ: AdminLockOut,
-			Err: err,
-		}
+		return nil, err
 	}
 
 	if err := a.adminDB.CreateAuthorityPolicy(ctx, p); err != nil {
@@ -91,7 +91,7 @@ func (a *Authority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Adm
 	if err := a.reloadPolicyEngines(ctx); err != nil {
 		return nil, &PolicyError{
 			Typ: ReloadFailure,
-			Err: fmt.Errorf("error reloading policy engines when updating authority policy %w", err),
+			Err: fmt.Errorf("error reloading policy engines when updating authority policy: %w", err),
 		}
 	}
 
@@ -145,14 +145,8 @@ func (a *Authority) checkProvisionerPolicy(ctx context.Context, currentAdmin *li
 		return nil
 	}
 
-	// get all admins for the provisioner
-	allProvisionerAdmins, ok := a.admins.LoadByProvisioner(provName)
-	if !ok {
-		return &PolicyError{
-			Typ: InternalFailure,
-			Err: errors.New("error retrieving admins by provisioner"),
-		}
-	}
+	// get all admins for the provisioner; ignoring case in which they're not found
+	allProvisionerAdmins, _ := a.admins.LoadByProvisioner(provName)
 
 	return a.checkPolicy(ctx, currentAdmin, allProvisionerAdmins, p)
 }
@@ -221,11 +215,6 @@ func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
 		if _, ok := a.adminDB.(*linkedCaClient); ok {
 			return nil
 		}
-
-		// // temporarily only support the admin nosql DB
-		// if _, ok := a.adminDB.(*adminDBNosql.DB); !ok {
-		// 	return nil
-		// }
 
 		linkedPolicy, err := a.adminDB.GetAuthorityPolicy(ctx)
 		if err != nil {
