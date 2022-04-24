@@ -10,14 +10,17 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/randutil"
+	"go.step.sm/crypto/sshutil"
+
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	policy "github.com/smallstep/certificates/policy"
 	"github.com/smallstep/certificates/templates"
-	"go.step.sm/crypto/randutil"
-	"go.step.sm/crypto/sshutil"
-	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -252,6 +255,12 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		if a.sshUserPolicy != nil {
 			allowed, err := a.sshUserPolicy.IsSSHCertificateAllowed(certTpl)
 			if err != nil {
+				var pe *policy.NamePolicyError
+				if errors.As(err, &pe) && pe.Reason == policy.NotAuthorizedForThisName {
+					return nil, errs.ApplyOptions(
+						errs.ForbiddenErr(errors.New("authority not allowed to sign"), "authority.SignSSH: %s", err.Error()),
+					)
+				}
 				return nil, errs.InternalServerErr(err,
 					errs.WithMessage("authority.SignSSH: error creating ssh user certificate"),
 				)
@@ -269,6 +278,13 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		if a.sshHostPolicy != nil {
 			allowed, err := a.sshHostPolicy.IsSSHCertificateAllowed(certTpl)
 			if err != nil {
+				var pe *policy.NamePolicyError
+				if errors.As(err, &pe) && pe.Reason == policy.NotAuthorizedForThisName {
+					return nil, errs.ApplyOptions(
+						// TODO: show which names were not allowed; they are in the err
+						errs.ForbiddenErr(errors.New("authority not allowed to sign"), "authority.SignSSH: %s", err.Error()),
+					)
+				}
 				return nil, errs.InternalServerErr(err,
 					errs.WithMessage("authority.SignSSH: error creating ssh host certificate"),
 				)

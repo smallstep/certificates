@@ -16,16 +16,19 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/x509util"
+
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/keyutil"
-	"go.step.sm/crypto/pemutil"
-	"go.step.sm/crypto/x509util"
-	"golang.org/x/crypto/ssh"
+	"github.com/smallstep/certificates/policy"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -199,6 +202,13 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	// Check if authority is allowed to sign the certificate
 	var allowedToSign bool
 	if allowedToSign, err = a.isAllowedToSign(leaf); err != nil {
+		var pe *policy.NamePolicyError
+		if errors.As(err, &pe) && pe.Reason == policy.NotAuthorizedForThisName {
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(errors.New("authority not allowed to sign"), err.Error()),
+				opts...,
+			)
+		}
 		return nil, errs.InternalServerErr(err,
 			errs.WithKeyVal("csr", csr),
 			errs.WithKeyVal("signOptions", signOpts),

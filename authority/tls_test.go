@@ -27,6 +27,7 @@ import (
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas/softcas"
 	"github.com/smallstep/certificates/db"
@@ -511,6 +512,37 @@ ZYtQ9Ot36qc=
 				code:      http.StatusForbidden,
 			}
 		},
+		"fail with policy": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			aa := testAuthority(t)
+			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			aa.db = &db.MockAuthDB{
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					fmt.Println(crt.Subject)
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					return nil
+				},
+			}
+			policyOptions := &policy.X509PolicyOptions{
+				DeniedNames: &policy.X509NameOptions{
+					DNSDomains: []string{"test.smallstep.com"},
+				},
+			}
+			engine, err := policy.NewX509PolicyEngine(policyOptions)
+			assert.FatalError(t, err)
+			aa.x509Policy = engine
+			return &signTest{
+				auth:            aa,
+				csr:             csr,
+				extraOpts:       extraOpts,
+				signOpts:        signOpts,
+				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
+				extensionsCount: 6,
+				err:             errors.New("authority not allowed to sign"),
+				code:            http.StatusForbidden,
+			}
+		},
 		"ok": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			_a := testAuthority(t)
@@ -651,6 +683,36 @@ ZYtQ9Ot36qc=
 				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
 				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
 				extensionsCount: 7,
+			}
+		},
+		"ok with policy": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			aa := testAuthority(t)
+			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			aa.db = &db.MockAuthDB{
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					fmt.Println(crt.Subject)
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					return nil
+				},
+			}
+			policyOptions := &policy.X509PolicyOptions{
+				AllowedNames: &policy.X509NameOptions{
+					DNSDomains: []string{"*.smallstep.com"},
+				},
+				DisableSubjectCommonNameVerification: true, // allows "smallstep test"
+			}
+			engine, err := policy.NewX509PolicyEngine(policyOptions)
+			assert.FatalError(t, err)
+			aa.x509Policy = engine
+			return &signTest{
+				auth:            aa,
+				csr:             csr,
+				extraOpts:       extraOpts,
+				signOpts:        signOpts,
+				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
+				extensionsCount: 6,
 			}
 		},
 	}
