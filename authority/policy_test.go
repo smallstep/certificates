@@ -331,17 +331,104 @@ func Test_policyToCertificates(t *testing.T) {
 }
 
 func TestAuthority_reloadPolicyEngines(t *testing.T) {
-	type exp struct {
-		x509Policy    bool
-		sshUserPolicy bool
-		sshHostPolicy bool
+
+	existingX509PolicyEngine, err := policy.NewX509PolicyEngine(&policy.X509PolicyOptions{
+		AllowedNames: &policy.X509NameOptions{
+			DNSDomains: []string{"*.hosts.example.com"},
+		},
+	})
+	assert.NoError(t, err)
+
+	existingSSHHostPolicyEngine, err := policy.NewSSHHostPolicyEngine(&policy.SSHPolicyOptions{
+		Host: &policy.SSHHostCertificateOptions{
+			AllowedNames: &policy.SSHNameOptions{
+				DNSDomains: []string{"*.hosts.example.com"},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	existingSSHUserPolicyEngine, err := policy.NewSSHUserPolicyEngine(&policy.SSHPolicyOptions{
+		User: &policy.SSHUserCertificateOptions{
+			AllowedNames: &policy.SSHNameOptions{
+				EmailAddresses: []string{"@mails.example.com"},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	newX509PolicyEngine, err := policy.NewX509PolicyEngine(&policy.X509PolicyOptions{
+		AllowedNames: &policy.X509NameOptions{
+			DNSDomains: []string{"*.local"},
+		},
+		DeniedNames: &policy.X509NameOptions{
+			DNSDomains: []string{"badhost.local"},
+		},
+		AllowWildcardLiteral:                 true,
+		DisableSubjectCommonNameVerification: false,
+	})
+	assert.NoError(t, err)
+
+	newSSHHostPolicyEngine, err := policy.NewSSHHostPolicyEngine(&policy.SSHPolicyOptions{
+		Host: &policy.SSHHostCertificateOptions{
+			AllowedNames: &policy.SSHNameOptions{
+				DNSDomains: []string{"*.local"},
+			},
+			DeniedNames: &policy.SSHNameOptions{
+				DNSDomains: []string{"badhost.local"},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	newSSHUserPolicyEngine, err := policy.NewSSHUserPolicyEngine(&policy.SSHPolicyOptions{
+		User: &policy.SSHUserCertificateOptions{
+			AllowedNames: &policy.SSHNameOptions{
+				Principals: []string{"*"},
+			},
+			DeniedNames: &policy.SSHNameOptions{
+				Principals: []string{"root"},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	newAdminX509PolicyEngine, err := policy.NewX509PolicyEngine(&policy.X509PolicyOptions{
+		AllowedNames: &policy.X509NameOptions{
+			DNSDomains: []string{"*.local"},
+		},
+	})
+	assert.NoError(t, err)
+
+	newAdminSSHHostPolicyEngine, err := policy.NewSSHHostPolicyEngine(&policy.SSHPolicyOptions{
+		Host: &policy.SSHHostCertificateOptions{
+			AllowedNames: &policy.SSHNameOptions{
+				DNSDomains: []string{"*.local"},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	newAdminSSHUserPolicyEngine, err := policy.NewSSHUserPolicyEngine(&policy.SSHPolicyOptions{
+		User: &policy.SSHUserCertificateOptions{
+			AllowedNames: &policy.SSHNameOptions{
+				EmailAddresses: []string{"@example.com"},
+			},
+		},
+	})
+	assert.NoError(t, err)
+
+	type expected struct {
+		x509Policy    policy.X509Policy
+		sshUserPolicy policy.UserPolicy
+		sshHostPolicy policy.HostPolicy
 	}
 	tests := []struct {
 		name     string
 		config   *config.Config
 		adminDB  admin.DB
 		ctx      context.Context
-		expected *exp
+		expected *expected
 		wantErr  bool
 	}{
 		{
@@ -360,6 +447,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: true,
+			expected: &expected{
+				x509Policy:    existingX509PolicyEngine,
+				sshUserPolicy: existingSSHUserPolicyEngine,
+				sshHostPolicy: existingSSHHostPolicyEngine,
+			},
 		},
 		{
 			name: "fail/standalone-ssh-host-policy",
@@ -379,6 +471,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: true,
+			expected: &expected{
+				x509Policy:    existingX509PolicyEngine,
+				sshUserPolicy: existingSSHUserPolicyEngine,
+				sshHostPolicy: existingSSHHostPolicyEngine,
+			},
 		},
 		{
 			name: "fail/standalone-ssh-user-policy",
@@ -398,6 +495,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: true,
+			expected: &expected{
+				x509Policy:    existingX509PolicyEngine,
+				sshUserPolicy: existingSSHUserPolicyEngine,
+				sshHostPolicy: existingSSHHostPolicyEngine,
+			},
 		},
 		{
 			name: "fail/adminDB.GetAuthorityPolicy-error",
@@ -413,6 +515,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: true,
+			expected: &expected{
+				x509Policy:    existingX509PolicyEngine,
+				sshUserPolicy: existingSSHUserPolicyEngine,
+				sshHostPolicy: existingSSHHostPolicyEngine,
+			},
 		},
 		{
 			name: "fail/admin-x509-policy",
@@ -434,6 +541,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: true,
+			expected: &expected{
+				x509Policy:    existingX509PolicyEngine,
+				sshUserPolicy: existingSSHUserPolicyEngine,
+				sshHostPolicy: existingSSHHostPolicyEngine,
+			},
 		},
 		{
 			name: "fail/admin-ssh-host-policy",
@@ -457,6 +569,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: true,
+			expected: &expected{
+				x509Policy:    existingX509PolicyEngine,
+				sshUserPolicy: existingSSHUserPolicyEngine,
+				sshHostPolicy: existingSSHHostPolicyEngine,
+			},
 		},
 		{
 			name: "fail/admin-ssh-user-policy",
@@ -480,6 +597,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: true,
+			expected: &expected{
+				x509Policy:    existingX509PolicyEngine,
+				sshUserPolicy: existingSSHUserPolicyEngine,
+				sshHostPolicy: existingSSHHostPolicyEngine,
+			},
 		},
 		{
 			name: "ok/linkedca-unsupported",
@@ -491,6 +613,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			adminDB: &linkedCaClient{},
 			ctx:     context.Background(),
 			wantErr: false,
+			expected: &expected{
+				x509Policy:    existingX509PolicyEngine,
+				sshUserPolicy: existingSSHUserPolicyEngine,
+				sshHostPolicy: existingSSHHostPolicyEngine,
+			},
 		},
 		{
 			name: "ok/standalone-no-policy",
@@ -500,9 +627,13 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 					Policy:      nil,
 				},
 			},
-			ctx:      context.Background(),
-			wantErr:  false,
-			expected: nil,
+			ctx:     context.Background(),
+			wantErr: false,
+			expected: &expected{
+				x509Policy:    nil,
+				sshUserPolicy: nil,
+				sshHostPolicy: nil,
+			},
 		},
 		{
 			name: "ok/standalone-x509-policy",
@@ -525,11 +656,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: false,
-			expected: &exp{
+			expected: &expected{
 				// expect only the X.509 policy to exist
-				x509Policy:    true,
-				sshHostPolicy: false,
-				sshUserPolicy: false,
+				x509Policy:    newX509PolicyEngine,
+				sshHostPolicy: nil,
+				sshUserPolicy: nil,
 			},
 		},
 		{
@@ -553,11 +684,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: false,
-			expected: &exp{
+			expected: &expected{
 				// expect only the SSH host policy to exist
-				x509Policy:    false,
-				sshHostPolicy: true,
-				sshUserPolicy: false,
+				x509Policy:    nil,
+				sshHostPolicy: newSSHHostPolicyEngine,
+				sshUserPolicy: nil,
 			},
 		},
 		{
@@ -581,11 +712,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: false,
-			expected: &exp{
+			expected: &expected{
 				// expect only the SSH user policy to exist
-				x509Policy:    false,
-				sshHostPolicy: false,
-				sshUserPolicy: true,
+				x509Policy:    nil,
+				sshHostPolicy: nil,
+				sshUserPolicy: newSSHUserPolicyEngine,
 			},
 		},
 		{
@@ -617,11 +748,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: false,
-			expected: &exp{
+			expected: &expected{
 				// expect only the SSH policy engines to exist
-				x509Policy:    false,
-				sshHostPolicy: true,
-				sshUserPolicy: true,
+				x509Policy:    nil,
+				sshHostPolicy: newSSHHostPolicyEngine,
+				sshUserPolicy: newSSHUserPolicyEngine,
 			},
 		},
 		{
@@ -663,11 +794,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: false,
-			expected: &exp{
+			expected: &expected{
 				// expect all three policy engines to exist
-				x509Policy:    true,
-				sshHostPolicy: true,
-				sshUserPolicy: true,
+				x509Policy:    newX509PolicyEngine,
+				sshHostPolicy: newSSHHostPolicyEngine,
+				sshUserPolicy: newSSHUserPolicyEngine,
 			},
 		},
 		{
@@ -690,10 +821,10 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: false,
-			expected: &exp{
-				x509Policy:    true,
-				sshHostPolicy: false,
-				sshUserPolicy: false,
+			expected: &expected{
+				x509Policy:    newAdminX509PolicyEngine,
+				sshHostPolicy: nil,
+				sshUserPolicy: nil,
 			},
 		},
 		{
@@ -718,10 +849,10 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: false,
-			expected: &exp{
-				x509Policy:    false,
-				sshHostPolicy: true,
-				sshUserPolicy: false,
+			expected: &expected{
+				x509Policy:    nil,
+				sshHostPolicy: newAdminSSHHostPolicyEngine,
+				sshUserPolicy: nil,
 			},
 		},
 		{
@@ -746,10 +877,10 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			},
 			ctx:     context.Background(),
 			wantErr: false,
-			expected: &exp{
-				x509Policy:    false,
-				sshHostPolicy: false,
-				sshUserPolicy: true,
+			expected: &expected{
+				x509Policy:    nil,
+				sshHostPolicy: nil,
+				sshUserPolicy: newAdminSSHUserPolicyEngine,
 			},
 		},
 		{
@@ -789,11 +920,11 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 				},
 			},
 			wantErr: false,
-			expected: &exp{
+			expected: &expected{
 				// expect all three policy engines to exist
-				x509Policy:    true,
-				sshHostPolicy: true,
-				sshUserPolicy: true,
+				x509Policy:    newX509PolicyEngine,
+				sshHostPolicy: newAdminSSHHostPolicyEngine,
+				sshUserPolicy: newAdminSSHUserPolicyEngine,
 			},
 		},
 		{
@@ -842,36 +973,30 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 				},
 			},
 			wantErr: false,
-			expected: &exp{
+			expected: &expected{
 				// expect all three policy engines to exist
-				x509Policy:    true,
-				sshHostPolicy: false,
-				sshUserPolicy: false,
+				x509Policy:    newX509PolicyEngine,
+				sshHostPolicy: nil,
+				sshUserPolicy: nil,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := &Authority{
-				config:  tt.config,
-				adminDB: tt.adminDB,
+				config:        tt.config,
+				adminDB:       tt.adminDB,
+				x509Policy:    existingX509PolicyEngine,
+				sshUserPolicy: existingSSHUserPolicyEngine,
+				sshHostPolicy: existingSSHHostPolicyEngine,
 			}
 			if err := a.reloadPolicyEngines(tt.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Authority.reloadPolicyEngines() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			// if expected value is set, check existence of the policy engines
-			// Check that they're always nil if the expected value is not set,
-			// which happens on errors.
-			if tt.expected != nil {
-				assert.Equal(t, tt.expected.x509Policy, a.x509Policy != nil)
-				assert.Equal(t, tt.expected.sshHostPolicy, a.sshHostPolicy != nil)
-				assert.Equal(t, tt.expected.sshUserPolicy, a.sshUserPolicy != nil)
-			} else {
-				assert.Nil(t, a.x509Policy)
-				assert.Nil(t, a.sshHostPolicy)
-				assert.Nil(t, a.sshUserPolicy)
-			}
+			assert.Equal(t, tt.expected.x509Policy, a.x509Policy)
+			assert.Equal(t, tt.expected.sshHostPolicy, a.sshHostPolicy)
+			assert.Equal(t, tt.expected.sshUserPolicy, a.sshUserPolicy)
 		})
 	}
 }

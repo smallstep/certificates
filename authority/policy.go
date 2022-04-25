@@ -208,7 +208,7 @@ func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
 		err           error
 		policyOptions *authPolicy.Options
 	)
-	// if admin API is enabled, the CA is running in linked mode
+
 	if a.config.AuthorityConfig.EnableAdmin {
 
 		// temporarily disable policy loading when LinkedCA is in use
