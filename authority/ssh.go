@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -256,10 +257,14 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 			allowed, err := a.sshUserPolicy.IsSSHCertificateAllowed(certTpl)
 			if err != nil {
 				var pe *policy.NamePolicyError
-				if errors.As(err, &pe) && pe.Reason == policy.NotAuthorizedForThisName {
-					return nil, errs.ApplyOptions(
-						errs.ForbiddenErr(errors.New("authority not allowed to sign"), "authority.SignSSH: %s", err.Error()),
-					)
+				if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
+					return nil, &errs.Error{
+						// NOTE: custom forbidden error, so that denied name is sent to client
+						// as well as shown in the logs.
+						Status: http.StatusForbidden,
+						Err:    fmt.Errorf("authority not allowed to sign: %w", err),
+						Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
+					}
 				}
 				return nil, errs.InternalServerErr(err,
 					errs.WithMessage("authority.SignSSH: error creating ssh user certificate"),
@@ -279,11 +284,14 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 			allowed, err := a.sshHostPolicy.IsSSHCertificateAllowed(certTpl)
 			if err != nil {
 				var pe *policy.NamePolicyError
-				if errors.As(err, &pe) && pe.Reason == policy.NotAuthorizedForThisName {
-					return nil, errs.ApplyOptions(
-						// TODO: show which names were not allowed; they are in the err
-						errs.ForbiddenErr(errors.New("authority not allowed to sign"), "authority.SignSSH: %s", err.Error()),
-					)
+				if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
+					return nil, &errs.Error{
+						// NOTE: custom forbidden error, so that denied name is sent to client
+						// as well as shown in the logs.
+						Status: http.StatusForbidden,
+						Err:    fmt.Errorf("authority not allowed to sign: %w", err),
+						Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
+					}
 				}
 				return nil, errs.InternalServerErr(err,
 					errs.WithMessage("authority.SignSSH: error creating ssh host certificate"),

@@ -203,11 +203,14 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	var allowedToSign bool
 	if allowedToSign, err = a.isAllowedToSign(leaf); err != nil {
 		var pe *policy.NamePolicyError
-		if errors.As(err, &pe) && pe.Reason == policy.NotAuthorizedForThisName {
-			return nil, errs.ApplyOptions(
-				errs.ForbiddenErr(errors.New("authority not allowed to sign"), err.Error()),
-				opts...,
-			)
+		if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
+			return nil, errs.ApplyOptions(&errs.Error{
+				// NOTE: custom forbidden error, so that denied name is sent to client
+				// as well as shown in the logs.
+				Status: http.StatusForbidden,
+				Err:    fmt.Errorf("authority not allowed to sign: %w", err),
+				Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
+			}, opts...)
 		}
 		return nil, errs.InternalServerErr(err,
 			errs.WithKeyVal("csr", csr),

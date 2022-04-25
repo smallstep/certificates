@@ -58,7 +58,7 @@ func TestAuthority_checkPolicy(t *testing.T) {
 				},
 				err: &PolicyError{
 					Typ: EvaluationFailure,
-					Err: errors.New("cannot parse domain: dns \"*\" cannot be converted to ASCII"),
+					Err: errors.New("cannot parse dns domain \"*\""),
 				},
 			}
 		},
@@ -105,7 +105,7 @@ func TestAuthority_checkPolicy(t *testing.T) {
 				},
 				err: &PolicyError{
 					Typ: EvaluationFailure,
-					Err: errors.New("cannot parse domain: dns \"**\" cannot be converted to ASCII"),
+					Err: errors.New("cannot parse dns domain \"**\""),
 				},
 			}
 		},

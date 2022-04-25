@@ -13,15 +13,17 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	adminAPI "github.com/smallstep/certificates/authority/admin/api"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/errs"
+	"google.golang.org/protobuf/encoding/protojson"
+
 	"go.step.sm/cli-utils/token"
 	"go.step.sm/cli-utils/token/provision"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/linkedca"
-	"google.golang.org/protobuf/encoding/protojson"
+
+	adminAPI "github.com/smallstep/certificates/authority/admin/api"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/errs"
 )
 
 const (
@@ -818,7 +820,7 @@ retry:
 
 func (c *AdminClient) GetProvisionerPolicy(provisionerName string) (*linkedca.Policy, error) {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioner", provisionerName, "policy")})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "policy")})
 	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
@@ -853,7 +855,7 @@ func (c *AdminClient) CreateProvisionerPolicy(provisionerName string, p *linkedc
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioner", provisionerName, "policy")})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "policy")})
 	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
@@ -888,7 +890,7 @@ func (c *AdminClient) UpdateProvisionerPolicy(provisionerName string, p *linkedc
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioner", provisionerName, "policy")})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "policy")})
 	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
@@ -919,7 +921,7 @@ retry:
 
 func (c *AdminClient) RemoveProvisionerPolicy(provisionerName string) error {
 	var retried bool
-	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioner", provisionerName, "policy")})
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "policy")})
 	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return fmt.Errorf("error generating admin token: %w", err)

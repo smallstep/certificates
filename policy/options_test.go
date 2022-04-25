@@ -5,8 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
-	"github.com/smallstep/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_normalizeAndValidateDNSDomainConstraint(t *testing.T) {
@@ -368,9 +367,9 @@ func TestNew(t *testing.T) {
 		},
 		"ok/with-permitted-ip-ranges": func(t *testing.T) test {
 			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			_, nw2, err := net.ParseCIDR("192.168.0.1/24")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			options := []NamePolicyOption{
 				WithPermittedIPRanges(nw1, nw2),
 			}
@@ -389,9 +388,9 @@ func TestNew(t *testing.T) {
 		},
 		"ok/with-excluded-ip-ranges": func(t *testing.T) test {
 			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			_, nw2, err := net.ParseCIDR("192.168.0.1/24")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			options := []NamePolicyOption{
 				WithExcludedIPRanges(nw1, nw2),
 			}
@@ -410,9 +409,9 @@ func TestNew(t *testing.T) {
 		},
 		"ok/with-permitted-cidrs": func(t *testing.T) test {
 			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			_, nw2, err := net.ParseCIDR("192.168.0.1/24")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			options := []NamePolicyOption{
 				WithPermittedCIDRs("127.0.0.1/24", "192.168.0.1/24"),
 			}
@@ -431,9 +430,9 @@ func TestNew(t *testing.T) {
 		},
 		"ok/with-excluded-cidrs": func(t *testing.T) test {
 			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			_, nw2, err := net.ParseCIDR("192.168.0.1/24")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			options := []NamePolicyOption{
 				WithExcludedCIDRs("127.0.0.1/24", "192.168.0.1/24"),
 			}
@@ -452,11 +451,11 @@ func TestNew(t *testing.T) {
 		},
 		"ok/with-permitted-ipsOrCIDRs-cidr": func(t *testing.T) test {
 			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			_, nw2, err := net.ParseCIDR("192.168.0.31/32")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			_, nw3, err := net.ParseCIDR("2001:0db8:85a3:0000:0000:8a2e:0370:7334/128")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			options := []NamePolicyOption{
 				WithPermittedIPsOrCIDRs("127.0.0.1/24", "192.168.0.31", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
 			}
@@ -475,11 +474,11 @@ func TestNew(t *testing.T) {
 		},
 		"ok/with-excluded-ipsOrCIDRs-cidr": func(t *testing.T) test {
 			_, nw1, err := net.ParseCIDR("127.0.0.1/24")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			_, nw2, err := net.ParseCIDR("192.168.0.31/32")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			_, nw3, err := net.ParseCIDR("2001:0db8:85a3:0000:0000:8a2e:0370:7334/128")
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 			options := []NamePolicyOption{
 				WithExcludedIPsOrCIDRs("127.0.0.1/24", "192.168.0.31", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
 			}

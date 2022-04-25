@@ -25,8 +25,6 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		return nil
 	}
 
-	// TODO: implement check that requires at least a single name in all of the SANs + subject?
-
 	// TODO: set limit on total of all names validated? In x509 there's a limit on the number of comparisons
 	// that protects the CA from a DoS (i.e. many heavy comparisons). The x509 implementation takes
 	// this number as a total of all checks and keeps a (pointer to a) counter of the number of checks
@@ -40,29 +38,37 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		// (other) excluded constraints, we'll allow a DNS (implicit allow; currently).
 		if e.numberOfDNSDomainConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
 			return &NamePolicyError{
-				Reason: NotAuthorizedForThisName,
-				Detail: fmt.Sprintf("dns %q is not explicitly permitted by any constraint", dns),
+				Reason:   NotAllowed,
+				NameType: DNSNameType,
+				Name:     dns,
+				detail:   fmt.Sprintf("dns %q is not explicitly permitted by any constraint", dns),
 			}
 		}
 		didCutWildcard := false
-		if strings.HasPrefix(dns, "*.") {
-			dns = dns[1:]
+		parsedDNS := dns
+		if strings.HasPrefix(parsedDNS, "*.") {
+			parsedDNS = parsedDNS[1:]
 			didCutWildcard = true
 		}
-		parsedDNS, err := idna.Lookup.ToASCII(dns)
+		// TODO(hs): fix this above; we need separate rule for Subject Common Name?
+		parsedDNS, err := idna.Lookup.ToASCII(parsedDNS)
 		if err != nil {
 			return &NamePolicyError{
-				Reason: CannotParseDomain,
-				Detail: fmt.Sprintf("dns %q cannot be converted to ASCII", dns),
+				Reason:   CannotParseDomain,
+				NameType: DNSNameType,
+				Name:     dns,
+				detail:   fmt.Sprintf("dns %q cannot be converted to ASCII", dns),
 			}
 		}
 		if didCutWildcard {
 			parsedDNS = "*" + parsedDNS
 		}
-		if _, ok := domainToReverseLabels(parsedDNS); !ok {
+		if _, ok := domainToReverseLabels(parsedDNS); !ok { // TODO(hs): this also fails with spaces
 			return &NamePolicyError{
-				Reason: CannotParseDomain,
-				Detail: fmt.Sprintf("cannot parse dns %q", dns),
+				Reason:   CannotParseDomain,
+				NameType: DNSNameType,
+				Name:     dns,
+				detail:   fmt.Sprintf("cannot parse dns %q", dns),
 			}
 		}
 		if err := checkNameConstraints("dns", dns, parsedDNS,
@@ -76,8 +82,10 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 	for _, ip := range ips {
 		if e.numberOfIPRangeConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
 			return &NamePolicyError{
-				Reason: NotAuthorizedForThisName,
-				Detail: fmt.Sprintf("ip %q is not explicitly permitted by any constraint", ip.String()),
+				Reason:   NotAllowed,
+				NameType: IPNameType,
+				Name:     ip.String(),
+				detail:   fmt.Sprintf("ip %q is not explicitly permitted by any constraint", ip.String()),
 			}
 		}
 		if err := checkNameConstraints("ip", ip.String(), ip,
@@ -91,15 +99,19 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 	for _, email := range emailAddresses {
 		if e.numberOfEmailAddressConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
 			return &NamePolicyError{
-				Reason: NotAuthorizedForThisName,
-				Detail: fmt.Sprintf("email %q is not explicitly permitted by any constraint", email),
+				Reason:   NotAllowed,
+				NameType: EmailNameType,
+				Name:     email,
+				detail:   fmt.Sprintf("email %q is not explicitly permitted by any constraint", email),
 			}
 		}
 		mailbox, ok := parseRFC2821Mailbox(email)
 		if !ok {
 			return &NamePolicyError{
-				Reason: CannotParseRFC822Name,
-				Detail: fmt.Sprintf("invalid rfc822Name %q", mailbox),
+				Reason:   CannotParseRFC822Name,
+				NameType: EmailNameType,
+				Name:     email,
+				detail:   fmt.Sprintf("invalid rfc822Name %q", mailbox),
 			}
 		}
 		// According to RFC 5280, section 7.5, emails are considered to match if the local part is
@@ -108,8 +120,10 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		domainASCII, err := idna.ToASCII(mailbox.domain)
 		if err != nil {
 			return &NamePolicyError{
-				Reason: CannotParseDomain,
-				Detail: fmt.Sprintf("cannot parse email domain %q", email),
+				Reason:   CannotParseDomain,
+				NameType: EmailNameType,
+				Name:     email,
+				detail:   fmt.Sprintf("cannot parse email domain %q", email),
 			}
 		}
 		mailbox.domain = domainASCII
@@ -126,10 +140,14 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 	for _, uri := range uris {
 		if e.numberOfURIDomainConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
 			return &NamePolicyError{
-				Reason: NotAuthorizedForThisName,
-				Detail: fmt.Sprintf("uri %q is not explicitly permitted by any constraint", uri.String()),
+				Reason:   NotAllowed,
+				NameType: URINameType,
+				Name:     uri.String(),
+				detail:   fmt.Sprintf("uri %q is not explicitly permitted by any constraint", uri.String()),
 			}
 		}
+		// TODO(hs): ideally we'd like the uri.String() to be the original contents; now
+		// it's transformed into ASCII. Prevent that here?
 		if err := checkNameConstraints("uri", uri.String(), uri,
 			func(parsedName, constraint interface{}) (bool, error) {
 				return e.matchURIConstraint(parsedName.(*url.URL), constraint.(string))
@@ -141,8 +159,10 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 	for _, principal := range principals {
 		if e.numberOfPrincipalConstraints == 0 && e.totalNumberOfPermittedConstraints > 0 {
 			return &NamePolicyError{
-				Reason: NotAuthorizedForThisName,
-				Detail: fmt.Sprintf("username principal %q is not explicitly permitted by any constraint", principal),
+				Reason:   NotAllowed,
+				NameType: PrincipalNameType,
+				Name:     principal,
+				detail:   fmt.Sprintf("username principal %q is not explicitly permitted by any constraint", principal),
 			}
 		}
 		// TODO: some validation? I.e. allowed characters?
@@ -175,15 +195,19 @@ func checkNameConstraints(
 		match, err := match(parsedName, constraint)
 		if err != nil {
 			return &NamePolicyError{
-				Reason: CannotMatchNameToConstraint,
-				Detail: err.Error(),
+				Reason:   CannotMatchNameToConstraint,
+				NameType: NameType(nameType),
+				Name:     name,
+				detail:   err.Error(),
 			}
 		}
 
 		if match {
 			return &NamePolicyError{
-				Reason: NotAuthorizedForThisName,
-				Detail: fmt.Sprintf("%s %q is excluded by constraint %q", nameType, name, constraint),
+				Reason:   NotAllowed,
+				NameType: NameType(nameType),
+				Name:     name,
+				detail:   fmt.Sprintf("%s %q is excluded by constraint %q", nameType, name, constraint),
 			}
 		}
 	}
@@ -196,8 +220,10 @@ func checkNameConstraints(
 		var err error
 		if ok, err = match(parsedName, constraint); err != nil {
 			return &NamePolicyError{
-				Reason: CannotMatchNameToConstraint,
-				Detail: err.Error(),
+				Reason:   CannotMatchNameToConstraint,
+				NameType: NameType(nameType),
+				Name:     name,
+				detail:   err.Error(),
 			}
 		}
 
@@ -208,8 +234,10 @@ func checkNameConstraints(
 
 	if !ok {
 		return &NamePolicyError{
-			Reason: NotAuthorizedForThisName,
-			Detail: fmt.Sprintf("%s %q is not permitted by any constraint", nameType, name),
+			Reason:   NotAllowed,
+			NameType: NameType(nameType),
+			Name:     name,
+			detail:   fmt.Sprintf("%s %q is not permitted by any constraint", nameType, name),
 		}
 	}
 

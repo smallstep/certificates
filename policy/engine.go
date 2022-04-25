@@ -15,11 +15,11 @@ import (
 type NamePolicyReason int
 
 const (
-	// NotAuthorizedForThisName results when an instance of
-	// NamePolicyEngine determines that there's a constraint which
-	// doesn't permit a DNS or another type of SAN to be signed
-	// (or otherwise used).
-	NotAuthorizedForThisName NamePolicyReason = iota
+	_ NamePolicyReason = iota
+	// NotAllowed results when an instance of NamePolicyEngine
+	// determines that there's a constraint which doesn't permit
+	// a DNS or another type of SAN to be signed (or otherwise used).
+	NotAllowed
 	// CannotParseDomain is returned when an error occurs
 	// when parsing the domain part of SAN or subject.
 	CannotParseDomain
@@ -31,24 +31,40 @@ const (
 	CannotMatchNameToConstraint
 )
 
+type NameType string
+
+const (
+	DNSNameType       NameType = "dns"
+	IPNameType        NameType = "ip"
+	EmailNameType     NameType = "email"
+	URINameType       NameType = "uri"
+	PrincipalNameType NameType = "principal"
+)
+
 type NamePolicyError struct {
-	Reason NamePolicyReason
-	Detail string
+	Reason   NamePolicyReason
+	NameType NameType
+	Name     string
+	detail   string
 }
 
 func (e *NamePolicyError) Error() string {
 	switch e.Reason {
-	case NotAuthorizedForThisName:
-		return "not authorized to sign for this name: " + e.Detail
+	case NotAllowed:
+		return fmt.Sprintf("%s name %q not allowed", e.NameType, e.Name)
 	case CannotParseDomain:
-		return "cannot parse domain: " + e.Detail
+		return fmt.Sprintf("cannot parse %s domain %q", e.NameType, e.Name)
 	case CannotParseRFC822Name:
-		return "cannot parse rfc822Name: " + e.Detail
+		return fmt.Sprintf("cannot parse %s rfc822Name %q", e.NameType, e.Name)
 	case CannotMatchNameToConstraint:
-		return "error matching name to constraint: " + e.Detail
+		return fmt.Sprintf("error matching %s name %q to constraint", e.NameType, e.Name)
 	default:
-		return "unknown error: " + e.Detail
+		return fmt.Sprintf("unknown error reason (%d): %s", e.Reason, e.detail)
 	}
+}
+
+func (e *NamePolicyError) Detail() string {
+	return e.detail
 }
 
 // NamePolicyEngine can be used to check that a CSR or Certificate meets all allowed and
@@ -98,13 +114,13 @@ func New(opts ...NamePolicyOption) (*NamePolicyEngine, error) {
 	}
 
 	e.permittedDNSDomains = removeDuplicates(e.permittedDNSDomains)
-	e.permittedIPRanges = removeDuplicateIPRanges(e.permittedIPRanges)
+	e.permittedIPRanges = removeDuplicateIPNets(e.permittedIPRanges)
 	e.permittedEmailAddresses = removeDuplicates(e.permittedEmailAddresses)
 	e.permittedURIDomains = removeDuplicates(e.permittedURIDomains)
 	e.permittedPrincipals = removeDuplicates(e.permittedPrincipals)
 
 	e.excludedDNSDomains = removeDuplicates(e.excludedDNSDomains)
-	e.excludedIPRanges = removeDuplicateIPRanges(e.excludedIPRanges)
+	e.excludedIPRanges = removeDuplicateIPNets(e.excludedIPRanges)
 	e.excludedEmailAddresses = removeDuplicates(e.excludedEmailAddresses)
 	e.excludedURIDomains = removeDuplicates(e.excludedURIDomains)
 	e.excludedPrincipals = removeDuplicates(e.excludedPrincipals)
@@ -126,35 +142,59 @@ func New(opts ...NamePolicyOption) (*NamePolicyEngine, error) {
 	return e, nil
 }
 
-func removeDuplicates(strSlice []string) []string {
-	if len(strSlice) == 0 {
-		return nil
+// removeDuplicates returns a new slice of strings with
+// duplicate values removed. It retains the order of elements
+// in the source slice.
+func removeDuplicates(items []string) (ret []string) {
+
+	// no need to remove dupes; return original
+	if len(items) <= 1 {
+		return items
 	}
-	keys := make(map[string]bool)
-	result := []string{}
-	for _, item := range strSlice {
-		if _, value := keys[item]; !value && item != "" { // skip empty constraints
-			keys[item] = true
-			result = append(result, item)
+
+	keys := make(map[string]struct{}, len(items))
+
+	ret = make([]string, 0, len(items))
+	for _, item := range items {
+		if _, ok := keys[item]; ok {
+			continue
 		}
+
+		keys[item] = struct{}{}
+		ret = append(ret, item)
 	}
-	return result
+
+	return
 }
 
-func removeDuplicateIPRanges(ipRanges []*net.IPNet) []*net.IPNet {
-	if len(ipRanges) == 0 {
-		return nil
+// removeDuplicateIPNets returns a new slice of net.IPNets with
+// duplicate values removed. It retains the order of elements in
+// the source slice. An IPNet is considered duplicate if its CIDR
+// notation exists multiple times in the slice.
+func removeDuplicateIPNets(items []*net.IPNet) (ret []*net.IPNet) {
+
+	// no need to remove dupes; return original
+	if len(items) <= 1 {
+		return items
 	}
-	keys := make(map[string]bool)
-	result := []*net.IPNet{}
-	for _, item := range ipRanges {
-		key := item.String()
-		if _, value := keys[key]; !value {
-			keys[key] = true
-			result = append(result, item)
+
+	keys := make(map[string]struct{}, len(items))
+
+	ret = make([]*net.IPNet, 0, len(items))
+	for _, item := range items {
+		key := item.String() // use CIDR notation as key
+		if _, ok := keys[key]; ok {
+			continue
 		}
+
+		keys[key] = struct{}{}
+		ret = append(ret, item)
 	}
-	return result
+
+	// TODO(hs): implement filter of fully overlapping ranges,
+	// so that the smaller ones are automatically removed?
+
+	return
 }
 
 // IsX509CertificateAllowed verifies that all SANs in a Certificate are allowed.
