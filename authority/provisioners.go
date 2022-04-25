@@ -145,7 +145,7 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 
 }
 
-// StoreProvisioner stores an provisioner.Interface to the authority.
+// StoreProvisioner stores a provisioner to the authority.
 func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisioner) error {
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
@@ -191,7 +191,7 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 	}
 
 	if err := a.provisioners.Store(certProv); err != nil {
-		if err := a.reloadAdminResources(ctx); err != nil {
+		if err := a.ReloadAdminResources(ctx); err != nil {
 			return admin.WrapErrorISE(err, "error reloading admin resources on failed provisioner store")
 		}
 		return admin.WrapErrorISE(err, "error storing provisioner in authority cache")
@@ -223,7 +223,7 @@ func (a *Authority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisio
 		return admin.WrapErrorISE(err, "error updating provisioner '%s' in authority cache", nu.Name)
 	}
 	if err := a.adminDB.UpdateProvisioner(ctx, nu); err != nil {
-		if err := a.reloadAdminResources(ctx); err != nil {
+		if err := a.ReloadAdminResources(ctx); err != nil {
 			return admin.WrapErrorISE(err, "error reloading admin resources on failed provisioner update")
 		}
 		return admin.WrapErrorISE(err, "error updating provisioner '%s'", nu.Name)
@@ -267,7 +267,7 @@ func (a *Authority) RemoveProvisioner(ctx context.Context, id string) error {
 	}
 	// Remove provisioner from database.
 	if err := a.adminDB.DeleteProvisioner(ctx, provID); err != nil {
-		if err := a.reloadAdminResources(ctx); err != nil {
+		if err := a.ReloadAdminResources(ctx); err != nil {
 			return admin.WrapErrorISE(err, "error reloading admin resources on failed provisioner remove")
 		}
 		return admin.WrapErrorISE(err, "error deleting provisioner %s", provName)

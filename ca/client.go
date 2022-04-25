@@ -425,16 +425,17 @@ func parseEndpoint(endpoint string) (*url.URL, error) {
 }
 
 // ProvisionerOption is the type of options passed to the Provisioner method.
-type ProvisionerOption func(o *provisionerOptions) error
+type ProvisionerOption func(o *ProvisionerOptions) error
 
-type provisionerOptions struct {
-	cursor string
-	limit  int
-	id     string
-	name   string
+// ProvisionerOptions stores options for the provisioner CRUD API.
+type ProvisionerOptions struct {
+	Cursor string
+	Limit  int
+	ID     string
+	Name   string
 }
 
-func (o *provisionerOptions) apply(opts []ProvisionerOption) (err error) {
+func (o *ProvisionerOptions) Apply(opts []ProvisionerOption) (err error) {
 	for _, fn := range opts {
 		if err = fn(o); err != nil {
 			return
@@ -443,51 +444,51 @@ func (o *provisionerOptions) apply(opts []ProvisionerOption) (err error) {
 	return
 }
 
-func (o *provisionerOptions) rawQuery() string {
+func (o *ProvisionerOptions) rawQuery() string {
 	v := url.Values{}
-	if len(o.cursor) > 0 {
-		v.Set("cursor", o.cursor)
+	if len(o.Cursor) > 0 {
+		v.Set("cursor", o.Cursor)
 	}
-	if o.limit > 0 {
-		v.Set("limit", strconv.Itoa(o.limit))
+	if o.Limit > 0 {
+		v.Set("limit", strconv.Itoa(o.Limit))
 	}
-	if len(o.id) > 0 {
-		v.Set("id", o.id)
+	if len(o.ID) > 0 {
+		v.Set("id", o.ID)
 	}
-	if len(o.name) > 0 {
-		v.Set("name", o.name)
+	if len(o.Name) > 0 {
+		v.Set("name", o.Name)
 	}
 	return v.Encode()
 }
 
 // WithProvisionerCursor will request the provisioners starting with the given cursor.
 func WithProvisionerCursor(cursor string) ProvisionerOption {
-	return func(o *provisionerOptions) error {
-		o.cursor = cursor
+	return func(o *ProvisionerOptions) error {
+		o.Cursor = cursor
 		return nil
 	}
 }
 
 // WithProvisionerLimit will request the given number of provisioners.
 func WithProvisionerLimit(limit int) ProvisionerOption {
-	return func(o *provisionerOptions) error {
-		o.limit = limit
+	return func(o *ProvisionerOptions) error {
+		o.Limit = limit
 		return nil
 	}
 }
 
 // WithProvisionerID will request the given provisioner.
 func WithProvisionerID(id string) ProvisionerOption {
-	return func(o *provisionerOptions) error {
-		o.id = id
+	return func(o *ProvisionerOptions) error {
+		o.ID = id
 		return nil
 	}
 }
 
 // WithProvisionerName will request the given provisioner.
 func WithProvisionerName(name string) ProvisionerOption {
-	return func(o *provisionerOptions) error {
-		o.name = name
+	return func(o *ProvisionerOptions) error {
+		o.Name = name
 		return nil
 	}
 }
@@ -810,8 +811,8 @@ retry:
 // paginate the provisioners.
 func (c *Client) Provisioners(opts ...ProvisionerOption) (*api.ProvisionersResponse, error) {
 	var retried bool
-	o := new(provisionerOptions)
-	if err := o.apply(opts); err != nil {
+	o := new(ProvisionerOptions)
+	if err := o.Apply(opts); err != nil {
 		return nil, err
 	}
 	u := c.endpoint.ResolveReference(&url.URL{

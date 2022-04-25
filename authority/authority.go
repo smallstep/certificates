@@ -115,6 +115,20 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 	return a, nil
 }
 
+// FromOptions creates an Authority exclusively using the passed in options
+// and does not intialize the Authority.
+func FromOptions(opts ...Option) (*Authority, error) {
+	var a = new(Authority)
+
+	// Apply options.
+	for _, fn := range opts {
+		if err := fn(a); err != nil {
+			return nil, err
+		}
+	}
+	return a, nil
+}
+
 // NewEmbedded initializes an authority that can be embedded in a different
 // project without the limitations of the config.
 func NewEmbedded(opts ...Option) (*Authority, error) {
@@ -153,8 +167,8 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	return a, nil
 }
 
-// reloadAdminResources reloads admins and provisioners from the DB.
-func (a *Authority) reloadAdminResources(ctx context.Context) error {
+// ReloadAdminResources reloads admins and provisioners from the DB.
+func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 	var (
 		provList  provisioner.List
 		adminList []*linkedca.Admin
@@ -551,7 +565,7 @@ func (a *Authority) init() error {
 	}
 
 	// Load Provisioners and Admins
-	if err := a.reloadAdminResources(context.Background()); err != nil {
+	if err := a.ReloadAdminResources(context.Background()); err != nil {
 		return err
 	}
 
@@ -587,6 +601,12 @@ func (a *Authority) GetAdminDatabase() admin.DB {
 	return a.adminDB
 }
 
+// GetConfig returns the config.
+func (a *Authority) GetConfig() *config.Config {
+	return a.config
+}
+
+// GetInfo returns information about the authority.
 func (a *Authority) GetInfo() Info {
 	ai := Info{
 		StartTime:     a.startTime,

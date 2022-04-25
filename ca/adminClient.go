@@ -363,19 +363,19 @@ retry:
 // GetProvisioner performs the GET /admin/provisioners/{name} request to the CA.
 func (c *AdminClient) GetProvisioner(opts ...ProvisionerOption) (*linkedca.Provisioner, error) {
 	var retried bool
-	o := new(provisionerOptions)
-	if err := o.apply(opts); err != nil {
+	o := new(ProvisionerOptions)
+	if err := o.Apply(opts); err != nil {
 		return nil, err
 	}
 	var u *url.URL
 	switch {
-	case len(o.id) > 0:
+	case len(o.ID) > 0:
 		u = c.endpoint.ResolveReference(&url.URL{
 			Path:     "/admin/provisioners/id",
 			RawQuery: o.rawQuery(),
 		})
-	case len(o.name) > 0:
-		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.name)})
+	case len(o.Name) > 0:
+		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.Name)})
 	default:
 		return nil, errors.New("must set either name or id in method options")
 	}
@@ -410,8 +410,8 @@ retry:
 // GetProvisionersPaginate performs the GET /admin/provisioners request to the CA.
 func (c *AdminClient) GetProvisionersPaginate(opts ...ProvisionerOption) (*adminAPI.GetProvisionersResponse, error) {
 	var retried bool
-	o := new(provisionerOptions)
-	if err := o.apply(opts); err != nil {
+	o := new(ProvisionerOptions)
+	if err := o.Apply(opts); err != nil {
 		return nil, err
 	}
 	u := c.endpoint.ResolveReference(&url.URL{
@@ -472,19 +472,19 @@ func (c *AdminClient) RemoveProvisioner(opts ...ProvisionerOption) error {
 		retried bool
 	)
 
-	o := new(provisionerOptions)
-	if err := o.apply(opts); err != nil {
+	o := new(ProvisionerOptions)
+	if err := o.Apply(opts); err != nil {
 		return err
 	}
 
 	switch {
-	case len(o.id) > 0:
+	case len(o.ID) > 0:
 		u = c.endpoint.ResolveReference(&url.URL{
 			Path:     path.Join(adminURLPrefix, "provisioners/id"),
 			RawQuery: o.rawQuery(),
 		})
-	case len(o.name) > 0:
-		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.name)})
+	case len(o.Name) > 0:
+		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.Name)})
 	default:
 		return errors.New("must set either name or id in method options")
 	}
