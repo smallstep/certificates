@@ -18,6 +18,7 @@ import (
 
 	vault "github.com/hashicorp/vault/api"
 	auth "github.com/hashicorp/vault/api/auth/approle"
+	kubeauth "github.com/hashicorp/vault/api/auth/kubernetes"
 )
 
 func init() {
@@ -34,6 +35,7 @@ type VaultOptions struct {
 	PKIRoleRSA      string        `json:"pkiRoleRSA,omitempty"`
 	PKIRoleEC       string        `json:"pkiRoleEC,omitempty"`
 	PKIRoleEd25519  string        `json:"pkiRoleEd25519,omitempty"`
+	KubernetesRole  string        `json:"kubernetesRole,omitempty"`
 	RoleID          string        `json:"roleID,omitempty"`
 	SecretID        auth.SecretID `json:"secretID,omitempty"`
 	AppRole         string        `json:"appRole,omitempty"`
@@ -77,31 +79,49 @@ func New(ctx context.Context, opts apiv1.Options) (*VaultCAS, error) {
 		return nil, fmt.Errorf("unable to initialize vault client: %w", err)
 	}
 
-	var appRoleAuth *auth.AppRoleAuth
-	if vc.IsWrappingToken {
-		appRoleAuth, err = auth.NewAppRoleAuth(
-			vc.RoleID,
-			&vc.SecretID,
-			auth.WithWrappingToken(),
-			auth.WithMountPath(vc.AppRole),
+	if vc.KubernetesRole != "" {
+		var kubernetesAuth *kubeauth.KubernetesAuth
+		kubernetesAuth, err = kubeauth.NewKubernetesAuth(
+			vc.KubernetesRole,
 		)
-	} else {
-		appRoleAuth, err = auth.NewAppRoleAuth(
-			vc.RoleID,
-			&vc.SecretID,
-			auth.WithMountPath(vc.AppRole),
-		)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("unable to initialize AppRole auth method: %w", err)
-	}
+		if err != nil {
+			return nil, fmt.Errorf("unable to initialize Kubernetes auth method: %w", err)
+		}
 
-	authInfo, err := client.Auth().Login(ctx, appRoleAuth)
-	if err != nil {
-		return nil, fmt.Errorf("unable to login to AppRole auth method: %w", err)
-	}
-	if authInfo == nil {
-		return nil, errors.New("no auth info was returned after login")
+		authInfo, err := client.Auth().Login(ctx, kubernetesAuth)
+		if err != nil {
+			return nil, fmt.Errorf("unable to login to Kubernetes auth method: %w", err)
+		}
+		if authInfo == nil {
+			return nil, errors.New("no auth info was returned after login")
+		}
+	} else {
+		var appRoleAuth *auth.AppRoleAuth
+		if vc.IsWrappingToken {
+			appRoleAuth, err = auth.NewAppRoleAuth(
+				vc.RoleID,
+				&vc.SecretID,
+				auth.WithWrappingToken(),
+				auth.WithMountPath(vc.AppRole),
+			)
+		} else {
+			appRoleAuth, err = auth.NewAppRoleAuth(
+				vc.RoleID,
+				&vc.SecretID,
+				auth.WithMountPath(vc.AppRole),
+			)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("unable to initialize AppRole auth method: %w", err)
+		}
+
+		authInfo, err := client.Auth().Login(ctx, appRoleAuth)
+		if err != nil {
+			return nil, fmt.Errorf("unable to login to AppRole auth method: %w", err)
+		}
+		if authInfo == nil {
+			return nil, errors.New("no auth info was returned after login")
+		}
 	}
 
 	return &VaultCAS{
@@ -272,11 +292,11 @@ func loadOptions(config json.RawMessage) (*VaultOptions, error) {
 		vc.PKIRoleEd25519 = vc.PKIRoleDefault
 	}
 
-	if vc.RoleID == "" {
-		return nil, errors.New("vaultCAS config options must define `roleID`")
+	if vc.RoleID == "" && vc.KubernetesRole == "" {
+		return nil, errors.New("vaultCAS config options must define `roleID` or `kubernetesRole`")
 	}
 
-	if vc.SecretID.FromEnv == "" && vc.SecretID.FromFile == "" && vc.SecretID.FromString == "" {
+	if vc.SecretID.FromEnv == "" && vc.SecretID.FromFile == "" && vc.SecretID.FromString == "" && vc.RoleID != "" {
 		return nil, errors.New("vaultCAS config options must define `secretID` object with one of `FromEnv`, `FromFile` or `FromString`")
 	}
 
