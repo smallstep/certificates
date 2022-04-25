@@ -7,6 +7,7 @@ RUN apk add --no-cache curl git make
 RUN apk add --no-cache gcc musl-dev pkgconf pcsc-lite-dev
 RUN make V=1 GOFLAGS="" build
 
+
 FROM smallstep/step-cli:latest
 
 COPY --from=builder /src/bin/step-ca /usr/local/bin/step-ca
