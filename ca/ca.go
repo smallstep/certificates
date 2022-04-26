@@ -279,6 +279,10 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		insecureHandler = logger.Middleware(insecureHandler)
 	}
 
+	// Add authority handler
+	handler = auth.Middleware(handler)
+	insecureHandler = auth.Middleware(insecureHandler)
+
 	ca.srv = server.New(cfg.Address, handler, tlsConfig)
 
 	// only start the insecure server if the insecure address is configured
