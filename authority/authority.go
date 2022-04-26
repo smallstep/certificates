@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"log"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -151,6 +152,27 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	}
 
 	return a, nil
+}
+
+type authorityKey struct{}
+
+// NewContext adds the given authority to the context.
+func NewContext(ctx context.Context, a *Authority) context.Context {
+	return context.WithValue(ctx, authorityKey{}, a)
+}
+
+// FromContext returns the current authority from the given context.
+func FromContext(ctx context.Context) (a *Authority, ok bool) {
+	a, ok = ctx.Value(authorityKey{}).(*Authority)
+	return
+}
+
+// Middleware adds the current authority to the request context.
+func (a *Authority) Middleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := NewContext(r.Context(), a)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 // reloadAdminResources reloads admins and provisioners from the DB.
