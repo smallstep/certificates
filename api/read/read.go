@@ -16,7 +16,7 @@ import (
 )
 
 // JSON reads JSON from the request body and stores it in the value
-// pointed by v.
+// pointed to by v.
 func JSON(r io.Reader, v interface{}) error {
 	if err := json.NewDecoder(r).Decode(v); err != nil {
 		return errs.BadRequestErr(err, "error decoding json")
@@ -34,9 +34,7 @@ func ProtoJSON(r io.Reader, m proto.Message) error {
 
 	switch err := protojson.Unmarshal(data, m); {
 	case errors.Is(err, proto.Error):
-		// trim the proto prefix for the message
-		s := strings.TrimSpace(strings.TrimPrefix(err.Error(), "proto:"))
-		return badProtoJSONError(s)
+		return badProtoJSONError(err.Error())
 	default:
 		return err
 	}
@@ -59,9 +57,10 @@ func (e badProtoJSONError) Render(w http.ResponseWriter) {
 		Detail  string `json:"detail"`
 		Message string `json:"message"`
 	}{
-		Type:    "badRequest",
-		Detail:  "bad request",
-		Message: e.Error(),
+		Type:   "badRequest",
+		Detail: "bad request",
+		// trim the proto prefix for the message
+		Message: strings.TrimSpace(strings.TrimPrefix(e.Error(), "proto:")),
 	}
 	render.JSONStatus(w, v, http.StatusBadRequest)
 }
