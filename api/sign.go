@@ -49,7 +49,7 @@ type SignResponse struct {
 // Sign is an HTTP handler that reads a certificate request and an
 // one-time-token (ott) from the body and creates a new certificate with the
 // information in the certificate request.
-func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
+func Sign(w http.ResponseWriter, r *http.Request) {
 	var body SignRequest
 	if err := read.JSON(r.Body, &body); err != nil {
 		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
@@ -68,13 +68,14 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		TemplateData: body.TemplateData,
 	}
 
-	signOpts, err := h.Authority.AuthorizeSign(body.OTT)
+	a := mustAuthority(r.Context())
+	signOpts, err := a.AuthorizeSign(body.OTT)
 	if err != nil {
 		render.Error(w, errs.UnauthorizedErr(err))
 		return
 	}
 
-	certChain, err := h.Authority.Sign(body.CsrPEM.CertificateRequest, opts, signOpts...)
+	certChain, err := a.Sign(body.CsrPEM.CertificateRequest, opts, signOpts...)
 	if err != nil {
 		render.Error(w, errs.ForbiddenErr(err, "error signing certificate"))
 		return
@@ -89,6 +90,6 @@ func (h *caHandler) Sign(w http.ResponseWriter, r *http.Request) {
 		ServerPEM:    certChainPEM[0],
 		CaPEM:        caPEM,
 		CertChainPEM: certChainPEM,
-		TLSOptions:   h.Authority.GetTLSOptions(),
+		TLSOptions:   a.GetTLSOptions(),
 	}, http.StatusCreated)
 }
