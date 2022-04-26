@@ -170,10 +170,9 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	insecureHandler := http.Handler(insecureMux)
 
 	// Add regular CA api endpoints in / and /1.0
-	routerHandler := api.New(auth)
-	routerHandler.Route(mux)
+	api.Route(mux)
 	mux.Route("/1.0", func(r chi.Router) {
-		routerHandler.Route(r)
+		api.Route(r)
 	})
 
 	//Add ACME api endpoints in /acme and /1.0/acme

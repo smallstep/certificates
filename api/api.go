@@ -249,18 +249,21 @@ type FederationResponse struct {
 }
 
 // caHandler is the type used to implement the different CA HTTP endpoints.
-type caHandler struct {
-	Authority Authority
+type caHandler struct{}
+
+// Route configures the http request router.
+func (h *caHandler) Route(r Router) {
+	Route(r)
 }
 
 // New creates a new RouterHandler with the CA endpoints.
+//
+// Deprecated: Use api.Route(r Router)
 func New(auth Authority) RouterHandler {
-	return &caHandler{
-		Authority: auth,
-	}
+	return &caHandler{}
 }
 
-func (h *caHandler) Route(r Router) {
+func Route(r Router) {
 	r.MethodFunc("GET", "/version", Version)
 	r.MethodFunc("GET", "/health", Health)
 	r.MethodFunc("GET", "/root/{sha}", Root)
