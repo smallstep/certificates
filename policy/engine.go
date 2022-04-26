@@ -15,11 +15,10 @@ import (
 type NamePolicyReason int
 
 const (
-	_ NamePolicyReason = iota
 	// NotAllowed results when an instance of NamePolicyEngine
 	// determines that there's a constraint which doesn't permit
 	// a DNS or another type of SAN to be signed (or otherwise used).
-	NotAllowed
+	NotAllowed NamePolicyReason = iota + 1
 	// CannotParseDomain is returned when an error occurs
 	// when parsing the domain part of SAN or subject.
 	CannotParseDomain
@@ -198,7 +197,7 @@ func removeDuplicateIPNets(items []*net.IPNet) (ret []*net.IPNet) {
 }
 
 // IsX509CertificateAllowed verifies that all SANs in a Certificate are allowed.
-func (e *NamePolicyEngine) IsX509CertificateAllowed(cert *x509.Certificate) (bool, error) {
+func (e *NamePolicyEngine) IsX509CertificateAllowed(cert *x509.Certificate) error {
 	dnsNames, ips, emails, uris := cert.DNSNames, cert.IPAddresses, cert.EmailAddresses, cert.URIs
 	// when Subject Common Name must be verified in addition to the SANs, it is
 	// added to the appropriate slice of names.
@@ -206,13 +205,13 @@ func (e *NamePolicyEngine) IsX509CertificateAllowed(cert *x509.Certificate) (boo
 		appendSubjectCommonName(cert.Subject, &dnsNames, &ips, &emails, &uris)
 	}
 	if err := e.validateNames(dnsNames, ips, emails, uris, []string{}); err != nil {
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 }
 
 // IsX509CertificateRequestAllowed verifies that all names in the CSR are allowed.
-func (e *NamePolicyEngine) IsX509CertificateRequestAllowed(csr *x509.CertificateRequest) (bool, error) {
+func (e *NamePolicyEngine) IsX509CertificateRequestAllowed(csr *x509.CertificateRequest) error {
 	dnsNames, ips, emails, uris := csr.DNSNames, csr.IPAddresses, csr.EmailAddresses, csr.URIs
 	// when Subject Common Name must be verified in addition to the SANs, it is
 	// added to the appropriate slice of names.
@@ -220,47 +219,47 @@ func (e *NamePolicyEngine) IsX509CertificateRequestAllowed(csr *x509.Certificate
 		appendSubjectCommonName(csr.Subject, &dnsNames, &ips, &emails, &uris)
 	}
 	if err := e.validateNames(dnsNames, ips, emails, uris, []string{}); err != nil {
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 }
 
 // AreSANSAllowed verifies that all names in the slice of SANs are allowed.
 // The SANs are first split into DNS names, IPs, email addresses and URIs.
-func (e *NamePolicyEngine) AreSANsAllowed(sans []string) (bool, error) {
+func (e *NamePolicyEngine) AreSANsAllowed(sans []string) error {
 	dnsNames, ips, emails, uris := x509util.SplitSANs(sans)
 	if err := e.validateNames(dnsNames, ips, emails, uris, []string{}); err != nil {
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 }
 
 // IsDNSAllowed verifies a single DNS domain is allowed.
-func (e *NamePolicyEngine) IsDNSAllowed(dns string) (bool, error) {
+func (e *NamePolicyEngine) IsDNSAllowed(dns string) error {
 	if err := e.validateNames([]string{dns}, []net.IP{}, []string{}, []*url.URL{}, []string{}); err != nil {
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 }
 
 // IsIPAllowed verifies a single IP domain is allowed.
-func (e *NamePolicyEngine) IsIPAllowed(ip net.IP) (bool, error) {
+func (e *NamePolicyEngine) IsIPAllowed(ip net.IP) error {
 	if err := e.validateNames([]string{}, []net.IP{ip}, []string{}, []*url.URL{}, []string{}); err != nil {
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 }
 
 // IsSSHCertificateAllowed verifies that all principals in an SSH certificate are allowed.
-func (e *NamePolicyEngine) IsSSHCertificateAllowed(cert *ssh.Certificate) (bool, error) {
+func (e *NamePolicyEngine) IsSSHCertificateAllowed(cert *ssh.Certificate) error {
 	dnsNames, ips, emails, principals, err := splitSSHPrincipals(cert)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if err := e.validateNames(dnsNames, ips, emails, []*url.URL{}, principals); err != nil {
-		return false, err
+		return err
 	}
-	return true, nil
+	return nil
 }
 
 // appendSubjectCommonName appends the Subject Common Name to the appropriate slice of names. The logic is

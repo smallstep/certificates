@@ -480,16 +480,14 @@ func (v *sshNamePolicyValidator) Valid(cert *ssh.Certificate, _ SignSSHOptions) 
 		if v.hostPolicyEngine == nil && v.userPolicyEngine != nil {
 			return errors.New("SSH host certificate not authorized")
 		}
-		_, err := v.hostPolicyEngine.IsSSHCertificateAllowed(cert)
-		return err
+		return v.hostPolicyEngine.IsSSHCertificateAllowed(cert)
 	case ssh.UserCert:
 		// when no user policy engine is configured, but a host policy engine is
 		// configured, the user certificate is denied.
 		if v.userPolicyEngine == nil && v.hostPolicyEngine != nil {
 			return errors.New("SSH user certificate not authorized")
 		}
-		_, err := v.userPolicyEngine.IsSSHCertificateAllowed(cert)
-		return err
+		return v.userPolicyEngine.IsSSHCertificateAllowed(cert)
 	default:
 		return fmt.Errorf("unexpected SSH certificate type %d", cert.CertType) // satisfy return; shouldn't happen
 	}

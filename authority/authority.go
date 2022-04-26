@@ -81,9 +81,7 @@ type Authority struct {
 	authorizeSSHRenewFunc provisioner.AuthorizeSSHRenewFunc
 
 	// Policy engines
-	x509Policy    policy.X509Policy
-	sshUserPolicy policy.UserPolicy
-	sshHostPolicy policy.HostPolicy
+	policyEngine *policy.Engine
 
 	adminMutex sync.RWMutex
 }

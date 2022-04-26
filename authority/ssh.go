@@ -246,63 +246,21 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		return nil, errs.InternalServer("authority.SignSSH: unexpected ssh certificate type: %d", certTpl.CertType)
 	}
 
-	switch certTpl.CertType {
-	case ssh.UserCert:
-		// when no user policy engine is configured, but a host policy engine is
-		// configured, the user certificate is denied.
-		if a.sshUserPolicy == nil && a.sshHostPolicy != nil {
-			return nil, errs.ForbiddenErr(errors.New("authority not allowed to sign ssh user certificates"), "authority.SignSSH: error creating ssh user certificate")
-		}
-		if a.sshUserPolicy != nil {
-			allowed, err := a.sshUserPolicy.IsSSHCertificateAllowed(certTpl)
-			if err != nil {
-				var pe *policy.NamePolicyError
-				if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
-					return nil, &errs.Error{
-						// NOTE: custom forbidden error, so that denied name is sent to client
-						// as well as shown in the logs.
-						Status: http.StatusForbidden,
-						Err:    fmt.Errorf("authority not allowed to sign: %w", err),
-						Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
-					}
-				}
-				return nil, errs.InternalServerErr(err,
-					errs.WithMessage("authority.SignSSH: error creating ssh user certificate"),
-				)
-			}
-			if !allowed {
-				return nil, errs.ForbiddenErr(errors.New("authority not allowed to sign"), "authority.SignSSH: error creating ssh user certificate")
+	// Check if authority is allowed to sign the certificate
+	if err := a.isAllowedToSignSSHCertificate(certTpl); err != nil {
+		var pe *policy.NamePolicyError
+		if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
+			return nil, &errs.Error{
+				// NOTE: custom forbidden error, so that denied name is sent to client
+				// as well as shown in the logs.
+				Status: http.StatusForbidden,
+				Err:    fmt.Errorf("authority not allowed to sign: %w", err),
+				Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
 			}
 		}
-	case ssh.HostCert:
-		// when no host policy engine is configured, but a user policy engine is
-		// configured, the host certificate is denied.
-		if a.sshHostPolicy == nil && a.sshUserPolicy != nil {
-			return nil, errs.ForbiddenErr(errors.New("authority not allowed to sign ssh host certificates"), "authority.SignSSH: error creating ssh user certificate")
-		}
-		if a.sshHostPolicy != nil {
-			allowed, err := a.sshHostPolicy.IsSSHCertificateAllowed(certTpl)
-			if err != nil {
-				var pe *policy.NamePolicyError
-				if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
-					return nil, &errs.Error{
-						// NOTE: custom forbidden error, so that denied name is sent to client
-						// as well as shown in the logs.
-						Status: http.StatusForbidden,
-						Err:    fmt.Errorf("authority not allowed to sign: %w", err),
-						Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
-					}
-				}
-				return nil, errs.InternalServerErr(err,
-					errs.WithMessage("authority.SignSSH: error creating ssh host certificate"),
-				)
-			}
-			if !allowed {
-				return nil, errs.ForbiddenErr(errors.New("authority not allowed to sign"), "authority.SignSSH: error creating ssh host certificate")
-			}
-		}
-	default:
-		return nil, errs.InternalServer("authority.SignSSH: unexpected ssh certificate type: %d", certTpl.CertType)
+		return nil, errs.InternalServerErr(err,
+			errs.WithMessage("authority.SignSSH: error creating ssh certificate"),
+		)
 	}
 
 	// Sign certificate.
@@ -323,6 +281,11 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	}
 
 	return cert, nil
+}
+
+// isAllowedToSignSSHCertificate checks if the Authority is allowed to sign the SSH certificate.
+func (a *Authority) isAllowedToSignSSHCertificate(cert *ssh.Certificate) error {
+	return a.policyEngine.IsSSHCertificateAllowed(cert)
 }
 
 // RenewSSH creates a signed SSH certificate using the old SSH certificate as a template.

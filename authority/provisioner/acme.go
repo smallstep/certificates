@@ -118,9 +118,9 @@ func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIden
 	var err error
 	switch identifier.Type {
 	case IP:
-		_, err = x509Policy.IsIPAllowed(net.ParseIP(identifier.Value))
+		err = x509Policy.IsIPAllowed(net.ParseIP(identifier.Value))
 	case DNS:
-		_, err = x509Policy.IsDNSAllowed(identifier.Value)
+		err = x509Policy.IsDNSAllowed(identifier.Value)
 	default:
 		err = fmt.Errorf("invalid ACME identifier type '%s' provided", identifier.Type)
 	}

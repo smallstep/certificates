@@ -422,8 +422,7 @@ func (v *x509NamePolicyValidator) Valid(cert *x509.Certificate, _ SignOptions) e
 	if v.policyEngine == nil {
 		return nil
 	}
-	_, err := v.policyEngine.IsX509CertificateAllowed(cert)
-	return err
+	return v.policyEngine.IsX509CertificateAllowed(cert)
 }
 
 // var (

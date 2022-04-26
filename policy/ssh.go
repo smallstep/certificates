@@ -5,5 +5,5 @@ import (
 )
 
 type SSHNamePolicyEngine interface {
-	IsSSHCertificateAllowed(cert *ssh.Certificate) (bool, error)
+	IsSSHCertificateAllowed(cert *ssh.Certificate) error
 }

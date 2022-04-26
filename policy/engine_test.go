@@ -2391,25 +2391,22 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			engine, err := New(tt.options...)
 			assert.NoError(t, err)
-			got, err := engine.IsX509CertificateAllowed(tt.cert)
+			gotErr := engine.IsX509CertificateAllowed(tt.cert)
 			wantErr := tt.wantErr != nil
 
-			if (err != nil) != wantErr {
-				t.Errorf("NamePolicyEngine.IsX509CertificateAllowed() error = %v, wantErr %v", err, tt.wantErr)
+			if (gotErr != nil) != wantErr {
+				t.Errorf("NamePolicyEngine.IsX509CertificateAllowed() error = %v, wantErr %v", gotErr, tt.wantErr)
 				return
 			}
-			if err != nil {
+			if gotErr != nil {
 				var npe *NamePolicyError
-				assert.True(t, errors.As(err, &npe))
+				assert.True(t, errors.As(gotErr, &npe))
 				assert.NotEqual(t, "", npe.Error())
 				assert.Equal(t, tt.wantErr.Reason, npe.Reason)
 				assert.Equal(t, tt.wantErr.NameType, npe.NameType)
 				assert.Equal(t, tt.wantErr.Name, npe.Name)
 				assert.NotEqual(t, "", npe.Detail())
 				//assert.Equals(t, tt.err.Reason, npe.Reason) // NOTE: reason detail is skipped; it's a detail
-			}
-			if got != tt.want {
-				t.Errorf("NamePolicyEngine.IsX509CertificateAllowed() = %v, want %v", got, tt.want)
 			}
 
 			// Perform the same tests for a CSR, which are similar to Certificates
@@ -2420,47 +2417,41 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 				IPAddresses:    tt.cert.IPAddresses,
 				URIs:           tt.cert.URIs,
 			}
-			got, err = engine.IsX509CertificateRequestAllowed(csr)
+			gotErr = engine.IsX509CertificateRequestAllowed(csr)
 			wantErr = tt.wantErr != nil
-			if (err != nil) != wantErr {
-				t.Errorf("NamePolicyEngine.AreCSRNamesAllowed() error = %v, wantErr %v", err, tt.wantErr)
+			if (gotErr != nil) != wantErr {
+				t.Errorf("NamePolicyEngine.AreCSRNamesAllowed() error = %v, wantErr %v", gotErr, tt.wantErr)
 				return
 			}
-			if err != nil {
+			if gotErr != nil {
 				var npe *NamePolicyError
-				assert.True(t, errors.As(err, &npe))
+				assert.True(t, errors.As(gotErr, &npe))
 				assert.NotEqual(t, "", npe.Error())
 				assert.Equal(t, tt.wantErr.Reason, npe.Reason)
 				assert.Equal(t, tt.wantErr.NameType, npe.NameType)
 				assert.Equal(t, tt.wantErr.Name, npe.Name)
 				assert.NotEqual(t, "", npe.Detail())
 				//assert.Equals(t, tt.err.Reason, npe.Reason) // NOTE: reason detail is skipped; it's a detail
-			}
-			if got != tt.want {
-				t.Errorf("NamePolicyEngine.AreCSRNamesAllowed() = %v, want %v", got, tt.want)
 			}
 
 			// Perform the same tests for a slice of SANs
 			includeSubject := engine.verifySubjectCommonName // copy behavior of the engine when Subject has to be included as a SAN
 			sans := extractSANs(tt.cert, includeSubject)
-			got, err = engine.AreSANsAllowed(sans)
+			gotErr = engine.AreSANsAllowed(sans)
 			wantErr = tt.wantErr != nil
-			if (err != nil) != wantErr {
-				t.Errorf("NamePolicyEngine.AreSANsAllowed() error = %v, wantErr %v", err, tt.wantErr)
+			if (gotErr != nil) != wantErr {
+				t.Errorf("NamePolicyEngine.AreSANsAllowed() error = %v, wantErr %v", gotErr, tt.wantErr)
 				return
 			}
-			if err != nil {
+			if gotErr != nil {
 				var npe *NamePolicyError
-				assert.True(t, errors.As(err, &npe))
+				assert.True(t, errors.As(gotErr, &npe))
 				assert.NotEqual(t, "", npe.Error())
 				assert.Equal(t, tt.wantErr.Reason, npe.Reason)
 				assert.Equal(t, tt.wantErr.NameType, npe.NameType)
 				assert.Equal(t, tt.wantErr.Name, npe.Name)
 				assert.NotEqual(t, "", npe.Detail())
 				//assert.Equals(t, tt.err.Reason, npe.Reason) // NOTE: reason detail is skipped; it's a detail
-			}
-			if got != tt.want {
-				t.Errorf("NamePolicyEngine.AreSANsAllowed() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -2955,24 +2946,21 @@ func TestNamePolicyEngine_SSH_ArePrincipalsAllowed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			engine, err := New(tt.options...)
 			assert.NoError(t, err)
-			got, err := engine.IsSSHCertificateAllowed(tt.cert)
+			gotErr := engine.IsSSHCertificateAllowed(tt.cert)
 			wantErr := tt.wantErr != nil
-			if (err != nil) != wantErr {
-				t.Errorf("NamePolicyEngine.IsSSHCertificateAllowed() error = %v, wantErr %v", err, tt.wantErr)
+			if (gotErr != nil) != wantErr {
+				t.Errorf("NamePolicyEngine.IsSSHCertificateAllowed() error = %v, wantErr %v", gotErr, tt.wantErr)
 				return
 			}
-			if err != nil {
+			if gotErr != nil {
 				var npe *NamePolicyError
-				assert.True(t, errors.As(err, &npe))
+				assert.True(t, errors.As(gotErr, &npe))
 				assert.NotEqual(t, "", npe.Error())
 				assert.Equal(t, tt.wantErr.Reason, npe.Reason)
 				assert.Equal(t, tt.wantErr.NameType, npe.NameType)
 				assert.Equal(t, tt.wantErr.Name, npe.Name)
 				assert.NotEqual(t, "", npe.Detail())
 				//assert.Equals(t, tt.err.Reason, npe.Reason) // NOTE: reason detail is skipped; it's a detail
-			}
-			if got != tt.want {
-				t.Errorf("NamePolicyEngine.IsSSHCertificateAllowed() = %v, want %v", got, tt.want)
 			}
 		})
 	}

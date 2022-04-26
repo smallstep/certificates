@@ -523,14 +523,16 @@ ZYtQ9Ot36qc=
 					return nil
 				},
 			}
-			policyOptions := &policy.X509PolicyOptions{
-				DeniedNames: &policy.X509NameOptions{
-					DNSDomains: []string{"test.smallstep.com"},
+			options := &policy.Options{
+				X509: &policy.X509PolicyOptions{
+					DeniedNames: &policy.X509NameOptions{
+						DNSDomains: []string{"test.smallstep.com"},
+					},
 				},
 			}
-			engine, err := policy.NewX509PolicyEngine(policyOptions)
+			engine, err := policy.New(options)
 			assert.FatalError(t, err)
-			aa.x509Policy = engine
+			aa.policyEngine = engine
 			return &signTest{
 				auth:            aa,
 				csr:             csr,
@@ -696,15 +698,17 @@ ZYtQ9Ot36qc=
 					return nil
 				},
 			}
-			policyOptions := &policy.X509PolicyOptions{
-				AllowedNames: &policy.X509NameOptions{
-					DNSDomains: []string{"*.smallstep.com"},
+			options := &policy.Options{
+				X509: &policy.X509PolicyOptions{
+					AllowedNames: &policy.X509NameOptions{
+						DNSDomains: []string{"*.smallstep.com"},
+					},
+					DisableCommonNameVerification: true, // TODO(hs): allows "smallstep test"; do we want to keep it like this?
 				},
-				DisableCommonNameVerification: true, // TODO(hs): allows "smallstep test"; do we want to keep it like this?
 			}
-			engine, err := policy.NewX509PolicyEngine(policyOptions)
+			engine, err := policy.New(options)
 			assert.FatalError(t, err)
-			aa.x509Policy = engine
+			aa.policyEngine = engine
 			return &signTest{
 				auth:            aa,
 				csr:             csr,

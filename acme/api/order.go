@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -199,14 +198,7 @@ func isIdentifierAllowed(acmePolicy policy.X509Policy, identifier acme.Identifie
 	if acmePolicy == nil {
 		return nil
 	}
-	allowed, err := acmePolicy.AreSANsAllowed([]string{identifier.Value})
-	if err != nil {
-		return err
-	}
-	if !allowed {
-		return fmt.Errorf("acme identifier '%s' not allowed", identifier.Value)
-	}
-	return nil
+	return acmePolicy.AreSANsAllowed([]string{identifier.Value})
 }
 
 func newACMEPolicyEngine(eak *acme.ExternalAccountKey) (policy.X509Policy, error) {

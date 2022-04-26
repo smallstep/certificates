@@ -200,8 +200,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	// Check if authority is allowed to sign the certificate
-	var allowedToSign bool
-	if allowedToSign, err = a.isAllowedToSign(leaf); err != nil {
+	if err := a.isAllowedToSignX509Certificate(leaf); err != nil {
 		var pe *policy.NamePolicyError
 		if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
 			return nil, errs.ApplyOptions(&errs.Error{
@@ -216,12 +215,6 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 			errs.WithKeyVal("csr", csr),
 			errs.WithKeyVal("signOptions", signOpts),
 			errs.WithMessage("error creating certificate"),
-		)
-	}
-	if !allowedToSign {
-		return nil, errs.ApplyOptions(
-			errs.ForbiddenErr(errors.New("authority not allowed to sign"), "error creating certificate"),
-			opts...,
 		)
 	}
 
@@ -248,31 +241,16 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	return fullchain, nil
 }
 
-// isAllowedToSign checks if the Authority is allowed to sign the X.509 certificate.
-func (a *Authority) isAllowedToSign(cert *x509.Certificate) (bool, error) {
-
-	// if no policy is configured, the cert is implicitly allowed
-	if a.x509Policy == nil {
-		return true, nil
-	}
-
-	return a.x509Policy.IsX509CertificateAllowed(cert)
+// isAllowedToSignX509Certificate checks if the Authority is allowed
+// to sign the X.509 certificate.
+func (a *Authority) isAllowedToSignX509Certificate(cert *x509.Certificate) error {
+	return a.policyEngine.IsX509CertificateAllowed(cert)
 }
 
 // AreSANsAllowed evaluates the provided sans against the
 // authority X.509 policy.
 func (a *Authority) AreSANsAllowed(ctx context.Context, sans []string) error {
-
-	// no policy configured; return early
-	if a.x509Policy == nil {
-		return nil
-	}
-
-	// evaluate the X.509 policy for the provided sans
-	var err error
-	_, err = a.x509Policy.AreSANsAllowed(sans)
-
-	return err
+	return a.policyEngine.AreSANsAllowed(sans)
 }
 
 // Renew creates a new Certificate identical to the old certificate, except

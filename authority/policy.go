@@ -227,50 +227,19 @@ func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
 		policyOptions = a.config.AuthorityConfig.Policy
 	}
 
-	// if no new or updated policy option is set, clear policy engines that (may have)
-	// been configured before and return early
-	if policyOptions == nil {
-		a.x509Policy = nil
-		a.sshHostPolicy = nil
-		a.sshUserPolicy = nil
-		return nil
-	}
-
-	var (
-		x509Policy    authPolicy.X509Policy
-		sshHostPolicy authPolicy.HostPolicy
-		sshUserPolicy authPolicy.UserPolicy
-	)
-
-	// initialize the x509 allow/deny policy engine
-	if x509Policy, err = authPolicy.NewX509PolicyEngine(policyOptions.GetX509Options()); err != nil {
+	engine, err := authPolicy.New(policyOptions)
+	if err != nil {
 		return err
 	}
 
-	// initialize the SSH allow/deny policy engine for host certificates
-	if sshHostPolicy, err = authPolicy.NewSSHHostPolicyEngine(policyOptions.GetSSHOptions()); err != nil {
-		return err
-	}
-
-	// initialize the SSH allow/deny policy engine for user certificates
-	if sshUserPolicy, err = authPolicy.NewSSHUserPolicyEngine(policyOptions.GetSSHOptions()); err != nil {
-		return err
-	}
-
-	// set all policy engines; all or nothing
-	a.x509Policy = x509Policy
-	a.sshHostPolicy = sshHostPolicy
-	a.sshUserPolicy = sshUserPolicy
+	// only update the policy engine when no error was returned
+	a.policyEngine = engine
 
 	return nil
 }
 
 func isAllowed(engine authPolicy.X509Policy, sans []string) error {
-	var (
-		allowed bool
-		err     error
-	)
-	if allowed, err = engine.AreSANsAllowed(sans); err != nil {
+	if err := engine.AreSANsAllowed(sans); err != nil {
 		var policyErr *policy.NamePolicyError
 		isNamePolicyError := errors.As(err, &policyErr)
 		if isNamePolicyError && policyErr.Reason == policy.NotAllowed {
@@ -282,13 +251,6 @@ func isAllowed(engine authPolicy.X509Policy, sans []string) error {
 		return &PolicyError{
 			Typ: EvaluationFailure,
 			Err: err,
-		}
-	}
-
-	if !allowed {
-		return &PolicyError{
-			Typ: AdminLockOut,
-			Err: fmt.Errorf("the provided policy would lock out %s from the CA. Please update your policy to include %s as an allowed name", sans, sans),
 		}
 	}
 
