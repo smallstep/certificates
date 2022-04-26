@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -33,7 +34,9 @@ func ProtoJSON(r io.Reader, m proto.Message) error {
 
 	switch err := protojson.Unmarshal(data, m); {
 	case errors.Is(err, proto.Error):
-		return badProtoJSONError(err.Error())
+		// trim the proto prefix for the message
+		s := strings.TrimSpace(strings.TrimPrefix(err.Error(), "proto:"))
+		return badProtoJSONError(s)
 	default:
 		return err
 	}

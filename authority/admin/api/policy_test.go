@@ -376,7 +376,7 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 				// a syntax error (in the tests). If the message doesn't start with "proto",
 				// we expect a full string match.
 				if strings.HasPrefix(tc.err.Message, "proto:") {
-					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+					assert.True(t, strings.Contains(ae.Message, "syntax error"))
 				} else {
 					assert.Equals(t, tc.err.Message, ae.Message)
 				}
@@ -634,7 +634,7 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 				// a syntax error (in the tests). If the message doesn't start with "proto",
 				// we expect a full string match.
 				if strings.HasPrefix(tc.err.Message, "proto:") {
-					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+					assert.True(t, strings.Contains(ae.Message, "syntax error"))
 				} else {
 					assert.Equals(t, tc.err.Message, ae.Message)
 				}
@@ -1081,7 +1081,7 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 				// a syntax error (in the tests). If the message doesn't start with "proto",
 				// we expect a full string match.
 				if strings.HasPrefix(tc.err.Message, "proto:") {
-					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+					assert.True(t, strings.Contains(ae.Message, "syntax error"))
 				} else {
 					assert.Equals(t, tc.err.Message, ae.Message)
 				}
@@ -1292,7 +1292,7 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 				// a syntax error (in the tests). If the message doesn't start with "proto",
 				// we expect a full string match.
 				if strings.HasPrefix(tc.err.Message, "proto:") {
-					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+					assert.True(t, strings.Contains(ae.Message, "syntax error"))
 				} else {
 					assert.Equals(t, tc.err.Message, ae.Message)
 				}
@@ -1694,7 +1694,7 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 				// a syntax error (in the tests). If the message doesn't start with "proto",
 				// we expect a full string match.
 				if strings.HasPrefix(tc.err.Message, "proto:") {
-					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+					assert.True(t, strings.Contains(ae.Message, "syntax error"))
 				} else {
 					assert.Equals(t, tc.err.Message, ae.Message)
 				}
@@ -1880,7 +1880,7 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 				// a syntax error (in the tests). If the message doesn't start with "proto",
 				// we expect a full string match.
 				if strings.HasPrefix(tc.err.Message, "proto:") {
-					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+					assert.True(t, strings.Contains(ae.Message, "syntax error"))
 				} else {
 					assert.Equals(t, tc.err.Message, ae.Message)
 				}

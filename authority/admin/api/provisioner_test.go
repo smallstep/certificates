@@ -430,7 +430,7 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
 
 				if strings.HasPrefix(tc.err.Message, "proto:") {
-					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+					assert.True(t, strings.Contains(adminErr.Message, "syntax error"))
 				} else {
 					assert.Equals(t, tc.err.Message, adminErr.Message)
 				}
@@ -1087,7 +1087,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
 
 				if strings.HasPrefix(tc.err.Message, "proto:") {
-					assert.True(t, strings.Contains(tc.err.Message, "syntax error"))
+					assert.True(t, strings.Contains(adminErr.Message, "syntax error"))
 				} else {
 					assert.Equals(t, tc.err.Message, adminErr.Message)
 				}
