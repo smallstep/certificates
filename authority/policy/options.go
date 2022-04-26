@@ -31,7 +31,7 @@ type X509PolicyOptionsInterface interface {
 	GetAllowedNameOptions() *X509NameOptions
 	GetDeniedNameOptions() *X509NameOptions
 	IsWildcardLiteralAllowed() bool
-	ShouldVerifySubjectCommonName() bool
+	ShouldVerifyCommonName() bool
 }
 
 // X509PolicyOptions is a container for x509 allowed and denied
@@ -39,15 +39,19 @@ type X509PolicyOptionsInterface interface {
 type X509PolicyOptions struct {
 	// AllowedNames contains the x509 allowed names
 	AllowedNames *X509NameOptions `json:"allow,omitempty"`
+
 	// DeniedNames contains the x509 denied names
 	DeniedNames *X509NameOptions `json:"deny,omitempty"`
+
 	// AllowWildcardLiteral indicates if literal wildcard names
 	// such as *.example.com and @example.com are allowed. Defaults
 	// to false.
-	AllowWildcardLiteral bool `json:"allow_wildcard_literal,omitempty"`
-	// DisableSubjectCommonNameVerification indicates if the Subject Common Name
-	// is verified in addition to the SANs. Defaults to false.
-	DisableSubjectCommonNameVerification bool `json:"disable_subject_common_name_verification,omitempty"`
+	AllowWildcardLiteral bool `json:"allowWildcardLiteral,omitempty"`
+
+	// DisableCommonNameVerification indicates if the Subject Common Name
+	// is verified in addition to the SANs. Defaults to false, resulting in
+	// Common Names being verified.
+	DisableCommonNameVerification bool `json:"disableCommonNameVerification,omitempty"`
 }
 
 // X509NameOptions models the X509 name policy configuration.
@@ -92,13 +96,13 @@ func (o *X509PolicyOptions) IsWildcardLiteralAllowed() bool {
 	return o.AllowWildcardLiteral
 }
 
-// ShouldVerifySubjectCommonName returns whether the authority
+// ShouldVerifyCommonName returns whether the authority
 // should verify the Subject Common Name in addition to the SANs.
-func (o *X509PolicyOptions) ShouldVerifySubjectCommonName() bool {
+func (o *X509PolicyOptions) ShouldVerifyCommonName() bool {
 	if o == nil {
 		return false
 	}
-	return !o.DisableSubjectCommonNameVerification
+	return !o.DisableCommonNameVerification
 }
 
 // SSHPolicyOptionsInterface is an interface for providers of

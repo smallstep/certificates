@@ -91,7 +91,7 @@ func (p *Policy) IsWildcardLiteralAllowed() bool {
 // ShouldVerifySubjectCommonName returns true by default
 // for ACME account policies, as this is embedded in the
 // protocol.
-func (p *Policy) ShouldVerifySubjectCommonName() bool {
+func (p *Policy) ShouldVerifyCommonName() bool {
 	return true
 }
 
@@ -101,7 +101,7 @@ type ExternalAccountKey struct {
 	ProvisionerID string    `json:"provisionerID"`
 	Reference     string    `json:"reference"`
 	AccountID     string    `json:"-"`
-	KeyBytes      []byte    `json:"-"`
+	HmacKey       []byte    `json:"-"`
 	CreatedAt     time.Time `json:"createdAt"`
 	BoundAt       time.Time `json:"boundAt,omitempty"`
 	Policy        *Policy   `json:"policy,omitempty"`
@@ -121,6 +121,6 @@ func (eak *ExternalAccountKey) BindTo(account *Account) error {
 	}
 	eak.AccountID = account.ID
 	eak.BoundAt = time.Now()
-	eak.KeyBytes = []byte{} // clearing the key bytes; can only be used once
+	eak.HmacKey = []byte{} // clearing the key bytes; can only be used once
 	return nil
 }

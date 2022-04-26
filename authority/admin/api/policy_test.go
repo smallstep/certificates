@@ -21,15 +21,22 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 )
 
+type fakeLinkedCA struct {
+	admin.MockDB
+}
+
+func (f *fakeLinkedCA) IsLinkedCA() bool {
+	return true
+}
+
 func TestPolicyAdminResponder_GetAuthorityPolicy(t *testing.T) {
 	type test struct {
-		auth           adminAuthority
-		deploymentType string
-		adminDB        admin.DB
-		ctx            context.Context
-		err            *admin.Error
-		policy         *linkedca.Policy
-		statusCode     int
+		auth       adminAuthority
+		adminDB    admin.DB
+		ctx        context.Context
+		err        *admin.Error
+		policy     *linkedca.Policy
+		statusCode int
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/linkedca": func(t *testing.T) test {
@@ -37,10 +44,10 @@ func TestPolicyAdminResponder_GetAuthorityPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/auth.GetAuthorityPolicy-error": func(t *testing.T) test {
@@ -97,11 +104,8 @@ func TestPolicyAdminResponder_GetAuthorityPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				auth:           tc.auth,
-				adminDB:        tc.adminDB,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, nil)
 
 			req := httptest.NewRequest("GET", "/foo", nil)
 			req = req.WithContext(tc.ctx)
@@ -139,15 +143,14 @@ func TestPolicyAdminResponder_GetAuthorityPolicy(t *testing.T) {
 
 func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 	type test struct {
-		auth           adminAuthority
-		deploymentType string
-		adminDB        admin.DB
-		body           []byte
-		ctx            context.Context
-		acmeDB         acme.DB
-		err            *admin.Error
-		policy         *linkedca.Policy
-		statusCode     int
+		auth       adminAuthority
+		adminDB    admin.DB
+		body       []byte
+		ctx        context.Context
+		acmeDB     acme.DB
+		err        *admin.Error
+		policy     *linkedca.Policy
+		statusCode int
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/linkedca": func(t *testing.T) test {
@@ -155,10 +158,10 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/auth.GetAuthorityPolicy-error": func(t *testing.T) test {
@@ -343,12 +346,8 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				auth:           tc.auth,
-				adminDB:        tc.adminDB,
-				acmeDB:         tc.acmeDB,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, tc.acmeDB)
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
@@ -395,15 +394,14 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 
 func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 	type test struct {
-		auth           adminAuthority
-		deploymentType string
-		adminDB        admin.DB
-		body           []byte
-		ctx            context.Context
-		acmeDB         acme.DB
-		err            *admin.Error
-		policy         *linkedca.Policy
-		statusCode     int
+		auth       adminAuthority
+		adminDB    admin.DB
+		body       []byte
+		ctx        context.Context
+		acmeDB     acme.DB
+		err        *admin.Error
+		policy     *linkedca.Policy
+		statusCode int
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/linkedca": func(t *testing.T) test {
@@ -411,10 +409,10 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/auth.GetAuthorityPolicy-error": func(t *testing.T) test {
@@ -606,12 +604,8 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				auth:           tc.auth,
-				adminDB:        tc.adminDB,
-				acmeDB:         tc.acmeDB,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, tc.acmeDB)
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
@@ -658,14 +652,13 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 
 func TestPolicyAdminResponder_DeleteAuthorityPolicy(t *testing.T) {
 	type test struct {
-		auth           adminAuthority
-		deploymentType string
-		adminDB        admin.DB
-		body           []byte
-		ctx            context.Context
-		acmeDB         acme.DB
-		err            *admin.Error
-		statusCode     int
+		auth       adminAuthority
+		adminDB    admin.DB
+		body       []byte
+		ctx        context.Context
+		acmeDB     acme.DB
+		err        *admin.Error
+		statusCode int
 	}
 
 	var tests = map[string]func(t *testing.T) test{
@@ -674,10 +667,10 @@ func TestPolicyAdminResponder_DeleteAuthorityPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/auth.GetAuthorityPolicy-error": func(t *testing.T) test {
@@ -762,12 +755,8 @@ func TestPolicyAdminResponder_DeleteAuthorityPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				auth:           tc.auth,
-				adminDB:        tc.adminDB,
-				acmeDB:         tc.acmeDB,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, tc.acmeDB)
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
@@ -809,14 +798,13 @@ func TestPolicyAdminResponder_DeleteAuthorityPolicy(t *testing.T) {
 
 func TestPolicyAdminResponder_GetProvisionerPolicy(t *testing.T) {
 	type test struct {
-		auth           adminAuthority
-		deploymentType string
-		adminDB        admin.DB
-		ctx            context.Context
-		acmeDB         acme.DB
-		err            *admin.Error
-		policy         *linkedca.Policy
-		statusCode     int
+		auth       adminAuthority
+		adminDB    admin.DB
+		ctx        context.Context
+		acmeDB     acme.DB
+		err        *admin.Error
+		policy     *linkedca.Policy
+		statusCode int
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/linkedca": func(t *testing.T) test {
@@ -824,10 +812,10 @@ func TestPolicyAdminResponder_GetProvisionerPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/prov-no-policy": func(t *testing.T) test {
@@ -863,12 +851,8 @@ func TestPolicyAdminResponder_GetProvisionerPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				auth:           tc.auth,
-				adminDB:        tc.adminDB,
-				acmeDB:         tc.acmeDB,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, tc.acmeDB)
 
 			req := httptest.NewRequest("GET", "/foo", nil)
 			req = req.WithContext(tc.ctx)
@@ -906,13 +890,13 @@ func TestPolicyAdminResponder_GetProvisionerPolicy(t *testing.T) {
 
 func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 	type test struct {
-		auth           adminAuthority
-		deploymentType string
-		body           []byte
-		ctx            context.Context
-		err            *admin.Error
-		policy         *linkedca.Policy
-		statusCode     int
+		auth       adminAuthority
+		adminDB    admin.DB
+		body       []byte
+		ctx        context.Context
+		err        *admin.Error
+		policy     *linkedca.Policy
+		statusCode int
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/linkedca": func(t *testing.T) test {
@@ -920,10 +904,10 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/existing-policy": func(t *testing.T) test {
@@ -1067,10 +1051,8 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				auth:           tc.auth,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, nil)
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
@@ -1117,13 +1099,13 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 
 func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 	type test struct {
-		auth           adminAuthority
-		deploymentType string
-		body           []byte
-		ctx            context.Context
-		err            *admin.Error
-		policy         *linkedca.Policy
-		statusCode     int
+		auth       adminAuthority
+		body       []byte
+		adminDB    admin.DB
+		ctx        context.Context
+		err        *admin.Error
+		policy     *linkedca.Policy
+		statusCode int
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/linkedca": func(t *testing.T) test {
@@ -1131,10 +1113,10 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/no-existing-policy": func(t *testing.T) test {
@@ -1280,10 +1262,8 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				auth:           tc.auth,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, nil)
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
@@ -1330,14 +1310,13 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 
 func TestPolicyAdminResponder_DeleteProvisionerPolicy(t *testing.T) {
 	type test struct {
-		auth           adminAuthority
-		deploymentType string
-		adminDB        admin.DB
-		body           []byte
-		ctx            context.Context
-		acmeDB         acme.DB
-		err            *admin.Error
-		statusCode     int
+		auth       adminAuthority
+		adminDB    admin.DB
+		body       []byte
+		ctx        context.Context
+		acmeDB     acme.DB
+		err        *admin.Error
+		statusCode int
 	}
 
 	var tests = map[string]func(t *testing.T) test{
@@ -1346,10 +1325,10 @@ func TestPolicyAdminResponder_DeleteProvisionerPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/no-existing-policy": func(t *testing.T) test {
@@ -1404,12 +1383,8 @@ func TestPolicyAdminResponder_DeleteProvisionerPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				auth:           tc.auth,
-				adminDB:        tc.adminDB,
-				acmeDB:         tc.acmeDB,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, tc.acmeDB)
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
@@ -1451,12 +1426,12 @@ func TestPolicyAdminResponder_DeleteProvisionerPolicy(t *testing.T) {
 
 func TestPolicyAdminResponder_GetACMEAccountPolicy(t *testing.T) {
 	type test struct {
-		deploymentType string
-		ctx            context.Context
-		acmeDB         acme.DB
-		err            *admin.Error
-		policy         *linkedca.Policy
-		statusCode     int
+		ctx        context.Context
+		acmeDB     acme.DB
+		adminDB    admin.DB
+		err        *admin.Error
+		policy     *linkedca.Policy
+		statusCode int
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/linkedca": func(t *testing.T) test {
@@ -1464,10 +1439,10 @@ func TestPolicyAdminResponder_GetACMEAccountPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/no-policy": func(t *testing.T) test {
@@ -1514,10 +1489,8 @@ func TestPolicyAdminResponder_GetACMEAccountPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				acmeDB:         tc.acmeDB,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(nil, tc.adminDB, tc.acmeDB)
 
 			req := httptest.NewRequest("GET", "/foo", nil)
 			req = req.WithContext(tc.ctx)
@@ -1555,13 +1528,13 @@ func TestPolicyAdminResponder_GetACMEAccountPolicy(t *testing.T) {
 
 func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 	type test struct {
-		deploymentType string
-		acmeDB         acme.DB
-		body           []byte
-		ctx            context.Context
-		err            *admin.Error
-		policy         *linkedca.Policy
-		statusCode     int
+		acmeDB     acme.DB
+		adminDB    admin.DB
+		body       []byte
+		ctx        context.Context
+		err        *admin.Error
+		policy     *linkedca.Policy
+		statusCode int
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/linkedca": func(t *testing.T) test {
@@ -1569,10 +1542,10 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/existing-policy": func(t *testing.T) test {
@@ -1691,10 +1664,8 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				acmeDB:         tc.acmeDB,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(nil, tc.adminDB, tc.acmeDB)
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
@@ -1741,13 +1712,13 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 
 func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 	type test struct {
-		deploymentType string
-		acmeDB         acme.DB
-		body           []byte
-		ctx            context.Context
-		err            *admin.Error
-		policy         *linkedca.Policy
-		statusCode     int
+		acmeDB     acme.DB
+		adminDB    admin.DB
+		body       []byte
+		ctx        context.Context
+		err        *admin.Error
+		policy     *linkedca.Policy
+		statusCode int
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/linkedca": func(t *testing.T) test {
@@ -1755,10 +1726,10 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/no-existing-policy": func(t *testing.T) test {
@@ -1879,10 +1850,8 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				acmeDB:         tc.acmeDB,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(nil, tc.adminDB, tc.acmeDB)
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
@@ -1929,12 +1898,12 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 
 func TestPolicyAdminResponder_DeleteACMEAccountPolicy(t *testing.T) {
 	type test struct {
-		deploymentType string
-		body           []byte
-		ctx            context.Context
-		acmeDB         acme.DB
-		err            *admin.Error
-		statusCode     int
+		body       []byte
+		adminDB    admin.DB
+		ctx        context.Context
+		acmeDB     acme.DB
+		err        *admin.Error
+		statusCode int
 	}
 
 	var tests = map[string]func(t *testing.T) test{
@@ -1943,10 +1912,10 @@ func TestPolicyAdminResponder_DeleteACMEAccountPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 			err.Message = "policy operations not yet supported in linked deployments"
 			return test{
-				ctx:            ctx,
-				deploymentType: "linked",
-				err:            err,
-				statusCode:     501,
+				ctx:        ctx,
+				adminDB:    &fakeLinkedCA{},
+				err:        err,
+				statusCode: 501,
 			}
 		},
 		"fail/no-existing-policy": func(t *testing.T) test {
@@ -2033,10 +2002,8 @@ func TestPolicyAdminResponder_DeleteACMEAccountPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			par := &PolicyAdminResponder{
-				acmeDB:         tc.acmeDB,
-				deploymentType: tc.deploymentType,
-			}
+
+			par := NewPolicyAdminResponder(nil, tc.adminDB, tc.acmeDB)
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)

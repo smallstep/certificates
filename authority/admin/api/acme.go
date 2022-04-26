@@ -90,7 +90,7 @@ func eakToLinked(k *acme.ExternalAccountKey) *linkedca.EABKey {
 
 	eak := &linkedca.EABKey{
 		Id:          k.ID,
-		HmacKey:     k.KeyBytes,
+		HmacKey:     k.HmacKey,
 		Provisioner: k.ProvisionerID,
 		Reference:   k.Reference,
 		Account:     k.AccountID,
@@ -124,7 +124,7 @@ func linkedEAKToCertificates(k *linkedca.EABKey) *acme.ExternalAccountKey {
 		ProvisionerID: k.Provisioner,
 		Reference:     k.Reference,
 		AccountID:     k.Account,
-		KeyBytes:      k.HmacKey,
+		HmacKey:       k.HmacKey,
 		CreatedAt:     k.CreatedAt.AsTime(),
 		BoundAt:       k.BoundAt.AsTime(),
 	}

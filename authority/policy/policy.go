@@ -50,7 +50,7 @@ func NewX509PolicyEngine(policyOptions X509PolicyOptionsInterface) (X509Policy, 
 		return nil, nil
 	}
 
-	if policyOptions.ShouldVerifySubjectCommonName() {
+	if policyOptions.ShouldVerifyCommonName() {
 		options = append(options, policy.WithSubjectCommonNameVerification())
 	}
 

@@ -700,7 +700,7 @@ ZYtQ9Ot36qc=
 				AllowedNames: &policy.X509NameOptions{
 					DNSDomains: []string{"*.smallstep.com"},
 				},
-				DisableSubjectCommonNameVerification: true, // allows "smallstep test"
+				DisableCommonNameVerification: true, // TODO(hs): allows "smallstep test"; do we want to keep it like this?
 			}
 			engine, err := policy.NewX509PolicyEngine(policyOptions)
 			assert.FatalError(t, err)

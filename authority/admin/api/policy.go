@@ -30,19 +30,25 @@ type policyAdminResponderInterface interface {
 
 // PolicyAdminResponder is responsible for writing ACME admin responses
 type PolicyAdminResponder struct {
-	auth           adminAuthority
-	adminDB        admin.DB
-	acmeDB         acme.DB
-	deploymentType string
+	auth       adminAuthority
+	adminDB    admin.DB
+	acmeDB     acme.DB
+	isLinkedCA bool
 }
 
 // NewACMEAdminResponder returns a new ACMEAdminResponder
-func NewPolicyAdminResponder(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB, deploymentType string) *PolicyAdminResponder {
+func NewPolicyAdminResponder(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB) *PolicyAdminResponder {
+
+	var isLinkedCA bool
+	if a, ok := adminDB.(interface{ IsLinkedCA() bool }); ok {
+		isLinkedCA = a.IsLinkedCA()
+	}
+
 	return &PolicyAdminResponder{
-		auth:           auth,
-		adminDB:        adminDB,
-		acmeDB:         acmeDB,
-		deploymentType: deploymentType,
+		auth:       auth,
+		adminDB:    adminDB,
+		acmeDB:     acmeDB,
+		isLinkedCA: isLinkedCA,
 	}
 }
 
@@ -435,8 +441,8 @@ func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, 
 
 // blockLinkedCA blocks all API operations on linked deployments
 func (par *PolicyAdminResponder) blockLinkedCA() error {
-	// temporary blocking linked deployments based on string comparison (preventing import cycle)
-	if par.deploymentType == "linked" {
+	// temporary blocking linked deployments
+	if par.isLinkedCA {
 		return admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 	}
 	return nil

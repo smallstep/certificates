@@ -15,8 +15,7 @@ import (
 type policyErrorType int
 
 const (
-	_ policyErrorType = iota
-	AdminLockOut
+	AdminLockOut policyErrorType = iota + 1
 	StoreFailure
 	ReloadFailure
 	ConfigurationFailure
@@ -345,7 +344,7 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 		}
 
 		opts.X509.AllowWildcardLiteral = x509.AllowWildcardLiteral
-		opts.X509.DisableSubjectCommonNameVerification = x509.DisableSubjectCommonNameVerification
+		opts.X509.DisableCommonNameVerification = x509.DisableSubjectCommonNameVerification
 	}
 
 	// fill ssh policy configuration

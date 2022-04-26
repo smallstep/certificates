@@ -156,7 +156,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							KeyBytes:      []byte{1, 3, 3, 7},
+							HmacKey:       []byte{1, 3, 3, 7},
 							CreatedAt:     createdAt,
 						}, nil
 					},
@@ -170,7 +170,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 					ID:            "eakID",
 					ProvisionerID: provID,
 					Reference:     "testeak",
-					KeyBytes:      []byte{1, 3, 3, 7},
+					HmacKey:       []byte{1, 3, 3, 7},
 					CreatedAt:     createdAt,
 				},
 				err: nil,
@@ -523,7 +523,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							Reference:     "testeak",
 							CreatedAt:     createdAt,
 							AccountID:     "some-account-id",
-							KeyBytes:      []byte{},
+							HmacKey:       []byte{},
 						}, nil
 					},
 				},
@@ -630,7 +630,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							Reference:     "testeak",
 							CreatedAt:     createdAt,
 							AccountID:     "some-account-id",
-							KeyBytes:      []byte{1, 3, 3, 7},
+							HmacKey:       []byte{1, 3, 3, 7},
 							BoundAt:       boundAt,
 						}, nil
 					},
@@ -686,7 +686,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							KeyBytes:      []byte{1, 2, 3, 4},
+							HmacKey:       []byte{1, 2, 3, 4},
 							CreatedAt:     time.Now(),
 						}, nil
 					},
@@ -744,7 +744,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							KeyBytes:      []byte{1, 3, 3, 7},
+							HmacKey:       []byte{1, 3, 3, 7},
 							CreatedAt:     time.Now(),
 						}, nil
 					},
@@ -799,7 +799,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							KeyBytes:      []byte{1, 3, 3, 7},
+							HmacKey:       []byte{1, 3, 3, 7},
 							CreatedAt:     time.Now(),
 						}, nil
 					},
@@ -855,7 +855,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							KeyBytes:      []byte{1, 3, 3, 7},
+							HmacKey:       []byte{1, 3, 3, 7},
 							CreatedAt:     time.Now(),
 						}, nil
 					},
@@ -898,7 +898,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 				} else {
 					assert.NotNil(t, tc.eak)
 					assert.Equals(t, got.ID, tc.eak.ID)
-					assert.Equals(t, got.KeyBytes, tc.eak.KeyBytes)
+					assert.Equals(t, got.HmacKey, tc.eak.HmacKey)
 					assert.Equals(t, got.ProvisionerID, tc.eak.ProvisionerID)
 					assert.Equals(t, got.Reference, tc.eak.Reference)
 					assert.Equals(t, got.CreatedAt, tc.eak.CreatedAt)

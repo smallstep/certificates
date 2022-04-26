@@ -122,6 +122,13 @@ func newLinkedCAClient(token string) (*linkedCaClient, error) {
 	}, nil
 }
 
+// IsLinkedCA is a sentinel function that can be used to
+// check if a linkedCaClient is the underlying type of an
+// admin.DB interface.
+func (c *linkedCaClient) IsLinkedCA() bool {
+	return true
+}
+
 func (c *linkedCaClient) Run() {
 	c.renewer.Run()
 }

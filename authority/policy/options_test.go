@@ -63,21 +63,21 @@ func TestX509PolicyOptions_ShouldVerifySubjectCommonName(t *testing.T) {
 		{
 			name: "set-true",
 			options: &X509PolicyOptions{
-				DisableSubjectCommonNameVerification: true,
+				DisableCommonNameVerification: true,
 			},
 			want: false,
 		},
 		{
 			name: "set-false",
 			options: &X509PolicyOptions{
-				DisableSubjectCommonNameVerification: false,
+				DisableCommonNameVerification: false,
 			},
 			want: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.options.ShouldVerifySubjectCommonName(); got != tt.want {
+			if got := tt.options.ShouldVerifyCommonName(); got != tt.want {
 				t.Errorf("X509PolicyOptions.ShouldVerifySubjectCommonName() = %v, want %v", got, tt.want)
 			}
 		})

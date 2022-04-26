@@ -227,8 +227,8 @@ func Test_policyToCertificates(t *testing.T) {
 					AllowedNames: &policy.X509NameOptions{
 						DNSDomains: []string{"*.local"},
 					},
-					AllowWildcardLiteral:                 false,
-					DisableSubjectCommonNameVerification: false,
+					AllowWildcardLiteral:          false,
+					DisableCommonNameVerification: false,
 				},
 			},
 		},
@@ -290,8 +290,8 @@ func Test_policyToCertificates(t *testing.T) {
 						EmailAddresses: []string{"badhost.example.com"},
 						URIDomains:     []string{"https://badhost.local"},
 					},
-					AllowWildcardLiteral:                 true,
-					DisableSubjectCommonNameVerification: false,
+					AllowWildcardLiteral:          true,
+					DisableCommonNameVerification: false,
 				},
 				SSH: &policy.SSHPolicyOptions{
 					Host: &policy.SSHHostCertificateOptions{
@@ -364,8 +364,8 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 		DeniedNames: &policy.X509NameOptions{
 			DNSDomains: []string{"badhost.local"},
 		},
-		AllowWildcardLiteral:                 true,
-		DisableSubjectCommonNameVerification: false,
+		AllowWildcardLiteral:          true,
+		DisableCommonNameVerification: false,
 	})
 	assert.NoError(t, err)
 
@@ -648,8 +648,8 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							DeniedNames: &policy.X509NameOptions{
 								DNSDomains: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral:                 true,
-							DisableSubjectCommonNameVerification: false,
+							AllowWildcardLiteral:          true,
+							DisableCommonNameVerification: false,
 						},
 					},
 				},
@@ -768,8 +768,8 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							DeniedNames: &policy.X509NameOptions{
 								DNSDomains: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral:                 true,
-							DisableSubjectCommonNameVerification: false,
+							AllowWildcardLiteral:          true,
+							DisableCommonNameVerification: false,
 						},
 						SSH: &policy.SSHPolicyOptions{
 							Host: &policy.SSHHostCertificateOptions{

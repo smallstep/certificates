@@ -69,10 +69,12 @@ type X509Options struct {
 	// AllowWildcardLiteral indicates if literal wildcard names
 	// such as *.example.com and @example.com are allowed. Defaults
 	// to false.
-	AllowWildcardLiteral *bool `json:"-"`
-	// VerifySubjectCommonName indicates if the Subject Common Name
-	// is verified in addition to the SANs. Defaults to true.
-	VerifySubjectCommonName *bool `json:"-"`
+	AllowWildcardLiteral bool `json:"-"`
+
+	// DisableCommonNameVerification indicates if the Subject Common Name
+	// is verified in addition to the SANs. Defaults to false, resulting
+	// in Common Names to be verified.
+	DisableCommonNameVerification bool `json:"-"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
@@ -102,17 +104,14 @@ func (o *X509Options) IsWildcardLiteralAllowed() bool {
 	if o == nil {
 		return true
 	}
-	return o.AllowWildcardLiteral != nil && *o.AllowWildcardLiteral
+	return o.AllowWildcardLiteral
 }
 
-func (o *X509Options) ShouldVerifySubjectCommonName() bool {
+func (o *X509Options) ShouldVerifyCommonName() bool {
 	if o == nil {
 		return false
 	}
-	if o.VerifySubjectCommonName == nil {
-		return true
-	}
-	return *o.VerifySubjectCommonName
+	return !o.DisableCommonNameVerification
 }
 
 // TemplateOptions generates a CertificateOptions with the template and data

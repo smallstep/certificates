@@ -582,7 +582,7 @@ func TestHandler_NewAccount(t *testing.T) {
 				ID:            "eakID",
 				ProvisionerID: provID,
 				Reference:     "testeak",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     time.Now(),
 			}
 			return test{
@@ -759,7 +759,7 @@ func TestHandler_NewAccount(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							KeyBytes:      []byte{1, 3, 3, 7},
+							HmacKey:       []byte{1, 3, 3, 7},
 							CreatedAt:     time.Now(),
 						}, nil
 					},
