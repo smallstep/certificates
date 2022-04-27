@@ -221,9 +221,8 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		adminDB := auth.GetAdminDatabase()
 		if adminDB != nil {
 			acmeAdminResponder := adminAPI.NewACMEAdminResponder()
-			adminHandler := adminAPI.NewHandler(auth, adminDB, acmeDB, acmeAdminResponder)
 			mux.Route("/admin", func(r chi.Router) {
-				adminHandler.Route(r)
+				adminAPI.Route(r, acmeAdminResponder)
 			})
 		}
 	}
