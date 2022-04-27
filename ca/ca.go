@@ -308,11 +308,12 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 // buildContext builds the server base context.
 func buildContext(a *authority.Authority) context.Context {
 	ctx := authority.NewContext(context.Background(), a)
-
-	if db := a.GetAdminDatabase(); db != nil {
-		ctx = admin.NewContext(ctx, db)
+	if authDB := a.GetDatabase(); authDB != nil {
+		ctx = db.NewContext(ctx, authDB)
 	}
-
+	if adminDB := a.GetAdminDatabase(); adminDB != nil {
+		ctx = admin.NewContext(ctx, adminDB)
+	}
 	return ctx
 }
 
