@@ -12,11 +12,10 @@ type nextHTTP = func(http.ResponseWriter, *http.Request)
 
 // requireAPIEnabled is a middleware that ensures the Administration API
 // is enabled before servicing requests.
-func (h *Handler) requireAPIEnabled(next nextHTTP) nextHTTP {
+func requireAPIEnabled(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !h.auth.IsAdminAPIEnabled() {
-			render.Error(w, admin.NewError(admin.ErrorNotImplementedType,
-				"administration API not enabled"))
+		if !mustAuthority(r.Context()).IsAdminAPIEnabled() {
+			render.Error(w, admin.NewError(admin.ErrorNotImplementedType, "administration API not enabled"))
 			return
 		}
 		next(w, r)
@@ -24,7 +23,7 @@ func (h *Handler) requireAPIEnabled(next nextHTTP) nextHTTP {
 }
 
 // extractAuthorizeTokenAdmin is a middleware that extracts and caches the bearer token.
-func (h *Handler) extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
+func extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tok := r.Header.Get("Authorization")
 		if tok == "" {
@@ -33,13 +32,14 @@ func (h *Handler) extractAuthorizeTokenAdmin(next nextHTTP) nextHTTP {
 			return
 		}
 
-		adm, err := h.auth.AuthorizeAdminToken(r, tok)
+		ctx := r.Context()
+		adm, err := mustAuthority(ctx).AuthorizeAdminToken(r, tok)
 		if err != nil {
 			render.Error(w, err)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), adminContextKey, adm)
+		ctx = context.WithValue(ctx, adminContextKey, adm)
 		next(w, r.WithContext(ctx))
 	}
 }

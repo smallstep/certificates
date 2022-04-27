@@ -40,11 +40,11 @@ type GetExternalAccountKeysResponse struct {
 
 // requireEABEnabled is a middleware that ensures ACME EAB is enabled
 // before serving requests that act on ACME EAB credentials.
-func (h *Handler) requireEABEnabled(next nextHTTP) nextHTTP {
+func requireEABEnabled(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		provName := chi.URLParam(r, "provisionerName")
-		eabEnabled, prov, err := h.provisionerHasEABEnabled(ctx, provName)
+		eabEnabled, prov, err := provisionerHasEABEnabled(ctx, provName)
 		if err != nil {
 			render.Error(w, err)
 			return
@@ -60,16 +60,20 @@ func (h *Handler) requireEABEnabled(next nextHTTP) nextHTTP {
 
 // provisionerHasEABEnabled determines if the "requireEAB" setting for an ACME
 // provisioner is set to true and thus has EAB enabled.
-func (h *Handler) provisionerHasEABEnabled(ctx context.Context, provisionerName string) (bool, *linkedca.Provisioner, error) {
+func provisionerHasEABEnabled(ctx context.Context, provisionerName string) (bool, *linkedca.Provisioner, error) {
 	var (
 		p   provisioner.Interface
 		err error
 	)
-	if p, err = h.auth.LoadProvisionerByName(provisionerName); err != nil {
+
+	auth := mustAuthority(ctx)
+	db := admin.MustFromContext(ctx)
+
+	if p, err = auth.LoadProvisionerByName(provisionerName); err != nil {
 		return false, nil, admin.WrapErrorISE(err, "error loading provisioner %s", provisionerName)
 	}
 
-	prov, err := h.adminDB.GetProvisioner(ctx, p.GetID())
+	prov, err := db.GetProvisioner(ctx, p.GetID())
 	if err != nil {
 		return false, nil, admin.WrapErrorISE(err, "error getting provisioner with ID: %s", p.GetID())
 	}
