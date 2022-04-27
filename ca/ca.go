@@ -20,6 +20,7 @@ import (
 	acmeNoSQL "github.com/smallstep/certificates/acme/db/nosql"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/admin"
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/db"
@@ -280,7 +281,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		insecureHandler = logger.Middleware(insecureHandler)
 	}
 
-	// Add authority handler
+	// Create context with all the necessary values.
 	baseContext := buildContext(auth)
 
 	ca.srv = server.New(cfg.Address, handler, tlsConfig)
@@ -304,8 +305,13 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	return ca, nil
 }
 
+// buildContext builds the server base context.
 func buildContext(a *authority.Authority) context.Context {
 	ctx := authority.NewContext(context.Background(), a)
+
+	if db := a.GetAdminDatabase(); db != nil {
+		ctx = admin.NewContext(ctx, db)
+	}
 
 	return ctx
 }
