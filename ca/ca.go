@@ -1,10 +1,12 @@
 package ca
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -279,10 +281,12 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	// Add authority handler
-	handler = auth.Middleware(handler)
-	insecureHandler = auth.Middleware(insecureHandler)
+	baseContext := buildContext(auth)
 
 	ca.srv = server.New(cfg.Address, handler, tlsConfig)
+	ca.srv.BaseContext = func(net.Listener) context.Context {
+		return baseContext
+	}
 
 	// only start the insecure server if the insecure address is configured
 	// and, currently, also only when it should serve SCEP endpoints.
@@ -292,9 +296,18 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		// will probably introduce more complexity in terms of graceful
 		// reload.
 		ca.insecureSrv = server.New(cfg.InsecureAddress, insecureHandler, nil)
+		ca.insecureSrv.BaseContext = func(net.Listener) context.Context {
+			return baseContext
+		}
 	}
 
 	return ca, nil
+}
+
+func buildContext(a *authority.Authority) context.Context {
+	ctx := authority.NewContext(context.Background(), a)
+
+	return ctx
 }
 
 // Run starts the CA calling to the server ListenAndServe method.
