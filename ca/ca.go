@@ -282,7 +282,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	// Create context with all the necessary values.
-	baseContext := buildContext(auth)
+	baseContext := buildContext(auth, acmeDB)
 
 	ca.srv = server.New(cfg.Address, handler, tlsConfig)
 	ca.srv.BaseContext = func(net.Listener) context.Context {
@@ -306,13 +306,16 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 }
 
 // buildContext builds the server base context.
-func buildContext(a *authority.Authority) context.Context {
+func buildContext(a *authority.Authority, acmeDB acme.DB) context.Context {
 	ctx := authority.NewContext(context.Background(), a)
 	if authDB := a.GetDatabase(); authDB != nil {
 		ctx = db.NewContext(ctx, authDB)
 	}
 	if adminDB := a.GetAdminDatabase(); adminDB != nil {
 		ctx = admin.NewContext(ctx, adminDB)
+	}
+	if acmeDB != nil {
+		ctx = acme.NewContext(ctx, acmeDB)
 	}
 	return ctx
 }
