@@ -200,20 +200,18 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 			return nil, errors.Wrap(err, "error configuring ACME DB interface")
 		}
 	}
-	acmeHandler := acmeAPI.NewHandler(acmeAPI.HandlerOptions{
+	acmeOptions := &acmeAPI.HandlerOptions{
 		Backdate: *cfg.AuthorityConfig.Backdate,
-		DB:       acmeDB,
 		DNS:      dns,
 		Prefix:   prefix,
-		CA:       auth,
-	})
+	}
 	mux.Route("/"+prefix, func(r chi.Router) {
-		acmeHandler.Route(r)
+		acmeAPI.Route(r, acmeOptions)
 	})
 	// Use 2.0 because, at the moment, our ACME api is only compatible with v2.0
 	// of the ACME spec.
 	mux.Route("/2.0/"+prefix, func(r chi.Router) {
-		acmeHandler.Route(r)
+		acmeAPI.Route(r, acmeOptions)
 	})
 
 	// Admin API Router
