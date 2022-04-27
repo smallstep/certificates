@@ -16,7 +16,7 @@ type ExternalAccountBinding struct {
 }
 
 // validateExternalAccountBinding validates the externalAccountBinding property in a call to new-account.
-func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest) (*acme.ExternalAccountKey, error) {
+func validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest) (*acme.ExternalAccountKey, error) {
 	acmeProv, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
 		return nil, acme.WrapErrorISE(err, "could not load ACME provisioner from context")
@@ -47,7 +47,8 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 		return nil, acmeErr
 	}
 
-	externalAccountKey, err := h.db.GetExternalAccountKey(ctx, acmeProv.ID, keyID)
+	db := acme.MustFromContext(ctx)
+	externalAccountKey, err := db.GetExternalAccountKey(ctx, acmeProv.ID, keyID)
 	if err != nil {
 		if _, ok := err.(*acme.Error); ok {
 			return nil, acme.WrapError(acme.ErrorUnauthorizedType, err, "the field 'kid' references an unknown key")
