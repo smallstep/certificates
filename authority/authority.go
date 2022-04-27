@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"log"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -167,12 +166,14 @@ func FromContext(ctx context.Context) (a *Authority, ok bool) {
 	return
 }
 
-// Middleware adds the current authority to the request context.
-func (a *Authority) Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := NewContext(r.Context(), a)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+// MustFromContext returns the current authority from the given context. It will
+// panic if the authority is not in the context.
+func MustFromContext(ctx context.Context) *Authority {
+	if a, ok := FromContext(ctx); !ok {
+		panic("authority is not in the context")
+	} else {
+		return a
+	}
 }
 
 // reloadAdminResources reloads admins and provisioners from the DB.

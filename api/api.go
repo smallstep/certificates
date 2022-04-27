@@ -52,15 +52,9 @@ type Authority interface {
 	Version() authority.Version
 }
 
-var errAuthority = errors.New("authority is not in context")
-
 // mustAuthority will be replaced on unit tests.
 var mustAuthority = func(ctx context.Context) Authority {
-	a, ok := authority.FromContext(ctx)
-	if !ok {
-		panic(errAuthority)
-	}
-	return a
+	return authority.MustFromContext(ctx)
 }
 
 // TimeDuration is an alias of provisioner.TimeDuration
