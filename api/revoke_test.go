@@ -223,13 +223,13 @@ func Test_caHandler_Revoke(t *testing.T) {
 	for name, _tc := range tests {
 		tc := _tc(t)
 		t.Run(name, func(t *testing.T) {
-			h := New(tc.auth).(*caHandler)
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("POST", "http://example.com/revoke", strings.NewReader(tc.input))
 			if tc.tls != nil {
 				req.TLS = tc.tls
 			}
 			w := httptest.NewRecorder()
-			h.Revoke(logging.NewResponseLogger(w), req)
+			Revoke(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)

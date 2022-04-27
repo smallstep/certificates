@@ -54,7 +54,8 @@ type Authority interface {
 
 var errAuthority = errors.New("authority is not in context")
 
-func mustAuthority(ctx context.Context) Authority {
+// mustAuthority will be replaced on unit tests.
+var mustAuthority = func(ctx context.Context) Authority {
 	a, ok := authority.FromContext(ctx)
 	if !ok {
 		panic(errAuthority)
@@ -249,7 +250,9 @@ type FederationResponse struct {
 }
 
 // caHandler is the type used to implement the different CA HTTP endpoints.
-type caHandler struct{}
+type caHandler struct {
+	Authority Authority
+}
 
 // Route configures the http request router.
 func (h *caHandler) Route(r Router) {
