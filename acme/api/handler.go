@@ -84,7 +84,7 @@ func newOptionsContext(ctx context.Context, o *HandlerOptions) context.Context {
 func optionsFromContext(ctx context.Context) *HandlerOptions {
 	o, ok := ctx.Value(optionsKey{}).(*HandlerOptions)
 	if !ok {
-		panic("handler options are not in the context")
+		panic("acme options are not in the context")
 	}
 	return o
 }
