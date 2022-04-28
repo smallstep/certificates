@@ -762,10 +762,10 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				db: tc.db,
-			}
-			got, err := h.validateExternalAccountBinding(tc.ctx, tc.nar)
+			// h := &Handler{
+			// 	db: tc.db,
+			// }
+			got, err := validateExternalAccountBinding(tc.ctx, tc.nar)
 			wantErr := tc.err != nil
 			gotErr := err != nil
 			if wantErr != gotErr {

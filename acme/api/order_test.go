@@ -421,11 +421,11 @@ func TestHandler_GetOrder(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db}
+			// h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db}
 			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetOrder(w, req)
+			GetOrder(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
@@ -636,8 +636,8 @@ func TestHandler_newAuthorization(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
-			h := &Handler{db: tc.db}
-			if err := h.newAuthorization(context.Background(), tc.az); err != nil {
+			// h := &Handler{db: tc.db}
+			if err := newAuthorization(context.Background(), tc.az); err != nil {
 				if assert.NotNil(t, tc.err) {
 					switch k := err.(type) {
 					case *acme.Error:
@@ -1334,11 +1334,11 @@ func TestHandler_NewOrder(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db}
+			// h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db}
 			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.NewOrder(w, req)
+			NewOrder(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
@@ -1624,11 +1624,11 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db}
+			// h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db}
 			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.FinalizeOrder(w, req)
+			FinalizeOrder(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)

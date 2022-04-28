@@ -315,11 +315,11 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
+			// h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
 			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetOrdersByAccountID(w, req)
+			GetOrdersByAccountID(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
@@ -759,11 +759,11 @@ func TestHandler_NewAccount(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
+			// h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
 			req := httptest.NewRequest("GET", "/foo/bar", nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.NewAccount(w, req)
+			NewAccount(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
@@ -959,11 +959,11 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
+			// h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
 			req := httptest.NewRequest("GET", "/foo/bar", nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetOrUpdateAccount(w, req)
+			GetOrUpdateAccount(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)

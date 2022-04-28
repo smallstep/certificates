@@ -38,10 +38,10 @@ func TestHandler_GetNonce(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &Handler{}
+			// h := &Handler{}
 			w := httptest.NewRecorder()
 			req.Method = tt.name
-			h.GetNonce(w, req)
+			GetNonce(w, req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -53,6 +53,7 @@ func TestHandler_GetNonce(t *testing.T) {
 
 func TestHandler_GetDirectory(t *testing.T) {
 	linker := NewLinker("ca.smallstep.com", "acme")
+	_ = linker
 	type test struct {
 		ctx        context.Context
 		statusCode int
@@ -130,11 +131,11 @@ func TestHandler_GetDirectory(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{linker: linker}
+			// h := &Handler{linker: linker}
 			req := httptest.NewRequest("GET", "/foo/bar", nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetDirectory(w, req)
+			GetDirectory(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
@@ -304,11 +305,11 @@ func TestHandler_GetAuthorization(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
+			// h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
 			req := httptest.NewRequest("GET", "/foo/bar", nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetAuthorization(w, req)
+			GetAuthorization(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
@@ -447,11 +448,11 @@ func TestHandler_GetCertificate(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{db: tc.db}
+			// h := &Handler{db: tc.db}
 			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetCertificate(w, req)
+			GetCertificate(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
@@ -703,11 +704,11 @@ func TestHandler_GetChallenge(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{db: tc.db, linker: NewLinker("dns", "acme"), validateChallengeOptions: tc.vco}
+			// h := &Handler{db: tc.db, linker: NewLinker("dns", "acme"), validateChallengeOptions: tc.vco}
 			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetChallenge(w, req)
+			GetChallenge(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)

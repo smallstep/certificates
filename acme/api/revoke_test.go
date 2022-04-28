@@ -1057,11 +1057,11 @@ func TestHandler_RevokeCert(t *testing.T) {
 	for name, setup := range tests {
 		tc := setup(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db, ca: tc.ca}
+			// h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db, ca: tc.ca}
 			req := httptest.NewRequest("POST", revokeURL, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.RevokeCert(w, req)
+			RevokeCert(w, req)
 			res := w.Result()
 
 			assert.Equals(t, res.StatusCode, tc.statusCode)
@@ -1198,8 +1198,8 @@ func TestHandler_isAccountAuthorized(t *testing.T) {
 	for name, setup := range tests {
 		tc := setup(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{db: tc.db}
-			acmeErr := h.isAccountAuthorized(tc.ctx, tc.existingCert, tc.certToBeRevoked, tc.account)
+			// h := &Handler{db: tc.db}
+			acmeErr := isAccountAuthorized(tc.ctx, tc.existingCert, tc.certToBeRevoked, tc.account)
 
 			expectError := tc.err != nil
 			gotError := acmeErr != nil
