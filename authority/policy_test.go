@@ -218,8 +218,7 @@ func Test_policyToCertificates(t *testing.T) {
 					Allow: &linkedca.X509Names{
 						Dns: []string{"*.local"},
 					},
-					AllowWildcardLiteral:                 false,
-					DisableSubjectCommonNameVerification: false,
+					AllowWildcardLiteral: false,
 				},
 			},
 			want: &policy.Options{
@@ -227,8 +226,7 @@ func Test_policyToCertificates(t *testing.T) {
 					AllowedNames: &policy.X509NameOptions{
 						DNSDomains: []string{"*.local"},
 					},
-					AllowWildcardLiteral:          false,
-					DisableCommonNameVerification: false,
+					AllowWildcardLiteral: false,
 				},
 			},
 		},
@@ -237,19 +235,20 @@ func Test_policyToCertificates(t *testing.T) {
 			policy: &linkedca.Policy{
 				X509: &linkedca.X509Policy{
 					Allow: &linkedca.X509Names{
-						Dns:    []string{"step"},
-						Ips:    []string{"127.0.0.1/24"},
-						Emails: []string{"*.example.com"},
-						Uris:   []string{"https://*.local"},
+						Dns:         []string{"step"},
+						Ips:         []string{"127.0.0.1/24"},
+						Emails:      []string{"*.example.com"},
+						Uris:        []string{"https://*.local"},
+						CommonNames: []string{"some name"},
 					},
 					Deny: &linkedca.X509Names{
-						Dns:    []string{"bad"},
-						Ips:    []string{"127.0.0.30"},
-						Emails: []string{"badhost.example.com"},
-						Uris:   []string{"https://badhost.local"},
+						Dns:         []string{"bad"},
+						Ips:         []string{"127.0.0.30"},
+						Emails:      []string{"badhost.example.com"},
+						Uris:        []string{"https://badhost.local"},
+						CommonNames: []string{"another name"},
 					},
-					AllowWildcardLiteral:                 true,
-					DisableSubjectCommonNameVerification: false,
+					AllowWildcardLiteral: true,
 				},
 				Ssh: &linkedca.SSHPolicy{
 					Host: &linkedca.SSHHostPolicy{
@@ -283,15 +282,16 @@ func Test_policyToCertificates(t *testing.T) {
 						IPRanges:       []string{"127.0.0.1/24"},
 						EmailAddresses: []string{"*.example.com"},
 						URIDomains:     []string{"https://*.local"},
+						CommonNames:    []string{"some name"},
 					},
 					DeniedNames: &policy.X509NameOptions{
 						DNSDomains:     []string{"bad"},
 						IPRanges:       []string{"127.0.0.30"},
 						EmailAddresses: []string{"badhost.example.com"},
 						URIDomains:     []string{"https://badhost.local"},
+						CommonNames:    []string{"another name"},
 					},
-					AllowWildcardLiteral:          true,
-					DisableCommonNameVerification: false,
+					AllowWildcardLiteral: true,
 				},
 				SSH: &policy.SSHPolicyOptions{
 					Host: &policy.SSHHostCertificateOptions{
@@ -369,8 +369,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			DeniedNames: &policy.X509NameOptions{
 				DNSDomains: []string{"badhost.local"},
 			},
-			AllowWildcardLiteral:          true,
-			DisableCommonNameVerification: false,
+			AllowWildcardLiteral: true,
 		},
 	}
 
@@ -429,8 +428,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			DeniedNames: &policy.X509NameOptions{
 				DNSDomains: []string{"badhost.local"},
 			},
-			AllowWildcardLiteral:          true,
-			DisableCommonNameVerification: false,
+			AllowWildcardLiteral: true,
 		},
 		SSH: &policy.SSHPolicyOptions{
 			Host: &policy.SSHHostCertificateOptions{
@@ -488,8 +486,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			DeniedNames: &policy.X509NameOptions{
 				DNSDomains: []string{"badhost.local"},
 			},
-			AllowWildcardLiteral:          true,
-			DisableCommonNameVerification: false,
+			AllowWildcardLiteral: true,
 		},
 		SSH: &policy.SSHPolicyOptions{
 			Host: &policy.SSHHostCertificateOptions{
@@ -700,8 +697,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							DeniedNames: &policy.X509NameOptions{
 								DNSDomains: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral:          true,
-							DisableCommonNameVerification: false,
+							AllowWildcardLiteral: true,
 						},
 					},
 				},
@@ -800,8 +796,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							DeniedNames: &policy.X509NameOptions{
 								DNSDomains: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral:          true,
-							DisableCommonNameVerification: false,
+							AllowWildcardLiteral: true,
 						},
 						SSH: &policy.SSHPolicyOptions{
 							Host: &policy.SSHHostCertificateOptions{
@@ -916,8 +911,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							Deny: &linkedca.X509Names{
 								Dns: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral:                 true,
-							DisableSubjectCommonNameVerification: false,
+							AllowWildcardLiteral: true,
 						},
 						Ssh: &linkedca.SSHPolicy{
 							Host: &linkedca.SSHHostPolicy{
@@ -982,8 +976,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							Deny: &linkedca.X509Names{
 								Dns: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral:                 true,
-							DisableSubjectCommonNameVerification: false,
+							AllowWildcardLiteral: true,
 						},
 					}, nil
 				},

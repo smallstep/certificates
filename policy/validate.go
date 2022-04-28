@@ -15,6 +15,8 @@ import (
 	"strings"
 
 	"golang.org/x/net/idna"
+
+	"go.step.sm/crypto/x509util"
 )
 
 // validateNames verifies that all names are allowed.
@@ -71,7 +73,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 				detail:   fmt.Sprintf("cannot parse dns %q", dns),
 			}
 		}
-		if err := checkNameConstraints("dns", dns, parsedDNS,
+		if err := checkNameConstraints(DNSNameType, dns, parsedDNS,
 			func(parsedName, constraint interface{}) (bool, error) {
 				return e.matchDomainConstraint(parsedName.(string), constraint.(string))
 			}, e.permittedDNSDomains, e.excludedDNSDomains); err != nil {
@@ -88,7 +90,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 				detail:   fmt.Sprintf("ip %q is not explicitly permitted by any constraint", ip.String()),
 			}
 		}
-		if err := checkNameConstraints("ip", ip.String(), ip,
+		if err := checkNameConstraints(IPNameType, ip.String(), ip,
 			func(parsedName, constraint interface{}) (bool, error) {
 				return matchIPConstraint(parsedName.(net.IP), constraint.(*net.IPNet))
 			}, e.permittedIPRanges, e.excludedIPRanges); err != nil {
@@ -127,7 +129,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 			}
 		}
 		mailbox.domain = domainASCII
-		if err := checkNameConstraints("email", email, mailbox,
+		if err := checkNameConstraints(EmailNameType, email, mailbox,
 			func(parsedName, constraint interface{}) (bool, error) {
 				return e.matchEmailConstraint(parsedName.(rfc2821Mailbox), constraint.(string))
 			}, e.permittedEmailAddresses, e.excludedEmailAddresses); err != nil {
@@ -148,7 +150,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		}
 		// TODO(hs): ideally we'd like the uri.String() to be the original contents; now
 		// it's transformed into ASCII. Prevent that here?
-		if err := checkNameConstraints("uri", uri.String(), uri,
+		if err := checkNameConstraints(URINameType, uri.String(), uri,
 			func(parsedName, constraint interface{}) (bool, error) {
 				return e.matchURIConstraint(parsedName.(*url.URL), constraint.(string))
 			}, e.permittedURIDomains, e.excludedURIDomains); err != nil {
@@ -166,9 +168,9 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 			}
 		}
 		// TODO: some validation? I.e. allowed characters?
-		if err := checkNameConstraints("principal", principal, principal,
+		if err := checkNameConstraints(PrincipalNameType, principal, principal,
 			func(parsedName, constraint interface{}) (bool, error) {
-				return matchUsernameConstraint(parsedName.(string), constraint.(string))
+				return matchPrincipalConstraint(parsedName.(string), constraint.(string))
 			}, e.permittedPrincipals, e.excludedPrincipals); err != nil {
 			return err
 		}
@@ -178,11 +180,51 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 	return nil
 }
 
+// validateCommonName verifies that the Subject Common Name is allowed
+func (e *NamePolicyEngine) validateCommonName(commonName string) error {
+
+	// nothing to compare against; return early
+	if e.totalNumberOfConstraints == 0 {
+		return nil
+	}
+
+	// empty common names are not validated
+	if commonName == "" {
+		return nil
+	}
+
+	if e.numberOfCommonNameConstraints > 0 {
+		// Check the Common Name using its dedicated matcher if constraints have been
+		// configured. If no error is returned from matching, the Common Name was
+		// explicitly allowed and nil is returned immediately.
+		if err := checkNameConstraints(CNNameType, commonName, commonName,
+			func(parsedName, constraint interface{}) (bool, error) {
+				return matchCommonNameConstraint(parsedName.(string), constraint.(string))
+			}, e.permittedCommonNames, e.excludedCommonNames); err == nil {
+			return nil
+		}
+	}
+
+	// When an error was returned or when no constraints were configured for Common Names,
+	// the Common Name should be validated against the other types of constraints too,
+	// according to what type it is.
+	dnsNames, ips, emails, uris := x509util.SplitSANs([]string{commonName})
+
+	err := e.validateNames(dnsNames, ips, emails, uris, []string{})
+
+	if pe, ok := err.(*NamePolicyError); ok {
+		// override the name type with CN
+		pe.NameType = CNNameType
+	}
+
+	return err
+}
+
 // checkNameConstraints checks that a name, of type nameType is permitted.
 // The argument parsedName contains the parsed form of name, suitable for passing
 // to the match function.
 func checkNameConstraints(
-	nameType string,
+	nameType NameType,
 	name string,
 	parsedName interface{},
 	match func(parsedName, constraint interface{}) (match bool, err error),
@@ -196,7 +238,7 @@ func checkNameConstraints(
 		if err != nil {
 			return &NamePolicyError{
 				Reason:   CannotMatchNameToConstraint,
-				NameType: NameType(nameType),
+				NameType: nameType,
 				Name:     name,
 				detail:   err.Error(),
 			}
@@ -205,7 +247,7 @@ func checkNameConstraints(
 		if match {
 			return &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: NameType(nameType),
+				NameType: nameType,
 				Name:     name,
 				detail:   fmt.Sprintf("%s %q is excluded by constraint %q", nameType, name, constraint),
 			}
@@ -221,7 +263,7 @@ func checkNameConstraints(
 		if ok, err = match(parsedName, constraint); err != nil {
 			return &NamePolicyError{
 				Reason:   CannotMatchNameToConstraint,
-				NameType: NameType(nameType),
+				NameType: nameType,
 				Name:     name,
 				detail:   err.Error(),
 			}
@@ -235,7 +277,7 @@ func checkNameConstraints(
 	if !ok {
 		return &NamePolicyError{
 			Reason:   NotAllowed,
-			NameType: NameType(nameType),
+			NameType: nameType,
 			Name:     name,
 			detail:   fmt.Sprintf("%s %q is not permitted by any constraint", nameType, name),
 		}
@@ -591,11 +633,16 @@ func (e *NamePolicyEngine) matchURIConstraint(uri *url.URL, constraint string) (
 	return e.matchDomainConstraint(host, constraint)
 }
 
-// matchUsernameConstraint performs a string literal match against a constraint.
-func matchUsernameConstraint(username, constraint string) (bool, error) {
-	// allow any plain principal username
+// matchPrincipalConstraint performs a string literal equality check against a constraint.
+func matchPrincipalConstraint(principal, constraint string) (bool, error) {
+	// allow any plain principal when wildcard constraint is used
 	if constraint == "*" {
 		return true, nil
 	}
-	return strings.EqualFold(username, constraint), nil
+	return strings.EqualFold(principal, constraint), nil
+}
+
+// matchCommonNameConstraint performs a string literal equality check against constraint.
+func matchCommonNameConstraint(commonName, constraint string) (bool, error) {
+	return strings.EqualFold(commonName, constraint), nil
 }

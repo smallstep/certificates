@@ -2,7 +2,6 @@ package policy
 
 import (
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"fmt"
 	"net"
 	"net/url"
@@ -33,6 +32,7 @@ const (
 type NameType string
 
 const (
+	CNNameType        NameType = "cn"
 	DNSNameType       NameType = "dns"
 	IPNameType        NameType = "ip"
 	EmailNameType     NameType = "email"
@@ -80,6 +80,8 @@ type NamePolicyEngine struct {
 	allowLiteralWildcardNames bool
 
 	// permitted and exluded constraints similar to x509 Name Constraints
+	permittedCommonNames    []string
+	excludedCommonNames     []string
 	permittedDNSDomains     []string
 	excludedDNSDomains      []string
 	permittedIPRanges       []*net.IPNet
@@ -92,6 +94,7 @@ type NamePolicyEngine struct {
 	excludedPrincipals      []string
 
 	// some internal counts for housekeeping
+	numberOfCommonNameConstraints     int
 	numberOfDNSDomainConstraints      int
 	numberOfIPRangeConstraints        int
 	numberOfEmailAddressConstraints   int
@@ -112,29 +115,34 @@ func New(opts ...NamePolicyOption) (*NamePolicyEngine, error) {
 		}
 	}
 
+	e.permittedCommonNames = removeDuplicates(e.permittedCommonNames)
 	e.permittedDNSDomains = removeDuplicates(e.permittedDNSDomains)
 	e.permittedIPRanges = removeDuplicateIPNets(e.permittedIPRanges)
 	e.permittedEmailAddresses = removeDuplicates(e.permittedEmailAddresses)
 	e.permittedURIDomains = removeDuplicates(e.permittedURIDomains)
 	e.permittedPrincipals = removeDuplicates(e.permittedPrincipals)
 
+	e.excludedCommonNames = removeDuplicates(e.excludedCommonNames)
 	e.excludedDNSDomains = removeDuplicates(e.excludedDNSDomains)
 	e.excludedIPRanges = removeDuplicateIPNets(e.excludedIPRanges)
 	e.excludedEmailAddresses = removeDuplicates(e.excludedEmailAddresses)
 	e.excludedURIDomains = removeDuplicates(e.excludedURIDomains)
 	e.excludedPrincipals = removeDuplicates(e.excludedPrincipals)
 
+	e.numberOfCommonNameConstraints = len(e.permittedCommonNames) + len(e.excludedCommonNames)
 	e.numberOfDNSDomainConstraints = len(e.permittedDNSDomains) + len(e.excludedDNSDomains)
 	e.numberOfIPRangeConstraints = len(e.permittedIPRanges) + len(e.excludedIPRanges)
 	e.numberOfEmailAddressConstraints = len(e.permittedEmailAddresses) + len(e.excludedEmailAddresses)
 	e.numberOfURIDomainConstraints = len(e.permittedURIDomains) + len(e.excludedURIDomains)
 	e.numberOfPrincipalConstraints = len(e.permittedPrincipals) + len(e.excludedPrincipals)
 
-	e.totalNumberOfPermittedConstraints = len(e.permittedDNSDomains) + len(e.permittedIPRanges) +
-		len(e.permittedEmailAddresses) + len(e.permittedURIDomains) + len(e.permittedPrincipals)
+	e.totalNumberOfPermittedConstraints = len(e.permittedCommonNames) + len(e.permittedDNSDomains) +
+		len(e.permittedIPRanges) + len(e.permittedEmailAddresses) + len(e.permittedURIDomains) +
+		len(e.permittedPrincipals)
 
-	e.totalNumberOfExcludedConstraints = len(e.excludedDNSDomains) + len(e.excludedIPRanges) +
-		len(e.excludedEmailAddresses) + len(e.excludedURIDomains) + len(e.excludedPrincipals)
+	e.totalNumberOfExcludedConstraints = len(e.excludedCommonNames) + len(e.excludedDNSDomains) +
+		len(e.excludedIPRanges) + len(e.excludedEmailAddresses) + len(e.excludedURIDomains) +
+		len(e.excludedPrincipals)
 
 	e.totalNumberOfConstraints = e.totalNumberOfPermittedConstraints + e.totalNumberOfExcludedConstraints
 
@@ -198,29 +206,27 @@ func removeDuplicateIPNets(items []*net.IPNet) (ret []*net.IPNet) {
 
 // IsX509CertificateAllowed verifies that all SANs in a Certificate are allowed.
 func (e *NamePolicyEngine) IsX509CertificateAllowed(cert *x509.Certificate) error {
-	dnsNames, ips, emails, uris := cert.DNSNames, cert.IPAddresses, cert.EmailAddresses, cert.URIs
-	// when Subject Common Name must be verified in addition to the SANs, it is
-	// added to the appropriate slice of names.
-	if e.verifySubjectCommonName {
-		appendSubjectCommonName(cert.Subject, &dnsNames, &ips, &emails, &uris)
-	}
-	if err := e.validateNames(dnsNames, ips, emails, uris, []string{}); err != nil {
+	if err := e.validateNames(cert.DNSNames, cert.IPAddresses, cert.EmailAddresses, cert.URIs, []string{}); err != nil {
 		return err
 	}
+
+	if e.verifySubjectCommonName {
+		return e.validateCommonName(cert.Subject.CommonName)
+	}
+
 	return nil
 }
 
 // IsX509CertificateRequestAllowed verifies that all names in the CSR are allowed.
 func (e *NamePolicyEngine) IsX509CertificateRequestAllowed(csr *x509.CertificateRequest) error {
-	dnsNames, ips, emails, uris := csr.DNSNames, csr.IPAddresses, csr.EmailAddresses, csr.URIs
-	// when Subject Common Name must be verified in addition to the SANs, it is
-	// added to the appropriate slice of names.
-	if e.verifySubjectCommonName {
-		appendSubjectCommonName(csr.Subject, &dnsNames, &ips, &emails, &uris)
-	}
-	if err := e.validateNames(dnsNames, ips, emails, uris, []string{}); err != nil {
+	if err := e.validateNames(csr.DNSNames, csr.IPAddresses, csr.EmailAddresses, csr.URIs, []string{}); err != nil {
 		return err
 	}
+
+	if e.verifySubjectCommonName {
+		return e.validateCommonName(csr.Subject.CommonName)
+	}
+
 	return nil
 }
 
@@ -260,22 +266,6 @@ func (e *NamePolicyEngine) IsSSHCertificateAllowed(cert *ssh.Certificate) error 
 		return err
 	}
 	return nil
-}
-
-// appendSubjectCommonName appends the Subject Common Name to the appropriate slice of names. The logic is
-// similar as x509util.SplitSANs: if the subject can be parsed as an IP, it's added to the ips. If it can
-// be parsed as an URL, it is added to the URIs. If it contains an @, it is added to emails. When it's none
-// of these, it's added to the DNS names.
-func appendSubjectCommonName(subject pkix.Name, dnsNames *[]string, ips *[]net.IP, emails *[]string, uris *[]*url.URL) {
-	commonName := subject.CommonName
-	if commonName == "" {
-		return
-	}
-	subjectDNSNames, subjectIPs, subjectEmails, subjectURIs := x509util.SplitSANs([]string{commonName})
-	*dnsNames = append(*dnsNames, subjectDNSNames...)
-	*ips = append(*ips, subjectIPs...)
-	*emails = append(*emails, subjectEmails...)
-	*uris = append(*uris, subjectURIs...)
 }
 
 // splitPrincipals splits SSH certificate principals into DNS names, emails and usernames.

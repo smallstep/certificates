@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -146,7 +145,7 @@ func Test_badProtoJSONError_Render(t *testing.T) {
 			res := w.Result()
 			defer res.Body.Close()
 
-			data, err := ioutil.ReadAll(res.Body)
+			data, err := io.ReadAll(res.Body)
 			assert.NoError(t, err)
 
 			v := struct {

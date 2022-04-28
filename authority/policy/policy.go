@@ -28,6 +28,7 @@ func NewX509PolicyEngine(policyOptions X509PolicyOptionsInterface) (X509Policy, 
 	allowed := policyOptions.GetAllowedNameOptions()
 	if allowed != nil && allowed.HasNames() {
 		options = append(options,
+			policy.WithPermittedCommonNames(allowed.CommonNames...),
 			policy.WithPermittedDNSDomains(allowed.DNSDomains...),
 			policy.WithPermittedIPsOrCIDRs(allowed.IPRanges...),
 			policy.WithPermittedEmailAddresses(allowed.EmailAddresses...),
@@ -38,6 +39,7 @@ func NewX509PolicyEngine(policyOptions X509PolicyOptionsInterface) (X509Policy, 
 	denied := policyOptions.GetDeniedNameOptions()
 	if denied != nil && denied.HasNames() {
 		options = append(options,
+			policy.WithExcludedCommonNames(denied.CommonNames...),
 			policy.WithExcludedDNSDomains(denied.DNSDomains...),
 			policy.WithExcludedIPsOrCIDRs(denied.IPRanges...),
 			policy.WithExcludedEmailAddresses(denied.EmailAddresses...),
@@ -48,10 +50,6 @@ func NewX509PolicyEngine(policyOptions X509PolicyOptionsInterface) (X509Policy, 
 	// ensure no policy engine is returned when no name options were provided
 	if len(options) == 0 {
 		return nil, nil
-	}
-
-	if policyOptions.ShouldVerifyCommonName() {
-		options = append(options, policy.WithSubjectCommonNameVerification())
 	}
 
 	if policyOptions.IsWildcardLiteralAllowed() {

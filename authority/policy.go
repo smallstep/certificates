@@ -288,6 +288,9 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 			if allow.Uris != nil {
 				opts.X509.AllowedNames.URIDomains = allow.Uris
 			}
+			if allow.CommonNames != nil {
+				opts.X509.AllowedNames.CommonNames = allow.CommonNames
+			}
 		}
 		if deny := x509.GetDeny(); deny != nil {
 			opts.X509.DeniedNames = &authPolicy.X509NameOptions{}
@@ -303,10 +306,12 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 			if deny.Uris != nil {
 				opts.X509.DeniedNames.URIDomains = deny.Uris
 			}
+			if deny.CommonNames != nil {
+				opts.X509.DeniedNames.CommonNames = deny.CommonNames
+			}
 		}
 
 		opts.X509.AllowWildcardLiteral = x509.AllowWildcardLiteral
-		opts.X509.DisableCommonNameVerification = x509.DisableSubjectCommonNameVerification
 	}
 
 	// fill ssh policy configuration

@@ -610,22 +610,6 @@ func TestNamePolicyEngine_matchURIConstraint(t *testing.T) {
 	}
 }
 
-func extractSANs(cert *x509.Certificate, includeSubject bool) []string {
-	sans := []string{}
-	sans = append(sans, cert.DNSNames...)
-	for _, ip := range cert.IPAddresses {
-		sans = append(sans, ip.String())
-	}
-	sans = append(sans, cert.EmailAddresses...)
-	for _, uri := range cert.URIs {
-		sans = append(sans, uri.String())
-	}
-	if includeSubject && cert.Subject.CommonName != "" {
-		sans = append(sans, cert.Subject.CommonName)
-	}
-	return sans
-}
-
 func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -1141,6 +1125,42 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		},
 		// SUBJECT FAILURE TESTS
 		{
+			name: "fail/subject-permitted-no-match",
+			options: []NamePolicyOption{
+				WithSubjectCommonNameVerification(),
+				WithPermittedCommonNames("this name is allowed", "and this one too"),
+			},
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "some certificate name",
+				},
+			},
+			want: false,
+			wantErr: &NamePolicyError{
+				Reason:   NotAllowed, // only permitted names allowed
+				NameType: CNNameType,
+				Name:     "some certificate name",
+			},
+		},
+		{
+			name: "fail/subject-excluded-match",
+			options: []NamePolicyOption{
+				WithSubjectCommonNameVerification(),
+				WithExcludedCommonNames("this name is not allowed"),
+			},
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "this name is not allowed",
+				},
+			},
+			want: false,
+			wantErr: &NamePolicyError{
+				Reason:   CannotParseDomain, // CN cannot be parsed as DNS in this case
+				NameType: CNNameType,
+				Name:     "this name is not allowed",
+			},
+		},
+		{
 			name: "fail/subject-dns-no-domain",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
@@ -1154,7 +1174,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   CannotParseDomain,
-				NameType: DNSNameType,
+				NameType: CNNameType,
 				Name:     "name with space.local",
 			},
 		},
@@ -1172,7 +1192,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: DNSNameType,
+				NameType: CNNameType,
 				Name:     "example.notlocal",
 			},
 		},
@@ -1190,7 +1210,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: DNSNameType,
+				NameType: CNNameType,
 				Name:     "example.local",
 			},
 		},
@@ -1213,7 +1233,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: IPNameType,
+				NameType: CNNameType,
 				Name:     "10.10.10.10",
 			},
 		},
@@ -1236,7 +1256,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: IPNameType,
+				NameType: CNNameType,
 				Name:     "127.0.0.30",
 			},
 		},
@@ -1259,7 +1279,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: IPNameType,
+				NameType: CNNameType,
 				Name:     "2002:db8:85a3::8a2e:370:7339",
 			},
 		},
@@ -1282,7 +1302,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: IPNameType,
+				NameType: CNNameType,
 				Name:     "2001:db8:85a3::8a2e:370:7339",
 			},
 		},
@@ -1300,7 +1320,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: EmailNameType,
+				NameType: CNNameType,
 				Name:     "mail@smallstep.com",
 			},
 		},
@@ -1318,7 +1338,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: EmailNameType,
+				NameType: CNNameType,
 				Name:     "mail@example.local",
 			},
 		},
@@ -1336,7 +1356,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: URINameType,
+				NameType: CNNameType,
 				Name:     "https://www.google.com",
 			},
 		},
@@ -1354,7 +1374,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: URINameType,
+				NameType: CNNameType,
 				Name:     "https://www.example.com",
 			},
 		},
@@ -1575,7 +1595,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		},
 		// COMBINED FAILURE TESTS
 		{
-			name: "fail/combined-simple-all-badhost.local",
+			name: "fail/combined-simple-all-badhost.local-common-name",
 			options: []NamePolicyOption{
 				WithSubjectCommonNameVerification(),
 				WithPermittedDNSDomains("*.local"),
@@ -1604,8 +1624,41 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			want: false,
 			wantErr: &NamePolicyError{
 				Reason:   NotAllowed,
-				NameType: DNSNameType,
+				NameType: CNNameType,
 				Name:     "badhost.local",
+			},
+		},
+		{
+			name: "fail/combined-simple-all-anotherbadhost.local-dns",
+			options: []NamePolicyOption{
+				WithPermittedDNSDomains("*.local"),
+				WithPermittedCIDRs("127.0.0.1/24"),
+				WithPermittedEmailAddresses("@example.local"),
+				WithPermittedURIDomains("*.example.local"),
+				WithExcludedDNSDomains("anotherbadhost.local"),
+				WithExcludedCIDRs("127.0.0.128/25"),
+				WithExcludedEmailAddresses("badmail@example.local"),
+				WithExcludedURIDomains("badwww.example.local"),
+			},
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "badhost.local",
+				},
+				DNSNames:       []string{"anotherbadhost.local"},
+				IPAddresses:    []net.IP{net.ParseIP("127.0.0.40")},
+				EmailAddresses: []string{"mail@example.local"},
+				URIs: []*url.URL{
+					{
+						Scheme: "https",
+						Host:   "www.example.local",
+					},
+				},
+			},
+			want: false,
+			wantErr: &NamePolicyError{
+				Reason:   NotAllowed,
+				NameType: DNSNameType,
+				Name:     "anotherbadhost.local",
 			},
 		},
 		{
@@ -1711,6 +1764,32 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			cert: &x509.Certificate{
 				Subject: pkix.Name{
 					CommonName: "",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "ok/subject-permitted-match",
+			options: []NamePolicyOption{
+				WithSubjectCommonNameVerification(),
+				WithPermittedCommonNames("this name is allowed"),
+			},
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "this name is allowed",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "ok/subject-excluded-match",
+			options: []NamePolicyOption{
+				WithSubjectCommonNameVerification(),
+				WithExcludedCommonNames("this name is not allowed"),
+			},
+			cert: &x509.Certificate{
+				Subject: pkix.Name{
+					CommonName: "some other name",
 				},
 			},
 			want: true,
@@ -2421,26 +2500,6 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 			wantErr = tt.wantErr != nil
 			if (gotErr != nil) != wantErr {
 				t.Errorf("NamePolicyEngine.AreCSRNamesAllowed() error = %v, wantErr %v", gotErr, tt.wantErr)
-				return
-			}
-			if gotErr != nil {
-				var npe *NamePolicyError
-				assert.True(t, errors.As(gotErr, &npe))
-				assert.NotEqual(t, "", npe.Error())
-				assert.Equal(t, tt.wantErr.Reason, npe.Reason)
-				assert.Equal(t, tt.wantErr.NameType, npe.NameType)
-				assert.Equal(t, tt.wantErr.Name, npe.Name)
-				assert.NotEqual(t, "", npe.Detail())
-				//assert.Equals(t, tt.err.Reason, npe.Reason) // NOTE: reason detail is skipped; it's a detail
-			}
-
-			// Perform the same tests for a slice of SANs
-			includeSubject := engine.verifySubjectCommonName // copy behavior of the engine when Subject has to be included as a SAN
-			sans := extractSANs(tt.cert, includeSubject)
-			gotErr = engine.AreSANsAllowed(sans)
-			wantErr = tt.wantErr != nil
-			if (gotErr != nil) != wantErr {
-				t.Errorf("NamePolicyEngine.AreSANsAllowed() error = %v, wantErr %v", gotErr, tt.wantErr)
 				return
 			}
 			if gotErr != nil {

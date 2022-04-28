@@ -26,6 +26,20 @@ func WithAllowLiteralWildcardNames() NamePolicyOption {
 	}
 }
 
+func WithPermittedCommonNames(commonNames ...string) NamePolicyOption {
+	return func(g *NamePolicyEngine) error {
+		g.permittedCommonNames = commonNames
+		return nil
+	}
+}
+
+func WithExcludedCommonNames(commonNames ...string) NamePolicyOption {
+	return func(g *NamePolicyEngine) error {
+		g.excludedCommonNames = commonNames
+		return nil
+	}
+}
+
 func WithPermittedDNSDomains(domains ...string) NamePolicyOption {
 	return func(e *NamePolicyEngine) error {
 		normalizedDomains := make([]string, len(domains))
@@ -198,7 +212,6 @@ func WithExcludedURIDomains(domains ...string) NamePolicyOption {
 
 func WithPermittedPrincipals(principals ...string) NamePolicyOption {
 	return func(g *NamePolicyEngine) error {
-		// TODO(hs): normalize and parse principal into the right type? Seems the safe thing to do.
 		g.permittedPrincipals = principals
 		return nil
 	}
@@ -206,7 +219,6 @@ func WithPermittedPrincipals(principals ...string) NamePolicyOption {
 
 func WithExcludedPrincipals(principals ...string) NamePolicyOption {
 	return func(g *NamePolicyEngine) error {
-		// TODO(hs): normalize and parse principal into the right type? Seems the safe thing to do.
 		g.excludedPrincipals = principals
 		return nil
 	}

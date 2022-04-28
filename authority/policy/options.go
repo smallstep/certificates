@@ -31,7 +31,6 @@ type X509PolicyOptionsInterface interface {
 	GetAllowedNameOptions() *X509NameOptions
 	GetDeniedNameOptions() *X509NameOptions
 	IsWildcardLiteralAllowed() bool
-	ShouldVerifyCommonName() bool
 }
 
 // X509PolicyOptions is a container for x509 allowed and denied
@@ -47,15 +46,11 @@ type X509PolicyOptions struct {
 	// such as *.example.com and @example.com are allowed. Defaults
 	// to false.
 	AllowWildcardLiteral bool `json:"allowWildcardLiteral,omitempty"`
-
-	// DisableCommonNameVerification indicates if the Subject Common Name
-	// is verified in addition to the SANs. Defaults to false, resulting in
-	// Common Names being verified.
-	DisableCommonNameVerification bool `json:"disableCommonNameVerification,omitempty"`
 }
 
 // X509NameOptions models the X509 name policy configuration.
 type X509NameOptions struct {
+	CommonNames    []string `json:"cn,omitempty"`
 	DNSDomains     []string `json:"dns,omitempty"`
 	IPRanges       []string `json:"ip,omitempty"`
 	EmailAddresses []string `json:"email,omitempty"`
@@ -65,7 +60,8 @@ type X509NameOptions struct {
 // HasNames checks if the AllowedNameOptions has one or more
 // names configured.
 func (o *X509NameOptions) HasNames() bool {
-	return len(o.DNSDomains) > 0 ||
+	return len(o.CommonNames) > 0 ||
+		len(o.DNSDomains) > 0 ||
 		len(o.IPRanges) > 0 ||
 		len(o.EmailAddresses) > 0 ||
 		len(o.URIDomains) > 0
@@ -94,15 +90,6 @@ func (o *X509PolicyOptions) IsWildcardLiteralAllowed() bool {
 		return true
 	}
 	return o.AllowWildcardLiteral
-}
-
-// ShouldVerifyCommonName returns whether the authority
-// should verify the Subject Common Name in addition to the SANs.
-func (o *X509PolicyOptions) ShouldVerifyCommonName() bool {
-	if o == nil {
-		return false
-	}
-	return !o.DisableCommonNameVerification
 }
 
 // SSHPolicyOptionsInterface is an interface for providers of

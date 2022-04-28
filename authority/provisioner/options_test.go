@@ -322,38 +322,3 @@ func TestX509Options_IsWildcardLiteralAllowed(t *testing.T) {
 		})
 	}
 }
-
-func TestX509Options_ShouldVerifySubjectCommonName(t *testing.T) {
-	tests := []struct {
-		name    string
-		options *X509Options
-		want    bool
-	}{
-		{
-			name:    "nil-options",
-			options: nil,
-			want:    false,
-		},
-		{
-			name: "set-true",
-			options: &X509Options{
-				DisableCommonNameVerification: true,
-			},
-			want: false,
-		},
-		{
-			name: "set-false",
-			options: &X509Options{
-				DisableCommonNameVerification: false,
-			},
-			want: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.options.ShouldVerifyCommonName(); got != tt.want {
-				t.Errorf("X509PolicyOptions.ShouldVerifySubjectCommonName() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
