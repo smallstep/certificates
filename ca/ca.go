@@ -189,30 +189,24 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		dns = fmt.Sprintf("%s:%s", dns, port)
 	}
 
-	// ACME Router
-	prefix := "acme"
+	// ACME Router is only available if we have a database.
 	var acmeDB acme.DB
-	if cfg.DB == nil {
-		acmeDB = nil
-	} else {
+	var acmeLinker acme.Linker
+	if cfg.DB != nil {
 		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
 		if err != nil {
 			return nil, errors.Wrap(err, "error configuring ACME DB interface")
 		}
+		acmeLinker = acme.NewLinker(dns, "acme")
+		mux.Route("/acme", func(r chi.Router) {
+			acmeAPI.Route(r)
+		})
+		// Use 2.0 because, at the moment, our ACME api is only compatible with v2.0
+		// of the ACME spec.
+		mux.Route("/2.0/acme", func(r chi.Router) {
+			acmeAPI.Route(r)
+		})
 	}
-	acmeOptions := &acmeAPI.HandlerOptions{
-		Backdate: *cfg.AuthorityConfig.Backdate,
-		DNS:      dns,
-		Prefix:   prefix,
-	}
-	mux.Route("/"+prefix, func(r chi.Router) {
-		acmeAPI.Route(r, acmeOptions)
-	})
-	// Use 2.0 because, at the moment, our ACME api is only compatible with v2.0
-	// of the ACME spec.
-	mux.Route("/2.0/"+prefix, func(r chi.Router) {
-		acmeAPI.Route(r, acmeOptions)
-	})
 
 	// Admin API Router
 	if cfg.AuthorityConfig.EnableAdmin {
@@ -280,7 +274,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	// Create context with all the necessary values.
-	baseContext := buildContext(auth, scepAuthority, acmeDB)
+	baseContext := buildContext(auth, scepAuthority, acmeDB, acmeLinker)
 
 	ca.srv = server.New(cfg.Address, handler, tlsConfig)
 	ca.srv.BaseContext = func(net.Listener) context.Context {
@@ -304,7 +298,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 }
 
 // buildContext builds the server base context.
-func buildContext(a *authority.Authority, scepAuthority *scep.Authority, acmeDB acme.DB) context.Context {
+func buildContext(a *authority.Authority, scepAuthority *scep.Authority, acmeDB acme.DB, acmeLinker acme.Linker) context.Context {
 	ctx := authority.NewContext(context.Background(), a)
 	if authDB := a.GetDatabase(); authDB != nil {
 		ctx = db.NewContext(ctx, authDB)
@@ -316,7 +310,7 @@ func buildContext(a *authority.Authority, scepAuthority *scep.Authority, acmeDB 
 		ctx = scep.NewContext(ctx, scepAuthority)
 	}
 	if acmeDB != nil {
-		ctx = acme.NewContext(ctx, acmeDB)
+		ctx = acme.NewContext(ctx, acmeDB, acme.NewClient(), acmeLinker, nil)
 	}
 	return ctx
 }

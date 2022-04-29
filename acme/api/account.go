@@ -69,6 +69,9 @@ func (u *UpdateAccountRequest) Validate() error {
 // NewAccount is the handler resource for creating new ACME accounts.
 func NewAccount(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
@@ -120,7 +123,6 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		db := acme.MustFromContext(ctx)
 		acc = &acme.Account{
 			Key:     jwk,
 			Contact: nar.Contact,
@@ -148,16 +150,18 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 		httpStatus = http.StatusOK
 	}
 
-	o := optionsFromContext(ctx)
-	o.linker.LinkAccount(ctx, acc)
+	linker.LinkAccount(ctx, acc)
 
-	w.Header().Set("Location", o.linker.GetLink(r.Context(), AccountLinkType, acc.ID))
+	w.Header().Set("Location", linker.GetLink(r.Context(), acme.AccountLinkType, acc.ID))
 	render.JSONStatus(w, acc, httpStatus)
 }
 
 // GetOrUpdateAccount is the api for updating an ACME account.
 func GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+
 	acc, err := accountFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
@@ -189,7 +193,6 @@ func GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 				acc.Contact = uar.Contact
 			}
 
-			db := acme.MustFromContext(ctx)
 			if err := db.UpdateAccount(ctx, acc); err != nil {
 				render.Error(w, acme.WrapErrorISE(err, "error updating account"))
 				return
@@ -197,10 +200,9 @@ func GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	o := optionsFromContext(ctx)
-	o.linker.LinkAccount(ctx, acc)
+	linker.LinkAccount(ctx, acc)
 
-	w.Header().Set("Location", o.linker.GetLink(ctx, AccountLinkType, acc.ID))
+	w.Header().Set("Location", linker.GetLink(ctx, acme.AccountLinkType, acc.ID))
 	render.JSON(w, acc)
 }
 
@@ -216,6 +218,9 @@ func logOrdersByAccount(w http.ResponseWriter, oids []string) {
 // GetOrdersByAccountID ACME api for retrieving the list of order urls belonging to an account.
 func GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+
 	acc, err := accountFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
@@ -227,15 +232,13 @@ func GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := acme.MustFromContext(ctx)
 	orders, err := db.GetOrdersByAccountID(ctx, acc.ID)
 	if err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	o := optionsFromContext(ctx)
-	o.linker.LinkOrdersByAccountID(ctx, orders)
+	linker.LinkOrdersByAccountID(ctx, orders)
 
 	render.JSON(w, orders)
 	logOrdersByAccount(w, orders)

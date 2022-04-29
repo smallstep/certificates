@@ -47,7 +47,7 @@ func validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest)
 		return nil, acmeErr
 	}
 
-	db := acme.MustFromContext(ctx)
+	db := acme.MustDatabaseFromContext(ctx)
 	externalAccountKey, err := db.GetExternalAccountKey(ctx, acmeProv.ID, keyID)
 	if err != nil {
 		if _, ok := err.(*acme.Error); ok {
@@ -103,7 +103,6 @@ func keysAreEqual(x, y *jose.JSONWebKey) bool {
 //	o  	The "nonce" field MUST NOT be present
 //	o  	The "url" field MUST be set to the same value as the outer JWS
 func validateEABJWS(ctx context.Context, jws *jose.JSONWebSignature) (string, *acme.Error) {
-
 	if jws == nil {
 		return "", acme.NewErrorISE("no JWS provided")
 	}

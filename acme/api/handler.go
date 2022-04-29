@@ -2,12 +2,10 @@ package api
 
 import (
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
@@ -70,144 +68,117 @@ type HandlerOptions struct {
 	// PrerequisitesChecker checks if all prerequisites for serving ACME are
 	// met by the CA configuration.
 	PrerequisitesChecker func(ctx context.Context) (bool, error)
-
-	linker                   Linker
-	validateChallengeOptions *acme.ValidateChallengeOptions
-}
-
-type optionsKey struct{}
-
-func newOptionsContext(ctx context.Context, o *HandlerOptions) context.Context {
-	return context.WithValue(ctx, optionsKey{}, o)
-}
-
-func optionsFromContext(ctx context.Context) *HandlerOptions {
-	o, ok := ctx.Value(optionsKey{}).(*HandlerOptions)
-	if !ok {
-		panic("acme options are not in the context")
-	}
-	return o
 }
 
 var mustAuthority = func(ctx context.Context) acme.CertificateAuthority {
 	return authority.MustFromContext(ctx)
 }
 
-// Handler is the ACME API request handler.
-type Handler struct {
+// handler is the ACME API request handler.
+type handler struct {
 	opts *HandlerOptions
 }
 
 // Route traffic and implement the Router interface.
-//
-// Deprecated: Use api.Route(r Router, opts *HandlerOptions)
-func (h *Handler) Route(r api.Router) {
-	Route(r, h.opts)
+func (h *handler) Route(r api.Router) {
+	route(r, h.opts)
 }
 
 // NewHandler returns a new ACME API handler.
-//
-// Deprecated: Use api.Route(r Router, opts *HandlerOptions)
-func NewHandler(ops HandlerOptions) api.RouterHandler {
-	return &Handler{
-		opts: &ops,
+func NewHandler(opts HandlerOptions) api.RouterHandler {
+	return &handler{
+		opts: &opts,
 	}
 }
 
-// Route traffic and implement the Router interface.
-func Route(r api.Router, opts *HandlerOptions) {
-	// by default all prerequisites are met
-	if opts.PrerequisitesChecker == nil {
-		opts.PrerequisitesChecker = func(ctx context.Context) (bool, error) {
-			return true, nil
+// Route traffic and implement the Router interface. This method requires that
+// all the acme components, authority, db, client, linker, and prerequisite
+// checker to be present in the context.
+func Route(r api.Router) {
+	route(r, nil)
+}
+
+func route(r api.Router, opts *HandlerOptions) {
+	var withContext func(next nextHTTP) nextHTTP
+
+	// For backward compatibility this block adds will add a new middleware that
+	// will set the ACME components to the context.
+	if opts != nil {
+		client := acme.NewClient()
+		linker := acme.NewLinker(opts.DNS, opts.Prefix)
+
+		withContext = func(next nextHTTP) nextHTTP {
+			return func(w http.ResponseWriter, r *http.Request) {
+				ctx := r.Context()
+				if ca, ok := opts.CA.(*authority.Authority); ok && ca != nil {
+					ctx = authority.NewContext(ctx, ca)
+				}
+				ctx = acme.NewContext(ctx, opts.DB, client, linker, opts.PrerequisitesChecker)
+				next(w, r.WithContext(ctx))
+			}
+		}
+	} else {
+		withContext = func(next nextHTTP) nextHTTP {
+			return func(w http.ResponseWriter, r *http.Request) {
+				next(w, r)
+			}
 		}
 	}
 
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
+	commonMiddleware := func(next nextHTTP) nextHTTP {
+		return withContext(func(w http.ResponseWriter, r *http.Request) {
+			// Linker middleware gets the provisioner and current url from the
+			// request and sets them in the context.
+			linker := acme.MustLinkerFromContext(r.Context())
+			linker.Middleware(http.HandlerFunc(checkPrerequisites(next))).ServeHTTP(w, r)
+		})
 	}
-	client := http.Client{
-		Timeout:   30 * time.Second,
-		Transport: transport,
-	}
-	dialer := &net.Dialer{
-		Timeout: 30 * time.Second,
-	}
-
-	opts.linker = NewLinker(opts.DNS, opts.Prefix)
-	opts.validateChallengeOptions = &acme.ValidateChallengeOptions{
-		HTTPGet:   client.Get,
-		LookupTxt: net.LookupTXT,
-		TLSDial: func(network, addr string, config *tls.Config) (*tls.Conn, error) {
-			return tls.DialWithDialer(dialer, network, addr, config)
-		},
-	}
-
-	withOptions := func(next nextHTTP) nextHTTP {
-		return func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-
-			// For backward compatibility with NewHandler.
-			if ca, ok := opts.CA.(*authority.Authority); ok && ca != nil {
-				ctx = authority.NewContext(ctx, ca)
-			}
-			if opts.DB != nil {
-				ctx = acme.NewContext(ctx, opts.DB)
-			}
-
-			ctx = newOptionsContext(ctx, opts)
-			next(w, r.WithContext(ctx))
-		}
-	}
-
 	validatingMiddleware := func(next nextHTTP) nextHTTP {
-		return withOptions(baseURLFromRequest(lookupProvisioner(checkPrerequisites(addNonce(addDirLink(verifyContentType(parseJWS(validateJWS(next)))))))))
+		return commonMiddleware(addNonce(addDirLink(verifyContentType(parseJWS(validateJWS(next))))))
 	}
 	extractPayloadByJWK := func(next nextHTTP) nextHTTP {
-		return withOptions(validatingMiddleware(extractJWK(verifyAndExtractJWSPayload(next))))
+		return validatingMiddleware(extractJWK(verifyAndExtractJWSPayload(next)))
 	}
 	extractPayloadByKid := func(next nextHTTP) nextHTTP {
-		return withOptions(validatingMiddleware(lookupJWK(verifyAndExtractJWSPayload(next))))
+		return validatingMiddleware(lookupJWK(verifyAndExtractJWSPayload(next)))
 	}
 	extractPayloadByKidOrJWK := func(next nextHTTP) nextHTTP {
-		return withOptions(validatingMiddleware(extractOrLookupJWK(verifyAndExtractJWSPayload(next))))
+		return validatingMiddleware(extractOrLookupJWK(verifyAndExtractJWSPayload(next)))
 	}
 
-	getPath := opts.linker.GetUnescapedPathSuffix
+	getPath := acme.GetUnescapedPathSuffix
 
 	// Standard ACME API
-	r.MethodFunc("GET", getPath(NewNonceLinkType, "{provisionerID}"),
-		withOptions(baseURLFromRequest(lookupProvisioner(checkPrerequisites(addNonce(addDirLink(GetNonce)))))))
-	r.MethodFunc("HEAD", getPath(NewNonceLinkType, "{provisionerID}"),
-		withOptions(baseURLFromRequest(lookupProvisioner(checkPrerequisites(addNonce(addDirLink(GetNonce)))))))
-	r.MethodFunc("GET", getPath(DirectoryLinkType, "{provisionerID}"),
-		withOptions(baseURLFromRequest(lookupProvisioner(checkPrerequisites(GetDirectory)))))
-	r.MethodFunc("HEAD", getPath(DirectoryLinkType, "{provisionerID}"),
-		withOptions(baseURLFromRequest(lookupProvisioner(checkPrerequisites(GetDirectory)))))
+	r.MethodFunc("GET", getPath(acme.NewNonceLinkType, "{provisionerID}"),
+		commonMiddleware(addNonce(addDirLink(GetNonce))))
+	r.MethodFunc("HEAD", getPath(acme.NewNonceLinkType, "{provisionerID}"),
+		commonMiddleware(addNonce(addDirLink(GetNonce))))
+	r.MethodFunc("GET", getPath(acme.DirectoryLinkType, "{provisionerID}"),
+		commonMiddleware(GetDirectory))
+	r.MethodFunc("HEAD", getPath(acme.DirectoryLinkType, "{provisionerID}"),
+		commonMiddleware(GetDirectory))
 
-	r.MethodFunc("POST", getPath(NewAccountLinkType, "{provisionerID}"),
+	r.MethodFunc("POST", getPath(acme.NewAccountLinkType, "{provisionerID}"),
 		extractPayloadByJWK(NewAccount))
-	r.MethodFunc("POST", getPath(AccountLinkType, "{provisionerID}", "{accID}"),
+	r.MethodFunc("POST", getPath(acme.AccountLinkType, "{provisionerID}", "{accID}"),
 		extractPayloadByKid(GetOrUpdateAccount))
-	r.MethodFunc("POST", getPath(KeyChangeLinkType, "{provisionerID}", "{accID}"),
+	r.MethodFunc("POST", getPath(acme.KeyChangeLinkType, "{provisionerID}", "{accID}"),
 		extractPayloadByKid(NotImplemented))
-	r.MethodFunc("POST", getPath(NewOrderLinkType, "{provisionerID}"),
+	r.MethodFunc("POST", getPath(acme.NewOrderLinkType, "{provisionerID}"),
 		extractPayloadByKid(NewOrder))
-	r.MethodFunc("POST", getPath(OrderLinkType, "{provisionerID}", "{ordID}"),
+	r.MethodFunc("POST", getPath(acme.OrderLinkType, "{provisionerID}", "{ordID}"),
 		extractPayloadByKid(isPostAsGet(GetOrder)))
-	r.MethodFunc("POST", getPath(OrdersByAccountLinkType, "{provisionerID}", "{accID}"),
+	r.MethodFunc("POST", getPath(acme.OrdersByAccountLinkType, "{provisionerID}", "{accID}"),
 		extractPayloadByKid(isPostAsGet(GetOrdersByAccountID)))
-	r.MethodFunc("POST", getPath(FinalizeLinkType, "{provisionerID}", "{ordID}"),
+	r.MethodFunc("POST", getPath(acme.FinalizeLinkType, "{provisionerID}", "{ordID}"),
 		extractPayloadByKid(FinalizeOrder))
-	r.MethodFunc("POST", getPath(AuthzLinkType, "{provisionerID}", "{authzID}"),
+	r.MethodFunc("POST", getPath(acme.AuthzLinkType, "{provisionerID}", "{authzID}"),
 		extractPayloadByKid(isPostAsGet(GetAuthorization)))
-	r.MethodFunc("POST", getPath(ChallengeLinkType, "{provisionerID}", "{authzID}", "{chID}"),
+	r.MethodFunc("POST", getPath(acme.ChallengeLinkType, "{provisionerID}", "{authzID}", "{chID}"),
 		extractPayloadByKid(GetChallenge))
-	r.MethodFunc("POST", getPath(CertificateLinkType, "{provisionerID}", "{certID}"),
+	r.MethodFunc("POST", getPath(acme.CertificateLinkType, "{provisionerID}", "{certID}"),
 		extractPayloadByKid(isPostAsGet(GetCertificate)))
-	r.MethodFunc("POST", getPath(RevokeCertLinkType, "{provisionerID}"),
+	r.MethodFunc("POST", getPath(acme.RevokeCertLinkType, "{provisionerID}"),
 		extractPayloadByKidOrJWK(RevokeCert))
 }
 
@@ -251,20 +222,20 @@ func (d *Directory) ToLog() (interface{}, error) {
 // for client configuration.
 func GetDirectory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	o := optionsFromContext(ctx)
-
 	acmeProv, err := acmeProvisionerFromContext(ctx)
+	fmt.Println(acmeProv, err)
 	if err != nil {
 		render.Error(w, err)
 		return
 	}
 
+	linker := acme.MustLinkerFromContext(ctx)
 	render.JSON(w, &Directory{
-		NewNonce:   o.linker.GetLink(ctx, NewNonceLinkType),
-		NewAccount: o.linker.GetLink(ctx, NewAccountLinkType),
-		NewOrder:   o.linker.GetLink(ctx, NewOrderLinkType),
-		RevokeCert: o.linker.GetLink(ctx, RevokeCertLinkType),
-		KeyChange:  o.linker.GetLink(ctx, KeyChangeLinkType),
+		NewNonce:   linker.GetLink(ctx, acme.NewNonceLinkType),
+		NewAccount: linker.GetLink(ctx, acme.NewAccountLinkType),
+		NewOrder:   linker.GetLink(ctx, acme.NewOrderLinkType),
+		RevokeCert: linker.GetLink(ctx, acme.RevokeCertLinkType),
+		KeyChange:  linker.GetLink(ctx, acme.KeyChangeLinkType),
 		Meta: Meta{
 			ExternalAccountRequired: acmeProv.RequireEAB,
 		},
@@ -280,8 +251,8 @@ func NotImplemented(w http.ResponseWriter, r *http.Request) {
 // GetAuthorization ACME api for retrieving an Authz.
 func GetAuthorization(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	o := optionsFromContext(ctx)
-	db := acme.MustFromContext(ctx)
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
@@ -303,17 +274,17 @@ func GetAuthorization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	o.linker.LinkAuthorization(ctx, az)
+	linker.LinkAuthorization(ctx, az)
 
-	w.Header().Set("Location", o.linker.GetLink(ctx, AuthzLinkType, az.ID))
+	w.Header().Set("Location", linker.GetLink(ctx, acme.AuthzLinkType, az.ID))
 	render.JSON(w, az)
 }
 
 // GetChallenge ACME api for retrieving a Challenge.
 func GetChallenge(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	o := optionsFromContext(ctx)
-	db := acme.MustFromContext(ctx)
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
@@ -351,22 +322,22 @@ func GetChallenge(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, err)
 		return
 	}
-	if err = ch.Validate(ctx, db, jwk, o.validateChallengeOptions); err != nil {
+	if err = ch.Validate(ctx, db, jwk); err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error validating challenge"))
 		return
 	}
 
-	o.linker.LinkChallenge(ctx, ch, azID)
+	linker.LinkChallenge(ctx, ch, azID)
 
-	w.Header().Add("Link", link(o.linker.GetLink(ctx, AuthzLinkType, azID), "up"))
-	w.Header().Set("Location", o.linker.GetLink(ctx, ChallengeLinkType, azID, ch.ID))
+	w.Header().Add("Link", link(linker.GetLink(ctx, acme.AuthzLinkType, azID), "up"))
+	w.Header().Set("Location", linker.GetLink(ctx, acme.ChallengeLinkType, azID, ch.ID))
 	render.JSON(w, ch)
 }
 
 // GetCertificate ACME api for retrieving a Certificate.
 func GetCertificate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	db := acme.MustFromContext(ctx)
+	db := acme.MustDatabaseFromContext(ctx)
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {

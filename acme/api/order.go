@@ -70,12 +70,11 @@ var defaultOrderBackdate = time.Minute
 // NewOrder ACME api for creating a new order.
 func NewOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+	prov := acme.MustProvisionerFromContext(ctx)
+
 	acc, err := accountFromContext(ctx)
-	if err != nil {
-		render.Error(w, err)
-		return
-	}
-	prov, err := provisionerFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
 		return
@@ -136,16 +135,14 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 		o.NotBefore = o.NotBefore.Add(-defaultOrderBackdate)
 	}
 
-	db := acme.MustFromContext(ctx)
 	if err := db.CreateOrder(ctx, o); err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error creating order"))
 		return
 	}
 
-	opts := optionsFromContext(ctx)
-	opts.linker.LinkOrder(ctx, o)
+	linker.LinkOrder(ctx, o)
 
-	w.Header().Set("Location", opts.linker.GetLink(ctx, OrderLinkType, o.ID))
+	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
 	render.JSONStatus(w, o, http.StatusCreated)
 }
 
@@ -166,7 +163,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 		return acme.WrapErrorISE(err, "error generating random alphanumeric ID")
 	}
 
-	db := acme.MustFromContext(ctx)
+	db := acme.MustDatabaseFromContext(ctx)
 	az.Challenges = make([]*acme.Challenge, len(chTypes))
 	for i, typ := range chTypes {
 		ch := &acme.Challenge{
@@ -190,18 +187,16 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 // GetOrder ACME api for retrieving an order.
 func GetOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+	prov := acme.MustProvisionerFromContext(ctx)
+
 	acc, err := accountFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
 		return
 	}
-	prov, err := provisionerFromContext(ctx)
-	if err != nil {
-		render.Error(w, err)
-		return
-	}
 
-	db := acme.MustFromContext(ctx)
 	o, err := db.GetOrder(ctx, chi.URLParam(r, "ordID"))
 	if err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error retrieving order"))
@@ -222,22 +217,20 @@ func GetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	opts := optionsFromContext(ctx)
-	opts.linker.LinkOrder(ctx, o)
+	linker.LinkOrder(ctx, o)
 
-	w.Header().Set("Location", opts.linker.GetLink(ctx, OrderLinkType, o.ID))
+	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
 	render.JSON(w, o)
 }
 
 // FinalizeOrder attemptst to finalize an order and create a certificate.
 func FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+	prov := acme.MustProvisionerFromContext(ctx)
+
 	acc, err := accountFromContext(ctx)
-	if err != nil {
-		render.Error(w, err)
-		return
-	}
-	prov, err := provisionerFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
 		return
@@ -258,7 +251,6 @@ func FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := acme.MustFromContext(ctx)
 	o, err := db.GetOrder(ctx, chi.URLParam(r, "ordID"))
 	if err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error retrieving order"))
@@ -281,10 +273,9 @@ func FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	opts := optionsFromContext(ctx)
-	opts.linker.LinkOrder(ctx, o)
+	linker.LinkOrder(ctx, o)
 
-	w.Header().Set("Location", opts.linker.GetLink(ctx, OrderLinkType, o.ID))
+	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
 	render.JSON(w, o)
 }
 

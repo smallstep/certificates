@@ -31,39 +31,10 @@ func logNonce(w http.ResponseWriter, nonce string) {
 	}
 }
 
-// getBaseURLFromRequest determines the base URL which should be used for
-// constructing link URLs in e.g. the ACME directory result by taking the
-// request Host into consideration.
-//
-// If the Request.Host is an empty string, we return an empty string, to
-// indicate that the configured URL values should be used instead.  If this
-// function returns a non-empty result, then this should be used in constructing
-// ACME link URLs.
-func getBaseURLFromRequest(r *http.Request) *url.URL {
-	// NOTE: See https://github.com/letsencrypt/boulder/blob/master/web/relative.go
-	// for an implementation that allows HTTP requests using the x-forwarded-proto
-	// header.
-
-	if r.Host == "" {
-		return nil
-	}
-	return &url.URL{Scheme: "https", Host: r.Host}
-}
-
-// baseURLFromRequest is a middleware that extracts and caches the baseURL
-// from the request.
-// E.g. https://ca.smallstep.com/
-func baseURLFromRequest(next nextHTTP) nextHTTP {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.WithValue(r.Context(), baseURLContextKey, getBaseURLFromRequest(r))
-		next(w, r.WithContext(ctx))
-	}
-}
-
 // addNonce is a middleware that adds a nonce to the response header.
 func addNonce(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		db := acme.MustFromContext(r.Context())
+		db := acme.MustDatabaseFromContext(r.Context())
 		nonce, err := db.CreateNonce(r.Context())
 		if err != nil {
 			render.Error(w, err)
@@ -81,9 +52,9 @@ func addNonce(next nextHTTP) nextHTTP {
 func addDirLink(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		opts := optionsFromContext(ctx)
+		linker := acme.MustLinkerFromContext(ctx)
 
-		w.Header().Add("Link", link(opts.linker.GetLink(ctx, DirectoryLinkType), "index"))
+		w.Header().Add("Link", link(linker.GetLink(ctx, acme.DirectoryLinkType), "index"))
 		next(w, r)
 	}
 }
@@ -92,17 +63,12 @@ func addDirLink(next nextHTTP) nextHTTP {
 // application/jose+json.
 func verifyContentType(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var expected []string
-		ctx := r.Context()
-		opts := optionsFromContext(ctx)
-
-		p, err := provisionerFromContext(ctx)
-		if err != nil {
-			render.Error(w, err)
-			return
+		p := acme.MustProvisionerFromContext(r.Context())
+		u := &url.URL{
+			Path: acme.GetUnescapedPathSuffix(acme.CertificateLinkType, p.GetName(), ""),
 		}
 
-		u := url.URL{Path: opts.linker.GetUnescapedPathSuffix(CertificateLinkType, p.GetName(), "")}
+		var expected []string
 		if strings.Contains(r.URL.String(), u.EscapedPath()) {
 			// GET /certificate requests allow a greater range of content types.
 			expected = []string{"application/jose+json", "application/pkix-cert", "application/pkcs7-mime"}
@@ -159,7 +125,7 @@ func parseJWS(next nextHTTP) nextHTTP {
 func validateJWS(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		db := acme.MustFromContext(ctx)
+		db := acme.MustDatabaseFromContext(ctx)
 
 		jws, err := jwsFromContext(ctx)
 		if err != nil {
@@ -247,7 +213,7 @@ func validateJWS(next nextHTTP) nextHTTP {
 func extractJWK(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		db := acme.MustFromContext(ctx)
+		db := acme.MustDatabaseFromContext(ctx)
 
 		jws, err := jwsFromContext(ctx)
 		if err != nil {
@@ -325,18 +291,20 @@ func lookupProvisioner(next nextHTTP) nextHTTP {
 func checkPrerequisites(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		opts := optionsFromContext(ctx)
-
-		ok, err := opts.PrerequisitesChecker(ctx)
-		if err != nil {
-			render.Error(w, acme.WrapErrorISE(err, "error checking acme provisioner prerequisites"))
-			return
+		// If the function is not set assume that all prerequisites are met.
+		checkFunc, ok := acme.PrerequisitesCheckerFromContext(ctx)
+		if ok {
+			ok, err := checkFunc(ctx)
+			if err != nil {
+				render.Error(w, acme.WrapErrorISE(err, "error checking acme provisioner prerequisites"))
+				return
+			}
+			if !ok {
+				render.Error(w, acme.NewError(acme.ErrorNotImplementedType, "acme provisioner configuration lacks prerequisites"))
+				return
+			}
 		}
-		if !ok {
-			render.Error(w, acme.NewError(acme.ErrorNotImplementedType, "acme provisioner configuration lacks prerequisites"))
-			return
-		}
-		next(w, r.WithContext(ctx))
+		next(w, r)
 	}
 }
 
@@ -346,8 +314,8 @@ func checkPrerequisites(next nextHTTP) nextHTTP {
 func lookupJWK(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		opts := optionsFromContext(ctx)
-		db := acme.MustFromContext(ctx)
+		db := acme.MustDatabaseFromContext(ctx)
+		linker := acme.MustLinkerFromContext(ctx)
 
 		jws, err := jwsFromContext(ctx)
 		if err != nil {
@@ -355,7 +323,7 @@ func lookupJWK(next nextHTTP) nextHTTP {
 			return
 		}
 
-		kidPrefix := opts.linker.GetLink(ctx, AccountLinkType, "")
+		kidPrefix := linker.GetLink(ctx, acme.AccountLinkType, "")
 		kid := jws.Signatures[0].Protected.KeyID
 		if !strings.HasPrefix(kid, kidPrefix) {
 			render.Error(w, acme.NewError(acme.ErrorMalformedType,
@@ -527,32 +495,14 @@ func jwsFromContext(ctx context.Context) (*jose.JSONWebSignature, error) {
 	return val, nil
 }
 
-// provisionerFromContext searches the context for a provisioner. Returns the
-// provisioner or an error.
-func provisionerFromContext(ctx context.Context) (acme.Provisioner, error) {
-	val := ctx.Value(provisionerContextKey)
-	if val == nil {
-		return nil, acme.NewErrorISE("provisioner expected in request context")
-	}
-	pval, ok := val.(acme.Provisioner)
-	if !ok || pval == nil {
-		return nil, acme.NewErrorISE("provisioner in context is not an ACME provisioner")
-	}
-	return pval, nil
-}
-
 // acmeProvisionerFromContext searches the context for an ACME provisioner. Returns
 // pointer to an ACME provisioner or an error.
 func acmeProvisionerFromContext(ctx context.Context) (*provisioner.ACME, error) {
-	prov, err := provisionerFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	acmeProv, ok := prov.(*provisioner.ACME)
-	if !ok || acmeProv == nil {
+	p, ok := acme.MustProvisionerFromContext(ctx).(*provisioner.ACME)
+	if !ok {
 		return nil, acme.NewErrorISE("provisioner in context is not an ACME provisioner")
 	}
-	return acmeProv, nil
+	return p, nil
 }
 
 // payloadFromContext searches the context for a payload. Returns the payload

@@ -28,13 +28,11 @@ type revokePayload struct {
 // RevokeCert attempts to revoke a certificate.
 func RevokeCert(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	jws, err := jwsFromContext(ctx)
-	if err != nil {
-		render.Error(w, err)
-		return
-	}
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+	prov := acme.MustProvisionerFromContext(ctx)
 
-	prov, err := provisionerFromContext(ctx)
+	jws, err := jwsFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
 		return
@@ -67,7 +65,6 @@ func RevokeCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := acme.MustFromContext(ctx)
 	serial := certToBeRevoked.SerialNumber.String()
 	dbCert, err := db.GetCertificateBySerial(ctx, serial)
 	if err != nil {
@@ -138,8 +135,7 @@ func RevokeCert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logRevoke(w, options)
-	o := optionsFromContext(ctx)
-	w.Header().Add("Link", link(o.linker.GetLink(ctx, DirectoryLinkType), "index"))
+	w.Header().Add("Link", link(linker.GetLink(ctx, acme.DirectoryLinkType), "index"))
 	w.Write(nil)
 }
 

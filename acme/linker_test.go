@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/acme"
 )
 
 func TestLinker_GetUnescapedPathSuffix(t *testing.T) {
@@ -173,27 +172,27 @@ func TestLinker_LinkOrder(t *testing.T) {
 	linkerPrefix := "acme"
 	l := NewLinker("dns", linkerPrefix)
 	type test struct {
-		o        *acme.Order
-		validate func(o *acme.Order)
+		o        *Order
+		validate func(o *Order)
 	}
 	var tests = map[string]test{
 		"no-authz-and-no-cert": {
-			o: &acme.Order{
+			o: &Order{
 				ID: oid,
 			},
-			validate: func(o *acme.Order) {
+			validate: func(o *Order) {
 				assert.Equals(t, o.FinalizeURL, fmt.Sprintf("%s/%s/%s/order/%s/finalize", baseURL, linkerPrefix, provName, oid))
 				assert.Equals(t, o.AuthorizationURLs, []string{})
 				assert.Equals(t, o.CertificateURL, "")
 			},
 		},
 		"one-authz-and-cert": {
-			o: &acme.Order{
+			o: &Order{
 				ID:               oid,
 				CertificateID:    certID,
 				AuthorizationIDs: []string{"foo"},
 			},
-			validate: func(o *acme.Order) {
+			validate: func(o *Order) {
 				assert.Equals(t, o.FinalizeURL, fmt.Sprintf("%s/%s/%s/order/%s/finalize", baseURL, linkerPrefix, provName, oid))
 				assert.Equals(t, o.AuthorizationURLs, []string{
 					fmt.Sprintf("%s/%s/%s/authz/%s", baseURL, linkerPrefix, provName, "foo"),
@@ -202,12 +201,12 @@ func TestLinker_LinkOrder(t *testing.T) {
 			},
 		},
 		"many-authz": {
-			o: &acme.Order{
+			o: &Order{
 				ID:               oid,
 				CertificateID:    certID,
 				AuthorizationIDs: []string{"foo", "bar", "zap"},
 			},
-			validate: func(o *acme.Order) {
+			validate: func(o *Order) {
 				assert.Equals(t, o.FinalizeURL, fmt.Sprintf("%s/%s/%s/order/%s/finalize", baseURL, linkerPrefix, provName, oid))
 				assert.Equals(t, o.AuthorizationURLs, []string{
 					fmt.Sprintf("%s/%s/%s/authz/%s", baseURL, linkerPrefix, provName, "foo"),
@@ -237,15 +236,15 @@ func TestLinker_LinkAccount(t *testing.T) {
 	linkerPrefix := "acme"
 	l := NewLinker("dns", linkerPrefix)
 	type test struct {
-		a        *acme.Account
-		validate func(o *acme.Account)
+		a        *Account
+		validate func(o *Account)
 	}
 	var tests = map[string]test{
 		"ok": {
-			a: &acme.Account{
+			a: &Account{
 				ID: accID,
 			},
-			validate: func(a *acme.Account) {
+			validate: func(a *Account) {
 				assert.Equals(t, a.OrdersURL, fmt.Sprintf("%s/%s/%s/account/%s/orders", baseURL, linkerPrefix, provName, accID))
 			},
 		},
@@ -270,15 +269,15 @@ func TestLinker_LinkChallenge(t *testing.T) {
 	linkerPrefix := "acme"
 	l := NewLinker("dns", linkerPrefix)
 	type test struct {
-		ch       *acme.Challenge
-		validate func(o *acme.Challenge)
+		ch       *Challenge
+		validate func(o *Challenge)
 	}
 	var tests = map[string]test{
 		"ok": {
-			ch: &acme.Challenge{
+			ch: &Challenge{
 				ID: chID,
 			},
-			validate: func(ch *acme.Challenge) {
+			validate: func(ch *Challenge) {
 				assert.Equals(t, ch.URL, fmt.Sprintf("%s/%s/%s/challenge/%s/%s", baseURL, linkerPrefix, provName, azID, ch.ID))
 			},
 		},
@@ -305,20 +304,20 @@ func TestLinker_LinkAuthorization(t *testing.T) {
 	linkerPrefix := "acme"
 	l := NewLinker("dns", linkerPrefix)
 	type test struct {
-		az       *acme.Authorization
-		validate func(o *acme.Authorization)
+		az       *Authorization
+		validate func(o *Authorization)
 	}
 	var tests = map[string]test{
 		"ok": {
-			az: &acme.Authorization{
+			az: &Authorization{
 				ID: azID,
-				Challenges: []*acme.Challenge{
+				Challenges: []*Challenge{
 					{ID: chID0},
 					{ID: chID1},
 					{ID: chID2},
 				},
 			},
-			validate: func(az *acme.Authorization) {
+			validate: func(az *Authorization) {
 				assert.Equals(t, az.Challenges[0].URL, fmt.Sprintf("%s/%s/%s/challenge/%s/%s", baseURL, linkerPrefix, provName, az.ID, chID0))
 				assert.Equals(t, az.Challenges[1].URL, fmt.Sprintf("%s/%s/%s/challenge/%s/%s", baseURL, linkerPrefix, provName, az.ID, chID1))
 				assert.Equals(t, az.Challenges[2].URL, fmt.Sprintf("%s/%s/%s/challenge/%s/%s", baseURL, linkerPrefix, provName, az.ID, chID2))
