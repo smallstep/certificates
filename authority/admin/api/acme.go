@@ -109,6 +109,7 @@ func eakToLinked(k *acme.ExternalAccountKey) *linkedca.EABKey {
 		eak.Policy.X509.Allow.Ips = k.Policy.X509.Allowed.IPRanges
 		eak.Policy.X509.Deny.Dns = k.Policy.X509.Denied.DNSNames
 		eak.Policy.X509.Deny.Ips = k.Policy.X509.Denied.IPRanges
+		eak.Policy.X509.AllowWildcardNames = k.Policy.X509.AllowWildcardNames
 	}
 
 	return eak
@@ -143,6 +144,7 @@ func linkedEAKToCertificates(k *linkedca.EABKey) *acme.ExternalAccountKey {
 				eak.Policy.X509.Denied.DNSNames = deny.Dns
 				eak.Policy.X509.Denied.IPRanges = deny.Ips
 			}
+			eak.Policy.X509.AllowWildcardNames = x509.AllowWildcardNames
 		}
 	}
 

@@ -125,7 +125,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 				Reason:   CannotParseDomain,
 				NameType: EmailNameType,
 				Name:     email,
-				detail:   fmt.Sprintf("cannot parse email domain %q", email),
+				detail:   fmt.Errorf("cannot parse email domain %q: %w", email, err).Error(),
 			}
 		}
 		mailbox.domain = domainASCII
@@ -577,11 +577,6 @@ func matchIPConstraint(ip net.IP, constraint *net.IPNet) (bool, error) {
 
 // SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
 func (e *NamePolicyEngine) matchEmailConstraint(mailbox rfc2821Mailbox, constraint string) (bool, error) {
-	// TODO(hs): handle literal wildcard case for emails? Does that even make sense?
-	// If the constraint contains an @, then it specifies an exact mailbox name (currently)
-	if strings.Contains(constraint, "*") {
-		return false, fmt.Errorf("email constraint %q cannot contain asterisk", constraint)
-	}
 	if strings.Contains(constraint, "@") {
 		constraintMailbox, ok := parseRFC2821Mailbox(constraint)
 		if !ok {
@@ -617,7 +612,7 @@ func (e *NamePolicyEngine) matchURIConstraint(uri *url.URL, constraint string) (
 
 	if strings.Contains(host, ":") && !strings.HasSuffix(host, "]") {
 		var err error
-		host, _, err = net.SplitHostPort(uri.Host)
+		host, _, err = net.SplitHostPort(host)
 		if err != nil {
 			return false, err
 		}

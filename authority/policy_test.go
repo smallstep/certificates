@@ -218,7 +218,7 @@ func Test_policyToCertificates(t *testing.T) {
 					Allow: &linkedca.X509Names{
 						Dns: []string{"*.local"},
 					},
-					AllowWildcardLiteral: false,
+					AllowWildcardNames: false,
 				},
 			},
 			want: &policy.Options{
@@ -226,7 +226,7 @@ func Test_policyToCertificates(t *testing.T) {
 					AllowedNames: &policy.X509NameOptions{
 						DNSDomains: []string{"*.local"},
 					},
-					AllowWildcardLiteral: false,
+					AllowWildcardNames: false,
 				},
 			},
 		},
@@ -248,7 +248,7 @@ func Test_policyToCertificates(t *testing.T) {
 						Uris:        []string{"https://badhost.local"},
 						CommonNames: []string{"another name"},
 					},
-					AllowWildcardLiteral: true,
+					AllowWildcardNames: true,
 				},
 				Ssh: &linkedca.SSHPolicy{
 					Host: &linkedca.SSHHostPolicy{
@@ -291,7 +291,7 @@ func Test_policyToCertificates(t *testing.T) {
 						URIDomains:     []string{"https://badhost.local"},
 						CommonNames:    []string{"another name"},
 					},
-					AllowWildcardLiteral: true,
+					AllowWildcardNames: true,
 				},
 				SSH: &policy.SSHPolicyOptions{
 					Host: &policy.SSHHostCertificateOptions{
@@ -369,7 +369,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			DeniedNames: &policy.X509NameOptions{
 				DNSDomains: []string{"badhost.local"},
 			},
-			AllowWildcardLiteral: true,
+			AllowWildcardNames: true,
 		},
 	}
 
@@ -428,7 +428,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			DeniedNames: &policy.X509NameOptions{
 				DNSDomains: []string{"badhost.local"},
 			},
-			AllowWildcardLiteral: true,
+			AllowWildcardNames: true,
 		},
 		SSH: &policy.SSHPolicyOptions{
 			Host: &policy.SSHHostCertificateOptions{
@@ -486,7 +486,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			DeniedNames: &policy.X509NameOptions{
 				DNSDomains: []string{"badhost.local"},
 			},
-			AllowWildcardLiteral: true,
+			AllowWildcardNames: true,
 		},
 		SSH: &policy.SSHPolicyOptions{
 			Host: &policy.SSHHostCertificateOptions{
@@ -697,7 +697,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							DeniedNames: &policy.X509NameOptions{
 								DNSDomains: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral: true,
+							AllowWildcardNames: true,
 						},
 					},
 				},
@@ -796,7 +796,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							DeniedNames: &policy.X509NameOptions{
 								DNSDomains: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral: true,
+							AllowWildcardNames: true,
 						},
 						SSH: &policy.SSHPolicyOptions{
 							Host: &policy.SSHHostCertificateOptions{
@@ -911,7 +911,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							Deny: &linkedca.X509Names{
 								Dns: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral: true,
+							AllowWildcardNames: true,
 						},
 						Ssh: &linkedca.SSHPolicy{
 							Host: &linkedca.SSHHostPolicy{
@@ -976,7 +976,7 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 							Deny: &linkedca.X509Names{
 								Dns: []string{"badhost.local"},
 							},
-							AllowWildcardLiteral: true,
+							AllowWildcardNames: true,
 						},
 					}, nil
 				},
@@ -995,11 +995,6 @@ func TestAuthority_reloadPolicyEngines(t *testing.T) {
 			if err := a.reloadPolicyEngines(tt.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Authority.reloadPolicyEngines() error = %v, wantErr %v", err, tt.wantErr)
 			}
-
-			// TODO(hs): fix those
-			// assert.Equal(t, tt.expected.x509Policy, a.x509Policy)
-			// assert.Equal(t, tt.expected.sshHostPolicy, a.sshHostPolicy)
-			// assert.Equal(t, tt.expected.sshUserPolicy, a.sshUserPolicy)
 
 			assert.Equal(t, tt.expected, a.policyEngine)
 		})

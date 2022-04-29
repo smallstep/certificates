@@ -52,7 +52,7 @@ func NewX509PolicyEngine(policyOptions X509PolicyOptionsInterface) (X509Policy, 
 		return nil, nil
 	}
 
-	if policyOptions.IsWildcardLiteralAllowed() {
+	if policyOptions.AreWildcardNamesAllowed() {
 		options = append(options, policy.WithAllowLiteralWildcardNames())
 	}
 

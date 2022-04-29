@@ -53,8 +53,9 @@ type PolicyNames struct {
 
 // X509Policy contains ACME account level X.509 policy
 type X509Policy struct {
-	Allowed PolicyNames `json:"allow"`
-	Denied  PolicyNames `json:"deny"`
+	Allowed            PolicyNames `json:"allow"`
+	Denied             PolicyNames `json:"deny"`
+	AllowWildcardNames bool        `json:"allowWildcardNames"`
 }
 
 // Policy is an ACME Account level policy
@@ -81,18 +82,14 @@ func (p *Policy) GetDeniedNameOptions() *policy.X509NameOptions {
 	}
 }
 
-// IsWildcardLiteralAllowed returns true by default for
-// ACME account policies, as authorization is performed on DNS
-// level.
-func (p *Policy) IsWildcardLiteralAllowed() bool {
-	return true
-}
-
-// ShouldVerifySubjectCommonName returns true by default
-// for ACME account policies, as this is embedded in the
-// protocol.
-func (p *Policy) ShouldVerifyCommonName() bool {
-	return true
+// AreWildcardNamesAllowed returns if wildcard names
+// like *.example.com are allowed to be signed.
+// Defaults to false.
+func (p *Policy) AreWildcardNamesAllowed() bool {
+	if p == nil {
+		return false
+	}
+	return p.X509.AllowWildcardNames
 }
 
 // ExternalAccountKey is an ACME External Account Binding key.

@@ -311,7 +311,7 @@ func policyToCertificates(p *linkedca.Policy) *authPolicy.Options {
 			}
 		}
 
-		opts.X509.AllowWildcardLiteral = x509.AllowWildcardLiteral
+		opts.X509.AllowWildcardNames = x509.GetAllowWildcardNames()
 	}
 
 	// fill ssh policy configuration

@@ -30,7 +30,7 @@ func (o *Options) GetSSHOptions() *SSHPolicyOptions {
 type X509PolicyOptionsInterface interface {
 	GetAllowedNameOptions() *X509NameOptions
 	GetDeniedNameOptions() *X509NameOptions
-	IsWildcardLiteralAllowed() bool
+	AreWildcardNamesAllowed() bool
 }
 
 // X509PolicyOptions is a container for x509 allowed and denied
@@ -42,10 +42,9 @@ type X509PolicyOptions struct {
 	// DeniedNames contains the x509 denied names
 	DeniedNames *X509NameOptions `json:"deny,omitempty"`
 
-	// AllowWildcardLiteral indicates if literal wildcard names
-	// such as *.example.com and @example.com are allowed. Defaults
-	// to false.
-	AllowWildcardLiteral bool `json:"allowWildcardLiteral,omitempty"`
+	// AllowWildcardNames indicates if literal wildcard names
+	// like *.example.com are allowed. Defaults to false.
+	AllowWildcardNames bool `json:"allowWildcardNames,omitempty"`
 }
 
 // X509NameOptions models the X509 name policy configuration.
@@ -83,13 +82,13 @@ func (o *X509PolicyOptions) GetDeniedNameOptions() *X509NameOptions {
 	return o.DeniedNames
 }
 
-// IsWildcardLiteralAllowed returns whether the authority allows
-// literal wildcard domains and other names to be signed.
-func (o *X509PolicyOptions) IsWildcardLiteralAllowed() bool {
+// AreWildcardNamesAllowed returns whether the authority allows
+// literal wildcard names to be signed.
+func (o *X509PolicyOptions) AreWildcardNamesAllowed() bool {
 	if o == nil {
 		return true
 	}
-	return o.AllowWildcardLiteral
+	return o.AllowWildcardNames
 }
 
 // SSHPolicyOptionsInterface is an interface for providers of

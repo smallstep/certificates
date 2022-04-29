@@ -66,10 +66,9 @@ type X509Options struct {
 	// DeniedNames contains the SANs the provisioner is not authorized to sign
 	DeniedNames *policy.X509NameOptions `json:"-"`
 
-	// AllowWildcardLiteral indicates if literal wildcard names
-	// such as *.example.com and @example.com are allowed. Defaults
-	// to false.
-	AllowWildcardLiteral bool `json:"-"`
+	// AllowWildcardNames indicates if literal wildcard names
+	// like *.example.com are allowed. Defaults to false.
+	AllowWildcardNames bool `json:"-"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
@@ -95,11 +94,11 @@ func (o *X509Options) GetDeniedNameOptions() *policy.X509NameOptions {
 	return o.DeniedNames
 }
 
-func (o *X509Options) IsWildcardLiteralAllowed() bool {
+func (o *X509Options) AreWildcardNamesAllowed() bool {
 	if o == nil {
 		return true
 	}
-	return o.AllowWildcardLiteral
+	return o.AllowWildcardNames
 }
 
 // TemplateOptions generates a CertificateOptions with the template and data

@@ -286,17 +286,6 @@ func TestNamePolicyEngine_matchEmailConstraint(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name:   "fail/asterisk-prefix",
-			engine: &NamePolicyEngine{},
-			mailbox: rfc2821Mailbox{
-				local:  "mail",
-				domain: "local",
-			},
-			constraint: "*@example.com",
-			want:       false,
-			wantErr:    true,
-		},
-		{
 			name:   "fail/asterisk-label",
 			engine: &NamePolicyEngine{},
 			mailbox: rfc2821Mailbox{
@@ -304,17 +293,6 @@ func TestNamePolicyEngine_matchEmailConstraint(t *testing.T) {
 				domain: "local",
 			},
 			constraint: "@host.*.example.com",
-			want:       false,
-			wantErr:    true,
-		},
-		{
-			name:   "fail/asterisk-inside-local",
-			engine: &NamePolicyEngine{},
-			mailbox: rfc2821Mailbox{
-				local:  "mail",
-				domain: "local",
-			},
-			constraint: "m*il@local",
 			want:       false,
 			wantErr:    true,
 		},
@@ -358,7 +336,7 @@ func TestNamePolicyEngine_matchEmailConstraint(t *testing.T) {
 				local:  "mail",
 				domain: "local",
 			},
-			constraint: ".local", // "wildcard" for the local domain; requires exactly 1 subdomain
+			constraint: ".local",
 			want:       false,
 			wantErr:    false,
 		},
@@ -403,6 +381,50 @@ func TestNamePolicyEngine_matchEmailConstraint(t *testing.T) {
 				domain: "example.local",
 			},
 			constraint: ".local", // "wildcard" for the local domain; requires exactly 1 subdomain
+			want:       true,
+			wantErr:    false,
+		},
+		{
+			name:   "ok/asterisk-prefix",
+			engine: &NamePolicyEngine{},
+			mailbox: rfc2821Mailbox{
+				local:  "mail",
+				domain: "local",
+			},
+			constraint: "*@example.com",
+			want:       false,
+			wantErr:    false,
+		},
+		{
+			name:   "ok/asterisk-prefix-match",
+			engine: &NamePolicyEngine{},
+			mailbox: rfc2821Mailbox{
+				local:  "*",
+				domain: "example.com",
+			},
+			constraint: "*@example.com",
+			want:       true,
+			wantErr:    false,
+		},
+		{
+			name:   "ok/asterisk-inside-local",
+			engine: &NamePolicyEngine{},
+			mailbox: rfc2821Mailbox{
+				local:  "mail",
+				domain: "local",
+			},
+			constraint: "m*il@local",
+			want:       false,
+			wantErr:    false,
+		},
+		{
+			name:   "ok/asterisk-inside-local-match",
+			engine: &NamePolicyEngine{},
+			mailbox: rfc2821Mailbox{
+				local:  "m*il",
+				domain: "local",
+			},
+			constraint: "m*il@local",
 			want:       true,
 			wantErr:    false,
 		},

@@ -302,21 +302,21 @@ func TestX509Options_IsWildcardLiteralAllowed(t *testing.T) {
 		{
 			name: "set-true",
 			options: &X509Options{
-				AllowWildcardLiteral: true,
+				AllowWildcardNames: true,
 			},
 			want: true,
 		},
 		{
 			name: "set-false",
 			options: &X509Options{
-				AllowWildcardLiteral: false,
+				AllowWildcardNames: false,
 			},
 			want: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.options.IsWildcardLiteralAllowed(); got != tt.want {
+			if got := tt.options.AreWildcardNamesAllowed(); got != tt.want {
 				t.Errorf("X509PolicyOptions.IsWildcardLiteralAllowed() = %v, want %v", got, tt.want)
 			}
 		})
