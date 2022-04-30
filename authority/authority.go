@@ -116,7 +116,7 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 }
 
 // FromOptions creates an Authority exclusively using the passed in options
-// and does not intialize the Authority.
+// and does not initialize the Authority.
 func FromOptions(opts ...Option) (*Authority, error) {
 	var a = new(Authority)
 
