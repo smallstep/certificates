@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
-
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/nosql"
 	nosqldb "github.com/smallstep/nosql/database"
+	"go.step.sm/linkedca"
 )
 
 func TestDB_getDBAuthorityPolicyBytes(t *testing.T) {
@@ -136,13 +136,13 @@ func TestDB_getDBAuthorityPolicy(t *testing.T) {
 			dbp := &dbAuthorityPolicy{
 				ID:          "ID",
 				AuthorityID: "diffAuthID",
-				Policy: &linkedca.Policy{
+				Policy: linkedToDB(&linkedca.Policy{
 					X509: &linkedca.X509Policy{
 						Allow: &linkedca.X509Names{
 							Dns: []string{"*.local"},
 						},
 					},
-				},
+				}),
 			}
 			b, err := json.Marshal(dbp)
 			assert.FatalError(t, err)
@@ -177,13 +177,13 @@ func TestDB_getDBAuthorityPolicy(t *testing.T) {
 			dbap := &dbAuthorityPolicy{
 				ID:          "ID",
 				AuthorityID: authID,
-				Policy: &linkedca.Policy{
+				Policy: linkedToDB(&linkedca.Policy{
 					X509: &linkedca.X509Policy{
 						Allow: &linkedca.X509Names{
 							Dns: []string{"*.local"},
 						},
 					},
-				},
+				}),
 			}
 			b, err := json.Marshal(dbap)
 			assert.FatalError(t, err)
@@ -266,7 +266,7 @@ func TestDB_CreateAuthorityPolicy(t *testing.T) {
 
 						assert.Equals(t, _dbap.ID, authID)
 						assert.Equals(t, _dbap.AuthorityID, authID)
-						assert.Equals(t, _dbap.Policy, policy)
+						assert.Equals(t, _dbap.Policy, linkedToDB(policy))
 
 						return nil, false, errors.New("force")
 					},
@@ -296,7 +296,7 @@ func TestDB_CreateAuthorityPolicy(t *testing.T) {
 
 						assert.Equals(t, _dbap.ID, authID)
 						assert.Equals(t, _dbap.AuthorityID, authID)
-						assert.Equals(t, _dbap.Policy, policy)
+						assert.Equals(t, _dbap.Policy, linkedToDB(policy))
 
 						return nil, true, nil
 					},
@@ -388,7 +388,7 @@ func TestDB_GetAuthorityPolicy(t *testing.T) {
 						dbap := &dbAuthorityPolicy{
 							ID:          authID,
 							AuthorityID: authID,
-							Policy:      policy,
+							Policy:      linkedToDB(policy),
 						}
 
 						b, err := json.Marshal(dbap)
@@ -496,7 +496,7 @@ func TestDB_UpdateAuthorityPolicy(t *testing.T) {
 						dbap := &dbAuthorityPolicy{
 							ID:          authID,
 							AuthorityID: authID,
-							Policy:      oldPolicy,
+							Policy:      linkedToDB(oldPolicy),
 						}
 
 						b, err := json.Marshal(dbap)
@@ -513,7 +513,7 @@ func TestDB_UpdateAuthorityPolicy(t *testing.T) {
 
 						assert.Equals(t, _dbap.ID, authID)
 						assert.Equals(t, _dbap.AuthorityID, authID)
-						assert.Equals(t, _dbap.Policy, policy)
+						assert.Equals(t, _dbap.Policy, linkedToDB(policy))
 
 						return nil, false, errors.New("force")
 					},
@@ -548,7 +548,7 @@ func TestDB_UpdateAuthorityPolicy(t *testing.T) {
 						dbap := &dbAuthorityPolicy{
 							ID:          authID,
 							AuthorityID: authID,
-							Policy:      oldPolicy,
+							Policy:      linkedToDB(oldPolicy),
 						}
 
 						b, err := json.Marshal(dbap)
@@ -565,7 +565,7 @@ func TestDB_UpdateAuthorityPolicy(t *testing.T) {
 
 						assert.Equals(t, _dbap.ID, authID)
 						assert.Equals(t, _dbap.AuthorityID, authID)
-						assert.Equals(t, _dbap.Policy, policy)
+						assert.Equals(t, _dbap.Policy, linkedToDB(policy))
 
 						return nil, true, nil
 					},
@@ -656,7 +656,7 @@ func TestDB_DeleteAuthorityPolicy(t *testing.T) {
 						dbap := &dbAuthorityPolicy{
 							ID:          authID,
 							AuthorityID: authID,
-							Policy:      oldPolicy,
+							Policy:      linkedToDB(oldPolicy),
 						}
 
 						b, err := json.Marshal(dbap)
@@ -694,7 +694,7 @@ func TestDB_DeleteAuthorityPolicy(t *testing.T) {
 						dbap := &dbAuthorityPolicy{
 							ID:          authID,
 							AuthorityID: authID,
-							Policy:      oldPolicy,
+							Policy:      linkedToDB(oldPolicy),
 						}
 
 						b, err := json.Marshal(dbap)
@@ -733,6 +733,473 @@ func TestDB_DeleteAuthorityPolicy(t *testing.T) {
 					}
 				}
 				return
+			}
+		})
+	}
+}
+
+func Test_linkedToDB(t *testing.T) {
+	type args struct {
+		p *linkedca.Policy
+	}
+	tests := []struct {
+		name string
+		args args
+		want *dbPolicy
+	}{
+		{
+			name: "nil policy",
+			args: args{
+				p: nil,
+			},
+			want: nil,
+		},
+		{
+			name: "no x509 nor ssh",
+			args: args{
+				p: &linkedca.Policy{},
+			},
+			want: nil,
+		},
+		{
+			name: "x509",
+			args: args{
+				p: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns:         []string{"*.local"},
+							Ips:         []string{"192.168.0.1/24"},
+							Emails:      []string{"@example.com"},
+							Uris:        []string{"*.example.com"},
+							CommonNames: []string{"some name"},
+						},
+						Deny: &linkedca.X509Names{
+							Dns:         []string{"badhost.local"},
+							Ips:         []string{"192.168.0.30"},
+							Emails:      []string{"root@example.com"},
+							Uris:        []string{"bad.example.com"},
+							CommonNames: []string{"bad name"},
+						},
+						AllowWildcardNames: true,
+					},
+				},
+			},
+			want: &dbPolicy{
+				X509: &dbX509Policy{
+					Allow: &dbX509Names{
+						DNSDomains:     []string{"*.local"},
+						IPRanges:       []string{"192.168.0.1/24"},
+						EmailAddresses: []string{"@example.com"},
+						URIDomains:     []string{"*.example.com"},
+						CommonNames:    []string{"some name"},
+					},
+					Deny: &dbX509Names{
+						DNSDomains:     []string{"badhost.local"},
+						IPRanges:       []string{"192.168.0.30"},
+						EmailAddresses: []string{"root@example.com"},
+						URIDomains:     []string{"bad.example.com"},
+						CommonNames:    []string{"bad name"},
+					},
+					AllowWildcardNames: true,
+				},
+			},
+		},
+		{
+			name: "ssh user",
+			args: args{
+				p: &linkedca.Policy{
+					Ssh: &linkedca.SSHPolicy{
+						User: &linkedca.SSHUserPolicy{
+							Allow: &linkedca.SSHUserNames{
+								Emails:     []string{"@example.com"},
+								Principals: []string{"user"},
+							},
+							Deny: &linkedca.SSHUserNames{
+								Emails:     []string{"root@example.com"},
+								Principals: []string{"root"},
+							},
+						},
+					},
+				},
+			},
+			want: &dbPolicy{
+				SSH: &dbSSHPolicy{
+					User: &dbSSHUserPolicy{
+						Allow: &dbSSHUserNames{
+							EmailAddresses: []string{"@example.com"},
+							Principals:     []string{"user"},
+						},
+						Deny: &dbSSHUserNames{
+							EmailAddresses: []string{"root@example.com"},
+							Principals:     []string{"root"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "full ssh policy",
+			args: args{
+				p: &linkedca.Policy{
+					Ssh: &linkedca.SSHPolicy{
+						Host: &linkedca.SSHHostPolicy{
+							Allow: &linkedca.SSHHostNames{
+								Dns:        []string{"*.local"},
+								Ips:        []string{"192.168.0.1/24"},
+								Principals: []string{"host"},
+							},
+							Deny: &linkedca.SSHHostNames{
+								Dns:        []string{"badhost.local"},
+								Ips:        []string{"192.168.0.30"},
+								Principals: []string{"bad"},
+							},
+						},
+					},
+				},
+			},
+			want: &dbPolicy{
+				SSH: &dbSSHPolicy{
+					Host: &dbSSHHostPolicy{
+						Allow: &dbSSHHostNames{
+							DNSDomains: []string{"*.local"},
+							IPRanges:   []string{"192.168.0.1/24"},
+							Principals: []string{"host"},
+						},
+						Deny: &dbSSHHostNames{
+							DNSDomains: []string{"badhost.local"},
+							IPRanges:   []string{"192.168.0.30"},
+							Principals: []string{"bad"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "full policy",
+			args: args{
+				p: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns:         []string{"*.local"},
+							Ips:         []string{"192.168.0.1/24"},
+							Emails:      []string{"@example.com"},
+							Uris:        []string{"*.example.com"},
+							CommonNames: []string{"some name"},
+						},
+						Deny: &linkedca.X509Names{
+							Dns:         []string{"badhost.local"},
+							Ips:         []string{"192.168.0.30"},
+							Emails:      []string{"root@example.com"},
+							Uris:        []string{"bad.example.com"},
+							CommonNames: []string{"bad name"},
+						},
+						AllowWildcardNames: true,
+					},
+					Ssh: &linkedca.SSHPolicy{
+						User: &linkedca.SSHUserPolicy{
+							Allow: &linkedca.SSHUserNames{
+								Emails:     []string{"@example.com"},
+								Principals: []string{"user"},
+							},
+							Deny: &linkedca.SSHUserNames{
+								Emails:     []string{"root@example.com"},
+								Principals: []string{"root"},
+							},
+						},
+						Host: &linkedca.SSHHostPolicy{
+							Allow: &linkedca.SSHHostNames{
+								Dns:        []string{"*.local"},
+								Ips:        []string{"192.168.0.1/24"},
+								Principals: []string{"host"},
+							},
+							Deny: &linkedca.SSHHostNames{
+								Dns:        []string{"badhost.local"},
+								Ips:        []string{"192.168.0.30"},
+								Principals: []string{"bad"},
+							},
+						},
+					},
+				},
+			},
+			want: &dbPolicy{
+				X509: &dbX509Policy{
+					Allow: &dbX509Names{
+						DNSDomains:     []string{"*.local"},
+						IPRanges:       []string{"192.168.0.1/24"},
+						EmailAddresses: []string{"@example.com"},
+						URIDomains:     []string{"*.example.com"},
+						CommonNames:    []string{"some name"},
+					},
+					Deny: &dbX509Names{
+						DNSDomains:     []string{"badhost.local"},
+						IPRanges:       []string{"192.168.0.30"},
+						EmailAddresses: []string{"root@example.com"},
+						URIDomains:     []string{"bad.example.com"},
+						CommonNames:    []string{"bad name"},
+					},
+					AllowWildcardNames: true,
+				},
+				SSH: &dbSSHPolicy{
+					User: &dbSSHUserPolicy{
+						Allow: &dbSSHUserNames{
+							EmailAddresses: []string{"@example.com"},
+							Principals:     []string{"user"},
+						},
+						Deny: &dbSSHUserNames{
+							EmailAddresses: []string{"root@example.com"},
+							Principals:     []string{"root"},
+						},
+					},
+					Host: &dbSSHHostPolicy{
+						Allow: &dbSSHHostNames{
+							DNSDomains: []string{"*.local"},
+							IPRanges:   []string{"192.168.0.1/24"},
+							Principals: []string{"host"},
+						},
+						Deny: &dbSSHHostNames{
+							DNSDomains: []string{"badhost.local"},
+							IPRanges:   []string{"192.168.0.30"},
+							Principals: []string{"bad"},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := linkedToDB(tt.args.p); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("linkedToDB() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_dbToLinked(t *testing.T) {
+	type args struct {
+		p *dbPolicy
+	}
+	tests := []struct {
+		name string
+		args args
+		want *linkedca.Policy
+	}{
+		{
+			name: "nil policy",
+			args: args{
+				p: nil,
+			},
+			want: nil,
+		},
+		{
+			name: "x509",
+			args: args{
+				p: &dbPolicy{
+					X509: &dbX509Policy{
+						Allow: &dbX509Names{
+							DNSDomains:     []string{"*.local"},
+							IPRanges:       []string{"192.168.0.1/24"},
+							EmailAddresses: []string{"@example.com"},
+							URIDomains:     []string{"*.example.com"},
+							CommonNames:    []string{"some name"},
+						},
+						Deny: &dbX509Names{
+							DNSDomains:     []string{"badhost.local"},
+							IPRanges:       []string{"192.168.0.30"},
+							EmailAddresses: []string{"root@example.com"},
+							URIDomains:     []string{"bad.example.com"},
+							CommonNames:    []string{"bad name"},
+						},
+						AllowWildcardNames: true,
+					},
+				},
+			},
+			want: &linkedca.Policy{
+				X509: &linkedca.X509Policy{
+					Allow: &linkedca.X509Names{
+						Dns:         []string{"*.local"},
+						Ips:         []string{"192.168.0.1/24"},
+						Emails:      []string{"@example.com"},
+						Uris:        []string{"*.example.com"},
+						CommonNames: []string{"some name"},
+					},
+					Deny: &linkedca.X509Names{
+						Dns:         []string{"badhost.local"},
+						Ips:         []string{"192.168.0.30"},
+						Emails:      []string{"root@example.com"},
+						Uris:        []string{"bad.example.com"},
+						CommonNames: []string{"bad name"},
+					},
+					AllowWildcardNames: true,
+				},
+			},
+		},
+		{
+			name: "ssh user",
+			args: args{
+				p: &dbPolicy{
+					SSH: &dbSSHPolicy{
+						User: &dbSSHUserPolicy{
+							Allow: &dbSSHUserNames{
+								EmailAddresses: []string{"@example.com"},
+								Principals:     []string{"user"},
+							},
+							Deny: &dbSSHUserNames{
+								EmailAddresses: []string{"root@example.com"},
+								Principals:     []string{"root"},
+							},
+						},
+					},
+				},
+			},
+			want: &linkedca.Policy{
+				Ssh: &linkedca.SSHPolicy{
+					User: &linkedca.SSHUserPolicy{
+						Allow: &linkedca.SSHUserNames{
+							Emails:     []string{"@example.com"},
+							Principals: []string{"user"},
+						},
+						Deny: &linkedca.SSHUserNames{
+							Emails:     []string{"root@example.com"},
+							Principals: []string{"root"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "ssh host",
+			args: args{
+				p: &dbPolicy{
+					SSH: &dbSSHPolicy{
+						Host: &dbSSHHostPolicy{
+							Allow: &dbSSHHostNames{
+								DNSDomains: []string{"*.local"},
+								IPRanges:   []string{"192.168.0.1/24"},
+								Principals: []string{"host"},
+							},
+							Deny: &dbSSHHostNames{
+								DNSDomains: []string{"badhost.local"},
+								IPRanges:   []string{"192.168.0.30"},
+								Principals: []string{"bad"},
+							},
+						},
+					},
+				},
+			},
+			want: &linkedca.Policy{
+				Ssh: &linkedca.SSHPolicy{
+					Host: &linkedca.SSHHostPolicy{
+						Allow: &linkedca.SSHHostNames{
+							Dns:        []string{"*.local"},
+							Ips:        []string{"192.168.0.1/24"},
+							Principals: []string{"host"},
+						},
+						Deny: &linkedca.SSHHostNames{
+							Dns:        []string{"badhost.local"},
+							Ips:        []string{"192.168.0.30"},
+							Principals: []string{"bad"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "full policy",
+			args: args{
+				p: &dbPolicy{
+					X509: &dbX509Policy{
+						Allow: &dbX509Names{
+							DNSDomains:     []string{"*.local"},
+							IPRanges:       []string{"192.168.0.1/24"},
+							EmailAddresses: []string{"@example.com"},
+							URIDomains:     []string{"*.example.com"},
+							CommonNames:    []string{"some name"},
+						},
+						Deny: &dbX509Names{
+							DNSDomains:     []string{"badhost.local"},
+							IPRanges:       []string{"192.168.0.30"},
+							EmailAddresses: []string{"root@example.com"},
+							URIDomains:     []string{"bad.example.com"},
+							CommonNames:    []string{"bad name"},
+						},
+						AllowWildcardNames: true,
+					},
+					SSH: &dbSSHPolicy{
+						User: &dbSSHUserPolicy{
+							Allow: &dbSSHUserNames{
+								EmailAddresses: []string{"@example.com"},
+								Principals:     []string{"user"},
+							},
+							Deny: &dbSSHUserNames{
+								EmailAddresses: []string{"root@example.com"},
+								Principals:     []string{"root"},
+							},
+						},
+						Host: &dbSSHHostPolicy{
+							Allow: &dbSSHHostNames{
+								DNSDomains: []string{"*.local"},
+								IPRanges:   []string{"192.168.0.1/24"},
+								Principals: []string{"host"},
+							},
+							Deny: &dbSSHHostNames{
+								DNSDomains: []string{"badhost.local"},
+								IPRanges:   []string{"192.168.0.30"},
+								Principals: []string{"bad"},
+							},
+						},
+					},
+				},
+			},
+			want: &linkedca.Policy{
+				X509: &linkedca.X509Policy{
+					Allow: &linkedca.X509Names{
+						Dns:         []string{"*.local"},
+						Ips:         []string{"192.168.0.1/24"},
+						Emails:      []string{"@example.com"},
+						Uris:        []string{"*.example.com"},
+						CommonNames: []string{"some name"},
+					},
+					Deny: &linkedca.X509Names{
+						Dns:         []string{"badhost.local"},
+						Ips:         []string{"192.168.0.30"},
+						Emails:      []string{"root@example.com"},
+						Uris:        []string{"bad.example.com"},
+						CommonNames: []string{"bad name"},
+					},
+					AllowWildcardNames: true,
+				},
+				Ssh: &linkedca.SSHPolicy{
+					User: &linkedca.SSHUserPolicy{
+						Allow: &linkedca.SSHUserNames{
+							Emails:     []string{"@example.com"},
+							Principals: []string{"user"},
+						},
+						Deny: &linkedca.SSHUserNames{
+							Emails:     []string{"root@example.com"},
+							Principals: []string{"root"},
+						},
+					},
+					Host: &linkedca.SSHHostPolicy{
+						Allow: &linkedca.SSHHostNames{
+							Dns:        []string{"*.local"},
+							Ips:        []string{"192.168.0.1/24"},
+							Principals: []string{"host"},
+						},
+						Deny: &linkedca.SSHHostNames{
+							Dns:        []string{"badhost.local"},
+							Ips:        []string{"192.168.0.30"},
+							Principals: []string{"bad"},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := dbToLinked(tt.args.p); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("dbToLinked() = %v, want %v", got, tt.want)
 			}
 		})
 	}
