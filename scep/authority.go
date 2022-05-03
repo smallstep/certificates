@@ -63,20 +63,6 @@ type AuthorityOptions struct {
 	Prefix string
 }
 
-type optionsKey struct{}
-
-func newOptionsContext(ctx context.Context, o *AuthorityOptions) context.Context {
-	return context.WithValue(ctx, optionsKey{}, o)
-}
-
-func optionsFromContext(ctx context.Context) *AuthorityOptions {
-	o, ok := ctx.Value(optionsKey{}).(*AuthorityOptions)
-	if !ok {
-		panic("scep options are not in the context")
-	}
-	return o
-}
-
 // SignAuthority is the interface for a signing authority
 type SignAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)

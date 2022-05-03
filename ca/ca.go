@@ -230,13 +230,12 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "error creating SCEP authority")
 		}
-		scepRouterHandler := scepAPI.New(scepAuthority)
 
 		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
 		// SCEP operations are performed using HTTP, so that's why the API is mounted
 		// to the insecure mux.
 		insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
-			scepRouterHandler.Route(r)
+			scepAPI.Route(r)
 		})
 
 		// The RFC also mentions usage of HTTPS, but seems to advise
@@ -246,7 +245,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		// as well as HTTPS can be used to request certificates
 		// using SCEP.
 		mux.Route("/"+scepPrefix, func(r chi.Router) {
-			scepRouterHandler.Route(r)
+			scepAPI.Route(r)
 		})
 	}
 

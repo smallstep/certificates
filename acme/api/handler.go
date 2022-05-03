@@ -40,7 +40,7 @@ type payloadInfo struct {
 
 // HandlerOptions required to create a new ACME API request handler.
 type HandlerOptions struct {
-	// DB storage backend that impements the acme.DB interface.
+	// DB storage backend that implements the acme.DB interface.
 	//
 	// Deprecated: use acme.NewContex(context.Context, acme.DB)
 	DB acme.DB
@@ -50,7 +50,7 @@ type HandlerOptions struct {
 	// Deprecated: use authority.NewContext(context.Context, *authority.Authority)
 	CA acme.CertificateAuthority
 
-	// Backdate is the duration that the CA will substract from the current time
+	// Backdate is the duration that the CA will subtract from the current time
 	// to set the NotBefore in the certificate.
 	Backdate provisioner.Duration
 

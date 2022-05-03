@@ -40,10 +40,6 @@ func Route(r api.Router, acmeResponder acmeAdminResponderInterface) {
 		return extractAuthorizeTokenAdmin(requireAPIEnabled(next))
 	}
 
-	requireEABEnabled := func(next nextHTTP) nextHTTP {
-		return requireEABEnabled(next)
-	}
-
 	// Provisioners
 	r.MethodFunc("GET", "/provisioners/{name}", authnz(GetProvisioner))
 	r.MethodFunc("GET", "/provisioners", authnz(GetProvisioners))

@@ -37,11 +37,11 @@ func ClientFromContext(ctx context.Context) (c Client, ok bool) {
 // MustClientFromContext returns the current client from the given context. It will
 // return a new instance of the client if it does not exist.
 func MustClientFromContext(ctx context.Context) Client {
-	if c, ok := ClientFromContext(ctx); !ok {
+	c, ok := ClientFromContext(ctx)
+	if !ok {
 		return NewClient()
-	} else {
-		return c
 	}
+	return c
 }
 
 type client struct {

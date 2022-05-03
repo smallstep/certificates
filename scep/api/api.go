@@ -38,8 +38,8 @@ type request struct {
 	Message   []byte
 }
 
-// response is a SCEP server response.
-type response struct {
+// Response is a SCEP server Response.
+type Response struct {
 	Operation   string
 	CACertNum   int
 	Data        []byte
@@ -81,7 +81,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	var res response
+	var res Response
 
 	switch req.Operation {
 	case opnGetCACert:
@@ -110,7 +110,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var res response
+	var res Response
 	switch req.Operation {
 	case opnPKIOperation:
 		res, err = PKIOperation(r.Context(), req)
@@ -207,18 +207,18 @@ func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // GetCACert returns the CA certificates in a SCEP response
-func GetCACert(ctx context.Context) (response, error) {
+func GetCACert(ctx context.Context) (Response, error) {
 	auth := scep.MustFromContext(ctx)
 	certs, err := auth.GetCACertificates(ctx)
 	if err != nil {
-		return response{}, err
+		return Response{}, err
 	}
 
 	if len(certs) == 0 {
-		return response{}, errors.New("missing CA cert")
+		return Response{}, errors.New("missing CA cert")
 	}
 
-	res := response{
+	res := Response{
 		Operation: opnGetCACert,
 		CACertNum: len(certs),
 	}
@@ -231,7 +231,7 @@ func GetCACert(ctx context.Context) (response, error) {
 		// not signed or encrypted data has to be returned.
 		data, err := microscep.DegenerateCertificates(certs)
 		if err != nil {
-			return response{}, err
+			return Response{}, err
 		}
 		res.Data = data
 	}
@@ -240,11 +240,11 @@ func GetCACert(ctx context.Context) (response, error) {
 }
 
 // GetCACaps returns the CA capabilities in a SCEP response
-func GetCACaps(ctx context.Context) (response, error) {
+func GetCACaps(ctx context.Context) (Response, error) {
 	auth := scep.MustFromContext(ctx)
 	caps := auth.GetCACaps(ctx)
 
-	res := response{
+	res := Response{
 		Operation: opnGetCACaps,
 		Data:      formatCapabilities(caps),
 	}
@@ -253,12 +253,12 @@ func GetCACaps(ctx context.Context) (response, error) {
 }
 
 // PKIOperation performs PKI operations and returns a SCEP response
-func PKIOperation(ctx context.Context, req request) (response, error) {
+func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// parse the message using microscep implementation
 	microMsg, err := microscep.ParsePKIMessage(req.Message)
 	if err != nil {
 		// return the error, because we can't use the msg for creating a CertRep
-		return response{}, err
+		return Response{}, err
 	}
 
 	// this is essentially doing the same as microscep.ParsePKIMessage, but
@@ -266,7 +266,7 @@ func PKIOperation(ctx context.Context, req request) (response, error) {
 	// wrapper for the microscep implementation.
 	p7, err := pkcs7.Parse(microMsg.Raw)
 	if err != nil {
-		return response{}, err
+		return Response{}, err
 	}
 
 	// copy over properties to our internal PKIMessage
@@ -280,7 +280,7 @@ func PKIOperation(ctx context.Context, req request) (response, error) {
 
 	auth := scep.MustFromContext(ctx)
 	if err := auth.DecryptPKIEnvelope(ctx, msg); err != nil {
-		return response{}, err
+		return Response{}, err
 	}
 
 	// NOTE: at this point we have sufficient information for returning nicely signed CertReps
@@ -315,7 +315,7 @@ func PKIOperation(ctx context.Context, req request) (response, error) {
 		return createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
 	}
 
-	res := response{
+	res := Response{
 		Operation:   opnPKIOperation,
 		Data:        certRep.Raw,
 		Certificate: certRep.Certificate,
@@ -329,7 +329,7 @@ func formatCapabilities(caps []string) []byte {
 }
 
 // writeResponse writes a SCEP response back to the SCEP client.
-func writeResponse(w http.ResponseWriter, res response) {
+func writeResponse(w http.ResponseWriter, res Response) {
 
 	if res.Error != nil {
 		log.Error(w, res.Error)
@@ -349,20 +349,20 @@ func fail(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
-func createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (response, error) {
+func createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (Response, error) {
 	auth := scep.MustFromContext(ctx)
 	certRepMsg, err := auth.CreateFailureResponse(ctx, csr, msg, scep.FailInfoName(info), failError.Error())
 	if err != nil {
-		return response{}, err
+		return Response{}, err
 	}
-	return response{
+	return Response{
 		Operation: opnPKIOperation,
 		Data:      certRepMsg.Raw,
 		Error:     failError,
 	}, nil
 }
 
-func contentHeader(r response) string {
+func contentHeader(r Response) string {
 	switch r.Operation {
 	default:
 		return "text/plain"
