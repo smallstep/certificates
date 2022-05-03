@@ -1634,9 +1634,9 @@ func TestHandler_checkPrerequisites(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			// h := &Handler{db: nil, linker: tc.linker, prerequisitesChecker: tc.prerequisitesChecker}
+			ctx := acme.NewPrerequisitesCheckerContext(tc.ctx, tc.prerequisitesChecker)
 			req := httptest.NewRequest("GET", u, nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			checkPrerequisites(tc.next)(w, req)
 			res := w.Result()
