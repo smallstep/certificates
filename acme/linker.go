@@ -206,6 +206,11 @@ func (l *linker) Middleware(next http.Handler) http.Handler {
 
 // GetLink is a helper for GetLinkExplicit.
 func (l *linker) GetLink(ctx context.Context, typ LinkType, inputs ...string) string {
+	var name string
+	if p, ok := ProvisionerFromContext(ctx); ok {
+		name = p.GetName()
+	}
+
 	var u url.URL
 	if baseURL := baseURLFromContext(ctx); baseURL != nil {
 		u = *baseURL
@@ -217,8 +222,7 @@ func (l *linker) GetLink(ctx context.Context, typ LinkType, inputs ...string) st
 		u.Host = l.dns
 	}
 
-	p := MustProvisionerFromContext(ctx)
-	u.Path = l.prefix + GetUnescapedPathSuffix(typ, p.GetName(), inputs...)
+	u.Path = l.prefix + GetUnescapedPathSuffix(typ, name, inputs...)
 	return u.String()
 }
 

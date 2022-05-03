@@ -5,16 +5,34 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
-func TestLinker_GetUnescapedPathSuffix(t *testing.T) {
-	dns := "ca.smallstep.com"
-	prefix := "acme"
-	linker := NewLinker(dns, prefix)
+func mockProvisioner(t *testing.T) Provisioner {
+	t.Helper()
+	var defaultDisableRenewal = false
 
-	getPath := linker.GetUnescapedPathSuffix
+	// Initialize provisioners
+	p := &provisioner.ACME{
+		Type: "ACME",
+		Name: "test@acme-<test>provisioner.com",
+	}
+	if err := p.Init(provisioner.Config{Claims: provisioner.Claims{
+		MinTLSDur:      &provisioner.Duration{Duration: 5 * time.Minute},
+		MaxTLSDur:      &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:  &provisioner.Duration{Duration: 24 * time.Hour},
+		DisableRenewal: &defaultDisableRenewal,
+	}}); err != nil {
+		fmt.Printf("%v", err)
+	}
+	return p
+}
+
+func TestGetUnescapedPathSuffix(t *testing.T) {
+	getPath := GetUnescapedPathSuffix
 
 	assert.Equals(t, getPath(NewNonceLinkType, "{provisionerID}"), "/{provisionerID}/new-nonce")
 	assert.Equals(t, getPath(DirectoryLinkType, "{provisionerID}"), "/{provisionerID}/directory")
@@ -31,9 +49,9 @@ func TestLinker_GetUnescapedPathSuffix(t *testing.T) {
 }
 
 func TestLinker_DNS(t *testing.T) {
-	prov := newProv()
+	prov := mockProvisioner(t)
 	escProvName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
 	type test struct {
 		name                  string
 		dns                   string
@@ -116,19 +134,19 @@ func TestLinker_GetLink(t *testing.T) {
 	linker := NewLinker(dns, prefix)
 	id := "1234"
 
-	prov := newProv()
+	prov := mockProvisioner(t)
 	escProvName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
-	ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	// No provisioner and no BaseURL from request
 	assert.Equals(t, linker.GetLink(context.Background(), NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", "https://ca.smallstep.com", ""))
 	// Provisioner: yes, BaseURL: no
-	assert.Equals(t, linker.GetLink(context.WithValue(context.Background(), provisionerContextKey, prov), NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", "https://ca.smallstep.com", escProvName))
+	assert.Equals(t, linker.GetLink(context.WithValue(context.Background(), provisionerKey{}, prov), NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", "https://ca.smallstep.com", escProvName))
 
 	// Provisioner: no, BaseURL: yes
-	assert.Equals(t, linker.GetLink(context.WithValue(context.Background(), baseURLContextKey, baseURL), NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", "https://test.ca.smallstep.com", ""))
+	assert.Equals(t, linker.GetLink(context.WithValue(context.Background(), baseURLKey{}, baseURL), NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", "https://test.ca.smallstep.com", ""))
 
 	assert.Equals(t, linker.GetLink(ctx, NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", baseURL, escProvName))
 	assert.Equals(t, linker.GetLink(ctx, NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", baseURL, escProvName))
@@ -162,10 +180,10 @@ func TestLinker_GetLink(t *testing.T) {
 
 func TestLinker_LinkOrder(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	prov := newProv()
+	prov := mockProvisioner(t)
 	provName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), baseURLContextKey, baseURL)
-	ctx = context.WithValue(ctx, provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	oid := "orderID"
 	certID := "certID"
@@ -227,10 +245,10 @@ func TestLinker_LinkOrder(t *testing.T) {
 
 func TestLinker_LinkAccount(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	prov := newProv()
+	prov := mockProvisioner(t)
 	provName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), baseURLContextKey, baseURL)
-	ctx = context.WithValue(ctx, provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	accID := "accountID"
 	linkerPrefix := "acme"
@@ -259,10 +277,10 @@ func TestLinker_LinkAccount(t *testing.T) {
 
 func TestLinker_LinkChallenge(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	prov := newProv()
+	prov := mockProvisioner(t)
 	provName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), baseURLContextKey, baseURL)
-	ctx = context.WithValue(ctx, provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	chID := "chID"
 	azID := "azID"
@@ -292,10 +310,10 @@ func TestLinker_LinkChallenge(t *testing.T) {
 
 func TestLinker_LinkAuthorization(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	prov := newProv()
+	prov := mockProvisioner(t)
 	provName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), baseURLContextKey, baseURL)
-	ctx = context.WithValue(ctx, provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	chID0 := "chID-0"
 	chID1 := "chID-1"
@@ -334,10 +352,10 @@ func TestLinker_LinkAuthorization(t *testing.T) {
 
 func TestLinker_LinkOrdersByAccountID(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	prov := newProv()
+	prov := mockProvisioner(t)
 	provName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), baseURLContextKey, baseURL)
-	ctx = context.WithValue(ctx, provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	linkerPrefix := "acme"
 	l := NewLinker("dns", linkerPrefix)
