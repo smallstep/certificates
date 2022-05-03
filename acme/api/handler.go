@@ -223,7 +223,6 @@ func (d *Directory) ToLog() (interface{}, error) {
 func GetDirectory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acmeProv, err := acmeProvisionerFromContext(ctx)
-	fmt.Println(acmeProv, err)
 	if err != nil {
 		render.Error(w, err)
 		return

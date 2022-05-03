@@ -98,8 +98,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			assert.FatalError(t, err)
 			prov := newACMEProv(t)
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			return test{
 				db:  &acme.MockDB{},
 				ctx: ctx,
@@ -143,8 +142,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			createdAt := time.Now()
 			return test{
@@ -198,8 +196,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			}
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, scepProvisioner)
+			ctx = acme.NewProvisionerContext(ctx, scepProvisioner)
 			return test{
 				ctx: ctx,
 				err: acme.NewError(acme.ErrorServerInternalType, "could not load ACME provisioner from context: provisioner in context is not an ACME provisioner"),
@@ -218,8 +215,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			return test{
 				db:  &acme.MockDB{},
 				ctx: ctx,
@@ -264,8 +260,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				db:  &acme.MockDB{},
@@ -310,8 +305,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				db: &acme.MockDB{
@@ -358,8 +352,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				db: &acme.MockDB{
@@ -408,8 +401,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				db: &acme.MockDB{
@@ -458,8 +450,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				db: &acme.MockDB{
@@ -506,8 +497,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			createdAt := time.Now()
 			boundAt := time.Now().Add(1 * time.Second)
@@ -565,8 +555,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				db: &acme.MockDB{
@@ -623,8 +612,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				db: &acme.MockDB{
@@ -678,8 +666,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			assert.FatalError(t, err)
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
-			ctx := context.WithValue(context.Background(), baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				db: &acme.MockDB{
@@ -734,8 +721,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			prov := newACMEProv(t)
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), jwkContextKey, nil)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				db: &acme.MockDB{
@@ -762,10 +748,8 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			// h := &Handler{
-			// 	db: tc.db,
-			// }
-			got, err := validateExternalAccountBinding(tc.ctx, tc.nar)
+			ctx := acme.NewDatabaseContext(tc.ctx, tc.db)
+			got, err := validateExternalAccountBinding(ctx, tc.nar)
 			wantErr := tc.err != nil
 			gotErr := err != nil
 			if wantErr != gotErr {

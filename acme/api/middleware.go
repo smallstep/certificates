@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/go-chi/chi"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 
@@ -63,7 +62,12 @@ func addDirLink(next nextHTTP) nextHTTP {
 // application/jose+json.
 func verifyContentType(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		p := acme.MustProvisionerFromContext(r.Context())
+		p, err := provisionerFromContext(r.Context())
+		if err != nil {
+			render.Error(w, err)
+			return
+		}
+
 		u := &url.URL{
 			Path: acme.GetUnescapedPathSuffix(acme.CertificateLinkType, p.GetName(), ""),
 		}
@@ -260,32 +264,6 @@ func extractJWK(next nextHTTP) nextHTTP {
 	}
 }
 
-// lookupProvisioner loads the provisioner associated with the request.
-// Responds 404 if the provisioner does not exist.
-func lookupProvisioner(next nextHTTP) nextHTTP {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		nameEscaped := chi.URLParam(r, "provisionerID")
-		name, err := url.PathUnescape(nameEscaped)
-		if err != nil {
-			render.Error(w, acme.WrapErrorISE(err, "error url unescaping provisioner name '%s'", nameEscaped))
-			return
-		}
-		p, err := mustAuthority(r.Context()).LoadProvisionerByName(name)
-		if err != nil {
-			render.Error(w, err)
-			return
-		}
-		acmeProv, ok := p.(*provisioner.ACME)
-		if !ok {
-			render.Error(w, acme.NewError(acme.ErrorAccountDoesNotExistType, "provisioner must be of type ACME"))
-			return
-		}
-		ctx = context.WithValue(ctx, provisionerContextKey, acme.Provisioner(acmeProv))
-		next(w, r.WithContext(ctx))
-	}
-}
-
 // checkPrerequisites checks if all prerequisites for serving ACME
 // are met by the CA configuration.
 func checkPrerequisites(next nextHTTP) nextHTTP {
@@ -446,16 +424,12 @@ type ContextKey string
 const (
 	// accContextKey account key
 	accContextKey = ContextKey("acc")
-	// baseURLContextKey baseURL key
-	baseURLContextKey = ContextKey("baseURL")
 	// jwsContextKey jws key
 	jwsContextKey = ContextKey("jws")
 	// jwkContextKey jwk key
 	jwkContextKey = ContextKey("jwk")
 	// payloadContextKey payload key
 	payloadContextKey = ContextKey("payload")
-	// provisionerContextKey provisioner key
-	provisionerContextKey = ContextKey("provisioner")
 )
 
 // accountFromContext searches the context for an ACME account. Returns the
@@ -466,15 +440,6 @@ func accountFromContext(ctx context.Context) (*acme.Account, error) {
 		return nil, acme.NewError(acme.ErrorAccountDoesNotExistType, "account not in context")
 	}
 	return val, nil
-}
-
-// baseURLFromContext returns the baseURL if one is stored in the context.
-func baseURLFromContext(ctx context.Context) *url.URL {
-	val, ok := ctx.Value(baseURLContextKey).(*url.URL)
-	if !ok || val == nil {
-		return nil
-	}
-	return val
 }
 
 // jwkFromContext searches the context for a JWK. Returns the JWK or an error.
@@ -495,14 +460,29 @@ func jwsFromContext(ctx context.Context) (*jose.JSONWebSignature, error) {
 	return val, nil
 }
 
+// provisionerFromContext searches the context for a provisioner. Returns the
+// provisioner or an error.
+func provisionerFromContext(ctx context.Context) (acme.Provisioner, error) {
+	p, ok := acme.ProvisionerFromContext(ctx)
+	if !ok || p == nil {
+		return nil, acme.NewErrorISE("provisioner expected in request context")
+	}
+	return p, nil
+}
+
 // acmeProvisionerFromContext searches the context for an ACME provisioner. Returns
 // pointer to an ACME provisioner or an error.
 func acmeProvisionerFromContext(ctx context.Context) (*provisioner.ACME, error) {
-	p, ok := acme.MustProvisionerFromContext(ctx).(*provisioner.ACME)
+	p, err := provisionerFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ap, ok := p.(*provisioner.ACME)
 	if !ok {
 		return nil, acme.NewErrorISE("provisioner in context is not an ACME provisioner")
 	}
-	return p, nil
+
+	return ap, nil
 }
 
 // payloadFromContext searches the context for a payload. Returns the payload

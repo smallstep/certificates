@@ -72,9 +72,13 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	db := acme.MustDatabaseFromContext(ctx)
 	linker := acme.MustLinkerFromContext(ctx)
-	prov := acme.MustProvisionerFromContext(ctx)
 
 	acc, err := accountFromContext(ctx)
+	if err != nil {
+		render.Error(w, err)
+		return
+	}
+	prov, err := provisionerFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
 		return
@@ -189,9 +193,13 @@ func GetOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	db := acme.MustDatabaseFromContext(ctx)
 	linker := acme.MustLinkerFromContext(ctx)
-	prov := acme.MustProvisionerFromContext(ctx)
 
 	acc, err := accountFromContext(ctx)
+	if err != nil {
+		render.Error(w, err)
+		return
+	}
+	prov, err := provisionerFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
 		return
@@ -228,9 +236,13 @@ func FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	db := acme.MustDatabaseFromContext(ctx)
 	linker := acme.MustLinkerFromContext(ctx)
-	prov := acme.MustProvisionerFromContext(ctx)
 
 	acc, err := accountFromContext(ctx)
+	if err != nil {
+		render.Error(w, err)
+		return
+	}
+	prov, err := provisionerFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
 		return

@@ -296,10 +296,9 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			acc := &acme.Account{ID: accID}
-			ctx := context.WithValue(context.Background(), accContextKey, acc)
-			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			ctx = acme.NewProvisionerContext(ctx, prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
 			return test{
 				db: &acme.MockDB{
 					MockGetOrdersByAccountID: func(ctx context.Context, id string) ([]string, error) {
@@ -315,9 +314,9 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			// h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
+			ctx := acme.NewContext(tc.ctx, tc.db, nil, acme.NewLinker("test.ca.smallstep.com", "acme"), nil)
 			req := httptest.NewRequest("GET", u, nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			GetOrdersByAccountID(w, req)
 			res := w.Result()
@@ -363,6 +362,7 @@ func TestHandler_NewAccount(t *testing.T) {
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-payload": func(t *testing.T) test {
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        context.Background(),
 				statusCode: 500,
 				err:        acme.NewErrorISE("payload expected in request context"),
@@ -371,6 +371,7 @@ func TestHandler_NewAccount(t *testing.T) {
 		"fail/nil-payload": func(t *testing.T) test {
 			ctx := context.WithValue(context.Background(), payloadContextKey, nil)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 500,
 				err:        acme.NewErrorISE("payload expected in request context"),
@@ -379,6 +380,7 @@ func TestHandler_NewAccount(t *testing.T) {
 		"fail/unmarshal-payload-error": func(t *testing.T) test {
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{})
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 400,
 				err: acme.NewError(acme.ErrorMalformedType, "failed to "+
@@ -393,6 +395,7 @@ func TestHandler_NewAccount(t *testing.T) {
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorMalformedType, "contact cannot be empty string"),
@@ -405,8 +408,9 @@ func TestHandler_NewAccount(t *testing.T) {
 			b, err := json.Marshal(nar)
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
@@ -418,9 +422,10 @@ func TestHandler_NewAccount(t *testing.T) {
 			}
 			b, err := json.Marshal(nar)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 500,
 				err:        acme.NewErrorISE("jwk expected in request context"),
@@ -432,10 +437,11 @@ func TestHandler_NewAccount(t *testing.T) {
 			}
 			b, err := json.Marshal(nar)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, jwkContextKey, nil)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 500,
 				err:        acme.NewErrorISE("jwk expected in request context"),
@@ -454,9 +460,9 @@ func TestHandler_NewAccount(t *testing.T) {
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorExternalAccountRequiredType, "no external account binding provided"),
@@ -471,7 +477,7 @@ func TestHandler_NewAccount(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwkContextKey, jwk)
 			return test{
 				db: &acme.MockDB{
@@ -510,9 +516,9 @@ func TestHandler_NewAccount(t *testing.T) {
 			}
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, scepProvisioner)
+			ctx = acme.NewProvisionerContext(ctx, scepProvisioner)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 500,
 				err:        acme.NewError(acme.ErrorServerInternalType, "provisioner in context is not an ACME provisioner"),
@@ -551,8 +557,7 @@ func TestHandler_NewAccount(t *testing.T) {
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: payloadBytes})
 			ctx = context.WithValue(ctx, jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			eak := &acme.ExternalAccountKey{
 				ID:            "eakID",
@@ -599,8 +604,7 @@ func TestHandler_NewAccount(t *testing.T) {
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			return test{
 				db: &acme.MockDB{
 					MockCreateAccount: func(ctx context.Context, acc *acme.Account) error {
@@ -635,11 +639,11 @@ func TestHandler_NewAccount(t *testing.T) {
 				Status:  acme.StatusValid,
 				Contact: []string{"foo", "bar"},
 			}
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, accContextKey, acc)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				acc:        acc,
 				statusCode: 200,
@@ -664,8 +668,7 @@ func TestHandler_NewAccount(t *testing.T) {
 			prov.RequireEAB = false
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			return test{
 				db: &acme.MockDB{
 					MockCreateAccount: func(ctx context.Context, acc *acme.Account) error {
@@ -719,8 +722,7 @@ func TestHandler_NewAccount(t *testing.T) {
 			prov.RequireEAB = true
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: payloadBytes})
 			ctx = context.WithValue(ctx, jwkContextKey, jwk)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
-			ctx = context.WithValue(ctx, provisionerContextKey, prov)
+			ctx = acme.NewProvisionerContext(ctx, prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				db: &acme.MockDB{
@@ -759,9 +761,9 @@ func TestHandler_NewAccount(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			// h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
+			ctx := acme.NewContext(tc.ctx, tc.db, nil, acme.NewLinker("test.ca.smallstep.com", "acme"), nil)
 			req := httptest.NewRequest("GET", "/foo/bar", nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			NewAccount(w, req)
 			res := w.Result()
@@ -814,6 +816,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-account": func(t *testing.T) test {
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        context.Background(),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
@@ -822,6 +825,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 		"fail/nil-account": func(t *testing.T) test {
 			ctx := context.WithValue(context.Background(), accContextKey, nil)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
@@ -830,6 +834,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 		"fail/no-payload": func(t *testing.T) test {
 			ctx := context.WithValue(context.Background(), accContextKey, &acc)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 500,
 				err:        acme.NewErrorISE("payload expected in request context"),
@@ -839,6 +844,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, &acc)
 			ctx = context.WithValue(ctx, payloadContextKey, nil)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 500,
 				err:        acme.NewErrorISE("payload expected in request context"),
@@ -848,6 +854,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, &acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{})
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorMalformedType, "failed to unmarshal new-account request payload: unexpected end of JSON input"),
@@ -862,6 +869,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 			ctx := context.WithValue(context.Background(), accContextKey, &acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorMalformedType, "contact cannot be empty string"),
@@ -894,10 +902,9 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 			}
 			b, err := json.Marshal(uar)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, accContextKey, &acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
 				db: &acme.MockDB{
 					MockUpdateAccount: func(ctx context.Context, upd *acme.Account) error {
@@ -914,11 +921,11 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 			uar := &UpdateAccountRequest{}
 			b, err := json.Marshal(uar)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, accContextKey, &acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 200,
 			}
@@ -929,10 +936,9 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 			}
 			b, err := json.Marshal(uar)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, accContextKey, &acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
 				db: &acme.MockDB{
 					MockUpdateAccount: func(ctx context.Context, upd *acme.Account) error {
@@ -946,11 +952,11 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 			}
 		},
 		"ok/post-as-get": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, accContextKey, &acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{isPostAsGet: true})
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 200,
 			}
@@ -959,9 +965,9 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			// h := &Handler{db: tc.db, linker: NewLinker("dns", "acme")}
+			ctx := acme.NewContext(tc.ctx, tc.db, nil, acme.NewLinker("test.ca.smallstep.com", "acme"), nil)
 			req := httptest.NewRequest("GET", "/foo/bar", nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			GetOrUpdateAccount(w, req)
 			res := w.Result()

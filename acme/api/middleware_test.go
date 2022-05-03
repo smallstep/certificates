@@ -27,83 +27,18 @@ func testNext(w http.ResponseWriter, r *http.Request) {
 	w.Write(testBody)
 }
 
-func Test_baseURLFromRequest(t *testing.T) {
-	tests := []struct {
-		name            string
-		targetURL       string
-		expectedResult  *url.URL
-		requestPreparer func(*http.Request)
-	}{
-		{
-			"HTTPS host pass-through failed.",
-			"https://my.dummy.host",
-			&url.URL{Scheme: "https", Host: "my.dummy.host"},
-			nil,
-		},
-		{
-			"Port pass-through failed",
-			"https://host.with.port:8080",
-			&url.URL{Scheme: "https", Host: "host.with.port:8080"},
-			nil,
-		},
-		{
-			"Explicit host from Request.Host was not used.",
-			"https://some.target.host:8080",
-			&url.URL{Scheme: "https", Host: "proxied.host"},
-			func(r *http.Request) {
-				r.Host = "proxied.host"
-			},
-		},
-		{
-			"Missing Request.Host value did not result in empty string result.",
-			"https://some.host",
-			nil,
-			func(r *http.Request) {
-				r.Host = ""
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			request := httptest.NewRequest("GET", tc.targetURL, nil)
-			if tc.requestPreparer != nil {
-				tc.requestPreparer(request)
-			}
-			result := getBaseURLFromRequest(request)
-			if result == nil || tc.expectedResult == nil {
-				assert.Equals(t, result, tc.expectedResult)
-			} else if result.String() != tc.expectedResult.String() {
-				t.Errorf("Expected %q, but got %q", tc.expectedResult.String(), result.String())
-			}
-		})
-	}
-}
-
-func TestHandler_baseURLFromRequest(t *testing.T) {
-	// h := &Handler{}
-	req := httptest.NewRequest("GET", "/foo", nil)
-	req.Host = "test.ca.smallstep.com:8080"
-	w := httptest.NewRecorder()
-
-	next := func(w http.ResponseWriter, r *http.Request) {
-		bu := baseURLFromContext(r.Context())
-		if assert.NotNil(t, bu) {
-			assert.Equals(t, bu.Host, "test.ca.smallstep.com:8080")
-			assert.Equals(t, bu.Scheme, "https")
+func newBaseContext(ctx context.Context, args ...interface{}) context.Context {
+	for _, a := range args {
+		switch v := a.(type) {
+		case acme.DB:
+			ctx = acme.NewDatabaseContext(ctx, v)
+		case acme.Linker:
+			ctx = acme.NewLinkerContext(ctx, v)
+		case acme.PrerequisitesChecker:
+			ctx = acme.NewPrerequisitesCheckerContext(ctx, v)
 		}
 	}
-
-	baseURLFromRequest(next)(w, req)
-
-	req = httptest.NewRequest("GET", "/foo", nil)
-	req.Host = ""
-
-	next = func(w http.ResponseWriter, r *http.Request) {
-		assert.Equals(t, baseURLFromContext(r.Context()), nil)
-	}
-
-	baseURLFromRequest(next)(w, req)
+	return ctx
 }
 
 func TestHandler_addNonce(t *testing.T) {
@@ -139,8 +74,8 @@ func TestHandler_addNonce(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			// h := &Handler{db: tc.db}
-			req := httptest.NewRequest("GET", u, nil)
+			ctx := newBaseContext(context.Background(), tc.db)
+			req := httptest.NewRequest("GET", u, nil).WithContext(ctx)
 			w := httptest.NewRecorder()
 			addNonce(testNext)(w, req)
 			res := w.Result()
@@ -175,17 +110,15 @@ func TestHandler_addDirLink(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
 	type test struct {
 		link       string
-		linker     Linker
 		statusCode int
 		ctx        context.Context
 		err        *acme.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"ok": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
+			ctx = acme.NewLinkerContext(ctx, acme.NewLinker("test.ca.smallstep.com", "acme"))
 			return test{
-				linker:     NewLinker("dns", "acme"),
 				ctx:        ctx,
 				link:       fmt.Sprintf("%s/acme/%s/directory", baseURL.String(), provName),
 				statusCode: 200,
@@ -195,7 +128,6 @@ func TestHandler_addDirLink(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			// h := &Handler{linker: tc.linker}
 			req := httptest.NewRequest("GET", "/foo", nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
@@ -231,7 +163,6 @@ func TestHandler_verifyContentType(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
 	u := fmt.Sprintf("%s/acme/%s/certificate/abc123", baseURL.String(), escProvName)
 	type test struct {
-		h           Handler
 		ctx         context.Context
 		contentType string
 		err         *acme.Error
@@ -241,9 +172,6 @@ func TestHandler_verifyContentType(t *testing.T) {
 	var tests = map[string]func(t *testing.T) test{
 		"fail/provisioner-not-set": func(t *testing.T) test {
 			return test{
-				h: Handler{
-					// linker: NewLinker("dns", "acme"),
-				},
 				url:         u,
 				ctx:         context.Background(),
 				contentType: "foo",
@@ -253,11 +181,8 @@ func TestHandler_verifyContentType(t *testing.T) {
 		},
 		"fail/general-bad-content-type": func(t *testing.T) test {
 			return test{
-				h: Handler{
-					// linker: NewLinker("dns", "acme"),
-				},
 				url:         u,
-				ctx:         context.WithValue(context.Background(), provisionerContextKey, prov),
+				ctx:         acme.NewProvisionerContext(context.Background(), prov),
 				contentType: "foo",
 				statusCode:  400,
 				err:         acme.NewError(acme.ErrorMalformedType, "expected content-type to be in [application/jose+json], but got foo"),
@@ -265,10 +190,7 @@ func TestHandler_verifyContentType(t *testing.T) {
 		},
 		"fail/certificate-bad-content-type": func(t *testing.T) test {
 			return test{
-				h: Handler{
-					// linker: NewLinker("dns", "acme"),
-				},
-				ctx:         context.WithValue(context.Background(), provisionerContextKey, prov),
+				ctx:         acme.NewProvisionerContext(context.Background(), prov),
 				contentType: "foo",
 				statusCode:  400,
 				err:         acme.NewError(acme.ErrorMalformedType, "expected content-type to be in [application/jose+json application/pkix-cert application/pkcs7-mime], but got foo"),
@@ -276,40 +198,28 @@ func TestHandler_verifyContentType(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			return test{
-				h: Handler{
-					// linker: NewLinker("dns", "acme"),
-				},
-				ctx:         context.WithValue(context.Background(), provisionerContextKey, prov),
+				ctx:         acme.NewProvisionerContext(context.Background(), prov),
 				contentType: "application/jose+json",
 				statusCode:  200,
 			}
 		},
 		"ok/certificate/pkix-cert": func(t *testing.T) test {
 			return test{
-				h: Handler{
-					// linker: NewLinker("dns", "acme"),
-				},
-				ctx:         context.WithValue(context.Background(), provisionerContextKey, prov),
+				ctx:         acme.NewProvisionerContext(context.Background(), prov),
 				contentType: "application/pkix-cert",
 				statusCode:  200,
 			}
 		},
 		"ok/certificate/jose+json": func(t *testing.T) test {
 			return test{
-				h: Handler{
-					// linker: NewLinker("dns", "acme"),
-				},
-				ctx:         context.WithValue(context.Background(), provisionerContextKey, prov),
+				ctx:         acme.NewProvisionerContext(context.Background(), prov),
 				contentType: "application/jose+json",
 				statusCode:  200,
 			}
 		},
 		"ok/certificate/pkcs7-mime": func(t *testing.T) test {
 			return test{
-				h: Handler{
-					// linker: NewLinker("dns", "acme"),
-				},
-				ctx:         context.WithValue(context.Background(), provisionerContextKey, prov),
+				ctx:         acme.NewProvisionerContext(context.Background(), prov),
 				contentType: "application/pkcs7-mime",
 				statusCode:  200,
 			}
@@ -733,7 +643,7 @@ func TestHandler_lookupJWK(t *testing.T) {
 	parsedJWS, err := jose.ParseJWS(raw)
 	assert.FatalError(t, err)
 	type test struct {
-		linker     Linker
+		linker     acme.Linker
 		db         acme.DB
 		ctx        context.Context
 		next       func(http.ResponseWriter, *http.Request)
@@ -743,15 +653,19 @@ func TestHandler_lookupJWK(t *testing.T) {
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-jws": func(t *testing.T) test {
 			return test{
-				ctx:        context.WithValue(context.Background(), provisionerContextKey, prov),
+				db:         &acme.MockDB{},
+				linker:     acme.NewLinker("test.ca.smallstep.com", "acme"),
+				ctx:        acme.NewProvisionerContext(context.Background(), prov),
 				statusCode: 500,
 				err:        acme.NewErrorISE("jws expected in request context"),
 			}
 		},
 		"fail/nil-jws": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, nil)
 			return test{
+				db:         &acme.MockDB{},
+				linker:     acme.NewLinker("test.ca.smallstep.com", "acme"),
 				ctx:        ctx,
 				statusCode: 500,
 				err:        acme.NewErrorISE("jws expected in request context"),
@@ -765,11 +679,11 @@ func TestHandler_lookupJWK(t *testing.T) {
 			assert.FatalError(t, err)
 			_jws, err := _signer.Sign([]byte("baz"))
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, _jws)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				linker:     NewLinker("dns", "acme"),
+				db:         &acme.MockDB{},
+				linker:     acme.NewLinker("test.ca.smallstep.com", "acme"),
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorMalformedType, "kid does not have required prefix; expected %s, but got ", prefix),
@@ -789,22 +703,21 @@ func TestHandler_lookupJWK(t *testing.T) {
 			assert.FatalError(t, err)
 			_parsed, err := jose.ParseJWS(_raw)
 			assert.FatalError(t, err)
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, _parsed)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				linker:     NewLinker("dns", "acme"),
+				db:         &acme.MockDB{},
+				linker:     acme.NewLinker("test.ca.smallstep.com", "acme"),
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorMalformedType, "kid does not have required prefix; expected %s, but got foo", prefix),
 			}
 		},
 		"fail/account-not-found": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				linker: NewLinker("dns", "acme"),
+				linker: acme.NewLinker("test.ca.smallstep.com", "acme"),
 				db: &acme.MockDB{
 					MockGetAccount: func(ctx context.Context, accID string) (*acme.Account, error) {
 						assert.Equals(t, accID, accID)
@@ -817,11 +730,10 @@ func TestHandler_lookupJWK(t *testing.T) {
 			}
 		},
 		"fail/GetAccount-error": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				linker: NewLinker("dns", "acme"),
+				linker: acme.NewLinker("test.ca.smallstep.com", "acme"),
 				db: &acme.MockDB{
 					MockGetAccount: func(ctx context.Context, id string) (*acme.Account, error) {
 						assert.Equals(t, id, accID)
@@ -835,11 +747,10 @@ func TestHandler_lookupJWK(t *testing.T) {
 		},
 		"fail/account-not-valid": func(t *testing.T) test {
 			acc := &acme.Account{Status: "deactivated"}
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				linker: NewLinker("dns", "acme"),
+				linker: acme.NewLinker("test.ca.smallstep.com", "acme"),
 				db: &acme.MockDB{
 					MockGetAccount: func(ctx context.Context, id string) (*acme.Account, error) {
 						assert.Equals(t, id, accID)
@@ -853,11 +764,10 @@ func TestHandler_lookupJWK(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			acc := &acme.Account{Status: "valid", Key: jwk}
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
 			return test{
-				linker: NewLinker("dns", "acme"),
+				linker: acme.NewLinker("test.ca.smallstep.com", "acme"),
 				db: &acme.MockDB{
 					MockGetAccount: func(ctx context.Context, id string) (*acme.Account, error) {
 						assert.Equals(t, id, accID)
@@ -881,9 +791,9 @@ func TestHandler_lookupJWK(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			// h := &Handler{db: tc.db, linker: tc.linker}
+			ctx := newBaseContext(tc.ctx, tc.db, tc.linker)
 			req := httptest.NewRequest("GET", u, nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			lookupJWK(tc.next)(w, req)
 			res := w.Result()
@@ -945,15 +855,17 @@ func TestHandler_extractJWK(t *testing.T) {
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-jws": func(t *testing.T) test {
 			return test{
-				ctx:        context.WithValue(context.Background(), provisionerContextKey, prov),
+				db:         &acme.MockDB{},
+				ctx:        acme.NewProvisionerContext(context.Background(), prov),
 				statusCode: 500,
 				err:        acme.NewErrorISE("jws expected in request context"),
 			}
 		},
 		"fail/nil-jws": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, nil)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 500,
 				err:        acme.NewErrorISE("jws expected in request context"),
@@ -969,9 +881,10 @@ func TestHandler_extractJWK(t *testing.T) {
 					},
 				},
 			}
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, _jws)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorMalformedType, "jwk expected in protected header"),
@@ -987,16 +900,17 @@ func TestHandler_extractJWK(t *testing.T) {
 					},
 				},
 			}
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, _jws)
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        ctx,
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorMalformedType, "invalid jwk in protected header"),
 			}
 		},
 		"fail/GetAccountByKey-error": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				ctx: ctx,
@@ -1012,7 +926,7 @@ func TestHandler_extractJWK(t *testing.T) {
 		},
 		"fail/account-not-valid": func(t *testing.T) test {
 			acc := &acme.Account{Status: "deactivated"}
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				ctx: ctx,
@@ -1028,7 +942,7 @@ func TestHandler_extractJWK(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			acc := &acme.Account{Status: "valid"}
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				ctx: ctx,
@@ -1051,7 +965,7 @@ func TestHandler_extractJWK(t *testing.T) {
 			}
 		},
 		"ok/no-account": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				ctx: ctx,
@@ -1077,9 +991,9 @@ func TestHandler_extractJWK(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			// h := &Handler{db: tc.db}
+			ctx := newBaseContext(tc.ctx, tc.db)
 			req := httptest.NewRequest("GET", u, nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			extractJWK(tc.next)(w, req)
 			res := w.Result()
@@ -1118,6 +1032,7 @@ func TestHandler_validateJWS(t *testing.T) {
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-jws": func(t *testing.T) test {
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        context.Background(),
 				statusCode: 500,
 				err:        acme.NewErrorISE("jws expected in request context"),
@@ -1125,6 +1040,7 @@ func TestHandler_validateJWS(t *testing.T) {
 		},
 		"fail/nil-jws": func(t *testing.T) test {
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        context.WithValue(context.Background(), jwsContextKey, nil),
 				statusCode: 500,
 				err:        acme.NewErrorISE("jws expected in request context"),
@@ -1132,6 +1048,7 @@ func TestHandler_validateJWS(t *testing.T) {
 		},
 		"fail/no-signature": func(t *testing.T) test {
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        context.WithValue(context.Background(), jwsContextKey, &jose.JSONWebSignature{}),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorMalformedType, "request body does not contain a signature"),
@@ -1145,6 +1062,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        context.WithValue(context.Background(), jwsContextKey, jws),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorMalformedType, "request body contains more than one signature"),
@@ -1157,6 +1075,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        context.WithValue(context.Background(), jwsContextKey, jws),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorMalformedType, "unprotected header must not be used"),
@@ -1169,6 +1088,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        context.WithValue(context.Background(), jwsContextKey, jws),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorBadSignatureAlgorithmType, "unsuitable algorithm: none"),
@@ -1181,6 +1101,7 @@ func TestHandler_validateJWS(t *testing.T) {
 				},
 			}
 			return test{
+				db:         &acme.MockDB{},
 				ctx:        context.WithValue(context.Background(), jwsContextKey, jws),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorBadSignatureAlgorithmType, "unsuitable algorithm: %s", jose.HS256),
@@ -1444,9 +1365,9 @@ func TestHandler_validateJWS(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			// h := &Handler{db: tc.db}
+			ctx := newBaseContext(tc.ctx, tc.db)
 			req := httptest.NewRequest("GET", u, nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			validateJWS(tc.next)(w, req)
 			res := w.Result()
@@ -1542,7 +1463,7 @@ func TestHandler_extractOrLookupJWK(t *testing.T) {
 	u := "https://ca.smallstep.com/acme/account"
 	type test struct {
 		db         acme.DB
-		linker     Linker
+		linker     acme.Linker
 		statusCode int
 		ctx        context.Context
 		err        *acme.Error
@@ -1570,7 +1491,7 @@ func TestHandler_extractOrLookupJWK(t *testing.T) {
 			parsedJWS, err := jose.ParseJWS(raw)
 			assert.FatalError(t, err)
 			return test{
-				linker: NewLinker("dns", "acme"),
+				linker: acme.NewLinker("dns", "acme"),
 				db: &acme.MockDB{
 					MockGetAccountByKeyID: func(ctx context.Context, kid string) (*acme.Account, error) {
 						assert.Equals(t, kid, pub.KeyID)
@@ -1606,11 +1527,10 @@ func TestHandler_extractOrLookupJWK(t *testing.T) {
 			parsedJWS, err := jose.ParseJWS(raw)
 			assert.FatalError(t, err)
 			acc := &acme.Account{ID: "accID", Key: jwk, Status: "valid"}
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
-				linker: NewLinker("test.ca.smallstep.com", "acme"),
+				linker: acme.NewLinker("test.ca.smallstep.com", "acme"),
 				db: &acme.MockDB{
 					MockGetAccount: func(ctx context.Context, accID string) (*acme.Account, error) {
 						assert.Equals(t, accID, acc.ID)
@@ -1628,9 +1548,9 @@ func TestHandler_extractOrLookupJWK(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			// h := &Handler{db: tc.db, linker: tc.linker}
+			ctx := newBaseContext(tc.ctx, tc.db, tc.linker)
 			req := httptest.NewRequest("GET", u, nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			extractOrLookupJWK(tc.next)(w, req)
 			res := w.Result()
@@ -1664,7 +1584,7 @@ func TestHandler_checkPrerequisites(t *testing.T) {
 	u := fmt.Sprintf("%s/acme/%s/account/1234",
 		baseURL, provName)
 	type test struct {
-		linker               Linker
+		linker               acme.Linker
 		ctx                  context.Context
 		prerequisitesChecker func(context.Context) (bool, error)
 		next                 func(http.ResponseWriter, *http.Request)
@@ -1673,10 +1593,9 @@ func TestHandler_checkPrerequisites(t *testing.T) {
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/error": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			return test{
-				linker:               NewLinker("dns", "acme"),
+				linker:               acme.NewLinker("dns", "acme"),
 				ctx:                  ctx,
 				prerequisitesChecker: func(context.Context) (bool, error) { return false, errors.New("force") },
 				next: func(w http.ResponseWriter, r *http.Request) {
@@ -1687,10 +1606,9 @@ func TestHandler_checkPrerequisites(t *testing.T) {
 			}
 		},
 		"fail/prerequisites-nok": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			return test{
-				linker:               NewLinker("dns", "acme"),
+				linker:               acme.NewLinker("dns", "acme"),
 				ctx:                  ctx,
 				prerequisitesChecker: func(context.Context) (bool, error) { return false, nil },
 				next: func(w http.ResponseWriter, r *http.Request) {
@@ -1701,10 +1619,9 @@ func TestHandler_checkPrerequisites(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) test {
-			ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
-			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			return test{
-				linker:               NewLinker("dns", "acme"),
+				linker:               acme.NewLinker("dns", "acme"),
 				ctx:                  ctx,
 				prerequisitesChecker: func(context.Context) (bool, error) { return true, nil },
 				next: func(w http.ResponseWriter, r *http.Request) {

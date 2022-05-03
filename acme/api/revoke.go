@@ -30,9 +30,14 @@ func RevokeCert(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	db := acme.MustDatabaseFromContext(ctx)
 	linker := acme.MustLinkerFromContext(ctx)
-	prov := acme.MustProvisionerFromContext(ctx)
 
 	jws, err := jwsFromContext(ctx)
+	if err != nil {
+		render.Error(w, err)
+		return
+	}
+
+	prov, err := provisionerFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
 		return
