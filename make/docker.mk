@@ -14,7 +14,6 @@ endif
 
 DOCKER_PLATFORMS = linux/amd64,linux/386,linux/arm,linux/arm64
 DOCKER_IMAGE_NAME = smallstep/step-ca
-DOCKER_IMAGE_NAME_HSM = smallstep/step-ca-hsm
 
 docker-prepare:
 	# Ensure, we can build for ARM architecture
@@ -56,8 +55,8 @@ define DOCKER_BUILDX
 	# $(2) -- Push (empty is no push | --push will push to dockerhub)
 	docker buildx build . --progress plain -t $(DOCKER_IMAGE_NAME):$(1) -f docker/Dockerfile.step-ca --platform="$(DOCKER_PLATFORMS)" $(2)
 	echo -n "$(COSIGN_PWD)" | cosign sign -key /tmp/cosign.key -r $(DOCKER_IMAGE_NAME):$(1)
-	docker buildx build . --progress plain -t $(DOCKER_IMAGE_NAME_HSM):$(1) -f docker/Dockerfile.step-ca.hsm --platform="$(DOCKER_PLATFORMS)" $(2)
-	echo -n "$(COSIGN_PWD)" | cosign sign -key /tmp/cosign.key -r $(DOCKER_IMAGE_NAME_HSM):$(1)
+	docker buildx build . --progress plain -t $(DOCKER_IMAGE_NAME):$(1)-hsm -f docker/Dockerfile.step-ca.hsm --platform="$(DOCKER_PLATFORMS)" $(2)
+	echo -n "$(COSIGN_PWD)" | cosign sign -key /tmp/cosign.key -r $(DOCKER_IMAGE_NAME):$(1)-hsm
 endef
 
 # For non-master builds don't build the docker containers.
@@ -84,7 +83,7 @@ DOCKER_OUTPUT=$(OUTPUT_ROOT)docker/
 
 DOCKER_MAKE=V=$V GOOS_OVERRIDE='GOOS=linux GOARCH=amd64' PREFIX=$(1) make $(1)bin/$(BINNAME)
 DOCKER_BUILD=$Q docker build -t $(DOCKER_IMAGE_NAME):latest -f docker/Dockerfile.step-ca --build-arg BINPATH=$(DOCKER_OUTPUT)bin/$(BINNAME) .
-DOCKER_BUILD_HSM=$Q docker build -t $(DOCKER_IMAGE_NAME_HSM):latest -f docker/Dockerfile.step-ca.hsm --build-arg BINPATH=$(DOCKER_OUTPUT)bin/$(BINNAME) .
+DOCKER_BUILD_HSM=$Q docker build -t $(DOCKER_IMAGE_NAME):latest-hsm -f docker/Dockerfile.step-ca.hsm --build-arg BINPATH=$(DOCKER_OUTPUT)bin/$(BINNAME) .
 
 docker-dev: docker/Dockerfile.step-ca
 	mkdir -p $(DOCKER_OUTPUT)
