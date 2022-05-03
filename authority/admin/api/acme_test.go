@@ -29,6 +29,17 @@ func readProtoJSON(r io.ReadCloser, m proto.Message) error {
 	return protojson.Unmarshal(data, m)
 }
 
+func mockMustAuthority(t *testing.T, a adminAuthority) {
+	t.Helper()
+	fn := mustAuthority
+	t.Cleanup(func() {
+		mustAuthority = fn
+	})
+	mustAuthority = func(ctx context.Context) adminAuthority {
+		return a
+	}
+}
+
 func TestHandler_requireEABEnabled(t *testing.T) {
 	type test struct {
 		ctx        context.Context
@@ -54,6 +65,7 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				auth:       auth,
+				adminDB:    &admin.MockDB{},
 				err:        err,
 				statusCode: 500,
 			}
@@ -143,16 +155,12 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth:    tc.auth,
-				adminDB: tc.adminDB,
-				acmeDB:  nil,
-			}
-
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
 			req := httptest.NewRequest("GET", "/foo", nil) // chi routing is prepared in test setup
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
-			h.requireEABEnabled(tc.next)(w, req)
+			requireEABEnabled(tc.next)(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -194,6 +202,7 @@ func TestHandler_provisionerHasEABEnabled(t *testing.T) {
 			}
 			return test{
 				auth:            auth,
+				adminDB:         &admin.MockDB{},
 				provisionerName: "provName",
 				want:            false,
 				err:             admin.WrapErrorISE(errors.New("force"), "error loading provisioner provName"),
@@ -358,12 +367,9 @@ func TestHandler_provisionerHasEABEnabled(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth:    tc.auth,
-				adminDB: tc.adminDB,
-				acmeDB:  nil,
-			}
-			got, prov, err := h.provisionerHasEABEnabled(context.TODO(), tc.provisionerName)
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(context.Background(), tc.adminDB)
+			got, prov, err := provisionerHasEABEnabled(ctx, tc.provisionerName)
 			if (err != nil) != (tc.err != nil) {
 				t.Errorf("Handler.provisionerHasEABEnabled() error = %v, want err %v", err, tc.err)
 				return
