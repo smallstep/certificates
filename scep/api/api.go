@@ -48,28 +48,48 @@ type Response struct {
 }
 
 // handler is the SCEP request handler.
-type handler struct{}
+type handler struct {
+	auth *scep.Authority
+}
 
 // Route traffic and implement the Router interface.
 //
 // Deprecated: use scep.Route(r api.Router)
 func (h *handler) Route(r api.Router) {
-	Route(r)
+	route(r, func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			ctx := scep.NewContext(r.Context(), h.auth)
+			next(w, r.WithContext(ctx))
+		}
+	})
 }
 
 // New returns a new SCEP API router.
 //
 // Deprecated: use scep.Route(r api.Router)
 func New(auth *scep.Authority) api.RouterHandler {
-	return &handler{}
+	return &handler{auth: auth}
 }
 
 // Route traffic and implement the Router interface.
 func Route(r api.Router) {
-	r.MethodFunc(http.MethodGet, "/{provisionerName}/*", lookupProvisioner(Get))
-	r.MethodFunc(http.MethodGet, "/{provisionerName}", lookupProvisioner(Get))
-	r.MethodFunc(http.MethodPost, "/{provisionerName}/*", lookupProvisioner(Post))
-	r.MethodFunc(http.MethodPost, "/{provisionerName}", lookupProvisioner(Post))
+	route(r, nil)
+}
+
+func route(r api.Router, middleware func(next http.HandlerFunc) http.HandlerFunc) {
+	getHandler := lookupProvisioner(Get)
+	postHandler := lookupProvisioner(Post)
+
+	// For backward compatibility.
+	if middleware != nil {
+		getHandler = middleware(getHandler)
+		postHandler = middleware(postHandler)
+	}
+
+	r.MethodFunc(http.MethodGet, "/{provisionerName}/*", getHandler)
+	r.MethodFunc(http.MethodGet, "/{provisionerName}", getHandler)
+	r.MethodFunc(http.MethodPost, "/{provisionerName}/*", postHandler)
+	r.MethodFunc(http.MethodPost, "/{provisionerName}", postHandler)
 }
 
 // Get handles all SCEP GET requests

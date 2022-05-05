@@ -453,7 +453,6 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, csr *x509.Certifi
 
 // MatchChallengePassword verifies a SCEP challenge password
 func (a *Authority) MatchChallengePassword(ctx context.Context, password string) (bool, error) {
-
 	p, err := provisionerFromContext(ctx)
 	if err != nil {
 		return false, err
