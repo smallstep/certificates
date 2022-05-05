@@ -104,7 +104,7 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 
 	newPolicy.Deduplicate()
 
-	adm := linkedca.AdminFromContext(ctx)
+	adm := linkedca.MustAdminFromContext(ctx)
 
 	var createdPolicy *linkedca.Policy
 	if createdPolicy, err = par.auth.CreateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
@@ -149,7 +149,7 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 
 	newPolicy.Deduplicate()
 
-	adm := linkedca.AdminFromContext(ctx)
+	adm := linkedca.MustAdminFromContext(ctx)
 
 	var updatedPolicy *linkedca.Policy
 	if updatedPolicy, err = par.auth.UpdateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
@@ -202,7 +202,7 @@ func (par *PolicyAdminResponder) GetProvisionerPolicy(w http.ResponseWriter, r *
 		return
 	}
 
-	prov := linkedca.ProvisionerFromContext(r.Context())
+	prov := linkedca.MustProvisionerFromContext(r.Context())
 
 	policy := prov.GetPolicy()
 	if policy == nil {
@@ -222,7 +222,7 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 	}
 
 	ctx := r.Context()
-	prov := linkedca.ProvisionerFromContext(ctx)
+	prov := linkedca.MustProvisionerFromContext(ctx)
 
 	policy := prov.GetPolicy()
 	if policy != nil {
@@ -263,7 +263,7 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 	}
 
 	ctx := r.Context()
-	prov := linkedca.ProvisionerFromContext(ctx)
+	prov := linkedca.MustProvisionerFromContext(ctx)
 
 	if prov.Policy == nil {
 		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "provisioner policy does not exist"))
@@ -301,7 +301,7 @@ func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, 
 	}
 
 	ctx := r.Context()
-	prov := linkedca.ProvisionerFromContext(ctx)
+	prov := linkedca.MustProvisionerFromContext(ctx)
 
 	if prov.Policy == nil {
 		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "provisioner policy does not exist"))
@@ -327,7 +327,7 @@ func (par *PolicyAdminResponder) GetACMEAccountPolicy(w http.ResponseWriter, r *
 	}
 
 	ctx := r.Context()
-	eak := linkedca.ExternalAccountKeyFromContext(ctx)
+	eak := linkedca.MustExternalAccountKeyFromContext(ctx)
 
 	policy := eak.GetPolicy()
 	if policy == nil {
@@ -346,8 +346,8 @@ func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, 
 	}
 
 	ctx := r.Context()
-	prov := linkedca.ProvisionerFromContext(ctx)
-	eak := linkedca.ExternalAccountKeyFromContext(ctx)
+	prov := linkedca.MustProvisionerFromContext(ctx)
+	eak := linkedca.MustExternalAccountKeyFromContext(ctx)
 
 	policy := eak.GetPolicy()
 	if policy != nil {
@@ -383,8 +383,8 @@ func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, 
 	}
 
 	ctx := r.Context()
-	prov := linkedca.ProvisionerFromContext(ctx)
-	eak := linkedca.ExternalAccountKeyFromContext(ctx)
+	prov := linkedca.MustProvisionerFromContext(ctx)
+	eak := linkedca.MustExternalAccountKeyFromContext(ctx)
 
 	policy := eak.GetPolicy()
 	if policy == nil {
@@ -418,8 +418,8 @@ func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, 
 	}
 
 	ctx := r.Context()
-	prov := linkedca.ProvisionerFromContext(ctx)
-	eak := linkedca.ExternalAccountKeyFromContext(ctx)
+	prov := linkedca.MustProvisionerFromContext(ctx)
+	eak := linkedca.MustExternalAccountKeyFromContext(ctx)
 
 	policy := eak.GetPolicy()
 	if policy == nil {

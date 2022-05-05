@@ -107,7 +107,7 @@ func (h *Handler) checkAction(next http.HandlerFunc, supportedInStandalone bool)
 func (h *Handler) loadExternalAccountKey(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		prov := linkedca.ProvisionerFromContext(ctx)
+		prov := linkedca.MustProvisionerFromContext(ctx)
 
 		reference := chi.URLParam(r, "reference")
 		keyID := chi.URLParam(r, "keyID")

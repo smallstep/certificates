@@ -173,7 +173,7 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 		return admin.WrapErrorISE(err, "error generating provisioner config")
 	}
 
-	adm := linkedca.AdminFromContext(ctx)
+	adm := linkedca.MustAdminFromContext(ctx)
 
 	if err := a.checkProvisionerPolicy(ctx, adm, prov.Name, prov.Policy); err != nil {
 		return err
@@ -224,7 +224,7 @@ func (a *Authority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisio
 		return admin.WrapErrorISE(err, "error generating provisioner config")
 	}
 
-	adm := linkedca.AdminFromContext(ctx)
+	adm := linkedca.MustAdminFromContext(ctx)
 
 	if err := a.checkProvisionerPolicy(ctx, adm, nu.Name, nu.Policy); err != nil {
 		return err

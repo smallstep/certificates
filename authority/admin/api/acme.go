@@ -36,7 +36,7 @@ type GetExternalAccountKeysResponse struct {
 func (h *Handler) requireEABEnabled(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		prov := linkedca.ProvisionerFromContext(ctx)
+		prov := linkedca.MustProvisionerFromContext(ctx)
 
 		acmeProvisioner := prov.GetDetails().GetACME()
 		if acmeProvisioner == nil {

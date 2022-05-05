@@ -176,7 +176,7 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 			}
 			next := func(w http.ResponseWriter, r *http.Request) {
 				ctx := r.Context()
-				adm := linkedca.AdminFromContext(ctx) // verifying that the context now has a linkedca.Admin
+				adm := linkedca.MustAdminFromContext(ctx) // verifying that the context now has a linkedca.Admin
 				opts := []cmp.Option{cmpopts.IgnoreUnexported(linkedca.Admin{}, timestamppb.Timestamp{})}
 				if !cmp.Equal(adm, adm, opts...) {
 					t.Errorf("linkedca.Admin diff =\n%s", cmp.Diff(adm, adm, opts...))
@@ -314,7 +314,7 @@ func TestHandler_loadProvisionerByName(t *testing.T) {
 				adminDB:    db,
 				statusCode: 200,
 				next: func(w http.ResponseWriter, r *http.Request) {
-					prov := linkedca.ProvisionerFromContext(r.Context())
+					prov := linkedca.MustProvisionerFromContext(r.Context())
 					assert.NotNil(t, prov)
 					assert.Equals(t, "provID", prov.GetId())
 					assert.Equals(t, "provName", prov.GetName())
@@ -588,7 +588,7 @@ func TestHandler_loadExternalAccountKey(t *testing.T) {
 					},
 				},
 				next: func(w http.ResponseWriter, r *http.Request) {
-					contextEAK := linkedca.ExternalAccountKeyFromContext(r.Context())
+					contextEAK := linkedca.MustExternalAccountKeyFromContext(r.Context())
 					assert.NotNil(t, eak)
 					exp := &linkedca.EABKey{
 						Id:          "eakID",
@@ -632,7 +632,7 @@ func TestHandler_loadExternalAccountKey(t *testing.T) {
 					},
 				},
 				next: func(w http.ResponseWriter, r *http.Request) {
-					contextEAK := linkedca.ExternalAccountKeyFromContext(r.Context())
+					contextEAK := linkedca.MustExternalAccountKeyFromContext(r.Context())
 					assert.NotNil(t, eak)
 					exp := &linkedca.EABKey{
 						Id:          "eakID",
