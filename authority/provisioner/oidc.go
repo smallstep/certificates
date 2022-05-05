@@ -355,7 +355,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(o.ctl.Claimer.MinTLSCertDuration(), o.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(o.ctl.GetPolicy().GetX509()),
+		newX509NamePolicyValidator(o.ctl.getPolicy().getX509()),
 	}, nil
 }
 
@@ -443,7 +443,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(o.ctl.GetPolicy().GetSSHHost(), o.ctl.GetPolicy().GetSSHUser()),
+		newSSHNamePolicyValidator(o.ctl.getPolicy().getSSHHost(), o.ctl.getPolicy().getSSHUser()),
 	), nil
 }
 

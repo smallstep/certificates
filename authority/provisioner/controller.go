@@ -199,7 +199,7 @@ func SanitizeSSHUserPrincipal(email string) string {
 	}, strings.ToLower(email))
 }
 
-func (c *Controller) GetPolicy() *policyEngine {
+func (c *Controller) getPolicy() *policyEngine {
 	if c == nil {
 		return nil
 	}

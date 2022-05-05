@@ -235,7 +235,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		defaultSANsValidator(claims.SANs),
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.ctl.GetPolicy().GetX509()),
+		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
 	}, nil
 }
 
@@ -321,6 +321,6 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.ctl.GetPolicy().GetSSHHost(), p.ctl.GetPolicy().GetSSHUser()),
+		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), p.ctl.getPolicy().getSSHUser()),
 	), nil
 }

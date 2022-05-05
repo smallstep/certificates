@@ -478,7 +478,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		defaultPublicKeyValidator{},
 		commonNameValidator(payload.Claims.Subject),
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.ctl.GetPolicy().GetX509()),
+		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
 	), nil
 }
 
@@ -758,6 +758,6 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.ctl.GetPolicy().GetSSHHost(), nil),
+		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
 	), nil
 }

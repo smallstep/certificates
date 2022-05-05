@@ -107,7 +107,7 @@ type ACMEIdentifier struct {
 // certificate for an ACME Order Identifier.
 func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIdentifier) error {
 
-	x509Policy := p.ctl.GetPolicy().GetX509()
+	x509Policy := p.ctl.getPolicy().getX509()
 
 	// identifier is allowed if no policy is configured
 	if x509Policy == nil {
@@ -141,7 +141,7 @@ func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.ctl.GetPolicy().GetX509()),
+		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
 	}
 
 	return opts, nil

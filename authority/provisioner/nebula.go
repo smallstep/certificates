@@ -163,7 +163,7 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 		},
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
-		newX509NamePolicyValidator(p.ctl.GetPolicy().GetX509()),
+		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
 	}, nil
 }
 
@@ -260,7 +260,7 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.ctl.GetPolicy().GetSSHHost(), nil),
+		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
 	), nil
 }
 

@@ -43,21 +43,21 @@ func newPolicyEngine(options *Options) (*policyEngine, error) {
 	}, nil
 }
 
-func (p *policyEngine) GetX509() policy.X509Policy {
+func (p *policyEngine) getX509() policy.X509Policy {
 	if p == nil {
 		return nil
 	}
 	return p.x509Policy
 }
 
-func (p *policyEngine) GetSSHHost() policy.HostPolicy {
+func (p *policyEngine) getSSHHost() policy.HostPolicy {
 	if p == nil {
 		return nil
 	}
 	return p.sshHostPolicy
 }
 
-func (p *policyEngine) GetSSHUser() policy.UserPolicy {
+func (p *policyEngine) getSSHUser() policy.UserPolicy {
 	if p == nil {
 		return nil
 	}
