@@ -79,12 +79,29 @@ type handler struct {
 	opts *HandlerOptions
 }
 
-// Route traffic and implement the Router interface.
+// Route traffic and implement the Router interface. For backward compatibility
+// this route adds will add a new middleware that will set the ACME components
+// on the context.
+//
+// Deprecated: use api.Route(r api.Router)
 func (h *handler) Route(r api.Router) {
-	route(r, h.opts)
+	client := acme.NewClient()
+	linker := acme.NewLinker(h.opts.DNS, h.opts.Prefix)
+	route(r, func(next nextHTTP) nextHTTP {
+		return func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			if ca, ok := h.opts.CA.(*authority.Authority); ok && ca != nil {
+				ctx = authority.NewContext(ctx, ca)
+			}
+			ctx = acme.NewContext(ctx, h.opts.DB, client, linker, h.opts.PrerequisitesChecker)
+			next(w, r.WithContext(ctx))
+		}
+	})
 }
 
 // NewHandler returns a new ACME API handler.
+//
+// Deprecated: use api.Route(r api.Router)
 func NewHandler(opts HandlerOptions) api.RouterHandler {
 	return &handler{
 		opts: &opts,
@@ -98,40 +115,18 @@ func Route(r api.Router) {
 	route(r, nil)
 }
 
-func route(r api.Router, opts *HandlerOptions) {
-	var withContext func(next nextHTTP) nextHTTP
-
-	// For backward compatibility this block adds will add a new middleware that
-	// will set the ACME components to the context.
-	if opts != nil {
-		client := acme.NewClient()
-		linker := acme.NewLinker(opts.DNS, opts.Prefix)
-
-		withContext = func(next nextHTTP) nextHTTP {
-			return func(w http.ResponseWriter, r *http.Request) {
-				ctx := r.Context()
-				if ca, ok := opts.CA.(*authority.Authority); ok && ca != nil {
-					ctx = authority.NewContext(ctx, ca)
-				}
-				ctx = acme.NewContext(ctx, opts.DB, client, linker, opts.PrerequisitesChecker)
-				next(w, r.WithContext(ctx))
-			}
-		}
-	} else {
-		withContext = func(next nextHTTP) nextHTTP {
-			return func(w http.ResponseWriter, r *http.Request) {
-				next(w, r)
-			}
-		}
-	}
-
+func route(r api.Router, middleware func(next nextHTTP) nextHTTP) {
 	commonMiddleware := func(next nextHTTP) nextHTTP {
-		return withContext(func(w http.ResponseWriter, r *http.Request) {
+		handler := func(w http.ResponseWriter, r *http.Request) {
 			// Linker middleware gets the provisioner and current url from the
 			// request and sets them in the context.
 			linker := acme.MustLinkerFromContext(r.Context())
 			linker.Middleware(http.HandlerFunc(checkPrerequisites(next))).ServeHTTP(w, r)
-		})
+		}
+		if middleware != nil {
+			handler = middleware(handler)
+		}
+		return handler
 	}
 	validatingMiddleware := func(next nextHTTP) nextHTTP {
 		return commonMiddleware(addNonce(addDirLink(verifyContentType(parseJWS(validateJWS(next))))))
