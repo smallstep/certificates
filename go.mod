@@ -63,4 +63,4 @@ require (
 // replace github.com/smallstep/nosql => ../nosql
 // replace go.step.sm/crypto => ../crypto
 // replace go.step.sm/cli-utils => ../cli-utils
-replace go.step.sm/linkedca => ../linkedca
+// replace go.step.sm/linkedca => ../linkedca
