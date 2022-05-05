@@ -68,8 +68,11 @@ func Sign(w http.ResponseWriter, r *http.Request) {
 		TemplateData: body.TemplateData,
 	}
 
-	a := mustAuthority(r.Context())
-	signOpts, err := a.AuthorizeSign(body.OTT)
+	ctx := r.Context()
+	a := mustAuthority(ctx)
+
+	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
+	signOpts, err := a.Authorize(ctx, body.OTT)
 	if err != nil {
 		render.Error(w, errs.UnauthorizedErr(err))
 		return

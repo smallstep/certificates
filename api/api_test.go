@@ -185,7 +185,7 @@ func mockMustAuthority(t *testing.T, a Authority) {
 type mockAuthority struct {
 	ret1, ret2                   interface{}
 	err                          error
-	authorizeSign                func(ott string) ([]provisioner.SignOption, error)
+	authorize                    func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	authorizeRenewToken          func(ctx context.Context, ott string) (*x509.Certificate, error)
 	getTLSOptions                func() *authority.TLSOptions
 	root                         func(shasum string) (*x509.Certificate, error)
@@ -214,12 +214,8 @@ type mockAuthority struct {
 
 // TODO: remove once Authorize is deprecated.
 func (m *mockAuthority) Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
-	return m.AuthorizeSign(ott)
-}
-
-func (m *mockAuthority) AuthorizeSign(ott string) ([]provisioner.SignOption, error) {
-	if m.authorizeSign != nil {
-		return m.authorizeSign(ott)
+	if m.authorize != nil {
+		return m.authorize(ctx, ott)
 	}
 	return m.ret1.([]provisioner.SignOption), m.err
 }
@@ -908,7 +904,7 @@ func Test_Sign(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, &mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.signErr,
-				authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+				authorize: func(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 					return tt.certAttrOpts, tt.autherr
 				},
 				getTLSOptions: func() *authority.TLSOptions {

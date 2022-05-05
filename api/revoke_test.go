@@ -108,7 +108,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 				input:      string(input),
 				statusCode: http.StatusOK,
 				auth: &mockAuthority{
-					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+					authorize: func(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 						return nil, nil
 					},
 					revoke: func(ctx context.Context, opts *authority.RevokeOptions) error {
@@ -152,7 +152,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 				statusCode: http.StatusOK,
 				tls:        cs,
 				auth: &mockAuthority{
-					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+					authorize: func(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 						return nil, nil
 					},
 					revoke: func(ctx context.Context, ri *authority.RevokeOptions) error {
@@ -187,7 +187,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 				input:      string(input),
 				statusCode: http.StatusInternalServerError,
 				auth: &mockAuthority{
-					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+					authorize: func(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 						return nil, nil
 					},
 					revoke: func(ctx context.Context, opts *authority.RevokeOptions) error {
@@ -209,7 +209,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 				input:      string(input),
 				statusCode: http.StatusForbidden,
 				auth: &mockAuthority{
-					authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+					authorize: func(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 						return nil, nil
 					},
 					revoke: func(ctx context.Context, opts *authority.RevokeOptions) error {

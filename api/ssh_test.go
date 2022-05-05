@@ -316,7 +316,7 @@ func Test_SSHSign(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, &mockAuthority{
-				authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+				authorize: func(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 					return []provisioner.SignOption{}, tt.authErr
 				},
 				signSSH: func(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
