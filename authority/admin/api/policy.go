@@ -32,7 +32,7 @@ type PolicyAdminResponder interface {
 	DeleteACMEAccountPolicy(w http.ResponseWriter, r *http.Request)
 }
 
-// policyAdminResponder is responsible for writing ACME admin responses.
+// policyAdminResponder implements PolicyAdminResponder.
 type policyAdminResponder struct{}
 
 // NewACMEAdminResponder returns a new PolicyAdminResponder.
