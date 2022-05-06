@@ -13,7 +13,7 @@ import (
 // Handler is the Admin API request handler.
 type Handler struct {
 	acmeResponder   acmeAdminResponderInterface
-	policyResponder policyAdminResponderInterface
+	policyResponder PolicyAdminResponder
 }
 
 // Route traffic and implement the Router interface.
@@ -24,7 +24,7 @@ func (h *Handler) Route(r api.Router) {
 }
 
 // NewHandler returns a new Authority Config Handler.
-func NewHandler(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB, acmeResponder acmeAdminResponderInterface, policyResponder policyAdminResponderInterface) api.RouterHandler {
+func NewHandler(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB, acmeResponder acmeAdminResponderInterface, policyResponder PolicyAdminResponder) api.RouterHandler {
 	return &Handler{
 		acmeResponder:   acmeResponder,
 		policyResponder: policyResponder,
@@ -36,7 +36,7 @@ var mustAuthority = func(ctx context.Context) adminAuthority {
 }
 
 // Route traffic and implement the Router interface.
-func Route(r api.Router, acmeResponder acmeAdminResponderInterface, policyResponder policyAdminResponderInterface) {
+func Route(r api.Router, acmeResponder acmeAdminResponderInterface, policyResponder PolicyAdminResponder) {
 	authnz := func(next http.HandlerFunc) http.HandlerFunc {
 		return extractAuthorizeTokenAdmin(requireAPIEnabled(next))
 	}
