@@ -28,13 +28,12 @@ type SCEP struct {
 	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
 	// at https://github.com/mozilla-services/pkcs7/blob/33d05740a3526e382af6395d3513e73d4e66d1cb/encrypt.go#L63
 	// Defaults to 0, being DES-CBC
-	EncryptionAlgorithmIdentifier int `json:"encryptionAlgorithmIdentifier,omitempty"`
-
-	Options                 *Options `json:"options,omitempty"`
-	Claims                  *Claims  `json:"claims,omitempty"`
-	secretChallengePassword string
-	encryptionAlgorithm     int
-	ctl                     *Controller
+	EncryptionAlgorithmIdentifier int      `json:"encryptionAlgorithmIdentifier,omitempty"`
+	Options                       *Options `json:"options,omitempty"`
+	Claims                        *Claims  `json:"claims,omitempty"`
+	ctl                           *Controller
+	secretChallengePassword       string
+	encryptionAlgorithm           int
 }
 
 // GetID returns the provisioner unique identifier.
@@ -84,7 +83,6 @@ func (s *SCEP) DefaultTLSCertDuration() time.Duration {
 
 // Init initializes and validates the fields of a SCEP type.
 func (s *SCEP) Init(config Config) (err error) {
-
 	switch {
 	case s.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -112,7 +110,7 @@ func (s *SCEP) Init(config Config) (err error) {
 
 	// TODO: add other, SCEP specific, options?
 
-	s.ctl, err = NewController(s, s.Claims, config)
+	s.ctl, err = NewController(s, s.Claims, config, s.Options)
 	return
 }
 
@@ -129,6 +127,7 @@ func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		newPublicKeyMinimumLengthValidator(s.MinimumPublicKeyLength),
 		newValidityValidator(s.ctl.Claimer.MinTLSCertDuration(), s.ctl.Claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(s.ctl.getPolicy().getX509()),
 	}, nil
 }
 

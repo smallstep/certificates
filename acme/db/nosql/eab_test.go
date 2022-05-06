@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	certdb "github.com/smallstep/certificates/db"
@@ -32,7 +33,7 @@ func TestDB_getDBExternalAccountKey(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     "ref",
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			b, err := json.Marshal(dbeak)
@@ -108,7 +109,7 @@ func TestDB_getDBExternalAccountKey(t *testing.T) {
 				}
 			} else if assert.Nil(t, tc.err) {
 				assert.Equals(t, dbeak.ID, tc.dbeak.ID)
-				assert.Equals(t, dbeak.KeyBytes, tc.dbeak.KeyBytes)
+				assert.Equals(t, dbeak.HmacKey, tc.dbeak.HmacKey)
 				assert.Equals(t, dbeak.ProvisionerID, tc.dbeak.ProvisionerID)
 				assert.Equals(t, dbeak.Reference, tc.dbeak.Reference)
 				assert.Equals(t, dbeak.CreatedAt, tc.dbeak.CreatedAt)
@@ -136,7 +137,7 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     "ref",
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			b, err := json.Marshal(dbeak)
@@ -154,7 +155,7 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 					ProvisionerID: provID,
 					Reference:     "ref",
 					AccountID:     "",
-					KeyBytes:      []byte{1, 3, 3, 7},
+					HmacKey:       []byte{1, 3, 3, 7},
 					CreatedAt:     now,
 				},
 			}
@@ -179,7 +180,7 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 				ProvisionerID: "aDifferentProvID",
 				Reference:     "ref",
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			b, err := json.Marshal(dbeak)
@@ -197,7 +198,7 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 					ProvisionerID: provID,
 					Reference:     "ref",
 					AccountID:     "",
-					KeyBytes:      []byte{1, 3, 3, 7},
+					HmacKey:       []byte{1, 3, 3, 7},
 					CreatedAt:     now,
 				},
 				acmeErr: acme.NewError(acme.ErrorUnauthorizedType, "provisioner does not match provisioner for which the EAB key was created"),
@@ -225,7 +226,7 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 				}
 			} else if assert.Nil(t, tc.err) {
 				assert.Equals(t, eak.ID, tc.eak.ID)
-				assert.Equals(t, eak.KeyBytes, tc.eak.KeyBytes)
+				assert.Equals(t, eak.HmacKey, tc.eak.HmacKey)
 				assert.Equals(t, eak.ProvisionerID, tc.eak.ProvisionerID)
 				assert.Equals(t, eak.Reference, tc.eak.Reference)
 				assert.Equals(t, eak.CreatedAt, tc.eak.CreatedAt)
@@ -255,7 +256,7 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			dbref := &dbExternalAccountKeyReference{
@@ -288,7 +289,7 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 					ProvisionerID: provID,
 					Reference:     ref,
 					AccountID:     "",
-					KeyBytes:      []byte{1, 3, 3, 7},
+					HmacKey:       []byte{1, 3, 3, 7},
 					CreatedAt:     now,
 				},
 				err: nil,
@@ -392,7 +393,7 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 				assert.Equals(t, eak.AccountID, tc.eak.AccountID)
 				assert.Equals(t, eak.BoundAt, tc.eak.BoundAt)
 				assert.Equals(t, eak.CreatedAt, tc.eak.CreatedAt)
-				assert.Equals(t, eak.KeyBytes, tc.eak.KeyBytes)
+				assert.Equals(t, eak.HmacKey, tc.eak.HmacKey)
 				assert.Equals(t, eak.ProvisionerID, tc.eak.ProvisionerID)
 				assert.Equals(t, eak.Reference, tc.eak.Reference)
 			}
@@ -420,7 +421,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			b1, err := json.Marshal(dbeak1)
@@ -430,7 +431,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			b2, err := json.Marshal(dbeak2)
@@ -440,7 +441,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 				ProvisionerID: "aDifferentProvID",
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			b3, err := json.Marshal(dbeak3)
@@ -513,7 +514,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 						ProvisionerID: provID,
 						Reference:     ref,
 						AccountID:     "",
-						KeyBytes:      []byte{1, 3, 3, 7},
+						HmacKey:       []byte{1, 3, 3, 7},
 						CreatedAt:     now,
 					},
 					{
@@ -521,7 +522,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 						ProvisionerID: provID,
 						Reference:     ref,
 						AccountID:     "",
-						KeyBytes:      []byte{1, 3, 3, 7},
+						HmacKey:       []byte{1, 3, 3, 7},
 						CreatedAt:     now,
 					},
 				},
@@ -598,7 +599,7 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 				assert.Equals(t, "", nextCursor)
 				for i, eak := range eaks {
 					assert.Equals(t, eak.ID, tc.eaks[i].ID)
-					assert.Equals(t, eak.KeyBytes, tc.eaks[i].KeyBytes)
+					assert.Equals(t, eak.HmacKey, tc.eaks[i].HmacKey)
 					assert.Equals(t, eak.ProvisionerID, tc.eaks[i].ProvisionerID)
 					assert.Equals(t, eak.Reference, tc.eaks[i].Reference)
 					assert.Equals(t, eak.CreatedAt, tc.eaks[i].CreatedAt)
@@ -627,7 +628,7 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			dbref := &dbExternalAccountKeyReference{
@@ -707,7 +708,7 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 				ProvisionerID: "aDifferentProvID",
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			b, err := json.Marshal(dbeak)
@@ -730,7 +731,7 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			dbref := &dbExternalAccountKeyReference{
@@ -780,7 +781,7 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			dbref := &dbExternalAccountKeyReference{
@@ -830,7 +831,7 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			dbref := &dbExternalAccountKeyReference{
@@ -953,7 +954,7 @@ func TestDB_CreateExternalAccountKey(t *testing.T) {
 							assert.Equals(t, string(key), dbeak.ID)
 							assert.Equals(t, eak.ProvisionerID, dbeak.ProvisionerID)
 							assert.Equals(t, eak.Reference, dbeak.Reference)
-							assert.Equals(t, 32, len(dbeak.KeyBytes))
+							assert.Equals(t, 32, len(dbeak.HmacKey))
 							assert.False(t, dbeak.CreatedAt.IsZero())
 							assert.Equals(t, dbeak.AccountID, eak.AccountID)
 							assert.True(t, dbeak.BoundAt.IsZero())
@@ -1078,7 +1079,7 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 		ProvisionerID: provID,
 		Reference:     ref,
 		AccountID:     "",
-		KeyBytes:      []byte{1, 3, 3, 7},
+		HmacKey:       []byte{1, 3, 3, 7},
 		CreatedAt:     now,
 	}
 	b, err := json.Marshal(dbeak)
@@ -1096,7 +1097,7 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			return test{
@@ -1120,7 +1121,7 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 						assert.Equals(t, dbNew.AccountID, dbeak.AccountID)
 						assert.Equals(t, dbNew.CreatedAt, dbeak.CreatedAt)
 						assert.Equals(t, dbNew.BoundAt, dbeak.BoundAt)
-						assert.Equals(t, dbNew.KeyBytes, dbeak.KeyBytes)
+						assert.Equals(t, dbNew.HmacKey, dbeak.HmacKey)
 						return nu, true, nil
 					},
 				},
@@ -1148,7 +1149,7 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 				ProvisionerID: "aDifferentProvID",
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			b, err := json.Marshal(newDBEAK)
@@ -1174,7 +1175,7 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			b, err := json.Marshal(newDBEAK)
@@ -1200,7 +1201,7 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 				ProvisionerID: provID,
 				Reference:     ref,
 				AccountID:     "",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     now,
 			}
 			b, err := json.Marshal(newDBEAK)
@@ -1237,7 +1238,7 @@ func TestDB_UpdateExternalAccountKey(t *testing.T) {
 				assert.Equals(t, dbeak.AccountID, tc.eak.AccountID)
 				assert.Equals(t, dbeak.CreatedAt, tc.eak.CreatedAt)
 				assert.Equals(t, dbeak.BoundAt, tc.eak.BoundAt)
-				assert.Equals(t, dbeak.KeyBytes, tc.eak.KeyBytes)
+				assert.Equals(t, dbeak.HmacKey, tc.eak.HmacKey)
 			}
 		})
 	}

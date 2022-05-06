@@ -8,18 +8,21 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestHandler_GetProvisioner(t *testing.T) {
@@ -333,12 +336,12 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 			return test{
 				ctx:        context.Background(),
 				body:       body,
-				statusCode: 500,
-				err: &admin.Error{ // TODO(hs): this probably needs a better error
-					Type:    "",
-					Status:  500,
-					Detail:  "",
-					Message: "",
+				statusCode: 400,
+				err: &admin.Error{
+					Type:    "badRequest",
+					Status:  400,
+					Detail:  "bad request",
+					Message: "proto: syntax error (line 1:2): invalid value !",
 				},
 			}
 		},
@@ -419,9 +422,15 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &adminErr))
 
 				assert.Equals(t, tc.err.Type, adminErr.Type)
-				assert.Equals(t, tc.err.Message, adminErr.Message)
 				assert.Equals(t, tc.err.Detail, adminErr.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+				if strings.HasPrefix(tc.err.Message, "proto:") {
+					assert.True(t, strings.Contains(adminErr.Message, "syntax error"))
+				} else {
+					assert.Equals(t, tc.err.Message, adminErr.Message)
+				}
+
 				return
 			}
 
@@ -611,12 +620,12 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				ctx:        context.Background(),
 				body:       body,
 				adminDB:    &admin.MockDB{},
-				statusCode: 500,
-				err: &admin.Error{ // TODO(hs): this probably needs a better error
-					Type:    "",
-					Status:  500,
-					Detail:  "",
-					Message: "",
+				statusCode: 400,
+				err: &admin.Error{
+					Type:    "badRequest",
+					Status:  400,
+					Detail:  "bad request",
+					Message: "proto: syntax error (line 1:2): invalid value !",
 				},
 			}
 		},
@@ -1068,9 +1077,15 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &adminErr))
 
 				assert.Equals(t, tc.err.Type, adminErr.Type)
-				assert.Equals(t, tc.err.Message, adminErr.Message)
 				assert.Equals(t, tc.err.Detail, adminErr.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+				if strings.HasPrefix(tc.err.Message, "proto:") {
+					assert.True(t, strings.Contains(adminErr.Message, "syntax error"))
+				} else {
+					assert.Equals(t, tc.err.Message, adminErr.Message)
+				}
+
 				return
 			}
 

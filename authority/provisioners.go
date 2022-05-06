@@ -10,16 +10,19 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/admin"
-	"github.com/smallstep/certificates/authority/config"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/certificates/errs"
+	"gopkg.in/square/go-jose.v2/jwt"
+
 	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/linkedca"
-	"gopkg.in/square/go-jose.v2/jwt"
+
+	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/errs"
 )
 
 // GetEncryptedKey returns the JWE key corresponding to the given kid argument.
@@ -170,6 +173,12 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 		return admin.WrapErrorISE(err, "error generating provisioner config")
 	}
 
+	adm := linkedca.MustAdminFromContext(ctx)
+
+	if err := a.checkProvisionerPolicy(ctx, adm, prov.Name, prov.Policy); err != nil {
+		return err
+	}
+
 	if err := certProv.Init(provisionerConfig); err != nil {
 		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %s", prov.Name)
 	}
@@ -213,6 +222,12 @@ func (a *Authority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisio
 	provisionerConfig, err := a.generateProvisionerConfig(ctx)
 	if err != nil {
 		return admin.WrapErrorISE(err, "error generating provisioner config")
+	}
+
+	adm := linkedca.MustAdminFromContext(ctx)
+
+	if err := a.checkProvisionerPolicy(ctx, adm, nu.Name, nu.Policy); err != nil {
+		return err
 	}
 
 	if err := certProv.Init(provisionerConfig); err != nil {
@@ -426,6 +441,60 @@ func optionsToCertificates(p *linkedca.Provisioner) *provisioner.Options {
 	if p.SshTemplate != nil {
 		ops.SSH.Template = string(p.SshTemplate.Template)
 		ops.SSH.TemplateData = p.SshTemplate.Data
+	}
+	if pol := p.GetPolicy(); pol != nil {
+		if x := pol.GetX509(); x != nil {
+			if allow := x.GetAllow(); allow != nil {
+				ops.X509.AllowedNames = &policy.X509NameOptions{
+					DNSDomains:     allow.Dns,
+					IPRanges:       allow.Ips,
+					EmailAddresses: allow.Emails,
+					URIDomains:     allow.Uris,
+				}
+			}
+			if deny := x.GetDeny(); deny != nil {
+				ops.X509.DeniedNames = &policy.X509NameOptions{
+					DNSDomains:     deny.Dns,
+					IPRanges:       deny.Ips,
+					EmailAddresses: deny.Emails,
+					URIDomains:     deny.Uris,
+				}
+			}
+		}
+		if ssh := pol.GetSsh(); ssh != nil {
+			if host := ssh.GetHost(); host != nil {
+				ops.SSH.Host = &policy.SSHHostCertificateOptions{}
+				if allow := host.GetAllow(); allow != nil {
+					ops.SSH.Host.AllowedNames = &policy.SSHNameOptions{
+						DNSDomains: allow.Dns,
+						IPRanges:   allow.Ips,
+						Principals: allow.Principals,
+					}
+				}
+				if deny := host.GetDeny(); deny != nil {
+					ops.SSH.Host.DeniedNames = &policy.SSHNameOptions{
+						DNSDomains: deny.Dns,
+						IPRanges:   deny.Ips,
+						Principals: deny.Principals,
+					}
+				}
+			}
+			if user := ssh.GetUser(); user != nil {
+				ops.SSH.User = &policy.SSHUserCertificateOptions{}
+				if allow := user.GetAllow(); allow != nil {
+					ops.SSH.User.AllowedNames = &policy.SSHNameOptions{
+						EmailAddresses: allow.Emails,
+						Principals:     allow.Principals,
+					}
+				}
+				if deny := user.GetDeny(); deny != nil {
+					ops.SSH.User.DeniedNames = &policy.SSHNameOptions{
+						EmailAddresses: deny.Emails,
+						Principals:     deny.Principals,
+					}
+				}
+			}
+		}
 	}
 	return ops
 }

@@ -12,10 +12,16 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/authority/admin"
 	adminDBNosql "github.com/smallstep/certificates/authority/admin/db/nosql"
 	"github.com/smallstep/certificates/authority/administrator"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
@@ -26,9 +32,6 @@ import (
 	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/nosql"
-	"go.step.sm/crypto/pemutil"
-	"go.step.sm/linkedca"
-	"golang.org/x/crypto/ssh"
 )
 
 // Authority implements the Certificate Authority internal interface.
@@ -76,6 +79,9 @@ type Authority struct {
 	getIdentityFunc       provisioner.GetIdentityFunc
 	authorizeRenewFunc    provisioner.AuthorizeRenewFunc
 	authorizeSSHRenewFunc provisioner.AuthorizeSSHRenewFunc
+
+	// Policy engines
+	policyEngine *policy.Engine
 
 	adminMutex sync.RWMutex
 }
@@ -232,6 +238,7 @@ func (a *Authority) reloadAdminResources(ctx context.Context) error {
 	a.provisioners = provClxn
 	a.config.AuthorityConfig.Admins = adminList
 	a.admins = adminClxn
+
 	return nil
 }
 
@@ -575,6 +582,11 @@ func (a *Authority) init() error {
 
 	// Load Provisioners and Admins
 	if err := a.reloadAdminResources(context.Background()); err != nil {
+		return err
+	}
+
+	// Load x509 and SSH Policy Engines
+	if err := a.reloadPolicyEngines(context.Background()); err != nil {
 		return err
 	}
 

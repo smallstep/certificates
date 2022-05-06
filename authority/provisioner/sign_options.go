@@ -13,9 +13,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/errs"
 )
 
 // DefaultCertValidity is the default validity for a certificate if none is specified.
@@ -401,6 +403,32 @@ func (v *validityValidator) Valid(cert *x509.Certificate, o SignOptions) error {
 	}
 	return nil
 }
+
+// x509NamePolicyValidator validates that the certificate (to be signed)
+// contains only allowed SANs.
+type x509NamePolicyValidator struct {
+	policyEngine policy.X509Policy
+}
+
+// newX509NamePolicyValidator return a new SANs allow/deny validator.
+func newX509NamePolicyValidator(engine policy.X509Policy) *x509NamePolicyValidator {
+	return &x509NamePolicyValidator{
+		policyEngine: engine,
+	}
+}
+
+// Valid validates that the certificate (to be signed) contains only allowed SANs.
+func (v *x509NamePolicyValidator) Valid(cert *x509.Certificate, _ SignOptions) error {
+	if v.policyEngine == nil {
+		return nil
+	}
+	return v.policyEngine.IsX509CertificateAllowed(cert)
+}
+
+// var (
+// 	stepOIDRoot = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
+// 	stepOIDProvisioner = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
+// )
 
 // type stepProvisionerASN1 struct {
 // 	Type          int

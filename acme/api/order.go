@@ -16,6 +16,8 @@ import (
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 // NewOrderRequest represents the body for a NewOrder request.
@@ -37,6 +39,8 @@ func (n *NewOrderRequest) Validate() error {
 		if id.Type == acme.IP && net.ParseIP(id.Value) == nil {
 			return acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", id.Value)
 		}
+		// TODO(hs): add some validations for DNS domains?
+		// TODO(hs): combine the errors from this with allow/deny policy, like example error in https://datatracker.ietf.org/doc/html/rfc8555#section-6.7.1
 	}
 	return nil
 }
@@ -70,6 +74,7 @@ var defaultOrderBackdate = time.Minute
 // NewOrder ACME api for creating a new order.
 func NewOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	ca := mustAuthority(ctx)
 	db := acme.MustDatabaseFromContext(ctx)
 	linker := acme.MustLinkerFromContext(ctx)
 
@@ -88,6 +93,7 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, err)
 		return
 	}
+
 	var nor NewOrderRequest
 	if err := json.Unmarshal(payload.value, &nor); err != nil {
 		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
@@ -98,6 +104,48 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 	if err := nor.Validate(); err != nil {
 		render.Error(w, err)
 		return
+	}
+
+	// TODO(hs): gather all errors, so that we can build one response with ACME subproblems
+	// include the nor.Validate() error here too, like in the example in the ACME RFC?
+
+	acmeProv, err := acmeProvisionerFromContext(ctx)
+	if err != nil {
+		render.Error(w, err)
+		return
+	}
+
+	var eak *acme.ExternalAccountKey
+	if acmeProv.RequireEAB {
+		if eak, err = db.GetExternalAccountKeyByAccountID(ctx, prov.GetID(), acc.ID); err != nil {
+			render.Error(w, acme.WrapErrorISE(err, "error retrieving external account binding key"))
+			return
+		}
+	}
+
+	acmePolicy, err := newACMEPolicyEngine(eak)
+	if err != nil {
+		render.Error(w, acme.WrapErrorISE(err, "error creating ACME policy engine"))
+		return
+	}
+
+	for _, identifier := range nor.Identifiers {
+		// evaluate the ACME account level policy
+		if err = isIdentifierAllowed(acmePolicy, identifier); err != nil {
+			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			return
+		}
+		// evaluate the provisioner level policy
+		orderIdentifier := provisioner.ACMEIdentifier{Type: provisioner.ACMEIdentifierType(identifier.Type), Value: identifier.Value}
+		if err = prov.AuthorizeOrderIdentifier(ctx, orderIdentifier); err != nil {
+			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			return
+		}
+		// evaluate the authority level policy
+		if err = ca.AreSANsAllowed(ctx, []string{identifier.Value}); err != nil {
+			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			return
+		}
 	}
 
 	now := clock.Now()
@@ -148,6 +196,20 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
 	render.JSONStatus(w, o, http.StatusCreated)
+}
+
+func isIdentifierAllowed(acmePolicy policy.X509Policy, identifier acme.Identifier) error {
+	if acmePolicy == nil {
+		return nil
+	}
+	return acmePolicy.AreSANsAllowed([]string{identifier.Value})
+}
+
+func newACMEPolicyEngine(eak *acme.ExternalAccountKey) (policy.X509Policy, error) {
+	if eak == nil {
+		return nil, nil
+	}
+	return policy.NewX509PolicyEngine(eak.Policy)
 }
 
 func newAuthorization(ctx context.Context, az *acme.Authorization) error {
@@ -231,7 +293,7 @@ func GetOrder(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, o)
 }
 
-// FinalizeOrder attemptst to finalize an order and create a certificate.
+// FinalizeOrder attempts to finalize an order and create a certificate.
 func FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	db := acme.MustDatabaseFromContext(ctx)

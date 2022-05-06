@@ -24,10 +24,12 @@ const (
 	ErrorBadRequestType
 	// ErrorNotImplementedType not implemented.
 	ErrorNotImplementedType
-	// ErrorUnauthorizedType internal server error.
+	// ErrorUnauthorizedType unauthorized.
 	ErrorUnauthorizedType
 	// ErrorServerInternalType internal server error.
 	ErrorServerInternalType
+	// ErrorConflictType conflict.
+	ErrorConflictType
 )
 
 // String returns the string representation of the admin problem type,
@@ -48,6 +50,8 @@ func (ap ProblemType) String() string {
 		return "unauthorized"
 	case ErrorServerInternalType:
 		return "internalServerError"
+	case ErrorConflictType:
+		return "conflict"
 	default:
 		return fmt.Sprintf("unsupported error type '%d'", int(ap))
 	}
@@ -64,7 +68,7 @@ var (
 	errorServerInternalMetadata = errorMetadata{
 		typ:     ErrorServerInternalType.String(),
 		details: "the server experienced an internal error",
-		status:  500,
+		status:  http.StatusInternalServerError,
 	}
 	errorMap = map[ProblemType]errorMetadata{
 		ErrorNotFoundType: {
@@ -98,6 +102,11 @@ var (
 			status:  http.StatusUnauthorized,
 		},
 		ErrorServerInternalType: errorServerInternalMetadata,
+		ErrorConflictType: {
+			typ:     ErrorConflictType.String(),
+			details: "conflict",
+			status:  http.StatusConflict,
+		},
 	}
 )
 

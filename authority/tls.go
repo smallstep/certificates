@@ -16,16 +16,19 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/x509util"
+
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/keyutil"
-	"go.step.sm/crypto/pemutil"
-	"go.step.sm/crypto/x509util"
-	"golang.org/x/crypto/ssh"
+	"github.com/smallstep/certificates/policy"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -196,6 +199,25 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
+	// Check if authority is allowed to sign the certificate
+	if err := a.isAllowedToSignX509Certificate(leaf); err != nil {
+		var pe *policy.NamePolicyError
+		if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
+			return nil, errs.ApplyOptions(&errs.Error{
+				// NOTE: custom forbidden error, so that denied name is sent to client
+				// as well as shown in the logs.
+				Status: http.StatusForbidden,
+				Err:    fmt.Errorf("authority not allowed to sign: %w", err),
+				Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
+			}, opts...)
+		}
+		return nil, errs.InternalServerErr(err,
+			errs.WithKeyVal("csr", csr),
+			errs.WithKeyVal("signOptions", signOpts),
+			errs.WithMessage("error creating certificate"),
+		)
+	}
+
 	// Sign certificate
 	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
@@ -217,6 +239,18 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	return fullchain, nil
+}
+
+// isAllowedToSignX509Certificate checks if the Authority is allowed
+// to sign the X.509 certificate.
+func (a *Authority) isAllowedToSignX509Certificate(cert *x509.Certificate) error {
+	return a.policyEngine.IsX509CertificateAllowed(cert)
+}
+
+// AreSANsAllowed evaluates the provided sans against the
+// authority X.509 policy.
+func (a *Authority) AreSANsAllowed(ctx context.Context, sans []string) error {
+	return a.policyEngine.AreSANsAllowed(sans)
 }
 
 // Renew creates a new Certificate identical to the old certificate, except

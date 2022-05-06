@@ -8,12 +8,15 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"go.step.sm/linkedca"
+
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	cas "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	kms "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/certificates/templates"
-	"go.step.sm/linkedca"
 )
 
 const (
@@ -95,6 +98,7 @@ type AuthConfig struct {
 	Admins               []*linkedca.Admin     `json:"-"`
 	Template             *ASN1DN               `json:"template,omitempty"`
 	Claims               *provisioner.Claims   `json:"claims,omitempty"`
+	Policy               *policy.Options       `json:"policy,omitempty"`
 	DisableIssuedAtCheck bool                  `json:"disableIssuedAtCheck,omitempty"`
 	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
 	EnableAdmin          bool                  `json:"enableAdmin,omitempty"`

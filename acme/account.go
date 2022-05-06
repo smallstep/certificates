@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/certificates/authority/policy"
 )
 
 // Account is a subset of the internal account type containing only those
@@ -43,15 +45,63 @@ func KeyToID(jwk *jose.JSONWebKey) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(kid), nil
 }
 
+// PolicyNames contains ACME account level policy names
+type PolicyNames struct {
+	DNSNames []string `json:"dns"`
+	IPRanges []string `json:"ips"`
+}
+
+// X509Policy contains ACME account level X.509 policy
+type X509Policy struct {
+	Allowed            PolicyNames `json:"allow"`
+	Denied             PolicyNames `json:"deny"`
+	AllowWildcardNames bool        `json:"allowWildcardNames"`
+}
+
+// Policy is an ACME Account level policy
+type Policy struct {
+	X509 X509Policy `json:"x509"`
+}
+
+func (p *Policy) GetAllowedNameOptions() *policy.X509NameOptions {
+	if p == nil {
+		return nil
+	}
+	return &policy.X509NameOptions{
+		DNSDomains: p.X509.Allowed.DNSNames,
+		IPRanges:   p.X509.Allowed.IPRanges,
+	}
+}
+func (p *Policy) GetDeniedNameOptions() *policy.X509NameOptions {
+	if p == nil {
+		return nil
+	}
+	return &policy.X509NameOptions{
+		DNSDomains: p.X509.Denied.DNSNames,
+		IPRanges:   p.X509.Denied.IPRanges,
+	}
+}
+
+// AreWildcardNamesAllowed returns if wildcard names
+// like *.example.com are allowed to be signed.
+// Defaults to false.
+func (p *Policy) AreWildcardNamesAllowed() bool {
+	if p == nil {
+		return false
+	}
+	return p.X509.AllowWildcardNames
+}
+
 // ExternalAccountKey is an ACME External Account Binding key.
 type ExternalAccountKey struct {
 	ID            string    `json:"id"`
 	ProvisionerID string    `json:"provisionerID"`
 	Reference     string    `json:"reference"`
 	AccountID     string    `json:"-"`
-	KeyBytes      []byte    `json:"-"`
+	HmacKey       []byte    `json:"-"`
 	CreatedAt     time.Time `json:"createdAt"`
 	BoundAt       time.Time `json:"boundAt,omitempty"`
+	Policy        *Policy   `json:"policy,omitempty"`
 }
 
 // AlreadyBound returns whether this EAK is already bound to
@@ -68,6 +118,6 @@ func (eak *ExternalAccountKey) BindTo(account *Account) error {
 	}
 	eak.AccountID = account.ID
 	eak.BoundAt = time.Now()
-	eak.KeyBytes = []byte{} // clearing the key bytes; can only be used once
+	eak.HmacKey = []byte{} // clearing the key bytes; can only be used once
 	return nil
 }

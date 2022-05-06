@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/smallstep/certificates/acme"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/certificates/acme"
 )
 
 // ExternalAccountBinding represents the ACME externalAccountBinding JWS
@@ -56,11 +57,19 @@ func validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest)
 		return nil, acme.WrapErrorISE(err, "error retrieving external account key")
 	}
 
+	if externalAccountKey == nil {
+		return nil, acme.NewError(acme.ErrorUnauthorizedType, "the field 'kid' references an unknown key")
+	}
+
+	if len(externalAccountKey.HmacKey) == 0 {
+		return nil, acme.NewError(acme.ErrorServerInternalType, "external account binding key with id '%s' does not have secret bytes", keyID)
+	}
+
 	if externalAccountKey.AlreadyBound() {
 		return nil, acme.NewError(acme.ErrorUnauthorizedType, "external account binding key with id '%s' was already bound to account '%s' on %s", keyID, externalAccountKey.AccountID, externalAccountKey.BoundAt)
 	}
 
-	payload, err := eabJWS.Verify(externalAccountKey.KeyBytes)
+	payload, err := eabJWS.Verify(externalAccountKey.HmacKey)
 	if err != nil {
 		return nil, acme.WrapErrorISE(err, "error verifying externalAccountBinding signature")
 	}

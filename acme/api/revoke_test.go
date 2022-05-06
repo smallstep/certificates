@@ -24,14 +24,16 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ocsp"
+
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/x509util"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/keyutil"
-	"go.step.sm/crypto/x509util"
-	"golang.org/x/crypto/ocsp"
 )
 
 // v is a utility function to return the pointer to an integer
@@ -274,12 +276,20 @@ func jwsFinal(sha crypto.Hash, sig []byte, phead, payload string) ([]byte, error
 }
 
 type mockCA struct {
-	MockIsRevoked func(sn string) (bool, error)
-	MockRevoke    func(ctx context.Context, opts *authority.RevokeOptions) error
+	MockIsRevoked      func(sn string) (bool, error)
+	MockRevoke         func(ctx context.Context, opts *authority.RevokeOptions) error
+	MockAreSANsallowed func(ctx context.Context, sans []string) error
 }
 
 func (m *mockCA) Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	return nil, nil
+}
+
+func (m *mockCA) AreSANsAllowed(ctx context.Context, sans []string) error {
+	if m.MockAreSANsallowed != nil {
+		return m.MockAreSANsallowed(ctx, sans)
+	}
+	return nil
 }
 
 func (m *mockCA) IsRevoked(sn string) (bool, error) {

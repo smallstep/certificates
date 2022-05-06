@@ -13,10 +13,12 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+
+	"go.step.sm/crypto/jose"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/crypto/jose"
 )
 
 var (
@@ -28,6 +30,22 @@ var (
 		DisableRenewal: &defaultDisableRenewal,
 	}
 )
+
+type fakeProvisioner struct{}
+
+func (*fakeProvisioner) AuthorizeOrderIdentifier(ctx context.Context, identifier provisioner.ACMEIdentifier) error {
+	return nil
+}
+
+func (*fakeProvisioner) AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+	return nil, nil
+}
+
+func (*fakeProvisioner) AuthorizeRevoke(ctx context.Context, token string) error { return nil }
+func (*fakeProvisioner) GetID() string                                           { return "" }
+func (*fakeProvisioner) GetName() string                                         { return "" }
+func (*fakeProvisioner) DefaultTLSCertDuration() time.Duration                   { return 0 }
+func (*fakeProvisioner) GetOptions() *provisioner.Options                        { return nil }
 
 func newProv() acme.Provisioner {
 	// Initialize provisioners
@@ -41,8 +59,30 @@ func newProv() acme.Provisioner {
 	return p
 }
 
+func newProvWithOptions(options *provisioner.Options) acme.Provisioner {
+	// Initialize provisioners
+	p := &provisioner.ACME{
+		Type:    "ACME",
+		Name:    "test@acme-<test>provisioner.com",
+		Options: options,
+	}
+	if err := p.Init(provisioner.Config{Claims: globalProvisionerClaims}); err != nil {
+		fmt.Printf("%v", err)
+	}
+	return p
+}
+
 func newACMEProv(t *testing.T) *provisioner.ACME {
 	p := newProv()
+	a, ok := p.(*provisioner.ACME)
+	if !ok {
+		t.Fatal("not a valid ACME provisioner")
+	}
+	return a
+}
+
+func newACMEProvWithOptions(t *testing.T, options *provisioner.Options) *provisioner.ACME {
+	p := newProvWithOptions(options)
 	a, ok := p.(*provisioner.ACME)
 	if !ok {
 		t.Fatal("not a valid ACME provisioner")
@@ -507,16 +547,9 @@ func TestHandler_NewAccount(t *testing.T) {
 			}
 			b, err := json.Marshal(nar)
 			assert.FatalError(t, err)
-			scepProvisioner := &provisioner.SCEP{
-				Type: "SCEP",
-				Name: "test@scep-<test>provisioner.com",
-			}
-			if err := scepProvisioner.Init(provisioner.Config{Claims: globalProvisionerClaims}); err != nil {
-				assert.FatalError(t, err)
-			}
 			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
 			ctx = context.WithValue(ctx, jwkContextKey, jwk)
-			ctx = acme.NewProvisionerContext(ctx, scepProvisioner)
+			ctx = acme.NewProvisionerContext(ctx, &fakeProvisioner{})
 			return test{
 				db:         &acme.MockDB{},
 				ctx:        ctx,
@@ -563,7 +596,7 @@ func TestHandler_NewAccount(t *testing.T) {
 				ID:            "eakID",
 				ProvisionerID: provID,
 				Reference:     "testeak",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     time.Now(),
 			}
 			return test{
@@ -737,7 +770,7 @@ func TestHandler_NewAccount(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							KeyBytes:      []byte{1, 3, 3, 7},
+							HmacKey:       []byte{1, 3, 3, 7},
 							CreatedAt:     time.Now(),
 						}, nil
 					},

@@ -29,6 +29,10 @@ type adminAuthority interface {
 	LoadProvisionerByID(id string) (provisioner.Interface, error)
 	UpdateProvisioner(ctx context.Context, nu *linkedca.Provisioner) error
 	RemoveProvisioner(ctx context.Context, id string) error
+	GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error)
+	CreateAuthorityPolicy(ctx context.Context, admin *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
+	UpdateAuthorityPolicy(ctx context.Context, admin *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
+	RemoveAuthorityPolicy(ctx context.Context) error
 }
 
 // CreateAdminRequest represents the body for a CreateAdmin request.

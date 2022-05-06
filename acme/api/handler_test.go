@@ -20,7 +20,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
-	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 )
@@ -93,11 +92,7 @@ func TestHandler_GetDirectory(t *testing.T) {
 			}
 		},
 		"fail/different-provisioner": func(t *testing.T) test {
-			prov := &provisioner.SCEP{
-				Type: "SCEP",
-				Name: "test@scep-<test>provisioner.com",
-			}
-			ctx := acme.NewProvisionerContext(context.Background(), prov)
+			ctx := acme.NewProvisionerContext(context.Background(), &fakeProvisioner{})
 			return test{
 				ctx:        ctx,
 				statusCode: 500,
