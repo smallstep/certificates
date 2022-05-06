@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
 	"github.com/smallstep/certificates/acme"
 	nosqlDB "github.com/smallstep/nosql"
 )
@@ -23,7 +24,7 @@ type dbExternalAccountKey struct {
 	ProvisionerID string    `json:"provisionerID"`
 	Reference     string    `json:"reference"`
 	AccountID     string    `json:"accountID,omitempty"`
-	KeyBytes      []byte    `json:"key"`
+	HmacKey       []byte    `json:"key"`
 	CreatedAt     time.Time `json:"createdAt"`
 	BoundAt       time.Time `json:"boundAt"`
 }
@@ -72,7 +73,7 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerID, refer
 		ID:            keyID,
 		ProvisionerID: provisionerID,
 		Reference:     reference,
-		KeyBytes:      random,
+		HmacKey:       random,
 		CreatedAt:     clock.Now(),
 	}
 
@@ -99,7 +100,7 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerID, refer
 		ProvisionerID: dbeak.ProvisionerID,
 		Reference:     dbeak.Reference,
 		AccountID:     dbeak.AccountID,
-		KeyBytes:      dbeak.KeyBytes,
+		HmacKey:       dbeak.HmacKey,
 		CreatedAt:     dbeak.CreatedAt,
 		BoundAt:       dbeak.BoundAt,
 	}, nil
@@ -124,7 +125,7 @@ func (db *DB) GetExternalAccountKey(ctx context.Context, provisionerID, keyID st
 		ProvisionerID: dbeak.ProvisionerID,
 		Reference:     dbeak.Reference,
 		AccountID:     dbeak.AccountID,
-		KeyBytes:      dbeak.KeyBytes,
+		HmacKey:       dbeak.HmacKey,
 		CreatedAt:     dbeak.CreatedAt,
 		BoundAt:       dbeak.BoundAt,
 	}, nil
@@ -191,7 +192,7 @@ func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerID, cursor 
 		}
 		keys = append(keys, &acme.ExternalAccountKey{
 			ID:            eak.ID,
-			KeyBytes:      eak.KeyBytes,
+			HmacKey:       eak.HmacKey,
 			ProvisionerID: eak.ProvisionerID,
 			Reference:     eak.Reference,
 			AccountID:     eak.AccountID,
@@ -226,6 +227,10 @@ func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerI
 	return db.GetExternalAccountKey(ctx, provisionerID, dbExternalAccountKeyReference.ExternalAccountKeyID)
 }
 
+func (db *DB) GetExternalAccountKeyByAccountID(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+	return nil, nil
+}
+
 func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerID string, eak *acme.ExternalAccountKey) error {
 	externalAccountKeyMutex.Lock()
 	defer externalAccountKeyMutex.Unlock()
@@ -252,7 +257,7 @@ func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerID string
 		ProvisionerID: eak.ProvisionerID,
 		Reference:     eak.Reference,
 		AccountID:     eak.AccountID,
-		KeyBytes:      eak.KeyBytes,
+		HmacKey:       eak.HmacKey,
 		CreatedAt:     eak.CreatedAt,
 		BoundAt:       eak.BoundAt,
 	}

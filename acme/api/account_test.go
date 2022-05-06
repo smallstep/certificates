@@ -13,10 +13,12 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+
+	"go.step.sm/crypto/jose"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/crypto/jose"
 )
 
 var (
@@ -41,8 +43,30 @@ func newProv() acme.Provisioner {
 	return p
 }
 
+func newProvWithOptions(options *provisioner.Options) acme.Provisioner {
+	// Initialize provisioners
+	p := &provisioner.ACME{
+		Type:    "ACME",
+		Name:    "test@acme-<test>provisioner.com",
+		Options: options,
+	}
+	if err := p.Init(provisioner.Config{Claims: globalProvisionerClaims}); err != nil {
+		fmt.Printf("%v", err)
+	}
+	return p
+}
+
 func newACMEProv(t *testing.T) *provisioner.ACME {
 	p := newProv()
+	a, ok := p.(*provisioner.ACME)
+	if !ok {
+		t.Fatal("not a valid ACME provisioner")
+	}
+	return a
+}
+
+func newACMEProvWithOptions(t *testing.T, options *provisioner.Options) *provisioner.ACME {
+	p := newProvWithOptions(options)
 	a, ok := p.(*provisioner.ACME)
 	if !ok {
 		t.Fatal("not a valid ACME provisioner")
@@ -558,7 +582,7 @@ func TestHandler_NewAccount(t *testing.T) {
 				ID:            "eakID",
 				ProvisionerID: provID,
 				Reference:     "testeak",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				CreatedAt:     time.Now(),
 			}
 			return test{
@@ -735,7 +759,7 @@ func TestHandler_NewAccount(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							KeyBytes:      []byte{1, 3, 3, 7},
+							HmacKey:       []byte{1, 3, 3, 7},
 							CreatedAt:     time.Now(),
 						}, nil
 					},

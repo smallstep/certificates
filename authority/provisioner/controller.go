@@ -21,11 +21,16 @@ type Controller struct {
 	IdentityFunc          GetIdentityFunc
 	AuthorizeRenewFunc    AuthorizeRenewFunc
 	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
+	policy                *policyEngine
 }
 
 // NewController initializes a new provisioner controller.
-func NewController(p Interface, claims *Claims, config Config) (*Controller, error) {
+func NewController(p Interface, claims *Claims, config Config, options *Options) (*Controller, error) {
 	claimer, err := NewClaimer(claims, config.Claims)
+	if err != nil {
+		return nil, err
+	}
+	policy, err := newPolicyEngine(options)
 	if err != nil {
 		return nil, err
 	}
@@ -36,6 +41,7 @@ func NewController(p Interface, claims *Claims, config Config) (*Controller, err
 		IdentityFunc:          config.GetIdentityFunc,
 		AuthorizeRenewFunc:    config.AuthorizeRenewFunc,
 		AuthorizeSSHRenewFunc: config.AuthorizeSSHRenewFunc,
+		policy:                policy,
 	}, nil
 }
 
@@ -191,4 +197,11 @@ func SanitizeSSHUserPrincipal(email string) string {
 			return '_'
 		}
 	}, strings.ToLower(email))
+}
+
+func (c *Controller) getPolicy() *policyEngine {
+	if c == nil {
+		return nil
+	}
+	return c.policy
 }

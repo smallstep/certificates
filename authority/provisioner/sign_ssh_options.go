@@ -4,11 +4,13 @@ import (
 	"crypto/rsa"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/keyutil"
 	"golang.org/x/crypto/ssh"
@@ -441,6 +443,53 @@ func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, o SignSSHOpti
 		return errs.BadRequest("ssh certificate key algorithm (DSA) is not supported")
 	default:
 		return nil
+	}
+}
+
+// sshNamePolicyValidator validates that the certificate (to be signed)
+// contains only allowed principals.
+type sshNamePolicyValidator struct {
+	hostPolicyEngine policy.HostPolicy
+	userPolicyEngine policy.UserPolicy
+}
+
+// newSSHNamePolicyValidator return a new SSH allow/deny validator.
+func newSSHNamePolicyValidator(host policy.HostPolicy, user policy.UserPolicy) *sshNamePolicyValidator {
+	return &sshNamePolicyValidator{
+		hostPolicyEngine: host,
+		userPolicyEngine: user,
+	}
+}
+
+// Valid validates that the certificate (to be signed) contains only allowed principals.
+func (v *sshNamePolicyValidator) Valid(cert *ssh.Certificate, _ SignSSHOptions) error {
+	if v.hostPolicyEngine == nil && v.userPolicyEngine == nil {
+		// no policy configured at all; allow anything
+		return nil
+	}
+
+	// Check the policy type to execute based on type of the certificate.
+	// We don't allow user certs if only a host policy engine is configured and
+	// the same for host certs: if only a user policy engine is configured, host
+	// certs are denied. When both policy engines are configured, the type of
+	// cert determines which policy engine is used.
+	switch cert.CertType {
+	case ssh.HostCert:
+		// when no host policy engine is configured, but a user policy engine is
+		// configured, the host certificate is denied.
+		if v.hostPolicyEngine == nil && v.userPolicyEngine != nil {
+			return errors.New("SSH host certificate not authorized")
+		}
+		return v.hostPolicyEngine.IsSSHCertificateAllowed(cert)
+	case ssh.UserCert:
+		// when no user policy engine is configured, but a host policy engine is
+		// configured, the user certificate is denied.
+		if v.userPolicyEngine == nil && v.hostPolicyEngine != nil {
+			return errors.New("SSH user certificate not authorized")
+		}
+		return v.userPolicyEngine.IsSSHCertificateAllowed(cert)
+	default:
+		return fmt.Errorf("unexpected SSH certificate type %d", cert.CertType) // satisfy return; shouldn't happen
 	}
 }
 

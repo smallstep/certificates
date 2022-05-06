@@ -131,8 +131,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if eak != nil { // means that we have a (valid) External Account Binding key that should be bound, updated and sent in the response
-			err := eak.BindTo(acc)
-			if err != nil {
+			if err := eak.BindTo(acc); err != nil {
 				render.Error(w, err)
 				return
 			}

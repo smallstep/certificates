@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/assert"
 )
 
 func TestKeyToID(t *testing.T) {
@@ -95,7 +96,7 @@ func TestExternalAccountKey_BindTo(t *testing.T) {
 				ID:            "eakID",
 				ProvisionerID: "provID",
 				Reference:     "ref",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 			},
 			acct: &Account{
 				ID: "accountID",
@@ -108,7 +109,7 @@ func TestExternalAccountKey_BindTo(t *testing.T) {
 				ID:            "eakID",
 				ProvisionerID: "provID",
 				Reference:     "ref",
-				KeyBytes:      []byte{1, 3, 3, 7},
+				HmacKey:       []byte{1, 3, 3, 7},
 				AccountID:     "someAccountID",
 				BoundAt:       boundAt,
 			},
@@ -138,7 +139,7 @@ func TestExternalAccountKey_BindTo(t *testing.T) {
 				assert.Equals(t, ae.Subproblems, tt.err.Subproblems)
 			} else {
 				assert.Equals(t, eak.AccountID, acct.ID)
-				assert.Equals(t, eak.KeyBytes, []byte{})
+				assert.Equals(t, eak.HmacKey, []byte{})
 				assert.NotNil(t, eak.BoundAt)
 			}
 		})

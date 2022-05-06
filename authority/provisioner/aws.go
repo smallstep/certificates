@@ -17,10 +17,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 // awsIssuer is the string used as issuer in the generated tokens.
@@ -421,7 +423,7 @@ func (p *AWS) Init(config Config) (err error) {
 	}
 
 	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
-	p.ctl, err = NewController(p, p.Claims, config)
+	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
@@ -476,6 +478,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		defaultPublicKeyValidator{},
 		commonNameValidator(payload.Claims.Subject),
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
 	), nil
 }
 
@@ -543,7 +546,7 @@ func (p *AWS) readURL(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("Request for metadata returned non-successful status code %d",
+	return nil, fmt.Errorf("request for metadata returned non-successful status code %d",
 		resp.StatusCode)
 }
 
@@ -576,7 +579,7 @@ func (p *AWS) readURLv2(url string) (*http.Response, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("Request for API token returned non-successful status code %d", resp.StatusCode)
+		return nil, fmt.Errorf("request for API token returned non-successful status code %d", resp.StatusCode)
 	}
 	token, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -754,5 +757,7 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		&sshCertValidityValidator{p.ctl.Claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
+		// Ensure that all principal names are allowed
+		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
 	), nil
 }
