@@ -15,16 +15,19 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/db"
+	"golang.org/x/crypto/ssh"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/tlsutil"
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
-	"golang.org/x/crypto/ssh"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+
+	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 )
 
 const uuidPattern = "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
@@ -34,6 +37,9 @@ type linkedCaClient struct {
 	client      linkedca.MajordomoClient
 	authorityID string
 }
+
+// interface guard
+var _ admin.DB = (*linkedCaClient)(nil)
 
 type linkedCAClaims struct {
 	jose.Claims
@@ -114,6 +120,13 @@ func newLinkedCAClient(token string) (*linkedCaClient, error) {
 		client:      linkedca.NewMajordomoClient(conn),
 		authorityID: authority,
 	}, nil
+}
+
+// IsLinkedCA is a sentinel function that can be used to
+// check if a linkedCaClient is the underlying type of an
+// admin.DB interface.
+func (c *linkedCaClient) IsLinkedCA() bool {
+	return true
 }
 
 func (c *linkedCaClient) Run() {
@@ -338,6 +351,22 @@ func (c *linkedCaClient) IsSSHRevoked(serial string) (bool, error) {
 		return false, errors.Wrap(err, "error getting certificate status")
 	}
 	return resp.Status != linkedca.RevocationStatus_ACTIVE, nil
+}
+
+func (c *linkedCaClient) CreateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+	return errors.New("not implemented yet")
+}
+
+func (c *linkedCaClient) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
+	return nil, errors.New("not implemented yet")
+}
+
+func (c *linkedCaClient) UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+	return errors.New("not implemented yet")
+}
+
+func (c *linkedCaClient) DeleteAuthorityPolicy(ctx context.Context) error {
+	return errors.New("not implemented yet")
 }
 
 func createProvisionerIdentity(prov provisioner.Interface) *linkedca.ProvisionerIdentity {

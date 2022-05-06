@@ -12,6 +12,7 @@ import (
 // CertificateAuthority is the interface implemented by a CA authority.
 type CertificateAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	AreSANsAllowed(ctx context.Context, sans []string) error
 	IsRevoked(sn string) (bool, error)
 	Revoke(context.Context, *authority.RevokeOptions) error
 	LoadProvisionerByName(string) (provisioner.Interface, error)
@@ -30,6 +31,7 @@ var clock Clock
 // Provisioner is an interface that implements a subset of the provisioner.Interface --
 // only those methods required by the ACME api/authority.
 type Provisioner interface {
+	AuthorizeOrderIdentifier(ctx context.Context, identifier provisioner.ACMEIdentifier) error
 	AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error)
 	AuthorizeRevoke(ctx context.Context, token string) error
 	GetID() string
@@ -40,14 +42,15 @@ type Provisioner interface {
 
 // MockProvisioner for testing
 type MockProvisioner struct {
-	Mret1                   interface{}
-	Merr                    error
-	MgetID                  func() string
-	MgetName                func() string
-	MauthorizeSign          func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
-	MauthorizeRevoke        func(ctx context.Context, token string) error
-	MdefaultTLSCertDuration func() time.Duration
-	MgetOptions             func() *provisioner.Options
+	Mret1                     interface{}
+	Merr                      error
+	MgetID                    func() string
+	MgetName                  func() string
+	MauthorizeOrderIdentifier func(ctx context.Context, identifier provisioner.ACMEIdentifier) error
+	MauthorizeSign            func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
+	MauthorizeRevoke          func(ctx context.Context, token string) error
+	MdefaultTLSCertDuration   func() time.Duration
+	MgetOptions               func() *provisioner.Options
 }
 
 // GetName mock
@@ -56,6 +59,14 @@ func (m *MockProvisioner) GetName() string {
 		return m.MgetName()
 	}
 	return m.Mret1.(string)
+}
+
+// AuthorizeOrderIdentifiers mock
+func (m *MockProvisioner) AuthorizeOrderIdentifier(ctx context.Context, identifier provisioner.ACMEIdentifier) error {
+	if m.MauthorizeOrderIdentifier != nil {
+		return m.MauthorizeOrderIdentifier(ctx, identifier)
+	}
+	return m.Merr
 }
 
 // AuthorizeSign mock

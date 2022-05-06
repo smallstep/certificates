@@ -16,9 +16,13 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+
+	"go.step.sm/crypto/pemutil"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
-	"go.step.sm/crypto/pemutil"
+	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 func TestNewOrderRequest_Validate(t *testing.T) {
@@ -667,6 +671,7 @@ func TestHandler_NewOrder(t *testing.T) {
 		baseURL.String(), escProvName)
 
 	type test struct {
+		ca         acme.CertificateAuthority
 		db         acme.DB
 		ctx        context.Context
 		nor        *NewOrderRequest
@@ -756,6 +761,222 @@ func TestHandler_NewOrder(t *testing.T) {
 				err:        acme.NewError(acme.ErrorMalformedType, "identifiers list cannot be empty"),
 			}
 		},
+		"fail/acmeProvisionerFromContext-error": func(t *testing.T) test {
+			acc := &acme.Account{ID: "accID"}
+			fr := &NewOrderRequest{
+				Identifiers: []acme.Identifier{
+					{Type: "dns", Value: "zap.internal"},
+				},
+			}
+			b, err := json.Marshal(fr)
+			assert.FatalError(t, err)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, &acme.MockProvisioner{})
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			return test{
+				ctx:        ctx,
+				statusCode: 500,
+				ca:         &mockCA{},
+				db: &acme.MockDB{
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, errors.New("force")
+					},
+				},
+				err: acme.NewErrorISE("error retrieving external account binding key: force"),
+			}
+		},
+		"fail/db.GetExternalAccountKeyByAccountID-error": func(t *testing.T) test {
+			acmeProv := newACMEProv(t)
+			acmeProv.RequireEAB = true
+			acc := &acme.Account{ID: "accID"}
+			fr := &NewOrderRequest{
+				Identifiers: []acme.Identifier{
+					{Type: "dns", Value: "zap.internal"},
+				},
+			}
+			b, err := json.Marshal(fr)
+			assert.FatalError(t, err)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, acmeProv)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			return test{
+				ctx:        ctx,
+				statusCode: 500,
+				ca:         &mockCA{},
+				db: &acme.MockDB{
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, errors.New("force")
+					},
+				},
+				err: acme.NewErrorISE("error retrieving external account binding key: force"),
+			}
+		},
+		"fail/newACMEPolicyEngine-error": func(t *testing.T) test {
+			acmeProv := newACMEProv(t)
+			acmeProv.RequireEAB = true
+			acc := &acme.Account{ID: "accID"}
+			fr := &NewOrderRequest{
+				Identifiers: []acme.Identifier{
+					{Type: "dns", Value: "zap.internal"},
+				},
+			}
+			b, err := json.Marshal(fr)
+			assert.FatalError(t, err)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, acmeProv)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			return test{
+				ctx:        ctx,
+				statusCode: 500,
+				ca:         &mockCA{},
+				db: &acme.MockDB{
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return &acme.ExternalAccountKey{
+							Policy: &acme.Policy{
+								X509: acme.X509Policy{
+									Allowed: acme.PolicyNames{
+										DNSNames: []string{"**.local"},
+									},
+								},
+							},
+						}, nil
+					},
+				},
+				err: acme.NewErrorISE("error creating ACME policy engine"),
+			}
+		},
+		"fail/isIdentifierAllowed-error": func(t *testing.T) test {
+			acmeProv := newACMEProv(t)
+			acmeProv.RequireEAB = true
+			acc := &acme.Account{ID: "accID"}
+			fr := &NewOrderRequest{
+				Identifiers: []acme.Identifier{
+					{Type: "dns", Value: "zap.internal"},
+				},
+			}
+			b, err := json.Marshal(fr)
+			assert.FatalError(t, err)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, acmeProv)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			return test{
+				ctx:        ctx,
+				statusCode: 400,
+				ca:         &mockCA{},
+				db: &acme.MockDB{
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return &acme.ExternalAccountKey{
+							Policy: &acme.Policy{
+								X509: acme.X509Policy{
+									Allowed: acme.PolicyNames{
+										DNSNames: []string{"*.local"},
+									},
+								},
+							},
+						}, nil
+					},
+				},
+				err: acme.NewError(acme.ErrorRejectedIdentifierType, "not authorized"),
+			}
+		},
+		"fail/prov.AuthorizeOrderIdentifier-error": func(t *testing.T) test {
+			options := &provisioner.Options{
+				X509: &provisioner.X509Options{
+					AllowedNames: &policy.X509NameOptions{
+						DNSDomains: []string{"*.local"},
+					},
+				},
+			}
+			provWithPolicy := newACMEProvWithOptions(t, options)
+			provWithPolicy.RequireEAB = true
+			acc := &acme.Account{ID: "accID"}
+			fr := &NewOrderRequest{
+				Identifiers: []acme.Identifier{
+					{Type: "dns", Value: "zap.internal"},
+				},
+			}
+			b, err := json.Marshal(fr)
+			assert.FatalError(t, err)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, provWithPolicy)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			return test{
+				ctx:        ctx,
+				statusCode: 400,
+				ca:         &mockCA{},
+				db: &acme.MockDB{
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return &acme.ExternalAccountKey{
+							Policy: &acme.Policy{
+								X509: acme.X509Policy{
+									Allowed: acme.PolicyNames{
+										DNSNames: []string{"*.internal"},
+									},
+								},
+							},
+						}, nil
+					},
+				},
+				err: acme.NewError(acme.ErrorRejectedIdentifierType, "not authorized"),
+			}
+		},
+		"fail/ca.AreSANsAllowed-error": func(t *testing.T) test {
+			options := &provisioner.Options{
+				X509: &provisioner.X509Options{
+					AllowedNames: &policy.X509NameOptions{
+						DNSDomains: []string{"*.internal"},
+					},
+				},
+			}
+			provWithPolicy := newACMEProvWithOptions(t, options)
+			provWithPolicy.RequireEAB = true
+			acc := &acme.Account{ID: "accID"}
+			fr := &NewOrderRequest{
+				Identifiers: []acme.Identifier{
+					{Type: "dns", Value: "zap.internal"},
+				},
+			}
+			b, err := json.Marshal(fr)
+			assert.FatalError(t, err)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, provWithPolicy)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			return test{
+				ctx:        ctx,
+				statusCode: 400,
+				ca: &mockCA{
+					MockAreSANsallowed: func(ctx context.Context, sans []string) error {
+						return errors.New("force: not authorized by authority")
+					},
+				},
+				db: &acme.MockDB{
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return &acme.ExternalAccountKey{
+							Policy: &acme.Policy{
+								X509: acme.X509Policy{
+									Allowed: acme.PolicyNames{
+										DNSNames: []string{"*.internal"},
+									},
+								},
+							},
+						}, nil
+					},
+				},
+				err: acme.NewError(acme.ErrorRejectedIdentifierType, "not authorized"),
+			}
+		},
 		"fail/error-h.newAuthorization": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accID"}
 			fr := &NewOrderRequest{
@@ -771,6 +992,7 @@ func TestHandler_NewOrder(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				statusCode: 500,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						assert.Equals(t, ch.AccountID, "accID")
@@ -779,6 +1001,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, ch.Status, acme.StatusPending)
 						assert.Equals(t, ch.Value, "zap.internal")
 						return errors.New("force")
+					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
 					},
 				},
 				err: acme.NewErrorISE("error creating challenge: force"),
@@ -804,6 +1031,7 @@ func TestHandler_NewOrder(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				statusCode: 500,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -849,6 +1077,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
 						return errors.New("force")
 					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
+					},
 				},
 				err: acme.NewErrorISE("error creating order: force"),
 			}
@@ -876,6 +1109,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch chCount {
@@ -945,6 +1179,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID, *az2ID})
 						return nil
 					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
+					},
 				},
 				vr: func(t *testing.T, o *acme.Order) {
 					now := clock.Now()
@@ -991,6 +1230,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -1036,6 +1276,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.Identifiers, nor.Identifiers)
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
 						return nil
+					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
 					},
 				},
 				vr: func(t *testing.T, o *acme.Order) {
@@ -1083,6 +1328,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -1128,6 +1374,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.Identifiers, nor.Identifiers)
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
 						return nil
+					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
 					},
 				},
 				vr: func(t *testing.T, o *acme.Order) {
@@ -1174,6 +1425,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -1219,6 +1471,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.Identifiers, nor.Identifiers)
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
 						return nil
+					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
 					},
 				},
 				vr: func(t *testing.T, o *acme.Order) {
@@ -1266,6 +1523,7 @@ func TestHandler_NewOrder(t *testing.T) {
 				ctx:        ctx,
 				statusCode: 201,
 				nor:        nor,
+				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -1312,6 +1570,11 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
 						return nil
 					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
+					},
 				},
 				vr: func(t *testing.T, o *acme.Order) {
 					testBufferDur := 5 * time.Second
@@ -1330,11 +1593,115 @@ func TestHandler_NewOrder(t *testing.T) {
 				},
 			}
 		},
+		"ok/default-naf-nbf-with-policy": func(t *testing.T) test {
+			options := &provisioner.Options{
+				X509: &provisioner.X509Options{
+					AllowedNames: &policy.X509NameOptions{
+						DNSDomains: []string{"*.internal"},
+					},
+				},
+			}
+			provWithPolicy := newACMEProvWithOptions(t, options)
+			provWithPolicy.RequireEAB = true
+			acc := &acme.Account{ID: "accID"}
+			nor := &NewOrderRequest{
+				Identifiers: []acme.Identifier{
+					{Type: "dns", Value: "zap.internal"},
+				},
+			}
+			b, err := json.Marshal(nor)
+			assert.FatalError(t, err)
+			ctx := context.WithValue(context.Background(), provisionerContextKey, provWithPolicy)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+			var (
+				ch1, ch2, ch3 **acme.Challenge
+				az1ID         *string
+				count         = 0
+			)
+			return test{
+				ctx:        ctx,
+				statusCode: 201,
+				nor:        nor,
+				ca:         &mockCA{},
+				db: &acme.MockDB{
+					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
+						switch count {
+						case 0:
+							ch.ID = "dns"
+							assert.Equals(t, ch.Type, acme.DNS01)
+							ch1 = &ch
+						case 1:
+							ch.ID = "http"
+							assert.Equals(t, ch.Type, acme.HTTP01)
+							ch2 = &ch
+						case 2:
+							ch.ID = "tls"
+							assert.Equals(t, ch.Type, acme.TLSALPN01)
+							ch3 = &ch
+						default:
+							assert.FatalError(t, errors.New("test logic error"))
+							return errors.New("force")
+						}
+						count++
+						assert.Equals(t, ch.AccountID, "accID")
+						assert.NotEquals(t, ch.Token, "")
+						assert.Equals(t, ch.Status, acme.StatusPending)
+						assert.Equals(t, ch.Value, "zap.internal")
+						return nil
+					},
+					MockCreateAuthorization: func(ctx context.Context, az *acme.Authorization) error {
+						az.ID = "az1ID"
+						az1ID = &az.ID
+						assert.Equals(t, az.AccountID, "accID")
+						assert.NotEquals(t, az.Token, "")
+						assert.Equals(t, az.Status, acme.StatusPending)
+						assert.Equals(t, az.Identifier, nor.Identifiers[0])
+						assert.Equals(t, az.Challenges, []*acme.Challenge{*ch1, *ch2, *ch3})
+						assert.Equals(t, az.Wildcard, false)
+						return nil
+					},
+					MockCreateOrder: func(ctx context.Context, o *acme.Order) error {
+						o.ID = "ordID"
+						assert.Equals(t, o.AccountID, "accID")
+						assert.Equals(t, o.ProvisionerID, prov.GetID())
+						assert.Equals(t, o.Status, acme.StatusPending)
+						assert.Equals(t, o.Identifiers, nor.Identifiers)
+						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
+						return nil
+					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
+					},
+				},
+				vr: func(t *testing.T, o *acme.Order) {
+					now := clock.Now()
+					testBufferDur := 5 * time.Second
+					orderExpiry := now.Add(defaultOrderExpiry)
+					expNbf := now.Add(-defaultOrderBackdate)
+					expNaf := now.Add(prov.DefaultTLSCertDuration())
+
+					assert.Equals(t, o.ID, "ordID")
+					assert.Equals(t, o.Status, acme.StatusPending)
+					assert.Equals(t, o.Identifiers, nor.Identifiers)
+					assert.Equals(t, o.AuthorizationURLs, []string{fmt.Sprintf("%s/acme/%s/authz/az1ID", baseURL.String(), escProvName)})
+					assert.True(t, o.NotBefore.Add(-testBufferDur).Before(expNbf))
+					assert.True(t, o.NotBefore.Add(testBufferDur).After(expNbf))
+					assert.True(t, o.NotAfter.Add(-testBufferDur).Before(expNaf))
+					assert.True(t, o.NotAfter.Add(testBufferDur).After(expNaf))
+					assert.True(t, o.ExpiresAt.Add(-testBufferDur).Before(orderExpiry))
+					assert.True(t, o.ExpiresAt.Add(testBufferDur).After(orderExpiry))
+				},
+			}
+		},
 	}
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db}
+			h := &Handler{linker: NewLinker("dns", "acme"), db: tc.db, ca: tc.ca}
 			req := httptest.NewRequest("GET", u, nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()

@@ -5,8 +5,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/authority/policy"
 )
 
 // CertificateOptions is an interface that returns a list of options passed when
@@ -56,11 +59,46 @@ type X509Options struct {
 	// TemplateData is a JSON object with variables that can be used in custom
 	// templates.
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
+
+	// AllowedNames contains the SANs the provisioner is authorized to sign
+	AllowedNames *policy.X509NameOptions `json:"-"`
+
+	// DeniedNames contains the SANs the provisioner is not authorized to sign
+	DeniedNames *policy.X509NameOptions `json:"-"`
+
+	// AllowWildcardNames indicates if literal wildcard names
+	// like *.example.com are allowed. Defaults to false.
+	AllowWildcardNames bool `json:"-"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
 func (o *X509Options) HasTemplate() bool {
 	return o != nil && (o.Template != "" || o.TemplateFile != "")
+}
+
+// GetAllowedNameOptions returns the AllowedNames, which models the
+// SANs that a provisioner is authorized to sign x509 certificates for.
+func (o *X509Options) GetAllowedNameOptions() *policy.X509NameOptions {
+	if o == nil {
+		return nil
+	}
+	return o.AllowedNames
+}
+
+// GetDeniedNameOptions returns the DeniedNames, which models the
+// SANs that a provisioner is NOT authorized to sign x509 certificates for.
+func (o *X509Options) GetDeniedNameOptions() *policy.X509NameOptions {
+	if o == nil {
+		return nil
+	}
+	return o.DeniedNames
+}
+
+func (o *X509Options) AreWildcardNamesAllowed() bool {
+	if o == nil {
+		return true
+	}
+	return o.AllowWildcardNames
 }
 
 // TemplateOptions generates a CertificateOptions with the template and data

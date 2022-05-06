@@ -10,11 +10,13 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 // NOTE: There can be at most one kubernetes service account provisioner configured
@@ -91,6 +93,7 @@ func (p *K8sSA) GetEncryptedKey() (string, string, bool) {
 
 // Init initializes and validates the fields of a K8sSA type.
 func (p *K8sSA) Init(config Config) (err error) {
+
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -137,7 +140,7 @@ func (p *K8sSA) Init(config Config) (err error) {
 		p.kauthn = k8s.AuthenticationV1()
 	*/
 
-	p.ctl, err = NewController(p, p.Claims, config)
+	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
@@ -239,6 +242,7 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
 	}, nil
 }
 
@@ -281,6 +285,8 @@ func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		&sshCertValidityValidator{p.ctl.Claimer},
 		// Require and validate all the default fields in the SSH certificate.
 		&sshCertDefaultValidator{},
+		// Ensure that all principal names are allowed
+		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), p.ctl.getPolicy().getSSHUser()),
 	), nil
 }
 

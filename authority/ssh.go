@@ -5,18 +5,23 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/randutil"
+	"go.step.sm/crypto/sshutil"
 
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	policy "github.com/smallstep/certificates/policy"
 	"github.com/smallstep/certificates/templates"
-	"go.step.sm/crypto/randutil"
-	"go.step.sm/crypto/sshutil"
-	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -241,6 +246,23 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		return nil, errs.InternalServer("authority.SignSSH: unexpected ssh certificate type: %d", certTpl.CertType)
 	}
 
+	// Check if authority is allowed to sign the certificate
+	if err := a.isAllowedToSignSSHCertificate(certTpl); err != nil {
+		var pe *policy.NamePolicyError
+		if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
+			return nil, &errs.Error{
+				// NOTE: custom forbidden error, so that denied name is sent to client
+				// as well as shown in the logs.
+				Status: http.StatusForbidden,
+				Err:    fmt.Errorf("authority not allowed to sign: %w", err),
+				Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
+			}
+		}
+		return nil, errs.InternalServerErr(err,
+			errs.WithMessage("authority.SignSSH: error creating ssh certificate"),
+		)
+	}
+
 	// Sign certificate.
 	cert, err := sshutil.CreateCertificate(certTpl, signer)
 	if err != nil {
@@ -259,6 +281,11 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	}
 
 	return cert, nil
+}
+
+// isAllowedToSignSSHCertificate checks if the Authority is allowed to sign the SSH certificate.
+func (a *Authority) isAllowedToSignSSHCertificate(cert *ssh.Certificate) error {
+	return a.policyEngine.IsSSHCertificateAllowed(cert)
 }
 
 // RenewSSH creates a signed SSH certificate using the old SSH certificate as a template.

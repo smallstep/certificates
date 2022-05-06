@@ -6,6 +6,8 @@ import (
 
 	"github.com/pkg/errors"
 	"go.step.sm/crypto/sshutil"
+
+	"github.com/smallstep/certificates/authority/policy"
 )
 
 // SSHCertificateOptions is an interface that returns a list of options passed when
@@ -33,6 +35,60 @@ type SSHOptions struct {
 	// TemplateData is a JSON object with variables that can be used in custom
 	// templates.
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
+
+	// User contains SSH user certificate options.
+	User *policy.SSHUserCertificateOptions `json:"-"`
+
+	// Host contains SSH host certificate options.
+	Host *policy.SSHHostCertificateOptions `json:"-"`
+}
+
+// GetAllowedUserNameOptions returns the SSHNameOptions that are
+// allowed when SSH User certificates are requested.
+func (o *SSHOptions) GetAllowedUserNameOptions() *policy.SSHNameOptions {
+	if o == nil {
+		return nil
+	}
+	if o.User == nil {
+		return nil
+	}
+	return o.User.AllowedNames
+}
+
+// GetDeniedUserNameOptions returns the SSHNameOptions that are
+// denied when SSH user certificates are requested.
+func (o *SSHOptions) GetDeniedUserNameOptions() *policy.SSHNameOptions {
+	if o == nil {
+		return nil
+	}
+	if o.User == nil {
+		return nil
+	}
+	return o.User.DeniedNames
+}
+
+// GetAllowedHostNameOptions returns the SSHNameOptions that are
+// allowed when SSH host certificates are requested.
+func (o *SSHOptions) GetAllowedHostNameOptions() *policy.SSHNameOptions {
+	if o == nil {
+		return nil
+	}
+	if o.Host == nil {
+		return nil
+	}
+	return o.Host.AllowedNames
+}
+
+// GetDeniedHostNameOptions returns the SSHNameOptions that are
+// denied when SSH host certificates are requested.
+func (o *SSHOptions) GetDeniedHostNameOptions() *policy.SSHNameOptions {
+	if o == nil {
+		return nil
+	}
+	if o.Host == nil {
+		return nil
+	}
+	return o.Host.DeniedNames
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.

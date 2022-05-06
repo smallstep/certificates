@@ -287,3 +287,38 @@ func Test_unsafeParseSigned(t *testing.T) {
 		})
 	}
 }
+
+func TestX509Options_IsWildcardLiteralAllowed(t *testing.T) {
+	tests := []struct {
+		name    string
+		options *X509Options
+		want    bool
+	}{
+		{
+			name:    "nil-options",
+			options: nil,
+			want:    true,
+		},
+		{
+			name: "set-true",
+			options: &X509Options{
+				AllowWildcardNames: true,
+			},
+			want: true,
+		},
+		{
+			name: "set-false",
+			options: &X509Options{
+				AllowWildcardNames: false,
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.options.AreWildcardNamesAllowed(); got != tt.want {
+				t.Errorf("X509PolicyOptions.IsWildcardLiteralAllowed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -4,20 +4,24 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/authority/admin"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"go.step.sm/linkedca"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/authority/admin"
 )
 
 func readProtoJSON(r io.ReadCloser, m proto.Message) error {
@@ -32,106 +36,76 @@ func readProtoJSON(r io.ReadCloser, m proto.Message) error {
 func TestHandler_requireEABEnabled(t *testing.T) {
 	type test struct {
 		ctx        context.Context
-		adminDB    admin.DB
-		auth       adminAuthority
-		next       nextHTTP
+		next       http.HandlerFunc
 		err        *admin.Error
 		statusCode int
 	}
 	var tests = map[string]func(t *testing.T) test{
-		"fail/h.provisionerHasEABEnabled": func(t *testing.T) test {
-			chiCtx := chi.NewRouteContext()
-			chiCtx.URLParams.Add("provisionerName", "provName")
-			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &mockAdminAuthority{
-				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
-					assert.Equals(t, "provName", name)
-					return nil, errors.New("force")
-				},
+		"fail/prov.GetDetails": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Id:   "provID",
+				Name: "provName",
 			}
-			err := admin.NewErrorISE("error loading provisioner provName: force")
-			err.Message = "error loading provisioner provName: force"
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
+			err := admin.NewErrorISE("error getting ACME details for provisioner 'provName'")
+			err.Message = "error getting ACME details for provisioner 'provName'"
 			return test{
 				ctx:        ctx,
-				auth:       auth,
+				err:        err,
+				statusCode: 500,
+			}
+		},
+		"fail/prov.GetDetails.GetACME": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Id:      "provID",
+				Name:    "provName",
+				Details: &linkedca.ProvisionerDetails{},
+			}
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
+			err := admin.NewErrorISE("error getting ACME details for provisioner 'provName'")
+			err.Message = "error getting ACME details for provisioner 'provName'"
+			return test{
+				ctx:        ctx,
 				err:        err,
 				statusCode: 500,
 			}
 		},
 		"ok/eab-disabled": func(t *testing.T) test {
-			chiCtx := chi.NewRouteContext()
-			chiCtx.URLParams.Add("provisionerName", "provName")
-			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &mockAdminAuthority{
-				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
-					assert.Equals(t, "provName", name)
-					return &provisioner.MockProvisioner{
-						MgetID: func() string {
-							return "provID"
+			prov := &linkedca.Provisioner{
+				Id:   "provID",
+				Name: "provName",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_ACME{
+						ACME: &linkedca.ACMEProvisioner{
+							RequireEab: false,
 						},
-					}, nil
+					},
 				},
 			}
-			db := &admin.MockDB{
-				MockGetProvisioner: func(ctx context.Context, id string) (*linkedca.Provisioner, error) {
-					assert.Equals(t, "provID", id)
-					return &linkedca.Provisioner{
-						Id:   "provID",
-						Name: "provName",
-						Details: &linkedca.ProvisionerDetails{
-							Data: &linkedca.ProvisionerDetails_ACME{
-								ACME: &linkedca.ACMEProvisioner{
-									RequireEab: false,
-								},
-							},
-						},
-					}, nil
-				},
-			}
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
 			err := admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner provName")
-			err.Message = "ACME EAB not enabled for provisioner provName"
+			err.Message = "ACME EAB not enabled for provisioner 'provName'"
 			return test{
 				ctx:        ctx,
-				auth:       auth,
-				adminDB:    db,
 				err:        err,
 				statusCode: 400,
 			}
 		},
 		"ok/eab-enabled": func(t *testing.T) test {
-			chiCtx := chi.NewRouteContext()
-			chiCtx.URLParams.Add("provisionerName", "provName")
-			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
-			auth := &mockAdminAuthority{
-				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
-					assert.Equals(t, "provName", name)
-					return &provisioner.MockProvisioner{
-						MgetID: func() string {
-							return "provID"
+			prov := &linkedca.Provisioner{
+				Id:   "provID",
+				Name: "provName",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_ACME{
+						ACME: &linkedca.ACMEProvisioner{
+							RequireEab: true,
 						},
-					}, nil
+					},
 				},
 			}
-			db := &admin.MockDB{
-				MockGetProvisioner: func(ctx context.Context, id string) (*linkedca.Provisioner, error) {
-					assert.Equals(t, "provID", id)
-					return &linkedca.Provisioner{
-						Id:   "provID",
-						Name: "provName",
-						Details: &linkedca.ProvisionerDetails{
-							Data: &linkedca.ProvisionerDetails_ACME{
-								ACME: &linkedca.ACMEProvisioner{
-									RequireEab: true,
-								},
-							},
-						},
-					}, nil
-				},
-			}
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
 			return test{
-				ctx:     ctx,
-				auth:    auth,
-				adminDB: db,
+				ctx: ctx,
 				next: func(w http.ResponseWriter, r *http.Request) {
 					w.Write(nil) // mock response with status 200
 				},
@@ -143,13 +117,9 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth:    tc.auth,
-				adminDB: tc.adminDB,
-				acmeDB:  nil,
-			}
+			h := &Handler{}
 
-			req := httptest.NewRequest("GET", "/foo", nil) // chi routing is prepared in test setup
+			req := httptest.NewRequest("GET", "/foo", nil)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			h.requireEABEnabled(tc.next)(w, req)
@@ -171,216 +141,6 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 				assert.Equals(t, tc.err.Detail, err.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
 				return
-			}
-		})
-	}
-}
-
-func TestHandler_provisionerHasEABEnabled(t *testing.T) {
-	type test struct {
-		adminDB         admin.DB
-		auth            adminAuthority
-		provisionerName string
-		want            bool
-		err             *admin.Error
-	}
-	var tests = map[string]func(t *testing.T) test{
-		"fail/auth.LoadProvisionerByName": func(t *testing.T) test {
-			auth := &mockAdminAuthority{
-				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
-					assert.Equals(t, "provName", name)
-					return nil, errors.New("force")
-				},
-			}
-			return test{
-				auth:            auth,
-				provisionerName: "provName",
-				want:            false,
-				err:             admin.WrapErrorISE(errors.New("force"), "error loading provisioner provName"),
-			}
-		},
-		"fail/db.GetProvisioner": func(t *testing.T) test {
-			auth := &mockAdminAuthority{
-				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
-					assert.Equals(t, "provName", name)
-					return &provisioner.MockProvisioner{
-						MgetID: func() string {
-							return "provID"
-						},
-					}, nil
-				},
-			}
-			db := &admin.MockDB{
-				MockGetProvisioner: func(ctx context.Context, id string) (*linkedca.Provisioner, error) {
-					assert.Equals(t, "provID", id)
-					return nil, errors.New("force")
-				},
-			}
-			return test{
-				auth:            auth,
-				adminDB:         db,
-				provisionerName: "provName",
-				want:            false,
-				err:             admin.WrapErrorISE(errors.New("force"), "error loading provisioner provName"),
-			}
-		},
-		"fail/prov.GetDetails": func(t *testing.T) test {
-			auth := &mockAdminAuthority{
-				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
-					assert.Equals(t, "provName", name)
-					return &provisioner.MockProvisioner{
-						MgetID: func() string {
-							return "provID"
-						},
-					}, nil
-				},
-			}
-			db := &admin.MockDB{
-				MockGetProvisioner: func(ctx context.Context, id string) (*linkedca.Provisioner, error) {
-					assert.Equals(t, "provID", id)
-					return &linkedca.Provisioner{
-						Id:      "provID",
-						Name:    "provName",
-						Details: nil,
-					}, nil
-				},
-			}
-			return test{
-				auth:            auth,
-				adminDB:         db,
-				provisionerName: "provName",
-				want:            false,
-				err:             admin.WrapErrorISE(errors.New("force"), "error loading provisioner provName"),
-			}
-		},
-		"fail/details.GetACME": func(t *testing.T) test {
-			auth := &mockAdminAuthority{
-				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
-					assert.Equals(t, "provName", name)
-					return &provisioner.MockProvisioner{
-						MgetID: func() string {
-							return "provID"
-						},
-					}, nil
-				},
-			}
-			db := &admin.MockDB{
-				MockGetProvisioner: func(ctx context.Context, id string) (*linkedca.Provisioner, error) {
-					assert.Equals(t, "provID", id)
-					return &linkedca.Provisioner{
-						Id:   "provID",
-						Name: "provName",
-						Details: &linkedca.ProvisionerDetails{
-							Data: &linkedca.ProvisionerDetails_ACME{
-								ACME: nil,
-							},
-						},
-					}, nil
-				},
-			}
-			return test{
-				auth:            auth,
-				adminDB:         db,
-				provisionerName: "provName",
-				want:            false,
-				err:             admin.WrapErrorISE(errors.New("force"), "error loading provisioner provName"),
-			}
-		},
-		"ok/eab-disabled": func(t *testing.T) test {
-			auth := &mockAdminAuthority{
-				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
-					assert.Equals(t, "eab-disabled", name)
-					return &provisioner.MockProvisioner{
-						MgetID: func() string {
-							return "provID"
-						},
-					}, nil
-				},
-			}
-			db := &admin.MockDB{
-				MockGetProvisioner: func(ctx context.Context, id string) (*linkedca.Provisioner, error) {
-					assert.Equals(t, "provID", id)
-					return &linkedca.Provisioner{
-						Id:   "provID",
-						Name: "eab-disabled",
-						Details: &linkedca.ProvisionerDetails{
-							Data: &linkedca.ProvisionerDetails_ACME{
-								ACME: &linkedca.ACMEProvisioner{
-									RequireEab: false,
-								},
-							},
-						},
-					}, nil
-				},
-			}
-			return test{
-				adminDB:         db,
-				auth:            auth,
-				provisionerName: "eab-disabled",
-				want:            false,
-			}
-		},
-		"ok/eab-enabled": func(t *testing.T) test {
-			auth := &mockAdminAuthority{
-				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
-					assert.Equals(t, "eab-enabled", name)
-					return &provisioner.MockProvisioner{
-						MgetID: func() string {
-							return "provID"
-						},
-					}, nil
-				},
-			}
-			db := &admin.MockDB{
-				MockGetProvisioner: func(ctx context.Context, id string) (*linkedca.Provisioner, error) {
-					assert.Equals(t, "provID", id)
-					return &linkedca.Provisioner{
-						Id:   "provID",
-						Name: "eab-enabled",
-						Details: &linkedca.ProvisionerDetails{
-							Data: &linkedca.ProvisionerDetails_ACME{
-								ACME: &linkedca.ACMEProvisioner{
-									RequireEab: true,
-								},
-							},
-						},
-					}, nil
-				},
-			}
-			return test{
-				adminDB:         db,
-				auth:            auth,
-				provisionerName: "eab-enabled",
-				want:            true,
-			}
-		},
-	}
-	for name, prep := range tests {
-		tc := prep(t)
-		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth:    tc.auth,
-				adminDB: tc.adminDB,
-				acmeDB:  nil,
-			}
-			got, prov, err := h.provisionerHasEABEnabled(context.TODO(), tc.provisionerName)
-			if (err != nil) != (tc.err != nil) {
-				t.Errorf("Handler.provisionerHasEABEnabled() error = %v, want err %v", err, tc.err)
-				return
-			}
-			if tc.err != nil {
-				assert.Type(t, &linkedca.Provisioner{}, prov)
-				assert.Type(t, &admin.Error{}, err)
-				adminError, _ := err.(*admin.Error)
-				assert.Equals(t, tc.err.Type, adminError.Type)
-				assert.Equals(t, tc.err.Status, adminError.Status)
-				assert.Equals(t, tc.err.StatusCode(), adminError.StatusCode())
-				assert.Equals(t, tc.err.Message, adminError.Message)
-				assert.Equals(t, tc.err.Detail, adminError.Detail)
-				return
-			}
-			if got != tc.want {
-				t.Errorf("Handler.provisionerHasEABEnabled() = %v, want %v", got, tc.want)
 			}
 		})
 	}
@@ -582,6 +342,209 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 			assert.Equals(t, tc.err.StatusCode(), res.StatusCode)
 			assert.Equals(t, tc.err.Detail, adminErr.Detail)
 			assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+		})
+	}
+}
+
+func Test_eakToLinked(t *testing.T) {
+	tests := []struct {
+		name string
+		k    *acme.ExternalAccountKey
+		want *linkedca.EABKey
+	}{
+		{
+			name: "no-key",
+			k:    nil,
+			want: nil,
+		},
+		{
+			name: "no-policy",
+			k: &acme.ExternalAccountKey{
+				ID:            "keyID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				AccountID:     "accID",
+				HmacKey:       []byte{1, 3, 3, 7},
+				CreatedAt:     time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour),
+				BoundAt:       time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC),
+				Policy:        nil,
+			},
+			want: &linkedca.EABKey{
+				Id:          "keyID",
+				Provisioner: "provID",
+				HmacKey:     []byte{1, 3, 3, 7},
+				Reference:   "ref",
+				Account:     "accID",
+				CreatedAt:   timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour)),
+				BoundAt:     timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC)),
+				Policy:      nil,
+			},
+		},
+		{
+			name: "with-policy",
+			k: &acme.ExternalAccountKey{
+				ID:            "keyID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				AccountID:     "accID",
+				HmacKey:       []byte{1, 3, 3, 7},
+				CreatedAt:     time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour),
+				BoundAt:       time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC),
+				Policy: &acme.Policy{
+					X509: acme.X509Policy{
+						Allowed: acme.PolicyNames{
+							DNSNames: []string{"*.local"},
+							IPRanges: []string{"10.0.0.0/24"},
+						},
+						Denied: acme.PolicyNames{
+							DNSNames: []string{"badhost.local"},
+							IPRanges: []string{"10.0.0.30"},
+						},
+					},
+				},
+			},
+			want: &linkedca.EABKey{
+				Id:          "keyID",
+				Provisioner: "provID",
+				HmacKey:     []byte{1, 3, 3, 7},
+				Reference:   "ref",
+				Account:     "accID",
+				CreatedAt:   timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour)),
+				BoundAt:     timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC)),
+				Policy: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns: []string{"*.local"},
+							Ips: []string{"10.0.0.0/24"},
+						},
+						Deny: &linkedca.X509Names{
+							Dns: []string{"badhost.local"},
+							Ips: []string{"10.0.0.30"},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := eakToLinked(tt.k); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("eakToLinked() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_linkedEAKToCertificates(t *testing.T) {
+	tests := []struct {
+		name string
+		k    *linkedca.EABKey
+		want *acme.ExternalAccountKey
+	}{
+		{
+			name: "no-key",
+			k:    nil,
+			want: nil,
+		},
+		{
+			name: "no-policy",
+			k: &linkedca.EABKey{
+				Id:          "keyID",
+				Provisioner: "provID",
+				HmacKey:     []byte{1, 3, 3, 7},
+				Reference:   "ref",
+				Account:     "accID",
+				CreatedAt:   timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour)),
+				BoundAt:     timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC)),
+				Policy:      nil,
+			},
+			want: &acme.ExternalAccountKey{
+				ID:            "keyID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				AccountID:     "accID",
+				HmacKey:       []byte{1, 3, 3, 7},
+				CreatedAt:     time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour),
+				BoundAt:       time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC),
+				Policy:        nil,
+			},
+		},
+		{
+			name: "no-x509-policy",
+			k: &linkedca.EABKey{
+				Id:          "keyID",
+				Provisioner: "provID",
+				HmacKey:     []byte{1, 3, 3, 7},
+				Reference:   "ref",
+				Account:     "accID",
+				CreatedAt:   timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour)),
+				BoundAt:     timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC)),
+				Policy:      &linkedca.Policy{},
+			},
+			want: &acme.ExternalAccountKey{
+				ID:            "keyID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				AccountID:     "accID",
+				HmacKey:       []byte{1, 3, 3, 7},
+				CreatedAt:     time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour),
+				BoundAt:       time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC),
+				Policy:        &acme.Policy{},
+			},
+		},
+		{
+			name: "with-x509-policy",
+			k: &linkedca.EABKey{
+				Id:          "keyID",
+				Provisioner: "provID",
+				HmacKey:     []byte{1, 3, 3, 7},
+				Reference:   "ref",
+				Account:     "accID",
+				CreatedAt:   timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour)),
+				BoundAt:     timestamppb.New(time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC)),
+				Policy: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns: []string{"*.local"},
+							Ips: []string{"10.0.0.0/24"},
+						},
+						Deny: &linkedca.X509Names{
+							Dns: []string{"badhost.local"},
+							Ips: []string{"10.0.0.30"},
+						},
+						AllowWildcardNames: true,
+					},
+				},
+			},
+			want: &acme.ExternalAccountKey{
+				ID:            "keyID",
+				ProvisionerID: "provID",
+				Reference:     "ref",
+				AccountID:     "accID",
+				HmacKey:       []byte{1, 3, 3, 7},
+				CreatedAt:     time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC).Add(-1 * time.Hour),
+				BoundAt:       time.Date(2022, 04, 12, 9, 30, 30, 0, time.UTC),
+				Policy: &acme.Policy{
+					X509: acme.X509Policy{
+						Allowed: acme.PolicyNames{
+							DNSNames: []string{"*.local"},
+							IPRanges: []string{"10.0.0.0/24"},
+						},
+						Denied: acme.PolicyNames{
+							DNSNames: []string{"badhost.local"},
+							IPRanges: []string{"10.0.0.30"},
+						},
+						AllowWildcardNames: true,
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := linkedEAKToCertificates(tt.k); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("linkedEAKToCertificates() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
