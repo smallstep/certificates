@@ -28,14 +28,30 @@ func WithAllowLiteralWildcardNames() NamePolicyOption {
 
 func WithPermittedCommonNames(commonNames ...string) NamePolicyOption {
 	return func(g *NamePolicyEngine) error {
-		g.permittedCommonNames = commonNames
+		normalizedCommonNames := make([]string, len(commonNames))
+		for i, commonName := range commonNames {
+			normalizedCommonName, err := normalizeAndValidateCommonName(commonName)
+			if err != nil {
+				return fmt.Errorf("cannot parse permitted common name constraint %q: %w", commonName, err)
+			}
+			normalizedCommonNames[i] = normalizedCommonName
+		}
+		g.permittedCommonNames = normalizedCommonNames
 		return nil
 	}
 }
 
 func WithExcludedCommonNames(commonNames ...string) NamePolicyOption {
 	return func(g *NamePolicyEngine) error {
-		g.excludedCommonNames = commonNames
+		normalizedCommonNames := make([]string, len(commonNames))
+		for i, commonName := range commonNames {
+			normalizedCommonName, err := normalizeAndValidateCommonName(commonName)
+			if err != nil {
+				return fmt.Errorf("cannot parse excluded common name constraint %q: %w", commonName, err)
+			}
+			normalizedCommonNames[i] = normalizedCommonName
+		}
+		g.excludedCommonNames = normalizedCommonNames
 		return nil
 	}
 }
@@ -240,6 +256,17 @@ func networkFor(ip net.IP) *net.IPNet {
 
 func isIPv4(ip net.IP) bool {
 	return ip.To4() != nil
+}
+
+func normalizeAndValidateCommonName(constraint string) (string, error) {
+	normalizedConstraint := strings.ToLower(strings.TrimSpace(constraint))
+	if normalizedConstraint == "" {
+		return "", fmt.Errorf("contraint %q can not be empty or white space string", constraint)
+	}
+	if normalizedConstraint == "*" {
+		return "", fmt.Errorf("wildcard constraint %q is not supported", constraint)
+	}
+	return normalizedConstraint, nil
 }
 
 func normalizeAndValidateDNSDomainConstraint(constraint string) (string, error) {

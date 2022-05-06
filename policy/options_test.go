@@ -8,6 +8,46 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_normalizeAndValidateCommonName(t *testing.T) {
+	tests := []struct {
+		name       string
+		constraint string
+		want       string
+		wantErr    bool
+	}{
+		{
+			name:       "fail/empty-constraint",
+			constraint: "",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "fail/wildcard",
+			constraint: "*",
+			want:       "",
+			wantErr:    true,
+		},
+		{
+			name:       "ok",
+			constraint: "step",
+			want:       "step",
+			wantErr:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizeAndValidateCommonName(tt.constraint)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("normalizeAndValidateCommonName() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("normalizeAndValidateCommonName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_normalizeAndValidateDNSDomainConstraint(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -196,6 +236,24 @@ func TestNew(t *testing.T) {
 		wantErr bool
 	}
 	var tests = map[string]func(t *testing.T) test{
+		"fail/with-permitted-common-name": func(t *testing.T) test {
+			return test{
+				options: []NamePolicyOption{
+					WithPermittedCommonNames("*"),
+				},
+				want:    nil,
+				wantErr: true,
+			}
+		},
+		"fail/with-excluded-common-name": func(t *testing.T) test {
+			return test{
+				options: []NamePolicyOption{
+					WithExcludedCommonNames(""),
+				},
+				want:    nil,
+				wantErr: true,
+			}
+		},
 		"fail/with-permitted-dns-domains": func(t *testing.T) test {
 			return test{
 				options: []NamePolicyOption{

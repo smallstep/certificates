@@ -639,5 +639,9 @@ func matchPrincipalConstraint(principal, constraint string) (bool, error) {
 
 // matchCommonNameConstraint performs a string literal equality check against constraint.
 func matchCommonNameConstraint(commonName, constraint string) (bool, error) {
+	// wildcard constraint is (currently) not supported for common names
+	if constraint == "*" {
+		return false, nil
+	}
 	return strings.EqualFold(commonName, constraint), nil
 }

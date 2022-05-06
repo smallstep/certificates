@@ -2492,6 +2492,7 @@ func TestNamePolicyEngine_X509_AllAllowed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			engine, err := New(tt.options...)
 			assert.NoError(t, err)
+			assert.NotNil(t, engine)
 			gotErr := engine.IsX509CertificateAllowed(tt.cert)
 			wantErr := tt.wantErr != nil
 
