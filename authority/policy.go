@@ -155,7 +155,7 @@ func (a *Authority) checkProvisionerPolicy(ctx context.Context, currentAdmin *li
 func (a *Authority) checkPolicy(ctx context.Context, currentAdmin *linkedca.Admin, otherAdmins []*linkedca.Admin, p *linkedca.Policy) error {
 
 	// convert the policy; return early if nil
-	policyOptions := authPolicy.PolicyToCertificates(p)
+	policyOptions := authPolicy.LinkedToCertificates(p)
 	if policyOptions == nil {
 		return nil
 	}
@@ -222,7 +222,7 @@ func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
 				return fmt.Errorf("error getting policy to (re)load policy engines: %w", err)
 			}
 		}
-		policyOptions = authPolicy.PolicyToCertificates(linkedPolicy)
+		policyOptions = authPolicy.LinkedToCertificates(linkedPolicy)
 	} else {
 		policyOptions = a.config.AuthorityConfig.Policy
 	}

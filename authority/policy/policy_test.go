@@ -146,7 +146,7 @@ func TestPolicyToCertificates(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := PolicyToCertificates(tt.args.policy)
+			got := LinkedToCertificates(tt.args.policy)
 			if !cmp.Equal(tt.want, got) {
 				t.Errorf("policyToCertificates() diff=\n%s", cmp.Diff(tt.want, got))
 			}

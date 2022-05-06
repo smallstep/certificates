@@ -142,7 +142,7 @@ func newSSHPolicyEngine(policyOptions SSHPolicyOptionsInterface, typ sshPolicyEn
 	return policy.New(options...)
 }
 
-func PolicyToCertificates(p *linkedca.Policy) *Options {
+func LinkedToCertificates(p *linkedca.Policy) *Options {
 
 	// return early
 	if p == nil {
