@@ -11,6 +11,7 @@ import (
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/policy"
 )
 
 type policyAdminResponderInterface interface {
@@ -104,6 +105,11 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 
 	newPolicy.Deduplicate()
 
+	if err := validatePolicy(newPolicy); err != nil {
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error validating authority policy"))
+		return
+	}
+
 	adm := linkedca.MustAdminFromContext(ctx)
 
 	var createdPolicy *linkedca.Policy
@@ -148,6 +154,11 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 	}
 
 	newPolicy.Deduplicate()
+
+	if err := validatePolicy(newPolicy); err != nil {
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error validating authority policy"))
+		return
+	}
 
 	adm := linkedca.MustAdminFromContext(ctx)
 
@@ -239,6 +250,11 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 
 	newPolicy.Deduplicate()
 
+	if err := validatePolicy(newPolicy); err != nil {
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error validating provisioner policy"))
+		return
+	}
+
 	prov.Policy = newPolicy
 
 	if err := par.auth.UpdateProvisioner(ctx, prov); err != nil {
@@ -277,6 +293,11 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 	}
 
 	newPolicy.Deduplicate()
+
+	if err := validatePolicy(newPolicy); err != nil {
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error validating provisioner policy"))
+		return
+	}
 
 	prov.Policy = newPolicy
 	if err := par.auth.UpdateProvisioner(ctx, prov); err != nil {
@@ -364,6 +385,11 @@ func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, 
 
 	newPolicy.Deduplicate()
 
+	if err := validatePolicy(newPolicy); err != nil {
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error validating ACME EAK policy"))
+		return
+	}
+
 	eak.Policy = newPolicy
 
 	acmeEAK := linkedEAKToCertificates(eak)
@@ -399,6 +425,11 @@ func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, 
 	}
 
 	newPolicy.Deduplicate()
+
+	if err := validatePolicy(newPolicy); err != nil {
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error validating ACME EAK policy"))
+		return
+	}
 
 	eak.Policy = newPolicy
 	acmeEAK := linkedEAKToCertificates(eak)
@@ -454,4 +485,32 @@ func isBadRequest(err error) bool {
 	var pe *authority.PolicyError
 	isPolicyError := errors.As(err, &pe)
 	return isPolicyError && (pe.Typ == authority.AdminLockOut || pe.Typ == authority.EvaluationFailure || pe.Typ == authority.ConfigurationFailure)
+}
+
+func validatePolicy(p *linkedca.Policy) error {
+
+	// convert the policy; return early if nil
+	options := policy.PolicyToCertificates(p)
+	if options == nil {
+		return nil
+	}
+
+	var err error
+
+	// Initialize a temporary x509 allow/deny policy engine
+	if _, err = policy.NewX509PolicyEngine(options.GetX509Options()); err != nil {
+		return err
+	}
+
+	// Initialize a temporary SSH allow/deny policy engine for host certificates
+	if _, err = policy.NewSSHHostPolicyEngine(options.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	// Initialize a temporary SSH allow/deny policy engine for user certificates
+	if _, err = policy.NewSSHUserPolicyEngine(options.GetSSHOptions()); err != nil {
+		return err
+	}
+
+	return nil
 }

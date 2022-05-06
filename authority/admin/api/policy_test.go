@@ -343,6 +343,32 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 				statusCode: 400,
 			}
 		},
+		"fail/validatePolicy": func(t *testing.T) test {
+			ctx := context.Background()
+			adminErr := admin.NewError(admin.ErrorBadRequestType, "error validating authority policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)")
+			adminErr.Message = "error validating authority policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)"
+			body := []byte(`
+			{
+				"x509": {
+				   "allow": {
+					  "uris": [
+						 	"https://example.com"
+						]
+					}
+				}
+			}`)
+			return test{
+				ctx: ctx,
+				auth: &mockAdminAuthority{
+					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+						return nil, admin.NewError(admin.ErrorNotFoundType, "not found")
+					},
+				},
+				body:       body,
+				err:        adminErr,
+				statusCode: 400,
+			}
+		},
 		"fail/CreateAuthorityPolicy-policy-admin-lockout-error": func(t *testing.T) test {
 			adm := &linkedca.Admin{
 				Subject: "step",
@@ -598,6 +624,39 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 			adminErr := admin.NewError(admin.ErrorBadRequestType, "proto: syntax error (line 1:2): invalid value ?")
 			adminErr.Message = "proto: syntax error (line 1:2): invalid value ?"
 			body := []byte("{?}")
+			return test{
+				ctx: ctx,
+				auth: &mockAdminAuthority{
+					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+						return policy, nil
+					},
+				},
+				body:       body,
+				err:        adminErr,
+				statusCode: 400,
+			}
+		},
+		"fail/validatePolicy": func(t *testing.T) test {
+			policy := &linkedca.Policy{
+				X509: &linkedca.X509Policy{
+					Allow: &linkedca.X509Names{
+						Dns: []string{"*.local"},
+					},
+				},
+			}
+			ctx := context.Background()
+			adminErr := admin.NewError(admin.ErrorBadRequestType, "error validating authority policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)")
+			adminErr.Message = "error validating authority policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)"
+			body := []byte(`
+			{
+				"x509": {
+				   "allow": {
+					  "uris": [
+						 	"https://example.com"
+						]
+					}
+				}
+			}`)
 			return test{
 				ctx: ctx,
 				auth: &mockAdminAuthority{
@@ -1174,6 +1233,35 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 				statusCode: 400,
 			}
 		},
+		"fail/validatePolicy": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Name: "provName",
+			}
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
+			adminErr := admin.NewError(admin.ErrorBadRequestType, "error validating provisioner policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)")
+			adminErr.Message = "error validating provisioner policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)"
+			body := []byte(`
+			{
+				"x509": {
+				   "allow": {
+					  "uris": [
+						 	"https://example.com"
+						]
+					}
+				}
+			}`)
+			return test{
+				ctx: ctx,
+				auth: &mockAdminAuthority{
+					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+						return nil, admin.NewError(admin.ErrorNotFoundType, "not found")
+					},
+				},
+				body:       body,
+				err:        adminErr,
+				statusCode: 400,
+			}
+		},
 		"fail/auth.UpdateProvisioner-policy-admin-lockout-error": func(t *testing.T) test {
 			adm := &linkedca.Admin{
 				Subject: "step",
@@ -1386,6 +1474,43 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 			body := []byte("{?}")
 			return test{
 				ctx:        ctx,
+				body:       body,
+				err:        adminErr,
+				statusCode: 400,
+			}
+		},
+		"fail/validatePolicy": func(t *testing.T) test {
+			policy := &linkedca.Policy{
+				X509: &linkedca.X509Policy{
+					Allow: &linkedca.X509Names{
+						Dns: []string{"*.local"},
+					},
+				},
+			}
+			prov := &linkedca.Provisioner{
+				Name:   "provName",
+				Policy: policy,
+			}
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
+			adminErr := admin.NewError(admin.ErrorBadRequestType, "error validating provisioner policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)")
+			adminErr.Message = "error validating provisioner policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)"
+			body := []byte(`
+			{
+				"x509": {
+				   "allow": {
+					  "uris": [
+						 	"https://example.com"
+						]
+					}
+				}
+			}`)
+			return test{
+				ctx: ctx,
+				auth: &mockAdminAuthority{
+					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
+						return nil, admin.NewError(admin.ErrorNotFoundType, "not found")
+					},
+				},
 				body:       body,
 				err:        adminErr,
 				statusCode: 400,
@@ -1916,6 +2041,34 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 				statusCode: 400,
 			}
 		},
+		"fail/validatePolicy": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Name: "provName",
+			}
+			eak := &linkedca.EABKey{
+				Id: "eakID",
+			}
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
+			ctx = linkedca.NewContextWithExternalAccountKey(ctx, eak)
+			adminErr := admin.NewError(admin.ErrorBadRequestType, "error validating ACME EAK policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)")
+			adminErr.Message = "error validating ACME EAK policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)"
+			body := []byte(`
+			{
+				"x509": {
+				   "allow": {
+					  "uris": [
+						 	"https://example.com"
+						]
+					}
+				}
+			}`)
+			return test{
+				ctx:        ctx,
+				body:       body,
+				err:        adminErr,
+				statusCode: 400,
+			}
+		},
 		"fail/acmeDB.UpdateExternalAccountKey-error": func(t *testing.T) test {
 			prov := &linkedca.Provisioner{
 				Id:   "provID",
@@ -2102,6 +2255,42 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 			adminErr := admin.NewError(admin.ErrorBadRequestType, "proto: syntax error (line 1:2): invalid value ?")
 			adminErr.Message = "proto: syntax error (line 1:2): invalid value ?"
 			body := []byte("{?}")
+			return test{
+				ctx:        ctx,
+				body:       body,
+				err:        adminErr,
+				statusCode: 400,
+			}
+		},
+		"fail/validatePolicy": func(t *testing.T) test {
+			policy := &linkedca.Policy{
+				X509: &linkedca.X509Policy{
+					Allow: &linkedca.X509Names{
+						Dns: []string{"*.local"},
+					},
+				},
+			}
+			prov := &linkedca.Provisioner{
+				Name: "provName",
+			}
+			eak := &linkedca.EABKey{
+				Id:     "eakID",
+				Policy: policy,
+			}
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
+			ctx = linkedca.NewContextWithExternalAccountKey(ctx, eak)
+			adminErr := admin.NewError(admin.ErrorBadRequestType, "error validating ACME EAK policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)")
+			adminErr.Message = "error validating ACME EAK policy: cannot parse permitted URI domain constraint \"https://example.com\": URI domain constraint \"https://example.com\" contains scheme (not supported yet)"
+			body := []byte(`
+			{
+				"x509": {
+				   "allow": {
+					  "uris": [
+						 	"https://example.com"
+						]
+					}
+				}
+			}`)
 			return test{
 				ctx:        ctx,
 				body:       body,
@@ -2422,6 +2611,100 @@ func Test_isBadRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isBadRequest(tt.err); got != tt.want {
 				t.Errorf("isBadRequest() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_validatePolicy(t *testing.T) {
+	type args struct {
+		p *linkedca.Policy
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "nil",
+			args: args{
+				p: nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "x509",
+			args: args{
+				p: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns: []string{"**.local"},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "ssh user",
+			args: args{
+				p: &linkedca.Policy{
+					Ssh: &linkedca.SSHPolicy{
+						User: &linkedca.SSHUserPolicy{
+							Allow: &linkedca.SSHUserNames{
+								Emails: []string{"@@example.com"},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "ssh host",
+			args: args{
+				p: &linkedca.Policy{
+					Ssh: &linkedca.SSHPolicy{
+						Host: &linkedca.SSHHostPolicy{
+							Allow: &linkedca.SSHHostNames{
+								Dns: []string{"**.local"},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "ok",
+			args: args{
+				p: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns: []string{"*.local"},
+						},
+					},
+					Ssh: &linkedca.SSHPolicy{
+						User: &linkedca.SSHUserPolicy{
+							Allow: &linkedca.SSHUserNames{
+								Emails: []string{"@example.com"},
+							},
+						},
+						Host: &linkedca.SSHHostPolicy{
+							Allow: &linkedca.SSHHostNames{
+								Dns: []string{"*.local"},
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validatePolicy(tt.args.p); (err != nil) != tt.wantErr {
+				t.Errorf("validatePolicy() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

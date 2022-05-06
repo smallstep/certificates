@@ -3,6 +3,8 @@ package policy
 import (
 	"fmt"
 
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/policy"
 )
 
@@ -52,9 +54,13 @@ func NewX509PolicyEngine(policyOptions X509PolicyOptionsInterface) (X509Policy, 
 		return nil, nil
 	}
 
+	// check if configuration specifies that wildcard names are allowed
 	if policyOptions.AreWildcardNamesAllowed() {
 		options = append(options, policy.WithAllowLiteralWildcardNames())
 	}
+
+	// enable subject common name verification by default
+	options = append(options, policy.WithSubjectCommonNameVerification())
 
 	return policy.New(options...)
 }
@@ -134,4 +140,117 @@ func newSSHPolicyEngine(policyOptions SSHPolicyOptionsInterface, typ sshPolicyEn
 	}
 
 	return policy.New(options...)
+}
+
+func PolicyToCertificates(p *linkedca.Policy) *Options {
+
+	// return early
+	if p == nil {
+		return nil
+	}
+
+	// return early if x509 nor SSH is set
+	if p.GetX509() == nil && p.GetSsh() == nil {
+		return nil
+	}
+
+	opts := &Options{}
+
+	// fill x509 policy configuration
+	if x509 := p.GetX509(); x509 != nil {
+		opts.X509 = &X509PolicyOptions{}
+		if allow := x509.GetAllow(); allow != nil {
+			opts.X509.AllowedNames = &X509NameOptions{}
+			if allow.Dns != nil {
+				opts.X509.AllowedNames.DNSDomains = allow.Dns
+			}
+			if allow.Ips != nil {
+				opts.X509.AllowedNames.IPRanges = allow.Ips
+			}
+			if allow.Emails != nil {
+				opts.X509.AllowedNames.EmailAddresses = allow.Emails
+			}
+			if allow.Uris != nil {
+				opts.X509.AllowedNames.URIDomains = allow.Uris
+			}
+			if allow.CommonNames != nil {
+				opts.X509.AllowedNames.CommonNames = allow.CommonNames
+			}
+		}
+		if deny := x509.GetDeny(); deny != nil {
+			opts.X509.DeniedNames = &X509NameOptions{}
+			if deny.Dns != nil {
+				opts.X509.DeniedNames.DNSDomains = deny.Dns
+			}
+			if deny.Ips != nil {
+				opts.X509.DeniedNames.IPRanges = deny.Ips
+			}
+			if deny.Emails != nil {
+				opts.X509.DeniedNames.EmailAddresses = deny.Emails
+			}
+			if deny.Uris != nil {
+				opts.X509.DeniedNames.URIDomains = deny.Uris
+			}
+			if deny.CommonNames != nil {
+				opts.X509.DeniedNames.CommonNames = deny.CommonNames
+			}
+		}
+
+		opts.X509.AllowWildcardNames = x509.GetAllowWildcardNames()
+	}
+
+	// fill ssh policy configuration
+	if ssh := p.GetSsh(); ssh != nil {
+		opts.SSH = &SSHPolicyOptions{}
+		if host := ssh.GetHost(); host != nil {
+			opts.SSH.Host = &SSHHostCertificateOptions{}
+			if allow := host.GetAllow(); allow != nil {
+				opts.SSH.Host.AllowedNames = &SSHNameOptions{}
+				if allow.Dns != nil {
+					opts.SSH.Host.AllowedNames.DNSDomains = allow.Dns
+				}
+				if allow.Ips != nil {
+					opts.SSH.Host.AllowedNames.IPRanges = allow.Ips
+				}
+				if allow.Principals != nil {
+					opts.SSH.Host.AllowedNames.Principals = allow.Principals
+				}
+			}
+			if deny := host.GetDeny(); deny != nil {
+				opts.SSH.Host.DeniedNames = &SSHNameOptions{}
+				if deny.Dns != nil {
+					opts.SSH.Host.DeniedNames.DNSDomains = deny.Dns
+				}
+				if deny.Ips != nil {
+					opts.SSH.Host.DeniedNames.IPRanges = deny.Ips
+				}
+				if deny.Principals != nil {
+					opts.SSH.Host.DeniedNames.Principals = deny.Principals
+				}
+			}
+		}
+		if user := ssh.GetUser(); user != nil {
+			opts.SSH.User = &SSHUserCertificateOptions{}
+			if allow := user.GetAllow(); allow != nil {
+				opts.SSH.User.AllowedNames = &SSHNameOptions{}
+				if allow.Emails != nil {
+					opts.SSH.User.AllowedNames.EmailAddresses = allow.Emails
+				}
+				if allow.Principals != nil {
+					opts.SSH.User.AllowedNames.Principals = allow.Principals
+				}
+			}
+			if deny := user.GetDeny(); deny != nil {
+				opts.SSH.User.DeniedNames = &SSHNameOptions{}
+				if deny.Emails != nil {
+					opts.SSH.User.DeniedNames.EmailAddresses = deny.Emails
+				}
+				if deny.Principals != nil {
+					opts.SSH.User.DeniedNames.Principals = deny.Principals
+				}
+			}
+		}
+	}
+
+	return opts
 }
