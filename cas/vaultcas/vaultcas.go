@@ -15,10 +15,10 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/cas/apiv1"
+	"github.com/smallstep/certificates/cas/vaultcas/auth/approle"
+	"github.com/smallstep/certificates/cas/vaultcas/auth/kubernetes"
 
 	vault "github.com/hashicorp/vault/api"
-	auth "github.com/hashicorp/vault/api/auth/approle"
-	kubeauth "github.com/hashicorp/vault/api/auth/kubernetes"
 )
 
 func init() {
@@ -30,16 +30,14 @@ func init() {
 // VaultOptions defines the configuration options added using the
 // apiv1.Options.Config field.
 type VaultOptions struct {
-	PKI             string        `json:"pki,omitempty"`
-	PKIRoleDefault  string        `json:"pkiRoleDefault,omitempty"`
-	PKIRoleRSA      string        `json:"pkiRoleRSA,omitempty"`
-	PKIRoleEC       string        `json:"pkiRoleEC,omitempty"`
-	PKIRoleEd25519  string        `json:"pkiRoleEd25519,omitempty"`
-	KubernetesRole  string        `json:"kubernetesRole,omitempty"`
-	RoleID          string        `json:"roleID,omitempty"`
-	SecretID        auth.SecretID `json:"secretID,omitempty"`
-	AppRole         string        `json:"appRole,omitempty"`
-	IsWrappingToken bool          `json:"isWrappingToken,omitempty"`
+	PKIMountPath   string          `json:"pkiMountPath,omitempty"`
+	PKIRoleDefault string          `json:"pkiRoleDefault,omitempty"`
+	PKIRoleRSA     string          `json:"pkiRoleRSA,omitempty"`
+	PKIRoleEC      string          `json:"pkiRoleEC,omitempty"`
+	PKIRoleEd25519 string          `json:"pkiRoleEd25519,omitempty"`
+	AuthType       string          `json:"authType,omitempty"`
+	AuthMountPath  string          `json:"authMountPath,omitempty"`
+	AuthOptions    json.RawMessage `json:"authOptions,omitempty"`
 }
 
 // VaultCAS implements a Certificate Authority Service using Hashicorp Vault.
@@ -79,49 +77,25 @@ func New(ctx context.Context, opts apiv1.Options) (*VaultCAS, error) {
 		return nil, fmt.Errorf("unable to initialize vault client: %w", err)
 	}
 
-	if vc.KubernetesRole != "" {
-		var kubernetesAuth *kubeauth.KubernetesAuth
-		kubernetesAuth, err = kubeauth.NewKubernetesAuth(
-			vc.KubernetesRole,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("unable to initialize Kubernetes auth method: %w", err)
-		}
+	var method vault.AuthMethod
+	switch vc.AuthType {
+	case "kubernetes":
+		method, err = kubernetes.NewKubernetesAuthMethod(vc.AuthMountPath, vc.AuthOptions)
+	case "approle":
+		method, err = approle.NewApproleAuthMethod(vc.AuthMountPath, vc.AuthOptions)
+	default:
+		return nil, fmt.Errorf("unknown auth type: %v", vc.AuthType)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unable to configure auth method: %w", err)
+	}
 
-		authInfo, err := client.Auth().Login(ctx, kubernetesAuth)
-		if err != nil {
-			return nil, fmt.Errorf("unable to login to Kubernetes auth method: %w", err)
-		}
-		if authInfo == nil {
-			return nil, errors.New("no auth info was returned after login")
-		}
-	} else {
-		var appRoleAuth *auth.AppRoleAuth
-		if vc.IsWrappingToken {
-			appRoleAuth, err = auth.NewAppRoleAuth(
-				vc.RoleID,
-				&vc.SecretID,
-				auth.WithWrappingToken(),
-				auth.WithMountPath(vc.AppRole),
-			)
-		} else {
-			appRoleAuth, err = auth.NewAppRoleAuth(
-				vc.RoleID,
-				&vc.SecretID,
-				auth.WithMountPath(vc.AppRole),
-			)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("unable to initialize AppRole auth method: %w", err)
-		}
-
-		authInfo, err := client.Auth().Login(ctx, appRoleAuth)
-		if err != nil {
-			return nil, fmt.Errorf("unable to login to AppRole auth method: %w", err)
-		}
-		if authInfo == nil {
-			return nil, errors.New("no auth info was returned after login")
-		}
+	authInfo, err := client.Auth().Login(ctx, method)
+	if err != nil {
+		return nil, fmt.Errorf("unable to login to Kubernetes auth method: %w", err)
+	}
+	if authInfo == nil {
+		return nil, errors.New("no auth info was returned after login")
 	}
 
 	return &VaultCAS{
@@ -154,7 +128,7 @@ func (v *VaultCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv
 // GetCertificateAuthority returns the root certificate of the certificate
 // authority using the configured fingerprint.
 func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
-	secret, err := v.client.Logical().Read(v.config.PKI + "/cert/ca_chain")
+	secret, err := v.client.Logical().Read(v.config.PKIMountPath + "/cert/ca_chain")
 	if err != nil {
 		return nil, fmt.Errorf("error reading ca chain: %w", err)
 	}
@@ -210,7 +184,7 @@ func (v *VaultCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv
 	vaultReq := map[string]interface{}{
 		"serial_number": formatSerialNumber(sn),
 	}
-	_, err := v.client.Logical().Write(v.config.PKI+"/revoke/", vaultReq)
+	_, err := v.client.Logical().Write(v.config.PKIMountPath+"/revoke/", vaultReq)
 	if err != nil {
 		return nil, fmt.Errorf("error revoking certificate: %w", err)
 	}
@@ -244,7 +218,7 @@ func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.
 		"ttl":    lifetime.Seconds(),
 	}
 
-	secret, err := v.client.Logical().Write(v.config.PKI+"/sign/"+vaultPKIRole, vaultReq)
+	secret, err := v.client.Logical().Write(v.config.PKIMountPath+"/sign/"+vaultPKIRole, vaultReq)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error signing certificate: %w", err)
 	}
@@ -267,19 +241,15 @@ func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.
 }
 
 func loadOptions(config json.RawMessage) (*VaultOptions, error) {
-	var vc *VaultOptions
+	// setup default values
+	vc := VaultOptions{
+		PKIMountPath:   "pki",
+		PKIRoleDefault: "default",
+	}
 
 	err := json.Unmarshal(config, &vc)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding vaultCAS config: %w", err)
-	}
-
-	if vc.PKI == "" {
-		vc.PKI = "pki" // use default pki vault name
-	}
-
-	if vc.PKIRoleDefault == "" {
-		vc.PKIRoleDefault = "default" // use default pki role name
 	}
 
 	if vc.PKIRoleRSA == "" {
@@ -292,23 +262,7 @@ func loadOptions(config json.RawMessage) (*VaultOptions, error) {
 		vc.PKIRoleEd25519 = vc.PKIRoleDefault
 	}
 
-	if vc.RoleID == "" && vc.KubernetesRole == "" {
-		return nil, errors.New("vaultCAS config options must define `roleID` or `kubernetesRole`")
-	}
-
-	if vc.SecretID.FromEnv == "" && vc.SecretID.FromFile == "" && vc.SecretID.FromString == "" && vc.RoleID != "" {
-		return nil, errors.New("vaultCAS config options must define `secretID` object with one of `FromEnv`, `FromFile` or `FromString`")
-	}
-
-	if vc.PKI == "" {
-		vc.PKI = "pki" // use default pki vault name
-	}
-
-	if vc.AppRole == "" {
-		vc.AppRole = "auth/approle"
-	}
-
-	return vc, nil
+	return &vc, nil
 }
 
 func parseCertificates(pemCert string) []*x509.Certificate {
