@@ -1,8 +1,10 @@
 package render
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -26,10 +28,32 @@ func TestJSON(t *testing.T) {
 	assert.Empty(t, rw.Fields())
 }
 
-func TestJSONPanics(t *testing.T) {
-	assert.Panics(t, func() {
-		JSON(httptest.NewRecorder(), make(chan struct{}))
-	})
+func TestJSONPanicsOnUnsupportedType(t *testing.T) {
+	jsonPanicTest[json.UnsupportedTypeError](t, make(chan struct{}))
+}
+
+func TestJSONPanicsOnUnsupportedValue(t *testing.T) {
+	jsonPanicTest[json.UnsupportedValueError](t, math.NaN())
+}
+
+func jsonPanicTest[T json.UnsupportedTypeError | json.UnsupportedValueError](t *testing.T, v any) {
+	t.Helper()
+
+	defer func() {
+		var err error
+		if r := recover(); r == nil {
+			t.Fatal("expected panic")
+		} else if e, ok := r.(error); !ok {
+			t.Fatalf("did not panic with an error (%T)", r)
+		} else {
+			err = e
+		}
+
+		var e *T
+		assert.ErrorAs(t, err, &e)
+	}()
+
+	JSON(httptest.NewRecorder(), v)
 }
 
 type renderableError struct {

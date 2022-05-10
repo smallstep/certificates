@@ -2,7 +2,6 @@
 package render
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -24,14 +23,20 @@ func JSON(w http.ResponseWriter, v interface{}) {
 // JSONStatus sets the Content-Type of w to application/json unless one is
 // specified.
 func JSONStatus(w http.ResponseWriter, v interface{}, status int) {
-	var b bytes.Buffer
-	if err := json.NewEncoder(&b).Encode(v); err != nil {
-		panic(err)
-	}
-
 	setContentTypeUnlessPresent(w, "application/json")
 	w.WriteHeader(status)
-	_, _ = b.WriteTo(w)
+
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		var errUnsupportedType *json.UnsupportedTypeError
+		if errors.As(err, &errUnsupportedType) {
+			panic(err)
+		}
+
+		var errUnsupportedValue *json.UnsupportedValueError
+		if errors.As(err, &errUnsupportedValue) {
+			panic(err)
+		}
+	}
 
 	log.EnabledResponse(w, v)
 }
