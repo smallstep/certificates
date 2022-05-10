@@ -50,6 +50,7 @@ type Authority interface {
 	GetRoots() ([]*x509.Certificate, error)
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
+	Health() error
 }
 
 // TimeDuration is an alias of provisioner.TimeDuration
@@ -293,7 +294,12 @@ func (h *caHandler) Version(w http.ResponseWriter, r *http.Request) {
 
 // Health is an HTTP handler that returns the status of the server.
 func (h *caHandler) Health(w http.ResponseWriter, r *http.Request) {
-	render.JSON(w, HealthResponse{Status: "ok"})
+	err := h.Authority.Health()
+	if err == nil {
+		render.JSON(w, HealthResponse{Status: "ok"})
+	} else {
+		render.JSONStatus(w, HealthResponse{Status: "error"}, http.StatusServiceUnavailable)
+	}
 }
 
 // Root is an HTTP handler that using the SHA256 from the URL, returns the root

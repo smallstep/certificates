@@ -159,6 +159,11 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	return a, nil
 }
 
+// Health checks if the authority is stil alive.
+func (a *Authority) Health() error {
+	return a.db.Ping()
+}
+
 // reloadAdminResources reloads admins and provisioners from the DB.
 func (a *Authority) reloadAdminResources(ctx context.Context) error {
 	var (

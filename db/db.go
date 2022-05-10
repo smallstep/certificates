@@ -56,6 +56,7 @@ type AuthDB interface {
 	StoreSSHCertificate(crt *ssh.Certificate) error
 	GetSSHHostPrincipals() ([]string, error)
 	Shutdown() error
+	Ping() error
 }
 
 // DB is a wrapper over the nosql.DB interface.
@@ -369,6 +370,11 @@ type MockAuthDB struct {
 	MShutdown             func() error
 }
 
+// Ping mock
+func (m *MockAuthDB) Ping() error {
+	return nil
+}
+
 // IsRevoked mock.
 func (m *MockAuthDB) IsRevoked(sn string) (bool, error) {
 	if m.MIsRevoked != nil {
@@ -485,6 +491,11 @@ type MockNoSQLDB struct {
 	MList        func(bucket []byte) ([]*database.Entry, error)
 	MUpdate      func(tx *database.Tx) error
 	MCmpAndSwap  func(bucket, key, old, newval []byte) ([]byte, bool, error)
+}
+
+// Ping mock
+func (m *MockNoSQLDB) Ping() error {
+	return nil
 }
 
 // CmpAndSwap mock

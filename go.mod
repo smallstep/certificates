@@ -60,7 +60,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
-// replace github.com/smallstep/nosql => ../nosql
+replace github.com/smallstep/nosql => github.com/hm-edu/nosql v0.4.1-0.20220510094234-1fbe0ffbb194
+
 // replace go.step.sm/crypto => ../crypto
 // replace go.step.sm/cli-utils => ../cli-utils
 // replace go.step.sm/linkedca => ../linkedca
