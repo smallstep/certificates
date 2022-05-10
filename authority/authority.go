@@ -250,6 +250,7 @@ func (a *Authority) init() error {
 	}
 
 	var err error
+	ctx := NewContext(context.Background(), a)
 
 	// Set password if they are not set.
 	var configPassword []byte
@@ -285,7 +286,7 @@ func (a *Authority) init() error {
 		if a.config.KMS != nil {
 			options = *a.config.KMS
 		}
-		a.keyManager, err = kms.New(context.Background(), options)
+		a.keyManager, err = kms.New(ctx, options)
 		if err != nil {
 			return err
 		}
@@ -315,7 +316,7 @@ func (a *Authority) init() error {
 
 		// Configure linked RA
 		if linkedcaClient != nil && options.CertificateAuthority == "" {
-			conf, err := linkedcaClient.GetConfiguration(context.Background())
+			conf, err := linkedcaClient.GetConfiguration(ctx)
 			if err != nil {
 				return err
 			}
@@ -349,7 +350,7 @@ func (a *Authority) init() error {
 			}
 		}
 
-		a.x509CAService, err = cas.New(context.Background(), options)
+		a.x509CAService, err = cas.New(ctx, options)
 		if err != nil {
 			return err
 		}
@@ -536,7 +537,7 @@ func (a *Authority) init() error {
 			}
 		}
 
-		a.scepService, err = scep.NewService(context.Background(), options)
+		a.scepService, err = scep.NewService(ctx, options)
 		if err != nil {
 			return err
 		}
@@ -558,19 +559,19 @@ func (a *Authority) init() error {
 			}
 		}
 
-		provs, err := a.adminDB.GetProvisioners(context.Background())
+		provs, err := a.adminDB.GetProvisioners(ctx)
 		if err != nil {
 			return admin.WrapErrorISE(err, "error loading provisioners to initialize authority")
 		}
 		if len(provs) == 0 && !strings.EqualFold(a.config.AuthorityConfig.DeploymentType, "linked") {
 			// Create First Provisioner
-			prov, err := CreateFirstProvisioner(context.Background(), a.adminDB, string(a.password))
+			prov, err := CreateFirstProvisioner(ctx, a.adminDB, string(a.password))
 			if err != nil {
 				return admin.WrapErrorISE(err, "error creating first provisioner")
 			}
 
 			// Create first admin
-			if err := a.adminDB.CreateAdmin(context.Background(), &linkedca.Admin{
+			if err := a.adminDB.CreateAdmin(ctx, &linkedca.Admin{
 				ProvisionerId: prov.Id,
 				Subject:       "step",
 				Type:          linkedca.Admin_SUPER_ADMIN,
@@ -581,12 +582,12 @@ func (a *Authority) init() error {
 	}
 
 	// Load Provisioners and Admins
-	if err := a.reloadAdminResources(context.Background()); err != nil {
+	if err := a.reloadAdminResources(ctx); err != nil {
 		return err
 	}
 
 	// Load x509 and SSH Policy Engines
-	if err := a.reloadPolicyEngines(context.Background()); err != nil {
+	if err := a.reloadPolicyEngines(ctx); err != nil {
 		return err
 	}
 
@@ -609,6 +610,15 @@ func (a *Authority) init() error {
 	a.initOnce = true
 
 	return nil
+}
+
+// GetID returns the define authority id or a zero uuid.
+func (a *Authority) GetID() string {
+	const zeroUUID = "00000000-0000-0000-0000-000000000000"
+	if id := a.config.AuthorityConfig.AuthorityID; id != "" {
+		return id
+	}
+	return zeroUUID
 }
 
 // GetDatabase returns the authority database. If the configuration does not
