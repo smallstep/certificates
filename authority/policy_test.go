@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/square/go-jose.v2"
 
 	"go.step.sm/linkedca"
 
@@ -918,12 +919,57 @@ func TestAuthority_checkAuthorityPolicy(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "fail/policy",
+			fields: fields{
+				admins: administrator.NewCollection(nil),
+				adminDB: &admin.MockDB{
+					MockGetAdmins: func(ctx context.Context) ([]*linkedca.Admin, error) {
+						return []*linkedca.Admin{
+							{
+								Id:      "adminID1",
+								Subject: "anotherAdmin",
+							},
+							{
+								Id:      "adminID2",
+								Subject: "step",
+							},
+							{
+								Id:      "adminID3",
+								Subject: "otherAdmin",
+							},
+						}, nil
+					},
+				},
+			},
+			args: args{
+				currentAdmin: &linkedca.Admin{Subject: "step"},
+				provName:     "prov",
+				p: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns: []string{"step", "otherAdmin"},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "ok",
 			fields: fields{
 				admins: administrator.NewCollection(nil),
 				adminDB: &admin.MockDB{
 					MockGetAdmins: func(ctx context.Context) ([]*linkedca.Admin, error) {
-						return []*linkedca.Admin{}, nil
+						return []*linkedca.Admin{
+							{
+								Id:      "adminID2",
+								Subject: "step",
+							},
+							{
+								Id:      "adminID3",
+								Subject: "otherAdmin",
+							},
+						}, nil
 					},
 				},
 			},
@@ -957,6 +1003,20 @@ func TestAuthority_checkAuthorityPolicy(t *testing.T) {
 }
 
 func TestAuthority_checkProvisionerPolicy(t *testing.T) {
+	jwkProvisioner := &provisioner.JWK{
+		ID:   "jwkID",
+		Type: "JWK",
+		Name: "jwkProv",
+		Key:  &jose.JSONWebKey{KeyID: "jwkKeyID"},
+	}
+	provisioners := provisioner.NewCollection(testAudiences)
+	provisioners.Store(jwkProvisioner)
+	admins := administrator.NewCollection(provisioners)
+	admins.Store(&linkedca.Admin{
+		Id:            "adminID",
+		Subject:       "step",
+		ProvisionerId: "jwkID",
+	}, jwkProvisioner)
 	type fields struct {
 		provisioners *provisioner.Collection
 		admins       *administrator.Collection
@@ -964,10 +1024,9 @@ func TestAuthority_checkProvisionerPolicy(t *testing.T) {
 		adminDB      admin.DB
 	}
 	type args struct {
-		ctx          context.Context
-		currentAdmin *linkedca.Admin
-		provName     string
-		p            *linkedca.Policy
+		ctx      context.Context
+		provName string
+		p        *linkedca.Policy
 	}
 	tests := []struct {
 		name    string
@@ -979,20 +1038,37 @@ func TestAuthority_checkProvisionerPolicy(t *testing.T) {
 			name:   "no policy",
 			fields: fields{},
 			args: args{
-				currentAdmin: nil,
-				provName:     "prov",
-				p:            nil,
+				provName: "prov",
+				p:        nil,
 			},
 			wantErr: false,
 		},
 		{
-			name: "ok",
+			name: "fail/policy",
 			fields: fields{
-				admins: administrator.NewCollection(nil),
+				provisioners: provisioners,
+				admins:       admins,
 			},
 			args: args{
-				currentAdmin: &linkedca.Admin{Subject: "step"},
-				provName:     "prov",
+				provName: "jwkProv",
+				p: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns: []string{"otherAdmin"}, // step not in policy
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "ok",
+			fields: fields{
+				provisioners: provisioners,
+				admins:       admins,
+			},
+			args: args{
+				provName: "jwkProv",
 				p: &linkedca.Policy{
 					X509: &linkedca.X509Policy{
 						Allow: &linkedca.X509Names{
@@ -1012,7 +1088,7 @@ func TestAuthority_checkProvisionerPolicy(t *testing.T) {
 				db:           tt.fields.db,
 				adminDB:      tt.fields.adminDB,
 			}
-			if err := a.checkProvisionerPolicy(tt.args.ctx, tt.args.currentAdmin, tt.args.provName, tt.args.p); (err != nil) != tt.wantErr {
+			if err := a.checkProvisionerPolicy(tt.args.ctx, tt.args.provName, tt.args.p); (err != nil) != tt.wantErr {
 				t.Errorf("Authority.checkProvisionerPolicy() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

@@ -137,7 +137,7 @@ func (a *Authority) checkAuthorityPolicy(ctx context.Context, currentAdmin *link
 	return a.checkPolicy(ctx, currentAdmin, allAdmins, p)
 }
 
-func (a *Authority) checkProvisionerPolicy(ctx context.Context, currentAdmin *linkedca.Admin, provName string, p *linkedca.Policy) error {
+func (a *Authority) checkProvisionerPolicy(ctx context.Context, provName string, p *linkedca.Policy) error {
 
 	// no policy and thus nothing to evaluate; return early
 	if p == nil {
@@ -147,7 +147,11 @@ func (a *Authority) checkProvisionerPolicy(ctx context.Context, currentAdmin *li
 	// get all admins for the provisioner; ignoring case in which they're not found
 	allProvisionerAdmins, _ := a.admins.LoadByProvisioner(provName)
 
-	return a.checkPolicy(ctx, currentAdmin, allProvisionerAdmins, p)
+	// check the policy; pass in nil as the current admin, as all admins for the
+	// provisioner will be checked by looping through allProvisionerAdmins. Also,
+	// the current admin may be a super admin not belonging to the provisioner, so
+	// can't be blocked, but is not required to be in the policy, either.
+	return a.checkPolicy(ctx, nil, allProvisionerAdmins, p)
 }
 
 // checkPolicy checks if a new or updated policy configuration results in the user
@@ -178,10 +182,13 @@ func (a *Authority) checkPolicy(ctx context.Context, currentAdmin *linkedca.Admi
 
 	// check if the admin user that instructed the authority policy to be
 	// created or updated, would still be allowed when the provided policy
-	// would be applied.
-	sans := []string{currentAdmin.GetSubject()}
-	if err := isAllowed(engine, sans); err != nil {
-		return err
+	// would be applied. This case is skipped when current admin is nil, which
+	// is the case when a provisioner policy is checked.
+	if currentAdmin != nil {
+		sans := []string{currentAdmin.GetSubject()}
+		if err := isAllowed(engine, sans); err != nil {
+			return err
+		}
 	}
 
 	// loop through admins to verify that none of them would be
@@ -189,7 +196,7 @@ func (a *Authority) checkPolicy(ctx context.Context, currentAdmin *linkedca.Admi
 	// an error with a message that includes the admin subject that
 	// would be locked out.
 	for _, adm := range otherAdmins {
-		sans = []string{adm.GetSubject()}
+		sans := []string{adm.GetSubject()}
 		if err := isAllowed(engine, sans); err != nil {
 			return err
 		}
