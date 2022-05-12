@@ -78,8 +78,12 @@ type Authority struct {
 	authorizeSSHRenewFunc provisioner.AuthorizeSSHRenewFunc
 
 	adminMutex sync.RWMutex
+
+	// Do Not initialize the authority
+	skipInit bool
 }
 
+// Info contains information about the authority.
 type Info struct {
 	StartTime          time.Time
 	RootX509Certs      []*x509.Certificate
@@ -107,25 +111,13 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		}
 	}
 
-	// Initialize authority from options or configuration.
-	if err := a.init(); err != nil {
-		return nil, err
-	}
-
-	return a, nil
-}
-
-// FromOptions creates an Authority exclusively using the passed in options
-// and does not initialize the Authority.
-func FromOptions(opts ...Option) (*Authority, error) {
-	var a = new(Authority)
-
-	// Apply options.
-	for _, fn := range opts {
-		if err := fn(a); err != nil {
+	if !a.skipInit {
+		// Initialize authority from options or configuration.
+		if err := a.init(); err != nil {
 			return nil, err
 		}
 	}
+
 	return a, nil
 }
 
@@ -159,9 +151,11 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	// Initialize config required fields.
 	a.config.Init()
 
-	// Initialize authority from options or configuration.
-	if err := a.init(); err != nil {
-		return nil, err
+	if !a.skipInit {
+		// Initialize authority from options or configuration.
+		if err := a.init(); err != nil {
+			return nil, err
+		}
 	}
 
 	return a, nil

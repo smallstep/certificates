@@ -243,27 +243,29 @@ func (a *Authority) RemoveProvisioner(ctx context.Context, id string) error {
 	}
 
 	provName, provID := p.GetName(), p.GetID()
-	// Validate
-	//  - Check that there will be SUPER_ADMINs that remain after we
-	//    remove this provisioner.
-	if a.admins.SuperCount() == a.admins.SuperCountByProvisioner(provName) {
-		return admin.NewError(admin.ErrorBadRequestType,
-			"cannot remove provisioner %s because no super admins will remain", provName)
-	}
+	if a.IsAdminAPIEnabled() {
+		// Validate
+		//  - Check that there will be SUPER_ADMINs that remain after we
+		//    remove this provisioner.
+		if a.IsAdminAPIEnabled() && a.admins.SuperCount() == a.admins.SuperCountByProvisioner(provName) {
+			return admin.NewError(admin.ErrorBadRequestType,
+				"cannot remove provisioner %s because no super admins will remain", provName)
+		}
 
-	// Delete all admins associated with the provisioner.
-	admins, ok := a.admins.LoadByProvisioner(provName)
-	if ok {
-		for _, adm := range admins {
-			if err := a.removeAdmin(ctx, adm.Id); err != nil {
-				return admin.WrapErrorISE(err, "error deleting admin %s, as part of provisioner %s deletion", adm.Subject, provName)
+		// Delete all admins associated with the provisioner.
+		admins, ok := a.admins.LoadByProvisioner(provName)
+		if ok {
+			for _, adm := range admins {
+				if err := a.removeAdmin(ctx, adm.Id); err != nil {
+					return admin.WrapErrorISE(err, "error deleting admin %s, as part of provisioner %s deletion", adm.Subject, provName)
+				}
 			}
 		}
 	}
 
 	// Remove provisioner from authority caches.
 	if err := a.provisioners.Remove(provID); err != nil {
-		return admin.WrapErrorISE(err, "error removing admin from authority cache")
+		return admin.WrapErrorISE(err, "error removing provisioner from authority cache")
 	}
 	// Remove provisioner from database.
 	if err := a.adminDB.DeleteProvisioner(ctx, provID); err != nil {
