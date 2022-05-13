@@ -109,7 +109,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	case opnGetCACaps:
 		res, err = GetCACaps(ctx)
 	case opnPKIOperation:
-		res, err = h.PKIOperation(ctx, req)
+		res, err = PKIOperation(ctx, req)
 	default:
 		err = fmt.Errorf("unknown operation: %s", req.Operation)
 	}
