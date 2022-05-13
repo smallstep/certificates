@@ -109,7 +109,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	case opnGetCACaps:
 		res, err = GetCACaps(ctx)
 	case opnPKIOperation:
-		// TODO: implement the GET for PKI operation? Default CACAPS doesn't specify this is in use, though
+		res, err = h.PKIOperation(ctx, req)
 	default:
 		err = fmt.Errorf("unknown operation: %s", req.Operation)
 	}
@@ -170,8 +170,8 @@ func decodeRequest(r *http.Request) (request, error) {
 			if _, ok := query["message"]; ok {
 				message = query.Get("message")
 			}
-			// TODO: verify this; it seems like it should be StdEncoding instead of URLEncoding
-			decodedMessage, err := base64.URLEncoding.DecodeString(message)
+			// TODO: verify this; right type of encoding? Needs additional transformations?
+			decodedMessage, err := base64.StdEncoding.DecodeString(message)
 			if err != nil {
 				return request{}, err
 			}
