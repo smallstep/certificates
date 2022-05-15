@@ -182,8 +182,6 @@ func TestNew_register(t *testing.T) {
 		CertificateAuthority:            caURL.String(),
 		CertificateAuthorityFingerprint: testRootFingerprint,
 		Config: json.RawMessage(`{
-			"PKIMountPath": "pki",
-			"PKIRoleDefault": "pki-role",
 			"AuthType": "approle",
 			"AuthOptions": {"RoleID":"roleID","SecretID":"secretID","IsWrappingToken":false}
 		}`),
@@ -204,8 +202,6 @@ func TestVaultCAS_CreateCertificate(t *testing.T) {
 		PKIRoleRSA:     "rsa",
 		PKIRoleEC:      "ec",
 		PKIRoleEd25519: "ed25519",
-		AuthType:       "approle",
-		AuthOptions:    json.RawMessage(`{"RoleID":"roleID","SecretID":"secretID","IsWrappingToken":false}`),
 	}
 
 	type fields struct {
@@ -336,8 +332,6 @@ func TestVaultCAS_RevokeCertificate(t *testing.T) {
 		PKIRoleRSA:     "rsa",
 		PKIRoleEC:      "ec",
 		PKIRoleEd25519: "ed25519",
-		AuthType:       "approle",
-		AuthOptions:    json.RawMessage(`{"RoleID":"roleID","SecretID":"secretID","IsWrappingToken":false}`),
 	}
 
 	type fields struct {
@@ -406,8 +400,6 @@ func TestVaultCAS_RenewCertificate(t *testing.T) {
 		PKIRoleRSA:     "rsa",
 		PKIRoleEC:      "ec",
 		PKIRoleEd25519: "ed25519",
-		AuthType:       "approle",
-		AuthOptions:    json.RawMessage(`{"RoleID":"roleID","SecretID":"secretID","IsWrappingToken":false}`),
 	}
 
 	type fields struct {

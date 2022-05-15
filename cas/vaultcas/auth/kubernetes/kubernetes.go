@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/vault/api/auth/kubernetes"
@@ -31,6 +32,11 @@ func NewKubernetesAuthMethod(mountPath string, options json.RawMessage) (*kubern
 	if opts.TokenPath != "" {
 		loginOptions = append(loginOptions, kubernetes.WithServiceAccountTokenPath(opts.TokenPath))
 	}
+
+	if opts.Role == "" {
+		return nil, errors.New("you must set role")
+	}
+
 	kubernetesAuth, err = kubernetes.NewKubernetesAuth(
 		opts.Role,
 		loginOptions...,

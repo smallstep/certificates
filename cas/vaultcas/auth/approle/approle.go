@@ -2,6 +2,7 @@ package approle
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/hashicorp/vault/api/auth/approle"
@@ -12,6 +13,8 @@ import (
 type AuthOptions struct {
 	RoleID          string `json:"roleID,omitempty"`
 	SecretID        string `json:"secretID,omitempty"`
+	SecretIDFile    string `json:"secretIDFile,omitempty"`
+	SecretIDEnv     string `json:"secretIDEnv,omitempty"`
 	IsWrappingToken bool   `json:"isWrappingToken,omitempty"`
 }
 
@@ -33,8 +36,25 @@ func NewApproleAuthMethod(mountPath string, options json.RawMessage) (*approle.A
 		loginOptions = append(loginOptions, approle.WithWrappingToken())
 	}
 
-	sid := approle.SecretID{
-		FromString: opts.SecretID,
+	if opts.RoleID == "" {
+		return nil, errors.New("you must set roleID")
+	}
+
+	var sid approle.SecretID
+	if opts.SecretID != "" {
+		sid = approle.SecretID{
+			FromString: opts.SecretID,
+		}
+	} else if opts.SecretIDFile != "" {
+		sid = approle.SecretID{
+			FromFile: opts.SecretIDFile,
+		}
+	} else if opts.SecretIDEnv != "" {
+		sid = approle.SecretID{
+			FromEnv: opts.SecretIDEnv,
+		}
+	} else {
+		return nil, errors.New("you must set one of secretID, secretIDFile or secretIDEnv")
 	}
 
 	approleAuth, err = approle.NewAppRoleAuth(opts.RoleID, &sid, loginOptions...)
