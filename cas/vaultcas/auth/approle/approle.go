@@ -41,19 +41,20 @@ func NewApproleAuthMethod(mountPath string, options json.RawMessage) (*approle.A
 	}
 
 	var sid approle.SecretID
-	if opts.SecretID != "" {
+	switch {
+	case opts.SecretID != "" && opts.SecretIDFile == "" && opts.SecretIDEnv == "":
 		sid = approle.SecretID{
 			FromString: opts.SecretID,
 		}
-	} else if opts.SecretIDFile != "" {
+	case opts.SecretIDFile != "" && opts.SecretID == "" && opts.SecretIDEnv == "":
 		sid = approle.SecretID{
 			FromFile: opts.SecretIDFile,
 		}
-	} else if opts.SecretIDEnv != "" {
+	case opts.SecretIDEnv != "" && opts.SecretIDFile == "" && opts.SecretID == "":
 		sid = approle.SecretID{
 			FromEnv: opts.SecretIDEnv,
 		}
-	} else {
+	default:
 		return nil, errors.New("you must set one of secretID, secretIDFile or secretIDEnv")
 	}
 

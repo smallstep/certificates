@@ -158,6 +158,30 @@ func TestApprole_NewApproleAuthMethod(t *testing.T) {
 			`{"RoleID": "0000-0000-0000-0000"}`,
 			true,
 		},
+		{
+			"fail multiple secret-id types id and env",
+			"",
+			`{"RoleID": "0000-0000-0000-0000", "SecretID": "0000-0000-0000-0000", "SecretIDEnv": "VAULT_APPROLE_SECRETID"}`,
+			true,
+		},
+		{
+			"fail multiple secret-id types id and file",
+			"",
+			`{"RoleID": "0000-0000-0000-0000", "SecretID": "0000-0000-0000-0000", "SecretIDFile": "./secret-id"}`,
+			true,
+		},
+		{
+			"fail multiple secret-id types env and file",
+			"",
+			`{"RoleID": "0000-0000-0000-0000", "SecretIDFile": "./secret-id", "SecretIDEnv": "VAULT_APPROLE_SECRETID"}`,
+			true,
+		},
+		{
+			"fail multiple secret-id types all",
+			"",
+			`{"RoleID": "0000-0000-0000-0000", "SecretID": "0000-0000-0000-0000", "SecretIDFile": "./secret-id", "SecretIDEnv": "VAULT_APPROLE_SECRETID"}`,
+			true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
