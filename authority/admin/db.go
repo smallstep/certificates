@@ -71,52 +71,6 @@ type DB interface {
 	DeleteAdmin(ctx context.Context, id string) error
 }
 
-type NoDB struct{}
-
-func NewNoDB() *NoDB {
-	return &NoDB{}
-}
-
-func (n *NoDB) CreateProvisioner(ctx context.Context, prov *linkedca.Provisioner) error {
-	return nil
-}
-
-func (n *NoDB) GetProvisioner(ctx context.Context, id string) (*linkedca.Provisioner, error) {
-	return nil, nil
-}
-
-func (n *NoDB) GetProvisioners(ctx context.Context) ([]*linkedca.Provisioner, error) {
-	return nil, nil
-}
-
-func (n *NoDB) UpdateProvisioner(ctx context.Context, prov *linkedca.Provisioner) error {
-	return nil
-}
-
-func (n *NoDB) DeleteProvisioner(ctx context.Context, id string) error {
-	return nil
-}
-
-func (n *NoDB) CreateAdmin(ctx context.Context, admin *linkedca.Admin) error {
-	return nil
-}
-
-func (n *NoDB) GetAdmin(ctx context.Context, id string) (*linkedca.Admin, error) {
-	return nil, nil
-}
-
-func (n *NoDB) GetAdmins(ctx context.Context) ([]*linkedca.Admin, error) {
-	return nil, nil
-}
-
-func (n *NoDB) UpdateAdmin(ctx context.Context, prov *linkedca.Admin) error {
-	return nil
-}
-
-func (n *NoDB) DeleteAdmin(ctx context.Context, id string) error {
-	return nil
-}
-
 // MockDB is an implementation of the DB interface that should only be used as
 // a mock in tests.
 type MockDB struct {

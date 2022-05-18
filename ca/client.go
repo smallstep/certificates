@@ -435,6 +435,7 @@ type ProvisionerOptions struct {
 	Name   string
 }
 
+// Apply caches provisioner options on a struct for later use.
 func (o *ProvisionerOptions) Apply(opts []ProvisionerOption) (err error) {
 	for _, fn := range opts {
 		if err = fn(o); err != nil {
@@ -446,16 +447,16 @@ func (o *ProvisionerOptions) Apply(opts []ProvisionerOption) (err error) {
 
 func (o *ProvisionerOptions) rawQuery() string {
 	v := url.Values{}
-	if len(o.Cursor) > 0 {
+	if o.Cursor != "" {
 		v.Set("cursor", o.Cursor)
 	}
 	if o.Limit > 0 {
 		v.Set("limit", strconv.Itoa(o.Limit))
 	}
-	if len(o.ID) > 0 {
+	if o.ID != "" {
 		v.Set("id", o.ID)
 	}
-	if len(o.Name) > 0 {
+	if o.Name != "" {
 		v.Set("name", o.Name)
 	}
 	return v.Encode()

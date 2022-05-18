@@ -266,6 +266,14 @@ func WithAdminDB(d admin.DB) Option {
 	}
 }
 
+// WithProvisioners is an option to set the provisioner collection.
+func WithProvisioners(ps *provisioner.Collection) Option {
+	return func(a *Authority) error {
+		a.provisioners = ps
+		return nil
+	}
+}
+
 // WithLinkedCAToken is an option to set the authentication token used to enable
 // linked ca.
 func WithLinkedCAToken(token string) Option {

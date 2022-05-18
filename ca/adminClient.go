@@ -369,12 +369,12 @@ func (c *AdminClient) GetProvisioner(opts ...ProvisionerOption) (*linkedca.Provi
 	}
 	var u *url.URL
 	switch {
-	case len(o.ID) > 0:
+	case o.ID != "":
 		u = c.endpoint.ResolveReference(&url.URL{
 			Path:     "/admin/provisioners/id",
 			RawQuery: o.rawQuery(),
 		})
-	case len(o.Name) > 0:
+	case o.Name != "":
 		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.Name)})
 	default:
 		return nil, errors.New("must set either name or id in method options")
@@ -478,12 +478,12 @@ func (c *AdminClient) RemoveProvisioner(opts ...ProvisionerOption) error {
 	}
 
 	switch {
-	case len(o.ID) > 0:
+	case o.ID != "":
 		u = c.endpoint.ResolveReference(&url.URL{
 			Path:     path.Join(adminURLPrefix, "provisioners/id"),
 			RawQuery: o.rawQuery(),
 		})
-	case len(o.Name) > 0:
+	case o.Name != "":
 		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.Name)})
 	default:
 		return errors.New("must set either name or id in method options")
