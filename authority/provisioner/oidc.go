@@ -434,6 +434,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	}
 
 	return append(signOptions,
+		o,
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{o.ctl.Claimer},
 		// Validate public key

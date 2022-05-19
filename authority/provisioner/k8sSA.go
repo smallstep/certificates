@@ -275,6 +275,7 @@ func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 	signOptions := []SignOption{templateOptions}
 
 	return append(signOptions,
+		p,
 		// Require type, key-id and principals in the SignSSHOptions.
 		&sshCertOptionsRequireValidator{CertType: true, KeyID: true, Principals: true},
 		// Set the validity bounds if not set.

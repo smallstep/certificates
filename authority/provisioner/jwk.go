@@ -257,6 +257,7 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	}
 
 	return append(signOptions,
+		p,
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{p.ctl.Claimer},
 		// Validate public key
