@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -370,7 +371,9 @@ func TestBootstrapClient(t *testing.T) {
 }
 
 func TestBootstrapClientServerRotation(t *testing.T) {
-	t.Skipf("skip until we fix https://github.com/smallstep/certificates/issues/873")
+	if os.Getenv("CI") == "true" {
+		t.Skipf("skip until we fix https://github.com/smallstep/certificates/issues/873")
+	}
 	reset := setMinCertDuration(1 * time.Second)
 	defer reset()
 
