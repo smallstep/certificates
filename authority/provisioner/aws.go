@@ -747,6 +747,7 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	signOptions = append(signOptions, templateOptions)
 
 	return append(signOptions,
+		p,
 		// Validate user SignSSHOptions.
 		sshCertOptionsValidator(defaults),
 		// Set the validity bounds if not set.

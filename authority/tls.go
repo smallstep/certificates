@@ -365,28 +365,31 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 // `StoreCertificate(...*x509.Certificate) error` instead of just
 // `StoreCertificate(*x509.Certificate) error`.
 func (a *Authority) storeCertificate(prov provisioner.Interface, fullchain []*x509.Certificate) error {
-	type linkedChainStorer interface {
+	type certificateChainStorer interface {
 		StoreCertificateChain(provisioner.Interface, ...*x509.Certificate) error
 	}
-	type certificateChainStorer interface {
+	type certificateChainSimpleStorer interface {
 		StoreCertificateChain(...*x509.Certificate) error
 	}
+
 	// Store certificate in linkedca
 	switch s := a.adminDB.(type) {
-	case linkedChainStorer:
-		return s.StoreCertificateChain(prov, fullchain...)
 	case certificateChainStorer:
+		return s.StoreCertificateChain(prov, fullchain...)
+	case certificateChainSimpleStorer:
 		return s.StoreCertificateChain(fullchain...)
 	}
 
 	// Store certificate in local db
 	switch s := a.db.(type) {
-	case linkedChainStorer:
-		return s.StoreCertificateChain(prov, fullchain...)
 	case certificateChainStorer:
+		return s.StoreCertificateChain(prov, fullchain...)
+	case certificateChainSimpleStorer:
 		return s.StoreCertificateChain(fullchain...)
+	case db.CertificateStorer:
+		return s.StoreCertificate(fullchain[0])
 	default:
-		return a.db.StoreCertificate(fullchain[0])
+		return nil
 	}
 }
 
@@ -398,15 +401,21 @@ func (a *Authority) storeRenewedCertificate(oldCert *x509.Certificate, fullchain
 	type renewedCertificateChainStorer interface {
 		StoreRenewedCertificate(*x509.Certificate, ...*x509.Certificate) error
 	}
+
 	// Store certificate in linkedca
 	if s, ok := a.adminDB.(renewedCertificateChainStorer); ok {
 		return s.StoreRenewedCertificate(oldCert, fullchain...)
 	}
+
 	// Store certificate in local db
-	if s, ok := a.db.(renewedCertificateChainStorer); ok {
+	switch s := a.db.(type) {
+	case renewedCertificateChainStorer:
 		return s.StoreRenewedCertificate(oldCert, fullchain...)
+	case db.CertificateStorer:
+		return s.StoreCertificate(fullchain[0])
+	default:
+		return nil
 	}
-	return a.db.StoreCertificate(fullchain[0])
 }
 
 // RevokeOptions are the options for the Revoke API.

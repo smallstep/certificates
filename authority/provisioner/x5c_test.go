@@ -769,6 +769,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 						nw := now()
 						for _, o := range opts {
 							switch v := o.(type) {
+							case Interface:
 							case sshCertOptionsValidator:
 								tc.claims.Step.SSH.ValidAfter.t = time.Time{}
 								tc.claims.Step.SSH.ValidBefore.t = time.Time{}
@@ -799,9 +800,9 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 							tot++
 						}
 						if len(tc.claims.Step.SSH.CertType) > 0 {
-							assert.Equals(t, tot, 10)
+							assert.Equals(t, tot, 11)
 						} else {
-							assert.Equals(t, tot, 8)
+							assert.Equals(t, tot, 9)
 						}
 					}
 				}
