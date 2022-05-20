@@ -51,6 +51,7 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRenewMethod)
+	ctx = provisioner.NewContextWithToken(ctx, body.OTT)
 	_, err := h.Authority.Authorize(ctx, body.OTT)
 	if err != nil {
 		render.Error(w, errs.UnauthorizedErr(err))

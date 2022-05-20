@@ -222,6 +222,7 @@ func (p *SSHPOP) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Cert
 		return nil, nil, errs.BadRequest("sshpop certificate must be a host ssh certificate")
 	}
 	return claims.sshCert, []SignOption{
+		p,
 		// Validate public key
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.

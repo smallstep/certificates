@@ -459,9 +459,10 @@ func TestSSHPOP_AuthorizeSSHRekey(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Len(t, 3, opts)
+					assert.Len(t, 4, opts)
 					for _, o := range opts {
 						switch v := o.(type) {
+						case Interface:
 						case *sshDefaultPublicKeyValidator:
 						case *sshCertDefaultValidator:
 						case *sshCertValidityValidator:

@@ -270,13 +270,13 @@ func (c *linkedCaClient) GetCertificateData(serial string) (*db.CertificateData,
 	}, nil
 }
 
-func (c *linkedCaClient) StoreCertificateChain(prov provisioner.Interface, fullchain ...*x509.Certificate) error {
+func (c *linkedCaClient) StoreCertificateChain(p provisioner.Interface, fullchain ...*x509.Certificate) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err := c.client.PostCertificate(ctx, &linkedca.CertificateRequest{
 		PemCertificate:      serializeCertificateChain(fullchain[0]),
 		PemCertificateChain: serializeCertificateChain(fullchain[1:]...),
-		Provisioner:         createProvisionerIdentity(prov),
+		Provisioner:         createProvisionerIdentity(p),
 	})
 	return errors.Wrap(err, "error posting certificate")
 }
@@ -292,22 +292,23 @@ func (c *linkedCaClient) StoreRenewedCertificate(parent *x509.Certificate, fullc
 	return errors.Wrap(err, "error posting renewed certificate")
 }
 
-func (c *linkedCaClient) StoreSSHCertificate(prov provisioner.Interface, crt *ssh.Certificate) error {
+func (c *linkedCaClient) StoreSSHCertificate(p provisioner.Interface, crt *ssh.Certificate) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err := c.client.PostSSHCertificate(ctx, &linkedca.SSHCertificateRequest{
 		Certificate: string(ssh.MarshalAuthorizedKey(crt)),
-		Provisioner: createProvisionerIdentity(prov),
+		Provisioner: createProvisionerIdentity(p),
 	})
 	return errors.Wrap(err, "error posting ssh certificate")
 }
 
-func (c *linkedCaClient) StoreRenewedSSHCertificate(parent, crt *ssh.Certificate) error {
+func (c *linkedCaClient) StoreRenewedSSHCertificate(p provisioner.Interface, parent, crt *ssh.Certificate) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err := c.client.PostSSHCertificate(ctx, &linkedca.SSHCertificateRequest{
 		Certificate:       string(ssh.MarshalAuthorizedKey(crt)),
 		ParentCertificate: string(ssh.MarshalAuthorizedKey(parent)),
+		Provisioner:       createProvisionerIdentity(p),
 	})
 	return errors.Wrap(err, "error posting renewed ssh certificate")
 }
@@ -380,14 +381,14 @@ func (c *linkedCaClient) DeleteAuthorityPolicy(ctx context.Context) error {
 	return errors.New("not implemented yet")
 }
 
-func createProvisionerIdentity(prov provisioner.Interface) *linkedca.ProvisionerIdentity {
-	if prov == nil {
+func createProvisionerIdentity(p provisioner.Interface) *linkedca.ProvisionerIdentity {
+	if p == nil {
 		return nil
 	}
 	return &linkedca.ProvisionerIdentity{
-		Id:   prov.GetID(),
-		Type: linkedca.Provisioner_Type(prov.GetType()),
-		Name: prov.GetName(),
+		Id:   p.GetID(),
+		Type: linkedca.Provisioner_Type(p.GetType()),
+		Name: p.GetName(),
 	}
 }
 
