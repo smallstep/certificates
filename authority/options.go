@@ -267,6 +267,8 @@ func WithAdminDB(d admin.DB) Option {
 }
 
 // WithProvisioners is an option to set the provisioner collection.
+// 
+// Deprecated: provisioner collections will likely change
 func WithProvisioners(ps *provisioner.Collection) Option {
 	return func(a *Authority) error {
 		a.provisioners = ps
