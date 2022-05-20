@@ -266,6 +266,16 @@ func WithAdminDB(d admin.DB) Option {
 	}
 }
 
+// WithProvisioners is an option to set the provisioner collection.
+//
+// Deprecated: provisioner collections will likely change
+func WithProvisioners(ps *provisioner.Collection) Option {
+	return func(a *Authority) error {
+		a.provisioners = ps
+		return nil
+	}
+}
+
 // WithLinkedCAToken is an option to set the authentication token used to enable
 // linked ca.
 func WithLinkedCAToken(token string) Option {
@@ -280,6 +290,15 @@ func WithLinkedCAToken(token string) Option {
 func WithX509Enforcers(ces ...provisioner.CertificateEnforcer) Option {
 	return func(a *Authority) error {
 		a.x509Enforcers = ces
+		return nil
+	}
+}
+
+// WithSkipInit is an option that allows the constructor to skip initializtion
+// of the authority.
+func WithSkipInit() Option {
+	return func(a *Authority) error {
+		a.skipInit = true
 		return nil
 	}
 }
