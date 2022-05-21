@@ -84,15 +84,15 @@ func New(ctx context.Context, opts apiv1.Options) (*VaultCAS, error) {
 	case "approle":
 		method, err = approle.NewApproleAuthMethod(vc.AuthMountPath, vc.AuthOptions)
 	default:
-		return nil, fmt.Errorf("unknown auth type: %v", vc.AuthType)
+		return nil, fmt.Errorf("unknown auth type: %s, only 'kubernetes' and 'approle' currently supported", vc.AuthType)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("unable to configure auth method: %w", err)
+		return nil, fmt.Errorf("unable to configure %s auth method: %w", vc.AuthType, err)
 	}
 
 	authInfo, err := client.Auth().Login(ctx, method)
 	if err != nil {
-		return nil, fmt.Errorf("unable to login to Kubernetes auth method: %w", err)
+		return nil, fmt.Errorf("unable to login to %s auth method: %w", vc.AuthType, err)
 	}
 	if authInfo == nil {
 		return nil, errors.New("no auth info was returned after login")
