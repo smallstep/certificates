@@ -33,6 +33,17 @@ func readProtoJSON(r io.ReadCloser, m proto.Message) error {
 	return protojson.Unmarshal(data, m)
 }
 
+func mockMustAuthority(t *testing.T, a adminAuthority) {
+	t.Helper()
+	fn := mustAuthority
+	t.Cleanup(func() {
+		mustAuthority = fn
+	})
+	mustAuthority = func(ctx context.Context) adminAuthority {
+		return a
+	}
+}
+
 func TestHandler_requireEABEnabled(t *testing.T) {
 	type test struct {
 		ctx        context.Context
@@ -117,12 +128,9 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{}
-
-			req := httptest.NewRequest("GET", "/foo", nil)
-			req = req.WithContext(tc.ctx)
+			req := httptest.NewRequest("GET", "/foo", nil).WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.requireEABEnabled(tc.next)(w, req)
+			requireEABEnabled(tc.next)(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)

@@ -76,6 +76,29 @@ type DB interface {
 	DeleteAuthorityPolicy(ctx context.Context) error
 }
 
+type dbKey struct{}
+
+// NewContext adds the given admin database to the context.
+func NewContext(ctx context.Context, db DB) context.Context {
+	return context.WithValue(ctx, dbKey{}, db)
+}
+
+// FromContext returns the current admin database from the given context.
+func FromContext(ctx context.Context) (db DB, ok bool) {
+	db, ok = ctx.Value(dbKey{}).(DB)
+	return
+}
+
+// MustFromContext returns the current admin database from the given context. It
+// will panic if it's not in the context.
+func MustFromContext(ctx context.Context) DB {
+	if db, ok := FromContext(ctx); !ok {
+		panic("admin database is not in the context")
+	} else {
+		return db
+	}
+}
+
 // MockDB is an implementation of the DB interface that should only be used as
 // a mock in tests.
 type MockDB struct {

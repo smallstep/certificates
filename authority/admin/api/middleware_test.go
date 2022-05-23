@@ -71,13 +71,11 @@ func TestHandler_requireAPIEnabled(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("GET", "/foo", nil) // chi routing is prepared in test setup
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.requireAPIEnabled(tc.next)(w, req)
+			requireAPIEnabled(tc.next)(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -196,13 +194,10 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
-
+			mockMustAuthority(t, tc.auth)
 			req := tc.req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.extractAuthorizeTokenAdmin(tc.next)(w, req)
+			extractAuthorizeTokenAdmin(tc.next)(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -251,6 +246,7 @@ func TestHandler_loadProvisionerByName(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				auth:       auth,
+				adminDB:    &admin.MockDB{},
 				statusCode: 500,
 				err:        err,
 			}
@@ -326,16 +322,13 @@ func TestHandler_loadProvisionerByName(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth:    tc.auth,
-				adminDB: tc.adminDB,
-			}
-
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
 			req := httptest.NewRequest("GET", "/foo", nil) // chi routing is prepared in test setup
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 
 			w := httptest.NewRecorder()
-			h.loadProvisionerByName(tc.next)(w, req)
+			loadProvisionerByName(tc.next)(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -405,14 +398,10 @@ func TestHandler_checkAction(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-
-				adminDB: tc.adminDB,
-			}
-
-			req := httptest.NewRequest("GET", "/foo", nil)
+			ctx := admin.NewContext(context.Background(), tc.adminDB)
+			req := httptest.NewRequest("GET", "/foo", nil).WithContext(ctx)
 			w := httptest.NewRecorder()
-			h.checkAction(tc.next, tc.supportedInStandalone)(w, req)
+			checkAction(tc.next, tc.supportedInStandalone)(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -653,14 +642,11 @@ func TestHandler_loadExternalAccountKey(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				acmeDB: tc.acmeDB,
-			}
-
+			ctx := acme.NewDatabaseContext(tc.ctx, tc.acmeDB)
 			req := httptest.NewRequest("GET", "/foo", nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
-			h.loadExternalAccountKey(tc.next)(w, req)
+			loadExternalAccountKey(tc.next)(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)

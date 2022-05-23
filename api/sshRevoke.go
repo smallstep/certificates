@@ -48,7 +48,7 @@ func (r *SSHRevokeRequest) Validate() (err error) {
 // Revoke supports handful of different methods that revoke a Certificate.
 //
 // NOTE: currently only Passive revocation is supported.
-func (h *caHandler) SSHRevoke(w http.ResponseWriter, r *http.Request) {
+func SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	var body SSHRevokeRequest
 	if err := read.JSON(r.Body, &body); err != nil {
 		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
@@ -68,16 +68,19 @@ func (h *caHandler) SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRevokeMethod)
+	a := mustAuthority(ctx)
+
 	// A token indicates that we are using the api via a provisioner token,
 	// otherwise it is assumed that the certificate is revoking itself over mTLS.
 	logOtt(w, body.OTT)
-	if _, err := h.Authority.Authorize(ctx, body.OTT); err != nil {
+
+	if _, err := a.Authorize(ctx, body.OTT); err != nil {
 		render.Error(w, errs.UnauthorizedErr(err))
 		return
 	}
 	opts.OTT = body.OTT
 
-	if err := h.Authority.Revoke(ctx, opts); err != nil {
+	if err := a.Revoke(ctx, opts); err != nil {
 		render.Error(w, errs.ForbiddenErr(err, "error revoking ssh certificate"))
 		return
 	}

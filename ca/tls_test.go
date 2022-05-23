@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -77,7 +78,12 @@ func startCATestServer() *httptest.Server {
 		panic(err)
 	}
 	// Use a httptest.Server instead
-	return startTestServer(ca.srv.TLSConfig, ca.srv.Handler)
+	srv := startTestServer(ca.srv.TLSConfig, ca.srv.Handler)
+	baseContext := buildContext(ca.auth, nil, nil, nil)
+	srv.Config.BaseContext = func(net.Listener) context.Context {
+		return baseContext
+	}
+	return srv
 }
 
 func sign(domain string) (*Client, *api.SignResponse, crypto.PrivateKey) {

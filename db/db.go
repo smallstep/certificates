@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/json"
 	"strconv"
@@ -54,6 +55,29 @@ type AuthDB interface {
 	IsSSHHost(name string) (bool, error)
 	GetSSHHostPrincipals() ([]string, error)
 	Shutdown() error
+}
+
+type dbKey struct{}
+
+// NewContext adds the given authority database to the context.
+func NewContext(ctx context.Context, db AuthDB) context.Context {
+	return context.WithValue(ctx, dbKey{}, db)
+}
+
+// FromContext returns the current authority database from the given context.
+func FromContext(ctx context.Context) (db AuthDB, ok bool) {
+	db, ok = ctx.Value(dbKey{}).(AuthDB)
+	return
+}
+
+// MustFromContext returns the current database from the given context. It
+// will panic if it's not in the context.
+func MustFromContext(ctx context.Context) AuthDB {
+	if db, ok := FromContext(ctx); !ok {
+		panic("authority database is not in the context")
+	} else {
+		return db
+	}
 }
 
 // CertificateStorer is an extension of AuthDB that allows to store

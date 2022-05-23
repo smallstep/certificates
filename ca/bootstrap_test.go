@@ -54,7 +54,11 @@ func startCABootstrapServer() *httptest.Server {
 	if err != nil {
 		panic(err)
 	}
+	baseContext := buildContext(ca.auth, nil, nil, nil)
 	srv.Config.Handler = ca.srv.Handler
+	srv.Config.BaseContext = func(net.Listener) context.Context {
+		return baseContext
+	}
 	srv.TLS = ca.srv.TLSConfig
 	srv.StartTLS()
 	// Force the use of GetCertificate on IPs

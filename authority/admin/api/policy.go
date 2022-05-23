@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -14,7 +15,9 @@ import (
 	"github.com/smallstep/certificates/authority/policy"
 )
 
-type policyAdminResponderInterface interface {
+// PolicyAdminResponder is the interface responsible for writing ACME admin
+// responses.
+type PolicyAdminResponder interface {
 	GetAuthorityPolicy(w http.ResponseWriter, r *http.Request)
 	CreateAuthorityPolicy(w http.ResponseWriter, r *http.Request)
 	UpdateAuthorityPolicy(w http.ResponseWriter, r *http.Request)
@@ -29,39 +32,24 @@ type policyAdminResponderInterface interface {
 	DeleteACMEAccountPolicy(w http.ResponseWriter, r *http.Request)
 }
 
-// PolicyAdminResponder is responsible for writing ACME admin responses
-type PolicyAdminResponder struct {
-	auth       adminAuthority
-	adminDB    admin.DB
-	acmeDB     acme.DB
-	isLinkedCA bool
-}
+// policyAdminResponder implements PolicyAdminResponder.
+type policyAdminResponder struct{}
 
-// NewACMEAdminResponder returns a new ACMEAdminResponder
-func NewPolicyAdminResponder(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB) *PolicyAdminResponder {
-
-	var isLinkedCA bool
-	if a, ok := adminDB.(interface{ IsLinkedCA() bool }); ok {
-		isLinkedCA = a.IsLinkedCA()
-	}
-
-	return &PolicyAdminResponder{
-		auth:       auth,
-		adminDB:    adminDB,
-		acmeDB:     acmeDB,
-		isLinkedCA: isLinkedCA,
-	}
+// NewACMEAdminResponder returns a new PolicyAdminResponder.
+func NewPolicyAdminResponder() PolicyAdminResponder {
+	return &policyAdminResponder{}
 }
 
 // GetAuthorityPolicy handles the GET /admin/authority/policy request
-func (par *PolicyAdminResponder) GetAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) GetAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	authorityPolicy, err := par.auth.GetAuthorityPolicy(r.Context())
+	auth := mustAuthority(ctx)
+	authorityPolicy, err := auth.GetAuthorityPolicy(r.Context())
 	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
 		render.Error(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
 		return
@@ -76,15 +64,15 @@ func (par *PolicyAdminResponder) GetAuthorityPolicy(w http.ResponseWriter, r *ht
 }
 
 // CreateAuthorityPolicy handles the POST /admin/authority/policy request
-func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	ctx := r.Context()
-	authorityPolicy, err := par.auth.GetAuthorityPolicy(ctx)
+	auth := mustAuthority(ctx)
+	authorityPolicy, err := auth.GetAuthorityPolicy(ctx)
 
 	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
 		render.Error(w, admin.WrapErrorISE(err, "error retrieving authority policy"))
@@ -113,7 +101,7 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 	adm := linkedca.MustAdminFromContext(ctx)
 
 	var createdPolicy *linkedca.Policy
-	if createdPolicy, err = par.auth.CreateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
+	if createdPolicy, err = auth.CreateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
 		if isBadRequest(err) {
 			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error storing authority policy"))
 			return
@@ -127,15 +115,15 @@ func (par *PolicyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 }
 
 // UpdateAuthorityPolicy handles the PUT /admin/authority/policy request
-func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	ctx := r.Context()
-	authorityPolicy, err := par.auth.GetAuthorityPolicy(ctx)
+	auth := mustAuthority(ctx)
+	authorityPolicy, err := auth.GetAuthorityPolicy(ctx)
 
 	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
 		render.Error(w, admin.WrapErrorISE(err, "error retrieving authority policy"))
@@ -163,7 +151,7 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 	adm := linkedca.MustAdminFromContext(ctx)
 
 	var updatedPolicy *linkedca.Policy
-	if updatedPolicy, err = par.auth.UpdateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
+	if updatedPolicy, err = auth.UpdateAuthorityPolicy(ctx, adm, newPolicy); err != nil {
 		if isBadRequest(err) {
 			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating authority policy"))
 			return
@@ -177,15 +165,15 @@ func (par *PolicyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 }
 
 // DeleteAuthorityPolicy handles the DELETE /admin/authority/policy request
-func (par *PolicyAdminResponder) DeleteAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) DeleteAuthorityPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	ctx := r.Context()
-	authorityPolicy, err := par.auth.GetAuthorityPolicy(ctx)
+	auth := mustAuthority(ctx)
+	authorityPolicy, err := auth.GetAuthorityPolicy(ctx)
 
 	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
 		render.Error(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
@@ -197,7 +185,7 @@ func (par *PolicyAdminResponder) DeleteAuthorityPolicy(w http.ResponseWriter, r 
 		return
 	}
 
-	if err := par.auth.RemoveAuthorityPolicy(ctx); err != nil {
+	if err := auth.RemoveAuthorityPolicy(ctx); err != nil {
 		render.Error(w, admin.WrapErrorISE(err, "error deleting authority policy"))
 		return
 	}
@@ -206,15 +194,14 @@ func (par *PolicyAdminResponder) DeleteAuthorityPolicy(w http.ResponseWriter, r 
 }
 
 // GetProvisionerPolicy handles the GET /admin/provisioners/{name}/policy request
-func (par *PolicyAdminResponder) GetProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) GetProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	prov := linkedca.MustProvisionerFromContext(r.Context())
-
+	prov := linkedca.MustProvisionerFromContext(ctx)
 	provisionerPolicy := prov.GetPolicy()
 	if provisionerPolicy == nil {
 		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "provisioner policy does not exist"))
@@ -225,16 +212,14 @@ func (par *PolicyAdminResponder) GetProvisionerPolicy(w http.ResponseWriter, r *
 }
 
 // CreateProvisionerPolicy handles the POST /admin/provisioners/{name}/policy request
-func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	ctx := r.Context()
 	prov := linkedca.MustProvisionerFromContext(ctx)
-
 	provisionerPolicy := prov.GetPolicy()
 	if provisionerPolicy != nil {
 		adminErr := admin.NewError(admin.ErrorConflictType, "provisioner %s already has a policy", prov.Name)
@@ -256,8 +241,8 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 	}
 
 	prov.Policy = newPolicy
-
-	if err := par.auth.UpdateProvisioner(ctx, prov); err != nil {
+	auth := mustAuthority(ctx)
+	if err := auth.UpdateProvisioner(ctx, prov); err != nil {
 		if isBadRequest(err) {
 			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error creating provisioner policy"))
 			return
@@ -271,16 +256,14 @@ func (par *PolicyAdminResponder) CreateProvisionerPolicy(w http.ResponseWriter, 
 }
 
 // UpdateProvisionerPolicy handles the PUT /admin/provisioners/{name}/policy request
-func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	ctx := r.Context()
 	prov := linkedca.MustProvisionerFromContext(ctx)
-
 	provisionerPolicy := prov.GetPolicy()
 	if provisionerPolicy == nil {
 		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "provisioner policy does not exist"))
@@ -301,7 +284,8 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 	}
 
 	prov.Policy = newPolicy
-	if err := par.auth.UpdateProvisioner(ctx, prov); err != nil {
+	auth := mustAuthority(ctx)
+	if err := auth.UpdateProvisioner(ctx, prov); err != nil {
 		if isBadRequest(err) {
 			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating provisioner policy"))
 			return
@@ -315,16 +299,14 @@ func (par *PolicyAdminResponder) UpdateProvisionerPolicy(w http.ResponseWriter, 
 }
 
 // DeleteProvisionerPolicy handles the DELETE /admin/provisioners/{name}/policy request
-func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	ctx := r.Context()
 	prov := linkedca.MustProvisionerFromContext(ctx)
-
 	if prov.Policy == nil {
 		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "provisioner policy does not exist"))
 		return
@@ -333,7 +315,8 @@ func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, 
 	// remove the policy
 	prov.Policy = nil
 
-	if err := par.auth.UpdateProvisioner(ctx, prov); err != nil {
+	auth := mustAuthority(ctx)
+	if err := auth.UpdateProvisioner(ctx, prov); err != nil {
 		render.Error(w, admin.WrapErrorISE(err, "error deleting provisioner policy"))
 		return
 	}
@@ -341,16 +324,14 @@ func (par *PolicyAdminResponder) DeleteProvisionerPolicy(w http.ResponseWriter, 
 	render.JSONStatus(w, DeleteResponse{Status: "ok"}, http.StatusOK)
 }
 
-func (par *PolicyAdminResponder) GetACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) GetACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	ctx := r.Context()
 	eak := linkedca.MustExternalAccountKeyFromContext(ctx)
-
 	eakPolicy := eak.GetPolicy()
 	if eakPolicy == nil {
 		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME EAK policy does not exist"))
@@ -360,17 +341,15 @@ func (par *PolicyAdminResponder) GetACMEAccountPolicy(w http.ResponseWriter, r *
 	render.ProtoJSONStatus(w, eakPolicy, http.StatusOK)
 }
 
-func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	ctx := r.Context()
 	prov := linkedca.MustProvisionerFromContext(ctx)
 	eak := linkedca.MustExternalAccountKeyFromContext(ctx)
-
 	eakPolicy := eak.GetPolicy()
 	if eakPolicy != nil {
 		adminErr := admin.NewError(admin.ErrorConflictType, "ACME EAK %s already has a policy", eak.Id)
@@ -394,7 +373,8 @@ func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, 
 	eak.Policy = newPolicy
 
 	acmeEAK := linkedEAKToCertificates(eak)
-	if err := par.acmeDB.UpdateExternalAccountKey(ctx, prov.GetId(), acmeEAK); err != nil {
+	acmeDB := acme.MustDatabaseFromContext(ctx)
+	if err := acmeDB.UpdateExternalAccountKey(ctx, prov.GetId(), acmeEAK); err != nil {
 		render.Error(w, admin.WrapErrorISE(err, "error creating ACME EAK policy"))
 		return
 	}
@@ -402,17 +382,15 @@ func (par *PolicyAdminResponder) CreateACMEAccountPolicy(w http.ResponseWriter, 
 	render.ProtoJSONStatus(w, newPolicy, http.StatusCreated)
 }
 
-func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	ctx := r.Context()
 	prov := linkedca.MustProvisionerFromContext(ctx)
 	eak := linkedca.MustExternalAccountKeyFromContext(ctx)
-
 	eakPolicy := eak.GetPolicy()
 	if eakPolicy == nil {
 		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME EAK policy does not exist"))
@@ -434,7 +412,8 @@ func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, 
 
 	eak.Policy = newPolicy
 	acmeEAK := linkedEAKToCertificates(eak)
-	if err := par.acmeDB.UpdateExternalAccountKey(ctx, prov.GetId(), acmeEAK); err != nil {
+	acmeDB := acme.MustDatabaseFromContext(ctx)
+	if err := acmeDB.UpdateExternalAccountKey(ctx, prov.GetId(), acmeEAK); err != nil {
 		render.Error(w, admin.WrapErrorISE(err, "error updating ACME EAK policy"))
 		return
 	}
@@ -442,17 +421,15 @@ func (par *PolicyAdminResponder) UpdateACMEAccountPolicy(w http.ResponseWriter, 
 	render.ProtoJSONStatus(w, newPolicy, http.StatusOK)
 }
 
-func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
-
-	if err := par.blockLinkedCA(); err != nil {
+func (par *policyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := blockLinkedCA(ctx); err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	ctx := r.Context()
 	prov := linkedca.MustProvisionerFromContext(ctx)
 	eak := linkedca.MustExternalAccountKeyFromContext(ctx)
-
 	eakPolicy := eak.GetPolicy()
 	if eakPolicy == nil {
 		render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME EAK policy does not exist"))
@@ -463,7 +440,8 @@ func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, 
 	eak.Policy = nil
 
 	acmeEAK := linkedEAKToCertificates(eak)
-	if err := par.acmeDB.UpdateExternalAccountKey(ctx, prov.GetId(), acmeEAK); err != nil {
+	acmeDB := acme.MustDatabaseFromContext(ctx)
+	if err := acmeDB.UpdateExternalAccountKey(ctx, prov.GetId(), acmeEAK); err != nil {
 		render.Error(w, admin.WrapErrorISE(err, "error deleting ACME EAK policy"))
 		return
 	}
@@ -472,9 +450,10 @@ func (par *PolicyAdminResponder) DeleteACMEAccountPolicy(w http.ResponseWriter, 
 }
 
 // blockLinkedCA blocks all API operations on linked deployments
-func (par *PolicyAdminResponder) blockLinkedCA() error {
+func blockLinkedCA(ctx context.Context) error {
 	// temporary blocking linked deployments
-	if par.isLinkedCA {
+	adminDB := admin.MustFromContext(ctx)
+	if a, ok := adminDB.(interface{ IsLinkedCA() bool }); ok && a.IsLinkedCA() {
 		return admin.NewError(admin.ErrorNotImplementedType, "policy operations not yet supported in linked deployments")
 	}
 	return nil
