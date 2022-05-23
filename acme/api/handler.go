@@ -83,7 +83,9 @@ type handler struct {
 // this route adds will add a new middleware that will set the ACME components
 // on the context.
 //
-// Deprecated: use api.Route(r api.Router)
+// Note: this method is deprecated in step-ca, other applications can still use
+// this to support ACME, but the recommendation is to use use
+// api.Route(api.Router) and acme.NewContext() instead.
 func (h *handler) Route(r api.Router) {
 	client := acme.NewClient()
 	linker := acme.NewLinker(h.opts.DNS, h.opts.Prefix)
@@ -101,7 +103,9 @@ func (h *handler) Route(r api.Router) {
 
 // NewHandler returns a new ACME API handler.
 //
-// Deprecated: use api.Route(r api.Router)
+// Note: this method is deprecated in step-ca, other applications can still use
+// this to support ACME, but the recommendation is to use use
+// api.Route(api.Router) and acme.NewContext() instead.
 func NewHandler(opts HandlerOptions) api.RouterHandler {
 	return &handler{
 		opts: &opts,
