@@ -253,7 +253,8 @@ func (a *Authority) authorizeSign(ctx context.Context, token string) ([]provisio
 //
 // Deprecated: Use Authorize(context.Context, string) ([]provisioner.SignOption, error).
 func (a *Authority) AuthorizeSign(token string) ([]provisioner.SignOption, error) {
-	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod)
+	ctx := NewContext(context.Background(), a)
+	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 	return a.Authorize(ctx, token)
 }
 

@@ -590,7 +590,7 @@ func (a *Authority) init() error {
 	}
 
 	// Load Provisioners and Admins
-	if err := a.ReloadAdminResources(context.Background()); err != nil {
+	if err := a.ReloadAdminResources(ctx); err != nil {
 		return err
 	}
 
