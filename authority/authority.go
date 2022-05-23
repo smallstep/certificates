@@ -84,8 +84,12 @@ type Authority struct {
 	policyEngine *policy.Engine
 
 	adminMutex sync.RWMutex
+
+	// Do Not initialize the authority
+	skipInit bool
 }
 
+// Info contains information about the authority.
 type Info struct {
 	StartTime          time.Time
 	RootX509Certs      []*x509.Certificate
@@ -113,9 +117,11 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		}
 	}
 
-	// Initialize authority from options or configuration.
-	if err := a.init(); err != nil {
-		return nil, err
+	if !a.skipInit {
+		// Initialize authority from options or configuration.
+		if err := a.init(); err != nil {
+			return nil, err
+		}
 	}
 
 	return a, nil
@@ -151,9 +157,11 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	// Initialize config required fields.
 	a.config.Init()
 
-	// Initialize authority from options or configuration.
-	if err := a.init(); err != nil {
-		return nil, err
+	if !a.skipInit {
+		// Initialize authority from options or configuration.
+		if err := a.init(); err != nil {
+			return nil, err
+		}
 	}
 
 	return a, nil
@@ -182,8 +190,8 @@ func MustFromContext(ctx context.Context) *Authority {
 	}
 }
 
-// reloadAdminResources reloads admins and provisioners from the DB.
-func (a *Authority) reloadAdminResources(ctx context.Context) error {
+// ReloadAdminResources reloads admins and provisioners from the DB.
+func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 	var (
 		provList  provisioner.List
 		adminList []*linkedca.Admin
@@ -582,7 +590,7 @@ func (a *Authority) init() error {
 	}
 
 	// Load Provisioners and Admins
-	if err := a.reloadAdminResources(ctx); err != nil {
+	if err := a.ReloadAdminResources(context.Background()); err != nil {
 		return err
 	}
 
@@ -632,6 +640,12 @@ func (a *Authority) GetAdminDatabase() admin.DB {
 	return a.adminDB
 }
 
+// GetConfig returns the config.
+func (a *Authority) GetConfig() *config.Config {
+	return a.config
+}
+
+// GetInfo returns information about the authority.
 func (a *Authority) GetInfo() Info {
 	ai := Info{
 		StartTime:     a.startTime,

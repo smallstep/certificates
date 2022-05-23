@@ -289,16 +289,27 @@ func (c *linkedCaClient) StoreRenewedCertificate(parent *x509.Certificate, fullc
 		PemCertificateChain:  serializeCertificateChain(fullchain[1:]...),
 		PemParentCertificate: serializeCertificateChain(parent),
 	})
-	return errors.Wrap(err, "error posting certificate")
+	return errors.Wrap(err, "error posting renewed certificate")
 }
 
-func (c *linkedCaClient) StoreSSHCertificate(crt *ssh.Certificate) error {
+func (c *linkedCaClient) StoreSSHCertificate(prov provisioner.Interface, crt *ssh.Certificate) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err := c.client.PostSSHCertificate(ctx, &linkedca.SSHCertificateRequest{
 		Certificate: string(ssh.MarshalAuthorizedKey(crt)),
+		Provisioner: createProvisionerIdentity(prov),
 	})
 	return errors.Wrap(err, "error posting ssh certificate")
+}
+
+func (c *linkedCaClient) StoreRenewedSSHCertificate(parent, crt *ssh.Certificate) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_, err := c.client.PostSSHCertificate(ctx, &linkedca.SSHCertificateRequest{
+		Certificate:       string(ssh.MarshalAuthorizedKey(crt)),
+		ParentCertificate: string(ssh.MarshalAuthorizedKey(parent)),
+	})
+	return errors.Wrap(err, "error posting renewed ssh certificate")
 }
 
 func (c *linkedCaClient) Revoke(crt *x509.Certificate, rci *db.RevokedCertificateInfo) error {

@@ -151,7 +151,7 @@ integration: bin/$(BINNAME)
 #########################################
 
 fmt:
-	$Q gofmt -l -w $(SRC)
+	$Q gofmt -l -s -w $(SRC)
 
 lint:
 	$Q golangci-lint run --timeout=30m

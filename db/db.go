@@ -51,10 +51,8 @@ type AuthDB interface {
 	Revoke(rci *RevokedCertificateInfo) error
 	RevokeSSH(rci *RevokedCertificateInfo) error
 	GetCertificate(serialNumber string) (*x509.Certificate, error)
-	StoreCertificate(crt *x509.Certificate) error
 	UseToken(id, tok string) (bool, error)
 	IsSSHHost(name string) (bool, error)
-	StoreSSHCertificate(crt *ssh.Certificate) error
 	GetSSHHostPrincipals() ([]string, error)
 	Shutdown() error
 }
@@ -80,6 +78,13 @@ func MustFromContext(ctx context.Context) AuthDB {
 	} else {
 		return db
 	}
+}
+
+// CertificateStorer is an extension of AuthDB that allows to store
+// certificates.
+type CertificateStorer interface {
+	StoreCertificate(crt *x509.Certificate) error
+	StoreSSHCertificate(crt *ssh.Certificate) error
 }
 
 // DB is a wrapper over the nosql.DB interface.

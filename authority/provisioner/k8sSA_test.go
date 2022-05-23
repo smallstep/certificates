@@ -368,9 +368,10 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
-						assert.Len(t, 7, opts)
+						assert.Len(t, 8, opts)
 						for _, o := range opts {
 							switch v := o.(type) {
+							case Interface:
 							case sshCertificateOptionsFunc:
 							case *sshCertOptionsRequireValidator:
 								assert.Equals(t, v, &sshCertOptionsRequireValidator{CertType: true, KeyID: true, Principals: true})

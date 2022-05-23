@@ -312,6 +312,7 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	}
 
 	return append(signOptions,
+		p,
 		// Checks the validity bounds, and set the validity if has not been set.
 		&sshLimitDuration{p.ctl.Claimer, claims.chains[0][0].NotAfter},
 		// Validate public key.

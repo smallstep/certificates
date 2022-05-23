@@ -1,0 +1,56 @@
+name: Bug Report
+description: File a bug report
+title: "[Bug]: "
+labels: ["bug", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Tell us how to reproduce this issue.
+      placeholder: These are the steps!
+    validations:
+      required: true
+  - type: textarea
+    id: your-env
+    attributes:
+      label: Your Environment
+      value: |-
+             * OS -
+             * `step-ca` Version -
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What happens instead?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here.
+    validations:
+      required: false
+  - type: textarea
+    id: contributing
+    attributes:
+      label: Contributing
+      value: |
+             Vote on this issue by adding a 👍 reaction.
+             To contribute a fix for this issue, leave a comment (and link to your pull request, if you've opened one already).
+    validations:
+      required: false

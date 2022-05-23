@@ -250,6 +250,7 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 	}
 
 	return append(signOptions,
+		p,
 		templateOptions,
 		// Checks the validity bounds, and set the validity if has not been set.
 		&sshLimitDuration{p.ctl.Claimer, crt.Details.NotAfter},

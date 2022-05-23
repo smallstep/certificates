@@ -29,6 +29,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.1.1
 	github.com/hashicorp/vault/api v1.3.1
 	github.com/hashicorp/vault/api/auth/approle v0.1.1
+	github.com/hashicorp/vault/api/auth/kubernetes v0.1.0
 	github.com/jhump/protoreflect v1.9.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
@@ -46,7 +47,7 @@ require (
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.0
-	go.step.sm/crypto v0.16.1
+	go.step.sm/crypto v0.16.2
 	go.step.sm/linkedca v0.16.1
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20220403103023-749bd193bc2b
@@ -64,3 +65,6 @@ require (
 // replace go.step.sm/crypto => ../crypto
 // replace go.step.sm/cli-utils => ../cli-utils
 // replace go.step.sm/linkedca => ../linkedca
+
+// use github.com/smallstep/pkcs7 fork with patches applied
+replace go.mozilla.org/pkcs7 => github.com/smallstep/pkcs7 v0.0.0-20211016004704-52592125d6f6
