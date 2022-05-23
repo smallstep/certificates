@@ -14,6 +14,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"go.step.sm/crypto/jose"
@@ -417,6 +418,34 @@ func TestAuthority_GetSCEPService(t *testing.T) {
 				if got := a.GetSCEPService(); (got != nil) != tt.wantService {
 					t.Errorf("Authority.GetSCEPService() = %v, wantService %v", got, tt.wantService)
 				}
+			}
+		})
+	}
+}
+
+func TestAuthority_GetID(t *testing.T) {
+	type fields struct {
+		authorityID string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"ok", fields{""}, "00000000-0000-0000-0000-000000000000"},
+		{"ok with id", fields{"10b9a431-ed3b-4a5f-abee-ec35119b65e7"}, "10b9a431-ed3b-4a5f-abee-ec35119b65e7"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &Authority{
+				config: &config.Config{
+					AuthorityConfig: &config.AuthConfig{
+						AuthorityID: tt.fields.authorityID,
+					},
+				},
+			}
+			if got := a.GetID(); got != tt.want {
+				t.Errorf("Authority.GetID() = %v, want %v", got, tt.want)
 			}
 		})
 	}

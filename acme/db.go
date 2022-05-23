@@ -49,6 +49,29 @@ type DB interface {
 	UpdateOrder(ctx context.Context, o *Order) error
 }
 
+type dbKey struct{}
+
+// NewDatabaseContext adds the given acme database to the context.
+func NewDatabaseContext(ctx context.Context, db DB) context.Context {
+	return context.WithValue(ctx, dbKey{}, db)
+}
+
+// DatabaseFromContext returns the current acme database from the given context.
+func DatabaseFromContext(ctx context.Context) (db DB, ok bool) {
+	db, ok = ctx.Value(dbKey{}).(DB)
+	return
+}
+
+// MustDatabaseFromContext returns the current database from the given context.
+// It will panic if it's not in the context.
+func MustDatabaseFromContext(ctx context.Context) DB {
+	if db, ok := DatabaseFromContext(ctx); !ok {
+		panic("acme database is not in the context")
+	} else {
+		return db
+	}
+}
+
 // MockDB is an implementation of the DB interface that should only be used as
 // a mock in tests.
 type MockDB struct {

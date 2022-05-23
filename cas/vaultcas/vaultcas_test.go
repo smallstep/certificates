@@ -14,7 +14,6 @@ import (
 	"time"
 
 	vault "github.com/hashicorp/vault/api"
-	auth "github.com/hashicorp/vault/api/auth/approle"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"go.step.sm/crypto/pemutil"
 )
@@ -99,7 +98,7 @@ func testCAHelper(t *testing.T) (*url.URL, *vault.Client) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.RequestURI == "/v1/auth/auth/approle/login":
+		case r.RequestURI == "/v1/auth/approle/login":
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 				  "auth": {
@@ -183,11 +182,8 @@ func TestNew_register(t *testing.T) {
 		CertificateAuthority:            caURL.String(),
 		CertificateAuthorityFingerprint: testRootFingerprint,
 		Config: json.RawMessage(`{
-			"PKI": "pki",
-			"PKIRoleDefault": "pki-role",
-			"RoleID": "roleID",
-			"SecretID": {"FromString": "secretID"},
-			"IsWrappingToken": false
+			"AuthType": "approle",
+			"AuthOptions": {"RoleID":"roleID","SecretID":"secretID","IsWrappingToken":false}
 		}`),
 	})
 
@@ -201,15 +197,11 @@ func TestVaultCAS_CreateCertificate(t *testing.T) {
 	_, client := testCAHelper(t)
 
 	options := VaultOptions{
-		PKI:             "pki",
-		PKIRoleDefault:  "role",
-		PKIRoleRSA:      "rsa",
-		PKIRoleEC:       "ec",
-		PKIRoleEd25519:  "ed25519",
-		RoleID:          "roleID",
-		SecretID:        auth.SecretID{FromString: "secretID"},
-		AppRole:         "approle",
-		IsWrappingToken: false,
+		PKIMountPath:   "pki",
+		PKIRoleDefault: "role",
+		PKIRoleRSA:     "rsa",
+		PKIRoleEC:      "ec",
+		PKIRoleEd25519: "ed25519",
 	}
 
 	type fields struct {
@@ -291,7 +283,7 @@ func TestVaultCAS_GetCertificateAuthority(t *testing.T) {
 	}
 
 	options := VaultOptions{
-		PKI: "pki",
+		PKIMountPath: "pki",
 	}
 
 	rootCert := parseCertificates(testRootCertificate)[0]
@@ -335,15 +327,11 @@ func TestVaultCAS_RevokeCertificate(t *testing.T) {
 	_, client := testCAHelper(t)
 
 	options := VaultOptions{
-		PKI:             "pki",
-		PKIRoleDefault:  "role",
-		PKIRoleRSA:      "rsa",
-		PKIRoleEC:       "ec",
-		PKIRoleEd25519:  "ed25519",
-		RoleID:          "roleID",
-		SecretID:        auth.SecretID{FromString: "secretID"},
-		AppRole:         "approle",
-		IsWrappingToken: false,
+		PKIMountPath:   "pki",
+		PKIRoleDefault: "role",
+		PKIRoleRSA:     "rsa",
+		PKIRoleEC:      "ec",
+		PKIRoleEd25519: "ed25519",
 	}
 
 	type fields struct {
@@ -407,15 +395,11 @@ func TestVaultCAS_RenewCertificate(t *testing.T) {
 	_, client := testCAHelper(t)
 
 	options := VaultOptions{
-		PKI:             "pki",
-		PKIRoleDefault:  "role",
-		PKIRoleRSA:      "rsa",
-		PKIRoleEC:       "ec",
-		PKIRoleEd25519:  "ed25519",
-		RoleID:          "roleID",
-		SecretID:        auth.SecretID{FromString: "secretID"},
-		AppRole:         "approle",
-		IsWrappingToken: false,
+		PKIMountPath:   "pki",
+		PKIRoleDefault: "role",
+		PKIRoleRSA:     "rsa",
+		PKIRoleEC:      "ec",
+		PKIRoleEd25519: "ed25519",
 	}
 
 	type fields struct {
@@ -465,200 +449,64 @@ func TestVaultCAS_loadOptions(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			"ok mandatory with SecretID FromString",
-			`{"RoleID": "roleID", "SecretID": {"FromString": "secretID"}}`,
-			&VaultOptions{
-				PKI:             "pki",
-				PKIRoleDefault:  "default",
-				PKIRoleRSA:      "default",
-				PKIRoleEC:       "default",
-				PKIRoleEd25519:  "default",
-				RoleID:          "roleID",
-				SecretID:        auth.SecretID{FromString: "secretID"},
-				AppRole:         "auth/approle",
-				IsWrappingToken: false,
-			},
-			false,
-		},
-		{
-			"ok mandatory with SecretID FromFile",
-			`{"RoleID": "roleID", "SecretID": {"FromFile": "secretID"}}`,
-			&VaultOptions{
-				PKI:             "pki",
-				PKIRoleDefault:  "default",
-				PKIRoleRSA:      "default",
-				PKIRoleEC:       "default",
-				PKIRoleEd25519:  "default",
-				RoleID:          "roleID",
-				SecretID:        auth.SecretID{FromFile: "secretID"},
-				AppRole:         "auth/approle",
-				IsWrappingToken: false,
-			},
-			false,
-		},
-		{
-			"ok mandatory with SecretID FromEnv",
-			`{"RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
-			&VaultOptions{
-				PKI:             "pki",
-				PKIRoleDefault:  "default",
-				PKIRoleRSA:      "default",
-				PKIRoleEC:       "default",
-				PKIRoleEd25519:  "default",
-				RoleID:          "roleID",
-				SecretID:        auth.SecretID{FromEnv: "secretID"},
-				AppRole:         "auth/approle",
-				IsWrappingToken: false,
-			},
-			false,
-		},
-		{
 			"ok mandatory PKIRole PKIRoleEd25519",
-			`{"PKIRoleDefault": "role", "PKIRoleEd25519": "ed25519" , "RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
+			`{"PKIRoleDefault": "role", "PKIRoleEd25519": "ed25519"}`,
 			&VaultOptions{
-				PKI:             "pki",
-				PKIRoleDefault:  "role",
-				PKIRoleRSA:      "role",
-				PKIRoleEC:       "role",
-				PKIRoleEd25519:  "ed25519",
-				RoleID:          "roleID",
-				SecretID:        auth.SecretID{FromEnv: "secretID"},
-				AppRole:         "auth/approle",
-				IsWrappingToken: false,
+				PKIMountPath:   "pki",
+				PKIRoleDefault: "role",
+				PKIRoleRSA:     "role",
+				PKIRoleEC:      "role",
+				PKIRoleEd25519: "ed25519",
 			},
 			false,
 		},
 		{
 			"ok mandatory PKIRole PKIRoleEC",
-			`{"PKIRoleDefault": "role", "PKIRoleEC": "ec" , "RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
+			`{"PKIRoleDefault": "role", "PKIRoleEC": "ec"}`,
 			&VaultOptions{
-				PKI:             "pki",
-				PKIRoleDefault:  "role",
-				PKIRoleRSA:      "role",
-				PKIRoleEC:       "ec",
-				PKIRoleEd25519:  "role",
-				RoleID:          "roleID",
-				SecretID:        auth.SecretID{FromEnv: "secretID"},
-				AppRole:         "auth/approle",
-				IsWrappingToken: false,
+				PKIMountPath:   "pki",
+				PKIRoleDefault: "role",
+				PKIRoleRSA:     "role",
+				PKIRoleEC:      "ec",
+				PKIRoleEd25519: "role",
 			},
 			false,
 		},
 		{
 			"ok mandatory PKIRole PKIRoleRSA",
-			`{"PKIRoleDefault": "role", "PKIRoleRSA": "rsa" , "RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
+			`{"PKIRoleDefault": "role", "PKIRoleRSA": "rsa"}`,
 			&VaultOptions{
-				PKI:             "pki",
-				PKIRoleDefault:  "role",
-				PKIRoleRSA:      "rsa",
-				PKIRoleEC:       "role",
-				PKIRoleEd25519:  "role",
-				RoleID:          "roleID",
-				SecretID:        auth.SecretID{FromEnv: "secretID"},
-				AppRole:         "auth/approle",
-				IsWrappingToken: false,
+				PKIMountPath:   "pki",
+				PKIRoleDefault: "role",
+				PKIRoleRSA:     "rsa",
+				PKIRoleEC:      "role",
+				PKIRoleEd25519: "role",
 			},
 			false,
 		},
 		{
 			"ok mandatory PKIRoleRSA PKIRoleEC PKIRoleEd25519",
-			`{"PKIRoleRSA": "rsa", "PKIRoleEC": "ec", "PKIRoleEd25519": "ed25519", "RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
+			`{"PKIRoleRSA": "rsa", "PKIRoleEC": "ec", "PKIRoleEd25519": "ed25519"}`,
 			&VaultOptions{
-				PKI:             "pki",
-				PKIRoleDefault:  "default",
-				PKIRoleRSA:      "rsa",
-				PKIRoleEC:       "ec",
-				PKIRoleEd25519:  "ed25519",
-				RoleID:          "roleID",
-				SecretID:        auth.SecretID{FromEnv: "secretID"},
-				AppRole:         "auth/approle",
-				IsWrappingToken: false,
+				PKIMountPath:   "pki",
+				PKIRoleDefault: "default",
+				PKIRoleRSA:     "rsa",
+				PKIRoleEC:      "ec",
+				PKIRoleEd25519: "ed25519",
 			},
 			false,
 		},
 		{
 			"ok mandatory PKIRoleRSA PKIRoleEC PKIRoleEd25519 with useless PKIRoleDefault",
-			`{"PKIRoleDefault": "role", "PKIRoleRSA": "rsa", "PKIRoleEC": "ec", "PKIRoleEd25519": "ed25519", "RoleID": "roleID", "SecretID": {"FromEnv": "secretID"}}`,
+			`{"PKIRoleDefault": "role", "PKIRoleRSA": "rsa", "PKIRoleEC": "ec", "PKIRoleEd25519": "ed25519"}`,
 			&VaultOptions{
-				PKI:             "pki",
-				PKIRoleDefault:  "role",
-				PKIRoleRSA:      "rsa",
-				PKIRoleEC:       "ec",
-				PKIRoleEd25519:  "ed25519",
-				RoleID:          "roleID",
-				SecretID:        auth.SecretID{FromEnv: "secretID"},
-				AppRole:         "auth/approle",
-				IsWrappingToken: false,
+				PKIMountPath:   "pki",
+				PKIRoleDefault: "role",
+				PKIRoleRSA:     "rsa",
+				PKIRoleEC:      "ec",
+				PKIRoleEd25519: "ed25519",
 			},
 			false,
-		},
-		{
-			"ok mandatory with AppRole",
-			`{"AppRole": "test", "RoleID": "roleID", "SecretID": {"FromString": "secretID"}}`,
-			&VaultOptions{
-				PKI:             "pki",
-				PKIRoleDefault:  "default",
-				PKIRoleRSA:      "default",
-				PKIRoleEC:       "default",
-				PKIRoleEd25519:  "default",
-				RoleID:          "roleID",
-				SecretID:        auth.SecretID{FromString: "secretID"},
-				AppRole:         "test",
-				IsWrappingToken: false,
-			},
-			false,
-		},
-		{
-			"ok mandatory with IsWrappingToken",
-			`{"IsWrappingToken": true, "RoleID": "roleID", "SecretID": {"FromString": "secretID"}}`,
-			&VaultOptions{
-				PKI:             "pki",
-				PKIRoleDefault:  "default",
-				PKIRoleRSA:      "default",
-				PKIRoleEC:       "default",
-				PKIRoleEd25519:  "default",
-				RoleID:          "roleID",
-				SecretID:        auth.SecretID{FromString: "secretID"},
-				AppRole:         "auth/approle",
-				IsWrappingToken: true,
-			},
-			false,
-		},
-		{
-			"fail with SecretID FromFail",
-			`{"RoleID": "roleID", "SecretID": {"FromFail": "secretID"}}`,
-			nil,
-			true,
-		},
-		{
-			"fail with SecretID empty FromEnv",
-			`{"RoleID": "roleID", "SecretID": {"FromEnv": ""}}`,
-			nil,
-			true,
-		},
-		{
-			"fail with SecretID empty FromFile",
-			`{"RoleID": "roleID", "SecretID": {"FromFile": ""}}`,
-			nil,
-			true,
-		},
-		{
-			"fail with SecretID empty FromString",
-			`{"RoleID": "roleID", "SecretID": {"FromString": ""}}`,
-			nil,
-			true,
-		},
-		{
-			"fail mandatory with SecretID FromFail",
-			`{"RoleID": "roleID", "SecretID": {"FromFail": "secretID"}}`,
-			nil,
-			true,
-		},
-		{
-			"fail missing RoleID",
-			`{"SecretID": {"FromString": "secretID"}}`,
-			nil,
-			true,
 		},
 	}
 	for _, tt := range tests {

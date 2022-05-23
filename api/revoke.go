@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"net/http"
 
 	"golang.org/x/crypto/ocsp"
@@ -49,7 +48,7 @@ func (r *RevokeRequest) Validate() (err error) {
 // NOTE: currently only Passive revocation is supported.
 //
 // TODO: Add CRL and OCSP support.
-func (h *caHandler) Revoke(w http.ResponseWriter, r *http.Request) {
+func Revoke(w http.ResponseWriter, r *http.Request) {
 	var body RevokeRequest
 	if err := read.JSON(r.Body, &body); err != nil {
 		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
@@ -68,12 +67,14 @@ func (h *caHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 		PassiveOnly: body.Passive,
 	}
 
-	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.RevokeMethod)
+	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.RevokeMethod)
+	a := mustAuthority(ctx)
+
 	// A token indicates that we are using the api via a provisioner token,
 	// otherwise it is assumed that the certificate is revoking itself over mTLS.
 	if len(body.OTT) > 0 {
 		logOtt(w, body.OTT)
-		if _, err := h.Authority.Authorize(ctx, body.OTT); err != nil {
+		if _, err := a.Authorize(ctx, body.OTT); err != nil {
 			render.Error(w, errs.UnauthorizedErr(err))
 			return
 		}
@@ -98,7 +99,7 @@ func (h *caHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 		opts.MTLS = true
 	}
 
-	if err := h.Authority.Revoke(ctx, opts); err != nil {
+	if err := a.Revoke(ctx, opts); err != nil {
 		render.Error(w, errs.ForbiddenErr(err, "error revoking certificate"))
 		return
 	}

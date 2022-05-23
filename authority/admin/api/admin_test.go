@@ -352,14 +352,11 @@ func TestHandler_GetAdmin(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
-
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("GET", "/foo", nil) // chi routing is prepared in test setup
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetAdmin(w, req)
+			GetAdmin(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -491,13 +488,10 @@ func TestHandler_GetAdmins(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
-
+			mockMustAuthority(t, tc.auth)
 			req := tc.req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetAdmins(w, req)
+			GetAdmins(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -675,13 +669,11 @@ func TestHandler_CreateAdmin(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("GET", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.CreateAdmin(w, req)
+			CreateAdmin(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -767,13 +759,11 @@ func TestHandler_DeleteAdmin(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("DELETE", "/foo", nil) // chi routing is prepared in test setup
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.DeleteAdmin(w, req)
+			DeleteAdmin(w, req)
 			res := w.Result()
 			assert.Equals(t, tc.statusCode, res.StatusCode)
 
@@ -912,13 +902,11 @@ func TestHandler_UpdateAdmin(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("GET", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.UpdateAdmin(w, req)
+			UpdateAdmin(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)

@@ -260,8 +260,7 @@ func (a *Authority) authorizeSign(ctx context.Context, token string) ([]provisio
 // AuthorizeSign authorizes a signature request by validating and authenticating
 // a token that must be sent w/ the request.
 //
-// NOTE: This method is deprecated and should not be used. We make it available
-// in the short term os as not to break existing clients.
+// Deprecated: Use Authorize(context.Context, string) ([]provisioner.SignOption, error).
 func (a *Authority) AuthorizeSign(token string) ([]provisioner.SignOption, error) {
 	ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod)
 	return a.Authorize(ctx, token)

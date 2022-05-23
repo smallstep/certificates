@@ -2,6 +2,7 @@ package ca
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/sha1"
@@ -281,7 +282,8 @@ ZEp7knvU2psWRw==
 			assert.FatalError(t, err)
 			rr := httptest.NewRecorder()
 
-			tc.ca.srv.Handler.ServeHTTP(rr, rq)
+			ctx := authority.NewContext(context.Background(), tc.ca.auth)
+			tc.ca.srv.Handler.ServeHTTP(rr, rq.WithContext(ctx))
 
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}
@@ -360,7 +362,8 @@ func TestCAProvisioners(t *testing.T) {
 			assert.FatalError(t, err)
 			rr := httptest.NewRecorder()
 
-			tc.ca.srv.Handler.ServeHTTP(rr, rq)
+			ctx := authority.NewContext(context.Background(), tc.ca.auth)
+			tc.ca.srv.Handler.ServeHTTP(rr, rq.WithContext(ctx))
 
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}
@@ -426,7 +429,8 @@ func TestCAProvisionerEncryptedKey(t *testing.T) {
 			assert.FatalError(t, err)
 			rr := httptest.NewRecorder()
 
-			tc.ca.srv.Handler.ServeHTTP(rr, rq)
+			ctx := authority.NewContext(context.Background(), tc.ca.auth)
+			tc.ca.srv.Handler.ServeHTTP(rr, rq.WithContext(ctx))
 
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}
@@ -487,7 +491,8 @@ func TestCARoot(t *testing.T) {
 			assert.FatalError(t, err)
 			rr := httptest.NewRecorder()
 
-			tc.ca.srv.Handler.ServeHTTP(rr, rq)
+			ctx := authority.NewContext(context.Background(), tc.ca.auth)
+			tc.ca.srv.Handler.ServeHTTP(rr, rq.WithContext(ctx))
 
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}
@@ -534,7 +539,8 @@ func TestCAHealth(t *testing.T) {
 			assert.FatalError(t, err)
 			rr := httptest.NewRecorder()
 
-			tc.ca.srv.Handler.ServeHTTP(rr, rq)
+			ctx := authority.NewContext(context.Background(), tc.ca.auth)
+			tc.ca.srv.Handler.ServeHTTP(rr, rq.WithContext(ctx))
 
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}
@@ -628,7 +634,8 @@ func TestCARenew(t *testing.T) {
 			rq.TLS = tc.tlsConnState
 			rr := httptest.NewRecorder()
 
-			tc.ca.srv.Handler.ServeHTTP(rr, rq)
+			ctx := authority.NewContext(context.Background(), tc.ca.auth)
+			tc.ca.srv.Handler.ServeHTTP(rr, rq.WithContext(ctx))
 
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}

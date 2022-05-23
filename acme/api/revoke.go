@@ -26,9 +26,11 @@ type revokePayload struct {
 }
 
 // RevokeCert attempts to revoke a certificate.
-func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
-
+func RevokeCert(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+
 	jws, err := jwsFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
@@ -69,7 +71,7 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serial := certToBeRevoked.SerialNumber.String()
-	dbCert, err := h.db.GetCertificateBySerial(ctx, serial)
+	dbCert, err := db.GetCertificateBySerial(ctx, serial)
 	if err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error retrieving certificate by serial"))
 		return
@@ -87,7 +89,7 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 			render.Error(w, err)
 			return
 		}
-		acmeErr := h.isAccountAuthorized(ctx, dbCert, certToBeRevoked, account)
+		acmeErr := isAccountAuthorized(ctx, dbCert, certToBeRevoked, account)
 		if acmeErr != nil {
 			render.Error(w, acmeErr)
 			return
@@ -103,7 +105,8 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	hasBeenRevokedBefore, err := h.ca.IsRevoked(serial)
+	ca := mustAuthority(ctx)
+	hasBeenRevokedBefore, err := ca.IsRevoked(serial)
 	if err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error retrieving revocation status of certificate"))
 		return
@@ -130,14 +133,14 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	options := revokeOptions(serial, certToBeRevoked, reasonCode)
-	err = h.ca.Revoke(ctx, options)
+	err = ca.Revoke(ctx, options)
 	if err != nil {
 		render.Error(w, wrapRevokeErr(err))
 		return
 	}
 
 	logRevoke(w, options)
-	w.Header().Add("Link", link(h.linker.GetLink(ctx, DirectoryLinkType), "index"))
+	w.Header().Add("Link", link(linker.GetLink(ctx, acme.DirectoryLinkType), "index"))
 	w.Write(nil)
 }
 
@@ -148,7 +151,7 @@ func (h *Handler) RevokeCert(w http.ResponseWriter, r *http.Request) {
 // the identifiers in the certificate are extracted and compared against the (valid) Authorizations
 // that are stored for the ACME Account. If these sets match, the Account is considered authorized
 // to revoke the certificate. If this check fails, the client will receive an unauthorized error.
-func (h *Handler) isAccountAuthorized(ctx context.Context, dbCert *acme.Certificate, certToBeRevoked *x509.Certificate, account *acme.Account) *acme.Error {
+func isAccountAuthorized(ctx context.Context, dbCert *acme.Certificate, certToBeRevoked *x509.Certificate, account *acme.Account) *acme.Error {
 	if !account.IsValid() {
 		return wrapUnauthorizedError(certToBeRevoked, nil, fmt.Sprintf("account '%s' has status '%s'", account.ID, account.Status), nil)
 	}

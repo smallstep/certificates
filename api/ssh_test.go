@@ -251,7 +251,7 @@ func TestSignSSHRequest_Validate(t *testing.T) {
 	}
 }
 
-func Test_caHandler_SSHSign(t *testing.T) {
+func Test_SSHSign(t *testing.T) {
 	user, err := getSignedUserCertificate()
 	assert.FatalError(t, err)
 	host, err := getSignedHostCertificate()
@@ -315,8 +315,8 @@ func Test_caHandler_SSHSign(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{
-				authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+			mockMustAuthority(t, &mockAuthority{
+				authorize: func(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 					return []provisioner.SignOption{}, tt.authErr
 				},
 				signSSH: func(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
@@ -328,11 +328,11 @@ func Test_caHandler_SSHSign(t *testing.T) {
 				sign: func(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 					return tt.tlsSignCerts, tt.tlsSignErr
 				},
-			}).(*caHandler)
+			})
 
 			req := httptest.NewRequest("POST", "http://example.com/ssh/sign", bytes.NewReader(tt.req))
 			w := httptest.NewRecorder()
-			h.SSHSign(logging.NewResponseLogger(w), req)
+			SSHSign(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -353,7 +353,7 @@ func Test_caHandler_SSHSign(t *testing.T) {
 	}
 }
 
-func Test_caHandler_SSHRoots(t *testing.T) {
+func Test_SSHRoots(t *testing.T) {
 	user, err := ssh.NewPublicKey(sshUserKey.Public())
 	assert.FatalError(t, err)
 	userB64 := base64.StdEncoding.EncodeToString(user.Marshal())
@@ -378,15 +378,15 @@ func Test_caHandler_SSHRoots(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{
+			mockMustAuthority(t, &mockAuthority{
 				getSSHRoots: func(ctx context.Context) (*authority.SSHKeys, error) {
 					return tt.keys, tt.keysErr
 				},
-			}).(*caHandler)
+			})
 
 			req := httptest.NewRequest("GET", "http://example.com/ssh/roots", http.NoBody)
 			w := httptest.NewRecorder()
-			h.SSHRoots(logging.NewResponseLogger(w), req)
+			SSHRoots(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -407,7 +407,7 @@ func Test_caHandler_SSHRoots(t *testing.T) {
 	}
 }
 
-func Test_caHandler_SSHFederation(t *testing.T) {
+func Test_SSHFederation(t *testing.T) {
 	user, err := ssh.NewPublicKey(sshUserKey.Public())
 	assert.FatalError(t, err)
 	userB64 := base64.StdEncoding.EncodeToString(user.Marshal())
@@ -432,15 +432,15 @@ func Test_caHandler_SSHFederation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{
+			mockMustAuthority(t, &mockAuthority{
 				getSSHFederation: func(ctx context.Context) (*authority.SSHKeys, error) {
 					return tt.keys, tt.keysErr
 				},
-			}).(*caHandler)
+			})
 
 			req := httptest.NewRequest("GET", "http://example.com/ssh/federation", http.NoBody)
 			w := httptest.NewRecorder()
-			h.SSHFederation(logging.NewResponseLogger(w), req)
+			SSHFederation(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -461,7 +461,7 @@ func Test_caHandler_SSHFederation(t *testing.T) {
 	}
 }
 
-func Test_caHandler_SSHConfig(t *testing.T) {
+func Test_SSHConfig(t *testing.T) {
 	userOutput := []templates.Output{
 		{Name: "config.tpl", Type: templates.File, Comment: "#", Path: "ssh/config", Content: []byte("UserKnownHostsFile /home/user/.step/ssh/known_hosts")},
 		{Name: "known_host.tpl", Type: templates.File, Comment: "#", Path: "ssh/known_host", Content: []byte("@cert-authority * ecdsa-sha2-nistp256 AAAA...=")},
@@ -492,15 +492,15 @@ func Test_caHandler_SSHConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{
+			mockMustAuthority(t, &mockAuthority{
 				getSSHConfig: func(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error) {
 					return tt.output, tt.err
 				},
-			}).(*caHandler)
+			})
 
 			req := httptest.NewRequest("GET", "http://example.com/ssh/config", strings.NewReader(tt.req))
 			w := httptest.NewRecorder()
-			h.SSHConfig(logging.NewResponseLogger(w), req)
+			SSHConfig(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -521,7 +521,7 @@ func Test_caHandler_SSHConfig(t *testing.T) {
 	}
 }
 
-func Test_caHandler_SSHCheckHost(t *testing.T) {
+func Test_SSHCheckHost(t *testing.T) {
 	tests := []struct {
 		name       string
 		req        string
@@ -539,15 +539,15 @@ func Test_caHandler_SSHCheckHost(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{
+			mockMustAuthority(t, &mockAuthority{
 				checkSSHHost: func(ctx context.Context, principal, token string) (bool, error) {
 					return tt.exists, tt.err
 				},
-			}).(*caHandler)
+			})
 
 			req := httptest.NewRequest("GET", "http://example.com/ssh/check-host", strings.NewReader(tt.req))
 			w := httptest.NewRecorder()
-			h.SSHCheckHost(logging.NewResponseLogger(w), req)
+			SSHCheckHost(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -568,7 +568,7 @@ func Test_caHandler_SSHCheckHost(t *testing.T) {
 	}
 }
 
-func Test_caHandler_SSHGetHosts(t *testing.T) {
+func Test_SSHGetHosts(t *testing.T) {
 	hosts := []authority.Host{
 		{HostID: "1", HostTags: []authority.HostTag{{ID: "1", Name: "group", Value: "1"}}, Hostname: "host1"},
 		{HostID: "2", HostTags: []authority.HostTag{{ID: "1", Name: "group", Value: "1"}, {ID: "2", Name: "group", Value: "2"}}, Hostname: "host2"},
@@ -590,15 +590,15 @@ func Test_caHandler_SSHGetHosts(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{
+			mockMustAuthority(t, &mockAuthority{
 				getSSHHosts: func(context.Context, *x509.Certificate) ([]authority.Host, error) {
 					return tt.hosts, tt.err
 				},
-			}).(*caHandler)
+			})
 
 			req := httptest.NewRequest("GET", "http://example.com/ssh/host", http.NoBody)
 			w := httptest.NewRecorder()
-			h.SSHGetHosts(logging.NewResponseLogger(w), req)
+			SSHGetHosts(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -619,7 +619,7 @@ func Test_caHandler_SSHGetHosts(t *testing.T) {
 	}
 }
 
-func Test_caHandler_SSHBastion(t *testing.T) {
+func Test_SSHBastion(t *testing.T) {
 	bastion := &authority.Bastion{
 		Hostname: "bastion.local",
 	}
@@ -645,15 +645,15 @@ func Test_caHandler_SSHBastion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{
+			mockMustAuthority(t, &mockAuthority{
 				getSSHBastion: func(ctx context.Context, user, hostname string) (*authority.Bastion, error) {
 					return tt.bastion, tt.bastionErr
 				},
-			}).(*caHandler)
+			})
 
 			req := httptest.NewRequest("POST", "http://example.com/ssh/bastion", bytes.NewReader(tt.req))
 			w := httptest.NewRecorder()
-			h.SSHBastion(logging.NewResponseLogger(w), req)
+			SSHBastion(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {

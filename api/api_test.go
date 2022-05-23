@@ -171,10 +171,21 @@ func parseCertificateRequest(data string) *x509.CertificateRequest {
 	return csr
 }
 
+func mockMustAuthority(t *testing.T, a Authority) {
+	t.Helper()
+	fn := mustAuthority
+	t.Cleanup(func() {
+		mustAuthority = fn
+	})
+	mustAuthority = func(ctx context.Context) Authority {
+		return a
+	}
+}
+
 type mockAuthority struct {
 	ret1, ret2                   interface{}
 	err                          error
-	authorizeSign                func(ott string) ([]provisioner.SignOption, error)
+	authorize                    func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	authorizeRenewToken          func(ctx context.Context, ott string) (*x509.Certificate, error)
 	getTLSOptions                func() *authority.TLSOptions
 	root                         func(shasum string) (*x509.Certificate, error)
@@ -203,12 +214,8 @@ type mockAuthority struct {
 
 // TODO: remove once Authorize is deprecated.
 func (m *mockAuthority) Authorize(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
-	return m.AuthorizeSign(ott)
-}
-
-func (m *mockAuthority) AuthorizeSign(ott string) ([]provisioner.SignOption, error) {
-	if m.authorizeSign != nil {
-		return m.authorizeSign(ott)
+	if m.authorize != nil {
+		return m.authorize(ctx, ott)
 	}
 	return m.ret1.([]provisioner.SignOption), m.err
 }
@@ -789,11 +796,10 @@ func Test_caHandler_Route(t *testing.T) {
 	}
 }
 
-func Test_caHandler_Health(t *testing.T) {
+func Test_Health(t *testing.T) {
 	req := httptest.NewRequest("GET", "http://example.com/health", nil)
 	w := httptest.NewRecorder()
-	h := New(&mockAuthority{}).(*caHandler)
-	h.Health(w, req)
+	Health(w, req)
 
 	res := w.Result()
 	if res.StatusCode != 200 {
@@ -811,7 +817,7 @@ func Test_caHandler_Health(t *testing.T) {
 	}
 }
 
-func Test_caHandler_Root(t *testing.T) {
+func Test_Root(t *testing.T) {
 	tests := []struct {
 		name       string
 		root       *x509.Certificate
@@ -832,9 +838,9 @@ func Test_caHandler_Root(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{ret1: tt.root, err: tt.err}).(*caHandler)
+			mockMustAuthority(t, &mockAuthority{ret1: tt.root, err: tt.err})
 			w := httptest.NewRecorder()
-			h.Root(w, req)
+			Root(w, req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -855,7 +861,7 @@ func Test_caHandler_Root(t *testing.T) {
 	}
 }
 
-func Test_caHandler_Sign(t *testing.T) {
+func Test_Sign(t *testing.T) {
 	csr := parseCertificateRequest(csrPEM)
 	valid, err := json.Marshal(SignRequest{
 		CsrPEM: CertificateRequest{csr},
@@ -896,18 +902,18 @@ func Test_caHandler_Sign(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{
+			mockMustAuthority(t, &mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.signErr,
-				authorizeSign: func(ott string) ([]provisioner.SignOption, error) {
+				authorize: func(ctx context.Context, ott string) ([]provisioner.SignOption, error) {
 					return tt.certAttrOpts, tt.autherr
 				},
 				getTLSOptions: func() *authority.TLSOptions {
 					return nil
 				},
-			}).(*caHandler)
+			})
 			req := httptest.NewRequest("POST", "http://example.com/sign", strings.NewReader(tt.input))
 			w := httptest.NewRecorder()
-			h.Sign(logging.NewResponseLogger(w), req)
+			Sign(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -928,7 +934,7 @@ func Test_caHandler_Sign(t *testing.T) {
 	}
 }
 
-func Test_caHandler_Renew(t *testing.T) {
+func Test_Renew(t *testing.T) {
 	cs := &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{parseCertificate(certPEM)},
 	}
@@ -1018,7 +1024,7 @@ func Test_caHandler_Renew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{
+			mockMustAuthority(t, &mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.err,
 				authorizeRenewToken: func(ctx context.Context, ott string) (*x509.Certificate, error) {
 					jwt, chain, err := jose.ParseX5cInsecure(ott, []*x509.Certificate{tt.root})
@@ -1039,12 +1045,12 @@ func Test_caHandler_Renew(t *testing.T) {
 				getTLSOptions: func() *authority.TLSOptions {
 					return nil
 				},
-			}).(*caHandler)
+			})
 			req := httptest.NewRequest("POST", "http://example.com/renew", nil)
 			req.TLS = tt.tls
 			req.Header = tt.header
 			w := httptest.NewRecorder()
-			h.Renew(logging.NewResponseLogger(w), req)
+			Renew(logging.NewResponseLogger(w), req)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -1073,7 +1079,7 @@ func Test_caHandler_Renew(t *testing.T) {
 	}
 }
 
-func Test_caHandler_Rekey(t *testing.T) {
+func Test_Rekey(t *testing.T) {
 	cs := &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{parseCertificate(certPEM)},
 	}
@@ -1104,16 +1110,16 @@ func Test_caHandler_Rekey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{
+			mockMustAuthority(t, &mockAuthority{
 				ret1: tt.cert, ret2: tt.root, err: tt.err,
 				getTLSOptions: func() *authority.TLSOptions {
 					return nil
 				},
-			}).(*caHandler)
+			})
 			req := httptest.NewRequest("POST", "http://example.com/rekey", strings.NewReader(tt.input))
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
-			h.Rekey(logging.NewResponseLogger(w), req)
+			Rekey(logging.NewResponseLogger(w), req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -1134,7 +1140,7 @@ func Test_caHandler_Rekey(t *testing.T) {
 	}
 }
 
-func Test_caHandler_Provisioners(t *testing.T) {
+func Test_Provisioners(t *testing.T) {
 	type fields struct {
 		Authority Authority
 	}
@@ -1200,10 +1206,8 @@ func Test_caHandler_Provisioners(t *testing.T) {
 	assert.FatalError(t, err)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &caHandler{
-				Authority: tt.fields.Authority,
-			}
-			h.Provisioners(tt.args.w, tt.args.r)
+			mockMustAuthority(t, tt.fields.Authority)
+			Provisioners(tt.args.w, tt.args.r)
 
 			rec := tt.args.w.(*httptest.ResponseRecorder)
 			res := rec.Result()
@@ -1238,7 +1242,7 @@ func Test_caHandler_Provisioners(t *testing.T) {
 	}
 }
 
-func Test_caHandler_ProvisionerKey(t *testing.T) {
+func Test_ProvisionerKey(t *testing.T) {
 	type fields struct {
 		Authority Authority
 	}
@@ -1270,10 +1274,8 @@ func Test_caHandler_ProvisionerKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &caHandler{
-				Authority: tt.fields.Authority,
-			}
-			h.ProvisionerKey(tt.args.w, tt.args.r)
+			mockMustAuthority(t, tt.fields.Authority)
+			ProvisionerKey(tt.args.w, tt.args.r)
 
 			rec := tt.args.w.(*httptest.ResponseRecorder)
 			res := rec.Result()
@@ -1298,7 +1300,7 @@ func Test_caHandler_ProvisionerKey(t *testing.T) {
 	}
 }
 
-func Test_caHandler_Roots(t *testing.T) {
+func Test_Roots(t *testing.T) {
 	cs := &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{parseCertificate(certPEM)},
 	}
@@ -1319,11 +1321,11 @@ func Test_caHandler_Roots(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err}).(*caHandler)
+			mockMustAuthority(t, &mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err})
 			req := httptest.NewRequest("GET", "http://example.com/roots", nil)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
-			h.Roots(w, req)
+			Roots(w, req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -1360,10 +1362,10 @@ func Test_caHandler_RootsPEM(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{ret1: tt.roots, err: tt.err}).(*caHandler)
+			mockMustAuthority(t, &mockAuthority{ret1: tt.roots, err: tt.err})
 			req := httptest.NewRequest("GET", "https://example.com/roots", nil)
 			w := httptest.NewRecorder()
-			h.RootsPEM(w, req)
+			RootsPEM(w, req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {
@@ -1384,7 +1386,7 @@ func Test_caHandler_RootsPEM(t *testing.T) {
 	}
 }
 
-func Test_caHandler_Federation(t *testing.T) {
+func Test_Federation(t *testing.T) {
 	cs := &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{parseCertificate(certPEM)},
 	}
@@ -1405,11 +1407,11 @@ func Test_caHandler_Federation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := New(&mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err}).(*caHandler)
+			mockMustAuthority(t, &mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err})
 			req := httptest.NewRequest("GET", "http://example.com/federation", nil)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
-			h.Federation(w, req)
+			Federation(w, req)
 			res := w.Result()
 
 			if res.StatusCode != tt.statusCode {

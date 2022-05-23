@@ -17,11 +17,10 @@ import (
 
 // requireAPIEnabled is a middleware that ensures the Administration API
 // is enabled before servicing requests.
-func (h *Handler) requireAPIEnabled(next http.HandlerFunc) http.HandlerFunc {
+func requireAPIEnabled(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !h.auth.IsAdminAPIEnabled() {
-			render.Error(w, admin.NewError(admin.ErrorNotImplementedType,
-				"administration API not enabled"))
+		if !mustAuthority(r.Context()).IsAdminAPIEnabled() {
+			render.Error(w, admin.NewError(admin.ErrorNotImplementedType, "administration API not enabled"))
 			return
 		}
 		next(w, r)
@@ -29,7 +28,7 @@ func (h *Handler) requireAPIEnabled(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // extractAuthorizeTokenAdmin is a middleware that extracts and caches the bearer token.
-func (h *Handler) extractAuthorizeTokenAdmin(next http.HandlerFunc) http.HandlerFunc {
+func extractAuthorizeTokenAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		tok := r.Header.Get("Authorization")
@@ -39,36 +38,39 @@ func (h *Handler) extractAuthorizeTokenAdmin(next http.HandlerFunc) http.Handler
 			return
 		}
 
-		adm, err := h.auth.AuthorizeAdminToken(r, tok)
+		ctx := r.Context()
+		adm, err := mustAuthority(ctx).AuthorizeAdminToken(r, tok)
 		if err != nil {
 			render.Error(w, err)
 			return
 		}
 
-		ctx := linkedca.NewContextWithAdmin(r.Context(), adm)
+		ctx = linkedca.NewContextWithAdmin(ctx, adm)
 		next(w, r.WithContext(ctx))
 	}
 }
 
 // loadProvisionerByName is a middleware that searches for a provisioner
 // by name and stores it in the context.
-func (h *Handler) loadProvisionerByName(next http.HandlerFunc) http.HandlerFunc {
+func loadProvisionerByName(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		ctx := r.Context()
-		name := chi.URLParam(r, "provisionerName")
 		var (
 			p   provisioner.Interface
 			err error
 		)
 
+		ctx := r.Context()
+		auth := mustAuthority(ctx)
+		adminDB := admin.MustFromContext(ctx)
+		name := chi.URLParam(r, "provisionerName")
+
 		// TODO(hs): distinguish 404 vs. 500
-		if p, err = h.auth.LoadProvisionerByName(name); err != nil {
+		if p, err = auth.LoadProvisionerByName(name); err != nil {
 			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
 			return
 		}
 
-		prov, err := h.adminDB.GetProvisioner(ctx, p.GetID())
+		prov, err := adminDB.GetProvisioner(ctx, p.GetID())
 		if err != nil {
 			render.Error(w, admin.WrapErrorISE(err, "error retrieving provisioner %s", name))
 			return
@@ -80,9 +82,8 @@ func (h *Handler) loadProvisionerByName(next http.HandlerFunc) http.HandlerFunc 
 }
 
 // checkAction checks if an action is supported in standalone or not
-func (h *Handler) checkAction(next http.HandlerFunc, supportedInStandalone bool) http.HandlerFunc {
+func checkAction(next http.HandlerFunc, supportedInStandalone bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		// actions allowed in standalone mode are always supported
 		if supportedInStandalone {
 			next(w, r)
@@ -91,7 +92,7 @@ func (h *Handler) checkAction(next http.HandlerFunc, supportedInStandalone bool)
 
 		// when an action is not supported in standalone mode and when
 		// using a nosql.DB backend, actions are not supported
-		if _, ok := h.adminDB.(*nosql.DB); ok {
+		if _, ok := admin.MustFromContext(r.Context()).(*nosql.DB); ok {
 			render.Error(w, admin.NewError(admin.ErrorNotImplementedType,
 				"operation not supported in standalone mode"))
 			return
@@ -104,10 +105,11 @@ func (h *Handler) checkAction(next http.HandlerFunc, supportedInStandalone bool)
 
 // loadExternalAccountKey is a middleware that searches for an ACME
 // External Account Key by reference or keyID and stores it in the context.
-func (h *Handler) loadExternalAccountKey(next http.HandlerFunc) http.HandlerFunc {
+func loadExternalAccountKey(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		prov := linkedca.MustProvisionerFromContext(ctx)
+		acmeDB := acme.MustDatabaseFromContext(ctx)
 
 		reference := chi.URLParam(r, "reference")
 		keyID := chi.URLParam(r, "keyID")
@@ -118,9 +120,9 @@ func (h *Handler) loadExternalAccountKey(next http.HandlerFunc) http.HandlerFunc
 		)
 
 		if keyID != "" {
-			eak, err = h.acmeDB.GetExternalAccountKey(ctx, prov.GetId(), keyID)
+			eak, err = acmeDB.GetExternalAccountKey(ctx, prov.GetId(), keyID)
 		} else {
-			eak, err = h.acmeDB.GetExternalAccountKeyByReference(ctx, prov.GetId(), reference)
+			eak, err = acmeDB.GetExternalAccountKeyByReference(ctx, prov.GetId(), reference)
 		}
 
 		if err != nil {

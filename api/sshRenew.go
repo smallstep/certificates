@@ -37,7 +37,7 @@ type SSHRenewResponse struct {
 // SSHRenew is an HTTP handler that reads an RenewSSHRequest with a one-time-token
 // (ott) from the body and creates a new SSH certificate with the information in
 // the request.
-func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
+func SSHRenew(w http.ResponseWriter, r *http.Request) {
 	var body SSHRenewRequest
 	if err := read.JSON(r.Body, &body); err != nil {
 		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
@@ -52,7 +52,9 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRenewMethod)
 	ctx = provisioner.NewContextWithToken(ctx, body.OTT)
-	_, err := h.Authority.Authorize(ctx, body.OTT)
+
+	a := mustAuthority(ctx)
+	_, err := a.Authorize(ctx, body.OTT)
 	if err != nil {
 		render.Error(w, errs.UnauthorizedErr(err))
 		return
@@ -63,7 +65,7 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newCert, err := h.Authority.RenewSSH(ctx, oldCert)
+	newCert, err := a.RenewSSH(ctx, oldCert)
 	if err != nil {
 		render.Error(w, errs.ForbiddenErr(err, "error renewing ssh certificate"))
 		return
@@ -73,7 +75,7 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 	notBefore := time.Unix(int64(oldCert.ValidAfter), 0)
 	notAfter := time.Unix(int64(oldCert.ValidBefore), 0)
 
-	identity, err := h.renewIdentityCertificate(r, notBefore, notAfter)
+	identity, err := renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
 		render.Error(w, errs.ForbiddenErr(err, "error renewing identity certificate"))
 		return
@@ -86,7 +88,7 @@ func (h *caHandler) SSHRenew(w http.ResponseWriter, r *http.Request) {
 }
 
 // renewIdentityCertificate request the client TLS certificate if present. If notBefore and notAfter are passed the
-func (h *caHandler) renewIdentityCertificate(r *http.Request, notBefore, notAfter time.Time) ([]Certificate, error) {
+func renewIdentityCertificate(r *http.Request, notBefore, notAfter time.Time) ([]Certificate, error) {
 	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
 		return nil, nil
 	}
@@ -106,7 +108,7 @@ func (h *caHandler) renewIdentityCertificate(r *http.Request, notBefore, notAfte
 		cert.NotAfter = notAfter
 	}
 
-	certChain, err := h.Authority.Renew(cert)
+	certChain, err := mustAuthority(r.Context()).Renew(cert)
 	if err != nil {
 		return nil, err
 	}

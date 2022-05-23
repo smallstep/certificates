@@ -109,7 +109,8 @@ func TestPolicyAdminResponder_GetAuthorityPolicy(t *testing.T) {
 			err := admin.WrapErrorISE(errors.New("force"), "error retrieving authority policy")
 			err.Message = "error retrieving authority policy: force"
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return nil, admin.NewError(admin.ErrorServerInternalType, "force")
@@ -124,7 +125,8 @@ func TestPolicyAdminResponder_GetAuthorityPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorNotFoundType, "authority policy does not exist")
 			err.Message = "authority policy does not exist"
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return nil, admin.NewError(admin.ErrorNotFoundType, "not found")
@@ -179,7 +181,8 @@ func TestPolicyAdminResponder_GetAuthorityPolicy(t *testing.T) {
 				},
 			}
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return policy, nil
@@ -234,11 +237,12 @@ func TestPolicyAdminResponder_GetAuthorityPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, nil)
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("GET", "/foo", nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.GetAuthorityPolicy(w, req)
@@ -301,7 +305,8 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 			err := admin.WrapErrorISE(errors.New("force"), "error retrieving authority policy")
 			err.Message = "error retrieving authority policy: force"
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return nil, admin.NewError(admin.ErrorServerInternalType, "force")
@@ -316,7 +321,8 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 			err := admin.NewError(admin.ErrorConflictType, "authority already has a policy")
 			err.Message = "authority already has a policy"
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return &linkedca.Policy{}, nil
@@ -332,7 +338,8 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 			adminErr.Message = "proto: syntax error (line 1:2): invalid value ?"
 			body := []byte("{?}")
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return nil, admin.NewError(admin.ErrorNotFoundType, "not found")
@@ -358,7 +365,8 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 				}
 			}`)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return nil, admin.NewError(admin.ErrorNotFoundType, "not found")
@@ -509,11 +517,13 @@ func TestPolicyAdminResponder_CreateAuthorityPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, tc.acmeDB)
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			ctx = acme.NewDatabaseContext(ctx, tc.acmeDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.CreateAuthorityPolicy(w, req)
@@ -586,7 +596,8 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 			err := admin.WrapErrorISE(errors.New("force"), "error retrieving authority policy")
 			err.Message = "error retrieving authority policy: force"
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return nil, admin.NewError(admin.ErrorServerInternalType, "force")
@@ -602,7 +613,8 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 			err.Message = "authority policy does not exist"
 			err.Status = http.StatusNotFound
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return nil, nil
@@ -625,7 +637,8 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 			adminErr.Message = "proto: syntax error (line 1:2): invalid value ?"
 			body := []byte("{?}")
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return policy, nil
@@ -658,7 +671,8 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 				}
 			}`)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return policy, nil
@@ -809,11 +823,13 @@ func TestPolicyAdminResponder_UpdateAuthorityPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, tc.acmeDB)
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			ctx = acme.NewDatabaseContext(ctx, tc.acmeDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.UpdateAuthorityPolicy(w, req)
@@ -886,7 +902,8 @@ func TestPolicyAdminResponder_DeleteAuthorityPolicy(t *testing.T) {
 			err := admin.WrapErrorISE(errors.New("force"), "error retrieving authority policy")
 			err.Message = "error retrieving authority policy: force"
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return nil, admin.NewError(admin.ErrorServerInternalType, "force")
@@ -902,7 +919,8 @@ func TestPolicyAdminResponder_DeleteAuthorityPolicy(t *testing.T) {
 			err.Message = "authority policy does not exist"
 			err.Status = http.StatusNotFound
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return nil, nil
@@ -924,7 +942,8 @@ func TestPolicyAdminResponder_DeleteAuthorityPolicy(t *testing.T) {
 			err := admin.NewErrorISE("error deleting authority policy: force")
 			err.Message = "error deleting authority policy: force"
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return policy, nil
@@ -947,7 +966,8 @@ func TestPolicyAdminResponder_DeleteAuthorityPolicy(t *testing.T) {
 			}
 			ctx := context.Background()
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return policy, nil
@@ -963,11 +983,13 @@ func TestPolicyAdminResponder_DeleteAuthorityPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, tc.acmeDB)
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			ctx = acme.NewDatabaseContext(ctx, tc.acmeDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.DeleteAuthorityPolicy(w, req)
@@ -1033,6 +1055,7 @@ func TestPolicyAdminResponder_GetProvisionerPolicy(t *testing.T) {
 			err.Message = "provisioner policy does not exist"
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				err:        err,
 				statusCode: 404,
 			}
@@ -1085,7 +1108,8 @@ func TestPolicyAdminResponder_GetProvisionerPolicy(t *testing.T) {
 			}
 			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				response: &testPolicyResponse{
 					X509: &testX509Policy{
 						Allow: &testX509Names{
@@ -1135,11 +1159,13 @@ func TestPolicyAdminResponder_GetProvisionerPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, tc.acmeDB)
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			ctx = acme.NewDatabaseContext(ctx, tc.acmeDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("GET", "/foo", nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.GetProvisionerPolicy(w, req)
@@ -1214,6 +1240,7 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 			err.Message = "provisioner provName already has a policy"
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				err:        err,
 				statusCode: 409,
 			}
@@ -1228,6 +1255,7 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 			body := []byte("{?}")
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				body:       body,
 				err:        adminErr,
 				statusCode: 400,
@@ -1251,7 +1279,8 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 				}
 			}`)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return nil, admin.NewError(admin.ErrorNotFoundType, "not found")
@@ -1283,7 +1312,8 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 			body, err := protojson.Marshal(policy)
 			assert.NoError(t, err)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockUpdateProvisioner: func(ctx context.Context, nu *linkedca.Provisioner) error {
 						return &authority.PolicyError{
@@ -1318,7 +1348,8 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 			body, err := protojson.Marshal(policy)
 			assert.NoError(t, err)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockUpdateProvisioner: func(ctx context.Context, nu *linkedca.Provisioner) error {
 						return &authority.PolicyError{
@@ -1351,7 +1382,8 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 			body, err := protojson.Marshal(policy)
 			assert.NoError(t, err)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockUpdateProvisioner: func(ctx context.Context, nu *linkedca.Provisioner) error {
 						return nil
@@ -1372,11 +1404,12 @@ func TestPolicyAdminResponder_CreateProvisionerPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, nil)
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.CreateProvisionerPolicy(w, req)
@@ -1452,6 +1485,7 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 			err.Message = "provisioner policy does not exist"
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				err:        err,
 				statusCode: 404,
 			}
@@ -1474,6 +1508,7 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 			body := []byte("{?}")
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				body:       body,
 				err:        adminErr,
 				statusCode: 400,
@@ -1505,7 +1540,8 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 				}
 			}`)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockGetAuthorityPolicy: func(ctx context.Context) (*linkedca.Policy, error) {
 						return nil, admin.NewError(admin.ErrorNotFoundType, "not found")
@@ -1538,7 +1574,8 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 			body, err := protojson.Marshal(policy)
 			assert.NoError(t, err)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockUpdateProvisioner: func(ctx context.Context, nu *linkedca.Provisioner) error {
 						return &authority.PolicyError{
@@ -1574,7 +1611,8 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 			body, err := protojson.Marshal(policy)
 			assert.NoError(t, err)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockUpdateProvisioner: func(ctx context.Context, nu *linkedca.Provisioner) error {
 						return &authority.PolicyError{
@@ -1608,7 +1646,8 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 			body, err := protojson.Marshal(policy)
 			assert.NoError(t, err)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockUpdateProvisioner: func(ctx context.Context, nu *linkedca.Provisioner) error {
 						return nil
@@ -1629,11 +1668,12 @@ func TestPolicyAdminResponder_UpdateProvisionerPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, nil)
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.UpdateProvisionerPolicy(w, req)
@@ -1710,6 +1750,7 @@ func TestPolicyAdminResponder_DeleteProvisionerPolicy(t *testing.T) {
 			err.Message = "provisioner policy does not exist"
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				err:        err,
 				statusCode: 404,
 			}
@@ -1723,7 +1764,8 @@ func TestPolicyAdminResponder_DeleteProvisionerPolicy(t *testing.T) {
 			err := admin.NewErrorISE("error deleting provisioner policy: force")
 			err.Message = "error deleting provisioner policy: force"
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockUpdateProvisioner: func(ctx context.Context, nu *linkedca.Provisioner) error {
 						return errors.New("force")
@@ -1740,7 +1782,8 @@ func TestPolicyAdminResponder_DeleteProvisionerPolicy(t *testing.T) {
 			}
 			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				auth: &mockAdminAuthority{
 					MockUpdateProvisioner: func(ctx context.Context, nu *linkedca.Provisioner) error {
 						return nil
@@ -1753,11 +1796,13 @@ func TestPolicyAdminResponder_DeleteProvisionerPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(tc.auth, tc.adminDB, tc.acmeDB)
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			ctx = acme.NewDatabaseContext(ctx, tc.acmeDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.DeleteProvisionerPolicy(w, req)
@@ -1828,6 +1873,7 @@ func TestPolicyAdminResponder_GetACMEAccountPolicy(t *testing.T) {
 			err.Message = "ACME EAK policy does not exist"
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				err:        err,
 				statusCode: 404,
 			}
@@ -1885,7 +1931,8 @@ func TestPolicyAdminResponder_GetACMEAccountPolicy(t *testing.T) {
 			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
 			ctx = linkedca.NewContextWithExternalAccountKey(ctx, eak)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				response: &testPolicyResponse{
 					X509: &testX509Policy{
 						Allow: &testX509Names{
@@ -1935,11 +1982,12 @@ func TestPolicyAdminResponder_GetACMEAccountPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(nil, tc.adminDB, tc.acmeDB)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			ctx = acme.NewDatabaseContext(ctx, tc.acmeDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("GET", "/foo", nil)
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.GetACMEAccountPolicy(w, req)
@@ -2018,6 +2066,7 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 			err.Message = "ACME EAK eakID already has a policy"
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				err:        err,
 				statusCode: 409,
 			}
@@ -2036,6 +2085,7 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 			body := []byte("{?}")
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				body:       body,
 				err:        adminErr,
 				statusCode: 400,
@@ -2064,6 +2114,7 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 			}`)
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				body:       body,
 				err:        adminErr,
 				statusCode: 400,
@@ -2091,7 +2142,8 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 			body, err := protojson.Marshal(policy)
 			assert.NoError(t, err)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				acmeDB: &acme.MockDB{
 					MockUpdateExternalAccountKey: func(ctx context.Context, provisionerID string, eak *acme.ExternalAccountKey) error {
 						assert.Equal(t, "provID", provisionerID)
@@ -2124,7 +2176,8 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 			body, err := protojson.Marshal(policy)
 			assert.NoError(t, err)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				acmeDB: &acme.MockDB{
 					MockUpdateExternalAccountKey: func(ctx context.Context, provisionerID string, eak *acme.ExternalAccountKey) error {
 						assert.Equal(t, "provID", provisionerID)
@@ -2147,11 +2200,12 @@ func TestPolicyAdminResponder_CreateACMEAccountPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(nil, tc.adminDB, tc.acmeDB)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			ctx = acme.NewDatabaseContext(ctx, tc.acmeDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.CreateACMEAccountPolicy(w, req)
@@ -2231,6 +2285,7 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 			err.Message = "ACME EAK policy does not exist"
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				err:        err,
 				statusCode: 404,
 			}
@@ -2257,6 +2312,7 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 			body := []byte("{?}")
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				body:       body,
 				err:        adminErr,
 				statusCode: 400,
@@ -2293,6 +2349,7 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 			}`)
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				body:       body,
 				err:        adminErr,
 				statusCode: 400,
@@ -2321,7 +2378,8 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 			body, err := protojson.Marshal(policy)
 			assert.NoError(t, err)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				acmeDB: &acme.MockDB{
 					MockUpdateExternalAccountKey: func(ctx context.Context, provisionerID string, eak *acme.ExternalAccountKey) error {
 						assert.Equal(t, "provID", provisionerID)
@@ -2355,7 +2413,8 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 			body, err := protojson.Marshal(policy)
 			assert.NoError(t, err)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				acmeDB: &acme.MockDB{
 					MockUpdateExternalAccountKey: func(ctx context.Context, provisionerID string, eak *acme.ExternalAccountKey) error {
 						assert.Equal(t, "provID", provisionerID)
@@ -2378,11 +2437,12 @@ func TestPolicyAdminResponder_UpdateACMEAccountPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(nil, tc.adminDB, tc.acmeDB)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			ctx = acme.NewDatabaseContext(ctx, tc.acmeDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.UpdateACMEAccountPolicy(w, req)
@@ -2462,6 +2522,7 @@ func TestPolicyAdminResponder_DeleteACMEAccountPolicy(t *testing.T) {
 			err.Message = "ACME EAK policy does not exist"
 			return test{
 				ctx:        ctx,
+				adminDB:    &admin.MockDB{},
 				err:        err,
 				statusCode: 404,
 			}
@@ -2487,7 +2548,8 @@ func TestPolicyAdminResponder_DeleteACMEAccountPolicy(t *testing.T) {
 			err := admin.NewErrorISE("error deleting ACME EAK policy: force")
 			err.Message = "error deleting ACME EAK policy: force"
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				acmeDB: &acme.MockDB{
 					MockUpdateExternalAccountKey: func(ctx context.Context, provisionerID string, eak *acme.ExternalAccountKey) error {
 						assert.Equal(t, "provID", provisionerID)
@@ -2518,7 +2580,8 @@ func TestPolicyAdminResponder_DeleteACMEAccountPolicy(t *testing.T) {
 			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
 			ctx = linkedca.NewContextWithExternalAccountKey(ctx, eak)
 			return test{
-				ctx: ctx,
+				ctx:     ctx,
+				adminDB: &admin.MockDB{},
 				acmeDB: &acme.MockDB{
 					MockUpdateExternalAccountKey: func(ctx context.Context, provisionerID string, eak *acme.ExternalAccountKey) error {
 						assert.Equal(t, "provID", provisionerID)
@@ -2533,11 +2596,12 @@ func TestPolicyAdminResponder_DeleteACMEAccountPolicy(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-
-			par := NewPolicyAdminResponder(nil, tc.adminDB, tc.acmeDB)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			ctx = acme.NewDatabaseContext(ctx, tc.acmeDB)
+			par := NewPolicyAdminResponder()
 
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
 			par.DeleteACMEAccountPolicy(w, req)

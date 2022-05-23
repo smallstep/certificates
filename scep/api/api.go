@@ -38,8 +38,8 @@ type request struct {
 	Message   []byte
 }
 
-// response is a SCEP server response.
-type response struct {
+// Response is a SCEP server Response.
+type Response struct {
 	Operation   string
 	CACertNum   int
 	Data        []byte
@@ -52,25 +52,48 @@ type handler struct {
 	auth *scep.Authority
 }
 
+// Route traffic and implement the Router interface.
+//
+// Deprecated: use scep.Route(r api.Router)
+func (h *handler) Route(r api.Router) {
+	route(r, func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			ctx := scep.NewContext(r.Context(), h.auth)
+			next(w, r.WithContext(ctx))
+		}
+	})
+}
+
 // New returns a new SCEP API router.
+//
+// Deprecated: use scep.Route(r api.Router)
 func New(auth *scep.Authority) api.RouterHandler {
-	return &handler{
-		auth: auth,
-	}
+	return &handler{auth: auth}
 }
 
 // Route traffic and implement the Router interface.
-func (h *handler) Route(r api.Router) {
-	getLink := h.auth.GetLinkExplicit
-	r.MethodFunc(http.MethodGet, getLink("{provisionerName}/*", false, nil), h.lookupProvisioner(h.Get))
-	r.MethodFunc(http.MethodGet, getLink("{provisionerName}", false, nil), h.lookupProvisioner(h.Get))
-	r.MethodFunc(http.MethodPost, getLink("{provisionerName}/*", false, nil), h.lookupProvisioner(h.Post))
-	r.MethodFunc(http.MethodPost, getLink("{provisionerName}", false, nil), h.lookupProvisioner(h.Post))
+func Route(r api.Router) {
+	route(r, nil)
+}
+
+func route(r api.Router, middleware func(next http.HandlerFunc) http.HandlerFunc) {
+	getHandler := lookupProvisioner(Get)
+	postHandler := lookupProvisioner(Post)
+
+	// For backward compatibility.
+	if middleware != nil {
+		getHandler = middleware(getHandler)
+		postHandler = middleware(postHandler)
+	}
+
+	r.MethodFunc(http.MethodGet, "/{provisionerName}/*", getHandler)
+	r.MethodFunc(http.MethodGet, "/{provisionerName}", getHandler)
+	r.MethodFunc(http.MethodPost, "/{provisionerName}/*", postHandler)
+	r.MethodFunc(http.MethodPost, "/{provisionerName}", postHandler)
 }
 
 // Get handles all SCEP GET requests
-func (h *handler) Get(w http.ResponseWriter, r *http.Request) {
-
+func Get(w http.ResponseWriter, r *http.Request) {
 	req, err := decodeRequest(r)
 	if err != nil {
 		fail(w, fmt.Errorf("invalid scep get request: %w", err))
@@ -78,15 +101,15 @@ func (h *handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	var res response
+	var res Response
 
 	switch req.Operation {
 	case opnGetCACert:
-		res, err = h.GetCACert(ctx)
+		res, err = GetCACert(ctx)
 	case opnGetCACaps:
-		res, err = h.GetCACaps(ctx)
+		res, err = GetCACaps(ctx)
 	case opnPKIOperation:
-		res, err = h.PKIOperation(ctx, req)
+		res, err = PKIOperation(ctx, req)
 	default:
 		err = fmt.Errorf("unknown operation: %s", req.Operation)
 	}
@@ -100,20 +123,17 @@ func (h *handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // Post handles all SCEP POST requests
-func (h *handler) Post(w http.ResponseWriter, r *http.Request) {
-
+func Post(w http.ResponseWriter, r *http.Request) {
 	req, err := decodeRequest(r)
 	if err != nil {
 		fail(w, fmt.Errorf("invalid scep post request: %w", err))
 		return
 	}
 
-	ctx := r.Context()
-	var res response
-
+	var res Response
 	switch req.Operation {
 	case opnPKIOperation:
-		res, err = h.PKIOperation(ctx, req)
+		res, err = PKIOperation(r.Context(), req)
 	default:
 		err = fmt.Errorf("unknown operation: %s", req.Operation)
 	}
@@ -127,7 +147,6 @@ func (h *handler) Post(w http.ResponseWriter, r *http.Request) {
 }
 
 func decodeRequest(r *http.Request) (request, error) {
-
 	defer r.Body.Close()
 
 	method := r.Method
@@ -179,9 +198,8 @@ func decodeRequest(r *http.Request) (request, error) {
 
 // lookupProvisioner loads the provisioner associated with the request.
 // Responds 404 if the provisioner does not exist.
-func (h *handler) lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
+func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		name := chi.URLParam(r, "provisionerName")
 		provisionerName, err := url.PathUnescape(name)
 		if err != nil {
@@ -189,7 +207,9 @@ func (h *handler) lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		p, err := h.auth.LoadProvisionerByName(provisionerName)
+		ctx := r.Context()
+		auth := scep.MustFromContext(ctx)
+		p, err := auth.LoadProvisionerByName(provisionerName)
 		if err != nil {
 			fail(w, err)
 			return
@@ -201,25 +221,24 @@ func (h *handler) lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		ctx := r.Context()
 		ctx = context.WithValue(ctx, scep.ProvisionerContextKey, scep.Provisioner(prov))
 		next(w, r.WithContext(ctx))
 	}
 }
 
 // GetCACert returns the CA certificates in a SCEP response
-func (h *handler) GetCACert(ctx context.Context) (response, error) {
-
-	certs, err := h.auth.GetCACertificates(ctx)
+func GetCACert(ctx context.Context) (Response, error) {
+	auth := scep.MustFromContext(ctx)
+	certs, err := auth.GetCACertificates(ctx)
 	if err != nil {
-		return response{}, err
+		return Response{}, err
 	}
 
 	if len(certs) == 0 {
-		return response{}, errors.New("missing CA cert")
+		return Response{}, errors.New("missing CA cert")
 	}
 
-	res := response{
+	res := Response{
 		Operation: opnGetCACert,
 		CACertNum: len(certs),
 	}
@@ -232,7 +251,7 @@ func (h *handler) GetCACert(ctx context.Context) (response, error) {
 		// not signed or encrypted data has to be returned.
 		data, err := microscep.DegenerateCertificates(certs)
 		if err != nil {
-			return response{}, err
+			return Response{}, err
 		}
 		res.Data = data
 	}
@@ -241,11 +260,11 @@ func (h *handler) GetCACert(ctx context.Context) (response, error) {
 }
 
 // GetCACaps returns the CA capabilities in a SCEP response
-func (h *handler) GetCACaps(ctx context.Context) (response, error) {
+func GetCACaps(ctx context.Context) (Response, error) {
+	auth := scep.MustFromContext(ctx)
+	caps := auth.GetCACaps(ctx)
 
-	caps := h.auth.GetCACaps(ctx)
-
-	res := response{
+	res := Response{
 		Operation: opnGetCACaps,
 		Data:      formatCapabilities(caps),
 	}
@@ -254,13 +273,12 @@ func (h *handler) GetCACaps(ctx context.Context) (response, error) {
 }
 
 // PKIOperation performs PKI operations and returns a SCEP response
-func (h *handler) PKIOperation(ctx context.Context, req request) (response, error) {
-
+func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// parse the message using microscep implementation
 	microMsg, err := microscep.ParsePKIMessage(req.Message)
 	if err != nil {
 		// return the error, because we can't use the msg for creating a CertRep
-		return response{}, err
+		return Response{}, err
 	}
 
 	// this is essentially doing the same as microscep.ParsePKIMessage, but
@@ -268,7 +286,7 @@ func (h *handler) PKIOperation(ctx context.Context, req request) (response, erro
 	// wrapper for the microscep implementation.
 	p7, err := pkcs7.Parse(microMsg.Raw)
 	if err != nil {
-		return response{}, err
+		return Response{}, err
 	}
 
 	// copy over properties to our internal PKIMessage
@@ -280,8 +298,9 @@ func (h *handler) PKIOperation(ctx context.Context, req request) (response, erro
 		P7:            p7,
 	}
 
-	if err := h.auth.DecryptPKIEnvelope(ctx, msg); err != nil {
-		return response{}, err
+	auth := scep.MustFromContext(ctx)
+	if err := auth.DecryptPKIEnvelope(ctx, msg); err != nil {
+		return Response{}, err
 	}
 
 	// NOTE: at this point we have sufficient information for returning nicely signed CertReps
@@ -293,13 +312,13 @@ func (h *handler) PKIOperation(ctx context.Context, req request) (response, erro
 	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
 	// We'll have to see how it works out.
 	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
-		challengeMatches, err := h.auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
+		challengeMatches, err := auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
 		if err != nil {
-			return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("error when checking password"))
+			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("error when checking password"))
 		}
 		if !challengeMatches {
 			// TODO: can this be returned safely to the client? In the end, if the password was correct, that gains a bit of info too.
-			return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("wrong password provided"))
+			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("wrong password provided"))
 		}
 	}
 
@@ -311,12 +330,12 @@ func (h *handler) PKIOperation(ctx context.Context, req request) (response, erro
 	// Authentication by the (self-signed) certificate with an optional challenge is required; supporting renewals incl. verification
 	// of the client cert is not.
 
-	certRep, err := h.auth.SignCSR(ctx, csr, msg)
+	certRep, err := auth.SignCSR(ctx, csr, msg)
 	if err != nil {
-		return h.createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
+		return createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
 	}
 
-	res := response{
+	res := Response{
 		Operation:   opnPKIOperation,
 		Data:        certRep.Raw,
 		Certificate: certRep.Certificate,
@@ -330,7 +349,7 @@ func formatCapabilities(caps []string) []byte {
 }
 
 // writeResponse writes a SCEP response back to the SCEP client.
-func writeResponse(w http.ResponseWriter, res response) {
+func writeResponse(w http.ResponseWriter, res Response) {
 
 	if res.Error != nil {
 		log.Error(w, res.Error)
@@ -350,19 +369,20 @@ func fail(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
-func (h *handler) createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (response, error) {
-	certRepMsg, err := h.auth.CreateFailureResponse(ctx, csr, msg, scep.FailInfoName(info), failError.Error())
+func createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (Response, error) {
+	auth := scep.MustFromContext(ctx)
+	certRepMsg, err := auth.CreateFailureResponse(ctx, csr, msg, scep.FailInfoName(info), failError.Error())
 	if err != nil {
-		return response{}, err
+		return Response{}, err
 	}
-	return response{
+	return Response{
 		Operation: opnPKIOperation,
 		Data:      certRepMsg.Raw,
 		Error:     failError,
 	}, nil
 }
 
-func contentHeader(r response) string {
+func contentHeader(r Response) string {
 	switch r.Operation {
 	default:
 		return "text/plain"

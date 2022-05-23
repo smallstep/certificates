@@ -50,6 +50,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 				ctx:        ctx,
 				req:        req,
 				auth:       auth,
+				adminDB:    &admin.MockDB{},
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    admin.ErrorServerInternalType.String(),
@@ -74,6 +75,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 				ctx:        ctx,
 				req:        req,
 				auth:       auth,
+				adminDB:    &admin.MockDB{},
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    admin.ErrorServerInternalType.String(),
@@ -156,13 +158,11 @@ func TestHandler_GetProvisioner(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth:    tc.auth,
-				adminDB: tc.adminDB,
-			}
-			req := tc.req.WithContext(tc.ctx)
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			req := tc.req.WithContext(ctx)
 			w := httptest.NewRecorder()
-			h.GetProvisioner(w, req)
+			GetProvisioner(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -280,12 +280,10 @@ func TestHandler_GetProvisioners(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := tc.req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetProvisioners(w, req)
+			GetProvisioners(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -405,13 +403,11 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.CreateProvisioner(w, req)
+			CreateProvisioner(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -571,12 +567,10 @@ func TestHandler_DeleteProvisioner(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := tc.req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.DeleteProvisioner(w, req)
+			DeleteProvisioner(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -625,6 +619,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			return test{
 				ctx:        context.Background(),
 				body:       body,
+				adminDB:    &admin.MockDB{},
 				statusCode: 400,
 				err: &admin.Error{
 					Type:    "badRequest",
@@ -654,6 +649,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				body:       body,
+				adminDB:    &admin.MockDB{},
 				auth:       auth,
 				statusCode: 500,
 				err: &admin.Error{
@@ -1061,14 +1057,12 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth:    tc.auth,
-				adminDB: tc.adminDB,
-			}
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
-			h.UpdateProvisioner(w, req)
+			UpdateProvisioner(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)

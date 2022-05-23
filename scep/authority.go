@@ -27,6 +27,29 @@ type Authority struct {
 	signAuth                SignAuthority
 }
 
+type authorityKey struct{}
+
+// NewContext adds the given authority to the context.
+func NewContext(ctx context.Context, a *Authority) context.Context {
+	return context.WithValue(ctx, authorityKey{}, a)
+}
+
+// FromContext returns the current authority from the given context.
+func FromContext(ctx context.Context) (a *Authority, ok bool) {
+	a, ok = ctx.Value(authorityKey{}).(*Authority)
+	return
+}
+
+// MustFromContext returns the current authority from the given context. It will
+// panic if the authority is not in the context.
+func MustFromContext(ctx context.Context) *Authority {
+	if a, ok := FromContext(ctx); !ok {
+		panic("scep authority is not in the context")
+	} else {
+		return a
+	}
+}
+
 // AuthorityOptions required to create a new SCEP Authority.
 type AuthorityOptions struct {
 	// Service provides the certificate chain, the signer and the decrypter to the Authority
@@ -163,7 +186,6 @@ func (a *Authority) GetCACertificates(ctx context.Context) ([]*x509.Certificate,
 
 // DecryptPKIEnvelope decrypts an enveloped message
 func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error {
-
 	p7c, err := pkcs7.Parse(msg.P7.Content)
 	if err != nil {
 		return fmt.Errorf("error parsing pkcs7 content: %w", err)
@@ -210,7 +232,6 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 // SignCSR creates an x509.Certificate based on a CSR template and Cert Authority credentials
 // returns a new PKIMessage with CertRep data
 func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage) (*PKIMessage, error) {
-
 	// TODO: intermediate storage of the request? In SCEP it's possible to request a csr/certificate
 	// to be signed, which can be performed asynchronously / out-of-band. In that case a client can
 	// poll for the status. It seems to be similar as what can happen in ACME, so might want to model
@@ -432,7 +453,6 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, csr *x509.Certifi
 
 // MatchChallengePassword verifies a SCEP challenge password
 func (a *Authority) MatchChallengePassword(ctx context.Context, password string) (bool, error) {
-
 	p, err := provisionerFromContext(ctx)
 	if err != nil {
 		return false, err

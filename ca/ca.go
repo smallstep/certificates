@@ -1,10 +1,12 @@
 package ca
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -18,6 +20,7 @@ import (
 	acmeNoSQL "github.com/smallstep/certificates/acme/db/nosql"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/admin"
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/db"
@@ -170,10 +173,9 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	insecureHandler := http.Handler(insecureMux)
 
 	// Add regular CA api endpoints in / and /1.0
-	routerHandler := api.New(auth)
-	routerHandler.Route(mux)
+	api.Route(mux)
 	mux.Route("/1.0", func(r chi.Router) {
-		routerHandler.Route(r)
+		api.Route(r)
 	})
 
 	//Add ACME api endpoints in /acme and /1.0/acme
@@ -187,49 +189,41 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		dns = fmt.Sprintf("%s:%s", dns, port)
 	}
 
-	// ACME Router
-	prefix := "acme"
+	// ACME Router is only available if we have a database.
 	var acmeDB acme.DB
-	if cfg.DB == nil {
-		acmeDB = nil
-	} else {
+	var acmeLinker acme.Linker
+	if cfg.DB != nil {
 		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
 		if err != nil {
 			return nil, errors.Wrap(err, "error configuring ACME DB interface")
 		}
+		acmeLinker = acme.NewLinker(dns, "acme")
+		mux.Route("/acme", func(r chi.Router) {
+			acmeAPI.Route(r)
+		})
+		// Use 2.0 because, at the moment, our ACME api is only compatible with v2.0
+		// of the ACME spec.
+		mux.Route("/2.0/acme", func(r chi.Router) {
+			acmeAPI.Route(r)
+		})
 	}
-	acmeHandler := acmeAPI.NewHandler(acmeAPI.HandlerOptions{
-		Backdate: *cfg.AuthorityConfig.Backdate,
-		DB:       acmeDB,
-		DNS:      dns,
-		Prefix:   prefix,
-		CA:       auth,
-	})
-	mux.Route("/"+prefix, func(r chi.Router) {
-		acmeHandler.Route(r)
-	})
-	// Use 2.0 because, at the moment, our ACME api is only compatible with v2.0
-	// of the ACME spec.
-	mux.Route("/2.0/"+prefix, func(r chi.Router) {
-		acmeHandler.Route(r)
-	})
 
 	// Admin API Router
 	if cfg.AuthorityConfig.EnableAdmin {
 		adminDB := auth.GetAdminDatabase()
 		if adminDB != nil {
 			acmeAdminResponder := adminAPI.NewACMEAdminResponder()
-			policyAdminResponder := adminAPI.NewPolicyAdminResponder(auth, adminDB, acmeDB)
-			adminHandler := adminAPI.NewHandler(auth, adminDB, acmeDB, acmeAdminResponder, policyAdminResponder)
+			policyAdminResponder := adminAPI.NewPolicyAdminResponder()
 			mux.Route("/admin", func(r chi.Router) {
-				adminHandler.Route(r)
+				adminAPI.Route(r, acmeAdminResponder, policyAdminResponder)
 			})
 		}
 	}
 
+	var scepAuthority *scep.Authority
 	if ca.shouldServeSCEPEndpoints() {
 		scepPrefix := "scep"
-		scepAuthority, err := scep.New(auth, scep.AuthorityOptions{
+		scepAuthority, err = scep.New(auth, scep.AuthorityOptions{
 			Service: auth.GetSCEPService(),
 			DNS:     dns,
 			Prefix:  scepPrefix,
@@ -237,13 +231,12 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "error creating SCEP authority")
 		}
-		scepRouterHandler := scepAPI.New(scepAuthority)
 
 		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
 		// SCEP operations are performed using HTTP, so that's why the API is mounted
 		// to the insecure mux.
 		insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
-			scepRouterHandler.Route(r)
+			scepAPI.Route(r)
 		})
 
 		// The RFC also mentions usage of HTTPS, but seems to advise
@@ -253,7 +246,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		// as well as HTTPS can be used to request certificates
 		// using SCEP.
 		mux.Route("/"+scepPrefix, func(r chi.Router) {
-			scepRouterHandler.Route(r)
+			scepAPI.Route(r)
 		})
 	}
 
@@ -280,7 +273,13 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		insecureHandler = logger.Middleware(insecureHandler)
 	}
 
+	// Create context with all the necessary values.
+	baseContext := buildContext(auth, scepAuthority, acmeDB, acmeLinker)
+
 	ca.srv = server.New(cfg.Address, handler, tlsConfig)
+	ca.srv.BaseContext = func(net.Listener) context.Context {
+		return baseContext
+	}
 
 	// only start the insecure server if the insecure address is configured
 	// and, currently, also only when it should serve SCEP endpoints.
@@ -290,9 +289,30 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		// will probably introduce more complexity in terms of graceful
 		// reload.
 		ca.insecureSrv = server.New(cfg.InsecureAddress, insecureHandler, nil)
+		ca.insecureSrv.BaseContext = func(net.Listener) context.Context {
+			return baseContext
+		}
 	}
 
 	return ca, nil
+}
+
+// buildContext builds the server base context.
+func buildContext(a *authority.Authority, scepAuthority *scep.Authority, acmeDB acme.DB, acmeLinker acme.Linker) context.Context {
+	ctx := authority.NewContext(context.Background(), a)
+	if authDB := a.GetDatabase(); authDB != nil {
+		ctx = db.NewContext(ctx, authDB)
+	}
+	if adminDB := a.GetAdminDatabase(); adminDB != nil {
+		ctx = admin.NewContext(ctx, adminDB)
+	}
+	if scepAuthority != nil {
+		ctx = scep.NewContext(ctx, scepAuthority)
+	}
+	if acmeDB != nil {
+		ctx = acme.NewContext(ctx, acmeDB, acme.NewClient(), acmeLinker, nil)
+	}
+	return ctx
 }
 
 // Run starts the CA calling to the server ListenAndServe method.
