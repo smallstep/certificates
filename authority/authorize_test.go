@@ -114,7 +114,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeToken: error parsing token"),
+				err:   errors.New("error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -133,7 +133,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: token issued before the bootstrap of certificate authority"),
+				err:   errors.New("token issued before the bootstrap of certificate authority"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -155,7 +155,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: provisioner not found or invalid audience (https://example.com/revoke)"),
+				err:   errors.New("provisioner not found or invalid audience (https://example.com/revoke)"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -192,7 +192,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  _a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: token already used"),
+				err:   errors.New("token already used"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -227,7 +227,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  _a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: token already used"),
+				err:   errors.New("token already used"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -275,7 +275,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  _a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: failed when attempting to store token: force"),
+				err:   errors.New("failed when attempting to store token: force"),
 				code:  http.StatusInternalServerError,
 			}
 		},
@@ -300,7 +300,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  _a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: token already used"),
+				err:   errors.New("token already used"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -353,7 +353,7 @@ func TestAuthority_authorizeRevoke(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeRevoke: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeRevoke: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -437,7 +437,7 @@ func TestAuthority_authorizeSign(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeSign: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeSign: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -524,7 +524,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   context.Background(),
-				err:   errors.New("authority.Authorize: authority.authorizeSign: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSign: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -533,7 +533,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeSign: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSign: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -559,7 +559,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.RevokeMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeRevoke: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeRevoke: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -585,7 +585,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.SSHSignMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeSSHSign: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSSHSign: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -615,7 +615,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.SSHRenewMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeSSHRenew: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSSHRenew: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -659,7 +659,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.SSHRevokeMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeSSHRevoke: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSSHRevoke: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -685,7 +685,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.SSHRekeyMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeSSHRekey: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSSHRekey: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -988,7 +988,7 @@ func TestAuthority_authorizeSSHSign(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeSSHSign: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeSSHSign: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -1082,7 +1082,7 @@ func TestAuthority_authorizeSSHRenew(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeSSHRenew: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeSSHRenew: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -1190,7 +1190,7 @@ func TestAuthority_authorizeSSHRevoke(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeSSHRevoke: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeSSHRevoke: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -1282,7 +1282,7 @@ func TestAuthority_authorizeSSHRekey(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeSSHRekey: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeSSHRekey: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -1345,7 +1345,7 @@ func TestAuthority_authorizeSSHRekey(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, tc.cert.Serial, cert.Serial)
-					assert.Len(t, 3, signOpts)
+					assert.Len(t, 4, signOpts)
 				}
 			}
 		})

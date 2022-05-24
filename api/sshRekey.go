@@ -59,6 +59,7 @@ func SSHRekey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRekeyMethod)
+	ctx = provisioner.NewContextWithToken(ctx, body.OTT)
 
 	a := mustAuthority(ctx)
 	signOpts, err := a.Authorize(ctx, body.OTT)

@@ -51,6 +51,8 @@ func SSHRenew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRenewMethod)
+	ctx = provisioner.NewContextWithToken(ctx, body.OTT)
+
 	a := mustAuthority(ctx)
 	_, err := a.Authorize(ctx, body.OTT)
 	if err != nil {
