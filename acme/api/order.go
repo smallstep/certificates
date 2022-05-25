@@ -54,7 +54,13 @@ type FinalizeRequest struct {
 // Validate validates a finalize request body.
 func (f *FinalizeRequest) Validate() error {
 	var err error
-	csrBytes, err := base64.RawURLEncoding.DecodeString(f.CSR)
+	// RFC 8555 isn't 100% conclusive about using raw base64-url encoding for the
+	// CSR specifically, instead of "normal" base64-url encoding (incl. padding).
+	// By trimming the padding from CSRs submitted by ACME clients that use
+	// base64-url encoding instead of raw base64-url encoding, these are also
+	// supported. This was reported in https://github.com/smallstep/certificates/issues/939
+	// to be the case for a Synology DSM NAS system.
+	csrBytes, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(f.CSR, "="))
 	if err != nil {
 		return acme.WrapError(acme.ErrorMalformedType, err, "error base64url decoding csr")
 	}
