@@ -210,6 +210,13 @@ func TestFinalizeRequestValidate(t *testing.T) {
 				},
 			}
 		},
+		"ok/padding": func(t *testing.T) test {
+			return test{
+				fr: &FinalizeRequest{
+					CSR: base64.RawURLEncoding.EncodeToString(csr.Raw) + "==", // add intentional padding
+				},
+			}
+		},
 	}
 	for name, run := range tests {
 		tc := run(t)
