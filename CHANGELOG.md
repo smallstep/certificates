@@ -6,8 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased - 0.19.1] - DATE
 ### Added
+- Added Kubernetes auth method for Vault RAs.
+- Added support for reporting provisioners to linkedca.
 ### Changed
+- Context usage in HTTP APIs.
+- Changed authentication for Vault RAs.
 ### Deprecated
+- HTTP API handler types.
 ### Removed
 ### Fixed
 - Fixed SSH revocation.
