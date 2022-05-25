@@ -8,14 +8,22 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Added Kubernetes auth method for Vault RAs.
 - Added support for reporting provisioners to linkedca.
+- Added support for certificate policies on authority level.
+- Added a Dockerfile with a step-ca build with HSM support.
 ### Changed
 - Context usage in HTTP APIs.
 - Changed authentication for Vault RAs.
+- Error message returned to client when authenticating with expired certificate.
+- Strip padding from ACME CSRs.
 ### Deprecated
 - HTTP API handler types.
 ### Removed
 ### Fixed
 - Fixed SSH revocation.
+- CA client dial context for js/wasm target.
+- Incomplete `extraNames` support in templates.
+- SCEP GET request support.
+- Large SCEP request handling.
 ### Security
 
 ## [0.19.0] - 2022-04-19
@@ -33,6 +41,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   When a context has been configured and no configuration file is provided
   on startup, the configuration for the current context is used.
 - Added startup info logging and option to skip it (`--quiet`).
+- Added support for renaming the CA (Common Name).
 ### Changed
 - Made SCEP CA URL paths dynamic.
 - Support two latest versions of Go (1.17, 1.18).
