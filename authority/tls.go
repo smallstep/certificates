@@ -560,7 +560,7 @@ func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateIn
 	}); ok {
 		return lca.RevokeSSH(crt, rci)
 	}
-	return a.db.Revoke(rci)
+	return a.db.RevokeSSH(rci)
 }
 
 // GetTLSCertificate creates a new leaf certificate to be used by the CA HTTPS server.
