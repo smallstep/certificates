@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/pkg/errors"
@@ -288,10 +289,20 @@ func getDefaultDialer() *net.Dialer {
 // transport for HTTP/2.
 func getDefaultTransport(tlsConfig *tls.Config) *http.Transport {
 	var dialContext func(ctx context.Context, network string, addr string) (net.Conn, error)
-	if mTLSDialContext == nil {
+	switch {
+	case runtime.GOOS == "js" && runtime.GOARCH == "wasm":
+		// when running in js/wasm and using the default dialer context all requests
+		// performed by the CA client resulted in a "protocol not supported" error.
+		// By setting the dial context to nil requests will be handled by the browser
+		// fetch API instead. Currently this will always set the dial context to nil,
+		// but we could implement some additional logic similar to what's found in
+		// https://github.com/golang/go/pull/46923/files to support a different dial
+		// context if it is available, required and expected to work.
+		dialContext = nil
+	case mTLSDialContext == nil:
 		d := getDefaultDialer()
 		dialContext = d.DialContext
-	} else {
+	default:
 		dialContext = mTLSDialContext()
 	}
 	return &http.Transport{
