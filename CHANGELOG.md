@@ -4,12 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased - 0.19.1] - DATE
+## [0.20.0] - 2022-05-26
 ### Added
 - Added Kubernetes auth method for Vault RAs.
 - Added support for reporting provisioners to linkedca.
 - Added support for certificate policies on authority level.
 - Added a Dockerfile with a step-ca build with HSM support.
+- A few new WithXX methods for instantiating authorities
 ### Changed
 - Context usage in HTTP APIs.
 - Changed authentication for Vault RAs.
@@ -17,14 +18,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Strip padding from ACME CSRs.
 ### Deprecated
 - HTTP API handler types.
-### Removed
 ### Fixed
 - Fixed SSH revocation.
 - CA client dial context for js/wasm target.
 - Incomplete `extraNames` support in templates.
 - SCEP GET request support.
 - Large SCEP request handling.
-### Security
 
 ## [0.19.0] - 2022-04-19
 ### Added
