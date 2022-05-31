@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -41,14 +42,12 @@ func SkipTokenReuseFromContext(ctx context.Context) bool {
 	return m
 }
 
-// authorizeToken parses the token and returns the provisioner used to generate
-// the token. This method enforces the One-Time use policy (tokens can only be
-// used once).
-func (a *Authority) authorizeToken(ctx context.Context, token string) (provisioner.Interface, error) {
-	// Validate payload
+// getProvisionerFromToken extracts a provisioner from the given token without
+// doing any token validation.
+func (a *Authority) getProvisionerFromToken(token string) (provisioner.Interface, *Claims, error) {
 	tok, err := jose.ParseSigned(token)
 	if err != nil {
-		return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.authorizeToken: error parsing token")
+		return nil, nil, fmt.Errorf("error parsing token: %w", err)
 	}
 
 	// Get claims w/out verification. We need to look up the provisioner
@@ -56,7 +55,25 @@ func (a *Authority) authorizeToken(ctx context.Context, token string) (provision
 	// before we can look up the provisioner.
 	var claims Claims
 	if err := tok.UnsafeClaimsWithoutVerification(&claims); err != nil {
-		return nil, errs.Wrap(http.StatusUnauthorized, err, "authority.authorizeToken")
+		return nil, nil, fmt.Errorf("error unmarshaling token: %w", err)
+	}
+
+	// This method will also validate the audiences for JWK provisioners.
+	p, ok := a.provisioners.LoadByToken(tok, &claims.Claims)
+	if !ok {
+		return nil, nil, fmt.Errorf("provisioner not found or invalid audience (%s)", strings.Join(claims.Audience, ", "))
+	}
+
+	return p, &claims, nil
+}
+
+// authorizeToken parses the token and returns the provisioner used to generate
+// the token. This method enforces the One-Time use policy (tokens can only be
+// used once).
+func (a *Authority) authorizeToken(ctx context.Context, token string) (provisioner.Interface, error) {
+	p, claims, err := a.getProvisionerFromToken(token)
+	if err != nil {
+		return nil, errs.UnauthorizedErr(err)
 	}
 
 	// TODO: use new persistence layer abstraction.
@@ -64,15 +81,8 @@ func (a *Authority) authorizeToken(ctx context.Context, token string) (provision
 	// This check is meant as a stopgap solution to the current lack of a persistence layer.
 	if a.config.AuthorityConfig != nil && !a.config.AuthorityConfig.DisableIssuedAtCheck {
 		if claims.IssuedAt != nil && claims.IssuedAt.Time().Before(a.startTime) {
-			return nil, errs.Unauthorized("authority.authorizeToken: token issued before the bootstrap of certificate authority")
+			return nil, errs.Unauthorized("token issued before the bootstrap of certificate authority")
 		}
-	}
-
-	// This method will also validate the audiences for JWK provisioners.
-	p, ok := a.provisioners.LoadByToken(tok, &claims.Claims)
-	if !ok {
-		return nil, errs.Unauthorized("authority.authorizeToken: provisioner "+
-			"not found or invalid audience (%s)", strings.Join(claims.Audience, ", "))
 	}
 
 	// Store the token to protect against reuse unless it's skipped.
@@ -189,10 +199,10 @@ func (a *Authority) UseToken(token string, prov provisioner.Interface) error {
 		ok, err := a.db.UseToken(reuseKey, token)
 		if err != nil {
 			return errs.Wrap(http.StatusInternalServerError, err,
-				"authority.authorizeToken: failed when attempting to store token")
+				"failed when attempting to store token")
 		}
 		if !ok {
-			return errs.Unauthorized("authority.authorizeToken: token already used")
+			return errs.Unauthorized("token already used")
 		}
 	}
 	return nil

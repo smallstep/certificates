@@ -161,6 +161,12 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	// Set backdate with the configured value
 	opts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
+	// Attempt to extract the provisioner from the token.
+	var prov provisioner.Interface
+	if token, ok := provisioner.TokenFromContext(ctx); ok {
+		prov, _, _ = a.getProvisionerFromToken(token)
+	}
+
 	for _, op := range signOpts {
 		switch o := op.(type) {
 		// add options to NewCertificate
@@ -276,7 +282,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		}
 	}
 
-	if err = a.storeSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeSSHCertificate(prov, cert); err != nil && err != db.ErrNotImplemented {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error storing certificate in db")
 	}
 
@@ -296,6 +302,12 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 
 	if err := a.authorizeSSHCertificate(ctx, oldCert); err != nil {
 		return nil, err
+	}
+
+	// Attempt to extract the provisioner from the token.
+	var prov provisioner.Interface
+	if token, ok := provisioner.TokenFromContext(ctx); ok {
+		prov, _, _ = a.getProvisionerFromToken(token)
 	}
 
 	backdate := a.config.AuthorityConfig.Backdate.Duration
@@ -340,7 +352,7 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 	}
 
-	if err = a.storeSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && err != db.ErrNotImplemented {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error storing certificate in db")
 	}
 
@@ -350,6 +362,12 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 // RekeySSH creates a signed SSH certificate using the old SSH certificate as a template.
 func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	var validators []provisioner.SSHCertValidator
+
+	// Attempt to extract the provisioner from the token.
+	var prov provisioner.Interface
+	if token, ok := provisioner.TokenFromContext(ctx); ok {
+		prov, _, _ = a.getProvisionerFromToken(token)
+	}
 
 	for _, op := range signOpts {
 		switch o := op.(type) {
@@ -419,21 +437,59 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 		}
 	}
 
-	if err = a.storeSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && err != db.ErrNotImplemented {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "rekeySSH; error storing certificate in db")
 	}
 
 	return cert, nil
 }
 
-func (a *Authority) storeSSHCertificate(cert *ssh.Certificate) error {
+func (a *Authority) storeSSHCertificate(prov provisioner.Interface, cert *ssh.Certificate) error {
 	type sshCertificateStorer interface {
-		StoreSSHCertificate(crt *ssh.Certificate) error
+		StoreSSHCertificate(provisioner.Interface, *ssh.Certificate) error
 	}
-	if s, ok := a.adminDB.(sshCertificateStorer); ok {
+
+	// Store certificate in admindb or linkedca
+	switch s := a.adminDB.(type) {
+	case sshCertificateStorer:
+		return s.StoreSSHCertificate(prov, cert)
+	case db.CertificateStorer:
 		return s.StoreSSHCertificate(cert)
 	}
-	return a.db.StoreSSHCertificate(cert)
+
+	// Store certificate in localdb
+	switch s := a.db.(type) {
+	case sshCertificateStorer:
+		return s.StoreSSHCertificate(prov, cert)
+	case db.CertificateStorer:
+		return s.StoreSSHCertificate(cert)
+	default:
+		return nil
+	}
+}
+
+func (a *Authority) storeRenewedSSHCertificate(prov provisioner.Interface, parent, cert *ssh.Certificate) error {
+	type sshRenewerCertificateStorer interface {
+		StoreRenewedSSHCertificate(p provisioner.Interface, parent, cert *ssh.Certificate) error
+	}
+
+	// Store certificate in admindb or linkedca
+	switch s := a.adminDB.(type) {
+	case sshRenewerCertificateStorer:
+		return s.StoreRenewedSSHCertificate(prov, parent, cert)
+	case db.CertificateStorer:
+		return s.StoreSSHCertificate(cert)
+	}
+
+	// Store certificate in localdb
+	switch s := a.db.(type) {
+	case sshRenewerCertificateStorer:
+		return s.StoreRenewedSSHCertificate(prov, parent, cert)
+	case db.CertificateStorer:
+		return s.StoreSSHCertificate(cert)
+	default:
+		return nil
+	}
 }
 
 // IsValidForAddUser checks if a user provisioner certificate can be issued to
@@ -479,6 +535,12 @@ func (a *Authority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, subje
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSHAddUser: error reading random number")
 	}
 
+	// Attempt to extract the provisioner from the token.
+	var prov provisioner.Interface
+	if token, ok := provisioner.TokenFromContext(ctx); ok {
+		prov, _, _ = a.getProvisionerFromToken(token)
+	}
+
 	signer := a.sshCAUserCertSignKey
 	principal := subject.ValidPrincipals[0]
 	addUserPrincipal := a.getAddUserPrincipal()
@@ -511,7 +573,7 @@ func (a *Authority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, subje
 	}
 	cert.Signature = sig
 
-	if err = a.storeSSHCertificate(cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeRenewedSSHCertificate(prov, subject, cert); err != nil && err != db.ErrNotImplemented {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSHAddUser: error storing certificate in db")
 	}
 
