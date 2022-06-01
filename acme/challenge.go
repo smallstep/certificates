@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -348,6 +349,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			NewError(ErrorBadAttestationStatementType, "attestation format %q is not enabled", att.Format))
 	}
 
+<<<<<<< HEAD
 	switch att.Format {
 	case "apple":
 		data, err := doAppleAttestationFormat(ctx, prov, ch, &att)
@@ -360,6 +362,44 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 				return storeError(ctx, db, ch, true, acmeError)
 			}
 			return WrapErrorISE(err, "error validating attestation")
+=======
+	akCertBytes, valid := x5c[0].([]byte)
+	if !valid {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"error getting certificate from x5c cert chain"))
+	}
+
+	akCert, err := x509.ParseCertificate(akCertBytes)
+	if err != nil {
+		return WrapErrorISE(err, "error parsing AK certificate")
+	}
+
+	if err := params.Verify(attest.VerifyOpts{Public: akCert.PublicKey, Hash: crypto.SHA256}); err != nil {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"params.Verify failed: %v", err))
+	}
+
+	attData, err := tpm2.DecodeAttestationData(params.CreateAttestation)
+	if err != nil {
+		return WrapErrorISE(err, "error decoding attestation data")
+	}
+
+	keyAuth, err := KeyAuthorization(ch.Token, jwk)
+	if err != nil {
+		return err
+	}
+	hashedKeyAuth := sha256.Sum256([]byte(keyAuth))
+
+	if !bytes.Equal(attData.ExtraData, hashedKeyAuth[:]) {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"key authorization mismatch"))
+	}
+
+	var sanExt pkix.Extension
+	for _, ext := range akCert.Extensions {
+		if ext.Id.Equal(oid.SubjectAltName) {
+			sanExt = ext
+>>>>>>> b02694a3 (Verify key authorization is contained within the TPM quote extraData field)
 		}
 
 		// Validate nonce with SHA-256 of the token.
