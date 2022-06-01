@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/sha256"
@@ -25,6 +26,7 @@ import (
 	"github.com/google/go-attestation/attest"
 	"github.com/google/go-attestation/oid"
 	x509ext "github.com/google/go-attestation/x509"
+	"github.com/google/go-tpm/tpm2"
 	"go.step.sm/crypto/jose"
 )
 
@@ -357,6 +359,22 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	if err := params.Verify(attest.VerifyOpts{Public: akCert.PublicKey, Hash: crypto.SHA256}); err != nil {
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"params.Verify failed: %v", err))
+	}
+
+	attData, err := tpm2.DecodeAttestationData(params.CreateAttestation)
+	if err != nil {
+		return WrapErrorISE(err, "error decoding attestation data")
+	}
+
+	keyAuth, err := KeyAuthorization(ch.Token, jwk)
+	if err != nil {
+		return err
+	}
+	hashedKeyAuth := sha256.Sum256([]byte(keyAuth))
+
+	if !bytes.Equal(attData.ExtraData, hashedKeyAuth[:]) {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"key authorization mismatch"))
 	}
 
 	var sanExt pkix.Extension
