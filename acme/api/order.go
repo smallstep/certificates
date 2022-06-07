@@ -44,6 +44,10 @@ func (n *NewOrderRequest) Validate() error {
 			if _, err := x509util.SanitizeName(value); err != nil {
 				return acme.NewError(acme.ErrorMalformedType, "invalid DNS name: %s", id.Value)
 			}
+		case acme.PermanentIdentifier:
+			if id.Value == "" {
+				return acme.NewError(acme.ErrorMalformedType, "permanent identifier cannot be empty")
+			}
 		default:
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
 		}
@@ -390,6 +394,8 @@ func challengeTypes(az *acme.Authorization) []acme.ChallengeType {
 		}
 	case acme.PermanentIdentifier:
 		chTypes = []acme.ChallengeType{acme.DEVICEATTEST01}
+	case acme.CA:
+		chTypes = []acme.ChallengeType{acme.APPLEATTEST01}
 	default:
 		chTypes = []acme.ChallengeType{}
 	}

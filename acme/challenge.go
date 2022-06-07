@@ -13,11 +13,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -41,6 +43,7 @@ const (
 	TLSALPN01 ChallengeType = "tls-alpn-01"
 	// DEVICEATTEST01 is the device-attest-01 ACME challenge type
 	DEVICEATTEST01 ChallengeType = "device-attest-01"
+	APPLEATTEST01  ChallengeType = "client-01"
 )
 
 // Challenge represents an ACME response Challenge type.
@@ -84,6 +87,8 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 		return tlsalpn01Validate(ctx, ch, db, jwk)
 	case DEVICEATTEST01:
 		return deviceAttest01Validate(ctx, ch, db, jwk, payload)
+	case APPLEATTEST01:
+		return appleAttest01Validate(ctx, ch, db, jwk, payload)
 	default:
 		return NewErrorISE("unexpected challenge type '%s'", ch.Type)
 	}
@@ -404,6 +409,68 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"identifier from certificate and challenge do not match"))
 	}
+
+	// Update and store the challenge.
+	ch.Status = StatusValid
+	ch.Error = nil
+	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
+
+	if err := db.UpdateChallenge(ctx, ch); err != nil {
+		return WrapErrorISE(err, "error updating challenge")
+	}
+	return nil
+}
+
+type ApplePayload struct {
+	AttObj string `json:"attObj"`
+	Error  string `json:"error"`
+}
+
+func appleAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
+	var p ApplePayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return WrapErrorISE(err, "error unmarshalling JSON")
+	}
+
+	fmt.Fprintf(os.Stderr, "p.AttObj: %v\n", p.AttObj)
+
+	attObj, err := base64.RawURLEncoding.DecodeString(p.AttObj)
+	if err != nil {
+		return WrapErrorISE(err, "error base64 decoding attObj")
+	}
+
+	att := AttestationObject{}
+	if err := cbor.Unmarshal(attObj, &att); err != nil {
+		return WrapErrorISE(err, "error unmarshalling CBOR")
+	}
+
+	if att.Format != "apple" {
+		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement,
+			"unexpected attestation object format"))
+	}
+
+	x5c, x509present := att.AttStatement["x5c"].([]interface{})
+	if !x509present {
+		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement,
+			"x5c not present"))
+	}
+
+	attCertBytes, valid := x5c[0].([]byte)
+	if !valid {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"error getting certificate from x5c cert chain"))
+	}
+
+	attCert, err := x509.ParseCertificate(attCertBytes)
+	if err != nil {
+		return WrapErrorISE(err, "error parsing AK certificate")
+	}
+
+	b := &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: attCert.Raw,
+	}
+	pem.Encode(os.Stderr, b)
 
 	// Update and store the challenge.
 	ch.Status = StatusValid
