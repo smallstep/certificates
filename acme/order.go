@@ -5,7 +5,9 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"net"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -25,6 +27,7 @@ const (
 	DNS IdentifierType = "dns"
 	// DNS is the ACME dns identifier type
 	PermanentIdentifier IdentifierType = "permanent-identifier"
+	CA                  IdentifierType = "ca"
 )
 
 // Identifier encodes the type that an order pertains to.
@@ -146,6 +149,12 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		return NewErrorISE("unexpected status %s for order %s", o.Status, o.ID)
 	}
 
+	b := &pem.Block{
+		Type:  "CERTIFICATE REQUEST",
+		Bytes: csr.Raw,
+	}
+	pem.Encode(os.Stderr, b)
+
 	// canonicalize the CSR to allow for comparison
 	csr = canonicalize(csr)
 
@@ -229,6 +238,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 		case PermanentIdentifier:
 			orderPIDs[indexPID] = n.Value
 			indexPID++
+		case CA:
 		default:
 			return sans, NewErrorISE("unsupported identifier type in order: %s", n.Type)
 		}
