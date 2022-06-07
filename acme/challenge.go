@@ -16,11 +16,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/url"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -43,6 +45,7 @@ const (
 	TLSALPN01 ChallengeType = "tls-alpn-01"
 	// DEVICEATTEST01 is the device-attest-01 ACME challenge type
 	DEVICEATTEST01 ChallengeType = "device-attest-01"
+	APPLEATTEST01  ChallengeType = "client-01"
 )
 
 // Challenge represents an ACME response Challenge type.
@@ -86,6 +89,8 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 		return tlsalpn01Validate(ctx, ch, db, jwk)
 	case DEVICEATTEST01:
 		return deviceAttest01Validate(ctx, ch, db, jwk, payload)
+	case APPLEATTEST01:
+		return appleAttest01Validate(ctx, ch, db, jwk, payload)
 	default:
 		return NewErrorISE("unexpected challenge type '%s'", ch.Type)
 	}
@@ -349,7 +354,6 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			NewError(ErrorBadAttestationStatementType, "attestation format %q is not enabled", att.Format))
 	}
 
-<<<<<<< HEAD
 	switch att.Format {
 	case "apple":
 		data, err := doAppleAttestationFormat(ctx, prov, ch, &att)
@@ -362,44 +366,6 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 				return storeError(ctx, db, ch, true, acmeError)
 			}
 			return WrapErrorISE(err, "error validating attestation")
-=======
-	akCertBytes, valid := x5c[0].([]byte)
-	if !valid {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"error getting certificate from x5c cert chain"))
-	}
-
-	akCert, err := x509.ParseCertificate(akCertBytes)
-	if err != nil {
-		return WrapErrorISE(err, "error parsing AK certificate")
-	}
-
-	if err := params.Verify(attest.VerifyOpts{Public: akCert.PublicKey, Hash: crypto.SHA256}); err != nil {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"params.Verify failed: %v", err))
-	}
-
-	attData, err := tpm2.DecodeAttestationData(params.CreateAttestation)
-	if err != nil {
-		return WrapErrorISE(err, "error decoding attestation data")
-	}
-
-	keyAuth, err := KeyAuthorization(ch.Token, jwk)
-	if err != nil {
-		return err
-	}
-	hashedKeyAuth := sha256.Sum256([]byte(keyAuth))
-
-	if !bytes.Equal(attData.ExtraData, hashedKeyAuth[:]) {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"key authorization mismatch"))
-	}
-
-	var sanExt pkix.Extension
-	for _, ext := range akCert.Extensions {
-		if ext.Id.Equal(oid.SubjectAltName) {
-			sanExt = ext
->>>>>>> b02694a3 (Verify key authorization is contained within the TPM quote extraData field)
 		}
 
 		// Validate nonce with SHA-256 of the token.
@@ -452,6 +418,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	return nil
 }
 
+<<<<<<< HEAD
 // Apple Enterprise Attestation Root CA from
 // https://www.apple.com/certificateauthority/private/
 const appleEnterpriseAttestationRootCA = `-----BEGIN CERTIFICATE-----
@@ -692,6 +659,68 @@ func doStepAttestationFormat(ctx context.Context, prov Provisioner, ch *Challeng
 	}
 
 	return data, nil
+=======
+type ApplePayload struct {
+	AttObj string `json:"attObj"`
+	Error  string `json:"error"`
+}
+
+func appleAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
+	var p ApplePayload
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return WrapErrorISE(err, "error unmarshalling JSON")
+	}
+
+	fmt.Fprintf(os.Stderr, "p.AttObj: %v\n", p.AttObj)
+
+	attObj, err := base64.RawURLEncoding.DecodeString(p.AttObj)
+	if err != nil {
+		return WrapErrorISE(err, "error base64 decoding attObj")
+	}
+
+	att := AttestationObject{}
+	if err := cbor.Unmarshal(attObj, &att); err != nil {
+		return WrapErrorISE(err, "error unmarshalling CBOR")
+	}
+
+	if att.Format != "apple" {
+		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement,
+			"unexpected attestation object format"))
+	}
+
+	x5c, x509present := att.AttStatement["x5c"].([]interface{})
+	if !x509present {
+		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement,
+			"x5c not present"))
+	}
+
+	attCertBytes, valid := x5c[0].([]byte)
+	if !valid {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"error getting certificate from x5c cert chain"))
+	}
+
+	attCert, err := x509.ParseCertificate(attCertBytes)
+	if err != nil {
+		return WrapErrorISE(err, "error parsing AK certificate")
+	}
+
+	b := &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: attCert.Raw,
+	}
+	pem.Encode(os.Stderr, b)
+
+	// Update and store the challenge.
+	ch.Status = StatusValid
+	ch.Error = nil
+	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
+
+	if err := db.UpdateChallenge(ctx, ch); err != nil {
+		return WrapErrorISE(err, "error updating challenge")
+	}
+	return nil
+>>>>>>> 26e1b4ba (iOS 16 beta 1 support)
 }
 
 // serverName determines the SNI HostName to set based on an acme.Challenge
