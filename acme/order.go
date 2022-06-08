@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-attestation/oid"
+	attest_x509 "github.com/google/go-attestation/x509"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/x509util"
 )
@@ -188,6 +190,11 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		data.SetSubjectAlternativeNames(sans...)
 	}
 
+	deviceIDs, err := o.deviceIDs(csr)
+	if err != nil {
+		return err
+	}
+
 	// Get authorizations from the ACME provisioner.
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 	signOps, err := p.AuthorizeSign(ctx, "")
@@ -304,6 +311,25 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	}
 
 	return sans, nil
+}
+
+func (o *Order) deviceIDs(csr *x509.CertificateRequest) ([]x509util.PermanentIdentifier, error) {
+	var permIDs []x509util.PermanentIdentifier
+	for _, ext := range csr.Extensions {
+		if ext.Id.Equal(oid.SubjectAltName) {
+			san, err := attest_x509.ParseSubjectAltName(ext)
+			if err != nil {
+				return nil, err
+			}
+			for _, pi := range san.PermanentIdentifiers {
+				permIDs = append(permIDs, x509util.PermanentIdentifier{
+					Value:    pi.IdentifierValue,
+					Assigner: pi.Assigner,
+				})
+			}
+		}
+	}
+	return permIDs, nil
 }
 
 // numberOfIdentifierType returns the number of Identifiers that
