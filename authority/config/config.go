@@ -200,8 +200,6 @@ func (c *Config) Save(filename string) error {
 // Validate validates the configuration.
 func (c *Config) Validate() error {
 	switch {
-	case c.Address == "":
-		return errors.New("address cannot be empty")
 	case len(c.DNSNames) == 0:
 		return errors.New("dnsNames cannot be empty")
 	case c.AuthorityConfig == nil:
@@ -223,8 +221,10 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate address (a port is required)
-	if _, _, err := net.SplitHostPort(c.Address); err != nil {
-		return errors.Errorf("invalid address %s", c.Address)
+	if c.Address != "" {
+		if _, _, err := net.SplitHostPort(c.Address); err != nil {
+			return errors.Errorf("invalid address %s", c.Address)
+		}
 	}
 
 	if c.TLS == nil {

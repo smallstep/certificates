@@ -169,9 +169,6 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	mux := chi.NewRouter()
 	handler := http.Handler(mux)
 
-	insecureMux := chi.NewRouter()
-	insecureHandler := http.Handler(insecureMux)
-
 	// Add regular CA api endpoints in / and /1.0
 	api.Route(mux)
 	mux.Route("/1.0", func(r chi.Router) {
@@ -232,13 +229,6 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 			return nil, errors.Wrap(err, "error creating SCEP authority")
 		}
 
-		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
-		// SCEP operations are performed using HTTP, so that's why the API is mounted
-		// to the insecure mux.
-		insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
-			scepAPI.Route(r)
-		})
-
 		// The RFC also mentions usage of HTTPS, but seems to advise
 		// against it, because of potential interoperability issues.
 		// Currently I think it's not bad to use HTTPS also, so that's
@@ -260,7 +250,6 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 			return nil, err
 		}
 		handler = m.Middleware(handler)
-		insecureHandler = m.Middleware(insecureHandler)
 	}
 
 	// Add logger if configured
@@ -270,25 +259,24 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 			return nil, err
 		}
 		handler = logger.Middleware(handler)
-		insecureHandler = logger.Middleware(insecureHandler)
 	}
 
 	// Create context with all the necessary values.
 	baseContext := buildContext(auth, scepAuthority, acmeDB, acmeLinker)
 
-	ca.srv = server.New(cfg.Address, handler, tlsConfig)
-	ca.srv.BaseContext = func(net.Listener) context.Context {
-		return baseContext
+	if cfg.Address != "" {
+		ca.srv = server.New(cfg.Address, handler, tlsConfig)
+		ca.srv.BaseContext = func(net.Listener) context.Context {
+			return baseContext
+		}
 	}
 
-	// only start the insecure server if the insecure address is configured
-	// and, currently, also only when it should serve SCEP endpoints.
-	if ca.shouldServeSCEPEndpoints() && cfg.InsecureAddress != "" {
+	if cfg.InsecureAddress != "" {
 		// TODO: instead opt for having a single server.Server but two
 		// http.Servers handling the HTTP and HTTPS handler? The latter
 		// will probably introduce more complexity in terms of graceful
 		// reload.
-		ca.insecureSrv = server.New(cfg.InsecureAddress, insecureHandler, nil)
+		ca.insecureSrv = server.New(cfg.InsecureAddress, handler, nil)
 		ca.insecureSrv.BaseContext = func(net.Listener) context.Context {
 			return baseContext
 		}
@@ -329,11 +317,13 @@ func (ca *CA) Run() error {
 			log.Printf("Current context: %s", step.Contexts().GetCurrent().Name)
 		}
 		log.Printf("Config file: %s", ca.opts.configFile)
-		baseURL := fmt.Sprintf("https://%s%s",
-			authorityInfo.DNSNames[0],
-			ca.config.Address[strings.LastIndex(ca.config.Address, ":"):])
-		log.Printf("The primary server URL is %s", baseURL)
-		log.Printf("Root certificates are available at %s/roots.pem", baseURL)
+		if ca.config.Address != "" {
+			baseURL := fmt.Sprintf("https://%s%s",
+				authorityInfo.DNSNames[0],
+				ca.config.Address[strings.LastIndex(ca.config.Address, ":"):])
+			log.Printf("The primary server URL is %s", baseURL)
+			log.Printf("Root certificates are available at %s/roots.pem", baseURL)
+		}
 		if len(authorityInfo.DNSNames) > 1 {
 			log.Printf("Additional configured hostnames: %s",
 				strings.Join(authorityInfo.DNSNames[1:], ", "))
@@ -357,11 +347,13 @@ func (ca *CA) Run() error {
 		}()
 	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		errs <- ca.srv.ListenAndServe()
-	}()
+	if ca.srv != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- ca.srv.ListenAndServe()
+		}()
+	}
 
 	// wait till error occurs; ensures the servers keep listening
 	err := <-errs
