@@ -227,8 +227,10 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate address (a port is required)
-	if _, _, err := net.SplitHostPort(c.Address); err != nil {
-		return errors.Errorf("invalid address %s", c.Address)
+	if c.Address != "" {
+		if _, _, err := net.SplitHostPort(c.Address); err != nil {
+			return errors.Errorf("invalid address %s", c.Address)
+		}
 	}
 
 	if c.TLS == nil {
