@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-attestation/oid"
+	attest_x509 "github.com/google/go-attestation/x509"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/x509util"
 )
@@ -21,6 +23,8 @@ const (
 	IP IdentifierType = "ip"
 	// DNS is the ACME dns identifier type
 	DNS IdentifierType = "dns"
+	// DNS is the ACME dns identifier type
+	PermanentIdentifier IdentifierType = "permanent-identifier"
 )
 
 // Identifier encodes the type that an order pertains to.
@@ -151,6 +155,11 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		return err
 	}
 
+	deviceIDs, err := o.deviceIDs(csr)
+	if err != nil {
+		return err
+	}
+
 	// Get authorizations from the ACME provisioner.
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 	signOps, err := p.AuthorizeSign(ctx, "")
@@ -162,13 +171,13 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	data := x509util.NewTemplateData()
 	data.SetCommonName(csr.Subject.CommonName)
 	data.Set(x509util.SANsKey, sans)
+	data.SetPermanentIdentifiers(deviceIDs)
 
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
 	if err != nil {
 		return WrapErrorISE(err, "error creating template options from ACME provisioner")
 	}
 	signOps = append(signOps, templateOptions)
-
 	// Sign a new certificate.
 	certChain, err := auth.Sign(csr, provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
@@ -207,7 +216,8 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	// order the DNS names and IP addresses, so that they can be compared against the canonicalized CSR
 	orderNames := make([]string, numberOfIdentifierType(DNS, o.Identifiers))
 	orderIPs := make([]net.IP, numberOfIdentifierType(IP, o.Identifiers))
-	indexDNS, indexIP := 0, 0
+	orderPIDs := make([]string, numberOfIdentifierType(PermanentIdentifier, o.Identifiers))
+	indexDNS, indexIP, indexPID := 0, 0, 0
 	for _, n := range o.Identifiers {
 		switch n.Type {
 		case DNS:
@@ -216,6 +226,9 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 		case IP:
 			orderIPs[indexIP] = net.ParseIP(n.Value) // NOTE: this assumes are all valid IPs at this time; or will result in nil entries
 			indexIP++
+		case PermanentIdentifier:
+			orderPIDs[indexPID] = n.Value
+			indexPID++
 		default:
 			return sans, NewErrorISE("unsupported identifier type in order: %s", n.Type)
 		}
@@ -267,6 +280,25 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	}
 
 	return sans, nil
+}
+
+func (o *Order) deviceIDs(csr *x509.CertificateRequest) ([]x509util.PermanentIdentifier, error) {
+	var permIDs []x509util.PermanentIdentifier
+	for _, ext := range csr.Extensions {
+		if ext.Id.Equal(oid.SubjectAltName) {
+			san, err := attest_x509.ParseSubjectAltName(ext)
+			if err != nil {
+				return nil, err
+			}
+			for _, pi := range san.PermanentIdentifiers {
+				permIDs = append(permIDs, x509util.PermanentIdentifier{
+					Value:    pi.IdentifierValue,
+					Assigner: pi.Assigner,
+				})
+			}
+		}
+	}
+	return permIDs, nil
 }
 
 // numberOfIdentifierType returns the number of Identifiers that

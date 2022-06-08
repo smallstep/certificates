@@ -33,7 +33,7 @@ func (n *NewOrderRequest) Validate() error {
 		return acme.NewError(acme.ErrorMalformedType, "identifiers list cannot be empty")
 	}
 	for _, id := range n.Identifiers {
-		if !(id.Type == acme.DNS || id.Type == acme.IP) {
+		if !(id.Type == acme.DNS || id.Type == acme.IP || id.Type == acme.PermanentIdentifier) {
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
 		}
 		if id.Type == acme.IP && net.ParseIP(id.Value) == nil {
@@ -373,6 +373,8 @@ func challengeTypes(az *acme.Authorization) []acme.ChallengeType {
 		if !az.Wildcard {
 			chTypes = append(chTypes, []acme.ChallengeType{acme.HTTP01, acme.TLSALPN01}...)
 		}
+	case acme.PermanentIdentifier:
+		chTypes = []acme.ChallengeType{acme.DEVICEATTEST01}
 	default:
 		chTypes = []acme.ChallengeType{}
 	}
