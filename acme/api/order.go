@@ -388,6 +388,8 @@ func challengeTypes(az *acme.Authorization) []acme.ChallengeType {
 		if !az.Wildcard {
 			chTypes = append(chTypes, []acme.ChallengeType{acme.HTTP01, acme.TLSALPN01}...)
 		}
+	case acme.PermanentIdentifier:
+		chTypes = []acme.ChallengeType{acme.DEVICEATTEST01}
 	default:
 		chTypes = []acme.ChallengeType{}
 	}
