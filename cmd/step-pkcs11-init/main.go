@@ -37,11 +37,13 @@ type Config struct {
 	RootKeyObject    string
 	RootSubject      string
 	RootPath         string
+	RootKty          string
 	CrtObject        string
 	CrtPath          string
 	CrtKeyObject     string
 	CrtSubject       string
 	CrtKeyPath       string
+	CrtKty           string
 	SSHHostKeyObject string
 	SSHUserKeyObject string
 	RootFile         string
@@ -77,6 +79,12 @@ func (c *Config) Validate() error {
 		return errors.New("flag `--root-gen` requires `--root-cert-path`")
 	case c.Pin != "" && c.PinFile != "":
 		return errors.New("Only set one of pin and pin-file")
+	case c.CrtKeyPath != "" && c.CrtKty != "EC":
+		return errors.New("Only ECDSA keys are supported for file system")
+	case c.CrtKty != "EC" && c.CrtKty != "RSA" && c.CrtKty != "OKP":
+		return errors.New("crt-kty must be one of EC, RSA, or OKP")
+	case c.RootKty != "EC" && c.RootKty != "RSA" && c.RootKty != "OKP":
+		return errors.New("root-kty must be one of EC, RSA, or OKP")
 	default:
 		if c.RootFile != "" {
 			c.GenerateRoot = false
@@ -119,6 +127,7 @@ func main() {
 	flag.StringVar(&c.RootKeyObject, "root-key-obj", "pkcs11:id=7330;object=root-key", "PKCS #11 URI with object id and label to store the root key.")
 	// Option 2: Read root from disk and sign intermediate
 	flag.StringVar(&c.RootFile, "root-cert-file", "", "Path to the root certificate to use.")
+	flag.StringVar(&c.RootKty, "root-kty", "EC", "The key type to build ther certificate upon. Supports EC, RSA, and OKP")
 	flag.StringVar(&c.KeyFile, "root-key-file", "", "Path to the root key to use.")
 	// Option 3: Generate certificate signing request
 	flag.StringVar(&c.CrtSubject, "crt-name", "PKCS #11 Smallstep Intermediate", "Subject of the intermediate certificate.")
@@ -132,6 +141,7 @@ func main() {
 	flag.StringVar(&c.RootPath, "root-cert-path", "root_ca.crt", "Location to write the root certificate.")
 	flag.StringVar(&c.CrtPath, "crt-cert-path", "intermediate_ca.crt", "Location to write the intermediate certificate.")
 	flag.StringVar(&c.CrtKeyPath, "crt-key-path", "", "Location to write the intermediate private key.")
+	flag.StringVar(&c.CrtKty, "crt-kty", "EC", "The key type to build ther certificate upon. Supports EC, RSA, and OKP")
 	// Others
 	flag.BoolVar(&c.NoCerts, "no-certs", false, "Do not store certificates in the module.")
 	flag.BoolVar(&c.Force, "force", false, "Force the delete of previous keys.")
@@ -297,6 +307,12 @@ func checkObject(k kms.KeyManager, rawuri string) {
 	}
 }
 
+var ktyMapping = map[string]apiv1.SignatureAlgorithm{
+	"EC":  apiv1.ECDSAWithSHA256,
+	"RSA": apiv1.SHA256WithRSAPSS,
+	"OKP": apiv1.PureEd25519,
+}
+
 func createPKI(k kms.KeyManager, c Config) error {
 	var err error
 	ui.Println("Creating PKI ...")
@@ -309,7 +325,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 	case c.GenerateRoot:
 		resp, err := k.CreateKey(&apiv1.CreateKeyRequest{
 			Name:               c.RootKeyObject,
-			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
+			SignatureAlgorithm: ktyMapping[c.RootKty],
 			Extractable:        c.Extractable,
 		})
 		if err != nil {
@@ -413,7 +429,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 	} else {
 		resp, err := k.CreateKey(&apiv1.CreateKeyRequest{
 			Name:               c.CrtKeyObject,
-			SignatureAlgorithm: apiv1.ECDSAWithSHA256,
+			SignatureAlgorithm: ktyMapping[c.CrtKty],
 			Extractable:        c.Extractable,
 		})
 		if err != nil {
