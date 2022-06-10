@@ -38,12 +38,14 @@ type Config struct {
 	RootSubject      string
 	RootPath         string
 	RootKty          string
+	RootKtySize      int
 	CrtObject        string
 	CrtPath          string
 	CrtKeyObject     string
 	CrtSubject       string
 	CrtKeyPath       string
 	CrtKty           string
+	CrtKtySize       int
 	SSHHostKeyObject string
 	SSHUserKeyObject string
 	RootFile         string
@@ -85,6 +87,10 @@ func (c *Config) Validate() error {
 		return errors.New("crt-kty must be one of EC, RSA, or OKP")
 	case c.RootKty != "EC" && c.RootKty != "RSA" && c.RootKty != "OKP":
 		return errors.New("root-kty must be one of EC, RSA, or OKP")
+	case c.RootKty != "RSA" && c.RootKtySize != 0:
+		return errors.New("root-kty-size is only applicable for root-kty=RSA")
+	case c.CrtKty != "RSA" && c.CrtKtySize != 0:
+		return errors.New("crt-kty-size is only applicable for crt-kty=RSA")
 	default:
 		if c.RootFile != "" {
 			c.GenerateRoot = false
@@ -127,8 +133,9 @@ func main() {
 	flag.StringVar(&c.RootKeyObject, "root-key-obj", "pkcs11:id=7330;object=root-key", "PKCS #11 URI with object id and label to store the root key.")
 	// Option 2: Read root from disk and sign intermediate
 	flag.StringVar(&c.RootFile, "root-cert-file", "", "Path to the root certificate to use.")
-	flag.StringVar(&c.RootKty, "root-kty", "EC", "The key type to build ther certificate upon. Supports EC, RSA, and OKP")
 	flag.StringVar(&c.KeyFile, "root-key-file", "", "Path to the root key to use.")
+	flag.StringVar(&c.RootKty, "root-kty", "EC", "The key type to build the certificate upon. Supports EC, RSA, and OKP")
+	flag.IntVar(&c.RootKtySize, "root-kty-size", 0, "The number of bits if root-kty=RSA")
 	// Option 3: Generate certificate signing request
 	flag.StringVar(&c.CrtSubject, "crt-name", "PKCS #11 Smallstep Intermediate", "Subject of the intermediate certificate.")
 	flag.StringVar(&c.CrtObject, "crt-cert-obj", "pkcs11:id=7331;object=intermediate-cert", "PKCS #11 URI with object id and label to store the intermediate certificate.")
@@ -141,7 +148,8 @@ func main() {
 	flag.StringVar(&c.RootPath, "root-cert-path", "root_ca.crt", "Location to write the root certificate.")
 	flag.StringVar(&c.CrtPath, "crt-cert-path", "intermediate_ca.crt", "Location to write the intermediate certificate.")
 	flag.StringVar(&c.CrtKeyPath, "crt-key-path", "", "Location to write the intermediate private key.")
-	flag.StringVar(&c.CrtKty, "crt-kty", "EC", "The key type to build ther certificate upon. Supports EC, RSA, and OKP")
+	flag.StringVar(&c.CrtKty, "crt-kty", "EC", "The key type to build the certificate upon. Supports EC, RSA, and OKP")
+	flag.IntVar(&c.CrtKtySize, "crt-kty-size", 0, "The number of bits if crt-kty=RSA")
 	// Others
 	flag.BoolVar(&c.NoCerts, "no-certs", false, "Do not store certificates in the module.")
 	flag.BoolVar(&c.Force, "force", false, "Force the delete of previous keys.")
@@ -327,6 +335,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			Name:               c.RootKeyObject,
 			SignatureAlgorithm: ktyMapping[c.RootKty],
 			Extractable:        c.Extractable,
+			Bits:               c.RootKtySize,
 		})
 		if err != nil {
 			return err
@@ -431,6 +440,7 @@ func createPKI(k kms.KeyManager, c Config) error {
 			Name:               c.CrtKeyObject,
 			SignatureAlgorithm: ktyMapping[c.CrtKty],
 			Extractable:        c.Extractable,
+			Bits:               c.CrtKtySize,
 		})
 		if err != nil {
 			return err
