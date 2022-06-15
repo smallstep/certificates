@@ -33,7 +33,7 @@ The only prerequisites are [`go`](https://golang.org/) and make.
 
 To build from source:
 
-    make bootstrap && make
+    make bootstrap && make CI=true
 
 Find your binaries in `bin/`.
 
