@@ -14,12 +14,15 @@ var softHSM2Once sync.Once
 
 // mustPKCS11 configures a *PKCS11 KMS to be used with OpenSC, using for example
 // a Nitrokey HSM. To initialize these tests we should run:
-//   sc-hsm-tool --initialize --so-pin 3537363231383830 --pin 123456
-//  Or:
-//   pkcs11-tool --module /usr/local/lib/opensc-pkcs11.so \
-//   --init-token --init-pin \
-//   --so-pin=3537363231383830 --new-pin=123456 --pin=123456 \
-//   --label="pkcs11-test"
+//
+//	sc-hsm-tool --initialize --so-pin 3537363231383830 --pin 123456
+//
+// Or:
+//
+//	pkcs11-tool --module /usr/local/lib/opensc-pkcs11.so \
+//	--init-token --init-pin \
+//	--so-pin=3537363231383830 --new-pin=123456 --pin=123456 \
+//	--label="pkcs11-test"
 func mustPKCS11(t TBTesting) *PKCS11 {
 	t.Helper()
 	testModule = "OpenSC"

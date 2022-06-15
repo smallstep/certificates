@@ -51,22 +51,27 @@ const awsMetadataTokenTTLHeader = "X-aws-ec2-metadata-token-ttl-seconds"
 // signature.
 //
 // The first certificate is used in:
-//   ap-northeast-2, ap-south-1, ap-southeast-1, ap-southeast-2
-//   eu-central-1, eu-north-1, eu-west-1, eu-west-2, eu-west-3
-//   us-east-1, us-east-2, us-west-1, us-west-2
-//   ca-central-1, sa-east-1
+//
+//	ap-northeast-2, ap-south-1, ap-southeast-1, ap-southeast-2
+//	eu-central-1, eu-north-1, eu-west-1, eu-west-2, eu-west-3
+//	us-east-1, us-east-2, us-west-1, us-west-2
+//	ca-central-1, sa-east-1
 //
 // The second certificate is used in:
-//   eu-south-1
+//
+//	eu-south-1
 //
 // The third certificate is used in:
-//   ap-east-1
+//
+//	ap-east-1
 //
 // The fourth certificate is used in:
-//   af-south-1
+//
+//	af-south-1
 //
 // The fifth certificate is used in:
-//   me-south-1
+//
+//	me-south-1
 const awsCertificate = `-----BEGIN CERTIFICATE-----
 MIIDIjCCAougAwIBAgIJAKnL4UEDMN/FMA0GCSqGSIb3DQEBBQUAMGoxCzAJBgNV
 BAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdTZWF0dGxlMRgw

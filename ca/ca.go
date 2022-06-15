@@ -523,7 +523,7 @@ func (ca *CA) shouldServeSCEPEndpoints() bool {
 	return ca.auth.GetSCEPService() != nil
 }
 
-//nolint // ignore linters to allow keeping this function around for debugging
+// nolint // ignore linters to allow keeping this function around for debugging
 func dumpRoutes(mux chi.Routes) {
 	// helpful routine for logging all routes //
 	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {

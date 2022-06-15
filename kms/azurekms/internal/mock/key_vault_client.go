@@ -6,9 +6,10 @@ package mock
 
 import (
 	context "context"
+	reflect "reflect"
+
 	keyvault "github.com/Azure/azure-sdk-for-go/services/keyvault/v7.1/keyvault"
 	gomock "github.com/golang/mock/gomock"
-	reflect "reflect"
 )
 
 // KeyVaultClient is a mock of KeyVaultClient interface

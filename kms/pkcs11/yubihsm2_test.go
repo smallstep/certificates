@@ -14,7 +14,8 @@ var yubiHSM2Once sync.Once
 
 // mustPKCS11 configures a *PKCS11 KMS to be used with YubiHSM2. To initialize
 // these tests, we should run:
-// 	yubihsm-connector -d
+//
+//	yubihsm-connector -d
 func mustPKCS11(t TBTesting) *PKCS11 {
 	t.Helper()
 	testModule = "YubiHSM2"
