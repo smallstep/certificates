@@ -119,13 +119,13 @@ func parseJWS(next nextHTTP) nextHTTP {
 // The JWS Unprotected Header [RFC7515] MUST NOT be used
 // The JWS Payload MUST NOT be detached
 // The JWS Protected Header MUST include the following fields:
-//   * “alg” (Algorithm)
-//     * This field MUST NOT contain “none” or a Message Authentication Code
-//       (MAC) algorithm (e.g. one in which the algorithm registry description
-//       mentions MAC/HMAC).
-//   * “nonce” (defined in Section 6.5)
-//   * “url” (defined in Section 6.4)
-//   * Either “jwk” (JSON Web Key) or “kid” (Key ID) as specified below<Paste>
+//   - “alg” (Algorithm).
+//     This field MUST NOT contain “none” or a Message Authentication Code
+//     (MAC) algorithm (e.g. one in which the algorithm registry description
+//     mentions MAC/HMAC).
+//   - “nonce” (defined in Section 6.5)
+//   - “url” (defined in Section 6.4)
+//   - Either “jwk” (JSON Web Key) or “kid” (Key ID) as specified below<Paste>
 func validateJWS(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

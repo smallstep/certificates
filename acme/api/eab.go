@@ -107,10 +107,11 @@ func keysAreEqual(x, y *jose.JSONWebKey) bool {
 
 // validateEABJWS verifies the contents of the External Account Binding JWS.
 // The protected header of the JWS MUST meet the following criteria:
-// 	o 	The "alg" field MUST indicate a MAC-based algorithm
-//	o  	The "kid" field MUST contain the key identifier provided by the CA
-//	o  	The "nonce" field MUST NOT be present
-//	o  	The "url" field MUST be set to the same value as the outer JWS
+//
+//   - The "alg" field MUST indicate a MAC-based algorithm
+//   - The "kid" field MUST contain the key identifier provided by the CA
+//   - The "nonce" field MUST NOT be present
+//   - The "url" field MUST be set to the same value as the outer JWS
 func validateEABJWS(ctx context.Context, jws *jose.JSONWebSignature) (string, *acme.Error) {
 	if jws == nil {
 		return "", acme.NewErrorISE("no JWS provided")

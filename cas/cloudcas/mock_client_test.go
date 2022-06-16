@@ -5,12 +5,13 @@
 package cloudcas
 
 import (
-	privateca "cloud.google.com/go/security/privateca/apiv1"
 	context "context"
+	reflect "reflect"
+
+	privateca "cloud.google.com/go/security/privateca/apiv1"
 	gomock "github.com/golang/mock/gomock"
 	gax "github.com/googleapis/gax-go/v2"
 	privateca0 "google.golang.org/genproto/googleapis/cloud/security/privateca/v1"
-	reflect "reflect"
 )
 
 // MockCertificateAuthorityClient is a mock of CertificateAuthorityClient interface

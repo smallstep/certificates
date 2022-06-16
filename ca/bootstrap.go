@@ -48,17 +48,18 @@ func Bootstrap(token string) (*Client, error) {
 // certificate after 2/3rd of the certificate's lifetime has expired.
 //
 // Usage:
-//   // Default example with certificate rotation.
-//   client, err := ca.BootstrapClient(ctx.Background(), token)
 //
-//   // Example canceling automatic certificate rotation.
-//   ctx, cancel := context.WithCancel(context.Background())
-//   defer cancel()
-//   client, err := ca.BootstrapClient(ctx, token)
-//   if err != nil {
-//     return err
-//   }
-//   resp, err := client.Get("https://internal.smallstep.com")
+//	// Default example with certificate rotation.
+//	client, err := ca.BootstrapClient(ctx.Background(), token)
+//
+//	// Example canceling automatic certificate rotation.
+//	ctx, cancel := context.WithCancel(context.Background())
+//	defer cancel()
+//	client, err := ca.BootstrapClient(ctx, token)
+//	if err != nil {
+//	  return err
+//	}
+//	resp, err := client.Get("https://internal.smallstep.com")
 func BootstrapClient(ctx context.Context, token string, options ...TLSOption) (*http.Client, error) {
 	b, err := createBootstrap(token)
 	if err != nil {
@@ -96,23 +97,24 @@ func BootstrapClient(ctx context.Context, token string, options ...TLSOption) (*
 // ca.AddClientCA(*x509.Certificate).
 //
 // Usage:
-//   // Default example with certificate rotation.
-//   srv, err := ca.BootstrapServer(context.Background(), token, &http.Server{
-//       Addr: ":443",
-//       Handler: handler,
-//   })
 //
-//   // Example canceling automatic certificate rotation.
-//   ctx, cancel := context.WithCancel(context.Background())
-//   defer cancel()
-//   srv, err := ca.BootstrapServer(ctx, token, &http.Server{
-//       Addr: ":443",
-//       Handler: handler,
-//   })
-//   if err != nil {
-//       return err
-//   }
-//   srv.ListenAndServeTLS("", "")
+//	// Default example with certificate rotation.
+//	srv, err := ca.BootstrapServer(context.Background(), token, &http.Server{
+//	    Addr: ":443",
+//	    Handler: handler,
+//	})
+//
+//	// Example canceling automatic certificate rotation.
+//	ctx, cancel := context.WithCancel(context.Background())
+//	defer cancel()
+//	srv, err := ca.BootstrapServer(ctx, token, &http.Server{
+//	    Addr: ":443",
+//	    Handler: handler,
+//	})
+//	if err != nil {
+//	    return err
+//	}
+//	srv.ListenAndServeTLS("", "")
 func BootstrapServer(ctx context.Context, token string, base *http.Server, options ...TLSOption) (*http.Server, error) {
 	if base.TLSConfig != nil {
 		return nil, errors.New("server TLSConfig is already set")
@@ -152,19 +154,20 @@ func BootstrapServer(ctx context.Context, token string, base *http.Server, optio
 // ca.AddClientCA(*x509.Certificate).
 //
 // Usage:
-//   inner, err := net.Listen("tcp", ":443")
-//   if err != nil {
-//     return nil
-//   }
-//   ctx, cancel := context.WithCancel(context.Background())
-//   defer cancel()
-//   lis, err := ca.BootstrapListener(ctx, token, inner)
-//   if err != nil {
-//       return err
-//   }
-//   srv := grpc.NewServer()
-//   ... // register services
-//   srv.Serve(lis)
+//
+//	inner, err := net.Listen("tcp", ":443")
+//	if err != nil {
+//	  return nil
+//	}
+//	ctx, cancel := context.WithCancel(context.Background())
+//	defer cancel()
+//	lis, err := ca.BootstrapListener(ctx, token, inner)
+//	if err != nil {
+//	    return err
+//	}
+//	srv := grpc.NewServer()
+//	... // register services
+//	srv.Serve(lis)
 func BootstrapListener(ctx context.Context, token string, inner net.Listener, options ...TLSOption) (net.Listener, error) {
 	b, err := createBootstrap(token)
 	if err != nil {
