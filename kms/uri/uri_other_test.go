@@ -1,4 +1,4 @@
-//go:build go1.19
+//go:build !go1.19
 
 package uri
 
@@ -35,7 +35,7 @@ func TestParse(t *testing.T) {
 			Values: url.Values{},
 		}, false},
 		{"ok file simple", args{"file:/tmp/ca.cert"}, &URI{
-			URL:    &url.URL{Scheme: "file", Path: "/tmp/ca.cert", OmitHost: true},
+			URL:    &url.URL{Scheme: "file", Path: "/tmp/ca.cert"},
 			Values: url.Values{},
 		}, false},
 		{"ok file host", args{"file://tmp/ca.cert"}, &URI{
