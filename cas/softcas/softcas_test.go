@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
@@ -347,6 +348,67 @@ func TestSoftCAS_CreateCertificate(t *testing.T) {
 				t.Errorf("SoftCAS.CreateCertificate() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSoftCAS_CreateCertificate_pss(t *testing.T) {
+	signer, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now()
+	template := &x509.Certificate{
+		Subject:               pkix.Name{CommonName: "Test Root CA"},
+		KeyUsage:              x509.KeyUsageCRLSign | x509.KeyUsageCertSign,
+		PublicKey:             signer.Public(),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		MaxPathLen:            0,
+		SerialNumber:          big.NewInt(1234),
+		SignatureAlgorithm:    x509.SHA256WithRSAPSS,
+		NotBefore:             now,
+		NotAfter:              now.Add(24 * time.Hour),
+	}
+
+	iss, err := x509util.CreateCertificate(template, template, signer.Public(), signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iss.SignatureAlgorithm != x509.SHA256WithRSAPSS {
+		t.Errorf("Certificate.SignatureAlgorithm = %v, want %v", iss.SignatureAlgorithm, x509.SHA256WithRSAPSS)
+	}
+
+	c := &SoftCAS{
+		CertificateChain: []*x509.Certificate{iss},
+		Signer:           signer,
+	}
+	cert, err := c.CreateCertificate(&apiv1.CreateCertificateRequest{
+		Template: &x509.Certificate{
+			Subject:      pkix.Name{CommonName: "test.smallstep.com"},
+			DNSNames:     []string{"test.smallstep.com"},
+			KeyUsage:     x509.KeyUsageDigitalSignature,
+			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			PublicKey:    testSigner.Public(),
+			SerialNumber: big.NewInt(1234),
+		},
+		Lifetime: time.Hour, Backdate: time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("SoftCAS.CreateCertificate() error = %v", err)
+	}
+	if cert.Certificate.SignatureAlgorithm != x509.SHA256WithRSAPSS {
+		t.Errorf("Certificate.SignatureAlgorithm = %v, want %v", iss.SignatureAlgorithm, x509.SHA256WithRSAPSS)
+	}
+
+	pool := x509.NewCertPool()
+	pool.AddCert(iss)
+	if _, err = cert.Certificate.Verify(x509.VerifyOptions{
+		CurrentTime: time.Now(),
+		Roots:       pool,
+		KeyUsages:   []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+	}); err != nil {
+		t.Errorf("Certificate.Verify() error = %v", err)
 	}
 }
 

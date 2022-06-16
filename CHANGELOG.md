@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Changed
+- Certificates signed by an issuer using an RSA key will use the same algorithm
+  and not default to PKCS #1. For example, if the issuer certificate uses
+  x509.SHA256WithRSAPSS, the signed certificate will also be signed using
+  x509.SHA256WithRSAPSS.
+
 ## [0.20.0] - 2022-05-26
 ### Added
 - Added Kubernetes auth method for Vault RAs.
