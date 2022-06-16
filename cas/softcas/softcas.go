@@ -3,6 +3,7 @@ package softcas
 import (
 	"context"
 	"crypto"
+	"crypto/rsa"
 	"crypto/x509"
 	"time"
 
@@ -244,6 +245,8 @@ func createCertificate(template, parent *x509.Certificate, pub crypto.PublicKey,
 	if template.SignatureAlgorithm == 0 {
 		if sa, ok := signer.(apiv1.SignatureAlgorithmGetter); ok {
 			template.SignatureAlgorithm = sa.SignatureAlgorithm()
+		} else if _, ok := parent.PublicKey.(*rsa.PublicKey); ok {
+			template.SignatureAlgorithm = parent.SignatureAlgorithm
 		}
 	}
 	return x509util.CreateCertificate(template, parent, pub, signer)
