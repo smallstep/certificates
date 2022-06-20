@@ -573,7 +573,7 @@ func (a *Authority) init() error {
 		}
 		if len(provs) == 0 && !strings.EqualFold(a.config.AuthorityConfig.DeploymentType, "linked") {
 			// Create First Provisioner
-			prov, err := CreateFirstProvisioner(ctx, a.adminDB, string(a.password))
+			prov, subject, err := CreateFirstProvisioner(ctx, a.adminDB, string(a.password))
 			if err != nil {
 				return admin.WrapErrorISE(err, "error creating first provisioner")
 			}
@@ -581,7 +581,7 @@ func (a *Authority) init() error {
 			// Create first admin
 			if err := a.adminDB.CreateAdmin(ctx, &linkedca.Admin{
 				ProvisionerId: prov.Id,
-				Subject:       "step",
+				Subject:       subject,
 				Type:          linkedca.Admin_SUPER_ADMIN,
 			}); err != nil {
 				return admin.WrapErrorISE(err, "error creating first admin")

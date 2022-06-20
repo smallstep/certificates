@@ -290,27 +290,33 @@ func (a *Authority) RemoveProvisioner(ctx context.Context, id string) error {
 
 // CreateFirstProvisioner creates and stores the first provisioner when using
 // admin database provisioner storage.
-func CreateFirstProvisioner(ctx context.Context, adminDB admin.DB, password string) (*linkedca.Provisioner, error) {
+func CreateFirstProvisioner(ctx context.Context, adminDB admin.DB, password string) (*linkedca.Provisioner, string, error) {
+
+	subject, err := ui.Prompt("Please enter admin name/subject for first provisioner", ui.WithValidateNotEmpty())
+	if err != nil {
+		return nil, "", err
+	}
+
 	if password == "" {
 		pass, err := ui.PromptPasswordGenerate("Please enter the password to encrypt your first provisioner, leave empty and we'll generate one")
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		password = string(pass)
 	}
 
 	jwk, jwe, err := jose.GenerateDefaultKeyPair([]byte(password))
 	if err != nil {
-		return nil, admin.WrapErrorISE(err, "error generating JWK key pair")
+		return nil, "", admin.WrapErrorISE(err, "error generating JWK key pair")
 	}
 
 	jwkPubBytes, err := jwk.MarshalJSON()
 	if err != nil {
-		return nil, admin.WrapErrorISE(err, "error marshaling JWK")
+		return nil, "", admin.WrapErrorISE(err, "error marshaling JWK")
 	}
 	jwePrivStr, err := jwe.CompactSerialize()
 	if err != nil {
-		return nil, admin.WrapErrorISE(err, "error serializing JWE")
+		return nil, "", admin.WrapErrorISE(err, "error serializing JWE")
 	}
 
 	p := &linkedca.Provisioner{
@@ -333,10 +339,11 @@ func CreateFirstProvisioner(ctx context.Context, adminDB admin.DB, password stri
 			},
 		},
 	}
+
 	if err := adminDB.CreateProvisioner(ctx, p); err != nil {
-		return nil, admin.WrapErrorISE(err, "error creating provisioner")
+		return nil, "", admin.WrapErrorISE(err, "error creating provisioner")
 	}
-	return p, nil
+	return p, subject, nil
 }
 
 // ValidateClaims validates the Claims type.
