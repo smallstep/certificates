@@ -326,6 +326,15 @@ type AttestationObject struct {
 // TODO(bweeks): move attestation verification to a shared package.
 // TODO(bweeks): define new error type for failed attestation validation.
 func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
+	// TODO(bweeks): investigate if the iOS implementation allows for proper
+	// platform detection.
+	{
+		var p ApplePayload
+		if err := json.Unmarshal(payload, &p); err == nil {
+			return appleAttest01Validate(ctx, ch, db, jwk, payload)
+		}
+	}
+
 	var p Payload
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return WrapErrorISE(err, "error unmarshalling JSON")
@@ -432,7 +441,10 @@ func appleAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.
 		return WrapErrorISE(err, "error unmarshalling JSON")
 	}
 
-	fmt.Fprintf(os.Stderr, "p.AttObj: %v\n", p.AttObj)
+	if p.Error != "" {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"payload contained error: %v", p.Error))
+	}
 
 	attObj, err := base64.RawURLEncoding.DecodeString(p.AttObj)
 	if err != nil {
@@ -453,6 +465,11 @@ func appleAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.
 	if !x509present {
 		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement,
 			"x5c not present"))
+	}
+
+	if len(x5c) == 0 {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"x5c is empty"))
 	}
 
 	attCertBytes, valid := x5c[0].([]byte)
