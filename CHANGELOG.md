@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+### TEMPLATE -- do not alter or remove
+---
+## [x.y.z] - aaaa-bb-cc
+### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+### Security
+---
+
 ## [Unreleased]
 ### Changed
 - Certificates signed by an issuer using an RSA key will be signed using the same algorithm as the issuer certificate was signed with. The signature will no longer default to PKCS #1. For example, if the issuer certificate was signed using RSA-PSS with SHA-256, a new certificate will also be signed using RSA-PSS with SHA-256.
