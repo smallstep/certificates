@@ -8,18 +8,21 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestHandler_GetProvisioner(t *testing.T) {
@@ -47,6 +50,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 				ctx:        ctx,
 				req:        req,
 				auth:       auth,
+				adminDB:    &admin.MockDB{},
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    admin.ErrorServerInternalType.String(),
@@ -71,6 +75,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 				ctx:        ctx,
 				req:        req,
 				auth:       auth,
+				adminDB:    &admin.MockDB{},
 				statusCode: 500,
 				err: &admin.Error{
 					Type:    admin.ErrorServerInternalType.String(),
@@ -153,13 +158,11 @@ func TestHandler_GetProvisioner(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth:    tc.auth,
-				adminDB: tc.adminDB,
-			}
-			req := tc.req.WithContext(tc.ctx)
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
+			req := tc.req.WithContext(ctx)
 			w := httptest.NewRecorder()
-			h.GetProvisioner(w, req)
+			GetProvisioner(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -277,12 +280,10 @@ func TestHandler_GetProvisioners(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := tc.req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetProvisioners(w, req)
+			GetProvisioners(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -335,12 +336,12 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 			return test{
 				ctx:        context.Background(),
 				body:       body,
-				statusCode: 500,
-				err: &admin.Error{ // TODO(hs): this probably needs a better error
-					Type:    "",
-					Status:  500,
-					Detail:  "",
-					Message: "",
+				statusCode: 400,
+				err: &admin.Error{
+					Type:    "badRequest",
+					Status:  400,
+					Detail:  "bad request",
+					Message: "proto: syntax error (line 1:2): invalid value !",
 				},
 			}
 		},
@@ -402,13 +403,11 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.CreateProvisioner(w, req)
+			CreateProvisioner(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -423,9 +422,15 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &adminErr))
 
 				assert.Equals(t, tc.err.Type, adminErr.Type)
-				assert.Equals(t, tc.err.Message, adminErr.Message)
 				assert.Equals(t, tc.err.Detail, adminErr.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+				if strings.HasPrefix(tc.err.Message, "proto:") {
+					assert.True(t, strings.Contains(adminErr.Message, "syntax error"))
+				} else {
+					assert.Equals(t, tc.err.Message, adminErr.Message)
+				}
+
 				return
 			}
 
@@ -562,12 +567,10 @@ func TestHandler_DeleteProvisioner(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := tc.req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.DeleteProvisioner(w, req)
+			DeleteProvisioner(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -616,12 +619,13 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			return test{
 				ctx:        context.Background(),
 				body:       body,
-				statusCode: 500,
-				err: &admin.Error{ // TODO(hs): this probably needs a better error
-					Type:    "",
-					Status:  500,
-					Detail:  "",
-					Message: "",
+				adminDB:    &admin.MockDB{},
+				statusCode: 400,
+				err: &admin.Error{
+					Type:    "badRequest",
+					Status:  400,
+					Detail:  "bad request",
+					Message: "proto: syntax error (line 1:2): invalid value !",
 				},
 			}
 		},
@@ -645,6 +649,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				body:       body,
+				adminDB:    &admin.MockDB{},
 				auth:       auth,
 				statusCode: 500,
 				err: &admin.Error{
@@ -1052,14 +1057,12 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth:    tc.auth,
-				adminDB: tc.adminDB,
-			}
+			mockMustAuthority(t, tc.auth)
+			ctx := admin.NewContext(tc.ctx, tc.adminDB)
 			req := httptest.NewRequest("POST", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
-			req = req.WithContext(tc.ctx)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
-			h.UpdateProvisioner(w, req)
+			UpdateProvisioner(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -1074,9 +1077,15 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &adminErr))
 
 				assert.Equals(t, tc.err.Type, adminErr.Type)
-				assert.Equals(t, tc.err.Message, adminErr.Message)
 				assert.Equals(t, tc.err.Detail, adminErr.Detail)
 				assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
+
+				if strings.HasPrefix(tc.err.Message, "proto:") {
+					assert.True(t, strings.Contains(adminErr.Message, "syntax error"))
+				} else {
+					assert.Equals(t, tc.err.Message, adminErr.Message)
+				}
+
 				return
 			}
 

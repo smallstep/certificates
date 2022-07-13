@@ -32,7 +32,9 @@ func init() {
 var now = time.Now
 
 // The actual regular expression that matches a certificate authority is:
-//   ^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z0-9-]+/caPools/[a-zA-Z0-9-_]+/certificateAuthorities/[a-zA-Z0-9-_]+$
+//
+//	^projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z0-9-]+/caPools/[a-zA-Z0-9-_]+/certificateAuthorities/[a-zA-Z0-9-_]+$
+//
 // But we will allow a more flexible one to fail if this changes.
 var caRegexp = regexp.MustCompile("^projects/[^/]+/locations/[^/]+/caPools/[^/]+/certificateAuthorities/[^/]+$")
 

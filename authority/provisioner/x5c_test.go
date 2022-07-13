@@ -468,9 +468,10 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
-						assert.Equals(t, len(opts), 7)
+						assert.Equals(t, 9, len(opts))
 						for _, o := range opts {
 							switch v := o.(type) {
+							case *X5C:
 							case certificateOptionsFunc:
 							case *provisionerExtensionOption:
 								assert.Equals(t, v.Type, TypeX5C)
@@ -479,7 +480,6 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 								assert.Len(t, 0, v.KeyValuePairs)
 							case profileLimitDuration:
 								assert.Equals(t, v.def, tc.p.ctl.Claimer.DefaultTLSCertDuration())
-
 								claims, err := tc.p.authorizeToken(tc.token, tc.p.ctl.Audiences.Sign)
 								assert.FatalError(t, err)
 								assert.Equals(t, v.notAfter, claims.chains[0][0].NotAfter)
@@ -491,6 +491,8 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 							case *validityValidator:
 								assert.Equals(t, v.min, tc.p.ctl.Claimer.MinTLSCertDuration())
 								assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
+							case *x509NamePolicyValidator:
+								assert.Equals(t, nil, v.policyEngine)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
@@ -767,6 +769,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 						nw := now()
 						for _, o := range opts {
 							switch v := o.(type) {
+							case Interface:
 							case sshCertOptionsValidator:
 								tc.claims.Step.SSH.ValidAfter.t = time.Time{}
 								tc.claims.Step.SSH.ValidBefore.t = time.Time{}
@@ -787,6 +790,9 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 								assert.Equals(t, v.NotAfter, x5cCerts[0].NotAfter)
 							case *sshCertValidityValidator:
 								assert.Equals(t, v.Claimer, tc.p.ctl.Claimer)
+							case *sshNamePolicyValidator:
+								assert.Equals(t, nil, v.userPolicyEngine)
+								assert.Equals(t, nil, v.hostPolicyEngine)
 							case *sshDefaultPublicKeyValidator, *sshCertDefaultValidator, sshCertificateOptionsFunc:
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
@@ -794,9 +800,9 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 							tot++
 						}
 						if len(tc.claims.Step.SSH.CertType) > 0 {
-							assert.Equals(t, tot, 9)
+							assert.Equals(t, tot, 11)
 						} else {
-							assert.Equals(t, tot, 7)
+							assert.Equals(t, tot, 9)
 						}
 					}
 				}

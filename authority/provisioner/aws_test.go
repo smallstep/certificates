@@ -642,11 +642,11 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1, "foo.local"}, 6, http.StatusOK, false},
-		{"ok", p2, args{t2, "instance-id"}, 10, http.StatusOK, false},
-		{"ok", p2, args{t2Hostname, "ip-127-0-0-1.us-west-1.compute.internal"}, 10, http.StatusOK, false},
-		{"ok", p2, args{t2PrivateIP, "127.0.0.1"}, 10, http.StatusOK, false},
-		{"ok", p1, args{t4, "instance-id"}, 6, http.StatusOK, false},
+		{"ok", p1, args{t1, "foo.local"}, 8, http.StatusOK, false},
+		{"ok", p2, args{t2, "instance-id"}, 12, http.StatusOK, false},
+		{"ok", p2, args{t2Hostname, "ip-127-0-0-1.us-west-1.compute.internal"}, 12, http.StatusOK, false},
+		{"ok", p2, args{t2PrivateIP, "127.0.0.1"}, 12, http.StatusOK, false},
+		{"ok", p1, args{t4, "instance-id"}, 8, http.StatusOK, false},
 		{"fail account", p3, args{token: t3}, 0, http.StatusUnauthorized, true},
 		{"fail token", p1, args{token: "token"}, 0, http.StatusUnauthorized, true},
 		{"fail subject", p1, args{token: failSubject}, 0, http.StatusUnauthorized, true},
@@ -673,9 +673,10 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			default:
-				assert.Len(t, tt.wantLen, got)
+				assert.Equals(t, tt.wantLen, len(got))
 				for _, o := range got {
 					switch v := o.(type) {
+					case *AWS:
 					case certificateOptionsFunc:
 					case *provisionerExtensionOption:
 						assert.Equals(t, v.Type, TypeAWS)
@@ -698,6 +699,8 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, v, nil)
 					case dnsNamesValidator:
 						assert.Equals(t, []string(v), []string{"ip-127-0-0-1.us-west-1.compute.internal"})
+					case *x509NamePolicyValidator:
+						assert.Equals(t, nil, v.policyEngine)
 					default:
 						assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 					}
@@ -810,7 +813,6 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 			} else if assert.NotNil(t, got) {
 				cert, err := signSSHCertificate(tt.args.key, tt.args.sshOpts, got, signer.Key.(crypto.Signer))
 				if (err != nil) != tt.wantSignErr {
-
 					t.Errorf("SignSSH error = %v, wantSignErr %v", err, tt.wantSignErr)
 				} else {
 					if tt.wantSignErr {

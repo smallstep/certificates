@@ -13,10 +13,16 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/authority/admin"
 	adminDBNosql "github.com/smallstep/certificates/authority/admin/db/nosql"
 	"github.com/smallstep/certificates/authority/administrator"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
@@ -27,9 +33,6 @@ import (
 	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/nosql"
-	"go.step.sm/crypto/pemutil"
-	"go.step.sm/linkedca"
-	"golang.org/x/crypto/ssh"
 )
 
 // Authority implements the Certificate Authority internal interface.
@@ -81,9 +84,16 @@ type Authority struct {
 	authorizeRenewFunc    provisioner.AuthorizeRenewFunc
 	authorizeSSHRenewFunc provisioner.AuthorizeSSHRenewFunc
 
+	// Policy engines
+	policyEngine *policy.Engine
+
 	adminMutex sync.RWMutex
+
+	// Do Not initialize the authority
+	skipInit bool
 }
 
+// Info contains information about the authority.
 type Info struct {
 	StartTime          time.Time
 	RootX509Certs      []*x509.Certificate
@@ -111,9 +121,11 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		}
 	}
 
-	// Initialize authority from options or configuration.
-	if err := a.init(); err != nil {
-		return nil, err
+	if !a.skipInit {
+		// Initialize authority from options or configuration.
+		if err := a.init(); err != nil {
+			return nil, err
+		}
 	}
 
 	return a, nil
@@ -149,16 +161,41 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	// Initialize config required fields.
 	a.config.Init()
 
-	// Initialize authority from options or configuration.
-	if err := a.init(); err != nil {
-		return nil, err
+	if !a.skipInit {
+		// Initialize authority from options or configuration.
+		if err := a.init(); err != nil {
+			return nil, err
+		}
 	}
 
 	return a, nil
 }
 
-// reloadAdminResources reloads admins and provisioners from the DB.
-func (a *Authority) reloadAdminResources(ctx context.Context) error {
+type authorityKey struct{}
+
+// NewContext adds the given authority to the context.
+func NewContext(ctx context.Context, a *Authority) context.Context {
+	return context.WithValue(ctx, authorityKey{}, a)
+}
+
+// FromContext returns the current authority from the given context.
+func FromContext(ctx context.Context) (a *Authority, ok bool) {
+	a, ok = ctx.Value(authorityKey{}).(*Authority)
+	return
+}
+
+// MustFromContext returns the current authority from the given context. It will
+// panic if the authority is not in the context.
+func MustFromContext(ctx context.Context) *Authority {
+	if a, ok := FromContext(ctx); !ok {
+		panic("authority is not in the context")
+	} else {
+		return a
+	}
+}
+
+// ReloadAdminResources reloads admins and provisioners from the DB.
+func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 	var (
 		provList  provisioner.List
 		adminList []*linkedca.Admin
@@ -213,6 +250,7 @@ func (a *Authority) reloadAdminResources(ctx context.Context) error {
 	a.provisioners = provClxn
 	a.config.AuthorityConfig.Admins = adminList
 	a.admins = adminClxn
+
 	return nil
 }
 
@@ -224,6 +262,7 @@ func (a *Authority) init() error {
 	}
 
 	var err error
+	ctx := NewContext(context.Background(), a)
 
 	// Set password if they are not set.
 	var configPassword []byte
@@ -259,10 +298,25 @@ func (a *Authority) init() error {
 		if a.config.KMS != nil {
 			options = *a.config.KMS
 		}
-		a.keyManager, err = kms.New(context.Background(), options)
+		a.keyManager, err = kms.New(ctx, options)
 		if err != nil {
 			return err
 		}
+	}
+
+	// Initialize linkedca client if necessary. On a linked RA, the issuer
+	// configuration might come from majordomo.
+	var linkedcaClient *linkedCaClient
+	if a.config.AuthorityConfig.EnableAdmin && a.linkedCAToken != "" && a.adminDB == nil {
+		linkedcaClient, err = newLinkedCAClient(a.linkedCAToken)
+		if err != nil {
+			return err
+		}
+		// If authorityId is configured make sure it matches the one in the token
+		if id := a.config.AuthorityConfig.AuthorityID; id != "" && !strings.EqualFold(id, linkedcaClient.authorityID) {
+			return errors.New("error initializing linkedca: token authority and configured authority do not match")
+		}
+		linkedcaClient.Run()
 	}
 
 	// Initialize the X.509 CA Service if it has not been set in the options.
@@ -270,6 +324,22 @@ func (a *Authority) init() error {
 		var options casapi.Options
 		if a.config.AuthorityConfig.Options != nil {
 			options = *a.config.AuthorityConfig.Options
+		}
+
+		// Configure linked RA
+		if linkedcaClient != nil && options.CertificateAuthority == "" {
+			conf, err := linkedcaClient.GetConfiguration(ctx)
+			if err != nil {
+				return err
+			}
+			if conf.RaConfig != nil {
+				options.CertificateAuthority = conf.RaConfig.CaUrl
+				options.CertificateAuthorityFingerprint = conf.RaConfig.Fingerprint
+				options.CertificateIssuer = &casapi.CertificateIssuer{
+					Type:        conf.RaConfig.Provisioner.Type.String(),
+					Provisioner: conf.RaConfig.Provisioner.Name,
+				}
+			}
 		}
 
 		// Set the issuer password if passed in the flags.
@@ -292,7 +362,7 @@ func (a *Authority) init() error {
 			}
 		}
 
-		a.x509CAService, err = cas.New(context.Background(), options)
+		a.x509CAService, err = cas.New(ctx, options)
 		if err != nil {
 			return err
 		}
@@ -479,7 +549,7 @@ func (a *Authority) init() error {
 			}
 		}
 
-		a.scepService, err = scep.NewService(context.Background(), options)
+		a.scepService, err = scep.NewService(ctx, options)
 		if err != nil {
 			return err
 		}
@@ -491,40 +561,29 @@ func (a *Authority) init() error {
 		// Initialize step-ca Admin Database if it's not already initialized using
 		// WithAdminDB.
 		if a.adminDB == nil {
-			if a.linkedCAToken == "" {
-				// Check if AuthConfig already exists
+			if linkedcaClient != nil {
+				a.adminDB = linkedcaClient
+			} else {
 				a.adminDB, err = adminDBNosql.New(a.db.(nosql.DB), admin.DefaultAuthorityID)
 				if err != nil {
 					return err
 				}
-			} else {
-				// Use the linkedca client as the admindb.
-				client, err := newLinkedCAClient(a.linkedCAToken)
-				if err != nil {
-					return err
-				}
-				// If authorityId is configured make sure it matches the one in the token
-				if id := a.config.AuthorityConfig.AuthorityID; id != "" && !strings.EqualFold(id, client.authorityID) {
-					return errors.New("error initializing linkedca: token authority and configured authority do not match")
-				}
-				client.Run()
-				a.adminDB = client
 			}
 		}
 
-		provs, err := a.adminDB.GetProvisioners(context.Background())
+		provs, err := a.adminDB.GetProvisioners(ctx)
 		if err != nil {
 			return admin.WrapErrorISE(err, "error loading provisioners to initialize authority")
 		}
 		if len(provs) == 0 && !strings.EqualFold(a.config.AuthorityConfig.DeploymentType, "linked") {
 			// Create First Provisioner
-			prov, err := CreateFirstProvisioner(context.Background(), a.adminDB, string(a.password))
+			prov, err := CreateFirstProvisioner(ctx, a.adminDB, string(a.password))
 			if err != nil {
 				return admin.WrapErrorISE(err, "error creating first provisioner")
 			}
 
 			// Create first admin
-			if err := a.adminDB.CreateAdmin(context.Background(), &linkedca.Admin{
+			if err := a.adminDB.CreateAdmin(ctx, &linkedca.Admin{
 				ProvisionerId: prov.Id,
 				Subject:       "step",
 				Type:          linkedca.Admin_SUPER_ADMIN,
@@ -535,7 +594,12 @@ func (a *Authority) init() error {
 	}
 
 	// Load Provisioners and Admins
-	if err := a.reloadAdminResources(context.Background()); err != nil {
+	if err := a.ReloadAdminResources(ctx); err != nil {
+		return err
+	}
+
+	// Load x509 and SSH Policy Engines
+	if err := a.reloadPolicyEngines(ctx); err != nil {
 		return err
 	}
 
@@ -570,6 +634,15 @@ func (a *Authority) init() error {
 	return nil
 }
 
+// GetID returns the define authority id or a zero uuid.
+func (a *Authority) GetID() string {
+	const zeroUUID = "00000000-0000-0000-0000-000000000000"
+	if id := a.config.AuthorityConfig.AuthorityID; id != "" {
+		return id
+	}
+	return zeroUUID
+}
+
 // GetDatabase returns the authority database. If the configuration does not
 // define a database, GetDatabase will return a db.SimpleDB instance.
 func (a *Authority) GetDatabase() db.AuthDB {
@@ -581,6 +654,12 @@ func (a *Authority) GetAdminDatabase() admin.DB {
 	return a.adminDB
 }
 
+// GetConfig returns the config.
+func (a *Authority) GetConfig() *config.Config {
+	return a.config
+}
+
+// GetInfo returns information about the authority.
 func (a *Authority) GetInfo() Info {
 	ai := Info{
 		StartTime:     a.startTime,

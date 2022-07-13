@@ -268,6 +268,7 @@ func TestOrder_UpdateStatus(t *testing.T) {
 
 type mockSignAuth struct {
 	sign                  func(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	areSANsAllowed        func(ctx context.Context, sans []string) error
 	loadProvisionerByName func(string) (provisioner.Interface, error)
 	ret1, ret2            interface{}
 	err                   error
@@ -280,6 +281,13 @@ func (m *mockSignAuth) Sign(csr *x509.CertificateRequest, signOpts provisioner.S
 		return nil, m.err
 	}
 	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
+}
+
+func (m *mockSignAuth) AreSANsAllowed(ctx context.Context, sans []string) error {
+	if m.areSANsAllowed != nil {
+		return m.areSANsAllowed(ctx, sans)
+	}
+	return m.err
 }
 
 func (m *mockSignAuth) LoadProvisionerByName(name string) (provisioner.Interface, error) {

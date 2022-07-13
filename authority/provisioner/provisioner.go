@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
 	"golang.org/x/crypto/ssh"
 )
@@ -212,8 +211,6 @@ type Config struct {
 	Claims Claims
 	// Audiences are the audiences used in the default provisioner, (JWK).
 	Audiences Audiences
-	// DB is the interface to the authority DB client.
-	DB db.AuthDB
 	// SSHKeys are the root SSH public keys
 	SSHKeys *SSHKeys
 	// GetIdentityFunc is a function that returns an identity that will be

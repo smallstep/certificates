@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,18 +13,23 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	adminAPI "github.com/smallstep/certificates/authority/admin/api"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/errs"
+	"google.golang.org/protobuf/encoding/protojson"
+
 	"go.step.sm/cli-utils/token"
 	"go.step.sm/cli-utils/token/provision"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/linkedca"
-	"google.golang.org/protobuf/encoding/protojson"
+
+	adminAPI "github.com/smallstep/certificates/authority/admin/api"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/errs"
 )
 
-var adminURLPrefix = "admin"
+const (
+	adminURLPrefix = "admin"
+	adminIssuer    = "step-admin-client/1.0"
+)
 
 // AdminClient implements an HTTP client for the CA server.
 type AdminClient struct {
@@ -35,7 +41,6 @@ type AdminClient struct {
 	x5cCertFile string
 	x5cCertStrs []string
 	x5cCert     *x509.Certificate
-	x5cIssuer   string
 	x5cSubject  string
 }
 
@@ -77,24 +82,30 @@ func NewAdminClient(endpoint string, opts ...ClientOption) (*AdminClient, error)
 		x5cCertFile: o.x5cCertFile,
 		x5cCertStrs: o.x5cCertStrs,
 		x5cCert:     o.x5cCert,
-		x5cIssuer:   o.x5cIssuer,
 		x5cSubject:  o.x5cSubject,
 	}, nil
 }
 
-func (c *AdminClient) generateAdminToken(urlPath string) (string, error) {
+func (c *AdminClient) generateAdminToken(aud *url.URL) (string, error) {
 	// A random jwt id will be used to identify duplicated tokens
 	jwtID, err := randutil.Hex(64) // 256 bits
 	if err != nil {
 		return "", err
 	}
 
+	// Drop any query string parameter from the token audience
+	aud = &url.URL{
+		Scheme: aud.Scheme,
+		Host:   aud.Host,
+		Path:   aud.Path,
+	}
+
 	now := time.Now()
 	tokOptions := []token.Options{
 		token.WithJWTID(jwtID),
 		token.WithKid(c.x5cJWK.KeyID),
-		token.WithIssuer(c.x5cIssuer),
-		token.WithAudience(urlPath),
+		token.WithIssuer(adminIssuer),
+		token.WithAudience(aud.String()),
 		token.WithValidity(now, now.Add(token.DefaultValidity)),
 		token.WithX5CCerts(c.x5cCertStrs),
 	}
@@ -205,7 +216,7 @@ func (c *AdminClient) GetAdminsPaginate(opts ...AdminOption) (*adminAPI.GetAdmin
 		Path:     "/admin/admins",
 		RawQuery: o.rawQuery(),
 	})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -260,7 +271,7 @@ func (c *AdminClient) CreateAdmin(createAdminRequest *adminAPI.CreateAdminReques
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/admin/admins"})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -292,7 +303,7 @@ retry:
 func (c *AdminClient) RemoveAdmin(id string) error {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "admins", id)})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")
 	}
@@ -324,7 +335,7 @@ func (c *AdminClient) UpdateAdmin(id string, uar *adminAPI.UpdateAdminRequest) (
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "admins", id)})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -355,23 +366,23 @@ retry:
 // GetProvisioner performs the GET /admin/provisioners/{name} request to the CA.
 func (c *AdminClient) GetProvisioner(opts ...ProvisionerOption) (*linkedca.Provisioner, error) {
 	var retried bool
-	o := new(provisionerOptions)
-	if err := o.apply(opts); err != nil {
+	o := new(ProvisionerOptions)
+	if err := o.Apply(opts); err != nil {
 		return nil, err
 	}
 	var u *url.URL
 	switch {
-	case len(o.id) > 0:
+	case o.ID != "":
 		u = c.endpoint.ResolveReference(&url.URL{
 			Path:     "/admin/provisioners/id",
 			RawQuery: o.rawQuery(),
 		})
-	case len(o.name) > 0:
-		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.name)})
+	case o.Name != "":
+		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.Name)})
 	default:
 		return nil, errors.New("must set either name or id in method options")
 	}
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -402,15 +413,15 @@ retry:
 // GetProvisionersPaginate performs the GET /admin/provisioners request to the CA.
 func (c *AdminClient) GetProvisionersPaginate(opts ...ProvisionerOption) (*adminAPI.GetProvisionersResponse, error) {
 	var retried bool
-	o := new(provisionerOptions)
-	if err := o.apply(opts); err != nil {
+	o := new(ProvisionerOptions)
+	if err := o.Apply(opts); err != nil {
 		return nil, err
 	}
 	u := c.endpoint.ResolveReference(&url.URL{
 		Path:     "/admin/provisioners",
 		RawQuery: o.rawQuery(),
 	})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -464,23 +475,23 @@ func (c *AdminClient) RemoveProvisioner(opts ...ProvisionerOption) error {
 		retried bool
 	)
 
-	o := new(provisionerOptions)
-	if err := o.apply(opts); err != nil {
+	o := new(ProvisionerOptions)
+	if err := o.Apply(opts); err != nil {
 		return err
 	}
 
 	switch {
-	case len(o.id) > 0:
+	case o.ID != "":
 		u = c.endpoint.ResolveReference(&url.URL{
 			Path:     path.Join(adminURLPrefix, "provisioners/id"),
 			RawQuery: o.rawQuery(),
 		})
-	case len(o.name) > 0:
-		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.name)})
+	case o.Name != "":
+		u = c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", o.Name)})
 	default:
 		return errors.New("must set either name or id in method options")
 	}
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")
 	}
@@ -512,7 +523,7 @@ func (c *AdminClient) CreateProvisioner(prov *linkedca.Provisioner) (*linkedca.P
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners")})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -548,7 +559,7 @@ func (c *AdminClient) UpdateProvisioner(name string, prov *linkedca.Provisioner)
 		return errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", name)})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")
 	}
@@ -587,7 +598,7 @@ func (c *AdminClient) GetExternalAccountKeysPaginate(provisionerName, reference 
 		Path:     p,
 		RawQuery: o.rawQuery(),
 	})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -623,7 +634,7 @@ func (c *AdminClient) CreateExternalAccountKey(provisionerName string, eakReques
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab/", provisionerName)})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error generating admin token")
 	}
@@ -655,7 +666,7 @@ retry:
 func (c *AdminClient) RemoveExternalAccountKey(provisionerName, keyID string) error {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "acme/eab", provisionerName, "/", keyID)})
-	tok, err := c.generateAdminToken(u.Path)
+	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return errors.Wrapf(err, "error generating admin token")
 	}
@@ -668,6 +679,418 @@ retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return errors.Wrapf(err, "client DELETE %s failed", u)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return readAdminError(resp.Body)
+	}
+	return nil
+}
+
+func (c *AdminClient) GetAuthorityPolicy() (*linkedca.Policy, error) {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodGet, u.String(), http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("creating GET %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client GET %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) CreateAuthorityPolicy(p *linkedca.Policy) (*linkedca.Policy, error) {
+	var retried bool
+	body, err := protojson.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating POST %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client POST %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) UpdateAuthorityPolicy(p *linkedca.Policy) (*linkedca.Policy, error) {
+	var retried bool
+	body, err := protojson.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPut, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating PUT %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client PUT %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) RemoveAuthorityPolicy() error {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "policy")})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodDelete, u.String(), http.NoBody)
+	if err != nil {
+		return fmt.Errorf("creating DELETE %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("client DELETE %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return readAdminError(resp.Body)
+	}
+	return nil
+}
+
+func (c *AdminClient) GetProvisionerPolicy(provisionerName string) (*linkedca.Policy, error) {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "policy")})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodGet, u.String(), http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("creating GET %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client GET %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) CreateProvisionerPolicy(provisionerName string, p *linkedca.Policy) (*linkedca.Policy, error) {
+	var retried bool
+	body, err := protojson.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "policy")})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating POST %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client POST %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) UpdateProvisionerPolicy(provisionerName string, p *linkedca.Policy) (*linkedca.Policy, error) {
+	var retried bool
+	body, err := protojson.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "policy")})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPut, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating PUT %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client PUT %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) RemoveProvisionerPolicy(provisionerName string) error {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "policy")})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodDelete, u.String(), http.NoBody)
+	if err != nil {
+		return fmt.Errorf("creating DELETE %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("client DELETE %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return readAdminError(resp.Body)
+	}
+	return nil
+}
+
+func (c *AdminClient) GetACMEPolicy(provisionerName, reference, keyID string) (*linkedca.Policy, error) {
+	var retried bool
+	var urlPath string
+	switch {
+	case keyID != "":
+		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "key", keyID)
+	default:
+		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "reference", reference)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: urlPath})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodGet, u.String(), http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("creating GET %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client GET %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) CreateACMEPolicy(provisionerName, reference, keyID string, p *linkedca.Policy) (*linkedca.Policy, error) {
+	var retried bool
+	body, err := protojson.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+	var urlPath string
+	switch {
+	case keyID != "":
+		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "key", keyID)
+	default:
+		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "reference", reference)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: urlPath})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating POST %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client POST %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) UpdateACMEPolicy(provisionerName, reference, keyID string, p *linkedca.Policy) (*linkedca.Policy, error) {
+	var retried bool
+	body, err := protojson.Marshal(p)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+	var urlPath string
+	switch {
+	case keyID != "":
+		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "key", keyID)
+	default:
+		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "reference", reference)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: urlPath})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodPut, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating PUT %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client PUT %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var policy = new(linkedca.Policy)
+	if err := readProtoJSON(resp.Body, policy); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return policy, nil
+}
+
+func (c *AdminClient) RemoveACMEPolicy(provisionerName, reference, keyID string) error {
+	var retried bool
+	var urlPath string
+	switch {
+	case keyID != "":
+		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "key", keyID)
+	default:
+		urlPath = path.Join(adminURLPrefix, "acme", "policy", provisionerName, "reference", reference)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: urlPath})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return fmt.Errorf("error generating admin token: %w", err)
+	}
+	req, err := http.NewRequest(http.MethodDelete, u.String(), http.NoBody)
+	if err != nil {
+		return fmt.Errorf("creating DELETE %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("client DELETE %s failed: %w", u, err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {

@@ -39,7 +39,7 @@ type SSHRekeyResponse struct {
 // SSHRekey is an HTTP handler that reads an RekeySSHRequest with a one-time-token
 // (ott) from the body and creates a new SSH certificate with the information in
 // the request.
-func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
+func SSHRekey(w http.ResponseWriter, r *http.Request) {
 	var body SSHRekeyRequest
 	if err := read.JSON(r.Body, &body); err != nil {
 		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
@@ -59,7 +59,10 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRekeyMethod)
-	signOpts, err := h.Authority.Authorize(ctx, body.OTT)
+	ctx = provisioner.NewContextWithToken(ctx, body.OTT)
+
+	a := mustAuthority(ctx)
+	signOpts, err := a.Authorize(ctx, body.OTT)
 	if err != nil {
 		render.Error(w, errs.UnauthorizedErr(err))
 		return
@@ -70,7 +73,7 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newCert, err := h.Authority.RekeySSH(ctx, oldCert, publicKey, signOpts...)
+	newCert, err := a.RekeySSH(ctx, oldCert, publicKey, signOpts...)
 	if err != nil {
 		render.Error(w, errs.ForbiddenErr(err, "error rekeying ssh certificate"))
 		return
@@ -80,7 +83,7 @@ func (h *caHandler) SSHRekey(w http.ResponseWriter, r *http.Request) {
 	notBefore := time.Unix(int64(oldCert.ValidAfter), 0)
 	notAfter := time.Unix(int64(oldCert.ValidBefore), 0)
 
-	identity, err := h.renewIdentityCertificate(r, notBefore, notAfter)
+	identity, err := renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
 		render.Error(w, errs.ForbiddenErr(err, "error renewing identity certificate"))
 		return

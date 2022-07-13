@@ -15,15 +15,19 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/db"
+	"golang.org/x/crypto/ssh"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/tlsutil"
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
-	"golang.org/x/crypto/ssh"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+
+	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 )
 
 const uuidPattern = "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
@@ -33,6 +37,9 @@ type linkedCaClient struct {
 	client      linkedca.MajordomoClient
 	authorityID string
 }
+
+// interface guard
+var _ admin.DB = (*linkedCaClient)(nil)
 
 type linkedCAClaims struct {
 	jose.Claims
@@ -115,6 +122,13 @@ func newLinkedCAClient(token string) (*linkedCaClient, error) {
 	}, nil
 }
 
+// IsLinkedCA is a sentinel function that can be used to
+// check if a linkedCaClient is the underlying type of an
+// admin.DB interface.
+func (c *linkedCaClient) IsLinkedCA() bool {
+	return true
+}
+
 func (c *linkedCaClient) Run() {
 	c.renewer.Run()
 }
@@ -151,13 +165,21 @@ func (c *linkedCaClient) GetProvisioner(ctx context.Context, id string) (*linked
 }
 
 func (c *linkedCaClient) GetProvisioners(ctx context.Context) ([]*linkedca.Provisioner, error) {
+	resp, err := c.GetConfiguration(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Provisioners, nil
+}
+
+func (c *linkedCaClient) GetConfiguration(ctx context.Context) (*linkedca.ConfigurationResponse, error) {
 	resp, err := c.client.GetConfiguration(ctx, &linkedca.ConfigurationRequest{
 		AuthorityId: c.authorityID,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "error getting provisioners")
+		return nil, errors.Wrap(err, "error getting configuration")
 	}
-	return resp.Provisioners, nil
+	return resp, nil
 }
 
 func (c *linkedCaClient) UpdateProvisioner(ctx context.Context, prov *linkedca.Provisioner) error {
@@ -204,11 +226,9 @@ func (c *linkedCaClient) GetAdmin(ctx context.Context, id string) (*linkedca.Adm
 }
 
 func (c *linkedCaClient) GetAdmins(ctx context.Context) ([]*linkedca.Admin, error) {
-	resp, err := c.client.GetConfiguration(ctx, &linkedca.ConfigurationRequest{
-		AuthorityId: c.authorityID,
-	})
+	resp, err := c.GetConfiguration(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "error getting admins")
+		return nil, err
 	}
 	return resp.Admins, nil
 }
@@ -228,12 +248,35 @@ func (c *linkedCaClient) DeleteAdmin(ctx context.Context, id string) error {
 	return errors.Wrap(err, "error deleting admin")
 }
 
-func (c *linkedCaClient) StoreCertificateChain(fullchain ...*x509.Certificate) error {
+func (c *linkedCaClient) GetCertificateData(serial string) (*db.CertificateData, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	resp, err := c.client.GetCertificate(ctx, &linkedca.GetCertificateRequest{
+		Serial: serial,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var pd *db.ProvisionerData
+	if p := resp.Provisioner; p != nil {
+		pd = &db.ProvisionerData{
+			ID: p.Id, Name: p.Name, Type: p.Type.String(),
+		}
+	}
+	return &db.CertificateData{
+		Provisioner: pd,
+	}, nil
+}
+
+func (c *linkedCaClient) StoreCertificateChain(p provisioner.Interface, fullchain ...*x509.Certificate) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err := c.client.PostCertificate(ctx, &linkedca.CertificateRequest{
 		PemCertificate:      serializeCertificateChain(fullchain[0]),
 		PemCertificateChain: serializeCertificateChain(fullchain[1:]...),
+		Provisioner:         createProvisionerIdentity(p),
 	})
 	return errors.Wrap(err, "error posting certificate")
 }
@@ -246,16 +289,28 @@ func (c *linkedCaClient) StoreRenewedCertificate(parent *x509.Certificate, fullc
 		PemCertificateChain:  serializeCertificateChain(fullchain[1:]...),
 		PemParentCertificate: serializeCertificateChain(parent),
 	})
-	return errors.Wrap(err, "error posting certificate")
+	return errors.Wrap(err, "error posting renewed certificate")
 }
 
-func (c *linkedCaClient) StoreSSHCertificate(crt *ssh.Certificate) error {
+func (c *linkedCaClient) StoreSSHCertificate(p provisioner.Interface, crt *ssh.Certificate) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_, err := c.client.PostSSHCertificate(ctx, &linkedca.SSHCertificateRequest{
 		Certificate: string(ssh.MarshalAuthorizedKey(crt)),
+		Provisioner: createProvisionerIdentity(p),
 	})
 	return errors.Wrap(err, "error posting ssh certificate")
+}
+
+func (c *linkedCaClient) StoreRenewedSSHCertificate(p provisioner.Interface, parent, crt *ssh.Certificate) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_, err := c.client.PostSSHCertificate(ctx, &linkedca.SSHCertificateRequest{
+		Certificate:       string(ssh.MarshalAuthorizedKey(crt)),
+		ParentCertificate: string(ssh.MarshalAuthorizedKey(parent)),
+		Provisioner:       createProvisionerIdentity(p),
+	})
+	return errors.Wrap(err, "error posting renewed ssh certificate")
 }
 
 func (c *linkedCaClient) Revoke(crt *x509.Certificate, rci *db.RevokedCertificateInfo) error {
@@ -308,6 +363,33 @@ func (c *linkedCaClient) IsSSHRevoked(serial string) (bool, error) {
 		return false, errors.Wrap(err, "error getting certificate status")
 	}
 	return resp.Status != linkedca.RevocationStatus_ACTIVE, nil
+}
+
+func (c *linkedCaClient) CreateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+	return errors.New("not implemented yet")
+}
+
+func (c *linkedCaClient) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
+	return nil, errors.New("not implemented yet")
+}
+
+func (c *linkedCaClient) UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+	return errors.New("not implemented yet")
+}
+
+func (c *linkedCaClient) DeleteAuthorityPolicy(ctx context.Context) error {
+	return errors.New("not implemented yet")
+}
+
+func createProvisionerIdentity(p provisioner.Interface) *linkedca.ProvisionerIdentity {
+	if p == nil {
+		return nil
+	}
+	return &linkedca.ProvisionerIdentity{
+		Id:   p.GetID(),
+		Type: linkedca.Provisioner_Type(p.GetType()),
+		Name: p.GetName(),
+	}
 }
 
 func serializeCertificate(crt *x509.Certificate) string {

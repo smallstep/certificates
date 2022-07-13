@@ -114,7 +114,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeToken: error parsing token"),
+				err:   errors.New("error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -133,7 +133,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: token issued before the bootstrap of certificate authority"),
+				err:   errors.New("token issued before the bootstrap of certificate authority"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -155,7 +155,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: provisioner not found or invalid audience (https://example.com/revoke)"),
+				err:   errors.New("provisioner not found or invalid audience (https://example.com/revoke)"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -192,7 +192,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  _a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: token already used"),
+				err:   errors.New("token already used"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -227,7 +227,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  _a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: token already used"),
+				err:   errors.New("token already used"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -275,7 +275,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  _a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: failed when attempting to store token: force"),
+				err:   errors.New("failed when attempting to store token: force"),
 				code:  http.StatusInternalServerError,
 			}
 		},
@@ -300,7 +300,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			return &authorizeTest{
 				auth:  _a,
 				token: raw,
-				err:   errors.New("authority.authorizeToken: token already used"),
+				err:   errors.New("token already used"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -353,7 +353,7 @@ func TestAuthority_authorizeRevoke(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeRevoke: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeRevoke: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -437,7 +437,7 @@ func TestAuthority_authorizeSign(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeSign: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeSign: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -491,7 +491,7 @@ func TestAuthority_authorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Len(t, 7, got)
+					assert.Equals(t, 9, len(got)) // number of provisioner.SignOptions returned
 				}
 			}
 		})
@@ -524,7 +524,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   context.Background(),
-				err:   errors.New("authority.Authorize: authority.authorizeSign: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSign: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -533,7 +533,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeSign: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSign: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -559,7 +559,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.RevokeMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeRevoke: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeRevoke: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -585,7 +585,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.SSHSignMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeSSHSign: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSSHSign: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -615,7 +615,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.SSHRenewMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeSSHRenew: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSSHRenew: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -659,7 +659,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.SSHRevokeMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeSSHRevoke: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSSHRevoke: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -685,7 +685,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				auth:  a,
 				token: "foo",
 				ctx:   provisioner.NewContextWithMethod(context.Background(), provisioner.SSHRekeyMethod),
-				err:   errors.New("authority.Authorize: authority.authorizeSSHRekey: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.Authorize: authority.authorizeSSHRekey: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -847,6 +847,29 @@ func TestAuthority_authorizeRenew(t *testing.T) {
 				cert: fooCrt,
 			}
 		},
+		"ok/from db": func(t *testing.T) *authorizeTest {
+			a := testAuthority(t)
+			a.db = &db.MockAuthDB{
+				MIsRevoked: func(key string) (bool, error) {
+					return false, nil
+				},
+				MGetCertificateData: func(serialNumber string) (*db.CertificateData, error) {
+					p, ok := a.provisioners.LoadByName("step-cli")
+					if !ok {
+						t.Fatal("provisioner step-cli not found")
+					}
+					return &db.CertificateData{
+						Provisioner: &db.ProvisionerData{
+							ID: p.GetID(),
+						},
+					}, nil
+				},
+			}
+			return &authorizeTest{
+				auth: a,
+				cert: fooCrt,
+			}
+		},
 	}
 
 	for name, genTestCase := range tests {
@@ -965,7 +988,7 @@ func TestAuthority_authorizeSSHSign(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeSSHSign: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeSSHSign: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -1011,7 +1034,7 @@ func TestAuthority_authorizeSSHSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Len(t, 7, got)
+					assert.Len(t, 9, got) // number of provisioner.SignOptions returned
 				}
 			}
 		})
@@ -1059,7 +1082,7 @@ func TestAuthority_authorizeSSHRenew(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeSSHRenew: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeSSHRenew: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -1167,7 +1190,7 @@ func TestAuthority_authorizeSSHRevoke(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeSSHRevoke: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeSSHRevoke: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -1259,7 +1282,7 @@ func TestAuthority_authorizeSSHRekey(t *testing.T) {
 			return &authorizeTest{
 				auth:  a,
 				token: "foo",
-				err:   errors.New("authority.authorizeSSHRekey: authority.authorizeToken: error parsing token"),
+				err:   errors.New("authority.authorizeSSHRekey: error parsing token"),
 				code:  http.StatusUnauthorized,
 			}
 		},
@@ -1322,7 +1345,7 @@ func TestAuthority_authorizeSSHRekey(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, tc.cert.Serial, cert.Serial)
-					assert.Len(t, 3, signOpts)
+					assert.Len(t, 4, signOpts)
 				}
 			}
 		})
@@ -1381,7 +1404,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	t1, c1 := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1400,7 +1423,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	t2, c2 := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 		IssuedAt:  jose.NewNumericDate(now),
@@ -1417,10 +1440,29 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 		})
 		return nil
 	}))
-	badSigner, _ := generateX5cToken(a1, otherSigner, jose.Claims{
+	t3, c3 := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
 		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	badSigner, _ := generateX5cToken(a1, otherSigner, jose.Claims{
+		Audience:  []string{"https://example.com/1.0/renew"},
+		Subject:   "test.example.com",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1439,7 +1481,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badProvisioner, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1477,7 +1519,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badSubject, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "bad-subject",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1496,7 +1538,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badNotBefore, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now.Add(5 * time.Minute)),
 		Expiry:    jose.NewNumericDate(now.Add(10 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1515,7 +1557,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badExpiry, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now.Add(-5 * time.Minute)),
 		Expiry:    jose.NewNumericDate(now.Add(-time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1534,7 +1576,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badIssuedAt, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 		IssuedAt:  jose.NewNumericDate(now.Add(5 * time.Minute)),
@@ -1554,7 +1596,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	badAudience, _ := generateX5cToken(a1, signer, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/sign"},
 		Subject:   "test.example.com",
-		Issuer:    "step-cli",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1584,6 +1626,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	}{
 		{"ok", a1, args{ctx, t1}, c1, false},
 		{"ok expired cert", a1, args{ctx, t2}, c2, false},
+		{"ok provisioner issuer", a1, args{ctx, t3}, c3, false},
 		{"fail token", a1, args{ctx, "not.a.token"}, nil, true},
 		{"fail token reuse", a1, args{ctx, t1}, nil, true},
 		{"fail token signature", a1, args{ctx, badSigner}, nil, true},

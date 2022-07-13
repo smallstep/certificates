@@ -1,21 +1,38 @@
-package api
+package acme
 
 import (
 	"context"
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
-func TestLinker_GetUnescapedPathSuffix(t *testing.T) {
-	dns := "ca.smallstep.com"
-	prefix := "acme"
-	linker := NewLinker(dns, prefix)
+func mockProvisioner(t *testing.T) Provisioner {
+	t.Helper()
+	var defaultDisableRenewal = false
 
-	getPath := linker.GetUnescapedPathSuffix
+	// Initialize provisioners
+	p := &provisioner.ACME{
+		Type: "ACME",
+		Name: "test@acme-<test>provisioner.com",
+	}
+	if err := p.Init(provisioner.Config{Claims: provisioner.Claims{
+		MinTLSDur:      &provisioner.Duration{Duration: 5 * time.Minute},
+		MaxTLSDur:      &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:  &provisioner.Duration{Duration: 24 * time.Hour},
+		DisableRenewal: &defaultDisableRenewal,
+	}}); err != nil {
+		fmt.Printf("%v", err)
+	}
+	return p
+}
+
+func TestGetUnescapedPathSuffix(t *testing.T) {
+	getPath := GetUnescapedPathSuffix
 
 	assert.Equals(t, getPath(NewNonceLinkType, "{provisionerID}"), "/{provisionerID}/new-nonce")
 	assert.Equals(t, getPath(DirectoryLinkType, "{provisionerID}"), "/{provisionerID}/directory")
@@ -32,9 +49,9 @@ func TestLinker_GetUnescapedPathSuffix(t *testing.T) {
 }
 
 func TestLinker_DNS(t *testing.T) {
-	prov := newProv()
+	prov := mockProvisioner(t)
 	escProvName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
 	type test struct {
 		name                  string
 		dns                   string
@@ -117,19 +134,19 @@ func TestLinker_GetLink(t *testing.T) {
 	linker := NewLinker(dns, prefix)
 	id := "1234"
 
-	prov := newProv()
+	prov := mockProvisioner(t)
 	escProvName := url.PathEscape(prov.GetName())
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	ctx := context.WithValue(context.Background(), provisionerContextKey, prov)
-	ctx = context.WithValue(ctx, baseURLContextKey, baseURL)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	// No provisioner and no BaseURL from request
 	assert.Equals(t, linker.GetLink(context.Background(), NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", "https://ca.smallstep.com", ""))
 	// Provisioner: yes, BaseURL: no
-	assert.Equals(t, linker.GetLink(context.WithValue(context.Background(), provisionerContextKey, prov), NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", "https://ca.smallstep.com", escProvName))
+	assert.Equals(t, linker.GetLink(context.WithValue(context.Background(), provisionerKey{}, prov), NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", "https://ca.smallstep.com", escProvName))
 
 	// Provisioner: no, BaseURL: yes
-	assert.Equals(t, linker.GetLink(context.WithValue(context.Background(), baseURLContextKey, baseURL), NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", "https://test.ca.smallstep.com", ""))
+	assert.Equals(t, linker.GetLink(context.WithValue(context.Background(), baseURLKey{}, baseURL), NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", "https://test.ca.smallstep.com", ""))
 
 	assert.Equals(t, linker.GetLink(ctx, NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", baseURL, escProvName))
 	assert.Equals(t, linker.GetLink(ctx, NewNonceLinkType), fmt.Sprintf("%s/acme/%s/new-nonce", baseURL, escProvName))
@@ -163,37 +180,37 @@ func TestLinker_GetLink(t *testing.T) {
 
 func TestLinker_LinkOrder(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	prov := newProv()
+	prov := mockProvisioner(t)
 	provName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), baseURLContextKey, baseURL)
-	ctx = context.WithValue(ctx, provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	oid := "orderID"
 	certID := "certID"
 	linkerPrefix := "acme"
 	l := NewLinker("dns", linkerPrefix)
 	type test struct {
-		o        *acme.Order
-		validate func(o *acme.Order)
+		o        *Order
+		validate func(o *Order)
 	}
 	var tests = map[string]test{
 		"no-authz-and-no-cert": {
-			o: &acme.Order{
+			o: &Order{
 				ID: oid,
 			},
-			validate: func(o *acme.Order) {
+			validate: func(o *Order) {
 				assert.Equals(t, o.FinalizeURL, fmt.Sprintf("%s/%s/%s/order/%s/finalize", baseURL, linkerPrefix, provName, oid))
 				assert.Equals(t, o.AuthorizationURLs, []string{})
 				assert.Equals(t, o.CertificateURL, "")
 			},
 		},
 		"one-authz-and-cert": {
-			o: &acme.Order{
+			o: &Order{
 				ID:               oid,
 				CertificateID:    certID,
 				AuthorizationIDs: []string{"foo"},
 			},
-			validate: func(o *acme.Order) {
+			validate: func(o *Order) {
 				assert.Equals(t, o.FinalizeURL, fmt.Sprintf("%s/%s/%s/order/%s/finalize", baseURL, linkerPrefix, provName, oid))
 				assert.Equals(t, o.AuthorizationURLs, []string{
 					fmt.Sprintf("%s/%s/%s/authz/%s", baseURL, linkerPrefix, provName, "foo"),
@@ -202,12 +219,12 @@ func TestLinker_LinkOrder(t *testing.T) {
 			},
 		},
 		"many-authz": {
-			o: &acme.Order{
+			o: &Order{
 				ID:               oid,
 				CertificateID:    certID,
 				AuthorizationIDs: []string{"foo", "bar", "zap"},
 			},
-			validate: func(o *acme.Order) {
+			validate: func(o *Order) {
 				assert.Equals(t, o.FinalizeURL, fmt.Sprintf("%s/%s/%s/order/%s/finalize", baseURL, linkerPrefix, provName, oid))
 				assert.Equals(t, o.AuthorizationURLs, []string{
 					fmt.Sprintf("%s/%s/%s/authz/%s", baseURL, linkerPrefix, provName, "foo"),
@@ -228,24 +245,24 @@ func TestLinker_LinkOrder(t *testing.T) {
 
 func TestLinker_LinkAccount(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	prov := newProv()
+	prov := mockProvisioner(t)
 	provName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), baseURLContextKey, baseURL)
-	ctx = context.WithValue(ctx, provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	accID := "accountID"
 	linkerPrefix := "acme"
 	l := NewLinker("dns", linkerPrefix)
 	type test struct {
-		a        *acme.Account
-		validate func(o *acme.Account)
+		a        *Account
+		validate func(o *Account)
 	}
 	var tests = map[string]test{
 		"ok": {
-			a: &acme.Account{
+			a: &Account{
 				ID: accID,
 			},
-			validate: func(a *acme.Account) {
+			validate: func(a *Account) {
 				assert.Equals(t, a.OrdersURL, fmt.Sprintf("%s/%s/%s/account/%s/orders", baseURL, linkerPrefix, provName, accID))
 			},
 		},
@@ -260,25 +277,25 @@ func TestLinker_LinkAccount(t *testing.T) {
 
 func TestLinker_LinkChallenge(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	prov := newProv()
+	prov := mockProvisioner(t)
 	provName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), baseURLContextKey, baseURL)
-	ctx = context.WithValue(ctx, provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	chID := "chID"
 	azID := "azID"
 	linkerPrefix := "acme"
 	l := NewLinker("dns", linkerPrefix)
 	type test struct {
-		ch       *acme.Challenge
-		validate func(o *acme.Challenge)
+		ch       *Challenge
+		validate func(o *Challenge)
 	}
 	var tests = map[string]test{
 		"ok": {
-			ch: &acme.Challenge{
+			ch: &Challenge{
 				ID: chID,
 			},
-			validate: func(ch *acme.Challenge) {
+			validate: func(ch *Challenge) {
 				assert.Equals(t, ch.URL, fmt.Sprintf("%s/%s/%s/challenge/%s/%s", baseURL, linkerPrefix, provName, azID, ch.ID))
 			},
 		},
@@ -293,10 +310,10 @@ func TestLinker_LinkChallenge(t *testing.T) {
 
 func TestLinker_LinkAuthorization(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	prov := newProv()
+	prov := mockProvisioner(t)
 	provName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), baseURLContextKey, baseURL)
-	ctx = context.WithValue(ctx, provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	chID0 := "chID-0"
 	chID1 := "chID-1"
@@ -305,20 +322,20 @@ func TestLinker_LinkAuthorization(t *testing.T) {
 	linkerPrefix := "acme"
 	l := NewLinker("dns", linkerPrefix)
 	type test struct {
-		az       *acme.Authorization
-		validate func(o *acme.Authorization)
+		az       *Authorization
+		validate func(o *Authorization)
 	}
 	var tests = map[string]test{
 		"ok": {
-			az: &acme.Authorization{
+			az: &Authorization{
 				ID: azID,
-				Challenges: []*acme.Challenge{
+				Challenges: []*Challenge{
 					{ID: chID0},
 					{ID: chID1},
 					{ID: chID2},
 				},
 			},
-			validate: func(az *acme.Authorization) {
+			validate: func(az *Authorization) {
 				assert.Equals(t, az.Challenges[0].URL, fmt.Sprintf("%s/%s/%s/challenge/%s/%s", baseURL, linkerPrefix, provName, az.ID, chID0))
 				assert.Equals(t, az.Challenges[1].URL, fmt.Sprintf("%s/%s/%s/challenge/%s/%s", baseURL, linkerPrefix, provName, az.ID, chID1))
 				assert.Equals(t, az.Challenges[2].URL, fmt.Sprintf("%s/%s/%s/challenge/%s/%s", baseURL, linkerPrefix, provName, az.ID, chID2))
@@ -335,10 +352,10 @@ func TestLinker_LinkAuthorization(t *testing.T) {
 
 func TestLinker_LinkOrdersByAccountID(t *testing.T) {
 	baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
-	prov := newProv()
+	prov := mockProvisioner(t)
 	provName := url.PathEscape(prov.GetName())
-	ctx := context.WithValue(context.Background(), baseURLContextKey, baseURL)
-	ctx = context.WithValue(ctx, provisionerContextKey, prov)
+	ctx := NewProvisionerContext(context.Background(), prov)
+	ctx = context.WithValue(ctx, baseURLKey{}, baseURL)
 
 	linkerPrefix := "acme"
 	l := NewLinker("dns", linkerPrefix)

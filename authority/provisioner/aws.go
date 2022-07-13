@@ -17,10 +17,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 // awsIssuer is the string used as issuer in the generated tokens.
@@ -49,22 +51,27 @@ const awsMetadataTokenTTLHeader = "X-aws-ec2-metadata-token-ttl-seconds"
 // signature.
 //
 // The first certificate is used in:
-//   ap-northeast-2, ap-south-1, ap-southeast-1, ap-southeast-2
-//   eu-central-1, eu-north-1, eu-west-1, eu-west-2, eu-west-3
-//   us-east-1, us-east-2, us-west-1, us-west-2
-//   ca-central-1, sa-east-1
+//
+//	ap-northeast-2, ap-south-1, ap-southeast-1, ap-southeast-2
+//	eu-central-1, eu-north-1, eu-west-1, eu-west-2, eu-west-3
+//	us-east-1, us-east-2, us-west-1, us-west-2
+//	ca-central-1, sa-east-1
 //
 // The second certificate is used in:
-//   eu-south-1
+//
+//	eu-south-1
 //
 // The third certificate is used in:
-//   ap-east-1
+//
+//	ap-east-1
 //
 // The fourth certificate is used in:
-//   af-south-1
+//
+//	af-south-1
 //
 // The fifth certificate is used in:
-//   me-south-1
+//
+//	me-south-1
 const awsCertificate = `-----BEGIN CERTIFICATE-----
 MIIDIjCCAougAwIBAgIJAKnL4UEDMN/FMA0GCSqGSIb3DQEBBQUAMGoxCzAJBgNV
 BAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdTZWF0dGxlMRgw
@@ -421,7 +428,7 @@ func (p *AWS) Init(config Config) (err error) {
 	}
 
 	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
-	p.ctl, err = NewController(p, p.Claims, config)
+	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
@@ -467,6 +474,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	}
 
 	return append(so,
+		p,
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeAWS, p.Name, doc.AccountID, "InstanceID", doc.InstanceID),
@@ -475,6 +483,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		defaultPublicKeyValidator{},
 		commonNameValidator(payload.Claims.Subject),
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
 	), nil
 }
 
@@ -542,7 +551,7 @@ func (p *AWS) readURL(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return nil, fmt.Errorf("Request for metadata returned non-successful status code %d",
+	return nil, fmt.Errorf("request for metadata returned non-successful status code %d",
 		resp.StatusCode)
 }
 
@@ -575,7 +584,7 @@ func (p *AWS) readURLv2(url string) (*http.Response, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("Request for API token returned non-successful status code %d", resp.StatusCode)
+		return nil, fmt.Errorf("request for API token returned non-successful status code %d", resp.StatusCode)
 	}
 	token, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -743,6 +752,7 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	signOptions = append(signOptions, templateOptions)
 
 	return append(signOptions,
+		p,
 		// Validate user SignSSHOptions.
 		sshCertOptionsValidator(defaults),
 		// Set the validity bounds if not set.
@@ -753,5 +763,7 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		&sshCertValidityValidator{p.ctl.Claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
+		// Ensure that all principal names are allowed
+		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
 	), nil
 }

@@ -654,7 +654,7 @@ preferably not all - meaning it never leaves the server on which it was created.
 
 ### Passwords
 
-When you intialize your PKI (`step ca init`) the root and intermediate
+When you initialize your PKI (`step ca init`) the root and intermediate
 private keys will be encrypted with the same password. We recommend that you
 change the password with which the intermediate is encrypted at your earliest
 convenience.
@@ -681,7 +681,7 @@ to divide the root private key password across a handful of trusted parties.
 
 ### Provisioners
 
-When you intialize your PKI (`step ca init`) a default provisioner will be created
+When you initialize your PKI (`step ca init`) a default provisioner will be created
 and it's private key will be encrypted using the same password used to encrypt
 the root private key. Before deploying the Step CA you should remove this
 provisioner and add new ones that are encrypted with new, secure, random passwords.

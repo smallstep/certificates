@@ -6,10 +6,11 @@ package cloudcas
 
 import (
 	context "context"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	longrunning "google.golang.org/genproto/googleapis/longrunning"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	reflect "reflect"
 )
 
 // MockOperationsServer is a mock of OperationsServer interface

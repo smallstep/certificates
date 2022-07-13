@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/go-chi/chi"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 
@@ -31,39 +30,11 @@ func logNonce(w http.ResponseWriter, nonce string) {
 	}
 }
 
-// baseURLFromRequest determines the base URL which should be used for
-// constructing link URLs in e.g. the ACME directory result by taking the
-// request Host into consideration.
-//
-// If the Request.Host is an empty string, we return an empty string, to
-// indicate that the configured URL values should be used instead.  If this
-// function returns a non-empty result, then this should be used in
-// constructing ACME link URLs.
-func baseURLFromRequest(r *http.Request) *url.URL {
-	// NOTE: See https://github.com/letsencrypt/boulder/blob/master/web/relative.go
-	// for an implementation that allows HTTP requests using the x-forwarded-proto
-	// header.
-
-	if r.Host == "" {
-		return nil
-	}
-	return &url.URL{Scheme: "https", Host: r.Host}
-}
-
-// baseURLFromRequest is a middleware that extracts and caches the baseURL
-// from the request.
-// E.g. https://ca.smallstep.com/
-func (h *Handler) baseURLFromRequest(next nextHTTP) nextHTTP {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.WithValue(r.Context(), baseURLContextKey, baseURLFromRequest(r))
-		next(w, r.WithContext(ctx))
-	}
-}
-
 // addNonce is a middleware that adds a nonce to the response header.
-func (h *Handler) addNonce(next nextHTTP) nextHTTP {
+func addNonce(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nonce, err := h.db.CreateNonce(r.Context())
+		db := acme.MustDatabaseFromContext(r.Context())
+		nonce, err := db.CreateNonce(r.Context())
 		if err != nil {
 			render.Error(w, err)
 			return
@@ -77,25 +48,31 @@ func (h *Handler) addNonce(next nextHTTP) nextHTTP {
 
 // addDirLink is a middleware that adds a 'Link' response reader with the
 // directory index url.
-func (h *Handler) addDirLink(next nextHTTP) nextHTTP {
+func addDirLink(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Link", link(h.linker.GetLink(r.Context(), DirectoryLinkType), "index"))
+		ctx := r.Context()
+		linker := acme.MustLinkerFromContext(ctx)
+
+		w.Header().Add("Link", link(linker.GetLink(ctx, acme.DirectoryLinkType), "index"))
 		next(w, r)
 	}
 }
 
 // verifyContentType is a middleware that verifies that content type is
 // application/jose+json.
-func (h *Handler) verifyContentType(next nextHTTP) nextHTTP {
+func verifyContentType(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var expected []string
 		p, err := provisionerFromContext(r.Context())
 		if err != nil {
 			render.Error(w, err)
 			return
 		}
 
-		u := url.URL{Path: h.linker.GetUnescapedPathSuffix(CertificateLinkType, p.GetName(), "")}
+		u := &url.URL{
+			Path: acme.GetUnescapedPathSuffix(acme.CertificateLinkType, p.GetName(), ""),
+		}
+
+		var expected []string
 		if strings.Contains(r.URL.String(), u.EscapedPath()) {
 			// GET /certificate requests allow a greater range of content types.
 			expected = []string{"application/jose+json", "application/pkix-cert", "application/pkcs7-mime"}
@@ -117,7 +94,7 @@ func (h *Handler) verifyContentType(next nextHTTP) nextHTTP {
 }
 
 // parseJWS is a middleware that parses a request body into a JSONWebSignature struct.
-func (h *Handler) parseJWS(next nextHTTP) nextHTTP {
+func parseJWS(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -142,17 +119,19 @@ func (h *Handler) parseJWS(next nextHTTP) nextHTTP {
 // The JWS Unprotected Header [RFC7515] MUST NOT be used
 // The JWS Payload MUST NOT be detached
 // The JWS Protected Header MUST include the following fields:
-//   * “alg” (Algorithm)
-//     * This field MUST NOT contain “none” or a Message Authentication Code
-//       (MAC) algorithm (e.g. one in which the algorithm registry description
-//       mentions MAC/HMAC).
-//   * “nonce” (defined in Section 6.5)
-//   * “url” (defined in Section 6.4)
-//   * Either “jwk” (JSON Web Key) or “kid” (Key ID) as specified below<Paste>
-func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
+//   - “alg” (Algorithm).
+//     This field MUST NOT contain “none” or a Message Authentication Code
+//     (MAC) algorithm (e.g. one in which the algorithm registry description
+//     mentions MAC/HMAC).
+//   - “nonce” (defined in Section 6.5)
+//   - “url” (defined in Section 6.4)
+//   - Either “jwk” (JSON Web Key) or “kid” (Key ID) as specified below<Paste>
+func validateJWS(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		jws, err := jwsFromContext(r.Context())
+		db := acme.MustDatabaseFromContext(ctx)
+
+		jws, err := jwsFromContext(ctx)
 		if err != nil {
 			render.Error(w, err)
 			return
@@ -202,7 +181,7 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 		}
 
 		// Check the validity/freshness of the Nonce.
-		if err := h.db.DeleteNonce(ctx, acme.Nonce(hdr.Nonce)); err != nil {
+		if err := db.DeleteNonce(ctx, acme.Nonce(hdr.Nonce)); err != nil {
 			render.Error(w, err)
 			return
 		}
@@ -235,10 +214,12 @@ func (h *Handler) validateJWS(next nextHTTP) nextHTTP {
 // extractJWK is a middleware that extracts the JWK from the JWS and saves it
 // in the context. Make sure to parse and validate the JWS before running this
 // middleware.
-func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
+func extractJWK(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		jws, err := jwsFromContext(r.Context())
+		db := acme.MustDatabaseFromContext(ctx)
+
+		jws, err := jwsFromContext(ctx)
 		if err != nil {
 			render.Error(w, err)
 			return
@@ -264,7 +245,7 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 		ctx = context.WithValue(ctx, jwkContextKey, jwk)
 
 		// Get Account OR continue to generate a new one OR continue Revoke with certificate private key
-		acc, err := h.db.GetAccountByKeyID(ctx, jwk.KeyID)
+		acc, err := db.GetAccountByKeyID(ctx, jwk.KeyID)
 		switch {
 		case errors.Is(err, acme.ErrNotFound):
 			// For NewAccount and Revoke requests ...
@@ -283,63 +264,44 @@ func (h *Handler) extractJWK(next nextHTTP) nextHTTP {
 	}
 }
 
-// lookupProvisioner loads the provisioner associated with the request.
-// Responds 404 if the provisioner does not exist.
-func (h *Handler) lookupProvisioner(next nextHTTP) nextHTTP {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		nameEscaped := chi.URLParam(r, "provisionerID")
-		name, err := url.PathUnescape(nameEscaped)
-		if err != nil {
-			render.Error(w, acme.WrapErrorISE(err, "error url unescaping provisioner name '%s'", nameEscaped))
-			return
-		}
-		p, err := h.ca.LoadProvisionerByName(name)
-		if err != nil {
-			render.Error(w, err)
-			return
-		}
-		acmeProv, ok := p.(*provisioner.ACME)
-		if !ok {
-			render.Error(w, acme.NewError(acme.ErrorAccountDoesNotExistType, "provisioner must be of type ACME"))
-			return
-		}
-		ctx = context.WithValue(ctx, provisionerContextKey, acme.Provisioner(acmeProv))
-		next(w, r.WithContext(ctx))
-	}
-}
-
 // checkPrerequisites checks if all prerequisites for serving ACME
 // are met by the CA configuration.
-func (h *Handler) checkPrerequisites(next nextHTTP) nextHTTP {
+func checkPrerequisites(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		ok, err := h.prerequisitesChecker(ctx)
-		if err != nil {
-			render.Error(w, acme.WrapErrorISE(err, "error checking acme provisioner prerequisites"))
-			return
+		// If the function is not set assume that all prerequisites are met.
+		checkFunc, ok := acme.PrerequisitesCheckerFromContext(ctx)
+		if ok {
+			ok, err := checkFunc(ctx)
+			if err != nil {
+				render.Error(w, acme.WrapErrorISE(err, "error checking acme provisioner prerequisites"))
+				return
+			}
+			if !ok {
+				render.Error(w, acme.NewError(acme.ErrorNotImplementedType, "acme provisioner configuration lacks prerequisites"))
+				return
+			}
 		}
-		if !ok {
-			render.Error(w, acme.NewError(acme.ErrorNotImplementedType, "acme provisioner configuration lacks prerequisites"))
-			return
-		}
-		next(w, r.WithContext(ctx))
+		next(w, r)
 	}
 }
 
 // lookupJWK loads the JWK associated with the acme account referenced by the
 // kid parameter of the signed payload.
 // Make sure to parse and validate the JWS before running this middleware.
-func (h *Handler) lookupJWK(next nextHTTP) nextHTTP {
+func lookupJWK(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		db := acme.MustDatabaseFromContext(ctx)
+		linker := acme.MustLinkerFromContext(ctx)
+
 		jws, err := jwsFromContext(ctx)
 		if err != nil {
 			render.Error(w, err)
 			return
 		}
 
-		kidPrefix := h.linker.GetLink(ctx, AccountLinkType, "")
+		kidPrefix := linker.GetLink(ctx, acme.AccountLinkType, "")
 		kid := jws.Signatures[0].Protected.KeyID
 		if !strings.HasPrefix(kid, kidPrefix) {
 			render.Error(w, acme.NewError(acme.ErrorMalformedType,
@@ -349,7 +311,7 @@ func (h *Handler) lookupJWK(next nextHTTP) nextHTTP {
 		}
 
 		accID := strings.TrimPrefix(kid, kidPrefix)
-		acc, err := h.db.GetAccount(ctx, accID)
+		acc, err := db.GetAccount(ctx, accID)
 		switch {
 		case nosql.IsErrNotFound(err):
 			render.Error(w, acme.NewError(acme.ErrorAccountDoesNotExistType, "account with ID '%s' not found", accID))
@@ -372,7 +334,7 @@ func (h *Handler) lookupJWK(next nextHTTP) nextHTTP {
 
 // extractOrLookupJWK forwards handling to either extractJWK or
 // lookupJWK based on the presence of a JWK or a KID, respectively.
-func (h *Handler) extractOrLookupJWK(next nextHTTP) nextHTTP {
+func extractOrLookupJWK(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		jws, err := jwsFromContext(ctx)
@@ -385,13 +347,13 @@ func (h *Handler) extractOrLookupJWK(next nextHTTP) nextHTTP {
 		// and it can be used to check if a JWK exists. This flow is used when the ACME client
 		// signed the payload with a certificate private key.
 		if canExtractJWKFrom(jws) {
-			h.extractJWK(next)(w, r)
+			extractJWK(next)(w, r)
 			return
 		}
 
 		// default to looking up the JWK based on KeyID. This flow is used when the ACME client
 		// signed the payload with an account private key.
-		h.lookupJWK(next)(w, r)
+		lookupJWK(next)(w, r)
 	}
 }
 
@@ -408,7 +370,7 @@ func canExtractJWKFrom(jws *jose.JSONWebSignature) bool {
 
 // verifyAndExtractJWSPayload extracts the JWK from the JWS and saves it in the context.
 // Make sure to parse and validate the JWS before running this middleware.
-func (h *Handler) verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
+func verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		jws, err := jwsFromContext(ctx)
@@ -440,7 +402,7 @@ func (h *Handler) verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 }
 
 // isPostAsGet asserts that the request is a PostAsGet (empty JWS payload).
-func (h *Handler) isPostAsGet(next nextHTTP) nextHTTP {
+func isPostAsGet(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		payload, err := payloadFromContext(r.Context())
 		if err != nil {
@@ -462,16 +424,12 @@ type ContextKey string
 const (
 	// accContextKey account key
 	accContextKey = ContextKey("acc")
-	// baseURLContextKey baseURL key
-	baseURLContextKey = ContextKey("baseURL")
 	// jwsContextKey jws key
 	jwsContextKey = ContextKey("jws")
 	// jwkContextKey jwk key
 	jwkContextKey = ContextKey("jwk")
 	// payloadContextKey payload key
 	payloadContextKey = ContextKey("payload")
-	// provisionerContextKey provisioner key
-	provisionerContextKey = ContextKey("provisioner")
 )
 
 // accountFromContext searches the context for an ACME account. Returns the
@@ -482,15 +440,6 @@ func accountFromContext(ctx context.Context) (*acme.Account, error) {
 		return nil, acme.NewError(acme.ErrorAccountDoesNotExistType, "account not in context")
 	}
 	return val, nil
-}
-
-// baseURLFromContext returns the baseURL if one is stored in the context.
-func baseURLFromContext(ctx context.Context) *url.URL {
-	val, ok := ctx.Value(baseURLContextKey).(*url.URL)
-	if !ok || val == nil {
-		return nil
-	}
-	return val
 }
 
 // jwkFromContext searches the context for a JWK. Returns the JWK or an error.
@@ -514,29 +463,26 @@ func jwsFromContext(ctx context.Context) (*jose.JSONWebSignature, error) {
 // provisionerFromContext searches the context for a provisioner. Returns the
 // provisioner or an error.
 func provisionerFromContext(ctx context.Context) (acme.Provisioner, error) {
-	val := ctx.Value(provisionerContextKey)
-	if val == nil {
+	p, ok := acme.ProvisionerFromContext(ctx)
+	if !ok || p == nil {
 		return nil, acme.NewErrorISE("provisioner expected in request context")
 	}
-	pval, ok := val.(acme.Provisioner)
-	if !ok || pval == nil {
-		return nil, acme.NewErrorISE("provisioner in context is not an ACME provisioner")
-	}
-	return pval, nil
+	return p, nil
 }
 
 // acmeProvisionerFromContext searches the context for an ACME provisioner. Returns
 // pointer to an ACME provisioner or an error.
 func acmeProvisionerFromContext(ctx context.Context) (*provisioner.ACME, error) {
-	prov, err := provisionerFromContext(ctx)
+	p, err := provisionerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	acmeProv, ok := prov.(*provisioner.ACME)
-	if !ok || acmeProv == nil {
+	ap, ok := p.(*provisioner.ACME)
+	if !ok {
 		return nil, acme.NewErrorISE("provisioner in context is not an ACME provisioner")
 	}
-	return acmeProv, nil
+
+	return ap, nil
 }
 
 // payloadFromContext searches the context for a payload. Returns the payload

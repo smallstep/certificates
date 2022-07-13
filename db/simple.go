@@ -20,7 +20,7 @@ type SimpleDB struct {
 	usedTokens *sync.Map
 }
 
-func newSimpleDB(c *Config) (AuthDB, error) {
+func newSimpleDB(c *Config) (*SimpleDB, error) {
 	db := &SimpleDB{}
 	db.usedTokens = new(sync.Map)
 	return db, nil

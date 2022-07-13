@@ -112,6 +112,7 @@ func Test_createPublicKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	ecCert := mustParseCertificate(t, testLeafCertificate)
+	ecCertPublicKey := ecCert.PublicKey.(*ecdsa.PublicKey)
 	rsaCert := mustParseCertificate(t, testRSACertificate)
 	type args struct {
 		key crypto.PublicKey
@@ -132,9 +133,14 @@ func Test_createPublicKey(t *testing.T) {
 		}, false},
 		{"fail ed25519", args{edpub}, nil, true},
 		{"fail ec marshal", args{&ecdsa.PublicKey{
-			Curve: &elliptic.CurveParams{Name: "FOO", BitSize: 256},
-			X:     ecCert.PublicKey.(*ecdsa.PublicKey).X,
-			Y:     ecCert.PublicKey.(*ecdsa.PublicKey).Y,
+			Curve: &elliptic.CurveParams{
+				Name:    "FOO",
+				BitSize: 256,
+				P:       ecCertPublicKey.Params().P,
+				B:       ecCertPublicKey.Params().B,
+			},
+			X: ecCertPublicKey.X,
+			Y: ecCertPublicKey.Y,
 		}}, nil, true},
 	}
 	for _, tt := range tests {

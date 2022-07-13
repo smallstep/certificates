@@ -59,12 +59,12 @@ func newSubProv(subject, prov string) subProv {
 	return subProv{subject, prov}
 }
 
-// LoadBySubProv a admin by the subject and provisioner name.
+// LoadBySubProv loads an admin by subject and provisioner name.
 func (c *Collection) LoadBySubProv(sub, provName string) (*linkedca.Admin, bool) {
 	return loadAdmin(c.bySubProv, newSubProv(sub, provName))
 }
 
-// LoadByProvisioner a admin by the subject and provisioner name.
+// LoadByProvisioner loads admins by provisioner name.
 func (c *Collection) LoadByProvisioner(provName string) ([]*linkedca.Admin, bool) {
 	val, ok := c.byProv.Load(provName)
 	if !ok {
@@ -78,7 +78,7 @@ func (c *Collection) LoadByProvisioner(provName string) ([]*linkedca.Admin, bool
 }
 
 // Store adds an admin to the collection and enforces the uniqueness of
-// admin IDs and amdin subject <-> provisioner name combos.
+// admin IDs and admin subject <-> provisioner name combos.
 func (c *Collection) Store(adm *linkedca.Admin, prov provisioner.Interface) error {
 	// Input validation.
 	if adm.ProvisionerId != prov.GetID() {

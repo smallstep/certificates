@@ -19,7 +19,9 @@ type CommonLogFormat struct{}
 
 // Format implements the logrus.Formatter interface. It returns the given
 // logrus entry as a CLF line with the following format:
-// 	<request-id> <remote-address> <name> <user-id> <time> <duration> "<method> <path> <protocol>" <status> <size>
+//
+//	<request-id> <remote-address> <name> <user-id> <time> <duration> "<method> <path> <protocol>" <status> <size>
+//
 // If a field is not known, the hyphen symbol (-) will be used.
 func (f *CommonLogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 	data := make([]string, len(clfFields))

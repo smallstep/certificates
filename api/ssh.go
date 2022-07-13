@@ -250,7 +250,7 @@ type SSHBastionResponse struct {
 // SSHSign is an HTTP handler that reads an SignSSHRequest with a one-time-token
 // (ott) from the body and creates a new SSH certificate with the information in
 // the request.
-func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
+func SSHSign(w http.ResponseWriter, r *http.Request) {
 	var body SSHSignRequest
 	if err := read.JSON(r.Body, &body); err != nil {
 		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
@@ -288,13 +288,16 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHSignMethod)
-	signOpts, err := h.Authority.Authorize(ctx, body.OTT)
+	ctx = provisioner.NewContextWithToken(ctx, body.OTT)
+
+	a := mustAuthority(ctx)
+	signOpts, err := a.Authorize(ctx, body.OTT)
 	if err != nil {
 		render.Error(w, errs.UnauthorizedErr(err))
 		return
 	}
 
-	cert, err := h.Authority.SignSSH(ctx, publicKey, opts, signOpts...)
+	cert, err := a.SignSSH(ctx, publicKey, opts, signOpts...)
 	if err != nil {
 		render.Error(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
 		return
@@ -302,7 +305,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 
 	var addUserCertificate *SSHCertificate
 	if addUserPublicKey != nil && authority.IsValidForAddUser(cert) == nil {
-		addUserCert, err := h.Authority.SignSSHAddUser(ctx, addUserPublicKey, cert)
+		addUserCert, err := a.SignSSHAddUser(ctx, addUserPublicKey, cert)
 		if err != nil {
 			render.Error(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
 			return
@@ -315,7 +318,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 	if cr := body.IdentityCSR.CertificateRequest; cr != nil {
 		ctx := authority.NewContextWithSkipTokenReuse(r.Context())
 		ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
-		signOpts, err := h.Authority.Authorize(ctx, body.OTT)
+		signOpts, err := a.Authorize(ctx, body.OTT)
 		if err != nil {
 			render.Error(w, errs.UnauthorizedErr(err))
 			return
@@ -327,7 +330,7 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 			NotAfter:  time.Unix(int64(cert.ValidBefore), 0),
 		})
 
-		certChain, err := h.Authority.Sign(cr, provisioner.SignOptions{}, signOpts...)
+		certChain, err := a.Sign(cr, provisioner.SignOptions{}, signOpts...)
 		if err != nil {
 			render.Error(w, errs.ForbiddenErr(err, "error signing identity certificate"))
 			return
@@ -344,8 +347,9 @@ func (h *caHandler) SSHSign(w http.ResponseWriter, r *http.Request) {
 
 // SSHRoots is an HTTP handler that returns the SSH public keys for user and host
 // certificates.
-func (h *caHandler) SSHRoots(w http.ResponseWriter, r *http.Request) {
-	keys, err := h.Authority.GetSSHRoots(r.Context())
+func SSHRoots(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	keys, err := mustAuthority(ctx).GetSSHRoots(ctx)
 	if err != nil {
 		render.Error(w, errs.InternalServerErr(err))
 		return
@@ -369,8 +373,9 @@ func (h *caHandler) SSHRoots(w http.ResponseWriter, r *http.Request) {
 
 // SSHFederation is an HTTP handler that returns the federated SSH public keys
 // for user and host certificates.
-func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
-	keys, err := h.Authority.GetSSHFederation(r.Context())
+func SSHFederation(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	keys, err := mustAuthority(ctx).GetSSHFederation(ctx)
 	if err != nil {
 		render.Error(w, errs.InternalServerErr(err))
 		return
@@ -394,7 +399,7 @@ func (h *caHandler) SSHFederation(w http.ResponseWriter, r *http.Request) {
 
 // SSHConfig is an HTTP handler that returns rendered templates for ssh clients
 // and servers.
-func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
+func SSHConfig(w http.ResponseWriter, r *http.Request) {
 	var body SSHConfigRequest
 	if err := read.JSON(r.Body, &body); err != nil {
 		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
@@ -405,7 +410,8 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ts, err := h.Authority.GetSSHConfig(r.Context(), body.Type, body.Data)
+	ctx := r.Context()
+	ts, err := mustAuthority(ctx).GetSSHConfig(ctx, body.Type, body.Data)
 	if err != nil {
 		render.Error(w, errs.InternalServerErr(err))
 		return
@@ -426,7 +432,7 @@ func (h *caHandler) SSHConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 // SSHCheckHost is the HTTP handler that returns if a hosts certificate exists or not.
-func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
+func SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 	var body SSHCheckPrincipalRequest
 	if err := read.JSON(r.Body, &body); err != nil {
 		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
@@ -437,7 +443,8 @@ func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exists, err := h.Authority.CheckSSHHost(r.Context(), body.Principal, body.Token)
+	ctx := r.Context()
+	exists, err := mustAuthority(ctx).CheckSSHHost(ctx, body.Principal, body.Token)
 	if err != nil {
 		render.Error(w, errs.InternalServerErr(err))
 		return
@@ -448,13 +455,14 @@ func (h *caHandler) SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 }
 
 // SSHGetHosts is the HTTP handler that returns a list of valid ssh hosts.
-func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
+func SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 	var cert *x509.Certificate
 	if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 		cert = r.TLS.PeerCertificates[0]
 	}
 
-	hosts, err := h.Authority.GetSSHHosts(r.Context(), cert)
+	ctx := r.Context()
+	hosts, err := mustAuthority(ctx).GetSSHHosts(ctx, cert)
 	if err != nil {
 		render.Error(w, errs.InternalServerErr(err))
 		return
@@ -465,7 +473,7 @@ func (h *caHandler) SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 }
 
 // SSHBastion provides returns the bastion configured if any.
-func (h *caHandler) SSHBastion(w http.ResponseWriter, r *http.Request) {
+func SSHBastion(w http.ResponseWriter, r *http.Request) {
 	var body SSHBastionRequest
 	if err := read.JSON(r.Body, &body); err != nil {
 		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
@@ -476,7 +484,8 @@ func (h *caHandler) SSHBastion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bastion, err := h.Authority.GetSSHBastion(r.Context(), body.User, body.Hostname)
+	ctx := r.Context()
+	bastion, err := mustAuthority(ctx).GetSSHBastion(ctx, body.User, body.Hostname)
 	if err != nil {
 		render.Error(w, errs.InternalServerErr(err))
 		return

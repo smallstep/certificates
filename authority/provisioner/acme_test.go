@@ -176,9 +176,10 @@ func TestACME_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) && assert.NotNil(t, opts) {
-					assert.Len(t, 5, opts)
+					assert.Equals(t, 7, len(opts)) // number of SignOptions returned
 					for _, o := range opts {
 						switch v := o.(type) {
+						case *ACME:
 						case *provisionerExtensionOption:
 							assert.Equals(t, v.Type, TypeACME)
 							assert.Equals(t, v.Name, tc.p.GetName())
@@ -192,6 +193,8 @@ func TestACME_AuthorizeSign(t *testing.T) {
 						case *validityValidator:
 							assert.Equals(t, v.min, tc.p.ctl.Claimer.MinTLSCertDuration())
 							assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
+						case *x509NamePolicyValidator:
+							assert.Equals(t, nil, v.policyEngine)
 						default:
 							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}

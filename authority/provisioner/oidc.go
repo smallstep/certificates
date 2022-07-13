@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 // openIDConfiguration contains the necessary properties in the
@@ -195,7 +197,7 @@ func (o *OIDC) Init(config Config) (err error) {
 		return err
 	}
 
-	o.ctl, err = NewController(o, o.Claims, config)
+	o.ctl, err = NewController(o, o.Claims, config, o.Options)
 	return
 }
 
@@ -345,6 +347,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	}
 
 	return []SignOption{
+		o,
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
@@ -352,6 +355,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(o.ctl.Claimer.MinTLSCertDuration(), o.ctl.Claimer.MaxTLSCertDuration()),
+		newX509NamePolicyValidator(o.ctl.getPolicy().getX509()),
 	}, nil
 }
 
@@ -430,6 +434,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	}
 
 	return append(signOptions,
+		o,
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{o.ctl.Claimer},
 		// Validate public key
@@ -438,6 +443,8 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		&sshCertValidityValidator{o.ctl.Claimer},
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
+		// Ensure that all principal names are allowed
+		newSSHNamePolicyValidator(o.ctl.getPolicy().getSSHHost(), o.ctl.getPolicy().getSSHUser()),
 	), nil
 }
 

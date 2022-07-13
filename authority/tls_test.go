@@ -27,6 +27,7 @@ import (
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas/softcas"
 	"github.com/smallstep/certificates/db"
@@ -511,6 +512,39 @@ ZYtQ9Ot36qc=
 				code:      http.StatusForbidden,
 			}
 		},
+		"fail with policy": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			aa := testAuthority(t)
+			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			aa.db = &db.MockAuthDB{
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					fmt.Println(crt.Subject)
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					return nil
+				},
+			}
+			options := &policy.Options{
+				X509: &policy.X509PolicyOptions{
+					DeniedNames: &policy.X509NameOptions{
+						DNSDomains: []string{"test.smallstep.com"},
+					},
+				},
+			}
+			engine, err := policy.New(options)
+			assert.FatalError(t, err)
+			aa.policyEngine = engine
+			return &signTest{
+				auth:            aa,
+				csr:             csr,
+				extraOpts:       extraOpts,
+				signOpts:        signOpts,
+				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
+				extensionsCount: 6,
+				err:             errors.New("authority not allowed to sign"),
+				code:            http.StatusForbidden,
+			}
+		},
 		"ok": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			_a := testAuthority(t)
@@ -651,6 +685,38 @@ ZYtQ9Ot36qc=
 				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
 				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
 				extensionsCount: 7,
+			}
+		},
+		"ok with policy": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			aa := testAuthority(t)
+			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			aa.db = &db.MockAuthDB{
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					fmt.Println(crt.Subject)
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					return nil
+				},
+			}
+			options := &policy.Options{
+				X509: &policy.X509PolicyOptions{
+					AllowedNames: &policy.X509NameOptions{
+						CommonNames: []string{"smallstep test"},
+						DNSDomains:  []string{"*.smallstep.com"},
+					},
+				},
+			}
+			engine, err := policy.New(options)
+			assert.FatalError(t, err)
+			aa.policyEngine = engine
+			return &signTest{
+				auth:            aa,
+				csr:             csr,
+				extraOpts:       extraOpts,
+				signOpts:        signOpts,
+				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
+				extensionsCount: 6,
 			}
 		},
 	}
@@ -1235,8 +1301,11 @@ func TestAuthority_Revoke(t *testing.T) {
 
 	a := testAuthority(t)
 
+	tlsRevokeCtx := provisioner.NewContextWithMethod(context.Background(), provisioner.RevokeMethod)
+
 	type test struct {
 		auth            *Authority
+		ctx             context.Context
 		opts            *RevokeOptions
 		err             error
 		code            int
@@ -1246,6 +1315,7 @@ func TestAuthority_Revoke(t *testing.T) {
 		"fail/token/authorizeRevoke error": func() test {
 			return test{
 				auth: a,
+				ctx:  tlsRevokeCtx,
 				opts: &RevokeOptions{
 					OTT:        "foo",
 					Serial:     "sn",
@@ -1270,6 +1340,7 @@ func TestAuthority_Revoke(t *testing.T) {
 
 			return test{
 				auth: a,
+				ctx:  tlsRevokeCtx,
 				opts: &RevokeOptions{
 					Serial:     "sn",
 					ReasonCode: reasonCode,
@@ -1309,6 +1380,7 @@ func TestAuthority_Revoke(t *testing.T) {
 
 			return test{
 				auth: _a,
+				ctx:  tlsRevokeCtx,
 				opts: &RevokeOptions{
 					Serial:     "sn",
 					ReasonCode: reasonCode,
@@ -1348,6 +1420,7 @@ func TestAuthority_Revoke(t *testing.T) {
 
 			return test{
 				auth: _a,
+				ctx:  tlsRevokeCtx,
 				opts: &RevokeOptions{
 					Serial:     "sn",
 					ReasonCode: reasonCode,
@@ -1385,6 +1458,7 @@ func TestAuthority_Revoke(t *testing.T) {
 			assert.FatalError(t, err)
 			return test{
 				auth: _a,
+				ctx:  tlsRevokeCtx,
 				opts: &RevokeOptions{
 					Serial:     "sn",
 					ReasonCode: reasonCode,
@@ -1401,6 +1475,7 @@ func TestAuthority_Revoke(t *testing.T) {
 
 			return test{
 				auth: _a,
+				ctx:  tlsRevokeCtx,
 				opts: &RevokeOptions{
 					Crt:        crt,
 					Serial:     "102012593071130646873265215610956555026",
@@ -1425,6 +1500,7 @@ func TestAuthority_Revoke(t *testing.T) {
 
 			return test{
 				auth: _a,
+				ctx:  tlsRevokeCtx,
 				opts: &RevokeOptions{
 					Crt:        crt,
 					Serial:     "102012593071130646873265215610956555026",
@@ -1442,6 +1518,7 @@ func TestAuthority_Revoke(t *testing.T) {
 
 			return test{
 				auth: _a,
+				ctx:  tlsRevokeCtx,
 				opts: &RevokeOptions{
 					Crt:        crt,
 					Serial:     "102012593071130646873265215610956555026",
@@ -1451,12 +1528,42 @@ func TestAuthority_Revoke(t *testing.T) {
 				},
 			}
 		},
+		"ok/ssh": func() test {
+			a := testAuthority(t, WithDatabase(&db.MockAuthDB{
+				MRevoke: func(rci *db.RevokedCertificateInfo) error {
+					return errors.New("Revoke was called")
+				},
+				MRevokeSSH: func(rci *db.RevokedCertificateInfo) error {
+					return nil
+				},
+			}))
+
+			cl := jwt.Claims{
+				Subject:   "sn",
+				Issuer:    validIssuer,
+				NotBefore: jwt.NewNumericDate(now),
+				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+				ID:        "44",
+			}
+			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+			return test{
+				auth: a,
+				ctx:  provisioner.NewContextWithMethod(context.Background(), provisioner.SSHRevokeMethod),
+				opts: &RevokeOptions{
+					Serial:     "sn",
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					OTT:        raw,
+				},
+			}
+		},
 	}
 	for name, f := range tests {
 		tc := f()
 		t.Run(name, func(t *testing.T) {
-			ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.RevokeMethod)
-			if err := tc.auth.Revoke(ctx, tc.opts); err != nil {
+			if err := tc.auth.Revoke(tc.ctx, tc.opts); err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")

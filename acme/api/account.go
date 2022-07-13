@@ -67,8 +67,11 @@ func (u *UpdateAccountRequest) Validate() error {
 }
 
 // NewAccount is the handler resource for creating new ACME accounts.
-func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
+func NewAccount(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
@@ -114,7 +117,7 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		eak, err := h.validateExternalAccountBinding(ctx, &nar)
+		eak, err := validateExternalAccountBinding(ctx, &nar)
 		if err != nil {
 			render.Error(w, err)
 			return
@@ -125,18 +128,17 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 			Contact: nar.Contact,
 			Status:  acme.StatusValid,
 		}
-		if err := h.db.CreateAccount(ctx, acc); err != nil {
+		if err := db.CreateAccount(ctx, acc); err != nil {
 			render.Error(w, acme.WrapErrorISE(err, "error creating account"))
 			return
 		}
 
 		if eak != nil { // means that we have a (valid) External Account Binding key that should be bound, updated and sent in the response
-			err := eak.BindTo(acc)
-			if err != nil {
+			if err := eak.BindTo(acc); err != nil {
 				render.Error(w, err)
 				return
 			}
-			if err := h.db.UpdateExternalAccountKey(ctx, prov.ID, eak); err != nil {
+			if err := db.UpdateExternalAccountKey(ctx, prov.ID, eak); err != nil {
 				render.Error(w, acme.WrapErrorISE(err, "error updating external account binding key"))
 				return
 			}
@@ -147,15 +149,18 @@ func (h *Handler) NewAccount(w http.ResponseWriter, r *http.Request) {
 		httpStatus = http.StatusOK
 	}
 
-	h.linker.LinkAccount(ctx, acc)
+	linker.LinkAccount(ctx, acc)
 
-	w.Header().Set("Location", h.linker.GetLink(r.Context(), AccountLinkType, acc.ID))
+	w.Header().Set("Location", linker.GetLink(r.Context(), acme.AccountLinkType, acc.ID))
 	render.JSONStatus(w, acc, httpStatus)
 }
 
 // GetOrUpdateAccount is the api for updating an ACME account.
-func (h *Handler) GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
+func GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+
 	acc, err := accountFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
@@ -187,16 +192,16 @@ func (h *Handler) GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 				acc.Contact = uar.Contact
 			}
 
-			if err := h.db.UpdateAccount(ctx, acc); err != nil {
+			if err := db.UpdateAccount(ctx, acc); err != nil {
 				render.Error(w, acme.WrapErrorISE(err, "error updating account"))
 				return
 			}
 		}
 	}
 
-	h.linker.LinkAccount(ctx, acc)
+	linker.LinkAccount(ctx, acc)
 
-	w.Header().Set("Location", h.linker.GetLink(ctx, AccountLinkType, acc.ID))
+	w.Header().Set("Location", linker.GetLink(ctx, acme.AccountLinkType, acc.ID))
 	render.JSON(w, acc)
 }
 
@@ -210,8 +215,11 @@ func logOrdersByAccount(w http.ResponseWriter, oids []string) {
 }
 
 // GetOrdersByAccountID ACME api for retrieving the list of order urls belonging to an account.
-func (h *Handler) GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
+func GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+
 	acc, err := accountFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
@@ -222,13 +230,14 @@ func (h *Handler) GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType, "account ID '%s' does not match url param '%s'", acc.ID, accID))
 		return
 	}
-	orders, err := h.db.GetOrdersByAccountID(ctx, acc.ID)
+
+	orders, err := db.GetOrdersByAccountID(ctx, acc.ID)
 	if err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	h.linker.LinkOrdersByAccountID(ctx, orders)
+	linker.LinkOrdersByAccountID(ctx, orders)
 
 	render.JSON(w, orders)
 	logOrdersByAccount(w, orders)

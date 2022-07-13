@@ -38,7 +38,7 @@ func (p *noop) Init(config Config) error {
 }
 
 func (p *noop) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	return []SignOption{}, nil
+	return []SignOption{p}, nil
 }
 
 func (p *noop) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
@@ -50,7 +50,7 @@ func (p *noop) AuthorizeRevoke(ctx context.Context, token string) error {
 }
 
 func (p *noop) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
-	return []SignOption{}, nil
+	return []SignOption{p}, nil
 }
 
 func (p *noop) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {

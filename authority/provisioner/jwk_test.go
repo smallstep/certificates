@@ -297,9 +297,10 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.NotNil(t, got) {
-					assert.Len(t, 7, got)
+					assert.Equals(t, 9, len(got))
 					for _, o := range got {
 						switch v := o.(type) {
+						case *JWK:
 						case certificateOptionsFunc:
 						case *provisionerExtensionOption:
 							assert.Equals(t, v.Type, TypeJWK)
@@ -316,6 +317,8 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 							assert.Equals(t, v.max, tt.prov.ctl.Claimer.MaxTLSCertDuration())
 						case defaultSANsValidator:
 							assert.Equals(t, []string(v), tt.sans)
+						case *x509NamePolicyValidator:
+							assert.Equals(t, nil, v.policyEngine)
 						default:
 							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}

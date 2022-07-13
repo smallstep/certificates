@@ -23,29 +23,31 @@ type GetProvisionersResponse struct {
 }
 
 // GetProvisioner returns the requested provisioner, or an error.
-func (h *Handler) GetProvisioner(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	id := r.URL.Query().Get("id")
-	name := chi.URLParam(r, "name")
-
+func GetProvisioner(w http.ResponseWriter, r *http.Request) {
 	var (
 		p   provisioner.Interface
 		err error
 	)
+
+	ctx := r.Context()
+	id := r.URL.Query().Get("id")
+	name := chi.URLParam(r, "name")
+	auth := mustAuthority(ctx)
+	db := admin.MustFromContext(ctx)
+
 	if len(id) > 0 {
-		if p, err = h.auth.LoadProvisionerByID(id); err != nil {
+		if p, err = auth.LoadProvisionerByID(id); err != nil {
 			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", id))
 			return
 		}
 	} else {
-		if p, err = h.auth.LoadProvisionerByName(name); err != nil {
+		if p, err = auth.LoadProvisionerByName(name); err != nil {
 			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
 			return
 		}
 	}
 
-	prov, err := h.adminDB.GetProvisioner(ctx, p.GetID())
+	prov, err := db.GetProvisioner(ctx, p.GetID())
 	if err != nil {
 		render.Error(w, err)
 		return
@@ -54,7 +56,7 @@ func (h *Handler) GetProvisioner(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetProvisioners returns the given segment of  provisioners associated with the authority.
-func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
+func GetProvisioners(w http.ResponseWriter, r *http.Request) {
 	cursor, limit, err := api.ParseCursor(r)
 	if err != nil {
 		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err,
@@ -62,7 +64,7 @@ func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p, next, err := h.auth.GetProvisioners(cursor, limit)
+	p, next, err := mustAuthority(r.Context()).GetProvisioners(cursor, limit)
 	if err != nil {
 		render.Error(w, errs.InternalServerErr(err))
 		return
@@ -74,7 +76,7 @@ func (h *Handler) GetProvisioners(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateProvisioner creates a new prov.
-func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
+func CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 	var prov = new(linkedca.Provisioner)
 	if err := read.ProtoJSON(r.Body, prov); err != nil {
 		render.Error(w, err)
@@ -87,7 +89,7 @@ func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.auth.StoreProvisioner(r.Context(), prov); err != nil {
+	if err := mustAuthority(r.Context()).StoreProvisioner(r.Context(), prov); err != nil {
 		render.Error(w, admin.WrapErrorISE(err, "error storing provisioner %s", prov.Name))
 		return
 	}
@@ -95,27 +97,29 @@ func (h *Handler) CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteProvisioner deletes a provisioner.
-func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	name := chi.URLParam(r, "name")
-
+func DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 	var (
 		p   provisioner.Interface
 		err error
 	)
+
+	id := r.URL.Query().Get("id")
+	name := chi.URLParam(r, "name")
+	auth := mustAuthority(r.Context())
+
 	if len(id) > 0 {
-		if p, err = h.auth.LoadProvisionerByID(id); err != nil {
+		if p, err = auth.LoadProvisionerByID(id); err != nil {
 			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", id))
 			return
 		}
 	} else {
-		if p, err = h.auth.LoadProvisionerByName(name); err != nil {
+		if p, err = auth.LoadProvisionerByName(name); err != nil {
 			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
 			return
 		}
 	}
 
-	if err := h.auth.RemoveProvisioner(r.Context(), p.GetID()); err != nil {
+	if err := auth.RemoveProvisioner(r.Context(), p.GetID()); err != nil {
 		render.Error(w, admin.WrapErrorISE(err, "error removing provisioner %s", p.GetName()))
 		return
 	}
@@ -124,23 +128,27 @@ func (h *Handler) DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateProvisioner updates an existing prov.
-func (h *Handler) UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
+func UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 	var nu = new(linkedca.Provisioner)
 	if err := read.ProtoJSON(r.Body, nu); err != nil {
 		render.Error(w, err)
 		return
 	}
 
+	ctx := r.Context()
 	name := chi.URLParam(r, "name")
-	_old, err := h.auth.LoadProvisionerByName(name)
+	auth := mustAuthority(ctx)
+	db := admin.MustFromContext(ctx)
+
+	p, err := auth.LoadProvisionerByName(name)
 	if err != nil {
 		render.Error(w, admin.WrapErrorISE(err, "error loading provisioner from cached configuration '%s'", name))
 		return
 	}
 
-	old, err := h.adminDB.GetProvisioner(r.Context(), _old.GetID())
+	old, err := db.GetProvisioner(r.Context(), p.GetID())
 	if err != nil {
-		render.Error(w, admin.WrapErrorISE(err, "error loading provisioner from db '%s'", _old.GetID()))
+		render.Error(w, admin.WrapErrorISE(err, "error loading provisioner from db '%s'", p.GetID()))
 		return
 	}
 
@@ -171,7 +179,7 @@ func (h *Handler) UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.auth.UpdateProvisioner(r.Context(), nu); err != nil {
+	if err := auth.UpdateProvisioner(r.Context(), nu); err != nil {
 		render.Error(w, err)
 		return
 	}

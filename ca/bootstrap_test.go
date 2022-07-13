@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -53,7 +54,11 @@ func startCABootstrapServer() *httptest.Server {
 	if err != nil {
 		panic(err)
 	}
+	baseContext := buildContext(ca.auth, nil, nil, nil)
 	srv.Config.Handler = ca.srv.Handler
+	srv.Config.BaseContext = func(net.Listener) context.Context {
+		return baseContext
+	}
 	srv.TLS = ca.srv.TLSConfig
 	srv.StartTLS()
 	// Force the use of GetCertificate on IPs
@@ -92,6 +97,7 @@ func mTLSMiddleware(next http.Handler, nonAuthenticatedPaths ...string) http.Han
 		for _, s := range nonAuthenticatedPaths {
 			if strings.HasPrefix(r.URL.Path, s) || strings.HasPrefix(r.URL.Path, "/1.0"+s) {
 				next.ServeHTTP(w, r)
+				return
 			}
 		}
 		isMTLS := r.TLS != nil && len(r.TLS.PeerCertificates) > 0
@@ -369,6 +375,9 @@ func TestBootstrapClient(t *testing.T) {
 }
 
 func TestBootstrapClientServerRotation(t *testing.T) {
+	if os.Getenv("CI") == "true" {
+		t.Skipf("skip until we fix https://github.com/smallstep/certificates/issues/873")
+	}
 	reset := setMinCertDuration(1 * time.Second)
 	defer reset()
 

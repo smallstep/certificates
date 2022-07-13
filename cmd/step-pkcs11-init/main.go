@@ -47,6 +47,7 @@ type Config struct {
 	RootFile         string
 	KeyFile          string
 	Pin              string
+	PinFile          string
 	NoCerts          bool
 	EnableSSH        bool
 	Force            bool
@@ -74,6 +75,8 @@ func (c *Config) Validate() error {
 		return errors.New("flag `--root-gen` requires flag `--root-key-obj`")
 	case c.RootFile == "" && c.GenerateRoot && c.RootPath == "":
 		return errors.New("flag `--root-gen` requires `--root-cert-path`")
+	case c.Pin != "" && c.PinFile != "":
+		return errors.New("Only set one of pin and pin-file")
 	default:
 		if c.RootFile != "" {
 			c.GenerateRoot = false
@@ -108,6 +111,7 @@ func main() {
 	var c Config
 	flag.StringVar(&c.KMS, "kms", kmsuri, "PKCS #11 URI with the module-path and token to connect to the module.")
 	flag.StringVar(&c.Pin, "pin", "", "PKCS #11 PIN")
+	flag.StringVar(&c.PinFile, "pin-file", "", "PKCS #11 PIN File")
 	// Option 1: Generate new root
 	flag.BoolVar(&c.GenerateRoot, "root-gen", true, "Enable the generation of a root key.")
 	flag.StringVar(&c.RootSubject, "root-name", "PKCS #11 Smallstep Root", "Subject and Issuer of the root certificate.")
@@ -147,7 +151,18 @@ func main() {
 	// Initialize windows terminal
 	ui.Init()
 
-	if u.Get("pin-value") == "" && u.Get("pin-source") == "" && c.Pin == "" {
+	switch {
+	case u.Get("pin-value") != "":
+	case u.Get("pin-source") != "":
+	case c.Pin != "":
+	case c.PinFile != "":
+		content, err := os.ReadFile(c.PinFile)
+		if err != nil {
+			fatal(err)
+		}
+		c.Pin = string(content)
+
+	default:
 		pin, err := ui.PromptPassword("What is the PKCS#11 PIN?")
 		if err != nil {
 			fatal(err)

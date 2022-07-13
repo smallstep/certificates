@@ -14,11 +14,13 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type mockAdminAuthority struct {
@@ -37,6 +39,11 @@ type mockAdminAuthority struct {
 	MockLoadProvisionerByID   func(id string) (provisioner.Interface, error)
 	MockUpdateProvisioner     func(ctx context.Context, nu *linkedca.Provisioner) error
 	MockRemoveProvisioner     func(ctx context.Context, id string) error
+
+	MockGetAuthorityPolicy    func(ctx context.Context) (*linkedca.Policy, error)
+	MockCreateAuthorityPolicy func(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
+	MockUpdateAuthorityPolicy func(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
+	MockRemoveAuthorityPolicy func(ctx context.Context) error
 }
 
 func (m *mockAdminAuthority) IsAdminAPIEnabled() bool {
@@ -126,6 +133,34 @@ func (m *mockAdminAuthority) UpdateProvisioner(ctx context.Context, nu *linkedca
 func (m *mockAdminAuthority) RemoveProvisioner(ctx context.Context, id string) error {
 	if m.MockRemoveProvisioner != nil {
 		return m.MockRemoveProvisioner(ctx, id)
+	}
+	return m.MockErr
+}
+
+func (m *mockAdminAuthority) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
+	if m.MockGetAuthorityPolicy != nil {
+		return m.MockGetAuthorityPolicy(ctx)
+	}
+	return m.MockRet1.(*linkedca.Policy), m.MockErr
+}
+
+func (m *mockAdminAuthority) CreateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error) {
+	if m.MockCreateAuthorityPolicy != nil {
+		return m.MockCreateAuthorityPolicy(ctx, adm, policy)
+	}
+	return m.MockRet1.(*linkedca.Policy), m.MockErr
+}
+
+func (m *mockAdminAuthority) UpdateAuthorityPolicy(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error) {
+	if m.MockUpdateAuthorityPolicy != nil {
+		return m.MockUpdateAuthorityPolicy(ctx, adm, policy)
+	}
+	return m.MockRet1.(*linkedca.Policy), m.MockErr
+}
+
+func (m *mockAdminAuthority) RemoveAuthorityPolicy(ctx context.Context) error {
+	if m.MockRemoveAuthorityPolicy != nil {
+		return m.MockRemoveAuthorityPolicy(ctx)
 	}
 	return m.MockErr
 }
@@ -317,14 +352,11 @@ func TestHandler_GetAdmin(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
-
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("GET", "/foo", nil) // chi routing is prepared in test setup
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetAdmin(w, req)
+			GetAdmin(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -456,13 +488,10 @@ func TestHandler_GetAdmins(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
-
+			mockMustAuthority(t, tc.auth)
 			req := tc.req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.GetAdmins(w, req)
+			GetAdmins(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -640,13 +669,11 @@ func TestHandler_CreateAdmin(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("GET", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.CreateAdmin(w, req)
+			CreateAdmin(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)
@@ -732,13 +759,11 @@ func TestHandler_DeleteAdmin(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("DELETE", "/foo", nil) // chi routing is prepared in test setup
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.DeleteAdmin(w, req)
+			DeleteAdmin(w, req)
 			res := w.Result()
 			assert.Equals(t, tc.statusCode, res.StatusCode)
 
@@ -877,13 +902,11 @@ func TestHandler_UpdateAdmin(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			h := &Handler{
-				auth: tc.auth,
-			}
+			mockMustAuthority(t, tc.auth)
 			req := httptest.NewRequest("GET", "/foo", io.NopCloser(bytes.NewBuffer(tc.body)))
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
-			h.UpdateAdmin(w, req)
+			UpdateAdmin(w, req)
 			res := w.Result()
 
 			assert.Equals(t, tc.statusCode, res.StatusCode)

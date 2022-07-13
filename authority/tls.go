@@ -18,16 +18,19 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/x509util"
+
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/keyutil"
-	"go.step.sm/crypto/pemutil"
-	"go.step.sm/crypto/x509util"
-	"golang.org/x/crypto/ssh"
+	"github.com/smallstep/certificates/policy"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -91,8 +94,13 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	// Set backdate with the configured value
 	signOpts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
+	var prov provisioner.Interface
 	for _, op := range extraOpts {
 		switch k := op.(type) {
+		// Capture current provisioner
+		case provisioner.Interface:
+			prov = k
+
 		// Adds new options to NewCertificate
 		case provisioner.CertificateOptions:
 			certOptions = append(certOptions, k.Options(signOpts)...)
@@ -193,6 +201,25 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
+	// Check if authority is allowed to sign the certificate
+	if err := a.isAllowedToSignX509Certificate(leaf); err != nil {
+		var pe *policy.NamePolicyError
+		if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
+			return nil, errs.ApplyOptions(&errs.Error{
+				// NOTE: custom forbidden error, so that denied name is sent to client
+				// as well as shown in the logs.
+				Status: http.StatusForbidden,
+				Err:    fmt.Errorf("authority not allowed to sign: %w", err),
+				Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
+			}, opts...)
+		}
+		return nil, errs.InternalServerErr(err,
+			errs.WithKeyVal("csr", csr),
+			errs.WithKeyVal("signOptions", signOpts),
+			errs.WithMessage("error creating certificate"),
+		)
+	}
+
 	// Sign certificate
 	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
@@ -206,7 +233,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
-	if err = a.storeCertificate(fullchain); err != nil {
+	if err = a.storeCertificate(prov, fullchain); err != nil {
 		if err != db.ErrNotImplemented {
 			return nil, errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Sign; error storing certificate in db", opts...)
@@ -214,6 +241,18 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	return fullchain, nil
+}
+
+// isAllowedToSignX509Certificate checks if the Authority is allowed
+// to sign the X.509 certificate.
+func (a *Authority) isAllowedToSignX509Certificate(cert *x509.Certificate) error {
+	return a.policyEngine.IsX509CertificateAllowed(cert)
+}
+
+// AreSANsAllowed evaluates the provided sans against the
+// authority X.509 policy.
+func (a *Authority) AreSANsAllowed(ctx context.Context, sans []string) error {
+	return a.policyEngine.AreSANsAllowed(sans)
 }
 
 // Renew creates a new Certificate identical to the old certificate, except
@@ -327,19 +366,33 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 // TODO: at some point we should replace the db.AuthDB interface to implement
 // `StoreCertificate(...*x509.Certificate) error` instead of just
 // `StoreCertificate(*x509.Certificate) error`.
-func (a *Authority) storeCertificate(fullchain []*x509.Certificate) error {
+func (a *Authority) storeCertificate(prov provisioner.Interface, fullchain []*x509.Certificate) error {
 	type certificateChainStorer interface {
+		StoreCertificateChain(provisioner.Interface, ...*x509.Certificate) error
+	}
+	type certificateChainSimpleStorer interface {
 		StoreCertificateChain(...*x509.Certificate) error
 	}
+
 	// Store certificate in linkedca
-	if s, ok := a.adminDB.(certificateChainStorer); ok {
+	switch s := a.adminDB.(type) {
+	case certificateChainStorer:
+		return s.StoreCertificateChain(prov, fullchain...)
+	case certificateChainSimpleStorer:
 		return s.StoreCertificateChain(fullchain...)
 	}
+
 	// Store certificate in local db
-	if s, ok := a.db.(certificateChainStorer); ok {
+	switch s := a.db.(type) {
+	case certificateChainStorer:
+		return s.StoreCertificateChain(prov, fullchain...)
+	case certificateChainSimpleStorer:
 		return s.StoreCertificateChain(fullchain...)
+	case db.CertificateStorer:
+		return s.StoreCertificate(fullchain[0])
+	default:
+		return nil
 	}
-	return a.db.StoreCertificate(fullchain[0])
 }
 
 // storeRenewedCertificate allows to use an extension of the db.AuthDB interface
@@ -350,15 +403,21 @@ func (a *Authority) storeRenewedCertificate(oldCert *x509.Certificate, fullchain
 	type renewedCertificateChainStorer interface {
 		StoreRenewedCertificate(*x509.Certificate, ...*x509.Certificate) error
 	}
+
 	// Store certificate in linkedca
 	if s, ok := a.adminDB.(renewedCertificateChainStorer); ok {
 		return s.StoreRenewedCertificate(oldCert, fullchain...)
 	}
+
 	// Store certificate in local db
-	if s, ok := a.db.(renewedCertificateChainStorer); ok {
+	switch s := a.db.(type) {
+	case renewedCertificateChainStorer:
 		return s.StoreRenewedCertificate(oldCert, fullchain...)
+	case db.CertificateStorer:
+		return s.StoreCertificate(fullchain[0])
+	default:
+		return nil
 	}
-	return a.db.StoreCertificate(fullchain[0])
 }
 
 // RevokeOptions are the options for the Revoke API.
@@ -521,7 +580,7 @@ func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateIn
 	}); ok {
 		return lca.RevokeSSH(crt, rci)
 	}
-	return a.db.Revoke(rci)
+	return a.db.RevokeSSH(rci)
 }
 
 // GetCertificateRevocationList will return the currently generated CRL from the DB, or a not implemented
@@ -664,7 +723,7 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	}
 
 	// Create initial certificate request.
-	cr, err := x509util.CreateCertificateRequest("Step Online CA", sans, signer)
+	cr, err := x509util.CreateCertificateRequest(a.config.CommonName, sans, signer)
 	if err != nil {
 		return fatal(err)
 	}

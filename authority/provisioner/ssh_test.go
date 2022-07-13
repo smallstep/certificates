@@ -53,6 +53,7 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 
 	for _, op := range signOpts {
 		switch o := op.(type) {
+		case Interface:
 		// add options to NewCertificate
 		case SSHCertificateOptions:
 			certOptions = append(certOptions, o.Options(opts)...)

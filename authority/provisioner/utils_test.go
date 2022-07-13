@@ -24,22 +24,22 @@ import (
 )
 
 var (
-	defaultDisableRenewal        = false
-	defaultAllowRenewAfterExpiry = false
-	defaultEnableSSHCA           = true
-	globalProvisionerClaims      = Claims{
-		MinTLSDur:             &Duration{5 * time.Minute},
-		MaxTLSDur:             &Duration{24 * time.Hour},
-		DefaultTLSDur:         &Duration{24 * time.Hour},
-		MinUserSSHDur:         &Duration{Duration: 5 * time.Minute}, // User SSH certs
-		MaxUserSSHDur:         &Duration{Duration: 24 * time.Hour},
-		DefaultUserSSHDur:     &Duration{Duration: 16 * time.Hour},
-		MinHostSSHDur:         &Duration{Duration: 5 * time.Minute}, // Host SSH certs
-		MaxHostSSHDur:         &Duration{Duration: 30 * 24 * time.Hour},
-		DefaultHostSSHDur:     &Duration{Duration: 30 * 24 * time.Hour},
-		EnableSSHCA:           &defaultEnableSSHCA,
-		DisableRenewal:        &defaultDisableRenewal,
-		AllowRenewAfterExpiry: &defaultAllowRenewAfterExpiry,
+	defaultDisableRenewal          = false
+	defaultAllowRenewalAfterExpiry = false
+	defaultEnableSSHCA             = true
+	globalProvisionerClaims        = Claims{
+		MinTLSDur:               &Duration{5 * time.Minute},
+		MaxTLSDur:               &Duration{24 * time.Hour},
+		DefaultTLSDur:           &Duration{24 * time.Hour},
+		MinUserSSHDur:           &Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:           &Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur:       &Duration{Duration: 16 * time.Hour},
+		MinHostSSHDur:           &Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:           &Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur:       &Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:             &defaultEnableSSHCA,
+		DisableRenewal:          &defaultDisableRenewal,
+		AllowRenewalAfterExpiry: &defaultAllowRenewalAfterExpiry,
 	}
 	testAudiences = Audiences{
 		Sign:      []string{"https://ca.smallstep.com/1.0/sign", "https://ca.smallstep.com/sign"},
@@ -184,7 +184,7 @@ func generateJWK() (*JWK, error) {
 	}
 	p.ctl, err = NewController(p, p.Claims, Config{
 		Audiences: testAudiences,
-	})
+	}, nil)
 	return p, err
 }
 
@@ -219,7 +219,7 @@ func generateK8sSA(inputPubKey interface{}) (*K8sSA, error) {
 	}
 	p.ctl, err = NewController(p, p.Claims, Config{
 		Audiences: testAudiences,
-	})
+	}, nil)
 	return p, err
 }
 
@@ -256,7 +256,7 @@ func generateSSHPOP() (*SSHPOP, error) {
 	}
 	p.ctl, err = NewController(p, p.Claims, Config{
 		Audiences: testAudiences,
-	})
+	}, nil)
 	return p, err
 }
 
@@ -305,7 +305,7 @@ M46l92gdOozT
 	}
 	p.ctl, err = NewController(p, p.Claims, Config{
 		Audiences: testAudiences,
-	})
+	}, nil)
 	return p, err
 }
 
@@ -343,7 +343,7 @@ func generateOIDC() (*OIDC, error) {
 	}
 	p.ctl, err = NewController(p, p.Claims, Config{
 		Audiences: testAudiences,
-	})
+	}, nil)
 	return p, err
 }
 
@@ -373,7 +373,7 @@ func generateGCP() (*GCP, error) {
 	}
 	p.ctl, err = NewController(p, p.Claims, Config{
 		Audiences: testAudiences.WithFragment("gcp/" + name),
-	})
+	}, nil)
 	return p, err
 }
 
@@ -411,7 +411,7 @@ func generateAWS() (*AWS, error) {
 	}
 	p.ctl, err = NewController(p, p.Claims, Config{
 		Audiences: testAudiences.WithFragment("aws/" + name),
-	})
+	}, nil)
 	return p, err
 }
 
@@ -518,7 +518,7 @@ func generateAWSV1Only() (*AWS, error) {
 	}
 	p.ctl, err = NewController(p, p.Claims, Config{
 		Audiences: testAudiences.WithFragment("aws/" + name),
-	})
+	}, nil)
 	return p, err
 }
 
@@ -608,7 +608,7 @@ func generateAzure() (*Azure, error) {
 	}
 	p.ctl, err = NewController(p, p.Claims, Config{
 		Audiences: testAudiences,
-	})
+	}, nil)
 	return p, err
 }
 

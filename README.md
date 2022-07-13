@@ -54,7 +54,7 @@ Setting up a *public key infrastructure* (PKI) is out of reach for many small te
 - [Short-lived certificates](https://smallstep.com/blog/passive-revocation.html) with automated enrollment, renewal, and passive revocation
 - Capable of high availability (HA) deployment using [root federation](https://smallstep.com/blog/step-v0.8.3-federation-root-rotation.html) and/or multiple intermediaries
 - Can operate as [an online intermediate CA for an existing root CA](https://smallstep.com/docs/tutorials/intermediate-ca-new-ca)
-- [Badger, BoltDB, and MySQL database backends](https://smallstep.com/docs/step-ca/configuration#databases)
+- [Badger, BoltDB, Postgres, and MySQL database backends](https://smallstep.com/docs/step-ca/configuration#databases)
 
 ### ⚙️ Many ways to automate
 
@@ -68,6 +68,7 @@ You can issue certificates in exchange for:
 - [Cloud instance identity documents](https://smallstep.com/blog/embarrassingly-easy-certificates-on-aws-azure-gcp/), for VMs on AWS, GCP, and Azure
 - [Single-use, short-lived JWK tokens](https://smallstep.com/docs/step-ca/provisioners#jwk) issued by your CD tool — Puppet, Chef, Ansible, Terraform, etc.
 - A trusted X.509 certificate (X5C provisioner)
+- A host certificate from your Nebula network
 - A SCEP challenge (SCEP provisioner)
 - An SSH host certificates needing renewal (the SSHPOP provisioner)
 - Learn more in our [provisioner documentation](https://smallstep.com/docs/step-ca/provisioners)

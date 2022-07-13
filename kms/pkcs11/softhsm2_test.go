@@ -14,12 +14,14 @@ var softHSM2Once sync.Once
 
 // mustPKCS11 configures a *PKCS11 KMS to be used with SoftHSM2. To initialize
 // these tests, we should run:
-//   softhsm2-util --init-token --free \
-//   --token pkcs11-test --label pkcs11-test \
-//   --so-pin password --pin password
+//
+//	softhsm2-util --init-token --free \
+//	--token pkcs11-test --label pkcs11-test \
+//	--so-pin password --pin password
 //
 // To delete we should run:
-// 	softhsm2-util --delete-token --token pkcs11-test
+//
+//	softhsm2-util --delete-token --token pkcs11-test
 func mustPKCS11(t TBTesting) *PKCS11 {
 	t.Helper()
 	testModule = "SoftHSM2"

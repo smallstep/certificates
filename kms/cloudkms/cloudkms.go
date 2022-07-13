@@ -279,7 +279,8 @@ func (k *CloudKMS) createKeyRingIfNeeded(name string) error {
 
 // GetPublicKey gets from Google's Cloud KMS a public key by name. Key names
 // follow the pattern:
-//   projects/([^/]+)/locations/([a-zA-Z0-9_-]{1,63})/keyRings/([a-zA-Z0-9_-]{1,63})/cryptoKeys/([a-zA-Z0-9_-]{1,63})/cryptoKeyVersions/([a-zA-Z0-9_-]{1,63})
+//
+//	projects/([^/]+)/locations/([a-zA-Z0-9_-]{1,63})/keyRings/([a-zA-Z0-9_-]{1,63})/cryptoKeys/([a-zA-Z0-9_-]{1,63})/cryptoKeyVersions/([a-zA-Z0-9_-]{1,63})
 func (k *CloudKMS) GetPublicKey(req *apiv1.GetPublicKeyRequest) (crypto.PublicKey, error) {
 	if req.Name == "" {
 		return nil, errors.New("createKeyRequest 'name' cannot be empty")

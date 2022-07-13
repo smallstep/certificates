@@ -16,6 +16,8 @@ import (
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 // NewOrderRequest represents the body for a NewOrder request.
@@ -37,6 +39,8 @@ func (n *NewOrderRequest) Validate() error {
 		if id.Type == acme.IP && net.ParseIP(id.Value) == nil {
 			return acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", id.Value)
 		}
+		// TODO(hs): add some validations for DNS domains?
+		// TODO(hs): combine the errors from this with allow/deny policy, like example error in https://datatracker.ietf.org/doc/html/rfc8555#section-6.7.1
 	}
 	return nil
 }
@@ -50,7 +54,13 @@ type FinalizeRequest struct {
 // Validate validates a finalize request body.
 func (f *FinalizeRequest) Validate() error {
 	var err error
-	csrBytes, err := base64.RawURLEncoding.DecodeString(f.CSR)
+	// RFC 8555 isn't 100% conclusive about using raw base64-url encoding for the
+	// CSR specifically, instead of "normal" base64-url encoding (incl. padding).
+	// By trimming the padding from CSRs submitted by ACME clients that use
+	// base64-url encoding instead of raw base64-url encoding, these are also
+	// supported. This was reported in https://github.com/smallstep/certificates/issues/939
+	// to be the case for a Synology DSM NAS system.
+	csrBytes, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(f.CSR, "="))
 	if err != nil {
 		return acme.WrapError(acme.ErrorMalformedType, err, "error base64url decoding csr")
 	}
@@ -68,8 +78,12 @@ var defaultOrderExpiry = time.Hour * 24
 var defaultOrderBackdate = time.Minute
 
 // NewOrder ACME api for creating a new order.
-func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
+func NewOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	ca := mustAuthority(ctx)
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+
 	acc, err := accountFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
@@ -85,6 +99,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, err)
 		return
 	}
+
 	var nor NewOrderRequest
 	if err := json.Unmarshal(payload.value, &nor); err != nil {
 		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
@@ -95,6 +110,48 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 	if err := nor.Validate(); err != nil {
 		render.Error(w, err)
 		return
+	}
+
+	// TODO(hs): gather all errors, so that we can build one response with ACME subproblems
+	// include the nor.Validate() error here too, like in the example in the ACME RFC?
+
+	acmeProv, err := acmeProvisionerFromContext(ctx)
+	if err != nil {
+		render.Error(w, err)
+		return
+	}
+
+	var eak *acme.ExternalAccountKey
+	if acmeProv.RequireEAB {
+		if eak, err = db.GetExternalAccountKeyByAccountID(ctx, prov.GetID(), acc.ID); err != nil {
+			render.Error(w, acme.WrapErrorISE(err, "error retrieving external account binding key"))
+			return
+		}
+	}
+
+	acmePolicy, err := newACMEPolicyEngine(eak)
+	if err != nil {
+		render.Error(w, acme.WrapErrorISE(err, "error creating ACME policy engine"))
+		return
+	}
+
+	for _, identifier := range nor.Identifiers {
+		// evaluate the ACME account level policy
+		if err = isIdentifierAllowed(acmePolicy, identifier); err != nil {
+			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			return
+		}
+		// evaluate the provisioner level policy
+		orderIdentifier := provisioner.ACMEIdentifier{Type: provisioner.ACMEIdentifierType(identifier.Type), Value: identifier.Value}
+		if err = prov.AuthorizeOrderIdentifier(ctx, orderIdentifier); err != nil {
+			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			return
+		}
+		// evaluate the authority level policy
+		if err = ca.AreSANsAllowed(ctx, []string{identifier.Value}); err != nil {
+			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			return
+		}
 	}
 
 	now := clock.Now()
@@ -117,7 +174,7 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt:  o.ExpiresAt,
 			Status:     acme.StatusPending,
 		}
-		if err := h.newAuthorization(ctx, az); err != nil {
+		if err := newAuthorization(ctx, az); err != nil {
 			render.Error(w, err)
 			return
 		}
@@ -136,18 +193,32 @@ func (h *Handler) NewOrder(w http.ResponseWriter, r *http.Request) {
 		o.NotBefore = o.NotBefore.Add(-defaultOrderBackdate)
 	}
 
-	if err := h.db.CreateOrder(ctx, o); err != nil {
+	if err := db.CreateOrder(ctx, o); err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error creating order"))
 		return
 	}
 
-	h.linker.LinkOrder(ctx, o)
+	linker.LinkOrder(ctx, o)
 
-	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
+	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
 	render.JSONStatus(w, o, http.StatusCreated)
 }
 
-func (h *Handler) newAuthorization(ctx context.Context, az *acme.Authorization) error {
+func isIdentifierAllowed(acmePolicy policy.X509Policy, identifier acme.Identifier) error {
+	if acmePolicy == nil {
+		return nil
+	}
+	return acmePolicy.AreSANsAllowed([]string{identifier.Value})
+}
+
+func newACMEPolicyEngine(eak *acme.ExternalAccountKey) (policy.X509Policy, error) {
+	if eak == nil {
+		return nil, nil
+	}
+	return policy.NewX509PolicyEngine(eak.Policy)
+}
+
+func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 	if strings.HasPrefix(az.Identifier.Value, "*.") {
 		az.Wildcard = true
 		az.Identifier = acme.Identifier{
@@ -163,6 +234,8 @@ func (h *Handler) newAuthorization(ctx context.Context, az *acme.Authorization) 
 	if err != nil {
 		return acme.WrapErrorISE(err, "error generating random alphanumeric ID")
 	}
+
+	db := acme.MustDatabaseFromContext(ctx)
 	az.Challenges = make([]*acme.Challenge, len(chTypes))
 	for i, typ := range chTypes {
 		ch := &acme.Challenge{
@@ -172,20 +245,23 @@ func (h *Handler) newAuthorization(ctx context.Context, az *acme.Authorization) 
 			Token:     az.Token,
 			Status:    acme.StatusPending,
 		}
-		if err := h.db.CreateChallenge(ctx, ch); err != nil {
+		if err := db.CreateChallenge(ctx, ch); err != nil {
 			return acme.WrapErrorISE(err, "error creating challenge")
 		}
 		az.Challenges[i] = ch
 	}
-	if err = h.db.CreateAuthorization(ctx, az); err != nil {
+	if err = db.CreateAuthorization(ctx, az); err != nil {
 		return acme.WrapErrorISE(err, "error creating authorization")
 	}
 	return nil
 }
 
 // GetOrder ACME api for retrieving an order.
-func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
+func GetOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+
 	acc, err := accountFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
@@ -196,7 +272,8 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, err)
 		return
 	}
-	o, err := h.db.GetOrder(ctx, chi.URLParam(r, "ordID"))
+
+	o, err := db.GetOrder(ctx, chi.URLParam(r, "ordID"))
 	if err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error retrieving order"))
 		return
@@ -211,20 +288,23 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 			"provisioner '%s' does not own order '%s'", prov.GetID(), o.ID))
 		return
 	}
-	if err = o.UpdateStatus(ctx, h.db); err != nil {
+	if err = o.UpdateStatus(ctx, db); err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error updating order status"))
 		return
 	}
 
-	h.linker.LinkOrder(ctx, o)
+	linker.LinkOrder(ctx, o)
 
-	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
+	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
 	render.JSON(w, o)
 }
 
-// FinalizeOrder attemptst to finalize an order and create a certificate.
-func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
+// FinalizeOrder attempts to finalize an order and create a certificate.
+func FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	db := acme.MustDatabaseFromContext(ctx)
+	linker := acme.MustLinkerFromContext(ctx)
+
 	acc, err := accountFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
@@ -251,7 +331,7 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	o, err := h.db.GetOrder(ctx, chi.URLParam(r, "ordID"))
+	o, err := db.GetOrder(ctx, chi.URLParam(r, "ordID"))
 	if err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error retrieving order"))
 		return
@@ -266,14 +346,16 @@ func (h *Handler) FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 			"provisioner '%s' does not own order '%s'", prov.GetID(), o.ID))
 		return
 	}
-	if err = o.Finalize(ctx, h.db, fr.csr, h.ca, prov); err != nil {
+
+	ca := mustAuthority(ctx)
+	if err = o.Finalize(ctx, db, fr.csr, ca, prov); err != nil {
 		render.Error(w, acme.WrapErrorISE(err, "error finalizing order"))
 		return
 	}
 
-	h.linker.LinkOrder(ctx, o)
+	linker.LinkOrder(ctx, o)
 
-	w.Header().Set("Location", h.linker.GetLink(ctx, OrderLinkType, o.ID))
+	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
 	render.JSON(w, o)
 }
 

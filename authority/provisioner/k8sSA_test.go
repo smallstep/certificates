@@ -280,9 +280,9 @@ func TestK8sSA_AuthorizeSign(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
-						tot := 0
 						for _, o := range opts {
 							switch v := o.(type) {
+							case *K8sSA:
 							case certificateOptionsFunc:
 							case *provisionerExtensionOption:
 								assert.Equals(t, v.Type, TypeK8sSA)
@@ -295,12 +295,13 @@ func TestK8sSA_AuthorizeSign(t *testing.T) {
 							case *validityValidator:
 								assert.Equals(t, v.min, tc.p.ctl.Claimer.MinTLSCertDuration())
 								assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
+							case *x509NamePolicyValidator:
+								assert.Equals(t, nil, v.policyEngine)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
-							tot++
 						}
-						assert.Equals(t, tot, 5)
+						assert.Equals(t, 7, len(opts))
 					}
 				}
 			}
@@ -367,9 +368,10 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
-						tot := 0
+						assert.Len(t, 8, opts)
 						for _, o := range opts {
 							switch v := o.(type) {
+							case Interface:
 							case sshCertificateOptionsFunc:
 							case *sshCertOptionsRequireValidator:
 								assert.Equals(t, v, &sshCertOptionsRequireValidator{CertType: true, KeyID: true, Principals: true})
@@ -379,12 +381,13 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 							case *sshCertDefaultValidator:
 							case *sshDefaultDuration:
 								assert.Equals(t, v.Claimer, tc.p.ctl.Claimer)
+							case *sshNamePolicyValidator:
+								assert.Equals(t, nil, v.userPolicyEngine)
+								assert.Equals(t, nil, v.hostPolicyEngine)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
-							tot++
 						}
-						assert.Equals(t, tot, 6)
 					}
 				}
 			}

@@ -23,6 +23,7 @@ type DB interface {
 	GetExternalAccountKey(ctx context.Context, provisionerID, keyID string) (*ExternalAccountKey, error)
 	GetExternalAccountKeys(ctx context.Context, provisionerID, cursor string, limit int) ([]*ExternalAccountKey, string, error)
 	GetExternalAccountKeyByReference(ctx context.Context, provisionerID, reference string) (*ExternalAccountKey, error)
+	GetExternalAccountKeyByAccountID(ctx context.Context, provisionerID, accountID string) (*ExternalAccountKey, error)
 	DeleteExternalAccountKey(ctx context.Context, provisionerID, keyID string) error
 	UpdateExternalAccountKey(ctx context.Context, provisionerID string, eak *ExternalAccountKey) error
 
@@ -48,6 +49,29 @@ type DB interface {
 	UpdateOrder(ctx context.Context, o *Order) error
 }
 
+type dbKey struct{}
+
+// NewDatabaseContext adds the given acme database to the context.
+func NewDatabaseContext(ctx context.Context, db DB) context.Context {
+	return context.WithValue(ctx, dbKey{}, db)
+}
+
+// DatabaseFromContext returns the current acme database from the given context.
+func DatabaseFromContext(ctx context.Context) (db DB, ok bool) {
+	db, ok = ctx.Value(dbKey{}).(DB)
+	return
+}
+
+// MustDatabaseFromContext returns the current database from the given context.
+// It will panic if it's not in the context.
+func MustDatabaseFromContext(ctx context.Context) DB {
+	if db, ok := DatabaseFromContext(ctx); !ok {
+		panic("acme database is not in the context")
+	} else {
+		return db
+	}
+}
+
 // MockDB is an implementation of the DB interface that should only be used as
 // a mock in tests.
 type MockDB struct {
@@ -60,6 +84,7 @@ type MockDB struct {
 	MockGetExternalAccountKey            func(ctx context.Context, provisionerID, keyID string) (*ExternalAccountKey, error)
 	MockGetExternalAccountKeys           func(ctx context.Context, provisionerID, cursor string, limit int) ([]*ExternalAccountKey, string, error)
 	MockGetExternalAccountKeyByReference func(ctx context.Context, provisionerID, reference string) (*ExternalAccountKey, error)
+	MockGetExternalAccountKeyByAccountID func(ctx context.Context, provisionerID, accountID string) (*ExternalAccountKey, error)
 	MockDeleteExternalAccountKey         func(ctx context.Context, provisionerID, keyID string) error
 	MockUpdateExternalAccountKey         func(ctx context.Context, provisionerID string, eak *ExternalAccountKey) error
 
@@ -162,6 +187,16 @@ func (m *MockDB) GetExternalAccountKeys(ctx context.Context, provisionerID, curs
 func (m *MockDB) GetExternalAccountKeyByReference(ctx context.Context, provisionerID, reference string) (*ExternalAccountKey, error) {
 	if m.MockGetExternalAccountKeyByReference != nil {
 		return m.MockGetExternalAccountKeyByReference(ctx, provisionerID, reference)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(*ExternalAccountKey), m.MockError
+}
+
+// GetExternalAccountKeyByAccountID mock
+func (m *MockDB) GetExternalAccountKeyByAccountID(ctx context.Context, provisionerID, accountID string) (*ExternalAccountKey, error) {
+	if m.MockGetExternalAccountKeyByAccountID != nil {
+		return m.MockGetExternalAccountKeyByAccountID(ctx, provisionerID, accountID)
 	} else if m.MockError != nil {
 		return nil, m.MockError
 	}

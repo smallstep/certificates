@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -21,11 +22,16 @@ type Controller struct {
 	IdentityFunc          GetIdentityFunc
 	AuthorizeRenewFunc    AuthorizeRenewFunc
 	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
+	policy                *policyEngine
 }
 
 // NewController initializes a new provisioner controller.
-func NewController(p Interface, claims *Claims, config Config) (*Controller, error) {
+func NewController(p Interface, claims *Claims, config Config, options *Options) (*Controller, error) {
 	claimer, err := NewClaimer(claims, config.Claims)
+	if err != nil {
+		return nil, err
+	}
+	policy, err := newPolicyEngine(options)
 	if err != nil {
 		return nil, err
 	}
@@ -36,6 +42,7 @@ func NewController(p Interface, claims *Claims, config Config) (*Controller, err
 		IdentityFunc:          config.GetIdentityFunc,
 		AuthorizeRenewFunc:    config.AuthorizeRenewFunc,
 		AuthorizeSSHRenewFunc: config.AuthorizeSSHRenewFunc,
+		policy:                policy,
 	}, nil
 }
 
@@ -124,8 +131,10 @@ func DefaultAuthorizeRenew(ctx context.Context, p *Controller, cert *x509.Certif
 	if now.Before(cert.NotBefore) {
 		return errs.Unauthorized("certificate is not yet valid" + " " + now.UTC().Format(time.RFC3339Nano) + " vs " + cert.NotBefore.Format(time.RFC3339Nano))
 	}
-	if now.After(cert.NotAfter) && !p.Claimer.AllowRenewAfterExpiry() {
-		return errs.Unauthorized("certificate has expired")
+	if now.After(cert.NotAfter) && !p.Claimer.AllowRenewalAfterExpiry() {
+		// return a custom 401 Unauthorized error with a clearer message for the client
+		// TODO(hs): these errors likely need to be refactored as a whole; HTTP status codes shouldn't be in this layer.
+		return errs.New(http.StatusUnauthorized, "The request lacked necessary authorization to be completed: certificate expired on %s", cert.NotAfter)
 	}
 
 	return nil
@@ -144,7 +153,7 @@ func DefaultAuthorizeSSHRenew(ctx context.Context, p *Controller, cert *ssh.Cert
 	if after := int64(cert.ValidAfter); after < 0 || unixNow < int64(cert.ValidAfter) {
 		return errs.Unauthorized("certificate is not yet valid")
 	}
-	if before := int64(cert.ValidBefore); cert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) && !p.Claimer.AllowRenewAfterExpiry() {
+	if before := int64(cert.ValidBefore); cert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) && !p.Claimer.AllowRenewalAfterExpiry() {
 		return errs.Unauthorized("certificate has expired")
 	}
 
@@ -191,4 +200,11 @@ func SanitizeSSHUserPrincipal(email string) string {
 			return '_'
 		}
 	}, strings.ToLower(email))
+}
+
+func (c *Controller) getPolicy() *policyEngine {
+	if c == nil {
+		return nil
+	}
+	return c.policy
 }

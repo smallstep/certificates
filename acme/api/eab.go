@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/smallstep/certificates/acme"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/certificates/acme"
 )
 
 // ExternalAccountBinding represents the ACME externalAccountBinding JWS
@@ -16,7 +17,7 @@ type ExternalAccountBinding struct {
 }
 
 // validateExternalAccountBinding validates the externalAccountBinding property in a call to new-account.
-func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest) (*acme.ExternalAccountKey, error) {
+func validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest) (*acme.ExternalAccountKey, error) {
 	acmeProv, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
 		return nil, acme.WrapErrorISE(err, "could not load ACME provisioner from context")
@@ -47,7 +48,8 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 		return nil, acmeErr
 	}
 
-	externalAccountKey, err := h.db.GetExternalAccountKey(ctx, acmeProv.ID, keyID)
+	db := acme.MustDatabaseFromContext(ctx)
+	externalAccountKey, err := db.GetExternalAccountKey(ctx, acmeProv.ID, keyID)
 	if err != nil {
 		if _, ok := err.(*acme.Error); ok {
 			return nil, acme.WrapError(acme.ErrorUnauthorizedType, err, "the field 'kid' references an unknown key")
@@ -55,11 +57,19 @@ func (h *Handler) validateExternalAccountBinding(ctx context.Context, nar *NewAc
 		return nil, acme.WrapErrorISE(err, "error retrieving external account key")
 	}
 
+	if externalAccountKey == nil {
+		return nil, acme.NewError(acme.ErrorUnauthorizedType, "the field 'kid' references an unknown key")
+	}
+
+	if len(externalAccountKey.HmacKey) == 0 {
+		return nil, acme.NewError(acme.ErrorServerInternalType, "external account binding key with id '%s' does not have secret bytes", keyID)
+	}
+
 	if externalAccountKey.AlreadyBound() {
 		return nil, acme.NewError(acme.ErrorUnauthorizedType, "external account binding key with id '%s' was already bound to account '%s' on %s", keyID, externalAccountKey.AccountID, externalAccountKey.BoundAt)
 	}
 
-	payload, err := eabJWS.Verify(externalAccountKey.KeyBytes)
+	payload, err := eabJWS.Verify(externalAccountKey.HmacKey)
 	if err != nil {
 		return nil, acme.WrapErrorISE(err, "error verifying externalAccountBinding signature")
 	}
@@ -97,12 +107,12 @@ func keysAreEqual(x, y *jose.JSONWebKey) bool {
 
 // validateEABJWS verifies the contents of the External Account Binding JWS.
 // The protected header of the JWS MUST meet the following criteria:
-// 	o 	The "alg" field MUST indicate a MAC-based algorithm
-//	o  	The "kid" field MUST contain the key identifier provided by the CA
-//	o  	The "nonce" field MUST NOT be present
-//	o  	The "url" field MUST be set to the same value as the outer JWS
+//
+//   - The "alg" field MUST indicate a MAC-based algorithm
+//   - The "kid" field MUST contain the key identifier provided by the CA
+//   - The "nonce" field MUST NOT be present
+//   - The "url" field MUST be set to the same value as the outer JWS
 func validateEABJWS(ctx context.Context, jws *jose.JSONWebSignature) (string, *acme.Error) {
-
 	if jws == nil {
 		return "", acme.NewErrorISE("no JWS provided")
 	}

@@ -23,7 +23,8 @@ import (
 
 // defaultOnboardingURL is the production onboarding url, to use a development
 // url use:
-//   export STEP_CA_ONBOARDING_URL=http://localhost:3002/onboarding/
+//
+//	export STEP_CA_ONBOARDING_URL=http://localhost:3002/onboarding/
 const defaultOnboardingURL = "https://api.smallstep.com/onboarding/"
 
 type onboardingConfiguration struct {
