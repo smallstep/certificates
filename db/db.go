@@ -255,9 +255,9 @@ func (db *DB) GetRevokedCertificates() (*[]RevokedCertificateInfo, error) {
 			return nil, err
 		}
 
-		if !data.ExpiresAt.IsZero() && data.ExpiresAt.After(now) {
+		if !data.RevokedAt.IsZero() && data.RevokedAt.After(now) {
 			revokedCerts = append(revokedCerts, data)
-		} else if data.ExpiresAt.IsZero() {
+		} else if data.RevokedAt.IsZero() {
 			cert, err := db.GetCertificate(data.Serial)
 			if err != nil {
 				revokedCerts = append(revokedCerts, data) // a revoked certificate may not be in the database,

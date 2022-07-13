@@ -119,6 +119,11 @@ starting the CA.
 * `address`: e.g. `127.0.0.1:8080` - address and port on which the CA will bind
 and respond to requests.
 
+* `crl`: Certificate Revocation List settings:
+    - generate: Enable/Disable CRL generation (`true` to generate, `false` to disable)
+
+    - cacheDuration: Time between CRL regeneration task. E.g if set to `5m`, step-ca will regenerate the CRL every 5 minutes.
+
 * `dnsNames`: comma separated list of DNS Name(s) for the CA.
 
 * `logger`: the default logging format for the CA is `text`. The other option

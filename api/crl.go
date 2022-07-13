@@ -9,8 +9,8 @@ import (
 )
 
 // CRL is an HTTP handler that returns the current CRL in DER or PEM format
-func (h *caHandler) CRL(w http.ResponseWriter, r *http.Request) {
-	crlBytes, err := h.Authority.GetCertificateRevocationList()
+func CRL(w http.ResponseWriter, r *http.Request) {
+	crlBytes, err := mustAuthority(r.Context()).GetCertificateRevocationList()
 
 	_, formatAsPEM := r.URL.Query()["pem"]
 
