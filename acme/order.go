@@ -5,15 +5,11 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"net"
-	"os"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/google/go-attestation/oid"
-	attest_x509 "github.com/google/go-attestation/x509"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/x509util"
 )
@@ -28,7 +24,6 @@ const (
 	// PermanentIdentifier is the ACME permanent-identifier identifier type
 	// defined in https://datatracker.ietf.org/doc/html/draft-bweeks-acme-device-attest-00
 	PermanentIdentifier IdentifierType = "permanent-identifier"
-	CA                  IdentifierType = "ca"
 )
 
 // Identifier encodes the type that an order pertains to.
@@ -155,12 +150,6 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		return NewErrorISE("unexpected status %s for order %s", o.Status, o.ID)
 	}
 
-	b := &pem.Block{
-		Type:  "CERTIFICATE REQUEST",
-		Bytes: csr.Raw,
-	}
-	pem.Encode(os.Stderr, b)
-
 	// canonicalize the CSR to allow for comparison
 	csr = canonicalize(csr)
 
@@ -197,11 +186,6 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 			return err
 		}
 		data.SetSubjectAlternativeNames(sans...)
-	}
-
-	deviceIDs, err := o.deviceIDs(csr)
-	if err != nil {
-		return err
 	}
 
 	// Get authorizations from the ACME provisioner.
@@ -269,7 +253,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 		case PermanentIdentifier:
 			orderPIDs[indexPID] = n.Value
 			indexPID++
-		case CA:
 		default:
 			return sans, NewErrorISE("unsupported identifier type in order: %s", n.Type)
 		}
@@ -323,25 +306,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	return sans, nil
 }
 
-func (o *Order) deviceIDs(csr *x509.CertificateRequest) ([]x509util.PermanentIdentifier, error) {
-	var permIDs []x509util.PermanentIdentifier
-	for _, ext := range csr.Extensions {
-		if ext.Id.Equal(oid.SubjectAltName) {
-			san, err := attest_x509.ParseSubjectAltName(ext)
-			if err != nil {
-				return nil, err
-			}
-			for _, pi := range san.PermanentIdentifiers {
-				permIDs = append(permIDs, x509util.PermanentIdentifier{
-					Value:    pi.IdentifierValue,
-					Assigner: pi.Assigner,
-				})
-			}
-		}
-	}
-	return permIDs, nil
-}
-
 // numberOfIdentifierType returns the number of Identifiers that
 // are of type typ.
 func numberOfIdentifierType(typ IdentifierType, ids []Identifier) int {
@@ -360,6 +324,7 @@ func numberOfIdentifierType(typ IdentifierType, ids []Identifier) int {
 // addresses or DNS names slice, depending on whether it can be parsed as an IP
 // or not. This might result in an additional SAN in the final certificate.
 func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.CertificateRequest) {
+
 	// for clarity only; we're operating on the same object by pointer
 	canonicalized = csr
 

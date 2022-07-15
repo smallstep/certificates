@@ -399,8 +399,6 @@ func challengeTypes(az *acme.Authorization) []acme.ChallengeType {
 		}
 	case acme.PermanentIdentifier:
 		chTypes = []acme.ChallengeType{acme.DEVICEATTEST01}
-	case acme.CA:
-		chTypes = []acme.ChallengeType{acme.APPLEATTEST01}
 	default:
 		chTypes = []acme.ChallengeType{}
 	}
