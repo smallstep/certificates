@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-attestation/oid"
-	attest_x509 "github.com/google/go-attestation/x509"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/x509util"
 )
@@ -25,9 +23,9 @@ const (
 	IP IdentifierType = "ip"
 	// DNS is the ACME dns identifier type
 	DNS IdentifierType = "dns"
-	// DNS is the ACME dns identifier type
+	// PermanentIdentifier is the ACME permanent-identifier identifier type
+	// defined in https://datatracker.ietf.org/doc/html/draft-bweeks-acme-device-attest-00
 	PermanentIdentifier IdentifierType = "permanent-identifier"
-	CA                  IdentifierType = "ca"
 )
 
 // Identifier encodes the type that an order pertains to.
@@ -131,6 +129,11 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 
 // Finalize signs a certificate if the necessary conditions for Order completion
 // have been met.
+//
+// TODO(mariano): Here or in the challenge validation we should perform some
+// external validation using the identifier value and the attestation data. From
+// a validation service we can get the list of SANs to set in the final
+// certificate.
 func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateRequest, auth CertificateAuthority, p Provisioner) error {
 	if err := o.UpdateStatus(ctx, db); err != nil {
 		return err
@@ -149,24 +152,33 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		return NewErrorISE("unexpected status %s for order %s", o.Status, o.ID)
 	}
 
-	b := &pem.Block{
-		Type:  "CERTIFICATE REQUEST",
-		Bytes: csr.Raw,
-	}
-	pem.Encode(os.Stderr, b)
-
 	// canonicalize the CSR to allow for comparison
 	csr = canonicalize(csr)
 
-	// retrieve the requested SANs for the Order
-	sans, err := o.sans(csr)
-	if err != nil {
-		return err
+	// Template data
+	data := x509util.NewTemplateData()
+	data.SetCommonName(csr.Subject.CommonName)
+
+	// TODO: support for multiple identifiers?
+	var permanentIdentifier string
+	for i := range o.Identifiers {
+		if o.Identifiers[i].Type == PermanentIdentifier {
+			permanentIdentifier = o.Identifiers[i].Value
+			break
+		}
 	}
 
-	deviceIDs, err := o.deviceIDs(csr)
-	if err != nil {
-		return err
+	if permanentIdentifier != "" {
+		data.SetPermanentIdentifiers([]x509util.PermanentIdentifier{
+			{Value: permanentIdentifier},
+		})
+	} else {
+		// retrieve the requested SANs for the Order
+		sans, err := o.sans(csr)
+		if err != nil {
+			return err
+		}
+		data.Set(x509util.SANsKey, sans)
 	}
 
 	// Get authorizations from the ACME provisioner.
@@ -175,12 +187,6 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	if err != nil {
 		return WrapErrorISE(err, "error retrieving authorization options from ACME provisioner")
 	}
-
-	// Template data
-	data := x509util.NewTemplateData()
-	data.SetCommonName(csr.Subject.CommonName)
-	data.Set(x509util.SANsKey, sans)
-	data.SetPermanentIdentifiers(deviceIDs)
 
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
 	if err != nil {
@@ -206,6 +212,11 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		return WrapErrorISE(err, "error creating certificate for order %s", o.ID)
 	}
 
+	// TODO(mariano): debug - remove me
+	pem.Encode(os.Stderr, &pem.Block{
+		Type: "CERTIFICATE", Bytes: cert.Leaf.Raw,
+	})
+
 	o.CertificateID = cert.ID
 	o.Status = StatusValid
 	if err = db.UpdateOrder(ctx, o); err != nil {
@@ -215,9 +226,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 }
 
 func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativeName, error) {
-
 	var sans []x509util.SubjectAlternativeName
-
 	if len(csr.EmailAddresses) > 0 || len(csr.URIs) > 0 {
 		return sans, NewError(ErrorBadCSRType, "Only DNS names and IP addresses are allowed")
 	}
@@ -238,7 +247,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 		case PermanentIdentifier:
 			orderPIDs[indexPID] = n.Value
 			indexPID++
-		case CA:
 		default:
 			return sans, NewErrorISE("unsupported identifier type in order: %s", n.Type)
 		}
@@ -290,25 +298,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	}
 
 	return sans, nil
-}
-
-func (o *Order) deviceIDs(csr *x509.CertificateRequest) ([]x509util.PermanentIdentifier, error) {
-	var permIDs []x509util.PermanentIdentifier
-	for _, ext := range csr.Extensions {
-		if ext.Id.Equal(oid.SubjectAltName) {
-			san, err := attest_x509.ParseSubjectAltName(ext)
-			if err != nil {
-				return nil, err
-			}
-			for _, pi := range san.PermanentIdentifiers {
-				permIDs = append(permIDs, x509util.PermanentIdentifier{
-					Value:    pi.IdentifierValue,
-					Assigner: pi.Assigner,
-				})
-			}
-		}
-	}
-	return permIDs, nil
 }
 
 // numberOfIdentifierType returns the number of Identifiers that
