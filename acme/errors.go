@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"runtime/debug"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api/render"
@@ -277,8 +275,6 @@ type Error struct {
 
 // NewError creates a new Error type.
 func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
-	fmt.Fprintf(os.Stderr, msg+"\n", args...)
-	debug.PrintStack()
 	return newError(pt, errors.Errorf(msg, args...))
 }
 
@@ -304,8 +300,6 @@ func newError(pt ProblemType, err error) *Error {
 
 // NewErrorISE creates a new ErrorServerInternalType Error.
 func NewErrorISE(msg string, args ...interface{}) *Error {
-	fmt.Fprintf(os.Stderr, msg+"\n", args...)
-	debug.PrintStack()
 	return NewError(ErrorServerInternalType, msg, args...)
 }
 
@@ -329,8 +323,6 @@ func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Err
 
 // WrapErrorISE shortcut to wrap an internal server error type.
 func WrapErrorISE(err error, msg string, args ...interface{}) *Error {
-	fmt.Fprintf(os.Stderr, msg+"\n", args...)
-	debug.PrintStack()
 	return WrapError(ErrorServerInternalType, err, msg, args...)
 }
 

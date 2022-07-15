@@ -1,14 +1,12 @@
 package acme
 
 import (
-	"bytes"
 	"context"
 	"crypto"
 	"crypto/sha256"
 	"crypto/subtle"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
@@ -25,11 +23,8 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/google/go-attestation/attest"
-	"github.com/google/go-attestation/oid"
-	x509ext "github.com/google/go-attestation/x509"
-	"github.com/google/go-tpm/tpm2"
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/pemutil"
 )
 
 type ChallengeType string
@@ -43,7 +38,6 @@ const (
 	TLSALPN01 ChallengeType = "tls-alpn-01"
 	// DEVICEATTEST01 is the device-attest-01 ACME challenge type
 	DEVICEATTEST01 ChallengeType = "device-attest-01"
-	APPLEATTEST01  ChallengeType = "client-01"
 )
 
 // Challenge represents an ACME response Challenge type.
@@ -87,8 +81,6 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 		return tlsalpn01Validate(ctx, ch, db, jwk)
 	case DEVICEATTEST01:
 		return deviceAttest01Validate(ctx, ch, db, jwk, payload)
-	case APPLEATTEST01:
-		return appleAttest01Validate(ctx, ch, db, jwk, payload)
 	default:
 		return NewErrorISE("unexpected challenge type '%s'", ch.Type)
 	}
@@ -315,7 +307,8 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 }
 
 type Payload struct {
-	AttStmt []byte `json:"attStmt"`
+	AttObj string `json:"attObj"`
+	Error  string `json:"error"`
 }
 
 type AttestationObject struct {
@@ -326,117 +319,7 @@ type AttestationObject struct {
 // TODO(bweeks): move attestation verification to a shared package.
 // TODO(bweeks): define new error type for failed attestation validation.
 func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
-	// TODO(bweeks): investigate if the iOS implementation allows for proper
-	// platform detection.
-	{
-		var p ApplePayload
-		if err := json.Unmarshal(payload, &p); err == nil {
-			return appleAttest01Validate(ctx, ch, db, jwk, payload)
-		}
-	}
-
 	var p Payload
-	if err := json.Unmarshal(payload, &p); err != nil {
-		return WrapErrorISE(err, "error unmarshalling JSON")
-	}
-
-	att := AttestationObject{}
-	if err := cbor.Unmarshal(p.AttStmt, &att); err != nil {
-		return WrapErrorISE(err, "error unmarshalling CBOR")
-	}
-
-	// TODO(bweeks): move verification code to a shared package.
-	// begin TPM key certification verification
-	params := &attest.CertificationParameters{
-		Public:            att.AttStatement["pubArea"].([]byte),
-		CreateAttestation: att.AttStatement["certInfo"].([]byte),
-		CreateSignature:   att.AttStatement["sig"].([]byte),
-	}
-	// end TPM key certification verification
-
-	x5c, x509present := att.AttStatement["x5c"].([]interface{})
-	if !x509present {
-		return errors.New("x5c not present")
-	}
-
-	akCertBytes, valid := x5c[0].([]byte)
-	if !valid {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"error getting certificate from x5c cert chain"))
-	}
-
-	akCert, err := x509.ParseCertificate(akCertBytes)
-	if err != nil {
-		return WrapErrorISE(err, "error parsing AK certificate")
-	}
-
-	if err := params.Verify(attest.VerifyOpts{Public: akCert.PublicKey, Hash: crypto.SHA256}); err != nil {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"params.Verify failed: %v", err))
-	}
-
-	attData, err := tpm2.DecodeAttestationData(params.CreateAttestation)
-	if err != nil {
-		return WrapErrorISE(err, "error decoding attestation data")
-	}
-
-	keyAuth, err := KeyAuthorization(ch.Token, jwk)
-	if err != nil {
-		return err
-	}
-	hashedKeyAuth := sha256.Sum256([]byte(keyAuth))
-
-	if !bytes.Equal(attData.ExtraData, hashedKeyAuth[:]) {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"key authorization mismatch"))
-	}
-
-	var sanExt pkix.Extension
-	for _, ext := range akCert.Extensions {
-		if ext.Id.Equal(oid.SubjectAltName) {
-			sanExt = ext
-		}
-	}
-	if sanExt.Value == nil {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"akCert missing subjectAltName"))
-	}
-
-	san, err := x509ext.ParseSubjectAltName(sanExt)
-	if err != nil {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"failed to parse subjectAltName"))
-	}
-
-	if len(san.PermanentIdentifiers) != 1 {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"subjectAltName doesn't contain a PermanentIdentifier"))
-	}
-
-	wantPermID := san.PermanentIdentifiers[0]
-	if wantPermID.IdentifierValue != ch.Value {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"identifier from certificate and challenge do not match"))
-	}
-
-	// Update and store the challenge.
-	ch.Status = StatusValid
-	ch.Error = nil
-	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
-
-	if err := db.UpdateChallenge(ctx, ch); err != nil {
-		return WrapErrorISE(err, "error updating challenge")
-	}
-	return nil
-}
-
-type ApplePayload struct {
-	AttObj string `json:"attObj"`
-	Error  string `json:"error"`
-}
-
-func appleAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
-	var p ApplePayload
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return WrapErrorISE(err, "error unmarshalling JSON")
 	}
@@ -456,38 +339,38 @@ func appleAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.
 		return WrapErrorISE(err, "error unmarshalling CBOR")
 	}
 
-	if att.Format != "apple" {
-		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement,
-			"unexpected attestation object format"))
-	}
+	switch att.Format {
+	case "apple":
+		data, err := doAppleAttestationFormat(ctx, ch, db, &att)
+		if err != nil {
+			return err
+		}
 
-	x5c, x509present := att.AttStatement["x5c"].([]interface{})
-	if !x509present {
-		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement,
-			"x5c not present"))
-	}
+		// Validate nonce with SHA-256 of the token
+		//
+		// TODO(mariano): validate this
+		if data.Nonce != "" {
+			sum := sha256.Sum256([]byte(ch.Token))
+			if data.Nonce != hex.EncodeToString(sum[:]) {
+				return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "challenge token does not match"))
+			}
+		}
 
-	if len(x5c) == 0 {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"x5c is empty"))
-	}
+		// Validate Apple's ClientIdentifier (Identifier.Value) with device
+		// identifiers.
+		//
+		// Note: We might want to use an external service for this.
+		if data.UDID != ch.Value && data.SerialNumber != ch.Value {
+			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "permanent identifier does not match"))
+		}
 
-	attCertBytes, valid := x5c[0].([]byte)
-	if !valid {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"error getting certificate from x5c cert chain"))
+		// TODO(mariano): debug - remove me
+		pem.Encode(os.Stderr, &pem.Block{
+			Type: "CERTIFICATE", Bytes: data.Certificate.Raw,
+		})
+	default:
+		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "unexpected attestation object format"))
 	}
-
-	attCert, err := x509.ParseCertificate(attCertBytes)
-	if err != nil {
-		return WrapErrorISE(err, "error parsing AK certificate")
-	}
-
-	b := &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: attCert.Raw,
-	}
-	pem.Encode(os.Stderr, b)
 
 	// Update and store the challenge.
 	ch.Status = StatusValid
@@ -498,6 +381,104 @@ func appleAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.
 		return WrapErrorISE(err, "error updating challenge")
 	}
 	return nil
+}
+
+// Apple Enterprise Attestation Root CA from
+// https://www.apple.com/certificateauthority/private/
+const appleEnterpriseAttestationRootCA = `-----BEGIN CERTIFICATE-----
+MIICJDCCAamgAwIBAgIUQsDCuyxyfFxeq/bxpm8frF15hzcwCgYIKoZIzj0EAwMw
+UTEtMCsGA1UEAwwkQXBwbGUgRW50ZXJwcmlzZSBBdHRlc3RhdGlvbiBSb290IENB
+MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzAeFw0yMjAyMTYxOTAx
+MjRaFw00NzAyMjAwMDAwMDBaMFExLTArBgNVBAMMJEFwcGxlIEVudGVycHJpc2Ug
+QXR0ZXN0YXRpb24gUm9vdCBDQTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UE
+BhMCVVMwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAT6Jigq+Ps9Q4CoT8t8q+UnOe2p
+oT9nRaUfGhBTbgvqSGXPjVkbYlIWYO+1zPk2Sz9hQ5ozzmLrPmTBgEWRcHjA2/y7
+7GEicps9wn2tj+G89l3INNDKETdxSPPIZpPj8VmjQjBAMA8GA1UdEwEB/wQFMAMB
+Af8wHQYDVR0OBBYEFPNqTQGd8muBpV5du+UIbVbi+d66MA4GA1UdDwEB/wQEAwIB
+BjAKBggqhkjOPQQDAwNpADBmAjEA1xpWmTLSpr1VH4f8Ypk8f3jMUKYz4QPG8mL5
+8m9sX/b2+eXpTv2pH4RZgJjucnbcAjEA4ZSB6S45FlPuS/u4pTnzoz632rA+xW/T
+ZwFEh9bhKjJ+5VQ9/Do1os0u3LEkgN/r
+-----END CERTIFICATE-----`
+
+var (
+	oidAppleSerialNumber                    = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 1}
+	oidAppleUniqueDeviceIdentifier          = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 2}
+	oidAppleSecureEnclaveProcessorOSVersion = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 10, 2}
+	oidAppleNonce                           = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 11, 1}
+)
+
+type appleAttestationData struct {
+	Nonce        string
+	SerialNumber string
+	UDID         string
+	SEPVersion   string
+	Certificate  *x509.Certificate
+}
+
+func doAppleAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *AttestationObject) (*appleAttestationData, error) {
+	root, err := pemutil.ParseCertificate([]byte(appleEnterpriseAttestationRootCA))
+	if err != nil {
+		return nil, WrapErrorISE(err, "error parsing apple enterprise ca")
+	}
+	roots := x509.NewCertPool()
+	roots.AddCert(root)
+
+	x5c, ok := att.AttStatement["x5c"].([]interface{})
+	if !ok {
+		return nil, storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "x5c not present"))
+	}
+	if len(x5c) == 0 {
+		return nil, storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType, "x5c is empty"))
+	}
+
+	der, ok := x5c[0].([]byte)
+	if !ok {
+		return nil, storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "x5c is malformed"))
+	}
+	leaf, err := x509.ParseCertificate(der)
+	if err != nil {
+		return nil, storeError(ctx, db, ch, true, WrapError(ErrorBadAttestationStatement, err, "x5c is malformed"))
+	}
+
+	intermediates := x509.NewCertPool()
+	for _, v := range x5c[1:] {
+		der, ok = v.([]byte)
+		if !ok {
+			return nil, storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "x5c is malformed"))
+		}
+		cert, err := x509.ParseCertificate(der)
+		if err != nil {
+			return nil, storeError(ctx, db, ch, true, WrapError(ErrorBadAttestationStatement, err, "x5c is malformed"))
+		}
+		intermediates.AddCert(cert)
+	}
+
+	if _, err := leaf.Verify(x509.VerifyOptions{
+		Intermediates: intermediates,
+		Roots:         roots,
+		CurrentTime:   time.Now().Truncate(time.Second),
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+	}); err != nil {
+		return nil, storeError(ctx, db, ch, true, WrapError(ErrorBadAttestationStatement, err, "x5c is not valid"))
+	}
+
+	data := &appleAttestationData{
+		Certificate: leaf,
+	}
+	for _, ext := range leaf.Extensions {
+		switch {
+		case ext.Id.Equal(oidAppleSerialNumber):
+			data.SerialNumber = string(ext.Value)
+		case ext.Id.Equal(oidAppleUniqueDeviceIdentifier):
+			data.UDID = string(ext.Value)
+		case ext.Id.Equal(oidAppleSecureEnclaveProcessorOSVersion):
+			data.SEPVersion = string(ext.Value)
+		case ext.Id.Equal(oidAppleNonce):
+			data.Nonce = string(ext.Value)
+		}
+	}
+
+	return data, nil
 }
 
 // serverName determines the SNI HostName to set based on an acme.Challenge
