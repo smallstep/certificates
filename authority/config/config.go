@@ -92,16 +92,17 @@ type ASN1DN struct {
 // cas.Options.
 type AuthConfig struct {
 	*cas.Options
-	AuthorityID          string                `json:"authorityId,omitempty"`
-	DeploymentType       string                `json:"deploymentType,omitempty"`
-	Provisioners         provisioner.List      `json:"provisioners,omitempty"`
-	Admins               []*linkedca.Admin     `json:"-"`
-	Template             *ASN1DN               `json:"template,omitempty"`
-	Claims               *provisioner.Claims   `json:"claims,omitempty"`
-	Policy               *policy.Options       `json:"policy,omitempty"`
-	DisableIssuedAtCheck bool                  `json:"disableIssuedAtCheck,omitempty"`
-	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
-	EnableAdmin          bool                  `json:"enableAdmin,omitempty"`
+	AuthorityID            string                `json:"authorityId,omitempty"`
+	DeploymentType         string                `json:"deploymentType,omitempty"`
+	Provisioners           provisioner.List      `json:"provisioners,omitempty"`
+	Admins                 []*linkedca.Admin     `json:"-"`
+	Template               *ASN1DN               `json:"template,omitempty"`
+	Claims                 *provisioner.Claims   `json:"claims,omitempty"`
+	Policy                 *policy.Options       `json:"policy,omitempty"`
+	DisableIssuedAtCheck   bool                  `json:"disableIssuedAtCheck,omitempty"`
+	Backdate               *provisioner.Duration `json:"backdate,omitempty"`
+	EnableAdmin            bool                  `json:"enableAdmin,omitempty"`
+	DisableSSHHostsListAPI bool                  `json:"disableSSHHostsListAPI,omitempty"`
 }
 
 // init initializes the required fields in the AuthConfig if they are not
