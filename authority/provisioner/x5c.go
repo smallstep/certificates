@@ -223,10 +223,10 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 
 	// Wrap provisioner if the token is an RA token.
 	var self Interface = p
-	if claims.Step != nil && claims.Step.RAInfo != nil {
+	if claims.Step != nil && claims.Step.RA != nil {
 		self = &raProvisioner{
 			Interface: p,
-			raInfo:    claims.Step.RAInfo,
+			raInfo:    claims.Step.RA,
 		}
 	}
 

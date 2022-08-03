@@ -23,8 +23,8 @@ type jwtPayload struct {
 }
 
 type stepPayload struct {
-	SSH    *SignSSHOptions `json:"ssh,omitempty"`
-	RAInfo *RAInfo         `json:"ra,omitempty"`
+	SSH *SignSSHOptions `json:"ssh,omitempty"`
+	RA  *RAInfo         `json:"ra,omitempty"`
 }
 
 // JWK is the default provisioner, an entity that can sign tokens necessary for
@@ -175,10 +175,10 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 
 	// Wrap provisioner if the token is an RA token.
 	var self Interface = p
-	if claims.Step != nil && claims.Step.RAInfo != nil {
+	if claims.Step != nil && claims.Step.RA != nil {
 		self = &raProvisioner{
 			Interface: p,
-			raInfo:    claims.Step.RAInfo,
+			raInfo:    claims.Step.RA,
 		}
 	}
 
