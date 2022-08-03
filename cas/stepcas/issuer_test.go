@@ -13,7 +13,7 @@ import (
 
 type mockErrIssuer struct{}
 
-func (m mockErrIssuer) SignToken(subject string, sans []string) (string, error) {
+func (m mockErrIssuer) SignToken(subject string, sans []string, info *raInfo) (string, error) {
 	return "", apiv1.ErrNotImplemented{}
 }
 
