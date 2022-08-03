@@ -53,25 +53,25 @@ func newJWKIssuer(caURL *url.URL, client *ca.Client, cfg *apiv1.CertificateIssue
 	}, nil
 }
 
-func (i *jwkIssuer) SignToken(subject string, sans []string) (string, error) {
+func (i *jwkIssuer) SignToken(subject string, sans []string, info *raInfo) (string, error) {
 	aud := i.caURL.ResolveReference(&url.URL{
 		Path: "/1.0/sign",
 	}).String()
-	return i.createToken(aud, subject, sans)
+	return i.createToken(aud, subject, sans, info)
 }
 
 func (i *jwkIssuer) RevokeToken(subject string) (string, error) {
 	aud := i.caURL.ResolveReference(&url.URL{
 		Path: "/1.0/revoke",
 	}).String()
-	return i.createToken(aud, subject, nil)
+	return i.createToken(aud, subject, nil, nil)
 }
 
 func (i *jwkIssuer) Lifetime(d time.Duration) time.Duration {
 	return d
 }
 
-func (i *jwkIssuer) createToken(aud, sub string, sans []string) (string, error) {
+func (i *jwkIssuer) createToken(aud, sub string, sans []string, info *raInfo) (string, error) {
 	id, err := randutil.Hex(64) // 256 bits
 	if err != nil {
 		return "", err
@@ -82,6 +82,13 @@ func (i *jwkIssuer) createToken(aud, sub string, sans []string) (string, error) 
 	if len(sans) > 0 {
 		builder = builder.Claims(map[string]interface{}{
 			"sans": sans,
+		})
+	}
+	if info != nil {
+		builder = builder.Claims(map[string]interface{}{
+			"step": map[string]interface{}{
+				"ra": info,
+			},
 		})
 	}
 
