@@ -166,7 +166,7 @@ func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.D
 	if err != nil {
 		return nil, nil, err
 	}
-	println(token)
+
 	resp, err := s.client.Sign(&api.SignRequest{
 		CsrPEM:   api.CertificateRequest{CertificateRequest: cr},
 		OTT:      token,
