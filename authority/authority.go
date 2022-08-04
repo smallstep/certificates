@@ -312,6 +312,7 @@ func (a *Authority) init() error {
 		if id := a.config.AuthorityConfig.AuthorityID; id != "" && !strings.EqualFold(id, linkedcaClient.authorityID) {
 			return errors.New("error initializing linkedca: token authority and configured authority do not match")
 		}
+		a.config.AuthorityConfig.AuthorityID = linkedcaClient.authorityID
 		linkedcaClient.Run()
 	}
 
@@ -321,6 +322,9 @@ func (a *Authority) init() error {
 		if a.config.AuthorityConfig.Options != nil {
 			options = *a.config.AuthorityConfig.Options
 		}
+
+		// AuthorityID might be empty. It's always available linked CAs/RAs.
+		options.AuthorityID = a.config.AuthorityConfig.AuthorityID
 
 		// Configure linked RA
 		if linkedcaClient != nil && options.CertificateAuthority == "" {
@@ -357,7 +361,6 @@ func (a *Authority) init() error {
 				return err
 			}
 		}
-
 		a.x509CAService, err = cas.New(ctx, options)
 		if err != nil {
 			return err

@@ -27,11 +27,16 @@ func Test_jwkIssuer_SignToken(t *testing.T) {
 	type args struct {
 		subject string
 		sans    []string
+		info    *raInfo
+	}
+	type stepClaims struct {
+		RA *raInfo `json:"ra"`
 	}
 	type claims struct {
-		Aud  []string `json:"aud"`
-		Sub  string   `json:"sub"`
-		Sans []string `json:"sans"`
+		Aud  []string   `json:"aud"`
+		Sub  string     `json:"sub"`
+		Sans []string   `json:"sans"`
+		Step stepClaims `json:"step"`
 	}
 	tests := []struct {
 		name    string
@@ -39,8 +44,11 @@ func Test_jwkIssuer_SignToken(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{caURL, "ra@doe.org", signer}, args{"doe", []string{"doe.org"}}, false},
-		{"fail", fields{caURL, "ra@doe.org", &mockErrSigner{}}, args{"doe", []string{"doe.org"}}, true},
+		{"ok", fields{caURL, "ra@doe.org", signer}, args{"doe", []string{"doe.org"}, nil}, false},
+		{"ok ra", fields{caURL, "ra@doe.org", signer}, args{"doe", []string{"doe.org"}, &raInfo{
+			AuthorityID: "authority-id", ProvisionerID: "provisioner-id", ProvisionerType: "provisioner-type",
+		}}, false},
+		{"fail", fields{caURL, "ra@doe.org", &mockErrSigner{}}, args{"doe", []string{"doe.org"}, nil}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -49,7 +57,7 @@ func Test_jwkIssuer_SignToken(t *testing.T) {
 				issuer: tt.fields.issuer,
 				signer: tt.fields.signer,
 			}
-			got, err := i.SignToken(tt.args.subject, tt.args.sans)
+			got, err := i.SignToken(tt.args.subject, tt.args.sans, tt.args.info)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("jwkIssuer.SignToken() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -64,6 +72,9 @@ func Test_jwkIssuer_SignToken(t *testing.T) {
 					Aud:  []string{tt.fields.caURL.String() + "/1.0/sign"},
 					Sub:  tt.args.subject,
 					Sans: tt.args.sans,
+				}
+				if tt.args.info != nil {
+					want.Step.RA = tt.args.info
 				}
 				if err := jwt.Claims(testX5CKey.Public(), &c); err != nil {
 					t.Errorf("jwt.Claims() error = %v", err)

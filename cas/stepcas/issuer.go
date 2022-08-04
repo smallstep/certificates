@@ -10,8 +10,15 @@ import (
 	"github.com/smallstep/certificates/cas/apiv1"
 )
 
+type raInfo struct {
+	AuthorityID     string `json:"authorityId,omitempty"`
+	ProvisionerID   string `json:"provisionerId"`
+	ProvisionerType string `json:"provisionerType"`
+	ProvisionerName string `json:"provisionerName"`
+}
+
 type stepIssuer interface {
-	SignToken(subject string, sans []string) (string, error)
+	SignToken(subject string, sans []string, info *raInfo) (string, error)
 	RevokeToken(subject string) (string, error)
 	Lifetime(d time.Duration) time.Duration
 }

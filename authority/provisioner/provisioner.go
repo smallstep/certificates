@@ -340,6 +340,26 @@ type Permissions struct {
 	CriticalOptions map[string]string `json:"criticalOptions"`
 }
 
+// RAInfo is the information about a provisioner present in RA tokens generated
+// by StepCAS.
+type RAInfo struct {
+	AuthorityID     string `json:"authorityId"`
+	ProvisionerID   string `json:"provisionerId"`
+	ProvisionerType string `json:"provisionerType"`
+	ProvisionerName string `json:"provisionerName"`
+}
+
+// raProvisioner wraps a provisioner with RA data.
+type raProvisioner struct {
+	Interface
+	raInfo *RAInfo
+}
+
+// RAInfo returns the RAInfo in the wrapped provisioner.
+func (p *raProvisioner) RAInfo() *RAInfo {
+	return p.raInfo
+}
+
 // MockProvisioner for testing
 type MockProvisioner struct {
 	Mret1, Mret2, Mret3 interface{}

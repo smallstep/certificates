@@ -665,6 +665,14 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 			Certificate:      testCrt,
 			CertificateChain: []*x509.Certificate{testIssCrt},
 		}, false},
+		{"ok with provisioner", fields{jwk, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
+			CSR:         testCR,
+			Lifetime:    time.Hour,
+			Provisioner: &apiv1.ProvisionerInfo{ProvisionerID: "provisioner-id", ProvisionerType: "ACME"},
+		}}, &apiv1.CreateCertificateResponse{
+			Certificate:      testCrt,
+			CertificateChain: []*x509.Certificate{testIssCrt},
+		}, false},
 		{"fail CSR", fields{x5c, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:      nil,
 			Lifetime: time.Hour,
@@ -691,6 +699,7 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 			s := &StepCAS{
 				iss:         tt.fields.iss,
 				client:      tt.fields.client,
+				authorityID: "authority-id",
 				fingerprint: tt.fields.fingerprint,
 			}
 			got, err := s.CreateCertificate(tt.args.req)

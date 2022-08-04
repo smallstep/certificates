@@ -51,11 +51,16 @@ func Test_x5cIssuer_SignToken(t *testing.T) {
 	type args struct {
 		subject string
 		sans    []string
+		info    *raInfo
+	}
+	type stepClaims struct {
+		RA *raInfo `json:"ra"`
 	}
 	type claims struct {
-		Aud  []string `json:"aud"`
-		Sub  string   `json:"sub"`
-		Sans []string `json:"sans"`
+		Aud  []string   `json:"aud"`
+		Sub  string     `json:"sub"`
+		Sans []string   `json:"sans"`
+		Step stepClaims `json:"step"`
 	}
 	tests := []struct {
 		name    string
@@ -63,10 +68,13 @@ func Test_x5cIssuer_SignToken(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", fields{caURL, testX5CPath, testX5CKeyPath, "X5C"}, args{"doe", []string{"doe.org"}}, false},
-		{"fail crt", fields{caURL, "", testX5CKeyPath, "X5C"}, args{"doe", []string{"doe.org"}}, true},
-		{"fail key", fields{caURL, testX5CPath, "", "X5C"}, args{"doe", []string{"doe.org"}}, true},
-		{"fail no signer", fields{caURL, testIssKeyPath, testIssPath, "X5C"}, args{"doe", []string{"doe.org"}}, true},
+		{"ok", fields{caURL, testX5CPath, testX5CKeyPath, "X5C"}, args{"doe", []string{"doe.org"}, nil}, false},
+		{"ok ra", fields{caURL, testX5CPath, testX5CKeyPath, "X5C"}, args{"doe", []string{"doe.org"}, &raInfo{
+			AuthorityID: "authority-id", ProvisionerID: "provisioner-id", ProvisionerType: "provisioner-type",
+		}}, false},
+		{"fail crt", fields{caURL, "", testX5CKeyPath, "X5C"}, args{"doe", []string{"doe.org"}, nil}, true},
+		{"fail key", fields{caURL, testX5CPath, "", "X5C"}, args{"doe", []string{"doe.org"}, nil}, true},
+		{"fail no signer", fields{caURL, testIssKeyPath, testIssPath, "X5C"}, args{"doe", []string{"doe.org"}, nil}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -76,7 +84,7 @@ func Test_x5cIssuer_SignToken(t *testing.T) {
 				keyFile:  tt.fields.keyFile,
 				issuer:   tt.fields.issuer,
 			}
-			got, err := i.SignToken(tt.args.subject, tt.args.sans)
+			got, err := i.SignToken(tt.args.subject, tt.args.sans, tt.args.info)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("x5cIssuer.SignToken() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -90,6 +98,9 @@ func Test_x5cIssuer_SignToken(t *testing.T) {
 					Aud:  []string{tt.fields.caURL.String() + "/1.0/sign#x5c/X5C"},
 					Sub:  tt.args.subject,
 					Sans: tt.args.sans,
+				}
+				if tt.args.info != nil {
+					want.Step.RA = tt.args.info
 				}
 				if err := jwt.Claims(testX5CKey.Public(), &c); err != nil {
 					t.Errorf("jwt.Claims() error = %v", err)
