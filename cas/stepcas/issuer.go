@@ -14,6 +14,7 @@ type raInfo struct {
 	AuthorityID     string `json:"authorityId,omitempty"`
 	ProvisionerID   string `json:"provisionerId"`
 	ProvisionerType string `json:"provisionerType"`
+	ProvisionerName string `json:"provisionerName"`
 }
 
 type stepIssuer interface {

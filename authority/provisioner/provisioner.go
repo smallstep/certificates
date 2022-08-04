@@ -346,6 +346,7 @@ type RAInfo struct {
 	AuthorityID     string `json:"authorityId"`
 	ProvisionerID   string `json:"provisionerId"`
 	ProvisionerType string `json:"provisionerType"`
+	ProvisionerName string `json:"provisionerName"`
 }
 
 // raProvisioner wraps a provisioner with RA data.

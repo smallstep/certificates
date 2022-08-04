@@ -81,6 +81,7 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 			AuthorityID:     s.authorityID,
 			ProvisionerID:   p.ProvisionerID,
 			ProvisionerType: p.ProvisionerType,
+			ProvisionerName: p.ProvisionerName,
 		}
 	}
 

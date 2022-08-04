@@ -102,6 +102,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 			pInfo = &casapi.ProvisionerInfo{
 				ProvisionerID:   prov.GetID(),
 				ProvisionerType: prov.GetType().String(),
+				ProvisionerName: prov.GetName(),
 			}
 		// Adds new options to NewCertificate
 		case provisioner.CertificateOptions:
