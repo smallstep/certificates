@@ -35,7 +35,7 @@ require (
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/micromdm/scep/v2 v2.1.0
 	github.com/miekg/pkcs11 v1.1.1 // indirect
-	github.com/newrelic/go-agent v3.18.0+incompatible
+	github.com/newrelic/go-agent/v3 v3.18.0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.8.1
