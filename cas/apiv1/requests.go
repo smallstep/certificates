@@ -65,6 +65,7 @@ type CreateCertificateRequest struct {
 type ProvisionerInfo struct {
 	ProvisionerID   string
 	ProvisionerType string
+	ProvisionerName string
 }
 
 // CreateCertificateResponse is the response to a create certificate request.

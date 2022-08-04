@@ -277,6 +277,7 @@ func (c *linkedCaClient) StoreCertificateChain(p provisioner.Interface, fullchai
 		PemCertificate:      serializeCertificateChain(fullchain[0]),
 		PemCertificateChain: serializeCertificateChain(fullchain[1:]...),
 		Provisioner:         createProvisionerIdentity(p),
+		RaProvisioner:       createRegistrationAuthorityProvisioner(p),
 	})
 	return errors.Wrap(err, "error posting certificate")
 }
@@ -390,6 +391,26 @@ func createProvisionerIdentity(p provisioner.Interface) *linkedca.ProvisionerIde
 		Type: linkedca.Provisioner_Type(p.GetType()),
 		Name: p.GetName(),
 	}
+}
+
+type raProvisioner interface {
+	RAInfo() *provisioner.RAInfo
+}
+
+func createRegistrationAuthorityProvisioner(p provisioner.Interface) *linkedca.RegistrationAuthorityProvisioner {
+	if rap, ok := p.(raProvisioner); ok {
+		info := rap.RAInfo()
+		typ := linkedca.Provisioner_Type_value[strings.ToUpper(info.ProvisionerType)]
+		return &linkedca.RegistrationAuthorityProvisioner{
+			AuthorityId: info.AuthorityID,
+			Provisioner: &linkedca.ProvisionerIdentity{
+				Id:   info.ProvisionerID,
+				Type: linkedca.Provisioner_Type(typ),
+				Name: info.ProvisionerName,
+			},
+		}
+	}
+	return nil
 }
 
 func serializeCertificate(crt *x509.Certificate) string {
