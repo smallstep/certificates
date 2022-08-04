@@ -20,7 +20,7 @@ require (
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/go-kit/kit v0.10.0 // indirect
-	github.com/go-piv/piv-go v1.7.0
+	github.com/go-piv/piv-go v1.10.0
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/mock v1.6.0
@@ -34,8 +34,8 @@ require (
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/micromdm/scep/v2 v2.1.0
-	github.com/miekg/pkcs11 v1.0.3 // indirect
-	github.com/newrelic/go-agent v2.15.0+incompatible
+	github.com/miekg/pkcs11 v1.1.1 // indirect
+	github.com/newrelic/go-agent/v3 v3.18.0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
 	github.com/sirupsen/logrus v1.8.1
