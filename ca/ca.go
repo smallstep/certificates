@@ -45,6 +45,7 @@ type options struct {
 	sshHostPassword []byte
 	sshUserPassword []byte
 	database        db.AuthDB
+	webhookClient   *http.Client
 }
 
 func (o *options) apply(opts []Option) {
@@ -154,6 +155,12 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	if ca.opts.database != nil {
 		opts = append(opts, authority.WithDatabase(ca.opts.database))
+	}
+
+	if ca.opts.webhookClient != nil {
+		opts = append(opts, authority.WithWebhookClient(ca.opts.webhookClient))
+	} else {
+		opts = append(opts, authority.WithWebhookClient(http.DefaultClient))
 	}
 
 	auth, err := authority.New(cfg, opts...)
