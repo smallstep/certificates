@@ -60,7 +60,7 @@ type CreateCertificateRequest struct {
 	Provisioner *ProvisionerInfo
 }
 
-// ProvisionerInfo contains information of the provisioner used to authorize an
+// ProvisionerInfo contains information of the provisioner used to authorize a
 // certificate.
 type ProvisionerInfo struct {
 	ProvisionerID   string
