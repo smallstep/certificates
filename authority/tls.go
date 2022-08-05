@@ -91,6 +91,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	// Set backdate with the configured value
 	signOpts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
+	signOpts.WebhookClient = a.webhookClient
+
 	var prov provisioner.Interface
 	var pInfo *casapi.ProvisionerInfo
 	var attData provisioner.AttestationData

@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -45,7 +46,6 @@ type options struct {
 	sshHostPassword []byte
 	sshUserPassword []byte
 	database        db.AuthDB
-	webhookClient   *http.Client
 }
 
 func (o *options) apply(opts []Option) {
@@ -157,11 +157,8 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithDatabase(ca.opts.database))
 	}
 
-	if ca.opts.webhookClient != nil {
-		opts = append(opts, authority.WithWebhookClient(ca.opts.webhookClient))
-	} else {
-		opts = append(opts, authority.WithWebhookClient(http.DefaultClient))
-	}
+	webhookTransport := getWebhookTransport()
+	opts = append(opts, authority.WithWebhookClient(&http.Client{Transport: webhookTransport}))
 
 	auth, err := authority.New(cfg, opts...)
 	if err != nil {
@@ -173,6 +170,9 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO does this config have a cert with client auth?
+	webhookTransport.TLSClientConfig = tlsConfig
 
 	// Using chi as the main router
 	mux := chi.NewRouter()
@@ -545,5 +545,16 @@ func dumpRoutes(mux chi.Routes) {
 	}
 	if err := chi.Walk(mux, walkFunc); err != nil {
 		fmt.Printf("Logging err: %s\n", err.Error())
+	}
+}
+
+func getWebhookTransport() *http.Transport {
+	return &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
 	}
 }

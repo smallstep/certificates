@@ -69,6 +69,9 @@ type X509Options struct {
 	// AllowWildcardNames indicates if literal wildcard names
 	// like *.example.com are allowed. Defaults to false.
 	AllowWildcardNames bool `json:"-"`
+
+	// Inventories is a list of webhooks that can augment template data
+	Inventories []Webhook `json:"inventories"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.

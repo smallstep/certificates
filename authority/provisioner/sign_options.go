@@ -25,10 +25,11 @@ const DefaultCertValidity = 24 * time.Hour
 // SignOptions contains the options that can be passed to the Sign method. Backdate
 // is automatically filled and can only be configured in the CA.
 type SignOptions struct {
-	NotAfter     TimeDuration    `json:"notAfter"`
-	NotBefore    TimeDuration    `json:"notBefore"`
-	TemplateData json.RawMessage `json:"templateData"`
-	Backdate     time.Duration   `json:"-"`
+	NotAfter      TimeDuration    `json:"notAfter"`
+	NotBefore     TimeDuration    `json:"notBefore"`
+	TemplateData  json.RawMessage `json:"templateData"`
+	Backdate      time.Duration   `json:"-"`
+	WebhookClient *http.Client    `json:"-"`
 }
 
 // SignOption is the interface used to collect all extra options used in the
