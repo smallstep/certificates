@@ -72,7 +72,7 @@ retry:
 		req.SetBasicAuth(w.Username, w.Password)
 	}
 
-	// TODO is there a request ID on the context already?
+	// TODO get request ID from context
 
 	resp, err := client.Do(req)
 	if err != nil {

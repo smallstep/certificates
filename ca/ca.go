@@ -171,7 +171,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		return nil, err
 	}
 
-	// TODO does this config have a cert with client auth?
+	// TODO does this config have a renewing cert with client auth?
 	webhookTransport.TLSClientConfig = tlsConfig
 
 	// Using chi as the main router
