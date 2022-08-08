@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Changed
 - Certificates signed by an issuer using an RSA key will be signed using the same algorithm as the issuer certificate was signed with. The signature will no longer default to PKCS #1. For example, if the issuer certificate was signed using RSA-PSS with SHA-256, a new certificate will also be signed using RSA-PSS with SHA-256.
+- Support two latest versions of Go (1.18, 1.19)
 
 ## [0.20.0] - 2022-05-26
 ### Added
