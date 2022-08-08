@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -188,7 +187,7 @@ func Test_fileExists(t *testing.T) {
 }
 
 func TestWriteDefaultIdentity(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "go-tests")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "go-tests")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -373,7 +372,7 @@ func (r *renewer) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
 }
 
 func TestIdentity_Renew(t *testing.T) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "go-tests")
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "go-tests")
 	if err != nil {
 		t.Fatal(err)
 	}
