@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -291,7 +290,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Create test files.
-	path, err := ioutil.TempDir(os.TempDir(), "stepcas")
+	path, err := os.MkdirTemp(os.TempDir(), "stepcas")
 	if err != nil {
 		panic(err)
 	}

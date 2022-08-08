@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -369,7 +368,7 @@ func TestTemplate_Output(t *testing.T) {
 }
 
 func TestOutput_Write(t *testing.T) {
-	dir, err := ioutil.TempDir("", "test-output-write")
+	dir, err := os.MkdirTemp("", "test-output-write")
 	assert.FatalError(t, err)
 	defer os.RemoveAll(dir)
 
