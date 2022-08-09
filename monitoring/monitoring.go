@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	newrelic "github.com/newrelic/go-agent"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/logging"
 )
@@ -41,7 +41,10 @@ func New(raw json.RawMessage) (*Monitoring, error) {
 	m := new(Monitoring)
 	switch strings.ToLower(config.Type) {
 	case "", "newrelic":
-		app, err := newrelic.NewApplication(newrelic.NewConfig(config.Name, config.Key))
+		app, err := newrelic.NewApplication(
+			newrelic.ConfigAppName(config.Name),
+			newrelic.ConfigLicense(config.Key),
+		)
 		if err != nil {
 			return nil, errors.Wrap(err, "error loading New Relic application")
 		}
@@ -58,12 +61,15 @@ func (m *Monitoring) Middleware(next http.Handler) http.Handler {
 	return m.middleware(next)
 }
 
-func newRelicMiddleware(app newrelic.Application) Middleware {
+func newRelicMiddleware(app *newrelic.Application) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Start transaction
-			txn := app.StartTransaction(transactionName(r), w, r)
+			txn := app.StartTransaction(transactionName(r))
 			defer txn.End()
+
+			w = txn.SetWebResponse(w)
+			txn.SetWebRequestHTTP(r)
 
 			// Wrap request writer if necessary
 			rw := logging.NewResponseLogger(w)

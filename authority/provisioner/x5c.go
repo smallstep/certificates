@@ -221,8 +221,17 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
 	}
 
+	// Wrap provisioner if the token is an RA token.
+	var self Interface = p
+	if claims.Step != nil && claims.Step.RA != nil {
+		self = &raProvisioner{
+			Interface: p,
+			raInfo:    claims.Step.RA,
+		}
+	}
+
 	return []SignOption{
-		p,
+		self,
 		templateOptions,
 		// modifiers / withOptions
 		newProvisionerExtensionOption(TypeX5C, p.Name, ""),

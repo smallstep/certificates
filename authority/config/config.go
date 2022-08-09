@@ -102,6 +102,7 @@ type AuthConfig struct {
 	DisableIssuedAtCheck bool                  `json:"disableIssuedAtCheck,omitempty"`
 	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
 	EnableAdmin          bool                  `json:"enableAdmin,omitempty"`
+	DisableGetSSHHosts   bool                  `json:"disableGetSSHHosts,omitempty"`
 }
 
 // init initializes the required fields in the AuthConfig if they are not

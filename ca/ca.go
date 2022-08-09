@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -332,10 +333,10 @@ func (ca *CA) Run() error {
 			log.Printf("X.509 Root Fingerprint: %s", x509util.Fingerprint(crt))
 		}
 		if authorityInfo.SSHCAHostPublicKey != nil {
-			log.Printf("SSH Host CA Key: %s\n", authorityInfo.SSHCAHostPublicKey)
+			log.Printf("SSH Host CA Key: %s\n", bytes.TrimSpace(authorityInfo.SSHCAHostPublicKey))
 		}
 		if authorityInfo.SSHCAUserPublicKey != nil {
-			log.Printf("SSH User CA Key: %s\n", authorityInfo.SSHCAUserPublicKey)
+			log.Printf("SSH User CA Key: %s\n", bytes.TrimSpace(authorityInfo.SSHCAUserPublicKey))
 		}
 	}
 

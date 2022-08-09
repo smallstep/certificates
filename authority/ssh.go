@@ -602,6 +602,9 @@ func (a *Authority) CheckSSHHost(ctx context.Context, principal, token string) (
 
 // GetSSHHosts returns a list of valid host principals.
 func (a *Authority) GetSSHHosts(ctx context.Context, cert *x509.Certificate) ([]config.Host, error) {
+	if a.GetConfig().AuthorityConfig.DisableGetSSHHosts {
+		return nil, errs.New(http.StatusNotFound, "ssh hosts list api disabled")
+	}
 	if a.sshGetHostsFunc != nil {
 		hosts, err := a.sshGetHostsFunc(ctx, cert)
 		return hosts, errs.Wrap(http.StatusInternalServerError, err, "getSSHHosts")
