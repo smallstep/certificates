@@ -1,6 +1,7 @@
 package api
 
 import (
+	"math/big"
 	"net/http"
 
 	"golang.org/x/crypto/ocsp"
@@ -33,6 +34,11 @@ func (r *RevokeRequest) Validate() (err error) {
 	if r.Serial == "" {
 		return errs.BadRequest("missing serial")
 	}
+	sn, ok := new(big.Int).SetString(r.Serial, 0)
+	if !ok {
+		return errs.BadRequest("'%s' is not a valid serial number - use a base 10 representation or add a prefix indicating the base", r.Serial)
+	}
+	r.Serial = sn.String()
 	if r.ReasonCode < ocsp.Unspecified || r.ReasonCode > ocsp.AACompromise {
 		return errs.BadRequest("reasonCode out of bounds")
 	}
