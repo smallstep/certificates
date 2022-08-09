@@ -5,7 +5,6 @@ import (
 	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -425,18 +424,6 @@ func (v *x509NamePolicyValidator) Valid(cert *x509.Certificate, _ SignOptions) e
 	return v.policyEngine.IsX509CertificateAllowed(cert)
 }
 
-// var (
-// 	stepOIDRoot = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64}
-// 	stepOIDProvisioner = append(asn1.ObjectIdentifier(nil), append(stepOIDRoot, 1)...)
-// )
-
-// type stepProvisionerASN1 struct {
-// 	Type          int
-// 	Name          []byte
-// 	CredentialID  []byte
-// 	KeyValuePairs []string `asn1:"optional,omitempty"`
-// }
-
 type forceCNOption struct {
 	ForceCN bool
 }
@@ -481,13 +468,14 @@ func (o *provisionerExtensionOption) Modify(cert *x509.Certificate, _ SignOption
 	if err != nil {
 		return errs.NewError(http.StatusInternalServerError, err, "error creating certificate")
 	}
-	// Prepend the provisioner extension. In the auth.Sign code we will
-	// force the resulting certificate to only have one extension, the
-	// first stepOIDProvisioner that is found in the ExtraExtensions.
-	// A client could pass a csr containing a malicious stepOIDProvisioner
-	// ExtraExtension. If we were to append (rather than prepend) the correct
-	// stepOIDProvisioner extension, then the resulting certificate would
-	// contain the malicious extension, rather than the one applied by step-ca.
-	cert.ExtraExtensions = append([]pkix.Extension{ext}, cert.ExtraExtensions...)
+	// Replace or append the provisioner extension to avoid the inclusions of
+	// malicious stepOIDProvisioner using templates.
+	for i, e := range cert.ExtraExtensions {
+		if e.Id.Equal(StepOIDProvisioner) {
+			cert.ExtraExtensions[i] = ext
+			return nil
+		}
+	}
+	cert.ExtraExtensions = append(cert.ExtraExtensions, ext)
 	return nil
 }
