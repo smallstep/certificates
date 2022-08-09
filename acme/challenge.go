@@ -346,12 +346,10 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			return err
 		}
 
-		// Validate nonce with SHA-256 of the token
-		//
-		// TODO(mariano): validate this
-		if data.Nonce != "" {
+		// Validate nonce with SHA-256 of the token.
+		if len(data.Nonce) != 0 {
 			sum := sha256.Sum256([]byte(ch.Token))
-			if data.Nonce != hex.EncodeToString(sum[:]) {
+			if subtle.ConstantTimeCompare(data.Nonce, sum[:]) != 1 {
 				return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "challenge token does not match"))
 			}
 		}
@@ -408,7 +406,7 @@ var (
 )
 
 type appleAttestationData struct {
-	Nonce        string
+	Nonce        []byte
 	SerialNumber string
 	UDID         string
 	SEPVersion   string
@@ -474,7 +472,7 @@ func doAppleAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *At
 		case ext.Id.Equal(oidAppleSecureEnclaveProcessorOSVersion):
 			data.SEPVersion = string(ext.Value)
 		case ext.Id.Equal(oidAppleNonce):
-			data.Nonce = string(ext.Value)
+			data.Nonce = ext.Value
 		}
 	}
 
