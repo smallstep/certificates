@@ -9,10 +9,11 @@ import (
 	"reflect"
 	"testing"
 
+	"go.step.sm/crypto/kms"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
+
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/cas/softcas"
-	"github.com/smallstep/certificates/kms"
-	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 )
 
 type mockCAS struct{}

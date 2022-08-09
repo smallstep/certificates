@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"time"
 
-	"github.com/smallstep/certificates/kms/apiv1"
+	"go.step.sm/crypto/kms/apiv1"
 )
 
 // CertificateAuthorityType indicates the type of Certificate Authority to

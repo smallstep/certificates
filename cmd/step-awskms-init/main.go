@@ -14,10 +14,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/certificates/kms/awskms"
 	"go.step.sm/cli-utils/fileutil"
 	"go.step.sm/cli-utils/ui"
+	"go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/kms/awskms"
 	"go.step.sm/crypto/pemutil"
 	"golang.org/x/crypto/ssh"
 )
@@ -35,7 +35,7 @@ func main() {
 	ui.Init()
 
 	c, err := awskms.New(context.Background(), apiv1.Options{
-		Type:            string(apiv1.AmazonKMS),
+		Type:            apiv1.AmazonKMS,
 		Region:          region,
 		CredentialsFile: credentialsFile,
 	})

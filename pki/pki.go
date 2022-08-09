@@ -26,14 +26,14 @@ import (
 	"github.com/smallstep/certificates/cas"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/certificates/kms"
-	kmsapi "github.com/smallstep/certificates/kms/apiv1"
 	"github.com/smallstep/nosql"
 	"go.step.sm/cli-utils/errs"
 	"go.step.sm/cli-utils/fileutil"
 	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/kms"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
@@ -807,8 +807,9 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 
 	// Enable KMS if necessary
 	if p.Kms != nil {
+		typ := strings.ToLower(p.Kms.Type.String())
 		cfg.KMS = &kmsapi.Options{
-			Type: strings.ToLower(p.Kms.Type.String()),
+			Type: kmsapi.Type(typ),
 		}
 	}
 

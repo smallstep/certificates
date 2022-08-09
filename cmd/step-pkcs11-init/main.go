@@ -18,15 +18,15 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/kms"
-	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/certificates/kms/uri"
 	"go.step.sm/cli-utils/fileutil"
 	"go.step.sm/cli-utils/ui"
+	"go.step.sm/crypto/kms"
+	"go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/kms/uri"
 	"go.step.sm/crypto/pemutil"
 
 	// Enable pkcs11.
-	_ "github.com/smallstep/certificates/kms/pkcs11"
+	_ "go.step.sm/crypto/kms/pkcs11"
 )
 
 // Config is a mapping of the cli flags.
@@ -171,7 +171,7 @@ func main() {
 	}
 
 	k, err := kms.New(context.Background(), apiv1.Options{
-		Type: string(apiv1.PKCS11),
+		Type: apiv1.PKCS11,
 		URI:  c.KMS,
 		Pin:  c.Pin,
 	})
