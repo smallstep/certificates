@@ -7,14 +7,16 @@ import (
 	"encoding/pem"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/kms"
+
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/certificates/kms"
-	"golang.org/x/crypto/ssh"
 )
 
 // Option sets options to the Authority.

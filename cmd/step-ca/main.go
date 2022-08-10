@@ -26,15 +26,13 @@ import (
 	"go.step.sm/cli-utils/usage"
 
 	// Enabled kms interfaces.
-	_ "github.com/smallstep/certificates/kms/awskms"
-	_ "github.com/smallstep/certificates/kms/azurekms"
-	_ "github.com/smallstep/certificates/kms/cloudkms"
-	_ "github.com/smallstep/certificates/kms/softkms"
-	_ "github.com/smallstep/certificates/kms/sshagentkms"
-
-	// Experimental kms interfaces.
-	_ "github.com/smallstep/certificates/kms/pkcs11"
-	_ "github.com/smallstep/certificates/kms/yubikey"
+	_ "go.step.sm/crypto/kms/awskms"
+	_ "go.step.sm/crypto/kms/azurekms"
+	_ "go.step.sm/crypto/kms/cloudkms"
+	_ "go.step.sm/crypto/kms/pkcs11"
+	_ "go.step.sm/crypto/kms/softkms"
+	_ "go.step.sm/crypto/kms/sshagentkms"
+	_ "go.step.sm/crypto/kms/yubikey"
 
 	// Enabled cas interfaces.
 	_ "github.com/smallstep/certificates/cas/cloudcas"

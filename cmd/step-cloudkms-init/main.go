@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/certificates/kms/cloudkms"
 	"go.step.sm/cli-utils/fileutil"
 	"go.step.sm/cli-utils/ui"
+	"go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/kms/cloudkms"
 	"go.step.sm/crypto/pemutil"
 	"golang.org/x/crypto/ssh"
 )
@@ -66,7 +66,7 @@ func main() {
 	ui.Init()
 
 	c, err := cloudkms.New(context.Background(), apiv1.Options{
-		Type:            string(apiv1.CloudKMS),
+		Type:            apiv1.CloudKMS,
 		CredentialsFile: credentialsFile,
 	})
 	if err != nil {

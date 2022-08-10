@@ -14,6 +14,9 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 
+	"go.step.sm/crypto/kms"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/kms/sshagentkms"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/linkedca"
 
@@ -26,9 +29,6 @@ import (
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/certificates/kms"
-	kmsapi "github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/certificates/kms/sshagentkms"
 	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/nosql"
@@ -431,7 +431,7 @@ func (a *Authority) init() error {
 			// erroring out with: ssh: unsupported key type *agent.Key
 			switch s := signer.(type) {
 			case *sshagentkms.WrappedSSHSigner:
-				a.sshCAHostCertSignKey = s.Sshsigner
+				a.sshCAHostCertSignKey = s.Signer
 			case crypto.Signer:
 				a.sshCAHostCertSignKey, err = ssh.NewSignerFromSigner(s)
 			default:
@@ -457,7 +457,7 @@ func (a *Authority) init() error {
 			// erroring out with: ssh: unsupported key type *agent.Key
 			switch s := signer.(type) {
 			case *sshagentkms.WrappedSSHSigner:
-				a.sshCAUserCertSignKey = s.Sshsigner
+				a.sshCAUserCertSignKey = s.Signer
 			case crypto.Signer:
 				a.sshCAUserCertSignKey, err = ssh.NewSignerFromSigner(s)
 			default:

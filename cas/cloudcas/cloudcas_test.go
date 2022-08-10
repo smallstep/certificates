@@ -25,7 +25,7 @@ import (
 	gax "github.com/googleapis/gax-go/v2"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
-	kmsapi "github.com/smallstep/certificates/kms/apiv1"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"google.golang.org/api/option"
 	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1"
 	longrunningpb "google.golang.org/genproto/googleapis/longrunning"
