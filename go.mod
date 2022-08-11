@@ -20,9 +20,7 @@ require (
 	github.com/go-piv/piv-go v1.10.0 // indirect
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/golang/mock v1.6.0
-	github.com/google/go-attestation v0.4.4-0.20220404204839-8820d49b18d9
 	github.com/google/go-cmp v0.5.8
-	github.com/google/go-tpm v0.3.3
 	github.com/google/uuid v1.3.0
 	github.com/googleapis/gax-go/v2 v2.4.0
 	github.com/hashicorp/vault/api v1.3.1
@@ -33,8 +31,6 @@ require (
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/micromdm/scep/v2 v2.1.0
-	github.com/micromdm/scep/v2 v2.1.0
-	github.com/newrelic/go-agent v2.15.0+incompatible
 	github.com/newrelic/go-agent/v3 v3.18.0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
@@ -45,13 +41,12 @@ require (
 	github.com/stretchr/testify v1.7.1
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
-	go.step.sm/cli-utils v0.7.0
 	go.step.sm/cli-utils v0.7.4
 	go.step.sm/crypto v0.18.0
 	go.step.sm/linkedca v0.18.0
 	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
 	golang.org/x/net v0.0.0-20220909164309-bea034e7d591
-	golang.org/x/sys v0.0.0-20220405052023-b1e9470b6e64 // indirect
+	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 	google.golang.org/api v0.84.0
 	google.golang.org/genproto v0.0.0-20220617124728-180714bec0ad
@@ -140,11 +135,11 @@ require (
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/thales-e-security/pool v0.0.2 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
-	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 	golang.org/x/text v0.3.8-0.20211004125949-5bd84dd9b33b // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/yaml.v3 v3.0.0 // indirect
@@ -157,7 +152,3 @@ require (
 
 // use github.com/smallstep/pkcs7 fork with patches applied
 replace go.mozilla.org/pkcs7 => github.com/smallstep/pkcs7 v0.0.0-20211016004704-52592125d6f6
-
-replace go.step.sm/crypto => github.com/brandonweeks/crypto v0.16.2-0.20220531234114-45e4f06ca16b
-
-replace github.com/google/go-attestation => github.com/brandonweeks/go-attestation v0.0.0-20220602235615-164122a1d59b
