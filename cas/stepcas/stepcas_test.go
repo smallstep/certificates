@@ -667,7 +667,15 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 		{"ok with provisioner", fields{jwk, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:         testCR,
 			Lifetime:    time.Hour,
-			Provisioner: &apiv1.ProvisionerInfo{ProvisionerID: "provisioner-id", ProvisionerType: "ACME"},
+			Provisioner: &apiv1.ProvisionerInfo{ID: "provisioner-id", Type: "ACME"},
+		}}, &apiv1.CreateCertificateResponse{
+			Certificate:      testCrt,
+			CertificateChain: []*x509.Certificate{testIssCrt},
+		}, false},
+		{"ok with server cert", fields{jwk, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
+			CSR:            testCR,
+			Lifetime:       time.Hour,
+			IsCAServerCert: true,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      testCrt,
 			CertificateChain: []*x509.Certificate{testIssCrt},

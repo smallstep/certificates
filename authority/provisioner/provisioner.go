@@ -343,10 +343,11 @@ type Permissions struct {
 // RAInfo is the information about a provisioner present in RA tokens generated
 // by StepCAS.
 type RAInfo struct {
-	AuthorityID     string `json:"authorityId"`
-	ProvisionerID   string `json:"provisionerId"`
-	ProvisionerType string `json:"provisionerType"`
-	ProvisionerName string `json:"provisionerName"`
+	AuthorityID     string `json:"authorityId,omitempty"`
+	EndpointID      string `json:"endpointId,omitempty"`
+	ProvisionerID   string `json:"provisionerId,omitempty"`
+	ProvisionerType string `json:"provisionerType,omitempty"`
+	ProvisionerName string `json:"provisionerName,omitempty"`
 }
 
 // raProvisioner wraps a provisioner with RA data.

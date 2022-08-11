@@ -48,6 +48,9 @@ func Test_jwkIssuer_SignToken(t *testing.T) {
 		{"ok ra", fields{caURL, "ra@doe.org", signer}, args{"doe", []string{"doe.org"}, &raInfo{
 			AuthorityID: "authority-id", ProvisionerID: "provisioner-id", ProvisionerType: "provisioner-type",
 		}}, false},
+		{"ok ra endpoint id", fields{caURL, "ra@doe.org", signer}, args{"doe", []string{"doe.org"}, &raInfo{
+			AuthorityID: "authority-id", EndpointID: "endpoint-id",
+		}}, false},
 		{"fail", fields{caURL, "ra@doe.org", &mockErrSigner{}}, args{"doe", []string{"doe.org"}, nil}, true},
 	}
 	for _, tt := range tests {

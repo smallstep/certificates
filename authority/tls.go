@@ -100,9 +100,9 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		case provisioner.Interface:
 			prov = k
 			pInfo = &casapi.ProvisionerInfo{
-				ProvisionerID:   prov.GetID(),
-				ProvisionerType: prov.GetType().String(),
-				ProvisionerName: prov.GetName(),
+				ID:   prov.GetID(),
+				Type: prov.GetType().String(),
+				Name: prov.GetName(),
 			}
 		// Adds new options to NewCertificate
 		case provisioner.CertificateOptions:
@@ -615,10 +615,11 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	certTpl.NotAfter = now.Add(24 * time.Hour)
 
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
-		Template: certTpl,
-		CSR:      cr,
-		Lifetime: 24 * time.Hour,
-		Backdate: 1 * time.Minute,
+		Template:       certTpl,
+		CSR:            cr,
+		Lifetime:       24 * time.Hour,
+		Backdate:       1 * time.Minute,
+		IsCAServerCert: true,
 	})
 	if err != nil {
 		return fatal(err)

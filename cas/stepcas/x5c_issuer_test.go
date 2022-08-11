@@ -72,6 +72,9 @@ func Test_x5cIssuer_SignToken(t *testing.T) {
 		{"ok ra", fields{caURL, testX5CPath, testX5CKeyPath, "X5C"}, args{"doe", []string{"doe.org"}, &raInfo{
 			AuthorityID: "authority-id", ProvisionerID: "provisioner-id", ProvisionerType: "provisioner-type",
 		}}, false},
+		{"ok ra endpoint id", fields{caURL, testX5CPath, testX5CKeyPath, "X5C"}, args{"doe", []string{"doe.org"}, &raInfo{
+			AuthorityID: "authority-id", EndpointID: "endpoint-id",
+		}}, false},
 		{"fail crt", fields{caURL, "", testX5CKeyPath, "X5C"}, args{"doe", []string{"doe.org"}, nil}, true},
 		{"fail key", fields{caURL, testX5CPath, "", "X5C"}, args{"doe", []string{"doe.org"}, nil}, true},
 		{"fail no signer", fields{caURL, testIssKeyPath, testIssPath, "X5C"}, args{"doe", []string{"doe.org"}, nil}, true},
