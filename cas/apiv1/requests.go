@@ -63,9 +63,9 @@ type CreateCertificateRequest struct {
 // ProvisionerInfo contains information of the provisioner used to authorize a
 // certificate.
 type ProvisionerInfo struct {
-	ProvisionerID   string
-	ProvisionerType string
-	ProvisionerName string
+	ID   string
+	Type string
+	Name string
 }
 
 // CreateCertificateResponse is the response to a create certificate request.

@@ -79,9 +79,9 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 	if p := req.Provisioner; p != nil {
 		info = &raInfo{
 			AuthorityID:     s.authorityID,
-			ProvisionerID:   p.ProvisionerID,
-			ProvisionerType: p.ProvisionerType,
-			ProvisionerName: p.ProvisionerName,
+			ProvisionerID:   p.ID,
+			ProvisionerType: p.Type,
+			ProvisionerName: p.Name,
 		}
 	}
 
