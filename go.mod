@@ -6,22 +6,21 @@ require (
 	cloud.google.com/go v0.100.2
 	cloud.google.com/go/kms v1.4.0
 	cloud.google.com/go/security v1.3.0
-	github.com/Azure/azure-sdk-for-go v58.0.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.17
-	github.com/Azure/go-autorest/autorest/azure/auth v0.5.8
+	github.com/Azure/azure-sdk-for-go v65.0.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.11.27
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
 	github.com/Azure/go-autorest/autorest/date v0.3.0
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/ThalesIgnite/crypto11 v1.2.4
-	github.com/aws/aws-sdk-go v1.37.0
+	github.com/ThalesIgnite/crypto11 v1.2.5
+	github.com/aws/aws-sdk-go v1.44.37
 	github.com/dgraph-io/ristretto v0.0.4-0.20200906165740-41ebdbffecfd // indirect
 	github.com/fxamacker/cbor/v2 v2.4.0
 	github.com/go-chi/chi v4.0.2+incompatible
 	github.com/go-piv/piv-go v1.10.0
 	github.com/golang/mock v1.6.0
-	github.com/google/go-attestation v0.4.4-0.20220404204839-8820d49b18d9 // indirect
 	github.com/google/go-cmp v0.5.8
 	github.com/google/uuid v1.3.0
-	github.com/googleapis/gax-go/v2 v2.1.1
+	github.com/googleapis/gax-go/v2 v2.4.0
 	github.com/hashicorp/vault/api v1.3.1
 	github.com/hashicorp/vault/api/auth/approle v0.1.1
 	github.com/hashicorp/vault/api/auth/kubernetes v0.1.0
@@ -38,30 +37,30 @@ require (
 	github.com/stretchr/testify v1.7.1
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
-	go.step.sm/cli-utils v0.7.0
-	go.step.sm/crypto v0.16.2
+	go.step.sm/cli-utils v0.7.3
+	go.step.sm/crypto v0.17.1-0.20220810233434-022ae3d77b48
 	go.step.sm/linkedca v0.17.0
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
-	golang.org/x/net v0.0.0-20220403103023-749bd193bc2b
-	golang.org/x/sys v0.0.0-20220405052023-b1e9470b6e64 // indirect
-	google.golang.org/api v0.70.0
-	google.golang.org/genproto v0.0.0-20220401170504-314d38edb7de
-	google.golang.org/grpc v1.45.0
+	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
+	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d // indirect
+	google.golang.org/api v0.84.0
+	google.golang.org/genproto v0.0.0-20220617124728-180714bec0ad
+	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
 require (
-	cloud.google.com/go/compute v1.3.0 // indirect
+	cloud.google.com/go/compute v1.6.1 // indirect
 	cloud.google.com/go/iam v0.1.0 // indirect
 	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
-	github.com/Azure/go-autorest/autorest/adal v0.9.11 // indirect
-	github.com/Azure/go-autorest/autorest/azure/cli v0.4.2 // indirect
+	github.com/Azure/go-autorest/autorest/adal v0.9.18 // indirect
+	github.com/Azure/go-autorest/autorest/azure/cli v0.4.5 // indirect
 	github.com/Azure/go-autorest/autorest/to v0.4.0 // indirect
 	github.com/Azure/go-autorest/autorest/validation v0.3.1 // indirect
-	github.com/Azure/go-autorest/logger v0.2.0 // indirect
+	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.1.1 // indirect
@@ -78,13 +77,14 @@ require (
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/fatih/color v1.9.0 // indirect
-	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.0 // indirect
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.0.0-20220520183353-fd19c99a87aa // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-hclog v0.16.2 // indirect
@@ -113,6 +113,7 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
 	github.com/jackc/pgtype v1.9.0 // indirect
 	github.com/jackc/pgx/v4 v4.14.0 // indirect
+	github.com/jhump/protoreflect v1.9.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.12.3 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
@@ -136,8 +137,8 @@ require (
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
+	golang.org/x/text v0.3.8-0.20211004125949-5bd84dd9b33b // indirect
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/yaml.v3 v3.0.0 // indirect
@@ -150,7 +151,3 @@ require (
 
 // use github.com/smallstep/pkcs7 fork with patches applied
 replace go.mozilla.org/pkcs7 => github.com/smallstep/pkcs7 v0.0.0-20211016004704-52592125d6f6
-
-replace go.step.sm/crypto => github.com/brandonweeks/crypto v0.16.2-0.20220531234114-45e4f06ca16b
-
-replace github.com/google/go-attestation => github.com/brandonweeks/go-attestation v0.0.0-20220602235615-164122a1d59b

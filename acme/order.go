@@ -169,8 +169,8 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	}
 
 	if permanentIdentifier != "" {
-		data.SetPermanentIdentifiers([]x509util.PermanentIdentifier{
-			{Value: permanentIdentifier},
+		data.Set(x509util.SANsKey, []x509util.SubjectAlternativeName{
+			{Type: x509util.PermanentIdentifierType, Value: permanentIdentifier},
 		})
 	} else {
 		// retrieve the requested SANs for the Order
