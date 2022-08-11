@@ -273,11 +273,13 @@ func (c *linkedCaClient) GetCertificateData(serial string) (*db.CertificateData,
 func (c *linkedCaClient) StoreCertificateChain(p provisioner.Interface, fullchain ...*x509.Certificate) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	raProvisioner, endpointID := createRegistrationAuthorityProvisioner(p)
 	_, err := c.client.PostCertificate(ctx, &linkedca.CertificateRequest{
 		PemCertificate:      serializeCertificateChain(fullchain[0]),
 		PemCertificateChain: serializeCertificateChain(fullchain[1:]...),
 		Provisioner:         createProvisionerIdentity(p),
-		RaProvisioner:       createRegistrationAuthorityProvisioner(p),
+		RaProvisioner:       raProvisioner,
+		EndpointId:          endpointID,
 	})
 	return errors.Wrap(err, "error posting certificate")
 }
@@ -397,7 +399,7 @@ type raProvisioner interface {
 	RAInfo() *provisioner.RAInfo
 }
 
-func createRegistrationAuthorityProvisioner(p provisioner.Interface) *linkedca.RegistrationAuthorityProvisioner {
+func createRegistrationAuthorityProvisioner(p provisioner.Interface) (*linkedca.RegistrationAuthorityProvisioner, string) {
 	if rap, ok := p.(raProvisioner); ok {
 		info := rap.RAInfo()
 		typ := linkedca.Provisioner_Type_value[strings.ToUpper(info.ProvisionerType)]
@@ -408,9 +410,9 @@ func createRegistrationAuthorityProvisioner(p provisioner.Interface) *linkedca.R
 				Type: linkedca.Provisioner_Type(typ),
 				Name: info.ProvisionerName,
 			},
-		}
+		}, info.EndpointID
 	}
-	return nil
+	return nil, ""
 }
 
 func serializeCertificate(crt *x509.Certificate) string {

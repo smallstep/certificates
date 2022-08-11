@@ -615,10 +615,11 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	certTpl.NotAfter = now.Add(24 * time.Hour)
 
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
-		Template: certTpl,
-		CSR:      cr,
-		Lifetime: 24 * time.Hour,
-		Backdate: 1 * time.Minute,
+		Template:     certTpl,
+		CSR:          cr,
+		Lifetime:     24 * time.Hour,
+		Backdate:     1 * time.Minute,
+		IsServerCert: true,
 	})
 	if err != nil {
 		return fatal(err)
