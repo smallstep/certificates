@@ -52,13 +52,13 @@ const (
 
 // CreateCertificateRequest is the request used to sign a new certificate.
 type CreateCertificateRequest struct {
-	Template     *x509.Certificate
-	CSR          *x509.CertificateRequest
-	Lifetime     time.Duration
-	Backdate     time.Duration
-	RequestID    string
-	Provisioner  *ProvisionerInfo
-	IsServerCert bool
+	Template       *x509.Certificate
+	CSR            *x509.CertificateRequest
+	Lifetime       time.Duration
+	Backdate       time.Duration
+	RequestID      string
+	Provisioner    *ProvisionerInfo
+	IsCAServerCert bool
 }
 
 // ProvisionerInfo contains information of the provisioner used to authorize a

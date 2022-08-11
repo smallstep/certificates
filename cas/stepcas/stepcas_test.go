@@ -673,9 +673,9 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 			CertificateChain: []*x509.Certificate{testIssCrt},
 		}, false},
 		{"ok with server cert", fields{jwk, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
-			CSR:          testCR,
-			Lifetime:     time.Hour,
-			IsServerCert: true,
+			CSR:            testCR,
+			Lifetime:       time.Hour,
+			IsCAServerCert: true,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      testCrt,
 			CertificateChain: []*x509.Certificate{testIssCrt},

@@ -78,7 +78,7 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 	info := &raInfo{
 		AuthorityID: s.authorityID,
 	}
-	if req.IsServerCert {
+	if req.IsCAServerCert {
 		info.EndpointID = newServerEndpointID(s.authorityID).String()
 	}
 	if p := req.Provisioner; p != nil {
