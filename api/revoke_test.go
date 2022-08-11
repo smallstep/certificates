@@ -33,7 +33,7 @@ func TestRevokeRequestValidate(t *testing.T) {
 		},
 		"error/bad sn": {
 			rr:  &RevokeRequest{Serial: "sn"},
-			err: &errs.Error{Err: errors.New("'sn' is not a valid serial number - use a base 10 representation or add a prefix indicating the base"), Status: http.StatusBadRequest},
+			err: &errs.Error{Err: errors.New("'sn' is not a valid serial number - use a base 10 representation or a base 16 representation with '0x' prefix"), Status: http.StatusBadRequest},
 		},
 		"error/bad reasonCode": {
 			rr: &RevokeRequest{
