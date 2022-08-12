@@ -120,6 +120,6 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 }
 
 func sanitizeLogEntry(s string) string {
-	escaped := strings.Replace(s, "\n", "", -1)
-	return strings.Replace(escaped, "\r", "", -1)
+	escaped := strings.ReplaceAll(s, "\n", "")
+	return strings.ReplaceAll(escaped, "\r", "")
 }
