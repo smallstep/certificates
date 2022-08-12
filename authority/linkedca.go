@@ -461,7 +461,7 @@ func getRootCertificate(endpoint, fingerprint string) (*x509.Certificate, error)
 	defer cancel()
 
 	conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: true, // lgtm[go/disabled-certificate-check]
 	})))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error connecting %s", endpoint)
