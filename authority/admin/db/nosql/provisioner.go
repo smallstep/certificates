@@ -24,6 +24,7 @@ type dbProvisioner struct {
 	SSHTemplate  *linkedca.Template        `json:"sshTemplate"`
 	CreatedAt    time.Time                 `json:"createdAt"`
 	DeletedAt    time.Time                 `json:"deletedAt"`
+	Webhooks     []*linkedca.Webhook       `json:"webhooks"`
 }
 
 func (dbp *dbProvisioner) clone() *dbProvisioner {
@@ -48,6 +49,7 @@ func (dbp *dbProvisioner) convert2linkedca() (*linkedca.Provisioner, error) {
 		SshTemplate:  dbp.SSHTemplate,
 		CreatedAt:    timestamppb.New(dbp.CreatedAt),
 		DeletedAt:    timestamppb.New(dbp.DeletedAt),
+		Webhooks:     dbp.Webhooks,
 	}, nil
 }
 
@@ -164,6 +166,7 @@ func (db *DB) CreateProvisioner(ctx context.Context, prov *linkedca.Provisioner)
 		X509Template: prov.X509Template,
 		SSHTemplate:  prov.SshTemplate,
 		CreatedAt:    clock.Now(),
+		Webhooks:     prov.Webhooks,
 	}
 
 	if err := db.save(ctx, prov.Id, dbp, nil, "provisioner", provisionersTable); err != nil {
@@ -193,6 +196,7 @@ func (db *DB) UpdateProvisioner(ctx context.Context, prov *linkedca.Provisioner)
 	}
 	nu.X509Template = prov.X509Template
 	nu.SSHTemplate = prov.SshTemplate
+	nu.Webhooks = prov.Webhooks
 
 	return db.save(ctx, prov.Id, nu, old, "provisioner", provisionersTable)
 }
