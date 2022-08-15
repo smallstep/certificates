@@ -227,8 +227,9 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		if adminDB != nil {
 			acmeAdminResponder := adminAPI.NewACMEAdminResponder()
 			policyAdminResponder := adminAPI.NewPolicyAdminResponder()
+			webhookAdminResponder := adminAPI.NewWebhookAdminResponder()
 			mux.Route("/admin", func(r chi.Router) {
-				adminAPI.Route(r, acmeAdminResponder, policyAdminResponder)
+				adminAPI.Route(r, acmeAdminResponder, policyAdminResponder, webhookAdminResponder)
 			})
 		}
 	}

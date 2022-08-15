@@ -12,24 +12,26 @@ import (
 
 // Handler is the Admin API request handler.
 type Handler struct {
-	acmeResponder   ACMEAdminResponder
-	policyResponder PolicyAdminResponder
+	acmeResponder    ACMEAdminResponder
+	policyResponder  PolicyAdminResponder
+	webhookResponder WebhookAdminResponder
 }
 
 // Route traffic and implement the Router interface.
 //
 // Deprecated: use Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder PolicyAdminResponder)
 func (h *Handler) Route(r api.Router) {
-	Route(r, h.acmeResponder, h.policyResponder)
+	Route(r, h.acmeResponder, h.policyResponder, h.webhookResponder)
 }
 
 // NewHandler returns a new Authority Config Handler.
 //
 // Deprecated: use Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder PolicyAdminResponder)
-func NewHandler(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB, acmeResponder ACMEAdminResponder, policyResponder PolicyAdminResponder) api.RouterHandler {
+func NewHandler(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB, acmeResponder ACMEAdminResponder, policyResponder PolicyAdminResponder, webhookResponder WebhookAdminResponder) api.RouterHandler {
 	return &Handler{
-		acmeResponder:   acmeResponder,
-		policyResponder: policyResponder,
+		acmeResponder:    acmeResponder,
+		policyResponder:  policyResponder,
+		webhookResponder: webhookResponder,
 	}
 }
 
@@ -38,7 +40,7 @@ var mustAuthority = func(ctx context.Context) adminAuthority {
 }
 
 // Route traffic and implement the Router interface.
-func Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder PolicyAdminResponder) {
+func Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder PolicyAdminResponder, webhookResponder WebhookAdminResponder) {
 	authnz := func(next http.HandlerFunc) http.HandlerFunc {
 		return extractAuthorizeTokenAdmin(requireAPIEnabled(next))
 	}
@@ -113,5 +115,10 @@ func Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder Polic
 		r.MethodFunc("PUT", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(policyResponder.UpdateACMEAccountPolicy))
 		r.MethodFunc("DELETE", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(policyResponder.DeleteACMEAccountPolicy))
 		r.MethodFunc("DELETE", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(policyResponder.DeleteACMEAccountPolicy))
+	}
+
+	if webhookResponder != nil {
+		r.MethodFunc("POST", "provisioners/{provisionerName}/webhooks", webhookResponder.CreateProvisionerWebhook)
+		r.MethodFunc("POST", "provisioners/{provisionerName}/webhooks", webhookResponder.CreateProvisionerWebhook)
 	}
 }
