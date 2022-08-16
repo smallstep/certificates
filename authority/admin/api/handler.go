@@ -69,6 +69,10 @@ func Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder Polic
 		return authnz(disabledInStandalone(loadProvisionerByName(requireEABEnabled(loadExternalAccountKey(next)))))
 	}
 
+	webhookMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+		return authnz(loadProvisionerByName(next))
+	}
+
 	// Provisioners
 	r.MethodFunc("GET", "/provisioners/{name}", authnz(GetProvisioner))
 	r.MethodFunc("GET", "/provisioners", authnz(GetProvisioners))
@@ -118,7 +122,8 @@ func Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder Polic
 	}
 
 	if webhookResponder != nil {
-		r.MethodFunc("POST", "provisioners/{provisionerName}/webhooks", webhookResponder.CreateProvisionerWebhook)
-		r.MethodFunc("POST", "provisioners/{provisionerName}/webhooks", webhookResponder.CreateProvisionerWebhook)
+		r.MethodFunc("POST", "provisioners/{provisionerName}/webhooks", webhookMiddleware(webhookResponder.CreateProvisionerWebhook))
+		r.MethodFunc("PUT", "provisioners/{provisionerName}/webhooks/{webhookName}", webhookMiddleware(webhookResponder.UpdateProvisionerWebhook))
+		r.MethodFunc("DELETE", "provisioners/{provisionerName}/webhooks/{webhookName}", webhookMiddleware(webhookResponder.DeleteProvisionerWebhook))
 	}
 }
