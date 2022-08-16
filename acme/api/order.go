@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi"
 
 	"go.step.sm/crypto/randutil"
+	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api/render"
@@ -33,12 +34,20 @@ func (n *NewOrderRequest) Validate() error {
 		return acme.NewError(acme.ErrorMalformedType, "identifiers list cannot be empty")
 	}
 	for _, id := range n.Identifiers {
-		if !(id.Type == acme.DNS || id.Type == acme.IP) {
+		switch id.Type {
+		case acme.IP:
+			if net.ParseIP(id.Value) == nil {
+				return acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", id.Value)
+			}
+		case acme.DNS:
+			value, _ := trimIfWildcard(id.Value)
+			if _, err := x509util.SanitizeName(value); err != nil {
+				return acme.NewError(acme.ErrorMalformedType, "invalid DNS name: %s", id.Value)
+			}
+		default:
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
 		}
-		if id.Type == acme.IP && net.ParseIP(id.Value) == nil {
-			return acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", id.Value)
-		}
+
 		// TODO(hs): add some validations for DNS domains?
 		// TODO(hs): combine the errors from this with allow/deny policy, like example error in https://datatracker.ietf.org/doc/html/rfc8555#section-6.7.1
 	}
@@ -218,13 +227,19 @@ func newACMEPolicyEngine(eak *acme.ExternalAccountKey) (policy.X509Policy, error
 	return policy.NewX509PolicyEngine(eak.Policy)
 }
 
+func trimIfWildcard(value string) (string, bool) {
+	if strings.HasPrefix(value, "*.") {
+		return strings.TrimPrefix(value, "*."), true
+	}
+	return value, false
+}
+
 func newAuthorization(ctx context.Context, az *acme.Authorization) error {
-	if strings.HasPrefix(az.Identifier.Value, "*.") {
-		az.Wildcard = true
-		az.Identifier = acme.Identifier{
-			Value: strings.TrimPrefix(az.Identifier.Value, "*."),
-			Type:  az.Identifier.Type,
-		}
+	value, isWildcard := trimIfWildcard(az.Identifier.Value)
+	az.Wildcard = isWildcard
+	az.Identifier = acme.Identifier{
+		Value: value,
+		Type:  az.Identifier.Type,
 	}
 
 	chTypes := challengeTypes(az)
