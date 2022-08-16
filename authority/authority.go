@@ -339,6 +339,19 @@ func (a *Authority) init() error {
 					Type:        conf.RaConfig.Provisioner.Type.String(),
 					Provisioner: conf.RaConfig.Provisioner.Name,
 				}
+				// Configure the RA authority type if needed
+				if options.Type == "" {
+					options.Type = casapi.StepCAS
+				}
+			}
+			// Remote configuration is currently only supported on a linked RA
+			if sc := conf.ServerConfig; sc != nil {
+				if a.config.Address == "" {
+					a.config.Address = sc.Address
+				}
+				if len(a.config.DNSNames) == 0 {
+					a.config.DNSNames = sc.DnsNames
+				}
 			}
 		}
 
