@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -20,14 +21,15 @@ import (
 type Webhook struct {
 	Name          string `json:"name"`
 	URL           string `json:"url"`
+	Kind          string `json:"kind"`
 	BearerToken   string `json:"-"`
 	Username      string `json:"-"`
 	Password      string `json:"-"`
-	SigningSecret []byte `json:"-"`
+	SigningSecret string `json:"-"`
 }
 
 type webhookRequestBody struct {
-	Timestamp string `json:"timstamp"`
+	Timestamp string `json:"timestamp"`
 	CSR       []byte `json:"csr"`
 }
 
@@ -63,7 +65,11 @@ retry:
 		return nil, err
 	}
 
-	sig := hmac.New(sha256.New, w.SigningSecret).Sum(reqBytes)
+	secret, err := base64.StdEncoding.DecodeString(w.SigningSecret)
+	if err != nil {
+		return nil, err
+	}
+	sig := hmac.New(sha256.New, secret).Sum(reqBytes)
 	req.Header.Set("X-Smallstep-Signature", hex.EncodeToString(sig))
 
 	if w.BearerToken != "" {

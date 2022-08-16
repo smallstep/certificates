@@ -41,6 +41,9 @@ type SSHOptions struct {
 
 	// Host contains SSH host certificate options.
 	Host *policy.SSHHostCertificateOptions `json:"-"`
+
+	// Webhooks is a list of webhooks that can augment template data
+	Webhooks []*Webhook `json:"webhooks"`
 }
 
 // GetAllowedUserNameOptions returns the SSHNameOptions that are

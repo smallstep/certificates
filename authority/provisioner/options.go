@@ -72,8 +72,8 @@ type X509Options struct {
 	// like *.example.com are allowed. Defaults to false.
 	AllowWildcardNames bool `json:"-"`
 
-	// Inventories is a list of webhooks that can augment template data
-	Inventories []Webhook `json:"inventories"`
+	// Webhooks is a list of webhooks that can augment template data
+	Webhooks []*Webhook `json:"webhooks"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
@@ -136,7 +136,7 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 	return certificateOptionsFunc(func(so SignOptions) []x509util.Option {
 		var enrich = func(fn func(string, x509util.TemplateData) x509util.Option, arg1 string) x509util.Option {
 			return func(cr *x509.CertificateRequest, xOpts *x509util.Options) error {
-				for _, wh := range opts.Inventories {
+				for _, wh := range opts.Webhooks {
 					d, err := wh.Do(context.TODO(), so.WebhookClient, cr, data)
 					if err != nil {
 						return err

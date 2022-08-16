@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"strings"
 	"time"
 
@@ -46,13 +47,14 @@ type SSHCertOptionsValidator interface {
 
 // SignSSHOptions contains the options that can be passed to the SignSSH method.
 type SignSSHOptions struct {
-	CertType     string          `json:"certType"`
-	KeyID        string          `json:"keyID"`
-	Principals   []string        `json:"principals"`
-	ValidAfter   TimeDuration    `json:"validAfter,omitempty"`
-	ValidBefore  TimeDuration    `json:"validBefore,omitempty"`
-	TemplateData json.RawMessage `json:"templateData,omitempty"`
-	Backdate     time.Duration   `json:"-"`
+	CertType      string          `json:"certType"`
+	KeyID         string          `json:"keyID"`
+	Principals    []string        `json:"principals"`
+	ValidAfter    TimeDuration    `json:"validAfter,omitempty"`
+	ValidBefore   TimeDuration    `json:"validBefore,omitempty"`
+	TemplateData  json.RawMessage `json:"templateData,omitempty"`
+	Backdate      time.Duration   `json:"-"`
+	WebhookClient *http.Client    `json:"-"`
 }
 
 // Validate validates the given SignSSHOptions.
