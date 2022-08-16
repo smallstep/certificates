@@ -72,6 +72,7 @@ type Config struct {
 	Password         string               `json:"password,omitempty"`
 	Templates        *templates.Templates `json:"templates,omitempty"`
 	CommonName       string               `json:"commonName,omitempty"`
+	SkipValidation   bool                 `json:"-"`
 }
 
 // ASN1DN contains ASN1.DN attributes that are used in Subject and Issuer
@@ -201,6 +202,8 @@ func (c *Config) Save(filename string) error {
 // Validate validates the configuration.
 func (c *Config) Validate() error {
 	switch {
+	case c.SkipValidation:
+		return nil
 	case c.Address == "":
 		return errors.New("address cannot be empty")
 	case len(c.DNSNames) == 0:
