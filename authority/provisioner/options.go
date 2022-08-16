@@ -10,6 +10,7 @@ import (
 
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/x509util"
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/policy"
 )
@@ -136,13 +137,18 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 	return certificateOptionsFunc(func(so SignOptions) []x509util.Option {
 		var enrich = func(fn func(string, x509util.TemplateData) x509util.Option, arg1 string) x509util.Option {
 			return func(cr *x509.CertificateRequest, xOpts *x509util.Options) error {
-				for _, wh := range opts.Webhooks {
-					d, err := wh.Do(context.TODO(), so.WebhookClient, cr, data)
-					if err != nil {
-						return err
+				if opts != nil {
+					for _, wh := range opts.Webhooks {
+						if wh.Kind != linkedca.Webhook_ENRICHING.String() {
+							continue
+						}
+						d, err := wh.Do(context.TODO(), so.WebhookClient, cr, data)
+						if err != nil {
+							return err
+						}
+						// TODO add SetInventories method under 'inventories' key
+						data.Set(wh.Name, d)
 					}
-					// TODO add SetInventories method under 'inventories' key
-					data.Set(wh.Name, d)
 				}
 				return fn(arg1, data)(cr, xOpts)
 			}

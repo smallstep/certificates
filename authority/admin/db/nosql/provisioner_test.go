@@ -363,7 +363,7 @@ func defaultDBP(t *testing.T) *dbProvisioner {
 				Name:        "metadata",
 				Url:         "https://inventory.smallstep.com",
 				Kind:        linkedca.Webhook_ENRICHING,
-				Secret:      []byte("signing secret"),
+				Secret:      "signing secret",
 				BearerToken: "token",
 			},
 		},

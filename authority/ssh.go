@@ -160,6 +160,8 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	// Set backdate with the configured value
 	opts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
+	opts.WebhookClient = a.webhookClient
+
 	var prov provisioner.Interface
 	for _, op := range signOpts {
 		switch o := op.(type) {
