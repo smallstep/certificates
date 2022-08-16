@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go v0.100.2
 	cloud.google.com/go/security v1.3.0
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/go-chi/chi v4.0.2+incompatible
+	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.8
 	github.com/google/uuid v1.3.0
