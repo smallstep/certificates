@@ -49,6 +49,36 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 				err: acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: foo"),
 			}
 		},
+		"fail/bad-identifier/bad-dns": func(t *testing.T) test {
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "dns", Value: "xn--bücher.example.com"},
+					},
+				},
+				err: acme.NewError(acme.ErrorMalformedType, "invalid DNS name: xn--bücher.example.com"),
+			}
+		},
+		"fail/bad-identifier/dns-port": func(t *testing.T) test {
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "dns", Value: "example.com:8080"},
+					},
+				},
+				err: acme.NewError(acme.ErrorMalformedType, "invalid DNS name: example.com:8080"),
+			}
+		},
+		"fail/bad-identifier/dns-wildcard-port": func(t *testing.T) test {
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "dns", Value: "*.example.com:8080"},
+					},
+				},
+				err: acme.NewError(acme.ErrorMalformedType, "invalid DNS name: *.example.com:8080"),
+			}
+		},
 		"fail/bad-ip": func(t *testing.T) test {
 			nbf := time.Now().UTC().Add(time.Minute)
 			naf := time.Now().UTC().Add(5 * time.Minute)
@@ -72,7 +102,7 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
 						{Type: "dns", Value: "example.com"},
-						{Type: "dns", Value: "bar.com"},
+						{Type: "dns", Value: "*.bar.com"},
 					},
 					NotAfter:  naf,
 					NotBefore: nbf,
@@ -2094,6 +2124,35 @@ func TestHandler_challengeTypes(t *testing.T) {
 			if got := challengeTypes(tt.args.az); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Handler.challengeTypes() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestTrimIfWildcard(t *testing.T) {
+	tests := []struct {
+		name      string
+		arg       string
+		wantValue string
+		wantBool  bool
+	}{
+		{
+			name:      "no trim",
+			arg:       "smallstep.com",
+			wantValue: "smallstep.com",
+			wantBool:  false,
+		},
+		{
+			name:      "trim",
+			arg:       "*.smallstep.com",
+			wantValue: "smallstep.com",
+			wantBool:  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v, ok := trimIfWildcard(tt.arg)
+			assert.Equals(t, v, tt.wantValue)
+			assert.Equals(t, ok, tt.wantBool)
 		})
 	}
 }
