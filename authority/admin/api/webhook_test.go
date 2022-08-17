@@ -23,9 +23,8 @@ func assertEqualWebhook(t *testing.T, a, b *linkedca.Webhook) {
 	assert.Equal(t, a.Name, b.Name)
 	assert.Equal(t, a.Url, b.Url)
 	assert.Equal(t, a.Kind, b.Kind)
-	assert.Equal(t, a.BearerToken, b.BearerToken)
-	assert.Equal(t, a.Username, b.Username)
-	assert.Equal(t, a.Password, b.Password)
+
+	assert.Equal(t, a.GetAuth(), b.GetAuth())
 }
 
 func TestWebhookAdminResponder_CreateProvisionerWebhook(t *testing.T) {
@@ -131,29 +130,6 @@ func TestWebhookAdminResponder_CreateProvisionerWebhook(t *testing.T) {
 			adminErr := admin.NewError(admin.ErrorBadRequestType, "webhook url must use https")
 			adminErr.Message = "webhook url must use https"
 			body := []byte(`{"name": "metadata", "url": "http://example.com", "kind": "ENRICHING"}`)
-			return test{
-				ctx:        ctx,
-				body:       body,
-				err:        adminErr,
-				statusCode: 400,
-			}
-		},
-		"fail/multiple-auth": func(t *testing.T) test {
-			prov := &linkedca.Provisioner{
-				Name: "provName",
-			}
-			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
-			adminErr := admin.NewError(admin.ErrorBadRequestType, "webhook cannot use both bearer and basic authentication")
-			adminErr.Message = "webhook cannot use both bearer and basic authentication"
-			body := []byte(`
-			{
-				"name": "metadata",
-				"url": "https://example.com",
-				"kind": "ENRICHING",
-				"bearer_token": "token",
-				"username": "user",
-				"password": "pass"
-			}`)
 			return test{
 				ctx:        ctx,
 				body:       body,
@@ -511,31 +487,6 @@ func TestWebhookAdminResponder_UpdateProvisionerWebhook(t *testing.T) {
 			adminErr := admin.NewError(admin.ErrorBadRequestType, "webhook url must use https")
 			adminErr.Message = "webhook url must use https"
 			body := []byte(`{"name": "metadata", "url": "http://example.com", "kind": "ENRICHING"}`)
-			return test{
-				ctx:        ctx,
-				adminDB:    &admin.MockDB{},
-				body:       body,
-				err:        adminErr,
-				statusCode: 400,
-			}
-		},
-		"fail/multiple-auth": func(t *testing.T) test {
-			prov := &linkedca.Provisioner{
-				Name:     "provName",
-				Webhooks: []*linkedca.Webhook{{Name: "my-webhook", Url: "https://example.com", Kind: linkedca.Webhook_ENRICHING}},
-			}
-			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
-			adminErr := admin.NewError(admin.ErrorBadRequestType, "webhook cannot use both bearer and basic authentication")
-			adminErr.Message = "webhook cannot use both bearer and basic authentication"
-			body := []byte(`
-			{
-				"name": "my-webhook",
-				"url": "https://example.com",
-				"kind": "ENRICHING",
-				"bearer_token": "token",
-				"username": "user",
-				"password": "pass"
-			}`)
 			return test{
 				ctx:        ctx,
 				adminDB:    &admin.MockDB{},

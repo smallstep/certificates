@@ -508,15 +508,22 @@ func optionsToCertificates(p *linkedca.Provisioner) *provisioner.Options {
 }
 
 func webhookToCertificates(wh *linkedca.Webhook) *provisioner.Webhook {
-	return &provisioner.Webhook{
+	pwh := &provisioner.Webhook{
 		Name:          wh.Name,
 		URL:           wh.Url,
 		Kind:          wh.Kind.String(),
-		BearerToken:   wh.BearerToken,
-		Username:      wh.Username,
-		Password:      wh.Password,
 		SigningSecret: wh.Secret,
 	}
+
+	switch a := wh.GetAuth().(type) {
+	case *linkedca.Webhook_BearerToken:
+		pwh.BearerToken = a.BearerToken
+	case *linkedca.Webhook_Basic:
+		pwh.BasicAuth.Username = a.Basic.Username
+		pwh.BasicAuth.Password = a.Basic.Password
+	}
+
+	return pwh
 }
 
 func durationsToCertificates(d *linkedca.Durations) (min, max, def *provisioner.Duration, err error) {

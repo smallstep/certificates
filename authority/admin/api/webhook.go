@@ -60,11 +60,6 @@ func validateWebhook(webhook *linkedca.Webhook) error {
 		return admin.NewError(admin.ErrorBadRequestType, "webhook kind is invalid")
 	}
 
-	// multiple authentication methods
-	if webhook.BearerToken != "" && (webhook.Username != "" || webhook.Password != "") {
-		return admin.NewError(admin.ErrorBadRequestType, "webhook cannot use both bearer and basic authentication")
-	}
-
 	return nil
 }
 

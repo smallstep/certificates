@@ -22,10 +22,12 @@ type Webhook struct {
 	Name          string `json:"name"`
 	URL           string `json:"url"`
 	Kind          string `json:"kind"`
-	BearerToken   string `json:"-"`
-	Username      string `json:"-"`
-	Password      string `json:"-"`
 	SigningSecret string `json:"-"`
+	BearerToken   string `json:"-"`
+	BasicAuth     struct {
+		Username string
+		Password string
+	} `json:"-"`
 }
 
 type webhookRequestBody struct {
@@ -74,8 +76,8 @@ retry:
 
 	if w.BearerToken != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", w.BearerToken))
-	} else if w.Username != "" || w.Password != "" {
-		req.SetBasicAuth(w.Username, w.Password)
+	} else if w.BasicAuth.Username != "" || w.BasicAuth.Password != "" {
+		req.SetBasicAuth(w.BasicAuth.Username, w.BasicAuth.Password)
 	}
 
 	// TODO get request ID from context

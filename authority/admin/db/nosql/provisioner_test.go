@@ -137,6 +137,7 @@ func TestDB_getDBProvisioner(t *testing.T) {
 			}
 		},
 		"fail/deleted": func(t *testing.T) test {
+
 			now := clock.Now()
 			dbp := &dbProvisioner{
 				ID:          provID,
@@ -145,7 +146,6 @@ func TestDB_getDBProvisioner(t *testing.T) {
 				Name:        "provName",
 				CreatedAt:   now,
 				DeletedAt:   now,
-				Webhooks:    []*linkedca.Webhook{{Name: "webhook"}},
 			}
 			b, err := json.Marshal(dbp)
 			assert.FatalError(t, err)
@@ -169,7 +169,6 @@ func TestDB_getDBProvisioner(t *testing.T) {
 				Type:        linkedca.Provisioner_JWK,
 				Name:        "provName",
 				CreatedAt:   now,
-				Webhooks:    []*linkedca.Webhook{{Name: "webhook"}},
 			}
 			b, err := json.Marshal(dbp)
 			assert.FatalError(t, err)
@@ -264,7 +263,6 @@ func TestDB_unmarshalDBProvisioner(t *testing.T) {
 				Type:        linkedca.Provisioner_JWK,
 				Name:        "provName",
 				CreatedAt:   clock.Now(),
-				Webhooks:    []*linkedca.Webhook{{Name: "webhook"}},
 			}
 			data, err := json.Marshal(dbp)
 			assert.FatalError(t, err)
@@ -358,13 +356,13 @@ func defaultDBP(t *testing.T) *dbProvisioner {
 			Data:     []byte("zap"),
 		},
 		CreatedAt: clock.Now(),
-		Webhooks: []*linkedca.Webhook{
+		Webhooks: []dbWebhook{
 			{
-				Name:        "metadata",
-				Url:         "https://inventory.smallstep.com",
-				Kind:        linkedca.Webhook_ENRICHING,
-				Secret:      "signing secret",
-				BearerToken: "token",
+				Name:          "metadata",
+				URL:           "https://inventory.smallstep.com",
+				Kind:          linkedca.Webhook_ENRICHING.String(),
+				SigningSecret: "signing secret",
+				BearerToken:   "token",
 			},
 		},
 	}
@@ -433,7 +431,7 @@ func TestDB_unmarshalProvisioner(t *testing.T) {
 				assert.Equals(t, prov.Claims, tc.dbp.Claims)
 				assert.Equals(t, prov.X509Template, tc.dbp.X509Template)
 				assert.Equals(t, prov.SshTemplate, tc.dbp.SSHTemplate)
-				assert.Equals(t, prov.Webhooks, tc.dbp.Webhooks)
+				assert.Equals(t, prov.Webhooks, dbWebhooksToLinkedca(tc.dbp.Webhooks))
 
 				retDetailsBytes, err := json.Marshal(prov.Details.GetData())
 				assert.FatalError(t, err)
@@ -572,7 +570,7 @@ func TestDB_GetProvisioner(t *testing.T) {
 				assert.Equals(t, prov.Claims, tc.dbp.Claims)
 				assert.Equals(t, prov.X509Template, tc.dbp.X509Template)
 				assert.Equals(t, prov.SshTemplate, tc.dbp.SSHTemplate)
-				assert.Equals(t, prov.Webhooks, tc.dbp.Webhooks)
+				assert.Equals(t, prov.Webhooks, dbWebhooksToLinkedca(tc.dbp.Webhooks))
 
 				retDetailsBytes, err := json.Marshal(prov.Details.GetData())
 				assert.FatalError(t, err)
@@ -837,7 +835,7 @@ func TestDB_GetProvisioners(t *testing.T) {
 					assert.Equals(t, provs[0].Claims, fooProv.Claims)
 					assert.Equals(t, provs[0].X509Template, fooProv.X509Template)
 					assert.Equals(t, provs[0].SshTemplate, fooProv.SSHTemplate)
-					assert.Equals(t, provs[0].Webhooks, fooProv.Webhooks)
+					assert.Equals(t, provs[0].Webhooks, dbWebhooksToLinkedca(fooProv.Webhooks))
 
 					retDetailsBytes, err := json.Marshal(provs[0].Details.GetData())
 					assert.FatalError(t, err)
@@ -850,7 +848,7 @@ func TestDB_GetProvisioners(t *testing.T) {
 					assert.Equals(t, provs[1].Claims, zapProv.Claims)
 					assert.Equals(t, provs[1].X509Template, zapProv.X509Template)
 					assert.Equals(t, provs[1].SshTemplate, zapProv.SSHTemplate)
-					assert.Equals(t, provs[1].Webhooks, zapProv.Webhooks)
+					assert.Equals(t, provs[1].Webhooks, dbWebhooksToLinkedca(zapProv.Webhooks))
 
 					retDetailsBytes, err = json.Marshal(provs[1].Details.GetData())
 					assert.FatalError(t, err)
@@ -915,7 +913,7 @@ func TestDB_CreateProvisioner(t *testing.T) {
 						assert.Equals(t, _dbp.Claims, prov.Claims)
 						assert.Equals(t, _dbp.X509Template, prov.X509Template)
 						assert.Equals(t, _dbp.SSHTemplate, prov.SshTemplate)
-						assert.Equals(t, _dbp.Webhooks, prov.Webhooks)
+						assert.Equals(t, _dbp.Webhooks, linkedcaWebhooksToDB(prov.Webhooks))
 
 						retDetailsBytes, err := json.Marshal(prov.Details.GetData())
 						assert.FatalError(t, err)
@@ -953,7 +951,7 @@ func TestDB_CreateProvisioner(t *testing.T) {
 						assert.Equals(t, _dbp.Claims, prov.Claims)
 						assert.Equals(t, _dbp.X509Template, prov.X509Template)
 						assert.Equals(t, _dbp.SSHTemplate, prov.SshTemplate)
-						assert.Equals(t, _dbp.Webhooks, prov.Webhooks)
+						assert.Equals(t, _dbp.Webhooks, linkedcaWebhooksToDB(prov.Webhooks))
 
 						retDetailsBytes, err := json.Marshal(prov.Details.GetData())
 						assert.FatalError(t, err)
@@ -1102,7 +1100,7 @@ func TestDB_UpdateProvisioner(t *testing.T) {
 						assert.Equals(t, _dbp.Claims, prov.Claims)
 						assert.Equals(t, _dbp.X509Template, prov.X509Template)
 						assert.Equals(t, _dbp.SSHTemplate, prov.SshTemplate)
-						assert.Equals(t, _dbp.Webhooks, prov.Webhooks)
+						assert.Equals(t, _dbp.Webhooks, linkedcaWebhooksToDB(prov.Webhooks))
 
 						retDetailsBytes, err := json.Marshal(prov.Details.GetData())
 						assert.FatalError(t, err)
@@ -1197,7 +1195,7 @@ func TestDB_UpdateProvisioner(t *testing.T) {
 						assert.Equals(t, _dbp.Claims, prov.Claims)
 						assert.Equals(t, _dbp.X509Template, prov.X509Template)
 						assert.Equals(t, _dbp.SSHTemplate, prov.SshTemplate)
-						assert.Equals(t, _dbp.Webhooks, prov.Webhooks)
+						assert.Equals(t, _dbp.Webhooks, linkedcaWebhooksToDB(prov.Webhooks))
 
 						retDetailsBytes, err := json.Marshal(prov.Details.GetData())
 						assert.FatalError(t, err)
@@ -1233,6 +1231,152 @@ func TestDB_UpdateProvisioner(t *testing.T) {
 					}
 				}
 			}
+		})
+	}
+}
+
+func Test_linkedcaWebhooksToDB(t *testing.T) {
+	type test struct {
+		in   []*linkedca.Webhook
+		want []dbWebhook
+	}
+	var tests = map[string]test{
+		"nil": test{
+			in:   nil,
+			want: nil,
+		},
+		"zero": test{
+			in:   []*linkedca.Webhook{},
+			want: nil,
+		},
+		"bearer": test{
+			in: []*linkedca.Webhook{
+				{
+					Name:   "bearer",
+					Url:    "https://example.com",
+					Kind:   linkedca.Webhook_ENRICHING,
+					Secret: "signing secret",
+					Auth: &linkedca.Webhook_BearerToken{
+						BearerToken: "token",
+					},
+				},
+			},
+			want: []dbWebhook{
+				{
+					Name:          "bearer",
+					URL:           "https://example.com",
+					Kind:          "ENRICHING",
+					SigningSecret: "signing secret",
+					BearerToken:   "token",
+				},
+			},
+		},
+		"basic": test{
+			in: []*linkedca.Webhook{
+				{
+					Name:   "basic",
+					Url:    "https://example.com",
+					Kind:   linkedca.Webhook_ENRICHING,
+					Secret: "signing secret",
+					Auth: &linkedca.Webhook_Basic{
+						Basic: &linkedca.Webhook_BasicAuth{
+							Username: "user",
+							Password: "pass",
+						},
+					},
+				},
+			},
+			want: []dbWebhook{
+				{
+					Name:          "basic",
+					URL:           "https://example.com",
+					Kind:          "ENRICHING",
+					SigningSecret: "signing secret",
+					BasicAuth: dbBasicAuth{
+						Username: "user",
+						Password: "pass",
+					},
+				},
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := linkedcaWebhooksToDB(tc.in)
+			assert.Equals(t, tc.want, got)
+		})
+	}
+}
+
+func Test_dbWebhooksToLinkedca(t *testing.T) {
+	type test struct {
+		in   []dbWebhook
+		want []*linkedca.Webhook
+	}
+	var tests = map[string]test{
+		"nil": test{
+			in:   nil,
+			want: nil,
+		},
+		"zero": test{
+			in:   []dbWebhook{},
+			want: nil,
+		},
+		"bearer": test{
+			in: []dbWebhook{
+				{
+					Name:          "bearer",
+					URL:           "https://example.com",
+					Kind:          "ENRICHING",
+					SigningSecret: "signing secret",
+					BearerToken:   "token",
+				},
+			},
+			want: []*linkedca.Webhook{
+				{
+					Name:   "bearer",
+					Url:    "https://example.com",
+					Kind:   linkedca.Webhook_ENRICHING,
+					Secret: "signing secret",
+					Auth: &linkedca.Webhook_BearerToken{
+						BearerToken: "token",
+					},
+				},
+			},
+		},
+		"basic": test{
+			in: []dbWebhook{
+				{
+					Name:          "basic",
+					URL:           "https://example.com",
+					Kind:          "ENRICHING",
+					SigningSecret: "signing secret",
+					BasicAuth: dbBasicAuth{
+						Username: "user",
+						Password: "pass",
+					},
+				},
+			},
+			want: []*linkedca.Webhook{
+				{
+					Name:   "basic",
+					Url:    "https://example.com",
+					Kind:   linkedca.Webhook_ENRICHING,
+					Secret: "signing secret",
+					Auth: &linkedca.Webhook_Basic{
+						Basic: &linkedca.Webhook_BasicAuth{
+							Username: "user",
+							Password: "pass",
+						},
+					},
+				},
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := dbWebhooksToLinkedca(tc.in)
+			assert.Equals(t, tc.want, got)
 		})
 	}
 }

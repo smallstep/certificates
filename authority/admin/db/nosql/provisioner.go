@@ -24,7 +24,21 @@ type dbProvisioner struct {
 	SSHTemplate  *linkedca.Template        `json:"sshTemplate"`
 	CreatedAt    time.Time                 `json:"createdAt"`
 	DeletedAt    time.Time                 `json:"deletedAt"`
-	Webhooks     []*linkedca.Webhook       `json:"webhooks"`
+	Webhooks     []dbWebhook               `json:"webhooks"`
+}
+
+type dbBasicAuth struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type dbWebhook struct {
+	Name          string      `json:"name"`
+	URL           string      `json:"url"`
+	Kind          string      `json:"kind"`
+	SigningSecret string      `json:"signingSecret"`
+	BearerToken   string      `json:"bearerToken"`
+	BasicAuth     dbBasicAuth `json:"basicAuth"`
 }
 
 func (dbp *dbProvisioner) clone() *dbProvisioner {
@@ -49,7 +63,7 @@ func (dbp *dbProvisioner) convert2linkedca() (*linkedca.Provisioner, error) {
 		SshTemplate:  dbp.SSHTemplate,
 		CreatedAt:    timestamppb.New(dbp.CreatedAt),
 		DeletedAt:    timestamppb.New(dbp.DeletedAt),
-		Webhooks:     dbp.Webhooks,
+		Webhooks:     dbWebhooksToLinkedca(dbp.Webhooks),
 	}, nil
 }
 
@@ -166,7 +180,7 @@ func (db *DB) CreateProvisioner(ctx context.Context, prov *linkedca.Provisioner)
 		X509Template: prov.X509Template,
 		SSHTemplate:  prov.SshTemplate,
 		CreatedAt:    clock.Now(),
-		Webhooks:     prov.Webhooks,
+		Webhooks:     linkedcaWebhooksToDB(prov.Webhooks),
 	}
 
 	if err := db.save(ctx, prov.Id, dbp, nil, "provisioner", provisionersTable); err != nil {
@@ -196,7 +210,7 @@ func (db *DB) UpdateProvisioner(ctx context.Context, prov *linkedca.Provisioner)
 	}
 	nu.X509Template = prov.X509Template
 	nu.SSHTemplate = prov.SshTemplate
-	nu.Webhooks = prov.Webhooks
+	nu.Webhooks = linkedcaWebhooksToDB(prov.Webhooks)
 
 	return db.save(ctx, prov.Id, nu, old, "provisioner", provisionersTable)
 }
@@ -212,4 +226,55 @@ func (db *DB) DeleteProvisioner(ctx context.Context, id string) error {
 	nu.DeletedAt = clock.Now()
 
 	return db.save(ctx, old.ID, nu, old, "provisioner", provisionersTable)
+}
+
+func dbWebhooksToLinkedca(dbwhs []dbWebhook) []*linkedca.Webhook {
+	var lwhs []*linkedca.Webhook
+
+	for _, dbwh := range dbwhs {
+		lwh := &linkedca.Webhook{
+			Name:   dbwh.Name,
+			Url:    dbwh.URL,
+			Kind:   linkedca.Webhook_Kind(linkedca.Webhook_Kind_value[dbwh.Kind]),
+			Secret: dbwh.SigningSecret,
+		}
+		if dbwh.BearerToken != "" {
+			lwh.Auth = &linkedca.Webhook_BearerToken{
+				BearerToken: dbwh.BearerToken,
+			}
+		} else if dbwh.BasicAuth.Username != "" || dbwh.BasicAuth.Password != "" {
+			lwh.Auth = &linkedca.Webhook_Basic{
+				Basic: &linkedca.Webhook_BasicAuth{
+					Username: dbwh.BasicAuth.Username,
+					Password: dbwh.BasicAuth.Password,
+				},
+			}
+		}
+		lwhs = append(lwhs, lwh)
+	}
+
+	return lwhs
+}
+
+func linkedcaWebhooksToDB(lwhs []*linkedca.Webhook) []dbWebhook {
+	var dbwhs []dbWebhook
+
+	for _, lwh := range lwhs {
+		dbwh := dbWebhook{
+			Name:          lwh.Name,
+			URL:           lwh.Url,
+			Kind:          lwh.Kind.String(),
+			SigningSecret: lwh.Secret,
+		}
+		switch a := lwh.GetAuth().(type) {
+		case *linkedca.Webhook_BearerToken:
+			dbwh.BearerToken = a.BearerToken
+		case *linkedca.Webhook_Basic:
+			dbwh.BasicAuth.Username = a.Basic.Username
+			dbwh.BasicAuth.Password = a.Basic.Password
+		}
+		dbwhs = append(dbwhs, dbwh)
+	}
+
+	return dbwhs
 }
