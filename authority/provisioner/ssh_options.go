@@ -43,7 +43,7 @@ type SSHOptions struct {
 	Host *policy.SSHHostCertificateOptions `json:"-"`
 
 	// Webhooks is a list of webhooks that can augment template data
-	Webhooks []*Webhook `json:"webhooks"`
+	Webhooks []*Webhook `json:"webhooks,omitempty"`
 }
 
 // GetAllowedUserNameOptions returns the SSHNameOptions that are
