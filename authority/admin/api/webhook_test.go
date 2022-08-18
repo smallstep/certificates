@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-// ignore secret
+// ignore secret and id since those are set by the server
 func assertEqualWebhook(t *testing.T, a, b *linkedca.Webhook) {
 	assert.Equal(t, a.Name, b.Name)
 	assert.Equal(t, a.Url, b.Url)
@@ -256,6 +256,7 @@ func TestWebhookAdminResponder_CreateProvisionerWebhook(t *testing.T) {
 
 			assertEqualWebhook(t, tc.response, resp)
 			assert.NotEmpty(t, resp.Secret)
+			assert.NotEmpty(t, resp.Id)
 		})
 	}
 }

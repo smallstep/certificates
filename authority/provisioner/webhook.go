@@ -19,6 +19,7 @@ import (
 )
 
 type Webhook struct {
+	ID            string `json:"id"`
 	Name          string `json:"name"`
 	URL           string `json:"url"`
 	Kind          string `json:"kind"`
@@ -73,6 +74,7 @@ retry:
 	}
 	sig := hmac.New(sha256.New, secret).Sum(reqBytes)
 	req.Header.Set("X-Smallstep-Signature", hex.EncodeToString(sig))
+	req.Header.Set("X-Smallstep-Webhook-ID", w.ID)
 
 	if w.BearerToken != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", w.BearerToken))

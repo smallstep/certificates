@@ -34,6 +34,7 @@ type dbBasicAuth struct {
 
 type dbWebhook struct {
 	Name          string      `json:"name"`
+	ID            string      `json:"id"`
 	URL           string      `json:"url"`
 	Kind          string      `json:"kind"`
 	SigningSecret string      `json:"signingSecret"`
@@ -234,6 +235,7 @@ func dbWebhooksToLinkedca(dbwhs []dbWebhook) []*linkedca.Webhook {
 	for _, dbwh := range dbwhs {
 		lwh := &linkedca.Webhook{
 			Name:   dbwh.Name,
+			Id:     dbwh.ID,
 			Url:    dbwh.URL,
 			Kind:   linkedca.Webhook_Kind(linkedca.Webhook_Kind_value[dbwh.Kind]),
 			Secret: dbwh.SigningSecret,
@@ -262,6 +264,7 @@ func linkedcaWebhooksToDB(lwhs []*linkedca.Webhook) []dbWebhook {
 	for _, lwh := range lwhs {
 		dbwh := dbWebhook{
 			Name:          lwh.Name,
+			ID:            lwh.Id,
 			URL:           lwh.Url,
 			Kind:          lwh.Kind.String(),
 			SigningSecret: lwh.Secret,

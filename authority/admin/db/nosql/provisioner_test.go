@@ -1326,6 +1326,7 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 			in: []dbWebhook{
 				{
 					Name:          "bearer",
+					ID:            "69350cb6-6c31-4b5e-bf25-affd5053427d",
 					URL:           "https://example.com",
 					Kind:          "ENRICHING",
 					SigningSecret: "signing secret",
@@ -1335,6 +1336,7 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 			want: []*linkedca.Webhook{
 				{
 					Name:   "bearer",
+					Id:     "69350cb6-6c31-4b5e-bf25-affd5053427d",
 					Url:    "https://example.com",
 					Kind:   linkedca.Webhook_ENRICHING,
 					Secret: "signing secret",
@@ -1348,6 +1350,7 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 			in: []dbWebhook{
 				{
 					Name:          "basic",
+					ID:            "69350cb6-6c31-4b5e-bf25-affd5053427d",
 					URL:           "https://example.com",
 					Kind:          "ENRICHING",
 					SigningSecret: "signing secret",
@@ -1360,6 +1363,7 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 			want: []*linkedca.Webhook{
 				{
 					Name:   "basic",
+					Id:     "69350cb6-6c31-4b5e-bf25-affd5053427d",
 					Url:    "https://example.com",
 					Kind:   linkedca.Webhook_ENRICHING,
 					Secret: "signing secret",
