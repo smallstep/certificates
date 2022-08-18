@@ -146,8 +146,7 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 						if err != nil {
 							return err
 						}
-						// TODO add SetInventories method under 'inventories' key
-						data.Set(wh.Name, d)
+						data.SetWebhooks(wh.Name, d)
 					}
 				}
 				return fn(arg1, data)(cr, xOpts)

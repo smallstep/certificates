@@ -80,12 +80,11 @@ retry:
 		req.SetBasicAuth(w.BasicAuth.Username, w.BasicAuth.Password)
 	}
 
-	// TODO get request ID from context
-
 	resp, err := client.Do(req)
 	if err != nil {
 		if retries > 0 {
 			retries--
+			time.Sleep(time.Second)
 			goto retry
 		}
 		return nil, err

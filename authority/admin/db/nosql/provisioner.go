@@ -24,7 +24,7 @@ type dbProvisioner struct {
 	SSHTemplate  *linkedca.Template        `json:"sshTemplate"`
 	CreatedAt    time.Time                 `json:"createdAt"`
 	DeletedAt    time.Time                 `json:"deletedAt"`
-	Webhooks     []dbWebhook               `json:"webhooks"`
+	Webhooks     []dbWebhook               `json:"webhooks,omitempty"`
 }
 
 type dbBasicAuth struct {
