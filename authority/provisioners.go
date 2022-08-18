@@ -517,10 +517,10 @@ func webhookToCertificates(wh *linkedca.Webhook) *provisioner.Webhook {
 
 	switch a := wh.GetAuth().(type) {
 	case *linkedca.Webhook_BearerToken:
-		pwh.BearerToken = a.BearerToken
-	case *linkedca.Webhook_Basic:
-		pwh.BasicAuth.Username = a.Basic.Username
-		pwh.BasicAuth.Password = a.Basic.Password
+		pwh.BearerToken = a.BearerToken.BearerToken
+	case *linkedca.Webhook_BasicAuth:
+		pwh.BasicAuth.Username = a.BasicAuth.Username
+		pwh.BasicAuth.Password = a.BasicAuth.Password
 	}
 
 	return pwh

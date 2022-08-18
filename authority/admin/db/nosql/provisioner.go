@@ -242,11 +242,13 @@ func dbWebhooksToLinkedca(dbwhs []dbWebhook) []*linkedca.Webhook {
 		}
 		if dbwh.BearerToken != "" {
 			lwh.Auth = &linkedca.Webhook_BearerToken{
-				BearerToken: dbwh.BearerToken,
+				BearerToken: &linkedca.BearerToken{
+					BearerToken: dbwh.BearerToken,
+				},
 			}
 		} else if dbwh.BasicAuth.Username != "" || dbwh.BasicAuth.Password != "" {
-			lwh.Auth = &linkedca.Webhook_Basic{
-				Basic: &linkedca.Webhook_BasicAuth{
+			lwh.Auth = &linkedca.Webhook_BasicAuth{
+				BasicAuth: &linkedca.BasicAuth{
 					Username: dbwh.BasicAuth.Username,
 					Password: dbwh.BasicAuth.Password,
 				},
@@ -271,10 +273,10 @@ func linkedcaWebhooksToDB(lwhs []*linkedca.Webhook) []dbWebhook {
 		}
 		switch a := lwh.GetAuth().(type) {
 		case *linkedca.Webhook_BearerToken:
-			dbwh.BearerToken = a.BearerToken
-		case *linkedca.Webhook_Basic:
-			dbwh.BasicAuth.Username = a.Basic.Username
-			dbwh.BasicAuth.Password = a.Basic.Password
+			dbwh.BearerToken = a.BearerToken.BearerToken
+		case *linkedca.Webhook_BasicAuth:
+			dbwh.BasicAuth.Username = a.BasicAuth.Username
+			dbwh.BasicAuth.Password = a.BasicAuth.Password
 		}
 		dbwhs = append(dbwhs, dbwh)
 	}

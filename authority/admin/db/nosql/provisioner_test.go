@@ -1257,7 +1257,9 @@ func Test_linkedcaWebhooksToDB(t *testing.T) {
 					Kind:   linkedca.Webhook_ENRICHING,
 					Secret: "signing secret",
 					Auth: &linkedca.Webhook_BearerToken{
-						BearerToken: "token",
+						BearerToken: &linkedca.BearerToken{
+							BearerToken: "token",
+						},
 					},
 				},
 			},
@@ -1278,8 +1280,8 @@ func Test_linkedcaWebhooksToDB(t *testing.T) {
 					Url:    "https://example.com",
 					Kind:   linkedca.Webhook_ENRICHING,
 					Secret: "signing secret",
-					Auth: &linkedca.Webhook_Basic{
-						Basic: &linkedca.Webhook_BasicAuth{
+					Auth: &linkedca.Webhook_BasicAuth{
+						BasicAuth: &linkedca.BasicAuth{
 							Username: "user",
 							Password: "pass",
 						},
@@ -1341,7 +1343,9 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 					Kind:   linkedca.Webhook_ENRICHING,
 					Secret: "signing secret",
 					Auth: &linkedca.Webhook_BearerToken{
-						BearerToken: "token",
+						BearerToken: &linkedca.BearerToken{
+							BearerToken: "token",
+						},
 					},
 				},
 			},
@@ -1367,8 +1371,8 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 					Url:    "https://example.com",
 					Kind:   linkedca.Webhook_ENRICHING,
 					Secret: "signing secret",
-					Auth: &linkedca.Webhook_Basic{
-						Basic: &linkedca.Webhook_BasicAuth{
+					Auth: &linkedca.Webhook_BasicAuth{
+						BasicAuth: &linkedca.BasicAuth{
 							Username: "user",
 							Password: "pass",
 						},
