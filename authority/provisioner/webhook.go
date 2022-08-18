@@ -96,6 +96,14 @@ retry:
 			log.Printf("Failed to close body of response from %s", w.URL)
 		}
 	}()
+	if resp.StatusCode >= 400 {
+		if retries > 0 {
+			retries--
+			time.Sleep(time.Second)
+			goto retry
+		}
+		return nil, fmt.Errorf("Webhook server responded with %d", resp.StatusCode)
+	}
 
 	respBody := &webhookResponseBody{
 		Data: map[string]interface{}{},
