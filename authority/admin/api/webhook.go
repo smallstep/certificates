@@ -207,6 +207,9 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 	}
 
 	whResponse := *newWebhook
+	// Not removing client-supplied auth secrets since those may have been
+	// updated in this request and we should show in the response that they
+	// changed
 	whResponse.Secret = ""
 	render.ProtoJSONStatus(w, &whResponse, http.StatusCreated)
 }
