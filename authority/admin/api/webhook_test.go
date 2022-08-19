@@ -157,6 +157,27 @@ func TestWebhookAdminResponder_CreateProvisionerWebhook(t *testing.T) {
 				statusCode: 400,
 			}
 		},
+		"fail/secret-in-request": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Name: "provName",
+			}
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
+			adminErr := admin.NewError(admin.ErrorBadRequestType, "webhook secret must not be set")
+			adminErr.Message = "webhook secret must not be set"
+			body := []byte(`
+			{
+				"name": "metadata",
+				"url": "https://example.com",
+				"kind": "ENRICHING",
+				"secret": "secret"
+			}`)
+			return test{
+				ctx:        ctx,
+				body:       body,
+				err:        adminErr,
+				statusCode: 400,
+			}
+		},
 		"fail/auth.UpdateProvisioner-error": func(t *testing.T) test {
 			adm := &linkedca.Admin{
 				Subject: "step",
@@ -513,6 +534,28 @@ func TestWebhookAdminResponder_UpdateProvisionerWebhook(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				adminDB:    &admin.MockDB{},
+				body:       body,
+				err:        adminErr,
+				statusCode: 400,
+			}
+		},
+		"fail/different-secret-in-request": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Name:     "provName",
+				Webhooks: []*linkedca.Webhook{{Name: "my-webhook", Url: "https://example.com", Kind: linkedca.Webhook_ENRICHING, Secret: "c2VjcmV0"}},
+			}
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
+			adminErr := admin.NewError(admin.ErrorBadRequestType, "webhook secret cannot be updated")
+			adminErr.Message = "webhook secret cannot be updated"
+			body := []byte(`
+			{
+				"name": "my-webhook",
+				"url": "https://example.com",
+				"kind": "ENRICHING",
+				"secret": "secret"
+			}`)
+			return test{
+				ctx:        ctx,
 				body:       body,
 				err:        adminErr,
 				statusCode: 400,
