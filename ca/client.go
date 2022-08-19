@@ -56,6 +56,7 @@ func newClient(transport http.RoundTripper) *uaClient {
 	}
 }
 
+// nolint:gosec // used in bootstrap protocol
 func newInsecureClient() *uaClient {
 	return &uaClient{
 		Client: &http.Client{
@@ -201,7 +202,9 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 		switch tr := tr.(type) {
 		case *http.Transport:
 			if tr.TLSClientConfig == nil {
-				tr.TLSClientConfig = &tls.Config{}
+				tr.TLSClientConfig = &tls.Config{
+					MinVersion: tls.VersionTLS12,
+				}
 			}
 			if len(tr.TLSClientConfig.Certificates) == 0 && tr.TLSClientConfig.GetClientCertificate == nil {
 				tr.TLSClientConfig.Certificates = []tls.Certificate{o.certificate}
@@ -209,7 +212,9 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 			}
 		case *http2.Transport:
 			if tr.TLSClientConfig == nil {
-				tr.TLSClientConfig = &tls.Config{}
+				tr.TLSClientConfig = &tls.Config{
+					MinVersion: tls.VersionTLS12,
+				}
 			}
 			if len(tr.TLSClientConfig.Certificates) == 0 && tr.TLSClientConfig.GetClientCertificate == nil {
 				tr.TLSClientConfig.Certificates = []tls.Certificate{o.certificate}
@@ -236,11 +241,15 @@ func WithTransport(tr http.RoundTripper) ClientOption {
 }
 
 // WithInsecure adds a insecure transport that bypasses TLS verification.
+// nolint:gosec // insecure option
 func WithInsecure() ClientOption {
 	return func(o *clientOptions) error {
 		o.transport = &http.Transport{
-			Proxy:           http.ProxyFromEnvironment,
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			Proxy: http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: true,
+			},
 		}
 		return nil
 	}

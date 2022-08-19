@@ -296,6 +296,7 @@ func (i *Identity) Renew(client Renewer) error {
 		tr.TLSClientConfig = &tls.Config{
 			Certificates:             []tls.Certificate{cert},
 			RootCAs:                  client.GetRootCAs(),
+			MinVersion:               tls.VersionTLS12,
 			PreferServerCipherSuites: true,
 		}
 

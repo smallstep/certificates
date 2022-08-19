@@ -149,7 +149,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 		// [RFC5246] or higher when connecting to clients for validation.
 		MinVersion:         tls.VersionTLS12,
 		ServerName:         serverName(ch),
-		InsecureSkipVerify: true, // we expect a self-signed challenge certificate
+		InsecureSkipVerify: true, // nolint:gosec // we expect a self-signed challenge certificate
 	}
 
 	hostPort := net.JoinHostPort(ch.Value, "443")

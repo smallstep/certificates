@@ -173,7 +173,7 @@ func (r *TLSRenewer) renewCertificate() {
 	cert, err := r.RenewCertificate()
 	if err != nil {
 		next = r.renewJitter / 2
-		next += time.Duration(rand.Int63n(int64(next)))
+		next += time.Duration(mathRandInt63n(int64(next)))
 	} else {
 		r.setCertificate(cert)
 		next = r.nextRenewDuration(cert.Leaf.NotAfter)
@@ -185,10 +185,15 @@ func (r *TLSRenewer) renewCertificate() {
 
 func (r *TLSRenewer) nextRenewDuration(notAfter time.Time) time.Duration {
 	d := time.Until(notAfter).Truncate(time.Second) - r.renewBefore
-	n := rand.Int63n(int64(r.renewJitter))
+	n := mathRandInt63n(int64(r.renewJitter))
 	d -= time.Duration(n)
 	if d < 0 {
 		d = 0
 	}
 	return d
+}
+
+// nolint:gosec // not used for cryptographic security
+func mathRandInt63n(n int64) int64 {
+	return rand.Int63n(n)
 }

@@ -169,6 +169,7 @@ func (t *TLSOptions) TLSConfig() *tls.Config {
 		rs = tls.RenegotiateNever
 	}
 
+	// nolint:gosec // default MinVersion 1.2, if defined but empty 1.3 is used
 	return &tls.Config{
 		CipherSuites:  t.CipherSuites.Value(),
 		MinVersion:    t.MinVersion.Value(),

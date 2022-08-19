@@ -1,7 +1,7 @@
 package provisioner
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" // nolint:gosec // not used for cryptographic security
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/binary"
@@ -319,6 +319,7 @@ func loadProvisioner(m *sync.Map, key string) (Interface, bool) {
 // provisionerSum returns the SHA1 of the provisioners ID. From this we will
 // create the unique and sorted id.
 func provisionerSum(p Interface) []byte {
+	// nolint:gosec // not used for cryptographic security
 	sum := sha1.Sum([]byte(p.GetID()))
 	return sum[:]
 }

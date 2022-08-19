@@ -39,13 +39,14 @@ func New(addr string, handler http.Handler, tlsConfig *tls.Config) *Server {
 // tls.Config.
 func newHTTPServer(addr string, handler http.Handler, tlsConfig *tls.Config) *http.Server {
 	return &http.Server{
-		Addr:         addr,
-		Handler:      handler,
-		TLSConfig:    tlsConfig,
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
-		IdleTimeout:  15 * time.Second,
-		ErrorLog:     log.New(os.Stderr, "", log.Ldate|log.Ltime|log.Llongfile),
+		Addr:              addr,
+		Handler:           handler,
+		TLSConfig:         tlsConfig,
+		WriteTimeout:      15 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 15 * time.Second,
+		IdleTimeout:       15 * time.Second,
+		ErrorLog:          log.New(os.Stderr, "", log.Ldate|log.Ltime|log.Llongfile),
 	}
 }
 
