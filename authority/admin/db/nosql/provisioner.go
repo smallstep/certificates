@@ -38,8 +38,8 @@ type dbWebhook struct {
 	URL           string      `json:"url"`
 	Kind          string      `json:"kind"`
 	SigningSecret string      `json:"signingSecret"`
-	BearerToken   string      `json:"bearerToken"`
-	BasicAuth     dbBasicAuth `json:"basicAuth"`
+	BearerToken   string      `json:"bearerToken,omitempty"`
+	BasicAuth     dbBasicAuth `json:"basicAuth,omitempty"`
 }
 
 func (dbp *dbProvisioner) clone() *dbProvisioner {
