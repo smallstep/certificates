@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 
+	"github.com/smallstep/assert"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 )
@@ -175,10 +178,11 @@ func TestCustomTemplateOptions(t *testing.T) {
 		userOptions     SignOptions
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    x509util.Options
-		wantErr bool
+		name             string
+		args             args
+		want             x509util.Options
+		wantErr          bool
+		webhookResponses []map[string]interface{}
 	}{
 		{"ok", args{nil, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
@@ -186,52 +190,87 @@ func TestCustomTemplateOptions(t *testing.T) {
 	"sans": [{"type":"dns","value":"foo.com"}],
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
-}`)}, false},
+}`)}, false, nil},
 		{"okIID", args{nil, data, x509util.DefaultIIDLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"subject": {"commonName": "foo"},
 	"sans": [{"type":"dns","value":"foo.com"}],
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
-}`)}, false},
+}`)}, false, nil},
 		{"okNoData", args{&Options{}, nil, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"subject": null,
 	"sans": null,
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
-}`)}, false},
+}`)}, false, nil},
 		{"okTemplateData", args{&Options{X509: &X509Options{TemplateData: []byte(`{"foo":"bar"}`)}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"subject": {"commonName":"foobar"},
 	"sans": [{"type":"dns","value":"foo.com"}],
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
-}`)}, false},
+}`)}, false, nil},
 		{"okTemplate", args{&Options{X509: &X509Options{Template: "{{ toJson .Insecure.CR }}"}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
-			CertBuffer: bytes.NewBufferString(csrCertificate)}, false},
+			CertBuffer: bytes.NewBufferString(csrCertificate)}, false, nil},
 		{"okFile", args{&Options{X509: &X509Options{TemplateFile: "./testdata/templates/cr.tpl"}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
-			CertBuffer: bytes.NewBufferString(csrCertificate)}, false},
+			CertBuffer: bytes.NewBufferString(csrCertificate)}, false, nil},
 		{"okBase64", args{&Options{X509: &X509Options{Template: "e3sgdG9Kc29uIC5JbnNlY3VyZS5DUiB9fQ=="}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
-			CertBuffer: bytes.NewBufferString(csrCertificate)}, false},
+			CertBuffer: bytes.NewBufferString(csrCertificate)}, false, nil},
 		{"okUserOptions", args{&Options{X509: &X509Options{Template: `{"foo": "{{.Insecure.User.foo}}"}`}}, data, x509util.DefaultLeafTemplate, SignOptions{TemplateData: []byte(`{"foo":"bar"}`)}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{"foo": "bar"}`),
-		}, false},
+		}, false, nil},
 		{"okBadUserOptions", args{&Options{X509: &X509Options{Template: `{"foo": "{{.Insecure.User.foo}}"}`}}, data, x509util.DefaultLeafTemplate, SignOptions{TemplateData: []byte(`{"badJSON"}`)}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{"foo": "<no value>"}`),
-		}, false},
+		}, false, nil},
 		{"okNullTemplateData", args{&Options{X509: &X509Options{TemplateData: []byte(`null`)}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
 			CertBuffer: bytes.NewBufferString(`{
 	"subject": {"commonName":"foobar"},
 	"sans": [{"type":"dns","value":"foo.com"}],
 	"keyUsage": ["digitalSignature"],
 	"extKeyUsage": ["serverAuth", "clientAuth"]
-}`)}, false},
-		{"fail", args{&Options{X509: &X509Options{TemplateData: []byte(`{"badJSON`)}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{}, true},
-		{"failTemplateData", args{&Options{X509: &X509Options{TemplateData: []byte(`{"badJSON}`)}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{}, true},
+}`)}, false, nil},
+		{"fail", args{&Options{X509: &X509Options{TemplateData: []byte(`{"badJSON`)}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{}, true, nil},
+		{"failTemplateData", args{&Options{X509: &X509Options{TemplateData: []byte(`{"badJSON}`)}}, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{}, true, nil},
+		{
+			"okWebhook",
+			args{
+				&Options{
+					X509: &X509Options{
+						Template: `{"foo": "{{ .Webhooks.people.role }}"}`,
+					},
+					Webhooks: []*Webhook{{Name: "people", Kind: "ENRICHING"}},
+				},
+				data,
+				x509util.DefaultLeafTemplate,
+				SignOptions{
+					WebhookClient: http.DefaultClient,
+				},
+			},
+			x509util.Options{
+				CertBuffer: bytes.NewBufferString(`{"foo": "dba"}`),
+			},
+			false,
+			[]map[string]interface{}{
+				{"role": "dba"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.args.o != nil {
+				for i, wh := range tt.args.o.Webhooks {
+					ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						err := json.NewEncoder(w).Encode(webhookResponseBody{
+							Data: tt.webhookResponses[i],
+						})
+						assert.FatalError(t, err)
+					}))
+					defer ts.Close()
+					wh.URL = ts.URL
+				}
+			}
 			cof, err := CustomTemplateOptions(tt.args.o, tt.args.data, tt.args.defaultTemplate)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CustomTemplateOptions() error = %v, wantErr %v", err, tt.wantErr)
