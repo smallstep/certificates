@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/templates"
+	"go.step.sm/crypto/sshutil"
 )
 
 type Webhook struct {
@@ -32,15 +33,16 @@ type Webhook struct {
 }
 
 type webhookRequestBody struct {
-	Timestamp string `json:"timestamp"`
-	CSR       []byte `json:"csr"`
+	Timestamp string                     `json:"timestamp"`
+	X509_CSR  []byte                     `json:"csr,omitempty"`
+	SSH_CR    sshutil.CertificateRequest `json:"ssh_cr,omitempty"`
 }
 
 type webhookResponseBody struct {
 	Data map[string]interface{} `json:"data"`
 }
 
-func (w *Webhook) Do(ctx context.Context, client *http.Client, csr *x509.CertificateRequest, data map[string]interface{}) (map[string]interface{}, error) {
+func (w *Webhook) Do(ctx context.Context, client *http.Client, certReq interface{}, data map[string]interface{}) (map[string]interface{}, error) {
 	tmpl, err := template.New("url").Funcs(templates.StepFuncMap()).Parse(w.URL)
 	if err != nil {
 		return nil, err
@@ -51,11 +53,20 @@ func (w *Webhook) Do(ctx context.Context, client *http.Client, csr *x509.Certifi
 	}
 	url := buf.String()
 
+	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
 	retries := 1
 retry:
 	reqBody := &webhookRequestBody{
 		Timestamp: time.Now().Format(time.RFC3339Nano),
-		CSR:       csr.Raw,
+	}
+	switch r := certReq.(type) {
+	case *x509.CertificateRequest:
+		if r != nil {
+			reqBody.X509_CSR = r.Raw
+		}
+	case sshutil.CertificateRequest:
+		reqBody.SSH_CR = r
 	}
 
 	reqBytes, err := json.Marshal(reqBody)
@@ -63,7 +74,7 @@ retry:
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewReader(reqBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBytes))
 	if err != nil {
 		return nil, err
 	}

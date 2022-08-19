@@ -1,11 +1,13 @@
 package provisioner
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 
 	"github.com/pkg/errors"
 	"go.step.sm/crypto/sshutil"
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/policy"
 )
@@ -127,10 +129,28 @@ func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemp
 	}
 
 	return sshCertificateOptionsFunc(func(so SignSSHOptions) []sshutil.Option {
+		var enrich = func(fn func(string, sshutil.TemplateData) sshutil.Option, arg1 string) sshutil.Option {
+			return func(cr sshutil.CertificateRequest, sshOpts *sshutil.Options) error {
+				if opts != nil {
+					for _, wh := range opts.Webhooks {
+						if wh.Kind != linkedca.Webhook_ENRICHING.String() {
+							continue
+						}
+						d, err := wh.Do(context.Background(), so.WebhookClient, cr, data)
+						if err != nil {
+							return err
+						}
+						data.SetWebhook(wh.Name, d)
+					}
+				}
+				return fn(arg1, data)(cr, sshOpts)
+			}
+		}
+
 		// We're not provided user data without custom templates.
 		if !opts.HasTemplate() {
 			return []sshutil.Option{
-				sshutil.WithTemplate(defaultTemplate, data),
+				enrich(sshutil.WithTemplate, defaultTemplate),
 			}
 		}
 
@@ -147,7 +167,7 @@ func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemp
 		// Load a template from a file if Template is not defined.
 		if opts.Template == "" && opts.TemplateFile != "" {
 			return []sshutil.Option{
-				sshutil.WithTemplateFile(opts.TemplateFile, data),
+				enrich(sshutil.WithTemplateFile, opts.TemplateFile),
 			}
 		}
 
@@ -156,12 +176,12 @@ func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemp
 		template := strings.TrimSpace(opts.Template)
 		if strings.HasPrefix(template, "{") {
 			return []sshutil.Option{
-				sshutil.WithTemplate(template, data),
+				enrich(sshutil.WithTemplate, template),
 			}
 		}
 		// 2. As a base64 encoded JSON.
 		return []sshutil.Option{
-			sshutil.WithTemplateBase64(template, data),
+			enrich(sshutil.WithTemplateBase64, template),
 		}
 	}), nil
 }
