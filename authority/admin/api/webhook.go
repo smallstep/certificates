@@ -206,5 +206,7 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 		return
 	}
 
-	render.ProtoJSONStatus(w, newWebhook, http.StatusCreated)
+	whResponse := *newWebhook
+	whResponse.Secret = ""
+	render.ProtoJSONStatus(w, &whResponse, http.StatusCreated)
 }
