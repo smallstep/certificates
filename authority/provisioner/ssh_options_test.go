@@ -88,10 +88,11 @@ func TestCustomSSHTemplateOptions(t *testing.T) {
 		{"fail", args{&Options{SSH: &SSHOptions{TemplateData: []byte(`{"badJSON`)}}, data, sshutil.DefaultTemplate, SignSSHOptions{}}, sshutil.Options{}, true, nil},
 		{"okWebhook",
 			args{
-				&Options{SSH: &SSHOptions{
-					Template: `{"foo": "{{ .Webhooks.people.role }}"}`,
-					Webhooks: []*Webhook{{Name: "people", Kind: "ENRICHING"}},
-				}},
+				&Options{
+					SSH: &SSHOptions{
+						Template: `{"foo": "{{ .Webhooks.people.role }}"}`,
+					},
+					Webhooks: []*Webhook{{Name: "people", Kind: "ENRICHING"}}},
 				sshutil.CreateTemplateData(sshutil.HostCert, "smallstep.com", []string{"smallstep.com"}),
 				sshutil.DefaultTemplate,
 				SignSSHOptions{
@@ -109,8 +110,8 @@ func TestCustomSSHTemplateOptions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.args.o != nil && tt.args.o.SSH != nil {
-				for i, wh := range tt.args.o.SSH.Webhooks {
+			if tt.args.o != nil {
+				for i, wh := range tt.args.o.Webhooks {
 					ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						err := json.NewEncoder(w).Encode(webhookResponseBody{
 							Data: tt.webhookResponses[i],
@@ -119,7 +120,6 @@ func TestCustomSSHTemplateOptions(t *testing.T) {
 					}))
 					defer ts.Close()
 					wh.URL = ts.URL
-
 				}
 			}
 			cof, err := CustomSSHTemplateOptions(tt.args.o, tt.args.data, tt.args.defaultTemplate)

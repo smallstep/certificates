@@ -493,16 +493,9 @@ func optionsToCertificates(p *linkedca.Provisioner) *provisioner.Options {
 			}
 		}
 	}
-	if p.Type == linkedca.Provisioner_SSHPOP {
-		for _, wh := range p.Webhooks {
-			whCert := webhookToCertificates(wh)
-			ops.SSH.Webhooks = append(ops.SSH.Webhooks, whCert)
-		}
-	} else {
-		for _, wh := range p.Webhooks {
-			whCert := webhookToCertificates(wh)
-			ops.X509.Webhooks = append(ops.X509.Webhooks, whCert)
-		}
+	for _, wh := range p.Webhooks {
+		whCert := webhookToCertificates(wh)
+		ops.Webhooks = append(ops.Webhooks, whCert)
 	}
 	return ops
 }

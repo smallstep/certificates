@@ -32,6 +32,9 @@ func (fn certificateOptionsFunc) Options(so SignOptions) []x509util.Option {
 type Options struct {
 	X509 *X509Options `json:"x509,omitempty"`
 	SSH  *SSHOptions  `json:"ssh,omitempty"`
+
+	// Webhooks is a list of webhooks that can augment template data
+	Webhooks []*Webhook `json:"webhooks,omitempty"`
 }
 
 // GetX509Options returns the X.509 options.
@@ -72,9 +75,6 @@ type X509Options struct {
 	// AllowWildcardNames indicates if literal wildcard names
 	// like *.example.com are allowed. Defaults to false.
 	AllowWildcardNames bool `json:"-"`
-
-	// Webhooks is a list of webhooks that can augment template data
-	Webhooks []*Webhook `json:"webhooks,omitempty"`
 }
 
 // HasTemplate returns true if a template is defined in the provisioner options.
@@ -138,7 +138,7 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 		var enrich = func(fn func(string, x509util.TemplateData) x509util.Option, arg1 string) x509util.Option {
 			return func(cr *x509.CertificateRequest, xOpts *x509util.Options) error {
 				if opts != nil {
-					for _, wh := range opts.Webhooks {
+					for _, wh := range o.Webhooks {
 						if wh.Kind != linkedca.Webhook_ENRICHING.String() {
 							continue
 						}

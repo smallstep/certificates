@@ -43,9 +43,6 @@ type SSHOptions struct {
 
 	// Host contains SSH host certificate options.
 	Host *policy.SSHHostCertificateOptions `json:"-"`
-
-	// Webhooks is a list of webhooks that can augment template data
-	Webhooks []*Webhook `json:"webhooks,omitempty"`
 }
 
 // GetAllowedUserNameOptions returns the SSHNameOptions that are
@@ -132,7 +129,7 @@ func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemp
 		var enrich = func(fn func(string, sshutil.TemplateData) sshutil.Option, arg1 string) sshutil.Option {
 			return func(cr sshutil.CertificateRequest, sshOpts *sshutil.Options) error {
 				if opts != nil {
-					for _, wh := range opts.Webhooks {
+					for _, wh := range o.Webhooks {
 						if wh.Kind != linkedca.Webhook_ENRICHING.String() {
 							continue
 						}
