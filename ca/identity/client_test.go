@@ -58,6 +58,7 @@ func TestClient(t *testing.T) {
 		Certificates: []tls.Certificate{crt},
 		ClientCAs:    pool,
 		ClientAuth:   tls.VerifyClientCertIfGiven,
+		MinVersion:   tls.VersionTLS12,
 	}
 	okServer.StartTLS()
 
@@ -132,6 +133,7 @@ func TestLoadClient(t *testing.T) {
 	tr.TLSClientConfig = &tls.Config{
 		Certificates: []tls.Certificate{crt},
 		RootCAs:      pool,
+		MinVersion:   tls.VersionTLS12,
 	}
 	expected := &Client{
 		CaURL: &url.URL{Scheme: "https", Host: "127.0.0.1"},

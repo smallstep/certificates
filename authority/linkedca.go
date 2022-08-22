@@ -461,6 +461,7 @@ func getRootCertificate(endpoint, fingerprint string) (*x509.Certificate, error)
 	defer cancel()
 
 	conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+		// nolint:gosec // used in bootstrap protocol
 		InsecureSkipVerify: true, // lgtm[go/disabled-certificate-check]
 	})))
 	if err != nil {
@@ -514,7 +515,8 @@ func login(authority, token string, csr *x509.CertificateRequest, signer crypto.
 	defer cancel()
 
 	conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
-		RootCAs: rootCAs,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    rootCAs,
 	})))
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "error connecting %s", endpoint)
@@ -590,6 +592,7 @@ func login(authority, token string, csr *x509.CertificateRequest, signer crypto.
 	rootCAs.AddCert(bundle[last])
 
 	return cert, &tls.Config{
-		RootCAs: rootCAs,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    rootCAs,
 	}, nil
 }

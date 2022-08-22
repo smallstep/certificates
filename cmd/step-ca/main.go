@@ -14,6 +14,7 @@ import (
 	"time"
 
 	// Server profiler
+	// nolint:gosec // profile server, if enabled runs on a different port
 	_ "net/http/pprof"
 
 	"github.com/smallstep/certificates/authority"

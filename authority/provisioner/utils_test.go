@@ -449,6 +449,7 @@ func generateAWSWithServer() (*AWS, *httptest.Server, error) {
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error signing document")
 	}
+	// nolint:gosec // tests minimum size of the key
 	token := "AQAEAEEO9-7Z88ewKFpboZuDlFYWz9A3AN-wMOVzjEhfAyXW31BvVw=="
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
