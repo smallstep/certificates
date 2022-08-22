@@ -95,7 +95,9 @@ retry:
 
 	resp, err := client.Do(req)
 	if err != nil {
-		if retries > 0 {
+		if err == context.DeadlineExceeded {
+			return nil, err
+		} else if retries > 0 {
 			retries--
 			time.Sleep(time.Second)
 			goto retry

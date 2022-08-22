@@ -142,7 +142,7 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 						if wh.Kind != linkedca.Webhook_ENRICHING.String() {
 							continue
 						}
-						d, err := wh.Do(context.TODO(), so.WebhookClient, cr, data)
+						d, err := wh.Do(context.Background(), so.WebhookClient, cr, data)
 						if err != nil {
 							return err
 						}
