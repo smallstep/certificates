@@ -38,10 +38,8 @@ type Claimer struct {
 // NewClaimer initializes a new claimer with the given claims.
 func NewClaimer(claims *Claims, global Claims) (*Claimer, error) {
 	c := &Claimer{global: global, claims: claims}
-	if err := c.Validate(); err != nil {
-		return nil, err
-	}
-	return c, nil
+	err := c.Validate()
+	return c, err
 }
 
 // Claims returns the merge of the inner and global claims.
