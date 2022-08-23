@@ -321,6 +321,15 @@ func (c *Config) GetAudiences() provisioner.Audiences {
 	return audiences
 }
 
+// GetWebhookClientConfig returns the webhook client config from the authority
+// config if set.
+func (c *Config) GetWebhookClientConfig() *WebhookClient {
+	if c.AuthorityConfig == nil {
+		return nil
+	}
+	return c.AuthorityConfig.WebhookClient
+}
+
 // Audience returns the list of audiences for a given path.
 func (c *Config) Audience(path string) []string {
 	audiences := make([]string, len(c.DNSNames)+1)

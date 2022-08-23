@@ -120,12 +120,13 @@ func WithQuiet(quiet bool) Option {
 // CA is the type used to build the complete certificate authority. It builds
 // the HTTP server, set ups the middlewares and the HTTP handlers.
 type CA struct {
-	auth        *authority.Authority
-	config      *config.Config
-	srv         *server.Server
-	insecureSrv *server.Server
-	opts        *options
-	renewer     *TLSRenewer
+	auth          *authority.Authority
+	config        *config.Config
+	srv           *server.Server
+	insecureSrv   *server.Server
+	opts          *options
+	renewer       *TLSRenewer
+	clientRenewer *TLSRenewer
 }
 
 // New creates and initializes the CA with the given configuration and options.
@@ -156,8 +157,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithDatabase(ca.opts.database))
 	}
 
-	// TODO shouldn't be reading AuthorityConfig here
-	webhookTransport := getWebhookTransport(cfg.AuthorityConfig.WebhookClient)
+	webhookTransport := getWebhookTransport(cfg.GetWebhookClientConfig())
 	opts = append(opts, authority.WithWebhookClient(&http.Client{Transport: webhookTransport}))
 
 	auth, err := authority.New(cfg, opts...)
@@ -171,8 +171,11 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		return nil, err
 	}
 
-	// TODO does this config have a renewing cert with client auth?
-	webhookTransport.TLSClientConfig = tlsConfig
+	tlsClientConfig, err := ca.getTLSClientConfig(auth)
+	if err != nil {
+		return nil, err
+	}
+	webhookTransport.TLSClientConfig = tlsClientConfig
 
 	// Using chi as the main router
 	mux := chi.NewRouter()
@@ -530,6 +533,51 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	// Add support for mutual tls to renew certificates
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
 	tlsConfig.ClientCAs = certPool
+
+	return tlsConfig, nil
+}
+
+// getTLSClientConfig returns a TLSConfig for the CA with a self-renewing client
+// certificate.
+func (ca *CA) getTLSClientConfig(auth *authority.Authority) (*tls.Config, error) {
+	// Create initial TLS certificate
+	tlsCrt, err := auth.GetTLSClientCertificate()
+	if err != nil {
+		return nil, err
+	}
+
+	// Start tls renewer with the new certificate.
+	// If a renewer was started, attempt to stop it before.
+	if ca.clientRenewer != nil {
+		ca.clientRenewer.Stop()
+	}
+
+	ca.clientRenewer, err = NewTLSRenewer(tlsCrt, auth.GetTLSClientCertificate)
+	if err != nil {
+		return nil, err
+	}
+	ca.renewer.Run()
+
+	var tlsConfig *tls.Config
+	if ca.config.TLS != nil {
+		tlsConfig = ca.config.TLS.TLSConfig()
+	} else {
+		tlsConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
+	}
+
+	tlsConfig.GetClientCertificate = ca.clientRenewer.GetClientCertificateForCA
+
+	// Web PKI plus this authority's roots
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
+	for _, crt := range auth.GetRootCertificates() {
+		certPool.AddCert(crt)
+	}
+	tlsConfig.RootCAs = certPool
 
 	return tlsConfig, nil
 }

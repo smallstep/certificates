@@ -122,6 +122,10 @@ func (r *TLSRenewer) GetCertificateForCA(clientHello *tls.ClientHelloInfo) (*tls
 	return r.getCertificateForCA(), nil
 }
 
+func (r *TLSRenewer) GetClientCertificateForCA(certRequestInfo *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+	return r.getCertificateForCA(), nil
+}
+
 // GetClientCertificate returns the current client certificate.
 //
 // This method is set in the tls.Config GetClientCertificate property.

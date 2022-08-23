@@ -683,6 +683,85 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	return &tlsCrt, nil
 }
 
+// GetTLSClientCertificate creates a new leaf certificate to be used for webhook
+// requests.
+func (a *Authority) GetTLSClientCertificate() (*tls.Certificate, error) {
+	// Generate default key.
+	priv, err := keyutil.GenerateDefaultKey()
+	if err != nil {
+		return nil, err
+	}
+	signer, ok := priv.(crypto.Signer)
+	if !ok {
+		return nil, errors.New("private key is not a crypto.Signer")
+
+	}
+
+	// prepare the sans: IPv6 DNS hostname representations are converted to their IP representation
+	sans := make([]string, len(a.config.DNSNames))
+	for i, san := range a.config.DNSNames {
+		if strings.HasPrefix(san, "[") && strings.HasSuffix(san, "]") {
+			if ip := net.ParseIP(san[1 : len(san)-1]); ip != nil {
+				san = ip.String()
+			}
+		}
+		sans[i] = san
+	}
+
+	// Create initial certificate request.
+	cr, err := x509util.CreateCertificateRequest(a.config.CommonName, sans, signer)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate certificate template directly from the certificate request.
+	template, err := x509util.NewCertificate(cr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get x509 certificate template, set validity and sign it.
+	now := time.Now()
+	certTpl := template.GetCertificate()
+	certTpl.NotBefore = now.Add(-1 * time.Minute)
+	certTpl.NotAfter = now.Add(24 * time.Hour)
+	certTpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
+
+	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
+		Template: certTpl,
+		CSR:      cr,
+		Lifetime: 24 * time.Hour,
+		Backdate: 1 * time.Minute,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate PEM blocks to create tls.Certificate
+	pemBlocks := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: resp.Certificate.Raw,
+	})
+	for _, crt := range resp.CertificateChain {
+		pemBlocks = append(pemBlocks, pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: crt.Raw,
+		})...)
+	}
+	keyPEM, err := pemutil.Serialize(priv)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsCrt, err := tls.X509KeyPair(pemBlocks, pem.EncodeToMemory(keyPEM))
+	if err != nil {
+		return nil, err
+	}
+	// Set leaf certificate
+	tlsCrt.Leaf = resp.Certificate
+	return &tlsCrt, nil
+}
+
 // templatingError tries to extract more information about the cause of
 // an error related to (most probably) malformed template data and adds
 // this to the error message.
