@@ -109,7 +109,7 @@ retry:
 			log.Printf("Failed to close body of response from %s", w.URL)
 		}
 	}()
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode >= 500 {
 		if retries > 0 {
 			retries--
 			time.Sleep(time.Second)

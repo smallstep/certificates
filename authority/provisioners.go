@@ -502,6 +502,7 @@ func optionsToCertificates(p *linkedca.Provisioner) *provisioner.Options {
 
 func webhookToCertificates(wh *linkedca.Webhook) *provisioner.Webhook {
 	pwh := &provisioner.Webhook{
+		ID:            wh.Id,
 		Name:          wh.Name,
 		URL:           wh.Url,
 		Kind:          wh.Kind.String(),
