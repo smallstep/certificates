@@ -122,6 +122,11 @@ func (r *TLSRenewer) GetCertificateForCA(clientHello *tls.ClientHelloInfo) (*tls
 	return r.getCertificateForCA(), nil
 }
 
+// GetClientCertificateForCA returns the current client certificate. It can only
+// be used if the renew function creates the new certificate and do not uses a
+// TLS request. It's intended to be use by the certificate authority server.
+//
+// This method is set in the tls.Config GetClientCertificate property.
 func (r *TLSRenewer) GetClientCertificateForCA(certRequestInfo *tls.CertificateRequestInfo) (*tls.Certificate, error) {
 	return r.getCertificateForCA(), nil
 }
