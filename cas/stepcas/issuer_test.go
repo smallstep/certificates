@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"go.step.sm/crypto/jose"
@@ -33,6 +34,42 @@ func (s *mockErrSigner) Sign(payload []byte) (*jose.JSONWebSignature, error) {
 
 func (s *mockErrSigner) Options() jose.SignerOptions {
 	return jose.SignerOptions{}
+}
+
+func Test_newServerEndpointID(t *testing.T) {
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []byte
+	}{
+		{"ok", args{"foo"}, []byte{
+			0x8f, 0x63, 0x69, 0x20, 0x8a, 0x7a, 0x57, 0x0c, 0xbe, 0x4c, 0x46, 0x66, 0x77, 0xf8, 0x54, 0xe7,
+		}},
+		{"ok uuid", args{"e4fa6d2d-fa9c-4fdc-913e-7484cc9516e4"}, []byte{
+			0x8d, 0x8d, 0x7f, 0x04, 0x73, 0xd4, 0x5f, 0x2f, 0xa8, 0xe1, 0x28, 0x9a, 0xd1, 0xa8, 0xcf, 0x7e,
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var want uuid.UUID
+			copy(want[:], tt.want)
+			got := newServerEndpointID(tt.args.name)
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("newServerEndpointID() = %v, want %v", got, tt.want)
+			}
+			// Check version
+			if v := (got[6] & 0xf0) >> 4; v != 5 {
+				t.Errorf("newServerEndpointID() version = %d, want 5", v)
+			}
+			// Check variant
+			if v := (got[8] & 0x80) >> 6; v != 2 {
+				t.Errorf("newServerEndpointID() variant = %d, want 2", v)
+			}
+		})
+	}
 }
 
 func Test_newStepIssuer(t *testing.T) {

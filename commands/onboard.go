@@ -92,6 +92,7 @@ func onboardAction(ctx *cli.Context) error {
 	token := ctx.Args().Get(0)
 	onboardingURL := u.ResolveReference(&url.URL{Path: token}).String()
 
+	// nolint:gosec // onboarding url
 	res, err := http.Get(onboardingURL)
 	if err != nil {
 		return errors.Wrap(err, "error connecting onboarding guide")
@@ -132,6 +133,7 @@ func onboardAction(ctx *cli.Context) error {
 		return errors.Wrap(err, "error marshaling payload")
 	}
 
+	// nolint:gosec // onboarding url
 	resp, err := http.Post(onboardingURL, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		return errors.Wrap(err, "error connecting onboarding guide")

@@ -31,9 +31,13 @@ func TestRevokeRequestValidate(t *testing.T) {
 			rr:  &RevokeRequest{},
 			err: &errs.Error{Err: errors.New("missing serial"), Status: http.StatusBadRequest},
 		},
+		"error/bad sn": {
+			rr:  &RevokeRequest{Serial: "sn"},
+			err: &errs.Error{Err: errors.New("'sn' is not a valid serial number - use a base 10 representation or a base 16 representation with '0x' prefix"), Status: http.StatusBadRequest},
+		},
 		"error/bad reasonCode": {
 			rr: &RevokeRequest{
-				Serial:     "sn",
+				Serial:     "10",
 				ReasonCode: 15,
 				Passive:    true,
 			},
@@ -41,7 +45,7 @@ func TestRevokeRequestValidate(t *testing.T) {
 		},
 		"error/non-passive not implemented": {
 			rr: &RevokeRequest{
-				Serial:     "sn",
+				Serial:     "10",
 				ReasonCode: 8,
 				Passive:    false,
 			},
@@ -49,7 +53,7 @@ func TestRevokeRequestValidate(t *testing.T) {
 		},
 		"ok": {
 			rr: &RevokeRequest{
-				Serial:     "sn",
+				Serial:     "10",
 				ReasonCode: 9,
 				Passive:    true,
 			},
@@ -97,7 +101,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 		},
 		"200/ott": func(t *testing.T) test {
 			input, err := json.Marshal(RevokeRequest{
-				Serial:     "sn",
+				Serial:     "10",
 				ReasonCode: 4,
 				Reason:     "foo",
 				OTT:        "valid",
@@ -114,7 +118,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 					revoke: func(ctx context.Context, opts *authority.RevokeOptions) error {
 						assert.True(t, opts.PassiveOnly)
 						assert.False(t, opts.MTLS)
-						assert.Equals(t, opts.Serial, "sn")
+						assert.Equals(t, opts.Serial, "10")
 						assert.Equals(t, opts.ReasonCode, 4)
 						assert.Equals(t, opts.Reason, "foo")
 						return nil
@@ -125,7 +129,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 		},
 		"400/no OTT and no peer certificate": func(t *testing.T) test {
 			input, err := json.Marshal(RevokeRequest{
-				Serial:     "sn",
+				Serial:     "10",
 				ReasonCode: 4,
 				Passive:    true,
 			})
@@ -176,7 +180,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 		},
 		"500/ott authority.Revoke": func(t *testing.T) test {
 			input, err := json.Marshal(RevokeRequest{
-				Serial:     "sn",
+				Serial:     "10",
 				ReasonCode: 4,
 				Reason:     "foo",
 				OTT:        "valid",
@@ -198,7 +202,7 @@ func Test_caHandler_Revoke(t *testing.T) {
 		},
 		"403/ott authority.Revoke": func(t *testing.T) test {
 			input, err := json.Marshal(RevokeRequest{
-				Serial:     "sn",
+				Serial:     "10",
 				ReasonCode: 4,
 				Reason:     "foo",
 				OTT:        "valid",

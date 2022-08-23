@@ -6,7 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha1" // nolint:gosec // used to create the Subject Key Identifier by RFC 5280
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/hex"
@@ -18,14 +18,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/kms"
-	"github.com/smallstep/certificates/kms/apiv1"
 	"go.step.sm/cli-utils/fileutil"
 	"go.step.sm/cli-utils/ui"
+	"go.step.sm/crypto/kms"
+	"go.step.sm/crypto/kms/apiv1"
 	"go.step.sm/crypto/pemutil"
 
 	// Enable yubikey.
-	_ "github.com/smallstep/certificates/kms/yubikey"
+	_ "go.step.sm/crypto/kms/yubikey"
 )
 
 // Config is a mapping of the cli flags.
@@ -97,7 +97,7 @@ func main() {
 	c.Pin = string(pin)
 
 	k, err := kms.New(context.Background(), apiv1.Options{
-		Type:          string(apiv1.YubiKey),
+		Type:          apiv1.YubiKey,
 		Pin:           c.Pin,
 		ManagementKey: c.ManagementKey,
 	})
@@ -346,6 +346,7 @@ func mustSubjectKeyID(key crypto.PublicKey) []byte {
 	if err != nil {
 		panic(err)
 	}
+	// nolint:gosec // used to create the Subject Key Identifier by RFC 5280
 	hash := sha1.Sum(b)
 	return hash[:]
 }

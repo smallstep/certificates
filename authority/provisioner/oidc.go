@@ -464,7 +464,7 @@ func (o *OIDC) AuthorizeSSHRevoke(ctx context.Context, token string) error {
 }
 
 func getAndDecode(uri string, v interface{}) error {
-	resp, err := http.Get(uri)
+	resp, err := http.Get(uri) // nolint:gosec // openid-configuration uri
 	if err != nil {
 		return errors.Wrapf(err, "failed to connect to %s", uri)
 	}

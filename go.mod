@@ -4,19 +4,18 @@ go 1.18
 
 require (
 	cloud.google.com/go v0.100.2
-	cloud.google.com/go/kms v1.4.0
 	cloud.google.com/go/security v1.3.0
-	github.com/Azure/azure-sdk-for-go v65.0.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.27
-	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
-	github.com/Azure/go-autorest/autorest/date v0.3.0
+	github.com/Azure/azure-sdk-for-go v65.0.0+incompatible // indirect
+	github.com/Azure/go-autorest/autorest v0.11.27 // indirect
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11 // indirect
+	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/ThalesIgnite/crypto11 v1.2.5
-	github.com/aws/aws-sdk-go v1.44.37
+	github.com/ThalesIgnite/crypto11 v1.2.5 // indirect
+	github.com/aws/aws-sdk-go v1.44.37 // indirect
 	github.com/dgraph-io/ristretto v0.0.4-0.20200906165740-41ebdbffecfd // indirect
 	github.com/fxamacker/cbor/v2 v2.4.0
-	github.com/go-chi/chi v4.0.2+incompatible
-	github.com/go-piv/piv-go v1.10.0
+	github.com/go-chi/chi v4.1.2+incompatible
+	github.com/go-piv/piv-go v1.10.0 // indirect
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.8
 	github.com/google/uuid v1.3.0
@@ -38,11 +37,10 @@ require (
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.3
-	go.step.sm/crypto v0.17.1-0.20220810233434-022ae3d77b48
-	go.step.sm/linkedca v0.17.0
+	go.step.sm/crypto v0.17.3
+	go.step.sm/linkedca v0.18.0
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
-	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d // indirect
 	google.golang.org/api v0.84.0
 	google.golang.org/genproto v0.0.0-20220617124728-180714bec0ad
 	google.golang.org/grpc v1.47.0
@@ -53,6 +51,7 @@ require (
 require (
 	cloud.google.com/go/compute v1.6.1 // indirect
 	cloud.google.com/go/iam v0.1.0 // indirect
+	cloud.google.com/go/kms v1.4.0 // indirect
 	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
@@ -138,6 +137,7 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
+	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d // indirect
 	golang.org/x/text v0.3.8-0.20211004125949-5bd84dd9b33b // indirect
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 	google.golang.org/appengine v1.6.7 // indirect

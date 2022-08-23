@@ -35,9 +35,16 @@ func TestConfigValidate(t *testing.T) {
 	type ConfigValidateTest struct {
 		config *Config
 		err    error
-		tls    TLSOptions
+		tls    *TLSOptions
 	}
 	tests := map[string]func(*testing.T) ConfigValidateTest{
+		"skip-validation": func(t *testing.T) ConfigValidateTest {
+			return ConfigValidateTest{
+				config: &Config{
+					SkipValidation: true,
+				},
+			}
+		},
 		"empty-address": func(t *testing.T) ConfigValidateTest {
 			return ConfigValidateTest{
 				config: &Config{
@@ -128,7 +135,7 @@ func TestConfigValidate(t *testing.T) {
 					Password:         "pass",
 					AuthorityConfig:  ac,
 				},
-				tls: DefaultTLSOptions,
+				tls: &DefaultTLSOptions,
 			}
 		},
 		"empty-TLS-values": func(t *testing.T) ConfigValidateTest {
@@ -143,7 +150,7 @@ func TestConfigValidate(t *testing.T) {
 					AuthorityConfig:  ac,
 					TLS:              &TLSOptions{},
 				},
-				tls: DefaultTLSOptions,
+				tls: &DefaultTLSOptions,
 			}
 		},
 		"custom-tls-values": func(t *testing.T) ConfigValidateTest {
@@ -165,7 +172,7 @@ func TestConfigValidate(t *testing.T) {
 						Renegotiation: true,
 					},
 				},
-				tls: TLSOptions{
+				tls: &TLSOptions{
 					CipherSuites: CipherSuites{
 						"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
 					},
@@ -209,9 +216,9 @@ func TestConfigValidate(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					fmt.Printf("tc.tls = %+v\n", tc.tls)
-					fmt.Printf("*tc.config.TLS = %+v\n", *tc.config.TLS)
-					assert.Equals(t, *tc.config.TLS, tc.tls)
+					fmt.Printf("tc.tls = %v\n", tc.tls)
+					fmt.Printf("*tc.config.TLS = %v\n", tc.config.TLS)
+					assert.Equals(t, tc.config.TLS, tc.tls)
 				}
 			}
 		})

@@ -75,14 +75,16 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 		return nil, errors.New("createCertificateRequest `lifetime` cannot be 0")
 	}
 
-	var info *raInfo
+	info := &raInfo{
+		AuthorityID: s.authorityID,
+	}
+	if req.IsCAServerCert {
+		info.EndpointID = newServerEndpointID(s.authorityID).String()
+	}
 	if p := req.Provisioner; p != nil {
-		info = &raInfo{
-			AuthorityID:     s.authorityID,
-			ProvisionerID:   p.ProvisionerID,
-			ProvisionerType: p.ProvisionerType,
-			ProvisionerName: p.ProvisionerName,
-		}
+		info.ProvisionerID = p.ID
+		info.ProvisionerType = p.Type
+		info.ProvisionerName = p.Name
 	}
 
 	cert, chain, err := s.createCertificate(req.CSR, req.Lifetime, info)

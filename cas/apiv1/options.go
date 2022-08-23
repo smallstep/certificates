@@ -6,7 +6,8 @@ import (
 	"encoding/json"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/kms"
+
+	"go.step.sm/crypto/kms"
 )
 
 // Options represents the configuration options used to select and configure the

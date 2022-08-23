@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"time"
 
-	"github.com/smallstep/certificates/kms/apiv1"
+	"go.step.sm/crypto/kms/apiv1"
 )
 
 // CertificateAuthorityType indicates the type of Certificate Authority to
@@ -52,20 +52,21 @@ const (
 
 // CreateCertificateRequest is the request used to sign a new certificate.
 type CreateCertificateRequest struct {
-	Template    *x509.Certificate
-	CSR         *x509.CertificateRequest
-	Lifetime    time.Duration
-	Backdate    time.Duration
-	RequestID   string
-	Provisioner *ProvisionerInfo
+	Template       *x509.Certificate
+	CSR            *x509.CertificateRequest
+	Lifetime       time.Duration
+	Backdate       time.Duration
+	RequestID      string
+	Provisioner    *ProvisionerInfo
+	IsCAServerCert bool
 }
 
 // ProvisionerInfo contains information of the provisioner used to authorize a
 // certificate.
 type ProvisionerInfo struct {
-	ProvisionerID   string
-	ProvisionerType string
-	ProvisionerName string
+	ID   string
+	Type string
+	Name string
 }
 
 // CreateCertificateResponse is the response to a create certificate request.

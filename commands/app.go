@@ -7,12 +7,15 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"unicode"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
+	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/pki"
 	"github.com/urfave/cli"
 	"go.step.sm/cli-utils/errs"
@@ -99,8 +102,33 @@ func appAction(ctx *cli.Context) error {
 	}
 
 	cfg, err := config.LoadConfiguration(configFile)
-	if err != nil {
+	if err != nil && token == "" {
 		fatal(err)
+	}
+
+	// Initialize a basic configuration to be used with an automatically
+	// configured linked RA. Default configuration includes:
+	//  * badgerv2 on $(step path)/db
+	//  * JSON logger
+	//  * Default TLS options
+	if cfg == nil {
+		cfg = &config.Config{
+			SkipValidation: true,
+			Logger:         []byte(`{"format":"json"}`),
+			DB: &db.Config{
+				Type:       "badgerv2",
+				DataSource: filepath.Join(step.Path(), "db"),
+			},
+			AuthorityConfig: &config.AuthConfig{
+				DeploymentType: pki.LinkedDeployment.String(),
+				Provisioners:   provisioner.List{},
+				Template:       &config.ASN1DN{},
+				Backdate: &provisioner.Duration{
+					Duration: config.DefaultBackdate,
+				},
+			},
+			TLS: &config.DefaultTLSOptions,
+		}
 	}
 
 	if cfg.AuthorityConfig != nil {
