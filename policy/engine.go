@@ -73,7 +73,6 @@ func (e *NamePolicyError) Detail() string {
 // TODO(hs): implement matching URI schemes, paths, etc; not just the domain part of URI domains
 
 type NamePolicyEngine struct {
-
 	// verifySubjectCommonName is set when Subject Common Name must be verified
 	verifySubjectCommonName bool
 	// allowLiteralWildcardNames allows literal wildcard DNS domains
@@ -107,7 +106,6 @@ type NamePolicyEngine struct {
 
 // NewNamePolicyEngine creates a new NamePolicyEngine with NamePolicyOptions
 func New(opts ...NamePolicyOption) (*NamePolicyEngine, error) {
-
 	e := &NamePolicyEngine{}
 	for _, option := range opts {
 		if err := option(e); err != nil {
@@ -153,7 +151,6 @@ func New(opts ...NamePolicyOption) (*NamePolicyEngine, error) {
 // duplicate values removed. It retains the order of elements
 // in the source slice.
 func removeDuplicates(items []string) (ret []string) {
-
 	// no need to remove dupes; return original
 	if len(items) <= 1 {
 		return items
@@ -179,7 +176,6 @@ func removeDuplicates(items []string) (ret []string) {
 // the source slice. An IPNet is considered duplicate if its CIDR
 // notation exists multiple times in the slice.
 func removeDuplicateIPNets(items []*net.IPNet) (ret []*net.IPNet) {
-
 	// no need to remove dupes; return original
 	if len(items) <= 1 {
 		return items

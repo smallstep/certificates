@@ -1266,7 +1266,7 @@ func TestACMEClient_GetCertificate(t *testing.T) {
 		Type:  "Certificate",
 		Bytes: leaf.Raw,
 	})
-	// nolint:gocritic
+	//nolint:gocritic
 	certBytes := append(leafb, leafb...)
 	certBytes = append(certBytes, leafb...)
 	ac := &ACMEClient{

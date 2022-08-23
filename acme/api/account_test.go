@@ -184,11 +184,12 @@ func TestNewAccountRequest_Validate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if err := tc.nar.Validate(); err != nil {
 				if assert.NotNil(t, err) {
-					ae, ok := err.(*acme.Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
+					var ae *acme.Error
+					if assert.True(t, errors.As(err, &ae)) {
+						assert.HasPrefix(t, ae.Error(), tc.err.Error())
+						assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+						assert.Equals(t, ae.Type, tc.err.Type)
+					}
 				}
 			} else {
 				assert.Nil(t, tc.err)
@@ -255,11 +256,12 @@ func TestUpdateAccountRequest_Validate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if err := tc.uar.Validate(); err != nil {
 				if assert.NotNil(t, err) {
-					ae, ok := err.(*acme.Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
+					var ae *acme.Error
+					if assert.True(t, errors.As(err, &ae)) {
+						assert.HasPrefix(t, ae.Error(), tc.err.Error())
+						assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+						assert.Equals(t, ae.Type, tc.err.Type)
+					}
 				}
 			} else {
 				assert.Nil(t, tc.err)

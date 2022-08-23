@@ -59,9 +59,9 @@ func (t Type) String() string {
 	return strings.ToLower(string(t))
 }
 
-// ErrNotImplemented is the type of error returned if an operation is not
-// implemented.
-type ErrNotImplemented struct {
+// ErrNotImplemented is the type of error returned if an operation is not implemented.
+type ErrNotImplemented struct { //nolint:errname // ignore error name warning
+
 	Message string
 }
 

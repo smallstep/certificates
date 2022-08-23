@@ -29,7 +29,7 @@ ci: testcgo build
 
 bootstra%:
 	# Using a released version of golangci-lint to take into account custom replacements in their go.mod
-	$Q curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.42.0
+	$Q curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.48.0
 
 .PHONY: bootstra%
 
@@ -151,7 +151,7 @@ integration: bin/$(BINNAME)
 #########################################
 
 fmt:
-	$Q gofmt -l -s -w $(SRC)
+	$Q goimports -local github.com/golangci/golangci-lint -l -w $(SRC)
 
 lint:
 	$Q golangci-lint run --timeout=30m

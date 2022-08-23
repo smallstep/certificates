@@ -247,14 +247,14 @@ func TestOrder_UpdateStatus(t *testing.T) {
 			tc := run(t)
 			if err := tc.o.UpdateStatus(context.Background(), tc.db); err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch k := err.(type) {
-					case *Error:
+					var k *Error
+					if errors.As(err, &k) {
 						assert.Equals(t, k.Type, tc.err.Type)
 						assert.Equals(t, k.Detail, tc.err.Detail)
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
-					default:
+					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
 				}
@@ -812,14 +812,14 @@ func TestOrder_Finalize(t *testing.T) {
 			tc := run(t)
 			if err := tc.o.Finalize(context.Background(), tc.db, tc.csr, tc.ca, tc.prov); err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch k := err.(type) {
-					case *Error:
+					var k *Error
+					if errors.As(err, &k) {
 						assert.Equals(t, k.Type, tc.err.Type)
 						assert.Equals(t, k.Detail, tc.err.Detail)
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
-					default:
+					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
 				}
@@ -1474,14 +1474,14 @@ func TestOrder_sans(t *testing.T) {
 					t.Errorf("Order.sans() = %v, want error; got none", got)
 					return
 				}
-				switch k := err.(type) {
-				case *Error:
+				var k *Error
+				if errors.As(err, &k) {
 					assert.Equals(t, k.Type, tt.err.Type)
 					assert.Equals(t, k.Detail, tt.err.Detail)
 					assert.Equals(t, k.Status, tt.err.Status)
 					assert.Equals(t, k.Err.Error(), tt.err.Err.Error())
 					assert.Equals(t, k.Detail, tt.err.Detail)
-				default:
+				} else {
 					assert.FatalError(t, errors.New("unexpected error type"))
 				}
 				return

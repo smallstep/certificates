@@ -14,7 +14,6 @@ type Service struct {
 }
 
 func NewService(ctx context.Context, opts Options) (*Service, error) {
-
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}

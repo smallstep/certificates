@@ -197,7 +197,6 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 }
 
 func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativeName, error) {
-
 	var sans []x509util.SubjectAlternativeName
 
 	if len(csr.EmailAddresses) > 0 || len(csr.URIs) > 0 {
@@ -287,7 +286,6 @@ func numberOfIdentifierType(typ IdentifierType, ids []Identifier) int {
 // addresses or DNS names slice, depending on whether it can be parsed as an IP
 // or not. This might result in an additional SAN in the final certificate.
 func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.CertificateRequest) {
-
 	// for clarity only; we're operating on the same object by pointer
 	canonicalized = csr
 

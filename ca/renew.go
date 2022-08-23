@@ -193,7 +193,7 @@ func (r *TLSRenewer) nextRenewDuration(notAfter time.Time) time.Duration {
 	return d
 }
 
-// nolint:gosec // not used for cryptographic security
+//nolint:gosec // not used for cryptographic security
 func mathRandInt63n(n int64) int64 {
 	return rand.Int63n(n)
 }

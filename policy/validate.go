@@ -8,6 +8,7 @@ package policy
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -21,7 +22,6 @@ import (
 
 // validateNames verifies that all names are allowed.
 func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailAddresses []string, uris []*url.URL, principals []string) error {
-
 	// nothing to compare against; return early
 	if e.totalNumberOfConstraints == 0 {
 		return nil
@@ -182,7 +182,6 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 
 // validateCommonName verifies that the Subject Common Name is allowed
 func (e *NamePolicyEngine) validateCommonName(commonName string) error {
-
 	// nothing to compare against; return early
 	if e.totalNumberOfConstraints == 0 {
 		return nil
@@ -212,7 +211,8 @@ func (e *NamePolicyEngine) validateCommonName(commonName string) error {
 
 	err := e.validateNames(dnsNames, ips, emails, uris, []string{})
 
-	if pe, ok := err.(*NamePolicyError); ok {
+	var pe *NamePolicyError
+	if errors.As(err, &pe) {
 		// override the name type with CN
 		pe.NameType = CNNameType
 	}
@@ -229,7 +229,6 @@ func checkNameConstraints(
 	parsedName interface{},
 	match func(parsedName, constraint interface{}) (match bool, err error),
 	permitted, excluded interface{}) error {
-
 	excludedValue := reflect.ValueOf(excluded)
 
 	for i := 0; i < excludedValue.Len(); i++ {
@@ -552,7 +551,6 @@ func (e *NamePolicyEngine) matchDomainConstraint(domain, constraint string) (boo
 
 // SOURCE: https://cs.opensource.google/go/go/+/refs/tags/go1.17.5:src/crypto/x509/verify.go
 func matchIPConstraint(ip net.IP, constraint *net.IPNet) (bool, error) {
-
 	// TODO(hs): this is code from Go library, but I got some unexpected result:
 	// with permitted net 127.0.0.0/24, 127.0.0.1 is NOT allowed. When parsing 127.0.0.1 as net.IP
 	// which is in the IPAddresses slice, the underlying length is 16. The contraint.IP has a length

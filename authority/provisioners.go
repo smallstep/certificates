@@ -145,7 +145,6 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 		AuthorizeRenewFunc:    a.authorizeRenewFunc,
 		AuthorizeSSHRenewFunc: a.authorizeSSHRenewFunc,
 	}, nil
-
 }
 
 // StoreProvisioner stores a provisioner to the authority.
@@ -530,6 +529,7 @@ func durationsToLinkedca(d *provisioner.Duration) string {
 // certifictes claims type.
 func claimsToCertificates(c *linkedca.Claims) (*provisioner.Claims, error) {
 	if c == nil {
+		//nolint:nilnil // legacy
 		return nil, nil
 	}
 

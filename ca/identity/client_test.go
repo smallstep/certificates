@@ -242,7 +242,7 @@ func Test_defaultsConfig_Validate(t *testing.T) {
 	}
 }
 
-// nolint:staticcheck,gocritic
+//nolint:staticcheck,gocritic
 func equalPools(a, b *x509.CertPool) bool {
 	if reflect.DeepEqual(a, b) {
 		return true

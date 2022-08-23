@@ -9,8 +9,8 @@ type policyEngine struct {
 }
 
 func newPolicyEngine(options *Options) (*policyEngine, error) {
-
 	if options == nil {
+		//nolint:nilnil // legacy
 		return nil, nil
 	}
 

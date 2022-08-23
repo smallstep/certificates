@@ -196,7 +196,7 @@ To get a linked authority token:
 	}
 
 	go ca.StopReloaderHandler(srv)
-	if err = srv.Run(); err != nil && err != http.ErrServerClosed {
+	if err = srv.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fatal(err)
 	}
 	return nil

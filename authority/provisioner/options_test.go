@@ -254,7 +254,7 @@ func TestCustomTemplateOptions(t *testing.T) {
 }
 
 func Test_unsafeParseSigned(t *testing.T) {
-	// nolint:gosec // no credentials here
+	//nolint:gosec // no credentials here
 	okToken := "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqYW5lQGRvZS5jb20iLCJpc3MiOiJodHRwczovL2RvZS5jb20iLCJqdGkiOiI4ZmYzMjQ4MS1mZDVmLTRlMmUtOTZkZi05MDhjMTI3Yzg1ZjciLCJpYXQiOjE1OTUzNjAwMjgsImV4cCI6MTU5NTM2MzYyOH0.aid8UuhFucJOFHXaob9zpNtVvhul9ulTGsA52mU6XIw"
 	type args struct {
 		s string

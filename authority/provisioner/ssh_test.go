@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"crypto"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -84,9 +85,10 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 	// Create certificate from template.
 	certificate, err := sshutil.NewCertificate(cr, certOptions...)
 	if err != nil {
-		if _, ok := err.(*sshutil.TemplateError); ok {
-			return nil, errs.NewErr(http.StatusBadRequest, err,
-				errs.WithMessage(err.Error()),
+		var templErr *sshutil.TemplateError
+		if errors.As(err, &templErr) {
+			return nil, errs.NewErr(http.StatusBadRequest, templErr,
+				errs.WithMessage(templErr.Error()),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
 		}

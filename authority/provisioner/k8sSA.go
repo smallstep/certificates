@@ -93,7 +93,6 @@ func (p *K8sSA) GetEncryptedKey() (string, string, bool) {
 
 // Init initializes and validates the fields of a K8sSA type.
 func (p *K8sSA) Init(config Config) (err error) {
-
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")

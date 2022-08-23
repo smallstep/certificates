@@ -54,6 +54,7 @@ func (p *noop) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 }
 
 func (p *noop) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {
+	//nolint:nilnil // fine for noop
 	return nil, nil
 }
 

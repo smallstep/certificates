@@ -305,7 +305,6 @@ func (v profileDefaultDuration) Modify(cert *x509.Certificate, so SignOptions) e
 	if notBefore.IsZero() {
 		notBefore = now()
 		backdate = -1 * so.Backdate
-
 	}
 	notAfter := so.NotAfter.RelativeTime(notBefore)
 	if notAfter.IsZero() {

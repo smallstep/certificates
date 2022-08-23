@@ -72,12 +72,22 @@ type RenderableError interface {
 	Render(http.ResponseWriter)
 }
 
+// AsRenderableError attempts to return an error type that implements the
+// RenderableError interface.
+func AsRenderableError(err error) (RenderableError, bool) {
+	//nolint:errorlint // ignore type assertion warning. casting to interface is hard.
+	if r, ok := err.(RenderableError); ok {
+		return r, true
+	}
+	return nil, false
+}
+
 // Error marshals the JSON representation of err to w. In case err implements
 // RenderableError its own Render method will be called instead.
 func Error(w http.ResponseWriter, err error) {
 	log.Error(w, err)
 
-	if e, ok := err.(RenderableError); ok {
+	if e, ok := AsRenderableError(err); ok {
 		e.Render(w)
 
 		return
@@ -97,6 +107,16 @@ type StatusCodedError interface {
 	StatusCode() int
 }
 
+// AsStatusCodedError attempts to return an error type that implements the
+// StatusCodedError interface.
+func AsStatusCodedError(err error) (StatusCodedError, bool) {
+	//nolint:errorlint // ignore type assertion warning. casting to interface is hard.
+	if sc, ok := err.(StatusCodedError); ok {
+		return sc, true
+	}
+	return nil, false
+}
+
 func statusCodeFromError(err error) (code int) {
 	code = http.StatusInternalServerError
 
@@ -105,12 +125,13 @@ func statusCodeFromError(err error) (code int) {
 	}
 
 	for err != nil {
-		if sc, ok := err.(StatusCodedError); ok {
+		if sc, ok := AsStatusCodedError(err); ok {
 			code = sc.StatusCode()
 
 			break
 		}
 
+		//nolint:errorlint // ignore type assertion warning. casting to interface is hard.
 		cause, ok := err.(causer)
 		if !ok {
 			break

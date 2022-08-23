@@ -21,6 +21,16 @@ type StackTracedError interface {
 	StackTrace() errors.StackTrace
 }
 
+// AsStackTracedError attempts to return the input error cast to a
+// StackTracedError interface.
+func AsStackTracedError(err error) (StackTracedError, bool) {
+	//nolint:errorlint // ignore type assertion warning. casting to interface is hard.
+	if st, ok := err.(StackTracedError); ok {
+		return st, ok
+	}
+	return nil, false
+}
+
 // Error adds to the response writer the given error if it implements
 // logging.ResponseLogger. If it does not implement it, then writes the error
 // using the log package.
@@ -38,8 +48,9 @@ func Error(rw http.ResponseWriter, err error) {
 		return
 	}
 
-	e, ok := err.(StackTracedError)
+	e, ok := AsStackTracedError(err)
 	if !ok {
+		//nolint:errorlint // ignore type assertion warning. casting to interface is hard.
 		e, ok = errors.Cause(err).(StackTracedError)
 	}
 
