@@ -41,8 +41,8 @@ func TestJSON(t *testing.T) {
 			}
 
 			if tt.wantErr {
-				e, ok := err.(*errs.Error)
-				if ok {
+				var e *errs.Error
+				if errors.As(err, &e) {
 					if code := e.StatusCode(); code != 400 {
 						t.Errorf("error.StatusCode() = %v, wants 400", code)
 					}
@@ -102,14 +102,15 @@ func TestProtoJSON(t *testing.T) {
 			}
 
 			if tt.wantErr {
-				switch err.(type) {
-				case badProtoJSONError:
+				var (
+					ee  *errs.Error
+					bpe badProtoJSONError
+				)
+				switch {
+				case errors.As(err, &bpe):
 					assert.Contains(t, err.Error(), "syntax error")
-				case *errs.Error:
-					var ee *errs.Error
-					if errors.As(err, &ee) {
-						assert.Equal(t, http.StatusBadRequest, ee.Status)
-					}
+				case errors.As(err, &ee):
+					assert.Equal(t, http.StatusBadRequest, ee.Status)
 				}
 				return
 			}

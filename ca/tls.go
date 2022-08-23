@@ -105,8 +105,8 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	}
 
 	tr := getDefaultTransport(tlsConfig)
-	// Use mutable tls.Config on renew
-	tr.DialTLS = c.buildDialTLS(tlsCtx) // nolint:staticcheck,gocritic
+	//nolint:staticcheck // Use mutable tls.Config on renew
+	tr.DialTLS = c.buildDialTLS(tlsCtx)
 	// tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
@@ -153,8 +153,8 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 	// Update renew function with transport
 	tr := getDefaultTransport(tlsConfig)
-	// Use mutable tls.Config on renew
-	tr.DialTLS = c.buildDialTLS(tlsCtx) // nolint:staticcheck,gocritic
+	//nolint:staticcheck // Use mutable tls.Config on renew
+	tr.DialTLS = c.buildDialTLS(tlsCtx)
 	// tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
 
@@ -194,8 +194,7 @@ func (c *Client) buildDialTLS(ctx *TLSOptionCtx) func(network, addr string) (net
 	}
 }
 
-// buildDialTLSContext returns an implementation of DialTLSContext callback in http.Transport.
-// nolint:unused,gocritic
+//nolint:unused // buildDialTLSContext returns an implementation of DialTLSContext callback in http.Transport.
 func (c *Client) buildDialTLSContext(tlsCtx *TLSOptionCtx) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		d := getDefaultDialer()
@@ -253,8 +252,7 @@ func TLSCertificate(sign *api.SignResponse, pk crypto.PrivateKey) (*tls.Certific
 		return nil, err
 	}
 
-	// nolint:gocritic
-	// using a new variable for clarity
+	//nolint:gocritic // using a new variable for clarity
 	chain := append(certPEM, caPEM...)
 	cert, err := tls.X509KeyPair(chain, keyPEM)
 	if err != nil {

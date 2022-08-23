@@ -84,7 +84,6 @@ func (h *acmeAdminResponder) DeleteExternalAccountKey(w http.ResponseWriter, r *
 }
 
 func eakToLinked(k *acme.ExternalAccountKey) *linkedca.EABKey {
-
 	if k == nil {
 		return nil
 	}

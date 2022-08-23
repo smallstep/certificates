@@ -247,7 +247,7 @@ func TestOIDC_authorizeToken(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(render.StatusCodedError)
+				sc, ok := render.AsStatusCodedError(err)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
@@ -318,7 +318,7 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(render.StatusCodedError)
+				sc, ok := render.AsStatusCodedError(err)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
@@ -406,7 +406,7 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 				t.Errorf("OIDC.Authorize() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			} else if err != nil {
-				sc, ok := err.(render.StatusCodedError)
+				sc, ok := render.AsStatusCodedError(err)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
@@ -452,7 +452,7 @@ func TestOIDC_AuthorizeRenew(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(render.StatusCodedError)
+				sc, ok := render.AsStatusCodedError(err)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
@@ -540,7 +540,7 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	pub := key.Public().Key
 	rsa2048, err := rsa.GenerateKey(rand.Reader, 2048)
 	assert.FatalError(t, err)
-	// nolint:gosec // tests minimum size of the key
+	//nolint:gosec // tests minimum size of the key
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 
@@ -614,7 +614,7 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(render.StatusCodedError)
+				sc, ok := render.AsStatusCodedError(err)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
@@ -682,7 +682,7 @@ func TestOIDC_AuthorizeSSHRevoke(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("OIDC.AuthorizeSSHRevoke() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(render.StatusCodedError)
+				sc, ok := render.AsStatusCodedError(err)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}

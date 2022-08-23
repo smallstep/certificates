@@ -324,7 +324,6 @@ func numberOfIdentifierType(typ IdentifierType, ids []Identifier) int {
 // addresses or DNS names slice, depending on whether it can be parsed as an IP
 // or not. This might result in an additional SAN in the final certificate.
 func canonicalize(csr *x509.CertificateRequest) (canonicalized *x509.CertificateRequest) {
-
 	// for clarity only; we're operating on the same object by pointer
 	canonicalized = csr
 

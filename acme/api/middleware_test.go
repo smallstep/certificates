@@ -518,9 +518,6 @@ func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 			}
 		},
 		"ok/empty-algorithm-in-jwk": func(t *testing.T) test {
-			_pub := *pub
-			clone := &_pub
-			clone.Algorithm = ""
 			ctx := context.WithValue(context.Background(), jwsContextKey, parsedJWS)
 			ctx = context.WithValue(ctx, jwkContextKey, pub)
 			return test{

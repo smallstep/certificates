@@ -50,7 +50,8 @@ func (par *policyAdminResponder) GetAuthorityPolicy(w http.ResponseWriter, r *ht
 
 	auth := mustAuthority(ctx)
 	authorityPolicy, err := auth.GetAuthorityPolicy(r.Context())
-	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
+	var ae *admin.Error
+	if errors.As(err, &ae) && !ae.IsType(admin.ErrorNotFoundType) {
 		render.Error(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
 		return
 	}
@@ -74,7 +75,8 @@ func (par *policyAdminResponder) CreateAuthorityPolicy(w http.ResponseWriter, r 
 	auth := mustAuthority(ctx)
 	authorityPolicy, err := auth.GetAuthorityPolicy(ctx)
 
-	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
+	var ae *admin.Error
+	if errors.As(err, &ae) && !ae.IsType(admin.ErrorNotFoundType) {
 		render.Error(w, admin.WrapErrorISE(err, "error retrieving authority policy"))
 		return
 	}
@@ -125,7 +127,8 @@ func (par *policyAdminResponder) UpdateAuthorityPolicy(w http.ResponseWriter, r 
 	auth := mustAuthority(ctx)
 	authorityPolicy, err := auth.GetAuthorityPolicy(ctx)
 
-	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
+	var ae *admin.Error
+	if errors.As(err, &ae) && !ae.IsType(admin.ErrorNotFoundType) {
 		render.Error(w, admin.WrapErrorISE(err, "error retrieving authority policy"))
 		return
 	}
@@ -175,7 +178,8 @@ func (par *policyAdminResponder) DeleteAuthorityPolicy(w http.ResponseWriter, r 
 	auth := mustAuthority(ctx)
 	authorityPolicy, err := auth.GetAuthorityPolicy(ctx)
 
-	if ae, ok := err.(*admin.Error); ok && !ae.IsType(admin.ErrorNotFoundType) {
+	var ae *admin.Error
+	if errors.As(err, &ae) && !ae.IsType(admin.ErrorNotFoundType) {
 		render.Error(w, admin.WrapErrorISE(ae, "error retrieving authority policy"))
 		return
 	}
@@ -468,7 +472,6 @@ func isBadRequest(err error) bool {
 }
 
 func validatePolicy(p *linkedca.Policy) error {
-
 	// convert the policy; return early if nil
 	options := policy.LinkedToCertificates(p)
 	if options == nil {

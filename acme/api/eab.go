@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"go.step.sm/crypto/jose"
 
@@ -24,6 +25,7 @@ func validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest)
 	}
 
 	if !acmeProv.RequireEAB {
+		//nolint:nilnil // legacy
 		return nil, nil
 	}
 
@@ -51,7 +53,8 @@ func validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest)
 	db := acme.MustDatabaseFromContext(ctx)
 	externalAccountKey, err := db.GetExternalAccountKey(ctx, acmeProv.ID, keyID)
 	if err != nil {
-		if _, ok := err.(*acme.Error); ok {
+		var ae *acme.Error
+		if errors.As(err, &ae) {
 			return nil, acme.WrapError(acme.ErrorUnauthorizedType, err, "the field 'kid' references an unknown key")
 		}
 		return nil, acme.WrapErrorISE(err, "error retrieving external account key")

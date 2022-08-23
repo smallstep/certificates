@@ -760,7 +760,7 @@ func TestAuthority_GetSSHBastion(t *testing.T) {
 				t.Errorf("Authority.GetSSHBastion() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			} else if err != nil {
-				_, ok := err.(render.StatusCodedError)
+				_, ok := render.AsStatusCodedError(err)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 			}
 			if !reflect.DeepEqual(got, tt.want) {
@@ -850,7 +850,7 @@ func TestAuthority_GetSSHHosts(t *testing.T) {
 			hosts, err := auth.GetSSHHosts(context.Background(), tc.cert)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
+					sc, ok := render.AsStatusCodedError(err)
 					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -1077,7 +1077,7 @@ func TestAuthority_RekeySSH(t *testing.T) {
 			cert, err := auth.RekeySSH(context.Background(), tc.cert, tc.key, tc.signOpts...)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
+					sc, ok := render.AsStatusCodedError(err)
 					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())

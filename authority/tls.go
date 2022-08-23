@@ -142,7 +142,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	cert, err := x509util.NewCertificate(csr, certOptions...)
 	if err != nil {
-		if _, ok := err.(*x509util.TemplateError); ok {
+		var te *x509util.TemplateError
+		if errors.As(err, &te) {
 			return nil, errs.ApplyOptions(
 				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("csr", csr),
@@ -244,7 +245,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
 	if err = a.storeCertificate(prov, fullchain); err != nil {
-		if err != db.ErrNotImplemented {
+		if !errors.Is(err, db.ErrNotImplemented) {
 			return nil, errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Sign; error storing certificate in db", opts...)
 		}
@@ -362,7 +363,7 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 
 	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
 	if err = a.storeRenewedCertificate(oldCert, fullchain); err != nil {
-		if err != db.ErrNotImplemented {
+		if !errors.Is(err, db.ErrNotImplemented) {
 			return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey; error storing certificate in db", opts...)
 		}
 	}
@@ -542,12 +543,12 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		// Save as revoked in the Db.
 		err = a.revoke(revokedCert, rci)
 	}
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return nil
-	case db.ErrNotImplemented:
+	case errors.Is(err, db.ErrNotImplemented):
 		return errs.NotImplemented("authority.Revoke; no persistence layer configured", opts...)
-	case db.ErrAlreadyExists:
+	case errors.Is(err, db.ErrAlreadyExists):
 		return errs.ApplyOptions(
 			errs.BadRequest("certificate with serial number '%s' is already revoked", rci.Serial),
 			opts...,
@@ -667,7 +668,7 @@ func templatingError(err error) error {
 	)
 	if errors.As(err, &syntaxError) {
 		// offset is arguably not super clear to the user, but it's the best we can do here
-		cause = fmt.Errorf("%s at offset %d", cause.Error(), syntaxError.Offset)
+		cause = fmt.Errorf("%w at offset %d", cause, syntaxError.Offset)
 	} else if errors.As(err, &typeError) {
 		// slightly rewriting the default error message to include the offset
 		cause = fmt.Errorf("cannot unmarshal %s at offset %d into Go value of type %s", typeError.Value, typeError.Offset, typeError.Type)

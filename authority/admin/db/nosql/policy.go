@@ -83,6 +83,7 @@ func (db *DB) getDBAuthorityPolicyBytes(ctx context.Context, authorityID string)
 
 func (db *DB) unmarshalDBAuthorityPolicy(data []byte) (*dbAuthorityPolicy, error) {
 	if len(data) == 0 {
+		//nolint:nilnil // legacy
 		return nil, nil
 	}
 	var dba = new(dbAuthorityPolicy)
@@ -102,6 +103,7 @@ func (db *DB) getDBAuthorityPolicy(ctx context.Context, authorityID string) (*db
 		return nil, err
 	}
 	if dbap == nil {
+		//nolint:nilnil // legacy
 		return nil, nil
 	}
 	if dbap.AuthorityID != authorityID {
@@ -112,7 +114,6 @@ func (db *DB) getDBAuthorityPolicy(ctx context.Context, authorityID string) (*db
 }
 
 func (db *DB) CreateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
-
 	dbap := &dbAuthorityPolicy{
 		ID:          db.authorityID,
 		AuthorityID: db.authorityID,
@@ -228,7 +229,6 @@ func dbToLinked(p *dbPolicy) *linkedca.Policy {
 }
 
 func linkedToDB(p *linkedca.Policy) *dbPolicy {
-
 	if p == nil {
 		return nil
 	}

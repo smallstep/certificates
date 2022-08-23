@@ -179,11 +179,12 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if err := tc.nor.Validate(); err != nil {
 				if assert.NotNil(t, err) {
-					ae, ok := err.(*acme.Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
+					var ae *acme.Error
+					if assert.True(t, errors.As(err, &ae)) {
+						assert.HasPrefix(t, ae.Error(), tc.err.Error())
+						assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+						assert.Equals(t, ae.Type, tc.err.Type)
+					}
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
@@ -253,11 +254,12 @@ func TestFinalizeRequestValidate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if err := tc.fr.Validate(); err != nil {
 				if assert.NotNil(t, err) {
-					ae, ok := err.(*acme.Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
+					var ae *acme.Error
+					if assert.True(t, errors.As(err, &ae)) {
+						assert.HasPrefix(t, ae.Error(), tc.err.Error())
+						assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+						assert.Equals(t, ae.Type, tc.err.Type)
+					}
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
@@ -761,14 +763,14 @@ func TestHandler_newAuthorization(t *testing.T) {
 			ctx = acme.NewProvisionerContext(ctx, tc.prov)
 			if err := newAuthorization(ctx, tc.az); err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch k := err.(type) {
-					case *acme.Error:
+					var k *acme.Error
+					if assert.True(t, errors.As(err, &k)) {
 						assert.Equals(t, k.Type, tc.err.Type)
 						assert.Equals(t, k.Detail, tc.err.Detail)
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
-					default:
+					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
 				}

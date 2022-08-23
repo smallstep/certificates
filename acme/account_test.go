@@ -46,14 +46,14 @@ func TestKeyToID(t *testing.T) {
 			tc := run(t)
 			if id, err := KeyToID(tc.jwk); err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch k := err.(type) {
-					case *Error:
+					var k *Error
+					if errors.As(err, &k) {
 						assert.Equals(t, k.Type, tc.err.Type)
 						assert.Equals(t, k.Detail, tc.err.Detail)
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
-					default:
+					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
 				}
@@ -131,12 +131,13 @@ func TestExternalAccountKey_BindTo(t *testing.T) {
 			}
 			if wantErr {
 				assert.NotNil(t, err)
-				assert.Type(t, &Error{}, err)
-				ae, _ := err.(*Error)
-				assert.Equals(t, ae.Type, tt.err.Type)
-				assert.Equals(t, ae.Detail, tt.err.Detail)
-				assert.Equals(t, ae.Identifier, tt.err.Identifier)
-				assert.Equals(t, ae.Subproblems, tt.err.Subproblems)
+				var ae *Error
+				if assert.True(t, errors.As(err, &ae)) {
+					assert.Equals(t, ae.Type, tt.err.Type)
+					assert.Equals(t, ae.Detail, tt.err.Detail)
+					assert.Equals(t, ae.Identifier, tt.err.Identifier)
+					assert.Equals(t, ae.Subproblems, tt.err.Subproblems)
+				}
 			} else {
 				assert.Equals(t, eak.AccountID, acct.ID)
 				assert.Equals(t, eak.HmacKey, []byte{})
