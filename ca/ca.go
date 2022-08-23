@@ -13,7 +13,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -157,7 +156,8 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithDatabase(ca.opts.database))
 	}
 
-	webhookTransport := getWebhookTransport()
+	// TODO shouldn't be reading AuthorityConfig here
+	webhookTransport := getWebhookTransport(cfg.AuthorityConfig.WebhookClient)
 	opts = append(opts, authority.WithWebhookClient(&http.Client{Transport: webhookTransport}))
 
 	auth, err := authority.New(cfg, opts...)
@@ -554,13 +554,18 @@ func dumpRoutes(mux chi.Routes) {
 	}
 }
 
-func getWebhookTransport() *http.Transport {
-	return &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+func getWebhookTransport(config *config.WebhookClient) *http.Transport {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+
+	// If no policy is supplied all webhook server requests are allowed
+	if config != nil {
+		t.DialContext = func(ctx context.Context, network string, addr string) (net.Conn, error) {
+			d := net.Dialer{
+				Control: config.ControlFunc(addr),
+			}
+			return d.DialContext(ctx, network, addr)
+		}
 	}
+
+	return t
 }

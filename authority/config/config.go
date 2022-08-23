@@ -104,6 +104,7 @@ type AuthConfig struct {
 	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
 	EnableAdmin          bool                  `json:"enableAdmin,omitempty"`
 	DisableGetSSHHosts   bool                  `json:"disableGetSSHHosts,omitempty"`
+	WebhookClient        *WebhookClient        `json:"webhookClient,omitempty"`
 }
 
 // init initializes the required fields in the AuthConfig if they are not
@@ -130,6 +131,10 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 
 	// Initialize required fields.
 	c.init()
+
+	if err := c.WebhookClient.init(); err != nil {
+		return err
+	}
 
 	// Check that only one K8sSA is enabled
 	var k8sCount int
