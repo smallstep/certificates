@@ -255,8 +255,14 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 	}
 
 	db := acme.MustDatabaseFromContext(ctx)
-	az.Challenges = make([]*acme.Challenge, len(chTypes))
-	for i, typ := range chTypes {
+	prov := acme.MustProvisionerFromContext(ctx)
+	az.Challenges = make([]*acme.Challenge, 0, len(chTypes))
+	for _, typ := range chTypes {
+		// Make sure the challenge is enabled
+		if err := prov.AuthorizeChallenge(ctx, string(typ)); err != nil {
+			continue
+		}
+
 		ch := &acme.Challenge{
 			AccountID: az.AccountID,
 			Value:     az.Identifier.Value,
@@ -267,7 +273,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 		if err := db.CreateChallenge(ctx, ch); err != nil {
 			return acme.WrapErrorISE(err, "error creating challenge")
 		}
-		az.Challenges[i] = ch
+		az.Challenges = append(az.Challenges, ch)
 	}
 	if err = db.CreateAuthorization(ctx, az); err != nil {
 		return acme.WrapErrorISE(err, "error creating authorization")

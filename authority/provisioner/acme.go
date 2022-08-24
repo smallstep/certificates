@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -22,7 +23,11 @@ type ACME struct {
 	// by clients when creating a new Account. If set to true, the provided
 	// EAB will be verified. If set to false and an EAB is provided, it is
 	// not verified. Defaults to false.
-	RequireEAB bool     `json:"requireEAB,omitempty"`
+	RequireEAB bool `json:"requireEAB,omitempty"`
+	// Challenges contains the enabled challenges for this provisioner. If this
+	// value is not set the default http-01, dns-01 and tls-alpn-01 challenges
+	// will be enabled, device-attest-01 will be disabled.
+	Challenges []string `json:"challenges,omitempty"`
 	Claims     *Claims  `json:"claims,omitempty"`
 	Options    *Options `json:"options,omitempty"`
 
@@ -162,4 +167,22 @@ func (p *ACME) AuthorizeRevoke(ctx context.Context, token string) error {
 // certificate was configured to allow renewals.
 func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	return p.ctl.AuthorizeRenew(ctx, cert)
+}
+
+// AuthorizeChallenge checks if the given challenge is enabled. By default
+// http-01, dns-01 and tls-alpn-01 are enabled, to disable any of them the
+// Challenge provisioner property should have at least one element.
+func (p *ACME) AuthorizeChallenge(ctx context.Context, challenge string) error {
+	enabledChallenges := []string{
+		"http-01", "dns-01", "tls-alpn-01",
+	}
+	if len(p.Challenges) > 0 {
+		enabledChallenges = p.Challenges
+	}
+	for _, ch := range enabledChallenges {
+		if strings.EqualFold(ch, challenge) {
+			return nil
+		}
+	}
+	return fmt.Errorf("acme challenge %q is disabled", challenge)
 }
