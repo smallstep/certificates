@@ -28,7 +28,7 @@ Index of Documentation and Tutorials for using and deploying the `step certifica
     * Check out our [Blog](https://smallstep.com/blog/). We post quality
       educational content as well as periodic updates on new releases.
 * **API**: Guides to using the API via the `step` CLI.
-    * [Revoking Certificates](https://smallstep.com/docs/step-ca/certificate-authority-server-production#x509-certificate-revocation)
+    * [Revoking Certificates](https://smallstep.com/docs/step-ca/revocation)
     * [Persistence Layer](https://smallstep.com/docs/step-ca/configuration#databases): description and guide to using `step certificates`'
       persistence layer for storing certificate management metadata.
 * **Tutorials**: Guides for deploying and getting started with `step` in various environments.
