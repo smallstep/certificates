@@ -204,3 +204,44 @@ func TestACME_AuthorizeSign(t *testing.T) {
 		})
 	}
 }
+
+func TestACME_AuthorizeChallenge(t *testing.T) {
+	ctx := context.Background()
+	type fields struct {
+		Challenges []string
+	}
+	type args struct {
+		ctx       context.Context
+		challenge string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"ok http-01", fields{nil}, args{ctx, "http-01"}, false},
+		{"ok dns-01", fields{nil}, args{ctx, "dns-01"}, false},
+		{"ok tls-alpn-01", fields{[]string{}}, args{ctx, "tls-alpn-01"}, false},
+		{"fail device-attest-01", fields{[]string{}}, args{ctx, "device-attest-01"}, true},
+		{"ok http-01 enabled", fields{[]string{"http-01"}}, args{ctx, "http-01"}, false},
+		{"ok dns-01 enabled", fields{[]string{"http-01", "dns-01"}}, args{ctx, "dns-01"}, false},
+		{"ok tls-alpn-01 enabled", fields{[]string{"http-01", "dns-01", "tls-alpn-01"}}, args{ctx, "tls-alpn-01"}, false},
+		{"ok device-attest-01 enabled", fields{[]string{"device-attest-01", "dns-01"}}, args{ctx, "device-attest-01"}, false},
+		{"fail http-01", fields{[]string{"dns-01"}}, args{ctx, "http-01"}, true},
+		{"fail dns-01", fields{[]string{"http-01", "tls-alpn-01"}}, args{ctx, "dns-01"}, true},
+		{"fail tls-alpn-01", fields{[]string{"http-01", "dns-01", "device-attest-01"}}, args{ctx, "tls-alpn-01"}, true},
+		{"fail device-attest-01", fields{[]string{"http-01", "dns-01"}}, args{ctx, "device-attest-01"}, true},
+		{"fail unknown", fields{[]string{"http-01", "dns-01", "tls-alpn-01", "device-attest-01"}}, args{ctx, "unknown"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &ACME{
+				Challenges: tt.fields.Challenges,
+			}
+			if err := p.AuthorizeChallenge(tt.args.ctx, tt.args.challenge); (err != nil) != tt.wantErr {
+				t.Errorf("ACME.AuthorizeChallenge() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

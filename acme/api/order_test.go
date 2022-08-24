@@ -502,10 +502,12 @@ func TestHandler_GetOrder(t *testing.T) {
 }
 
 func TestHandler_newAuthorization(t *testing.T) {
+	defaultProvisioner := newProv()
 	type test struct {
-		az  *acme.Authorization
-		db  acme.DB
-		err *acme.Error
+		az   *acme.Authorization
+		prov acme.Provisioner
+		db   acme.DB
+		err  *acme.Error
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/error-db.CreateChallenge": func(t *testing.T) test {
@@ -517,6 +519,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 				},
 			}
 			return test{
+				prov: defaultProvisioner,
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						assert.Equals(t, ch.AccountID, az.AccountID)
@@ -544,6 +547,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 			count := 0
 			var ch1, ch2, ch3 **acme.Challenge
 			return test{
+				prov: defaultProvisioner,
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -598,6 +602,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 			count := 0
 			var ch1, ch2, ch3 **acme.Challenge
 			return test{
+				prov: defaultProvisioner,
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						switch count {
@@ -650,6 +655,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 			}
 			var ch1 **acme.Challenge
 			return test{
+				prov: defaultProvisioner,
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
 						ch.ID = "dns"
@@ -678,12 +684,86 @@ func TestHandler_newAuthorization(t *testing.T) {
 				az: az,
 			}
 		},
+		"ok/permanent-identifier-disabled": func(t *testing.T) test {
+			az := &acme.Authorization{
+				AccountID: "accID",
+				Identifier: acme.Identifier{
+					Type:  "permanent-identifier",
+					Value: "7b53aa19-26f7-4fac-824f-7a781de0dab0",
+				},
+				Status:    acme.StatusPending,
+				ExpiresAt: clock.Now(),
+			}
+			return test{
+				prov: defaultProvisioner,
+				db: &acme.MockDB{
+					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
+						t.Errorf("createChallenge should not be called")
+						return nil
+					},
+					MockCreateAuthorization: func(ctx context.Context, _az *acme.Authorization) error {
+						assert.Equals(t, _az.AccountID, az.AccountID)
+						assert.Equals(t, _az.Token, az.Token)
+						assert.Equals(t, _az.Status, acme.StatusPending)
+						assert.Equals(t, _az.Identifier, az.Identifier)
+						assert.Equals(t, _az.ExpiresAt, az.ExpiresAt)
+						assert.Equals(t, _az.Challenges, []*acme.Challenge{})
+						assert.Equals(t, _az.Wildcard, false)
+						return nil
+					},
+				},
+				az: az,
+			}
+		},
+		"ok/permanent-identifier-enabled": func(t *testing.T) test {
+			var ch1 *acme.Challenge
+			az := &acme.Authorization{
+				AccountID: "accID",
+				Identifier: acme.Identifier{
+					Type:  "permanent-identifier",
+					Value: "7b53aa19-26f7-4fac-824f-7a781de0dab0",
+				},
+				Status:    acme.StatusPending,
+				ExpiresAt: clock.Now(),
+			}
+			deviceAttestProv := newProv()
+			deviceAttestProv.(*provisioner.ACME).Challenges = []string{string(acme.DEVICEATTEST01)}
+			return test{
+				prov: deviceAttestProv,
+				db: &acme.MockDB{
+					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
+						ch.ID = "997bacc2-c175-4214-a3b4-a229ada5f671"
+						assert.Equals(t, ch.Type, acme.DEVICEATTEST01)
+						assert.Equals(t, ch.AccountID, az.AccountID)
+						assert.Equals(t, ch.Token, az.Token)
+						assert.Equals(t, ch.Status, acme.StatusPending)
+						assert.Equals(t, ch.Value, "7b53aa19-26f7-4fac-824f-7a781de0dab0")
+						ch1 = ch
+						return nil
+					},
+					MockCreateAuthorization: func(ctx context.Context, _az *acme.Authorization) error {
+						assert.Equals(t, _az.AccountID, az.AccountID)
+						assert.Equals(t, _az.Token, az.Token)
+						assert.Equals(t, _az.Status, acme.StatusPending)
+						assert.Equals(t, _az.Identifier, az.Identifier)
+						assert.Equals(t, _az.ExpiresAt, az.ExpiresAt)
+						assert.Equals(t, _az.Challenges, []*acme.Challenge{ch1})
+						assert.Equals(t, _az.Wildcard, false)
+						return nil
+					},
+				},
+				az: az,
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
+			if name == "ok/permanent-identifier-enabled" {
+				println(1)
+			}
 			tc := run(t)
 			ctx := newBaseContext(context.Background(), tc.db)
-			ctx = acme.NewProvisionerContext(ctx, newProv())
+			ctx = acme.NewProvisionerContext(ctx, tc.prov)
 			if err := newAuthorization(ctx, tc.az); err != nil {
 				if assert.NotNil(t, tc.err) {
 					var k *acme.Error
