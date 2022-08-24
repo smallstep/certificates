@@ -217,6 +217,7 @@ type ACMEIdentifier struct {
 // AuthorizeOrderIdentifier verifies the provisioner is allowed to issue a
 // certificate for an ACME Order Identifier.
 func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIdentifier) error {
+
 	x509Policy := p.ctl.getPolicy().getX509()
 
 	// identifier is allowed if no policy is configured

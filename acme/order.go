@@ -1,4 +1,4 @@
-cpackage acme
+package acme
 
 import (
 	"bytes"
