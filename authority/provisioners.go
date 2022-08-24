@@ -753,6 +753,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			Name:       p.Name,
 			ForceCN:    cfg.ForceCn,
 			RequireEAB: cfg.RequireEab,
+			Challenges: challengesToCertificates(cfg.Challenges),
 			Claims:     claims,
 			Options:    options,
 		}, nil
@@ -1001,7 +1002,8 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Details: &linkedca.ProvisionerDetails{
 				Data: &linkedca.ProvisionerDetails_ACME{
 					ACME: &linkedca.ACMEProvisioner{
-						ForceCn: p.ForceCN,
+						ForceCn:    p.ForceCN,
+						Challenges: challengesToLinkedca(p.Challenges),
 					},
 				},
 			},
@@ -1121,4 +1123,42 @@ func parseInstanceAge(age string) (provisioner.Duration, error) {
 		instanceAge = *iap
 	}
 	return instanceAge, nil
+}
+
+func challengesToCertificates(challenges []linkedca.ACMEProvisioner_ChallengeType) []string {
+	ret := make([]string, len(challenges))
+	for i, ch := range challenges {
+		switch ch {
+		case linkedca.ACMEProvisioner_HTTP_01:
+			ret[i] = "http-01"
+		case linkedca.ACMEProvisioner_DNS_01:
+			ret[i] = "dns-01"
+		case linkedca.ACMEProvisioner_TLS_ALPN_O1:
+			ret[i] = "tls-alpn-01"
+		case linkedca.ACMEProvisioner_DEVICE_ATTEST_01:
+			ret[i] = "device-attest-01"
+		default:
+			ret[i] = "unknown"
+		}
+	}
+	return ret
+}
+
+func challengesToLinkedca(challenges []string) []linkedca.ACMEProvisioner_ChallengeType {
+	ret := make([]linkedca.ACMEProvisioner_ChallengeType, len(challenges))
+	for i, ch := range challenges {
+		switch ch {
+		case "http-01":
+			ret[i] = linkedca.ACMEProvisioner_DNS_01
+		case "dns-01":
+			ret[i] = linkedca.ACMEProvisioner_DNS_01
+		case "tls-alpn-01":
+			ret[i] = linkedca.ACMEProvisioner_TLS_ALPN_O1
+		case "device-attest-01":
+			ret[i] = linkedca.ACMEProvisioner_DEVICE_ATTEST_01
+		default:
+			ret[i] = linkedca.ACMEProvisioner_UNKNOWN
+		}
+	}
+	return ret
 }

@@ -683,6 +683,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
 			ctx := newBaseContext(context.Background(), tc.db)
+			ctx = acme.NewProvisionerContext(ctx, newProv())
 			if err := newAuthorization(ctx, tc.az); err != nil {
 				if assert.NotNil(t, tc.err) {
 					var k *acme.Error
