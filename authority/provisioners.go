@@ -502,11 +502,12 @@ func optionsToCertificates(p *linkedca.Provisioner) *provisioner.Options {
 
 func webhookToCertificates(wh *linkedca.Webhook) *provisioner.Webhook {
 	pwh := &provisioner.Webhook{
-		ID:            wh.Id,
-		Name:          wh.Name,
-		URL:           wh.Url,
-		Kind:          wh.Kind.String(),
-		SigningSecret: wh.Secret,
+		ID:                   wh.Id,
+		Name:                 wh.Name,
+		URL:                  wh.Url,
+		Kind:                 wh.Kind.String(),
+		SigningSecret:        wh.Secret,
+		DisableTLSClientAuth: wh.DisableTlsClientAuth,
 	}
 
 	switch a := wh.GetAuth().(type) {

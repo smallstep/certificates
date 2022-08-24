@@ -15,18 +15,20 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/templates"
 	"go.step.sm/crypto/sshutil"
 )
 
 type Webhook struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	URL           string `json:"url"`
-	Kind          string `json:"kind"`
-	SigningSecret string `json:"-"`
-	BearerToken   string `json:"-"`
-	BasicAuth     struct {
+	ID                   string `json:"id"`
+	Name                 string `json:"name"`
+	URL                  string `json:"url"`
+	Kind                 string `json:"kind"`
+	DisableTLSClientAuth bool   `json:"disableTLSClientAuth,omitempty"`
+	SigningSecret        string `json:"-"`
+	BearerToken          string `json:"-"`
+	BasicAuth            struct {
 		Username string
 		Password string
 	} `json:"-"`
@@ -93,6 +95,20 @@ retry:
 		req.SetBasicAuth(w.BasicAuth.Username, w.BasicAuth.Password)
 	}
 
+	if w.DisableTLSClientAuth {
+		transport, ok := client.Transport.(*http.Transport)
+		if !ok {
+			return nil, errors.New("client transport is not a *http.Transport")
+		}
+		transport = transport.Clone()
+		tlsConfig := transport.TLSClientConfig.Clone()
+		tlsConfig.GetClientCertificate = nil
+		tlsConfig.Certificates = nil
+		transport.TLSClientConfig = tlsConfig
+		client = &http.Client{
+			Transport: transport,
+		}
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		if err == context.DeadlineExceeded {
@@ -109,12 +125,12 @@ retry:
 			log.Printf("Failed to close body of response from %s", w.URL)
 		}
 	}()
-	if resp.StatusCode >= 500 {
-		if retries > 0 {
-			retries--
-			time.Sleep(time.Second)
-			goto retry
-		}
+	if resp.StatusCode >= 500 && retries > 0 {
+		retries--
+		time.Sleep(time.Second)
+		goto retry
+	}
+	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("Webhook server responded with %d", resp.StatusCode)
 	}
 

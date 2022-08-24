@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -18,6 +19,7 @@ import (
 )
 
 func TestWebhook_Do(t *testing.T) {
+	csr := parseCertificateRequest(t, "testdata/certs/ecdsa.csr")
 	type test struct {
 		webhook       Webhook
 		dataArg       map[string]interface{}
@@ -127,7 +129,6 @@ func TestWebhook_Do(t *testing.T) {
 
 			tc.webhook.URL = ts.URL + tc.webhook.URL
 
-			csr := parseCertificateRequest(t, "testdata/certs/ecdsa.csr")
 			got, err := tc.webhook.Do(context.Background(), http.DefaultClient, csr, tc.dataArg)
 			if tc.expectErr != nil {
 				assert.Equals(t, tc.expectErr.Error(), err.Error())
@@ -138,4 +139,29 @@ func TestWebhook_Do(t *testing.T) {
 			assert.Equals(t, got, tc.webhookData)
 		})
 	}
+
+	t.Run("disableTLSClientAuth", func(t *testing.T) {
+		ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("{}"))
+		}))
+		ts.TLS.ClientAuth = tls.RequireAnyClientCert
+		wh := Webhook{
+			URL: ts.URL,
+		}
+		cert, err := tls.LoadX509KeyPair("testdata/certs/foo.crt", "testdata/secrets/foo.key")
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+			Certificates:       []tls.Certificate{cert},
+		}
+		client := &http.Client{
+			Transport: transport,
+		}
+		_, err = wh.Do(context.Background(), client, csr, nil)
+		assert.FatalError(t, err)
+
+		wh.DisableTLSClientAuth = true
+		_, err = wh.Do(context.Background(), client, csr, nil)
+		assert.Error(t, err)
+	})
 }

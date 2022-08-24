@@ -33,13 +33,14 @@ type dbBasicAuth struct {
 }
 
 type dbWebhook struct {
-	Name          string      `json:"name"`
-	ID            string      `json:"id"`
-	URL           string      `json:"url"`
-	Kind          string      `json:"kind"`
-	SigningSecret string      `json:"signingSecret"`
-	BearerToken   string      `json:"bearerToken,omitempty"`
-	BasicAuth     dbBasicAuth `json:"basicAuth,omitempty"`
+	Name                 string      `json:"name"`
+	ID                   string      `json:"id"`
+	URL                  string      `json:"url"`
+	Kind                 string      `json:"kind"`
+	SigningSecret        string      `json:"signingSecret"`
+	BearerToken          string      `json:"bearerToken,omitempty"`
+	BasicAuth            dbBasicAuth `json:"basicAuth,omitempty"`
+	DisableTLSClientAuth bool        `json:"disableTLSClientAuth,omitempty"`
 }
 
 func (dbp *dbProvisioner) clone() *dbProvisioner {
@@ -234,11 +235,12 @@ func dbWebhooksToLinkedca(dbwhs []dbWebhook) []*linkedca.Webhook {
 
 	for _, dbwh := range dbwhs {
 		lwh := &linkedca.Webhook{
-			Name:   dbwh.Name,
-			Id:     dbwh.ID,
-			Url:    dbwh.URL,
-			Kind:   linkedca.Webhook_Kind(linkedca.Webhook_Kind_value[dbwh.Kind]),
-			Secret: dbwh.SigningSecret,
+			Name:                 dbwh.Name,
+			Id:                   dbwh.ID,
+			Url:                  dbwh.URL,
+			Kind:                 linkedca.Webhook_Kind(linkedca.Webhook_Kind_value[dbwh.Kind]),
+			Secret:               dbwh.SigningSecret,
+			DisableTlsClientAuth: dbwh.DisableTLSClientAuth,
 		}
 		if dbwh.BearerToken != "" {
 			lwh.Auth = &linkedca.Webhook_BearerToken{
@@ -265,11 +267,12 @@ func linkedcaWebhooksToDB(lwhs []*linkedca.Webhook) []dbWebhook {
 
 	for _, lwh := range lwhs {
 		dbwh := dbWebhook{
-			Name:          lwh.Name,
-			ID:            lwh.Id,
-			URL:           lwh.Url,
-			Kind:          lwh.Kind.String(),
-			SigningSecret: lwh.Secret,
+			Name:                 lwh.Name,
+			ID:                   lwh.Id,
+			URL:                  lwh.Url,
+			Kind:                 lwh.Kind.String(),
+			SigningSecret:        lwh.Secret,
+			DisableTLSClientAuth: lwh.DisableTlsClientAuth,
 		}
 		switch a := lwh.GetAuth().(type) {
 		case *linkedca.Webhook_BearerToken:
