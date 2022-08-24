@@ -19,6 +19,7 @@ import (
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/nosql/database"
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
 )
 
 var testBody = []byte("foo")
@@ -1136,6 +1137,8 @@ func TestHandler_validateJWS(t *testing.T) {
 			}
 		},
 		"fail/rsa-key-too-small": func(t *testing.T) test {
+			revert := keyutil.Insecure()
+			defer revert()
 			jwk, err := jose.GenerateJWK("RSA", "", "", "sig", "", 1024)
 			assert.FatalError(t, err)
 			pub := jwk.Public()
