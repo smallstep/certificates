@@ -1149,7 +1149,7 @@ func challengesToLinkedca(challenges []string) []linkedca.ACMEProvisioner_Challe
 	for i, ch := range challenges {
 		switch ch {
 		case "http-01":
-			ret[i] = linkedca.ACMEProvisioner_DNS_01
+			ret[i] = linkedca.ACMEProvisioner_HTTP_01
 		case "dns-01":
 			ret[i] = linkedca.ACMEProvisioner_DNS_01
 		case "tls-alpn-01":
