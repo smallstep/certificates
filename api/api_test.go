@@ -1437,7 +1437,7 @@ func Test_fmtPublicKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
+	rsa2048, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1463,7 +1463,7 @@ func Test_fmtPublicKey(t *testing.T) {
 		want string
 	}{
 		{"p256", args{p256.Public(), p256, nil}, "ECDSA P-256"},
-		{"rsa1024", args{rsa1024.Public(), rsa1024, nil}, "RSA 1024"},
+		{"rsa2048", args{rsa2048.Public(), rsa2048, nil}, "RSA 2048"},
 		{"ed25519", args{edPub, edPriv, nil}, "Ed25519"},
 		{"dsa2048", args{cert: &x509.Certificate{PublicKeyAlgorithm: x509.DSA, PublicKey: &dsa2048.PublicKey}}, "DSA 2048"},
 		{"unknown", args{cert: &x509.Certificate{PublicKeyAlgorithm: x509.ECDSA, PublicKey: []byte("12345678")}}, "ECDSA unknown"},

@@ -93,12 +93,17 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	signOpts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
 	var prov provisioner.Interface
+	var pInfo *casapi.ProvisionerInfo
 	for _, op := range extraOpts {
 		switch k := op.(type) {
 		// Capture current provisioner
 		case provisioner.Interface:
 			prov = k
-
+			pInfo = &casapi.ProvisionerInfo{
+				ID:   prov.GetID(),
+				Type: prov.GetType().String(),
+				Name: prov.GetName(),
+			}
 		// Adds new options to NewCertificate
 		case provisioner.CertificateOptions:
 			certOptions = append(certOptions, k.Options(signOpts)...)
@@ -221,10 +226,11 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	// Sign certificate
 	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
-		Template: leaf,
-		CSR:      csr,
-		Lifetime: lifetime,
-		Backdate: signOpts.Backdate,
+		Template:    leaf,
+		CSR:         csr,
+		Lifetime:    lifetime,
+		Backdate:    signOpts.Backdate,
+		Provisioner: pInfo,
 	})
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign; error creating certificate", opts...)
@@ -609,10 +615,11 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	certTpl.NotAfter = now.Add(24 * time.Hour)
 
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
-		Template: certTpl,
-		CSR:      cr,
-		Lifetime: 24 * time.Hour,
-		Backdate: 1 * time.Minute,
+		Template:       certTpl,
+		CSR:            cr,
+		Lifetime:       24 * time.Hour,
+		Backdate:       1 * time.Minute,
+		IsCAServerCert: true,
 	})
 	if err != nil {
 		return fatal(err)

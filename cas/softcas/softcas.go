@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/cas/apiv1"
-	"github.com/smallstep/certificates/kms"
-	kmsapi "github.com/smallstep/certificates/kms/apiv1"
+
+	"go.step.sm/crypto/kms"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/cas/apiv1"
 )
 
 func init() {
@@ -201,7 +203,7 @@ func (c *SoftCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthori
 func (c *SoftCAS) initializeKeyManager() (err error) {
 	if c.KeyManager == nil {
 		c.KeyManager, err = kms.New(context.Background(), kmsapi.Options{
-			Type: string(kmsapi.DefaultKMS),
+			Type: kmsapi.DefaultKMS,
 		})
 	}
 	return

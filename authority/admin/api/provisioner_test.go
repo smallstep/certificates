@@ -355,7 +355,7 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 				Type: linkedca.Provisioner_OIDC,
 				Name: "provName",
 				X509Template: &linkedca.Template{
-					Template: []byte("{!?}"),
+					Template: []byte(`{ {{missingFunction "foo"}} }`),
 				},
 			}
 			body, err := protojson.Marshal(prov)
@@ -368,7 +368,7 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 					Type:    "badRequest",
 					Status:  400,
 					Detail:  "bad request",
-					Message: "invalid template: invalid X.509 template: invalid JSON: invalid character '!' looking for beginning of object key string",
+					Message: "invalid template: invalid X.509 template: error parsing template: template: template:1: function \"missingFunction\" not defined",
 				},
 			}
 		},
@@ -973,7 +973,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				CreatedAt:   timestamppb.New(createdAt),
 				DeletedAt:   timestamppb.New(deletedAt),
 				X509Template: &linkedca.Template{
-					Template: []byte("{!?}"),
+					Template: []byte("{ {{ missingFunction }} }"),
 				},
 			}
 			body, err := protojson.Marshal(prov)
@@ -1010,7 +1010,7 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 					Type:    "badRequest",
 					Status:  400,
 					Detail:  "bad request",
-					Message: "invalid template: invalid X.509 template: invalid JSON: invalid character '!' looking for beginning of object key string",
+					Message: "invalid template: invalid X.509 template: error parsing template: template: template:1: function \"missingFunction\" not defined",
 				},
 			}
 		},
@@ -1220,13 +1220,13 @@ func Test_validateTemplates(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "fail/x509-template-trailing-comma",
+			name: "fail/x509-template-missing-quote",
 			args: args{
 				x509: &linkedca.Template{
-					Template: []byte(`{"x": 1,}`),
+					Template: []byte(`{ {{printf "%q" "quoted}} }`),
 				},
 			},
-			err: errors.New("invalid X.509 template: invalid JSON: invalid character '}' looking for beginning of object key string"),
+			err: errors.New("invalid X.509 template: error parsing template: template: template:1: unterminated quoted string"),
 		},
 		{
 			name: "fail/x509-template-data",
@@ -1235,16 +1235,16 @@ func Test_validateTemplates(t *testing.T) {
 					Data: []byte(`{!?}`),
 				},
 			},
-			err: errors.New("invalid X.509 template data: invalid JSON: invalid character '!' looking for beginning of object key string"),
+			err: errors.New("invalid X.509 template data: error validating json template data"),
 		},
 		{
-			name: "fail/ssh-template-trailing-comma",
+			name: "fail/ssh-template-unknown-function",
 			args: args{
 				ssh: &linkedca.Template{
-					Template: []byte(`{"x": 1,}`),
+					Template: []byte(`{ {{unknownFunction "foo"}} }`),
 				},
 			},
-			err: errors.New("invalid SSH template: invalid JSON: invalid character '}' looking for beginning of object key string"),
+			err: errors.New("invalid SSH template: error parsing template: template: template:1: function \"unknownFunction\" not defined"),
 		},
 		{
 			name: "fail/ssh-template-data",
@@ -1253,7 +1253,7 @@ func Test_validateTemplates(t *testing.T) {
 					Data: []byte(`{!?}`),
 				},
 			},
-			err: errors.New("invalid SSH template data: invalid JSON: invalid character '!' looking for beginning of object key string"),
+			err: errors.New("invalid SSH template data: error validating json template data"),
 		},
 	}
 	for _, tt := range tests {

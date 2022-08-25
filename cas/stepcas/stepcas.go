@@ -23,6 +23,7 @@ func init() {
 type StepCAS struct {
 	iss         stepIssuer
 	client      *ca.Client
+	authorityID string
 	fingerprint string
 }
 
@@ -59,6 +60,7 @@ func New(ctx context.Context, opts apiv1.Options) (*StepCAS, error) {
 	return &StepCAS{
 		iss:         iss,
 		client:      client,
+		authorityID: opts.AuthorityID,
 		fingerprint: opts.CertificateAuthorityFingerprint,
 	}, nil
 }
@@ -73,7 +75,19 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 		return nil, errors.New("createCertificateRequest `lifetime` cannot be 0")
 	}
 
-	cert, chain, err := s.createCertificate(req.CSR, req.Lifetime)
+	info := &raInfo{
+		AuthorityID: s.authorityID,
+	}
+	if req.IsCAServerCert {
+		info.EndpointID = newServerEndpointID(s.authorityID).String()
+	}
+	if p := req.Provisioner; p != nil {
+		info.ProvisionerID = p.ID
+		info.ProvisionerType = p.Type
+		info.ProvisionerName = p.Name
+	}
+
+	cert, chain, err := s.createCertificate(req.CSR, req.Lifetime, info)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +149,7 @@ func (s *StepCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequ
 	}, nil
 }
 
-func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.Duration) (*x509.Certificate, []*x509.Certificate, error) {
+func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.Duration, raInfo *raInfo) (*x509.Certificate, []*x509.Certificate, error) {
 	sans := make([]string, 0, len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses)+len(cr.URIs))
 	sans = append(sans, cr.DNSNames...)
 	sans = append(sans, cr.EmailAddresses...)
@@ -151,7 +165,7 @@ func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.D
 		commonName = sans[0]
 	}
 
-	token, err := s.iss.SignToken(commonName, sans)
+	token, err := s.iss.SignToken(commonName, sans, raInfo)
 	if err != nil {
 		return nil, nil, err
 	}

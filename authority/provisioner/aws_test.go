@@ -316,7 +316,7 @@ func TestAWS_authorizeToken(t *testing.T) {
 	}
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	assert.FatalError(t, err)
-	badKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	badKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	assert.FatalError(t, err)
 
 	type test struct {
@@ -579,7 +579,7 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	assert.FatalError(t, err)
 
-	badKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	badKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	assert.FatalError(t, err)
 
 	t4, err := generateAWSToken(
@@ -748,6 +748,7 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 	pub := key.Public().Key
 	rsa2048, err := rsa.GenerateKey(rand.Reader, 2048)
 	assert.FatalError(t, err)
+	// nolint:gosec // tests minimum size of the key
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 

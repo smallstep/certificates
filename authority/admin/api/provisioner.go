@@ -202,7 +202,7 @@ func UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 }
 
 // validateTemplates validates the X.509 and SSH templates and template data if set.
-func validateTemplates(x509 *linkedca.Template, ssh *linkedca.Template) error {
+func validateTemplates(x509, ssh *linkedca.Template) error {
 	if x509 != nil {
 		if len(x509.Template) > 0 {
 			if err := x509util.ValidateTemplate(x509.Template); err != nil {

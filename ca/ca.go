@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -14,6 +15,7 @@ import (
 	"sync"
 
 	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
@@ -171,6 +173,10 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	insecureMux := chi.NewRouter()
 	insecureHandler := http.Handler(insecureMux)
+
+	// Add HEAD middleware
+	mux.Use(middleware.GetHead)
+	insecureMux.Use(middleware.GetHead)
 
 	// Add regular CA api endpoints in / and /1.0
 	api.Route(mux)
@@ -342,10 +348,10 @@ func (ca *CA) Run() error {
 			log.Printf("X.509 Root Fingerprint: %s", x509util.Fingerprint(crt))
 		}
 		if authorityInfo.SSHCAHostPublicKey != nil {
-			log.Printf("SSH Host CA Key: %s\n", authorityInfo.SSHCAHostPublicKey)
+			log.Printf("SSH Host CA Key: %s\n", bytes.TrimSpace(authorityInfo.SSHCAHostPublicKey))
 		}
 		if authorityInfo.SSHCAUserPublicKey != nil {
-			log.Printf("SSH User CA Key: %s\n", authorityInfo.SSHCAUserPublicKey)
+			log.Printf("SSH User CA Key: %s\n", bytes.TrimSpace(authorityInfo.SSHCAUserPublicKey))
 		}
 	}
 

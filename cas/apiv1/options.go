@@ -6,12 +6,17 @@ import (
 	"encoding/json"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/kms"
+
+	"go.step.sm/crypto/kms"
 )
 
 // Options represents the configuration options used to select and configure the
 // CertificateAuthorityService (CAS) to use.
 type Options struct {
+	// AuthorityID is the the id oc the current authority. This is used on
+	// StepCAS to add information about the origin of a certificate.
+	AuthorityID string `json:"-"`
+
 	// The type of the CAS to use.
 	Type string `json:"type"`
 

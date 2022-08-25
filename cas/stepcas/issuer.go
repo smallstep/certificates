@@ -5,13 +5,33 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas/apiv1"
 )
 
+// raAuthorityNS is a custom namespace used to generate endpoint ids based on
+// the authority id.
+var raAuthorityNS = uuid.MustParse("d6f14c1f-2f92-47bf-a04f-7b2c11382edd")
+
+// newServerEndpointID returns a uuid v5 using raAuthorityNS as the namespace.
+// The return uuid will be used as the server endpoint id, it will be unique per
+// authority.
+func newServerEndpointID(data string) uuid.UUID {
+	return uuid.NewSHA1(raAuthorityNS, []byte(data))
+}
+
+type raInfo struct {
+	AuthorityID     string `json:"authorityId,omitempty"`
+	EndpointID      string `json:"endpointId,omitempty"`
+	ProvisionerID   string `json:"provisionerId,omitempty"`
+	ProvisionerType string `json:"provisionerType,omitempty"`
+	ProvisionerName string `json:"provisionerName,omitempty"`
+}
+
 type stepIssuer interface {
-	SignToken(subject string, sans []string) (string, error)
+	SignToken(subject string, sans []string, info *raInfo) (string, error)
 	RevokeToken(subject string) (string, error)
 	Lifetime(d time.Duration) time.Duration
 }

@@ -60,6 +60,7 @@ func init() {
 			d := &tls.Dialer{
 				NetDialer: getDefaultDialer(),
 				Config: &tls.Config{
+					MinVersion:           tls.VersionTLS12,
 					RootCAs:              pool,
 					GetClientCertificate: id.GetClientCertificateFunc(),
 				},

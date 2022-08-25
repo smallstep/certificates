@@ -3,7 +3,6 @@ package log
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
@@ -28,8 +27,6 @@ type StackTracedError interface {
 func Error(rw http.ResponseWriter, err error) {
 	rl, ok := rw.(logging.ResponseLogger)
 	if !ok {
-		log.Println(err)
-
 		return
 	}
 
@@ -72,8 +69,6 @@ func EnabledResponse(rw http.ResponseWriter, v interface{}) {
 			rl.WithFields(map[string]interface{}{
 				"response": out,
 			})
-		} else {
-			log.Println(out)
 		}
 	}
 }

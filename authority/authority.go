@@ -14,6 +14,9 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 
+	"go.step.sm/crypto/kms"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/kms/sshagentkms"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/linkedca"
 
@@ -26,9 +29,6 @@ import (
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/certificates/kms"
-	kmsapi "github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/certificates/kms/sshagentkms"
 	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/nosql"
@@ -312,6 +312,7 @@ func (a *Authority) init() error {
 		if id := a.config.AuthorityConfig.AuthorityID; id != "" && !strings.EqualFold(id, linkedcaClient.authorityID) {
 			return errors.New("error initializing linkedca: token authority and configured authority do not match")
 		}
+		a.config.AuthorityConfig.AuthorityID = linkedcaClient.authorityID
 		linkedcaClient.Run()
 	}
 
@@ -321,6 +322,9 @@ func (a *Authority) init() error {
 		if a.config.AuthorityConfig.Options != nil {
 			options = *a.config.AuthorityConfig.Options
 		}
+
+		// AuthorityID might be empty. It's always available linked CAs/RAs.
+		options.AuthorityID = a.config.AuthorityConfig.AuthorityID
 
 		// Configure linked RA
 		if linkedcaClient != nil && options.CertificateAuthority == "" {
@@ -334,6 +338,19 @@ func (a *Authority) init() error {
 				options.CertificateIssuer = &casapi.CertificateIssuer{
 					Type:        conf.RaConfig.Provisioner.Type.String(),
 					Provisioner: conf.RaConfig.Provisioner.Name,
+				}
+				// Configure the RA authority type if needed
+				if options.Type == "" {
+					options.Type = casapi.StepCAS
+				}
+			}
+			// Remote configuration is currently only supported on a linked RA
+			if sc := conf.ServerConfig; sc != nil {
+				if a.config.Address == "" {
+					a.config.Address = sc.Address
+				}
+				if len(a.config.DNSNames) == 0 {
+					a.config.DNSNames = sc.DnsNames
 				}
 			}
 		}
@@ -357,7 +374,6 @@ func (a *Authority) init() error {
 				return err
 			}
 		}
-
 		a.x509CAService, err = cas.New(ctx, options)
 		if err != nil {
 			return err
@@ -428,7 +444,7 @@ func (a *Authority) init() error {
 			// erroring out with: ssh: unsupported key type *agent.Key
 			switch s := signer.(type) {
 			case *sshagentkms.WrappedSSHSigner:
-				a.sshCAHostCertSignKey = s.Sshsigner
+				a.sshCAHostCertSignKey = s.Signer
 			case crypto.Signer:
 				a.sshCAHostCertSignKey, err = ssh.NewSignerFromSigner(s)
 			default:
@@ -454,7 +470,7 @@ func (a *Authority) init() error {
 			// erroring out with: ssh: unsupported key type *agent.Key
 			switch s := signer.(type) {
 			case *sshagentkms.WrappedSSHSigner:
-				a.sshCAUserCertSignKey = s.Sshsigner
+				a.sshCAUserCertSignKey = s.Signer
 			case crypto.Signer:
 				a.sshCAUserCertSignKey, err = ssh.NewSignerFromSigner(s)
 			default:

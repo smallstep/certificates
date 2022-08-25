@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        go: [ '1.17', '1.18' ]
+        go: [ '1.18', '1.19' ]
     steps:
       -
         name: Checkout
@@ -32,33 +32,15 @@ jobs:
         name: golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
-          # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
-          version: 'v1.45.2'
-
-          # Optional: working directory, useful for monorepos
-          # working-directory: somedir
-
-          # Optional: golangci-lint command line arguments.
+          version: ${{ secrets.GOLANGCI_LINT_VERSION }}
           args: --timeout=30m
-
-          # Optional: show only new issues if it's a pull request. The default value is `false`.
-          # only-new-issues: true
-
-          # Optional: if set to true then the action will use pre-installed Go.
-          # skip-go-installation: true
-
-          # Optional: if set to true then the action don't cache or restore ~/go/pkg.
-          # skip-pkg-cache: true
-
-          # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
-          # skip-build-cache: true
       -
         name: Test, Build
         id: lint_test_build
         run: V=1 make ci
       -
         name: Codecov
-        if: matrix.go == '1.18'
+        if: matrix.go == '1.19'
         uses: codecov/codecov-action@v2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

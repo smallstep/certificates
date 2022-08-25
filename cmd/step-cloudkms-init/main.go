@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha1" // nolint:gosec // used to create the Subject Key Identifier by RFC 5280
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/certificates/kms/cloudkms"
 	"go.step.sm/cli-utils/fileutil"
 	"go.step.sm/cli-utils/ui"
+	"go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/kms/cloudkms"
 	"go.step.sm/crypto/pemutil"
 	"golang.org/x/crypto/ssh"
 )
@@ -66,7 +66,7 @@ func main() {
 	ui.Init()
 
 	c, err := cloudkms.New(context.Background(), apiv1.Options{
-		Type:            string(apiv1.CloudKMS),
+		Type:            apiv1.CloudKMS,
 		CredentialsFile: credentialsFile,
 	})
 	if err != nil {
@@ -277,6 +277,7 @@ func mustSubjectKeyID(key crypto.PublicKey) []byte {
 	if err != nil {
 		panic(err)
 	}
+	// nolint:gosec // used to create the Subject Key Identifier by RFC 5280
 	hash := sha1.Sum(b)
 	return hash[:]
 }
