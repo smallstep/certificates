@@ -203,15 +203,14 @@ func UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 
 // validateTemplates validates the X.509 and SSH templates and template data if set.
 func validateTemplates(x509 *linkedca.Template, ssh *linkedca.Template) error {
-
 	if x509 != nil {
 		if len(x509.Template) > 0 {
-			if err := x509util.ValidateTemplate(string(x509.Template)); err != nil {
+			if err := x509util.ValidateTemplate(x509.Template); err != nil {
 				return fmt.Errorf("invalid X.509 template: %w", err)
 			}
 		}
 		if len(x509.Data) > 0 {
-			if err := x509util.ValidateTemplateData(string(x509.Data)); err != nil {
+			if err := x509util.ValidateTemplateData(x509.Data); err != nil {
 				return fmt.Errorf("invalid X.509 template data: %w", err)
 			}
 		}
@@ -219,13 +218,13 @@ func validateTemplates(x509 *linkedca.Template, ssh *linkedca.Template) error {
 
 	if ssh != nil {
 		if len(ssh.Template) > 0 {
-			if err := sshutil.ValidateTemplate(string(ssh.Template)); err != nil {
+			if err := sshutil.ValidateTemplate(ssh.Template); err != nil {
 				return fmt.Errorf("invalid SSH template: %w", err)
 			}
 		}
 
 		if len(ssh.Data) > 0 {
-			if err := sshutil.ValidateTemplateData(string(ssh.Data)); err != nil {
+			if err := sshutil.ValidateTemplateData(ssh.Data); err != nil {
 				return fmt.Errorf("invalid SSH template data: %w", err)
 			}
 		}
