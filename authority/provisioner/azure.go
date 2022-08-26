@@ -363,6 +363,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
+		newWebhooksAuthorizer(p.Options.Webhooks, data),
 	), nil
 }
 
@@ -431,6 +432,8 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
+		// Call authorizing webhooks
+		newWebhooksAuthorizerSSH(p.Options.Webhooks, data),
 	), nil
 }
 

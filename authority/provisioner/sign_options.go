@@ -1,11 +1,13 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -14,6 +16,7 @@ import (
 
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
@@ -39,6 +42,11 @@ type SignOption interface{}
 // CertificateValidator is an interface used to validate a given X.509 certificate.
 type CertificateValidator interface {
 	Valid(cert *x509.Certificate, opts SignOptions) error
+}
+
+// CertificateAuthorizer is an interface used to authorize a given X.509 certificate.
+type CertificateAuthorizer interface {
+	Authorize(req *x509.Certificate, opts SignOptions) error
 }
 
 // CertificateRequestValidator is an interface used to validate a given X.509 certificate request.
@@ -428,6 +436,42 @@ func (v *x509NamePolicyValidator) Valid(cert *x509.Certificate, _ SignOptions) e
 		return nil
 	}
 	return v.policyEngine.IsX509CertificateAllowed(cert)
+}
+
+// webhooksAuthorizer sends a certificate to a webhook for final authorization
+// before it is signed
+type webhooksAuthorizer struct {
+	webhooks []*Webhook
+	data     x509util.TemplateData
+}
+
+// newWebhooksAuthorizer finds all webhooks with kind AUTHORIZING and builds a
+// webhooksAuthorizer with them
+func newWebhooksAuthorizer(webhooks []*Webhook, data x509util.TemplateData) *webhooksAuthorizer {
+	wa := &webhooksAuthorizer{data: data}
+
+	for _, wh := range webhooks {
+		if wh.Kind == linkedca.Webhook_AUTHORIZING.String() {
+			wa.webhooks = append(wa.webhooks, wh)
+		}
+	}
+
+	return wa
+}
+
+// Authorize calls each webhook and returns an error if any fails to respond
+// with "{allow: true}"
+func (wa *webhooksAuthorizer) Authorize(cert *x509.Certificate, signOpts SignOptions) error {
+	for _, wh := range wa.webhooks {
+		resp, err := wh.Do(context.Background(), signOpts.WebhookClient, cert, wa.data)
+		if err != nil {
+			return err
+		}
+		if resp.Allow != true {
+			return fmt.Errorf("authorization denied by webhook %s", wh.Name)
+		}
+	}
+	return nil
 }
 
 type forceCNOption struct {

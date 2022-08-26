@@ -133,11 +133,11 @@ func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemp
 						if wh.Kind != linkedca.Webhook_ENRICHING.String() {
 							continue
 						}
-						d, err := wh.Do(context.Background(), so.WebhookClient, cr, data)
+						resp, err := wh.Do(context.Background(), so.WebhookClient, cr, data)
 						if err != nil {
 							return err
 						}
-						data.SetWebhook(wh.Name, d)
+						data.SetWebhook(wh.Name, resp.Data)
 					}
 				}
 				return fn(arg1, data)(cr, sshOpts)

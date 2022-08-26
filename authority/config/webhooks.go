@@ -104,7 +104,7 @@ func (wap WebhookAddressPolicy) IsHostnameMatch(hostname string) bool {
 // ControlFunc returns a function to be used in a net.Dialer's Control field
 // The serverAddr may be a hostname or an IP
 func (wc WebhookClient) ControlFunc(serverAddr string) func(string, string, syscall.RawConn) error {
-	// The resolvedAddress is an IP:port. If the webhook was configured with a
+	// The resolvedAddress is an IP:port.
 	return func(network, resolvedAddress string, c syscall.RawConn) error {
 		// First check if the server address is a denied hostname
 		serverHost, _, err := net.SplitHostPort(serverAddr)

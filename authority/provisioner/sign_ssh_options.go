@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/rsa"
 	"encoding/binary"
 	"encoding/json"
@@ -14,6 +15,8 @@ import (
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/sshutil"
+	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -36,6 +39,11 @@ type SSHCertModifier interface {
 type SSHCertValidator interface {
 	SignOption
 	Valid(cert *ssh.Certificate, opts SignSSHOptions) error
+}
+
+// SSHCertAuthorizer is an interface used to authorize an SSH certificate.
+type SSHCertAuthorizer interface {
+	Authorize(req *ssh.Certificate, opts SignSSHOptions) error
 }
 
 // SSHCertOptionsValidator is the interface used to validate the custom
@@ -561,4 +569,40 @@ func sshParseRSAPublicKey(in []byte) (*rsa.PublicKey, error) {
 	key.E = int(e)
 	key.N = w.N
 	return &key, nil
+}
+
+// webhooksAuthorizerSSH sends a certificate to a webhook for final
+// authorization before it is signed
+type webhooksAuthorizerSSH struct {
+	webhooks []*Webhook
+	data     sshutil.TemplateData
+}
+
+// newWebhooksAuthorizerSSH finds all webhooks with kind AUTHORIZING and builds
+// a webhooksAuthorizer with them
+func newWebhooksAuthorizerSSH(webhooks []*Webhook, data sshutil.TemplateData) *webhooksAuthorizerSSH {
+	wa := &webhooksAuthorizerSSH{data: data}
+
+	for _, wh := range webhooks {
+		if wh.Kind == linkedca.Webhook_AUTHORIZING.String() {
+			wa.webhooks = append(wa.webhooks, wh)
+		}
+	}
+
+	return wa
+}
+
+// Authorize calls each webhook and returns an error if any fails to respond
+// with "{allow: true}"
+func (wa *webhooksAuthorizerSSH) Authorize(cert *ssh.Certificate, signOpts SignSSHOptions) error {
+	for _, wh := range wa.webhooks {
+		resp, err := wh.Do(context.Background(), signOpts.WebhookClient, cert, wa.data)
+		if err != nil {
+			return err
+		}
+		if resp.Allow != true {
+			return fmt.Errorf("authorization denied by webhook %s", wh.Name)
+		}
+	}
+	return nil
 }

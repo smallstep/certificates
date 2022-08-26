@@ -468,7 +468,8 @@ func (ca *CA) Reload() error {
 }
 
 // getTLSConfig returns a TLSConfig for the CA server with a self-renewing
-// server certificate.
+// server certificate. The certificate may also be used for TLS client
+// authentication when connecting to webhook servers.
 func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	// Create initial TLS certificate
 	tlsCrt, err := auth.GetTLSCertificate()
@@ -509,6 +510,8 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	tlsConfig.GetClientCertificate = ca.renewer.GetClientCertificate
 
 	// initialize a certificate pool with root CA certificates to trust when doing mTLS.
+	// This pool is only used to verify clients. The default host pool is used to
+	// verify webhook servers.
 	certPool := x509.NewCertPool()
 	for _, crt := range auth.GetRootCertificates() {
 		certPool.AddCert(crt)
@@ -553,6 +556,8 @@ func dumpRoutes(mux chi.Routes) {
 	}
 }
 
+// getWebhookTransport builds a transport that checks policy before connecting
+// to any remote address
 func getWebhookTransport(config *config.WebhookClient) *http.Transport {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 

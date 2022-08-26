@@ -150,6 +150,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		certOptions []sshutil.Option
 		mods        []provisioner.SSHCertModifier
 		validators  []provisioner.SSHCertValidator
+		authorizers []provisioner.SSHCertAuthorizer
 	)
 
 	// Validate given options.
@@ -186,6 +187,10 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 			if err := o.Valid(opts); err != nil {
 				return nil, errs.BadRequestErr(err, "error validating ssh certificate options")
 			}
+
+		// authorize the final ssh.Certificate
+		case provisioner.SSHCertAuthorizer:
+			authorizers = append(authorizers, o)
 
 		default:
 			return nil, errs.InternalServer("authority.SignSSH: invalid extra option type %T", o)
@@ -262,6 +267,13 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		return nil, errs.InternalServerErr(err,
 			errs.WithMessage("authority.SignSSH: error creating ssh certificate"),
 		)
+	}
+
+	// Certificate final authorizers
+	for _, a := range authorizers {
+		if err := a.Authorize(certTpl, opts); err != nil {
+			return nil, errs.ForbiddenErr(err, "request not allowed by webhook server")
+		}
 	}
 
 	// Sign certificate.
