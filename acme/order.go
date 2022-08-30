@@ -5,9 +5,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"net"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -168,17 +166,20 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		}
 	}
 
+	var defaultTemplate string
 	if permanentIdentifier != "" {
-		data.Set(x509util.SANsKey, []x509util.SubjectAlternativeName{
-			{Type: x509util.PermanentIdentifierType, Value: permanentIdentifier},
+		defaultTemplate = x509util.DefaultAttestedLeafTemplate
+		data.SetSubjectAlternativeNames(x509util.SubjectAlternativeName{
+			Type:  x509util.PermanentIdentifierType,
+			Value: permanentIdentifier,
 		})
 	} else {
-		// retrieve the requested SANs for the Order
+		defaultTemplate = x509util.DefaultLeafTemplate
 		sans, err := o.sans(csr)
 		if err != nil {
 			return err
 		}
-		data.Set(x509util.SANsKey, sans)
+		data.SetSubjectAlternativeNames(sans...)
 	}
 
 	// Get authorizations from the ACME provisioner.
@@ -188,7 +189,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		return WrapErrorISE(err, "error retrieving authorization options from ACME provisioner")
 	}
 
-	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
+	templateOptions, err := provisioner.CustomTemplateOptions(p.GetOptions(), data, defaultTemplate)
 	if err != nil {
 		return WrapErrorISE(err, "error creating template options from ACME provisioner")
 	}
@@ -211,11 +212,6 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	if err := db.CreateCertificate(ctx, cert); err != nil {
 		return WrapErrorISE(err, "error creating certificate for order %s", o.ID)
 	}
-
-	// TODO(mariano): debug - remove me
-	pem.Encode(os.Stderr, &pem.Block{
-		Type: "CERTIFICATE", Bytes: cert.Leaf.Raw,
-	})
 
 	o.CertificateID = cert.ID
 	o.Status = StatusValid
