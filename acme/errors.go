@@ -174,6 +174,11 @@ var (
 			details: "The JWS was signed with an algorithm the server does not support",
 			status:  400,
 		},
+		ErrorBadAttestationStatement: {
+			typ:     officialACMEPrefix + ErrorBadNonceType.String(),
+			details: "Attestation statement cannot be verified",
+			status:  400,
+		},
 		ErrorCaaType: {
 			typ:     officialACMEPrefix + ErrorCaaType.String(),
 			details: "Certification Authority Authorization (CAA) records forbid the CA from issuing a certificate",
