@@ -53,6 +53,14 @@ func (o *Options) GetSSHOptions() *SSHOptions {
 	return o.SSH
 }
 
+// GetWebhooks returns the webhooks options.
+func (o *Options) GetWebhooks() []*Webhook {
+	if o == nil {
+		return nil
+	}
+	return o.Webhooks
+}
+
 // X509Options contains specific options for X.509 certificates.
 type X509Options struct {
 	// Template contains a X.509 certificate template. It can be a JSON template

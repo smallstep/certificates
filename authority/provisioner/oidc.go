@@ -356,7 +356,7 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		defaultPublicKeyValidator{},
 		newValidityValidator(o.ctl.Claimer.MinTLSCertDuration(), o.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(o.ctl.getPolicy().getX509()),
-		newWebhooksAuthorizer(o.Options.Webhooks, data),
+		newWebhooksAuthorizer(o.Options.GetWebhooks(), data),
 	}, nil
 }
 
@@ -462,7 +462,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(o.ctl.getPolicy().getSSHHost(), o.ctl.getPolicy().getSSHUser()),
 		// Call authorizing webhooks
-		newWebhooksAuthorizerSSH(o.Options.Webhooks, data),
+		newWebhooksAuthorizerSSH(o.Options.GetWebhooks(), data),
 	), nil
 }
 

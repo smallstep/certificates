@@ -484,7 +484,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		commonNameValidator(payload.Claims.Subject),
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
-		newWebhooksAuthorizer(p.Options.Webhooks, data),
+		newWebhooksAuthorizer(p.Options.GetWebhooks(), data),
 	), nil
 }
 
@@ -767,6 +767,6 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
 		// Call authorizing webhooks
-		newWebhooksAuthorizerSSH(p.Options.Webhooks, data),
+		newWebhooksAuthorizerSSH(p.Options.GetWebhooks(), data),
 	), nil
 }

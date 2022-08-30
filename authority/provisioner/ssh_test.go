@@ -51,6 +51,7 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 	var mods []SSHCertModifier
 	var certOptions []sshutil.Option
 	var validators []SSHCertValidator
+	var authorizers []SSHCertAuthorizer
 
 	for _, op := range signOpts {
 		switch o := op.(type) {
@@ -69,6 +70,9 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 			if err := o.Valid(opts); err != nil {
 				return nil, err
 			}
+		// authorize the ssh.Certificate
+		case SSHCertAuthorizer:
+			authorizers = append(authorizers, o)
 		default:
 			return nil, fmt.Errorf("signSSH: invalid extra option type %T", o)
 		}
@@ -107,6 +111,13 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 	// Use provisioner modifiers.
 	for _, m := range mods {
 		if err := m.Modify(cert, opts); err != nil {
+			return nil, errs.Wrap(http.StatusForbidden, err, "authority.SignSSH")
+		}
+	}
+
+	// Authorize
+	for _, a := range authorizers {
+		if err := a.Authorize(cert, opts); err != nil {
 			return nil, errs.Wrap(http.StatusForbidden, err, "authority.SignSSH")
 		}
 	}

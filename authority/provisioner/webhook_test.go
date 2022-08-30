@@ -120,7 +120,7 @@ func TestWebhook_Do(t *testing.T) {
 					return
 				}
 
-				err = json.NewEncoder(w).Encode(webhookResponseBody{
+				err = json.NewEncoder(w).Encode(WebhookResponseBody{
 					Data: tc.webhookData,
 				})
 				assert.FatalError(t, err)
@@ -136,7 +136,7 @@ func TestWebhook_Do(t *testing.T) {
 			}
 			assert.FatalError(t, err)
 
-			assert.Equals(t, got, tc.webhookData)
+			assert.Equals(t, got.Data, tc.webhookData)
 		})
 	}
 

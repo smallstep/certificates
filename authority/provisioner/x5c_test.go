@@ -468,7 +468,7 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
-						assert.Equals(t, 9, len(opts))
+						assert.Equals(t, 10, len(opts))
 						for _, o := range opts {
 							switch v := o.(type) {
 							case *X5C:
@@ -493,6 +493,8 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 								assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
 							case *x509NamePolicyValidator:
 								assert.Equals(t, nil, v.policyEngine)
+							case *webhooksAuthorizer:
+								assert.Equals(t, nil, v.webhooks)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
@@ -794,15 +796,17 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 								assert.Equals(t, nil, v.userPolicyEngine)
 								assert.Equals(t, nil, v.hostPolicyEngine)
 							case *sshDefaultPublicKeyValidator, *sshCertDefaultValidator, sshCertificateOptionsFunc:
+							case *webhooksAuthorizerSSH:
+								assert.Equals(t, nil, v.webhooks)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
 							tot++
 						}
 						if len(tc.claims.Step.SSH.CertType) > 0 {
-							assert.Equals(t, tot, 11)
+							assert.Equals(t, tot, 12)
 						} else {
-							assert.Equals(t, tot, 9)
+							assert.Equals(t, tot, 10)
 						}
 					}
 				}

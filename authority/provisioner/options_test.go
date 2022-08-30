@@ -262,7 +262,7 @@ func TestCustomTemplateOptions(t *testing.T) {
 			if tt.args.o != nil {
 				for i, wh := range tt.args.o.Webhooks {
 					ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						err := json.NewEncoder(w).Encode(webhookResponseBody{
+						err := json.NewEncoder(w).Encode(WebhookResponseBody{
 							Data: tt.webhookResponses[i],
 						})
 						assert.FatalError(t, err)
