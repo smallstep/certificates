@@ -249,6 +249,19 @@ func (c *ACMEClient) ValidateChallenge(url string) error {
 	return nil
 }
 
+// ValidateWithPayload will attempt to validate the challenge at the given url
+// with the given attestation payload.
+func (c *ACMEClient) ValidateWithPayload(url string, payload []byte) error {
+	resp, err := c.post(payload, url, withKid(c))
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode >= 400 {
+		return readACMEError(resp.Body)
+	}
+	return nil
+}
+
 // GetAuthz returns the Authz at the given path.
 func (c *ACMEClient) GetAuthz(url string) (*acme.Authorization, error) {
 	resp, err := c.post(nil, url, withKid(c))
