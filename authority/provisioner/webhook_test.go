@@ -21,13 +21,13 @@ import (
 func TestWebhook_Do(t *testing.T) {
 	csr := parseCertificateRequest(t, "testdata/certs/ecdsa.csr")
 	type test struct {
-		webhook       Webhook
-		dataArg       map[string]interface{}
-		webhookData   map[string]interface{}
-		expectPath    string
-		errStatusCode int
-		serverErrMsg  string
-		expectErr     error
+		webhook         Webhook
+		dataArg         map[string]interface{}
+		webhookResponse WebhookResponseBody
+		expectPath      string
+		errStatusCode   int
+		serverErrMsg    string
+		expectErr       error
 	}
 	tests := map[string]test{
 		"ok": {
@@ -35,7 +35,9 @@ func TestWebhook_Do(t *testing.T) {
 				ID:            "abc123",
 				SigningSecret: "c2VjcmV0Cg==",
 			},
-			webhookData: map[string]interface{}{"role": "dba"},
+			webhookResponse: WebhookResponseBody{
+				Data: map[string]interface{}{"role": "dba"},
+			},
 		},
 		"ok/bearer": {
 			webhook: Webhook{
@@ -43,7 +45,9 @@ func TestWebhook_Do(t *testing.T) {
 				SigningSecret: "c2VjcmV0Cg==",
 				BearerToken:   "mytoken",
 			},
-			webhookData: map[string]interface{}{"role": "dba"},
+			webhookResponse: WebhookResponseBody{
+				Data: map[string]interface{}{"role": "dba"},
+			},
 		},
 		"ok/basic": {
 			webhook: Webhook{
@@ -57,7 +61,9 @@ func TestWebhook_Do(t *testing.T) {
 					Password: "mypass",
 				},
 			},
-			webhookData: map[string]interface{}{"role": "dba"},
+			webhookResponse: WebhookResponseBody{
+				Data: map[string]interface{}{"role": "dba"},
+			},
 		},
 		"ok/templated-url": {
 			webhook: Webhook{
@@ -66,16 +72,29 @@ func TestWebhook_Do(t *testing.T) {
 				URL:           "/users/{{ .username }}?region={{ .region }}",
 				SigningSecret: "c2VjcmV0Cg==",
 			},
-			dataArg:     map[string]interface{}{"username": "areed", "region": "central"},
-			webhookData: map[string]interface{}{"role": "dba"},
-			expectPath:  "/users/areed?region=central",
+			dataArg: map[string]interface{}{"username": "areed", "region": "central"},
+			webhookResponse: WebhookResponseBody{
+				Data: map[string]interface{}{"role": "dba"},
+			},
+			expectPath: "/users/areed?region=central",
+		},
+		"ok/allow": {
+			webhook: Webhook{
+				ID:            "abc123",
+				SigningSecret: "c2VjcmV0Cg==",
+			},
+			webhookResponse: WebhookResponseBody{
+				Allow: true,
+			},
 		},
 		"fail/404": {
 			webhook: Webhook{
 				ID:            "abc123",
 				SigningSecret: "c2VjcmV0Cg==",
 			},
-			webhookData:   map[string]interface{}{"role": "dba"},
+			webhookResponse: WebhookResponseBody{
+				Data: map[string]interface{}{"role": "dba"},
+			},
 			errStatusCode: 404,
 			serverErrMsg:  "item not found",
 			expectErr:     errors.New("Webhook server responded with 404"),
@@ -120,9 +139,7 @@ func TestWebhook_Do(t *testing.T) {
 					return
 				}
 
-				err = json.NewEncoder(w).Encode(WebhookResponseBody{
-					Data: tc.webhookData,
-				})
+				err = json.NewEncoder(w).Encode(tc.webhookResponse)
 				assert.FatalError(t, err)
 			}))
 			defer ts.Close()
@@ -136,7 +153,7 @@ func TestWebhook_Do(t *testing.T) {
 			}
 			assert.FatalError(t, err)
 
-			assert.Equals(t, got.Data, tc.webhookData)
+			assert.Equals(t, got, &tc.webhookResponse)
 		})
 	}
 
