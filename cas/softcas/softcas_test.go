@@ -486,12 +486,15 @@ func TestSoftCAS_CreateCertificate_ec_rsa(t *testing.T) {
 		t.Errorf("Certificate.SignatureAlgorithm = %v, want %v", iss.SignatureAlgorithm, x509.SHA256WithRSAPSS)
 	}
 
-	pool := x509.NewCertPool()
-	pool.AddCert(iss)
+	roots := x509.NewCertPool()
+	roots.AddCert(root)
+	intermediates := x509.NewCertPool()
+	intermediates.AddCert(iss)
 	if _, err = cert.Certificate.Verify(x509.VerifyOptions{
-		CurrentTime: time.Now(),
-		Roots:       pool,
-		KeyUsages:   []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		CurrentTime:   time.Now(),
+		Roots:         roots,
+		Intermediates: intermediates,
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 	}); err != nil {
 		t.Errorf("Certificate.Verify() error = %v", err)
 	}
