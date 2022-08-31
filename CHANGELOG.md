@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ---
 
 ## [Unreleased]
+### Fixed
+- Fix signature algorithm on EC (root) + RSA (intermediate) PKIs.
+
+## [0.22.0] - 2022-08-26
 ### Added
 - Added automatic configuration of Linked RAs.
 - Send provisioner configuration on Linked RAs.
