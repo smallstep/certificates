@@ -16,8 +16,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ---
 
 ## [Unreleased]
+
+## [0.22.1] - 2022-08-31
 ### Fixed
-- Fix signature algorithm on EC (root) + RSA (intermediate) PKIs.
+- Fixed signature algorithm on EC (root) + RSA (intermediate) PKIs.
 
 ## [0.22.0] - 2022-08-26
 ### Added
