@@ -355,9 +355,8 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 					return acmeError
 				}
 				return storeError(ctx, db, ch, true, acmeError)
-			} else {
-				return WrapErrorISE(err, "error validating attestation")
 			}
+			return WrapErrorISE(err, "error validating attestation")
 		}
 
 		// Validate nonce with SHA-256 of the token.
@@ -385,9 +384,8 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 					return acmeError
 				}
 				return storeError(ctx, db, ch, true, acmeError)
-			} else {
-				return WrapErrorISE(err, "error validating attestation")
 			}
+			return WrapErrorISE(err, "error validating attestation")
 		}
 
 		// Validate Apple's ClientIdentifier (Identifier.Value) with device
@@ -625,20 +623,22 @@ func doStepAttestationFormat(ctx context.Context, ch *Challenge, jwk *jose.JSONW
 		return nil, NewError(ErrorBadAttestationStatement, "unsupported public key type %T", pub)
 	}
 
-	// Parse attestation data
+	// Parse attestation data:
+	// TODO(mariano): add support for other extensions.
 	data := &stepAttestationData{
 		Certificate: leaf,
 	}
 	for _, ext := range leaf.Extensions {
-		switch {
-		case ext.Id.Equal(oidYubicoSerialNumber):
-			var serialNumber int
-			rest, err := asn1.Unmarshal(ext.Value, &serialNumber)
-			if err != nil || len(rest) > 0 {
-				return nil, WrapError(ErrorBadAttestationStatement, err, "error parsing serial number")
-			}
-			data.SerialNumber = strconv.Itoa(serialNumber)
+		if !ext.Id.Equal(oidYubicoSerialNumber) {
+			continue
 		}
+		var serialNumber int
+		rest, err := asn1.Unmarshal(ext.Value, &serialNumber)
+		if err != nil || len(rest) > 0 {
+			return nil, WrapError(ErrorBadAttestationStatement, err, "error parsing serial number")
+		}
+		data.SerialNumber = strconv.Itoa(serialNumber)
+		break
 	}
 
 	return data, nil
