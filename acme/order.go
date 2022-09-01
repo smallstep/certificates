@@ -5,7 +5,9 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"net"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -202,6 +204,13 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	if err != nil {
 		return WrapErrorISE(err, "error signing certificate for order %s", o.ID)
 	}
+
+	pem.Encode(os.Stdout, &pem.Block{
+		Type: "CERTIFICATE REQUEST", Bytes: csr.Raw,
+	})
+	pem.Encode(os.Stdout, &pem.Block{
+		Type: "CERTIFICATE", Bytes: certChain[0].Raw,
+	})
 
 	cert := &Certificate{
 		AccountID:     o.AccountID,

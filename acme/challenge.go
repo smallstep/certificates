@@ -3,6 +3,10 @@ package acme
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/subtle"
 	"crypto/tls"
@@ -322,7 +326,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return WrapErrorISE(err, "error unmarshalling JSON")
 	}
-
+	fmt.Println(string(payload))
 	if p.Error != "" {
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"payload contained error: %v", p.Error))
@@ -337,6 +341,9 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	if err := cbor.Unmarshal(attObj, &att); err != nil {
 		return WrapErrorISE(err, "error unmarshalling CBOR")
 	}
+
+	b, _ := json.Marshal(att)
+	fmt.Println(string(b))
 
 	switch att.Format {
 	case "apple":
@@ -369,11 +376,11 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "permanent identifier does not match"))
 		}
 	case "step":
-		data, err := doStepAttestationFormat(ctx, ch, db, &att)
+		data, err := doStepAttestationFormat(ctx, ch, jwk, &att)
 		if err != nil {
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
-				fmt.Println(acmeError)
+				fmt.Printf("debug: %#v\n", acmeError)
 				if acmeError.Status == 500 {
 					return acmeError
 				}
@@ -534,7 +541,7 @@ type stepAttestationData struct {
 	SerialNumber string
 }
 
-func doStepAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *AttestationObject) (*stepAttestationData, error) {
+func doStepAttestationFormat(ctx context.Context, ch *Challenge, jwk *jose.JSONWebKey, att *AttestationObject) (*stepAttestationData, error) {
 	root, err := pemutil.ParseCertificate([]byte(yubicoPIVRootCA))
 	if err != nil {
 		return nil, WrapErrorISE(err, "error parsing root ca")
@@ -542,6 +549,7 @@ func doStepAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *Att
 	roots := x509.NewCertPool()
 	roots.AddCert(root)
 
+	// Extract x5c and verify certificate
 	x5c, ok := att.AttStatement["x5c"].([]interface{})
 	if !ok {
 		return nil, NewError(ErrorBadAttestationStatement, "x5c not present")
@@ -549,7 +557,6 @@ func doStepAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *Att
 	if len(x5c) == 0 {
 		return nil, NewError(ErrorRejectedIdentifierType, "x5c is empty")
 	}
-
 	der, ok := x5c[0].([]byte)
 	if !ok {
 		return nil, NewError(ErrorBadAttestationStatement, "x5c is malformed")
@@ -558,7 +565,6 @@ func doStepAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *Att
 	if err != nil {
 		return nil, WrapError(ErrorBadAttestationStatement, err, "x5c is malformed")
 	}
-
 	intermediates := x509.NewCertPool()
 	for _, v := range x5c[1:] {
 		der, ok = v.([]byte)
@@ -571,7 +577,6 @@ func doStepAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *Att
 		}
 		intermediates.AddCert(cert)
 	}
-
 	if _, err := leaf.Verify(x509.VerifyOptions{
 		Intermediates: intermediates,
 		Roots:         roots,
@@ -581,6 +586,46 @@ func doStepAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *Att
 		return nil, WrapError(ErrorBadAttestationStatement, err, "x5c is not valid")
 	}
 
+	// Verify proof of possession of private key validating the key
+	// authorization. Per recommendation at
+	// https://w3c.github.io/webauthn/#sctn-signature-attestation-types the
+	// signature is CBOR-encoded.
+	var sig []byte
+	csig, ok := att.AttStatement["sig"].([]byte)
+	if !ok {
+		return nil, NewError(ErrorBadAttestationStatement, "sig not present")
+	}
+	if err := cbor.Unmarshal(csig, &sig); err != nil {
+		return nil, NewError(ErrorBadAttestationStatement, "sig is malformed")
+	}
+	keyAuth, err := KeyAuthorization(ch.Token, jwk)
+	if err != nil {
+		return nil, err
+	}
+
+	switch pub := leaf.PublicKey.(type) {
+	case *ecdsa.PublicKey:
+		if pub.Curve != elliptic.P256() {
+			return nil, WrapError(ErrorBadAttestationStatement, err, "unsupported elliptic curve %s", pub.Curve)
+		}
+		sum := sha256.Sum256([]byte(keyAuth))
+		if !ecdsa.VerifyASN1(pub, sum[:], sig) {
+			return nil, NewError(ErrorBadAttestationStatement, "failed to validate signature")
+		}
+	case *rsa.PublicKey:
+		sum := sha256.Sum256([]byte(keyAuth))
+		if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig); err != nil {
+			return nil, NewError(ErrorBadAttestationStatement, "failed to validate signature")
+		}
+	case ed25519.PublicKey:
+		if !ed25519.Verify(pub, []byte(keyAuth), sig) {
+			return nil, NewError(ErrorBadAttestationStatement, "failed to validate signature")
+		}
+	default:
+		return nil, NewError(ErrorBadAttestationStatement, "unsupported public key type %T", pub)
+	}
+
+	// Parse attestation data
 	data := &stepAttestationData{
 		Certificate: leaf,
 	}
