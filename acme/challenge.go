@@ -26,8 +26,13 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/google/go-tpm/tpm2"
+	"github.com/ryboe/q"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
+
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 type ChallengeType string
@@ -395,6 +400,29 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		if data.SerialNumber != ch.Value {
 			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "permanent identifier does not match"))
 		}
+	case "tpm": // TODO(hs): this may end up being a different case; this is the generic `tpm` format from `WebAuthn`
+		data, err := doTPMAttestationFormat(ctx, ch, db, &att)
+		if err != nil {
+			q.Q("attestation error:", err)
+			return err
+		}
+
+		expectedDigest, err := keyAuthDigest(jwk, ch.Token)
+		if err != nil {
+			return fmt.Errorf("error creating key auth digest: %w", err)
+		}
+
+		q.Q(data)
+		q.Q(expectedDigest)
+
+		// verify the WebAuthn object contains the expect key authorization digest, which is carried
+		// within the encoded `certInfo` property of the attestation statement.
+		if subtle.ConstantTimeCompare(expectedDigest, data.ExtraData) == 0 {
+			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "key authorization doesn't match"))
+		}
+
+		// TODO(hs): more properties to verify? Apple method has nonce, check for permanent identifier.
+
 	default:
 		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "unexpected attestation object format"))
 	}
@@ -408,6 +436,128 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return WrapErrorISE(err, "error updating challenge")
 	}
 	return nil
+}
+
+// Borrowed from:
+// https://github.com/golang/crypto/blob/master/acme/acme.go#L748
+func keyAuthDigest(jwk *jose.JSONWebKey, token string) ([]byte, error) {
+	th, err := jwk.Thumbprint(crypto.SHA256) // TODO(hs): verify this is the correct thumbprint
+	digest := sha256.Sum256([]byte(fmt.Sprintf("%s.%s", token, th)))
+	return digest[:], err
+}
+
+type tpmAttestationData struct {
+	Certificate    *x509.Certificate
+	VerifiedChains [][]*x509.Certificate
+	ExtraData      []byte // TODO(hs): rename this to KeyAuthorization to reflect its usage?
+}
+
+func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *AttestationObject) (*tpmAttestationData, error) {
+
+	p := MustProvisionerFromContext(ctx)
+	prov, ok := p.(*provisioner.ACME)
+	if !ok {
+		return nil, NewErrorISE("provisioner in context is not an ACME provisioner")
+	}
+
+	x5c, ok := att.AttStatement["x5c"].([]interface{})
+	if !ok {
+		return nil, storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "x5c not present"))
+	}
+	if len(x5c) == 0 {
+		return nil, storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "x5c is empty"))
+	}
+
+	der, ok := x5c[0].([]byte)
+	if !ok {
+		return nil, storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "x5c is malformed"))
+	}
+	leaf, err := x509.ParseCertificate(der)
+	if err != nil {
+		return nil, storeError(ctx, db, ch, true, WrapError(ErrorBadAttestationStatement, err, "x5c is malformed"))
+	}
+
+	intermediates := x509.NewCertPool()
+	if len(x5c[1:]) > 0 {
+		for _, v := range x5c[1:] {
+			der, ok = v.([]byte)
+			if !ok {
+				return nil, storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "x5c is malformed"))
+			}
+			cert, err := x509.ParseCertificate(der)
+			if err != nil {
+				return nil, storeError(ctx, db, ch, true, WrapError(ErrorBadAttestationStatement, err, "x5c is malformed"))
+			}
+			intermediates.AddCert(cert)
+		}
+	}
+
+	// TODO(hs): this can be removed when permanent-identifier/hardware-module-name are handled correctly in
+	// the stdlib in https://cs.opensource.google/go/go/+/refs/tags/go1.19:src/crypto/x509/parser.go;drc=b5b2cf519fe332891c165077f3723ee74932a647;l=362,
+	// but I doubt that will happen.
+	// TODO(hs): decide on the right logic for handling unhandled critical extensions
+	if len(leaf.UnhandledCriticalExtensions) > 0 {
+		unhandledCriticalExtensions := leaf.UnhandledCriticalExtensions[:0]
+		for _, extOID := range leaf.UnhandledCriticalExtensions {
+			switch {
+			// TODO(hs): extend the switch statement with other allowed OIDs; this might have to become configurable too
+			case extOID.Equal(asn1.ObjectIdentifier{2, 5, 29, 17}):
+				// TODO(hs): decide when the processed extension is "OK"; permanent-identifier/hardware-module-name
+				for _, e := range leaf.Extensions {
+					if e.Id.Equal(extOID) {
+						// TODO(hs): validate this is in fact a valid PermanentIdentifier/HardwareModuleName
+						q.Q(e)
+					}
+				}
+				continue
+			default:
+				// OIDs that are not in the switch remain unhandled
+				unhandledCriticalExtensions = append(unhandledCriticalExtensions, extOID)
+			}
+		}
+		leaf.UnhandledCriticalExtensions = unhandledCriticalExtensions
+	}
+
+	roots, err := prov.GetAttestationRoots()
+	if err != nil {
+		return nil, WrapErrorISE(err, "error getting tpm attestation root CAs")
+	}
+
+	verifiedChains, err := leaf.Verify(x509.VerifyOptions{
+		Roots:         roots,
+		Intermediates: intermediates,
+		CurrentTime:   time.Now().Truncate(time.Second),
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+	})
+	if err != nil {
+		if storeErr := storeError(ctx, db, ch, true, WrapError(ErrorBadAttestationStatement, err, "x5c is not valid")); storeErr != nil {
+			return nil, fmt.Errorf("error saving order error: %w", storeErr)
+		}
+		return nil, fmt.Errorf("error verifying x5c leaf: %w", err)
+	}
+
+	// TODO(hs): implement revocation check; Verify() doesn't perform CRL check nor OCSP lookup.
+	// TODO(hs): more properties to verify and/or return?
+
+	q.Q(att.AttStatement)
+
+	certInfo, ok := att.AttStatement["certInfo"].([]byte)
+	if !ok {
+		return nil, errors.New("invalid certInfo in attestation statement")
+	}
+
+	tpmCertInfo, err := tpm2.DecodeAttestationData([]byte(certInfo))
+	if err != nil {
+		return nil, fmt.Errorf("invalid certInfo: %w", err)
+	}
+
+	q.Q(tpmCertInfo.ExtraData)
+
+	return &tpmAttestationData{
+		Certificate:    leaf,
+		VerifiedChains: verifiedChains,
+		ExtraData:      []byte(tpmCertInfo.ExtraData),
+	}, nil
 }
 
 // Apple Enterprise Attestation Root CA from
