@@ -21,7 +21,7 @@ func validateSSHCertificate(cert *ssh.Certificate, opts *SignSSHOptions) error {
 		return fmt.Errorf("certificate signature is nil")
 	case cert.SignatureKey == nil:
 		return fmt.Errorf("certificate signature is nil")
-	case !reflect.DeepEqual(cert.ValidPrincipals, opts.Principals):
+	case !reflect.DeepEqual(cert.ValidPrincipals, opts.Principals) && (len(opts.Principals) > 0 || len(cert.ValidPrincipals) > 0):
 		return fmt.Errorf("certificate principals are not equal, want %v, got %v", opts.Principals, cert.ValidPrincipals)
 	case cert.CertType != ssh.UserCert && cert.CertType != ssh.HostCert:
 		return fmt.Errorf("certificate type %v is not valid", cert.CertType)
