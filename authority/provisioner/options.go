@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -153,6 +154,9 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 						resp, err := wh.Do(context.Background(), so.WebhookClient, cr, data)
 						if err != nil {
 							return err
+						}
+						if !resp.Allow {
+							return fmt.Errorf("not allowed by webhook %s", wh.Name)
 						}
 						data.SetWebhook(wh.Name, resp.Data)
 					}
