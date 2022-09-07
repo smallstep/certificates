@@ -90,6 +90,9 @@ func main() {
 	// Initialize windows terminal
 	ui.Init()
 
+	ui.Println("⚠️  This command is deprecated and will be removed in future releases.")
+	ui.Println("⚠️  Please use https://github.com/smallstep/step-kms-plugin instead.")
+
 	pin, err := ui.PromptPassword("What is the YubiKey PIN?")
 	if err != nil {
 		fatal(err)
