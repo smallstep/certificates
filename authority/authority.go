@@ -794,14 +794,13 @@ func (a *Authority) startCRLGenerator() error {
 
 	go func() {
 		for {
-			select {
-			case <-a.crlTicker.C:
-				log.Println("Regenerating CRL")
-				err := a.GenerateCertificateRevocationList()
-				if err != nil {
-					log.Printf("ERROR: authority.crlGenerator encountered an error when regenerating the CRL: %v", err)
-				}
+			<-a.crlTicker.C
+			log.Println("Regenerating CRL")
+			err := a.GenerateCertificateRevocationList()
+			if err != nil {
+				log.Printf("ERROR: authority.crlGenerator encountered an error when regenerating the CRL: %v", err)
 			}
+
 		}
 	}()
 

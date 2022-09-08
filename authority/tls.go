@@ -549,6 +549,9 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 
 		// Save as revoked in the Db.
 		err = a.revoke(revokedCert, rci)
+		if err != nil {
+			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
+		}
 
 		// Generate a new CRL so CRL requesters will always get an up-to-date CRL whenever they request it
 		err = a.GenerateCertificateRevocationList()
