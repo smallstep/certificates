@@ -17,8 +17,8 @@ const (
 	ErrorAccountDoesNotExistType ProblemType = iota
 	// ErrorAlreadyRevokedType request specified a certificate to be revoked that has already been revoked
 	ErrorAlreadyRevokedType
-	// ErrorBadAttestation WebAuthn attestation statement could not be verified
-	ErrorBadAttestationStatement
+	// ErrorBadAttestationStatementType WebAuthn attestation statement could not be verified
+	ErrorBadAttestationStatementType
 	// ErrorBadCSRType CSR is unacceptable (e.g., due to a short key)
 	ErrorBadCSRType
 	// ErrorBadNonceType client sent an unacceptable anti-replay nonce
@@ -174,7 +174,7 @@ var (
 			details: "The JWS was signed with an algorithm the server does not support",
 			status:  400,
 		},
-		ErrorBadAttestationStatement: {
+		ErrorBadAttestationStatementType: {
 			typ:     officialACMEPrefix + ErrorBadNonceType.String(),
 			details: "Attestation statement cannot be verified",
 			status:  400,
