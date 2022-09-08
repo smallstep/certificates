@@ -41,12 +41,15 @@ func (*fakeProvisioner) AuthorizeSign(ctx context.Context, token string) ([]prov
 	return nil, nil
 }
 
-func (*fakeProvisioner) AuthorizeRevoke(ctx context.Context, token string) error        { return nil }
-func (*fakeProvisioner) AuthorizeChallenge(ctx context.Context, challenge string) error { return nil }
-func (*fakeProvisioner) GetID() string                                                  { return "" }
-func (*fakeProvisioner) GetName() string                                                { return "" }
-func (*fakeProvisioner) DefaultTLSCertDuration() time.Duration                          { return 0 }
-func (*fakeProvisioner) GetOptions() *provisioner.Options                               { return nil }
+func (*fakeProvisioner) AuthorizeChallenge(ctx context.Context, challenge provisioner.ACMEChallenge) error {
+	return nil
+}
+
+func (*fakeProvisioner) AuthorizeRevoke(ctx context.Context, token string) error { return nil }
+func (*fakeProvisioner) GetID() string                                           { return "" }
+func (*fakeProvisioner) GetName() string                                         { return "" }
+func (*fakeProvisioner) DefaultTLSCertDuration() time.Duration                   { return 0 }
+func (*fakeProvisioner) GetOptions() *provisioner.Options                        { return nil }
 
 func newProv() acme.Provisioner {
 	// Initialize provisioners
