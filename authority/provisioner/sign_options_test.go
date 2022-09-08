@@ -3,6 +3,7 @@ package provisioner
 import (
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"fmt"
 	"net"
 	"net/url"
@@ -625,6 +626,16 @@ func Test_profileDefaultDuration_Option(t *testing.T) {
 }
 
 func Test_newProvisionerExtension_Option(t *testing.T) {
+	expectedValue, err := asn1.Marshal(extensionASN1{
+		Type:          int(TypeJWK),
+		Name:          []byte("name"),
+		CredentialID:  []byte("credentialId"),
+		KeyValuePairs: []string{"key", "value"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type test struct {
 		cert  *x509.Certificate
 		valid func(*x509.Certificate)
@@ -636,18 +647,22 @@ func Test_newProvisionerExtension_Option(t *testing.T) {
 				valid: func(cert *x509.Certificate) {
 					if assert.Len(t, 1, cert.ExtraExtensions) {
 						ext := cert.ExtraExtensions[0]
-						assert.Equals(t, ext.Id, StepOIDProvisioner)
+						assert.Equals(t, StepOIDProvisioner, ext.Id)
+						assert.Equals(t, expectedValue, ext.Value)
+						assert.False(t, ext.Critical)
+
 					}
 				},
 			}
 		},
-		"ok/prepend": func() test {
+		"ok/replace": func() test {
 			return test{
 				cert: &x509.Certificate{ExtraExtensions: []pkix.Extension{{Id: StepOIDProvisioner, Critical: true}, {Id: []int{1, 2, 3}}}},
 				valid: func(cert *x509.Certificate) {
-					if assert.Len(t, 3, cert.ExtraExtensions) {
+					if assert.Len(t, 2, cert.ExtraExtensions) {
 						ext := cert.ExtraExtensions[0]
-						assert.Equals(t, ext.Id, StepOIDProvisioner)
+						assert.Equals(t, StepOIDProvisioner, ext.Id)
+						assert.Equals(t, expectedValue, ext.Value)
 						assert.False(t, ext.Critical)
 					}
 				},
@@ -657,7 +672,7 @@ func Test_newProvisionerExtension_Option(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tt := run()
-			assert.FatalError(t, newProvisionerExtensionOption(TypeJWK, "foo", "bar", "baz", "zap").Modify(tt.cert, SignOptions{}))
+			assert.FatalError(t, newProvisionerExtensionOption(TypeJWK, "name", "credentialId", "key", "value").Modify(tt.cert, SignOptions{}))
 			tt.valid(tt.cert)
 		})
 	}

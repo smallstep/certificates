@@ -5,10 +5,41 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 )
+
+// ACMEChallenge represents the supported acme challenges.
+type ACMEChallenge string
+
+// nolint:revive // better names
+const (
+	// HTTP_01 is the http-01 ACME challenge.
+	HTTP_01 ACMEChallenge = "http-01"
+	// DNS_01 is the dns-01 ACME challenge.
+	DNS_01 ACMEChallenge = "dns-01"
+	// TLS_ALPN_01 is the tls-alpn-01 ACME challenge.
+	TLS_ALPN_01 ACMEChallenge = "tls-alpn-01"
+	// DEVICE_ATTEST_01 is the device-attest-01 ACME challenge.
+	DEVICE_ATTEST_01 ACMEChallenge = "device-attest-01"
+)
+
+// String returns a normalized version of the challenge.
+func (c ACMEChallenge) String() string {
+	return strings.ToLower(string(c))
+}
+
+// Validate returns an error if the acme challenge is not a valid one.
+func (c ACMEChallenge) Validate() error {
+	switch ACMEChallenge(c.String()) {
+	case HTTP_01, DNS_01, TLS_ALPN_01, DEVICE_ATTEST_01:
+		return nil
+	default:
+		return fmt.Errorf("acme challenge %q is not supported", c)
+	}
+}
 
 // ACME is the acme provisioner type, an entity that can authorize the ACME
 // provisioning flow.
@@ -22,9 +53,13 @@ type ACME struct {
 	// by clients when creating a new Account. If set to true, the provided
 	// EAB will be verified. If set to false and an EAB is provided, it is
 	// not verified. Defaults to false.
-	RequireEAB bool     `json:"requireEAB,omitempty"`
-	Claims     *Claims  `json:"claims,omitempty"`
-	Options    *Options `json:"options,omitempty"`
+	RequireEAB bool `json:"requireEAB,omitempty"`
+	// Challenges contains the enabled challenges for this provisioner. If this
+	// value is not set the default http-01, dns-01 and tls-alpn-01 challenges
+	// will be enabled, device-attest-01 will be disabled.
+	Challenges []ACMEChallenge `json:"challenges,omitempty"`
+	Claims     *Claims         `json:"claims,omitempty"`
+	Options    *Options        `json:"options,omitempty"`
 
 	ctl *Controller
 }
@@ -81,6 +116,12 @@ func (p *ACME) Init(config Config) (err error) {
 		return errors.New("provisioner type cannot be empty")
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
+	}
+
+	for _, c := range p.Challenges {
+		if err := c.Validate(); err != nil {
+			return err
+		}
 	}
 
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
@@ -162,4 +203,22 @@ func (p *ACME) AuthorizeRevoke(ctx context.Context, token string) error {
 // certificate was configured to allow renewals.
 func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	return p.ctl.AuthorizeRenew(ctx, cert)
+}
+
+// IsChallengeEnabled checks if the given challenge is enabled. By default
+// http-01, dns-01 and tls-alpn-01 are enabled, to disable any of them the
+// Challenge provisioner property should have at least one element.
+func (p *ACME) IsChallengeEnabled(ctx context.Context, challenge ACMEChallenge) bool {
+	enabledChallenges := []ACMEChallenge{
+		HTTP_01, DNS_01, TLS_ALPN_01,
+	}
+	if len(p.Challenges) > 0 {
+		enabledChallenges = p.Challenges
+	}
+	for _, ch := range enabledChallenges {
+		if strings.EqualFold(string(ch), string(challenge)) {
+			return true
+		}
+	}
+	return false
 }

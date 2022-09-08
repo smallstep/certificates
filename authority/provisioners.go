@@ -753,6 +753,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			Name:       p.Name,
 			ForceCN:    cfg.ForceCn,
 			RequireEAB: cfg.RequireEab,
+			Challenges: challengesToCertificates(cfg.Challenges),
 			Claims:     claims,
 			Options:    options,
 		}, nil
@@ -1001,7 +1002,8 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Details: &linkedca.ProvisionerDetails{
 				Data: &linkedca.ProvisionerDetails_ACME{
 					ACME: &linkedca.ACMEProvisioner{
-						ForceCn: p.ForceCN,
+						ForceCn:    p.ForceCN,
+						Challenges: challengesToLinkedca(p.Challenges),
 					},
 				},
 			},
@@ -1121,4 +1123,42 @@ func parseInstanceAge(age string) (provisioner.Duration, error) {
 		instanceAge = *iap
 	}
 	return instanceAge, nil
+}
+
+// challengesToCertificates converts linkedca challenges to provisioner ones
+// skipping the unknown ones.
+func challengesToCertificates(challenges []linkedca.ACMEProvisioner_ChallengeType) []provisioner.ACMEChallenge {
+	ret := make([]provisioner.ACMEChallenge, 0, len(challenges))
+	for _, ch := range challenges {
+		switch ch {
+		case linkedca.ACMEProvisioner_HTTP_01:
+			ret = append(ret, provisioner.HTTP_01)
+		case linkedca.ACMEProvisioner_DNS_01:
+			ret = append(ret, provisioner.DNS_01)
+		case linkedca.ACMEProvisioner_TLS_ALPN_O1:
+			ret = append(ret, provisioner.TLS_ALPN_01)
+		case linkedca.ACMEProvisioner_DEVICE_ATTEST_01:
+			ret = append(ret, provisioner.DEVICE_ATTEST_01)
+		}
+	}
+	return ret
+}
+
+// challengesToLinkedca converts provisioner challenges to linkedca ones
+// skipping the unknown ones.
+func challengesToLinkedca(challenges []provisioner.ACMEChallenge) []linkedca.ACMEProvisioner_ChallengeType {
+	ret := make([]linkedca.ACMEProvisioner_ChallengeType, 0, len(challenges))
+	for _, ch := range challenges {
+		switch provisioner.ACMEChallenge(ch.String()) {
+		case provisioner.HTTP_01:
+			ret = append(ret, linkedca.ACMEProvisioner_HTTP_01)
+		case provisioner.DNS_01:
+			ret = append(ret, linkedca.ACMEProvisioner_DNS_01)
+		case provisioner.TLS_ALPN_01:
+			ret = append(ret, linkedca.ACMEProvisioner_TLS_ALPN_O1)
+		case provisioner.DEVICE_ATTEST_01:
+			ret = append(ret, linkedca.ACMEProvisioner_DEVICE_ATTEST_01)
+		}
+	}
+	return ret
 }

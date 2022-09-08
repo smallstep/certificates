@@ -71,6 +71,7 @@ type Provisioner interface {
 	AuthorizeOrderIdentifier(ctx context.Context, identifier provisioner.ACMEIdentifier) error
 	AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error)
 	AuthorizeRevoke(ctx context.Context, token string) error
+	IsChallengeEnabled(ctx context.Context, challenge provisioner.ACMEChallenge) bool
 	GetID() string
 	GetName() string
 	DefaultTLSCertDuration() time.Duration
@@ -109,6 +110,7 @@ type MockProvisioner struct {
 	MauthorizeOrderIdentifier func(ctx context.Context, identifier provisioner.ACMEIdentifier) error
 	MauthorizeSign            func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	MauthorizeRevoke          func(ctx context.Context, token string) error
+	MisChallengeEnabled       func(Ctx context.Context, challenge provisioner.ACMEChallenge) bool
 	MdefaultTLSCertDuration   func() time.Duration
 	MgetOptions               func() *provisioner.Options
 }
@@ -143,6 +145,14 @@ func (m *MockProvisioner) AuthorizeRevoke(ctx context.Context, token string) err
 		return m.MauthorizeRevoke(ctx, token)
 	}
 	return m.Merr
+}
+
+// AuthorizeChallenge mock
+func (m *MockProvisioner) IsChallengeEnabled(ctx context.Context, challenge provisioner.ACMEChallenge) bool {
+	if m.MisChallengeEnabled != nil {
+		return m.MisChallengeEnabled(ctx, challenge)
+	}
+	return m.Merr == nil
 }
 
 // DefaultTLSCertDuration mock

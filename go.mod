@@ -13,11 +13,9 @@ require (
 	github.com/ThalesIgnite/crypto11 v1.2.5 // indirect
 	github.com/aws/aws-sdk-go v1.44.37 // indirect
 	github.com/dgraph-io/ristretto v0.0.4-0.20200906165740-41ebdbffecfd // indirect
-	github.com/fatih/color v1.9.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.4.0
 	github.com/go-chi/chi v4.1.2+incompatible
-	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-piv/piv-go v1.10.0 // indirect
-	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.8
 	github.com/google/uuid v1.3.0
@@ -41,8 +39,8 @@ require (
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.4
-	go.step.sm/crypto v0.18.0
-	go.step.sm/linkedca v0.18.0
+	go.step.sm/crypto v0.19.0
+	go.step.sm/linkedca v0.18.1-0.20220824000236-47827c8eb300
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
@@ -80,7 +78,10 @@ require (
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/fatih/color v1.7.0 // indirect
+	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.0 // indirect
+	github.com/go-sql-driver/mysql v1.5.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
@@ -133,6 +134,7 @@ require (
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/thales-e-security/pool v0.0.2 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect

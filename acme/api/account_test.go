@@ -41,6 +41,10 @@ func (*fakeProvisioner) AuthorizeSign(ctx context.Context, token string) ([]prov
 	return nil, nil
 }
 
+func (*fakeProvisioner) IsChallengeEnabled(ctx context.Context, challenge provisioner.ACMEChallenge) bool {
+	return true
+}
+
 func (*fakeProvisioner) AuthorizeRevoke(ctx context.Context, token string) error { return nil }
 func (*fakeProvisioner) GetID() string                                           { return "" }
 func (*fakeProvisioner) GetName() string                                         { return "" }

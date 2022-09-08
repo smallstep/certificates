@@ -506,7 +506,7 @@ func TestChallenge_Validate(t *testing.T) {
 			}
 
 			ctx := NewClientContext(context.Background(), tc.vc)
-			if err := tc.ch.Validate(ctx, tc.db, tc.jwk); err != nil {
+			if err := tc.ch.Validate(ctx, tc.db, tc.jwk, nil); err != nil {
 				if assert.NotNil(t, tc.err) {
 					switch k := err.(type) {
 					case *Error:
