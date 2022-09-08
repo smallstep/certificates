@@ -326,7 +326,6 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return WrapErrorISE(err, "error unmarshalling JSON")
 	}
-	fmt.Println(string(payload))
 	if p.Error != "" {
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"payload contained error: %v", p.Error))
@@ -341,9 +340,6 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	if err := cbor.Unmarshal(attObj, &att); err != nil {
 		return WrapErrorISE(err, "error unmarshalling CBOR")
 	}
-
-	b, _ := json.Marshal(att)
-	fmt.Println(string(b))
 
 	switch att.Format {
 	case "apple":
@@ -379,7 +375,6 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		if err != nil {
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
-				fmt.Printf("debug: %#v\n", acmeError)
 				if acmeError.Status == 500 {
 					return acmeError
 				}
